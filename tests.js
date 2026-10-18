@@ -14239,6 +14239,863 @@ test('RISK MANUAL JSON EXPORT: unreadable, unsupported and hydration-placeholder
   assert.deepEqual(validDownloads,[],'an aborted readonly snapshot stops without a partial file');
 });
 
+test('RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exact sources before explicit local adoption',async t=>{
+  const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb');
+  const indexedDB=new IDBFactory(),dbName='chain-scanner-file-restore-'+Date.now()+'-'+Math.random(),sharedStorage=sharedScannerStorage();
+  const app=await loadApp({sharedStorage,indexedDBProvider:indexedDB,deviceDbName:dbName}),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+  assert.ok(store,'the actual app opened its isolated durable-store fixture');
+  t.after(async()=>{await store.close();});
+  ctx.addTask('Current board task');await ctx.persist();
+  const currentBoardRaw=JSON.stringify(ctx.state),prospective=JSON.parse(currentBoardRaw);
+  const taskId=prospective.tasks[0].id,heldAt=Date.now()-60_000,largeUnicodeUnknownField='🌿 café 🧭 '.repeat(180_000);
+  prospective.settings.workedHours=16;prospective.considered[taskId]='worked';prospective.workedAt[taskId]=heldAt;
+  prospective.tasks[0].title='Restored file task';
+  prospective.tasks[0].url='https://example.test/restore?a=1&b=2';
+  prospective.tasks[0].futureFileField={keep:'opaque <value> & data',sequence:[1,'🌿']};
+  prospective.futureFileBoardField={keep:true,tag:'<script> stays data',trace:largeUnicodeUnknownField};
+  const fileBytes=new TextEncoder().encode('\uFEFF \n'+JSON.stringify(prospective,null,2)+'\n');
+  const file=new File([fileBytes],'backup <selected>.json',{type:'application/json',lastModified:1760792400000});
+  const primaryWrites=[],commitHead=store.commitHead.bind(store);
+  store.commitHead=(...args)=>{primaryWrites.push(args[0]);return commitHead(...args);};
+
+  ctx.openSettings();
+  const settings=shim.document.getElementById('modalRoot').innerHTML;
+  const restoreAction=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);
+  assert.ok(restoreAction,'Settings exposes the clearly named backup-file restore action');
+  assert.match(settings,/<input\b(?=[^>]*type="file")(?=[^>]*id="restoreBackupFile")[^>]*>/,'the action uses a native JSON file input');
+  const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;
+  let pickerOpened=0;input.click=()=>{pickerOpened++;};
+  const originalGet=shim.document.getElementById.bind(shim.document);
+  shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
+  const cloudPushCalls=[],originalPush=ctx.window.CloudSync?.push?.bind(ctx.window.CloudSync);
+  if(originalPush)ctx.window.CloudSync.push=(...args)=>{cloudPushCalls.push(args);return originalPush(...args);};
+  async function selectFile(selected){
+    input.files=[selected];shim.document.dispatchEvent({type:'change',target:input});
+    for(let attempt=0;attempt<100&&!shim.document.getElementById('modalRoot').innerHTML.includes('data-act="confirm-file-restore"');attempt++)await flush();
+    return shim.document.getElementById('modalRoot').innerHTML;
+  }
+  await ctx.onAction(restoreAction[1],{});
+  assert.equal(pickerOpened,1,'the Settings action opens the native file picker');
+  const preview=await selectFile(file);
+  const confirm=preview.match(/<button\b[^>]*data-act="confirm-file-restore"[^>]*>/)?.[0];
+  assert.ok(confirm,'the supported file reaches a preview with an explicit restore confirmation; '+shim.document.getElementById('toast').textContent);
+  assert.doesNotMatch(confirm,/\sdisabled(?:\s|>|=)/,'confirmation is enabled only after the required source copies verify');
+  assert.match(preview,/backup &lt;selected&gt;\.json/,'the selected filename is escaped in the preview');
+  assert.match(preview,/Current board task/);assert.match(preview,/Restored file task/);
+  assert.match(preview,/opaque &lt;value&gt; &amp; data/,'unknown fields are previewed as data, not markup');
+  assert.equal(JSON.stringify(ctx.state),currentBoardRaw,'selection and preview leave the live board unchanged');
+  assert.deepEqual(primaryWrites,[],'selection and preview do not replace the durable board');
+  const backups=await store.listBackups(),currentCopy=backups.find(row=>row.kind==='before-file-restore'&&row.payload===currentBoardRaw),fileCopy=backups.find(row=>row.kind==='restore-file-source');
+  assert.ok(currentCopy,'the exact current board has a durable recovery copy');
+  assert.ok(fileCopy,'the selected file has a durable recovery copy');
+  assert.equal(fileCopy.restoreFile?.format,'chain-scanner.restore-file-source');
+  assert.equal(fileCopy.restoreFile?.formatVersion,1);
+  assert.equal(fileCopy.restoreFile?.fileName,file.name);
+  assert.equal(fileCopy.restoreFile?.byteLength,fileBytes.byteLength);
+  assert.ok(fileBytes.byteLength>2_000_000,'the exact-file fixture crosses the multi-megabyte boundary');
+  assert.deepEqual(Buffer.from(fileCopy.restoreFile?.bytesBase64||'','base64'),Buffer.from(fileBytes),'file recovery readback preserves the original BOM, whitespace and UTF-8 bytes');
+
+  await ctx.onAction('cancel-file-restore',{});
+  assert.equal(JSON.stringify(ctx.state),currentBoardRaw,'Cancel leaves the current board unchanged');
+  assert.deepEqual(primaryWrites,[],'Cancel does not replace the durable board');
+  assert.deepEqual(cloudPushCalls,[],'selecting, previewing and cancelling do not upload');
+  await ctx.onAction(restoreAction[1],{});assert.equal(pickerOpened,2);
+  const confirmedPreview=await selectFile(file);
+  assert.match(confirmedPreview,/data-act="confirm-file-restore"/);
+
+  await ctx.onAction('confirm-file-restore',{});
+  for(let attempt=0;attempt<100&&ctx.state.tasks?.[0]?.title!=='Restored file task';attempt++)await flush();
+  assert.equal(ctx.state.tasks[0].title,'Restored file task','explicit confirmation adopts the prepared board locally');
+  assert.equal(ctx.state.tasks[0].url,'https://example.test/restore?a=1&b=2');
+  assert.deepEqual(ctx.state.tasks[0].futureFileField,{keep:'opaque <value> & data',sequence:[1,'🌿']});
+  assert.deepEqual(ctx.state.futureFileBoardField,{keep:true,tag:'<script> stays data',trace:largeUnicodeUnknownField});
+  assert.equal(ctx.state.considered[taskId],'worked','a live timed hold remains part of the restored board');
+  assert.equal(ctx.state.workedAt[taskId],heldAt,'the timed hold keeps its original start time');
+  assert.ok(primaryWrites.length>0,'local adoption uses the guarded durable-head commit');
+  assert.ok((await store.listBackups()).some(row=>row.kind==='restore-file-source'&&row.restoreFile?.bytesBase64===Buffer.from(fileBytes).toString('base64')),'the exact file evidence remains after adoption');
+  await store.close();
+  const reopened=await loadApp({sharedStorage,indexedDBProvider:indexedDB,deviceDbName:dbName});
+  assert.equal(reopened.ctx.state.tasks[0].title,'Restored file task','the locally restored board survives a cold reopen');
+  assert.deepEqual(reopened.ctx.state.tasks[0].futureFileField,{keep:'opaque <value> & data',sequence:[1,'🌿']});
+  assert.equal(reopened.ctx.state.futureFileBoardField.trace,largeUnicodeUnknownField);
+  assert.equal(reopened.ctx.state.workedAt[taskId],heldAt,'the timed hold survives a cold reopen');
+  const reopenedStore=reopened.ctx.window.ScannerDeviceStore,rotatingHead=await reopenedStore.readHead();
+  const staleAt=Date.now()-10*86400000;
+  await reopenedStore.putBackup({expectedHash:rotatingHead.hash,backup:{id:'daily-old-file-restore-fixture',day:new Date(staleAt).toISOString().slice(0,10),at:staleAt,kind:'daily',payload:currentBoardRaw}});
+  await reopened.ctx.refreshDeviceBackupCache();assert.equal(await reopened.ctx.persist(),true,'ordinary save and automatic backup rotation complete');
+  assert.ok((await reopenedStore.listBackups()).some(row=>row.id===fileCopy.id&&row.restoreFile?.bytesBase64===fileCopy.restoreFile.bytesBase64),
+    'automatic backup rotation retains the exact selected-file metadata and bytes');
+
+  reopened.ctx.openSettings();
+  const reopenedSettings=reopened.shim.document.getElementById('modalRoot').innerHTML;
+  const reopenedAction=reopenedSettings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);
+  assert.ok(reopenedAction,'the same Settings control remains available after reopen');
+  const archiveInput=makeFakeElement();archiveInput.id='restoreBackupFile';archiveInput.files=[];archiveInput.matches=()=>false;
+  const reopenedGet=reopened.shim.document.getElementById.bind(reopened.shim.document);
+  reopened.shim.document.getElementById=id=>id==='restoreBackupFile'?archiveInput:reopenedGet(id);
+  let archivePickerOpens=0;archiveInput.click=()=>{archivePickerOpens++;};
+  async function selectReopenedFile(selected){
+    archiveInput.files=[selected];reopened.shim.document.dispatchEvent({type:'change',target:archiveInput});
+    for(let attempt=0;attempt<100&&!reopened.shim.document.getElementById('modalRoot').innerHTML.includes('data-act="confirm-file-restore"');attempt++)await flush();
+    return reopened.shim.document.getElementById('modalRoot').innerHTML;
+  }
+  const archiveBoard=JSON.parse(JSON.stringify(reopened.ctx.state));
+  archiveBoard.tasks=[{...archiveBoard.tasks[0],id:'archive-current-board',title:'Archive currentBoard task'}];
+  archiveBoard.considered={};archiveBoard.workedAt={};
+  const archive={format:'chain-scanner.recovery-archive',formatVersion:1,capturedAt:new Date().toISOString(),currentBoard:archiveBoard,
+    manifest:{status:'complete',consistency:'single-readonly-idb-transaction-and-unchanged-live-sources',sources:{
+      currentBoard:{status:'included',format:'existing-board-json'},localStorage:{},
+      indexedDB:{database:'chain-scanner-v2',schemaVersion:2,stores:{meta:{status:'included',rowCount:0},snapshots:{status:'included',rowCount:0},backups:{status:'included',rowCount:1},opaque:{status:'included',rowCount:0}}}},failures:[]},
+    appSources:{localStorage:[],indexedDB:{database:'chain-scanner-v2',stores:{meta:[],snapshots:[],
+      backups:[{key:{type:'string',value:'pending-upload'},value:{type:'object',value:{task:{id:'pending-queue-task',title:'Pending queue task'}}}}],opaque:[]}}}};
+  const archiveBytes=new TextEncoder().encode(JSON.stringify(archive,null,2)),archiveFile=new File([archiveBytes],'recovery <archive>.json',{type:'application/json'});
+  await reopened.ctx.onAction(reopenedAction[1],{});assert.equal(archivePickerOpens,1);
+  const archivePreview=await selectReopenedFile(archiveFile);
+  assert.match(archivePreview,/Only its ordinary <code>currentBoard<\/code> can be restored/);
+  assert.doesNotMatch(archivePreview,/pending-queue-task|Pending queue task/,'raw pending appSources are not rendered as an adopted-board task');
+  assert.equal(reopened.ctx.state.tasks[0].title,'Restored file task','archive preview does not apply its currentBoard early');
+  await reopened.ctx.onAction('confirm-file-restore',{});
+  for(let attempt=0;attempt<100&&reopened.ctx.state.tasks?.[0]?.title!=='Archive currentBoard task';attempt++)await flush();
+  assert.deepEqual(Array.from(reopened.ctx.state.tasks,task=>task.id),['archive-current-board'],'only the explicit ordinary currentBoard is adopted');
+  assert.doesNotMatch(JSON.stringify(reopened.ctx.state),/pending-queue-task|Pending queue task/,'raw pending appSources are never replayed');
+
+  const heldHead=await reopenedStore.readHead(),incomplete={...archive,manifest:{...archive.manifest,status:'partial',failures:[{source:'indexedDB.backups',status:'error'}]}};
+  const incompleteFile=new File([JSON.stringify(incomplete)],'incomplete.json',{type:'application/json'});
+  const pickerBefore=archivePickerOpens;await reopened.ctx.onAction(reopenedAction[1],{});assert.equal(archivePickerOpens,pickerBefore+1);
+  const priorToast=reopened.shim.document.getElementById('toast').textContent;reopened.shim.document.getElementById('toast').textContent='';
+  await selectReopenedFile(incompleteFile);
+  for(let attempt=0;attempt<100&&!reopened.shim.document.getElementById('toast').textContent.includes('incomplete');attempt++)await flush();
+  assert.match(reopened.shim.document.getElementById('toast').textContent,/incomplete/,'partial archives stop with an honest source error');
+  assert.deepEqual(await reopenedStore.readHead(),heldHead,'an incomplete archive cannot replace the saved board');
+  assert.deepEqual(Array.from(reopened.ctx.state.tasks,task=>task.id),['archive-current-board'],'an incomplete archive leaves the live board unchanged');
+  assert.notEqual(priorToast,reopened.shim.document.getElementById('toast').textContent);
+  t.after(async()=>{await reopened.ctx.window.ScannerDeviceStore.close();});
+  reopened.ctx.openHelp();
+  const help=reopened.shim.document.getElementById('modalRoot').innerHTML;
+  const restoreFaq=help.match(/<dt>How do backups and Restore work\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
+  assert.ok(restoreFaq,'the extended FAQ explains file restore');
+  assert.ok(restoreFaq.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the Restore FAQ keeps its word limit');
+  assert.match(restoreFaq,/exact bytes.*current board.*preview/);
+  assert.match(restoreFaq,/Cancel or close during source checks stops before adoption/);
+  assert.match(restoreFaq,/Archives apply only their current board.*offline or held sync leaves the board unchanged/);
+  assert.match(html,/Settings can restore a board JSON file with an explicit preview/,'the current changelog source explains guarded file restore');
+});
+
+test('RISK BACKUP FILE RESTORE: a signed-in file waits for explicit CAS and exact cloud acknowledgement',async t=>{
+  const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb');
+  const indexedDB=new IDBFactory(),dbName='chain-scanner-bound-file-restore-'+Date.now()+'-'+Math.random();
+  const currentBoard=syncState({tasks:[syncTask('bound-file-task','Cloud current task')],chain:['bound-file-task'],candidateId:'bound-file-task'});
+  const cloud=makeSyncHarness({remote:currentBoard,rev:4,delayMs:1});let backend,epoch=3,pending=false;
+  const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(currentBoard),[LOCAL_HEAD_KEY]:JSON.stringify(currentBoard)},
+    indexedDBProvider:indexedDB,deviceDbName:dbName,cloudSyncFactory:()=>{
+      backend=cloud.factory();
+      backend.recoveryIdentity=()=>backend.user==='e@example.com'?'uid-file-restore':null;
+      backend.recoveryEvidence=async()=>({identity:backend.recoveryIdentity(),epoch,pending});
+      return backend;
+    }});
+  const {ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+  t.after(async()=>{await store?.close?.();});
+  await ctx.cloudPull();
+  await syncSettle(10);
+  assert.equal(ctx.state.syncAccount,'e@example.com','the fixture first reconciles the saved board to its signed-in account');
+  assert.equal(ctx.state.syncRev,cloud.doc.rev,'the source and cloud fixture have reached the same reconciled revision');
+  const sourceRevision=ctx.state.syncRev;
+  const sourceRaw=JSON.stringify(ctx.state),before=await store.readHead(),primaryWrites=[],commitHead=store.commitHead.bind(store);
+  store.commitHead=(...args)=>{primaryWrites.push(args[0]);return commitHead(...args);};
+  const pushBases=[],push=backend.push.bind(backend);
+  backend.push=(...args)=>{pushBases.push(args[2]);return push(...args);};
+  cloud.calls.length=0;
+
+  const selected=JSON.parse(sourceRaw);selected.tasks[0].title='Explicitly confirmed cloud file';
+  const file=new File([JSON.stringify(selected)],'account-board.json',{type:'application/json'});
+  ctx.openSettings();
+  const settings=shim.document.getElementById('modalRoot').innerHTML;
+  const action=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);
+  assert.ok(action,'the account-bound route begins at the actual Settings control');
+  const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;
+  const originalGet=shim.document.getElementById.bind(shim.document);
+  shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
+  input.click=()=>{};
+  await ctx.onAction(action[1],{});
+  input.files=[file];shim.document.dispatchEvent({type:'change',target:input});
+  for(let attempt=0;attempt<100&&!shim.document.getElementById('modalRoot').innerHTML.includes('data-act="confirm-file-restore"');attempt++)await flush();
+  const preview=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(preview,/fresh cloud read and exact server readback are required/,shim.document.getElementById('toast').textContent);
+  assert.doesNotMatch(preview.match(/<button\b[^>]*data-act="confirm-file-restore"[^>]*>/)?.[0]||'',/\sdisabled(?:\s|>|=)/);
+  assert.deepEqual(cloud.calls,[],'file selection and preview perform no cloud read or write');
+  assert.deepEqual(primaryWrites,[],'preview leaves the reconciled durable board head unchanged');
+  assert.equal(JSON.stringify(ctx.state),sourceRaw);
+  assert.equal((await store.readHead()).hash,before.hash);
+  assert.ok((await store.listBackups()).some(row=>row.kind==='before-file-restore'&&row.payload===sourceRaw));
+  assert.ok((await store.listBackups()).some(row=>row.kind==='restore-file-source'&&row.payload===sourceRaw));
+
+  await ctx.onAction('confirm-file-restore',{});
+  for(let attempt=0;attempt<100&&ctx.state.tasks?.[0]?.title!=='Explicitly confirmed cloud file';attempt++)await flush();
+  assert.equal(ctx.state.tasks[0].title,'Explicitly confirmed cloud file');
+  assert.equal(cloud.calls.join(','),'pull,push,pull','confirmation uses fresh source read, conditional save and exact acknowledgement readback');
+  assert.deepEqual(pushBases,[sourceRevision],'the conditional cloud save is based on the reconciled revision');
+  assert.equal(cloud.doc.rev,sourceRevision+1);
+  assert.equal(cloud.remoteState().tasks[0].title,'Explicitly confirmed cloud file');
+  assert.equal(ctx.state.syncAccount,'e@example.com');assert.equal(ctx.state.syncRev,sourceRevision+1);assert.equal(ctx.state.syncDirty,false);
+  const committed=await store.readHead();assert.equal(committed.payload,JSON.stringify(ctx.state));
+  assert.notEqual(committed.hash,before.hash);
+
+  const acknowledgedRaw=JSON.stringify(ctx.state),acknowledgedHead=await store.readHead();
+  const uncertain=JSON.parse(acknowledgedRaw);uncertain.tasks[0].title='Cloud write with mismatched readback';
+  const uncertainFile=new File([JSON.stringify(uncertain)],'uncertain-account-board.json',{type:'application/json'});
+  const exactPull=backend.pull.bind(backend);let pullCount=0;
+  backend.pull=async()=>{const response=await exactPull();pullCount++;return pullCount===2?{...response,payload:JSON.stringify({...uncertain,tasks:[{...uncertain.tasks[0],title:'Different acknowledged payload'}]})}:response;};
+  cloud.calls.length=0;pushBases.length=0;
+  await ctx.onAction(action[1],{});input.files=[uncertainFile];shim.document.dispatchEvent({type:'change',target:input});
+  for(let attempt=0;attempt<100&&!shim.document.getElementById('modalRoot').innerHTML.includes('data-act="confirm-file-restore"');attempt++)await flush();
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="confirm-file-restore"/);
+  assert.equal(JSON.stringify(ctx.state),acknowledgedRaw,'the second preview still leaves the previously confirmed board live');
+  await ctx.onAction('confirm-file-restore',{});
+  assert.equal(cloud.calls.join(','),'pull,push,pull','the uncertain acknowledgement follows the same guarded publication steps');
+  assert.deepEqual(pushBases,[sourceRevision+1]);
+  assert.equal(JSON.stringify(ctx.state),acknowledgedRaw,'a mismatched exact readback cannot apply the prospective board locally');
+  assert.equal((await store.readHead()).hash,acknowledgedHead.hash,'the previous durable head remains active when acknowledgement differs');
+  assert.equal(cloud.remoteState().tasks[0].title,'Cloud write with mismatched readback','the fake cloud write landed but its mismatched readback remains explicitly unconfirmed');
+  assert.match(shim.document.getElementById('toast').textContent,/exact saved board could not be verified/);
+  assert.ok((await store.listBackups()).some(row=>row.kind==='restore-file-source'&&row.restoreFile?.fileName==='uncertain-account-board.json'));
+});
+
+test('RISK BACKUP FILE RESTORE: account-bound files stay protected while cloud is unavailable',async t=>{
+  const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb');
+  const indexedDB=new IDBFactory(),dbName='chain-scanner-held-file-restore-'+Date.now()+'-'+Math.random();
+  const board=syncState({tasks:[syncTask('held-file-task','Account-bound current task')],syncAccount:'e@example.com',syncRev:7,syncDirty:false});
+  const calls=[],backend={configured:true,ready:false,user:'e@example.com',status:'syncing',recoveryIdentity:()=> 'uid-held-file',
+    async recoveryEvidence(){return {identity:'uid-held-file',epoch:1,pending:false};},async pull(){calls.push('pull');return {error:true};},async push(){calls.push('push');return {error:true};}};
+  const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(board),[LOCAL_HEAD_KEY]:JSON.stringify(board)},indexedDBProvider:indexedDB,deviceDbName:dbName,cloudSyncFactory:()=>backend});
+  const {ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+  t.after(async()=>{await store?.close?.();});
+  const sourceRaw=JSON.stringify(ctx.state),head=await store.readHead(),primaryWrites=[],commitHead=store.commitHead.bind(store);
+  store.commitHead=(...args)=>{primaryWrites.push(args[0]);return commitHead(...args);};
+  const selected=JSON.parse(sourceRaw);selected.tasks[0].title='Offline prospective account board';
+  const file=new File([JSON.stringify(selected)],'offline-account-board.json',{type:'application/json'});
+  ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
+  const action=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);
+  assert.ok(action);
+  const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
+  const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
+  await ctx.onAction(action[1],{});input.files=[file];shim.document.dispatchEvent({type:'change',target:input});
+  for(let attempt=0;attempt<100&&!shim.document.getElementById('modalRoot').innerHTML.includes('data-act="confirm-file-restore"');attempt++)await flush();
+  const preview=shim.document.getElementById('modalRoot').innerHTML,confirm=preview.match(/<button\b[^>]*data-act="confirm-file-restore"[^>]*>/)?.[0]||'';
+  assert.match(preview,/cloud session is not ready/,'the account-bound route explains the offline hold');
+  assert.match(confirm,/\sdisabled(?:\s|>|=)/,'offline signed-in restore cannot be confirmed');
+  assert.deepEqual(calls,[],'file selection and preview do not contact the cloud');
+  assert.deepEqual(primaryWrites,[],'the file stays a backup while the active durable head remains unchanged');
+  assert.equal(JSON.stringify(ctx.state),sourceRaw);
+  assert.equal((await store.readHead()).hash,head.hash);
+  assert.ok((await store.listBackups()).some(row=>row.kind==='before-file-restore'&&row.payload===sourceRaw));
+  assert.ok((await store.listBackups()).some(row=>row.kind==='restore-file-source'&&row.payload===sourceRaw&&row.restoreFile?.fileName===file.name));
+  await ctx.onAction('confirm-file-restore',{});
+  assert.equal(JSON.stringify(ctx.state),sourceRaw);assert.equal((await store.readHead()).hash,head.hash);
+  assert.deepEqual(calls,[]);assert.deepEqual(primaryWrites,[]);
+});
+
+test('RISK BACKUP FILE RESTORE: IDB authority does not hide changed legacy board copies',async t=>{
+  const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb');
+  for(const key of [LOCAL_HEAD_KEY,STORE_KEY])await t.test(key,async sub=>{
+    const indexedDB=new IDBFactory(),sharedStorage=sharedScannerStorage(),dbName='chain-scanner-file-legacy-race-'+Date.now()+'-'+Math.random();
+    const {ctx,shim}=await loadApp({sharedStorage,indexedDBProvider:indexedDB,deviceDbName:dbName}),store=ctx.window.ScannerDeviceStore;
+    sub.after(async()=>{await store?.close?.();});
+    ctx.addTask('Accepted current board');await ctx.persist();
+    assert.ok(ctx.window.ScannerDeviceStore,'the fixture uses an already-open authoritative IndexedDB store');
+    const currentRaw=JSON.stringify(ctx.state),before=await store.readHead(),next=JSON.parse(currentRaw);
+    next.tasks[0].title='Prospective file board';
+    const file=new File([JSON.stringify(next)],'legacy-race.json',{type:'application/json'}),writes=[],commit=store.commitHead.bind(store);
+    store.commitHead=options=>{writes.push(options);return commit(options);};
+    ctx.openSettings();const markup=shim.document.getElementById('modalRoot').innerHTML;
+    const action=markup.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);
+    assert.ok(action,'the race starts from the real Settings control');
+    const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
+    const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
+    await ctx.onAction(action[1],{});input.files=[file];shim.document.dispatchEvent({type:'change',target:input});
+    for(let attempt=0;attempt<100&&!shim.document.getElementById('modalRoot').innerHTML.includes('data-act="confirm-file-restore"');attempt++)await flush();
+    assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="confirm-file-restore"/,'the real native-file route reaches its guarded preview');
+    const changed=JSON.parse(currentRaw);changed.otherTabLegacyCopy=key;shim.localStorage.setItem(key,JSON.stringify(changed));
+    await ctx.onAction('confirm-file-restore',{});
+    assert.equal(ctx.state.tasks[0].title,'Accepted current board',`a changed ${key} copy must hold stale consent`);
+    assert.equal((await store.readHead()).hash,before.hash,'the durable IDB head stays unchanged');
+    assert.equal(writes.some(options=>JSON.parse(options.payload).tasks?.[0]?.title==='Prospective file board'),false,
+      `the ${key} race is rejected before the prospective board is offered to commitHead`);
+    assert.ok((await store.listBackups()).some(row=>row.kind==='before-file-restore'&&row.payload===currentRaw),
+      'the saved current-board copy remains available after the hold');
+    assert.ok((await store.listBackups()).some(row=>row.kind==='restore-file-source'&&row.restoreFile?.fileName===file.name),
+      'the exact selected-file copy remains available after the hold');
+  });
+});
+
+test('RISK BACKUP FILE RESTORE: source changes during final awaited copy readback never reach the primary commit',async t=>{
+  const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb');
+  const indexedDB=new IDBFactory(),dbName='chain-scanner-file-final-readback-race-'+Date.now()+'-'+Math.random();
+  const {ctx,shim}=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName}),store=ctx.window.ScannerDeviceStore;
+  t.after(async()=>{await store?.close?.();});
+  ctx.addTask('Board before asynchronous copy readback');await ctx.persist();
+  const currentRaw=JSON.stringify(ctx.state),before=await store.readHead(),next=JSON.parse(currentRaw);
+  next.tasks[0].title='Stale consent must not commit';
+  const file=new File([JSON.stringify(next)],'final-readback-race.json',{type:'application/json'}),writes=[],commit=store.commitHead.bind(store);
+  store.commitHead=options=>{writes.push(options);return commit(options);};
+  ctx.openSettings();const markup=shim.document.getElementById('modalRoot').innerHTML;
+  const action=markup.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);
+  assert.ok(action,'the race starts from the real Settings control');
+  const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
+  const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
+  await ctx.onAction(action[1],{});input.files=[file];shim.document.dispatchEvent({type:'change',target:input});
+  for(let attempt=0;attempt<100&&!shim.document.getElementById('modalRoot').innerHTML.includes('data-act="confirm-file-restore"');attempt++)await flush();
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="confirm-file-restore"/);
+  const list=store.listBackups.bind(store);let readbacks=0;
+  store.listBackups=async(...args)=>{
+    const rows=await list(...args);readbacks++;
+    if(readbacks===2){ctx.state.unsubmittedDraftMarker='changed while final backup readback was pending';shim.document.getElementById('addInput').value='Unsubmitted draft changed during confirmation';}
+    return rows;
+  };
+  await ctx.onAction('confirm-file-restore',{});
+  assert.ok(readbacks>=2,'confirmation rechecks both protected copies at its final local-adoption boundary');
+  assert.equal(writes.some(options=>JSON.parse(options.payload).tasks?.[0]?.title==='Stale consent must not commit'),false,
+    'a state or draft change during the awaited readback is caught before the prospective primary head is attempted');
+  assert.equal(ctx.state.tasks[0].title,'Board before asynchronous copy readback');
+  assert.equal(ctx.state.unsubmittedDraftMarker,'changed while final backup readback was pending');
+  assert.equal(shim.document.getElementById('addInput').value,'Unsubmitted draft changed during confirmation');
+  assert.equal((await store.readHead()).hash,before.hash,'the original durable head remains active without a transient prospective write');
+  assert.ok((await list()).some(row=>row.kind==='before-file-restore'&&row.payload===currentRaw),'the original board copy remains readable');
+  assert.ok((await list()).some(row=>row.kind==='restore-file-source'&&row.restoreFile?.fileName===file.name),'the selected bytes remain readable');
+});
+
+test('RISK BACKUP FILE RESTORE: state, device-head, and draft-only changes expire preview consent',async t=>{
+  const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb');
+  for(const changedSource of ['current board only','durable device head only','quick-add draft only'])await t.test(changedSource,async sub=>{
+    const indexedDB=new IDBFactory(),dbName='chain-scanner-file-stale-source-'+Date.now()+'-'+Math.random();
+    const {ctx,shim}=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName}),store=ctx.window.ScannerDeviceStore;
+    sub.after(async()=>{await store?.close?.();});
+    ctx.addTask('Before stale-source preview');await ctx.persist();
+    const originalRaw=JSON.stringify(ctx.state),originalHead=await store.readHead(),prospective=JSON.parse(originalRaw);
+    prospective.tasks[0].title='Should not be committed';
+    const file=new File([JSON.stringify(prospective)],'stale-source.json',{type:'application/json'}),writes=[],commit=store.commitHead.bind(store);
+    store.commitHead=options=>{writes.push(options);return commit(options);};
+    ctx.openSettings();const markup=shim.document.getElementById('modalRoot').innerHTML;
+    const action=markup.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);
+    assert.ok(action,'the case begins from the Settings backup-file action');
+    const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
+    const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
+    await ctx.onAction(action[1],{});input.files=[file];shim.document.dispatchEvent({type:'change',target:input});
+    for(let attempt=0;attempt<100&&!shim.document.getElementById('modalRoot').innerHTML.includes('data-act="confirm-file-restore"');attempt++)await flush();
+    assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="confirm-file-restore"/,'selection reaches the actual file preview');
+    if(changedSource==='current board only')ctx.state.settings.theme='dark';
+    if(changedSource==='durable device head only'){
+      const peer=JSON.parse(originalHead.payload);peer.otherDeviceMarker='head changed after file preview';
+      assert.equal((await commit({expectedHash:originalHead.hash,payload:JSON.stringify(peer),account:null})).ok,true,'a peer commits an independent durable head');
+      writes.length=0;
+    }
+    if(changedSource==='quick-add draft only')shim.document.getElementById('addInput').value='Unsubmitted task draft';
+    await ctx.onAction('confirm-file-restore',{});
+    assert.equal(writes.some(options=>JSON.parse(options.payload).tasks?.[0]?.title==='Should not be committed'),false,
+      'a changed source expires the candidate before any primary-head offer');
+    if(changedSource==='current board only')assert.equal(ctx.state.settings.theme,'dark','the intervening state edit remains live');
+    if(changedSource==='durable device head only')assert.equal((await store.readHead()).payload.includes('head changed after file preview'),true,'the peer head remains active');
+    if(changedSource==='quick-add draft only'){
+      assert.equal(JSON.stringify(ctx.state),originalRaw,'the accepted board remains byte-for-byte unchanged');
+      assert.equal(shim.document.getElementById('addInput').value,'Unsubmitted task draft','the DOM-only draft remains untouched');
+    }
+  });
+});
+
+test('RISK BACKUP FILE RESTORE: cancel and file reselection bind confirmation to the newly selected bytes',async t=>{
+  const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb');
+  const indexedDB=new IDBFactory(),dbName='chain-scanner-file-reselection-'+Date.now()+'-'+Math.random();
+  const {ctx,shim}=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName}),store=ctx.window.ScannerDeviceStore;
+  t.after(async()=>{await store?.close?.();});
+  ctx.addTask('Current before reselection');await ctx.persist();
+  const sourceRaw=JSON.stringify(ctx.state),first=JSON.parse(sourceRaw),second=JSON.parse(sourceRaw);
+  first.tasks[0].title='Cancelled first file';second.tasks[0].title='Confirmed second file';
+  const firstFile=new File([JSON.stringify(first)],'cancelled-first.json',{type:'application/json'});
+  const secondFile=new File([JSON.stringify(second)],'confirmed-second.json',{type:'application/json'});
+  ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
+  const action=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);
+  assert.ok(action);
+  const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
+  const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
+  async function select(file){input.files=[file];shim.document.dispatchEvent({type:'change',target:input});for(let attempt=0;attempt<100&&!shim.document.getElementById('modalRoot').innerHTML.includes('data-act="confirm-file-restore"');attempt++)await flush();return shim.document.getElementById('modalRoot').innerHTML;}
+  await ctx.onAction(action[1],{});assert.match(await select(firstFile),/cancelled-first\.json/);
+  await ctx.onAction('cancel-file-restore',{});
+  await ctx.onAction('confirm-file-restore',{});
+  assert.equal(ctx.state.tasks[0].title,'Current before reselection','a detached confirmation after Cancel cannot use its former preview');
+  ctx.openSettings();const reopened=shim.document.getElementById('modalRoot').innerHTML;
+  const secondAction=reopened.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);assert.ok(secondAction);
+  await ctx.onAction(secondAction[1],{});assert.match(await select(secondFile),/confirmed-second\.json/);
+  await ctx.onAction('confirm-file-restore',{});
+  assert.equal(ctx.state.tasks[0].title,'Confirmed second file','only the current selection is adopted after explicit confirmation');
+  const rows=await store.listBackups();
+  assert.ok(rows.some(row=>row.kind==='restore-file-source'&&row.restoreFile?.fileName===firstFile.name));
+  assert.ok(rows.some(row=>row.kind==='restore-file-source'&&row.restoreFile?.fileName===secondFile.name));
+});
+
+test('RISK BACKUP FILE RESTORE: closing the preview cancels an in-flight source check before adoption',async t=>{
+  const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb');
+  const indexedDB=new IDBFactory(),dbName='chain-scanner-file-restore-cancel-pending-'+Date.now()+'-'+Math.random();
+  const {ctx,shim}=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName}),store=ctx.window.ScannerDeviceStore;
+  t.after(async()=>{await store?.close?.();});
+  ctx.addTask('Current board before cancel');await ctx.persist();
+  const currentRaw=JSON.stringify(ctx.state),next=JSON.parse(currentRaw);next.tasks[0].title='Cancelled while checking sources';
+  const file=new File([JSON.stringify(next)],'cancel-before-adoption.json',{type:'application/json'});
+  const beforeHead=await store.readHead(),primaryWrites=[],commit=store.commitHead.bind(store);
+  store.commitHead=(...args)=>{primaryWrites.push(args[0]);return commit(...args);};
+  const cloudPushes=[],originalPush=ctx.window.CloudSync?.push?.bind(ctx.window.CloudSync);
+  if(originalPush)ctx.window.CloudSync.push=(...args)=>{cloudPushes.push(args);return originalPush(...args);};
+  ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
+  const action=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);
+  assert.ok(action,'the test enters through the actual Settings restore action');
+  const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
+  const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
+  await ctx.onAction(action[1],{});input.files=[file];shim.document.dispatchEvent({type:'change',target:input});
+  for(let attempt=0;attempt<100&&!shim.document.getElementById('modalRoot').innerHTML.includes('data-act="confirm-file-restore"');attempt++)await flush();
+  const preview=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(preview,/data-act="confirm-file-restore"/,'the selected file reaches the actual guarded preview');
+  assert.match(preview,/Cancel or close while sources are being checked stops before applying this file/);
+  const close=preview.match(/<button\b(?=[^>]*class="x")(?=[^>]*data-act="([^"]+)")[^>]*aria-label="Cancel"[^>]*>/);
+  assert.ok(close,'the preview close control uses the same Cancel action as the explicit button');
+
+  let releaseRead,signalReadStarted;
+  const readStarted=new Promise(resolve=>{signalReadStarted=resolve;});
+  const readHead=store.readHead.bind(store);let pauseNextRead=true;
+  store.readHead=async(...args)=>{
+    if(pauseNextRead){pauseNextRead=false;signalReadStarted();await new Promise(resolve=>{releaseRead=resolve;});}
+    return readHead(...args);
+  };
+  const confirming=ctx.onAction('confirm-file-restore',{});
+  await readStarted;
+  await ctx.onAction(close[1],{});
+  assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/Preview backup file/,'closing the preview immediately dismisses it');
+  releaseRead();await confirming;
+  assert.equal(JSON.stringify(ctx.state),currentRaw,'a cancelled source check cannot apply its captured prospective board');
+  assert.deepEqual(await store.readHead(),beforeHead,'cancellation before source verification finishes cannot replace the durable head');
+  assert.deepEqual(primaryWrites,[],'cancellation stops before any primary-head commit');
+  assert.deepEqual(cloudPushes,[],'cancellation before adoption cannot publish a cloud board');
+  assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/Preview backup file/,'the settled confirmation does not reopen the cancelled preview');
+});
+
+test('RISK BACKUP FILE RESTORE: backdrop and Escape cancel a pending source check before adoption',async t=>{
+  const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb');
+  for(const closeVia of ['backdrop','Escape'])await t.test(closeVia,async sub=>{
+    const indexedDB=new IDBFactory(),dbName='chain-scanner-file-restore-generic-close-'+closeVia+'-'+Date.now()+'-'+Math.random();
+    const {ctx,shim}=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName}),store=ctx.window.ScannerDeviceStore;
+    sub.after(async()=>{await store?.close?.();});
+    ctx.addTask('Current board before generic close');await ctx.persist();
+    const currentRaw=JSON.stringify(ctx.state),next=JSON.parse(currentRaw);next.tasks[0].title='Must stay unadopted after generic close';
+    const file=new File([JSON.stringify(next)],'cancel-generic-close.json',{type:'application/json'});
+    const beforeHead=await store.readHead(),primaryWrites=[],commit=store.commitHead.bind(store);
+    store.commitHead=(...args)=>{primaryWrites.push(args[0]);return commit(...args);};
+    const cloudPushes=[],originalPush=ctx.window.CloudSync?.push?.bind(ctx.window.CloudSync);
+    if(originalPush)ctx.window.CloudSync.push=(...args)=>{cloudPushes.push(args);return originalPush(...args);};
+    ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
+    const action=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);
+    assert.ok(action,'the generic close case begins at the real Settings restore action');
+    const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
+    const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
+    await ctx.onAction(action[1],{});input.files=[file];shim.document.dispatchEvent({type:'change',target:input});
+    for(let attempt=0;attempt<100&&!shim.document.getElementById('modalRoot').innerHTML.includes('data-act="confirm-file-restore"');attempt++)await flush();
+    assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="confirm-file-restore"/,'the file reaches the actual guarded preview');
+
+    let releaseRead,signalReadStarted;
+    const readStarted=new Promise(resolve=>{signalReadStarted=resolve;});
+    const readHead=store.readHead.bind(store);let pauseNextRead=true;
+    store.readHead=async(...args)=>{
+      if(pauseNextRead){pauseNextRead=false;signalReadStarted();await new Promise(resolve=>{releaseRead=resolve;});}
+      return readHead(...args);
+    };
+    const modalRoot=shim.document.getElementById('modalRoot');
+    if(closeVia==='Escape'){
+      const querySelector=shim.document.querySelector.bind(shim.document);
+      shim.document.querySelector=selector=>selector==='.mback'&&modalRoot.innerHTML.includes('<div class="mback"')?makeFakeElement():querySelector(selector);
+    }
+    const confirming=ctx.onAction('confirm-file-restore',{});await readStarted;
+    if(closeVia==='backdrop'){
+      const backdrop=makeFakeElement();backdrop.classList={contains:value=>value==='mback'};backdrop.closest=()=>null;
+      shim.document.dispatchEvent({type:'click',detail:1,target:backdrop});
+    }else shim.document.dispatchEvent({type:'keydown',key:'Escape'});
+    assert.match(modalRoot.innerHTML,/<h2>Settings<\/h2>/,'closing returns to Settings and preserves its captured draft surface');
+    assert.doesNotMatch(modalRoot.innerHTML,/Preview backup file/,'the generic close immediately dismisses the preview');
+    releaseRead();assert.equal(await confirming,false,'the cancelled confirmation settles without applying its captured file');
+    assert.equal(JSON.stringify(ctx.state),currentRaw,'the captured file cannot replace the accepted board after a generic close');
+    assert.deepEqual(await store.readHead(),beforeHead,'generic close during source verification cannot replace the durable head');
+    assert.deepEqual(primaryWrites,[],'generic close stops before a primary-head commit');
+    assert.deepEqual(cloudPushes,[],'generic close before adoption cannot publish a cloud board');
+    assert.match(modalRoot.innerHTML,/<h2>Settings<\/h2>/,'the settled confirmation does not reopen the cancelled preview');
+    assert.doesNotMatch(modalRoot.innerHTML,/Preview backup file/);
+  });
+});
+
+test('RISK BACKUP FILE RESTORE: in-progress primary save blocks Cancel and modal dismissal',async t=>{
+  const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb');
+  const indexedDB=new IDBFactory(),dbName='chain-scanner-file-restore-commit-inflight-'+Date.now()+'-'+Math.random();
+  const {ctx,shim}=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName}),store=ctx.window.ScannerDeviceStore;
+  t.after(async()=>{await store?.close?.();});
+  ctx.addTask('Current board before protected save');await ctx.persist();
+  const next=JSON.parse(JSON.stringify(ctx.state));next.tasks[0].title='Selected board after protected save';
+  const file=new File([JSON.stringify(next)],'commit-inflight.json',{type:'application/json'});
+  ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
+  const action=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);
+  assert.ok(action,'the test enters through the real Settings file action');
+  const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
+  const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
+  await ctx.onAction(action[1],{});input.files=[file];shim.document.dispatchEvent({type:'change',target:input});
+  for(let attempt=0;attempt<100&&!shim.document.getElementById('modalRoot').innerHTML.includes('data-act="confirm-file-restore"');attempt++)await flush();
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="confirm-file-restore"/,'the file reaches the guarded preview');
+
+  let releaseCommit,signalCommitStarted;
+  const commitStarted=new Promise(resolve=>{signalCommitStarted=resolve;});
+  const commit=store.commitHead.bind(store);let pauseSelectedBoard=true;
+  store.commitHead=async options=>{
+    if(pauseSelectedBoard&&JSON.parse(options.payload).tasks?.[0]?.title==='Selected board after protected save'){
+      pauseSelectedBoard=false;signalCommitStarted();await new Promise(resolve=>{releaseCommit=resolve;});
+    }
+    return commit(options);
+  };
+  const confirming=ctx.onAction('confirm-file-restore',{});await commitStarted;
+  const inProgress=shim.document.getElementById('modalRoot').innerHTML;
+  const cancelButtons=[...inProgress.matchAll(/<button\b[^>]*data-act="cancel-file-restore"[^>]*>/g)].map(match=>match[0]);
+  const buttonsDisabled=cancelButtons.length===2&&cancelButtons.every(button=>/\sdisabled(?:\s|>|=)/.test(button));
+  const cancelResult=await ctx.onAction('cancel-file-restore',{});
+  const cancelKept=shim.document.getElementById('modalRoot').innerHTML.includes('Preview backup file');
+  const backdrop=makeFakeElement();backdrop.classList={contains:value=>value==='mback'};backdrop.closest=()=>null;
+  shim.document.dispatchEvent({type:'click',detail:1,target:backdrop});
+  const backdropKept=shim.document.getElementById('modalRoot').innerHTML.includes('Preview backup file');
+  shim.document.dispatchEvent({type:'keydown',key:'Escape'});
+  const escapeKept=shim.document.getElementById('modalRoot').innerHTML.includes('Preview backup file');
+  releaseCommit();const restored=await confirming;
+
+  assert.deepEqual({buttonsDisabled,cancelResult,cancelKept,backdropKept,escapeKept},
+    {buttonsDisabled:true,cancelResult:false,cancelKept:true,backdropKept:true,escapeKept:true},
+    'the actual Cancel/X handler and generic dismissal stay unavailable until the primary write resolves');
+  assert.equal(restored,true,'the guarded write completes after its durable result is known');
+  assert.equal(ctx.state.tasks[0].title,'Selected board after protected save','the completed confirmation adopts its file only after the write resolves');
+  assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state),'the visible result matches the verified durable head');
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/<h2>Settings<\/h2>/,'successful completion returns to Settings after adoption');
+  assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/Preview backup file/,'successful completion closes the preview after adoption');
+});
+
+test('RISK BACKUP FILE RESTORE: in-progress cloud publication blocks Cancel and modal dismissal',async t=>{
+  const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb');
+  const indexedDB=new IDBFactory(),dbName='chain-scanner-file-restore-cloud-inflight-'+Date.now()+'-'+Math.random();
+  const currentBoard=syncState({tasks:[syncTask('cloud-cancel-task','Cloud board before restore')],chain:['cloud-cancel-task'],candidateId:'cloud-cancel-task'});
+  const cloud=makeSyncHarness({remote:currentBoard,rev:4,delayMs:1});let backend,epoch=3,pending=false;
+  const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(currentBoard),[LOCAL_HEAD_KEY]:JSON.stringify(currentBoard)},
+    indexedDBProvider:indexedDB,deviceDbName:dbName,cloudSyncFactory:()=>{
+      backend=cloud.factory();backend.recoveryIdentity=()=>backend.user==='e@example.com'?'uid-cloud-cancel-file':null;
+      backend.recoveryEvidence=async()=>({identity:backend.recoveryIdentity(),epoch,pending});return backend;
+    }});
+  const {ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+  t.after(async()=>{await store?.close?.();});
+  await ctx.cloudPull();await syncSettle(10);
+  assert.equal(ctx.state.syncAccount,'e@example.com','the actual signed-in consumer finishes source reconciliation');
+  const next=JSON.parse(JSON.stringify(ctx.state));next.tasks[0].title='Cloud file after protected publication';
+  const file=new File([JSON.stringify(next)],'cloud-commit-inflight.json',{type:'application/json'});
+  ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
+  const action=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);
+  assert.ok(action,'the bound case starts through the real Settings file control');
+  const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
+  const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
+  await ctx.onAction(action[1],{});input.files=[file];shim.document.dispatchEvent({type:'change',target:input});
+  for(let attempt=0;attempt<100&&!shim.document.getElementById('modalRoot').innerHTML.includes('data-act="confirm-file-restore"');attempt++)await flush();
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/fresh cloud read and exact server readback are required/);
+
+  let releasePush,signalPushStarted;
+  const pushStarted=new Promise(resolve=>{signalPushStarted=resolve;});
+  const push=backend.push.bind(backend);
+  backend.push=async(...args)=>{signalPushStarted();await new Promise(resolve=>{releasePush=resolve;});return push(...args);};
+  cloud.calls.length=0;
+  const confirming=ctx.onAction('confirm-file-restore',{});await pushStarted;
+  const inProgress=shim.document.getElementById('modalRoot').innerHTML;
+  const cancelButtons=[...inProgress.matchAll(/<button\b[^>]*data-act="cancel-file-restore"[^>]*>/g)].map(match=>match[0]);
+  const buttonsDisabled=cancelButtons.length===2&&cancelButtons.every(button=>/\sdisabled(?:\s|>|=)/.test(button));
+  const progressExplained=/Cancel, close and Escape are unavailable until its result is known/.test(inProgress);
+  const cancelResult=await ctx.onAction('cancel-file-restore',{});
+  const cancelKept=shim.document.getElementById('modalRoot').innerHTML.includes('Preview backup file');
+  const backdrop=makeFakeElement();backdrop.classList={contains:value=>value==='mback'};backdrop.closest=()=>null;
+  shim.document.dispatchEvent({type:'click',detail:1,target:backdrop});
+  const backdropKept=shim.document.getElementById('modalRoot').innerHTML.includes('Preview backup file');
+  shim.document.dispatchEvent({type:'keydown',key:'Escape'});
+  const escapeKept=shim.document.getElementById('modalRoot').innerHTML.includes('Preview backup file');
+  const callsBeforeRelease=cloud.calls.join(',');
+  releasePush();const restored=await confirming;
+
+  assert.deepEqual({buttonsDisabled,progressExplained,cancelResult,cancelKept,backdropKept,escapeKept,callsBeforeRelease},
+    {buttonsDisabled:true,progressExplained:true,cancelResult:false,cancelKept:true,backdropKept:true,escapeKept:true,callsBeforeRelease:'pull'},
+    'the actual bound preview stays open and cannot claim Cancel after conditional publication has started');
+  assert.equal(restored,true,'the exact conditional publication and acknowledgement finish before application');
+  assert.equal(ctx.state.tasks[0].title,'Cloud file after protected publication');
+  assert.equal(cloud.remoteState().tasks[0].title,'Cloud file after protected publication');
+  assert.equal(cloud.calls.join(','),'pull,push,pull','only the confirmed, acknowledged cloud write publishes');
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/<h2>Settings<\/h2>/,'successful bound completion returns to Settings after adoption');
+  assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/Preview backup file/,'successful completion closes after the exact acknowledgement');
+});
+
+test('RISK BACKUP FILE RESTORE: backup CAS abort and readback failure keep the active board and any saved copies',async t=>{
+  const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb');
+  for(const failure of ['selected-file backup CAS abort','selected-file backup readback failure'])await t.test(failure,async sub=>{
+    const indexedDB=new IDBFactory(),dbName='chain-scanner-file-copy-failure-'+Date.now()+'-'+Math.random();
+    const {ctx,shim}=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName}),store=ctx.window.ScannerDeviceStore;
+    sub.after(async()=>{await store?.close?.();});
+    ctx.addTask('Board before backup failure');await ctx.persist();
+    const sourceRaw=JSON.stringify(ctx.state),head=await store.readHead(),next=JSON.parse(sourceRaw);next.tasks[0].title='Must remain a backup';
+    const fileBytes=new TextEncoder().encode(JSON.stringify(next)),file=new File([fileBytes],'protected-after-failure.json',{type:'application/json'});
+    const primaryWrites=[],commit=store.commitHead.bind(store);store.commitHead=options=>{primaryWrites.push(options);return commit(options);};
+    const put=store.putBackup.bind(store),list=store.listBackups.bind(store);let armReadbackFailure=false,failNextReadback=false;
+    store.putBackup=async options=>{
+      if(options.backup?.kind==='restore-file-source'&&failure==='selected-file backup CAS abort')
+        return put({...options,expectedHash:'deliberately-stale-head'});
+      const result=await put(options);
+      if(options.backup?.kind==='restore-file-source'&&failure==='selected-file backup readback failure')armReadbackFailure=true;
+      return result;
+    };
+    store.listBackups=async(...args)=>{
+      if(armReadbackFailure){armReadbackFailure=false;failNextReadback=true;return list(...args);}
+      if(failNextReadback){failNextReadback=false;throw Error('injected readback failure after actual backup transaction');}
+      return list(...args);
+    };
+    ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
+    const action=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);assert.ok(action);
+    const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
+    const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
+    const toastBefore=shim.document.getElementById('toast').textContent;
+    await ctx.onAction(action[1],{});input.files=[file];shim.document.dispatchEvent({type:'change',target:input});
+    for(let attempt=0;attempt<100&&shim.document.getElementById('toast').textContent===toastBefore;attempt++)await flush();
+    const modal=shim.document.getElementById('modalRoot').innerHTML;
+    assert.doesNotMatch(modal,/data-act="confirm-file-restore"/,'a failed backup or readback never enables adoption');
+    assert.equal(JSON.stringify(ctx.state),sourceRaw,'backup failure leaves the accepted board untouched');
+    assert.equal((await store.readHead()).hash,head.hash,'backup failure leaves the primary durable head untouched');
+    assert.deepEqual(primaryWrites,[],'no prospective primary head is attempted after a backup failure');
+    const rows=await list();
+    assert.ok(rows.some(row=>row.kind==='before-file-restore'&&row.payload===sourceRaw),'the completed current-board copy remains readable');
+    if(failure==='selected-file backup readback failure'){
+      const exact=rows.find(row=>row.kind==='restore-file-source'&&row.restoreFile?.fileName===file.name);
+      assert.ok(exact,'a row written before its readback failed remains available for recovery');
+      assert.deepEqual(Buffer.from(exact.restoreFile.bytesBase64,'base64'),Buffer.from(fileBytes),'the retained file row keeps the exact bytes');
+    }else assert.equal(rows.some(row=>row.kind==='restore-file-source'&&row.restoreFile?.fileName===file.name),false,
+      'an aborted selected-file backup leaves no false verified copy');
+  });
+});
+
+test('RISK BACKUP FILE RESTORE: unsupported and ambiguous selected files stop with exact bytes protected',async t=>{
+  const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb');
+  const indexedDB=new IDBFactory(),dbName='chain-scanner-file-invalid-input-'+Date.now()+'-'+Math.random();
+  const {ctx,shim}=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName}),store=ctx.window.ScannerDeviceStore;
+  t.after(async()=>{await store?.close?.();});
+  ctx.addTask('Board before invalid file');await ctx.persist();
+  const sourceRaw=JSON.stringify(ctx.state),head=await store.readHead(),valid=JSON.parse(sourceRaw);
+  const incomplete={format:'chain-scanner.recovery-archive',formatVersion:1,currentBoard:valid,
+    manifest:{status:'partial',failures:[{source:'indexedDB.backups',status:'error'}],sources:{currentBoard:{status:'included'}}}};
+  const missingCurrentBoard={format:'chain-scanner.recovery-archive',formatVersion:1,
+    manifest:{status:'complete',failures:[],sources:{currentBoard:{status:'included'}}}};
+  const cases=[
+    ['invalid-utf8.json',Uint8Array.of(0xc3,0x28)],
+    ['corrupt.json',new TextEncoder().encode('{not JSON')],
+    ['wrong-shape.json',new TextEncoder().encode(JSON.stringify({format:'ordinary-object',tasks:{}}))],
+    ['unsupported-version.json',new TextEncoder().encode(JSON.stringify({...incomplete,formatVersion:2,manifest:{...incomplete.manifest,status:'complete',failures:[]}}))],
+    ['missing-current-board.json',new TextEncoder().encode(JSON.stringify(missingCurrentBoard))],
+    ['partial-archive.json',new TextEncoder().encode(JSON.stringify(incomplete))],
+    ['duplicate-task-ids.json',new TextEncoder().encode(JSON.stringify({...valid,tasks:[valid.tasks[0],{...valid.tasks[0]}]}))],
+  ];
+  const writes=[],commit=store.commitHead.bind(store);store.commitHead=options=>{writes.push(options);return commit(options);};
+  ctx.openSettings();let settings=shim.document.getElementById('modalRoot').innerHTML;
+  let action=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);assert.ok(action);
+  const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
+  const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
+  for(const [name,bytes] of cases){
+    shim.document.getElementById('toast').textContent='';
+    if(!shim.document.getElementById('modalRoot').innerHTML.includes('Restore from backup file'))ctx.openSettings();
+    settings=shim.document.getElementById('modalRoot').innerHTML;action=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);assert.ok(action,`Settings can retry ${name}`);
+    const file=new File([bytes],name,{type:'application/json'});await ctx.onAction(action[1],{});input.files=[file];shim.document.dispatchEvent({type:'change',target:input});
+    for(let attempt=0;attempt<100&&shim.document.getElementById('toast').textContent==='';attempt++)await flush();
+    assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="confirm-file-restore"/,`${name} cannot create a restore confirmation`);
+    assert.equal(JSON.stringify(ctx.state),sourceRaw,`${name} leaves the current board unchanged`);
+    assert.equal((await store.readHead()).hash,head.hash,`${name} leaves the durable head unchanged`);
+    const row=(await store.listBackups()).find(item=>item.kind==='restore-file-source'&&item.restoreFile?.fileName===name);
+    assert.ok(row,`${name} is retained as file evidence`);
+    assert.deepEqual(Buffer.from(row.restoreFile.bytesBase64,'base64'),Buffer.from(bytes),`${name} retains its exact selected bytes`);
+  }
+  assert.deepEqual(writes,[],'no invalid or ambiguous file reaches the primary commit path');
+});
+
+test('RISK BACKUP FILE RESTORE: account, auth epoch, pending evidence, and cloud revision changes hold consent',async t=>{
+  const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb');
+  for(const changedSource of ['account identity','same-user auth epoch','pending account evidence','cloud revision only'])await t.test(changedSource,async sub=>{
+    const indexedDB=new IDBFactory(),dbName='chain-scanner-file-cloud-source-'+Date.now()+'-'+Math.random();
+    const source=syncState({tasks:[syncTask('cloud-current','Cloud board before file')],chain:['cloud-current'],candidateId:'cloud-current'});
+    const cloud=makeSyncHarness({remote:source,rev:9,delayMs:1});let backend,epoch=12,pending=false,identity='uid-file-source';
+    const {ctx,shim}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(source),[LOCAL_HEAD_KEY]:JSON.stringify(source)},
+      indexedDBProvider:indexedDB,deviceDbName:dbName,cloudSyncFactory:()=>{
+        backend=cloud.factory();backend.recoveryIdentity=()=>identity;
+        backend.recoveryEvidence=async()=>({identity,epoch,pending});return backend;
+      }}),store=ctx.window.ScannerDeviceStore;
+    sub.after(async()=>{await store?.close?.();});
+    await ctx.cloudPull();await syncSettle(10);
+    assert.equal(ctx.state.syncAccount,'e@example.com');const sourceRevision=ctx.state.syncRev;assert.equal(sourceRevision,cloud.doc.rev);
+    const currentRaw=JSON.stringify(ctx.state),head=await store.readHead(),next=JSON.parse(currentRaw);next.tasks[0].title='Must stay prospective';
+    const file=new File([JSON.stringify(next)],'cloud-source.json',{type:'application/json'}),writes=[],commit=store.commitHead.bind(store);
+    store.commitHead=options=>{writes.push(options);return commit(options);};
+    ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
+    const action=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);assert.ok(action);
+    const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
+    const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
+    await ctx.onAction(action[1],{});input.files=[file];shim.document.dispatchEvent({type:'change',target:input});
+    for(let attempt=0;attempt<100&&!shim.document.getElementById('modalRoot').innerHTML.includes('data-act="confirm-file-restore"');attempt++)await flush();
+    assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="confirm-file-restore"/);
+    cloud.calls.length=0;
+    if(changedSource==='account identity')identity='uid-switched-account';
+    if(changedSource==='same-user auth epoch')epoch++;
+    if(changedSource==='pending account evidence')pending=true;
+    if(changedSource==='cloud revision only'){
+      const peer=cloud.remoteState();peer.peerRevisionMarker='newer cloud copy';cloud.writeBehindBack(peer);
+    }
+    await ctx.onAction('confirm-file-restore',{});
+    assert.equal(writes.some(options=>JSON.parse(options.payload).tasks?.[0]?.title==='Must stay prospective'),false,
+      'changed account evidence or revision prevents local primary-head adoption');
+    assert.equal((await store.readHead()).hash,head.hash,'the original device head remains active');
+    assert.equal(JSON.stringify(ctx.state),currentRaw,'the accepted local board is unchanged');
+    assert.ok((await store.listBackups()).some(row=>row.kind==='before-file-restore'&&row.payload===currentRaw),'the current copy is retained');
+    assert.ok((await store.listBackups()).some(row=>row.kind==='restore-file-source'&&row.restoreFile?.fileName===file.name),'the file copy is retained');
+    if(changedSource==='cloud revision only'){
+      assert.deepEqual(cloud.calls,['pull'],'revision drift stops after a fresh read and before any push');
+      assert.equal(cloud.remoteState().peerRevisionMarker,'newer cloud copy','the independent newer cloud version remains active');
+    }else assert.deepEqual(cloud.calls,[],'identity, epoch, and pending-evidence changes stop before cloud reads or writes');
+  });
+});
+
+test('RISK BACKUP FILE RESTORE: a released old client wins CAS before the prospective file board is published',async t=>{
+  const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb');
+  const {SUPPORTED_RELEASE,readReleasedClient}=await import('./scripts/backward-compatibility.mjs');
+  const indexedDB=new IDBFactory(),sharedStorage=sharedScannerStorage(),dbName='chain-scanner-file-old-client-cas-'+Date.now()+'-'+Math.random();
+  const source=syncState({tasks:[syncTask('old-peer-current','Board before file restore')],chain:['old-peer-current'],candidateId:'old-peer-current'});
+  const cloud=makeSyncHarness({remote:source,rev:6,delayMs:1});let backend;
+  const current=await loadApp({sharedStorage,seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(source),[LOCAL_HEAD_KEY]:JSON.stringify(source)},
+    indexedDBProvider:indexedDB,deviceDbName:dbName,cloudSyncFactory:()=>{
+      backend=cloud.factory();backend.recoveryIdentity=()=>backend.user==='e@example.com'?'uid-old-peer':null;
+      backend.recoveryEvidence=async()=>({identity:backend.recoveryIdentity(),epoch:2,pending:false});return backend;
+    }}),store=current.ctx.window.ScannerDeviceStore;
+  let oldClient=null;
+  t.after(async()=>{await store?.close?.();});
+  await current.ctx.cloudPull();await syncSettle(15);
+  const currentRaw=JSON.stringify(current.ctx.state),sourceRevision=current.ctx.state.syncRev,head=await store.readHead();
+  assert.equal(sourceRevision,cloud.doc.rev,'the current app begins reconciled at the cloud revision');
+  const released=readReleasedClient(__dirname,SUPPORTED_RELEASE);
+  oldClient=await loadApp({appSource:extractAppScript(released.html),sharedStorage,cloudSyncFactory:cloud.factory});
+  const old=oldClient.ctx;
+  assert.ok(old.state,'the actual supported released client opens the shared local board');
+
+  const selected=JSON.parse(currentRaw);selected.tasks[0].title='Prospective file board must stay private until ACK';
+  const file=new File([JSON.stringify(selected)],'old-client-cas.json',{type:'application/json'});
+  const primaryWrites=[],commit=store.commitHead.bind(store);store.commitHead=options=>{primaryWrites.push(options);return commit(options);};
+  current.ctx.openSettings();const settings=current.shim.document.getElementById('modalRoot').innerHTML;
+  const action=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);assert.ok(action);
+  const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
+  const originalGet=current.shim.document.getElementById.bind(current.shim.document);current.shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
+  await current.ctx.onAction(action[1],{});input.files=[file];current.shim.document.dispatchEvent({type:'change',target:input});
+  for(let attempt=0;attempt<100&&!current.shim.document.getElementById('modalRoot').innerHTML.includes('data-act="confirm-file-restore"');attempt++)await flush();
+  assert.match(current.shim.document.getElementById('modalRoot').innerHTML,/data-act="confirm-file-restore"/);
+  const push=backend.push.bind(backend);let beforeCAS=null;
+  backend.push=async(payload,updatedAt,baseRevision)=>{
+    const active=await store.readHead();
+    assert.equal(active.payload,currentRaw,'the prospective board is not installed before the cloud CAS');
+    assert.equal(JSON.stringify(current.ctx.state),currentRaw,'the accepted board remains current before ACK');
+    await old.cloudPull();await syncSettle(20);
+    assert.equal(old.state.tasks.some(task=>task.title==='Prospective file board must stay private until ACK'),false,
+      'the actual released app sees only the prior accepted cloud board');
+    const peer=old.addTask('Released old-client peer edit');await old.persist();
+    const oldPayload=old.cloudPayload();
+    assert.ok(JSON.parse(oldPayload).tasks.some(task=>task.id===peer.id&&task.title==='Released old-client peer edit'),
+      'the released client serializes its own accepted peer edit');
+    const oldWrite=await old.window.CloudSync.push(oldPayload,Date.now(),cloud.doc.rev);
+    assert.equal(oldWrite?.ok,true,'the supported old client publishes its own serialized board through the conditional cloud API');
+    assert.ok(cloud.calls.includes('push'),'the released client used the same conditional cloud service as the pending file restore');
+    await syncSettle(10);
+    assert.ok(cloud.remoteState().tasks.some(task=>task.title==='Released old-client peer edit'),'the released client wins with an independent cloud edit');
+    assert.equal(cloud.remoteState().tasks.some(task=>task.title==='Prospective file board must stay private until ACK'),false,
+      'the old client never observes or publishes the prospective restore');
+    beforeCAS={baseRevision,remoteRevision:cloud.doc.rev};
+    return push(payload,updatedAt,baseRevision);
+  };
+  cloud.calls.length=0;
+  await current.ctx.onAction('confirm-file-restore',{});
+  assert.ok(beforeCAS,'file confirm stopped before the CAS hook: '+current.shim.document.getElementById('toast').textContent+'; calls='+cloud.calls.join(','));
+  assert.deepEqual(beforeCAS,{baseRevision:sourceRevision,remoteRevision:sourceRevision+1},'the old peer advances the cloud before the file conditional write');
+  assert.equal(cloud.conflicts,1,'the stale file restore loses its compare-and-set');
+  assert.equal(cloud.remoteState().tasks.some(task=>task.title==='Prospective file board must stay private until ACK'),false);
+  assert.ok(cloud.remoteState().tasks.some(task=>task.title==='Released old-client peer edit'));
+  assert.equal(JSON.stringify(current.ctx.state),currentRaw,'a CAS loser leaves the current accepted state untouched');
+  assert.equal((await store.readHead()).hash,head.hash,'a CAS loser does not replace the local durable head');
+  assert.equal(primaryWrites.some(options=>JSON.parse(options.payload).tasks?.[0]?.title==='Prospective file board must stay private until ACK'),false,
+    'the prospective primary head is never written without exact cloud acknowledgement');
+  assert.ok((await store.listBackups()).some(row=>row.kind==='before-file-restore'&&row.payload===currentRaw),'the original board copy remains available');
+  assert.ok((await store.listBackups()).some(row=>row.kind==='restore-file-source'&&row.restoreFile?.fileName===file.name),'the exact file copy remains available');
+});
+
+test('RISK BACKUP FILE RESTORE: replacement preserves completion, History, ratings, deletions, unknown data, and Undo',async t=>{
+  const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb');
+  const indexedDB=new IDBFactory(),dbName='chain-scanner-file-lifecycle-'+Date.now()+'-'+Math.random();
+  const {ctx,shim}=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName}),store=ctx.window.ScannerDeviceStore;
+  t.after(async()=>{await store?.close?.();});
+  const benchmark=ctx.addTask('Rating benchmark'),kept=ctx.addTask('Kept rating task');
+  ctx.state.chain=[benchmark.id];ctx.state.candidateId=kept.id;ctx.recomputeRanks();await ctx.decide('yes');
+  const currentRating=JSON.parse(JSON.stringify(ctx.state.tasks.find(task=>task.id===kept.id).ratingHistory[0]));
+  const completed=ctx.addTask('Completed task'),removed=ctx.addTask('Task removed by replacement');
+  await ctx.doneTask(completed.id);await ctx.workedOnTask(removed.id);
+  const currentKept=ctx.state.tasks.find(task=>task.id===kept.id);
+  currentKept.futureCurrentField={source:'current board',value:'preserve'};
+  ctx.state.futureCurrentBoardField={unknown:'current metadata'};
+  assert.ok(ctx.historyRows().some(row=>row.id===completed.id&&row.kind==='done'),'the source board has an ordinary completed History row');
+  assert.ok(ctx.historyRows().some(row=>row.kind==='worked'&&row.title==='Task removed by replacement'),'the source board has a logged History row');
+  await ctx.persist();
+  const originalHead=await store.readHead(),originalWorkLog=JSON.stringify(ctx.state.workLog);
+  assert.ok(currentRating,'the fixture derives an actual rating observation from the app rating action');
+  const next=JSON.parse(JSON.stringify(ctx.state));
+  next.tasks=next.tasks.filter(task=>task.id!==removed.id);
+  const fileKept=next.tasks.find(task=>task.id===kept.id);fileKept.title='File-selected task';
+  fileKept.futureSelectedField={keep:'file unknown value'};
+  const fileCompleted=next.tasks.find(task=>task.id===completed.id);fileCompleted.done=false;fileCompleted.completedAt=null;
+  next.futureSelectedBoardField={opaque:'file metadata'};
+  const decisionAccount=ctx.state.syncAccount??ctx.state.decisionBaseline?.account??null;
+  assert.equal(ctx.decisionEvidenceIssue(ctx.state,decisionAccount),null,'the real source board has valid decision evidence');
+  assert.equal(ctx.decisionEvidenceIssue(next,decisionAccount),null,'the selected replacement has valid decision evidence');
+  assert.equal(ctx.conflictingDecisionEvidence(next,ctx.state),false,'the replacement does not collide with a different decision event');
+  const file=new File([JSON.stringify(next)],'lifecycle-replacement.json',{type:'application/json'});
+  ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
+  const action=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);assert.ok(action);
+  const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
+  const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
+  await ctx.onAction(action[1],{});input.files=[file];shim.document.dispatchEvent({type:'change',target:input});
+  for(let attempt=0;attempt<100&&!shim.document.getElementById('modalRoot').innerHTML.includes('data-act="confirm-file-restore"');attempt++)await flush();
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="confirm-file-restore"/,shim.document.getElementById('toast').textContent);
+  await ctx.onAction('confirm-file-restore',{});
+  const restoredKept=ctx.state.tasks.find(task=>task.id===kept.id),restoredCompleted=ctx.state.tasks.find(task=>task.id===completed.id);
+  assert.equal(restoredKept.title,'File-selected task');
+  assert.deepEqual(restoredKept.futureCurrentField,{source:'current board',value:'preserve'});
+  assert.deepEqual(restoredKept.futureSelectedField,{keep:'file unknown value'});
+  assert.equal(JSON.stringify(restoredKept.ratingHistory),JSON.stringify([currentRating]),'the actual rating observation survives the file route unchanged');
+  assert.equal(restoredCompleted.done,false,'an explicitly open file task reopens a completed task');
+  assert.ok(restoredCompleted.restoredRunOp,'the reopen carries its protected completion lineage');
+  assert.equal(ctx.historyRows().some(row=>row.id===completed.id&&row.kind==='done'),false,'the reopened task is no longer shown as completed');
+  assert.ok(ctx.historyRows().some(row=>row.kind==='worked'&&row.title==='Task removed by replacement'),'ordinary History entries survive the board file');
+  assert.equal(ctx.state.tasks.some(task=>task.id===removed.id),false,'the selected task set removes the omitted task');
+  assert.equal(ctx.state.deletedTaskIds?.[removed.id],true,'the replacement records an explicit deletion marker');
+  assert.ok(ctx.state.deletionLog.some(row=>row.taskId===removed.id&&row.kind==='task'),'the task removal is visible in its deletion history');
+  assert.deepEqual(ctx.state.futureCurrentBoardField,{unknown:'current metadata'});
+  assert.deepEqual(ctx.state.futureSelectedBoardField,{opaque:'file metadata'});
+
+  assert.equal(await ctx.onAction('undo',{}),true,'the existing replacement Undo remains available');
+  assert.ok(ctx.state.tasks.some(task=>task.id===removed.id),'Undo restores the omitted task');
+  const undoKept=ctx.state.tasks.find(task=>task.id===kept.id),undoCompleted=ctx.state.tasks.find(task=>task.id===completed.id);
+  assert.equal(undoKept.title,'Kept rating task');assert.ok(undoKept.ratingHistory.some(row=>row.id===currentRating.id));
+  assert.equal(undoCompleted.done,true,'Undo restores the original completion');
+  assert.ok(ctx.historyRows().some(row=>row.id===completed.id&&row.kind==='done'),'Undo returns the completion to History');
+  assert.equal(JSON.stringify(ctx.state.workLog),originalWorkLog,'Undo restores original logged History entries exactly');
+  assert.ok(ctx.state.deletionLog.some(row=>row.taskId===removed.id&&row.kind==='task'),'Undo retains an honest record of the replacement deletion');
+  assert.equal(await ctx.persist(),true,'the explicit Undo is saved to the durable board');
+  assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state),'the Undo result is durable');
+  assert.notEqual((await store.readHead()).hash,originalHead.hash,'the durable head reflects the explicit restore and Undo sequence');
+});
+
 test('RISK IMPORT RENDERING: restored identifiers cannot inject attributes or break task reveal',async()=>{
   const base=syncState({tasks:[syncTask('task" autofocus data-injected="yes','Restored task')],contexts:[
     {id:'ctx" autofocus data-injected="yes',name:'Restored context',active:true},

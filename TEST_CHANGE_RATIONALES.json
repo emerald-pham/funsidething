@@ -12202,5 +12202,226 @@
     "greenEvidence": "Recorded current ticket190 focused consumer/failure/raw-port/inventory cohort passed 10/10 with zero skips at /Users/emeraldpham/.codex/task-artifacts/manual-json-export/phase2/root-packaging/owner-runs/2026-10-18T13-26-17-242Z-e8e1748b-eb90-492e-bfd5-cadeb900aef1.json. Recorded ticket190 consumer and port checks, including the no-device board fallback, remain in phase2/red-green-runs and array-properties-review/owner-runs. Issue194 original first RED and first GREEN were raw, unrecorded executions; its raw first GREEN has no recorder record and is not backfilled. Later recorded postimplementation 194 acceptance is preserved in /Users/emeraldpham/.codex/task-artifacts/storage-races-184/integration/194-final-checks/2026-10-18T13-03-26-342Z-b4231aa8-16cb-49d7-93a3-b8ddc11c0b1c.json (31/31). Issue190 parent-observed first consumer GREEN exec-5acc860c-dcc4-4481-80c3-86d96a32309a (2/2) was also raw and remains disclosed, not backfilled; the later recorded 2/2 consumer and 1/1 port checks are distinct evidence. Existing issue185/186/188 component GREEN records and issue194 combined cohorts remain in their own appended rationales and integration handback.",
     "comparison": "issue190CandidateAgainst52d4b25",
     "baseCommit": "52d4b2537bacbb60240ae7a53061224350ebd36f"
+  },
+  {
+    "testChangesSha256": "070a0b1c779ad9a6833e7b2d974d53346d90fa505cd353358d0ad240f1b3b395",
+    "reason": "Add an actual Settings file-selection consumer for guarded restore, with exact current/file copies verified before explicit local adoption.",
+    "previousBehavior": "Settings can export ordinary board JSON and a recovery archive, but has no native file-selection restore path; choosing a file cannot preview or safely apply it.",
+    "intendedBehavior": "A supported ordinary backup selected from Settings is parsed into a prepared preview without changing the live board. Exact current-board and selected-file bytes are stored and read back before confirmation is enabled; explicit confirmation uses guarded local adoption and survives cold reopen.",
+    "replacementTests": [
+      "RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exact sources before explicit local adoption"
+    ],
+    "preservedCoverage": [
+      "Existing manual JSON export tests, ordinary-import roundtrip, archive exact decode, archive failure stops, and raw read-only device snapshot assertions remain intact.",
+      "The new consumer uses only isolated synthetic state and a dedicated fake IndexedDB database; it checks that selection and preview do not replace the board or durable head, retains unknown fields as data, and verifies the exact BOM/whitespace/UTF-8 file bytes from durable backup readback.",
+      "This first RED proves the missing Settings consumer only. It does not claim archive selection, cancel, malformed input, account-bound CAS/acknowledgement, stale-source, draft, storage failure, native-rendered, or release coverage beyond later tests and owner/root evidence."
+    ],
+    "redEvidence": {
+      "command": "TZ=UTC /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/restore-backup-file-196/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/restore-backup-file/phase2/owner-runs --purpose preimplementation-red -- /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern='RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exact sources before explicit local adoption' tests.js",
+      "failure": "Recorded assertion failure at the first actual Settings consumer assertion: `Settings exposes the clearly named backup-file restore action` was absent on unchanged product code at 41644ed61f66d1283e6dd3caff7551805ec5c4ab. The recorder classified assertion-failure, exit 1; the app and isolated device-store fixture loaded successfully. Record: /Users/emeraldpham/.codex/task-artifacts/restore-backup-file/phase2/owner-runs/2026-10-18T13-45-23-975Z-a04ad281-9bb1-4283-bb98-442e6bff8b64.json."
+    },
+    "comparison": "issue196SettingsFileRestoreConsumerAgainst41644ed",
+    "baseCommit": "41644ed61f66d1283e6dd3caff7551805ec5c4ab"
+  },
+{
+  "testChangesSha256": "a1f8fddab0c99020794b8daf6f313508bed01cc43ccc550b1619a34edf1329d0",
+  "reason": "Add the approved Settings JSON-file restore path as one guarded behavior: protect exact sources, preview the ordinary board, and apply only after explicit local or verified cloud confirmation.",
+  "previousBehavior": "Settings had distinct JSON exports but no native file-selection restore flow. A selected current-board file or recovery archive could not be previewed and restored through a guarded, recoverable path.",
+  "intendedBehavior": "Read exact UTF-8 file bytes and store them with a safe displaced-current-board payload in local recovery backups before preview. Support ordinary boards and only a complete v1 recovery archive currentBoard. Keep raw appSources, pending records, authority markers and other archive rows as evidence. Allow explicit signed-out/local adoption after verified recovery copies; for account-bound boards require fresh exact-source pull, conditional cloud write and exact acknowledgement before local application. Offline, incomplete or mismatched sources stay protected.",
+  "replacementTests": [
+    "RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exact sources before explicit local adoption",
+    "RISK BACKUP FILE RESTORE: a signed-in file waits for explicit CAS and exact cloud acknowledgement",
+    "RISK BACKUP FILE RESTORE: account-bound files stay protected while cloud is unavailable"
+  ],
+  "preservedCoverage": [
+    "The actual Settings consumer covers BOM and whitespace exact-byte retention, a multi-megabyte Unicode unknown field, task unknown fields, a timed hold, source readback, Cancel, no preview writes, local adoption, cold reopen, backup rotation, currentBoard-only archive adoption, incomplete archive rejection, and FAQ length and changelog copy.",
+    "The signed-in consumer proves selection and preview do not contact cloud or replace the durable head; confirmation uses a fresh read, CAS against the reconciled revision, exact ACK readback and local adoption. A mismatched ACK leaves the prior active board and head intact.",
+    "The unavailable-cloud consumer proves an account-bound file remains only in protected local recovery copies while confirmation is disabled. Existing export/import, archive encoding, raw-source preservation and unrelated RISK assertions remain retained."
+  ],
+  "redEvidence": {
+    "command": "TZ=UTC /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/restore-backup-file-196/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/restore-backup-file/phase2/owner-runs --purpose preimplementation-red -- /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern='RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exact sources before explicit local adoption' tests.js",
+    "failure": "The real Settings consumer failed before file-restore UI implementation at its assertion that Settings exposes the clearly named backup-file restore action. This is the original consumer RED only; later exact-byte and archive assertions were not backfilled as preimplementation evidence."
+  },
+  "followupRepairRed": {
+    "record": "/Users/emeraldpham/.codex/task-artifacts/restore-backup-file/phase2/owner-runs/2026-10-18T14-10-17-795Z-37053283-f0b6-403e-88a2-496a7ae85499.json",
+    "purpose": "preimplementation-red for the specific post-implementation repair",
+    "failure": "A fresh conditional push and exact cloud readback advanced the remote revision to 6, but replaceState restored the old device-local syncRev 5 into the active board."
+  },
+  "observedIntermediateRuns": [
+    "2026-10-18T14-04-33-546Z-ab50130d-bc2c-415c-a5ba-d39177b75c50.json: fixture-only failure because the signed-out test has no CloudSync.push method; spy made optional.",
+    "2026-10-18T14-04-57-730Z-6cccab35-6a04-4847-8e81-5af1f97b7102.json and 2026-10-18T14-05-08-053Z-95ca51c8-0232-433c-a8ce-387b36b50115.json: test first expected raw pending appSources to render in the board preview; corrected to prove those rows are not rendered or replayed.",
+    "2026-10-18T14-05-21-252Z-d9fa103a-3e3e-4bb3-bb39-fbeaeddc9054.json: expanded local/archive consumer passed before the account-bound checks were added.",
+    "2026-10-18T14-08-23-241Z-12a69fe1-f14a-4983-9b1a-1809ed3e6396.json, 2026-10-18T14-08-44-046Z-26d70cb9-a40d-45b5-85d1-45d2dad2d393.json, and 2026-10-18T14-09-17-381Z-cbdd1712-70c8-40f5-a58a-08fa42c8213d.json: the first account-bound harness run raced initial reconciliation and stopped conservatively; the fixture now waits for reconciliation to settle.",
+    "2026-10-18T14-09-46-749Z-eaa0804b-540c-4c07-87d8-d15c499139b1.json: fixture assumed revision 4 although startup reconciliation advanced it to 5; changed to assert the actual reconciled revision.",
+    "2026-10-18T14-09-59-425Z-9f224ff4-a75a-4a6d-9d11-47839b4e096f.json is the first observed local revision mismatch; the targeted pre-repair RED is separately recorded above.",
+    "2026-10-18T14-10-31-349Z-7ce65286-c5ca-4bc2-be40-9d9f7d1b8f31.json passed after the install-boundary fix; 2026-10-18T14-11-10-497Z-4344c486-7294-4bf2-b7df-ab086165c90b.json and 2026-10-18T14-11-34-401Z-0978c367-7343-49fe-b8f2-8afa9c4de29d.json passed the mismatched-ACK and offline-bound additions.",
+    "2026-10-18T14-12-43-317Z-69bd489e-e92c-48aa-808a-ed81fb1a816f.json failed only because the DOM harness has no static changelog template; the final test checks changelog source text and renders the FAQ.",
+    "2026-10-18T14-12-58-364Z-25dff14e-540a-42fa-8cae-cc41d690142e.json passed all three restore RISK tests, 3/3 with zero skips."
+  ],
+  "greenEvidence": "The first rendered local consumer passed through record-run at /Users/emeraldpham/.codex/task-artifacts/restore-backup-file/phase2/owner-runs/2026-10-18T14-01-51-003Z-a84476f8-bbf6-45ec-8ba6-1e0a472365f9.json. The current final restore consumer, exact cloud-confirmation path and offline bound hold passed together 3/3 at /Users/emeraldpham/.codex/task-artifacts/restore-backup-file/phase2/owner-runs/2026-10-18T14-12-58-364Z-25dff14e-540a-42fa-8cae-cc41d690142e.json. The exact-revision install repair RED/GREEN records and all intermediate failures remain preserved in the same owner-runs directory; account-bound coverage added after the original UI implementation is sensitivity evidence, not a backdated initial RED."
+},
+{
+  "testChangesSha256": "8165166754a7898a251aef90d0b63ef01814dcdd225c7dc40ca4ace3cbb68715",
+  "reason": "Complete the accepted Settings file-restore consumer coverage for source invalidation, failed protection writes, invalid files, old-client CAS, and ordinary board lifecycle preservation.",
+  "previousBehavior": "The original consumer proved exact-file retention, local adoption, supported archive currentBoard handling, and basic signed-in acknowledgement. It did not yet independently exercise legacy browser copies, changes during final backup readback, each consent invalidator, injected backup failures, malformed inputs, a released peer winning CAS, or replacement Undo and History. These added checks target branches that were already implemented; they do not claim a newly discovered product failure.",
+  "intendedBehavior": "Use the actual Settings selection, preview, and confirmation route to prove a source change stops before the prospective primary-head write; failed backup or readback leaves only verified copies; malformed, unsupported, incomplete, and ambiguous files remain exact protected evidence; a supported old client can win the cloud CAS before file publication; and explicit restore plus Undo preserve completion, History, ratings, deletions, and unknown fields. Raw archive sources remain evidence and are never replayed.",
+  "replacementTests": [
+    "RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exact sources before explicit local adoption",
+    "RISK BACKUP FILE RESTORE: a signed-in file waits for explicit CAS and exact cloud acknowledgement",
+    "RISK BACKUP FILE RESTORE: account-bound files stay protected while cloud is unavailable",
+    "RISK BACKUP FILE RESTORE: IDB authority does not hide changed legacy board copies",
+    "RISK BACKUP FILE RESTORE: source changes during final awaited copy readback never reach the primary commit",
+    "RISK BACKUP FILE RESTORE: state, device-head, and draft-only changes expire preview consent",
+    "RISK BACKUP FILE RESTORE: cancel and file reselection bind confirmation to the newly selected bytes",
+    "RISK BACKUP FILE RESTORE: backup CAS abort and readback failure keep the active board and any saved copies",
+    "RISK BACKUP FILE RESTORE: unsupported and ambiguous selected files stop with exact bytes protected",
+    "RISK BACKUP FILE RESTORE: account, auth epoch, pending evidence, and cloud revision changes hold consent",
+    "RISK BACKUP FILE RESTORE: a released old client wins CAS before the prospective file board is published",
+    "RISK BACKUP FILE RESTORE: replacement preserves completion, History, ratings, deletions, unknown data, and Undo"
+  ],
+  "preservedCoverage": [
+    "The original exact-byte and archive consumer, account-bound CAS/ACK and offline hold tests remain intact, together with every prior RISK assertion.",
+    "The source matrix distinguishes accepted board state, durable IDB head, quick-add draft, both allowlisted legacy board keys, account identity, same-user auth epoch, pending upload evidence, cloud revision, file reselection, cancellation, and mutation during the final awaited backup readback.",
+    "Injected backup CAS abort and readback failure retain only the completed copies and never attempt a prospective primary-head write. Invalid UTF-8, corrupt JSON, wrong shape, unsupported version, missing currentBoard, partial archive, and duplicate task IDs retain exact selected bytes without enabling adoption.",
+    "The stale-peer test loads the actual supported released app source, serializes its own peer edit, and uses the isolated shared conditional cloud fixture to win before the file write. The lifecycle test uses real rating, completion, and worked-on actions and checks explicit replacement, deletion evidence, ordinary History, unknown fields, and durable Undo.",
+    "The additional branch-specific cases were added as later-baseline sensitivity after the initial implementation; they are not represented as separate preimplementation REDs. Native browser file-picker/rendering, real Firebase, release, and deployment checks remain root-owned evidence."
+  ],
+  "redEvidence": {
+    "command": "TZ=UTC /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/restore-backup-file-196/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/restore-backup-file/phase2/owner-runs --purpose preimplementation-red -- /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern='RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exact sources before explicit local adoption' tests.js",
+    "failure": "The genuine original full-Settings-consumer RED at 2026-10-18T13-45-23-975Z-a04ad281-9bb1-4283-bb98-442e6bff8b64.json failed because the backup-file restore action was absent at unchanged commit 41644ed61f66d1283e6dd3caff7551805ec5c4ab. A later recorded source-guard failure at 2026-10-18T14-25-16-107Z-73f17415-db3a-485b-afbd-59422967a7e7.json is labeled later-baseline-sensitivity by the recorder: it exposed changed legacy keys and an awaited-readback race before their source repair, but is not backfilled as the original preimplementation RED."
+  },
+  "observedIntermediateRuns": [
+    "2026-10-18T14-26-11-602Z-e37cc130-1ca7-4089-b5e6-856598698b09.json passed the two targeted legacy-key and final-readback source guards after repair.",
+    "2026-10-18T14-28-52-321Z-5dd9c021-8e97-4b85-8f78-a580106f4b1d.json passed the then-current nine-test backup-file cohort before the released-client and lifecycle cases were added.",
+    "2026-10-18T14-31-10-959Z-ab68d569-8f5b-4b43-966b-28eb6f7e9211.json retained two later-baseline fixture failures: the old-client fixture did not yet establish a peer write, and the lifecycle fixture manufactured inconsistent decision evidence. Neither was a source regression.",
+    "2026-10-18T14-35-41-421Z-0915789f-62ab-465b-b5d3-14f9c6bc93c7.json passed the actual released-client CAS case after asserting the released app's serialized peer edit reaches the shared conditional writer.",
+    "2026-10-18T14-35-58-968Z-b18bcbfe-1df4-4c5c-adcd-0356c47decfc.json found an unsupported synthetic rating event; 2026-10-18T14-36-12-182Z-2c27c771-87ff-4a36-984a-873958bd2da1.json found a cross-realm prototype comparison in the test; 2026-10-18T14-36-18-644Z-a8475b82-8fc4-4678-a310-0b36eb14332d.json found an expectation for History that the test had explicitly removed from the file; 2026-10-18T14-36-29-991Z-73b8a7c8-1591-4349-a845-fb778e6d962f.json found a durable read before awaiting persist. These recorded fixture/assertion issues were corrected without product-source changes.",
+    "2026-10-18T14-36-40-294Z-37ceb6ed-ff0b-460e-8ef4-ba70a4394ba3.json passed the lifecycle consumer after using actual app actions and awaiting durable Undo."
+  ],
+  "greenEvidence": "The complete RISK BACKUP FILE RESTORE focused cohort passed 12 top-level tests / 23 tests, 0 failures and 0 skips, through record-run at /Users/emeraldpham/.codex/task-artifacts/restore-backup-file/phase2/owner-runs/2026-10-18T14-38-35-078Z-7c5c9270-f18f-4eb9-bcec-9438997e75e5.json. The released-client case also passed independently at 2026-10-18T14-35-41-421Z-0915789f-62ab-465b-b5d3-14f9c6bc93c7.json and lifecycle preservation passed independently at 2026-10-18T14-36-40-294Z-37ceb6ed-ff0b-460e-8ef4-ba70a4394ba3.json.",
+  "comparison": "issue196FullSettingsRestoreCoverageAgainst41644ed",
+  "baseCommit": "41644ed61f66d1283e6dd3caff7551805ec5c4ab"
+},
+  {
+    "testChangesSha256": "62a703b462f9323f90305cec79c27662939d232f06b399ea825aba644a2be33f",
+    "reason": "Protect actual backup-file restore previews from cancellation races during source checks and from dismissal while publication or the primary write is unresolved.",
+    "previousBehavior": "The integrated 41644ed baseline had no file-restore controls. After implementation, later-baseline sensitivity found that Cancel during the first awaited source read closed the preview but still applied the captured board; a deferred primary commit also left Cancel, X, backdrop, and Escape dismissal active.",
+    "intendedBehavior": "Each selected file carries a consent generation that Cancel invalidates before the irreversible boundary. Once conditional cloud publication or a primary local write starts, Settings renders an in-progress state, disables Cancel and X, and guards direct Cancel plus generic close, backdrop, and Escape handlers until the result is known. The original preview closes only after successful adoption or a settled error.",
+    "replacementTests": [
+      "RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exact sources before explicit local adoption",
+      "RISK BACKUP FILE RESTORE: a signed-in file waits for explicit CAS and exact cloud acknowledgement",
+      "RISK BACKUP FILE RESTORE: account-bound files stay protected while cloud is unavailable",
+      "RISK BACKUP FILE RESTORE: IDB authority does not hide changed legacy board copies",
+      "RISK BACKUP FILE RESTORE: source changes during final awaited copy readback never reach the primary commit",
+      "RISK BACKUP FILE RESTORE: state, device-head, and draft-only changes expire preview consent",
+      "RISK BACKUP FILE RESTORE: cancel and file reselection bind confirmation to the newly selected bytes",
+      "RISK BACKUP FILE RESTORE: closing the preview cancels an in-flight source check before adoption",
+      "RISK BACKUP FILE RESTORE: in-progress primary save blocks Cancel and modal dismissal",
+      "RISK BACKUP FILE RESTORE: in-progress cloud publication blocks Cancel and modal dismissal",
+      "RISK BACKUP FILE RESTORE: backup CAS abort and readback failure keep the active board and any saved copies",
+      "RISK BACKUP FILE RESTORE: unsupported and ambiguous selected files stop with exact bytes protected",
+      "RISK BACKUP FILE RESTORE: account, auth epoch, pending evidence, and cloud revision changes hold consent",
+      "RISK BACKUP FILE RESTORE: a released old client wins CAS before the prospective file board is published",
+      "RISK BACKUP FILE RESTORE: replacement preserves completion, History, ratings, deletions, unknown data, and Undo",
+      "RISK BACKUP FILE RESTORE: backdrop and Escape cancel a pending source check before adoption"
+    ],
+    "preservedCoverage": [
+      "The original exact-byte file consumer, current-board preview and adoption, archive currentBoard-only path, and raw appSources evidence-only behavior remain intact.",
+      "Account-bound CAS and exact acknowledgement, offline holds, stale source matrices, backup failures, malformed inputs, old-client CAS, and durable Undo/history coverage remain in the same real Settings flow.",
+      "The new cancellation tests use isolated synthetic IndexedDB and cloud fixtures. One pauses the real first readHead and proves actual X/Cancel invalidates the captured preview; the other pauses actual commitHead and CloudSync.push to prove all closing routes remain unavailable until their results resolve.",
+      "The new records are later-baseline sensitivity findings against already implemented source, not original preimplementation REDs. Prior raw RED/GREEN provenance, all existing assertions, and prior rationale objects remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "Recorded later-baseline-sensitivity runs through scripts/agent-tools/record-run.mjs targeted the actual Settings file-restore consumer at record cf1d2466-ff8a-4495-945a-55f6a554c220 and the deferred primary commit boundary at record 14c14954-6f61-47cc-bd22-0849278afa3b.",
+      "failure": "The first assertion observed the selected board applied after X/Cancel closed the preview during a paused real readHead. The second assertion observed both Cancel controls enabled, a true Cancel handler result, and successful backdrop/Escape dismissal while real commitHead was paused. Both are postimplementation findings and are not backfilled as original REDs."
+    },
+    "observedIntermediateRuns": [
+      "2026-10-18T14-47-46-773Z-6c0528f8-c43b-4782-b374-c513ed160c3e.json: the first-read Cancel regression passed after consent-generation invalidation.",
+      "2026-10-18T14-49-07-433Z-b9d262a9-ce9a-4070-9bc6-f94dfb876da6.json, 2026-10-18T14-49-41-915Z-78bbecfb-47b4-4e74-b6b8-310d6db87b24.json, 2026-10-18T14-49-49-117Z-9f665ea6-3ecf-43ca-864e-e332ffd25e94.json, and 2026-10-18T14-50-03-575Z-2fb80613-9a00-4a04-afc5-ac71d4fe882e.json preserve FAQ word-count and stale copy-expectation corrections; no source defect was inferred from those assertion failures.",
+      "2026-10-18T14-52-30-872Z-14c14954-6f61-47cc-bd22-0849278afa3b.json: actual deferred primary-commit boundary sensitivity RED.",
+      "2026-10-18T14-53-47-035Z-1ff0a452-4f04-4334-97f0-9a7d52e8d419.json failed only because the test expected an empty modal after adoption; the real app correctly returned to Settings. That assertion was corrected without source changes.",
+      "2026-10-18T14-53-56-146Z-fba5531d-64e9-44c8-ab41-75103931c07f.json passed the first-read cancel, local commit pause, cloud push pause, and inventory checks 4/4; 2026-10-18T14-54-38-617Z-d6fce0bf-2097-4048-afc3-fac3500827da.json repeated them after generic reversible dismissal was routed through Cancel.",
+      "2026-10-18T14-56-52-548Z-39e9d710-ff71-4477-8d08-e3008d5b3edc.json passed the actual deferred source-read, primary-commit, and cloud-publication Cancel boundary cohort 3/3 with zero skips.",
+      "2026-10-18T15-00-23-724Z-bb2c75cf-7548-4ae1-b155-dc8e3a5773bf.json passed actual backdrop and Escape dismissal during a deferred Settings source read 3/3 with zero skips; cancellation kept Settings open and left accepted and durable boards unchanged.",
+      "2026-10-18T15-01-56-523Z-96071b87-19d6-43c6-821b-89b16b5c5c0c.json passed the risk-inventory mapping check after adding actual backdrop and Escape coverage."
+    ],
+    "greenEvidence": "The full focused export, backup-file restore, in-flight dismissal, and risk-inventory cohort passed 29/29 with zero skips through record-run at /Users/emeraldpham/.codex/task-artifacts/restore-backup-file/phase2/owner-runs/2026-10-18T14-55-01-262Z-21b0c869-4604-4a13-97db-3a7193a01f81.json. The final boundary-only rerun passed the actual first-read Cancel, primary commit, and cloud publication consumer paths 3/3 with zero skips at /Users/emeraldpham/.codex/task-artifacts/restore-backup-file/phase2/owner-runs/2026-10-18T14-56-52-548Z-39e9d710-ff71-4477-8d08-e3008d5b3edc.json. The actual backdrop and Escape consumer paths were also exercised during a deferred source read and passed 3/3 with zero skips at /Users/emeraldpham/.codex/task-artifacts/restore-backup-file/phase2/owner-runs/2026-10-18T15-00-23-724Z-bb2c75cf-7548-4ae1-b155-dc8e3a5773bf.json. The updated RISK test inventory mapping passed through record-run at /Users/emeraldpham/.codex/task-artifacts/restore-backup-file/phase2/owner-runs/2026-10-18T15-01-56-523Z-96071b87-19d6-43c6-821b-89b16b5c5c0c.json.",
+    "comparison": "issue196CancelAndInFlightDismissalAgainst41644ed",
+    "baseCommit": "41644ed61f66d1283e6dd3caff7551805ec5c4ab"
+  },
+  {
+    "testChangesSha256": "c0a623a7b5b64eddd77be324ef2b903caa5d440d3f4e27e7be9406d5e6b9cbff",
+    "reason": "Record the exact integrated candidate tests.js diff against origin/main after preserving the scoped 185, 186, 188, 194, and 190 evidence and completing issue196. This maps one combined candidate and does not claim new test authorship or backfill component chronology.",
+    "previousBehavior": "At the 52d origin/main baseline, durable hydration, overlapping device commits, held recovery consent, timed-hold projection, distinct JSON exports, and guarded backup-file restore each had scoped gaps. The aggregate preserves the individual owner records rather than treating every later assertion as a new preimplementation failure.",
+    "intendedBehavior": "Keep each approved repair within its existing boundary: wait for durable hydration; report verified superseding commits honestly; require fresh held-recovery consent after conflict; project supported timed holds at their action-time boundary; export a read-only current board and complete versioned local archive; and restore only an explicitly previewed supported currentBoard after exact copies, source checks, and local or confirmed cloud adoption.",
+    "preservedCoverage": [
+      "Issues185 and186 retain actual Auth/hydration, corrupt-head hold, overlapping-commit, account-switch, pending-draft, and storage-failure regressions in their existing component evidence.",
+      "Issue188 retains held-review, deliberate-choice, conditional-publication, source-change, exact-backup, safe-diagnostic, cancellation, and separately guarded supported-Restore boundaries.",
+      "Issue194 retains exact timed Can’t and Worked expiry, per-board duration settings, reopen and cloud-pull behavior, corrupt and orphan fail-closed controls, and its recorded FAQ coverage.",
+      "Issue190 retains distinct current-board and recovery-archive exports, the raw four-source read-only port, exact unknown values and array properties, and honest stop behavior for read, abort, change, and unsupported sources.",
+      "Issue196 retains the actual Settings file consumer, exact file and current-board copies, source-generation invalidation, in-progress local and cloud dismissal guards, failure and invalid-file holds, released-client CAS, and ordinary lifecycle plus Undo preservation. Archive pending, opaque, and authority evidence is never replayed.",
+      "This aggregate cites component records and candidly preserves the raw first-run limitations for 194 and 190 plus the later-baseline sensitivity labels for 196; no contributor or RED chronology is reassigned."
+    ],
+    "redEvidence": {
+      "command": "Component commands and records remain in their issue-specific rationale entries. The combined 185/186/188/194/190 aggregate red record is /Users/emeraldpham/.codex/task-artifacts/manual-json-export/phase2/root-packaging/owner-runs/2026-10-18T13-27-30-030Z-e199639e-f58b-40b3-a6e5-6f471e527e95.json; issue196 original missing-Settings-control RED is in its rationale at record a04ad281, and its later source-read and deferred-commit sensitivity REDs are cf1d2466 and 14c14954.",
+      "failure": "The component REDs are scoped and retained in their original records; the combined aggregate run found only that no exact rationale fingerprint existed for the combined candidate diff, not a behavioral failure. Issue194 first raw RED/GREEN and issue190 first raw GREEN remain explicitly unrecorded; they are not backfilled. Issue196 later-baseline REDs exposed the cancellation races after the initial implementation and are not represented as original preimplementation failures."
+    },
+    "greenEvidence": "The integrated 185/186/188/194/190 component and aggregate evidence remains in its existing rationale entries, including recorded issue194 postimplementation acceptance and recorded ticket190 focus cohorts. Issue196 current focused export/restore/in-flight/inventory passed 29/29 at /Users/emeraldpham/.codex/task-artifacts/restore-backup-file/phase2/owner-runs/2026-10-18T14-55-01-262Z-21b0c869-4604-4a13-97db-3a7193a01f81.json; deferred source, primary-write and cloud-publication boundaries passed 3/3 at 14-56-52-548Z-39e9d710-ff71-4477-8d08-e3008d5b3edc.json, and backdrop/Escape cancellation passed 3/3 at 15-00-23-724Z-bb2c75cf-7548-4ae1-b155-dc8e3a5773bf.json. The updated RISK test inventory mapping passed through record-run at /Users/emeraldpham/.codex/task-artifacts/restore-backup-file/phase2/owner-runs/2026-10-18T15-01-56-523Z-96071b87-19d6-43c6-821b-89b16b5c5c0c.json.",
+    "replacementTests": [
+      "RISK AUTH HYDRATION: real Auth and native resume wait for the durable board, then reconcile once",
+      "RISK AUTH HYDRATION: a corrupt device-head read stays visible and keeps cloud adoption held",
+      "RISK AUTH HYDRATION: extended FAQ and current Changelog explain the saved-board wait",
+      "RISK MANUAL JSON EXPORT: the actual Settings actions download current board and recovery archive",
+      "RISK MANUAL JSON EXPORT: unreadable, unsupported and hydration-placeholder sources stop without a file",
+      "RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exact sources before explicit local adoption",
+      "RISK BACKUP FILE RESTORE: a signed-in file waits for explicit CAS and exact cloud acknowledgement",
+      "RISK BACKUP FILE RESTORE: account-bound files stay protected while cloud is unavailable",
+      "RISK BACKUP FILE RESTORE: IDB authority does not hide changed legacy board copies",
+      "RISK BACKUP FILE RESTORE: source changes during final awaited copy readback never reach the primary commit",
+      "RISK BACKUP FILE RESTORE: state, device-head, and draft-only changes expire preview consent",
+      "RISK BACKUP FILE RESTORE: cancel and file reselection bind confirmation to the newly selected bytes",
+      "RISK BACKUP FILE RESTORE: closing the preview cancels an in-flight source check before adoption",
+      "RISK BACKUP FILE RESTORE: backdrop and Escape cancel a pending source check before adoption",
+      "RISK BACKUP FILE RESTORE: in-progress primary save blocks Cancel and modal dismissal",
+      "RISK BACKUP FILE RESTORE: in-progress cloud publication blocks Cancel and modal dismissal",
+      "RISK BACKUP FILE RESTORE: backup CAS abort and readback failure keep the active board and any saved copies",
+      "RISK BACKUP FILE RESTORE: unsupported and ambiguous selected files stop with exact bytes protected",
+      "RISK BACKUP FILE RESTORE: account, auth epoch, pending evidence, and cloud revision changes hold consent",
+      "RISK BACKUP FILE RESTORE: a released old client wins CAS before the prospective file board is published",
+      "RISK BACKUP FILE RESTORE: replacement preserves completion, History, ratings, deletions, unknown data, and Undo",
+      "RISK DEVICE STORAGE V2: raw export snapshot preserves exact sources in one read-only capture",
+      "RISK SCALABLE CONCURRENCY: overlapping native and background saves do not report a committed head as failed",
+      "RISK SCALABLE CONCURRENCY: a superseded Add keeps its pending draft when the current device head changes accounts",
+      "RISK timed-hold coherence: native Can’t expires at the exact deadline through IndexedDB and ordinary cloud pull",
+      "RISK timed-hold coherence: native Worked honors hours and local 2 AM ceilings across reopen and cloud pull",
+      "RISK timed-hold coherence: use each board’s Worked settings and keep orphan evidence fail-closed",
+      "RISK timed-hold coherence: extended FAQ and current Settings changelog explain retained expiry time",
+      "RISK held decision recovery: deliberate keep saved dark preserves exact sources and publishes a fresh choice",
+      "RISK held decision recovery: unreadable browser evidence and failed verified copies stop before changing the board",
+      "RISK held decision recovery: recorded light minimized empty-cloud and cloud-held sources require deliberate choices",
+      "RISK held decision recovery: native peer edits independent comparisons ratings and History survive the appearance choice",
+      "RISK held decision recovery: changed preview account local cloud and pending sources invalidate consent",
+      "RISK held decision recovery: a real conditional publication conflict preserves the peer and requires a fresh choice",
+      "RISK held decision recovery: unavailable reads local commit abort and failed uploads remain honest and retryable",
+      "RISK held decision recovery: unknown authority nonappearance incoherence and corrupt cloud stay held with safe diagnostics",
+      "RISK held decision recovery: cold reopen protects a pending choice from ordinary sync deletion and rotation",
+      "RISK held decision recovery: help and visible recovery explain deliberate appearance choices and protected limits",
+      "RISK held decision recovery: closing review during backup I O cancels consent before application",
+      "RISK held decision recovery: browser fallback verifies source backups and records an exact cloud acknowledgement",
+      "RISK held decision recovery: diagnostics identify only app origin fingerprint and safe source category",
+      "RISK held decision recovery: evidence and pending-choice archives cannot be restored as empty boards",
+      "RISK held decision recovery: supported released consumers cannot publish a prepared choice after conflict or uncertain acknowledgement",
+      "RISK held decision recovery: preview lists native peer task fields and displaced unknown paths with escaped values",
+      "RISK held decision recovery: native selected and enabled actions use established filled theme paint",
+      "RISK held decision recovery: rejected ordinary Restore leads through the visible error to deliberate recovery",
+      "RISK held decision recovery: confirmed publication revalidates changed sources before local apply",
+      "RISK held decision recovery: a newer durable or browser source during confirmed local commit stays current",
+      "RISK held decision recovery: new reviewed consent supersedes prior prepared publications only after exact ACK"
+    ],
+    "comparison": "integrated185-186-188-194-190-196-candidate-against-origin-main",
+    "baseCommit": "52d4b2537bacbb60240ae7a53061224350ebd36f",
+    "observedIntermediateRuns": [
+      "The aggregate record preserves component evidence and chronology in earlier rationale objects; the issue196 consumer cohort passed 29/29 at 14-55-01-262Z, source/commit/cloud cancellation controls passed 3/3 at 14-56-52-548Z, generic backdrop/Escape cancellation passed 3/3 at 15-00-23-724Z, and risk inventory mapping passed at 15-01-56-523Z."
+    ]
   }
 ]

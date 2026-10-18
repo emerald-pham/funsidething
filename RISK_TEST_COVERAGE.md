@@ -139,6 +139,23 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK DEVICE STORAGE V2: raw export snapshot preserves exact sources in one read-only capture
 - RISK MANUAL JSON EXPORT: the actual Settings actions download current board and recovery archive
 - RISK MANUAL JSON EXPORT: unreadable, unsupported and hydration-placeholder sources stop without a file
+- RISK BACKUP FILE RESTORE: the actual Settings file selection protects exact sources before explicit local adoption
+- RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exact sources before explicit local adoption
+- RISK BACKUP FILE RESTORE: a signed-in file waits for explicit CAS and exact cloud acknowledgement
+- RISK BACKUP FILE RESTORE: account-bound files stay protected while cloud is unavailable
+- RISK BACKUP FILE RESTORE: IDB authority does not hide changed legacy board copies
+- RISK BACKUP FILE RESTORE: source changes during final awaited copy readback never reach the primary commit
+- RISK BACKUP FILE RESTORE: state, device-head, and draft-only changes expire preview consent
+- RISK BACKUP FILE RESTORE: cancel and file reselection bind confirmation to the newly selected bytes
+- RISK BACKUP FILE RESTORE: closing the preview cancels an in-flight source check before adoption
+- RISK BACKUP FILE RESTORE: backdrop and Escape cancel a pending source check before adoption
+- RISK BACKUP FILE RESTORE: in-progress primary save blocks Cancel and modal dismissal
+- RISK BACKUP FILE RESTORE: in-progress cloud publication blocks Cancel and modal dismissal
+- RISK BACKUP FILE RESTORE: backup CAS abort and readback failure keep the active board and any saved copies
+- RISK BACKUP FILE RESTORE: unsupported and ambiguous selected files stop with exact bytes protected
+- RISK BACKUP FILE RESTORE: account, auth epoch, pending evidence, and cloud revision changes hold consent
+- RISK BACKUP FILE RESTORE: a released old client wins CAS before the prospective file board is published
+- RISK BACKUP FILE RESTORE: replacement preserves completion, History, ratings, deletions, unknown data, and Undo
 - RISK CLOUD V2: a multi-megabyte board publishes only after verified chunks and pulls byte-exactly
 - RISK CLOUD V2: crash resume, concurrent revisions, and account cancellation never publish partial data
 - RISK CLOUD V2: corrupt active data fails closed, manifest races retry, and garbage collection keeps recovery generations
@@ -1563,3 +1580,20 @@ The candidate worker precaches while predecessor clients remain on their existin
 - RISK held decision recovery: confirmed publication revalidates changed sources before local apply
 - RISK held decision recovery: a newer durable or browser source during confirmed local commit stays current
 - RISK held decision recovery: new reviewed consent supersedes prior prepared publications only after exact ACK
+
+- RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exact sources before explicit local adoption
+- RISK BACKUP FILE RESTORE: a signed-in file waits for explicit CAS and exact cloud acknowledgement
+- RISK BACKUP FILE RESTORE: account-bound files stay protected while cloud is unavailable
+- RISK BACKUP FILE RESTORE: IDB authority does not hide changed legacy board copies
+- RISK BACKUP FILE RESTORE: source changes during final awaited copy readback never reach the primary commit
+- RISK BACKUP FILE RESTORE: state, device-head, and draft-only changes expire preview consent
+- RISK BACKUP FILE RESTORE: cancel and file reselection bind confirmation to the newly selected bytes
+- RISK BACKUP FILE RESTORE: closing the preview cancels an in-flight source check before adoption
+- RISK BACKUP FILE RESTORE: backdrop and Escape cancel a pending source check before adoption
+- RISK BACKUP FILE RESTORE: in-progress primary save blocks Cancel and modal dismissal
+- RISK BACKUP FILE RESTORE: in-progress cloud publication blocks Cancel and modal dismissal
+- RISK BACKUP FILE RESTORE: backup CAS abort and readback failure keep the active board and any saved copies
+- RISK BACKUP FILE RESTORE: unsupported and ambiguous selected files stop with exact bytes protected
+- RISK BACKUP FILE RESTORE: account, auth epoch, pending evidence, and cloud revision changes hold consent
+- RISK BACKUP FILE RESTORE: a released old client wins CAS before the prospective file board is published
+- RISK BACKUP FILE RESTORE: replacement preserves completion, History, ratings, deletions, unknown data, and Undo
