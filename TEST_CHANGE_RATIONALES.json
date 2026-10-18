@@ -11613,5 +11613,42 @@
     "laterSensitivity": "External reversionbea2086a moves peer-response waiting before source prompt assertions again; the exact rev===5 assertion fails6!==5. External promptb4f9a1a delegates only fixture Done immediate call to the actual ordinary producer; source write-ACK-before-debounce assertion fails. External withheld-hint52a30b45 passes1/1 both completion modes: zero peer reads and no current/known completion through actual ordinary-write ACK, then dispatches the exact captured natural event and receives completion through its real canonical continuation, without manual target sync/focus. These are later sensitivity controls, not preimplementation chronology.",
     "attemptAttribution": "First preimplementation83f67ca0 PASSED3/3: waiting for ordinary producer entry alone precedes its write ACK and did not force the false negative. It is preserved as a non-RED control. Subsequent d96ef663 is the genuine pre-repair assertion RED. Root read exact probe/diff/full traces on clean fdf and approved the narrow source-ACK/peer-delay separation before edits; root-slow-peer-seam-acceptance.json SHAbd5b6289f5c0b7b28f5c38b3cc5f78ab007bfcf3a54e84cc81c5db8545e8f1f6 retains that boundary. Original main failure, head successes and fdf evidence remain distinct historical records. Parent reports full-fdf731148ae finished2158total/2110pass/0fail/48skip; it is predecessor evidence only. The first rationale generator and precommit gate correctly refused the missing updated test declaration in the exact diff; formatting only its unchanged title/deadline declaration binds the test body, with no runtime or time-budget edit. That packaging failure is retained separately, not a behavioral RED.",
     "validationScope": "The unchanged test title/deadline declaration receives whitespace formatting so the existing replacement-test diff validator can bind its updated body. No app/runtime/public copy/SW/hash change, shared loader/helper/default/deadline change, other consumer sweep, new framework, full suite/rules/compat/browser/emulator/CI/push/merge/deploy by worker. Root owns exact whole-candidate integration, independent review and release gates. Existing native/rendered proof carries only on mechanical unchanged runtime bytes."
+  },
+  {
+    "comparison": "optionalOldestStart182",
+    "baseCommit": "826f3a5dec47bd05dc6f27154d14ea4416201372",
+    "testChangesSha256": "0d6c60469981127553371d606ff93f4b205038c98325507f87f142d12c8c4649",
+    "reason": "Issue182 authorizes a saved strict boolean opt-out of automatic oldest first dot, neutral explicit first choices, truthful controls and preserved lifecycle/sync. New public-consumer tests are prepended without editing any original feature assertion.",
+    "previousBehavior": "Start always dots the oldest eligible task. A true opt-out still created an automatic first dot; unpaired Yes/No did not establish a chosen dot or skip. Settings had no opt-out. Existing automatic-first marker, summary and FAQ claims were unconditional.",
+    "intendedBehavior": "Only boolean true disables automatic seeding. Actual Settings change/save/reopen and Start offer an eligible unpaired candidate; first Yes is a deliberate neutral Dot, first No skips for this pass without pairwise learning. Default and invalid values retain automatic age and never-Done behavior. Existing dots, manual Dot, eligibility, saved draw, day cutoff, local persistence, concurrent peer edits, and synced Undo remain intact. Empty Start uses the existing new-pass representation and records its mode inside that pass, avoiding an unmatched automatic-root pair.",
+    "replacementTests": [
+      "RISK optional oldest start: enabled Start offers a candidate without dotting or learning",
+      "RISK optional oldest start: first Yes is unpaired and subsequent Yes learns normally",
+      "RISK optional oldest start: first No skips only this pass without pairwise learning and Undo restores it",
+      "RISK optional oldest start: Settings change save and reopen retain the preference and unrelated data",
+      "RISK optional oldest start: markers first-choice wording and exhausted-state controls match the enabled flow",
+      "RISK optional oldest start: skips before the first choice survive that choice and cold reopen",
+      "RISK optional oldest start: an unseeded descending pass clears first skips at the ordinary day boundary",
+      "RISK optional oldest start: enabling the setting waits for explicit Start before offering the first candidate",
+      "RISK optional oldest start: missing invalid and off values preserve defaults across all supported scan modes",
+      "RISK optional oldest start: zero and one eligible tasks remain usable with either preference",
+      "RISK optional oldest start: the unseeded candidate pool preserves completion date context dependency rest and postponement boundaries",
+      "RISK optional oldest start: toggling preserves an existing neutral chain and manual first Dot remains unchanged",
+      "RISK optional oldest start: synced preference first skip and explicit dot retain an independent peer edit",
+      "RISK optional oldest start: an empty started pass publishes and resumes with its saved draw",
+      "RISK optional oldest start: synced Undo reverses first choices Start and preference without learning",
+      "RISK optional oldest start: FAQ and current Changelog explain opt out defaults first choices and retained dots"
+    ],
+    "preservedCoverage": [
+      "All original tests.js bytes from the first quiet-reconciliation test through EOF remain byte-identical to826f3a5. No existing assertion, deadline, skip, fixture or supported compatibility baseline was removed or weakened.",
+      "The50 saved-value/mode cases plus zero/one/multiple and eligibility controls retain completion, dates, contexts, dependencies, rest and postponement. Explicit paired learning, automatic exclusion, manual Dot and existing-chain toggles remain tested.",
+      "Cloud consumers require actual SDK publication plus matching current serialized local, device and remote acknowledgements. First skip/choice plus independent peer edit and multi-step synced Undo run through production sync glue; no badge/read-only success substitutes for acknowledgement.",
+      "The earlier first-choice-reopen case passed when introduced and synced Undo also passed on first introduction; these are honest preservation controls, not claimed preimplementation REDs. Diagnostic preference-only passed, while Start/no/yes/both failed. The misplaced mode-gesture attempt failed and was corrected; no contrary run is hidden."
+    ],
+    "redEvidence": {
+      "command": "Pinned Node22 TZ=UTC node scripts/agent-tools/record-run.mjs --repo <isolated oldest-start-182 checkout> --evidence-dir /Users/emeraldpham/.codex/task-artifacts/oldest-start-182/test-runs --purpose preimplementation-red -- node --test --test-name-pattern=<individual optional oldest start slice> tests.js. Original start-red cb2dd4fa-032c-465c-83f1-b3c0b5529078 was recorded on runtime826 before implementation; all per-slice logs and source snapshots retained in /Users/emeraldpham/.codex/task-artifacts/oldest-start-182.",
+      "failure": "Original first RED expected empty chain but actual [optional-oldest]. Subsequent observed REDs: first Yes left chain empty, first No left considered undefined, real Settings Save still auto seeded, list promised suppressed seed, day cutoff kept skipped task, Settings enable offered candidate before Start, Postpone auto dotted replacement, cloud publication held unprojectable-decision-evidence, and mounted FAQ lacked the new question. See contemporaneous *-red.log files; diagnostic/reopen/synced-Undo passing controls are explicitly qualified. Empty-start-publication-red establishes later sync repair chronology, not baseline first RED."
+    },
+    "greenEvidence": "Focused final FAQ/behavior cohort faq-green.log passes19/19 including16 new optional-start tests, old FAQ brevity and neutral automatic exclusion FAQ. start-publication-corrected.log passes14/14 with full source held constant; later copy/comments/fingerprints receive final full/rules/compatibility/browser/review gates. No claim of shipment or original RED from these later greens."
   }
 ]
