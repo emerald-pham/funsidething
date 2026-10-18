@@ -25806,13 +25806,13 @@ async function ordinaryEditDebounceControl(){
   assert.equal(app.shim.localStorage.getItem(SYNC_STORE_KEY),JSON.stringify(app.ctx.state),'the actual startup consumer and device head are acknowledged before ordinary Add');
   startup.acknowledgedRaw=JSON.stringify(app.ctx.state);startup.account=vm.runInContext('reconciledAs',app.ctx);
   assert.equal(app.shim.window.CLOUD_PUSH_DELAY_MS,undefined,'the actual ordinary producer retains the default two-second debounce');
-  const push=app.shim.window.CloudSync.push;app.shim.window.CloudSync.push=async(...args)=>{entered.resolve({at:performance.now(),args});return push(...args);};
-  const started=performance.now();app.ctx.addTask('Actual ordinary debounced edit');return {app,h,started,entered:entered.promise,startup};
+  const acknowledged=deferredSyncFixture(),push=app.shim.window.CloudSync.push;app.shim.window.CloudSync.push=async(...args)=>{entered.resolve({at:performance.now(),args});const reply=await push(...args);acknowledged.resolve({at:performance.now(),reply});return reply;};
+  const started=performance.now();app.ctx.addTask('Actual ordinary debounced edit');return {app,h,started,entered:entered.promise,acknowledged:acknowledged.promise,startup};
  }catch(error){releaseStartup.resolve();await Promise.all(reads.filter(call=>!call.settled).map(call=>call.promise));app.ctx.suspendCloudSync();throw error;}
  finally{releaseStartup.resolve();}
 }
 
-test('RISK live scan sync: candidate Done publishes promptly and reaches another open device without focus',{timeout:10000},async t=>{
+test('RISK live scan sync: candidate Done publishes promptly and reaches another open device without focus', {timeout:10000},async t=>{
  const close=async app=>{if(!app)return;app.ctx.suspendCloudSync();vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry();clearTimeout(liveCloudTimer);',app.ctx);await app.ctx.window.ScannerDeviceStore?.close?.();};
  for(const evergreen of [false,true]){
   // The DOM shim unrefs application timers; keep this bounded IO observer alive.
@@ -25820,23 +25820,25 @@ test('RISK live scan sync: candidate Done publishes promptly and reaches another
   const {a,b,h,candidateId,nextId,benchId}=await liveScanSyncClients({evergreen}),ordinary=await ordinaryEditDebounceControl();
   const ratings=JSON.stringify(a.ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma]));
   const before={sourceRaw:h.doc.payload,senderRaw:JSON.stringify(a.ctx.state),peerRaw:JSON.stringify(b.ctx.state),initialA:liveDoneDeliverySnapshot(a,candidateId),initialB:liveDoneDeliverySnapshot(b,candidateId)},trace=[],started=performance.now();
-  const entered=deferredSyncFixture(),release=deferredSyncFixture(),senderEntered=deferredSyncFixture(),pulls=observeSyncFixtureCalls(b.ctx,'cloudPull');let held=false,delivered=false,consumer,response;
+  const entered=deferredSyncFixture(),release=deferredSyncFixture(),senderEntered=deferredSyncFixture(),sourceAcknowledged=deferredSyncFixture(),pulls=observeSyncFixtureCalls(b.ctx,'cloudPull');let held=false,delivered=false,consumer,response;
   const observe=event=>trace.push({event,elapsed:performance.now()-started,delivered,sourceRev:h.doc.rev,sourceDoneAt:h.remoteState().tasks.find(row=>row.id===candidateId).lastDoneAt,peer:liveDoneDeliverySnapshot(b,candidateId)});
   const dispatch=b.shim.window.dispatchEvent.bind(b.shim.window);b.shim.window.dispatchEvent=event=>{if(event.type==='cloudboardchange'){observe('natural-hint');trace.at(-1).hint={...event.detail};}return dispatch(event);};
   const CS=b.shim.window.CloudSync,pull=CS.pull;CS.pull=async(...args)=>{
-   observe('canonical-read-enter');const reply=await pull(...args);
+   observe('canonical-read-enter');const actual=pull(...args);observe('SDK-response-unavailable');const ordinaryACK=await ordinary.acknowledged;assert.equal(ordinaryACK.reply.ok,true,'the independent ordinary write really reached its SDK ACK');observe('ordinary-write-ACK-before-peer-SDK-response');const reply=await actual;observe('SDK-response-available');
    if(!held&&JSON.parse(reply.payload).tasks.find(row=>row.id===candidateId).lastDoneAt){held=true;observe('completion-response-held');entered.resolve({consumer:pulls.findLast(call=>!call.settled),response:{...reply}});await release.promise;delivered=true;observe('response-delivery-before-continuation');}
    return reply;
   };
-  const sourceCS=a.shim.window.CloudSync,push=sourceCS.push;sourceCS.push=async(...args)=>{observe('natural-Done-push-enter');senderEntered.resolve({at:performance.now(),args});return push(...args);};
+  const sourceCS=a.shim.window.CloudSync,push=sourceCS.push;sourceCS.push=async(...args)=>{observe('natural-Done-push-enter');senderEntered.resolve({at:performance.now(),args});const reply=await push(...args);observe('source-SDK-write-ACK');sourceAcknowledged.resolve({at:performance.now(),reply});return reply;};
   t.after(release.resolve);
   try{
    const actionAt=performance.now();
    a.ctx.onAction('cand-done',{dataset:{candidate:candidateId,benchmark:benchId}});
-   const publication=await senderEntered.promise;({consumer,response}=await entered.promise);assert.ok(consumer,'the natural revision hint owns an actual canonical read continuation');
+   const publication=await senderEntered.promise,sourceACK=await sourceAcknowledged.promise;assert.equal(sourceACK.reply.ok,true,'the natural Done write is acknowledged by the source SDK');assert.ok(sourceACK.at-actionAt<2000,'Done reaches its actual source write ACK before ordinary debounce');
    assert.ok(publication.at-actionAt<2000,'Done starts naturally before the ordinary edit debounce');
    assert.equal(ordinary.h.doc.rev,5,'the default ordinary edit is still unpublished when Done reaches the server');
    assert.ok(h.remoteState().tasks.find(t=>t.id===candidateId).lastDoneAt,'Done bypasses the ordinary two-second edit debounce');
+   observe('prompt-source-assertions-before-peer-response');
+   ({consumer,response}=await entered.promise);assert.ok(consumer,'the natural revision hint owns an actual canonical read continuation');
    const pending=liveDoneDeliverySnapshot(b,candidateId);assert.equal(pending.currentDoneAt,null,'the peer is unchanged while its real response is held');assert.equal(pending.knownDoneAt,null,'an undelivered response has not established completion knowledge');assert.equal(pending.pulling,true);
    assert.equal(trace.filter(row=>row.event==='natural-hint').length>0,true);assert.equal(delivered,false);
    release.resolve();await consumer.promise;await settleSavedViewPublication(a,h,'natural Done sender device/cloud ACK');await settleSavedViewPublication(b,h,'natural hinted Done read/device ACK');observe('canonical-consumer-and-device-ACK');
@@ -25848,9 +25850,9 @@ test('RISK live scan sync: candidate Done publishes promptly and reaches another
    assert.equal(b.ctx.state.workLog.filter(e=>e.taskId===candidateId).length,evergreen?1:0);
    assert.equal(JSON.stringify(JSON.parse(response.payload).decisionEvents),JSON.stringify(b.ctx.state.decisionEvents),'the natural response journal reaches the acknowledged peer exactly');
    const ordinaryPublication=await ordinary.entered;assert.ok(publication.at<ordinaryPublication.at,'the actual default-debounced edit producer follows Done');await settleSavedViewPublication(ordinary.app,ordinary.h,'ordinary edit control device/cloud ACK');
-   t.diagnostic(JSON.stringify({evergreen,ordinaryStartup:{heldConsumers:ordinary.startup.heldConsumers,account:ordinary.startup.account},DonePublicationMs:publication.at-actionAt,ordinaryPublicationMs:ordinaryPublication.at-ordinary.started,trace:trace.map(({event,elapsed,delivered,sourceRev,peer})=>({event,elapsed,delivered,sourceRev,peerRev:peer.rev,currentDoneAt:peer.currentDoneAt,knownDoneAt:peer.knownDoneAt}))}));
+   t.diagnostic(JSON.stringify({evergreen,ordinaryStartup:{heldConsumers:ordinary.startup.heldConsumers,account:ordinary.startup.account},DonePublicationMs:publication.at-actionAt,DoneSourceACKMs:sourceACK.at-actionAt,ordinaryPublicationMs:ordinaryPublication.at-ordinary.started,trace:trace.map(({event,elapsed,delivered,sourceRev,peer})=>({event,elapsed,delivered,sourceRev,peerRev:peer.rev,currentDoneAt:peer.currentDoneAt,knownDoneAt:peer.knownDoneAt}))}));
    if(process.env.LIVE_DONE_DELIVERY_EVIDENCE_DIR){fs.mkdirSync(process.env.LIVE_DONE_DELIVERY_EVIDENCE_DIR,{recursive:true});fs.writeFileSync(path.join(process.env.LIVE_DONE_DELIVERY_EVIDENCE_DIR,'live-Done-'+process.pid+'-'+(evergreen?'evergreen':'ordinary')+'.json'),JSON.stringify({evergreen,before,response,trace,ordinaryStartup:ordinary.startup,ordinarySourceRaw:ordinary.h.doc.payload,finalSourceRaw:h.doc.payload,finalA:liveDoneDeliverySnapshot(a,candidateId),finalB:liveDoneDeliverySnapshot(b,candidateId)},null,2));}
-  }finally{release.resolve();await consumer?.promise;await close(a);await close(b);await close(ordinary.app);clearTimeout(observerWatchdog);}
+  }finally{release.resolve();await consumer?.promise;await Promise.all(pulls.filter(call=>!call.settled).map(call=>call.promise));await close(a);await close(b);await close(ordinary.app);clearTimeout(observerWatchdog);}
  }
 });
 

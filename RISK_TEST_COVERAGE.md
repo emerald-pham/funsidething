@@ -434,7 +434,7 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 ## Open-device scan updates and tablet editor dates
 
 - RISK live scan sync: candidate Done publishes promptly and reaches another open device without focus
-  Proves natural prompt publication against an actual default-debounced edit after its queued startup read/device acknowledgement, a held notification-driven canonical response with no peer knowledge, then released consumer/device acknowledgement in both completion modes.
+  Proves natural source write acknowledgement before an actual default-debounced edit, independently delays the hinted peer SDK response through that ordinary edit’s write acknowledgement, then releases the held response and checks consumer/device acknowledgement in both completion modes.
 - RISK live scan sync: done adding for now shares the existing work mode and survives reload and reconnect
   Holds only the initial natural work response until its captured consumer and exact fallback/host device head acknowledge it; retains the original cold reload, hidden peer and later visibility-resume behavior.
 - RISK live scan sync: revision hints wake canonical reads without trusting foreign duplicate or malformed notifications
