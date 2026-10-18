@@ -92,9 +92,7 @@ For an agreed spec and ticket graph, run `/implement-spec`, complete the require
 checks and release gates, then run `/retro` for that session or checkpoint. Use
 `/to-tickets` for approved follow-ups when useful, then `/implement-spec` for the
 next graph. Use fresh focused agent contexts where supported, retaining existing
-ownership and coordination. Every functional slice keeps the required behavioral
-RED before implementation and GREEN afterward; a retrospective does not restore
-missing chronology.
+ownership and coordination.
 
 ## Finish and hand off
 
