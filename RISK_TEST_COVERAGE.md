@@ -141,6 +141,8 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK MANUAL JSON EXPORT: unreadable, unsupported and hydration-placeholder sources stop without a file
 - RISK BACKUP FILE RESTORE: the actual Settings file selection protects exact sources before explicit local adoption
 - RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exact sources before explicit local adoption
+- RISK BACKUP FILE RESTORE: current decisions survive file selection and cross-account transfer
+- RISK BACKUP FILE RESTORE: irreversible preview shows Restore and close as unavailable
 - RISK BACKUP FILE RESTORE: a signed-in file waits for explicit CAS and exact cloud acknowledgement
 - RISK BACKUP FILE RESTORE: account-bound files stay protected while cloud is unavailable
 - RISK BACKUP FILE RESTORE: IDB authority does not hide changed legacy board copies
@@ -797,6 +799,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK timed-hold coherence: native Can’t expires at the exact deadline through IndexedDB and ordinary cloud pull
 - RISK timed-hold coherence: native Worked honors hours and local 2 AM ceilings across reopen and cloud pull
 - RISK timed-hold coherence: use each board’s Worked settings and keep orphan evidence fail-closed
+- RISK decision replay: Start-root and real Worked membership survive ordinary cloud acknowledgement
 - RISK timed-hold coherence: extended FAQ and current Settings changelog explain retained expiry time
 - RISK timed-hold FAQ: actual Help retains Start and updated-board expiry cues together
 - RISK cloud current choices: compatible edits on the same task retain each changed property
