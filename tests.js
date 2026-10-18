@@ -275,6 +275,17 @@ test('RISK optional oldest start: the visible Resume action keeps an empty pause
  }
 });
 
+test('RISK optional oldest start: Quick start countdown and immediate-save inventory describe unpaired starts',async()=>{
+ const {ctx,shim}=await loadApp();ctx.onAction('help',{});const view=shim.document.getElementById('modalRoot').innerHTML;
+ const quick=view.match(/<summary>Quick start<\/summary>([\s\S]*?)<\/details>/)[1];
+ assert.match(quick,/With no dot, Yes chooses.*No skips.*this pass/,'Quick start must explain the initial unpaired choice');
+ assert.match(quick,/Once a dot exists, compare each candidate/,'benchmark comparisons start only after a dot exists');
+ const countdown=view.match(/<dt>What do the countdown tags mean\?<\/dt><dd>(.*?)<\/dd>/)[1];
+ assert.match(countdown,/Start clears expired.*before building.*eligible pool/,'timer cleanup does not promise automatic placement');
+ const immediate=view.match(/<dt>Which settings save immediately\?<\/dt><dd>(.*?)<\/dd>/)[1];
+ assert.match(immediate,/Skip automatically dotting the oldest task/,'the complete immediate-save inventory includes the new checkbox');
+});
+
 test('RISK quiet reconciliation feedback: a peer edit beside an ordinary Dislodge saves without a success interruption',async t=>{
  const at=Date.parse('2026-10-18T03:00:00Z'),ids=['quiet-first','quiet-second'];
  const initial=syncState({tasks:ids.map((id,i)=>({...syncTask(id,'Quiet task '+(i+1)),createdAt:i+1})),mode:'work',scanMode:'descending',syncAccount:'e@example.com',syncRev:4,syncDirty:false,settings:{horizonMin:60,thresholdPct:0,samples:40,cantMin:30,workedHours:8,theme:'system'}});

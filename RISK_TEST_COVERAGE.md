@@ -12,6 +12,8 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 ## Task state, eligibility, and scanner controls
 
+- RISK optional oldest start: Quick start countdown and immediate-save inventory describe unpaired starts
+
 - RISK optional oldest start: the visible Resume action keeps an empty paused pass and its saved draw
 
 - RISK optional oldest start: Save settings alone persists the checkbox transition
