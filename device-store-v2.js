@@ -232,7 +232,15 @@
       for(const key of snapshotKeys) if(!referenced.has(key)) snapshotStore.delete(key);
       await transactionDone(tx);
       const verified=await readHead();
-      if(!verified||verified.hash!==nextHash||verified.payload!==payload) throw new Error("Device head verification failed");
+      if(!verified) throw new Error("Device head verification failed");
+      if(verified.hash!==nextHash){
+        // The transaction above committed. A later CAS writer can advance the
+        // live head before this separate verification read; report that exact
+        // current head so its caller can reconcile instead of calling the
+        // already-committed write a failure.
+        return {ok:true,superseded:true,committedHash:nextHash,head:verified};
+      }
+      if(verified.payload!==payload) throw new Error("Device head verification failed");
       return {ok:true,hash:nextHash};
     }
 

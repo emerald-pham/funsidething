@@ -1,5 +1,25 @@
 [
   {
+    "testChangesSha256": "e5ed184eef3b73bec12fa898a7eeb4287a26c3c7e1a8cc47a02240914ec1641e",
+    "reason": "Add an actual native Add and ordinary background sendPush overlap regression for a transaction that commits before its separate verification read sees a later head. Add a real foreign-account current-head control and player-facing FAQ/changelog coverage without weakening existing save assertions.",
+    "previousBehavior": "After the old background transaction committed, a newer native Add advanced the actual device head before the background caller's verification read. The old caller threw Device head verification failed and showed a device-store write-failed warning despite both saves succeeding.",
+    "intendedBehavior": "Report a committed-but-superseded result with the verified current head. A caller may accept it only when the exact current payload/account matches its intended or live board; otherwise use guarded CAS repair or preserve the local pending Add and old markers on an account change. Genuine CAS, read, transaction, backup-collision and corruption failures remain failures.",
+    "replacementTests": [
+      "RISK SCALABLE CONCURRENCY: overlapping native and background saves do not report a committed head as failed",
+      "RISK SCALABLE CONCURRENCY: a superseded Add keeps its pending draft when the current device head changes accounts"
+    ],
+    "preservedCoverage": [
+      "The original native Add and ordinary background sendPush path, real IndexedDB device-store transactions, actual overlapping expected hashes, current cloud publication, retained unknown board fields, exact manual backup, legacy mirrors, in-memory durability markers and cold reopen are asserted together.",
+      "The foreign-account control uses an actual Add and a valid competitor commitHead against the shared real device store; it verifies the Add remains in memory and in the input, pending submission stays retryable, account-change warning is truthful, device authority remains established, and prior hash/raw/mirrors are unchanged.",
+      "Existing newer-edit and three-way CAS-repair tests stay unchanged and pass. Existing device-store migration still checks stale expectedHash and backup-ID collision. The external device-store control runner still verifies actual IDB abort, corrupt head, exact manual backup and opaque archive preservation.",
+      "Existing scalable legacy-tab, cloud recovery pin release and account-bound pending upload tests pass. No reconciliation/outbox protocol, schema or private production seam was added."
+    ],
+    "redEvidence": {
+      "command": "PATH=/Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin:$PATH TZ=UTC node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/storage-races-184/186/red-green-runs --purpose preimplementation-red -- node --test --test-name-pattern='RISK SCALABLE CONCURRENCY: overlapping native and background saves' tests.js",
+      "failure": "Actual baseline 52d4b2537bacbb60240ae7a53061224350ebd36 record 2026-10-18T11-08-25-410Z-c339384e-b01d-451c-ad2c-b895c7d22843 fails the intended assertion: a successful overlapping save must not show a device-store write-failed warning. It observes the exact device-save:device-store/write-failed toast and the sendPush exception Device head verification failed after the actual new native head committed. The later FAQ copy-only assertion also failed before the FAQ/changelog text was added; its corrected test fixture and the passing follow-up are linked in the external recorder directory."
+    }
+  },
+  {
     "testChangesSha256": "ec18aa9f1c1ec8c64b2ff2ab30464ee76c8ce318c54b38ecfc813630cfdfc7f5",
     "reason": "Repair the single original completion-sync fixture that failed push CI39102724734: observe actual publication/delivery instead of100/150ms guesses, read selected host storage for exact-byte checks, and name its acknowledged-completion precondition clearly. Preserve every original feature assertion.",
     "previousBehavior": "The existing completion test waited100ms before requiring peer receipt and150ms before requiring the acknowledged repaired union. Controlled250ms SDK delivery reproduces both premature observations while local completion remains present.",
@@ -11838,6 +11858,32 @@
       "command": "TZ=UTC node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/storage-hydration-185/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/storage-races-184/185 --purpose preimplementation-red -- node --test --test-name-pattern='RISK AUTH HYDRATION' tests.js",
       "failure": "On unchanged app source at52d4b2537bacbb60240ae7a53061224350ebd36f, the final assertion Pending successful hydration must not be reported as device-store/unavailable failed with12 captured false device-store/unavailable warnings. All data-preservation and successful-reconciliation assertions ran before that intended assertion; index.html was byte-identical to baseline."
     },
-    "greenEvidence": "Recorded focused green run 2026-10-18T11-17-35-514Z-ef2442c8-cf11-441b-bbbf-18dca24d0c1d.json passed13 Auth hydration, corrupt cloud and durable reads, account-switch, stale-listener, unavailable-store, blocked-open, and transport/permission controls. The primary three-test Auth hydration run also passed at 2026-10-18T11-17-13-348Z-be428243-d528-420d-81f3-b393ed237b83.json. Broader exact-candidate validation remains required after merge."
+    "greenEvidence": "Post-merge focused cohort 2026-10-18T11-29-11-506Z-9c06ace6-95b5-4e00-98f8-f67fa03ba9f4.json passed21/21 with zero skips, including all three Auth hydration tests, both Auth restore controls, all four scalable concurrency tests, account switch/sign-out, stale account callback, blocked/nonsettling IndexedDB, inaccessible established authority and cloud transport/permission controls. Pre-merge affected storage cohort 2026-10-18T11-17-35-514Z-ef2442c8-cf11-441b-bbbf-18dca24d0c1d.json passed13/13. Separately, full recorded run 2026-10-18T11-17-54-821Z-0f568f95-c1f7-4e7c-997f-290bd8cead1f.json is FAILED/incomplete: 2134 passed,6 failed,48 skipped. Five failures are pending root-owned final app-shell fingerprint packaging: 'PWA cache contract: CACHE_NAME is mechanically tied to every local app-shell byte' (#336), 'Settings changelog: every app asset change requires a current changelog entry' (#1164), 'RISK UI batch integration: saved Squared board retains context selector editor defaults duration badges and exact shell delivery' (#1642), 'RISK fireworks cached guidance: installed spawn-rate prose matches the bounded display and its exact offline shell' (#1651), and 'RISK visitor offline shell: travel pose and carrying renderer changes reach the fingerprinted installed shell' (#1656). The sixth, 'RISK repository process: Firestore deployment aborts when backward compatibility fails' (#1467), could not import missing firebase-tools. Do not treat this broad run as GREEN; root owns final fingerprint/dependency setup and exact-candidate full validation."
+  },
+  {
+    "comparison": "storageHydration185AndSupersededCommit186Combined",
+    "baseCommit": "52d4b2537bacbb60240ae7a53061224350ebd36f",
+    "testChangesSha256": "7124870a64adc9a641313767891972704b138234c7601df0b147aaec5c36b22a",
+    "reason": "The exact combined branch diff contains both issue 185 actual Auth and lifecycle reads during durable hydration and issue 186 overlapping device commits. One exact rationale keeps the shared test harness and all five new regressions accountable after integrating the two scoped changes.",
+    "previousBehavior": "Auth and resume can reach cloudPull while the durable board is still loading, causing a false unavailable warning and losing the queued post-hydration read. Concurrent device writers can also report a committed head as failed or treat a foreign-account head as this caller’s acknowledgement.",
+    "intendedBehavior": "Coalesce Auth and native resume until durable startup resolves, reconcile the current account once after successful hydration, and retain visible fail-closed handling for corrupt or unavailable storage. Superseded commits acknowledge only a verified current head for the same account, retain the newest accepted board, and keep pending Add drafts when the head changes accounts.",
+    "replacementTests": [
+      "RISK AUTH HYDRATION: real Auth and native resume wait for the durable board, then reconcile once",
+      "RISK AUTH HYDRATION: a corrupt device-head read stays visible and keeps cloud adoption held",
+      "RISK AUTH HYDRATION: extended FAQ and current Changelog explain the saved-board wait",
+      "RISK SCALABLE CONCURRENCY: overlapping native and background saves do not report a committed head as failed",
+      "RISK SCALABLE CONCURRENCY: a superseded Add keeps its pending draft when the current device head changes accounts"
+    ],
+    "preservedCoverage": [
+      "The full Firebase Auth module and public app cloudPull run against a held real IndexedDB open-success delivery; pending state, peer progress, chain, both first-dot values, decision identities, unknown fields, saved view, and exact manual/protected backup payloads remain checked.",
+      "The distinct corrupt-head control proves real read failure remains visible and cloud adoption held while legacy bytes and separate manual and protected recovery copies remain exact.",
+      "Overlapping save tests verify actual device-head and cloud acknowledgements, latest accepted task data, cached durable authority, and preservation of a pending Add across an account change.",
+      "Existing account-switch, stale listener, blocked/nonsettling open, unavailable established authority, cloud transport/permission, and prior storage assertions remain present and pass in the post-merge focused cohort."
+    ],
+    "redEvidence": {
+      "command": "Issue185: node scripts/agent-tools/record-run.mjs --repo <185 checkout> --evidence-dir <185 evidence> --purpose preimplementation-red -- node --test --test-name-pattern='RISK AUTH HYDRATION' tests.js. Issue186: TZ=UTC node scripts/agent-tools/record-run.mjs --repo <186 checkout> --evidence-dir /Users/emeraldpham/.codex/task-artifacts/storage-races-184/186/red-green-runs --purpose preimplementation-red -- node --test --test-name-pattern='RISK SCALABLE CONCURRENCY: overlapping native and background saves' tests.js.",
+      "failure": "On unchanged app source at 52d4b2537bacbb60240ae7a53061224350ebd36f, issue185 record 2026-10-18T11-12-53-016Z-0f05eac7-9925-474b-8047-1f8f7ba73eb7.json failed the intended final assertion after 12 false device-store/unavailable warnings. Issue186 record 2026-10-18T11-08-25-410Z-c339384e-b01d-451c-ad2c-b895c7d22843.json observed a device-store/write-failed toast and sendPush verification exception after the real newer native head had committed. Each RED preceded its runtime repair; controls and preserved assertions remained intact."
+    },
+    "greenEvidence": "Post-merge focused acceptance 2026-10-18T11-29-11-506Z-9c06ace6-95b5-4e00-98f8-f67fa03ba9f4.json passed 21/21 with zero skips, covering all five new tests plus hydration, auth, account, concurrency, durable-store, blocked-open, and transport controls. The independent broad worker run is recorded as FAILED/incomplete, not GREEN: 2134 passed, 6 failed, 48 skipped; five failures await root-owned final app-shell fingerprints and one lacks firebase-tools. Exact failing test names and causes are recorded in the issue185 rationale above and in the recorder output."
   }
 ]
