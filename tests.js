@@ -4606,7 +4606,7 @@ function makeDomShim({ prefersDark = false, sharedStorage = null } = {}) {
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
-async function loadApp({ appSource=appSrc, seed, cloudSyncFactory, prefersDark = false, noMatchMedia = false, seedStorage, sharedStorage, hostStorage, hostStorageDelayMs = 0, beforeStateReady, navigatorProvider, cryptoProvider = webcrypto, indexedDBProvider, deviceDbName, deviceOpenTimeoutMs, withSceneModules = false, sceneModulesAfterDomReady = false } = {}) {
+async function loadApp({ appSource=appSrc, artifacts=null, seed, cloudSyncFactory, prefersDark = false, noMatchMedia = false, seedStorage, sharedStorage, hostStorage, hostStorageDelayMs = 0, beforeStateReady, navigatorProvider, cryptoProvider = webcrypto, indexedDBProvider, deviceDbName, deviceOpenTimeoutMs, withSceneModules = false, sceneModulesAfterDomReady = false } = {}) {
   const shim = makeDomShim({ prefersDark, sharedStorage });
   if (noMatchMedia) delete shim.window.matchMedia;   // old browser / bare JS host
   if (seedStorage) for (const [k, v] of Object.entries(seedStorage)) shim.localStorage.setItem(k, v);
@@ -4657,8 +4657,8 @@ async function loadApp({ appSource=appSrc, seed, cloudSyncFactory, prefersDark =
   vm.createContext(sandbox);
   vm.runInContext(lzStringSrc, sandbox, { filename: "vendor/lz-string-1.5.0.min.js" });
   if(indexedDBProvider){
-    vm.runInContext(fs.readFileSync(path.join(__dirname,"device-store-v2.js"),"utf8"),sandbox,{filename:"device-store-v2.js"});
-    vm.runInContext(fs.readFileSync(path.join(__dirname,"cloud-store-v2.js"),"utf8"),sandbox,{filename:"cloud-store-v2.js"});
+    vm.runInContext(artifacts?.storage||fs.readFileSync(path.join(__dirname,"device-store-v2.js"),"utf8"),sandbox,{filename:"device-store-v2.js"});
+    vm.runInContext(artifacts?.cloud||fs.readFileSync(path.join(__dirname,"cloud-store-v2.js"),"utf8"),sandbox,{filename:"cloud-store-v2.js"});
     shim.window.ChainStorageV2=sandbox.ChainStorageV2;
     shim.window.ChainCloudV2=sandbox.ChainCloudV2;
   }
@@ -11382,8 +11382,8 @@ async function loadCloudBackend({ serverData={rev:4}, serverExists=true, failure
   return {...h,getStored:()=>({exists:h.docs.has('users/owner'),data:h.docs.get('users/owner')})};
 }
 
-async function loadCloudBackendV2({rootData=null,batchFailureAt=Infinity,failures={},timeoutMs=25,recordSyncError,cryptoProvider=webcrypto,runtimeWindow=null}={}){
- const moduleMatch=html.match(/<script type="module">([\s\S]*?)<\/script>/);assert.ok(moduleMatch);
+async function loadCloudBackendV2({artifacts=null,rootData=null,batchFailureAt=Infinity,failures={},timeoutMs=25,recordSyncError,cryptoProvider=webcrypto,runtimeWindow=null}={}){
+ const moduleMatch=(artifacts?.html||html).match(/<script type="module">([\s\S]*?)<\/script>/);assert.ok(moduleMatch);
  const moduleSource=moduleMatch[1].replace(/const \[appMod, A, F\] = await Promise\.all\(\[[\s\S]*?\]\);/,
   'const [appMod, A, F] = globalThis.__cloudModules;');
  const clone=value=>value==null||typeof value!=='object'?value:Array.isArray(value)?value.map(clone):Object.fromEntries(Object.entries(value).map(([key,item])=>[key,clone(item)]));
@@ -11437,7 +11437,7 @@ async function loadCloudBackendV2({rootData=null,batchFailureAt=Infinity,failure
  if(!runtimeWindow||recordSyncError!==undefined)window.recordSyncError=recordSyncError;
  const context=vm.createContext({window,CustomEvent:class{constructor(type,options){this.type=type;this.detail=options?.detail;}},__cloudModules:[{initializeApp:()=>({})},A,F],
   console,crypto:cryptoProvider,TextEncoder,TextDecoder,structuredClone,setTimeout,clearTimeout});context.globalThis=context;
- for(const file of ['device-store-v2.js','cloud-store-v2.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),context,{filename:file});
+ for(const file of ['device-store-v2.js','cloud-store-v2.js'])vm.runInContext(artifacts?(file==='device-store-v2.js'?artifacts.storage:artifacts.cloud):fs.readFileSync(path.join(__dirname,file),'utf8'),context,{filename:file});
  if(!runtimeWindow)window.ChainStorageV2=context.ChainStorageV2;window.ChainCloudV2=context.ChainCloudV2;
  await vm.runInContext(`(async()=>{${moduleSource}\n})()`,context,{filename:'index.html#cloud-v2-backend'});
  return {CS:window.CloudSync,auth,docs,pending,events,batchCommits,writes,popupProviders,transactionCalls,queries,network,subscriptions,
@@ -33430,16 +33430,17 @@ test('RISK CLOUD CONFORMANCE: controlled crypto delivery executes original adapt
 // Isolated original mixed-release replay: current typed light choice, then the
 // released pre-decision client saved dark while retaining that exact choice.
 function heldDecisionFixture188(){return {"local":{"v":2,"tasks":[{"id":"a","title":"Fixture A","url":null,"due":null,"evergreen":false,"ctx":[],"mu":25,"sigma":8.333333333333334,"done":false,"createdAt":1,"completedAt":null,"lastDoneAt":null,"startsAt":null,"prerequisiteRevision":0,"prerequisiteIds":[],"prerequisiteId":null,"prerequisiteMirror":null,"prerequisiteOps":{},"evergreenHours":18,"evergreenResetAtDay":true}],"contexts":[],"chain":[],"considered":{},"cantAt":{},"workedAt":{},"candidateId":null,"workLog":[],"interventionActive":false,"interventionP":0,"snooze":0,"mode":"scan","decisionsMs":[],"presentedAt":0,"passStartedAt":1792321140000,"listOpen":false,"ctxOpen":true,"histOpen":false,"seenQuickStart":true,"updatedAt":1792321201000,"settings":{"horizonMin":60,"thresholdPct":25,"samples":250,"cantMin":30,"workedHours":16,"postponeHours":1,"evergreenHours":18,"evergreenResetAtDay":true,"scanMode":"squared","squaredDefaultVersion":1,"listMetric":"rank","excludeNoContext":false,"lastTaskWoop":false,"floatingHeader":false,"patternedIndicators":false,"showPostpone":true,"theme":"dark","dateFormat":"system","hourlyQuotes":{},"scene":{"time":null,"season":null,"location":null},"skipOldestFirstDot":false},"passId":"mixed-rollout","scanMode":"descending","syncAccount":"e@example.com","syncRev":4,"syncDirty":true,"deletionLog":[],"deletedTaskIds":{},"clearedHistoryIds":{},"restoredTaskIds":{},"restoredHistoryIds":{},"restoredTaskOps":{},"restoredHistoryOps":{},"deletedAfterRestoreOps":{},"clearedAfterRestoreOps":{},"chance":null,"addOpen":true,"decisionBase":{"v":1,"id":"db1:ef0eff3a10121ebe968caa55bd33d2bb","account":"e@example.com","revision":4,"payload":"{\"v\":2,\"tasks\":[{\"id\":\"a\",\"title\":\"Fixture A\",\"url\":null,\"due\":null,\"evergreen\":false,\"ctx\":[],\"mu\":25,\"sigma\":8.333333333333334,\"done\":false,\"createdAt\":1,\"completedAt\":null,\"lastDoneAt\":null,\"startsAt\":null,\"prerequisiteRevision\":0,\"prerequisiteIds\":[],\"prerequisiteId\":null,\"prerequisiteMirror\":null,\"prerequisiteOps\":{},\"evergreenHours\":18,\"evergreenResetAtDay\":true}],\"contexts\":[],\"chain\":[],\"considered\":{},\"cantAt\":{},\"workedAt\":{},\"candidateId\":null,\"workLog\":[],\"interventionActive\":false,\"interventionP\":0,\"snooze\":0,\"mode\":\"scan\",\"decisionsMs\":[],\"presentedAt\":0,\"passStartedAt\":1792321140000,\"listOpen\":false,\"ctxOpen\":true,\"histOpen\":false,\"seenQuickStart\":true,\"updatedAt\":0,\"settings\":{\"horizonMin\":60,\"thresholdPct\":25,\"samples\":250,\"cantMin\":30,\"workedHours\":16,\"postponeHours\":1,\"evergreenHours\":18,\"evergreenResetAtDay\":true,\"scanMode\":\"squared\",\"squaredDefaultVersion\":1,\"listMetric\":\"rank\",\"excludeNoContext\":false,\"lastTaskWoop\":false,\"skipOldestFirstDot\":false,\"floatingHeader\":false,\"patternedIndicators\":false,\"showPostpone\":true,\"theme\":\"system\",\"dateFormat\":\"system\",\"hourlyQuotes\":{},\"scene\":{\"time\":null,\"season\":null,\"location\":null}},\"passId\":\"mixed-rollout\",\"scanMode\":\"descending\",\"deletionLog\":[],\"deletedTaskIds\":{},\"clearedHistoryIds\":{},\"restoredTaskIds\":{},\"restoredHistoryIds\":{},\"restoredTaskOps\":{},\"restoredHistoryOps\":{},\"deletedAfterRestoreOps\":{},\"clearedAfterRestoreOps\":{},\"chance\":null,\"addOpen\":true}"},"decisionBaseline":{"v":1,"account":"e@example.com","sourceBaseId":"db1:ef0eff3a10121ebe968caa55bd33d2bb","sourceRevision":4,"includedActionIds":[],"ratings":[{"taskId":"a","mu":25,"sigma":8.333333333333334}],"chainIds":[],"passId":"mixed-rollout","passAt":1792321140000,"considered":{},"cantAt":{},"workedAt":{},"observedRatingHistoryIds":[],"id":"dlb2:6b9e4e304cf1e2aa3f14f7dfde0b3097"},"decisionEvents":[{"v":1,"id":"te9703fc8-b286-48a2-ac2b-b42b9c803f19","at":1792321200000,"account":"e@example.com","baseId":"db1:ef0eff3a10121ebe968caa55bd33d2bb","kind":"current-choice","actionId":"tfa255a29-fb5d-40f6-ab66-73248fed8170","target":{"type":"setting","id":"board","property":"theme"},"value":"light","after":{"present":true},"before":{"present":true,"value":"system"},"passId":"mixed-rollout","passAt":1792321140000,"scanMode":"descending","chainIds":[],"observedActionIds":[]}]},"remote":{"v":1,"tasks":[{"id":"a","title":"Fixture A","url":null,"due":null,"evergreen":false,"ctx":[],"mu":25,"sigma":8.333333333333334,"done":false,"createdAt":1,"completedAt":null,"lastDoneAt":null}],"contexts":[],"chain":[],"considered":{},"cantAt":{},"workedAt":{},"candidateId":null,"workLog":[],"interventionActive":false,"interventionP":0,"snooze":0,"mode":"idle","decisionsMs":[],"presentedAt":0,"passStartedAt":1792321140000,"listOpen":false,"ctxOpen":true,"histOpen":false,"seenQuickStart":true,"updatedAt":0,"settings":{"horizonMin":60,"thresholdPct":25,"samples":250,"cantMin":30,"workedHours":8,"theme":"system"},"passId":"mixed-rollout","scanMode":"descending","syncAccount":"e@example.com","syncRev":4,"syncDirty":false},"rev":4,"producer":{"current":"52d4b25","old":"69a9fed","actions":["current cycle-theme system to light","old cycle-theme light to dark"]}};}
-async function heldDecisionApp188(t,{fixture=heldDecisionFixture188(),failures={},storageBackend="indexedDB"}={}){
+async function heldDecisionApp188(t,{fixture=heldDecisionFixture188(),failures={},storageBackend="indexedDB",timeoutMs=5000}={}){
  const {IDBFactory}=await import('fake-indexeddb'),factory=new IDBFactory(),deviceDbName='held-choice-188-'+Math.random(),idbFault={};
  const indexedDB={open(...args){const request=factory.open(...args);return new Proxy(request,{
   get(target,key){
    if(key==='result'){const db=Reflect.get(target,key,target);if(!db?.transaction)return db;return new Proxy(db,{get(target,key){
     if(key!=='transaction'){const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;}
     return(names,mode,...rest)=>{
-     if(idbFault.readBackups&&mode==='readonly'&&Array.from(names).includes('backups'))throw Object.assign(Error('fixture storage read unavailable'),{name:'AbortError'});
+     const stores=typeof names==='string'?[names]:Array.from(names);
+     if(idbFault.readBackups&&mode==='readonly'&&stores.includes('backups'))throw Object.assign(Error('fixture storage read unavailable'),{name:'AbortError'});
      const tx=target.transaction(names,mode,...rest);
-     if(mode!=='readwrite'||!Array.from(names).includes('backups'))return tx;
+     if(mode!=='readwrite'||!stores.includes('backups'))return tx;
      return new Proxy(tx,{get(target,key){
       if(key==='objectStore')return name=>{const store=target.objectStore(name);return new Proxy(store,{get(target,key){
        if(key==='put'&&name==='backups')return(...args)=>{const result=target.put(...args);if(idbFault.abortBackup){idbFault.aborts=(idbFault.aborts||0)+1;tx.abort();}return result;};
@@ -33457,7 +33458,7 @@ async function heldDecisionApp188(t,{fixture=heldDecisionFixture188(),failures={
  const app=await loadAppAtTime(1792323000000,{seed:188,seedStorage:{[SYNC_STORE_KEY]:localRaw,[LOCAL_HEAD_KEY]:localRaw},...(storageBackend==='indexedDB'?{indexedDBProvider:indexedDB,deviceDbName}:{})});
  if(!app.ctx.window.ChainStorageV2){vm.runInContext(fs.readFileSync(path.join(__dirname,'device-store-v2.js'),'utf8'),app.ctx,{filename:'device-store-v2.js'});app.ctx.window.ChainStorageV2=app.ctx.ChainStorageV2;}
  failures.authPending=true;
- const backend=await loadCloudBackendV2({rootData:cloudRaw===null?null:{payload:cloudRaw,updatedAt:fixture.remote.updatedAt,rev:fixture.rev,serverUpdatedAt:1},failures,timeoutMs:5000,recordSyncError:app.ctx.recordSyncError,runtimeWindow:app.ctx.window});
+ const backend=await loadCloudBackendV2({rootData:cloudRaw===null?null:{payload:cloudRaw,updatedAt:fixture.remote.updatedAt,rev:fixture.rev,serverUpdatedAt:1},failures,timeoutMs,recordSyncError:app.ctx.recordSyncError,runtimeWindow:app.ctx.window});
  backend.emitAuth({uid:'owner',email:'e@example.com'});app.ctx.window.CLOUD_PUSH_DELAY_MS=0;
  t.after(async()=>{backend.CS.suspend();vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);await app.ctx.window.ScannerDeviceStore?.close?.();});
  await app.ctx.cloudPull();
@@ -33606,8 +33607,9 @@ test('RISK held decision recovery: a real conditional publication conflict prese
  assert.equal(await ctx.onAction('apply-decision-recovery',{}),false);
  assert.match(shim.document.getElementById('modalRoot').innerHTML,/Another device saved first/);assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="choose-decision-recovery"[^>]*aria-pressed="true"/);
  assert.equal(backend.docs.get('users/owner').rev,5);assert.ok(JSON.parse((await backend.CS.pull()).payload).tasks.some(row=>row.id==='cas-peer'));
- assert.equal(ctx.state.settings.theme,'light','the deliberate choice is durable locally while publication is held');
- assert.equal(JSON.parse((await store.readHead()).payload).settings.theme,'light');
+ assert.equal(ctx.state.settings.theme,'dark','a prepared choice must not enter ordinary active state before exact acknowledgement');
+ assert.equal((await store.readHead()).payload,app.localRaw,'supported older consumers must still read the original head');
+ assert.ok((await store.listBackups()).some(row=>row.kind==='decision-recovery-choice'&&JSON.parse(row.payload).settings.theme==='light'),'the fresh chosen decision is durable only in its protected backup');
  const backups=await store.listBackups();assert.ok(backups.some(row=>row.kind==='decision-recovery-device'&&row.payload===app.localRaw));assert.ok(backups.some(row=>row.kind==='decision-recovery-cloud'&&row.payload===app.cloudRaw));assert.ok(backups.some(row=>row.kind==='decision-recovery-pending'&&JSON.parse(row.payload).pending?.generationId==='pending-at-choice'));
  // Merely reading or reconnecting cannot publish the obsolete consent.
  const remoteBefore=(await backend.CS.pull()).payload;ctx.closeModal();await ctx.cloudPull();await ctx.sendPush();for(let i=0;i<500&&vm.runInContext('pulling||cloudPushInFlight||!!cloudTimer',ctx);i++)await flush();assert.equal((await backend.CS.pull()).payload,remoteBefore,'ordinary reconnect must not publish a choice whose source lost its conditional race');
@@ -33625,12 +33627,12 @@ test('RISK held decision recovery: unavailable reads local commit abort and fail
   if(failure==='upload unavailable')faults.push=Object.assign(Error('server unavailable'),{code:'unavailable'});
   assert.equal(await ctx.onAction('apply-decision-recovery',{}),false);
   assert.match(shim.document.getElementById('modalRoot').innerHTML,/could not|not confirmed|cannot/i);
-  assert.equal(backend.docs.get('users/owner').rev,4);
-  if(failure!=='upload unavailable'){assert.equal(JSON.stringify(ctx.state),before);assert.equal((await store.readHead()).payload,head.payload);}
-  else {assert.equal(JSON.parse((await store.readHead()).payload).settings.theme,'light');assert.equal(ctx.state.syncDirty,true);}
+  assert.equal(backend.docs.get('users/owner').rev,failure==='local commit abort'?5:4);
+  assert.equal(JSON.stringify(ctx.state),before);assert.equal((await store.readHead()).payload,head.payload,'unconfirmed or unapplied choices never replace the ordinary head');
+  if(failure==='local commit abort'){assert.match(shim.document.getElementById('modalRoot').innerHTML,/Cloud saved.*could not finish applying/i);assert.ok((await store.listBackups()).some(row=>row.kind==='decision-recovery-cloud'&&JSON.parse(row.payload).settings.theme==='light'),'an acknowledged cloud source remains protected when local apply fails');}
   faults.serverOffline=false;delete faults.push;app.idbFault.abortHead=false;
   await ctx.onAction('review-decision-recovery',{});ctx.onAction('choose-decision-recovery',{dataset:{value:'light'}});assert.equal(await ctx.onAction('apply-decision-recovery',{}),true);
-  const {remote}=await settleRecovery188(app);assert.equal(remote.rev,5);
+  const {remote}=await settleRecovery188(app);assert.equal(remote.rev,failure==='local commit abort'?6:5);
  });
 });
 
@@ -33677,6 +33679,7 @@ test('RISK held decision recovery: cold reopen protects a pending choice from or
 test('RISK held decision recovery: help and visible recovery explain deliberate appearance choices and protected limits',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  assert.match(help,/What can I do when saved appearances disagree/);assert.match(help,/no choice is selected/i);assert.match(help,/pending choice.*reload/i);assert.match(help,/unknown.*compatible/i);
+ assert.match(help,/active board stays unchanged until.*cloud.*confirmed/i,'help distinguishes a prepared choice from an applied board');assert.match(help,/field paths.*values/i);
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];assert.match(current,/Review saved decisions/);assert.match(current,/appearance/);
 });
 
@@ -33712,10 +33715,162 @@ test('RISK held decision recovery: diagnostics identify only app origin fingerpr
 
 test('RISK held decision recovery: evidence and pending-choice archives cannot be restored as empty boards',async t=>{
  const app=await heldDecisionApp188(t),{ctx,shim}=app;
- for(const kind of ['decision-recovery-pending','decision-recovery-choice','decision-recovery-confirmed']){
+ for(const kind of ['decision-recovery-pending','decision-recovery-choice','decision-recovery-confirmed','decision-recovery-superseded']){
   const saved=await ctx.saveDurableBackup(kind,JSON.stringify({tasks:[],syncAccount:'e@example.com',pending:{exact:'archive'}}));assert.ok(saved.id);
   ctx.openSettings();const row=shim.document.getElementById('modalRoot').innerHTML.split('<div class="mgr backup-row">').find(row=>row.includes('data-id="'+saved.id+'"'));
   assert.match(row,/data-act="restore-local-backup"[^>]*disabled/,'evidence-only copies direct the person back to review instead of offering a blank Restore');
   const before=JSON.stringify(ctx.state);assert.equal(await ctx.restoreDurableBackupById(saved.id),false);assert.equal(JSON.stringify(ctx.state),before);
  }
+});
+
+
+function recoveryReleasedArtifacts188(sha){
+ return Object.fromEntries([['html','index.html'],['storage','device-store-v2.js'],['cloud','cloud-store-v2.js']].map(([key,file])=>{
+  const source=spawnSync('git',['show',sha+':'+file],{cwd:__dirname,encoding:'utf8',maxBuffer:16*1024*1024});assert.equal(source.status,0,source.stderr);return [key,source.stdout];
+ }));
+}
+async function settleRecoveryOperations188(ctx){
+ for(let n=0;n<1000&&vm.runInContext('pulling||cloudPushInFlight||!!cloudTimer',ctx);n++)await new Promise(resolve=>setTimeout(resolve,2));
+ assert.equal(vm.runInContext('pulling||cloudPushInFlight||!!cloudTimer',ctx),false,'ordinary app operations reach a settled observation');
+}
+test('RISK held decision recovery: supported released consumers cannot publish a prepared choice after conflict or uncertain acknowledgement',async t=>{
+ for(const sha of ['52d4b2537bacbb60240ae7a53061224350ebd36f','7b9c92a41999a44a12f92b7d6d1c8d02758c635e'])for(const failure of ['revision conflict','uncertain acknowledgement'])await t.test(sha.slice(0,7)+' '+failure,async t=>{
+  let release;const faults={},gate=new Promise(resolve=>release=resolve);t.after(()=>release());
+  const app=await heldDecisionApp188(t,{failures:faults,timeoutMs:150}),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+  const original=JSON.stringify(ctx.state),headBefore=(await store.readHead()).payload;
+  await ctx.onAction('review-decision-recovery',{});ctx.onAction('choose-decision-recovery',{dataset:{value:'light'}});
+  if(failure==='revision conflict'){const push=backend.CS.push;backend.CS.push=async(...args)=>{const root=backend.docs.get('users/owner'),peer=JSON.parse(root.payload);peer.tasks.push(syncTask('held-choice-peer','Peer kept across older resume'));backend.docs.set('users/owner',{...root,rev:5,payload:JSON.stringify(peer)});return push(...args);};}
+  else faults.publishPending=gate;
+  assert.equal(await ctx.onAction('apply-decision-recovery',{}),false);
+  const holds=(await store.listBackups()).filter(row=>row.kind==='decision-recovery-choice');assert.equal(holds.length,1);
+  const held=JSON.parse(holds[0].payload),choiceId=held.recoveryChoice.choiceId;assert.ok(held.decisionEvents.some(row=>row.id===choiceId&&row.value==='light'));
+  const expectedRevision=failure==='revision conflict'?5:4,remoteBefore=backend.docs.get('users/owner').payload;
+  ctx.closeModal();backend.CS.suspend();vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer);clearTimeout(saveTimer)',ctx);await store.close();
+  const artifacts=recoveryReleasedArtifacts188(sha),old=await loadAppAtTime(1792323002000,{artifacts,appSource:extractAppScript(artifacts.html),sharedStorage:shim.localStorage,indexedDBProvider:app.indexedDB,deviceDbName:app.deviceDbName});
+  const restored=await loadCloudBackendV2({artifacts,rootData:backend.docs.get('users/owner'),failures:{authPending:true},timeoutMs:5000,recordSyncError:old.ctx.recordSyncError,runtimeWindow:old.ctx.window});
+  for(const [key,value] of backend.docs)restored.docs.set(key,JSON.parse(JSON.stringify(value)));restored.emitAuth({uid:'owner',email:'e@example.com'});old.ctx.window.CLOUD_PUSH_DELAY_MS=0;
+  t.after(async()=>{restored.CS.suspend?.();vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer);clearTimeout(saveTimer)',old.ctx);await old.ctx.window.ScannerDeviceStore?.close?.();});
+  await old.ctx.cloudPull();await old.ctx.sendPush();await settleRecoveryOperations188(old.ctx);
+  const remote=await restored.CS.pull();
+  t.diagnostic(JSON.stringify({revision:remote.rev,preparedChoicePublished:JSON.parse(remote.payload).decisionEvents?.some(row=>row.id===choiceId)||false,theme:JSON.parse(remote.payload).settings?.theme,originalTheme:JSON.parse(remoteBefore).settings?.theme}));
+  assert.equal(JSON.parse(remote.payload).decisionEvents?.some(row=>row.id===choiceId)||false,false);
+  if(sha.startsWith('52d')||failure==='revision conflict'){
+   assert.equal(remote.rev,expectedRevision,'the supported modern old consumer cannot release the prepared choice');
+   assert.equal(remote.payload,remoteBefore,'ordinary resume leaves the exact remote source unchanged');
+  }else{
+   assert.equal(remote.rev,5,'the permanent-floor consumer can publish its original saved board, without the modern prepared decision');
+   assert.equal(JSON.parse(remote.payload).settings.theme,'dark');
+  }
+  assert.ok((await old.ctx.window.ScannerDeviceStore.listBackups()).some(row=>row.id===holds[0].id&&row.payload===holds[0].payload),'the exact prepared choice remains recoverable');
+  if(sha.startsWith('52d')){assert.equal(JSON.stringify(ctx.state),original);assert.equal(headBefore,app.localRaw);assert.equal(old.ctx.state.settings.theme,'dark','the supported comparison client still sees the original active value');}
+ });
+});
+
+
+test('RISK held decision recovery: preview lists native peer task fields and displaced unknown paths with escaped values',async t=>{
+ const fixture=heldDecisionFixture188(),peerRaw=JSON.stringify(fixture.local),peer=await loadAppAtTime(1792322900000,{seedStorage:{[SYNC_STORE_KEY]:peerRaw,[LOCAL_HEAD_KEY]:peerRaw}});
+ t.after(()=>vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry()',peer.ctx));
+ hydrateUnchangedEditorDraft(peer,'a');peer.shim.document.getElementById('etUrl').value='https://peer.example.test/review?x=<peer>&y=2';peer.shim.document.getElementById('etDue').value='2026-11-03';peer.shim.document.getElementById('etStart').value='2026-11-01';peer.ctx.onAction('save-edit',{dataset:{id:'a'}});assert.equal(await peer.ctx.persist(),true);
+ fixture.remote=JSON.parse(JSON.stringify(peer.ctx.state));fixture.remote.settings.theme='light';
+ fixture.local.tasks[0].futureOpaque={note:'<device-only-value>'};fixture.remote.tasks[0].futureOpaque={note:'<peer-only-value>'};fixture.remote.futurePeer={label:'<remote-unknown-field>'};
+ const app=await heldDecisionApp188(t,{fixture}),{ctx,shim}=app;await ctx.onAction('review-decision-recovery',{});const ui=shim.document.getElementById('modalRoot').innerHTML;
+ for(const field of ['tasks[a].url','tasks[a].due','tasks[a].startsAt','tasks[a].futureOpaque.note','futurePeer.label'])assert.ok(ui.includes(field),'the consent preview names concrete affected path '+field);
+ for(const value of ['https://peer.example.test/review?x=&lt;peer&gt;&amp;y=2','2026-11-03','2026-11-01','&lt;device-only-value&gt;','&lt;peer-only-value&gt;','&lt;remote-unknown-field&gt;'])assert.ok(ui.includes(value),'the preview shows readable escaped source value '+value);
+ assert.match(ui,/<li class="rating-event"><b>tasks\[a\]\.url<\/b>/,'concrete source values use the established wrapping evidence row');
+ assert.match(ui,/This device:.*Cloud:.*With either appearance:/s);assert.match(ui,/backup/i);assert.doesNotMatch(ui,/<peer>|<device-only-value>|<peer-only-value>|<remote-unknown-field>/);
+ ctx.onAction('choose-decision-recovery',{dataset:{value:'light'}});assert.equal(await ctx.onAction('apply-decision-recovery',{}),true);
+ const {remote}=await settleRecovery188(app),saved=JSON.parse(remote.payload);assert.equal(saved.tasks[0].url,'https://peer.example.test/review?x=<peer>&y=2');assert.equal(saved.tasks[0].due,'2026-11-03');assert.equal(saved.tasks[0].startsAt,'2026-11-01');assert.equal(saved.tasks[0].futureOpaque.note,'<device-only-value>');assert.equal(saved.futurePeer.label,'<remote-unknown-field>');
+ const copies=await ctx.window.ScannerDeviceStore.listBackups();assert.ok(copies.some(row=>row.kind==='decision-recovery-device'&&row.payload===app.localRaw));assert.ok(copies.some(row=>row.kind==='decision-recovery-cloud'&&row.payload===app.cloudRaw));
+});
+
+
+test('RISK held decision recovery: native selected and enabled actions use established filled theme paint',async t=>{
+ for(const theme of ['dark','light'])await t.test(theme,async t=>{
+  const fixture=heldDecisionFixture188();fixture.local.settings.theme=theme;const app=await heldDecisionApp188(t,{fixture}),{ctx,shim}=app;
+  await ctx.onAction('review-decision-recovery',{});let ui=shim.document.getElementById('modalRoot').innerHTML;
+  const button=(source,action)=>source.match(new RegExp('<button[^>]*data-act="'+action+'"[^>]*>[^<]*</button>'))?.[0];
+  assert.match(button(ui,'apply-decision-recovery'),/disabled/);assert.doesNotMatch(ui,/aria-pressed="true"/);
+  ctx.onAction('choose-decision-recovery',{dataset:{value:theme}});ui=shim.document.getElementById('modalRoot').innerHTML;
+  const selected=ui.match(/<button[^>]*aria-pressed="true"[^>]*>[^<]*<\/button>/)?.[0];
+  assert.match(selected,/class="btn setting-choice setting-set"/,'the native selected choice has the existing filled selected paint and action ink');
+  assert.match(button(ui,'apply-decision-recovery'),/class="btn primary"/,'the enabled primary action has the existing filled primary paint');assert.doesNotMatch(button(ui,'apply-decision-recovery'),/disabled/);
+  ctx.onAction('choose-decision-recovery',{dataset:{value:theme==='light'?'dark':'light'}});ui=shim.document.getElementById('modalRoot').innerHTML;assert.equal((ui.match(/aria-pressed="true"/g)||[]).length,1,'selection moves without duplicating selected state');
+  assert.match(html,/\.btn\.setting-choice\{color:var\(--action-ink\);box-shadow:none\}/);assert.match(html,/\.btn\.setting-set\{background:var\(--yes\);border-color:var\(--good\)\}/);assert.match(html,/\.btn\.primary\{background:var\(--chain-deep\)\}/);
+ });
+});
+
+
+test('RISK held decision recovery: rejected ordinary Restore leads through the visible error to deliberate recovery',async t=>{
+ const app=await heldDecisionApp188(t),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+ const manual=await ctx.saveDurableBackup('manual',app.localRaw),before=JSON.stringify(ctx.state),facts=JSON.stringify(ctx.state.decisionEvents),baseline=JSON.stringify(ctx.state.decisionBaseline);assert.ok(manual.id);
+ ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="restore-local-backup"/);
+ ctx.onAction('restore-local-backup',{dataset:{id:manual.id}});
+ for(let n=0;n<50&&!(await store.listBackups()).some(row=>row.kind==='before-restore'&&row.payload===before);n++)await flush();await flush();
+ assert.equal(backend.CS.errorStage,'reconcile');assert.equal(backend.CS.errorCode,'unprojectable-decision-evidence','ordinary Restore retains the existing fail-closed disagreement guard');
+ assert.equal(JSON.stringify(ctx.state),before);assert.equal((await store.readHead()).payload,app.localRaw);assert.equal(backend.docs.get('users/owner').rev,4);
+ const rejectedCopies=await store.listBackups();assert.ok(rejectedCopies.some(row=>row.id===manual.id&&row.payload===app.localRaw));assert.ok(rejectedCopies.some(row=>row.kind==='before-restore'&&row.payload===before));
+ ctx.closeModal();ctx.onAction('sync',{});assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="review-decision-recovery"/);
+ await ctx.onAction('review-decision-recovery',{});assert.match(shim.document.getElementById('modalRoot').innerHTML,/Saved appearance: <b>dark/);assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/aria-pressed="true"/);
+ ctx.onAction('choose-decision-recovery',{dataset:{value:'dark'}});assert.equal(await ctx.onAction('apply-decision-recovery',{}),true);
+ const {remote}=await settleRecovery188(app),saved=JSON.parse(remote.payload);assert.equal(saved.settings.theme,'dark');assert.equal(JSON.stringify(saved.decisionBaseline),baseline);for(const fact of JSON.parse(facts))assert.deepEqual(saved.decisionEvents.find(row=>row.id===fact.id),fact);assert.equal(saved.decisionEvents.length,JSON.parse(facts).length+1);
+ const copies=await store.listBackups();assert.ok(copies.some(row=>row.id===manual.id&&row.payload===app.localRaw));assert.ok(copies.some(row=>row.kind==='before-restore'&&row.payload===before));
+});
+
+
+test('RISK held decision recovery: confirmed publication revalidates changed sources before local apply',async t=>{
+ for(const race of ['local','head','browser','account','cloud','backup readback'])await t.test(race,async t=>{
+  const app=await heldDecisionApp188(t),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore,before=JSON.stringify(ctx.state),head=await store.readHead();
+  await ctx.onAction('review-decision-recovery',{});ctx.onAction('choose-decision-recovery',{dataset:{value:'light'}});
+  const put=store.putBackup.bind(store);let changed=false;
+  store.putBackup=async options=>{const result=await put(options);if(!changed&&options.backup.kind==='decision-recovery-cloud'&&JSON.parse(options.backup.payload).decisionEvents?.length>ctx.state.decisionEvents.length){
+   changed=true;
+   if(race==='local'){shim.document.getElementById('addInput').value='Local edit after verified cloud save';await ctx.onAction('add',{});}
+   if(race==='head'){const peer=JSON.parse(head.payload);peer.tasks.push(syncTask('after-ack-head','Other tab after ACK'));assert.equal((await store.commitHead({expectedHash:head.hash,payload:JSON.stringify(peer),account:'e@example.com'})).ok,true);}
+   if(race==='browser'){const peer=JSON.parse(app.localRaw);peer.tasks.push(syncTask('after-ack-browser','Browser source after ACK'));shim.localStorage.setItem(LOCAL_HEAD_KEY,JSON.stringify(peer));shim.localStorage.setItem(SYNC_STORE_KEY,JSON.stringify(peer));}
+   if(race==='account')backend.emitAuth({uid:'other-owner',email:'other@example.test'});
+   if(race==='cloud'){const remote=await backend.CS.pull(),peer=JSON.parse(remote.payload);peer.tasks.push(syncTask('after-ack-cloud','Peer after ACK'));backend.docs.set('users/owner',{rev:6,payload:JSON.stringify(peer),updatedAt:1792323000001});}
+   if(race==='backup readback')app.idbFault.readBackups=true;
+  }return result;};
+  assert.equal(await ctx.onAction('apply-decision-recovery',{}),false,'a confirmed publication cannot overwrite a changed or unverifiable source');assert.equal(changed,true);
+  assert.equal(ctx.state.settings.theme,'dark');if(race==='local')assert.ok(ctx.state.tasks.some(row=>row.title==='Local edit after verified cloud save'));else assert.equal(JSON.stringify(ctx.state),before);
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/Cloud saved/i,'the person is told that remote confirmation and local application are distinct');
+  app.idbFault.readBackups=false;const copies=await store.listBackups();assert.ok(copies.some(row=>row.kind==='decision-recovery-choice'));assert.ok(copies.some(row=>row.kind==='decision-recovery-device'&&row.payload===app.localRaw));assert.ok(copies.some(row=>row.kind==='decision-recovery-cloud'&&row.payload===app.cloudRaw));assert.ok(copies.some(row=>row.kind==='decision-recovery-cloud'&&JSON.parse(row.payload).settings.theme==='light'));
+  if(race==='head')assert.ok(JSON.parse((await store.readHead()).payload).tasks.some(row=>row.id==='after-ack-head'));else if(race!=='local')assert.equal((await store.readHead()).payload,head.payload);
+  assert.equal(backend.docs.get('users/owner').rev,race==='cloud'?6:5);
+ });
+});
+
+
+test('RISK held decision recovery: a newer durable or browser source during confirmed local commit stays current',async t=>{
+ for(const source of ['durable head','browser copy'])await t.test(source,async t=>{
+  const app=await heldDecisionApp188(t),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore,before=JSON.stringify(ctx.state);
+  await ctx.onAction('review-decision-recovery',{});ctx.onAction('choose-decision-recovery',{dataset:{value:'light'}});
+  const commit=store.commitHead.bind(store);let replaced=null;
+  store.commitHead=async options=>{const result=await commit(options);if(!replaced&&result?.ok&&JSON.parse(options.payload).syncRev===5){const peer=JSON.parse(options.payload);peer.tasks.push(syncTask('during-confirmed-apply','Newer work during confirmed apply'));replaced=JSON.stringify(peer);if(source==='durable head')assert.equal((await commit({expectedHash:result.hash,payload:replaced,account:'e@example.com'})).ok,true);else{shim.localStorage.setItem(LOCAL_HEAD_KEY,replaced);shim.localStorage.setItem(SYNC_STORE_KEY,replaced);}}return result;};
+  assert.equal(await ctx.onAction('apply-decision-recovery',{}),false,'a later device source invalidates finishing the prior local apply');assert.ok(replaced);assert.equal(JSON.stringify(ctx.state),before,'the stale prepared board must not replace current memory after another source arrives');
+  if(source==='durable head')assert.equal((await store.readHead()).payload,replaced);else assert.equal(shim.localStorage.getItem(LOCAL_HEAD_KEY),replaced);
+  assert.equal(backend.docs.get('users/owner').rev,5);assert.match(shim.document.getElementById('modalRoot').innerHTML,/Cloud saved/i);assert.ok((await store.listBackups()).some(row=>row.kind==='decision-recovery-choice'),'ordinary sync remains held until another deliberate review');
+ });
+});
+
+
+test('RISK held decision recovery: new reviewed consent supersedes prior prepared publications only after exact ACK',async t=>{
+ for(const partialFailure of [false,true])await t.test(partialFailure?'archive write failure':'confirmed supersession',async t=>{
+  const faults={},app=await heldDecisionApp188(t,{failures:faults}),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+  await ctx.onAction('review-decision-recovery',{});ctx.onAction('choose-decision-recovery',{dataset:{value:'light'}});faults.push=Object.assign(Error('offline'),{code:'unavailable'});assert.equal(await ctx.onAction('apply-decision-recovery',{}),false);
+  const old=(await store.listBackups()).find(row=>row.kind==='decision-recovery-choice'),oldId=JSON.parse(old.payload).recoveryChoice.choiceId;assert.ok(oldId);
+  await ctx.onAction('review-decision-recovery',{});let ui=shim.document.getElementById('modalRoot').innerHTML;assert.ok(ui.includes(oldId),'each prior prepared choice identity is shown before consent');assert.match(ui,/Prepared appearance: <b>light/);assert.match(ui,/abandon.*publication.*new choice/i);
+  assert.equal((await store.listBackups()).find(row=>row.id===old.id).kind,'decision-recovery-choice','reading alone never releases old consent');
+  ctx.onAction('choose-decision-recovery',{dataset:{value:'dark'}});delete faults.push;
+  const update=store.updateBackupKind.bind(store);let aborted=false;store.updateBackupKind=async(...args)=>{if(partialFailure&&args[0]===old.id&&!aborted){aborted=true;app.idbFault.abortBackup=true;try{return await update(...args);}finally{app.idbFault.abortBackup=false;}}return update(...args);};
+  assert.equal(await ctx.onAction('apply-decision-recovery',{}),!partialFailure);let copies=await store.listBackups();
+  if(partialFailure)assert.match(shim.document.getElementById('modalRoot').innerHTML,/Cloud and this device saved.*recovery hold/i,'archive bookkeeping failure must not imply local application failed');
+  assert.equal(copies.find(row=>row.id===old.id).payload,old.payload,'supersession never rewrites original payload bytes');
+  if(partialFailure){assert.equal(aborted,true);assert.equal(copies.find(row=>row.id===old.id).kind,'decision-recovery-choice');const remote=(await backend.CS.pull()).payload;ctx.closeModal();await ctx.cloudPull();await ctx.sendPush();assert.equal((await backend.CS.pull()).payload,remote,'partial archive failure stays held');await ctx.onAction('review-decision-recovery',{});ctx.onAction('choose-decision-recovery',{dataset:{value:'dark'}});assert.equal(await ctx.onAction('apply-decision-recovery',{}),true);copies=await store.listBackups();}
+  const archived=copies.find(row=>row.id===old.id);assert.equal(archived.kind,'decision-recovery-superseded','a never-published old choice is not labelled confirmed');assert.equal(copies.some(row=>row.kind==='decision-recovery-choice'),false);
+  const remote=JSON.parse((await backend.CS.pull()).payload);assert.equal(remote.decisionEvents.some(row=>row.id===oldId),false);for(const row of copies.filter(row=>row.kind==='decision-recovery-confirmed'))assert.ok(remote.decisionEvents.some(event=>event.id===JSON.parse(row.payload).recoveryChoice.choiceId),'confirmed means its own exact choice actually reached the cloud');
+  assert.equal(await ctx.persist(),true);assert.ok((await store.listBackups()).some(row=>row.id===old.id&&row.kind==='decision-recovery-superseded'&&row.payload===old.payload),'ordinary rotation preserves the exact superseded archive');
+  ctx.openSettings();const line=shim.document.getElementById('modalRoot').innerHTML.split('<div class="mgr backup-row">').find(row=>row.includes('data-id="'+old.id+'"'));assert.match(line,/superseded/i);assert.match(line,/data-act="restore-local-backup"[^>]*disabled/);assert.equal(await ctx.restoreDurableBackupById(old.id),false);
+  await ctx.onAction('delete-local-backup',{dataset:{id:old.id}});assert.equal((await store.listBackups()).some(row=>row.id===old.id),false,'a deliberately superseded evidence archive has the normal explicit Settings delete confirmation');assert.equal(remote.settings.theme,'dark');
+ });
 });
