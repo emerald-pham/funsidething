@@ -12668,5 +12668,47 @@
     ],
     "comparison": "Exact cumulative tests.js diff against 52d4b2537bacbb60240ae7a53061224350ebd36f",
     "baseCommit": "52d4b2537bacbb60240ae7a53061224350ebd36f"
+  },
+  {
+    "reason": "The actual combined candidate retained an older FAQ compatibility requirement alongside the newer timed-hold explanation. This exact test addition exercises the rendered Settings Help answer and requires both cues to remain together.",
+    "previousBehavior": "The Help answer explained Start expiry and unchanged decision time but omitted the required updated-board expiry wording, so the current FAQ contract failed.",
+    "intendedBehavior": "The same rendered answer keeps the Start eligible-pool cue, explains that an updated board clears an expired hold before its eligible pool is built, and preserves the original decision time.",
+    "preservedCoverage": [
+      "Timed Can’t and Worked holds retain their original starts across save, reopen, and cloud refresh.",
+      "Expiry eligibility and local 2 AM behavior remain unchanged; this is a copy and FAQ coverage repair only.",
+      "Manual JSON export, file restore, archive evidence, and protected backup behavior remain covered by their existing tests.",
+      "All historical regression rationales and original RED/GREEN evidence remain preserved without rewriting prior objects."
+    ],
+    "replacementTests": [
+      "RISK timed-hold FAQ: actual Help retains Start and updated-board expiry cues together"
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='^RISK timed-hold FAQ: actual Help retains Start and updated-board expiry cues together$' tests.js (record-run 5d674407-a48e-4b29-8cb9-7e6634b5d3cd; preimplementation-red)",
+      "failure": "On the actual Settings Help action, the new timer-copy assertion failed because the rendered answer did not explain that an updated board clears an expired hold before building its eligible pool. The Start wording and original decision-time explanation were present. The parent full-candidate run 230a494c independently reported the retained compatibility assertion at tests.js:33907; no product timing assertion failed."
+    },
+    "testChangesSha256": "7f97b364e929f6f7397e3a504b96dd07343cee8deedb96e9267b3cf2ee42f6db",
+    "comparison": "Exact tests.js diff against 70b9a568cf6b37f118633747b421e56a69c4acee",
+    "baseCommit": "70b9a568cf6b37f118633747b421e56a69c4acee"
+  },
+  {
+    "reason": "This exact-base aggregate records the cumulative tests.js changes since 52d, including the independently documented export, backup-file restore, recovery, timed-hold, and release-gate work plus this final FAQ compatibility repair. The specific new actual-Help test retains the original Start, updated-board, and unchanged-decision-time wording together; earlier case-level RED evidence remains in its historical records.",
+    "previousBehavior": "The Help answer explained Start expiry and unchanged decision time but omitted the required updated-board expiry wording, so the current FAQ contract failed.",
+    "intendedBehavior": "The same rendered answer keeps the Start eligible-pool cue, explains that an updated board clears an expired hold before its eligible pool is built, and preserves the original decision time.",
+    "preservedCoverage": [
+      "Timed Can’t and Worked holds retain their original starts across save, reopen, and cloud refresh.",
+      "Expiry eligibility and local 2 AM behavior remain unchanged; this is a copy and FAQ coverage repair only.",
+      "Manual JSON export, file restore, archive evidence, and protected backup behavior remain covered by their existing tests.",
+      "All historical regression rationales and original RED/GREEN evidence remain preserved without rewriting prior objects."
+    ],
+    "replacementTests": [
+      "RISK timed-hold FAQ: actual Help retains Start and updated-board expiry cues together"
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='^RISK timed-hold FAQ: actual Help retains Start and updated-board expiry cues together$' tests.js (record-run 5d674407-a48e-4b29-8cb9-7e6634b5d3cd; preimplementation-red)",
+      "failure": "On the actual Settings Help action, the new timer-copy assertion failed because the rendered answer did not explain that an updated board clears an expired hold before building its eligible pool. The Start wording and original decision-time explanation were present. The parent full-candidate run 230a494c independently reported the retained compatibility assertion at tests.js:33907; no product timing assertion failed."
+    },
+    "testChangesSha256": "6c59dd91a2cc059a60e2ce8da6d8996b89b028ff547c1e314dbaa19d53d2cf66",
+    "comparison": "Exact cumulative tests.js diff against 52d4b2537bacbb60240ae7a53061224350ebd36f",
+    "baseCommit": "52d4b2537bacbb60240ae7a53061224350ebd36f"
   }
 ]

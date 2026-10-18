@@ -33904,6 +33904,17 @@ test('RISK timed-hold coherence: use each board’s Worked settings and keep orp
  });
 });
 
+test('RISK timed-hold FAQ: actual Help retains Start and updated-board expiry cues together',async()=>{
+ const {ctx,shim}=await loadApp();ctx.onAction('help',{});
+ const help=shim.document.getElementById('modalRoot').innerHTML;
+ const timer=help.match(/<dt>What do the countdown tags mean\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
+ assert.ok(timer,'the actual Help action renders the countdown answer');
+ assert.match(timer,/Start clears expired holds before building the eligible pool/);
+ assert.match(timer,/updated board clears the hold before building its eligible pool/);
+ assert.match(timer,/Both timed holds keep their original start through save, reopen, and cloud refresh/);
+ assert.match(timer,/original decision time remains unchanged/);
+});
+
 test('RISK timed-hold coherence: extended FAQ and current Settings changelog explain retained expiry time',async()=>{
  const {ctx,shim}=await loadApp();ctx.onAction('help',{});
  const help=shim.document.getElementById('modalRoot').innerHTML;
