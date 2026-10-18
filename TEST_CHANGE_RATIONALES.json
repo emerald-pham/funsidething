@@ -12423,5 +12423,28 @@
     "observedIntermediateRuns": [
       "The aggregate record preserves component evidence and chronology in earlier rationale objects; the issue196 consumer cohort passed 29/29 at 14-55-01-262Z, source/commit/cloud cancellation controls passed 3/3 at 14-56-52-548Z, generic backdrop/Escape cancellation passed 3/3 at 15-00-23-724Z, and risk inventory mapping passed at 15-01-56-523Z."
     ]
+  },
+  {
+    "testChangesSha256": "6ae2292cec74777f27c54cbdbef0cdb184297d49df27e468daffa546fa9246e6",
+    "reason": "Ticket198 requires the actual existing test command to reject an absent native installed-client regression outcome.",
+    "previousBehavior": "The existing tests.js native-name selection exited successfully without executing any required native installed-client case.",
+    "intendedBehavior": "An always-registered process RISK executes the real narrow Node child once and independently rejects missing, duplicate, skipped or unsuccessful required native outcomes; the first vertical implements signed-out delivery and offline preservation.",
+    "replacementTests": [
+      "RISK repository process: required installed-client native outcomes execute exactly once",
+      "RISK native installed-client delivery: signed-out"
+    ],
+    "preservedCoverage": [
+      "All489 historical raw rationale records and prior test bytes unchanged.",
+      "Existing185/186/188/190/194/196 storage, held recovery, export, expiry and Restore contracts.",
+      "No product assets or service-worker behavior changed."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='^RISK repository process: required installed-client native outcomes execute exactly once$' tests.js",
+      "failure": "Before native registration/support/package/workflow implementation, recorderf8c5b66b-8ec7-4014-a7af-9504a8285ccd observed child exit0 with zero required native outcomes, then independent AssertionError Required native case absent or duplicated: RISK native installed-client delivery: signed-out;0!==1."
+    },
+    "observedIntermediateRuns": [
+      "Native9fbaa30a reached candidate offline SW reload but failed navigator.onLine true!==false; no native acceptance claimed. Later transport proof requires a successful online control and failed uncached offline request while the server remains listening.",
+      "Signed-out process/native GREEN cdda4764-361b-48b4-beb4-1a74d1507cb3; actual default headless Chromium151.0.7922.34; online listener echo then failed uncached offline fetch with listener live, exact same-candidate offline sources and native local draft. Earlier f3dceaa4 transport/retention passed but final unconditional Add toggle hid the pane; retained as failed harness attempt."
+    ]
   }
 ]

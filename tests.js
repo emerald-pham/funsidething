@@ -35283,3 +35283,30 @@ test('RISK held decision recovery: new reviewed consent supersedes prior prepare
   await ctx.onAction('delete-local-backup',{dataset:{id:old.id}});assert.equal((await store.listBackups()).some(row=>row.id===old.id),false,'a deliberately superseded evidence archive has the normal explicit Settings delete confirmation');assert.equal(remote.settings.theme,'dark');
  });
 });
+
+
+test('RISK repository process: required installed-client native outcomes execute exactly once',()=>{
+ const required=['RISK native installed-client delivery: signed-out'];
+ const env={...process.env,CHAIN_INSTALLED_NATIVE_CHILD:'1'};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^RISK native installed-client delivery: (signed-out|reconcile-held)$','tests.js'],{cwd:__dirname,env,encoding:'utf8',timeout:205000,maxBuffer:32*1024*1024});
+ const output=[result.stdout,result.stderr].filter(Boolean).join('\n');
+ assert.equal(result.error,undefined,'Native selected-test infrastructure must work: '+(result.error?.message||output));
+ assert.equal(result.signal,null,'Native selected-test run must finish: '+output);
+ assert.equal(result.status,0,'Native selected-test run must succeed: '+output);
+ const lines=(result.stdout||'').split(/\r?\n/);
+ for(const name of required){
+  const outcomes=lines.filter(line=>line.startsWith('ok ')&&line.replace(/^ok \d+ - /,'').split(' #')[0]===name);
+  assert.equal(outcomes.length,1,'Required native case absent or duplicated: '+name+'\n'+output);
+  assert.ok(!/ # (?:SKIP|TODO)\b/i.test(outcomes[0]),'Required native case must actually execute: '+name);
+ }
+ assert.ok(!/^not ok /m.test(result.stdout||''),'No native failure or cancellation may be hidden: '+output);
+});
+
+
+if(process.env.CHAIN_INSTALLED_NATIVE_CHILD==='1'){
+ test('RISK native installed-client delivery: signed-out',{timeout:210000},async t=>{
+  const {runInstalledClientCase}=await import('./scripts/installed-client-regression.mjs');
+  const result=await runInstalledClientCase({mode:'signed-out',repo:__dirname,oldCommit:'779defa4e8c3465fdf535fe17dbe2227d2b76ea1',candidateCommit:process.env.CHAIN_NATIVE_CANDIDATE_SHA,candidateTree:process.env.CHAIN_NATIVE_CANDIDATE_TREE,outputDir:process.env.CHAIN_NATIVE_OUTPUT,port:Number(process.env.CHAIN_NATIVE_PORT||0)});
+  t.diagnostic('Native evidence: '+result.reportPath);
+ });
+}

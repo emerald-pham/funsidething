@@ -1597,3 +1597,8 @@ The candidate worker precaches while predecessor clients remain on their existin
 - RISK BACKUP FILE RESTORE: account, auth epoch, pending evidence, and cloud revision changes hold consent
 - RISK BACKUP FILE RESTORE: a released old client wins CAS before the prospective file board is published
 - RISK BACKUP FILE RESTORE: replacement preserves completion, History, ratings, deletions, unknown data, and Undo
+
+## Installed-client required release command
+
+- RISK repository process: required installed-client native outcomes execute exactly once
+- RISK native installed-client delivery: signed-out
