@@ -25786,36 +25786,121 @@ test('RISK evergreen scan reconciliation: a delayed stale read and later revisio
  }
 });
 
-test('RISK live scan sync: candidate Done publishes promptly and reaches another open device without focus',async()=>{
+function liveDoneDeliverySnapshot(app,id){
+ return JSON.parse(vm.runInContext('JSON.stringify({rev:state.syncRev,dirty:state.syncDirty,reconciledAs,pulling,cloudPushInFlight,pendingPush,pendingCloudRevision,lastKnownCloudRevision,currentDoneAt:state.tasks.find(row=>row.id==='+JSON.stringify(id)+')?.lastDoneAt??null,knownDoneAt:JSON.parse(lastKnownCloudPayload||"null")?.tasks?.find(row=>row.id==='+JSON.stringify(id)+')?.lastDoneAt??null,lastPersistedRaw,stateRaw:JSON.stringify(state)})',app.ctx));
+}
+async function ordinaryEditDebounceControl(){
+ const initial=syncState({tasks:[syncTask('ordinary-control','Ordinary edit control')],syncRev:5,syncAccount:'e@example.com',syncDirty:false}),h=makeSyncHarness({remote:initial,rev:5,delayMs:1}),entered=deferredSyncFixture();
+ const startupEntered=deferredSyncFixture(),releaseStartup=deferredSyncFixture();let reads=[];
+ const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial)},cloudSyncFactory:()=>{
+  const CS=h.factory(),pull=CS.pull;let first=true;CS.pull=async(...args)=>{if(first){first=false;startupEntered.resolve();await releaseStartup.promise;}return pull(...args);};return CS;
+ },beforeStateReady:ctx=>{reads=observeSyncFixtureCalls(ctx,'cloudPull');ctx.cloudPull();}});
+ try{
+  await startupEntered.promise;const initialConsumers=reads.filter(call=>!call.settled),caller=app.ctx.cloudPull();await caller;
+  assert.ok(initialConsumers.length>0,'the ordinary control captures the real queued startup read');
+  assert.equal(vm.runInContext('pulling',app.ctx),true);assert.equal(vm.runInContext('reconciledAs',app.ctx),null,'a second early-returning caller is not initial read authority');
+  assert.equal(app.ctx.state.tasks.length,1,'ordinary Add has not run while startup is pending');assert.equal(h.doc.rev,5);
+  const startup={heldConsumers:initialConsumers.length,heldSourceRaw:h.doc.payload,heldRaw:JSON.stringify(app.ctx.state)};
+  releaseStartup.resolve();await Promise.all(initialConsumers.map(call=>call.promise));await caller;
+  assert.equal(await app.ctx.persist(),true);assert.equal(vm.runInContext('reconciledAs',app.ctx),'e@example.com');
+  assert.equal(app.shim.localStorage.getItem(SYNC_STORE_KEY),JSON.stringify(app.ctx.state),'the actual startup consumer and device head are acknowledged before ordinary Add');
+  startup.acknowledgedRaw=JSON.stringify(app.ctx.state);startup.account=vm.runInContext('reconciledAs',app.ctx);
+  assert.equal(app.shim.window.CLOUD_PUSH_DELAY_MS,undefined,'the actual ordinary producer retains the default two-second debounce');
+  const acknowledged=deferredSyncFixture(),push=app.shim.window.CloudSync.push;app.shim.window.CloudSync.push=async(...args)=>{entered.resolve({at:performance.now(),args});const reply=await push(...args);acknowledged.resolve({at:performance.now(),reply});return reply;};
+  const started=performance.now();app.ctx.addTask('Actual ordinary debounced edit');return {app,h,started,entered:entered.promise,acknowledged:acknowledged.promise,startup};
+ }catch(error){releaseStartup.resolve();await Promise.all(reads.filter(call=>!call.settled).map(call=>call.promise));app.ctx.suspendCloudSync();throw error;}
+ finally{releaseStartup.resolve();}
+}
+
+test('RISK live scan sync: candidate Done publishes promptly and reaches another open device without focus', {timeout:10000},async t=>{
+ const close=async app=>{if(!app)return;app.ctx.suspendCloudSync();vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry();clearTimeout(liveCloudTimer);',app.ctx);await app.ctx.window.ScannerDeviceStore?.close?.();};
  for(const evergreen of [false,true]){
-  const {a,b,h,candidateId,nextId,benchId}=await liveScanSyncClients({evergreen});
+  // The DOM shim unrefs application timers; keep this bounded IO observer alive.
+  const observerWatchdog=setTimeout(()=>{},10000);t.after(()=>clearTimeout(observerWatchdog));
+  const {a,b,h,candidateId,nextId,benchId}=await liveScanSyncClients({evergreen}),ordinary=await ordinaryEditDebounceControl();
   const ratings=JSON.stringify(a.ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma]));
-  a.ctx.onAction('cand-done',{dataset:{candidate:candidateId,benchmark:benchId}});
-  await syncSettle(100);
-  assert.ok(h.remoteState().tasks.find(t=>t.id===candidateId).lastDoneAt,'Done bypasses the ordinary two-second edit debounce');
-  const remoteTask=b.ctx.state.tasks.find(t=>t.id===candidateId);
-  assert.ok(remoteTask.lastDoneAt,'a server revision wakes the other already-open client');
-  assert.equal(remoteTask.done,!evergreen);assert.equal(b.ctx.isEligible(remoteTask),false);
-  assert.equal(b.ctx.state.mode,'scan','candidate Done keeps scanning');
-  assert.equal(b.ctx.state.candidateId,nextId);assert.equal(JSON.stringify(b.ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),ratings);
-  assert.equal(b.ctx.state.workLog.filter(e=>e.taskId===candidateId).length,evergreen?1:0);
+  const before={sourceRaw:h.doc.payload,senderRaw:JSON.stringify(a.ctx.state),peerRaw:JSON.stringify(b.ctx.state),initialA:liveDoneDeliverySnapshot(a,candidateId),initialB:liveDoneDeliverySnapshot(b,candidateId)},trace=[],started=performance.now();
+  const entered=deferredSyncFixture(),release=deferredSyncFixture(),senderEntered=deferredSyncFixture(),sourceAcknowledged=deferredSyncFixture(),pulls=observeSyncFixtureCalls(b.ctx,'cloudPull');let held=false,delivered=false,consumer,response;
+  const observe=event=>trace.push({event,elapsed:performance.now()-started,delivered,sourceRev:h.doc.rev,sourceDoneAt:h.remoteState().tasks.find(row=>row.id===candidateId).lastDoneAt,peer:liveDoneDeliverySnapshot(b,candidateId)});
+  const dispatch=b.shim.window.dispatchEvent.bind(b.shim.window);b.shim.window.dispatchEvent=event=>{if(event.type==='cloudboardchange'){observe('natural-hint');trace.at(-1).hint={...event.detail};}return dispatch(event);};
+  const CS=b.shim.window.CloudSync,pull=CS.pull;CS.pull=async(...args)=>{
+   observe('canonical-read-enter');const actual=pull(...args);observe('SDK-response-unavailable');const ordinaryACK=await ordinary.acknowledged;assert.equal(ordinaryACK.reply.ok,true,'the independent ordinary write really reached its SDK ACK');observe('ordinary-write-ACK-before-peer-SDK-response');const reply=await actual;observe('SDK-response-available');
+   if(!held&&JSON.parse(reply.payload).tasks.find(row=>row.id===candidateId).lastDoneAt){held=true;observe('completion-response-held');entered.resolve({consumer:pulls.findLast(call=>!call.settled),response:{...reply}});await release.promise;delivered=true;observe('response-delivery-before-continuation');}
+   return reply;
+  };
+  const sourceCS=a.shim.window.CloudSync,push=sourceCS.push;sourceCS.push=async(...args)=>{observe('natural-Done-push-enter');senderEntered.resolve({at:performance.now(),args});const reply=await push(...args);observe('source-SDK-write-ACK');sourceAcknowledged.resolve({at:performance.now(),reply});return reply;};
+  t.after(release.resolve);
+  try{
+   const actionAt=performance.now();
+   a.ctx.onAction('cand-done',{dataset:{candidate:candidateId,benchmark:benchId}});
+   const publication=await senderEntered.promise,sourceACK=await sourceAcknowledged.promise;assert.equal(sourceACK.reply.ok,true,'the natural Done write is acknowledged by the source SDK');assert.ok(sourceACK.at-actionAt<2000,'Done reaches its actual source write ACK before ordinary debounce');
+   assert.ok(publication.at-actionAt<2000,'Done starts naturally before the ordinary edit debounce');
+   assert.equal(ordinary.h.doc.rev,5,'the default ordinary edit is still unpublished when Done reaches the server');
+   assert.ok(h.remoteState().tasks.find(t=>t.id===candidateId).lastDoneAt,'Done bypasses the ordinary two-second edit debounce');
+   observe('prompt-source-assertions-before-peer-response');
+   ({consumer,response}=await entered.promise);assert.ok(consumer,'the natural revision hint owns an actual canonical read continuation');
+   const pending=liveDoneDeliverySnapshot(b,candidateId);assert.equal(pending.currentDoneAt,null,'the peer is unchanged while its real response is held');assert.equal(pending.knownDoneAt,null,'an undelivered response has not established completion knowledge');assert.equal(pending.pulling,true);
+   assert.equal(trace.filter(row=>row.event==='natural-hint').length>0,true);assert.equal(delivered,false);
+   release.resolve();await consumer.promise;await settleSavedViewPublication(a,h,'natural Done sender device/cloud ACK');await settleSavedViewPublication(b,h,'natural hinted Done read/device ACK');observe('canonical-consumer-and-device-ACK');
+   const remoteTask=b.ctx.state.tasks.find(t=>t.id===candidateId);
+   assert.ok(remoteTask.lastDoneAt,'a server revision wakes the other already-open client');
+   assert.equal(remoteTask.done,!evergreen);assert.equal(b.ctx.isEligible(remoteTask),false);
+   assert.equal(b.ctx.state.mode,'scan','candidate Done keeps scanning');
+   assert.equal(b.ctx.state.candidateId,nextId);assert.equal(JSON.stringify(b.ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),ratings);
+   assert.equal(b.ctx.state.workLog.filter(e=>e.taskId===candidateId).length,evergreen?1:0);
+   assert.equal(JSON.stringify(JSON.parse(response.payload).decisionEvents),JSON.stringify(b.ctx.state.decisionEvents),'the natural response journal reaches the acknowledged peer exactly');
+   const ordinaryPublication=await ordinary.entered;assert.ok(publication.at<ordinaryPublication.at,'the actual default-debounced edit producer follows Done');await settleSavedViewPublication(ordinary.app,ordinary.h,'ordinary edit control device/cloud ACK');
+   t.diagnostic(JSON.stringify({evergreen,ordinaryStartup:{heldConsumers:ordinary.startup.heldConsumers,account:ordinary.startup.account},DonePublicationMs:publication.at-actionAt,DoneSourceACKMs:sourceACK.at-actionAt,ordinaryPublicationMs:ordinaryPublication.at-ordinary.started,trace:trace.map(({event,elapsed,delivered,sourceRev,peer})=>({event,elapsed,delivered,sourceRev,peerRev:peer.rev,currentDoneAt:peer.currentDoneAt,knownDoneAt:peer.knownDoneAt}))}));
+   if(process.env.LIVE_DONE_DELIVERY_EVIDENCE_DIR){fs.mkdirSync(process.env.LIVE_DONE_DELIVERY_EVIDENCE_DIR,{recursive:true});fs.writeFileSync(path.join(process.env.LIVE_DONE_DELIVERY_EVIDENCE_DIR,'live-Done-'+process.pid+'-'+(evergreen?'evergreen':'ordinary')+'.json'),JSON.stringify({evergreen,before,response,trace,ordinaryStartup:ordinary.startup,ordinarySourceRaw:ordinary.h.doc.payload,finalSourceRaw:h.doc.payload,finalA:liveDoneDeliverySnapshot(a,candidateId),finalB:liveDoneDeliverySnapshot(b,candidateId)},null,2));}
+  }finally{release.resolve();await consumer?.promise;await Promise.all(pulls.filter(call=>!call.settled).map(call=>call.promise));await close(a);await close(b);await close(ordinary.app);clearTimeout(observerWatchdog);}
  }
 });
 
-test('RISK live scan sync: done adding for now shares the existing work mode and survives reload and reconnect',async()=>{
+function liveModeDeliverySnapshot(app){
+ return JSON.parse(vm.runInContext('JSON.stringify({mode:state.mode,rev:state.syncRev,dirty:state.syncDirty,reconciledAs,pulling,knownMode:JSON.parse(lastKnownCloudPayload||"null")?.mode??null,lastKnownCloudRevision,lastPersistedRaw,stateRaw:JSON.stringify(state)})',app.ctx));
+}
+async function settleLiveModePublication(app,h,label){
+ const deadline=performance.now()+8000;let observed,stored;
+ do{
+  observed=JSON.parse(vm.runInContext('JSON.stringify({idle:!cloudPushInFlight&&!pulling&&!pendingPush&&!cloudResumePending,dirty:state.syncDirty,payload:cloudPayload(),rev:state.syncRev,raw:lastPersistedRaw,stateRaw:JSON.stringify(state)})',app.ctx));
+  if(observed.idle&&!observed.dirty&&observed.payload===h.doc.payload&&observed.rev===h.doc.rev&&observed.raw===observed.stateRaw){
+   stored=app.shim.window.storage?(await app.shim.window.storage.get(SYNC_STORE_KEY))?.value:app.shim.localStorage.getItem(SYNC_STORE_KEY);
+   if(stored===observed.stateRaw)return;
+  }
+  await syncSettle(25);
+ }while(performance.now()<deadline);
+ assert.fail(label+' did not acknowledge the coherent browser/host head: '+JSON.stringify({observed,storedMatches:stored===observed.stateRaw}));
+}
+
+test('RISK live scan sync: done adding for now shares the existing work mode and survives reload and reconnect',{timeout:10000},async t=>{
+ const close=async app=>{if(!app)return;app.ctx.suspendCloudSync();vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry();clearTimeout(liveCloudTimer);',app.ctx);await app.ctx.window.ScannerDeviceStore?.close?.();};
  for(const hostStorage of [false,true]){
-  const {a,b,h,candidateId,benchId}=await liveScanSyncClients({hostStorage});
-  a.ctx.onAction('start-working',{dataset:{candidate:candidateId,benchmark:benchId}});await syncSettle(100);
-  assert.equal(h.remoteState().mode,'work','finishing the scan publishes immediately');
-  assert.equal(b.ctx.state.mode,'work','the open second platform pauses without a focus event');
-  assert.deepEqual([...b.ctx.state.chain],[benchId]);assert.ok(b.shim.document.getElementById('scan').innerHTML.includes('Scanning paused'));
-  const bytes=JSON.stringify(b.ctx.state),reloaded=await loadApp({[hostStorage?'hostStorage':'seedStorage']:{[SYNC_STORE_KEY]:bytes}});
-  assert.equal(reloaded.ctx.state.mode,'work');assert.deepEqual([...reloaded.ctx.state.chain],[benchId]);
-  b.shim.document.hidden=true;b.shim.document.dispatchEvent({type:'visibilitychange'});
-  a.ctx.onAction('resume-scan',{dataset:{}});a.ctx.cloudPushNow();await syncSettle(30);
-  assert.equal(b.ctx.state.mode,'work','hidden clients wait for a fresh server read');
-  b.shim.document.hidden=false;b.shim.document.dispatchEvent({type:'visibilitychange'});await syncSettle(80);
-  assert.equal(b.ctx.state.mode,'scan','returning or reconnecting receives the later explicit resume');
+  const observerWatchdog=setTimeout(()=>{},10000);t.after(()=>clearTimeout(observerWatchdog));
+  const {a,b,h,candidateId,benchId}=await liveScanSyncClients({hostStorage}),before={sourceRaw:h.doc.payload,senderRaw:JSON.stringify(a.ctx.state),peerRaw:JSON.stringify(b.ctx.state)};
+  const trace=[],started=performance.now(),entered=deferredSyncFixture(),release=deferredSyncFixture(),pulls=observeSyncFixtureCalls(b.ctx,'cloudPull');let held=false,delivered=false,consumer,response,reloaded;
+  const observe=event=>trace.push({event,elapsed:performance.now()-started,delivered,sourceRev:h.doc.rev,sourceMode:h.remoteState().mode,peer:liveModeDeliverySnapshot(b)});
+  const dispatch=b.shim.window.dispatchEvent.bind(b.shim.window);b.shim.window.dispatchEvent=event=>{if(event.type==='cloudboardchange'){observe('natural-hint');trace.at(-1).hint={...event.detail};}return dispatch(event);};
+  const CS=b.shim.window.CloudSync,pull=CS.pull;CS.pull=async(...args)=>{observe('canonical-read-enter');const reply=await pull(...args);if(!held&&JSON.parse(reply.payload).mode==='work'){held=true;observe('work-response-held');entered.resolve({consumer:pulls.findLast(call=>!call.settled),response:{...reply}});await release.promise;delivered=true;observe('response-delivery-before-continuation');}return reply;};
+  const sourceCS=a.shim.window.CloudSync,push=sourceCS.push;sourceCS.push=async(...args)=>{observe('natural-pause-push-enter');return push(...args);};t.after(release.resolve);
+  try{
+   a.ctx.onAction('start-working',{dataset:{candidate:candidateId,benchmark:benchId}});({consumer,response}=await entered.promise);assert.ok(consumer,'the natural pause hint starts an actual canonical read');
+   assert.ok(trace.find(row=>row.event==='natural-pause-push-enter').elapsed<2000,'finishing the scan bypasses the default ordinary debounce');
+   assert.equal(h.remoteState().mode,'work','finishing the scan publishes immediately');
+   const pending=liveModeDeliverySnapshot(b);assert.equal(pending.mode,'scan','the initial work response has not replaced the peer while held');assert.equal(pending.knownMode,null,'the held work response is not yet read authority');assert.equal(pending.pulling,true);assert.equal(delivered,false);
+   release.resolve();await consumer.promise;await settleLiveModePublication(a,h,'natural pause sender');await settleLiveModePublication(b,h,'natural pause hinted peer');observe('initial-canonical-consumer-and-device-ACK');
+   assert.equal(b.ctx.state.mode,'work','the open second platform pauses without a focus event');
+   assert.deepEqual([...b.ctx.state.chain],[benchId]);assert.ok(b.shim.document.getElementById('scan').innerHTML.includes('Scanning paused'));
+   const bytes=JSON.stringify(b.ctx.state);reloaded=await loadApp({[hostStorage?'hostStorage':'seedStorage']:{[SYNC_STORE_KEY]:bytes}});
+   assert.equal(reloaded.ctx.state.mode,'work');assert.deepEqual([...reloaded.ctx.state.chain],[benchId]);
+   b.shim.document.hidden=true;b.shim.document.dispatchEvent({type:'visibilitychange'});
+   a.ctx.onAction('resume-scan',{dataset:{}});a.ctx.cloudPushNow();await syncSettle(30);
+   assert.equal(b.ctx.state.mode,'work','hidden clients wait for a fresh server read');
+   b.shim.document.hidden=false;b.shim.document.dispatchEvent({type:'visibilitychange'});await syncSettle(80);
+   assert.equal(b.ctx.state.mode,'scan','returning or reconnecting receives the later explicit resume');
+   await settleLiveModePublication(a,h,'natural resume sender finished');await settleLiveModePublication(b,h,'original visibility resume finished');observe('original-resume-and-device-ACK');
+   t.diagnostic(JSON.stringify({hostStorage,trace:trace.map(({event,elapsed,delivered,sourceRev,sourceMode,peer})=>({event,elapsed,delivered,sourceRev,sourceMode,peerMode:peer.mode,knownMode:peer.knownMode}))}));
+   if(process.env.LIVE_DONE_DELIVERY_EVIDENCE_DIR){fs.mkdirSync(process.env.LIVE_DONE_DELIVERY_EVIDENCE_DIR,{recursive:true});fs.writeFileSync(path.join(process.env.LIVE_DONE_DELIVERY_EVIDENCE_DIR,'live-pause-'+process.pid+'-'+(hostStorage?'host':'fallback')+'.json'),JSON.stringify({hostStorage,before,response,trace,finalSourceRaw:h.doc.payload,finalA:liveModeDeliverySnapshot(a),finalB:liveModeDeliverySnapshot(b)},null,2));}
+  }finally{release.resolve();await consumer?.promise;await close(a);await close(b);await close(reloaded);clearTimeout(observerWatchdog);}
  }
 });
 
