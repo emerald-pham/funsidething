@@ -503,6 +503,7 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK completion lifecycle Start: an unaware pass root cannot bypass completion in either publication order
 - RISK completion lifecycle Dot: unseen Dot and opposite No keep learning while observed completion owns membership
 - RISK completion lifecycle maintenance: the local day marker and Resume or Rescan do not renew a removed member
+- RISK completion lifecycle fixtures: released Start informed Start and local maintenance execute in UTC and New York
 - RISK completion lifecycle return: observed Dot and next Done survive stale delivery and IndexedDB reopen
 - RISK evergreen scan reconciliation: merged completion removes resting crumbs tails and candidates without losing evidence
 - RISK evergreen scan reconciliation: a newer stale cloud chain cannot revive another browsers completed task

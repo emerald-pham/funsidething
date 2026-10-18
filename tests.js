@@ -249,16 +249,20 @@ async function releasedExpiryStartSource173(t){
  const publish=async(app,h,label)=>{assert.equal(await app.ctx.persist(),true);await app.ctx.cloudPushNow();await settleSavedViewPublication(app,h,label);};
  const at=Date.parse('2026-10-17T15:00:00Z'),initial=syncState({tasks:[
   {...syncTask('expiry-recurring','Recurring first task'),createdAt:at-2000,evergreen:true,evergreenHours:1,evergreenResetAtDay:false},
-  {...syncTask('expiry-peer','Independent peer title'),createdAt:at-1000,startsAt:'2026-10-18'}],chain:[],candidateId:null,mode:'work',scanMode:'descending',
+  {...syncTask('expiry-peer','Independent peer title'),createdAt:at-1000,startsAt:'2999-01-01'}],chain:[],candidateId:null,mode:'work',scanMode:'descending',
   passId:'expiry-initial-pass',passStartedAt:at-60000,syncAccount:'e@example.com',syncRev:4,syncDirty:false,seenQuickStart:true,
   settings:{horizonMin:60,thresholdPct:0,samples:40}}),remote=structuredClone(initial);for(const key of ['syncRev','syncAccount','syncDirty'])delete remote[key];
  const h=makeSyncHarness({remote,rev:4,delayMs:1}),raw=JSON.stringify(initial),old=await loadAppAtTime(at,{appSource:extractAppScript(released.stdout),
   seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});t.after(()=>closeLegacyApp173(old));await old.ctx.cloudPull();
+ // This peer is deliberately not yet eligible; real local calendar dates are
+ // independent of this fixture's Date.now-only completion clock.
+ assert.equal(old.ctx.isEligible(old.ctx.state.tasks.find(task=>task.id==='expiry-peer')),false,'the actual released peer stays future-dated in every local calendar');
  old.ctx.window.CloudSync.ready=false;old.ctx.onAction('start-scan',{dataset:{mode:'descending'}});old.ctx.window.CloudSync.ready=true;await publish(old,h,'expiry-released-initial-start');
  old.ctx.window.CloudSync.ready=false;hydrateUnchangedEditorDraft(old,'expiry-recurring');old.ctx.onAction('dot-task',{dataset:{id:'expiry-recurring'}});old.ctx.window.CloudSync.ready=true;await publish(old,h,'expiry-released-original-dot');
  const beforeDoneRaw=old.shim.localStorage.getItem(SYNC_STORE_KEY);old.ctx.window.CloudSync.ready=false;setFakeTime(old.ctx,at+100);hydrateUnchangedEditorDraft(old,'expiry-recurring');old.ctx.onAction('done-task',{dataset:{id:'expiry-recurring'}});assert.equal(await old.ctx.persist(),true);
  const afterDoneRaw=old.shim.localStorage.getItem(SYNC_STORE_KEY);setFakeTime(old.ctx,at+2*3600000);old.ctx.ensureCandidate();old.ctx.renderScan();
  assert.match(old.shim.document.getElementById('scan').innerHTML,/data-act="start-scan"/,'the actual old scanner offers permitted Start after its rest expires');
+ assert.deepEqual(Array.from(old.ctx.pool(),task=>task.id),['expiry-recurring'],'the actual released expired Start pool contains only its eligible recurring task');
  old.ctx.onAction('start-scan',{dataset:{mode:'descending'}});assert.deepEqual(Array.from(old.ctx.state.chain),['expiry-recurring']);
  hydrateUnchangedEditorDraft(old,'expiry-peer');old.shim.document.getElementById('etTitle').value='Actual later released peer title';old.ctx.onAction('save-edit',{dataset:{id:'expiry-peer'}});
  old.ctx.window.CloudSync.ready=true;await publish(old,h,'expiry-released-informed-start-title');
@@ -24414,7 +24418,7 @@ test('RISK completion lifecycle Start: an observed new-pass root survives peer m
  const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),at=Date.parse('2026-10-17T15:00:00Z'),
   taskId='informed-start-target',otherId='informed-start-peer',name=`completion-start-${Date.now()}-${Math.random()}`;
  const initial=syncState({tasks:[{...syncTask(taskId,'Recurring task'),evergreen:true,evergreenHours:1,evergreenResetAtDay:false},
-  {...syncTask(otherId,'Independent task'),startsAt:'2026-10-18'}],
+  {...syncTask(otherId,'Independent task'),startsAt:'2999-01-01'}],
   chain:[],candidateId:null,mode:'scan',scanMode:'descending',passId:'informed-start-pass',passStartedAt:at-60000,
   syncRev:4,syncAccount:'e@example.com',syncDirty:false,settings:{horizonMin:60,thresholdPct:0,samples:40,cantMin:30,workedHours:8}});
  const remote=structuredClone(initial);for(const key of ['syncRev','syncAccount','syncDirty'])delete remote[key];
@@ -24434,6 +24438,8 @@ test('RISK completion lifecycle Start: an observed new-pass root survives peer m
  setFakeTime(local.ctx,at+2*3600000);local.ctx.ensureCandidate();await local.ctx.persist();
  assert.equal(local.ctx.isEligible(local.ctx.state.tasks.find(row=>row.id===taskId)),true,'the existing rest has expired');
  assert.equal(local.ctx.state.chain.includes(taskId),false,'refreshing eligibility does not manufacture a return');
+ assert.equal(local.ctx.isEligible(local.ctx.state.tasks.find(row=>row.id===otherId)),false,'the unrelated future-dated peer cannot compete with the informed Start target');
+ assert.deepEqual(Array.from(local.ctx.pool(),task=>task.id),[taskId],'the informed Start really receives only its eligible returned task');
  local.ctx.renderScan();assert.match(local.shim.document.getElementById('scan').innerHTML,/data-act="start-scan"/,'the ordinary scanner offers Start for the eligible task');
  local.ctx.window.CloudSync.ready=false;
  local.ctx.onAction('start-scan',{dataset:{mode:'descending'}});await local.ctx.persist();
@@ -24670,7 +24676,8 @@ test('RISK completion lifecycle Dot: unseen Dot and opposite No keep learning wh
 });
 
 test('RISK completion lifecycle maintenance: the local day marker and Resume or Rescan do not renew a removed member',async()=>{
- const at=Date.parse('2026-10-17T05:58:00Z'),app=await loadAppAtTime(at),{ctx,shim}=app;
+ const at=+new Date(2026,9,17,1,58),localMarker=+new Date(2026,9,17,2,0),app=await loadAppAtTime(at),{ctx,shim}=app;
+ assert.equal(new Date(at).getHours(),1);assert.equal(new Date(at).getMinutes(),58);assert.equal(ctx.passResetCutoff(at),localMarker,'the actual local day marker is two minutes after this fixture begins');
  const reference=ctx.addTask('Legitimate current member'),task=ctx.addTask('Evergreen at the local 2 AM boundary');
  Object.assign(task,{evergreen:true,evergreenHours:18,evergreenResetAtDay:true});
  ctx.state.chain=[reference.id,task.id];ctx.state.candidateId=task.id;ctx.state.passStartedAt=at-60000;
@@ -24679,7 +24686,9 @@ test('RISK completion lifecycle maintenance: the local day marker and Resume or 
  const completion=JSON.parse(JSON.stringify(ctx.state.decisionEvents.find(event=>event.kind==='completion'&&event.taskId===task.id)));
  assert.ok(completion,'the real Done occurs just before the local marker');assert.deepEqual(Array.from(ctx.state.chain),[reference.id]);
  const ratings=JSON.stringify(ctx.state.tasks.map(row=>[row.id,row.mu,row.sigma]));
- setFakeTime(ctx,Date.parse('2026-10-17T06:00:00Z'));ctx.ensureCandidate();await ctx.persist();
+ assert.equal(ctx.isEligible(ctx.state.tasks.find(row=>row.id===task.id)),false,'the actual pre-marker completion still rests');
+ assert.equal(ctx.evergreenUntil(ctx.state.tasks.find(row=>row.id===task.id)),localMarker,'the optional rest ends at this local calendar marker');
+ setFakeTime(ctx,localMarker);assert.equal(vm.runInContext('new Date(Date.now()).getHours()',ctx),2);ctx.ensureCandidate();await ctx.persist();
  assert.equal(ctx.isEligible(ctx.state.tasks.find(row=>row.id===task.id)),true,'the optional day reset releases the rest at local 2 AM');
  assert.deepEqual(Array.from(ctx.state.chain),[reference.id],'day maintenance keeps every legitimate current member and does not restore Done membership');
  const passId=ctx.state.passId;assert.notEqual(passId,completion.passId,'the local marker starts its existing next pass');
@@ -32438,4 +32447,19 @@ test('RISK device save warning guidance: mounted help explains readable wrapped 
  assert.match(help,/Settings.*Last device save issue/);
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];
  assert.match(current,/Long device-save warnings stay readable on narrow screens and with enlarged text/);
+});
+
+test('RISK completion lifecycle fixtures: released Start informed Start and local maintenance execute in UTC and New York',async t=>{
+ // Run the real existing consumers in separate process-local calendars. A passing
+ // parent must include all four released-source subcases, not an early exit.
+ const pattern='^RISK legacy completion released Start: normally|^RISK completion lifecycle Start: an observed new-pass|^RISK completion lifecycle maintenance: the local day';
+ for(const zone of ['UTC','America/New_York'])await t.test(zone,()=>{
+  const env={...process.env,TZ:zone};delete env.NODE_TEST_CONTEXT;
+  const child=spawnSync(process.execPath,['--test','--test-name-pattern='+pattern,'tests.js'],{cwd:__dirname,env,encoding:'utf8',timeout:30000});
+  const output=child.stdout+child.stderr;
+  assert.equal(child.status,0,zone+' must execute the original Start/maintenance consumers successfully: '+output);
+  assert.match(output,/# tests 7\b/,'all three consumers and four released-source subcases actually execute');
+  assert.match(output,/# fail 0\b/);assert.match(output,/# skipped 0\b/);
+  t.diagnostic(zone+': seven real consumer cases passed, no skips');
+ });
 });
