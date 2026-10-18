@@ -11813,5 +11813,35 @@
       "failure": "UI: Quick start displays four essential steps in order failed the3rdliteral: actual With no dot, Yes chooses...Once a dot exists... versusold unconditionalCompareeachcandidate. UI: help describes Start scanning rather than a Can/Can't step failed the oldcase-sensitive Every mode chooses... regex againstactual By default, every mode.... Allbehaviorconsumer tests passed; no appfix or assertiondeletion made to hide these contradictions."
     },
     "greenEvidence": "ART/protected-copy-green.log directly reruns both original protectedcopy tests, allQuickstart companions and19newfeatureconsumers afteronlythese2expectationchanges. Finalexactcandidate fullsuite mustpass beforeCI/release; captured productbytes remain unchanged."
+  },
+  {
+    "testChangesSha256": "be62040650313267bda34ab90d272da299537429a9c95b8b0264ce00d76d1ae6",
+    "reason": "Keep supported timed Can’t and Worked decisions coherent when their saved hold has expired, while preserving their immutable decision history and the existing fail-closed guards for premature, corrupt, and unrelated evidence.",
+    "previousBehavior": "After a native Can’t expiry cleared its live marker, the saved board still contained the supported decision event. An ordinary cloud pull replayed that event, found a mismatch, and rejected the exact-deadline source as unprojectable, preventing acknowledgement and durable convergence.",
+    "intendedBehavior": "After cloudPull finishes its asynchronous reads and hydration, compare source and event projection at one effective instant. Normalize only matching supported expired hold pairs on copies using each board’s own settings and the existing exact deadline rules; keep native expiry, original facts, learning, History, and unrelated guards unchanged.",
+    "replacementTests": [
+      "RISK timed-hold coherence: native Can’t expires at the exact deadline through IndexedDB and ordinary cloud pull",
+      "RISK timed-hold coherence: native Worked honors hours and local 2 AM ceilings across reopen and cloud pull",
+      "RISK timed-hold coherence: use each board’s Worked settings and keep orphan evidence fail-closed",
+      "RISK timed-hold coherence: extended FAQ and current Settings changelog explain retained expiry time"
+    ],
+    "preservedCoverage": [
+      "The original native Can’t and Worked event envelopes and their original action times remain immutable through focus expiry, device persistence, cloud acknowledgement, and reopen.",
+      "Can’t is tested one millisecond before and exactly at its deadline; the exact-after eligibility result and a separate newer active Can’t remain distinct.",
+      "Worked uses its configured hour deadline and the local 2 AM ceiling, including a hold that remains active before a future deadline.",
+      "Each saved board is evaluated with its own Worked setting; a peer-cleared source may be adopted only after its own shorter deadline has passed.",
+      "A prematurely cleared active Worked mark and an orphan Can’t timestamp remain fail-closed, with the exact local device head and cloud source retained.",
+      "Real scanner pool membership, Ratings, rating history, History workLog, opaque settings and board fields, durable IndexedDB heads, and exact acknowledged cloud payloads are asserted.",
+      "Existing current-choice, Can’t/Return, causal projection, unknown decision authority, CAS, storage, account, and recovery protections remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "Raw preimplementation run on clean HEAD 52d4b2537bacbb60240ae7a53061224350ebd36f: TZ=America/New_York /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern=\"RISK timed-hold coherence: native Can’t expires at the exact deadline\" tests.js. Exact captured command IDs: exec-c68c4c95-3132-4e1d-b140-ee2a87f74be3 and exec-dbb9d1ab-d476-4f07-a95e-ff9dc504f9c1; raw result is in /Users/emeraldpham/Documents/Codex/2026-10-17/task/chain-timed-hold-first-red-verification.json.",
+      "failure": "Before any functional source edit, the direct exact-deadline assertion saw CloudSync.errorCode = unprojectable-decision-evidence where undefined was expected; the first broader run later showed the ordinary pull could not durably acknowledge publication. The captured artifact identifies a clean source HEAD and full failing output. It explicitly labels its tests.js SHA-256 as a later post-RED snapshot, so no post-edit whole-file hash is claimed as a pre-edit test identity."
+    },
+    "coverageChronology": {
+      "preimplementation": "Only the native Can’t exact-deadline ordinary-cloud-pull case has contemporaneous functional RED evidence, observed on unchanged 52d before runtime edits. The original test filename/title and raw command IDs are preserved in the coordinator artifact.",
+      "postimplementation": "Worked hour/2 AM, board-owned settings, after-await straddling, active-before-deadline, peer premature-clear, orphan-map, post-expiry eligibility, and FAQ controls were added or completed after the functional repair. They are reported as current GREEN controls, not retroactive preimplementation REDs."
+    },
+    "greenEvidence": "The complete 9-assertion timed-hold cohort passed through record-run with evidence /Users/emeraldpham/.codex/task-artifacts/cant-expiry-coherence/implementation/test-runs/2026-10-18T12-44-27-895Z-d3f39e89-8679-426f-87e9-46efb9a2c64c.json. Selected existing current-choice, current-choice projection, and unsupported authority controls passed 27 assertions in record-run evidence /Users/emeraldpham/.codex/task-artifacts/cant-expiry-coherence/implementation/test-runs/2026-10-18T12-44-46-648Z-48a9cc7a-4483-40ec-9ca8-6cfa669fed0d.json. The exact named RISK inventory gate passed at /Users/emeraldpham/.codex/task-artifacts/cant-expiry-coherence/implementation/test-runs/2026-10-18T12-46-22-575Z-1f3f8de3-aaae-4765-9f47-2d292a482b1f.json. The existing pending-write reconciliation preservation test passed through record-run at /Users/emeraldpham/.codex/task-artifacts/cant-expiry-coherence/implementation/test-runs/2026-10-18T12-47-07-993Z-c1703cc3-ca69-442e-a3e6-bec3b5874e4d.json."
   }
 ]
