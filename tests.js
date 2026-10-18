@@ -14014,6 +14014,69 @@ test('RISK RECOVERY EXPORT: an unsaved in-memory board remains copyable without 
   assert.match(download.blob.text,/Only in this open tab/);assert.doesNotMatch(download.blob.text,/device-only-recovery-id/);
 });
 
+test('RISK MANUAL JSON EXPORT: the actual Settings actions download current board and recovery archive',async t=>{
+  const {IDBFactory}=await import('fake-indexeddb'),dbName='chain-scanner-manual-export-'+Date.now()+'-'+Math.random();
+  const storage=sharedScannerStorage(),app=await loadApp({sharedStorage:storage,indexedDBProvider:new IDBFactory(),deviceDbName:dbName});
+  const {ctx,shim}=app,store=ctx.window.ScannerDeviceStore,account='archive-owner@example.test';
+  assert.ok(store,'the actual app opened its isolated device-store fixture');
+  t.after(async()=>{await store.close();});
+  const accepted=ctx.addTask('Accepted unsaved manual-export task');
+  accepted.futureManualExportField={keep:'opaque-value',sequence:[1,'😀']};
+  ctx.state.futureManualExportBoardField={keep:true};ctx.state.syncDirty=true;
+  await store.setPendingUpload(account,{generationId:'export-pending-generation-190',payloadHash:'a'.repeat(64),baseRev:7,updatedAt:1});
+  const head=await store.readHead();
+  await store.putBackup({expectedHash:head?.hash??null,backup:{id:'export-manual-backup-190',day:'2026-10-18',at:1,kind:'manual',payload:'{"futureBackupField":"keep"}'}});
+  const storedBefore=JSON.stringify({head:await store.readHead(),backups:await store.listBackups(),opaque:await store.listOpaqueArchives(),pending:await store.getPendingUpload(account)});
+  const memoryBefore=JSON.stringify(ctx.state),deviceWrites=[],browserWrites=[];
+  for(const name of ['migrateLegacy','commitHead','putBackup','updateBackupKind','deleteBackup','setPendingUpload','clearPendingUpload','setLegacyFingerprint']){
+    const original=store[name];store[name]=(...args)=>{deviceWrites.push(name);return original(...args);};
+  }
+  const originalSet=shim.localStorage.setItem.bind(shim.localStorage),originalRemove=shim.localStorage.removeItem.bind(shim.localStorage);
+  shim.localStorage.setItem=(key,value)=>{browserWrites.push(['set',key]);return originalSet(key,value);};
+  shim.localStorage.removeItem=key=>{browserWrites.push(['remove',key]);return originalRemove(key);};
+  let createdBlob=null;const downloads=[],link=makeFakeElement();link.remove=()=>{};
+  link.click=()=>downloads.push({name:link.download,href:link.href,blob:createdBlob});
+  shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();
+  ctx.Blob=class ExportBlob{constructor(parts,options){this.text=parts.join('');this.type=options.type;}};
+  ctx.URL={createObjectURL(blob){createdBlob=blob;return 'blob:manual-export-'+(downloads.length+1);},revokeObjectURL(){}};
+
+  ctx.openSettings();
+  const settings=shim.document.getElementById('modalRoot').innerHTML;
+  const currentControl=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Export current board JSON\s*<\/button>/);
+  const archiveControl=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Export recovery archive JSON\s*<\/button>/);
+  assert.ok(currentControl,'Settings exposes the clearly named current-board JSON export');
+  assert.ok(archiveControl,'Settings exposes the separate recovery-archive JSON export');
+  assert.match(settings,/not an ordinary board[- ]import file/i,'Settings explains that the recovery archive is not a normal board import');
+  assert.match(settings,/pending|recovery source/i,'Settings explains the archive recovery contents');
+
+  await ctx.onAction(currentControl[1],{});
+  for(let attempt=0;attempt<100&&downloads.length<1;attempt++)await flush();
+  assert.equal(downloads.length,1,'the current-board Settings action reaches the real download consumer');
+  assert.equal(downloads[0].name,'chain-scanner-current-board.json');
+  assert.equal(downloads[0].blob.type,'application/json');
+  const board=JSON.parse(downloads[0].blob.text);
+  assert.equal(board.tasks.find(task=>task.title==='Accepted unsaved manual-export task')?.futureManualExportField?.keep,'opaque-value');
+  assert.deepEqual(board.futureManualExportBoardField,{keep:true});
+
+  await ctx.onAction(archiveControl[1],{});
+  for(let attempt=0;attempt<100&&downloads.length<2;attempt++)await flush();
+  assert.equal(downloads.length,2,'the recovery-archive Settings action reaches the real download consumer');
+  assert.equal(downloads[1].name,'chain-scanner-recovery-archive.json');
+  assert.equal(downloads[1].blob.type,'application/json');
+  const archive=JSON.parse(downloads[1].blob.text);
+  assert.equal(archive.format,'chain-scanner-recovery-archive');
+  assert.equal(archive.schemaVersion,1);
+  assert.equal(archive.completeness.complete,true,'the isolated readable fixture is labelled complete');
+  assert.match(JSON.stringify(archive),/export-pending-generation-190/);
+  assert.match(JSON.stringify(archive),/export-manual-backup-190/);
+  assert.match(JSON.stringify(archive),/Accepted unsaved manual-export task/);
+
+  assert.equal(JSON.stringify(ctx.state),memoryBefore,'export leaves the accepted in-memory board untouched');
+  assert.deepEqual(deviceWrites,[],'export performs no device-store write');
+  assert.deepEqual(browserWrites,[],'export performs no browser-storage write');
+  assert.equal(JSON.stringify({head:await store.readHead(),backups:await store.listBackups(),opaque:await store.listOpaqueArchives(),pending:await store.getPendingUpload(account)}),storedBefore,'export leaves every seeded device-store source unchanged');
+});
+
 test('RISK IMPORT RENDERING: restored identifiers cannot inject attributes or break task reveal',async()=>{
   const base=syncState({tasks:[syncTask('task" autofocus data-injected="yes','Restored task')],contexts:[
     {id:'ctx" autofocus data-injected="yes',name:'Restored context',active:true},
@@ -23415,6 +23478,97 @@ function loadStorageV2({indexedDB}={}){
  assert.ok(sandbox.ChainStorageV2,'the storage module exposes its browser API');
  return sandbox.ChainStorageV2;
 }
+
+test('RISK DEVICE STORAGE V2: raw export snapshot preserves exact sources in one read-only capture',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),dbName='chain-scanner-raw-export-'+Date.now()+'-'+Math.random();
+ const transactionReads=[];let openCalls=0,abortNextSnapshot=false;
+ const nativeOpen=indexedDB.open.bind(indexedDB);
+ indexedDB.open=(...args)=>{
+  openCalls++;
+  const request=nativeOpen(...args);
+  request.addEventListener('success',event=>{
+   const db=event.target.result,nativeTransaction=db.transaction.bind(db);
+   db.transaction=(...transactionArgs)=>{
+    const tx=nativeTransaction(...transactionArgs),names=Array.from(tx.objectStoreNames);
+    transactionReads.push({names,mode:tx.mode});
+    if(abortNextSnapshot&&tx.mode==='readonly'&&names.length===4){
+     abortNextSnapshot=false;let issued=0;
+     const nativeObjectStore=tx.objectStore.bind(tx);
+     tx.objectStore=name=>{
+      const objectStore=nativeObjectStore(name);
+      for(const method of ['getAllKeys','getAll']){
+       const nativeRequest=objectStore[method].bind(objectStore);
+       objectStore[method]=(...requestArgs)=>{
+        const result=nativeRequest(...requestArgs);
+        if(++issued===8)tx.abort();
+        return result;
+       };
+      }
+      return objectStore;
+     };
+    }
+    return tx;
+   };
+  });
+  return request;
+ };
+ const storageV2=loadStorageV2({indexedDB}),store=storageV2.createDeviceStore({indexedDB,crypto:webcrypto,dbName});
+ await store.open();t.after(async()=>{await store.close();});
+ const rawOpen=await new Promise((resolve,reject)=>{
+  const request=indexedDB.open(dbName);
+  request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);
+ });
+ t.after(()=>rawOpen.close());
+ const expected={
+  meta:{keys:['head','pending:owner@example.test'],values:[
+   {hash:'corrupt-head-hash',schemaVersion:99,futureMeta:{raw:new Uint8Array([0,255,128])}},
+   {account:'owner@example.test',generationId:'pending-opaque-190',payloadHash:'not-a-hash',futurePending:{keep:['exact',7]}},
+  ]},
+  snapshots:{keys:['snapshot-corrupt'],values:[{hash:'mismatch',payload:new Uint8Array([123,0,255]),futureSnapshot:'keep'}]},
+  backups:{keys:['manual-corrupt'],values:['raw\u0000backup\uD800bytes']},
+  opaque:{keys:['opaque-archive'],values:[{raw:new Uint8Array([0,255,13]),futureOpaque:{retain:true}}]},
+ };
+ const seed=rawOpen.transaction(['meta','snapshots','backups','opaque'],'readwrite');
+ for(const [name,fixture] of Object.entries(expected)){
+  const objectStore=seed.objectStore(name);
+  for(let index=0;index<fixture.keys.length;index++)objectStore.put(fixture.values[index],fixture.keys[index]);
+ }
+ await new Promise((resolve,reject)=>{seed.oncomplete=resolve;seed.onerror=()=>reject(seed.error);seed.onabort=()=>reject(seed.error||new Error('fixture seed aborted'));});
+ const unopened=storageV2.createDeviceStore({indexedDB,crypto:webcrypto,dbName:dbName+'-unopened'}),opensBeforeUnopenedCall=openCalls;
+ assert.equal(typeof store.readRawExportSnapshot,'function','the existing open device-store exposes the additive raw export port');
+ await assert.rejects(unopened.readRawExportSnapshot(),/not open/i,'the export port cannot open or create a database on its own');
+ assert.equal(openCalls,opensBeforeUnopenedCall,'reading from a closed handle performs no IndexedDB open');
+
+ transactionReads.length=0;
+ const readsBeforeSnapshot=openCalls,snapshot=await store.readRawExportSnapshot();
+ assert.equal(openCalls,readsBeforeSnapshot,'a snapshot reuses the already-open database handle');
+ assert.deepEqual(transactionReads,[{names:['backups','meta','opaque','snapshots'],mode:'readonly'}],
+  'one readonly transaction covers all existing app-owned stores');
+ assert.deepEqual(Object.keys(snapshot.stores).sort(),['backups','meta','opaque','snapshots']);
+ for(const [name,fixture] of Object.entries(expected)){
+  assert.deepEqual(Array.from(snapshot.stores[name].keys),fixture.keys,`${name} source keys remain exact`);
+  assert.deepEqual(Array.from(snapshot.stores[name].values),fixture.values,`${name} raw values remain exact, including malformed and unknown rows`);
+ }
+
+ const unchanged=rawOpen.transaction(['meta','snapshots','backups','opaque'],'readonly');
+ const unchangedRows=await Promise.all(Object.keys(expected).map(async name=>{
+  const objectStore=unchanged.objectStore(name),[keys,values]=await Promise.all([
+   new Promise((resolve,reject)=>{const request=objectStore.getAllKeys();request.onsuccess=()=>resolve(Array.from(request.result));request.onerror=()=>reject(request.error);}),
+   new Promise((resolve,reject)=>{const request=objectStore.getAll();request.onsuccess=()=>resolve(Array.from(request.result));request.onerror=()=>reject(request.error);}),
+  ]);
+  return [name,{keys,values}];
+ }));
+ await new Promise((resolve,reject)=>{unchanged.oncomplete=resolve;unchanged.onerror=()=>reject(unchanged.error);unchanged.onabort=()=>reject(unchanged.error||new Error('verification read aborted'));});
+ for(const [name,rows] of unchangedRows){
+  assert.deepEqual(rows.keys,expected[name].keys,`${name} keys are unchanged after export`);
+  assert.deepEqual(rows.values,expected[name].values,`${name} values are unchanged after export`);
+ }
+
+ transactionReads.length=0;abortNextSnapshot=true;
+ await assert.rejects(store.readRawExportSnapshot(),/abort|transaction|request/i,'an aborted archive read rejects instead of producing a partial complete-looking snapshot');
+ assert.equal(abortNextSnapshot,false,'the read reached the real four-store transaction');
+ assert.deepEqual(transactionReads,[{names:['backups','meta','opaque','snapshots'],mode:'readonly'}]);
+});
 
 test('RISK SCALABLE BOARD CODEC: a multi-megabyte Unicode board roundtrips through bounded verified chunks',async()=>{
  const storageV2=loadStorageV2();

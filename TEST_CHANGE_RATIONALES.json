@@ -11885,5 +11885,24 @@
       "failure": "On unchanged app source at 52d4b2537bacbb60240ae7a53061224350ebd36f, issue185 record 2026-10-18T11-12-53-016Z-0f05eac7-9925-474b-8047-1f8f7ba73eb7.json failed the intended final assertion after 12 false device-store/unavailable warnings. Issue186 record 2026-10-18T11-08-25-410Z-c339384e-b01d-451c-ad2c-b895c7d22843.json observed a device-store/write-failed toast and sendPush verification exception after the real newer native head had committed. Each RED preceded its runtime repair; controls and preserved assertions remained intact."
     },
     "greenEvidence": "Post-merge focused acceptance 2026-10-18T11-29-11-506Z-9c06ace6-95b5-4e00-98f8-f67fa03ba9f4.json passed 21/21 with zero skips, covering all five new tests plus hydration, auth, account, concurrency, durable-store, blocked-open, and transport controls. The independent broad worker run is recorded as FAILED/incomplete, not GREEN: 2134 passed, 6 failed, 48 skipped; five failures await root-owned final app-shell fingerprints and one lacks firebase-tools. Exact failing test names and causes are recorded in the issue185 rationale above and in the recorder output."
+  },
+  {
+    "testChangesSha256": "c8fe3afd88185a251898f17a7498bdc68f8b60220f2e89bbd283ee0cb72408d7",
+    "reason": "Add the full-app Settings consumer contract for both distinct JSON exports and the raw app-owned storage-port contract needed to preserve recovery sources without interpreting them.",
+    "previousBehavior": "Settings has no distinctly named current-board and recovery-archive JSON export actions, and the device-store handle has no safe method to capture all raw app-owned rows together. Validating helpers can reject corrupt sources and silently omit their bytes.",
+    "intendedBehavior": "Keep the real Settings/download consumer as the highest-risk ticket test. The additive port on an already-open handle returns exact keys and raw values from the four existing stores in one readonly transaction, without opening, writing, filtering, or decoding; unopened and aborted captures reject. This checkpoint intentionally leaves the consumer RED until UI ownership is granted.",
+    "replacementTests": [
+      "RISK MANUAL JSON EXPORT: the actual Settings actions download current board and recovery archive",
+      "RISK DEVICE STORAGE V2: raw export snapshot preserves exact sources in one read-only capture"
+    ],
+    "preservedCoverage": [
+      "The actual Settings consumer uses the full app harness and isolated real fake-IndexedDB fixture; it checks both named actions, accepted unsaved board data, archive completeness and contents, download filenames and JSON type, and absence of board, device-store, or browser-storage writes. Its missing-control RED is preserved until the parent grants UI ownership.",
+      "The direct port regression checks exact keys and malformed, pending, unknown, opaque, and binary values across all four stores; it verifies one readonly transaction, no implicit open for a closed handle, unchanged seeded sources, and rejection of a real transaction abort.",
+      "Existing Settings recovery export, current-board view, device-store migration, CAS, backup, and snapshot-retirement assertions remain untouched. No import, cloud-format, write, migration, reset, authentication, or unrelated storage behavior is added."
+    ],
+    "redEvidence": {
+      "command": "TZ=UTC node scripts/agent-tools/record-run.mjs --repo <manual-export-190 worktree> --evidence-dir /Users/emeraldpham/.codex/task-artifacts/manual-json-export/phase1/red-green-runs --purpose preimplementation-red -- node --test --test-name-pattern=\"RISK DEVICE STORAGE V2: raw export snapshot\" tests.js; the actual Settings consumer was also run before storage implementation with --test-name-pattern=\"RISK MANUAL JSON EXPORT\".",
+      "failure": "The direct port RED is recorder record 2026-10-18T11-59-14-054Z-b4ff93b5-1628-47f2-9eaa-f725cf87d307.json: the intended first assertion observed readRawExportSnapshot as undefined. The full Settings consumer RED is 2026-10-18T11-56-54-268Z-9b520323-7f3c-4de4-ad81-c08a27146c25.json: the real Settings markup lacked the clearly named current-board export control. The later port GREEN does not replace that unfinished UI consumer RED."
+    }
   }
 ]

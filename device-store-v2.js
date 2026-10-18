@@ -92,6 +92,26 @@
     }
     const ensureOpen=()=>{if(!db) throw new Error("Device store is not open");};
 
+    async function readRawExportSnapshot(){
+      ensureOpen();
+      const tx=db.transaction(storeNames,"readonly"),done=transactionDone(tx);
+      try{
+        const entries=await Promise.all(storeNames.map(async name=>{
+          const store=tx.objectStore(name);
+          const [keys,values]=await Promise.all([
+            requestResult(store.getAllKeys()),requestResult(store.getAll()),
+          ]);
+          return [name,{keys,values}];
+        }));
+        await done;
+        return {stores:Object.fromEntries(entries)};
+      }catch(error){
+        try{tx.abort();}catch(e){}
+        try{await done;}catch(e){}
+        throw error;
+      }
+    }
+
     async function readHead(){
       ensureOpen();
       const tx=db.transaction(["meta","snapshots"],"readonly");
@@ -327,7 +347,7 @@
     }
 
     async function close(){if(db){db.close();db=null;}}
-    const api={open,close,readHead,withCurrentHead,listBackups,listOpaqueArchives,migrateLegacy,commitHead,putBackup,
+    const api={open,close,readRawExportSnapshot,readHead,withCurrentHead,listBackups,listOpaqueArchives,migrateLegacy,commitHead,putBackup,
       updateBackupKind,deleteBackup,getPendingUpload,setPendingUpload,clearPendingUpload,setLegacyFingerprint};
     return api;
   }

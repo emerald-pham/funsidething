@@ -136,6 +136,8 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK SCALABLE BOARD CODEC: a multi-megabyte Unicode board roundtrips through bounded verified chunks
 - RISK DEVICE STORAGE V2: migration and head plus recovery commits are atomic, CAS guarded, and preserve legacy bytes
 - RISK DEVICE STORAGE V2: unreferenced immutable snapshots retire while head and recovery references remain exact
+- RISK DEVICE STORAGE V2: raw export snapshot preserves exact sources in one read-only capture
+- RISK MANUAL JSON EXPORT: the actual Settings actions download current board and recovery archive
 - RISK CLOUD V2: a multi-megabyte board publishes only after verified chunks and pulls byte-exactly
 - RISK CLOUD V2: crash resume, concurrent revisions, and account cancellation never publish partial data
 - RISK CLOUD V2: corrupt active data fails closed, manifest races retry, and garbage collection keeps recovery generations
