@@ -12710,5 +12710,48 @@
     "testChangesSha256": "6c59dd91a2cc059a60e2ce8da6d8996b89b028ff547c1e314dbaa19d53d2cf66",
     "comparison": "Exact cumulative tests.js diff against 52d4b2537bacbb60240ae7a53061224350ebd36f",
     "baseCommit": "52d4b2537bacbb60240ae7a53061224350ebd36f"
+  },
+  {
+    "testChangesSha256": "c8d0e7b845b429d0812dc25ab0bd3bdcfe5452cbf5cfc3cfd064f4d6a0d42ba7",
+    "reason": "A real Settings review showed the natively disabled Save choice and sync action in the same green primary style as its enabled state, so people could not tell why it would not act.",
+    "previousBehavior": "Opening Settings Data and backups Review saved decisions with no choice showed a native disabled action using the same primary class as after choosing an offered value; the enabled and disabled gate itself worked.",
+    "intendedBehavior": "When the existing Apply guard disables the action, render it with the established subtle disabled treatment. Preserve native disabled semantics, the same guard, and the enabled primary class after a deliberate appearance choice. Recovery, sync, and source behavior do not change.",
+    "replacementTests": [
+      "RISK held decision recovery: actual Settings review gives unchosen Apply its disabled paint"
+    ],
+    "preservedCoverage": [
+      "The real Settings route exposes Review saved decisions, opens the actual review, and checks the no-choice Apply class and disabled attribute in both themes.",
+      "Choosing the current offered appearance still transitions to the existing enabled primary action; existing 188 source preservation and held-decision help consumers remain protected.",
+      "The 16-case related FAQ, PWA, and timed-hold regression cohort passed unchanged, including the 194 saved-expiry and current Settings copy contracts."
+    ],
+    "redEvidence": {
+      "command": "PATH=/Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin:$PATH TZ=UTC /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/restore-backup-file-196/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/storage-races-184/reviews/final-025/issue188-disabled-apply/runs --purpose preimplementation-red -- node --test --test-name-pattern=\"RISK held decision recovery: actual Settings review gives unchosen Apply its disabled paint\" tests.js",
+      "failure": "Recorded pre-edit RED ebaf8565-4280-487a-9b4d-1a892f192e0d reached the actual Settings route in both dark and light fixtures. Each emitted <button class=\"btn primary\" data-act=\"apply-decision-recovery\" disabled> while the consumer assertion required the established btn subtle disabled class. Both failures were the intended paint mismatch; no infrastructure failure occurred."
+    },
+    "greenEvidence": "Recorded focused green 5c803023-2977-449e-ac16-006059ead3dd passed both actual Settings theme transitions. Related source-preservation, existing selected/enabled paint, and help consumer cohort 8cb80db7-12ed-4006-bf39-68a7fa1530a8 passed 8 assertions. The 16-top-level FAQ/PWA/194/188 cohort 23d9db0f-0701-48c5-99ce-3cad4c284d5f passed 25 assertions with zero skips.",
+    "comparison": "Exact new RISK consumer diff on assembled candidate 0257e992fc9213573e9823254e0b8397d81b1ac7; root owns final aggregate fingerprint gate against 52d4b2537bacbb60240ae7a53061224350ebd36f.",
+    "baseCommit": "0257e992fc9213573e9823254e0b8397d81b1ac7"
+  },
+  {
+    "reason": "This exact 52d-based cumulative test diff includes previously documented recovery, export, Restore, expiry, and release-gate work plus the new 188 disabled-Apply paint regression. This aggregate binds the new full-range fingerprint while preserving the existing case-level chronology.",
+    "previousBehavior": "In the actual Settings Review saved decisions flow, Apply remained natively disabled with the primary class before a choice, so its appearance matched the enabled selected state.",
+    "intendedBehavior": "The unchosen Apply action uses the established subtle disabled treatment under the existing guard. Once a deliberate appearance choice is made, it remains enabled with the existing primary class. This is a paint-only change; state, recovery, and sync behavior are unchanged.",
+    "preservedCoverage": [
+      "The prior 501 rationale objects remain byte-for-byte intact, including their original component RED/GREEN records and cumulative aggregates.",
+      "The new assertion uses the actual Settings review in dark and light themes, checks the native disabled state and subtle class before selection, then verifies the selected action remains enabled and primary.",
+      "Existing recovery, export, timed-hold, protected-copy, installed-client, PWA, FAQ, and source-preservation coverage remains in the exact cumulative diff and its historical records.",
+      "This aggregate records the exact 52d base fingerprint; it does not claim a new cumulative preimplementation RED or replace earlier chronology."
+    ],
+    "redEvidence": {
+      "command": "PATH=/Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin:$PATH TZ=UTC /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/restore-backup-file-196/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/storage-races-184/reviews/final-025/issue188-disabled-apply/runs --purpose preimplementation-red -- node --test --test-name-pattern=\"RISK held decision recovery: actual Settings review gives unchosen Apply its disabled paint\" tests.js",
+      "failure": "The actual Settings consumer RED ebaf8565-4280-487a-9b4d-1a892f192e0d reached both dark and light review routes and failed only because the disabled no-choice Apply action rendered class btn primary instead of the required established disabled treatment. This is component RED evidence for the added test, not a claim that the entire cumulative 52d diff was red."
+    },
+    "greenEvidence": "The focused actual Settings consumer GREEN 5c803023-2977-449e-ac16-006059ead3dd passed both theme transitions. Related preservation/selected-paint/help cohort 8cb80db7-12ed-4006-bf39-68a7fa1530a8 passed 8 assertions, and the FAQ/PWA/194/188 cohort 75daeb57-90dc-40e4-97dd-ef9e1cf983e6 passed 25 assertions after packaging.",
+    "comparison": "Exact cumulative tests.js diff against 52d4b2537bacbb60240ae7a53061224350ebd36f, including the independently documented 188 disabled-Apply paint test.",
+    "baseCommit": "52d4b2537bacbb60240ae7a53061224350ebd36f",
+    "testChangesSha256": "77f3d606bb582849cdaa89c939fc179ed67f08b44f2784b2d11782749e508c2e",
+    "replacementTests": [
+      "RISK held decision recovery: actual Settings review gives unchosen Apply its disabled paint"
+    ]
   }
 ]

@@ -35296,6 +35296,22 @@ test('RISK held decision recovery: native selected and enabled actions use estab
 });
 
 
+test('RISK held decision recovery: actual Settings review gives unchosen Apply its disabled paint',async t=>{
+ for(const theme of ['dark','light'])await t.test(theme,async t=>{
+  const fixture=heldDecisionFixture188();fixture.local.settings.theme=theme;const app=await heldDecisionApp188(t,{fixture}),{ctx,shim}=app;
+  ctx.openSettings();let settings=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(settings,/data-act="review-decision-recovery"[^>]*>Review saved decisions</,'the real Settings route exposes the saved-decision review');
+  await ctx.onAction('review-decision-recovery',{});let review=shim.document.getElementById('modalRoot').innerHTML;
+  const apply=()=>review.match(/<button[^>]*data-act="apply-decision-recovery"[^>]*>[^<]*<\/button>/)?.[0];
+  assert.match(apply(),/class="btn subtle"/,'the actual no-choice Apply action uses established subdued disabled paint');
+  assert.match(apply(),/disabled/,'the no-choice action remains natively disabled');
+  ctx.onAction('choose-decision-recovery',{dataset:{value:theme}});review=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(apply(),/class="btn primary"/,'the selected action retains its existing primary appearance');
+  assert.doesNotMatch(apply(),/disabled/,'the selected action remains enabled');
+ });
+});
+
+
 test('RISK held decision recovery: rejected ordinary Restore leads through the visible error to deliberate recovery',async t=>{
  const app=await heldDecisionApp188(t),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
  const manual=await ctx.saveDurableBackup('manual',app.localRaw),before=JSON.stringify(ctx.state),facts=JSON.stringify(ctx.state.decisionEvents),baseline=JSON.stringify(ctx.state.decisionBaseline);assert.ok(manual.id);
