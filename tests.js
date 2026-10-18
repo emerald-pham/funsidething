@@ -9880,6 +9880,20 @@ test('RISK saved view fallback: corrupt or blocked local presentation storage le
  assert.equal(JSON.stringify(unavailable.ctx.state),before,'presentation storage failures never block or edit the authoritative board');
 });
 
+// Explicit external-IO controls for the five delivery-sensitive consumers below.
+// They observe real application promises; no loader, production state or timer changes.
+function deferredSyncFixture(){let resolve;const promise=new Promise(done=>{resolve=done;});return{promise,resolve};}
+function observeSyncFixtureCalls(ctx,name){
+ const original=ctx[name],calls=[];
+ ctx[name]=(...args)=>{const promise=original(...args),call={promise,settled:false};calls.push(call);Promise.resolve(promise).finally(()=>{call.settled=true;});return promise;};
+ return calls;
+}
+function holdNextSyncFixturePush(app){
+ const CS=app.shim.window.CloudSync,push=CS.push.bind(CS),entered=deferredSyncFixture(),release=deferredSyncFixture(),returned=deferredSyncFixture();let first=true;
+ CS.push=async(...args)=>{if(first){first=false;entered.resolve();await release.promise;}const result=await push(...args);returned.resolve(result);return result;};
+ return {entered:entered.promise,release:release.resolve,returned:returned.promise};
+}
+
 async function settleSavedViewPublication(app,h,stage){
  const deadline=performance.now()+8000;let observed,stored;
  do{
@@ -13976,7 +13990,7 @@ test('RISK comparison replay: first supported action freezes learned legacy rati
  }finally{try{await app.ctx.window.ScannerDeviceStore?.close?.();}catch{}}
 });
 
-test('RISK comparison replay: deleting an opponent keeps its frozen rating available without resurrecting the task',async()=>{
+test('RISK comparison replay: deleting an opponent keeps its frozen rating available without resurrecting the task',async t=>{
  const {IDBFactory}=await import('fake-indexeddb'),at=Date.parse('2026-10-17T16:00:00.000Z');
  for(const backend of ['browser fallback','IndexedDB'])for(const uploadFirst of ['yes','delete']){
   const initial=syncState({tasks:[
@@ -13990,9 +14004,10 @@ test('RISK comparison replay: deleting an opponent keeps its frozen rating avail
   const seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
   const options=device=>indexedDB?{seedStorage,indexedDBProvider:indexedDB,deviceDbName:names[device]}:{seedStorage};
   const factory=()=>h.factory(),phone=await loadAppAtTime(at,{...options('phone'),cloudSyncFactory:factory}),mac=await loadAppAtTime(at,{...options('mac'),cloudSyncFactory:factory});
-  const close=async app=>{try{await app.ctx.window.ScannerDeviceStore?.close?.();}catch{}};
+  const close=async app=>{app.ctx.suspendCloudSync();vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry();',app.ctx);try{await app.ctx.window.ScannerDeviceStore?.close?.();}catch{}};
   try{
-   await phone.ctx.cloudPull();await mac.ctx.cloudPull();await syncSettle(20);
+   await phone.ctx.cloudPull();await mac.ctx.cloudPull();assert.equal(await phone.ctx.persist(),true,'the startup phone head is device-acknowledged before the real action');assert.equal(await mac.ctx.persist(),true,'the startup Mac head is device-acknowledged before the real action');
+   for(const app of [phone,mac])assert.equal(vm.runInContext('reconciledAs',app.ctx),'e@example.com','the initial authoritative read completed before either producer acts');
    setFakeTime(phone.ctx,Date.parse('2026-10-17T16:01:00Z'));phone.ctx.state.candidateId='choice';phone.ctx.renderScan();
    assert.match(phone.shim.document.getElementById('scan').innerHTML,/data-act="yes" data-candidate="choice" data-benchmark="base"/);
    phone.ctx.window.CloudSync.ready=false;phone.ctx.onAction('yes',{dataset:{candidate:'choice',benchmark:'base'}});
@@ -14000,15 +14015,22 @@ test('RISK comparison replay: deleting an opponent keeps its frozen rating avail
    assert.match(mac.shim.document.getElementById('modalRoot').innerHTML,/data-act="delete-task" data-id="base"/);
    mac.ctx.window.CloudSync.ready=false;mac.ctx.onAction('delete-task',{dataset:{id:'base'}});
    const uploadFirstApp=uploadFirst==='yes'?phone:mac,uploadSecondApp=uploadFirst==='yes'?mac:phone;
-   uploadFirstApp.ctx.window.CloudSync.ready=true;await uploadFirstApp.ctx.cloudPushNow();await syncSettle(50);
-   await uploadSecondApp.ctx.cloudPull();await syncSettle(70);
-   uploadSecondApp.ctx.window.CloudSync.ready=true;await uploadSecondApp.ctx.cloudPushNow();await syncSettle(50);
+   assert.equal(await phone.ctx.persist(),true,'the real Yes is device-acknowledged before publication');assert.equal(await mac.ctx.persist(),true,'the real Delete is device-acknowledged before publication');
+   const localComparison=JSON.parse(JSON.stringify(phone.ctx.state.decisionEvents.find(event=>event.kind==='comparison'))),beforeFirstPublication=h.doc.payload;assert.ok(localComparison);
+   const held=holdNextSyncFixturePush(uploadFirstApp);t.after(held.release);
+   uploadFirstApp.ctx.window.CloudSync.ready=true;await uploadFirstApp.ctx.cloudPushNow();await held.entered;
+   assert.equal(h.doc.payload,beforeFirstPublication,'a held actual write has not published either producer yet');assert.equal(uploadFirstApp.ctx.state.syncDirty,true);
+   held.release();await held.returned;await settleSavedViewPublication(uploadFirstApp,h,'first comparison/delete publication '+backend+'/'+uploadFirst);
+   await uploadSecondApp.ctx.cloudPull();
+   uploadSecondApp.ctx.window.CloudSync.ready=true;await uploadSecondApp.ctx.cloudPushNow();await settleSavedViewPublication(uploadSecondApp,h,'second comparison/delete publication '+backend+'/'+uploadFirst);
    const cloud=h.remoteState(),baseline=cloud.decisionBaseline,event=cloud.decisionEvents?.[0];
    assert.equal(cloud.tasks.some(task=>task.id==='base'),false,'the explicit peer deletion wins in either publication order');
    assert.ok(event&&event.kind==='comparison'&&event.winnerId==='choice'&&event.loserId==='base');
+   assert.equal(JSON.stringify(event),JSON.stringify(localComparison),'the exact original comparison survives deletion and both publication orders');
    assert.ok(baseline.ratings.some(row=>row.taskId==='base'),'the deleted opponent remains an input in the frozen learning baseline');
-   const expected=baseline.ratings.find(row=>row.taskId==='choice'),ghost={...baseline.ratings.find(row=>row.taskId==='base')};
+   const exactFrozenBaseline=JSON.stringify(baseline),expected={...baseline.ratings.find(row=>row.taskId==='choice')},ghost={...baseline.ratings.find(row=>row.taskId==='base')};
    loadEngine(1434).updatePair(expected,ghost);
+   assert.equal(JSON.stringify(baseline),exactFrozenBaseline,'the rating oracle must not alter the exact acknowledged frozen source baseline');
    const survivor=cloud.tasks.find(task=>task.id==='choice');
    assert.equal(survivor.mu,expected.mu,'the surviving task learns against the deleted opponent exactly once');
    assert.equal(survivor.sigma,expected.sigma,'the ghost input retains deterministic uncertainty');
@@ -14016,7 +14038,9 @@ test('RISK comparison replay: deleting an opponent keeps its frozen rating avail
    const freshState={...cloud,syncRev:h.doc.rev,syncAccount:'e@example.com',syncDirty:false};
    const fresh=await loadAppAtTime(at+2*60000,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(freshState),[LOCAL_HEAD_KEY]:JSON.stringify(freshState)},cloudSyncFactory:factory});
    try{
-    await fresh.ctx.cloudPull();await syncSettle(25);
+    assert.equal(fresh.ctx.decisionEvidenceIssue(fresh.ctx.state,fresh.ctx.window.CloudSync.user),null,'the exact acknowledged frozen source is supported before fresh reconciliation');
+    await fresh.ctx.cloudPull();await settleSavedViewPublication(fresh,h,'fresh deleted-opponent consumer '+backend+'/'+uploadFirst);
+    assert.notEqual(fresh.ctx.window.CloudSync.status,'error','fresh-source readiness is an actual coherent acknowledgement, not an unsupported-authority hold');
     assert.equal(fresh.ctx.state.tasks.some(task=>task.id==='base'),false,'a fresh client never recreates the deleted opponent');
     assert.equal(fresh.ctx.state.tasks.find(task=>task.id==='choice').mu,expected.mu,'a fresh client retains the learned effect');
     assert.equal(fresh.ctx.state.tasks.find(task=>task.id==='choice').sigma,expected.sigma);
@@ -24965,7 +24989,7 @@ test('RISK completion boundaries: failed read stays pending and wake exactly ack
   try{CS.user=null;vm.runInContext('clearTimeout(saveTimer);saveTimer=null;clearTimeout(cloudTimer);cloudTimer=null;clearCloudRetry();',ctx);}catch{}
   try{await store.close();}catch{}
  });
- await ctx.__dataReady;await ctx.cloudPull();CS.ready=false;
+ await ctx.__dataReady;await ctx.cloudPull();assert.equal(await ctx.persist(),true,'the initial head and actual authoritative read complete before offline actions');assert.equal(vm.runInContext('reconciledAs',ctx),'e@example.com');CS.ready=false;
  hydrateUnchangedEditorDraft(app,doneId);ctx.onAction('done-task',{dataset:{id:doneId}});
  assert.equal(await ctx.persist(),true,'the real evergreen Done is durable while offline');
  hydrateUnchangedEditorDraft(app,candidateId);ctx.onAction('dot-task',{dataset:{id:candidateId}});
@@ -24985,8 +25009,11 @@ test('RISK completion boundaries: failed read stays pending and wake exactly ack
  assert.equal(JSON.stringify(ctx.state.decisionEvents.filter(event=>event.kind==='comparison'&&event.action==='dot'&&event.taskId===candidateId)),JSON.stringify([comparison]));
  assert.equal(JSON.stringify(ctx.state.tasks.map(row=>[row.id,row.mu,row.sigma])),ratingsAfterActions);
  CS.pull=basePull;
- CS.push=async(...args)=>{pushes++;const result=await basePush(...args);if(!uncertain){uncertain=true;CS.status='error';CS.errorStage='push';CS.errorCode='deadline-exceeded';return {error:true};}return result;};
- await ctx.cloudPull();ctx.cloudPushNow();await syncSettle(80);
+ const writes=observeSyncFixtureCalls(ctx,'sendPush'),commitEntered=deferredSyncFixture(),releaseCommit=deferredSyncFixture();t.after(releaseCommit.resolve);
+ CS.push=async(...args)=>{pushes++;commitEntered.resolve({consumer:writes.findLast(call=>!call.settled)});await releaseCommit.promise;const result=await basePush(...args);if(!uncertain){uncertain=true;CS.status='error';CS.errorStage='push';CS.errorCode='deadline-exceeded';return {error:true};}return result;};
+ await ctx.cloudPull();ctx.cloudPushNow();const {consumer}=await commitEntered.promise;assert.ok(consumer,'the actual sendPush consumer owns this pending write');
+ assert.equal(uncertain,false,'the held external commit has no acknowledgement yet');assert.equal(h.doc.payload,JSON.stringify(remote),'the pending write has not changed cloud content');assert.equal(ctx.state.syncDirty,true);
+ releaseCommit.resolve();await consumer.promise;
  assert.equal(uncertain,true,'the synthetic write commits before its acknowledgement is made uncertain');
  assert.equal(pushes,1,'one conditional publication has an uncertain acknowledgement');
  assert.equal(ctx.state.syncDirty,true,'an uncertain acknowledgement is still visibly pending');
@@ -25028,8 +25055,9 @@ test('RISK completion boundaries: a pending account-A acknowledgement and its le
  const docs=new Map([['e@example.com',{payload:JSON.stringify(accountA),updatedAt:at,rev:4}],['other@example.com',{payload:JSON.stringify(accountB),updatedAt:at+1,rev:12}]]);
  let ackStartedResolve,releaseAck,oldAckStarted=false,pushCount=0;
  const ackStarted=new Promise(resolve=>{ackStartedResolve=resolve;}),ackGate=new Promise(resolve=>{releaseAck=resolve;});
+ let pullCalls=[];const bReadEntered=deferredSyncFixture(),releaseBRead=deferredSyncFixture();t.after(releaseBRead.resolve);
  const CS={configured:true,ready:true,user:'e@example.com',status:'ok',errorStage:null,errorCode:null,signIn(){},signOut(){},
-  async pull(){const doc=docs.get(CS.user);return doc?{...doc}:{empty:true};},
+  async pull(){const account=CS.user,doc=docs.get(account);if(account==='other@example.com'){bReadEntered.resolve({consumer:pullCalls.findLast(call=>!call.settled)});await releaseBRead.promise;}return doc?{...doc}:{empty:true};},
   async push(payload,updatedAt,baseRev){
    pushCount++;const account=CS.user,doc=docs.get(account);
    if(!doc||doc.rev!==baseRev)return {conflict:true,rev:doc?.rev??0};
@@ -25044,6 +25072,7 @@ test('RISK completion boundaries: a pending account-A acknowledgement and its le
   try{CS.user=null;vm.runInContext('clearTimeout(saveTimer);saveTimer=null;clearTimeout(cloudTimer);cloudTimer=null;clearCloudRetry();',ctx);}catch{}
   try{await store.close();}catch{}
  });
+ pullCalls=observeSyncFixtureCalls(ctx,'cloudPull');
  await ctx.__dataReady;await ctx.cloudPull();CS.ready=false;
  hydrateUnchangedEditorDraft(app,doneId);ctx.onAction('done-task',{dataset:{id:doneId}});
  assert.equal(await ctx.persist(),true,'the real account-A completion is durably saved before publication');
@@ -25057,7 +25086,9 @@ test('RISK completion boundaries: a pending account-A acknowledgement and its le
  CS.user='other@example.com';shim.window.dispatchEvent({type:'cloudsync'});await ctx.cloudPull();
  assert.equal(ctx.state.syncAccount,'e@example.com','an in-flight A acknowledgement cannot rebind local state before the A write settles');
  assert.equal(ctx.state.decisionEvents.some(event=>event.id===done.id),true);
- releaseAck();await pending;await syncSettle(80);
+ releaseAck();await pending;const {consumer}=await bReadEntered.promise;assert.ok(consumer,'the real deferred B read has a captured application continuation');
+ assert.equal(ctx.state.syncAccount,'e@example.com','B remains pending while its actual authoritative response is held');assert.equal(ctx.state.decisionEvents.some(event=>event.id===done.id),true);
+ releaseBRead.resolve();await consumer.promise;await settleSavedViewPublication(app,{get doc(){return docs.get('other@example.com');}},'account B read/device/publication acknowledgement');
  assert.equal(ctx.state.syncAccount,'other@example.com','the deferred authoritative read adopts the newly selected account');
  assert.equal(ctx.state.syncRev,docs.get('other@example.com').rev,'the active revision is the destination account read or its own acknowledged repair');
  assert.ok(ctx.state.syncRev>=12,'the old account acknowledgement cannot rewind the destination revision');
@@ -25125,7 +25156,7 @@ test('RISK completion boundaries: a live editor and pressed scanner control defe
  shim.document.dispatchEvent({type:'input',target:search});const body=shim.document.getElementById('listBody');body.id='listBody';body.scrollTop=420;shim.document.dispatchEvent({type:'scroll',target:body});
  assert.equal(ctx.state.listOpen,true);assert.equal(ctx.state.tasks.find(row=>row.id===dependentId).prerequisiteId,gateId);
  assert.equal(ctx.isEligible(ctx.state.tasks.find(row=>row.id===dependentId)),false,'the saved prerequisite still controls eligibility');
- Object.defineProperty(scan,'innerHTML',{configurable:true,get:()=>painted,set(value){painted=value;paints.push({phase,chain:[...ctx.state.chain],markup:String(value)});}});
+ Object.defineProperty(scan,'innerHTML',{configurable:true,get:()=>painted,set(value){painted=value;paints.push({phase,gestureActive:vm.runInContext('scannerGestureActive',ctx),chain:[...ctx.state.chain],markup:String(value)});}});
  store.commitHead=async options=>{const result=await commit(options);if(result?.ok)durable.push({phase,chain:JSON.parse(options.payload).chain,events:JSON.parse(options.payload).decisionEvents||[]});return result;};
  // A newer cloud revision still carries the membership from before this Done.
  h.writeBehindBack(stale);CS.ready=true;
@@ -25165,11 +25196,18 @@ test('RISK completion boundaries: a live editor and pressed scanner control defe
  // A scanner control pressed before a second stale response arrives is also an
  // interaction boundary; let its actual delegated click finish before draining.
  h.writeBehindBack(stale);let releaseGesture,gestureStartedResolve;
- const paintCountBeforePress=paints.length,scannerBeforePress=scan.innerHTML,chainBeforePress=[...ctx.state.chain];
+ const paintCountBeforePreparation=paints.length,pullCalls=observeSyncFixtureCalls(ctx,'cloudPull'),gestureTrace=[];
+ const trace=event=>gestureTrace.push({event,phase,active:vm.runInContext('scannerGestureActive',ctx),paints:paints.length,chain:[...ctx.state.chain]});trace('before-preparation');
  const gestureStarted=new Promise(resolve=>{gestureStartedResolve=resolve;}),gestureGate=new Promise(resolve=>{releaseGesture=resolve;});
- CS.pull=async(...args)=>{const response=await basePull(...args);gestureStartedResolve();await gestureGate;return response;};
- const gesturePull=ctx.cloudPull();await gestureStarted;shim.document.dispatchEvent({type:'pointerdown'});
- releaseGesture();await gesturePull;CS.pull=basePull;
+ phase='pre-press-delivery-control';await ctx.cloudPull();await settleSavedViewPublication(app,h,'legitimate delivery before pointerdown');
+ assert.ok(paints.length>paintCountBeforePreparation,'a real pre-press cloud delivery has an observable scanner replacement');
+ assert.ok(paints.slice(paintCountBeforePreparation).every(row=>!row.gestureActive),'these legitimate replacements really precede the active pointer');trace('pre-press-read-and-ACK');
+ h.writeBehindBack(stale);phase='pressed-response-held';
+ CS.pull=async(...args)=>{const response=await basePull(...args);gestureStartedResolve({consumer:pullCalls.findLast(call=>!call.settled)});await gestureGate;return response;};
+ const gesturePull=ctx.cloudPull(),{consumer}=await gestureStarted;assert.ok(consumer,'the held response belongs to a real cloudPull continuation');
+ shim.document.dispatchEvent({type:'pointerdown'});assert.equal(vm.runInContext('scannerGestureActive',ctx),true,'actual pointerdown establishes the guarded baseline');trace('pointerdown');
+ const paintCountBeforePress=paints.length,scannerBeforePress=scan.innerHTML,chainBeforePress=[...ctx.state.chain];
+ releaseGesture();await consumer.promise;await gesturePull;CS.pull=basePull;trace('held-response-consumed');assert.equal(vm.runInContext('scannerGestureActive',ctx),true,'the actual response was consumed while the pointer remained held');
  assert.equal(vm.runInContext('deferredCloudPull',ctx),true,'a cloud response cannot replace a scanner under a held pointer');
  assert.deepEqual([...ctx.state.chain],chainBeforePress,'the held scanner keeps the same chain after recovery arrives');
  assert.equal(paints.length,paintCountBeforePress,'no scanner replacement occurs before the pressed response is delivered');
@@ -25177,8 +25215,9 @@ test('RISK completion boundaries: a live editor and pressed scanner control defe
  const candidate=ctx.state.candidateId,benchmark=ctx.benchmark()?.id;
  assert.ok(candidate&&benchmark);assert.match(scan.innerHTML,/data-act="no"/,'the actual scanner control remains available while the pointer is held');
  const noButton={dataset:{act:'no',candidate,benchmark},disabled:false};
+ shim.document.dispatchEvent({type:'pointerup'});trace('pointerup-before-click');
  shim.document.dispatchEvent({type:'click',detail:1,target:{classList:{contains:()=>false},closest:()=>noButton}});
- await syncSettle(20);ctx.cloudPushNow();await settleSavedViewPublication(app,h,'pressed scanner control and stale completion adoption');phase='settled';
+ ctx.cloudPushNow();await settleSavedViewPublication(app,h,'pressed scanner control and stale completion adoption');phase='settled';trace('click-and-final-ACK');assert.equal(vm.runInContext('scannerGestureActive',ctx),false);
  const noFact=ctx.state.decisionEvents.find(event=>event.kind==='no'&&event.candidateId===candidate);
  assert.ok(noFact,'the held actual scanner response commits before deferred cloud adoption is drained');
  assert.equal(JSON.stringify(h.remoteState().decisionEvents.find(event=>event.id===completion.id)),JSON.stringify(completion));
@@ -25190,6 +25229,8 @@ test('RISK completion boundaries: a live editor and pressed scanner control defe
  assert.ok(durable.every(row=>row.chain.every(id=>id!==doneId)
   &&row.events.filter(event=>event.kind==='completion'&&event.taskId===doneId).length===1),
   'durable writes after the held control retain one exact completion and no completed membership');
+ t.diagnostic(JSON.stringify({gestureTrace,allPaints:paints.map(({phase,gestureActive,chain})=>({phase,gestureActive,chain}))}));
+ if(process.env.SYNC_DELIVERY_EVIDENCE_DIR){fs.mkdirSync(process.env.SYNC_DELIVERY_EVIDENCE_DIR,{recursive:true});fs.writeFileSync(path.join(process.env.SYNC_DELIVERY_EVIDENCE_DIR,'gesture-observations-'+process.pid+'.json'),JSON.stringify({gestureTrace,paints,durable},null,2));}
  const savedView=storage.getItem('fvp:chain-scanner:saved-view:v1');assert.ok(savedView,'the device view has its own saved record');
  await closeFixture(app);
  const reopened=await loadAppAtTime(at+100,{...options,cloudSyncFactory:h.factory});
@@ -25802,17 +25843,26 @@ test('RISK live scan sync: duplicate Done and held keyboard repeats cannot compl
  }
 });
 
-test('RISK live scan sync: evergreen Done Undo propagates once and stale concurrent writes preserve its cancellation',async()=>{
+test('RISK live scan sync: evergreen Done Undo propagates once and stale concurrent writes preserve its cancellation',async t=>{
  const {a,b,h,notify,candidateId,benchId}=await liveScanSyncClients({evergreen:true});
- a.ctx.onAction('cand-done',{dataset:{candidate:candidateId,benchmark:benchId}});a.ctx.cloudPushNow();await syncSettle(80);
+ t.after(async()=>{for(const app of [a,b]){app.ctx.suspendCloudSync();vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry();',app.ctx);await app.ctx.window.ScannerDeviceStore?.close?.();}});
+ await a.ctx.cloudPull();await b.ctx.cloudPull();await settleSavedViewPublication(a,h,'live Done source startup');await settleSavedViewPublication(b,h,'live Done peer startup');
+ const held=holdNextSyncFixturePush(a);t.after(held.release);const beforePublication=h.doc.payload,ratingsBefore=JSON.stringify(a.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma]));
+ a.ctx.onAction('cand-done',{dataset:{candidate:candidateId,benchmark:benchId}});a.ctx.cloudPushNow();await held.entered;
+ assert.equal(h.doc.payload,beforePublication,'a real pending Done write has not reached cloud or its peer');assert.equal(!!b.ctx.state.tasks.find(task=>task.id===candidateId).lastDoneAt,false);
+ const completion=JSON.parse(JSON.stringify(a.ctx.state.decisionEvents.find(event=>event.kind==='completion'&&event.taskId===candidateId)));assert.ok(completion);
+ held.release();await held.returned;await settleSavedViewPublication(a,h,'live Done source publication');await settleSavedViewPublication(b,h,'live Done actual peer delivery');
  assert.ok(b.ctx.state.tasks.find(t=>t.id===candidateId).lastDoneAt,'completion reached the other client');
- const completed=JSON.parse(h.doc.payload);a.ctx.undo();a.ctx.cloudPushNow();await syncSettle(100);
+ assert.equal(JSON.stringify(b.ctx.state.decisionEvents.find(event=>event.id===completion.id)),JSON.stringify(completion));assert.equal(JSON.stringify(a.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),ratingsBefore);
+ const completed=JSON.parse(h.doc.payload);await a.ctx.undo();a.ctx.cloudPushNow();await settleSavedViewPublication(a,h,'live Undo source publication');await settleSavedViewPublication(b,h,'live Undo actual peer delivery');
+ const cancellation=JSON.parse(JSON.stringify(a.ctx.state.decisionEvents.find(event=>event.kind==='undo'&&event.targetEventIds.includes(completion.id))));assert.ok(cancellation);assert.equal(JSON.stringify(b.ctx.state.decisionEvents.find(event=>event.id===cancellation.id)),JSON.stringify(cancellation));
  assert.equal(b.ctx.state.tasks.find(t=>t.id===candidateId).lastDoneAt,null,'Undo cancels the rest on the other device');
  assert.equal(b.ctx.state.workLog.some(e=>e.taskId===candidateId),false);
- completed.tasks.find(t=>t.id===benchId).title='Concurrent unrelated title';h.writeBehindBack(completed);notify();await syncSettle(120);
+ completed.tasks.find(t=>t.id===benchId).title='Concurrent unrelated title';h.writeBehindBack(completed);notify();await settleSavedViewPublication(a,h,'live stale Done source cancellation ACK');await settleSavedViewPublication(b,h,'live stale Done peer cancellation ACK');await settleSavedViewPublication(a,h,'live final same-revision source ACK');
  assert.equal(a.ctx.state.tasks.find(t=>t.id===candidateId).lastDoneAt,null);assert.equal(b.ctx.state.tasks.find(t=>t.id===candidateId).lastDoneAt,null);
  assert.equal(h.remoteState().tasks.find(t=>t.id===candidateId).lastDoneAt,null,'canonical causal completion cancellation defeats the stale copy');
  assert.equal(b.ctx.state.tasks.find(t=>t.id===benchId).title,'Concurrent unrelated title','the accepted unrelated edit is retained');
+ for(const app of [a,b]){assert.equal(JSON.stringify(app.ctx.state.decisionEvents.find(event=>event.id===completion.id)),JSON.stringify(completion));assert.equal(JSON.stringify(app.ctx.state.decisionEvents.find(event=>event.id===cancellation.id)),JSON.stringify(cancellation));assert.equal(JSON.stringify(app.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),ratingsBefore);}
 });
 
 test('RISK live scan sync backend: only server-confirmed root revisions notify and listeners follow account and visibility lifetimes',async()=>{
@@ -32462,4 +32512,13 @@ test('RISK completion lifecycle fixtures: released Start informed Start and loca
   assert.match(output,/# fail 0\b/);assert.match(output,/# skipped 0\b/);
   t.diagnostic(zone+': seven real consumer cases passed, no skips');
  });
+});
+
+
+test('RISK completion delivery fixtures: controlled pending and acknowledged boundaries execute all five consumers',()=>{
+ const pattern='^RISK comparison replay: deleting an opponent|^RISK completion boundaries: failed read stays pending|^RISK completion boundaries: a pending account-A|^RISK completion boundaries: a live editor and pressed|^RISK live scan sync: evergreen Done Undo propagates';
+ const env={...process.env,TZ:'UTC'};delete env.NODE_TEST_CONTEXT;
+ const child=spawnSync(process.execPath,['--test','--test-name-pattern='+pattern,'tests.js'],{cwd:__dirname,env,encoding:'utf8',timeout:30000}),output=child.stdout+child.stderr;
+ assert.equal(child.status,0,'all five real controlled-delivery consumers complete: '+output);
+ assert.match(output,/# tests 5\b/);assert.match(output,/# fail 0\b/);assert.match(output,/# skipped 0\b/);
 });
