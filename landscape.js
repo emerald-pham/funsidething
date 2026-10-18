@@ -1621,7 +1621,7 @@
   window.addEventListener('storage',event=>{if(event.key==='fvp:chain-scanner:scene-time'||event.key==='fvp:chain-scanner:scene-season'||event.key===null){sceneStorage.release(event.key);refreshSky();renderSceneTimeChoice();}});
   document.addEventListener('click',event=>{
     const button=event.target.closest('[data-landscape-motion], [data-act="scene-settings"], [data-scene-view]');
-    if(!button)return;
+    if(!button||button===document.documentElement)return;
     if(button.hasAttribute('data-scene-view')){
       const viewing=document.documentElement.classList.toggle('viewing-scene');
       const wrap=document.querySelector('.wrap');wrap.inert=viewing;

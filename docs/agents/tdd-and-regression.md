@@ -69,6 +69,30 @@ functional RED/GREEN loop. Configuration, dependencies and code deletion need
 the same test-first evidence whenever they change functionality. Keep focused
 cohorts; do not expand into blanket account matrices without a changed risk.
 
+## Installed-client regression
+
+The required process RISK in `tests.js` runs the two named installed-client
+native cases through a narrow Node child of the existing `npm test` command.
+It requires one completed successful outcome per case and rejects missing,
+duplicate, skipped, cancelled or failed outcomes. The runner-only child marker
+registers native cases in that child; it is unrelated to application behavior.
+Ordinary CI runs these cases once, alongside the existing Node and agent-tool
+cohorts. Sensitivity variants are explicit owner evidence, not another broad
+suite or a set of skipped required cases.
+
+Local execution needs an explicit full `CHAIN_NATIVE_CANDIDATE_SHA` and
+`CHAIN_NATIVE_CANDIDATE_TREE`, a durable `CHAIN_NATIVE_OUTPUT`, and an allocated
+`CHAIN_NATIVE_PORT`. Use the recorder and shared host allocation before launching
+the process RISK. CI binds its exact checkout and installs the pinned Playwright
+package's matching Chromium in the existing scanner-tests job. Missing source,
+browser or runtime support is a failure to investigate, not an empty pass.
+
+Serve immutable old and candidate Git assets. A dirty runner may exercise an
+explicit committed app only after asset equality checks, recording runner
+provenance and that limited scope separately. Final release acceptance uses the
+actual coherent committed candidate; follow
+[release and review](release-and-review.md#installed-client-delivery-evidence).
+
 ## Protect existing features when changing tests
 
 Existing passing behavior tests are feature contracts. Preserve their assertions

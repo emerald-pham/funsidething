@@ -89,6 +89,9 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK DATE FORMAT: the sky-calendar label follows the chosen order without losing the observers timezone
 - RISK AUTH RESTORE: configured startup stays syncing until Firebase resolves the actual session
 - RISK AUTH RESTORE: remembered boards show syncing in header and Settings while restoration is pending
+- RISK AUTH HYDRATION: real Auth and native resume wait for the durable board, then reconcile once
+- RISK AUTH HYDRATION: a corrupt device-head read stays visible and keeps cloud adoption held
+- RISK AUTH HYDRATION: extended FAQ and current Changelog explain the saved-board wait
 
 - RISK IMPORT RENDERING: restored identifiers cannot inject attributes or break task reveal
 - RISK rating drift: Done and Worked on it stay neutral on every completion route and recurrence type
@@ -133,6 +136,31 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK SCALABLE BOARD CODEC: a multi-megabyte Unicode board roundtrips through bounded verified chunks
 - RISK DEVICE STORAGE V2: migration and head plus recovery commits are atomic, CAS guarded, and preserve legacy bytes
 - RISK DEVICE STORAGE V2: unreferenced immutable snapshots retire while head and recovery references remain exact
+- RISK DEVICE STORAGE V2: raw export snapshot preserves exact sources in one read-only capture
+- RISK MANUAL JSON EXPORT: the actual Settings actions download current board and recovery archive
+- RISK MANUAL JSON EXPORT: unreadable, unsupported and hydration-placeholder sources stop without a file
+- RISK BACKUP FILE RESTORE: the actual Settings file selection protects exact sources before explicit local adoption
+- RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exact sources before explicit local adoption
+- RISK BACKUP FILE RESTORE: compact settings and unknown board fields stay inside the actual preview
+- RISK BACKUP FILE RESTORE: current decisions survive file selection and cross-account transfer
+- RISK BACKUP FILE RESTORE: irreversible preview shows Restore and close as unavailable
+- RISK BACKUP FILE RESTORE: a signed-in file waits for explicit CAS and exact cloud acknowledgement
+- RISK BACKUP FILE RESTORE: account-bound files stay protected while cloud is unavailable
+- RISK BACKUP FILE RESTORE: IDB authority does not hide changed legacy board copies
+- RISK BACKUP FILE RESTORE: source changes during final awaited copy readback never reach the primary commit
+- RISK BACKUP FILE RESTORE: state, device-head, and draft-only changes expire preview consent
+- RISK BACKUP FILE RESTORE: cancel and file reselection bind confirmation to the newly selected bytes
+- RISK BACKUP FILE RESTORE: closing the preview cancels an in-flight source check before adoption
+- RISK BACKUP FILE RESTORE: backdrop and Escape cancel a pending source check before adoption
+- RISK BACKUP FILE RESTORE: in-progress primary save blocks Cancel and modal dismissal
+- RISK BACKUP FILE RESTORE: in-progress cloud publication blocks Cancel and modal dismissal
+- RISK BACKUP FILE RESTORE: backup CAS abort and readback failure keep the active board and any saved copies
+- RISK BACKUP FILE RESTORE: unsupported and ambiguous selected files stop with exact bytes protected
+- RISK BACKUP FILE RESTORE: account, auth epoch, pending evidence, and cloud revision changes hold consent
+- RISK BACKUP FILE RESTORE: a released old client wins CAS before the prospective file board is published
+- RISK BACKUP FILE RESTORE: replacement preserves completion, History, ratings, deletions, unknown data, and Undo
+- RISK BACKUP FILE RESTORE: fixture readiness leaves no ordinary save crossing delayed file reading
+- RISK BACKUP FILE RESTORE: fixture readiness waits for signed-in durable reconciliation before file consent
 - RISK CLOUD V2: a multi-megabyte board publishes only after verified chunks and pulls byte-exactly
 - RISK CLOUD V2: crash resume, concurrent revisions, and account cancellation never publish partial data
 - RISK CLOUD V2: corrupt active data fails closed, manifest races retry, and garbage collection keeps recovery generations
@@ -150,6 +178,8 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK SCALABLE SETTINGS: one confirmed delete removes only the selected IndexedDB recovery reference
 - RISK SCALABLE OFFLINE SHELL: storage and cloud generation modules load before the scanner and are cached together
 - RISK SCALABLE CONCURRENCY: a newer edit made during a device commit is the only board marked durable
+- RISK SCALABLE CONCURRENCY: overlapping native and background saves do not report a committed head as failed
+- RISK SCALABLE CONCURRENCY: a superseded Add keeps its pending draft when the current device head changes accounts
 - RISK SCALABLE CONCURRENCY: CAS repair retains peer work and a third in-tab edit before replacing state
 - RISK SCALABLE STARTUP: blocked and nonsettling IndexedDB opens fail closed within a bounded boot
 - RISK SCALABLE LEGACY TAB: each divergent v1 primary key is preserved and reconciled after migration
@@ -664,6 +694,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK backup mirror storage failure: quota rejection and IndexedDB abort preserve recoverability and allow an explicit retry
 - RISK device backup final guard: rejected throwing and asynchronous guards abort before deleting a verified reference
 - RISK backup mirror FAQ: confirmed matching-copy deletion and ambiguous recovery preserve the seven-day age cue
+- RISK backup help: expiry, protected-copy deletion, and archive limits remain complete
 
 - `RISK fireworks pair delay: seeded second launches span zero to three hundred milliseconds without shifting first shells or finale` — deterministic per-pair stagger and responsive ignition preservation.
 - `RISK fireworks frequency again: released scale two becomes four in live UTC scheduling and legacy advancement` — repeat frequency reduction and midnight reservations.
@@ -768,6 +799,12 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK cloud current choices: immediate preference controls retain their action times
 - RISK cloud current choices: Start scanning pass root and frozen draw survive a fresh client reopen
 - RISK cloud current choices: Can’t and Return are timed, causally linked disposition actions
+- RISK timed-hold coherence: native Can’t expires at the exact deadline through IndexedDB and ordinary cloud pull
+- RISK timed-hold coherence: native Worked honors hours and local 2 AM ceilings across reopen and cloud pull
+- RISK timed-hold coherence: use each board’s Worked settings and keep orphan evidence fail-closed
+- RISK decision replay: Start-root and real Worked membership survive ordinary cloud acknowledgement
+- RISK timed-hold coherence: extended FAQ and current Settings changelog explain retained expiry time
+- RISK timed-hold FAQ: actual Help retains Start and updated-board expiry cues together
 - RISK cloud current choices: compatible edits on the same task retain each changed property
 - RISK cloud current choices: original decision time wins conflicts in either publication order
 - RISK cloud current choices: causal projector retains compatible task fields and context membership
@@ -1022,6 +1059,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 - `RISK motion safety: explicit local choices expire after seven elapsed days and corrupt records fail closed`
 - `RISK motion safety: actual choice handler remembers selection while dismissal never writes consent`
+- `RISK motion safety: export clicks do not renew consent while actual choices still do`
 
 - `RISK motion safety accessibility: enlarged prompt fits the containing viewport and stacks intrinsic choice cards`
 
@@ -1526,3 +1564,57 @@ The candidate worker precaches while predecessor clients remain on their existin
 
 - RISK device save warning browser: actual held Add keeps every text line on contrasting toast paint and preserves short notices
 - RISK device save warning guidance: mounted help explains readable wrapped notices and recoverable device-save details
+
+## Held appearance decision recovery
+
+- RISK held decision recovery: deliberate keep saved dark preserves exact sources and publishes a fresh choice
+- RISK held decision recovery: unreadable browser evidence and failed verified copies stop before changing the board
+- RISK held decision recovery: recorded light minimized empty-cloud and cloud-held sources require deliberate choices
+- RISK held decision recovery: native peer edits independent comparisons ratings and History survive the appearance choice
+- RISK held decision recovery: changed preview account local cloud and pending sources invalidate consent
+- RISK held decision recovery: a real conditional publication conflict preserves the peer and requires a fresh choice
+- RISK held decision recovery: unavailable reads local commit abort and failed uploads remain honest and retryable
+- RISK held decision recovery: unknown authority nonappearance incoherence and corrupt cloud stay held with safe diagnostics
+- RISK held decision recovery: cold reopen protects a pending choice from ordinary sync deletion and rotation
+- RISK held decision recovery: help and visible recovery explain deliberate appearance choices and protected limits
+- RISK held decision recovery: closing review during backup I O cancels consent before application
+- RISK held decision recovery: browser fallback verifies source backups and records an exact cloud acknowledgement
+- RISK held decision recovery: diagnostics identify only app origin fingerprint and safe source category
+- RISK held decision recovery: evidence and pending-choice archives cannot be restored as empty boards
+
+- RISK held decision recovery: supported released consumers cannot publish a prepared choice after conflict or uncertain acknowledgement
+- RISK held decision recovery: preview lists native peer task fields and displaced unknown paths with escaped values
+- RISK held decision recovery: native selected and enabled actions use established filled theme paint
+- RISK held decision recovery: actual Settings review gives unchosen Apply its disabled paint
+- RISK held decision recovery: rejected ordinary Restore leads through the visible error to deliberate recovery
+- RISK held decision recovery: confirmed publication revalidates changed sources before local apply
+- RISK held decision recovery: a newer durable or browser source during confirmed local commit stays current
+- RISK held decision recovery: new reviewed consent supersedes prior prepared publications only after exact ACK
+
+- RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exact sources before explicit local adoption
+- RISK BACKUP FILE RESTORE: compact settings and unknown board fields stay inside the actual preview
+- RISK BACKUP FILE RESTORE: a signed-in file waits for explicit CAS and exact cloud acknowledgement
+- RISK BACKUP FILE RESTORE: account-bound files stay protected while cloud is unavailable
+- RISK BACKUP FILE RESTORE: IDB authority does not hide changed legacy board copies
+- RISK BACKUP FILE RESTORE: source changes during final awaited copy readback never reach the primary commit
+- RISK BACKUP FILE RESTORE: state, device-head, and draft-only changes expire preview consent
+- RISK BACKUP FILE RESTORE: cancel and file reselection bind confirmation to the newly selected bytes
+- RISK BACKUP FILE RESTORE: closing the preview cancels an in-flight source check before adoption
+- RISK BACKUP FILE RESTORE: backdrop and Escape cancel a pending source check before adoption
+- RISK BACKUP FILE RESTORE: in-progress primary save blocks Cancel and modal dismissal
+- RISK BACKUP FILE RESTORE: in-progress cloud publication blocks Cancel and modal dismissal
+- RISK BACKUP FILE RESTORE: backup CAS abort and readback failure keep the active board and any saved copies
+- RISK BACKUP FILE RESTORE: unsupported and ambiguous selected files stop with exact bytes protected
+- RISK BACKUP FILE RESTORE: account, auth epoch, pending evidence, and cloud revision changes hold consent
+- RISK BACKUP FILE RESTORE: a released old client wins CAS before the prospective file board is published
+- RISK BACKUP FILE RESTORE: replacement preserves completion, History, ratings, deletions, unknown data, and Undo
+- RISK BACKUP FILE RESTORE: fixture readiness leaves no ordinary save crossing delayed file reading
+- RISK BACKUP FILE RESTORE: fixture readiness waits for signed-in durable reconciliation before file consent
+
+## Installed-client required release command
+
+- RISK repository process: required installed-client native outcomes execute exactly once
+- RISK native installed-client delivery: signed-out
+- RISK native installed-client delivery: reconcile-held
+- RISK repository process: installed-client native registration sensitivities fail closed
+- RISK native installed-client sensitivity: unsafe delivery and source loss are rejected
