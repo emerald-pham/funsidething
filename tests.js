@@ -27340,7 +27340,7 @@ test('RISK completion boundaries: a pending account-A acknowledgement and its le
  assert.ok(pushCount>=1,'only the captured account-A write was pending through the transition');
 });
 
-test('RISK completion boundaries: a live editor and pressed scanner control defer stale adoption while the saved view and fields survive cold reopen',async t=>{
+test('RISK completion boundaries: slow native editor saves and pressed scanner controls defer stale adoption while the saved view and fields survive cold reopen',async t=>{
  const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),at=Date.parse('2026-10-17T15:00:00Z'),
   doneId='boundary-editor-done',peerId='boundary-editor-peer',gateId='boundary-editor-gate',dependentId='boundary-editor-dependent',
   name=`completion-boundary-editor-${Date.now()}-${Math.random()}`;
@@ -27375,7 +27375,13 @@ test('RISK completion boundaries: a live editor and pressed scanner control defe
  assert.equal(ctx.state.listOpen,true);assert.equal(ctx.state.tasks.find(row=>row.id===dependentId).prerequisiteId,gateId);
  assert.equal(ctx.isEligible(ctx.state.tasks.find(row=>row.id===dependentId)),false,'the saved prerequisite still controls eligibility');
  Object.defineProperty(scan,'innerHTML',{configurable:true,get:()=>painted,set(value){painted=value;paints.push({phase,gestureActive:vm.runInContext('scannerGestureActive',ctx),chain:[...ctx.state.chain],markup:String(value)});}});
- store.commitHead=async options=>{const result=await commit(options);if(result?.ok)durable.push({phase,chain:JSON.parse(options.payload).chain,events:JSON.parse(options.payload).decisionEvents||[]});return result;};
+ store.commitHead=async options=>{
+  // Exercise real commit completion beyond the editor's queued 350ms save
+  // so the regression retains the observed slow-storage producer overlap.
+  if(phase==='editor-save-and-deferred-adoption')await syncSettle(400);
+  const result=await commit(options);
+  if(result?.ok)durable.push({phase,chain:JSON.parse(options.payload).chain,events:JSON.parse(options.payload).decisionEvents||[]});return result;
+ };
  // A newer cloud revision still carries the membership from before this Done.
  h.writeBehindBack(stale);CS.ready=true;
  CS.pull=async(...args)=>{const response=await basePull(...args);readStartedResolve();await readGate;return response;};
@@ -27392,8 +27398,18 @@ test('RISK completion boundaries: a live editor and pressed scanner control defe
  assert.equal(ctx.state.tasks.find(row=>row.id===peerId).title,'Independent peer task','cloud content cannot replace the active editor under its draft');
  assert.equal(vm.runInContext('deferredCloudPull',ctx),true,'the cloud adoption waits for the editor close boundary');
  shim.document.querySelector=()=>null;
- phase='editor-save-and-deferred-adoption';ctx.onAction('save-edit',{dataset:{id:peerId}});assert.equal(await ctx.persist(),true,'the draft is saved through the real editor action before deferred adoption');
- await syncSettle(15);ctx.cloudPushNow();await settleSavedViewPublication(app,h,'editor-deferred completion adoption');phase='settled';
+ phase='editor-save-and-deferred-adoption';
+ const nativeSave=deferredSyncFixture(),schedule=ctx.setTimeout;
+ // Observe the real Save callback and its persistence result. Let the native
+ // editor/deferred producers finish before adding a redundant fixture save.
+ ctx.setTimeout=(fn,ms,...args)=>{
+  const timer=schedule(ms===350?(...fired)=>{const result=fn(...fired);nativeSave.resolve(result);return result;}:fn,ms,...args);
+  if(ms===350)timer.ref?.();return timer;
+ };
+ try{ctx.onAction('save-edit',{dataset:{id:peerId}});}finally{ctx.setTimeout=schedule;}
+ assert.equal(await nativeSave.promise,true,'the real queued editor Save completes a successful durable persist');
+ ctx.cloudPushNow();await settleSavedViewPublication(app,h,'editor-deferred completion adoption');
+ assert.equal(await ctx.persist(),true,'the redundant fixture save succeeds after native editor publication is durably acknowledged');phase='settled';
  const cloud=h.remoteState(),savedTask=ctx.state.tasks.find(row=>row.id===peerId);
  assert.deepEqual([...ctx.state.chain],[peerId],'deferred adoption never paints the completed member back into the chain');
  assert.equal(savedTask.title,'Editor draft during delayed recovery');assert.equal(savedTask.due,'2026-11-02');

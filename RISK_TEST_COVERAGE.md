@@ -561,7 +561,7 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK completion boundaries: failed device save holds cloud publication and retry keeps an editor change made while saving
 - RISK completion boundaries: failed read stays pending and wake exactly acknowledges an uncertain completion publication
 - RISK completion boundaries: a pending account-A acknowledgement and its learning stay out of account B
-- RISK completion boundaries: a live editor and pressed scanner control defer stale adoption while the saved view and fields survive cold reopen
+- RISK completion boundaries: slow native editor saves and pressed scanner controls defer stale adoption while the saved view and fields survive cold reopen
 - RISK completion lifecycle recovery: expired rest cannot restore 2→1 or 13→4 saved chains
 - RISK completion lifecycle Start: an explicit new pass bootstraps an eligible task after rest without a synthetic Dot
 - RISK completion lifecycle Start: an observed new-pass root survives peer merge and IndexedDB reopen

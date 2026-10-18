@@ -12930,5 +12930,67 @@
     "baseCommit": "52d4b2537bacbb60240ae7a53061224350ebd36f",
     "testChangesSha256": "0726c421c7e10f0ab1655bc53a5f83350e824860883580d7db4a359d490490bd",
     "comparison": "Exact tests.js diff against 52d4b2537bacbb60240ae7a53061224350ebd36f. This aggregate binds cumulative history without relabeling any historical RED as contemporaneous; all earlier case-level records retain their exact bytes and chronology."
+  },
+  {
+    "reason": "Fix the current mandatory P0 deferred-editor fixture readiness gate after branch D pushCI39163478537 failed this consumer, preserving the first1129 fileRestore repair and every app byte. Paired D PRCI39163482853 passed full/rules/compat, while the failed push remains failed. The case is renamed to accurately identify its strengthened slow-native-save coverage.",
+    "previousBehavior": "The real editor Save queued its native350ms persistence and released deferred cloud adoption, then the fixture injected an immediate extra persist and assumed15ms implied readiness. Under actual400ms storage-operation latency, concurrent fixture/native/adoption producers could leave local and durable revision5 dirty after a real cloud ACK6, with equal board content. The unchanged8s waiter failed. Independent head read equaled accepted bytes/hash: this is not a corruption claim. The one attribution control postponing only the extra fixture persist passed under the same latency; arbitrary production overlap safety remains unproven.",
+    "intendedBehavior": "The existing actual editor/pressed-scanner consumer retains real400ms commit-operation latency, observes the real queued350ms Save callback without cancellation or manual invocation, and asserts its actual persistence promise succeeds. It then reaches the unchanged semantic publication/head/ACK boundary before the redundant direct fixture persist assertion. The15ms readiness assumption is removed. The old assertion operation is retained but moved and reworded from misleading before-deferred-adoption chronology to honest post-native-publication proof; an additional actual native-promise acceptance assertion preserves the native-save claim.",
+    "preservedCoverage": [
+      "All original completion, editor draft/title/due, immutable theme and completion facts, prerequisite behavior, saved list/search/scroll, every scanner paint/durable chain, pressed-pointer/deferred-click and cold-reopen assertions remain; only the redundant persist assertion wording and ordering change explicitly as described.",
+      "The original8s semantic publication waiter and all1129 fileRestore helper/regression bytes are unchanged. No producer cancellation, forced state, guard change, readiness clock padding, skipped case or weakened error/account/ACK control is introduced.",
+      "All508 historical rationale objects remain raw-byte-exact and ordered. All35 delivered assets/SW and product metadata remain exactD. No product, FAQ/changelog, package, workflow, full/native/CI/release changes are part of this repair."
+    ],
+    "replacementTests": [
+      "RISK completion boundaries: slow native editor saves and pressed scanner controls defer stale adoption while the saved view and fields survive cold reopen"
+    ],
+    "redEvidence": {
+      "command": "TZ=UTC Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK completion boundaries: slow native editor saves and pressed scanner controls defer stale adoption while the saved view and fields survive cold reopen$\" tests.js",
+      "failure": "Retained actual-case RED d2c34a6d-3389-4ac3-8ace-934771540042 adds only the real400ms storage-operation latency and accurate case title before readiness repair; the original8s waiter fails with idletrue/dirtytrue/localRev5/remoteRev6/cloudMatchestrue/persistedMatchestrue/durableMatchesfalse. Earlier diagnosis on cleanD recorded unchanged baseline353bc0c0 PASS, transparent100ms controls PASS, actual causalREDbbbfcc0a with independent exact head read, and one native-save-first discrimination8eed2d7e PASS. These are postimplementation regression diagnosis, not invented original product RED chronology.",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/ci/pr205/112/deferred-completion-repair/runs/2026-10-18T20-53-01-290Z-d2c34a6d-3389-4ac3-8ace-934771540042.json",
+      "diagnosis": "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/ci/pr205/112/deferred-completion-diagnosis/CAUSAL_CHECKPOINT.json",
+      "laterSensitivity": {
+        "record": "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/ci/pr205/112/deferred-completion-repair/runs/2026-10-18T20-54-34-547Z-91d403be-f264-4ff7-bf61-7bacdf05cb5f.json",
+        "result": "Only the original immediate extra persist/15ms/waiter order is restored in an immutable external source copy. Actual400ms latency, real native callback, independent waiter and all case assertions remain; it fails at the intended original8s revision/dirty mismatch. This is later sensitivity, not an original RED."
+      }
+    },
+    "greenEvidence": {
+      "command": "TZ=UTC Node22 record-run --purpose green -- node --test --test-name-pattern=\"^(?:RISK completion boundaries:|RISK saved view decision integration:|RISK saved view account boundary:|RISK CLOUD ACCOUNT: signing out|RISK CLOUD STARTUP: a late write acknowledgement|RISK DEVICE STORAGE V2: migration|RISK BACKUP FILE RESTORE:|RISK test inventory:)\" tests.js",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/ci/pr205/112/deferred-completion-repair/runs/2026-10-18T20-54-48-906Z-939376e8-8983-43d1-99fb-843abcf0c896.json",
+      "result": "49 tests passed with zero failures/cancellations/skips: complete completion-boundary and fileRestore cohorts, saved-view publication/account, late ACK, atomic IDB CAS and inventory controls. The strengthened full consumer independently verifies native save acceptance, publication, pressed control and cold reopen. No full suite/native/browser/CI or release pass is claimed."
+    },
+    "baseCommit": "1129d51dd2386a01dd912d94ff0480cbab858c93",
+    "testChangesSha256": "98f27be90cafd3916016d0150bda4fe3ffaf0da3d84e2034fd4e70da952700ec",
+    "comparison": "Exact tests.js diff against 1129d51dd2386a01dd912d94ff0480cbab858c93. Direct D-to-repair fixture/test diff; current causalRED precedes readiness repair, separately from historical product/CI evidence."
+  },
+  {
+    "reason": "Fix the current mandatory P0 deferred-editor fixture readiness gate after branch D pushCI39163478537 failed this consumer, preserving the first1129 fileRestore repair and every app byte. Paired D PRCI39163482853 passed full/rules/compat, while the failed push remains failed. The case is renamed to accurately identify its strengthened slow-native-save coverage.",
+    "previousBehavior": "The real editor Save queued its native350ms persistence and released deferred cloud adoption, then the fixture injected an immediate extra persist and assumed15ms implied readiness. Under actual400ms storage-operation latency, concurrent fixture/native/adoption producers could leave local and durable revision5 dirty after a real cloud ACK6, with equal board content. The unchanged8s waiter failed. Independent head read equaled accepted bytes/hash: this is not a corruption claim. The one attribution control postponing only the extra fixture persist passed under the same latency; arbitrary production overlap safety remains unproven.",
+    "intendedBehavior": "The existing actual editor/pressed-scanner consumer retains real400ms commit-operation latency, observes the real queued350ms Save callback without cancellation or manual invocation, and asserts its actual persistence promise succeeds. It then reaches the unchanged semantic publication/head/ACK boundary before the redundant direct fixture persist assertion. The15ms readiness assumption is removed. The old assertion operation is retained but moved and reworded from misleading before-deferred-adoption chronology to honest post-native-publication proof; an additional actual native-promise acceptance assertion preserves the native-save claim.",
+    "preservedCoverage": [
+      "All original completion, editor draft/title/due, immutable theme and completion facts, prerequisite behavior, saved list/search/scroll, every scanner paint/durable chain, pressed-pointer/deferred-click and cold-reopen assertions remain; only the redundant persist assertion wording and ordering change explicitly as described.",
+      "The original8s semantic publication waiter and all1129 fileRestore helper/regression bytes are unchanged. No producer cancellation, forced state, guard change, readiness clock padding, skipped case or weakened error/account/ACK control is introduced.",
+      "All508 historical rationale objects remain raw-byte-exact and ordered. All35 delivered assets/SW and product metadata remain exactD. No product, FAQ/changelog, package, workflow, full/native/CI/release changes are part of this repair."
+    ],
+    "replacementTests": [
+      "RISK completion boundaries: slow native editor saves and pressed scanner controls defer stale adoption while the saved view and fields survive cold reopen"
+    ],
+    "redEvidence": {
+      "command": "TZ=UTC Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK completion boundaries: slow native editor saves and pressed scanner controls defer stale adoption while the saved view and fields survive cold reopen$\" tests.js",
+      "failure": "Retained actual-case RED d2c34a6d-3389-4ac3-8ace-934771540042 adds only the real400ms storage-operation latency and accurate case title before readiness repair; the original8s waiter fails with idletrue/dirtytrue/localRev5/remoteRev6/cloudMatchestrue/persistedMatchestrue/durableMatchesfalse. Earlier diagnosis on cleanD recorded unchanged baseline353bc0c0 PASS, transparent100ms controls PASS, actual causalREDbbbfcc0a with independent exact head read, and one native-save-first discrimination8eed2d7e PASS. These are postimplementation regression diagnosis, not invented original product RED chronology.",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/ci/pr205/112/deferred-completion-repair/runs/2026-10-18T20-53-01-290Z-d2c34a6d-3389-4ac3-8ace-934771540042.json",
+      "diagnosis": "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/ci/pr205/112/deferred-completion-diagnosis/CAUSAL_CHECKPOINT.json",
+      "laterSensitivity": {
+        "record": "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/ci/pr205/112/deferred-completion-repair/runs/2026-10-18T20-54-34-547Z-91d403be-f264-4ff7-bf61-7bacdf05cb5f.json",
+        "result": "Only the original immediate extra persist/15ms/waiter order is restored in an immutable external source copy. Actual400ms latency, real native callback, independent waiter and all case assertions remain; it fails at the intended original8s revision/dirty mismatch. This is later sensitivity, not an original RED."
+      }
+    },
+    "greenEvidence": {
+      "command": "TZ=UTC Node22 record-run --purpose green -- node --test --test-name-pattern=\"^(?:RISK completion boundaries:|RISK saved view decision integration:|RISK saved view account boundary:|RISK CLOUD ACCOUNT: signing out|RISK CLOUD STARTUP: a late write acknowledgement|RISK DEVICE STORAGE V2: migration|RISK BACKUP FILE RESTORE:|RISK test inventory:)\" tests.js",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/ci/pr205/112/deferred-completion-repair/runs/2026-10-18T20-54-48-906Z-939376e8-8983-43d1-99fb-843abcf0c896.json",
+      "result": "49 tests passed with zero failures/cancellations/skips: complete completion-boundary and fileRestore cohorts, saved-view publication/account, late ACK, atomic IDB CAS and inventory controls. The strengthened full consumer independently verifies native save acceptance, publication, pressed control and cold reopen. No full suite/native/browser/CI or release pass is claimed."
+    },
+    "baseCommit": "52d4b2537bacbb60240ae7a53061224350ebd36f",
+    "testChangesSha256": "714020774fae18ef6c3a3a5353594425b483bc46072de905c4f76ff5085ef05c",
+    "comparison": "Exact tests.js diff against 52d4b2537bacbb60240ae7a53061224350ebd36f. Cumulative binding only; all earlier exact case-level rationale bytes/chronologies are retained, not relabeled as one contemporaneousRED."
   }
 ]
