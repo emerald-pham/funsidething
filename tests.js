@@ -122,6 +122,30 @@ test('RISK quiet reconciliation feedback: an unchanged offchain task deleted by 
  assert.deepEqual(toasts,[],'an unchanged task deleted by a peer does not displace any local edit');
 });
 
+test('RISK quiet reconciliation feedback: independent context memberships stay quiet beside Dislodge',async t=>{
+ const at=Date.parse('2026-10-18T03:00:00Z'),ids=['spec-context-first','spec-context-second'];
+ const initial=syncState({tasks:ids.map((id,i)=>({...syncTask(id,'Spec context task '+(i+1)),createdAt:i+1})),contexts:[{id:'ctx-home',name:'Home',active:true},{id:'ctx-work',name:'Work',active:true}],mode:'work',scanMode:'descending',syncAccount:'e@example.com',syncRev:4,syncDirty:false,settings:{horizonMin:60,thresholdPct:0,samples:40,cantMin:30,workedHours:8,theme:'system'}});
+ const h=makeSyncHarness({remote:initial,rev:4,delayMs:1}),raw=JSON.stringify(initial);
+ const app=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});t.after(()=>closeLegacyApp173(app));
+ await app.ctx.cloudPull();app.ctx.window.CloudSync.ready=false;
+ app.ctx.onAction('start-scan',{dataset:{mode:'descending'}});app.ctx.onAction('yes',{dataset:{candidate:ids[1],benchmark:ids[0]}});app.ctx.onAction('start-working',{});assert.equal(await app.ctx.persist(),true);
+ app.ctx.window.CloudSync.ready=true;await app.ctx.cloudPull();await app.ctx.cloudPushNow();await settleSavedViewPublication(app,h,'spec common chain');
+ const peerRaw=JSON.stringify({...h.remoteState(),syncAccount:'e@example.com',syncRev:h.doc.rev,syncDirty:false});
+ const peer=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:peerRaw,[LOCAL_HEAD_KEY]:peerRaw},cloudSyncFactory:h.factory});t.after(()=>closeLegacyApp173(peer));
+ await peer.ctx.cloudPull();peer.ctx.window.CloudSync.ready=false;app.ctx.window.CloudSync.ready=false;
+ assert.equal(await saveEditorChoice(app,ids[0],at+100,{ctxIds:['ctx-work']}),true);
+ assert.equal(await saveEditorChoice(peer,ids[0],at+200,{ctxIds:['ctx-home']}),true);
+ peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPull();await peer.ctx.cloudPushNow();await settleSavedViewPublication(peer,h,'spec peer context');
+ setFakeTime(app.ctx,at+150);app.ctx.onAction('dislodge',{dataset:{benchmark:ids[1]}});assert.equal(await app.ctx.persist(),true);
+ const toasts=[],element=app.shim.document.getElementById('toast');let message=element.textContent;Object.defineProperty(element,'textContent',{configurable:true,get:()=>message,set(value){message=value;toasts.push(value);}});
+ app.ctx.window.CloudSync.ready=true;await app.ctx.cloudPull();await app.ctx.cloudPushNow();await settleSavedViewPublication(app,h,'spec retained contexts plus Dislodge');
+ assert.deepEqual(Array.from(app.ctx.state.chain),[ids[0]]);assert.equal(app.ctx.state.considered[ids[1]],'dislodged');
+ const contexts=Array.from(app.ctx.state.tasks.find(row=>row.id===ids[0]).ctx).sort();
+ assert.deepEqual(contexts,['ctx-home','ctx-work']);assert.deepEqual(h.remoteState().tasks.find(row=>row.id===ids[0]).ctx.slice().sort(),contexts);
+ t.diagnostic(JSON.stringify({toasts,contexts,chain:Array.from(app.ctx.state.chain),cloudChain:h.remoteState().chain,revision:h.doc.rev}));
+ assert.deepEqual(toasts,[],'retained independent context choices and Dislodge should stay quiet');
+});
+
 const LEGACY_COMPLETION_RELEASE='bd84e5c0ccc7c6ebe065f42f18df34d89eeab14e';
 async function legacyCompletionSource173(t,release=LEGACY_COMPLETION_RELEASE,account='e@example.com'){
  const released=spawnSync('git',['show',release+':index.html'],{cwd:__dirname,encoding:'utf8'});assert.equal(released.status,0,released.stderr);

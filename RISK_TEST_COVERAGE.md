@@ -19,6 +19,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK quiet reconciliation feedback: FAQ and Changelog distinguish quiet success from recovery guidance
 - RISK quiet reconciliation feedback: a displaced dependency choice keeps its recovery notice and exact backup
 - RISK quiet reconciliation feedback: an unchanged offchain task deleted by a peer stays quiet beside Dislodge
+- RISK quiet reconciliation feedback: independent context memberships stay quiet beside Dislodge
 
 - RISK neutral bootstrap: JSON replacement and Undo deletion cannot be promoted by stale chosen copies
 
