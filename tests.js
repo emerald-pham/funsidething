@@ -32585,6 +32585,242 @@ test('RISK cloud current choices: Can’t and Return are timed, causally linked 
  assert.equal(JSON.parse(ctx.cloudPayload()).decisionEvents.length,2,'the action pair is durable in the cloud payload');
 });
 
+test('RISK timed-hold coherence: native Can’t expires at the exact deadline through IndexedDB and ordinary cloud pull',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb');
+ const at=Date.parse('2026-10-16T14:00:00.000Z'),taskId='timed-cant-exact',secondTaskId='timed-cant-second',benchmarkId='timed-cant-benchmark';
+ const initial=syncState({tasks:[syncTask(taskId,'Timed Can’t task'),syncTask(secondTaskId,'Second timed Can’t task'),syncTask(benchmarkId,'Timed Can’t benchmark')],
+  chain:[benchmarkId],candidateId:taskId,mode:'scan',passStartedAt:at-60000,passId:'timed-cant-pass',
+  settings:{horizonMin:60,thresholdPct:25,samples:250,cantMin:15,workedHours:8,theme:'system',scanMode:'descending',futureSetting:{kept:true}},
+  syncRev:4,syncAccount:'e@example.com',syncDirty:false,futureBoardField:{kept:'opaque'}});
+ const remote=JSON.parse(JSON.stringify(initial));
+ for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:4,delayMs:20}),indexedDBProvider=new IDBFactory(),deviceDbName='timed-cant-exact-'+Date.now()+'-'+Math.random();
+ const cloudFactory=()=>{const CS=h.factory();CS.ready=false;return CS;};
+ const app=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},
+  indexedDBProvider,deviceDbName,cloudSyncFactory:cloudFactory});
+ const apps=[app];
+ const close=async target=>{if(!target||target.closedTimed194)return;target.closedTimed194=true;
+  try{target.ctx.window.CloudSync.user=null;target.ctx.suspendCloudSync();vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry()',target.ctx);}catch{}
+  try{await target.ctx.window.ScannerDeviceStore?.close?.();}catch{}};
+ t.after(async()=>{for(const target of apps)await close(target);});
+ await app.ctx.cloudPull();app.ctx.window.CloudSync.ready=false;
+ assert.equal(app.ctx.state.candidateId,taskId,'the native scanner offers the intended Can’t candidate');
+ app.ctx.onAction('cant',{dataset:{candidate:taskId,benchmark:benchmarkId}});
+ assert.equal(app.ctx.state.considered[taskId],'cant','the actual scanner action creates the timed hold');
+ assert.equal(app.ctx.state.candidateId,secondTaskId,'the scanner offers another eligible task after the first native Can’t');
+ setFakeTime(app.ctx,at+30000);app.ctx.onAction('cant',{dataset:{candidate:secondTaskId,benchmark:benchmarkId}});
+ assert.equal(app.ctx.state.considered[secondTaskId],'cant','a second real Can’t creates an independent timed hold');
+ const fact=JSON.stringify(app.ctx.state.decisionEvents),atFact=app.ctx.state.cantAt[taskId],secondAt=app.ctx.state.cantAt[secondTaskId];
+ assert.equal(atFact,at,'the hold stores its original native action time');
+ assert.equal(secondAt,at+30000,'the second hold keeps its independent native action time');
+ assert.equal(await app.ctx.persist(),true,'the native hold is durably saved before cloud publication');
+ const nativeHead=await app.ctx.window.ScannerDeviceStore.readHead();
+ assert.equal(JSON.parse(nativeHead.payload).cantAt[taskId],at,'the actual IndexedDB head carries the native timestamp');
+
+ app.ctx.window.CloudSync.ready=true;await app.ctx.cloudPull();await app.ctx.cloudPushNow();
+ await settleSavedViewPublication(app,h,'native Can’t timed-hold source publication');
+ assert.equal(h.remoteState().considered[taskId],'cant','the ordinary cloud document now has the original timed mark');
+ app.ctx.window.CloudSync.ready=false;
+
+ const beforeDeadline=at+15*60000-1;
+ setFakeTime(app.ctx,beforeDeadline);app.shim.window.dispatchEvent({type:'focus'});
+ assert.equal(app.ctx.state.considered[taskId],'cant','the native hold remains active one millisecond before its deadline');
+ assert.equal(app.ctx.state.considered[secondTaskId],'cant','the newer native hold is active before its own deadline too');
+ assert.equal(app.ctx.state.cantAt[taskId],at,'the original native timer is unchanged before its exact boundary');
+ assert.equal(await app.ctx.persist(),true,'the still-active hold reaches the actual device store');
+ app.ctx.window.CloudSync.ready=true;await app.ctx.cloudPull();
+ assert.equal(app.ctx.window.CloudSync.errorCode,undefined,'an active coherent Can’t hold still reconciles unchanged');
+ assert.equal(app.ctx.state.considered[taskId],'cant','ordinary cloud pull does not clear a hold before its deadline');
+ await app.ctx.cloudPushNow();await settleSavedViewPublication(app,h,'active native Can’t pre-deadline reconciliation');
+ await close(app);
+
+ const reopened=await loadAppAtTime(beforeDeadline,{indexedDBProvider,deviceDbName,cloudSyncFactory:cloudFactory});apps.push(reopened);
+ assert.equal(reopened.ctx.state.considered[taskId],'cant','cold IndexedDB reopen retains the active native hold');
+ assert.equal(reopened.ctx.state.considered[secondTaskId],'cant','cold reopen retains the independent second hold');
+ assert.equal(reopened.ctx.state.cantAt[taskId],at,'cold reopen preserves the original timer start');
+ setFakeTime(reopened.ctx,beforeDeadline);reopened.ctx.window.CloudSync.ready=true;
+ const priorPulls=h.calls.filter(call=>call==='pull').length,pullDuringDeadline=reopened.ctx.cloudPull();
+ const pullWaitUntil=Date.now()+1000;
+ while(h.calls.filter(call=>call==='pull').length===priorPulls&&Date.now()<pullWaitUntil)await new Promise(resolve=>setTimeout(resolve,1));
+ assert.equal(h.calls.filter(call=>call==='pull').length,priorPulls+1,'the ordinary remote read is in flight before the deadline');
+ setFakeTime(reopened.ctx,at+15*60000);reopened.shim.window.dispatchEvent({type:'focus'});
+ assert.equal(reopened.ctx.state.considered[taskId],undefined,'focus expires the native Can’t mark at the exact >= deadline');
+ assert.equal(reopened.ctx.state.cantAt[taskId],undefined,'the expired local mark drops only its live timestamp');
+ assert.equal(reopened.ctx.state.considered[secondTaskId],'cant','normalization does not clear the still-active peer hold');
+ assert.equal(reopened.ctx.state.cantAt[secondTaskId],secondAt,'the still-active peer keeps its original timer');
+ assert.equal(JSON.stringify(reopened.ctx.state.decisionEvents),fact,'expiry retains the immutable original Can’t fact and time');
+ assert.equal(await reopened.ctx.persist(),true,'the exact-deadline cleared board reaches the actual device store');
+ const expiredHead=await reopened.ctx.window.ScannerDeviceStore.readHead();
+ assert.equal(JSON.parse(expiredHead.payload).considered[taskId],undefined,'the durable head records the actual focus expiry');
+
+ await pullDuringDeadline;
+ assert.equal(reopened.ctx.window.CloudSync.errorCode,undefined,'ordinary cloud pull accepts the exact-deadline expiry as the same timed decision');
+ await reopened.ctx.cloudPushNow();
+ await settleSavedViewPublication(reopened,h,'expired native Can’t ordinary pull acknowledgement');
+ assert.equal(reopened.ctx.window.CloudSync.errorCode,undefined,'ordinary cloud pull reconciles the expired source');
+ assert.equal(h.remoteState().considered[taskId],undefined,'cloud acknowledgement does not revive the expired Can’t mark');
+ assert.equal(h.remoteState().considered[secondTaskId],'cant','cloud acknowledgement preserves the newer active hold');
+ assert.equal(h.remoteState().cantAt[secondTaskId],secondAt,'the peer timer remains byte-for-byte at its own original start');
+ assert.equal(JSON.stringify(reopened.ctx.state.decisionEvents),fact,'the cloud retains the exact original decision envelope');
+ assert.deepEqual(JSON.parse(JSON.stringify(reopened.ctx.state.settings.futureSetting)),{kept:true},'opaque Settings data survives expiry and adoption');
+ assert.deepEqual(JSON.parse(JSON.stringify(reopened.ctx.state.futureBoardField)),{kept:'opaque'},'opaque board data survives expiry and adoption');
+ assert.ok(Array.from(reopened.ctx.pool(),task=>task.id).includes(taskId),'the task rejoins the real scanner candidate pool after expiry');
+ assert.ok(!Array.from(reopened.ctx.pool(),task=>task.id).includes(secondTaskId),'the independent active native hold stays out of the scanner pool');
+ const acknowledged=await reopened.ctx.window.ScannerDeviceStore.readHead();
+ assert.equal(acknowledged.payload,JSON.stringify(reopened.ctx.state),'the exact acknowledged board is durable on device');
+ await close(reopened);
+});
+
+test('RISK timed-hold coherence: native Worked honors hours and local 2 AM ceilings across reopen and cloud pull',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb');
+ const run=async(subtest,{at,workedHours,label})=>{
+  const targetId='worked-'+label,remainingId='worked-remaining-'+label;
+  const initial=syncState({tasks:[syncTask(targetId,'Timed Worked task'),syncTask(remainingId,'Remaining benchmark')],
+   chain:[remainingId,targetId],candidateId:null,mode:'scan',passStartedAt:at-60000,passId:'worked-pass-'+label,
+   settings:{horizonMin:60,thresholdPct:25,samples:250,cantMin:30,workedHours,theme:'system',scanMode:'descending',futureSetting:{kept:label}},
+   syncRev:4,syncAccount:'e@example.com',syncDirty:false,futureBoardField:{kept:label}});
+  const remote=JSON.parse(JSON.stringify(initial));
+  for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+  const h=makeSyncHarness({remote,rev:4,delayMs:20}),indexedDBProvider=new IDBFactory(),deviceDbName='timed-worked-'+label+'-'+Date.now()+'-'+Math.random();
+  const cloudFactory=()=>{const CS=h.factory();CS.ready=false;return CS;},apps=[];
+  const close=async app=>{if(!app||app.closedTimed194)return;app.closedTimed194=true;
+   try{app.ctx.window.CloudSync.user=null;app.ctx.suspendCloudSync();vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry()',app.ctx);}catch{}
+   try{await app.ctx.window.ScannerDeviceStore?.close?.();}catch{}};
+  subtest.after(async()=>{for(const app of apps)await close(app);});
+  let app=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},
+   indexedDBProvider,deviceDbName,cloudSyncFactory:cloudFactory});apps.push(app);
+  app.ctx.window.CloudSync.ready=true;await app.ctx.cloudPull();app.ctx.window.CloudSync.ready=false;
+  app.ctx.onAction('worked',{dataset:{}});
+  assert.equal(app.ctx.state.considered[targetId],'worked','the actual benchmark Worked action creates the native hold');
+  assert.equal(app.ctx.state.workedAt[targetId],at,'Worked retains the original action time');
+  const facts=JSON.stringify(app.ctx.state.decisionEvents),workLog=JSON.stringify(app.ctx.state.workLog);
+  const ratings=JSON.stringify(app.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma,task.ratingHistory]));
+  assert.equal(app.ctx.state.workLog.at(-1).taskId,targetId,'the real Worked session appears in History data');
+  assert.equal(await app.ctx.persist(),true,'the actual IndexedDB device head saves the Worked source');
+  app.ctx.window.CloudSync.ready=true;await app.ctx.cloudPull();await app.ctx.cloudPushNow();
+  await settleSavedViewPublication(app,h,'native Worked '+label+' source publication');
+  assert.equal(h.remoteState().workedAt[targetId],at,'cloud retains the original Worked timestamp');
+
+  const cutoff=new Date(at);cutoff.setHours(2,0,0,0);if(cutoff.getTime()<=at)cutoff.setDate(cutoff.getDate()+1);
+  const deadline=Math.min(at+workedHours*3600000,cutoff.getTime()),beforeDeadline=deadline-1;
+  app.ctx.window.CloudSync.ready=false;setFakeTime(app.ctx,beforeDeadline);app.shim.window.dispatchEvent({type:'focus'});
+  assert.equal(app.ctx.state.considered[targetId],'worked','the Worked hold remains active one millisecond before its selected deadline');
+  assert.equal(app.ctx.state.workedAt[targetId],at,'the active hold keeps its original timestamp');
+  assert.equal(await app.ctx.persist(),true,'the active Worked hold reaches the device store');
+  app.ctx.window.CloudSync.ready=true;await app.ctx.cloudPull();
+  assert.equal(app.ctx.window.CloudSync.errorCode,undefined,'ordinary cloud pull accepts an active coherent Worked hold');
+  assert.equal(app.ctx.state.considered[targetId],'worked','pre-deadline reconciliation leaves eligibility held');
+  await app.ctx.cloudPushNow();await settleSavedViewPublication(app,h,'active native Worked '+label+' reconciliation');
+  await close(app);
+
+  app=await loadAppAtTime(beforeDeadline,{indexedDBProvider,deviceDbName,cloudSyncFactory:cloudFactory});apps.push(app);
+  assert.equal(app.ctx.state.considered[targetId],'worked','cold device reopen preserves the active Worked hold');
+  assert.equal(JSON.stringify(app.ctx.state.workLog),workLog,'cold reopen retains the exact History work session');
+  setFakeTime(app.ctx,beforeDeadline);app.ctx.window.CloudSync.ready=true;
+  const priorPulls=h.calls.filter(call=>call==='pull').length,pullDuringDeadline=app.ctx.cloudPull(),waitUntil=Date.now()+1000;
+  while(h.calls.filter(call=>call==='pull').length===priorPulls&&Date.now()<waitUntil)await new Promise(resolve=>setTimeout(resolve,1));
+  assert.equal(h.calls.filter(call=>call==='pull').length,priorPulls+1,'ordinary pull is waiting on the cloud at the deadline edge');
+  setFakeTime(app.ctx,deadline);app.shim.window.dispatchEvent({type:'focus'});
+  assert.equal(app.ctx.state.considered[targetId],undefined,'focus expires Worked at the configured hour or local 2 AM ceiling');
+  assert.equal(app.ctx.state.workedAt[targetId],undefined,'only the live timed marker is removed');
+  assert.equal(JSON.stringify(app.ctx.state.decisionEvents),facts,'the immutable Worked decision event and its time remain exact');
+  assert.equal(JSON.stringify(app.ctx.state.workLog),workLog,'expiry does not remove or restamp the History work session');
+  assert.equal(JSON.stringify(app.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma,task.ratingHistory])),ratings,'expiry does not change ratings or learning history');
+  assert.equal(await app.ctx.persist(),true,'the exact-deadline status is durably committed before cloud read resolves');
+  await pullDuringDeadline;
+  assert.equal(app.ctx.window.CloudSync.errorCode,undefined,'post-await cloud comparison uses the same effective deadline for both sources');
+  await app.ctx.cloudPushNow();await settleSavedViewPublication(app,h,'expired native Worked '+label+' ordinary pull acknowledgement');
+  assert.equal(h.remoteState().considered[targetId],undefined,'cloud acknowledgement does not revive the expired Worked hold');
+  assert.equal(JSON.stringify(app.ctx.state.decisionEvents),facts,'the cloud keeps the original Worked envelope');
+  assert.deepEqual(JSON.parse(JSON.stringify(app.ctx.state.settings.futureSetting)),{kept:label},'opaque Settings data survives');
+  assert.deepEqual(JSON.parse(JSON.stringify(app.ctx.state.futureBoardField)),{kept:label},'opaque board data survives');
+  assert.ok(Array.from(app.ctx.pool(),task=>task.id).includes(targetId),'the task returns to the real scanner candidate pool after expiry');
+  assert.equal((await app.ctx.window.ScannerDeviceStore.readHead()).payload,JSON.stringify(app.ctx.state),'exact cloud acknowledgement is durable on device');
+  await close(app);
+ };
+ await t.test('configured hour deadline',subtest=>run(subtest,{at:Date.parse('2026-10-16T14:00:00.000Z'),workedHours:1,label:'hours'}));
+ await t.test('local 2 AM ceiling before configured hours',subtest=>run(subtest,{at:Date.parse('2026-10-16T05:30:00.000Z'),workedHours:8,label:'2am'}));
+});
+
+test('RISK timed-hold coherence: use each board’s Worked settings and keep orphan evidence fail-closed',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb');
+ const runNative=async(subtest,{label,workedHours})=>{
+  const at=Date.parse('2026-10-16T14:00:00.000Z'),targetId='worked-peer-'+label,remainingId='worked-peer-remaining-'+label;
+  const initial=syncState({tasks:[syncTask(targetId,'Peer Worked task'),syncTask(remainingId,'Peer benchmark')],
+   chain:[remainingId,targetId],candidateId:null,mode:'scan',passStartedAt:at-60000,passId:'worked-peer-pass-'+label,
+   settings:{horizonMin:60,thresholdPct:25,samples:250,cantMin:30,workedHours,theme:'system',scanMode:'descending'},
+   syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+  const remote=JSON.parse(JSON.stringify(initial));for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+  const h=makeSyncHarness({remote,rev:4,delayMs:1}),indexedDBProvider=new IDBFactory(),deviceDbName='timed-worked-peer-'+label+'-'+Date.now()+'-'+Math.random();
+  const cloudFactory=()=>{const CS=h.factory();CS.ready=false;return CS;};
+  const app=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},indexedDBProvider,deviceDbName,cloudSyncFactory:cloudFactory});
+  subtest.after(async()=>{if(app.closedTimed194)return;app.ctx.window.CloudSync.user=null;app.ctx.suspendCloudSync();vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry()',app.ctx);await app.ctx.window.ScannerDeviceStore?.close?.();});
+  app.ctx.window.CloudSync.ready=true;await app.ctx.cloudPull();app.ctx.window.CloudSync.ready=false;
+  app.ctx.onAction('worked',{dataset:{}});assert.equal(app.ctx.state.considered[targetId],'worked','the real benchmark action owns this event');
+  const fact=JSON.stringify(app.ctx.state.decisionEvents),workLog=JSON.stringify(app.ctx.state.workLog);
+  assert.equal(await app.ctx.persist(),true,'native source is saved in fake IndexedDB');
+  app.ctx.window.CloudSync.ready=true;await app.ctx.cloudPull();await app.ctx.cloudPushNow();await settleSavedViewPublication(app,h,'native peer Worked '+label+' publication');
+  return {app,h,targetId,at,fact,workLog};
+ };
+
+ await t.test('remote cleared source uses its own duration while active local settings differ',async subtest=>{
+  const {app,h,targetId,at,fact,workLog}=await runNative(subtest,{label:'own-settings',workedHours:16});
+  const wire=h.remoteState();wire.settings.workedHours=1;delete wire.considered[targetId];delete wire.workedAt[targetId];h.writeBehindBack(wire);
+  assert.equal(app.ctx.state.settings.workedHours,16,'the receiving active board has its own longer duration');
+  assert.equal(h.remoteState().settings.workedHours,1,'the peer wire carries its own shorter duration');
+  assert.equal(h.remoteState().considered[targetId],undefined,'the peer’s already-cleared source retains the original decision fact');
+  setFakeTime(app.ctx,at+2*3600000);await app.ctx.cloudPull();
+  assert.equal(app.ctx.window.CloudSync.errorCode,undefined,'the expired peer source is evaluated with its own one-hour setting, not global state');
+  assert.equal(app.ctx.state.settings.workedHours,1,'ordinary pull adopts the peer’s board setting');
+  assert.equal(app.ctx.state.considered[targetId],undefined,'native adoption and expiry do not revive the old Worked fact');
+  assert.equal(app.ctx.state.workedAt[targetId],undefined,'the expired timestamp remains cleared after adoption');
+  assert.equal(JSON.stringify(app.ctx.state.decisionEvents),fact,'the exact original Worked event remains immutable');
+  assert.equal(JSON.stringify(app.ctx.state.workLog),workLog,'History keeps the exact original Worked session');
+  assert.ok(Array.from(app.ctx.pool(),task=>task.id).includes(targetId),'the peer-configured expiry restores native scanner eligibility');
+  await app.ctx.cloudPushNow();await settleSavedViewPublication(app,h,'peer-owned Worked expiry acknowledgement');
+  assert.equal(h.remoteState().considered[targetId],undefined,'the cloud acknowledgement preserves the expired normal form');
+  assert.equal((await app.ctx.window.ScannerDeviceStore.readHead()).payload,JSON.stringify(app.ctx.state),'the adopted normal form is durable on device');
+ });
+
+ await t.test('expired pair normalization does not sweep an unmatched timestamp',async subtest=>{
+  const {app,h,targetId,at,fact}=await runNative(subtest,{label:'orphan',workedHours:1});
+  const wire=h.remoteState();wire.cantAt[targetId]=at-60000;h.writeBehindBack(wire);
+  const priorDevice=(await app.ctx.window.ScannerDeviceStore.readHead()).payload,priorCloud=h.doc.payload;
+  setFakeTime(app.ctx,at+3600000);await app.ctx.cloudPull();
+  assert.equal(app.ctx.window.CloudSync.errorCode,'unprojectable-decision-evidence','an expired Worked pair cannot waive an orphan Can’t timestamp');
+  assert.equal(h.doc.payload,priorCloud,'the unmatched source is never acknowledged or overwritten');
+  assert.equal((await app.ctx.window.ScannerDeviceStore.readHead()).payload,priorDevice,'rejected cloud evidence leaves the exact device head untouched');
+  assert.equal(app.ctx.state.considered[targetId],'worked','the current board remains intact while the peer is held');
+  assert.equal(JSON.stringify(app.ctx.state.decisionEvents),fact,'fail-closed handling retains the exact action envelope');
+ });
+
+ await t.test('a peer cannot prematurely clear a coherent Worked hold before its future deadline',async subtest=>{
+  const {app,h,targetId,at,fact,workLog}=await runNative(subtest,{label:'early-clear',workedHours:1});
+  const wire=h.remoteState();delete wire.considered[targetId];delete wire.workedAt[targetId];h.writeBehindBack(wire);
+  const priorDevice=(await app.ctx.window.ScannerDeviceStore.readHead()).payload,priorCloud=h.doc.payload;
+  setFakeTime(app.ctx,at+30*60000);await app.ctx.cloudPull();
+  assert.equal(app.ctx.window.CloudSync.errorCode,'unprojectable-decision-evidence','a peer-cleared active hold remains unexplained until the original one-hour deadline');
+  assert.equal(h.doc.payload,priorCloud,'the prematurely cleared peer payload is not acknowledged or overwritten');
+  assert.equal((await app.ctx.window.ScannerDeviceStore.readHead()).payload,priorDevice,'the fail-closed read leaves the exact durable device head untouched');
+  assert.equal(app.ctx.state.considered[targetId],'worked','the active native hold remains held on this board');
+  assert.equal(app.ctx.state.workedAt[targetId],at,'the original start still defines its future deadline');
+  assert.equal(JSON.stringify(app.ctx.state.decisionEvents),fact,'the original decision envelope remains exact');
+  assert.equal(JSON.stringify(app.ctx.state.workLog),workLog,'History remains exact while the peer source is rejected');
+ });
+});
+
+test('RISK timed-hold coherence: extended FAQ and current Settings changelog explain retained expiry time',async()=>{
+ const {ctx,shim}=await loadApp();ctx.onAction('help',{});
+ const help=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(help,/Both timed holds keep their original start through save, reopen, and cloud refresh/);
+ assert.match(help,/updated board clears the hold before building its eligible pool/);
+ assert.match(help,/when the selected window ends, the task can rejoin scanning while its History entry stays/);
+ const current=fs.readFileSync(new URL('./index.html',import.meta.url),'utf8').match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1];
+ assert.ok(current,'the current Settings changelog template is present');
+ assert.match(current,/Expired Can’t and Worked holds now stay expired through save, reopen, and cloud refresh/);
+ assert.match(current,/original decision times and Worked History remain unchanged/);
+});
+
 test('RISK cloud current choices: compatible edits on the same task retain each changed property',async()=>{
  const at=Date.parse('2026-10-16T17:00:00.000Z');
  const initial=syncState({tasks:[Object.assign(syncTask('shared-edit','Original title'),{ctx:['ctx-work']}),

@@ -775,6 +775,10 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK cloud current choices: immediate preference controls retain their action times
 - RISK cloud current choices: Start scanning pass root and frozen draw survive a fresh client reopen
 - RISK cloud current choices: Can’t and Return are timed, causally linked disposition actions
+- RISK timed-hold coherence: native Can’t expires at the exact deadline through IndexedDB and ordinary cloud pull
+- RISK timed-hold coherence: native Worked honors hours and local 2 AM ceilings across reopen and cloud pull
+- RISK timed-hold coherence: use each board’s Worked settings and keep orphan evidence fail-closed
+- RISK timed-hold coherence: extended FAQ and current Settings changelog explain retained expiry time
 - RISK cloud current choices: compatible edits on the same task retain each changed property
 - RISK cloud current choices: original decision time wins conflicts in either publication order
 - RISK cloud current choices: causal projector retains compatible task fields and context membership
