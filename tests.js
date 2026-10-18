@@ -10784,13 +10784,13 @@ test('CLOUD ACCOUNT: a transaction binds its document before auth can switch', (
   assert.match(push,/auth\.currentUser\?\.uid\s*!==\s*pushUid/,'a late result from an earlier account cannot change current cloud status');
 });
 
-async function loadCloudBackend({ serverData={rev:4}, serverExists=true, failures={}, timeoutMs=25 }={}){
+async function loadCloudBackend({ serverData={rev:4}, serverExists=true, failures={}, timeoutMs=25, cryptoProvider=webcrypto }={}){
   const rootData=serverExists?{...serverData}:null;
-  const h=await loadCloudBackendV2({rootData,failures,timeoutMs});
+  const h=await loadCloudBackendV2({rootData,failures,timeoutMs,cryptoProvider});
   return {...h,getStored:()=>({exists:h.docs.has('users/owner'),data:h.docs.get('users/owner')})};
 }
 
-async function loadCloudBackendV2({rootData=null,batchFailureAt=Infinity,failures={},timeoutMs=25,recordSyncError}={}){
+async function loadCloudBackendV2({rootData=null,batchFailureAt=Infinity,failures={},timeoutMs=25,recordSyncError,cryptoProvider=webcrypto}={}){
  const moduleMatch=html.match(/<script type="module">([\s\S]*?)<\/script>/);assert.ok(moduleMatch);
  const moduleSource=moduleMatch[1].replace(/const \[appMod, A, F\] = await Promise\.all\(\[[\s\S]*?\]\);/,
   'const [appMod, A, F] = globalThis.__cloudModules;');
@@ -10838,7 +10838,7 @@ async function loadCloudBackendV2({rootData=null,batchFailureAt=Infinity,failure
  };
  window.recordSyncError=recordSyncError;
  const context=vm.createContext({window,CustomEvent:class{constructor(type,options){this.type=type;this.detail=options?.detail;}},__cloudModules:[{initializeApp:()=>({})},A,F],
-  console,crypto:webcrypto,TextEncoder,TextDecoder,structuredClone,setTimeout,clearTimeout});context.globalThis=context;
+  console,crypto:cryptoProvider,TextEncoder,TextDecoder,structuredClone,setTimeout,clearTimeout});context.globalThis=context;
  for(const file of ['device-store-v2.js','cloud-store-v2.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),context,{filename:file});
  window.ChainStorageV2=context.ChainStorageV2;window.ChainCloudV2=context.ChainCloudV2;
  await vm.runInContext(`(async()=>{${moduleSource}\n})()`,context,{filename:'index.html#cloud-v2-backend'});
@@ -10933,48 +10933,77 @@ test('RISK SCALABLE END TO END: a multi-megabyte local board reaches a v2 manife
  assert.doesNotMatch(badge.textContent,/error/i);assert.doesNotMatch(badge.title,/syncing|unsaved/i);
 });
 
-test('RISK CLOUD ADAPTER: malformed revisions fail closed before Firestore writes',async()=>{
+// These two conformance consumers control native crypto delivery, independently
+// retaining a real short-deadline negative control; default loader timing is unchanged.
+function cloudAdapterCryptoGate(){
+ const entered=deferredSyncFixture(),release=deferredSyncFixture(),trace=[],start=performance.now();let digests=0;
+ return {entered:entered.promise,release:release.resolve,trace,provider:{getRandomValues:webcrypto.getRandomValues.bind(webcrypto),randomUUID:webcrypto.randomUUID.bind(webcrypto),subtle:{async digest(...args){
+  trace.push({event:'digest-enter',elapsed:performance.now()-start,bytes:args[1].byteLength});
+  // The first payload hash precedes cloudDeadline; the snapshot hash is inside it.
+  if(++digests===2){entered.resolve();await release.promise;}
+  const result=await webcrypto.subtle.digest(...args);trace.push({event:'digest-delivered',elapsed:performance.now()-start});return result;
+ }}}};
+}
+async function releaseCloudAdapterCryptoAfterDeadline(app,gate,t){
+ await gate.entered;
+ const negativeGate=cloudAdapterCryptoGate(),negative=await loadCloudBackend({timeoutMs:25,cryptoProvider:negativeGate.provider});t.after(()=>{gate.release();negativeGate.release();});
+ const started=performance.now(),deadline=negative.CS.push('{}',1,4);await negativeGate.entered;
+ const expired=await deadline;
+ assert.equal(expired.error,true,'the independent real25ms deadline rejects a still-undelivered native digest');
+ assert.equal(negative.CS.errorStage,'push');assert.equal(negative.CS.errorCode,'deadline-exceeded');assert.equal(negative.writes.length,0);
+ assert.equal(negative.getStored().data.rev,4,'the timeout control never publishes its pending snapshot');
+ assert.equal(negativeGate.trace.filter(row=>row.event==='digest-delivered').length,1,'the timed operation is still awaiting the second native digest');
+ assert.equal(app.writes.length,0,'the original conformance source also remains unpublished while crypto is held');
+ assert.equal(gate.trace.filter(row=>row.event==='digest-delivered').length,1,'the original assertion cannot run on a delivered crypto operation yet');
+ const observation={deadlineMs:25,elapsed:performance.now()-started,negative:{stage:negative.CS.errorStage,code:negative.CS.errorCode,writes:negative.writes.length},original:{stage:app.CS.errorStage,code:app.CS.errorCode,writes:app.writes.length},originalTrace:[...gate.trace],negativeTrace:[...negativeGate.trace]};
+ t.diagnostic(JSON.stringify(observation));
+ negative.CS.suspend();negativeGate.release();gate.release();
+ return observation;
+}
+
+test('RISK CLOUD ADAPTER: malformed revisions fail closed before Firestore writes',async t=>{
   for(const baseRev of [undefined,'4',-1,1.5,Number.MAX_SAFE_INTEGER+1]){
-    const h=await loadCloudBackend();
+    const h=await loadCloudBackend({timeoutMs:5000});
     const reply=await h.CS.push('{}',Date.now(),baseRev);
     assert.equal(reply.error,true,`base revision ${String(baseRev)} must fail closed`);
     assert.equal(h.writes.length,0,'an invalid caller revision never reaches tx.set');
   }
   for(const rev of ['4',-1,1.5,Number.MAX_SAFE_INTEGER+1]){
-    const h=await loadCloudBackend({serverData:{rev}});
+    const h=await loadCloudBackend({timeoutMs:5000,serverData:{rev}});
     const reply=await h.CS.push('{}',Date.now(),4);
     assert.equal(reply.error,true,`stored revision ${String(rev)} must fail closed`);
     assert.equal(h.writes.length,0,'an invalid stored revision never reaches tx.set');
   }
-  const missing=await loadCloudBackend({serverExists:false});
+  const missing=await loadCloudBackend({timeoutMs:5000,serverExists:false});
   const staleCreate=await missing.CS.push('{}',Date.now(),4);
   assert.equal(staleCreate.conflict,true,'a caller that remembers a document cannot recreate a missing one blindly');
   assert.equal(missing.writes.length,0);
   assert.equal((await missing.CS.push('{}',Date.now(),0)).ok,true,'revision zero may create a genuinely absent document');
-  const valid=await loadCloudBackend();
-  const reply=await valid.CS.push('{}',Date.now(),4);
+  const gate=cloudAdapterCryptoGate(),valid=await loadCloudBackend({timeoutMs:5000,cryptoProvider:gate.provider});t.after(gate.release);
+  const delivery=releaseCloudAdapterCryptoAfterDeadline(valid,gate,t),reply=await valid.CS.push('{}',Date.now(),4);await delivery;
   assert.equal(reply.ok,true);assert.equal(reply.rev,5);assert.equal(reply.serverUpdatedAt,1234);
   assert.equal(valid.writes.length,1);
 });
 
-test('RISK CLOUD DIAGNOSTICS: safe failure stage and code survive backend and UI boundaries',async()=>{
-  const pullFailure=await loadCloudBackend({failures:{pull:Object.assign(Error('private payload detail'),{code:'permission-denied'})}});
+test('RISK CLOUD DIAGNOSTICS: safe failure stage and code survive backend and UI boundaries',async t=>{
+  const pullFailure=await loadCloudBackend({timeoutMs:5000,failures:{pull:Object.assign(Error('private payload detail'),{code:'permission-denied'})}});
   assert.equal((await pullFailure.CS.pull()).error,true);
   assert.equal(pullFailure.CS.errorStage,'pull');
   assert.equal(pullFailure.CS.errorCode,'permission-denied');
   assert.doesNotMatch(JSON.stringify(pullFailure.CS),/private payload detail/);
 
-  const pushFailure=await loadCloudBackend({failures:{push:Object.assign(Error('private write detail'),{code:'unavailable'})}});
-  assert.equal((await pushFailure.CS.push('{}',Date.now(),4)).error,true);
+  const gate=cloudAdapterCryptoGate(),pushFailure=await loadCloudBackend({timeoutMs:5000,cryptoProvider:gate.provider,failures:{push:Object.assign(Error('private write detail'),{code:'unavailable'})}});t.after(gate.release);
+  const delivery=releaseCloudAdapterCryptoAfterDeadline(pushFailure,gate,t);
+  assert.equal((await pushFailure.CS.push('{}',Date.now(),4)).error,true);await delivery;
   assert.equal(pushFailure.CS.errorStage,'push');
   assert.equal(pushFailure.CS.errorCode,'unavailable');
 
-  const signInFailure=await loadCloudBackend({failures:{signIn:Object.assign(Error('popup detail'),{code:'auth/popup-blocked'})}});
+  const signInFailure=await loadCloudBackend({timeoutMs:5000,failures:{signIn:Object.assign(Error('popup detail'),{code:'auth/popup-blocked'})}});
   await signInFailure.CS.signIn();
   assert.equal(signInFailure.CS.errorStage,'sign-in');
   assert.equal(signInFailure.CS.errorCode,'auth/popup-blocked');
 
-  const persistenceFailure=await loadCloudBackend({failures:{persistence:Object.assign(Error('storage detail'),{code:'auth/web-storage-unsupported'})}});
+  const persistenceFailure=await loadCloudBackend({timeoutMs:5000,failures:{persistence:Object.assign(Error('storage detail'),{code:'auth/web-storage-unsupported'})}});
   assert.equal(persistenceFailure.CS.configured,true,'an auth-storage failure must not hide configured cloud recovery');
   assert.equal(typeof persistenceFailure.CS.signIn,'function');
 
@@ -32527,4 +32556,11 @@ test('RISK completion delivery fixtures: controlled startup pending and acknowle
  const child=spawnSync(process.execPath,['--test','--test-name-pattern='+pattern,'tests.js'],{cwd:__dirname,env,encoding:'utf8',timeout:30000}),output=child.stdout+child.stderr;
  assert.equal(child.status,0,'all five real controlled-delivery consumers complete: '+output);
  assert.match(output,/# tests 5\b/);assert.match(output,/# fail 0\b/);assert.match(output,/# skipped 0\b/);
+});
+
+test('RISK CLOUD CONFORMANCE: controlled crypto delivery executes original adapter and diagnostic assertions while true deadlines remain bounded',()=>{
+ const pattern='^RISK CLOUD ADAPTER: malformed revisions|^RISK CLOUD DIAGNOSTICS: safe failure',env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const child=spawnSync(process.execPath,['--test','--test-name-pattern='+pattern,'tests.js'],{cwd:__dirname,env,encoding:'utf8',timeout:30000}),output=child.stdout+child.stderr;
+ assert.equal(child.status,0,'both original real-backend consumers complete after controlled native crypto delivery: '+output);
+ assert.match(output,/# tests 2\b/);assert.match(output,/# fail 0\b/);assert.match(output,/# skipped 0\b/);
 });

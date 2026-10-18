@@ -86,6 +86,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK CLOUD PAYLOAD: duplicated legacy Undo and backup Restore sources converge without losing their distinct facts
 - RISK CLOUD ADAPTER: malformed revisions fail closed before Firestore writes
 - RISK CLOUD DIAGNOSTICS: safe failure stage and code survive backend and UI boundaries
+- RISK CLOUD CONFORMANCE: controlled crypto delivery executes original adapter and diagnostic assertions while true deadlines remain bounded
 - RISK CLOUD RECOVERY: a durable ordinary save retries and clears its stale cloud error without reload
 - RISK CLOUD RECOVERY: Undo retries a failed write, while a failed retry and an account change stay errors
 - RISK CLOUD STARTUP: a repaired divergent browser pair resumes the initial cloud read without tapping the badge
