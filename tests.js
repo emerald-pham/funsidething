@@ -27585,6 +27585,47 @@ test('RISK completion convergence: failed saves backup failures account changes 
 });
 
 
+test('RISK completion convergence: late editor and scanner gesture release resume the queued verified recovery wakeup',{timeout:25000},async t=>{
+ const {IDBFactory}=await import('fake-indexeddb');
+ for(const interaction of ['editor','gesture'])await t.test(interaction,{timeout:12000},async t=>{
+  const initial=syncState({tasks:[syncTask('late-base','Saved task')],syncRev:4,syncAccount:'e@example.com',syncDirty:false,seenQuickStart:true}),remote=structuredClone(initial);
+  for(const key of ['syncRev','syncAccount','syncDirty'])delete remote[key];
+  const h=makeSyncHarness({remote,rev:4,delayMs:1}),raw=JSON.stringify(initial),app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},indexedDBProvider:new IDBFactory(),deviceDbName:'late-native-recovery-'+interaction+'-'+Math.random(),cloudSyncFactory:h.factory}),{ctx,shim}=app,backend=shim.window.CloudSync,store=shim.window.ScannerDeviceStore,
+   saves=observeQueuedNativeSaves(ctx,t),commit=store.commitHead.bind(store),put=store.putBackup.bind(store),entered=deferredSyncFixture(),release=deferredSyncFixture(),queued=deferredSyncFixture(),fired=deferredSyncFixture(),watchdog=setTimeout(()=>{},12000);
+  let held=false,conflicts=0,callbacks=0;
+  const guard=()=>JSON.parse(vm.runInContext('JSON.stringify({editor:hasActiveEditor(),gesture:scannerGestureActive,deferred:deferredCloudPull,ready:!!pendingDeviceCloudBackup?.ready,pulling,cloudPushInFlight,pendingCloudRevision})',ctx));
+  t.after(async()=>{release.resolve();clearTimeout(watchdog);ctx.suspendCloudSync();vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearTimeout(liveCloudTimer);clearCloudRetry()',ctx);await store.close();});
+  await ctx.cloudPull();assert.equal(await ctx.persist(),true);await saves.settle('late-interaction fixture startup');backend.ready=false;
+  shim.document.getElementById('addInput').value='Accepted task through late '+interaction;ctx.onAction('add',shim.document.getElementById('addButton'));await saves.settle('native task setup before late interaction');
+  const acceptedId=ctx.state.tasks.find(task=>task.title==='Accepted task through late '+interaction).id;
+  store.commitHead=async options=>{const result=await commit(options);if(saves.active()&&!held&&result?.ok){held=true;entered.resolve();await release.promise;}return result;};
+  store.putBackup=async options=>{const result=await put(options);if(result?.conflict)conflicts++;return result;};
+  // Graybox scheduler observation selects this existing native0ms callback,
+  // delegating it exactly once. The await-queued continuation activates the
+  // interaction before the real timer fires; no callback or flag is injected.
+  const schedule=ctx.setTimeout;ctx.setTimeout=(fn,ms,...args)=>{
+   if(ms!==0||!String(fn).includes('pendingDeviceCloudBackup!==pending'))return schedule(fn,ms,...args);
+   const timer=schedule((...values)=>{callbacks++;assert.equal(guard()[interaction],true,'the actual queued callback observes a newly active interaction');const result=fn(...values);fired.resolve();return result;},ms,...args);
+   queued.resolve();return timer;
+  };
+  ctx.onAction('cycle-theme',{});await entered.promise;backend.ready=true;h.writeBehindBack(remote);await ctx.cloudPull();assert.equal(conflicts,1,'the required recovery copy receives an actual prior expected-head conflict');
+  assert.equal(guard().deferred,false);assert.equal(guard().pendingCloudRevision,null);
+  release.resolve();await queued.promise;
+  assert.deepEqual(guard(),{editor:false,gesture:false,deferred:false,ready:true,pulling:false,cloudPushInFlight:false,pendingCloudRevision:null},'actual successful local persistence queues a proven wakeup before any interaction');
+  if(interaction==='editor')shim.document.activeElement={matches:selector=>selector.includes('input')};
+  else shim.document.dispatchEvent({type:'pointerdown',target:shim.document.getElementById('scan')});
+  await fired.promise;await saves.settle('native persistence after late interaction');
+  assert.equal(h.remoteState().tasks.some(task=>task.id===acceptedId),false,'the late active interaction still prevents cloud adoption/publication');
+  assert.equal(guard().deferred,true,'the late callback records the established natural-release marker');
+  if(interaction==='editor'){shim.document.activeElement=null;shim.document.dispatchEvent({type:'focusout'});}
+  else shim.document.dispatchEvent({type:'pointercancel',target:shim.document.getElementById('scan')});
+  await settleSavedViewPublication(app,h,'natural late '+interaction+' release and verified recovery acknowledgement');
+  assert.ok(h.remoteState().tasks.some(task=>task.id===acceptedId),'natural release alone publishes the retained native task without an extra save push pull or focus');
+  assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state),'the exact accepted state has its actual device head acknowledgement');
+  assert.equal(callbacks,1,'the one queued proven wakeup is observed exactly once');
+ });
+});
+
 test('RISK completion lifecycle recovery: expired rest cannot restore 2→1 or 13→4 saved chains',async t=>{
  const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),at=Date.parse('2026-10-17T15:00:00Z');
  const fixtures=[],closed=new WeakSet(),persistNow=app=>app.ctx.persist(),closeFixture=async app=>{if(!app||closed.has(app))return;closed.add(app);try{app.ctx.window.CloudSync&&(app.ctx.window.CloudSync.user=null);app.ctx.suspendCloudSync?.();vm.runInContext('clearTimeout(saveTimer);saveTimer=null;clearTimeout(cloudTimer);cloudTimer=null;clearCloudRetry();',app.ctx);}catch{}try{await app.ctx.window.ScannerDeviceStore?.close?.();}catch{}};

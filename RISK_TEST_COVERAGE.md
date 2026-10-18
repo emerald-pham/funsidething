@@ -564,6 +564,7 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK completion boundaries: a live editor and pressed scanner control defer stale adoption while the saved view and fields survive cold reopen
 - RISK completion convergence: native Done theme and editor Save finish after a conflicted recovery copy without an added trigger
 - RISK completion convergence: failed saves backup failures account changes suspension and drafts guard recovery wakeups
+- RISK completion convergence: late editor and scanner gesture release resume the queued verified recovery wakeup
 - RISK completion lifecycle recovery: expired rest cannot restore 2→1 or 13→4 saved chains
 - RISK completion lifecycle Start: an explicit new pass bootstraps an eligible task after rest without a synthetic Dot
 - RISK completion lifecycle Start: an observed new-pass root survives peer merge and IndexedDB reopen
