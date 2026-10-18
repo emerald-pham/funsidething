@@ -1533,3 +1533,20 @@ The candidate worker precaches while predecessor clients remain on their existin
 
 - RISK device save warning browser: actual held Add keeps every text line on contrasting toast paint and preserves short notices
 - RISK device save warning guidance: mounted help explains readable wrapped notices and recoverable device-save details
+
+## Held appearance decision recovery
+
+- RISK held decision recovery: deliberate keep saved dark preserves exact sources and publishes a fresh choice
+- RISK held decision recovery: unreadable browser evidence and failed verified copies stop before changing the board
+- RISK held decision recovery: recorded light minimized empty-cloud and cloud-held sources require deliberate choices
+- RISK held decision recovery: native peer edits independent comparisons ratings and History survive the appearance choice
+- RISK held decision recovery: changed preview account local cloud and pending sources invalidate consent
+- RISK held decision recovery: a real conditional publication conflict preserves the peer and requires a fresh choice
+- RISK held decision recovery: unavailable reads local commit abort and failed uploads remain honest and retryable
+- RISK held decision recovery: unknown authority nonappearance incoherence and corrupt cloud stay held with safe diagnostics
+- RISK held decision recovery: cold reopen protects a pending choice from ordinary sync deletion and rotation
+- RISK held decision recovery: help and visible recovery explain deliberate appearance choices and protected limits
+- RISK held decision recovery: closing review during backup I O cancels consent before application
+- RISK held decision recovery: browser fallback verifies source backups and records an exact cloud acknowledgement
+- RISK held decision recovery: diagnostics identify only app origin fingerprint and safe source category
+- RISK held decision recovery: evidence and pending-choice archives cannot be restored as empty boards
