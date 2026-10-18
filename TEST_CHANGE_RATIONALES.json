@@ -11073,5 +11073,61 @@
       "failure": "Evidence attribution discrepancy only: verified final original-dd approval at23:22:53.839Z contradicts the copied current-denial statement. This is documentation correction, not a new product/test RED."
     },
     "validationScope": "No test source or executable behavior changes; c28 incremental and original-bd84 gates plus focused preflight validate the evidence-only diff."
+  },
+  {
+    "comparison": "completion168ToastReadabilityDc8Incremental",
+    "baseCommit": "dc8ba56ce96b4eccff6896e7b75c4b550db2bdeb",
+    "testChangesSha256": "316c160448bc6dfabccf312c598e8a0c727d5d7567ce4deef66e4e65dc34b7d8",
+    "reason": "Independent actual-native FAQ review found first and last lines of the real ambiguous-legacy-completion save warning outside its contrasting rounded paint. Add permanent native consumer coverage before minimally bounding long-toast corners; reuse the exact immutable released app producer without weakening its existing assertions.",
+    "previousBehavior": "At390px, a native Add on the genuine released expired Start source triggers the unchanged production warning with99px corners. Native ranges demonstrate18 ordinary and8 enlarged first/last glyph interiors outside the solid contrasting background, despite rectangular visibility checks passing.",
+    "intendedBehavior": "A line-height-aware radius capped at32px leaves the actual two-line short notice capsule exactly unchanged while keeping every first/last-line glyph interior of the real long warning on contrasting paint in light/dark ordinary and1.5 text. Warning text, timers, save authority, source copies, drafts and learning remain unchanged. A65-word extended FAQ and current October17 changelog explain readable warnings and actual device-save details. This is a current CSS/copy/app/cache fingerprint change, not a test-only or unchanged-runtime slice.",
+    "replacementTests": [
+      "RISK device save warning browser: actual held Add keeps every text line on contrasting toast paint and preserves short notices",
+      "RISK device save warning guidance: mounted help explains readable wrapped notices and recoverable device-save details"
+    ],
+    "updatedTests": [
+      "RISK legacy completion released Start: normally acknowledged expired return is preserved or explicitly held before rewrite"
+    ],
+    "preservedCoverage": [
+      "Every existing passing assertion remains; extracting the actual immutable-bd84 expiry/Start producer into a shared fixture moves its unchanged consumer actions and assertions, and retains its existing test body. No hand-written unsupported legacy action is substituted.",
+      "Native Add preserves both literal local authoritative source strings, exact-source recovery backup, original task fields/ratings/history/decision facts and the newer Add. Expected null-device-store fallback remains held with cloud disabled; no authority, chronology or learning is fabricated.",
+      "The real Settings manual-backup notice supplies the before/after short geometry and paint control. Fresh isolated profiles, strict font allowlist, actual platform fonts/applied theme/root-body-toast paint, no page/local errors, clear native issue details and Diagnostics neighbors remain checked; toast expires naturally.",
+      "All prior completion, source-copy refusal/key races, unknown-format safe hold, modern/inherited lifecycle, Undo and deliberate replacement contracts remain. The genuine old expiry Start is still an exact-source/rev6 HOLD; ordinary already-offchain completion still checkpoints and exact-ACKs. Exact dd4300a P0 ancestry/session-used update guards and natural SW activation remain intact."
+    ],
+    "redEvidence": {
+      "command": "Pinned Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"RISK device save warning browser:\" tests.js with LANDSCAPE_BROWSER_URL=http://127.0.0.1:16802/, authorized Chrome/font module and isolated profiles; source runtime still exact dc8.",
+      "failure": "Native actual consumer RED runs/2026-10-18T00-11-06-330Z-365bb768-7bf0-421d-b0f5-580f98102ac1.json: all4 theme/scale subcases fail every-first/last-line solid-background assertion (18/8 outside). Initial center-based genuine RED8ac3c7f6 also retained; setup-only marker/config attempts a690aaa2/bbe5c352 are explicitly not product RED. Mounted guidance RED4374472f precedes copy edits."
+    },
+    "greenEvidence": "toast-readability-repair/runs/2026-10-18T00-14-33-158Z-3aa6fb2f-519a-478d-bba2-86655e84b8eb.json:5/5 actual native cases pass,0skip; all12 PNGs inspected before closing own contexts. fd81bf43:138/138 affected unpackaged functional cases pass. Final packaged records are bound separately in toast-readability-repair/implementation.md. Earlier native attempts801ea7df/26461ea7 failed newly added fixture details readiness/font-selection assumptions; all remain retained, not product failures. c6e126ba had only the expected prepackaging cache hash failure.",
+    "packagedGreenEvidence": "Final source bytes after hash-last packaging and added local-request-failure monitoring: runs/2026-10-18T00-17-23-159Z-8873eb35-a8c1-4353-b9ff-0fbbea75dc34.json native5/5 pass0skip; runs/2026-10-18T00-17-23-159Z-00340721-7905-4f8e-99a5-628b7f1494e9.json affected functional139/139 pass0skip, including the exact app-shell cache contract. App fingerprint e6f87e8ae2068bab2b8d68787be4ec83ec5adda2e6a5acf263e46f9e6e230a9f; shell97a86e2e008a5ee41bf78402b5d3709f2b17c49bafd0e15654694c73ac9e1a96.",
+    "validationScope": "Worker focused consumer/functional/preflight plus final app/SW packaging only. Prior dc8 full2151/2104/0fail/47skip, rules10 and compatibility15 are predecessor evidence; they are not final gates for this source-changing candidate. Parent owns renewed exact-commit complete gates, independent FAQ/typography and release. Original-dd changed-copy audit is closed/approved (d87c233e report at /tmp/chain-reload-p0-evidence/typography-dd4300a-final.md); its earlier denial is historical, and it does not approve this new combined candidate."
+  },
+  {
+    "comparison": "completion168ToastReadabilityOriginalBaseAggregate",
+    "baseCommit": "bd84e5c0ccc7c6ebe065f42f18df34d89eeab14e",
+    "testChangesSha256": "37a4b8b26a2d0e4ea42d75e89930d4df434417a5568bb9e472eb039536aa9a20",
+    "reason": "Aggregate original-bd84 rationale for the full completion precedence checkpoint, the integrated predecessor-safe update change, prior consumer-boundary repairs, and the newly confirmed long device-save warning readability repair. Earlier rationale objects and records remain verbatim historical slices.",
+    "previousBehavior": "The original release had no completion-observation journal or imported checkpoint fence; subsequent checkpoint implementation and repairs are fully recorded in preceding immutable rationale objects. The dc8 predecessor passed its unit/rules/compatibility gates but its long native warning still painted white glyphs outside the dark capsule.",
+    "intendedBehavior": "A line-height-aware radius capped at32px leaves the actual two-line short notice capsule exactly unchanged while keeping every first/last-line glyph interior of the real long warning on contrasting paint in light/dark ordinary and1.5 text. Warning text, timers, save authority, source copies, drafts and learning remain unchanged. A65-word extended FAQ and current October17 changelog explain readable warnings and actual device-save details. This is a current CSS/copy/app/cache fingerprint change, not a test-only or unchanged-runtime slice.",
+    "replacementTests": [
+      "RISK device save warning browser: actual held Add keeps every text line on contrasting toast paint and preserves short notices",
+      "RISK device save warning guidance: mounted help explains readable wrapped notices and recoverable device-save details"
+    ],
+    "updatedTests": [
+      "RISK legacy completion released Start: normally acknowledged expired return is preserved or explicitly held before rewrite"
+    ],
+    "preservedCoverage": [
+      "Every existing passing assertion remains; extracting the actual immutable-bd84 expiry/Start producer into a shared fixture moves its unchanged consumer actions and assertions, and retains its existing test body. No hand-written unsupported legacy action is substituted.",
+      "Native Add preserves both literal local authoritative source strings, exact-source recovery backup, original task fields/ratings/history/decision facts and the newer Add. Expected null-device-store fallback remains held with cloud disabled; no authority, chronology or learning is fabricated.",
+      "The real Settings manual-backup notice supplies the before/after short geometry and paint control. Fresh isolated profiles, strict font allowlist, actual platform fonts/applied theme/root-body-toast paint, no page/local errors, clear native issue details and Diagnostics neighbors remain checked; toast expires naturally.",
+      "All prior completion, source-copy refusal/key races, unknown-format safe hold, modern/inherited lifecycle, Undo and deliberate replacement contracts remain. The genuine old expiry Start is still an exact-source/rev6 HOLD; ordinary already-offchain completion still checkpoints and exact-ACKs. Exact dd4300a P0 ancestry/session-used update guards and natural SW activation remain intact."
+    ],
+    "redEvidence": {
+      "command": "Pinned Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"RISK device save warning browser:\" tests.js with LANDSCAPE_BROWSER_URL=http://127.0.0.1:16802/, authorized Chrome/font module and isolated profiles; source runtime still exact dc8.",
+      "failure": "Native actual consumer RED runs/2026-10-18T00-11-06-330Z-365bb768-7bf0-421d-b0f5-580f98102ac1.json: all4 theme/scale subcases fail every-first/last-line solid-background assertion (18/8 outside). Initial center-based genuine RED8ac3c7f6 also retained; setup-only marker/config attempts a690aaa2/bbe5c352 are explicitly not product RED. Mounted guidance RED4374472f precedes copy edits."
+    },
+    "greenEvidence": "toast-readability-repair/runs/2026-10-18T00-14-33-158Z-3aa6fb2f-519a-478d-bba2-86655e84b8eb.json:5/5 actual native cases pass,0skip; all12 PNGs inspected before closing own contexts. fd81bf43:138/138 affected unpackaged functional cases pass. Final packaged records are bound separately in toast-readability-repair/implementation.md. Earlier native attempts801ea7df/26461ea7 failed newly added fixture details readiness/font-selection assumptions; all remain retained, not product failures. c6e126ba had only the expected prepackaging cache hash failure.",
+    "packagedGreenEvidence": "Final source bytes after hash-last packaging and added local-request-failure monitoring: runs/2026-10-18T00-17-23-159Z-8873eb35-a8c1-4353-b9ff-0fbbea75dc34.json native5/5 pass0skip; runs/2026-10-18T00-17-23-159Z-00340721-7905-4f8e-99a5-628b7f1494e9.json affected functional139/139 pass0skip, including the exact app-shell cache contract. App fingerprint e6f87e8ae2068bab2b8d68787be4ec83ec5adda2e6a5acf263e46f9e6e230a9f; shell97a86e2e008a5ee41bf78402b5d3709f2b17c49bafd0e15654694c73ac9e1a96.",
+    "validationScope": "Worker focused consumer/functional/preflight plus final app/SW packaging only. Prior dc8 full2151/2104/0fail/47skip, rules10 and compatibility15 are predecessor evidence; they are not final gates for this source-changing candidate. Parent owns renewed exact-commit complete gates, independent FAQ/typography and release. Original-dd changed-copy audit is closed/approved (d87c233e report at /tmp/chain-reload-p0-evidence/typography-dd4300a-final.md); its earlier denial is historical, and it does not approve this new combined candidate."
   }
 ]

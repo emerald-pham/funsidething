@@ -244,7 +244,7 @@ test('RISK legacy completion released shell: actual stale write conflicts then h
  await old.ctx.onAction('sync-retry',{});await syncSettle(25);assert.equal(h.doc.payload,exact);assert.equal(old.ctx.state.syncDirty,true);
 });
 
-test('RISK legacy completion released Start: normally acknowledged expired return is preserved or explicitly held before rewrite',async t=>{
+async function releasedExpiryStartSource173(t){
  const released=spawnSync('git',['show',LEGACY_COMPLETION_RELEASE+':index.html'],{cwd:__dirname,encoding:'utf8'});assert.equal(released.status,0,released.stderr);
  const publish=async(app,h,label)=>{assert.equal(await app.ctx.persist(),true);await app.ctx.cloudPushNow();await settleSavedViewPublication(app,h,label);};
  const at=Date.parse('2026-10-17T15:00:00Z'),initial=syncState({tasks:[
@@ -263,6 +263,10 @@ test('RISK legacy completion released Start: normally acknowledged expired retur
  hydrateUnchangedEditorDraft(old,'expiry-peer');old.shim.document.getElementById('etTitle').value='Actual later released peer title';old.ctx.onAction('save-edit',{dataset:{id:'expiry-peer'}});
  old.ctx.window.CloudSync.ready=true;await publish(old,h,'expiry-released-informed-start-title');
  const exactOldCloud=h.doc.payload,exactOldRev=h.doc.rev,exactOldDevice=old.shim.localStorage.getItem(SYNC_STORE_KEY);assert.deepEqual(JSON.parse(exactOldCloud).chain,['expiry-recurring']);assert.equal(exactOldRev,6);assert.equal(old.ctx.decisionProjectionIssue(old.ctx.state),null);await closeLegacyApp173(old);
+ return {at,h,beforeDoneRaw,afterDoneRaw,exactOldDevice,exactOldCloud,exactOldRev};
+}
+test('RISK legacy completion released Start: normally acknowledged expired return is preserved or explicitly held before rewrite',async t=>{
+ const {at,h,beforeDoneRaw,afterDoneRaw,exactOldDevice,exactOldCloud,exactOldRev}=await releasedExpiryStartSource173(t);
  const candidate=await loadAppAtTime(at+2*3600000+1,{seedStorage:{[SYNC_STORE_KEY]:beforeDoneRaw,[LOCAL_HEAD_KEY]:beforeDoneRaw},cloudSyncFactory:()=>{const CS=h.factory();CS.ready=false;return CS;}});t.after(()=>closeLegacyApp173(candidate));
  const before=candidate.shim.localStorage.getItem(SYNC_STORE_KEY),facts=JSON.stringify(candidate.ctx.state.decisionEvents),ratings=JSON.stringify(candidate.ctx.state.tasks.map(row=>[row.id,row.mu,row.sigma]));
  candidate.ctx.window.CloudSync.ready=true;await candidate.ctx.cloudPull();await candidate.ctx.cloudPushNow();
@@ -32353,4 +32357,85 @@ test('RISK repository process: preflight catches outgoing upstream rationale gap
  assert.equal((output.match(/^✔ Landscape location:/gm)||[]).length,1);assert.equal((output.match(/^✔ RISK Quick start content:/gm)||[]).length,1);
  assert.equal((output.match(/Test-first diff gate passed\./g)||[]).length,1,'selected-base rationale runs once before upstream rejects');
  assert.deepEqual({refs:git('show-ref'),head:git('rev-parse','HEAD'),status:git('status','--porcelain','--untracked-files=no'),config:git('config','--local','--list')},before,'preflight preserves local refs, HEAD, tracked files and configuration');
+});
+
+test('RISK device save warning browser: actual held Add keeps every text line on contrasting toast paint and preserves short notices',
+ {skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {exactOldDevice}=await releasedExpiryStartSource173(t),original=JSON.parse(exactOldDevice);
+ const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT),{tmpdir}=await import('node:os');
+ const profiles=fs.mkdtempSync(path.join(tmpdir(),'scanner-toast-regression-'));
+ const {resolveExpectedFirstRunHelp}=await import('./scripts/browser-fixture-setup.mjs');
+ const origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin,fontsUrl=html.match(/href="(https:\/\/fonts.googleapis.com\/css2[^\"]+)"/)[1];
+ const evidence=process.env.TOAST_EVIDENCE_DIR;if(evidence)fs.mkdirSync(evidence,{recursive:true});
+ const poll=async(page,fn,arg,label)=>{const end=Date.now()+15000;while(Date.now()<end){if(await page.evaluate(fn,arg))return;await new Promise(r=>setTimeout(r,30));}assert.fail('Native readiness: '+label);};
+ // Measure actual text ranges against the normalized rounded paint boundary, rather
+ // than accepting a rectangle that can contain white glyphs outside its dark corners.
+ const measure=async page=>page.evaluate(()=>{
+  const el=document.getElementById('toast'),r=el.getBoundingClientRect(),s=getComputedStyle(el),chars=[];
+  const walker=document.createTreeWalker(el,NodeFilter.SHOW_TEXT);let n;
+  while(n=walker.nextNode())for(let i=0;i<n.length;i++){if(!n.textContent[i].trim())continue;const range=document.createRange();range.setStart(n,i);range.setEnd(n,i+1);const b=range.getBoundingClientRect();chars.push({text:n.textContent[i],x:b.x,y:b.y,w:b.width,h:b.height});}
+  const radius=Math.min(parseFloat(s.borderTopLeftRadius),r.width/2,r.height/2);
+  const inside=(x,y)=>{const cx=Math.max(r.left+radius,Math.min(x,r.right-radius)),cy=Math.max(r.top+radius,Math.min(y,r.bottom-radius));return (x-cx)**2+(y-cy)**2<=radius**2;};
+  const ys=[...new Set(chars.map(c=>c.y))],edgeChars=chars.filter(c=>c.y===ys[0]||c.y===ys.at(-1));
+  const outside=edgeChars.filter(c=>[c.x+Math.min(1,c.w/2),c.x+c.w-Math.min(1,c.w/2)].some(x=>[c.y+2,c.y+c.h-2].some(y=>!inside(x,y))));
+  return {text:el.textContent,rect:{x:r.x,y:r.y,w:r.width,h:r.height},radius,lineCount:ys.length,edgeChars,outside,
+   style:{font:s.fontFamily,fontSize:s.fontSize,lineHeight:s.lineHeight,color:s.color,background:s.backgroundColor,padding:s.padding},
+   theme:{attribute:document.documentElement.dataset.theme??null,dark:matchMedia('(prefers-color-scheme: dark)').matches,scheme:getComputedStyle(document.documentElement).colorScheme,root:getComputedStyle(document.documentElement).backgroundColor,body:getComputedStyle(document.body).backgroundColor,bodyInk:getComputedStyle(document.body).color},
+   viewport:{w:innerWidth,h:innerHeight},clip:el.scrollWidth>el.clientWidth||r.left<0||r.right>innerWidth||r.top<0||r.bottom>innerHeight};
+ });
+ try{for(const theme of ['light','dark'])for(const scale of [1,1.5])await t.test(theme+' '+scale,async()=>{
+  const context=await chromium.launchPersistentContext(path.join(profiles,theme+'-'+scale),{headless:true,channel:'chrome',viewport:{width:390,height:844},colorScheme:theme,serviceWorkers:'block'}),errors=[],localErrors=[];let page;
+  try{
+   await context.addInitScript(raw=>{Object.defineProperty(window,'FIREBASE_CONFIG',{configurable:false,writable:false,value:null});localStorage.setItem('fvp:chain-scanner:v1',raw);localStorage.setItem('fvp:chain-scanner:protected:v1',raw);localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced');},exactOldDevice);
+   await context.route('**/*',route=>{const req=route.request(),u=new URL(req.url());return u.origin===origin||req.url()===fontsUrl||(u.origin==='https://fonts.gstatic.com'&&u.pathname.startsWith('/s/')&&u.pathname.endsWith('.woff2')&&req.resourceType()==='font')?route.continue():route.abort();});
+   page=await context.newPage();page.on('pageerror',e=>errors.push(String(e)));page.on('response',r=>{if(new URL(r.url()).origin===origin&&r.status()>=400)localErrors.push([r.url(),r.status()]);});page.on('requestfailed',r=>{if(new URL(r.url()).origin===origin)localErrors.push([r.url(),r.failure()?.errorText]);});
+   const response=await page.goto(process.env.LANDSCAPE_BROWSER_URL);assert.equal(await response.text(),html,'native consumer serves this exact candidate shell');
+   await poll(page,()=>document.documentElement.dataset.appReady==='true'&&typeof state==='object',null,'app ready');
+   const motion=page.locator('#motionDialog [data-landscape-motion="reduced"]');if(await motion.isVisible())await motion.click();
+   await resolveExpectedFirstRunHelp(page);await page.evaluate(()=>document.fonts.ready);
+   // Ordinary short reference uses a real Settings action, not an injected toast.
+   await page.locator('[data-act="settings"]').click();const backups=page.locator('[data-act="make-manual-backup"]');for(const panel of await page.locator('#modalRoot details').filter({has:backups}).all())if(await panel.getAttribute('open')===null)await panel.locator(':scope > summary').click();await backups.click();
+   await poll(page,()=>document.querySelector('#toast.show')?.textContent==='Manual backup saved on this device.',null,'manual backup notice');
+   const short=await measure(page);if(evidence)await page.screenshot({path:path.join(evidence,theme+'-'+scale+'-short.png')});assert.equal(short.lineCount,2);assert.equal(short.radius,short.rect.h/2,'ordinary short notice retains its accepted capsule');assert.equal(short.clip,false);
+   await page.locator('#modalRoot [data-act="close-modal"][aria-label="Close"]').click();
+   await poll(page,()=>!document.querySelector('#toast.show'),null,'natural short notice expiry');
+   const before=await page.evaluate(()=>({raw:localStorage.getItem('fvp:chain-scanner:v1'),head:localStorage.getItem('fvp:chain-scanner:protected:v1'),tasks:state.tasks.map(x=>({...x})),chain:[...state.chain],facts:state.decisionEvents,workLog:state.workLog,history:state.history}));
+   assert.equal(before.raw,exactOldDevice);assert.equal(before.head,exactOldDevice);
+   const title='Native held warning '+theme+' '+scale;await page.locator('#addInput').fill(title);await page.locator('#addButton').click();
+   await poll(page,()=>document.querySelector('#toast.show')?.textContent.includes('device-save:completion-upgrade/ambiguous-legacy-completion'),null,'actual failed-save warning');
+   if(scale===1.5)await page.addStyleTag({content:'#toast{font-size:20.25px!important}'});
+   const warning=await measure(page),after=await page.evaluate(()=>({raw:localStorage.getItem('fvp:chain-scanner:v1'),head:localStorage.getItem('fvp:chain-scanner:protected:v1'),tasks:state.tasks.map(x=>({...x})),chain:[...state.chain],facts:state.decisionEvents,workLog:state.workLog,history:state.history,backups:readLocalBackups(),backend:window.ScannerDeviceStore===null,configured:window.CloudSync?.configured??false,user:window.CloudSync?.user??null}));
+   assert.equal(after.raw,exactOldDevice);assert.equal(after.head,exactOldDevice);assert.equal(after.backend,true);assert.equal(after.configured,false);assert.equal(after.user,null);
+   assert.deepEqual(after.tasks.filter(x=>original.tasks.some(o=>o.id===x.id)),before.tasks);assert.deepEqual(after.chain,before.chain);assert.deepEqual(after.facts,before.facts);assert.deepEqual(after.workLog,before.workLog);assert.deepEqual(after.history,before.history);assert.ok(after.tasks.some(x=>x.title===title));
+   assert.ok(after.backups.some(x=>x.payload===exactOldDevice),'exact source has a verified recovery copy');
+   assert.equal(warning.theme.dark,theme==='dark');assert.match(warning.theme.scheme,/light dark/);assert.equal(warning.theme.root,theme==='dark'?'rgb(36, 61, 84)':'rgb(247, 252, 248)');assert.equal(warning.theme.body,'rgba(0, 0, 0, 0)');assert.equal(warning.theme.bodyInk,theme==='dark'?'rgb(241, 250, 251)':'rgb(40, 77, 78)');assert.equal(warning.style.background,theme==='dark'?'rgb(51, 58, 74)':'rgb(36, 42, 58)');assert.equal(warning.style.color,theme==='dark'?'rgb(230, 232, 240)':'rgb(255, 255, 255)');assert.equal(warning.clip,false);
+   assert.equal(warning.text,"Couldn't save this edit on this device (device-save:completion-upgrade/ambiguous-legacy-completion). This older board has a saved Start and completion whose order cannot be proved. Its exact source stays protected; keep this tab open while sync waits for compatible recovery.");
+   const session=await context.newCDPSession(page);await session.send('DOM.enable');await session.send('CSS.enable');const platformFonts=async selector=>{const {root}=await session.send('DOM.getDocument');const {nodeId}=await session.send('DOM.querySelector',{nodeId:root.nodeId,selector});const fonts=(await session.send('CSS.getPlatformFontsForNode',{nodeId})).fonts;assert.ok(fonts.some(f=>f.isCustomFont&&/SplineSans/i.test(f.postScriptName)&&f.glyphCount>0),selector+' uses actual loaded Spline Sans');return fonts;};const fonts={};for(const selector of ['#toast','#addInput','#addButton'])fonts[selector]=await platformFonts(selector);
+   const row={theme,scale,short,warning,fonts,sourceUnchanged:true,holdAndNewAddPreserved:true,errors,localErrors};
+   if(evidence){fs.writeFileSync(path.join(evidence,theme+'-'+scale+'.json'),JSON.stringify(row,null,2));await page.screenshot({path:path.join(evidence,theme+'-'+scale+'.png')});
+    if(process.env.TOAST_REVIEW_PAUSE==='1'){const ack=path.join(evidence,theme+'-'+scale+'-inspected');const end=Date.now()+180000;while(!fs.existsSync(ack)&&Date.now()<end)await new Promise(r=>setTimeout(r,100));assert.ok(fs.existsSync(ack),'owner inspected the actual warning before closing its native context');}}
+   // The original long warning expires naturally; inspect the actual native issue
+   // details separately so an overlay never substitutes for readable Settings.
+   await page.locator('[data-act="settings"]').click();
+   await poll(page,()=>!document.querySelector('#toast.show'),null,'natural warning expiry');
+   const data=page.locator('#modalRoot details').filter({has:page.locator('[data-act="make-manual-backup"]')});for(const panel of await data.all())if(await panel.getAttribute('open')===null)await panel.locator(':scope > summary').click();
+   assert.equal(await page.locator('[data-act="make-manual-backup"]').isVisible(),true);assert.match(await page.locator('#modalRoot').innerText(),/Diagnostics download/);
+   const issue=page.locator('#modalRoot .kv').filter({hasText:'Last device save issue:'});await issue.scrollIntoViewIfNeeded();assert.equal(await issue.isVisible(),true);assert.match(await issue.innerText(),/Last device save issue:.*device-save:completion-upgrade\/ambiguous-legacy-completion/s);
+   row.details=await issue.evaluate(el=>{const b=el.getBoundingClientRect(),code=el.querySelector('code'),r=code.getBoundingClientRect();return {text:el.textContent,rect:{x:b.x,y:b.y,w:b.width,h:b.height},code:{x:r.x,y:r.y,w:r.width,h:r.height},scrollWidth:el.scrollWidth,clientWidth:el.clientWidth};});assert.ok(row.details.scrollWidth<=row.details.clientWidth+1);assert.ok(row.details.code.x>=row.details.rect.x&&row.details.code.x+row.details.code.w<=row.details.rect.x+row.details.rect.w+1);
+   await page.evaluate(()=>document.fonts.ready);fonts.details=await platformFonts('#modalRoot p.kv:has(code)');for(const act of ['view-current-board','download-current-board'])fonts[act]=await platformFonts('#modalRoot [data-act="'+act+'"]');await session.detach();
+   if(evidence){fs.writeFileSync(path.join(evidence,theme+'-'+scale+'.json'),JSON.stringify(row,null,2));await page.screenshot({path:path.join(evidence,theme+'-'+scale+'-details.png')});
+    if(process.env.TOAST_REVIEW_PAUSE==='1'){const ack=path.join(evidence,theme+'-'+scale+'-details-inspected');const end=Date.now()+180000;while(!fs.existsSync(ack)&&Date.now()<end)await new Promise(r=>setTimeout(r,100));assert.ok(fs.existsSync(ack),'owner inspected actual native details before closing its context');}}
+   assert.equal(await page.evaluate(()=>localStorage.getItem('fvp:chain-scanner:v1')),exactOldDevice);assert.equal(await page.evaluate(()=>localStorage.getItem('fvp:chain-scanner:protected:v1')),exactOldDevice);
+   t.diagnostic(JSON.stringify({theme,scale,short:short.rect,shortRadius:short.radius,warning:warning.rect,radius:warning.radius,outside:warning.outside.length,lines:warning.lineCount}));
+   assert.deepEqual(errors,[]);assert.deepEqual(localErrors,[]);assert.ok(warning.lineCount>4);assert.equal(warning.outside.length,0,'every first/last-line glyph has solid contrasting toast background');
+  }finally{await context.close();}
+ });}finally{fs.rmSync(profiles,{recursive:true,force:true});}
+});
+
+test('RISK device save warning guidance: mounted help explains readable wrapped notices and recoverable device-save details',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(help,/Long save warnings wrap on a solid background/);
+ assert.match(help,/Settings.*Last device save issue/);
+ const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];
+ assert.match(current,/Long device-save warnings stay readable on narrow screens and with enlarged text/);
 });

@@ -1484,3 +1484,8 @@ Issue #176/#177 supersedes the prior after-gesture automatic reload expectation.
 - RISK PWA upgrade safety: candidate installation keeps a predecessor document and unfinished draft intact
 
 The candidate worker precaches while predecessor clients remain on their existing worker. Natural activation after all app clients close retains first-install claim and cache retirement. Actual predecessor upgrade browser evidence is separate from Node lifecycle coverage.
+
+## Device-save warning readability
+
+- RISK device save warning browser: actual held Add keeps every text line on contrasting toast paint and preserves short notices
+- RISK device save warning guidance: mounted help explains readable wrapped notices and recoverable device-save details
