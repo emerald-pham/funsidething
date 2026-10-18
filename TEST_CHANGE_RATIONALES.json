@@ -12447,4 +12447,169 @@
       "Signed-out process/native GREEN cdda4764-361b-48b4-beb4-1a74d1507cb3; actual default headless Chromium151.0.7922.34; online listener echo then failed uncached offline fetch with listener live, exact same-candidate offline sources and native local draft. Earlier f3dceaa4 transport/retention passed but final unconditional Add toggle hid the pane; retained as failed harness attempt."
     ]
   }
+,
+{
+  "testChangesSha256": "930750e41056ff48899dfb72308c6fc7cfa32bc5b9c028bd152687b5421cd2c2",
+  "reason": "Add a real production-listener regression for ordinary export clicks bubbling to the document-root motion marker, while preserving explicit choice behavior.",
+  "previousBehavior": "The landscape document click listener can treat the html element motion-state marker as a clicked control when an ordinary Settings export or its programmatic download anchor bubbles to the root, renewing timed local motion consent.",
+  "intendedBehavior": "Current-board export, recovery-archive export, and their bubbled download clicks leave the exact saved consent record and expiry unchanged. Only the explicit Normal and Reduced motion controls save once and update the scene.",
+  "preservedCoverage": [
+    "Existing seven-day motion-consent expiry, corrupt-record fail-closed, dismissal, accessibility, resume, and real reduced-motion behavior assertions remain unchanged.",
+    "The new consumer registers and invokes the actual document click listener from landscape.js with ancestor-based closest semantics, observes exact stored consent bytes across both export actions and a programmatic anchor click, then verifies one save and scene update for each explicit choice.",
+    "The previously passing pedestrian motion-toggle consumer continues to prove retained visitor recipes and complete underway tails are restored without changing shared scene data."
+  ],
+  "redEvidence": {
+    "command": "TZ=UTC /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/restore-backup-file-196/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/manual-json-export/native-motion-consent/owner-runs --purpose preimplementation-red -- /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern='RISK motion safety: export clicks do not renew consent' tests.js",
+    "failure": "The real registered listener rewrote the consent from {\"choice\":\"normal\",\"savedAt\":1792335599000} to {\"choice\":\"normal\",\"savedAt\":1792335600000} after current-board export, recovery-archive export, and programmatic-anchor click. The assertion failed on unchanged product source at bf13b8eda2baa80875214e8a7e882a8d7f08d3bb; the test harness and modules loaded successfully. Recorded assertion-failure: /Users/emeraldpham/.codex/task-artifacts/manual-json-export/native-motion-consent/owner-runs/2026-10-18T15-23-10-929Z-e3567ed9-18e4-41a7-8dd9-a0a3c74b612f.json."
+  },
+  "replacementTests": [
+    "RISK motion safety: export clicks do not renew consent while actual choices still do"
+  ],
+  "comparison": "issue196 motion-consent export click regression against 52d origin main",
+  "baseCommit": "52d4b2537bacbb60240ae7a53061224350ebd36f"
+}
+,
+{
+  "testChangesSha256": "15dd5c4744334958120cd8310856ee29a9576b1250efaddc821227469de3bb7b",
+  "reason": "Record the exact issue196 motion-consent regression diff against its frozen implementation baseline as well as the integrated main comparison.",
+  "previousBehavior": "On the clean bf13b8 baseline, export button and bubbled download-anchor clicks can match the document-root motion marker and renew the saved seven-day consent timestamp.",
+  "intendedBehavior": "Only explicit Normal or Reduced motion controls renew the timed local choice; ordinary current-board and recovery-archive exports preserve the exact existing consent record.",
+  "preservedCoverage": [
+    "This base-specific rationale maps the single newly added motion-consent RISK consumer test; it does not replace or weaken existing landscape, PWA, export, or motion-safety assertions.",
+    "The test observes the real registered landscape.js click listener with ancestor closest semantics, exact local consent bytes, both Settings export actions, a programmatic download anchor, and explicit selection of either motion mode.",
+    "The actual preimplementation assertion failure is retained in the shared recorded run; this entry does not claim a second red execution or fabricate chronology."
+  ],
+  "redEvidence": {
+    "command": "TZ=UTC /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/restore-backup-file-196/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/manual-json-export/native-motion-consent/owner-runs --purpose preimplementation-red -- /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern='RISK motion safety: export clicks do not renew consent' tests.js",
+    "failure": "The actual listener rewrote the valid saved choice at 1792335599000 to savedAt 1792335600000 after export actions; the test harness loaded and failed on the intended consent assertion before landscape.js was edited. This is the same recorded RED, not an additional run: /Users/emeraldpham/.codex/task-artifacts/manual-json-export/native-motion-consent/owner-runs/2026-10-18T15-23-10-929Z-e3567ed9-18e4-41a7-8dd9-a0a3c74b612f.json."
+  },
+  "replacementTests": [
+    "RISK motion safety: export clicks do not renew consent while actual choices still do"
+  ],
+  "comparison": "issue196 motion-consent export click regression against bf13 implementation baseline",
+  "baseCommit": "bf13b8eda2baa80875214e8a7e882a8d7f08d3bb"
+},
+  {
+    "testChangesSha256": "113e3de40dabddff829adce05d023454401aa2f77db8950d6607cd47c73827c6",
+    "reason": "Issue198 adds required actual command/native installed-client regressions after genuine process-omission REDs; this exact aggregate retains independently implemented storage/recovery/Restore/motion contracts and their original chronology while reconciling both commit histories.",
+    "previousBehavior": "Before198, the real Node native-name selector exited successfully with zero required outcomes. The signed-out vertical then passed, but the unchanged real selector lacked a required held outcome. Previously integrated product regression evidence remains in the historical rationale objects.",
+    "intendedBehavior": "Existing npm test always requires exactly one actual signed-out and reconcile-held native outcome, rejects missing/duplicate/skip/failure, and retains explicit later process/native sensitivity checks without normal CI replay or product flags. The final app bytes remain exactly the mandatory3e repair; root owns new exact-final native/full/release acceptance.",
+    "replacementTests": [
+      "RISK repository process: required installed-client native outcomes execute exactly once",
+      "RISK native installed-client delivery: signed-out",
+      "RISK native installed-client delivery: reconcile-held",
+      "RISK repository process: installed-client native registration sensitivities fail closed",
+      "RISK native installed-client sensitivity: unsafe delivery and source loss are rejected"
+    ],
+    "preservedCoverage": [
+      "Every incoming3e test line and every own pre-reconciliation test line remains an exact ordered subsequence; all491incoming rationale objects plus own committed records retain exact raw object bytes and ordered occurrences.",
+      "Existing185/186 hydration/overlap,188 held recovery/consent/ACK,190 export,194 expiry,196 guarded Restore, and3e real motion-consent consumer assertions remain unchanged.",
+      "Immutable supported compatibility floor, both rule directions, rules gate, existing review identities, Pages prerequisites, and ordinary npm/agent-tool cohorts remain.",
+      "All35 delivered app assets including SW are byte-identical3e and its coherent metadata. No product implementation, SW or fingerprint change belongs to198."
+    ],
+    "redEvidence": {
+      "command": "Node22/TZUTC record-run preimplementation-red -> node --test --test-name-pattern='^RISK repository process: required installed-client native outcomes execute exactly once$' tests.js",
+      "failure": "First f8c5b66b-8ec7-4014-a7af-9504a8285ccd observed real childexit0/zero named native outcomes then independent signed-out assertion0!==1 before native registration/support/package/workflow implementation. Second dd619dfe-aa79-46e2-9f63-e7162cf1e665 observed real signed-out nativePASS/childexit0 then independent missing-held assertion0!==1 before held registration. These are actual chronological process REDs, not native causal or setup claims."
+    },
+    "observedIntermediateRuns": [
+      "Signed-out cdda4764 and two-case b5c89463 actual native/processGREEN serve committedbf13/tree8aa4 from dirty runner, with exact source/cache, two-old-client draft/wait, accepted edits/recovery before lastclose, live-origin online/offline transport controls, same-candidate offline retained sources and held remoteexact0writes. They are component proof, not final3e acceptance.",
+      "Later sensitivity00aaabd7 executes actual omission/duplicate/Node.skip source variants with real native callbacks and unchanged independent TAP consumer; each intended registration fault is rejected. Later4df39ba6 independently verifies four original nativeFAILED reports at actual wrong-document response hash, real stale-device-store cache hash, original unaccepted blurred draft after premature close, and missing synthetic protected backup against untampered baseline. They are later causal controls, not preimplementation REDs.",
+      "Retained failed attempts9fbaa30a (navigator.onLine hint mismatch after reload) andf3dceaa4 (final unconditional Add toggle hid pane); final transport proof uses uncached failure while listener remains live and final Add opens only if hidden. No failed attempt is relabeled GREEN.",
+      "Actual owner/root motion precodeRED and GREEN remain in the491incoming raw rationale records; this merge does not relabel or recreate their chronology. Focused process/workflow/inventory17/17 e9dae581, YAML/source bindingc1c111c9 and raw/test preservation51f93af6 passed before final merge; affected final checks follow against the actual combined source."
+    ],
+    "comparison": "Exact final198 reconciliation test diff against bf13b8eda2baa80875214e8a7e882a8d7f08d3bb",
+    "baseCommit": "bf13b8eda2baa80875214e8a7e882a8d7f08d3bb"
+  },
+  {
+    "testChangesSha256": "a9ec034b7d96d932027f1107337bb6f1e8b0cd55a154299047f351d5ea38a9d5",
+    "reason": "Issue198 adds required actual command/native installed-client regressions after genuine process-omission REDs; this exact aggregate retains independently implemented storage/recovery/Restore/motion contracts and their original chronology while reconciling both commit histories.",
+    "previousBehavior": "Before198, the real Node native-name selector exited successfully with zero required outcomes. The signed-out vertical then passed, but the unchanged real selector lacked a required held outcome. Previously integrated product regression evidence remains in the historical rationale objects.",
+    "intendedBehavior": "Existing npm test always requires exactly one actual signed-out and reconcile-held native outcome, rejects missing/duplicate/skip/failure, and retains explicit later process/native sensitivity checks without normal CI replay or product flags. The final app bytes remain exactly the mandatory3e repair; root owns new exact-final native/full/release acceptance.",
+    "replacementTests": [
+      "RISK repository process: required installed-client native outcomes execute exactly once",
+      "RISK native installed-client delivery: reconcile-held",
+      "RISK repository process: installed-client native registration sensitivities fail closed",
+      "RISK native installed-client sensitivity: unsafe delivery and source loss are rejected"
+    ],
+    "preservedCoverage": [
+      "Every incoming3e test line and every own pre-reconciliation test line remains an exact ordered subsequence; all491incoming rationale objects plus own committed records retain exact raw object bytes and ordered occurrences.",
+      "Existing185/186 hydration/overlap,188 held recovery/consent/ACK,190 export,194 expiry,196 guarded Restore, and3e real motion-consent consumer assertions remain unchanged.",
+      "Immutable supported compatibility floor, both rule directions, rules gate, existing review identities, Pages prerequisites, and ordinary npm/agent-tool cohorts remain.",
+      "All35 delivered app assets including SW are byte-identical3e and its coherent metadata. No product implementation, SW or fingerprint change belongs to198."
+    ],
+    "redEvidence": {
+      "command": "Node22/TZUTC record-run preimplementation-red -> node --test --test-name-pattern='^RISK repository process: required installed-client native outcomes execute exactly once$' tests.js",
+      "failure": "First f8c5b66b-8ec7-4014-a7af-9504a8285ccd observed real childexit0/zero named native outcomes then independent signed-out assertion0!==1 before native registration/support/package/workflow implementation. Second dd619dfe-aa79-46e2-9f63-e7162cf1e665 observed real signed-out nativePASS/childexit0 then independent missing-held assertion0!==1 before held registration. These are actual chronological process REDs, not native causal or setup claims."
+    },
+    "observedIntermediateRuns": [
+      "Signed-out cdda4764 and two-case b5c89463 actual native/processGREEN serve committedbf13/tree8aa4 from dirty runner, with exact source/cache, two-old-client draft/wait, accepted edits/recovery before lastclose, live-origin online/offline transport controls, same-candidate offline retained sources and held remoteexact0writes. They are component proof, not final3e acceptance.",
+      "Later sensitivity00aaabd7 executes actual omission/duplicate/Node.skip source variants with real native callbacks and unchanged independent TAP consumer; each intended registration fault is rejected. Later4df39ba6 independently verifies four original nativeFAILED reports at actual wrong-document response hash, real stale-device-store cache hash, original unaccepted blurred draft after premature close, and missing synthetic protected backup against untampered baseline. They are later causal controls, not preimplementation REDs.",
+      "Retained failed attempts9fbaa30a (navigator.onLine hint mismatch after reload) andf3dceaa4 (final unconditional Add toggle hid pane); final transport proof uses uncached failure while listener remains live and final Add opens only if hidden. No failed attempt is relabeled GREEN.",
+      "Actual owner/root motion precodeRED and GREEN remain in the491incoming raw rationale records; this merge does not relabel or recreate their chronology. Focused process/workflow/inventory17/17 e9dae581, YAML/source bindingc1c111c9 and raw/test preservation51f93af6 passed before final merge; affected final checks follow against the actual combined source."
+    ],
+    "comparison": "Exact final198 reconciliation test diff against ba4b1e6edc8955dbeb6775e8dfa06bf62f200e8f",
+    "baseCommit": "ba4b1e6edc8955dbeb6775e8dfa06bf62f200e8f"
+  },
+  {
+    "testChangesSha256": "ec2dcc34e435bc12cc9875a6e20ab503051d93309d8fdb089ce360fad797a71c",
+    "reason": "Issue198 adds required actual command/native installed-client regressions after genuine process-omission REDs; this exact aggregate retains independently implemented storage/recovery/Restore/motion contracts and their original chronology while reconciling both commit histories.",
+    "previousBehavior": "Before198, the real Node native-name selector exited successfully with zero required outcomes. The signed-out vertical then passed, but the unchanged real selector lacked a required held outcome. Previously integrated product regression evidence remains in the historical rationale objects.",
+    "intendedBehavior": "Existing npm test always requires exactly one actual signed-out and reconcile-held native outcome, rejects missing/duplicate/skip/failure, and retains explicit later process/native sensitivity checks without normal CI replay or product flags. The final app bytes remain exactly the mandatory3e repair; root owns new exact-final native/full/release acceptance.",
+    "replacementTests": [
+      "RISK repository process: required installed-client native outcomes execute exactly once",
+      "RISK native installed-client delivery: signed-out",
+      "RISK native installed-client delivery: reconcile-held",
+      "RISK repository process: installed-client native registration sensitivities fail closed",
+      "RISK native installed-client sensitivity: unsafe delivery and source loss are rejected"
+    ],
+    "preservedCoverage": [
+      "Every incoming3e test line and every own pre-reconciliation test line remains an exact ordered subsequence; all491incoming rationale objects plus own committed records retain exact raw object bytes and ordered occurrences.",
+      "Existing185/186 hydration/overlap,188 held recovery/consent/ACK,190 export,194 expiry,196 guarded Restore, and3e real motion-consent consumer assertions remain unchanged.",
+      "Immutable supported compatibility floor, both rule directions, rules gate, existing review identities, Pages prerequisites, and ordinary npm/agent-tool cohorts remain.",
+      "All35 delivered app assets including SW are byte-identical3e and its coherent metadata. No product implementation, SW or fingerprint change belongs to198."
+    ],
+    "redEvidence": {
+      "command": "Node22/TZUTC record-run preimplementation-red -> node --test --test-name-pattern='^RISK repository process: required installed-client native outcomes execute exactly once$' tests.js",
+      "failure": "First f8c5b66b-8ec7-4014-a7af-9504a8285ccd observed real childexit0/zero named native outcomes then independent signed-out assertion0!==1 before native registration/support/package/workflow implementation. Second dd619dfe-aa79-46e2-9f63-e7162cf1e665 observed real signed-out nativePASS/childexit0 then independent missing-held assertion0!==1 before held registration. These are actual chronological process REDs, not native causal or setup claims."
+    },
+    "observedIntermediateRuns": [
+      "Signed-out cdda4764 and two-case b5c89463 actual native/processGREEN serve committedbf13/tree8aa4 from dirty runner, with exact source/cache, two-old-client draft/wait, accepted edits/recovery before lastclose, live-origin online/offline transport controls, same-candidate offline retained sources and held remoteexact0writes. They are component proof, not final3e acceptance.",
+      "Later sensitivity00aaabd7 executes actual omission/duplicate/Node.skip source variants with real native callbacks and unchanged independent TAP consumer; each intended registration fault is rejected. Later4df39ba6 independently verifies four original nativeFAILED reports at actual wrong-document response hash, real stale-device-store cache hash, original unaccepted blurred draft after premature close, and missing synthetic protected backup against untampered baseline. They are later causal controls, not preimplementation REDs.",
+      "Retained failed attempts9fbaa30a (navigator.onLine hint mismatch after reload) andf3dceaa4 (final unconditional Add toggle hid pane); final transport proof uses uncached failure while listener remains live and final Add opens only if hidden. No failed attempt is relabeled GREEN.",
+      "Actual owner/root motion precodeRED and GREEN remain in the491incoming raw rationale records; this merge does not relabel or recreate their chronology. Focused process/workflow/inventory17/17 e9dae581, YAML/source bindingc1c111c9 and raw/test preservation51f93af6 passed before final merge; affected final checks follow against the actual combined source."
+    ],
+    "comparison": "Exact final198 reconciliation test diff against 52d4b2537bacbb60240ae7a53061224350ebd36f",
+    "baseCommit": "52d4b2537bacbb60240ae7a53061224350ebd36f"
+  },
+  {
+    "testChangesSha256": "0bcaa1471d7731c0d5be63ead8b25ce505f4b0013b16d4429d6b56573e6a1c0d",
+    "reason": "Issue198 adds required actual command/native installed-client regressions after genuine process-omission REDs; this exact aggregate retains independently implemented storage/recovery/Restore/motion contracts and their original chronology while reconciling both commit histories.",
+    "previousBehavior": "Before198, the real Node native-name selector exited successfully with zero required outcomes. The signed-out vertical then passed, but the unchanged real selector lacked a required held outcome. Previously integrated product regression evidence remains in the historical rationale objects.",
+    "intendedBehavior": "Existing npm test always requires exactly one actual signed-out and reconcile-held native outcome, rejects missing/duplicate/skip/failure, and retains explicit later process/native sensitivity checks without normal CI replay or product flags. The final app bytes remain exactly the mandatory3e repair; root owns new exact-final native/full/release acceptance.",
+    "replacementTests": [
+      "RISK repository process: required installed-client native outcomes execute exactly once",
+      "RISK native installed-client delivery: signed-out",
+      "RISK native installed-client delivery: reconcile-held",
+      "RISK repository process: installed-client native registration sensitivities fail closed",
+      "RISK native installed-client sensitivity: unsafe delivery and source loss are rejected"
+    ],
+    "preservedCoverage": [
+      "Every incoming3e test line and every own pre-reconciliation test line remains an exact ordered subsequence; all491incoming rationale objects plus own committed records retain exact raw object bytes and ordered occurrences.",
+      "Existing185/186 hydration/overlap,188 held recovery/consent/ACK,190 export,194 expiry,196 guarded Restore, and3e real motion-consent consumer assertions remain unchanged.",
+      "Immutable supported compatibility floor, both rule directions, rules gate, existing review identities, Pages prerequisites, and ordinary npm/agent-tool cohorts remain.",
+      "All35 delivered app assets including SW are byte-identical3e and its coherent metadata. No product implementation, SW or fingerprint change belongs to198."
+    ],
+    "redEvidence": {
+      "command": "Node22/TZUTC record-run preimplementation-red -> node --test --test-name-pattern='^RISK repository process: required installed-client native outcomes execute exactly once$' tests.js",
+      "failure": "First f8c5b66b-8ec7-4014-a7af-9504a8285ccd observed real childexit0/zero named native outcomes then independent signed-out assertion0!==1 before native registration/support/package/workflow implementation. Second dd619dfe-aa79-46e2-9f63-e7162cf1e665 observed real signed-out nativePASS/childexit0 then independent missing-held assertion0!==1 before held registration. These are actual chronological process REDs, not native causal or setup claims."
+    },
+    "observedIntermediateRuns": [
+      "Signed-out cdda4764 and two-case b5c89463 actual native/processGREEN serve committedbf13/tree8aa4 from dirty runner, with exact source/cache, two-old-client draft/wait, accepted edits/recovery before lastclose, live-origin online/offline transport controls, same-candidate offline retained sources and held remoteexact0writes. They are component proof, not final3e acceptance.",
+      "Later sensitivity00aaabd7 executes actual omission/duplicate/Node.skip source variants with real native callbacks and unchanged independent TAP consumer; each intended registration fault is rejected. Later4df39ba6 independently verifies four original nativeFAILED reports at actual wrong-document response hash, real stale-device-store cache hash, original unaccepted blurred draft after premature close, and missing synthetic protected backup against untampered baseline. They are later causal controls, not preimplementation REDs.",
+      "Retained failed attempts9fbaa30a (navigator.onLine hint mismatch after reload) andf3dceaa4 (final unconditional Add toggle hid pane); final transport proof uses uncached failure while listener remains live and final Add opens only if hidden. No failed attempt is relabeled GREEN.",
+      "Actual owner/root motion precodeRED and GREEN remain in the491incoming raw rationale records; this merge does not relabel or recreate their chronology. Focused process/workflow/inventory17/17 e9dae581, YAML/source bindingc1c111c9 and raw/test preservation51f93af6 passed before final merge; affected final checks follow against the actual combined source."
+    ],
+    "comparison": "Exact final198 reconciliation test diff against 3e3092d9908e2e8aeb3ce9ae00322c975f83e7a1",
+    "baseCommit": "3e3092d9908e2e8aeb3ce9ae00322c975f83e7a1"
+  }
 ]

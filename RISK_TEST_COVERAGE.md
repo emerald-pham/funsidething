@@ -1051,6 +1051,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 - `RISK motion safety: explicit local choices expire after seven elapsed days and corrupt records fail closed`
 - `RISK motion safety: actual choice handler remembers selection while dismissal never writes consent`
+- `RISK motion safety: export clicks do not renew consent while actual choices still do`
 
 - `RISK motion safety accessibility: enlarged prompt fits the containing viewport and stacks intrinsic choice cards`
 
@@ -1602,3 +1603,6 @@ The candidate worker precaches while predecessor clients remain on their existin
 
 - RISK repository process: required installed-client native outcomes execute exactly once
 - RISK native installed-client delivery: signed-out
+- RISK native installed-client delivery: reconcile-held
+- RISK repository process: installed-client native registration sensitivities fail closed
+- RISK native installed-client sensitivity: unsafe delivery and source loss are rejected

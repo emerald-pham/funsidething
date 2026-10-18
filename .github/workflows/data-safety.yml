@@ -20,6 +20,8 @@ jobs:
           distribution: temurin
           java-version: '21'
       - run: npm ci
+      - name: Install matching native Chromium
+        run: npx --no-install playwright install --with-deps chromium
       - name: Resolve comparison base
         id: diff-base
         shell: bash
@@ -42,7 +44,20 @@ jobs:
           fi
           echo "sha=$base" >> "$GITHUB_OUTPUT"
       - run: node scripts/test-first-gate.mjs "${{ steps.diff-base.outputs.sha }}"
+      - name: Bind exact native candidate tree
+        shell: bash
+        run: echo "CHAIN_NATIVE_CANDIDATE_TREE=$(git rev-parse "${GITHUB_SHA}^{tree}")" >> "$GITHUB_ENV"
       - run: npm test
+        env:
+          CHAIN_NATIVE_CANDIDATE_SHA: ${{ github.sha }}
+          CHAIN_NATIVE_OUTPUT: ${{ runner.temp }}/installed-client-regression
+      - name: Preserve native regression evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: installed-client-regression-${{ github.sha }}
+          path: ${{ runner.temp }}/installed-client-regression
+          if-no-files-found: error
       - run: npm run test:rules
       - name: Backward compatibility
         env:

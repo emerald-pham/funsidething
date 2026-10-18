@@ -19,6 +19,32 @@ boundary and the historical negative control. The Firestore `predeploy` hook
 also runs this same gate before `firebase deploy --only firestore:rules`, so a
 manual CLI rules deployment cannot accidentally omit the compatibility check.
 
+## Installed-client delivery evidence
+
+The existing scanner-tests command requires both signed-out and actual
+reconcile-held native installed-client outcomes. Each starts with immutable
+old `779defa4e8c3465fdf535fe17dbe2227d2b76ea1` and two controlled old documents,
+retains a blurred unfinished draft while the candidate worker waits, and proves
+accepted native edits and durable recovery readback before normal last-client
+close. Reopening must deliver the exact candidate shell and retain the board,
+pending generation, manual/protected backups, opaque archives and unknown fields.
+The held remote payload/revision remains exact with zero writes.
+
+Require offline reopening of that same delivered candidate, with an online
+transport control followed by failed uncached transport while the origin
+listener remains available. Server unavailability and a navigator hint alone
+do not prove network-offline acceptance. Record actual runtime, source/tree,
+response/cache hashes, preservation results and owned cleanup. Missing/skipped
+cases, unsupported runtime and incomplete cleanup remain failures.
+
+Keep actual command omission/duplicate/skip and native wrong-candidate,
+stale-byte, unsafe-replacement and source-loss sensitivity evidence distinct
+from the original process RED. Existing independent code and relevant
+data/sync reviewers inspect these exact results and limits with the retained
+app-consumer regressions. This adds no review role or release status. Native
+ephemeral Chromium evidence does not imply deployed or physical-device proof;
+existing compatibility, FAQ, rendered, CI and live gates still apply.
+
 ## Risk-based exact-commit release gates
 
 Every candidate needs an owner review of its exact diff. The release validator

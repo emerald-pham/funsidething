@@ -64,6 +64,12 @@ Risk determines regression breadth and the minimum useful actor/configuration
 set; it never waives RED. No blanket 21-actor/account matrix. Complete repository
 required full-suite/CI checks even when focused local tests suffice during a slice.
 
+Changes to startup/reload guards, mixed saved sources or recovery consent must
+retain the substantiated real app-consumer regressions in the Node suite.
+Changes to installed-client delivery also cross the required native command
+in [TDD and regression gates](tdd-and-regression.md#installed-client-regression).
+Use those existing consumers before introducing another harness or process.
+
 ## Browser choice
 
 Prefer the supported ChatGPT/Codex built-in browser (`@Browser`, the in-app

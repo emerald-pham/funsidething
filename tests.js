@@ -33230,6 +33230,46 @@ test('RISK pedestrian motion toggle consumer: real motion-choice handler restore
  assert.deepEqual(saved,['normal','reduced','normal']);assert.deepEqual(JSON.parse(JSON.stringify(results)),[['tail','current'],['current'],['tail','current']]);assert.equal(JSON.stringify(world),before);
 });
 
+test('RISK motion safety: export clicks do not renew consent while actual choices still do',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),update=source.slice(source.indexOf('  function updateMotion('),source.indexOf('  function openMotion('));
+ const listenerStart=source.indexOf("  document.addEventListener('click',event=>{\n    const button=event.target.closest('[data-landscape-motion]"),listenerEnd=source.indexOf("  dialog.addEventListener('close'",listenerStart);
+ assert.ok(listenerStart>=0&&listenerEnd>listenerStart,'the real document click listener is present');
+ const listener=source.slice(listenerStart,listenerEnd),c=sceneTimeline(),motionKey='fvp:chain-scanner:landscape-motion',now=Date.parse('2026-10-18T15:00:00.000Z');
+ const originalRaw=JSON.stringify({choice:'normal',savedAt:now-1000}),values=new Map([[motionKey,originalRaw]]),storage={getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,String(value))};
+ const originalSave=c.LivingSky.saveMotion,saves=[];
+ const S={...c.LivingSky,saveMotion(target,value){saves.push(value);return originalSave(target,value,now);}};
+ const selectorMatches=(node,selector)=>{
+  const match=selector.match(/^\[data-([a-z-]+)(?:="([^"]*)")?\]$/);if(!match)return false;
+  const key=match[1].replace(/-([a-z])/g,(_,letter)=>letter.toUpperCase()),present=Object.hasOwn(node.dataset,key);
+  return match[2]===undefined?present:present&&String(node.dataset[key])===match[2];
+ };
+ const element=(tagName,dataset,parentElement)=>({tagName,dataset,parentElement,hasAttribute(name){const match=name.match(/^data-([a-z-]+)$/);return !!match&&Object.hasOwn(dataset,match[1].replace(/-([a-z])/g,(_,letter)=>letter.toUpperCase()));},closest(selector){const selectors=selector.split(',').map(value=>value.trim());for(let node=this;node;node=node.parentElement)if(selectors.some(value=>selectorMatches(node,value)))return node;return null;}});
+ const root=element('HTML',{landscapeMotion:'normal'},null),body=element('BODY',{},root),normalChoice=element('BUTTON',{landscapeMotion:'normal'},body),reducedChoice=element('BUTTON',{landscapeMotion:'reduced'},body);
+ const note={hidden:false},motionButton={textContent:''};let handler,starts=0,closes=0;
+ normalChoice.setAttribute=(name,value)=>{normalChoice[name]=value;};reducedChoice.setAttribute=(name,value)=>{reducedChoice[name]=value;};
+ const dialog={querySelectorAll:()=>[normalChoice,reducedChoice],close(){closes++;}};
+ const document={documentElement:root,getElementById:id=>id==='deviceMotionNote'?note:{},addEventListener(name,fn){if(name==='click')handler=fn;}};
+ Object.assign(c,{preference:'normal',reduced:false,mq:{matches:false},storage,S,motionButton,dialog,document,start(){starts++;}});
+ vm.runInContext(update+listener,c);
+ assert.equal(typeof handler,'function','the extracted production document listener is registered');
+ const click=node=>handler({target:node});
+ click(element('BUTTON',{act:'download-current-board'},body));
+ click(element('BUTTON',{act:'download-recovery-archive'},body));
+ click(element('A',{download:'chain-scanner-current-board.json'},body));
+ assert.equal(storage.getItem(motionKey),originalRaw,'Settings export actions and their programmatic download click leave the exact timed consent bytes and expiry unchanged');
+ assert.deepEqual(saves,[],'ordinary downloads do not renew motion consent');
+ assert.equal(starts,0,'ordinary downloads do not restart the landscape');
+ click(normalChoice);
+ assert.equal(saves.length,1,'choosing Normal records one explicit motion choice');
+ assert.equal(storage.getItem(motionKey),JSON.stringify({choice:'normal',savedAt:now}));
+ assert.equal(root.dataset.landscapeMotion,'normal');assert.equal(note.hidden,true);
+ click(reducedChoice);
+ assert.equal(saves.length,2,'choosing Reduced records one explicit motion choice');
+ assert.equal(storage.getItem(motionKey),JSON.stringify({choice:'reduced',savedAt:now}));
+ assert.equal(root.dataset.landscapeMotion,'reduced');assert.equal(note.hidden,true);
+ assert.equal(starts,2,'the two explicit choices each update motion');assert.equal(closes,2,'each explicit choice closes its prompt');
+});
+
 // Replay actual canvas transforms and paint bounds. Tracking-camera ground marks
 // are diagnostic ink; exclude only their documented gray color, not actor shapes.
 function paintedMotionWorldXs(frame){
@@ -35285,11 +35325,11 @@ test('RISK held decision recovery: new reviewed consent supersedes prior prepare
 });
 
 
-test('RISK repository process: required installed-client native outcomes execute exactly once',()=>{
- const required=['RISK native installed-client delivery: signed-out'];
+test('RISK repository process: required installed-client native outcomes execute exactly once',t=>{
+ const required=['RISK native installed-client delivery: signed-out','RISK native installed-client delivery: reconcile-held'];
  const env={...process.env,CHAIN_INSTALLED_NATIVE_CHILD:'1'};delete env.NODE_TEST_CONTEXT;
- const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^RISK native installed-client delivery: (signed-out|reconcile-held)$','tests.js'],{cwd:__dirname,env,encoding:'utf8',timeout:205000,maxBuffer:32*1024*1024});
- const output=[result.stdout,result.stderr].filter(Boolean).join('\n');
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^RISK native installed-client delivery: (signed-out|reconcile-held)$','tests.js'],{cwd:__dirname,env,encoding:'utf8',timeout:405000,maxBuffer:32*1024*1024});
+ const output=[result.stdout,result.stderr].filter(Boolean).join('\n');t.diagnostic(output);
  assert.equal(result.error,undefined,'Native selected-test infrastructure must work: '+(result.error?.message||output));
  assert.equal(result.signal,null,'Native selected-test run must finish: '+output);
  assert.equal(result.status,0,'Native selected-test run must succeed: '+output);
@@ -35299,6 +35339,9 @@ test('RISK repository process: required installed-client native outcomes execute
   assert.equal(outcomes.length,1,'Required native case absent or duplicated: '+name+'\n'+output);
   assert.ok(!/ # (?:SKIP|TODO)\b/i.test(outcomes[0]),'Required native case must actually execute: '+name);
  }
+ assert.equal(lines.filter(line=>/^ok \d+ - /.test(line)).length,required.length,'Exactly the required native outcomes must run');
+ assert.equal(lines.filter(line=>/^1\.\.\d+$/.test(line)).at(-1),'1..'+required.length,'Native TAP plan must be complete and exact');
+ assert.match(result.stdout||'',/^# cancelled 0$/m);assert.match(result.stdout||'',/^# skipped 0$/m);assert.match(result.stdout||'',/^# todo 0$/m);
  assert.ok(!/^not ok /m.test(result.stdout||''),'No native failure or cancellation may be hidden: '+output);
 });
 
@@ -35308,5 +35351,71 @@ if(process.env.CHAIN_INSTALLED_NATIVE_CHILD==='1'){
   const {runInstalledClientCase}=await import('./scripts/installed-client-regression.mjs');
   const result=await runInstalledClientCase({mode:'signed-out',repo:__dirname,oldCommit:'779defa4e8c3465fdf535fe17dbe2227d2b76ea1',candidateCommit:process.env.CHAIN_NATIVE_CANDIDATE_SHA,candidateTree:process.env.CHAIN_NATIVE_CANDIDATE_TREE,outputDir:process.env.CHAIN_NATIVE_OUTPUT,port:Number(process.env.CHAIN_NATIVE_PORT||0)});
   t.diagnostic('Native evidence: '+result.reportPath);
+ });
+ test('RISK native installed-client delivery: reconcile-held',{timeout:210000},async t=>{
+  const {runInstalledClientCase}=await import('./scripts/installed-client-regression.mjs');
+  const result=await runInstalledClientCase({mode:'reconcile-held',repo:__dirname,oldCommit:'779defa4e8c3465fdf535fe17dbe2227d2b76ea1',candidateCommit:process.env.CHAIN_NATIVE_CANDIDATE_SHA,candidateTree:process.env.CHAIN_NATIVE_CANDIDATE_TREE,outputDir:process.env.CHAIN_NATIVE_OUTPUT,port:Number(process.env.CHAIN_NATIVE_PORT||0)});
+  t.diagnostic('Native evidence: '+result.reportPath);
+ });
+
+}
+
+// Installed-client sensitivity controls run only by an explicitly allocated owner command.
+if(process.env.CHAIN_INSTALLED_NATIVE_SENSITIVITY==='process'){
+ test('RISK repository process: installed-client native registration sensitivities fail closed',async t=>{
+  assert.ok(process.env.CHAIN_NATIVE_OUTPUT,'durable sensitivity output required');
+  const source=fs.readFileSync(path.join(__dirname,'tests.js'),'utf8');
+  const start=source.indexOf("test('RISK repository process: required installed-client native outcomes execute exactly once'");
+  const end=source.indexOf('\n// Installed-client sensitivity controls');assert.ok(start>=0&&end>start);
+  const actual=source.slice(start,end),heldStart=actual.indexOf(" test('RISK native installed-client delivery: reconcile-held'");
+  const heldEnd=actual.indexOf('\n });',heldStart)+5;assert.ok(heldStart>0&&heldEnd>heldStart);
+  const held=actual.slice(heldStart,heldEnd),nativeBody=held.slice(held.indexOf('async t=>{'));
+  fs.mkdirSync(process.env.CHAIN_NATIVE_OUTPUT,{recursive:true});
+  const directory=fs.mkdtempSync(path.join(process.env.CHAIN_NATIVE_OUTPUT,'process-sensitivity-'));
+  const hash=value=>createHash('sha256').update(value).digest('hex');
+  const records=[];
+  for(const variant of ['omission','duplicate','skip']){
+   const root=path.join(directory,variant);fs.mkdirSync(root);
+   fs.writeFileSync(path.join(root,'package.json'),JSON.stringify({type:'module'}));
+   fs.symlinkSync(path.join(__dirname,'scripts'),path.join(root,'scripts'),'junction');
+   const replacement=variant==='omission'?'':variant==='duplicate'?held+'\n'+held:held.replace('{timeout:210000}','{timeout:210000,skip:true}');
+   const mutated=actual.slice(0,heldStart)+replacement+actual.slice(heldEnd);
+   assert.equal(mutated.split(nativeBody).length-1,variant==='omission'?0:variant==='duplicate'?2:1,'actual native callback bytes retained in source variant');
+   // Only the command's fixture location changes; the independent TAP consumer
+   // and all remaining real native callback/import bytes are copied unchanged.
+   const fixtureSource='import {test} from "node:test";import assert from "node:assert/strict";import {spawnSync} from "node:child_process";import path from "node:path";import {fileURLToPath} from "node:url";\nconst __dirname='+JSON.stringify(__dirname)+';const variantRoot=path.dirname(fileURLToPath(import.meta.url));\n'+mutated.replace('cwd:__dirname,env,','cwd:variantRoot,env,');
+   const file=path.join(root,'tests.js');fs.writeFileSync(file,fixtureSource);
+   const env={...process.env};delete env.NODE_TEST_CONTEXT;delete env.CHAIN_INSTALLED_NATIVE_CHILD;
+   const args=['--test','--test-reporter=tap','--test-name-pattern=^RISK repository process: required installed-client native outcomes execute exactly once$','tests.js'];
+   const result=spawnSync(process.execPath,args,{cwd:root,env,encoding:'utf8',timeout:405000,maxBuffer:32*1024*1024});
+   const output=[result.stdout,result.stderr].filter(Boolean).join('\n');
+   const record={variant,file,sourceSha256:hash(fixtureSource),canonicalRegionSha256:hash(actual),realNativeBodySha256:hash(nativeBody),importedModuleSha256:hash(fs.readFileSync(path.join(__dirname,'scripts/installed-client-regression.mjs'))),command:[process.execPath,...args],cwd:root,status:result.status,signal:result.signal,error:result.error?.message,output};records.push(record);
+   fs.writeFileSync(path.join(directory,'report.json'),JSON.stringify(records,null,2)+'\n');
+   assert.equal(result.error,undefined,result.error?.message);assert.equal(result.signal,null);assert.notEqual(result.status,0,'actual command must reject '+variant+' native registration');
+   assert.ok(!/Cannot find (?:module|package)|ERR_MODULE_NOT_FOUND|SyntaxError/.test(output),'infrastructure failure is not a qualifying native registration control');
+   assert.match(output,variant==='skip'?/Required native case must actually execute: RISK native installed-client delivery: reconcile-held/:/Required native case absent or duplicated: RISK native installed-client delivery: reconcile-held/,'the unchanged TAP consumer must reject the actual registration fault');
+  }
+  t.diagnostic('Actual process sensitivity evidence: '+path.join(directory,'report.json'));
+ });
+}
+if(process.env.CHAIN_INSTALLED_NATIVE_SENSITIVITY==='causal'){
+ test('RISK native installed-client sensitivity: unsafe delivery and source loss are rejected',async t=>{
+  const {runInstalledClientCase}=await import('./scripts/installed-client-regression.mjs');
+  const expected={
+   'wrong-candidate':/actual response must identify the declared candidate document/,
+   'stale-byte':/candidate cache byte identity: \.\/device-store-v2\.js/,
+   'unsafe-quiescence':/original blurred draft must be durably accepted before last-client replacement/,
+   'source-loss':/protected\/manual backup exact: synthetic-protected/
+  };
+  for(const control of Object.keys(expected)){
+   let failure;
+   try{await runInstalledClientCase({mode:'signed-out',repo:__dirname,oldCommit:'779defa4e8c3465fdf535fe17dbe2227d2b76ea1',candidateCommit:process.env.CHAIN_NATIVE_CANDIDATE_SHA,candidateTree:process.env.CHAIN_NATIVE_CANDIDATE_TREE,outputDir:process.env.CHAIN_NATIVE_OUTPUT,port:Number(process.env.CHAIN_NATIVE_PORT||0),control});}catch(error){failure=error;}
+   assert.equal(failure?.code,'ERR_ASSERTION','real native control must reach its intended assertion, not infrastructure: '+(failure?.stack||control));
+   assert.match(failure.message,expected[control],'native control must expose its causal mismatch');
+   const report=JSON.parse(fs.readFileSync(failure.reportPath,'utf8'));
+   assert.equal(report.status,'failed');assert.deepEqual(report.cleanup,{contextClosed:true,browserClosed:true,serverClosed:true});
+   assert.equal(report.remote.before,report.remote.after);assert.equal(report.remote.calls.filter(row=>row.kind==='apply').length,0);
+   t.diagnostic(control+' rejected at actual native assertion; evidence '+failure.reportPath);
+  }
  });
 }
