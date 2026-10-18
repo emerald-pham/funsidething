@@ -13073,5 +13073,67 @@
     "baseCommit": "52d4b2537bacbb60240ae7a53061224350ebd36f",
     "testChangesSha256": "810f3144cc6c4d93902ed3f8cbace74f54bb1e4974536594595180e180169786",
     "comparison": "Exact tests.js diff against 52d4b2537bacbb60240ae7a53061224350ebd36f. Cumulative binding; historical case-level records and chronology remain exact, not relabeled as one contemporaneous featureRED."
+  },
+  {
+    "reason": "Repair the mandatory currentP0 live-click consumer readiness gate after exact mainM run39169461265 failed this unchanged preexisting case. The source case was byte-identical9895c7f6/52d/C/D/E/F/M. This tests-only change preserves its runtime title, all final feature assertions, selectors, helpers and app bytes.",
+    "previousBehavior": "The actual held click and remote pause used native publication/reconciliation, but the fixture assumed150ms meant completion had reached the server and both saved devices. Diagnostic main baselinecb4ee60b and transparent0ms control pass. With only250ms latency on the actual B SDK push, original assertion8bb1dfbf fails while local completion/fact/head are accepted and B is still pushing; the unchanged8s semantic waiter later verifies exact remote/A/B facts and both browser heads after natural ACK. MainCI did not capture its pending operation, so this is a demonstrated causal schedule, not certainty about that run exact in-flight stage or a loss/corruption claim.",
+    "intendedBehavior": "Keep the same real remote-pause/pressed-click consumer and all original final assertions. Retain bounded250ms latency through the original SDK operation, observe actual native entry/completion, and independently assert pending remote versus accepted local completion/fact/head. Await that actual natural operation and the unchanged8s coherent publication/head/ACK waiter on both devices before final completion assertions. Canonical pause readiness is explicitly verified before the held click. New10s overall test/watchdog bounds awaited native entry/completion; it tightens the prior unbounded case without inflating any existing helper deadline. The structurally updated registration preserves the exact runtime name for existing selectors and validator.",
+    "preservedCoverage": [
+      "All original final remote/A/B completion assertions, canonical work pause and three-task assertions remain verbatim; pressed-card protection and actual pointer/action/click operations are retained. New proof keeps exact accepted completion fact on server and both devices, and pending local durability before SDK response.",
+      "All code outside this one consumer, the8s settleLiveModePublication helper, required-five-consumer selector/count/deadline, entire earlier fileRestore/editor readiness repairs and native198 command registrations remain exactM. RISK map and every runtime title remain unchanged.",
+      "All513 historical rationale objects remain raw-byte-exact and ordered. All35 app assets/SW/public copy/product metadata remain exactC/F/M. No source/state substitution, forced B publication/manual callback, remote patch, longer readiness sleep, helper deadline increase or skipped guard is introduced."
+    ],
+    "replacementTests": [
+      "RISK live scan sync: an in-progress click survives a remote pause and its completion is retained through the conflict"
+    ],
+    "redEvidence": {
+      "command": "TZ=UTC Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK live scan sync: an in-progress click survives a remote pause and its completion is retained through the conflict$\" tests.js",
+      "failure": "Retained actual-case REDc2f0fdb4-5c3e-4fa8-b83d-0d5d55de0da5 observed natural B SDK entry still pending with completion in its actual request and local durable head; the original150ms final assertion then failed false!==true before changing readiness. This is regression RED for this fixture repair, after historical product implementation, not an invented original featureRED. Frozen earlier diagnostic8bb1dfbf independently observes pending B push at213ms, real ACK7 at345ms and coherent/fact/head completion by389ms. It reports0 actual CAS rejections, so no actual CAS-failure claim is inferred from the historical title.",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/ci/pr205/main-9fcb/live-click-repair/runs/2026-10-18T22-16-08-999Z-c2f0fdb4-5c3e-4fa8-b83d-0d5d55de0da5.json",
+      "diagnosis": "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/ci/pr205/main-9fcb/live-click-diagnosis/CAUSAL_CHECKPOINT.json",
+      "laterSensitivity": {
+        "record": "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/ci/pr205/main-9fcb/live-click-repair/runs/2026-10-18T22-18-04-213Z-73289ebe-16bf-4134-9884-31cc79043935.json",
+        "result": "Only post-click publication readiness is changed back to original150ms in an immutable external source copy. Actual250ms SDK latency, pending/native/local head/fact controls and every original final expectation stay. The original completion assertion fails at its intended mismatch; this is later sensitivity."
+      }
+    },
+    "greenEvidence": {
+      "command": "TZ=UTC Node22 record-run --purpose green -- node --test --test-name-pattern=\"^(?:RISK live scan sync:|RISK completion delivery fixtures:|RISK test inventory:)\" tests.js",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/ci/pr205/main-9fcb/live-click-repair/runs/2026-10-18T22-18-05-000Z-790c3852-86c7-4545-9f09-cf88bf495ee7.json",
+      "result": "13 focused tests pass with zero failures/cancellations/skips, including the full live-scan cohort, unchanged actual required-five-consumer child process gate and inventory. The changed consumer also independently passed53ece0c5. Native198 registration/command coverage is checked as unchanged metadata only; no actual native/browser/full/CI/release run is claimed."
+    },
+    "baseCommit": "9fcb349e99dbc6dd9675f7466bacf005718907c1",
+    "testChangesSha256": "d31dac558cc13148263d87574b8266b05ed7d13a85d65c6ba9434dc20f15e091",
+    "comparison": "Exact tests.js diff against 9fcb349e99dbc6dd9675f7466bacf005718907c1. Direct exactM-to-repair fixture diff; current causalRED precedes this readiness implementation, separately from failed mainCI and earlier historical implementation."
+  },
+  {
+    "reason": "Repair the mandatory currentP0 live-click consumer readiness gate after exact mainM run39169461265 failed this unchanged preexisting case. The source case was byte-identical9895c7f6/52d/C/D/E/F/M. This tests-only change preserves its runtime title, all final feature assertions, selectors, helpers and app bytes.",
+    "previousBehavior": "The actual held click and remote pause used native publication/reconciliation, but the fixture assumed150ms meant completion had reached the server and both saved devices. Diagnostic main baselinecb4ee60b and transparent0ms control pass. With only250ms latency on the actual B SDK push, original assertion8bb1dfbf fails while local completion/fact/head are accepted and B is still pushing; the unchanged8s semantic waiter later verifies exact remote/A/B facts and both browser heads after natural ACK. MainCI did not capture its pending operation, so this is a demonstrated causal schedule, not certainty about that run exact in-flight stage or a loss/corruption claim.",
+    "intendedBehavior": "Keep the same real remote-pause/pressed-click consumer and all original final assertions. Retain bounded250ms latency through the original SDK operation, observe actual native entry/completion, and independently assert pending remote versus accepted local completion/fact/head. Await that actual natural operation and the unchanged8s coherent publication/head/ACK waiter on both devices before final completion assertions. Canonical pause readiness is explicitly verified before the held click. New10s overall test/watchdog bounds awaited native entry/completion; it tightens the prior unbounded case without inflating any existing helper deadline. The structurally updated registration preserves the exact runtime name for existing selectors and validator.",
+    "preservedCoverage": [
+      "All original final remote/A/B completion assertions, canonical work pause and three-task assertions remain verbatim; pressed-card protection and actual pointer/action/click operations are retained. New proof keeps exact accepted completion fact on server and both devices, and pending local durability before SDK response.",
+      "All code outside this one consumer, the8s settleLiveModePublication helper, required-five-consumer selector/count/deadline, entire earlier fileRestore/editor readiness repairs and native198 command registrations remain exactM. RISK map and every runtime title remain unchanged.",
+      "All513 historical rationale objects remain raw-byte-exact and ordered. All35 app assets/SW/public copy/product metadata remain exactC/F/M. No source/state substitution, forced B publication/manual callback, remote patch, longer readiness sleep, helper deadline increase or skipped guard is introduced."
+    ],
+    "replacementTests": [
+      "RISK live scan sync: an in-progress click survives a remote pause and its completion is retained through the conflict"
+    ],
+    "redEvidence": {
+      "command": "TZ=UTC Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK live scan sync: an in-progress click survives a remote pause and its completion is retained through the conflict$\" tests.js",
+      "failure": "Retained actual-case REDc2f0fdb4-5c3e-4fa8-b83d-0d5d55de0da5 observed natural B SDK entry still pending with completion in its actual request and local durable head; the original150ms final assertion then failed false!==true before changing readiness. This is regression RED for this fixture repair, after historical product implementation, not an invented original featureRED. Frozen earlier diagnostic8bb1dfbf independently observes pending B push at213ms, real ACK7 at345ms and coherent/fact/head completion by389ms. It reports0 actual CAS rejections, so no actual CAS-failure claim is inferred from the historical title.",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/ci/pr205/main-9fcb/live-click-repair/runs/2026-10-18T22-16-08-999Z-c2f0fdb4-5c3e-4fa8-b83d-0d5d55de0da5.json",
+      "diagnosis": "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/ci/pr205/main-9fcb/live-click-diagnosis/CAUSAL_CHECKPOINT.json",
+      "laterSensitivity": {
+        "record": "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/ci/pr205/main-9fcb/live-click-repair/runs/2026-10-18T22-18-04-213Z-73289ebe-16bf-4134-9884-31cc79043935.json",
+        "result": "Only post-click publication readiness is changed back to original150ms in an immutable external source copy. Actual250ms SDK latency, pending/native/local head/fact controls and every original final expectation stay. The original completion assertion fails at its intended mismatch; this is later sensitivity."
+      }
+    },
+    "greenEvidence": {
+      "command": "TZ=UTC Node22 record-run --purpose green -- node --test --test-name-pattern=\"^(?:RISK live scan sync:|RISK completion delivery fixtures:|RISK test inventory:)\" tests.js",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/ci/pr205/main-9fcb/live-click-repair/runs/2026-10-18T22-18-05-000Z-790c3852-86c7-4545-9f09-cf88bf495ee7.json",
+      "result": "13 focused tests pass with zero failures/cancellations/skips, including the full live-scan cohort, unchanged actual required-five-consumer child process gate and inventory. The changed consumer also independently passed53ece0c5. Native198 registration/command coverage is checked as unchanged metadata only; no actual native/browser/full/CI/release run is claimed."
+    },
+    "baseCommit": "52d4b2537bacbb60240ae7a53061224350ebd36f",
+    "testChangesSha256": "fa2a2511c98cca7ffe8b04395ad6c8ce5c23b34ce62604276cd11ffcfa26c241",
+    "comparison": "Exact tests.js diff against 52d4b2537bacbb60240ae7a53061224350ebd36f. Cumulative original52d binding only; all earlier feature/test records and chronology remain raw-exact, not relabeled as one current RED."
   }
 ]

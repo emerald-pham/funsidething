@@ -28128,18 +28128,38 @@ test('RISK live scan sync: a form draft defers live adoption then receives compl
  assert.equal(b.ctx.state.tasks.find(t=>t.id===candidateId).done,true,'closing the edit drains the server revision without another focus');
 });
 
-test('RISK live scan sync: an in-progress click survives a remote pause and its completion is retained through the conflict',async()=>{
+test('RISK live scan sync: an in-progress click survives a remote pause and its completion is retained through the conflict',{timeout:10000},async t=>{
  const {a,b,h,candidateId,benchId}=await liveScanSyncClients();
+ const observerWatchdog=setTimeout(()=>{},10000),entered=deferredSyncFixture(),acknowledged=deferredSyncFixture();
+ const backend=b.shim.window.CloudSync,push=backend.push.bind(backend);let publicationFinished=false;
+ // Keep ordinary SDK operation latency beyond the former 150ms observation.
+ // The actual request, conditional revision and notification path still run.
+ backend.push=async(...args)=>{entered.resolve({payload:args[0],baseRev:args[2]});await syncSettle(250);const result=await push(...args);publicationFinished=true;acknowledged.resolve(result);return result;};
+ t.after(()=>{clearTimeout(observerWatchdog);for(const app of [a,b]){app.ctx.suspendCloudSync();vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearTimeout(liveCloudTimer);clearCloudRetry()',app.ctx);}backend.push=push;});
+
  b.shim.document.dispatchEvent({type:'pointerdown',target:{closest:()=>({})}});
  a.ctx.onAction('start-working',{dataset:{candidate:candidateId,benchmark:benchId}});a.ctx.cloudPushNow();await syncSettle(50);
+ await settleLiveModePublication(a,h,'native pause publication before the held click');
+ assert.equal(h.remoteState().mode,'work','the actual canonical pause is published while the other scanner is held');
  assert.equal(b.ctx.state.mode,'scan','a server reply cannot remove the pressed scanner card');
  b.ctx.onAction('cand-done',{dataset:{candidate:candidateId,benchmark:benchId}});
+ const completion=structuredClone(b.ctx.state.decisionEvents.find(row=>row.kind==='completion'&&row.taskId===candidateId));
+ assert.ok(completion,'the actual held click accepts one completion fact');
  b.shim.document.dispatchEvent({type:'click',target:{closest:()=>null}});
- await syncSettle(150);
+ const request=await entered.promise;
+ assert.equal(publicationFinished,false,'the real native publication is still pending at its SDK entry');
+ assert.equal(JSON.parse(request.payload).tasks.find(row=>row.id===candidateId).done,true,'the actual native request carries completion');
+ assert.equal(h.remoteState().tasks.find(row=>row.id===candidateId).done,false,'the undelivered request cannot already complete the remote task');
+ assert.equal(b.ctx.state.tasks.find(row=>row.id===candidateId).done,true,'the accepted click stays complete locally while publication is pending');
+ for(const key of [SYNC_STORE_KEY,LOCAL_HEAD_KEY])assert.equal(b.shim.localStorage.getItem(key),JSON.stringify(b.ctx.state),'the accepted completion is durable before its SDK response');
+ await acknowledged.promise;
+ await settleLiveModePublication(b,h,'native clicked-device publication and durable ACK');
+ await settleLiveModePublication(a,h,'native completion delivery to the paused device');
  assert.equal(h.remoteState().tasks.find(t=>t.id===candidateId).done,true,'the click remains completed after revision-conflict reconciliation');
  assert.equal(a.ctx.state.tasks.find(t=>t.id===candidateId).done,true);assert.equal(b.ctx.state.tasks.find(t=>t.id===candidateId).done,true);
  assert.equal(h.remoteState().mode,'work','the accepted remote pause remains the canonical session mode');
  assert.equal(h.remoteState().tasks.length,3,'no task is lost or resurrected');
+ for(const board of [h.remoteState(),a.ctx.state,b.ctx.state])assert.equal(JSON.stringify(board.decisionEvents.find(row=>row.id===completion.id)),JSON.stringify(completion),'the exact accepted completion fact survives native publication and peer delivery');
 });
 
 test('RISK live scan sync: stale Done comparison and pause controls never act on replacement tasks',async()=>{
