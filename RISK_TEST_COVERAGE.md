@@ -89,6 +89,9 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK DATE FORMAT: the sky-calendar label follows the chosen order without losing the observers timezone
 - RISK AUTH RESTORE: configured startup stays syncing until Firebase resolves the actual session
 - RISK AUTH RESTORE: remembered boards show syncing in header and Settings while restoration is pending
+- RISK AUTH HYDRATION: real Auth and native resume wait for the durable board, then reconcile once
+- RISK AUTH HYDRATION: a corrupt device-head read stays visible and keeps cloud adoption held
+- RISK AUTH HYDRATION: extended FAQ and current Changelog explain the saved-board wait
 
 - RISK IMPORT RENDERING: restored identifiers cannot inject attributes or break task reveal
 - RISK rating drift: Done and Worked on it stay neutral on every completion route and recurrence type

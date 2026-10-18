@@ -11813,5 +11813,31 @@
       "failure": "UI: Quick start displays four essential steps in order failed the3rdliteral: actual With no dot, Yes chooses...Once a dot exists... versusold unconditionalCompareeachcandidate. UI: help describes Start scanning rather than a Can/Can't step failed the oldcase-sensitive Every mode chooses... regex againstactual By default, every mode.... Allbehaviorconsumer tests passed; no appfix or assertiondeletion made to hide these contradictions."
     },
     "greenEvidence": "ART/protected-copy-green.log directly reruns both original protectedcopy tests, allQuickstart companions and19newfeatureconsumers afteronlythese2expectationchanges. Finalexactcandidate fullsuite mustpass beforeCI/release; captured productbytes remain unchanged."
+  },
+  {
+    "comparison": "storageHydration185ActualAuthAndResume",
+    "baseCommit": "52d4b2537bacbb60240ae7a53061224350ebd36f",
+    "testChangesSha256": "240079fc86d0bb64f7576cd3c53c3cb3cf62d7b770490efa94a5549823147982",
+    "reason": "Issue185 exposed a race where the existing Auth callback and native resume entry points can run while an established IndexedDB board is still opening. The regression uses the existing app and backend boundaries, and the only product change defers the read until startup resolves.",
+    "previousBehavior": "With the durable authority marker present, cloudPull checked the unavailable-store guard before its state-pending guard. Auth plus repeated pageshow, focus, and online signals each produced a false device-store/unavailable warning and failed to queue the post-hydration read.",
+    "intendedBehavior": "Pending boot state coalesces Auth and lifecycle requests without reporting storage failure, starting cloud reads, or publishing a placeholder. After the real store opens, the app reconciles once for the current account; an actual open failure still reaches the existing warning and fail-closed path.",
+    "replacementTests": [
+      "RISK AUTH HYDRATION: real Auth and native resume wait for the durable board, then reconcile once",
+      "RISK AUTH HYDRATION: a corrupt device-head read stays visible and keeps cloud adoption held",
+      "RISK AUTH HYDRATION: extended FAQ and current Changelog explain the saved-board wait"
+    ],
+    "updatedTests": [
+      "loadCloudBackendV2 can attach to the actual app window while preserving its standalone test mode when runtimeWindow is omitted."
+    ],
+    "preservedCoverage": [
+      "The actual full Firebase Auth module and public app cloudPull function run against a held real fake-IndexedDB open-success delivery; no app helper is replaced.",
+      "The successful-open control verifies no warning, cloud read, write, or premature adoption while state is pending, then verifies peer progress, chain, both first-dot values, decision identities, unknown fields, saved view, and exact manual and protected backups. A separate actual corrupted-head read stays visible, leaves cloud held, and retains distinct manual and protected recovery payloads.",
+      "Existing account-switch, stale listener callback, blocked and nonsettling open, unavailable established authority, and cloud corruption and transport controls remain unchanged and are rerun as affected controls."
+    ],
+    "redEvidence": {
+      "command": "TZ=UTC node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/storage-hydration-185/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/storage-races-184/185 --purpose preimplementation-red -- node --test --test-name-pattern='RISK AUTH HYDRATION' tests.js",
+      "failure": "On unchanged app source at52d4b2537bacbb60240ae7a53061224350ebd36f, the final assertion Pending successful hydration must not be reported as device-store/unavailable failed with12 captured false device-store/unavailable warnings. All data-preservation and successful-reconciliation assertions ran before that intended assertion; index.html was byte-identical to baseline."
+    },
+    "greenEvidence": "Recorded focused green run 2026-10-18T11-17-35-514Z-ef2442c8-cf11-441b-bbbf-18dca24d0c1d.json passed13 Auth hydration, corrupt cloud and durable reads, account-switch, stale-listener, unavailable-store, blocked-open, and transport/permission controls. The primary three-test Auth hydration run also passed at 2026-10-18T11-17-13-348Z-be428243-d528-420d-81f3-b393ed237b83.json. Broader exact-candidate validation remains required after merge."
   }
 ]

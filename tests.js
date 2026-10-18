@@ -3440,6 +3440,179 @@ test('RISK AUTH RESTORE: remembered boards show syncing in header and Settings w
   CS.status='error';CS.errorStage='auth-storage';ctx.renderSync();assert.equal(button.textContent,'☁ error','real auth failures remain visible');
 });
 
+test('RISK AUTH HYDRATION: real Auth and native resume wait for the durable board, then reconcile once',async()=>{
+ const {IDBFactory}=await import('fake-indexeddb'),at=Date.parse('2026-10-18T12:00:00Z'),pendingWarnings=[];
+ async function within(promise,label,ms=4000){let timer;try{return await Promise.race([promise,new Promise((_,reject)=>timer=setTimeout(()=>reject(Error('Auth hydration deadline: '+label)),ms))]);}finally{clearTimeout(timer);}}
+ async function until(check,label,ms=4000,details=()=>null){const end=Date.now()+ms;while(Date.now()<end){if(check())return;await new Promise(resolve=>setTimeout(resolve,2));}throw Error('Auth hydration deadline: '+label+' '+JSON.stringify(details()));}
+ for(const skipFirstDot of [false,true]){
+  const factory=new IDBFactory(),dbName='chain-scanner-auth-hydration-'+skipFirstDot+'-'+Date.now()+'-'+Math.random();
+  const protectedId='protected-auth-copy-'+skipFirstDot;
+  const board=syncState({tasks:[
+   {...syncTask('saved-local','Saved local decision'),futureTask:{opaque:['keep',7]}},
+   {...syncTask('saved-benchmark','Saved chain benchmark'),createdAt:2},
+  ],chain:['saved-benchmark'],candidateId:'saved-local',mode:'scan',passStartedAt:at-1000,passId:'auth-hydration-pass',
+   syncAccount:'owner@example.test',syncRev:4,syncDirty:true,listOpen:true,protectedBackupIds:[protectedId],
+   settings:{skipOldestFirstDot:skipFirstDot,listMetric:'chance'},futureSaved:{nested:['exact',19]}});
+  const savedView={v:1,account:'owner@example.test',query:'Saved query',eligibility:'all',tagFilter:null,scrollTop:44,listOpen:true};
+  const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(board),[LOCAL_HEAD_KEY]:JSON.stringify(board),
+   'fvp:chain-scanner:saved-view:v1':JSON.stringify(savedView)});
+  let warm,cold,ctx,shim,backend,backendPromise,boot,releaseOpen,openEntered;
+  const warnings=[];
+  const release=new Promise(resolve=>{releaseOpen=resolve;}),entered=new Promise(resolve=>{openEntered=resolve;});
+  try{
+   warm=await loadAppAtTime(at,{sharedStorage:storage,indexedDBProvider:factory,deviceDbName:dbName});
+   warm.ctx.setSkipOldestFirstDotPreference(!skipFirstDot);
+   warm.ctx.setSkipOldestFirstDotPreference(skipFirstDot);
+   assert.equal(await warm.ctx.persist(true),true,'the saved board and its pending local choices have an authoritative device head');
+   const durable=warm.shim.window.ScannerDeviceStore,initialHead=await durable.readHead();
+   const expectedState=JSON.parse(initialHead.payload),expectedEventIds=expectedState.decisionEvents.map(event=>event.id);
+   assert.equal(expectedEventIds.length,2,'the fixture contains two ordinary saved preference decisions');
+   const manualId='manual-auth-copy-'+skipFirstDot;
+   assert.equal((await durable.putBackup({expectedHash:initialHead.hash,backup:{id:manualId,day:'2026-10-18',at:42,kind:'manual',payload:initialHead.payload}})).ok,true);
+   assert.equal((await durable.putBackup({expectedHash:initialHead.hash,backup:{id:protectedId,day:'2026-10-18',at:43,kind:'other-browser-copy',payload:initialHead.payload}})).ok,true);
+   const remote=JSON.parse(warm.ctx.cloudPayload());
+   remote.tasks.push({...syncTask('peer-progress','Unrelated peer progress'),done:true,completedAt:at-10,lastDoneAt:at-10,futureTask:{opaque:'peer'}});
+   remote.workLog=[...(remote.workLog||[]),{id:'peer-work-185',taskId:'peer-progress',title:'Unrelated peer progress',kind:'worked',at:at-10}];
+   remote.futurePeerData={opaque:['preserve',23]};
+   const remotePayload=JSON.stringify(remote);
+   await durable.close();
+   const provider={open(...args){
+    const request=factory.open(...args);
+    return new Proxy(request,{get(target,key){const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;},
+     set(target,key,value){if(key==='onsuccess'){target.onsuccess=event=>{openEntered();release.then(()=>value.call(target,event));};return true;}return Reflect.set(target,key,value,target);}});
+   }};
+   boot=loadAppAtTime(at+1,{sharedStorage:storage,indexedDBProvider:provider,deviceDbName:dbName,beforeStateReady(app,host){
+    ctx=app;shim=host;
+    // A browser classic-script global is also a window property; expose the actual app entry point to its real module.
+    Object.defineProperty(shim.window,'cloudPull',{get:()=>ctx.cloudPull,configurable:true});
+    const toast=shim.document.getElementById('toast');let text=toast.textContent;
+    Object.defineProperty(toast,'textContent',{configurable:true,get(){return text;},set(value){text=value;if(/device-save:|Durable browser storage is unavailable/.test(String(value)))warnings.push(String(value));}});
+    backendPromise=loadCloudBackendV2({rootData:{payload:remotePayload,updatedAt:at,rev:5,serverUpdatedAt:1},failures:{authPending:true},timeoutMs:5000,runtimeWindow:shim.window});
+   }});
+   backend=await within(backendPromise,'real Firebase module setup');
+   await within(entered,'real IndexedDB open success');
+   const pending=vm.runInContext('({loaded:state!==null,required:deviceStorageRequired,authority:deviceStorageAuthority})',ctx);
+   assert.equal(pending.loaded,false,'the actual app is still hydrating');assert.equal(pending.required,true);assert.equal(pending.authority,false);
+   backend.emitAuth({uid:'owner',email:'owner@example.test'});
+   for(const type of ['pageshow','focus','online','pageshow','focus'])shim.window.dispatchEvent({type,persisted:false});
+   await flush();
+   assert.equal(ctx.state,null,'replayed browser wake signals cannot adopt before the real durable open is delivered');
+   assert.equal(vm.runInContext('deviceStorageAuthority',ctx),false);
+   assert.equal(backend.network.length,0,'no cloud read starts while the established durable head is still opening');
+   assert.equal(backend.writes.length,0,'pending initialization does not publish a placeholder or partial board');
+   releaseOpen();cold=await within(boot,'durable hydration');
+   const active=vm.runInContext('({reconciled:reconciled(),pulling,pushing:cloudPushInFlight})',ctx);
+   if(!active.reconciled&&!active.pulling&&!active.pushing)shim.window.dispatchEvent({type:'focus'});
+   await until(()=>vm.runInContext('reconciled()&&!pulling&&!cloudPushInFlight&&!pendingPush&&!cloudPullPending',ctx),'one settled reconciliation',4000,()=>({app:vm.runInContext('({state:state!==null,ready:cloudReady(),user:window.CloudSync?.user,status:window.CloudSync?.status,stage:window.CloudSync?.errorStage,code:window.CloudSync?.errorCode,pulling,push:cloudPushInFlight,pending:pendingPush,pullPending:cloudPullPending,reconciled:reconciled(),issue:deviceSaveIssue()})',ctx),network:backend.network,writes:backend.writes.length}));
+   await new Promise(resolve=>setTimeout(resolve,35));
+   assert.equal(vm.runInContext('deviceStorageAuthority',ctx),true,'successful open restores durable local authority');
+   assert.equal(ctx.state.tasks.find(task=>task.id==='saved-local').title,'Saved local decision');
+   assert.deepEqual(JSON.parse(JSON.stringify(ctx.state.tasks.find(task=>task.id==='saved-local').futureTask)),{opaque:['keep',7]});
+   assert.deepEqual(JSON.parse(JSON.stringify(ctx.state.futureSaved)),{nested:['exact',19]});
+   assert.deepEqual(Array.from(ctx.state.chain),['saved-benchmark'],'the saved chain remains intact');
+   assert.equal(ctx.state.settings.skipOldestFirstDot,skipFirstDot,'both saved first-dot preference values survive');
+   assert.equal(ctx.state.settings.listMetric,'chance');
+   assert.equal(ctx.state.listOpen,true);assert.equal(storage.getItem('fvp:chain-scanner:saved-view:v1'),JSON.stringify(savedView));
+   assert.ok(ctx.state.tasks.some(task=>task.id==='peer-progress'&&task.done),'unrelated peer task progress joins the saved board');
+   assert.ok(ctx.state.workLog.some(entry=>entry.id==='peer-work-185'),'peer history remains available');
+   assert.deepEqual(JSON.parse(JSON.stringify(ctx.state.futurePeerData)),{opaque:['preserve',23]});
+   const eventIds=ctx.state.decisionEvents.map(event=>event.id);
+   assert.deepEqual([...eventIds].sort(),[...expectedEventIds].sort(),'the same pending decisions remain in the reconciled board');
+   assert.equal(new Set(eventIds).size,eventIds.length,'Auth and repeated lifecycle wakes do not duplicate saved decisions');
+   const head=await shim.window.ScannerDeviceStore.readHead(),durableState=JSON.parse(head.payload),backups=await shim.window.ScannerDeviceStore.listBackups();
+   assert.ok(durableState.tasks.some(task=>task.id==='peer-progress'&&task.done),'reconciled peer progress is durable before the app accepts it');
+   assert.deepEqual(JSON.parse(JSON.stringify(durableState.futureSaved)),{nested:['exact',19]});
+   for(const [id,kind] of [[manualId,'manual'],[protectedId,'other-browser-copy']])
+    assert.ok(backups.some(row=>row.id===id&&row.kind===kind&&row.payload===initialHead.payload),kind+' recovery copy remains byte-exact');
+   assert.ok(backend.network.length>0,'the genuine cloud read starts after durable hydration');
+   assert.ok(backend.writes.length<=1,'coalesced startup signals produce at most one merged publication');
+   pendingWarnings.push(...warnings);
+  }finally{
+   releaseOpen();
+   if(boot&&!cold)try{cold=await within(boot,'cleanup boot');}catch{}
+   for(const app of [cold,warm])try{await app?.ctx.window.ScannerDeviceStore?.close?.();}catch{}
+  }
+ }
+ assert.deepEqual(pendingWarnings,[],'Pending successful hydration must not be reported as device-store/unavailable');
+});
+
+test('RISK AUTH HYDRATION: a corrupt device-head read stays visible and keeps cloud adoption held',async()=>{
+ const {IDBFactory}=await import('fake-indexeddb'),factory=new IDBFactory(),at=Date.parse('2026-10-18T13:00:00Z');
+ async function within(promise,label,ms=4000){let timer;try{return await Promise.race([promise,new Promise((_,reject)=>timer=setTimeout(()=>reject(Error('Corrupt-head control deadline: '+label)),ms))]);}finally{clearTimeout(timer);}}
+ const dbName='chain-scanner-auth-corrupt-head-'+Date.now()+'-'+Math.random(),protectedId='protected-corrupt-head-185';
+ const board=syncState({tasks:[syncTask('local-only','Protected local board')],syncAccount:'owner@example.test',syncRev:4,syncDirty:false,
+  protectedBackupIds:[protectedId],futureSaved:{keep:'original'}}),raw=JSON.stringify(board);
+ const storage=sharedScannerStorage({[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw});
+ const warm=await loadAppAtTime(at,{sharedStorage:storage,indexedDBProvider:factory,deviceDbName:dbName});
+ assert.equal(await warm.ctx.persist(true),true);
+ const durable=warm.shim.window.ScannerDeviceStore,initialHead=await durable.readHead();
+ const manualPayload=JSON.stringify({...JSON.parse(initialHead.payload),recoveryMarker:'manual'});
+ const protectedPayload=JSON.stringify({...JSON.parse(initialHead.payload),recoveryMarker:'protected'});
+ assert.equal((await durable.putBackup({expectedHash:initialHead.hash,backup:{id:'manual-corrupt-head-185',day:'2026-10-18',at:1,kind:'manual',payload:manualPayload}})).ok,true);
+ assert.equal((await durable.putBackup({expectedHash:initialHead.hash,backup:{id:protectedId,day:'2026-10-18',at:2,kind:'other-browser-copy',payload:protectedPayload}})).ok,true);
+ await durable.close();
+ const opened=await new Promise((resolve,reject)=>{const request=factory.open(dbName,1);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
+ let snapshotFound=false;
+ await new Promise((resolve,reject)=>{const tx=opened.transaction('snapshots','readwrite'),store=tx.objectStore('snapshots'),request=store.get(initialHead.hash);
+  request.onsuccess=()=>{if(!request.result)return; snapshotFound=true;store.put({...request.result,payload:request.result.payload+'corrupt'},initialHead.hash);};
+  request.onerror=()=>reject(request.error);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||Error('snapshot corruption fixture aborted'));
+ });
+ opened.close();assert.equal(snapshotFound,true,'the actual content-addressed head snapshot was found and damaged');
+ const browserCopies={[SYNC_STORE_KEY]:storage.getItem(SYNC_STORE_KEY),[LOCAL_HEAD_KEY]:storage.getItem(LOCAL_HEAD_KEY)};
+ let releaseSuccess,openEntered,ctx,shim,backendPromise,boot,cold,inspector;
+ const releaseDelivery=new Promise(resolve=>{releaseSuccess=resolve;});
+ const entered=new Promise(resolve=>{openEntered=resolve;}),warnings=[];
+ const provider={open(...args){const request=factory.open(...args);return new Proxy(request,{
+  get(target,key){const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;},
+  set(target,key,value){if(key==='onsuccess'){target.onsuccess=event=>{openEntered();releaseDelivery.then(()=>value.call(target,event));};return true;}return Reflect.set(target,key,value,target);}
+ });}};
+ try{
+  boot=loadAppAtTime(at+1,{sharedStorage:storage,indexedDBProvider:provider,deviceDbName:dbName,beforeStateReady(app,host){
+   ctx=app;shim=host;Object.defineProperty(shim.window,'cloudPull',{get:()=>ctx.cloudPull,configurable:true});
+   const toast=shim.document.getElementById('toast');let text=toast.textContent;
+   Object.defineProperty(toast,'textContent',{configurable:true,get(){return text;},set(value){text=value;if(/device-save:|Durable browser storage is unavailable/.test(String(value)))warnings.push(String(value));}});
+   const remote={...board,tasks:[...board.tasks,syncTask('remote-only','Must not be adopted before local head recovery')]};
+   backendPromise=loadCloudBackendV2({rootData:{payload:JSON.stringify(remote),updatedAt:at,rev:5},failures:{authPending:true},timeoutMs:5000,runtimeWindow:shim.window});
+  }});
+  const backend=await within(backendPromise,'real module before corrupt-read delivery');
+  await within(entered,'actual IndexedDB open success before damaged head read');
+  backend.emitAuth({uid:'owner',email:'owner@example.test'});
+  for(const type of ['pageshow','focus','online'])shim.window.dispatchEvent({type,persisted:false});
+  await flush();assert.equal(ctx.state,null,'the failed read has not been delivered yet');assert.deepEqual(warnings,[],'pending read delivery is not reported as a known failure');
+  assert.equal(backend.network.length,0);assert.equal(backend.writes.length,0);
+  releaseSuccess();cold=await within(boot,'corrupt head read failure');
+  assert.equal(vm.runInContext('deviceStorageAuthority',ctx),false);
+  assert.equal(vm.runInContext('storageOK',ctx),false,'a corrupt durable head cannot become a new empty local authority');
+  assert.ok(warnings.length>0,'the genuine durable read failure remains visible after startup resolves');
+  for(const [key,value] of Object.entries(browserCopies))assert.equal(storage.getItem(key),value,'old browser recovery bytes stay unchanged after the failed read');
+  assert.equal(backend.network.length,0,'the corrupt durable head does not authorize reading or adopting cloud data');
+  assert.equal(backend.writes.length,0);assert.equal(backend.docs.get('users/owner').rev,5,'the remote revision stays untouched');
+  inspector=warm.shim.window.ChainStorageV2.createDeviceStore({indexedDB:factory,crypto:warm.ctx.crypto,dbName});
+  await inspector.open();await assert.rejects(inspector.readHead(),/corrupt|head/i,'the control observes the real snapshot hash failure');
+  const backups=await inspector.listBackups();
+  assert.ok(backups.some(row=>row.id==='manual-corrupt-head-185'&&row.payload===manualPayload),'the distinct manual recovery payload stays exact');
+  assert.ok(backups.some(row=>row.id===protectedId&&row.payload===protectedPayload),'the distinct protected recovery payload stays exact');
+  await inspector.close();
+ }finally{
+  releaseSuccess();if(boot&&!cold)try{cold=await within(boot,'corrupt-read cleanup');}catch{}
+  try{await inspector?.close?.();}catch{}
+  for(const app of [cold,warm])try{await app?.ctx.window.ScannerDeviceStore?.close?.();}catch{}
+ }
+});
+
+test('RISK AUTH HYDRATION: extended FAQ and current Changelog explain the saved-board wait',async()=>{
+ const {ctx,shim}=await loadApp();
+ for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ const answer=help.match(/<dt>What happens when I sign in while my saved board is opening\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
+ assert.ok(answer,'the extended FAQ explains startup reconciliation');
+ assert.match(answer,/opens this device's saved board before checking for newer cloud changes/);
+ assert.match(answer,/storage is unavailable.*sync stays held.*shows a warning/);
+ const current=html.match(new RegExp('<template id="appChangelogCurrent">([\\s\\S]*?)<\\/template>'))?.[1]||'';
+ assert.match(current,/Signing in and returning to a tab wait for this device's saved board to open before checking newer cloud changes/);
+ assert.match(current,/Real storage failures stay visible and keep sync held/);
+});
+
 /* The landscape computes its sky locally from offline scene mirrors. It never
    makes a location-service request to decide what the sky looks like. */
 function livingSky() {
@@ -11208,7 +11381,7 @@ async function loadCloudBackend({ serverData={rev:4}, serverExists=true, failure
   return {...h,getStored:()=>({exists:h.docs.has('users/owner'),data:h.docs.get('users/owner')})};
 }
 
-async function loadCloudBackendV2({rootData=null,batchFailureAt=Infinity,failures={},timeoutMs=25,recordSyncError,cryptoProvider=webcrypto}={}){
+async function loadCloudBackendV2({rootData=null,batchFailureAt=Infinity,failures={},timeoutMs=25,recordSyncError,cryptoProvider=webcrypto,runtimeWindow=null}={}){
  const moduleMatch=html.match(/<script type="module">([\s\S]*?)<\/script>/);assert.ok(moduleMatch);
  const moduleSource=moduleMatch[1].replace(/const \[appMod, A, F\] = await Promise\.all\(\[[\s\S]*?\]\);/,
   'const [appMod, A, F] = globalThis.__cloudModules;');
@@ -11248,13 +11421,14 @@ async function loadCloudBackendV2({rootData=null,batchFailureAt=Infinity,failure
  let authListener=null;
  const auth={currentUser:{uid:'owner',email:'owner@example.test'}},A={browserLocalPersistence:{},getAuth:()=>auth,setPersistence:async()=>{if(failures.persistence)throw failures.persistence;},
   signInWithPopup:async(_auth,provider)=>{popupProviders.push(provider);if(failures.signIn)throw failures.signIn;},signOut:async()=>{if(failures.signOut)throw failures.signOut;},GoogleAuthProvider:class{setCustomParameters(value){this.customParameters=value;}},onAuthStateChanged(_auth,listener){authListener=listener;if(!failures.authPending)listener(auth.currentUser);}};
- const events=[],pending=new Map(),window={FIREBASE_CONFIG:{apiKey:'test-key'},CLOUD_SYNC_TIMEOUT_MS:timeoutMs,dispatchEvent:event=>{events.push(event);return true;}};window.window=window;
- window.ScannerDeviceStore={
+ const events=[],pending=new Map(),window=runtimeWindow||{FIREBASE_CONFIG:{apiKey:'test-key'},CLOUD_SYNC_TIMEOUT_MS:timeoutMs,dispatchEvent:event=>{events.push(event);return true;}};window.window=window;
+ if(runtimeWindow){window.FIREBASE_CONFIG??={apiKey:'test-key'};window.CLOUD_SYNC_TIMEOUT_MS??=timeoutMs;}
+ else window.ScannerDeviceStore={
   async getPendingUpload(account){return clone(pending.get(account)||null);},
   async setPendingUpload(account,value){pending.set(account,clone(value));return {ok:true};},
   async clearPendingUpload(account,generationId){if(pending.get(account)?.generationId!==generationId)return false;pending.delete(account);return true;},
  };
- window.recordSyncError=recordSyncError;
+ if(!runtimeWindow||recordSyncError!==undefined)window.recordSyncError=recordSyncError;
  const context=vm.createContext({window,CustomEvent:class{constructor(type,options){this.type=type;this.detail=options?.detail;}},__cloudModules:[{initializeApp:()=>({})},A,F],
   console,crypto:cryptoProvider,TextEncoder,TextDecoder,structuredClone,setTimeout,clearTimeout});context.globalThis=context;
  for(const file of ['device-store-v2.js','cloud-store-v2.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),context,{filename:file});
