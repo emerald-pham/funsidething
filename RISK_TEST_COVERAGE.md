@@ -12,6 +12,29 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 ## Task state, eligibility, and scanner controls
 
+- RISK optional oldest start: Quick start countdown and immediate-save inventory describe unpaired starts
+
+- RISK optional oldest start: the visible Resume action keeps an empty paused pass and its saved draw
+
+- RISK optional oldest start: Save settings alone persists the checkbox transition
+
+- RISK optional oldest start: enabled Start offers a candidate without dotting or learning
+- RISK optional oldest start: first Yes is unpaired and subsequent Yes learns normally
+- RISK optional oldest start: first No skips only this pass without pairwise learning and Undo restores it
+- RISK optional oldest start: Settings change save and reopen retain the preference and unrelated data
+- RISK optional oldest start: markers first-choice wording and exhausted-state controls match the enabled flow
+- RISK optional oldest start: skips before the first choice survive that choice and cold reopen
+- RISK optional oldest start: an unseeded descending pass clears first skips at the ordinary day boundary
+- RISK optional oldest start: enabling the setting waits for explicit Start before offering the first candidate
+- RISK optional oldest start: missing invalid and off values preserve defaults across all supported scan modes
+- RISK optional oldest start: zero and one eligible tasks remain usable with either preference
+- RISK optional oldest start: the unseeded candidate pool preserves completion date context dependency rest and postponement boundaries
+- RISK optional oldest start: toggling preserves an existing neutral chain and manual first Dot remains unchanged
+- RISK optional oldest start: synced preference first skip and explicit dot retain an independent peer edit
+- RISK optional oldest start: an empty started pass publishes and resumes with its saved draw
+- RISK optional oldest start: synced Undo reverses first choices Start and preference without learning
+- RISK optional oldest start: FAQ and current Changelog explain opt out defaults first choices and retained dots
+
 - RISK quiet reconciliation feedback: a peer edit beside an ordinary Dislodge saves without a success interruption
 - RISK quiet reconciliation feedback: a displaced local title keeps its recovery notice and exact backup
 - RISK quiet reconciliation feedback: independent comparison learning beside Dislodge stays quiet

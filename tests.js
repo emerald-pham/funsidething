@@ -7,6 +7,285 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
+test('RISK optional oldest start: enabled Start offers a candidate without dotting or learning',async()=>{
+ const {ctx,shim}=await loadApp({seed:182});
+ Object.assign(ctx.addTask('Oldest optional-start task',false),{id:'optional-oldest',createdAt:1});
+ Object.assign(ctx.addTask('Higher-ranked optional-start task',false),{id:'optional-higher',createdAt:2,mu:30});
+ ctx.state.settings.skipOldestFirstDot=true;
+ const ratings=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma,t.ratingHistory]));
+ ctx.onAction('start-scan',{dataset:{mode:'descending'}});
+ assert.deepEqual(Array.from(ctx.state.chain),[],'the enabled preference must not automatically place the oldest task');
+ assert.equal(ctx.state.candidateId,'optional-higher','an eligible candidate is offered using the selected mode');
+ assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma,t.ratingHistory])),ratings,'starting without a benchmark creates no learning');
+ assert.match(shim.document.getElementById('scan').innerHTML,/Higher-ranked optional-start task/,'the first candidate is visible');
+ assert.match(shim.document.getElementById('scan').innerHTML,/data-act="yes"/,'an existing affirmative action can choose the first dot');
+});
+
+test('RISK optional oldest start: first Yes is unpaired and subsequent Yes learns normally',async()=>{
+ const {ctx}=await loadApp({seed:183});
+ Object.assign(ctx.addTask('Older first-choice task',false),{id:'first-older',createdAt:1});
+ Object.assign(ctx.addTask('First deliberate choice',false),{id:'first-chosen',createdAt:2,mu:30});
+ ctx.state.settings.skipOldestFirstDot=true;
+ ctx.onAction('start-scan',{dataset:{mode:'descending'}});
+ const ratings=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma]));
+ ctx.onAction('yes',{dataset:{candidate:'first-chosen',benchmark:''}});
+ assert.deepEqual(Array.from(ctx.state.chain),['first-chosen'],'Yes explicitly establishes the first dot without a benchmark');
+ assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),ratings,'the unpaired choice leaves means and uncertainty unchanged');
+ assert.equal(ctx.state.candidateId,'first-older');
+ ctx.onAction('yes',{dataset:{candidate:'first-older',benchmark:'first-chosen'}});
+ assert.deepEqual(Array.from(ctx.state.chain),['first-chosen','first-older']);
+ assert.ok(ctx.state.tasks.find(t=>t.id==='first-older').mu>25,'a later real comparison still trains the chosen candidate');
+ assert.ok(ctx.state.tasks.find(t=>t.id==='first-chosen').mu<30,'the first explicitly chosen task participates in later learning');
+});
+
+test('RISK optional oldest start: first No skips only this pass without pairwise learning and Undo restores it',async()=>{
+ const {ctx}=await loadApp({seed:184});
+ Object.assign(ctx.addTask('Later first choice',false),{id:'skip-next',createdAt:1});
+ Object.assign(ctx.addTask('Skip this first choice',false),{id:'skip-first',createdAt:2,mu:30});
+ ctx.state.settings.skipOldestFirstDot=true;
+ ctx.onAction('start-scan',{dataset:{mode:'descending'}});
+ const ratings=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma,t.ratingHistory]));
+ ctx.onAction('no',{dataset:{candidate:'skip-first',benchmark:''}});
+ assert.equal(ctx.state.considered['skip-first'],'no','an unpaired No skips the candidate for this pass');
+ assert.deepEqual(Array.from(ctx.state.chain),[]);assert.equal(ctx.state.candidateId,'skip-next');
+ assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma,t.ratingHistory])),ratings,'an unpaired skip creates no comparison observation or rating change');
+ ctx.onAction('undo',{});
+ assert.equal(ctx.state.considered['skip-first'],undefined);assert.equal(ctx.state.candidateId,'skip-first');
+ ctx.onAction('no',{dataset:{candidate:'skip-first',benchmark:''}});
+ ctx.onAction('new-pass',{});
+ assert.equal(ctx.state.considered['skip-first'],undefined,'a fresh pass clears the unpaired No');
+ assert.equal(ctx.state.candidateId,'skip-first');assert.deepEqual(Array.from(ctx.state.chain),[]);
+});
+
+test('RISK optional oldest start: Settings change save and reopen retain the preference and unrelated data',async()=>{
+ const app=await loadApp({seed:185}),{ctx,shim}=app;
+ Object.assign(ctx.addTask('Settings oldest fixture',false),{id:'settings-oldest',createdAt:1,privateFutureTask:'retained'});
+ Object.assign(ctx.addTask('Settings next fixture',false),{id:'settings-next',createdAt:2});
+ ctx.state.settings.privateFutureSetting={retained:7};ctx.openSettings();
+ const box=shim.document.getElementById('stSkipOldestFirstDot');Object.assign(box,{id:'stSkipOldestFirstDot',checked:true,matches:()=>false});
+ shim.document.dispatchEvent({type:'change',target:box});
+ shim.document.getElementById('stScanMode').value='descending';ctx.onAction('save-settings',{});
+ ctx.onAction('start-scan',{dataset:{mode:'descending'}});
+ assert.deepEqual(Array.from(ctx.state.chain),[],'the real Settings save must enable an unseeded Start');
+ assert.equal(ctx.state.settings.skipOldestFirstDot,true);ctx.openSettings();
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="stSkipOldestFirstDot" type="checkbox" checked/);
+ ctx.closeModal();assert.equal(await ctx.persist(),true);
+ const raw=shim.localStorage.getItem(SYNC_STORE_KEY);assert.ok(raw);
+ const reopened=await loadApp({seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
+ reopened.ctx.openSettings();assert.match(reopened.shim.document.getElementById('modalRoot').innerHTML,/id="stSkipOldestFirstDot" type="checkbox" checked/);
+ reopened.ctx.closeModal();reopened.ctx.onAction('start-scan',{dataset:{mode:'descending'}});
+ assert.deepEqual(Array.from(reopened.ctx.state.chain),[]);
+ assert.equal(reopened.ctx.state.tasks.find(t=>t.id==='settings-oldest').privateFutureTask,'retained');
+ assert.equal(JSON.stringify(reopened.ctx.state.settings.privateFutureSetting),'{"retained":7}');
+});
+
+test('RISK optional oldest start: markers first-choice wording and exhausted-state controls match the enabled flow',async()=>{
+ const {ctx,shim}=await loadApp({seed:186});
+ Object.assign(ctx.addTask('Marker oldest task',false),{id:'marker-oldest',createdAt:1});
+ Object.assign(ctx.addTask('Marker next task',false),{id:'marker-next',createdAt:2});
+ ctx.state.settings.skipOldestFirstDot=true;ctx.state.settings.listMetric='chance';ctx.state.scanMode='chance';ctx.state.listOpen=true;ctx.render();
+ assert.doesNotMatch(shim.document.getElementById('listBody').innerHTML,/Will be added to the chain when you start scanning/,'the list must not promise a suppressed automatic first dot');
+ assert.doesNotMatch(shim.document.getElementById('listBody').innerHTML,/The first dot is chosen by age/);
+ ctx.state.listOpen=false;ctx.onAction('start-scan',{dataset:{mode:'descending'}});
+ assert.match(shim.document.getElementById('scan').innerHTML,/Choose this task as the first dot/);
+ for(let i=0;i<2;i++){const id=ctx.state.candidateId;assert.ok(id);ctx.onAction('no',{dataset:{candidate:id,benchmark:''}});}
+ assert.deepEqual(Array.from(ctx.state.chain),[]);assert.equal(ctx.state.candidateId,null);
+ assert.match(shim.document.getElementById('scan').innerHTML,/All eligible candidates have been scanned/);
+ assert.match(shim.document.getElementById('scan').innerHTML,/data-act="rescan"/,'explicit rescan remains available with no first dot');
+ ctx.onAction('rescan',{});assert.ok(ctx.state.candidateId);assert.deepEqual(Array.from(ctx.state.chain),[]);
+});
+
+test('RISK optional oldest start: skips before the first choice survive that choice and cold reopen',async()=>{
+ const app=await loadApp({seed:187}),{ctx,shim}=app;
+ Object.assign(ctx.addTask('Keep for later',false),{id:'flow-later',createdAt:1});
+ Object.assign(ctx.addTask('Skip before choosing',false),{id:'flow-skipped',createdAt:2,mu:30});
+ Object.assign(ctx.addTask('Choose this first',false),{id:'flow-chosen',createdAt:3,mu:28});
+ ctx.state.settings.skipOldestFirstDot=true;ctx.onAction('start-scan',{dataset:{mode:'descending'}});
+ ctx.onAction('no',{dataset:{candidate:'flow-skipped',benchmark:''}});
+ assert.equal(ctx.state.candidateId,'flow-chosen');ctx.onAction('yes',{dataset:{candidate:'flow-chosen',benchmark:''}});
+ assert.equal(ctx.state.considered['flow-skipped'],'no','choosing the first dot must not begin a different pass and revive a skipped candidate');
+ assert.equal(ctx.state.candidateId,'flow-later');assert.deepEqual(Array.from(ctx.state.chain),['flow-chosen']);
+ assert.equal(await ctx.persist(),true);const raw=shim.localStorage.getItem(SYNC_STORE_KEY);
+ const reopened=await loadApp({seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
+ assert.equal(reopened.ctx.state.considered['flow-skipped'],'no');assert.deepEqual(Array.from(reopened.ctx.state.chain),['flow-chosen']);
+ assert.equal(reopened.ctx.state.candidateId,'flow-later');
+});
+
+test('RISK optional oldest start: an unseeded descending pass clears first skips at the ordinary day boundary',async()=>{
+ const at=Date.parse('2026-10-18T01:00:00Z'),{ctx}=await loadAppAtTime(at,{seed:188});
+ Object.assign(ctx.addTask('Day boundary lower task',false),{id:'day-lower',createdAt:1});
+ Object.assign(ctx.addTask('Day boundary first task',false),{id:'day-first',createdAt:2,mu:30});
+ ctx.state.settings.skipOldestFirstDot=true;ctx.onAction('start-scan',{dataset:{mode:'descending'}});
+ ctx.onAction('no',{dataset:{candidate:'day-first',benchmark:''}});assert.equal(ctx.state.candidateId,'day-lower');
+ ctx.onAction('start-working',{});setFakeTime(ctx,at+2*60*60*1000);
+ ctx.onAction('resume-scan',{dataset:{mode:'descending'}});
+ assert.equal(ctx.state.considered['day-first'],undefined,'empty-chain passes still expire at the local day marker');
+ assert.equal(ctx.state.candidateId,'day-first');assert.deepEqual(Array.from(ctx.state.chain),[]);
+});
+
+test('RISK optional oldest start: enabling the setting waits for explicit Start before offering the first candidate',async()=>{
+ const {ctx,shim}=await loadApp({seed:189});ctx.addTask('Wait for Start',false);ctx.openSettings();
+ const box=shim.document.getElementById('stSkipOldestFirstDot');Object.assign(box,{id:'stSkipOldestFirstDot',checked:true,matches:()=>false});
+ shim.document.dispatchEvent({type:'change',target:box});ctx.closeModal();
+ assert.equal(ctx.state.candidateId,null,'changing a future-start preference must leave the initial scanner behind Start');
+ assert.deepEqual(Array.from(ctx.state.chain),[]);assert.match(shim.document.getElementById('scan').innerHTML,/data-act="start-scan"/);
+ assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/starts on the oldest/);
+ ctx.onAction('start-scan',{dataset:{mode:'descending'}});assert.ok(ctx.state.candidateId);assert.deepEqual(Array.from(ctx.state.chain),[]);
+});
+
+test('RISK optional oldest start: missing invalid and off values preserve defaults across all supported scan modes',async()=>{
+ for(const value of [undefined,false,true,null,0,1,'true','false',{},[]])for(const mode of ['descending','chance','squared','halving','both']){
+  const initial=syncState({tasks:[{...syncTask('default-oldest','Oldest default task'),createdAt:1},{...syncTask('default-next','Newer default task'),createdAt:2}],settings:{scanMode:mode}});
+  if(value!==undefined)initial.settings.skipOldestFirstDot=value;
+  const raw=JSON.stringify(initial),{ctx}=await loadApp({seed:190,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
+  assert.equal(ctx.state.settings.skipOldestFirstDot,value===true,'only a saved boolean true enables the option');
+  const ratings=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma]));
+  ctx.onAction('start-scan',{dataset:{mode:mode==='both'?'descending':mode}});
+  if(value===true){assert.deepEqual(Array.from(ctx.state.chain),[]);assert.ok(['default-oldest','default-next'].includes(ctx.state.candidateId));}
+  else assert.deepEqual(Array.from(ctx.state.chain),['default-oldest'],'older and invalid preferences preserve the oldest automatic first dot');
+  assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),ratings,'automatic or unseeded Start remains neutral');
+ }
+});
+
+test('RISK optional oldest start: zero and one eligible tasks remain usable with either preference',async()=>{
+ for(const enabled of [false,true]){
+  const {ctx,shim}=await loadApp({seed:191});ctx.state.settings.skipOldestFirstDot=enabled;
+  ctx.onAction('start-scan',{dataset:{mode:'descending'}});assert.deepEqual(Array.from(ctx.state.chain),[]);assert.equal(ctx.state.candidateId,null);
+  assert.match(shim.document.getElementById('scan').innerHTML,/Nothing eligible to scan|Nothing on the list yet/);
+  const task=ctx.addTask('Sole eligible task',false),ratings=JSON.stringify([task.mu,task.sigma]);ctx.onAction('start-scan',{dataset:{mode:'descending'}});
+  if(enabled){
+   assert.deepEqual(Array.from(ctx.state.chain),[]);assert.equal(ctx.state.candidateId,task.id);
+   ctx.onAction('no',{dataset:{candidate:task.id,benchmark:''}});assert.equal(ctx.state.candidateId,null);assert.deepEqual(Array.from(ctx.state.chain),[]);
+   ctx.onAction('new-pass',{});assert.equal(ctx.state.candidateId,task.id);ctx.onAction('yes',{dataset:{candidate:task.id,benchmark:''}});
+  }
+  assert.deepEqual(Array.from(ctx.state.chain),[task.id]);assert.equal(JSON.stringify([ctx.state.tasks[0].mu,ctx.state.tasks[0].sigma]),ratings);
+ }
+});
+
+test('RISK optional oldest start: the unseeded candidate pool preserves completion date context dependency rest and postponement boundaries',async()=>{
+ const at=Date.parse('2026-10-18T12:00:00Z'),{ctx}=await loadAppAtTime(at,{seed:192});
+ ctx.state.contexts=[{id:'allowed-context',name:'Allowed',active:true},{id:'excluded-context',name:'Excluded',active:true,excluded:true}];
+ const add=(id,extra={})=>Object.assign(ctx.addTask(id,false),{id,createdAt:1,...extra});
+ add('completed-ineligible',{done:true});add('future-ineligible',{startsAt:'2099-01-01'});add('context-ineligible',{ctx:['excluded-context']});
+ add('resting-ineligible',{evergreen:true,evergreenHours:24,evergreenResetAtDay:false,lastDoneAt:at});
+ add('dependency-ineligible',{prerequisiteId:'eligible-only',prerequisiteIds:['eligible-only']});add('eligible-only',{createdAt:9});add('postpone-first',{createdAt:10,mu:40});
+ ctx.state.settings.skipOldestFirstDot=true;ctx.state.settings.showPostpone=true;ctx.onAction('start-scan',{dataset:{mode:'descending'}});
+ assert.equal(ctx.state.candidateId,'postpone-first');ctx.onAction('postpone',{dataset:{candidate:'postpone-first',benchmark:''}});
+ assert.deepEqual(Array.from(ctx.state.chain),[],'postponing an unpaired candidate must not automatically dot its replacement');
+ assert.equal(ctx.state.candidateId,'eligible-only','all existing ineligible tasks stay outside the empty-chain candidate pool');
+ assert.deepEqual(Array.from(ctx.state.chain),[]);ctx.onAction('no',{dataset:{candidate:'eligible-only',benchmark:''}});assert.equal(ctx.state.candidateId,null);
+ ctx.onAction('new-pass',{});assert.equal(ctx.state.candidateId,'eligible-only','a fresh pass clears No without ending an active postponement or rest');
+});
+
+test('RISK optional oldest start: toggling preserves an existing neutral chain and manual first Dot remains unchanged',async()=>{
+ const {ctx,shim}=await loadApp({seed:193});const a=ctx.addTask('Existing automatic dot',false),b=ctx.addTask('Existing candidate',false);
+ ctx.onAction('start-scan',{dataset:{mode:'descending'}});const chain=Array.from(ctx.state.chain),ratings=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma]));
+ ctx.openSettings();const box=shim.document.getElementById('stSkipOldestFirstDot');Object.assign(box,{id:'stSkipOldestFirstDot',checked:true,matches:()=>false});shim.document.dispatchEvent({type:'change',target:box});ctx.closeModal();
+ assert.deepEqual(Array.from(ctx.state.chain),chain);assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),ratings);
+ ctx.onAction('undo',{});assert.equal(ctx.state.settings.skipOldestFirstDot,false);assert.deepEqual(Array.from(ctx.state.chain),chain);
+ ctx.onAction('yes',{dataset:{candidate:b.id,benchmark:a.id}});assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),ratings,'toggling does not retroactively make an automatic seed participate in learning');
+ for(const enabled of [false,true]){
+  const app=await loadApp({seed:194}),task=app.ctx.addTask('Explicit manual first dot',false);app.ctx.state.settings.skipOldestFirstDot=enabled;
+  const before=JSON.stringify([task.mu,task.sigma]);app.ctx.dotTask(task.id);assert.deepEqual(Array.from(app.ctx.state.chain),[task.id]);assert.equal(JSON.stringify([task.mu,task.sigma]),before);
+ }
+});
+
+test('RISK optional oldest start: synced preference first skip and explicit dot retain an independent peer edit',async t=>{
+ const at=Date.parse('2026-10-18T12:00:00Z');
+ const initial=syncState({tasks:[{...syncTask('cloud-later','Cloud later task'),createdAt:1},{...syncTask('cloud-skipped','Cloud skipped task'),createdAt:2,mu:30},{...syncTask('cloud-chosen','Cloud chosen task'),createdAt:3,mu:28}],settings:{scanMode:'descending',skipOldestFirstDot:false},syncAccount:'e@example.com',syncRev:4,syncDirty:false});
+ const h=makeSyncHarness({remote:initial,rev:4,delayMs:1}),raw=JSON.stringify(initial),opts={seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory};
+ const a=await loadAppAtTime(at,opts),b=await loadAppAtTime(at,opts);t.after(()=>closeLegacyApp173(a));t.after(()=>closeLegacyApp173(b));await a.ctx.cloudPull();await b.ctx.cloudPull();a.ctx.window.CloudSync.ready=false;b.ctx.window.CloudSync.ready=false;
+ setFakeTime(b.ctx,at+50);hydrateUnchangedEditorDraft(b,'cloud-later');b.shim.document.getElementById('etTitle').value='Independent peer title';b.ctx.onAction('save-edit',{dataset:{id:'cloud-later'}});assert.equal(await b.ctx.persist(),true);
+ setFakeTime(a.ctx,at+100);a.ctx.openSettings();const box=a.shim.document.getElementById('stSkipOldestFirstDot');Object.assign(box,{id:'stSkipOldestFirstDot',checked:true,matches:()=>false});a.shim.document.dispatchEvent({type:'change',target:box});a.ctx.closeModal();
+ a.ctx.onAction('start-scan',{dataset:{mode:'descending'}});a.ctx.onAction('no',{dataset:{candidate:'cloud-skipped',benchmark:''}});a.ctx.onAction('yes',{dataset:{candidate:'cloud-chosen',benchmark:''}});assert.equal(await a.ctx.persist(),true);
+ a.ctx.window.CloudSync.ready=true;await a.ctx.cloudPull();await a.ctx.cloudPushNow();await settleSavedViewPublication(a,h,'unseeded first choices publication');
+ b.ctx.window.CloudSync.ready=true;await b.ctx.cloudPull();await b.ctx.cloudPushNow();await settleSavedViewPublication(b,h,'independent peer edit and unseeded choices');
+ await a.ctx.cloudPull();await a.ctx.cloudPushNow();await settleSavedViewPublication(a,h,'unseeded peer acknowledgement');
+ for(const app of [a,b]){
+  assert.equal(app.ctx.state.settings.skipOldestFirstDot,true);assert.deepEqual(Array.from(app.ctx.state.chain),['cloud-chosen']);
+  assert.equal(app.ctx.state.considered['cloud-skipped'],'no','sync keeps a first skip without a fabricated comparison');
+  assert.equal(app.ctx.state.tasks.find(row=>row.id==='cloud-later').title,'Independent peer title');
+  assert.deepEqual(JSON.parse(JSON.stringify(app.ctx.state.tasks.map(row=>[row.id,row.mu]).sort())),[['cloud-chosen',28],['cloud-later',25],['cloud-skipped',30]],'independent first choices do not train any pair');
+ }
+});
+
+test('RISK optional oldest start: an empty started pass publishes and resumes with its saved draw',async t=>{
+ for(const mode of ['descending','chance','squared','halving']){
+  const at=Date.parse('2026-10-18T12:00:00Z'),initial=syncState({tasks:[{...syncTask('resume-a','Resume older'),createdAt:1},{...syncTask('resume-b','Resume higher'),createdAt:2,mu:30}],settings:{scanMode:mode,skipOldestFirstDot:true},syncAccount:'e@example.com',syncRev:4,syncDirty:false});
+  const h=makeSyncHarness({remote:initial,rev:4,delayMs:1}),raw=JSON.stringify(initial),app=await loadAppAtTime(at,{seed:195,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});t.after(()=>closeLegacyApp173(app));
+  await app.ctx.cloudPull();app.ctx.window.CloudSync.ready=false;app.ctx.onAction('start-scan',{dataset:{mode}});
+  const candidate=app.ctx.state.candidateId,draw=JSON.stringify(app.ctx.state.chance);assert.ok(candidate);assert.deepEqual(Array.from(app.ctx.state.chain),[]);
+  app.ctx.onAction('start-working',{});assert.equal(await app.ctx.persist(),true);
+  app.ctx.window.CloudSync.ready=true;await app.ctx.cloudPull();await app.ctx.cloudPushNow();
+  assert.notEqual(app.ctx.window.CloudSync.errorCode,'unprojectable-decision-evidence','a started empty pass must be publishable before any explicit choice');
+  await settleSavedViewPublication(app,h,'empty started '+mode+' pass');
+  const saved=JSON.stringify({...h.remoteState(),syncAccount:'e@example.com',syncRev:h.doc.rev,syncDirty:false});
+  const reopened=await loadAppAtTime(at+1000,{seed:196,seedStorage:{[SYNC_STORE_KEY]:saved,[LOCAL_HEAD_KEY]:saved},cloudSyncFactory:h.factory});t.after(()=>closeLegacyApp173(reopened));
+  await reopened.ctx.cloudPull();reopened.ctx.onAction('resume-scan',{dataset:{mode}});
+  assert.equal(reopened.ctx.state.candidateId,candidate);assert.equal(JSON.stringify(reopened.ctx.state.chance),draw,'pause reload and resume keep the saved draw');assert.deepEqual(Array.from(reopened.ctx.state.chain),[]);
+ }
+});
+
+test('RISK optional oldest start: synced Undo reverses first choices Start and preference without learning',async t=>{
+ const at=Date.parse('2026-10-18T12:00:00Z'),initial=syncState({tasks:[{...syncTask('undo-first','Skip first'),createdAt:1,mu:30},{...syncTask('undo-second','Choose second'),createdAt:2,mu:28}],settings:{skipOldestFirstDot:false},syncAccount:'e@example.com',syncRev:4,syncDirty:false});
+ const h=makeSyncHarness({remote:initial,rev:4,delayMs:1}),raw=JSON.stringify(initial),app=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});t.after(()=>closeLegacyApp173(app));await app.ctx.cloudPull();
+ const publish=async label=>{assert.equal(await app.ctx.persist(),true);await app.ctx.cloudPull();await app.ctx.cloudPushNow();await settleSavedViewPublication(app,h,label);};
+ app.ctx.openSettings();const box=app.shim.document.getElementById('stSkipOldestFirstDot');Object.assign(box,{id:'stSkipOldestFirstDot',checked:true,matches:()=>false});app.shim.document.dispatchEvent({type:'change',target:box});app.ctx.closeModal();
+ app.ctx.onAction('start-scan',{dataset:{mode:'descending'}});app.ctx.onAction('no',{dataset:{candidate:'undo-first',benchmark:''}});await publish('first unpaired skip');
+ assert.equal(h.remoteState().considered['undo-first'],'no');app.ctx.onAction('yes',{dataset:{candidate:'undo-second',benchmark:''}});await publish('first explicit dot');
+ app.ctx.onAction('undo',{});await publish('Undo first explicit dot');assert.deepEqual(h.remoteState().chain,[]);assert.equal(h.remoteState().considered['undo-first'],'no');
+ app.ctx.onAction('undo',{});await publish('Undo first skip');assert.equal(h.remoteState().considered['undo-first'],undefined);assert.equal(app.ctx.state.candidateId,'undo-first');
+ app.ctx.onAction('undo',{});await publish('Undo empty Start');assert.equal(app.ctx.state.candidateId,null);assert.deepEqual(h.remoteState().chain,[]);
+ app.ctx.onAction('undo',{});await publish('Undo optional-start preference');assert.equal(h.remoteState().settings.skipOldestFirstDot,false);
+ assert.deepEqual(h.remoteState().tasks.map(row=>[row.id,row.mu]),[['undo-first',30],['undo-second',28]],'all synced reversals remain unpaired and neutral');
+});
+
+test('RISK optional oldest start: FAQ and current Changelog explain opt out defaults first choices and retained dots',async()=>{
+ const {ctx,shim}=await loadApp();ctx.onAction('help',{});const view=shim.document.getElementById('modalRoot').innerHTML;
+ const answer=question=>{const found=view.match(new RegExp('<dt>'+question.replace(/[?]/g,'\\?')+'</dt><dd>(.*?)</dd>'));assert.ok(found,'the mounted FAQ includes '+question);return found[1];};
+ const choice=answer('Can I choose the first dot myself?');
+ assert.match(choice,/Skip automatically dotting the oldest task/);assert.match(choice,/off by default/i);assert.match(choice,/saves immediately/i);assert.match(choice,/Yes.*first dot/);assert.match(choice,/No.*pass/);assert.match(choice,/rating|learning/);assert.match(choice,/existing dots/i);
+ for(const question of ['What is Halving weighting?','What is Squared Weighting?','What is chance mode?','What happens to dots saved before this update?'])assert.match(answer(question),/unless.*skip|option.*off|by default/i,'automatic-first guidance accounts for the opt out: '+question);
+ const current=fs.readFileSync(new URL('./index.html',import.meta.url),'utf8').match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];
+ assert.match(current,/Settings.*choose the first dot yourself/);assert.match(current,/off by default/i);
+});
+
+test('RISK optional oldest start: Save settings alone persists the checkbox transition',async()=>{
+ const {ctx,shim}=await loadApp({seed:197});ctx.addTask('Save-only eligible task',false);ctx.openSettings();
+ assert.equal(ctx.state.settings.skipOldestFirstDot,false);
+ shim.document.getElementById('stSkipOldestFirstDot').checked=true;
+ ctx.onAction('save-settings',{});
+ assert.equal(ctx.state.settings.skipOldestFirstDot,true,'Save must read the checked draft even without an immediate change event');
+ ctx.onAction('start-scan',{dataset:{mode:'descending'}});assert.deepEqual(Array.from(ctx.state.chain),[]);assert.ok(ctx.state.candidateId);
+ assert.equal(await ctx.persist(),true);const raw=shim.localStorage.getItem(SYNC_STORE_KEY),reopened=await loadApp({seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
+ reopened.ctx.openSettings();assert.match(reopened.shim.document.getElementById('modalRoot').innerHTML,/id="stSkipOldestFirstDot" type="checkbox" checked/);
+});
+
+test('RISK optional oldest start: the visible Resume action keeps an empty paused pass and its saved draw',async()=>{
+ for(const mode of ['descending','chance','squared','halving']){
+  const {ctx,shim}=await loadApp({seed:198});
+  for(let n=0;n<4;n++)Object.assign(ctx.addTask('Paused candidate '+n,false),{id:'pause-'+n,createdAt:n+1,mu:25+n});
+  ctx.state.settings.skipOldestFirstDot=true;ctx.state.settings.scanMode=mode;ctx.onAction('start-scan',{dataset:{mode}});
+  const skipped=ctx.state.candidateId;ctx.onAction('no',{dataset:{candidate:skipped,benchmark:''}});
+  const chosen=ctx.state.candidateId;ctx.onAction('yes',{dataset:{candidate:chosen,benchmark:''}});ctx.onAction('start-working',{});ctx.onAction('worked',{dataset:{benchmark:chosen}});
+  assert.deepEqual(Array.from(ctx.state.chain),[]);assert.equal(ctx.state.mode,'work');
+  const before={passId:ctx.state.passId,draw:JSON.stringify(ctx.state.chance)},view=shim.document.getElementById('scan').innerHTML,action=view.match(/data-act="(start-scan|resume-scan)"/)?.[1];
+  assert.equal(action,'resume-scan','an already-started empty paused chain must offer Resume through its actual visible action');
+  ctx.onAction(action,{dataset:{mode}});assert.equal(ctx.state.passId,before.passId);assert.equal(JSON.stringify(ctx.state.chance),before.draw);assert.equal(ctx.state.considered[skipped],'no');assert.ok(ctx.state.candidateId);
+ }
+});
+
+test('RISK optional oldest start: Quick start countdown and immediate-save inventory describe unpaired starts',async()=>{
+ const {ctx,shim}=await loadApp();ctx.onAction('help',{});const view=shim.document.getElementById('modalRoot').innerHTML;
+ const quick=view.match(/<summary>Quick start<\/summary>([\s\S]*?)<\/details>/)[1];
+ assert.match(quick,/With no dot, Yes chooses.*No skips.*this pass/,'Quick start must explain the initial unpaired choice');
+ assert.match(quick,/Once a dot exists, compare each candidate/,'benchmark comparisons start only after a dot exists');
+ const countdown=view.match(/<dt>What do the countdown tags mean\?<\/dt><dd>(.*?)<\/dd>/)[1];
+ assert.match(countdown,/Start clears expired.*before building.*eligible pool/,'timer cleanup does not promise automatic placement');
+ const immediate=view.match(/<dt>Which settings save immediately\?<\/dt><dd>(.*?)<\/dd>/)[1];
+ assert.match(immediate,/Skip automatically dotting the oldest task/,'the complete immediate-save inventory includes the new checkbox');
+});
+
 test('RISK quiet reconciliation feedback: a peer edit beside an ordinary Dislodge saves without a success interruption',async t=>{
  const at=Date.parse('2026-10-18T03:00:00Z'),ids=['quiet-first','quiet-second'];
  const initial=syncState({tasks:ids.map((id,i)=>({...syncTask(id,'Quiet task '+(i+1)),createdAt:i+1})),mode:'work',scanMode:'descending',syncAccount:'e@example.com',syncRev:4,syncDirty:false,settings:{horizonMin:60,thresholdPct:0,samples:40,cantMin:30,workedHours:8,theme:'system'}});
@@ -7331,7 +7610,7 @@ test("UI: Quick start displays four essential steps in order", async () => {
   assert.deepEqual(steps, [
   "Add tasks. Optionally assign contexts, then enable the contexts needed for those tasks.",
   "Choose Start scanning.",
-  "Compare each candidate with the newest dot. Choose Yes if you prefer it, No to keep the dot, or Can’t to put the candidate aside for now.",
+  "With no dot, Yes chooses the first task and No skips it for this pass. Once a dot exists, compare each candidate with the newest dot: Yes if you prefer it, No to keep the dot, or Can’t to put the candidate aside for now.",
   "Choose done scanning when ready. Work the chain from the newest dot upward, using Done for finished tasks, Worked on it for progress, or Dislodge to set a task aside."
 ]);
 });
@@ -7363,7 +7642,7 @@ test("UI: help describes Start scanning rather than a Can/Can't step", async () 
   const helpHtml = shim.elements.get("modalRoot").innerHTML;
 
   assert.match(helpHtml, /start scanning/i, "help should name the button that starts a chain");
-  assert.match(helpHtml, /Every mode chooses the first dot by age: the oldest eligible task/, "normal mode retains the oldest eligible anchor");
+  assert.match(helpHtml, /By default, every mode chooses the first dot by age: the oldest eligible task/, "normal mode retains the oldest eligible anchor");
   assert.ok(!/Answer <b>Can<\/b>/.test(helpHtml), "the Can/Can't instruction should be gone");
 });
 

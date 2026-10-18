@@ -11613,5 +11613,205 @@
     "laterSensitivity": "External reversionbea2086a moves peer-response waiting before source prompt assertions again; the exact rev===5 assertion fails6!==5. External promptb4f9a1a delegates only fixture Done immediate call to the actual ordinary producer; source write-ACK-before-debounce assertion fails. External withheld-hint52a30b45 passes1/1 both completion modes: zero peer reads and no current/known completion through actual ordinary-write ACK, then dispatches the exact captured natural event and receives completion through its real canonical continuation, without manual target sync/focus. These are later sensitivity controls, not preimplementation chronology.",
     "attemptAttribution": "First preimplementation83f67ca0 PASSED3/3: waiting for ordinary producer entry alone precedes its write ACK and did not force the false negative. It is preserved as a non-RED control. Subsequent d96ef663 is the genuine pre-repair assertion RED. Root read exact probe/diff/full traces on clean fdf and approved the narrow source-ACK/peer-delay separation before edits; root-slow-peer-seam-acceptance.json SHAbd5b6289f5c0b7b28f5c38b3cc5f78ab007bfcf3a54e84cc81c5db8545e8f1f6 retains that boundary. Original main failure, head successes and fdf evidence remain distinct historical records. Parent reports full-fdf731148ae finished2158total/2110pass/0fail/48skip; it is predecessor evidence only. The first rationale generator and precommit gate correctly refused the missing updated test declaration in the exact diff; formatting only its unchanged title/deadline declaration binds the test body, with no runtime or time-budget edit. That packaging failure is retained separately, not a behavioral RED.",
     "validationScope": "The unchanged test title/deadline declaration receives whitespace formatting so the existing replacement-test diff validator can bind its updated body. No app/runtime/public copy/SW/hash change, shared loader/helper/default/deadline change, other consumer sweep, new framework, full suite/rules/compat/browser/emulator/CI/push/merge/deploy by worker. Root owns exact whole-candidate integration, independent review and release gates. Existing native/rendered proof carries only on mechanical unchanged runtime bytes."
+  },
+  {
+    "comparison": "optionalOldestStart182",
+    "baseCommit": "826f3a5dec47bd05dc6f27154d14ea4416201372",
+    "testChangesSha256": "0d6c60469981127553371d606ff93f4b205038c98325507f87f142d12c8c4649",
+    "reason": "Issue182 authorizes a saved strict boolean opt-out of automatic oldest first dot, neutral explicit first choices, truthful controls and preserved lifecycle/sync. New public-consumer tests are prepended without editing any original feature assertion.",
+    "previousBehavior": "Start always dots the oldest eligible task. A true opt-out still created an automatic first dot; unpaired Yes/No did not establish a chosen dot or skip. Settings had no opt-out. Existing automatic-first marker, summary and FAQ claims were unconditional.",
+    "intendedBehavior": "Only boolean true disables automatic seeding. Actual Settings change/save/reopen and Start offer an eligible unpaired candidate; first Yes is a deliberate neutral Dot, first No skips for this pass without pairwise learning. Default and invalid values retain automatic age and never-Done behavior. Existing dots, manual Dot, eligibility, saved draw, day cutoff, local persistence, concurrent peer edits, and synced Undo remain intact. Empty Start uses the existing new-pass representation and records its mode inside that pass, avoiding an unmatched automatic-root pair.",
+    "replacementTests": [
+      "RISK optional oldest start: enabled Start offers a candidate without dotting or learning",
+      "RISK optional oldest start: first Yes is unpaired and subsequent Yes learns normally",
+      "RISK optional oldest start: first No skips only this pass without pairwise learning and Undo restores it",
+      "RISK optional oldest start: Settings change save and reopen retain the preference and unrelated data",
+      "RISK optional oldest start: markers first-choice wording and exhausted-state controls match the enabled flow",
+      "RISK optional oldest start: skips before the first choice survive that choice and cold reopen",
+      "RISK optional oldest start: an unseeded descending pass clears first skips at the ordinary day boundary",
+      "RISK optional oldest start: enabling the setting waits for explicit Start before offering the first candidate",
+      "RISK optional oldest start: missing invalid and off values preserve defaults across all supported scan modes",
+      "RISK optional oldest start: zero and one eligible tasks remain usable with either preference",
+      "RISK optional oldest start: the unseeded candidate pool preserves completion date context dependency rest and postponement boundaries",
+      "RISK optional oldest start: toggling preserves an existing neutral chain and manual first Dot remains unchanged",
+      "RISK optional oldest start: synced preference first skip and explicit dot retain an independent peer edit",
+      "RISK optional oldest start: an empty started pass publishes and resumes with its saved draw",
+      "RISK optional oldest start: synced Undo reverses first choices Start and preference without learning",
+      "RISK optional oldest start: FAQ and current Changelog explain opt out defaults first choices and retained dots"
+    ],
+    "preservedCoverage": [
+      "All original tests.js bytes from the first quiet-reconciliation test through EOF remain byte-identical to826f3a5. No existing assertion, deadline, skip, fixture or supported compatibility baseline was removed or weakened.",
+      "The50 saved-value/mode cases plus zero/one/multiple and eligibility controls retain completion, dates, contexts, dependencies, rest and postponement. Explicit paired learning, automatic exclusion, manual Dot and existing-chain toggles remain tested.",
+      "Cloud consumers require actual SDK publication plus matching current serialized local, device and remote acknowledgements. First skip/choice plus independent peer edit and multi-step synced Undo run through production sync glue; no badge/read-only success substitutes for acknowledgement.",
+      "The earlier first-choice-reopen case passed when introduced and synced Undo also passed on first introduction; these are honest preservation controls, not claimed preimplementation REDs. Diagnostic preference-only passed, while Start/no/yes/both failed. The misplaced mode-gesture attempt failed and was corrected; no contrary run is hidden."
+    ],
+    "redEvidence": {
+      "command": "Pinned Node22 TZ=UTC node scripts/agent-tools/record-run.mjs --repo <isolated oldest-start-182 checkout> --evidence-dir /Users/emeraldpham/.codex/task-artifacts/oldest-start-182/test-runs --purpose preimplementation-red -- node --test --test-name-pattern=<individual optional oldest start slice> tests.js. Original start-red cb2dd4fa-032c-465c-83f1-b3c0b5529078 was recorded on runtime826 before implementation; all per-slice logs and source snapshots retained in /Users/emeraldpham/.codex/task-artifacts/oldest-start-182.",
+      "failure": "Original first RED expected empty chain but actual [optional-oldest]. Subsequent observed REDs: first Yes left chain empty, first No left considered undefined, real Settings Save still auto seeded, list promised suppressed seed, day cutoff kept skipped task, Settings enable offered candidate before Start, Postpone auto dotted replacement, cloud publication held unprojectable-decision-evidence, and mounted FAQ lacked the new question. See contemporaneous *-red.log files; diagnostic/reopen/synced-Undo passing controls are explicitly qualified. Empty-start-publication-red establishes later sync repair chronology, not baseline first RED."
+    },
+    "greenEvidence": "Focused final FAQ/behavior cohort faq-green.log passes19/19 including16 new optional-start tests, old FAQ brevity and neutral automatic exclusion FAQ. start-publication-corrected.log passes14/14 with full source held constant; later copy/comments/fingerprints receive final full/rules/compatibility/browser/review gates. No claim of shipment or original RED from these later greens."
+  },
+  {
+    "comparison": "optional182ReviewRepair",
+    "baseCommit": "fbbc89e654cd33bf77f3e82a611b7d9563252e29",
+    "testChangesSha256": "b6181d1683b761a1a18c7e6cc791a615eb5931802f8714f1a9a7ef46c1441133",
+    "reason": "Independent Standards found Save-only consumer coverage missing and Spec found the visible empty-paused action restarted an already started opted-out pass. Add18 total public-consumer tests with all original assertions retained; fix only the affected Resume route.",
+    "previousBehavior": "The original new Settings consumer dispatched change beforeSave, so it could not detect a missing Save assignment. An opted-out empty paused chain promised resume but its visible button dispatched Start, replacing pass ID and frozen draw. The prior fullcandidate run was interrupted143 explicitly before these edits and is not a passed fullsuite.",
+    "intendedBehavior": "Save-only false-to-true checkbox transition persists and reopens; keep the separate immediate change path. An already-started opted-out empty paused queue exposes Resume and preserves pass, draw and skipped candidates in all4modes. Existing initial/default Start routing remains. An external isolated client with only the Save assignment removed is rejected by the unchanged new consumer; this is later sensitivity, not original RED.",
+    "replacementTests": [
+      "RISK optional oldest start: Save settings alone persists the checkbox transition",
+      "RISK optional oldest start: the visible Resume action keeps an empty paused pass and its saved draw"
+    ],
+    "preservedCoverage": [
+      "All original baseline tests.js bytes from first quiet-reconciliation test through EOF remain byte-identical826; initial16 optional-start assertions are unchanged. No existing deadline, fixture, skip or assertion is weakened.",
+      "Actual Settings change and Save-only transitions, cold reopen, synced preference/first choices/Undo, age/never-Done fallback, oldinvalid values, eligibility and neutralmanual/automatic placement remain protected. The new Resume regression dispatches the action extracted from mounted scanner markup.",
+      "Initial baseline RED cb2dd4fa and later sliceREDs remain intact in prior rationale. Passing reopen, syncedUndo and Save-only controls are not claimed as preimplementation failures. The brokenSave case uses one removed public consumer assignment in an external copied client, with identity and full probe retained."
+    ],
+    "redEvidence": {
+      "command": "PinnedNode22 TZUTC recorder --purpose preimplementation-red -- node --test --test-name-pattern=\"optional oldest start: (the visible Resume|Save settings alone)\" tests.js, ART/review-consumers-red.log; then --purpose later-baseline-sensitivity -- node ART/broken-save-handler-probe.mjs, record2b350edc-db45-4f95-9733-b413a5ba4168.",
+      "failure": "Actual visible Resume regression failed start-scan !== resume-scan before one-line runtime route repair; Save-only passed on introduction. External broken Save client then failed unchanged consumer false !== true at Save must read checked draft, proving sensitivity without inventing an original RED. Original first-start behavioral failure retained separately."
+    },
+    "greenEvidence": "review-repair-green.log:81/81 passing,71 top-level,0skips;18 new consumers plus affected current-choice/provenance/lifecycle/settings/persistence/eligibility regressions. Final appfingerprints refreshed after routing repair; final exactcommit full/rules/compat/render/reviews still required."
+  },
+  {
+    "comparison": "optional182FinalAggregate",
+    "baseCommit": "826f3a5dec47bd05dc6f27154d14ea4416201372",
+    "testChangesSha256": "917a9c1bac99c800a529d4546d9b01464c22fbefb98fcc18328bc2bc950d89cc",
+    "reason": "Independent Standards found Save-only consumer coverage missing and Spec found the visible empty-paused action restarted an already started opted-out pass. Add18 total public-consumer tests with all original assertions retained; fix only the affected Resume route.",
+    "previousBehavior": "The original new Settings consumer dispatched change beforeSave, so it could not detect a missing Save assignment. An opted-out empty paused chain promised resume but its visible button dispatched Start, replacing pass ID and frozen draw. The prior fullcandidate run was interrupted143 explicitly before these edits and is not a passed fullsuite.",
+    "intendedBehavior": "Save-only false-to-true checkbox transition persists and reopens; keep the separate immediate change path. An already-started opted-out empty paused queue exposes Resume and preserves pass, draw and skipped candidates in all4modes. Existing initial/default Start routing remains. An external isolated client with only the Save assignment removed is rejected by the unchanged new consumer; this is later sensitivity, not original RED.",
+    "replacementTests": [
+      "RISK optional oldest start: enabled Start offers a candidate without dotting or learning",
+      "RISK optional oldest start: first Yes is unpaired and subsequent Yes learns normally",
+      "RISK optional oldest start: first No skips only this pass without pairwise learning and Undo restores it",
+      "RISK optional oldest start: Settings change save and reopen retain the preference and unrelated data",
+      "RISK optional oldest start: markers first-choice wording and exhausted-state controls match the enabled flow",
+      "RISK optional oldest start: skips before the first choice survive that choice and cold reopen",
+      "RISK optional oldest start: an unseeded descending pass clears first skips at the ordinary day boundary",
+      "RISK optional oldest start: enabling the setting waits for explicit Start before offering the first candidate",
+      "RISK optional oldest start: missing invalid and off values preserve defaults across all supported scan modes",
+      "RISK optional oldest start: zero and one eligible tasks remain usable with either preference",
+      "RISK optional oldest start: the unseeded candidate pool preserves completion date context dependency rest and postponement boundaries",
+      "RISK optional oldest start: toggling preserves an existing neutral chain and manual first Dot remains unchanged",
+      "RISK optional oldest start: synced preference first skip and explicit dot retain an independent peer edit",
+      "RISK optional oldest start: an empty started pass publishes and resumes with its saved draw",
+      "RISK optional oldest start: synced Undo reverses first choices Start and preference without learning",
+      "RISK optional oldest start: FAQ and current Changelog explain opt out defaults first choices and retained dots",
+      "RISK optional oldest start: Save settings alone persists the checkbox transition",
+      "RISK optional oldest start: the visible Resume action keeps an empty paused pass and its saved draw"
+    ],
+    "preservedCoverage": [
+      "All original baseline tests.js bytes from first quiet-reconciliation test through EOF remain byte-identical826; initial16 optional-start assertions are unchanged. No existing deadline, fixture, skip or assertion is weakened.",
+      "Actual Settings change and Save-only transitions, cold reopen, synced preference/first choices/Undo, age/never-Done fallback, oldinvalid values, eligibility and neutralmanual/automatic placement remain protected. The new Resume regression dispatches the action extracted from mounted scanner markup.",
+      "Initial baseline RED cb2dd4fa and later sliceREDs remain intact in prior rationale. Passing reopen, syncedUndo and Save-only controls are not claimed as preimplementation failures. The brokenSave case uses one removed public consumer assignment in an external copied client, with identity and full probe retained."
+    ],
+    "redEvidence": {
+      "command": "PinnedNode22 TZUTC recorder --purpose preimplementation-red -- node --test --test-name-pattern=\"optional oldest start: (the visible Resume|Save settings alone)\" tests.js, ART/review-consumers-red.log; then --purpose later-baseline-sensitivity -- node ART/broken-save-handler-probe.mjs, record2b350edc-db45-4f95-9733-b413a5ba4168.",
+      "failure": "Actual visible Resume regression failed start-scan !== resume-scan before one-line runtime route repair; Save-only passed on introduction. External broken Save client then failed unchanged consumer false !== true at Save must read checked draft, proving sensitivity without inventing an original RED. Original first-start behavioral failure retained separately."
+    },
+    "greenEvidence": "review-repair-green.log:81/81 passing,71 top-level,0skips;18 new consumers plus affected current-choice/provenance/lifecycle/settings/persistence/eligibility regressions. Final appfingerprints refreshed after routing repair; final exactcommit full/rules/compat/render/reviews still required."
+  },
+  {
+    "comparison": "optional182FaqReviewRepair",
+    "baseCommit": "7782e32f836f8618d92b5952a1b73c4bbed6847f",
+    "testChangesSha256": "c44f8bfed076b9a027b8ac29aea2ed3b564b5667f088a16b8ead0ab4fa048ac0",
+    "reason": "Distinct independent FAQ reviewer found3remaining prose consumers assuming an initial benchmark or omitting the new immediate-save setting. Add mountedHelp consumer coverage before editing those exactstrings; no executable application logic changes beyond the alreadyreviewed182 feature.",
+    "previousBehavior": "Quick start told every user to compare to an existing newest dot; countdownFAQ said Start chooses itsfirstdot; immediate-save inventory omitted skipautomatic checkbox although the Settings answer directed users there. The direct new FAQ answer and mode/default lifecycle descriptions were present.",
+    "intendedBehavior": "Quick start explains initial unpaired Yes/No then qualifies paired comparisons once a dotexists. Countdown answer describes expiry cleanup before eligiblepool construction, retaining original timer meanings. Immediate-save inventory names newcheckbox and retains unrelatedcontrols/numericSave/draft rules.19total newfeatureconsumers plus alloriginal tests retained.",
+    "replacementTests": [
+      "RISK optional oldest start: Quick start countdown and immediate-save inventory describe unpaired starts"
+    ],
+    "preservedCoverage": [
+      "Every original tests.js byte from firstquietreconciliation testthroughEOF remains unchanged826. All18previousnewfeaturetests, assertions, timers, SDK acknowledgement oracles, risknames and chronologicalevidence remain unchanged.",
+      "Runtime scanner/Settings/sync/Undo implementation is byte-identical7782 excluding these3FAQstringreplacements, appchangelog fingerprints and SWkey; no learning, eligibility, storage, authority, migration, rules, dependency or error behavior changed inthiscopyrepair.",
+      "Bothpartialfullruns are retained as interrupted143 and are not claimed passed. Allpassingcontrols and externalbrokenSavecontrol remain honestlyqualified; finalfullrun delayed until FAQsource/renderreview repairs reconciled."
+    ],
+    "redEvidence": {
+      "command": "PinnedNode22 TZUTC recorder --purpose preimplementation-red -- node --test --test-name-pattern=\"optional oldest start: Quick start\" tests.js; ART/faq-review-red.log before FAQstrings changed.",
+      "failure": "MountedQuickstart missing With no dot, Yes chooses ... No skips ... thispass. Originalintro only Compare eachcandidate ... newestdot. One meaningful actualcopyRED for the coordinated3FAQconsumerrepair. Original firstbehaviorRED cb2dd4fa and laterResumeRED retained inpriorrationales; thiscopyRED doesnotreplace chronology."
+    },
+    "greenEvidence": "ART/faq-review-green.log passes20/20 including19optionalfeaturecases, existingQuickstartbrevity and neutralbootstrapFAQ; finalfull/rules/compat/render/independentreview/CI/deployment stillpending."
+  },
+  {
+    "comparison": "optional182FaqFinalAggregate",
+    "baseCommit": "826f3a5dec47bd05dc6f27154d14ea4416201372",
+    "testChangesSha256": "a7e2c3ce18cff40a72a25b7bc4b9e621de3bdf7a6d6c1e310f385effba215e71",
+    "reason": "Distinct independent FAQ reviewer found3remaining prose consumers assuming an initial benchmark or omitting the new immediate-save setting. Add mountedHelp consumer coverage before editing those exactstrings; no executable application logic changes beyond the alreadyreviewed182 feature.",
+    "previousBehavior": "Quick start told every user to compare to an existing newest dot; countdownFAQ said Start chooses itsfirstdot; immediate-save inventory omitted skipautomatic checkbox although the Settings answer directed users there. The direct new FAQ answer and mode/default lifecycle descriptions were present.",
+    "intendedBehavior": "Quick start explains initial unpaired Yes/No then qualifies paired comparisons once a dotexists. Countdown answer describes expiry cleanup before eligiblepool construction, retaining original timer meanings. Immediate-save inventory names newcheckbox and retains unrelatedcontrols/numericSave/draft rules.19total newfeatureconsumers plus alloriginal tests retained.",
+    "replacementTests": [
+      "RISK optional oldest start: enabled Start offers a candidate without dotting or learning",
+      "RISK optional oldest start: first Yes is unpaired and subsequent Yes learns normally",
+      "RISK optional oldest start: first No skips only this pass without pairwise learning and Undo restores it",
+      "RISK optional oldest start: Settings change save and reopen retain the preference and unrelated data",
+      "RISK optional oldest start: markers first-choice wording and exhausted-state controls match the enabled flow",
+      "RISK optional oldest start: skips before the first choice survive that choice and cold reopen",
+      "RISK optional oldest start: an unseeded descending pass clears first skips at the ordinary day boundary",
+      "RISK optional oldest start: enabling the setting waits for explicit Start before offering the first candidate",
+      "RISK optional oldest start: missing invalid and off values preserve defaults across all supported scan modes",
+      "RISK optional oldest start: zero and one eligible tasks remain usable with either preference",
+      "RISK optional oldest start: the unseeded candidate pool preserves completion date context dependency rest and postponement boundaries",
+      "RISK optional oldest start: toggling preserves an existing neutral chain and manual first Dot remains unchanged",
+      "RISK optional oldest start: synced preference first skip and explicit dot retain an independent peer edit",
+      "RISK optional oldest start: an empty started pass publishes and resumes with its saved draw",
+      "RISK optional oldest start: synced Undo reverses first choices Start and preference without learning",
+      "RISK optional oldest start: FAQ and current Changelog explain opt out defaults first choices and retained dots",
+      "RISK optional oldest start: Save settings alone persists the checkbox transition",
+      "RISK optional oldest start: the visible Resume action keeps an empty paused pass and its saved draw",
+      "RISK optional oldest start: Quick start countdown and immediate-save inventory describe unpaired starts"
+    ],
+    "preservedCoverage": [
+      "Every original tests.js byte from firstquietreconciliation testthroughEOF remains unchanged826. All18previousnewfeaturetests, assertions, timers, SDK acknowledgement oracles, risknames and chronologicalevidence remain unchanged.",
+      "Runtime scanner/Settings/sync/Undo implementation is byte-identical7782 excluding these3FAQstringreplacements, appchangelog fingerprints and SWkey; no learning, eligibility, storage, authority, migration, rules, dependency or error behavior changed inthiscopyrepair.",
+      "Bothpartialfullruns are retained as interrupted143 and are not claimed passed. Allpassingcontrols and externalbrokenSavecontrol remain honestlyqualified; finalfullrun delayed until FAQsource/renderreview repairs reconciled."
+    ],
+    "redEvidence": {
+      "command": "PinnedNode22 TZUTC recorder --purpose preimplementation-red -- node --test --test-name-pattern=\"optional oldest start: Quick start\" tests.js; ART/faq-review-red.log before FAQstrings changed.",
+      "failure": "MountedQuickstart missing With no dot, Yes chooses ... No skips ... thispass. Originalintro only Compare eachcandidate ... newestdot. One meaningful actualcopyRED for the coordinated3FAQconsumerrepair. Original firstbehaviorRED cb2dd4fa and laterResumeRED retained inpriorrationales; thiscopyRED doesnotreplace chronology."
+    },
+    "greenEvidence": "ART/faq-review-green.log passes20/20 including19optionalfeaturecases, existingQuickstartbrevity and neutralbootstrapFAQ; finalfull/rules/compat/render/independentreview/CI/deployment stillpending."
+  },
+  {
+    "comparison": "optional182ProtectedHelpExpectationMigration",
+    "baseCommit": "826f3a5dec47bd05dc6f27154d14ea4416201372",
+    "testChangesSha256": "e3c84d373d4fe568bf53805e45a3cba234de6460ada31a7fd842281f9b3e011f",
+    "reason": "Issue182 explicitly changes empty-chain Start and requires truthful Quick start/FAQ/default wording. Final fullrun exposed2original exactcopy expectations that contradict the independently approved new prose; migrate only those2literal expectations, preserving every other original assertion and the exact4-step order/default oldest guarantee.",
+    "previousBehavior": "Original Quickstart array required the unconditional newest-dot comparison sentence. Original help regex required uppercase Every mode chooses the first dot by age with no default qualifier. Captured babd product correctly describes unpaired first choice and By default, every mode..., so these2original tests failed while2135other tests passed and48environmentcases skipped.",
+    "intendedBehavior": "Keep the exact four orderedQuickstart items, replacing only step3expectedliteral to include initial neutralYes/No then once-dot-exists comparisons. Keep help button naming, defaultage-anchor regex and retiredCan/Can't absence, adding the explicit By default qualifier to the exact age statement. No assertion removed/relaxed, no defaultbehavior modified. Retain all19newfeatureconsumers and priorSave-only/visibleResume/syncUndo/neutrallearning/eligibility coverage.",
+    "replacementTests": [
+      "RISK optional oldest start: enabled Start offers a candidate without dotting or learning",
+      "RISK optional oldest start: first Yes is unpaired and subsequent Yes learns normally",
+      "RISK optional oldest start: first No skips only this pass without pairwise learning and Undo restores it",
+      "RISK optional oldest start: Settings change save and reopen retain the preference and unrelated data",
+      "RISK optional oldest start: markers first-choice wording and exhausted-state controls match the enabled flow",
+      "RISK optional oldest start: skips before the first choice survive that choice and cold reopen",
+      "RISK optional oldest start: an unseeded descending pass clears first skips at the ordinary day boundary",
+      "RISK optional oldest start: enabling the setting waits for explicit Start before offering the first candidate",
+      "RISK optional oldest start: missing invalid and off values preserve defaults across all supported scan modes",
+      "RISK optional oldest start: zero and one eligible tasks remain usable with either preference",
+      "RISK optional oldest start: the unseeded candidate pool preserves completion date context dependency rest and postponement boundaries",
+      "RISK optional oldest start: toggling preserves an existing neutral chain and manual first Dot remains unchanged",
+      "RISK optional oldest start: synced preference first skip and explicit dot retain an independent peer edit",
+      "RISK optional oldest start: an empty started pass publishes and resumes with its saved draw",
+      "RISK optional oldest start: synced Undo reverses first choices Start and preference without learning",
+      "RISK optional oldest start: FAQ and current Changelog explain opt out defaults first choices and retained dots",
+      "RISK optional oldest start: Save settings alone persists the checkbox transition",
+      "RISK optional oldest start: the visible Resume action keeps an empty paused pass and its saved draw",
+      "RISK optional oldest start: Quick start countdown and immediate-save inventory describe unpaired starts"
+    ],
+    "updatedTests": [
+      "UI: Quick start displays four essential steps in order",
+      "UI: help describes Start scanning rather than a Can/Can't step"
+    ],
+    "preservedCoverage": [
+      "All19newoptional featuretests are unchanged. Every original test outside the2exactexpectedcopylines is byte-identical826. Within those2tests allotherassertions andstructure are retained, including exact4orderedsteps, Startbuttonnaming, defaultoldesteligibleanchor and no retiredCanstep.",
+      "Product files including index.html/sw.js/manifest/assets/rules/storage/SDK are byte-identical to captured babd3f5. This tests/evidence-only followup carries exactbyte rendering evidence; it does not claim newcaptures from its futurehead.",
+      "Fullrun864f4d23 onbabd is retained unchanged with2185total,2135pass,2fail,48envskip. Earlierfullruns fbbc/7782remain explicitlyinterrupted143. ActualoriginalfeatureREDcb2dd4fa and laterreviewREDs remainhistorical evidence; thismigration doesnot invent chronology or relabel anypassingcontrol."
+    ],
+    "redEvidence": {
+      "command": "PinnedNode22 TZUTC recorder --purpose green -- npm test onexactbabd3f5; ART/test-runs/2026-10-18T08-52-18-750Z-864f4d23-095f-408f-b87c-e7c801e2d1ec.json; ART/full-suite-babd3f5.log. This is actual later fullgatefailure preceding protectedtestexpectation migration, not original featureRED.",
+      "failure": "UI: Quick start displays four essential steps in order failed the3rdliteral: actual With no dot, Yes chooses...Once a dot exists... versusold unconditionalCompareeachcandidate. UI: help describes Start scanning rather than a Can/Can't step failed the oldcase-sensitive Every mode chooses... regex againstactual By default, every mode.... Allbehaviorconsumer tests passed; no appfix or assertiondeletion made to hide these contradictions."
+    },
+    "greenEvidence": "ART/protected-copy-green.log directly reruns both original protectedcopy tests, allQuickstart companions and19newfeatureconsumers afteronlythese2expectationchanges. Finalexactcandidate fullsuite mustpass beforeCI/release; captured productbytes remain unchanged."
   }
 ]
