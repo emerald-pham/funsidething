@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash, webcrypto } from "node:crypto";
 import vm from "node:vm";
 import fs from "node:fs";
@@ -11208,7 +11209,7 @@ async function loadCloudBackend({ serverData={rev:4}, serverExists=true, failure
   return {...h,getStored:()=>({exists:h.docs.has('users/owner'),data:h.docs.get('users/owner')})};
 }
 
-async function loadCloudBackendV2({rootData=null,batchFailureAt=Infinity,failures={},timeoutMs=25,recordSyncError,cryptoProvider=webcrypto}={}){
+async function loadCloudBackendV2({rootData=null,batchFailureAt=Infinity,failures={},timeoutMs=25,recordSyncError,cryptoProvider=webcrypto,runtimeWindow=null}={}){
  const moduleMatch=html.match(/<script type="module">([\s\S]*?)<\/script>/);assert.ok(moduleMatch);
  const moduleSource=moduleMatch[1].replace(/const \[appMod, A, F\] = await Promise\.all\(\[[\s\S]*?\]\);/,
   'const [appMod, A, F] = globalThis.__cloudModules;');
@@ -11248,17 +11249,23 @@ async function loadCloudBackendV2({rootData=null,batchFailureAt=Infinity,failure
  let authListener=null;
  const auth={currentUser:{uid:'owner',email:'owner@example.test'}},A={browserLocalPersistence:{},getAuth:()=>auth,setPersistence:async()=>{if(failures.persistence)throw failures.persistence;},
   signInWithPopup:async(_auth,provider)=>{popupProviders.push(provider);if(failures.signIn)throw failures.signIn;},signOut:async()=>{if(failures.signOut)throw failures.signOut;},GoogleAuthProvider:class{setCustomParameters(value){this.customParameters=value;}},onAuthStateChanged(_auth,listener){authListener=listener;if(!failures.authPending)listener(auth.currentUser);}};
- const events=[],pending=new Map(),window={FIREBASE_CONFIG:{apiKey:'test-key'},CLOUD_SYNC_TIMEOUT_MS:timeoutMs,dispatchEvent:event=>{events.push(event);return true;}};window.window=window;
- window.ScannerDeviceStore={
-  async getPendingUpload(account){return clone(pending.get(account)||null);},
-  async setPendingUpload(account,value){pending.set(account,clone(value));return {ok:true};},
-  async clearPendingUpload(account,generationId){if(pending.get(account)?.generationId!==generationId)return false;pending.delete(account);return true;},
- };
+ const events=[],pending=new Map(),window=runtimeWindow||{FIREBASE_CONFIG:{apiKey:'test-key'},CLOUD_SYNC_TIMEOUT_MS:timeoutMs,dispatchEvent:event=>{events.push(event);return true;}};
+ window.FIREBASE_CONFIG??={apiKey:'test-key'};window.CLOUD_SYNC_TIMEOUT_MS=timeoutMs;window.window=window;
+ if(runtimeWindow){
+  const dispatchEvent=window.dispatchEvent?.bind(window);
+  window.dispatchEvent=event=>{events.push(event);return dispatchEvent?dispatchEvent(event):true;};
+ }else{
+  window.ScannerDeviceStore={
+   async getPendingUpload(account){return clone(pending.get(account)||null);},
+   async setPendingUpload(account,value){pending.set(account,clone(value));return {ok:true};},
+   async clearPendingUpload(account,generationId){if(pending.get(account)?.generationId!==generationId)return false;pending.delete(account);return true;},
+  };
+ }
  window.recordSyncError=recordSyncError;
  const context=vm.createContext({window,CustomEvent:class{constructor(type,options){this.type=type;this.detail=options?.detail;}},__cloudModules:[{initializeApp:()=>({})},A,F],
   console,crypto:cryptoProvider,TextEncoder,TextDecoder,structuredClone,setTimeout,clearTimeout});context.globalThis=context;
  for(const file of ['device-store-v2.js','cloud-store-v2.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),context,{filename:file});
- window.ChainStorageV2=context.ChainStorageV2;window.ChainCloudV2=context.ChainCloudV2;
+ if(!runtimeWindow)window.ChainStorageV2=context.ChainStorageV2;window.ChainCloudV2=context.ChainCloudV2;
  await vm.runInContext(`(async()=>{${moduleSource}\n})()`,context,{filename:'index.html#cloud-v2-backend'});
  return {CS:window.CloudSync,auth,docs,pending,events,batchCommits,writes,popupProviders,transactionCalls,queries,network,subscriptions,
   emitSnapshot(entry,data,{fromCache=false,hasPendingWrites=false}={}){entry.next({exists:()=>data!==null,data:()=>clone(data),metadata:{fromCache,hasPendingWrites}});},
@@ -23800,6 +23807,180 @@ test('RISK SCALABLE CONCURRENCY: a newer edit made during a device commit is the
  assert.equal(JSON.parse(claimed).tasks.some(row=>row.title==='Second edit'),true);
  assert.equal(claimed,JSON.stringify(ctx.state),'the durability marker is byte-exactly the verified head and live board');
  await store.close();
+});
+
+test('RISK SCALABLE CONCURRENCY: overlapping native and background saves do not report a committed head as failed',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb');
+ const commits=new AsyncLocalStorage(),actions=new AsyncLocalStorage(),factory=new IDBFactory(),dbName='chain-scanner-native-background-overlap-'+Date.now()+'-'+Math.random();
+ const gate=()=>{let resolve;const promise=new Promise(done=>resolve=done);return{promise,resolve};};
+ const backgroundComplete=gate(),secondNativeWrite=gate(),releaseBackground=gate();
+ const start=performance.now(),commitCalls=[],commitErrors=[],toasts=[];let transactionId=0,held=null,armed=true,ctx,backend,store;
+ const bounded=async(promise,label,ms=5000)=>{let timer;try{return await Promise.race([promise,new Promise((_,reject)=>timer=setTimeout(()=>reject(Error('Diagnostic deadline: '+label)),ms))]);}finally{clearTimeout(timer);}};
+ const until=async(predicate,label)=>{const end=Date.now()+5000;while(Date.now()<end){if(await predicate())return;await new Promise(resolve=>setTimeout(resolve,2));}throw Error('Diagnostic deadline: '+label);};
+ const wrapDatabase=db=>new Proxy(db,{get(target,key){
+  if(key!=='transaction'){const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;}
+  return(...args)=>{
+   const transaction=target.transaction(...args),id=++transactionId,owner=commits.getStore(),write=args[1]==='readwrite';
+   const hold=write&&owner?.caller==='sendPush'&&owner.idempotent&&armed&&!held;
+   if(write&&owner?.caller==='native-Add'&&held&&id!==held.transaction)secondNativeWrite.resolve();
+   return new Proxy(transaction,{get(tx,key){const value=Reflect.get(tx,key,tx);return typeof value==='function'?value.bind(tx):value;},set(tx,key,value){
+    if(key==='oncomplete'&&hold){
+     tx.oncomplete=event=>{
+      if(held){value.call(tx,event);return;}
+      held={transaction:id,commit:owner.id};armed=false;backgroundComplete.resolve();
+      releaseBackground.promise.then(()=>value.call(tx,event));
+     };
+     return true;
+    }
+    return Reflect.set(tx,key,value,tx);
+   }});
+  };
+ }});
+ const indexedDBProvider={open(...args){
+  const request=factory.open(...args);
+  return new Proxy(request,{get(target,key){
+   if(key==='result'){const result=Reflect.get(target,key,target);return result&&typeof result.transaction==='function'?wrapDatabase(result):result;}
+   const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;
+  },set(target,key,value){return Reflect.set(target,key,value,target);}});
+ }};
+ const at=Date.parse('2026-10-18T12:00:00Z'),initial=syncState({
+  tasks:[Object.assign(syncTask('saved-peer','Unrelated saved task'),{futureTask:{opaque:'kept'}})],
+  mode:'work',syncAccount:'owner@example.test',syncRev:4,syncDirty:false,
+  settings:{horizonMin:60,thresholdPct:0,samples:40,cantMin:30,workedHours:8,theme:'system'},futureSaved:{nested:['keep',23]},
+ }),raw=JSON.stringify(initial),storage=sharedScannerStorage({[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}),apps=[];
+ t.after(async()=>{
+  releaseBackground.resolve();
+  try{backend?.CS.suspend();}catch{}
+  if(ctx)try{vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',ctx);}catch{}
+  for(const app of apps)try{await app.ctx.window.ScannerDeviceStore?.close?.();}catch{}
+ });
+ const app=await loadAppAtTime(at,{sharedStorage:storage,indexedDBProvider,deviceDbName:dbName});apps.push(app);ctx=app.ctx;
+ assert.equal(await ctx.persist(true),true,'the original board is durable before either caller starts');
+ store=ctx.window.ScannerDeviceStore;
+ const headBefore=await store.readHead();
+ assert.equal((await store.putBackup({expectedHash:headBefore.hash,backup:{id:'manual-before-overlap',day:'2026-10-18',at:1,kind:'manual',payload:raw}})).ok,true);
+ ctx.window.CLOUD_PUSH_DELAY_MS=0;
+ Object.defineProperty(ctx.window,'cloudPull',{get:()=>ctx.cloudPull,configurable:true});
+ backend=await loadCloudBackendV2({rootData:{payload:ctx.cloudPayload(),updatedAt:ctx.state.updatedAt,rev:4,serverUpdatedAt:1},failures:{authPending:true},timeoutMs:5000,recordSyncError:ctx.recordSyncError,runtimeWindow:ctx.window});
+ backend.emitAuth({uid:'owner',email:'owner@example.test'});
+ const exactlyCurrent=async()=>{
+  const head=await store.readHead(),remote=await backend.CS.pull();
+  return vm.runInContext('reconciled()&&!pulling&&!cloudPushInFlight&&!pendingPush&&!state.syncDirty',ctx)&&
+   head?.payload===JSON.stringify(ctx.state)&&remote?.payload===ctx.cloudPayload()&&remote?.rev===ctx.state.syncRev;
+ };
+ await until(exactlyCurrent,'initial cloud and device reconciliation');
+ const toast=ctx.document.getElementById('toast');let toastText=toast.textContent;
+ Object.defineProperty(toast,'textContent',{get(){return toastText;},set(value){toastText=value;toasts.push(String(value));}});
+ const originalCommit=store.commitHead;
+ store.commitHead=async function(...args){
+  const id=commitCalls.length+1,stack=new Error().stack||'',caller=stack.includes('sendPush')?'sendPush':actions.getStore()==='native-Add'?'native-Add':'other';
+  const payload=args[0]?.payload||'',payloadSha256=createHash('sha256').update(payload).digest('hex');
+  const observation={id,caller,expectedHash:args[0]?.expectedHash,payloadSha256,idempotent:payloadSha256===args[0]?.expectedHash};commitCalls.push(observation);
+  try{return await commits.run({id,caller,idempotent:observation.idempotent},()=>originalCommit.apply(this,args));}
+  catch(error){commitErrors.push({id,caller,name:error.name,message:error.message});throw error;}
+ };
+ const add=async title=>{
+  ctx.document.getElementById('addInput').value=title;
+  return actions.run('native-Add',()=>ctx.onAction('add',ctx.document.getElementById('addButton')));
+ };
+ await bounded(add('Rapid accepted one'),'first native Add');
+ await bounded(backgroundComplete.promise,'background sendPush transaction commit');
+ const second=add('Rapid accepted two');
+ await bounded(secondNativeWrite.promise,'second native Add write queued behind committed background transaction');
+ releaseBackground.resolve();
+ await bounded(second,'second native Add durable acknowledgement');
+ await until(exactlyCurrent,'final durable and cloud acknowledgement');
+
+ const background=commitCalls.find(call=>call.caller==='sendPush'&&call.idempotent),newerNative=commitCalls.find(call=>call.caller==='native-Add'&&call.expectedHash===background?.expectedHash&&call.payloadSha256!==background?.payloadSha256);
+ assert.ok(background,'the ordinary background sendPush path must use the device-store port');
+ assert.ok(newerNative,'the second native Add must commit a distinct payload against the same observed head: '+JSON.stringify(commitCalls));
+ assert.equal(background.idempotent,true,'the earlier background checkpoint is an idempotent save of its current head');
+ assert.ok(held,'the older transaction really committed before its completion delivery was held');
+ const warnings=toasts.filter(message=>/Couldn't save this edit|device-save:/.test(message));
+ assert.deepEqual(warnings,[],'a successful overlapping save must not show a device-store write-failed warning: '+JSON.stringify({warnings,commitErrors}));
+ assert.deepEqual(commitErrors,[],'a successful write overtaken by a newer head must return a truthful result instead of throwing');
+
+ const head=await store.readHead(),saved=JSON.parse(head.payload),backups=await store.listBackups(),cloud=JSON.parse((await backend.CS.pull()).payload),titles=saved.tasks.map(task=>task.title);
+ for(const title of ['Unrelated saved task','Rapid accepted one','Rapid accepted two'])assert.ok(titles.includes(title),'the latest durable board retains '+title);
+ assert.deepEqual(saved.futureSaved,{nested:['keep',23]});
+ assert.deepEqual(saved.tasks.find(task=>task.id==='saved-peer').futureTask,{opaque:'kept'});
+ assert.ok(backups.some(row=>row.id==='manual-before-overlap'&&row.payload===raw&&row.kind==='manual'),'the exact manual recovery copy remains available');
+ assert.deepEqual(cloud.tasks.map(task=>task.title).sort(),[...titles].sort(),'the final cloud publication retains the same tasks as device storage');
+ assert.equal(vm.runInContext('lastPersistedRaw',ctx),head.payload,'the in-memory durability marker names the actual current head');
+ assert.equal(vm.runInContext('deviceHeadHash',ctx),head.hash,'the cached CAS authority names the actual current head');
+ assert.equal(storage.getItem(LOCAL_HEAD_KEY),raw,'the protected legacy mirror is not regressed or overwritten by the older completion');
+ assert.equal(storage.getItem(SYNC_STORE_KEY),raw,'the shared legacy copy is not regressed or overwritten by the older completion');
+ const reopened=await loadAppAtTime(at+1000,{sharedStorage:storage,indexedDBProvider:factory,deviceDbName:dbName});apps.push(reopened);
+ assert.deepEqual([...reopened.ctx.state.tasks.map(task=>task.title)].sort(),[...titles].sort(),'a cold reopen reads the exact latest accepted tasks');
+ assert.deepEqual(reopened.ctx.state.futureSaved,{nested:['keep',23]},'unknown board fields remain intact after reopen');
+});
+
+test('RISK SCALABLE CONCURRENCY: a superseded Add keeps its pending draft when the current device head changes accounts',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),factory=new IDBFactory(),dbName='chain-scanner-foreign-head-overlap-'+Date.now()+'-'+Math.random();
+ let holdNext=false,heldCompletion=null,transactionCommitted;const committed=new Promise(resolve=>transactionCommitted=resolve);
+ const indexedDBProvider={open(...args){
+  const request=factory.open(...args);
+  return new Proxy(request,{get(target,key){
+   if(key==='result'){
+    const db=Reflect.get(target,key,target);
+    return new Proxy(db,{get(database,method){
+     if(method==='transaction')return(...txArgs)=>{
+      const tx=database.transaction(...txArgs),hold=holdNext&&txArgs[1]==='readwrite';
+      if(hold)holdNext=false;
+      return new Proxy(tx,{get(transaction,name){const value=Reflect.get(transaction,name,transaction);return typeof value==='function'?value.bind(transaction):value;},set(transaction,name,value){
+       if(name==='oncomplete'&&hold){
+        transaction.oncomplete=event=>{heldCompletion=()=>value.call(transaction,event);transactionCommitted();};return true;
+       }
+       return Reflect.set(transaction,name,value,transaction);
+      }});
+     };
+     const value=Reflect.get(database,method,database);return typeof value==='function'?value.bind(database):value;
+    }});
+   }
+   const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;
+  },set(target,key,value){return Reflect.set(target,key,value,target);}});
+ }};
+ const at=Date.parse('2026-10-18T12:30:00Z'),initial=syncState({tasks:[syncTask('saved','Saved before account change')],syncAccount:'owner@example.test',syncRev:4,syncDirty:false,
+  futureSaved:{opaque:['retain',19]}}),raw=JSON.stringify(initial),storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw});
+ const app=await loadAppAtTime(at,{sharedStorage:storage,indexedDBProvider,deviceDbName:dbName}),{ctx,shim}=app;const store=shim.window.ScannerDeviceStore;
+ t.after(async()=>{try{vm.runInContext('clearTimeout(saveTimer);saveTimer=null;clearCloudRetry();clearTimeout(cloudTimer)',ctx);}catch{}try{await store.close();}catch{}});
+ assert.equal(await ctx.persist(true),true,'the original owner board is durable before the overlapping Add');
+ const priorHead=await store.readHead(),priorMarker=vm.runInContext('lastPersistedRaw',ctx),priorHash=vm.runInContext('deviceHeadHash',ctx);
+ const priorLocalHead=storage.getItem(LOCAL_HEAD_KEY),priorLegacy=storage.getItem(SYNC_STORE_KEY);
+ assert.equal(priorMarker,priorHead.payload);assert.equal(priorHash,priorHead.hash);
+ assert.equal(priorLocalHead,raw);assert.equal(priorLegacy,raw);
+ const toast=shim.document.getElementById('toast');let toastText=toast.textContent;const toasts=[];
+ Object.defineProperty(toast,'textContent',{get(){return toastText;},set(value){toastText=String(value);toasts.push(toastText);}});
+ holdNext=true;shim.document.getElementById('addInput').value='Pending local Add';
+ const saving=ctx.onAction('add',shim.document.getElementById('addButton'));
+ await committed;
+ const localCommitted=await store.readHead(),foreign=JSON.parse(priorHead.payload);foreign.syncAccount='other@example.test';foreign.tasks.push(syncTask('foreign','Other account board'));
+ const foreignRaw=JSON.stringify(foreign),foreignWrite=await store.commitHead({expectedHash:localCommitted.hash,payload:foreignRaw,account:'other@example.test'});
+ assert.equal(foreignWrite.ok,true,'the other account advances the real device head with a valid guarded transaction');
+ heldCompletion();
+ assert.equal(await saving,false,'a foreign current head is not accepted as this local Add\'s acknowledgement');
+ const current=await store.readHead();
+ assert.equal(current.payload,foreignRaw,'the verified other-account head remains authoritative');
+ assert.equal(current.account,'other@example.test','the conflicting head is scoped to the other device account');
+ assert.ok((await store.listBackups()).some(row=>row.payload===localCommitted.payload),'the exact accepted local Add remains in its durable recovery copy');
+ assert.equal(vm.runInContext('deviceHeadHash',ctx),priorHash,'the failed local save does not claim another account\'s CAS hash');
+ assert.equal(vm.runInContext('lastPersistedRaw',ctx),priorMarker,'the exact previous local marker remains in place');
+ assert.equal(vm.runInContext('deviceStorageAuthority',ctx),true,'the store remains the durable authority even though this caller\'s cached head is stale');
+ assert.equal(JSON.stringify(ctx.state),vm.runInContext('JSON.stringify(state)',ctx));
+ assert.ok(ctx.state.tasks.some(task=>task.title==='Pending local Add'),'the accepted Add stays in the live board for recovery/retry');
+ assert.equal(ctx.state.syncDirty,true,'the local edit remains pending instead of being marked saved');
+ assert.equal(shim.document.getElementById('addInput').value,'Pending local Add','the native Add draft is not cleared by the superseded completion');
+ assert.equal(vm.runInContext('quickAddSubmission!==null',ctx),true,'the accepted native submission remains retryable');
+ assert.equal(storage.getItem(LOCAL_HEAD_KEY),priorLocalHead,'the protected local mirror is not replaced with foreign bytes');
+ assert.equal(storage.getItem(SYNC_STORE_KEY),priorLegacy,'the shared legacy mirror is not replaced with foreign bytes');
+ assert.ok(toasts.some(message=>message.includes('device-save:device-store/account-changed')),'the account change is reported truthfully');
+ for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ ctx.onAction('help',{});const help=shim.document.getElementById('modalRoot').innerHTML;
+ const addFaq=help.split('<dt>Why does Add turn green?</dt>')[1]?.split('</dd>')[0],latest=help.split('<h3>October 18, 2026</h3>')[1]?.split('</ul>')[0];
+ assert.ok(addFaq&&latest,'the user-facing save FAQ and current Settings changelog are present');
+ assert.match(addFaq,/newest accepted board stays in place/i,'the FAQ explains that a late older completion cannot replace a newer save');
+ assert.match(addFaq,/account change.*keeps the accepted task in the open tab/i,'the FAQ preserves the genuine account-change recovery behavior');
+ assert.match(latest,/overlapping device saves.*newest accepted board/i,'the current changelog records the corrected save outcome');
 });
 
 test('RISK SCALABLE CONCURRENCY: CAS repair retains peer work and a third in-tab edit before replacing state',async()=>{

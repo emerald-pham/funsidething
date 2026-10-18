@@ -150,6 +150,8 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK SCALABLE SETTINGS: one confirmed delete removes only the selected IndexedDB recovery reference
 - RISK SCALABLE OFFLINE SHELL: storage and cloud generation modules load before the scanner and are cached together
 - RISK SCALABLE CONCURRENCY: a newer edit made during a device commit is the only board marked durable
+- RISK SCALABLE CONCURRENCY: overlapping native and background saves do not report a committed head as failed
+- RISK SCALABLE CONCURRENCY: a superseded Add keeps its pending draft when the current device head changes accounts
 - RISK SCALABLE CONCURRENCY: CAS repair retains peer work and a third in-tab edit before replacing state
 - RISK SCALABLE STARTUP: blocked and nonsettling IndexedDB opens fail closed within a bounded boot
 - RISK SCALABLE LEGACY TAB: each divergent v1 primary key is preserved and reconciled after migration

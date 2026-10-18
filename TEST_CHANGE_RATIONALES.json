@@ -1,5 +1,25 @@
 [
   {
+    "testChangesSha256": "e5ed184eef3b73bec12fa898a7eeb4287a26c3c7e1a8cc47a02240914ec1641e",
+    "reason": "Add an actual native Add and ordinary background sendPush overlap regression for a transaction that commits before its separate verification read sees a later head. Add a real foreign-account current-head control and player-facing FAQ/changelog coverage without weakening existing save assertions.",
+    "previousBehavior": "After the old background transaction committed, a newer native Add advanced the actual device head before the background caller's verification read. The old caller threw Device head verification failed and showed a device-store write-failed warning despite both saves succeeding.",
+    "intendedBehavior": "Report a committed-but-superseded result with the verified current head. A caller may accept it only when the exact current payload/account matches its intended or live board; otherwise use guarded CAS repair or preserve the local pending Add and old markers on an account change. Genuine CAS, read, transaction, backup-collision and corruption failures remain failures.",
+    "replacementTests": [
+      "RISK SCALABLE CONCURRENCY: overlapping native and background saves do not report a committed head as failed",
+      "RISK SCALABLE CONCURRENCY: a superseded Add keeps its pending draft when the current device head changes accounts"
+    ],
+    "preservedCoverage": [
+      "The original native Add and ordinary background sendPush path, real IndexedDB device-store transactions, actual overlapping expected hashes, current cloud publication, retained unknown board fields, exact manual backup, legacy mirrors, in-memory durability markers and cold reopen are asserted together.",
+      "The foreign-account control uses an actual Add and a valid competitor commitHead against the shared real device store; it verifies the Add remains in memory and in the input, pending submission stays retryable, account-change warning is truthful, device authority remains established, and prior hash/raw/mirrors are unchanged.",
+      "Existing newer-edit and three-way CAS-repair tests stay unchanged and pass. Existing device-store migration still checks stale expectedHash and backup-ID collision. The external device-store control runner still verifies actual IDB abort, corrupt head, exact manual backup and opaque archive preservation.",
+      "Existing scalable legacy-tab, cloud recovery pin release and account-bound pending upload tests pass. No reconciliation/outbox protocol, schema or private production seam was added."
+    ],
+    "redEvidence": {
+      "command": "PATH=/Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin:$PATH TZ=UTC node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/storage-races-184/186/red-green-runs --purpose preimplementation-red -- node --test --test-name-pattern='RISK SCALABLE CONCURRENCY: overlapping native and background saves' tests.js",
+      "failure": "Actual baseline 52d4b2537bacbb60240ae7a53061224350ebd36 record 2026-10-18T11-08-25-410Z-c339384e-b01d-451c-ad2c-b895c7d22843 fails the intended assertion: a successful overlapping save must not show a device-store write-failed warning. It observes the exact device-save:device-store/write-failed toast and the sendPush exception Device head verification failed after the actual new native head committed. The later FAQ copy-only assertion also failed before the FAQ/changelog text was added; its corrected test fixture and the passing follow-up are linked in the external recorder directory."
+    }
+  },
+  {
     "testChangesSha256": "ec18aa9f1c1ec8c64b2ff2ab30464ee76c8ce318c54b38ecfc813630cfdfc7f5",
     "reason": "Repair the single original completion-sync fixture that failed push CI39102724734: observe actual publication/delivery instead of100/150ms guesses, read selected host storage for exact-byte checks, and name its acknowledged-completion precondition clearly. Preserve every original feature assertion.",
     "previousBehavior": "The existing completion test waited100ms before requiring peer receipt and150ms before requiring the acknowledged repaired union. Controlled250ms SDK delivery reproduces both premature observations while local completion remains present.",
