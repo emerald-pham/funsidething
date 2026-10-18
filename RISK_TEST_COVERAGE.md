@@ -12,6 +12,15 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 ## Task state, eligibility, and scanner controls
 
+- RISK quiet reconciliation feedback: a peer edit beside an ordinary Dislodge saves without a success interruption
+- RISK quiet reconciliation feedback: a displaced local title keeps its recovery notice and exact backup
+- RISK quiet reconciliation feedback: independent comparison learning beside Dislodge stays quiet
+- RISK quiet reconciliation feedback: an independent peer Dot preserves Dislodge and stays quiet
+- RISK quiet reconciliation feedback: FAQ and Changelog distinguish quiet success from recovery guidance
+- RISK quiet reconciliation feedback: a displaced dependency choice keeps its recovery notice and exact backup
+- RISK quiet reconciliation feedback: an unchanged offchain task deleted by a peer stays quiet beside Dislodge
+- RISK quiet reconciliation feedback: independent context memberships stay quiet beside Dislodge
+
 - RISK neutral bootstrap: JSON replacement and Undo deletion cannot be promoted by stale chosen copies
 
 - RISK neutral bootstrap: restoring a deleted automatic task during pending saves keeps backup exclusion
@@ -510,7 +519,7 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK completion delivery fixtures: controlled startup pending and acknowledged boundaries execute all five consumers
 - RISK completion lifecycle return: observed Dot and next Done survive stale delivery and IndexedDB reopen
 - RISK evergreen scan reconciliation: merged completion removes resting crumbs tails and candidates without losing evidence
-- RISK evergreen scan reconciliation: a newer stale cloud chain cannot revive another browsers completed task
+- RISK evergreen scan reconciliation: an acknowledged completion stays absent through newer stale cloud chains
 - RISK evergreen scan reconciliation: held editor and pointer delay resting chain adoption then stale benchmark controls stay inert
 - RISK evergreen scan reconciliation: cooldown expiry day reset and explicit return preserve eligible and unrelated chain membership
 - RISK evergreen scan reconciliation: offline cold reload clears legacy resting dots and Undo retains completion history
