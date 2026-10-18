@@ -87,6 +87,41 @@ test('RISK quiet reconciliation feedback: FAQ and Changelog distinguish quiet su
  assert.match(latest,/Dislodge.*independent.*quiet/i);assert.match(latest,/displaced edits.*save failures.*recovery guidance/i);
 });
 
+test('RISK quiet reconciliation feedback: a displaced dependency choice keeps its recovery notice and exact backup',async t=>{
+ const at=Date.parse('2026-10-18T03:00:00Z'),id='dep-owner',rootId='dep-root';
+ const initial=syncState({tasks:[{...syncTask(id,'Owner'),prerequisiteId:rootId,prerequisiteIds:[rootId]},syncTask(rootId,'Root')],mode:'work',syncAccount:'e@example.com',syncRev:4,syncDirty:false});
+ const h=makeSyncHarness({remote:initial,rev:4,delayMs:1}),raw=JSON.stringify(initial),opts={seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory};
+ const cryptoFor=prefix=>{let n=0;return {randomUUID:()=>prefix+String(++n).padStart(8,'0'),subtle:webcrypto.subtle,getRandomValues:webcrypto.getRandomValues.bind(webcrypto)}};
+ const app=await loadAppAtTime(at,{...opts,cryptoProvider:cryptoFor('a')}),peer=await loadAppAtTime(at,{...opts,cryptoProvider:cryptoFor('z')});t.after(()=>closeLegacyApp173(app));t.after(()=>closeLegacyApp173(peer));
+ await app.ctx.cloudPull();await peer.ctx.cloudPull();app.ctx.window.CloudSync.ready=false;peer.ctx.window.CloudSync.ready=false;
+ const choose=async(actor,hard,when)=>{setFakeTime(actor.ctx,when);hydrateUnchangedEditorDraft(actor,id);const box=actor.shim.document.getElementById('editDependencyHard0');Object.assign(box,{id:'editDependencyHard0',dataset:{dependencyHard:'edit',dependencyId:rootId},matches:()=>false,checked:hard});actor.shim.document.dispatchEvent({type:'change',target:box});actor.ctx.onAction('save-edit',{dataset:{id}});assert.equal(await actor.ctx.persist(),true);assert.equal(actor.ctx.taskDependencyMode(actor.ctx.state.tasks.find(x=>x.id===id),rootId),hard?'hard':'soft');};
+ await choose(app,true,at+100);const displaced=JSON.stringify(app.ctx.state);await choose(peer,true,at+200);await choose(peer,false,at+300);
+ peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPull();await peer.ctx.cloudPushNow();await settleSavedViewPublication(peer,h,'peer dependency');
+ const toasts=[],element=app.shim.document.getElementById('toast');let message=element.textContent;Object.defineProperty(element,'textContent',{configurable:true,get:()=>message,set(value){message=value;toasts.push(value);}});
+ app.ctx.window.CloudSync.ready=true;await app.ctx.cloudPull();await app.ctx.cloudPushNow();await settleSavedViewPublication(app,h,'displaced dependency');
+ const mode=app.ctx.taskDependencyMode(app.ctx.state.tasks.find(x=>x.id===id),rootId);t.diagnostic(JSON.stringify({mode,toasts,backup:app.ctx.readLocalBackups().some(row=>JSON.parse(row.payload).tasks.find(x=>x.id===id)?.dependencyModes?.[rootId]?.choices?.some(c=>c.mode==='hard'))}));
+ assert.equal(mode,'soft','the peer choice displaced this local hard setting');
+ assert.ok(app.ctx.readLocalBackups().some(row=>row.payload===displaced),'the exact displaced dependency draft remains recoverable');
+ assert.match(toasts.join('\n'),/previous board is in Settings backups/i,'a displaced dependency setting requires the existing recovery notice');
+});
+
+test('RISK quiet reconciliation feedback: an unchanged offchain task deleted by a peer stays quiet beside Dislodge',async t=>{
+ const at=Date.parse('2026-10-18T03:00:00Z'),ids=['delete-first','delete-second','delete-third'];
+ const initial=syncState({tasks:ids.map((id,i)=>({...syncTask(id,'Delete task '+(i+1)),createdAt:i+1})),mode:'work',syncAccount:'e@example.com',syncRev:4,syncDirty:false,settings:{horizonMin:60,thresholdPct:0,samples:40,cantMin:30,workedHours:8,theme:'system'}}),h=makeSyncHarness({remote:initial,rev:4,delayMs:1}),raw=JSON.stringify(initial);
+ const app=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});t.after(()=>closeLegacyApp173(app));
+ await app.ctx.cloudPull();app.ctx.window.CloudSync.ready=false;app.ctx.onAction('start-scan',{dataset:{mode:'descending'}});app.ctx.onAction('yes',{dataset:{candidate:ids[1],benchmark:ids[0]}});app.ctx.onAction('start-working',{});assert.equal(await app.ctx.persist(),true);
+ app.ctx.window.CloudSync.ready=true;await app.ctx.cloudPull();await app.ctx.cloudPushNow();await settleSavedViewPublication(app,h,'peer delete common chain');assert.deepEqual(h.remoteState().chain,ids.slice(0,2));
+ const peerRaw=JSON.stringify({...h.remoteState(),syncAccount:'e@example.com',syncRev:h.doc.rev,syncDirty:false}),peer=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:peerRaw,[LOCAL_HEAD_KEY]:peerRaw},cloudSyncFactory:h.factory});t.after(()=>closeLegacyApp173(peer));await peer.ctx.cloudPull();peer.ctx.window.CloudSync.ready=false;app.ctx.window.CloudSync.ready=false;
+ setFakeTime(peer.ctx,at+200);peer.ctx.onAction('delete-task',{dataset:{id:ids[2]}});assert.equal(await peer.ctx.persist(),true);assert.equal(peer.ctx.state.tasks.some(row=>row.id===ids[2]),false);
+ peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPull();await peer.ctx.cloudPushNow();await settleSavedViewPublication(peer,h,'peer delete acknowledged');
+ setFakeTime(app.ctx,at+100);app.ctx.onAction('dislodge',{dataset:{benchmark:ids[1]}});assert.equal(await app.ctx.persist(),true);
+ const toasts=[],element=app.shim.document.getElementById('toast');let message=element.textContent;Object.defineProperty(element,'textContent',{configurable:true,get:()=>message,set(value){message=value;toasts.push(value);}});
+ app.ctx.window.CloudSync.ready=true;await app.ctx.cloudPull();await app.ctx.cloudPushNow();await settleSavedViewPublication(app,h,'independent peer deletion beside Dislodge');
+ assert.deepEqual(Array.from(app.ctx.state.chain),[ids[0]]);assert.equal(app.ctx.state.tasks.some(row=>row.id===ids[2]),false);assert.equal(app.ctx.state.considered[ids[1]],'dislodged');assert.equal(app.ctx.state.tasks.find(row=>row.id===ids[1]).ratingHistory.filter(row=>row.kind==='dislodge').length,1);
+ t.diagnostic(JSON.stringify({toasts,chain:Array.from(app.ctx.state.chain),tasks:Array.from(app.ctx.state.tasks,row=>row.id),rev:h.doc.rev}));
+ assert.deepEqual(toasts,[],'an unchanged task deleted by a peer does not displace any local edit');
+});
+
 const LEGACY_COMPLETION_RELEASE='bd84e5c0ccc7c6ebe065f42f18df34d89eeab14e';
 async function legacyCompletionSource173(t,release=LEGACY_COMPLETION_RELEASE,account='e@example.com'){
  const released=spawnSync('git',['show',release+':index.html'],{cwd:__dirname,encoding:'utf8'});assert.equal(released.status,0,released.stderr);

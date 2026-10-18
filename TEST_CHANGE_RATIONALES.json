@@ -1,7 +1,7 @@
 [
   {
-    "testChangesSha256": "9746734b009b7f354de25d2e963bb9cc96c70eac30839643c80a9f32cc7f1b02",
-    "reason": "Add whole-app consumer evidence for quiet successful reconciliation beside ordinary Dislodge, independent learning and peer Dot, with recovery guidance preserved when a local title is displaced. No existing test assertion is changed.",
+    "testChangesSha256": "46310ddde74245e51b4935dde8cf4911bde2140cf63bc43dfc08b2f86895a5d0",
+    "reason": "Add seven whole-app consumer contracts for quiet retained Dislodge reconciliation and independent peer learning, Dot, and deletion, while preserving notices and exact backups for displaced title and dependency choices. Existing assertions are unchanged.",
     "previousBehavior": "Any successful same-account cloud adoption with local edits posts an out-of-date recovery toast, including nonconflicting retained decisions and exact durable publication.",
     "intendedBehavior": "Successful merges that retain local choices stay quiet. Displaced choices, account switches, and blocked or failed saves retain their existing recovery guidance. This feedback repair makes no claim to fix the still-unreproduced crash, page reload or reappearance.",
     "replacementTests": [
@@ -9,17 +9,19 @@
       "RISK quiet reconciliation feedback: a displaced local title keeps its recovery notice and exact backup",
       "RISK quiet reconciliation feedback: independent comparison learning beside Dislodge stays quiet",
       "RISK quiet reconciliation feedback: an independent peer Dot preserves Dislodge and stays quiet",
-      "RISK quiet reconciliation feedback: FAQ and Changelog distinguish quiet success from recovery guidance"
+      "RISK quiet reconciliation feedback: FAQ and Changelog distinguish quiet success from recovery guidance",
+      "RISK quiet reconciliation feedback: a displaced dependency choice keeps its recovery notice and exact backup",
+      "RISK quiet reconciliation feedback: an unchanged offchain task deleted by a peer stays quiet beside Dislodge"
     ],
     "preservedCoverage": [
-      "All original test assertions remain byte-for-byte unchanged; only these five app-consumer cases are inserted.",
+      "All original test assertions remain byte-for-byte unchanged; only these seven consumer cases are inserted.",
       "Actual Start, Yes, Dislodge, editor Save, No and Dot consumers are exercised. The existing publication fence awaits exact device/local/cloud payload, idle and dirty flags and revisions; a read or badge is not treated as acknowledgement.",
       "The conflicting-title case passed before implementation and still requires the exact displaced draft plus its recovery notice. This is preservation evidence, not a claimed RED.",
       "Exploratory 13-task/Halving/held-device/held-initial-read/browser controls are preserved outside the checkout. Fixture setup failures and the overstrict AX probe are explicitly not product REDs."
     ],
     "redEvidence": {
       "command": "TZ=UTC node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/successive-dislodge/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/post-p0-dislodge/test-runs --purpose preimplementation-red -- node --test --test-name-pattern=\"RISK quiet reconciliation feedback:\" tests.js",
-      "failure": "Before runtime edit: f52dcc5d (05:16:36Z), minimized c995b3d0 (05:17:21Z), final724dc8d8 (05:23:08Z) fail expected[] versus the out-of-date success toast while chain, peer title and actual ACK7/local7 pass. Removing either peer edit or local action passes controls9312cee8/5031e265; stack63d496ee identifies cloudPull success. First GREEN70489e3c. Subsequent pre-repair counterexamples: No-learning REDc374d10f (05:26:30Z) before excluding derived ratings; peer-Dot RED9aac0cfa (05:27:59Z) before queue-delta comparison. Four-case GREENb2961b59. FAQ RED5bea3a1d (05:29:20Z) precedes copy; the next changelog observation needed real-template hydration, corrected without app edits. Five-case GREEN30781555. Mechanical fingerprint RED31915db5 precedes renewal; all seven focused cases GREEN6da4d2b2. Original five exploratory loops replay GREEN015ad6fc with exact tests.js restoration. Full recorder JSON, output, source identities, diagnostic patch and rendered records remain under the external post-p0-dislodge directory; exact missing-task wording and crash/reappearance remain unreproduced."
+      "failure": "Before runtime edit: f52dcc5d (05:16:36Z), minimized c995b3d0 (05:17:21Z), final724dc8d8 (05:23:08Z) fail expected[] versus the out-of-date success toast while chain, peer title and actual ACK7/local7 pass. Removing either peer edit or local action passes controls9312cee8/5031e265; stack63d496ee identifies cloudPull success. First GREEN70489e3c. Subsequent pre-repair counterexamples: No-learning REDc374d10f (05:26:30Z) before excluding derived ratings; peer-Dot RED9aac0cfa (05:27:59Z) before queue-delta comparison. Four-case GREENb2961b59. FAQ RED5bea3a1d (05:29:20Z) precedes copy; the next changelog observation needed real-template hydration, corrected without app edits. Five-case GREEN30781555. Mechanical fingerprint RED31915db5 precedes renewal; all seven focused cases GREEN6da4d2b2. Original five exploratory loops replay GREEN015ad6fc with exact tests.js restoration. Full recorder JSON, output, source identities, diagnostic patch and rendered records remain under the external post-p0-dislodge directory; exact missing-task wording and crash/reappearance remain unreproduced. Reviewer counterexamples on45d098a are later repair evidence: dependency original210669da and owner f297435a fail absent recovery notice while final peer Soft, exact Hard draft backup and durable acknowledgement pass, before effective dependency projection. Owner GREEN9b71548e. Peer deletion RED18f9d10b (external) and owner same-test RED precede unchanged-row repair; seven-case peer-delete-owner-green passes. Existing protected FAQ literal REDa068dcb5 precedes restoration without editing its assertion; review-repairs-green passes eight cases. Full45 was deliberately interrupted after confirmed findings, never reported passed. Final candidate repeats required gates."
     }
   },
   {
