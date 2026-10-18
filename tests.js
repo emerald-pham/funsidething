@@ -29010,6 +29010,38 @@ test('RISK backup mirror FAQ: confirmed matching-copy deletion and ambiguous rec
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];assert.match(current,/Identical migrated backup copies appear once and can be deleted after one confirmation/);
 });
 
+test('RISK backup help: expiry, protected-copy deletion, and archive limits remain complete',async()=>{
+ const {ctx,shim}=await loadApp();ctx.onAction('help',{});const help=shim.document.getElementById('modalRoot').innerHTML;
+ const answer=question=>{
+  const escaped=question.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),match=help.match(new RegExp('<dt>'+escaped+'</dt><dd>(.*?)</dd>'));
+  assert.ok(match,'the actual help modal includes '+question);
+  return match[1].replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim();
+ };
+ const countdown=answer('What do the countdown tags mean?');
+ const taskHelp=answer('Can I undo, restore, or remove a task?');
+ const backups=answer('How do backups and Restore work?');
+ const exports=answer('What do the two JSON exports contain?');
+ assert.match(countdown,/Start clears expired.*before building.*eligible pool/,'expired holds clear before the next eligible pool is built');
+ assert.match(taskHelp,/Backup deletion asks for confirmation and keeps the current board/);
+ assert.match(taskHelp,/deletion is unavailable.*reopen Settings.*recovery options/);
+ assert.match(taskHelp,/copy changes during confirmation, reopen Settings/);
+ assert.match(taskHelp,/red Delete button.*more than seven days old/);
+ assert.match(taskHelp,/opening Settings does not delete it/i);
+ assert.match(backups,/Automatic backups cover today and the previous six local dates/);
+ assert.match(backups,/older automatic entries.*removed after a successful save, without Undo/);
+ assert.match(backups,/Manual and protected recovery copies remain/);
+ assert.match(backups,/Matching duplicate backups appear once/);
+ assert.match(exports,/current board JSON is ordinary board data/);
+ assert.match(exports,/versioned archive is not an ordinary board-import file/);
+ assert.match(exports,/pending work is never replayed/);
+ assert.match(backups,/File restore protects exact bytes and the current board in Settings backups/);
+ assert.match(backups,/Cancel or close during source checks stops before adoption/);
+ assert.match(backups,/Archives apply only their current board/);
+ assert.match(backups,/offline or held sync leaves the board unchanged/);
+ for(const [label,text] of Object.entries({countdown,taskHelp,backups,exports}))
+  assert.ok(text.split(/\s+/).filter(Boolean).length<=130,label+' FAQ answer stays within the 130-word limit');
+});
+
 
 test('RISK fireworks pair delay: seeded second launches span zero to three hundred milliseconds without shifting first shells or finale',()=>{
  const context=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
@@ -33762,6 +33794,10 @@ test('RISK timed-hold coherence: native Worked honors hours and local 2 AM ceili
 
   const cutoff=new Date(at);cutoff.setHours(2,0,0,0);if(cutoff.getTime()<=at)cutoff.setDate(cutoff.getDate()+1);
   const deadline=Math.min(at+workedHours*3600000,cutoff.getTime()),beforeDeadline=deadline-1;
+  if(label==='2am'){
+   assert.equal(deadline,cutoff.getTime(),'the local 2 AM ceiling independently supplies this fixture deadline');
+   assert.equal(deadline-at,30*60*1000,'a genuine local 1:30 AM start leaves exactly thirty minutes to the ceiling');
+  }
   app.ctx.window.CloudSync.ready=false;setFakeTime(app.ctx,beforeDeadline);app.shim.window.dispatchEvent({type:'focus'});
   assert.equal(app.ctx.state.considered[targetId],'worked','the Worked hold remains active one millisecond before its selected deadline');
   assert.equal(app.ctx.state.workedAt[targetId],at,'the active hold keeps its original timestamp');
@@ -33798,7 +33834,7 @@ test('RISK timed-hold coherence: native Worked honors hours and local 2 AM ceili
   await close(app);
  };
  await t.test('configured hour deadline',subtest=>run(subtest,{at:Date.parse('2026-10-16T14:00:00.000Z'),workedHours:1,label:'hours'}));
- await t.test('local 2 AM ceiling before configured hours',subtest=>run(subtest,{at:Date.parse('2026-10-16T05:30:00.000Z'),workedHours:8,label:'2am'}));
+ await t.test('local 2 AM ceiling before configured hours',subtest=>run(subtest,{at:new Date(2026,9,16,1,30,0,0).getTime(),workedHours:12,label:'2am'}));
 });
 
 test('RISK timed-hold coherence: use each board’s Worked settings and keep orphan evidence fail-closed',async t=>{

@@ -689,6 +689,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK backup mirror storage failure: quota rejection and IndexedDB abort preserve recoverability and allow an explicit retry
 - RISK device backup final guard: rejected throwing and asynchronous guards abort before deleting a verified reference
 - RISK backup mirror FAQ: confirmed matching-copy deletion and ambiguous recovery preserve the seven-day age cue
+- RISK backup help: expiry, protected-copy deletion, and archive limits remain complete
 
 - `RISK fireworks pair delay: seeded second launches span zero to three hundred milliseconds without shifting first shells or finale` — deterministic per-pair stagger and responsive ignition preservation.
 - `RISK fireworks frequency again: released scale two becomes four in live UTC scheduling and legacy advancement` — repeat frequency reduction and midnight reservations.

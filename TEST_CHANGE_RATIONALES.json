@@ -12612,4 +12612,61 @@
     "comparison": "Exact final198 reconciliation test diff against 3e3092d9908e2e8aeb3ce9ae00322c975f83e7a1",
     "baseCommit": "3e3092d9908e2e8aeb3ce9ae00322c975f83e7a1"
   }
+,
+  {
+    "testChangesSha256": "539888fac8d21188d893a769946c4ad2c8a7cc914b8d3346adcb6ac424fa7f4c",
+    "reason": "The actual combined #219 candidate exposed outdated recovery-help wording against retained FAQ assertions and a timezone-assuming local-2-AM test fixture. This correction restores the existing player-facing contracts and makes the fixture prove the same ceiling in UTC and New York without changing product timing.",
+    "previousBehavior": "The Help copy described expiry as an updated-board action and used shorthand for the automatic-backup date window and duplicate entries; retained copy checks require the precise Start, local-date, successful-save, Undo, and protected-copy behavior. The 194 fixture used fixed 05:30Z and eight hours as a New York 01:30 assumption; UTC places that instant after 2 AM, and the legacy v1 default migrates eight hours to sixteen.",
+    "intendedBehavior": "Help states that Start clears expired holds before building the eligible pool, automatic backups cover today and the prior six local dates, older automatic entries retire only after successful save without Undo, protected copies remain, and matching duplicates appear once. The existing 194 test creates a true local 01:30 action with a 12-hour duration and independently checks the 30-minute local 2 AM ceiling. Product scanner and expiry behavior are unchanged.",
+    "replacementTests": [
+      "RISK backup help: expiry, protected-copy deletion, and archive limits remain complete"
+    ],
+    "preservedCoverage": [
+      "The original optional-start, backup-mirror, legacy-expiry, deletion-confirmation, duplicate-identity, protected-copy, and PWA help assertions remain in place; this change adds a real Help-consumer RISK check rather than relaxing them.",
+      "The new Help consumer checks the current-board/archive distinction, pending evidence non-replay, exact file bytes and current-board backup, cancel-before-adoption, signed-in confirmation, and offline or held behavior while enforcing the 130-word answer limit.",
+      "The 194 timed-hold lifecycle assertions for save, reopen, cloud pull, History, Undo, and preserved source evidence remain; only its local-time fixture was corrected, with the 2 AM deadline and 30-minute interval asserted independently.",
+      "No scanner, storage, expiry, cloud, restore, or service-worker implementation changed in this candidate."
+    ],
+    "redEvidence": {
+      "command": "Node22/TZUTC record-run --purpose red -- node --test --test-name-pattern='RISK backup help: expiry, protected-copy deletion, and archive limits remain complete' tests.js",
+      "failure": "Recorded actual Help-consumer RED b72b4746-8066-486a-bd93-87d6cab82cc0 failed the retained Start-clears-expired-before-pool assertion on rendered text. The parent full-candidate record 95ac0ae9-de0c-40cc-9b92-52a7d48a8b5d also retained the existing FAQ failures and reported the 194 local-2-AM subtest failing under UTC. That was a test-fixture timezone assumption (05:30Z plus eight hours, with legacy v1 migration), not a product timing defect; product timing code was not edited."
+    },
+    "observedIntermediateRuns": [
+      "Focused FAQ/PWA attempt 2f920d93-673c-49f6-af67-8d923e0d5752 recorded 3/5 passing and two actual copy assertion failures because the first wording capitalized Older after a semicolon; the source wording was corrected to satisfy the preserved case-sensitive phrase.",
+      "Recorded focused FAQ/PWA GREEN 58292164-bf7e-452d-8012-bc0d95f26835 passed all five named tests: the three original failing FAQ tests, the new openHelp RISK consumer, and the PWA FAQ/changelog contract.",
+      "Recorded UTC timed-hold GREEN b09cfe8a-ed35-49a1-a884-4e3633c0d8e6 and America/New_York GREEN 81fa5690-0027-47e9-8685-6695c0576adb each passed both nested cases (3/3 TAP outcomes). The first attempted New York wrapper launch 24384bf7-f802-40c2-8cc9-a719302e794a had a mistyped Node path and launched no test; it remains recorded and is not treated as behavioral evidence."
+    ],
+    "comparison": "Exact tests.js diff against 219ee41c42a3542f96f791dfa7bf107514d5211b",
+    "baseCommit": "219ee41c42a3542f96f791dfa7bf107514d5211b"
+  }
+,
+  {
+    "testChangesSha256": "cb551b12287736862f828ee46b3acc5e71b472b6d5c15a738c0789eae3e7b532",
+    "reason": "This exact-base aggregate records the cumulative 52d test diff after integrating the previously documented recovery, export, Restore, expiry, and release-regression work plus this final #219 gate repair. The new correction restores retained Help copy contracts and makes the existing local-2-AM fixture timezone-correct; all earlier rationale records remain byte-preserved.",
+    "previousBehavior": "The cumulative candidate had accurate earlier red/green evidence in the historical rationale objects, but the actual #219 full-candidate run still failed three retained Help assertions and the 194 local-2-AM nested test under UTC. The new direct Help consumer also observed the old countdown wording before its copy correction.",
+    "intendedBehavior": "The actual Help output now states the retained countdown, backup date-window, successful-save expiry, Undo/protected-copy, duplicate, and archive/file-restore boundaries. The 194 test constructs local 01:30 and a 12-hour duration, then independently proves its deadline is local 02:00 exactly 30 minutes later in both UTC and New York. No product timing or persistence behavior is changed.",
+    "replacementTests": [
+      "RISK MANUAL JSON EXPORT: the actual Settings actions download current board and recovery archive",
+      "RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exact sources before explicit local adoption",
+      "RISK timed-hold coherence: native Worked honors hours and local 2 AM ceilings across reopen and cloud pull",
+      "RISK repository process: required installed-client native outcomes execute exactly once",
+      "RISK backup help: expiry, protected-copy deletion, and archive limits remain complete"
+    ],
+    "preservedCoverage": [
+      "The preceding 497 rationale objects, including their raw bytes and chronological RED/GREEN distinctions, are retained as an exact raw prefix; this additional object binds the cumulative test diff to the exact 52d base.",
+      "Earlier 185/186 hydration and overlap, 188 held recovery, 190 manual JSON export, 194 expiry, 196 guarded file Restore, and installed-client delivery evidence remain represented by their own unchanged rationale records and tests.",
+      "The final Help consumer verifies existing help via the actual application action and keeps prior FAQ assertions, archive non-replay rules, file-restore safeguards, and the 130-word limit.",
+      "The existing 194 save, reopen, cloud-pull, History, Undo, and source-preservation assertions stay intact; only the fixed-time fixture changes to a true local-time input."
+    ],
+    "redEvidence": {
+      "command": "Node22/TZUTC record-run preimplementation-red for the actual RISK backup-help consumer; separately preserve the parent full-candidate record 95ac0ae9-de0c-40cc-9b92-52a7d48a8b5d.",
+      "failure": "The actual new Help consumer record b72b4746-8066-486a-bd93-87d6cab82cc0 failed against rendered pre-edit copy. The parent candidate record 95ac0ae9-de0c-40cc-9b92-52a7d48a8b5d reports the three retained FAQ failures and local-2-AM fixture failure. The latter came from a New York-specific fixed instant and legacy duration migration under UTC, not product timing. Prior implementation RED chronology is unchanged in the earlier rationale objects; no result was backfilled."
+    },
+    "observedIntermediateRuns": [
+      "After the copy and fixture corrections, recorded FAQ/PWA/inventory cohort fcd569d3-0f7f-410e-bb1c-96d194e56c91 passes all six targeted contracts after root package.",
+      "Recorded pre-package UTC and America/New_York timed-hold cohorts b09cfe8a-ed35-49a1-a884-4e3633c0d8e6 and 81fa5690-0027-47e9-8685-6695c0576adb each pass 3/3. The separate recorded wrapper launch failure remains an infrastructure invocation mistake and is not behavioral evidence."
+    ],
+    "comparison": "Exact cumulative tests.js diff against 52d4b2537bacbb60240ae7a53061224350ebd36f",
+    "baseCommit": "52d4b2537bacbb60240ae7a53061224350ebd36f"
+  }
 ]
