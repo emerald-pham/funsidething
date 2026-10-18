@@ -141,6 +141,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK MANUAL JSON EXPORT: unreadable, unsupported and hydration-placeholder sources stop without a file
 - RISK BACKUP FILE RESTORE: the actual Settings file selection protects exact sources before explicit local adoption
 - RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exact sources before explicit local adoption
+- RISK BACKUP FILE RESTORE: compact settings and unknown board fields stay inside the actual preview
 - RISK BACKUP FILE RESTORE: current decisions survive file selection and cross-account transfer
 - RISK BACKUP FILE RESTORE: irreversible preview shows Restore and close as unavailable
 - RISK BACKUP FILE RESTORE: a signed-in file waits for explicit CAS and exact cloud acknowledgement
@@ -1589,6 +1590,7 @@ The candidate worker precaches while predecessor clients remain on their existin
 - RISK held decision recovery: new reviewed consent supersedes prior prepared publications only after exact ACK
 
 - RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exact sources before explicit local adoption
+- RISK BACKUP FILE RESTORE: compact settings and unknown board fields stay inside the actual preview
 - RISK BACKUP FILE RESTORE: a signed-in file waits for explicit CAS and exact cloud acknowledgement
 - RISK BACKUP FILE RESTORE: account-bound files stay protected while cloud is unavailable
 - RISK BACKUP FILE RESTORE: IDB authority does not hide changed legacy board copies

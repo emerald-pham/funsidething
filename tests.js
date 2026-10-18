@@ -14543,7 +14543,43 @@ test('RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exac
   assert.match(restoreFaq,/exact bytes.*current board.*preview/);
   assert.match(restoreFaq,/Cancel or close during source checks stops before adoption/);
   assert.match(restoreFaq,/Archives apply only their current board.*offline or held sync leaves the board unchanged/);
+  assert.match(restoreFaq,/Long before-and-after values wrap inside the preview\./,'the extended FAQ explains how long restore effects remain readable');
   assert.match(html,/Settings can restore a board JSON file with an explicit preview/,'the current changelog source explains guarded file restore');
+  assert.match(html,/Long board-field values wrap within the preview\./,'the current changelog explains the corrected file-restore preview');
+});
+
+test('RISK BACKUP FILE RESTORE: compact settings and unknown board fields stay inside the actual preview',async t=>{
+  const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb');
+  const app=await loadApp({sharedStorage:sharedScannerStorage(),indexedDBProvider:new IDBFactory(),deviceDbName:'chain-scanner-file-preview-wrap-'+Date.now()+'-'+Math.random()}),{ctx,shim}=app;
+  const store=ctx.window.ScannerDeviceStore;assert.ok(store,'the actual app opened an isolated durable-store fixture');
+  t.after(async()=>{await store.close();});
+  ctx.addTask('Current file preview task');assert.equal(await ctx.persist(),true);
+  const currentRaw=JSON.stringify(ctx.state),incoming=JSON.parse(currentRaw);
+  incoming.settings.workedHours=incoming.settings.workedHours===16?8:16;
+  const longBoardFieldName='futurePreviewField'+('unbroken'.repeat(14));
+  incoming[longBoardFieldName]={keep:'full preview value'};
+  const file=new File([JSON.stringify(incoming)],'compact-preview.json',{type:'application/json'});
+  ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
+  const restoreAction=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);
+  assert.ok(restoreAction,'the actual Settings file restore action is available');
+  const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
+  const originalGet=shim.document.getElementById.bind(shim.document);
+  shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
+  await ctx.onAction(restoreAction[1],{});
+  input.files=[file];shim.document.dispatchEvent({type:'change',target:input});
+  for(let attempt=0;attempt<100&&!shim.document.getElementById('modalRoot').innerHTML.includes('data-act="confirm-file-restore"');attempt++)await flush();
+  const preview=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(preview,/data-act="confirm-file-restore"/,'the actual selected board reaches its guarded preview');
+  assert.equal(JSON.stringify(ctx.state),currentRaw,'previewing compact settings and unknown fields does not change the accepted board');
+  const effects=preview.match(/<ul(?: class="file-restore-effects")?>([\s\S]*?)<\/ul>/);
+  assert.ok(effects,'the actual preview still renders its before-and-after effects list');
+  assert.ok(effects[1].includes(longBoardFieldName),'the complete unbroken unknown board-field name remains visible');
+  assert.ok(effects[1].includes('full preview value'),'the complete unknown board-field value remains visible');
+  assert.match(effects[1],/long value abbreviated/,'the compact settings JSON keeps its existing honest preview abbreviation');
+  assert.match(preview,/<ul class="file-restore-effects">/,'the real preview isolates its before-and-after effects list for narrow reflow');
+  assert.match(html,/#modalRoot\s+\.file-restore-effects\s+li\s*\{[^}]*overflow-wrap\s*:\s*anywhere/,'only file-restore effect rows break compact values and long field names within the preview');
+  await ctx.onAction('cancel-file-restore',{});
+  assert.equal(JSON.stringify(ctx.state),currentRaw,'Cancel leaves the accepted board unchanged');
 });
 
 test('RISK BACKUP FILE RESTORE: a signed-in file waits for explicit CAS and exact cloud acknowledgement',async t=>{
@@ -29197,6 +29233,7 @@ test('RISK backup help: expiry, protected-copy deletion, and archive limits rema
  assert.match(backups,/older automatic entries.*removed after a successful save, without Undo/);
  assert.match(backups,/Manual and protected recovery copies remain/);
  assert.match(backups,/Matching duplicate backups appear once/);
+ assert.match(backups,/Long before-and-after values wrap inside the preview\./);
  assert.match(exports,/current board JSON is ordinary board data/);
  assert.match(exports,/versioned archive is not an ordinary board-import file/);
  assert.match(exports,/pending work is never replayed/);
@@ -29210,6 +29247,7 @@ test('RISK backup help: expiry, protected-copy deletion, and archive limits rema
  const chapter=help.split('<details class="help-faq" data-help-changelog>')[1]?.split('</details>')[0]||'';
  assert.match(chapter,/Expired Can’t and Worked holds now stay expired through save, reopen, and cloud refresh, while their original decision times and Worked History remain unchanged\. Worked items stay off the dotted chain after saving and syncing\./);
  assert.match(chapter,/Settings can restore a board JSON file with an explicit preview[\s\S]*?Supported recorded choices, including Theme and inherited account choices, now travel with a file when source and account checks pass\./);
+ assert.match(chapter,/Long board-field values wrap within the preview\./);
  for(const [label,text] of Object.entries({countdown,taskHelp,backups,exports,worked}))
   assert.ok(text.split(/\s+/).filter(Boolean).length<=130,label+' FAQ answer stays within the 130-word limit');
 });

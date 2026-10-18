@@ -12818,5 +12818,55 @@
     ],
     "comparison": "Exact cumulative tests.js diff against 52d4b2537bacbb60240ae7a53061224350ebd36f.",
     "baseCommit": "52d4b2537bacbb60240ae7a53061224350ebd36f"
+  },
+  {
+    "reason": "An actual native dark-wide Settings restore preview clipped compact before-and-after settings JSON because its effects list had no wrap opportunities. Long unknown board-field names also need to remain readable without changing the board or restore guard.",
+    "previousBehavior": "Selecting a supported board file through Settings reached the explicit preview and preserved the accepted board, but the ordinary 560px dialog expanded horizontally when changed settings were shown as compact JSON. The Help answer and current changelog did not explain long preview values.",
+    "intendedBehavior": "The real file-restore effects list receives a narrowly scoped wrapping style so compact settings and long board-field names stay within the existing dialog. The complete visible field name and value remain present, and the existing explicit abbreviation for long JSON values remains honest. Selection, cancellation, current-board bytes, authority, confirmation and adoption behavior are unchanged. Help and the current changelog state that long preview values wrap.",
+    "preservedCoverage": [
+      "Actual Settings file selection still protects exact source bytes and the current board before explicit adoption.",
+      "Selection and cancellation leave the accepted board unchanged and do not publish or commit it.",
+      "Existing ordinary board, recovery archive, source authority, cloud acknowledgement, cancellation, Undo and Help boundaries remain covered by their prior RISK tests."
+    ],
+    "replacementTests": [
+      "RISK BACKUP FILE RESTORE: compact settings and unknown board fields stay inside the actual preview"
+    ],
+    "redEvidence": {
+      "command": "TZ=UTC Node 22 scripts/agent-tools/record-run.mjs --repo <196 worktree> --evidence-dir /Users/emeraldpham/.codex/task-artifacts/storage-races-184/fresh196-preview-reflow/recorded-runs --purpose preimplementation-red -- node --test --test-name-pattern=\"RISK BACKUP FILE RESTORE: compact settings and unknown board fields stay inside the actual preview\" tests.js",
+      "failure": "The actual Settings file input reached the supported preview; accepted board JSON remained unchanged; the complete long unknown field name/value and existing settings-JSON abbreviation were present. The RISK assertion then failed because the preview effects list lacked its scoped reflow container. Record e97a227b-66a8-402d-b6ef-385314d909a4 at /Users/emeraldpham/.codex/task-artifacts/storage-races-184/fresh196-preview-reflow/recorded-runs/2026-10-18T18-13-59-834Z-e97a227b-66a8-402d-b6ef-385314d909a4.json. The actual Help copy assertion also failed before the copy edit; record ab666646-f2e0-4bb3-95c6-f55a810e5122 at /Users/emeraldpham/.codex/task-artifacts/storage-races-184/fresh196-preview-reflow/recorded-runs/2026-10-18T18-14-55-976Z-ab666646-f2e0-4bb3-95c6-f55a810e5122.json."
+    },
+    "testChangesSha256": "922b65a20cc20a641170a40ed75f121b37a5628f0b8af010f15d60589826b36b",
+    "baseCommit": "cc779e87135a7ca9db02f0492ad24c939bb83b40",
+    "greenEvidence": {
+      "command": "TZ=UTC Node 22 record-run --test --test-name-pattern=RISK BACKUP FILE RESTORE compact settings and unknown board fields stay inside the actual preview OR RISK backup help expiry protected-copy deletion and archive limits remain complete tests.js",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/fresh196-preview-reflow/recorded-runs/2026-10-18T18-16-37-119Z-2d1514d6-74dd-4261-aa84-4f522d5ae744.json",
+      "result": "passed 2 tests with zero failures or skips; the actual Settings preview and Help/changelog assertions are green"
+    },
+    "comparison": "Exact tests.js diff against cc779e87135a7ca9db02f0492ad24c939bb83b40; the prior 504 rationale records are preserved byte-for-byte and in order."
+  },
+  {
+    "reason": "This exact-base aggregate binds the cumulative tests.js diff since 52d while retaining each prior case-level rationale and chronology; the current continuation adds an actual Settings file-restore reflow RISK case and direct Help/changelog assertions.",
+    "previousBehavior": "The cumulative candidate contains the previously recorded recovery, export, file restore, sync, timed-hold and release-gate behavior. On the clean cc779 continuation, an actual native dark-wide Settings restore showed the ordinary effects list overflowing its 560px modal on compact settings JSON; the contemporaneous RISK test then reached the real selected-file preview, retained the complete unknown field text and failed the missing-wrap assertion before source edits.",
+    "intendedBehavior": "The cumulative behavior remains covered by its earlier records. In the current continuation, only the actual file-restore effects rows gain scoped overflow wrapping, preserving complete visible board-field names and values, the existing long-value abbreviation, dialog geometry, exact file bytes, accepted-board state and restore authority. The Help FAQ and current changelog explain that long preview values wrap, and the FAQ remains within 130 words.",
+    "preservedCoverage": [
+      "Prior recovery, export, device-store, account authority, cloud acknowledgement, timed-hold, Undo and installed-client test histories remain in their exact ordered rationale records.",
+      "The actual file-restore route still protects the current board and exact file before explicit confirmation, with pending and archive evidence excluded from replay.",
+      "The new scoped visual rule changes no restore source, selected bytes, board state, account authority, backup write, or confirmation transition."
+    ],
+    "replacementTests": [
+      "RISK BACKUP FILE RESTORE: compact settings and unknown board fields stay inside the actual preview"
+    ],
+    "redEvidence": {
+      "command": "TZ=UTC Node 22 scripts/agent-tools/record-run.mjs --repo <196 worktree> --evidence-dir /Users/emeraldpham/.codex/task-artifacts/storage-races-184/fresh196-preview-reflow/recorded-runs --purpose preimplementation-red -- node --test --test-name-pattern=\"RISK BACKUP FILE RESTORE: compact settings and unknown board fields stay inside the actual preview\" tests.js",
+      "failure": "This is an exact cumulative 52d test-diff binding, not a claim that every historical change first went red together. Prior case-level chronology stays in earlier records. The new preview failure was observed contemporaneously on clean cc779 before source edits: record e97a227b-66a8-402d-b6ef-385314d909a4 at /Users/emeraldpham/.codex/task-artifacts/storage-races-184/fresh196-preview-reflow/recorded-runs/2026-10-18T18-13-59-834Z-e97a227b-66a8-402d-b6ef-385314d909a4.json. The direct current Help assertion also observed its missing cue before copy edits in record ab666646-f2e0-4bb3-95c6-f55a810e5122."
+    },
+    "testChangesSha256": "655fbf4df0ae4482f09dc79ba96618ae31066e251d9dfa4813acc2bb021f3f35",
+    "baseCommit": "52d4b2537bacbb60240ae7a53061224350ebd36f",
+    "greenEvidence": {
+      "command": "TZ=UTC Node 22 record-run --test-name-pattern=RISK BACKUP FILE RESTORE OR RISK backup help OR RISK backup mirror FAQ OR RISK test inventory tests.js",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/fresh196-preview-reflow/recorded-runs/2026-10-18T18-16-56-706Z-b3051c75-7b57-4788-bf24-4bd9181b52d5.json",
+      "result": "passed 37 tests with zero failures or skips across the focused file-restore, Help, and inventory cohort"
+    },
+    "comparison": "Exact cumulative tests.js diff against 52d4b2537bacbb60240ae7a53061224350ebd36f; all prior rationale objects remain byte-preserved and ordered."
   }
 ]
