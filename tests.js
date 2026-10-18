@@ -7,6 +7,86 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
+test('RISK quiet reconciliation feedback: a peer edit beside an ordinary Dislodge saves without a success interruption',async t=>{
+ const at=Date.parse('2026-10-18T03:00:00Z'),ids=['quiet-first','quiet-second'];
+ const initial=syncState({tasks:ids.map((id,i)=>({...syncTask(id,'Quiet task '+(i+1)),createdAt:i+1})),mode:'work',scanMode:'descending',syncAccount:'e@example.com',syncRev:4,syncDirty:false,settings:{horizonMin:60,thresholdPct:0,samples:40,cantMin:30,workedHours:8,theme:'system'}});
+ const h=makeSyncHarness({remote:initial,rev:4,delayMs:1}),raw=JSON.stringify(initial);
+ const app=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});t.after(()=>closeLegacyApp173(app));
+ await app.ctx.cloudPull();app.ctx.window.CloudSync.ready=false;
+ app.ctx.onAction('start-scan',{dataset:{mode:'descending'}});app.ctx.onAction('yes',{dataset:{candidate:ids[1],benchmark:ids[0]}});assert.equal(await app.ctx.persist(),true);
+ app.ctx.window.CloudSync.ready=true;await app.ctx.cloudPull();await app.ctx.cloudPushNow();await settleSavedViewPublication(app,h,'quiet feedback initial chain');assert.deepEqual(h.remoteState().chain,ids);
+ const peerRaw=JSON.stringify({...h.remoteState(),syncAccount:'e@example.com',syncRev:h.doc.rev,syncDirty:false});
+ const peer=await loadAppAtTime(at+10,{seedStorage:{[SYNC_STORE_KEY]:peerRaw,[LOCAL_HEAD_KEY]:peerRaw},cloudSyncFactory:h.factory});t.after(()=>closeLegacyApp173(peer));
+ await peer.ctx.cloudPull();peer.ctx.window.CloudSync.ready=false;hydrateUnchangedEditorDraft(peer,ids[0]);peer.shim.document.getElementById('etTitle').value='Kept peer title';peer.ctx.onAction('save-edit',{dataset:{id:ids[0]}});assert.equal(await peer.ctx.persist(),true);
+ peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPull();await peer.ctx.cloudPushNow();await settleSavedViewPublication(peer,h,'quiet feedback peer edit');
+ const toasts=[],element=app.shim.document.getElementById('toast');let message=element.textContent;Object.defineProperty(element,'textContent',{configurable:true,get:()=>message,set(value){message=value;toasts.push(value);}});
+ setFakeTime(app.ctx,at+100);app.ctx.onAction('dislodge',{dataset:{benchmark:ids[1]}});assert.equal(await app.ctx.persist(),true);
+ await app.ctx.cloudPull();await app.ctx.cloudPushNow();await settleSavedViewPublication(app,h,'quiet feedback final reconciliation');
+ assert.deepEqual(Array.from(app.ctx.state.chain),[ids[0]]);assert.deepEqual(Array.from(app.ctx.state.tasks,row=>row.id),ids);assert.equal(app.ctx.state.tasks[0].title,'Kept peer title');
+ assert.equal(app.ctx.state.considered[ids[1]],'dislodged');assert.equal(app.ctx.state.tasks[1].ratingHistory.filter(row=>row.kind==='dislodge').length,1);
+ t.diagnostic(JSON.stringify({toasts,chain:Array.from(app.ctx.state.chain),cloudChain:h.remoteState().chain,title:app.ctx.state.tasks[0].title}));
+ assert.deepEqual(toasts,[],'routine successful reconciliation stays quiet while both decisions are acknowledged and preserved');
+});
+
+test('RISK quiet reconciliation feedback: a displaced local title keeps its recovery notice and exact backup',async t=>{
+ const at=Date.parse('2026-10-18T03:00:00Z'),id='quiet-conflict',initial=syncState({tasks:[syncTask(id,'Original title')],mode:'work',syncAccount:'e@example.com',syncRev:4,syncDirty:false});
+ const h=makeSyncHarness({remote:initial,rev:4,delayMs:1}),raw=JSON.stringify(initial),options={seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory};
+ const app=await loadAppAtTime(at,options),peer=await loadAppAtTime(at,options);t.after(()=>closeLegacyApp173(app));t.after(()=>closeLegacyApp173(peer));
+ await app.ctx.cloudPull();await peer.ctx.cloudPull();app.ctx.window.CloudSync.ready=false;peer.ctx.window.CloudSync.ready=false;
+ assert.equal(await saveEditorChoice(app,id,at+100,{title:'Earlier local title'}),true);
+ assert.equal(await saveEditorChoice(peer,id,at+200,{title:'Later peer title'}),true);
+ peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPull();await peer.ctx.cloudPushNow();await settleSavedViewPublication(peer,h,'conflicting peer title');
+ const toasts=[],element=app.shim.document.getElementById('toast');let message=element.textContent;Object.defineProperty(element,'textContent',{configurable:true,get:()=>message,set(value){message=value;toasts.push(value);}});
+ app.ctx.window.CloudSync.ready=true;await app.ctx.cloudPull();await app.ctx.cloudPushNow();await settleSavedViewPublication(app,h,'displaced local title');
+ assert.equal(app.ctx.state.tasks[0].title,'Later peer title');assert.equal(h.remoteState().tasks[0].title,'Later peer title');
+ assert.ok(app.ctx.readLocalBackups().some(row=>JSON.parse(row.payload).tasks.some(task=>task.id===id&&task.title==='Earlier local title')),'the exact displaced title remains recoverable');
+ assert.match(toasts.join('\n'),/previous board is in Settings backups/i,'a same-field choice that displaced this draft still explains recovery');
+});
+
+test('RISK quiet reconciliation feedback: independent comparison learning beside Dislodge stays quiet',async t=>{
+ const at=Date.parse('2026-10-18T03:00:00Z'),ids=['learning-first','learning-second','learning-third'];
+ const initial=syncState({tasks:ids.map((id,i)=>({...syncTask(id,'Learning task '+(i+1)),createdAt:i+1})),mode:'work',syncAccount:'e@example.com',syncRev:4,syncDirty:false,settings:{horizonMin:60,thresholdPct:0,samples:40,cantMin:30,workedHours:8,theme:'system'}}),h=makeSyncHarness({remote:initial,rev:4,delayMs:1}),raw=JSON.stringify(initial);
+ const app=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});t.after(()=>closeLegacyApp173(app));
+ await app.ctx.cloudPull();app.ctx.window.CloudSync.ready=false;app.ctx.onAction('start-scan',{dataset:{mode:'descending'}});app.ctx.onAction('yes',{dataset:{candidate:ids[1],benchmark:ids[0]}});app.ctx.onAction('start-working',{});assert.equal(await app.ctx.persist(),true);
+ app.ctx.window.CloudSync.ready=true;await app.ctx.cloudPull();await app.ctx.cloudPushNow();await settleSavedViewPublication(app,h,'independent learning common chain');
+ const peerRaw=JSON.stringify({...h.remoteState(),syncAccount:'e@example.com',syncRev:h.doc.rev,syncDirty:false}),peer=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:peerRaw,[LOCAL_HEAD_KEY]:peerRaw},cloudSyncFactory:h.factory});t.after(()=>closeLegacyApp173(peer));await peer.ctx.cloudPull();peer.ctx.window.CloudSync.ready=false;app.ctx.window.CloudSync.ready=false;
+ setFakeTime(peer.ctx,at+200);peer.ctx.onAction('resume-scan',{dataset:{mode:'descending'}});assert.equal(peer.ctx.state.candidateId,ids[2]);peer.ctx.onAction('no',{dataset:{candidate:ids[2],benchmark:ids[1]}});assert.equal(await peer.ctx.persist(),true);
+ peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPull();await peer.ctx.cloudPushNow();await settleSavedViewPublication(peer,h,'independent learning peer No');
+ const toasts=[],element=app.shim.document.getElementById('toast');let message=element.textContent;Object.defineProperty(element,'textContent',{configurable:true,get:()=>message,set(value){message=value;toasts.push(value);}});
+ setFakeTime(app.ctx,at+100);app.ctx.onAction('dislodge',{dataset:{benchmark:ids[1]}});assert.equal(await app.ctx.persist(),true);
+ app.ctx.window.CloudSync.ready=true;await app.ctx.cloudPull();await app.ctx.cloudPushNow();await settleSavedViewPublication(app,h,'independent No and Dislodge publication');
+ assert.deepEqual(Array.from(app.ctx.state.chain),[ids[0]]);assert.equal(app.ctx.state.considered[ids[1]],'dislodged');assert.equal(app.ctx.state.considered[ids[2]],'no');
+ const history=app.ctx.state.tasks.find(row=>row.id===ids[1]).ratingHistory;assert.equal(history.filter(row=>row.kind==='dislodge').length,1);assert.equal(history.filter(row=>row.kind==='no').length,1,'independent comparison learning and standalone loss both survive');
+ t.diagnostic(JSON.stringify({toasts,chain:Array.from(app.ctx.state.chain),historyKinds:history.map(row=>row.kind)}));
+ assert.deepEqual(toasts,[],'a derived rating update is not a displaced user choice');
+});
+
+test('RISK quiet reconciliation feedback: an independent peer Dot preserves Dislodge and stays quiet',async t=>{
+ const at=Date.parse('2026-10-18T03:00:00Z'),ids=['dot-first','dot-second','dot-third'];
+ const initial=syncState({tasks:ids.map((id,i)=>({...syncTask(id,'Dot task '+(i+1)),createdAt:i+1})),mode:'work',syncAccount:'e@example.com',syncRev:4,syncDirty:false,settings:{horizonMin:60,thresholdPct:0,samples:40,cantMin:30,workedHours:8,theme:'system'}}),h=makeSyncHarness({remote:initial,rev:4,delayMs:1}),raw=JSON.stringify(initial);
+ const app=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});t.after(()=>closeLegacyApp173(app));
+ await app.ctx.cloudPull();app.ctx.window.CloudSync.ready=false;app.ctx.onAction('start-scan',{dataset:{mode:'descending'}});app.ctx.onAction('yes',{dataset:{candidate:ids[1],benchmark:ids[0]}});app.ctx.onAction('start-working',{});assert.equal(await app.ctx.persist(),true);
+ app.ctx.window.CloudSync.ready=true;await app.ctx.cloudPull();await app.ctx.cloudPushNow();await settleSavedViewPublication(app,h,'independent Dot common chain');
+ const peerRaw=JSON.stringify({...h.remoteState(),syncAccount:'e@example.com',syncRev:h.doc.rev,syncDirty:false}),peer=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:peerRaw,[LOCAL_HEAD_KEY]:peerRaw},cloudSyncFactory:h.factory});t.after(()=>closeLegacyApp173(peer));await peer.ctx.cloudPull();peer.ctx.window.CloudSync.ready=false;app.ctx.window.CloudSync.ready=false;
+ setFakeTime(peer.ctx,at+200);hydrateUnchangedEditorDraft(peer,ids[2]);peer.ctx.onAction('dot-task',{dataset:{id:ids[2]}});assert.equal(await peer.ctx.persist(),true);assert.deepEqual(Array.from(peer.ctx.state.chain),ids);
+ peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPull();await peer.ctx.cloudPushNow();await settleSavedViewPublication(peer,h,'independent peer Dot');
+ const toasts=[],element=app.shim.document.getElementById('toast');let message=element.textContent;Object.defineProperty(element,'textContent',{configurable:true,get:()=>message,set(value){message=value;toasts.push(value);}});
+ setFakeTime(app.ctx,at+100);app.ctx.onAction('dislodge',{dataset:{benchmark:ids[1]}});assert.equal(await app.ctx.persist(),true);
+ app.ctx.window.CloudSync.ready=true;await app.ctx.cloudPull();await app.ctx.cloudPushNow();await settleSavedViewPublication(app,h,'independent Dot and Dislodge publication');
+ assert.deepEqual(Array.from(app.ctx.state.chain),[ids[0],ids[2]]);assert.deepEqual(h.remoteState().chain,[ids[0],ids[2]]);assert.equal(app.ctx.state.considered[ids[1]],'dislodged');
+ const removed=app.ctx.state.tasks.find(row=>row.id===ids[1]),dotted=app.ctx.state.tasks.find(row=>row.id===ids[2]);assert.equal(removed.ratingHistory.filter(row=>row.kind==='dislodge').length,1);assert.equal(removed.ratingHistory.filter(row=>row.kind==='dot').length,1);assert.equal(dotted.ratingHistory.filter(row=>row.kind==='dot').length,1,'independent comparison learning is applied once');
+ t.diagnostic(JSON.stringify({toasts,chain:Array.from(app.ctx.state.chain),historyKinds:removed.ratingHistory.map(row=>row.kind)}));
+ assert.deepEqual(toasts,[],'a retained peer Dot is not a displaced local Dislodge');
+});
+
+test('RISK quiet reconciliation feedback: FAQ and Changelog distinguish quiet success from recovery guidance',async()=>{
+ const {ctx,shim}=await loadApp();for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ const entry=help.split('<dt>How are conflicting choices resolved?</dt>')[1]?.split('</dd>')[0];assert.ok(entry);
+ assert.match(entry,/successful sync stays quiet/i);assert.match(entry,/displaced edits.*recovery notice.*Settings backups/i);
+ const latest=help.split('<h3>October 18, 2026</h3>')[1]?.split('</ul>')[0];assert.ok(latest,'the current release explains this behavior');
+ assert.match(latest,/Dislodge.*independent.*quiet/i);assert.match(latest,/displaced edits.*save failures.*recovery guidance/i);
+});
+
 const LEGACY_COMPLETION_RELEASE='bd84e5c0ccc7c6ebe065f42f18df34d89eeab14e';
 async function legacyCompletionSource173(t,release=LEGACY_COMPLETION_RELEASE,account='e@example.com'){
  const released=spawnSync('git',['show',release+':index.html'],{cwd:__dirname,encoding:'utf8'});assert.equal(released.status,0,released.stderr);

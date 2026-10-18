@@ -1,5 +1,28 @@
 [
   {
+    "testChangesSha256": "9746734b009b7f354de25d2e963bb9cc96c70eac30839643c80a9f32cc7f1b02",
+    "reason": "Add whole-app consumer evidence for quiet successful reconciliation beside ordinary Dislodge, independent learning and peer Dot, with recovery guidance preserved when a local title is displaced. No existing test assertion is changed.",
+    "previousBehavior": "Any successful same-account cloud adoption with local edits posts an out-of-date recovery toast, including nonconflicting retained decisions and exact durable publication.",
+    "intendedBehavior": "Successful merges that retain local choices stay quiet. Displaced choices, account switches, and blocked or failed saves retain their existing recovery guidance. This feedback repair makes no claim to fix the still-unreproduced crash, page reload or reappearance.",
+    "replacementTests": [
+      "RISK quiet reconciliation feedback: a peer edit beside an ordinary Dislodge saves without a success interruption",
+      "RISK quiet reconciliation feedback: a displaced local title keeps its recovery notice and exact backup",
+      "RISK quiet reconciliation feedback: independent comparison learning beside Dislodge stays quiet",
+      "RISK quiet reconciliation feedback: an independent peer Dot preserves Dislodge and stays quiet",
+      "RISK quiet reconciliation feedback: FAQ and Changelog distinguish quiet success from recovery guidance"
+    ],
+    "preservedCoverage": [
+      "All original test assertions remain byte-for-byte unchanged; only these five app-consumer cases are inserted.",
+      "Actual Start, Yes, Dislodge, editor Save, No and Dot consumers are exercised. The existing publication fence awaits exact device/local/cloud payload, idle and dirty flags and revisions; a read or badge is not treated as acknowledgement.",
+      "The conflicting-title case passed before implementation and still requires the exact displaced draft plus its recovery notice. This is preservation evidence, not a claimed RED.",
+      "Exploratory 13-task/Halving/held-device/held-initial-read/browser controls are preserved outside the checkout. Fixture setup failures and the overstrict AX probe are explicitly not product REDs."
+    ],
+    "redEvidence": {
+      "command": "TZ=UTC node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/successive-dislodge/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/post-p0-dislodge/test-runs --purpose preimplementation-red -- node --test --test-name-pattern=\"RISK quiet reconciliation feedback:\" tests.js",
+      "failure": "Before runtime edit: f52dcc5d (05:16:36Z), minimized c995b3d0 (05:17:21Z), final724dc8d8 (05:23:08Z) fail expected[] versus the out-of-date success toast while chain, peer title and actual ACK7/local7 pass. Removing either peer edit or local action passes controls9312cee8/5031e265; stack63d496ee identifies cloudPull success. First GREEN70489e3c. Subsequent pre-repair counterexamples: No-learning REDc374d10f (05:26:30Z) before excluding derived ratings; peer-Dot RED9aac0cfa (05:27:59Z) before queue-delta comparison. Four-case GREENb2961b59. FAQ RED5bea3a1d (05:29:20Z) precedes copy; the next changelog observation needed real-template hydration, corrected without app edits. Five-case GREEN30781555. Mechanical fingerprint RED31915db5 precedes renewal; all seven focused cases GREEN6da4d2b2. Original five exploratory loops replay GREEN015ad6fc with exact tests.js restoration. Full recorder JSON, output, source identities, diagnostic patch and rendered records remain under the external post-p0-dislodge directory; exact missing-task wording and crash/reappearance remain unreproduced."
+    }
+  },
+  {
     "testChangesSha256": "f7fcec6ec7658394168dedf062493470056fa84dad6810dfc2ebe9c91613479b",
     "reason": "The real predecessor publication test proved that a page guard cannot protect already-running old HTML from candidate worker takeover. Remove forced waiting bypass and verify the old document retains its unfinished draft while the complete new shell still caches.",
     "previousBehavior": "Candidate skipWaiting immediately activates and claims a worker over public predecessor pages. Their existing controllerchange handler saves board data but then reloads, discarding a blurred DOM-only Add draft before the new guard can run.",

@@ -12,6 +12,12 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 ## Task state, eligibility, and scanner controls
 
+- RISK quiet reconciliation feedback: a peer edit beside an ordinary Dislodge saves without a success interruption
+- RISK quiet reconciliation feedback: a displaced local title keeps its recovery notice and exact backup
+- RISK quiet reconciliation feedback: independent comparison learning beside Dislodge stays quiet
+- RISK quiet reconciliation feedback: an independent peer Dot preserves Dislodge and stays quiet
+- RISK quiet reconciliation feedback: FAQ and Changelog distinguish quiet success from recovery guidance
+
 - RISK neutral bootstrap: JSON replacement and Undo deletion cannot be promoted by stale chosen copies
 
 - RISK neutral bootstrap: restoring a deleted automatic task during pending saves keeps backup exclusion
