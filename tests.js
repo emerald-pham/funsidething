@@ -7610,7 +7610,7 @@ test("UI: Quick start displays four essential steps in order", async () => {
   assert.deepEqual(steps, [
   "Add tasks. Optionally assign contexts, then enable the contexts needed for those tasks.",
   "Choose Start scanning.",
-  "Compare each candidate with the newest dot. Choose Yes if you prefer it, No to keep the dot, or Can’t to put the candidate aside for now.",
+  "With no dot, Yes chooses the first task and No skips it for this pass. Once a dot exists, compare each candidate with the newest dot: Yes if you prefer it, No to keep the dot, or Can’t to put the candidate aside for now.",
   "Choose done scanning when ready. Work the chain from the newest dot upward, using Done for finished tasks, Worked on it for progress, or Dislodge to set a task aside."
 ]);
 });
@@ -7642,7 +7642,7 @@ test("UI: help describes Start scanning rather than a Can/Can't step", async () 
   const helpHtml = shim.elements.get("modalRoot").innerHTML;
 
   assert.match(helpHtml, /start scanning/i, "help should name the button that starts a chain");
-  assert.match(helpHtml, /Every mode chooses the first dot by age: the oldest eligible task/, "normal mode retains the oldest eligible anchor");
+  assert.match(helpHtml, /By default, every mode chooses the first dot by age: the oldest eligible task/, "normal mode retains the oldest eligible anchor");
   assert.ok(!/Answer <b>Can<\/b>/.test(helpHtml), "the Can/Can't instruction should be gone");
 });
 

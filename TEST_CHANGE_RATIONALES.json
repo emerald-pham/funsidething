@@ -11770,5 +11770,48 @@
       "failure": "MountedQuickstart missing With no dot, Yes chooses ... No skips ... thispass. Originalintro only Compare eachcandidate ... newestdot. One meaningful actualcopyRED for the coordinated3FAQconsumerrepair. Original firstbehaviorRED cb2dd4fa and laterResumeRED retained inpriorrationales; thiscopyRED doesnotreplace chronology."
     },
     "greenEvidence": "ART/faq-review-green.log passes20/20 including19optionalfeaturecases, existingQuickstartbrevity and neutralbootstrapFAQ; finalfull/rules/compat/render/independentreview/CI/deployment stillpending."
+  },
+  {
+    "comparison": "optional182ProtectedHelpExpectationMigration",
+    "baseCommit": "826f3a5dec47bd05dc6f27154d14ea4416201372",
+    "testChangesSha256": "e3c84d373d4fe568bf53805e45a3cba234de6460ada31a7fd842281f9b3e011f",
+    "reason": "Issue182 explicitly changes empty-chain Start and requires truthful Quick start/FAQ/default wording. Final fullrun exposed2original exactcopy expectations that contradict the independently approved new prose; migrate only those2literal expectations, preserving every other original assertion and the exact4-step order/default oldest guarantee.",
+    "previousBehavior": "Original Quickstart array required the unconditional newest-dot comparison sentence. Original help regex required uppercase Every mode chooses the first dot by age with no default qualifier. Captured babd product correctly describes unpaired first choice and By default, every mode..., so these2original tests failed while2135other tests passed and48environmentcases skipped.",
+    "intendedBehavior": "Keep the exact four orderedQuickstart items, replacing only step3expectedliteral to include initial neutralYes/No then once-dot-exists comparisons. Keep help button naming, defaultage-anchor regex and retiredCan/Can't absence, adding the explicit By default qualifier to the exact age statement. No assertion removed/relaxed, no defaultbehavior modified. Retain all19newfeatureconsumers and priorSave-only/visibleResume/syncUndo/neutrallearning/eligibility coverage.",
+    "replacementTests": [
+      "RISK optional oldest start: enabled Start offers a candidate without dotting or learning",
+      "RISK optional oldest start: first Yes is unpaired and subsequent Yes learns normally",
+      "RISK optional oldest start: first No skips only this pass without pairwise learning and Undo restores it",
+      "RISK optional oldest start: Settings change save and reopen retain the preference and unrelated data",
+      "RISK optional oldest start: markers first-choice wording and exhausted-state controls match the enabled flow",
+      "RISK optional oldest start: skips before the first choice survive that choice and cold reopen",
+      "RISK optional oldest start: an unseeded descending pass clears first skips at the ordinary day boundary",
+      "RISK optional oldest start: enabling the setting waits for explicit Start before offering the first candidate",
+      "RISK optional oldest start: missing invalid and off values preserve defaults across all supported scan modes",
+      "RISK optional oldest start: zero and one eligible tasks remain usable with either preference",
+      "RISK optional oldest start: the unseeded candidate pool preserves completion date context dependency rest and postponement boundaries",
+      "RISK optional oldest start: toggling preserves an existing neutral chain and manual first Dot remains unchanged",
+      "RISK optional oldest start: synced preference first skip and explicit dot retain an independent peer edit",
+      "RISK optional oldest start: an empty started pass publishes and resumes with its saved draw",
+      "RISK optional oldest start: synced Undo reverses first choices Start and preference without learning",
+      "RISK optional oldest start: FAQ and current Changelog explain opt out defaults first choices and retained dots",
+      "RISK optional oldest start: Save settings alone persists the checkbox transition",
+      "RISK optional oldest start: the visible Resume action keeps an empty paused pass and its saved draw",
+      "RISK optional oldest start: Quick start countdown and immediate-save inventory describe unpaired starts"
+    ],
+    "updatedTests": [
+      "UI: Quick start displays four essential steps in order",
+      "UI: help describes Start scanning rather than a Can/Can't step"
+    ],
+    "preservedCoverage": [
+      "All19newoptional featuretests are unchanged. Every original test outside the2exactexpectedcopylines is byte-identical826. Within those2tests allotherassertions andstructure are retained, including exact4orderedsteps, Startbuttonnaming, defaultoldesteligibleanchor and no retiredCanstep.",
+      "Product files including index.html/sw.js/manifest/assets/rules/storage/SDK are byte-identical to captured babd3f5. This tests/evidence-only followup carries exactbyte rendering evidence; it does not claim newcaptures from its futurehead.",
+      "Fullrun864f4d23 onbabd is retained unchanged with2185total,2135pass,2fail,48envskip. Earlierfullruns fbbc/7782remain explicitlyinterrupted143. ActualoriginalfeatureREDcb2dd4fa and laterreviewREDs remainhistorical evidence; thismigration doesnot invent chronology or relabel anypassingcontrol."
+    ],
+    "redEvidence": {
+      "command": "PinnedNode22 TZUTC recorder --purpose green -- npm test onexactbabd3f5; ART/test-runs/2026-10-18T08-52-18-750Z-864f4d23-095f-408f-b87c-e7c801e2d1ec.json; ART/full-suite-babd3f5.log. This is actual later fullgatefailure preceding protectedtestexpectation migration, not original featureRED.",
+      "failure": "UI: Quick start displays four essential steps in order failed the3rdliteral: actual With no dot, Yes chooses...Once a dot exists... versusold unconditionalCompareeachcandidate. UI: help describes Start scanning rather than a Can/Can't step failed the oldcase-sensitive Every mode chooses... regex againstactual By default, every mode.... Allbehaviorconsumer tests passed; no appfix or assertiondeletion made to hide these contradictions."
+    },
+    "greenEvidence": "ART/protected-copy-green.log directly reruns both original protectedcopy tests, allQuickstart companions and19newfeatureconsumers afteronlythese2expectationchanges. Finalexactcandidate fullsuite mustpass beforeCI/release; captured productbytes remain unchanged."
   }
 ]
