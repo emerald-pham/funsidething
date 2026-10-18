@@ -159,6 +159,8 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK BACKUP FILE RESTORE: account, auth epoch, pending evidence, and cloud revision changes hold consent
 - RISK BACKUP FILE RESTORE: a released old client wins CAS before the prospective file board is published
 - RISK BACKUP FILE RESTORE: replacement preserves completion, History, ratings, deletions, unknown data, and Undo
+- RISK BACKUP FILE RESTORE: fixture readiness leaves no ordinary save crossing delayed file reading
+- RISK BACKUP FILE RESTORE: fixture readiness waits for signed-in durable reconciliation before file consent
 - RISK CLOUD V2: a multi-megabyte board publishes only after verified chunks and pulls byte-exactly
 - RISK CLOUD V2: crash resume, concurrent revisions, and account cancellation never publish partial data
 - RISK CLOUD V2: corrupt active data fails closed, manifest races retry, and garbage collection keeps recovery generations
@@ -1606,6 +1608,8 @@ The candidate worker precaches while predecessor clients remain on their existin
 - RISK BACKUP FILE RESTORE: account, auth epoch, pending evidence, and cloud revision changes hold consent
 - RISK BACKUP FILE RESTORE: a released old client wins CAS before the prospective file board is published
 - RISK BACKUP FILE RESTORE: replacement preserves completion, History, ratings, deletions, unknown data, and Undo
+- RISK BACKUP FILE RESTORE: fixture readiness leaves no ordinary save crossing delayed file reading
+- RISK BACKUP FILE RESTORE: fixture readiness waits for signed-in durable reconciliation before file consent
 
 ## Installed-client required release command
 

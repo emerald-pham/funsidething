@@ -14404,13 +14404,51 @@ test('RISK BACKUP FILE RESTORE: irreversible preview shows Restore and close as 
  }
 });
 
+const backupFileFixtures=new WeakMap();
+async function loadBackupFileFixtureApp(options={}){
+ const pending=new Set(),before=options.beforeStateReady;
+ const app=await loadApp({...options,beforeStateReady(ctx,shim){
+  const schedule=ctx.setTimeout,cancel=ctx.clearTimeout;
+  // Observe the actual save producer. Do not cancel or manually invoke it:
+  // Add's explicit persist does not consume its queued 350ms save callback.
+  ctx.setTimeout=(fn,ms,...args)=>{
+   if(ms!==350)return schedule(fn,ms,...args);
+   let resolve,reject;const row={done:new Promise((yes,no)=>{resolve=yes;reject=no;})};
+   row.done.catch(()=>{});
+   row.timer=schedule(()=>{const result=fn(...args);return Promise.resolve(result).then(resolve,reject).finally(()=>pending.delete(row));},ms);
+   row.cancel=()=>{pending.delete(row);resolve();};pending.add(row);return row.timer;
+  };
+  ctx.clearTimeout=timer=>{cancel(timer);for(const row of pending)if(row.timer===timer)row.cancel();};
+  before?.(ctx,shim);
+ }});
+ backupFileFixtures.set(app.ctx,{app,pending});return app;
+}
+async function prepareBackupFileFixtureSource(context,cloud=null){
+ const fixture=backupFileFixtures.get(context.ctx||context);assert.ok(fixture,'file fixture must observe its real save producers');
+ const {app,pending}=fixture;
+ if(cloud){app.ctx.cloudPull();app.ctx.cloudPushNow();await settleSavedViewPublication(app,cloud,'File fixture source');}
+ else assert.equal(await app.ctx.persist(),true,'fixture board is durably accepted');
+ let timer;
+ try{
+  await Promise.race([(async()=>{while(pending.size)await Promise.all([...pending].map(row=>row.done));})(),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('file fixture save producer did not complete')),8000);})]);
+ }finally{clearTimeout(timer);}
+ if(cloud){
+  await settleSavedViewPublication(app,cloud,'File fixture after queued save');
+  assert.equal(app.ctx.state.syncAccount,app.shim.window.CloudSync.user,'fixture board belongs to the reconciled signed-in account');
+  assert.equal(vm.runInContext('reconciled()&&!cloudAdoptionHeld&&!deferredCloudPull',app.ctx),true,'fixture reconciliation and source adoption are settled');
+ }
+ const raw=JSON.stringify(app.ctx.state),head=await app.ctx.window.ScannerDeviceStore.readHead();
+ assert.equal(head?.payload,raw,'fixture source is the exact accepted durable board');
+ assert.equal(head?.hash,vm.runInContext('deviceHeadHash',app.ctx),'fixture source commit acknowledgement is complete');
+}
+
 test('RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exact sources before explicit local adoption',async t=>{
   const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb');
   const indexedDB=new IDBFactory(),dbName='chain-scanner-file-restore-'+Date.now()+'-'+Math.random(),sharedStorage=sharedScannerStorage();
-  const app=await loadApp({sharedStorage,indexedDBProvider:indexedDB,deviceDbName:dbName}),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+  const app=await loadBackupFileFixtureApp({sharedStorage,indexedDBProvider:indexedDB,deviceDbName:dbName}),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
   assert.ok(store,'the actual app opened its isolated durable-store fixture');
   t.after(async()=>{await store.close();});
-  ctx.addTask('Current board task');await ctx.persist();
+  ctx.addTask('Current board task');await prepareBackupFileFixtureSource(ctx);
   const currentBoardRaw=JSON.stringify(ctx.state),prospective=JSON.parse(currentBoardRaw);
   const taskId=prospective.tasks[0].id,heldAt=Date.now()-60_000,largeUnicodeUnknownField='🌿 café 🧭 '.repeat(180_000);
   prospective.settings.workedHours=16;prospective.considered[taskId]='worked';prospective.workedAt[taskId]=heldAt;
@@ -14550,10 +14588,10 @@ test('RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exac
 
 test('RISK BACKUP FILE RESTORE: compact settings and unknown board fields stay inside the actual preview',async t=>{
   const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb');
-  const app=await loadApp({sharedStorage:sharedScannerStorage(),indexedDBProvider:new IDBFactory(),deviceDbName:'chain-scanner-file-preview-wrap-'+Date.now()+'-'+Math.random()}),{ctx,shim}=app;
+  const app=await loadBackupFileFixtureApp({sharedStorage:sharedScannerStorage(),indexedDBProvider:new IDBFactory(),deviceDbName:'chain-scanner-file-preview-wrap-'+Date.now()+'-'+Math.random()}),{ctx,shim}=app;
   const store=ctx.window.ScannerDeviceStore;assert.ok(store,'the actual app opened an isolated durable-store fixture');
   t.after(async()=>{await store.close();});
-  ctx.addTask('Current file preview task');assert.equal(await ctx.persist(),true);
+  ctx.addTask('Current file preview task');assert.equal(await ctx.persist(),true);await prepareBackupFileFixtureSource(ctx);
   const currentRaw=JSON.stringify(ctx.state),incoming=JSON.parse(currentRaw);
   incoming.settings.workedHours=incoming.settings.workedHours===16?8:16;
   const longBoardFieldName='futurePreviewField'+('unbroken'.repeat(14));
@@ -14587,7 +14625,7 @@ test('RISK BACKUP FILE RESTORE: a signed-in file waits for explicit CAS and exac
   const indexedDB=new IDBFactory(),dbName='chain-scanner-bound-file-restore-'+Date.now()+'-'+Math.random();
   const currentBoard=syncState({tasks:[syncTask('bound-file-task','Cloud current task')],chain:['bound-file-task'],candidateId:'bound-file-task'});
   const cloud=makeSyncHarness({remote:currentBoard,rev:4,delayMs:1});let backend,epoch=3,pending=false;
-  const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(currentBoard),[LOCAL_HEAD_KEY]:JSON.stringify(currentBoard)},
+  const app=await loadBackupFileFixtureApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(currentBoard),[LOCAL_HEAD_KEY]:JSON.stringify(currentBoard)},
     indexedDBProvider:indexedDB,deviceDbName:dbName,cloudSyncFactory:()=>{
       backend=cloud.factory();
       backend.recoveryIdentity=()=>backend.user==='e@example.com'?'uid-file-restore':null;
@@ -14596,8 +14634,7 @@ test('RISK BACKUP FILE RESTORE: a signed-in file waits for explicit CAS and exac
     }});
   const {ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
   t.after(async()=>{await store?.close?.();});
-  await ctx.cloudPull();
-  await syncSettle(10);
+  await prepareBackupFileFixtureSource(ctx,cloud);
   assert.equal(ctx.state.syncAccount,'e@example.com','the fixture first reconciles the saved board to its signed-in account');
   assert.equal(ctx.state.syncRev,cloud.doc.rev,'the source and cloud fixture have reached the same reconciled revision');
   const sourceRevision=ctx.state.syncRev;
@@ -14699,9 +14736,9 @@ test('RISK BACKUP FILE RESTORE: IDB authority does not hide changed legacy board
   const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb');
   for(const key of [LOCAL_HEAD_KEY,STORE_KEY])await t.test(key,async sub=>{
     const indexedDB=new IDBFactory(),sharedStorage=sharedScannerStorage(),dbName='chain-scanner-file-legacy-race-'+Date.now()+'-'+Math.random();
-    const {ctx,shim}=await loadApp({sharedStorage,indexedDBProvider:indexedDB,deviceDbName:dbName}),store=ctx.window.ScannerDeviceStore;
+    const {ctx,shim}=await loadBackupFileFixtureApp({sharedStorage,indexedDBProvider:indexedDB,deviceDbName:dbName}),store=ctx.window.ScannerDeviceStore;
     sub.after(async()=>{await store?.close?.();});
-    ctx.addTask('Accepted current board');await ctx.persist();
+    ctx.addTask('Accepted current board');await prepareBackupFileFixtureSource(ctx);
     assert.ok(ctx.window.ScannerDeviceStore,'the fixture uses an already-open authoritative IndexedDB store');
     const currentRaw=JSON.stringify(ctx.state),before=await store.readHead(),next=JSON.parse(currentRaw);
     next.tasks[0].title='Prospective file board';
@@ -14731,9 +14768,9 @@ test('RISK BACKUP FILE RESTORE: IDB authority does not hide changed legacy board
 test('RISK BACKUP FILE RESTORE: source changes during final awaited copy readback never reach the primary commit',async t=>{
   const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb');
   const indexedDB=new IDBFactory(),dbName='chain-scanner-file-final-readback-race-'+Date.now()+'-'+Math.random();
-  const {ctx,shim}=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName}),store=ctx.window.ScannerDeviceStore;
+  const {ctx,shim}=await loadBackupFileFixtureApp({indexedDBProvider:indexedDB,deviceDbName:dbName}),store=ctx.window.ScannerDeviceStore;
   t.after(async()=>{await store?.close?.();});
-  ctx.addTask('Board before asynchronous copy readback');await ctx.persist();
+  ctx.addTask('Board before asynchronous copy readback');await prepareBackupFileFixtureSource(ctx);
   const currentRaw=JSON.stringify(ctx.state),before=await store.readHead(),next=JSON.parse(currentRaw);
   next.tasks[0].title='Stale consent must not commit';
   const file=new File([JSON.stringify(next)],'final-readback-race.json',{type:'application/json'}),writes=[],commit=store.commitHead.bind(store);
@@ -14768,9 +14805,9 @@ test('RISK BACKUP FILE RESTORE: state, device-head, and draft-only changes expir
   const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb');
   for(const changedSource of ['current board only','durable device head only','quick-add draft only'])await t.test(changedSource,async sub=>{
     const indexedDB=new IDBFactory(),dbName='chain-scanner-file-stale-source-'+Date.now()+'-'+Math.random();
-    const {ctx,shim}=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName}),store=ctx.window.ScannerDeviceStore;
+    const {ctx,shim}=await loadBackupFileFixtureApp({indexedDBProvider:indexedDB,deviceDbName:dbName}),store=ctx.window.ScannerDeviceStore;
     sub.after(async()=>{await store?.close?.();});
-    ctx.addTask('Before stale-source preview');await ctx.persist();
+    ctx.addTask('Before stale-source preview');await prepareBackupFileFixtureSource(ctx);
     const originalRaw=JSON.stringify(ctx.state),originalHead=await store.readHead(),prospective=JSON.parse(originalRaw);
     prospective.tasks[0].title='Should not be committed';
     const file=new File([JSON.stringify(prospective)],'stale-source.json',{type:'application/json'}),writes=[],commit=store.commitHead.bind(store);
@@ -14805,9 +14842,9 @@ test('RISK BACKUP FILE RESTORE: state, device-head, and draft-only changes expir
 test('RISK BACKUP FILE RESTORE: cancel and file reselection bind confirmation to the newly selected bytes',async t=>{
   const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb');
   const indexedDB=new IDBFactory(),dbName='chain-scanner-file-reselection-'+Date.now()+'-'+Math.random();
-  const {ctx,shim}=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName}),store=ctx.window.ScannerDeviceStore;
+  const {ctx,shim}=await loadBackupFileFixtureApp({indexedDBProvider:indexedDB,deviceDbName:dbName}),store=ctx.window.ScannerDeviceStore;
   t.after(async()=>{await store?.close?.();});
-  ctx.addTask('Current before reselection');await ctx.persist();
+  ctx.addTask('Current before reselection');await prepareBackupFileFixtureSource(ctx);
   const sourceRaw=JSON.stringify(ctx.state),first=JSON.parse(sourceRaw),second=JSON.parse(sourceRaw);
   first.tasks[0].title='Cancelled first file';second.tasks[0].title='Confirmed second file';
   const firstFile=new File([JSON.stringify(first)],'cancelled-first.json',{type:'application/json'});
@@ -14835,9 +14872,9 @@ test('RISK BACKUP FILE RESTORE: cancel and file reselection bind confirmation to
 test('RISK BACKUP FILE RESTORE: closing the preview cancels an in-flight source check before adoption',async t=>{
   const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb');
   const indexedDB=new IDBFactory(),dbName='chain-scanner-file-restore-cancel-pending-'+Date.now()+'-'+Math.random();
-  const {ctx,shim}=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName}),store=ctx.window.ScannerDeviceStore;
+  const {ctx,shim}=await loadBackupFileFixtureApp({indexedDBProvider:indexedDB,deviceDbName:dbName}),store=ctx.window.ScannerDeviceStore;
   t.after(async()=>{await store?.close?.();});
-  ctx.addTask('Current board before cancel');await ctx.persist();
+  ctx.addTask('Current board before cancel');await prepareBackupFileFixtureSource(ctx);
   const currentRaw=JSON.stringify(ctx.state),next=JSON.parse(currentRaw);next.tasks[0].title='Cancelled while checking sources';
   const file=new File([JSON.stringify(next)],'cancel-before-adoption.json',{type:'application/json'});
   const beforeHead=await store.readHead(),primaryWrites=[],commit=store.commitHead.bind(store);
@@ -14880,9 +14917,9 @@ test('RISK BACKUP FILE RESTORE: backdrop and Escape cancel a pending source chec
   const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb');
   for(const closeVia of ['backdrop','Escape'])await t.test(closeVia,async sub=>{
     const indexedDB=new IDBFactory(),dbName='chain-scanner-file-restore-generic-close-'+closeVia+'-'+Date.now()+'-'+Math.random();
-    const {ctx,shim}=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName}),store=ctx.window.ScannerDeviceStore;
+    const {ctx,shim}=await loadBackupFileFixtureApp({indexedDBProvider:indexedDB,deviceDbName:dbName}),store=ctx.window.ScannerDeviceStore;
     sub.after(async()=>{await store?.close?.();});
-    ctx.addTask('Current board before generic close');await ctx.persist();
+    ctx.addTask('Current board before generic close');await prepareBackupFileFixtureSource(ctx);
     const currentRaw=JSON.stringify(ctx.state),next=JSON.parse(currentRaw);next.tasks[0].title='Must stay unadopted after generic close';
     const file=new File([JSON.stringify(next)],'cancel-generic-close.json',{type:'application/json'});
     const beforeHead=await store.readHead(),primaryWrites=[],commit=store.commitHead.bind(store);
@@ -14930,9 +14967,9 @@ test('RISK BACKUP FILE RESTORE: backdrop and Escape cancel a pending source chec
 test('RISK BACKUP FILE RESTORE: in-progress primary save blocks Cancel and modal dismissal',async t=>{
   const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb');
   const indexedDB=new IDBFactory(),dbName='chain-scanner-file-restore-commit-inflight-'+Date.now()+'-'+Math.random();
-  const {ctx,shim}=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName}),store=ctx.window.ScannerDeviceStore;
+  const {ctx,shim}=await loadBackupFileFixtureApp({indexedDBProvider:indexedDB,deviceDbName:dbName}),store=ctx.window.ScannerDeviceStore;
   t.after(async()=>{await store?.close?.();});
-  ctx.addTask('Current board before protected save');await ctx.persist();
+  ctx.addTask('Current board before protected save');await prepareBackupFileFixtureSource(ctx);
   const next=JSON.parse(JSON.stringify(ctx.state));next.tasks[0].title='Selected board after protected save';
   const file=new File([JSON.stringify(next)],'commit-inflight.json',{type:'application/json'});
   ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
@@ -14981,14 +15018,14 @@ test('RISK BACKUP FILE RESTORE: in-progress cloud publication blocks Cancel and 
   const indexedDB=new IDBFactory(),dbName='chain-scanner-file-restore-cloud-inflight-'+Date.now()+'-'+Math.random();
   const currentBoard=syncState({tasks:[syncTask('cloud-cancel-task','Cloud board before restore')],chain:['cloud-cancel-task'],candidateId:'cloud-cancel-task'});
   const cloud=makeSyncHarness({remote:currentBoard,rev:4,delayMs:1});let backend,epoch=3,pending=false;
-  const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(currentBoard),[LOCAL_HEAD_KEY]:JSON.stringify(currentBoard)},
+  const app=await loadBackupFileFixtureApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(currentBoard),[LOCAL_HEAD_KEY]:JSON.stringify(currentBoard)},
     indexedDBProvider:indexedDB,deviceDbName:dbName,cloudSyncFactory:()=>{
       backend=cloud.factory();backend.recoveryIdentity=()=>backend.user==='e@example.com'?'uid-cloud-cancel-file':null;
       backend.recoveryEvidence=async()=>({identity:backend.recoveryIdentity(),epoch,pending});return backend;
     }});
   const {ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
   t.after(async()=>{await store?.close?.();});
-  await ctx.cloudPull();await syncSettle(10);
+  await prepareBackupFileFixtureSource(ctx,cloud);
   assert.equal(ctx.state.syncAccount,'e@example.com','the actual signed-in consumer finishes source reconciliation');
   const next=JSON.parse(JSON.stringify(ctx.state));next.tasks[0].title='Cloud file after protected publication';
   const file=new File([JSON.stringify(next)],'cloud-commit-inflight.json',{type:'application/json'});
@@ -15036,9 +15073,9 @@ test('RISK BACKUP FILE RESTORE: backup CAS abort and readback failure keep the a
   const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb');
   for(const failure of ['selected-file backup CAS abort','selected-file backup readback failure'])await t.test(failure,async sub=>{
     const indexedDB=new IDBFactory(),dbName='chain-scanner-file-copy-failure-'+Date.now()+'-'+Math.random();
-    const {ctx,shim}=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName}),store=ctx.window.ScannerDeviceStore;
+    const {ctx,shim}=await loadBackupFileFixtureApp({indexedDBProvider:indexedDB,deviceDbName:dbName}),store=ctx.window.ScannerDeviceStore;
     sub.after(async()=>{await store?.close?.();});
-    ctx.addTask('Board before backup failure');await ctx.persist();
+    ctx.addTask('Board before backup failure');await prepareBackupFileFixtureSource(ctx);
     const sourceRaw=JSON.stringify(ctx.state),head=await store.readHead(),next=JSON.parse(sourceRaw);next.tasks[0].title='Must remain a backup';
     const fileBytes=new TextEncoder().encode(JSON.stringify(next)),file=new File([fileBytes],'protected-after-failure.json',{type:'application/json'});
     const primaryWrites=[],commit=store.commitHead.bind(store);store.commitHead=options=>{primaryWrites.push(options);return commit(options);};
@@ -15081,9 +15118,9 @@ test('RISK BACKUP FILE RESTORE: backup CAS abort and readback failure keep the a
 test('RISK BACKUP FILE RESTORE: unsupported and ambiguous selected files stop with exact bytes protected',async t=>{
   const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb');
   const indexedDB=new IDBFactory(),dbName='chain-scanner-file-invalid-input-'+Date.now()+'-'+Math.random();
-  const {ctx,shim}=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName}),store=ctx.window.ScannerDeviceStore;
+  const {ctx,shim}=await loadBackupFileFixtureApp({indexedDBProvider:indexedDB,deviceDbName:dbName}),store=ctx.window.ScannerDeviceStore;
   t.after(async()=>{await store?.close?.();});
-  ctx.addTask('Board before invalid file');await ctx.persist();
+  ctx.addTask('Board before invalid file');await prepareBackupFileFixtureSource(ctx);
   const sourceRaw=JSON.stringify(ctx.state),head=await store.readHead(),valid=JSON.parse(sourceRaw);
   const incomplete={format:'chain-scanner.recovery-archive',formatVersion:1,currentBoard:valid,
     manifest:{status:'partial',failures:[{source:'indexedDB.backups',status:'error'}],sources:{currentBoard:{status:'included'}}}};
@@ -15125,13 +15162,13 @@ test('RISK BACKUP FILE RESTORE: account, auth epoch, pending evidence, and cloud
     const indexedDB=new IDBFactory(),dbName='chain-scanner-file-cloud-source-'+Date.now()+'-'+Math.random();
     const source=syncState({tasks:[syncTask('cloud-current','Cloud board before file')],chain:['cloud-current'],candidateId:'cloud-current'});
     const cloud=makeSyncHarness({remote:source,rev:9,delayMs:1});let backend,epoch=12,pending=false,identity='uid-file-source';
-    const {ctx,shim}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(source),[LOCAL_HEAD_KEY]:JSON.stringify(source)},
+    const {ctx,shim}=await loadBackupFileFixtureApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(source),[LOCAL_HEAD_KEY]:JSON.stringify(source)},
       indexedDBProvider:indexedDB,deviceDbName:dbName,cloudSyncFactory:()=>{
         backend=cloud.factory();backend.recoveryIdentity=()=>identity;
         backend.recoveryEvidence=async()=>({identity,epoch,pending});return backend;
       }}),store=ctx.window.ScannerDeviceStore;
     sub.after(async()=>{await store?.close?.();});
-    await ctx.cloudPull();await syncSettle(10);
+    await prepareBackupFileFixtureSource(ctx,cloud);
     assert.equal(ctx.state.syncAccount,'e@example.com');const sourceRevision=ctx.state.syncRev;assert.equal(sourceRevision,cloud.doc.rev);
     const currentRaw=JSON.stringify(ctx.state),head=await store.readHead(),next=JSON.parse(currentRaw);next.tasks[0].title='Must stay prospective';
     const file=new File([JSON.stringify(next)],'cloud-source.json',{type:'application/json'}),writes=[],commit=store.commitHead.bind(store);
@@ -15170,14 +15207,14 @@ test('RISK BACKUP FILE RESTORE: a released old client wins CAS before the prospe
   const indexedDB=new IDBFactory(),sharedStorage=sharedScannerStorage(),dbName='chain-scanner-file-old-client-cas-'+Date.now()+'-'+Math.random();
   const source=syncState({tasks:[syncTask('old-peer-current','Board before file restore')],chain:['old-peer-current'],candidateId:'old-peer-current'});
   const cloud=makeSyncHarness({remote:source,rev:6,delayMs:1});let backend;
-  const current=await loadApp({sharedStorage,seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(source),[LOCAL_HEAD_KEY]:JSON.stringify(source)},
+  const current=await loadBackupFileFixtureApp({sharedStorage,seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(source),[LOCAL_HEAD_KEY]:JSON.stringify(source)},
     indexedDBProvider:indexedDB,deviceDbName:dbName,cloudSyncFactory:()=>{
       backend=cloud.factory();backend.recoveryIdentity=()=>backend.user==='e@example.com'?'uid-old-peer':null;
       backend.recoveryEvidence=async()=>({identity:backend.recoveryIdentity(),epoch:2,pending:false});return backend;
     }}),store=current.ctx.window.ScannerDeviceStore;
   let oldClient=null;
   t.after(async()=>{await store?.close?.();});
-  await current.ctx.cloudPull();await syncSettle(15);
+  await prepareBackupFileFixtureSource(current,cloud);
   const currentRaw=JSON.stringify(current.ctx.state),sourceRevision=current.ctx.state.syncRev,head=await store.readHead();
   assert.equal(sourceRevision,cloud.doc.rev,'the current app begins reconciled at the cloud revision');
   const released=readReleasedClient(__dirname,SUPPORTED_RELEASE);
@@ -15235,7 +15272,7 @@ test('RISK BACKUP FILE RESTORE: a released old client wins CAS before the prospe
 test('RISK BACKUP FILE RESTORE: replacement preserves completion, History, ratings, deletions, unknown data, and Undo',async t=>{
   const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb');
   const indexedDB=new IDBFactory(),dbName='chain-scanner-file-lifecycle-'+Date.now()+'-'+Math.random();
-  const {ctx,shim}=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName}),store=ctx.window.ScannerDeviceStore;
+  const {ctx,shim}=await loadBackupFileFixtureApp({indexedDBProvider:indexedDB,deviceDbName:dbName}),store=ctx.window.ScannerDeviceStore;
   t.after(async()=>{await store?.close?.();});
   const benchmark=ctx.addTask('Rating benchmark'),kept=ctx.addTask('Kept rating task');
   ctx.state.chain=[benchmark.id];ctx.state.candidateId=kept.id;ctx.recomputeRanks();await ctx.decide('yes');
@@ -15247,7 +15284,7 @@ test('RISK BACKUP FILE RESTORE: replacement preserves completion, History, ratin
   ctx.state.futureCurrentBoardField={unknown:'current metadata'};
   assert.ok(ctx.historyRows().some(row=>row.id===completed.id&&row.kind==='done'),'the source board has an ordinary completed History row');
   assert.ok(ctx.historyRows().some(row=>row.kind==='worked'&&row.title==='Task removed by replacement'),'the source board has a logged History row');
-  await ctx.persist();
+  await prepareBackupFileFixtureSource(ctx);
   const originalHead=await store.readHead(),originalWorkLog=JSON.stringify(ctx.state.workLog);
   assert.ok(currentRating,'the fixture derives an actual rating observation from the app rating action');
   const next=JSON.parse(JSON.stringify(ctx.state));
@@ -35750,3 +35787,62 @@ if(process.env.CHAIN_INSTALLED_NATIVE_SENSITIVITY==='causal'){
   }
  });
 }
+
+
+test('RISK BACKUP FILE RESTORE: fixture readiness leaves no ordinary save crossing delayed file reading',async t=>{
+ const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb'),timers=[];
+ const app=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'restore-readiness-'+Date.now()+'-'+Math.random(),beforeStateReady:ctx=>{
+  const schedule=ctx.setTimeout,cancel=ctx.clearTimeout;
+  ctx.setTimeout=(fn,ms,...args)=>{
+   if(ms!==350)return schedule(fn,ms,...args);
+   let resolve;const row={pending:true,done:new Promise(r=>resolve=r)};
+   row.timer=schedule(()=>{const task=fn(...args);return Promise.resolve(task).then(()=>{row.pending=false;resolve();});},ms);row.timer.ref?.();timers.push(row);return row.timer;
+  };
+  ctx.clearTimeout=timer=>{cancel(timer);const row=timers.find(r=>r.timer===timer);if(row)row.pending=false;};
+ }}),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+ t.after(async()=>{vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer)',ctx);await store.close();});
+ ctx.addTask('Current board task');await prepareBackupFileFixtureSource(app);
+ const baseline=JSON.stringify(ctx.state),head=await store.readHead();assert.equal(head.payload,baseline);
+ const writes=[],commit=store.commitHead.bind(store);store.commitHead=async options=>{writes.push(options);return commit(options);};
+ const next=JSON.parse(baseline);next.tasks[0].title='Prospective file task';const file=new File([JSON.stringify(next)],'latency.json',{type:'application/json'}),read=file.arrayBuffer.bind(file);
+ const pending=timers.filter(row=>row.pending);
+ file.arrayBuffer=async()=>{await Promise.all(pending.map(row=>row.done));return read();};
+ const input=makeFakeElement();input.id='restoreBackupFile';input.files=[file];input.click=()=>{};
+ const get=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:get(id);
+ ctx.openSettings();await ctx.onAction('choose-backup-file',{});input.files=[file];await ctx.handleRestoreBackupFileChange(input);
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="confirm-file-restore"/,'actual file handler reaches preview with unchanged sources');
+ assert.equal(JSON.stringify(ctx.state),baseline,'preview does not change the accepted board');
+ assert.deepEqual(writes,[],'selection and preview must not observe an ordinary setup save as a file replacement');
+});
+
+
+test('RISK BACKUP FILE RESTORE: fixture readiness waits for signed-in durable reconciliation before file consent',{timeout:10000},async t=>{
+ const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb');
+ const current=syncState({tasks:[syncTask('readiness-cloud','Cloud readiness task')],chain:['readiness-cloud'],candidateId:'readiness-cloud'});
+ const cloud=makeSyncHarness({remote:current,rev:4,delayMs:1}),pullGate=deferredSyncFixture(),commitGate=deferredSyncFixture(),entered=deferredSyncFixture();
+ let backend,held=true;
+ const app=await loadBackupFileFixtureApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(current),[LOCAL_HEAD_KEY]:JSON.stringify(current)},indexedDBProvider:new IDBFactory(),deviceDbName:'restore-cloud-readiness-'+Date.now()+'-'+Math.random(),cloudSyncFactory:()=>{
+  backend=cloud.factory();const pull=backend.pull.bind(backend);backend.pull=async()=>{await pullGate.promise;return pull();};
+  backend.recoveryIdentity=()=> 'fixture-readiness-uid';backend.recoveryEvidence=async()=>({identity:backend.recoveryIdentity(),epoch:1,pending:false});return backend;
+ }}),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore,commit=store.commitHead.bind(store);
+ store.commitHead=async options=>{const result=await commit(options);if(held){held=false;entered.resolve(result);await commitGate.promise;}return result;};
+ t.after(async()=>{pullGate.resolve();commitGate.resolve();ctx.cloudPushNow();await settleSavedViewPublication(app,cloud,'Readiness test cleanup');vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry()',ctx);await store.close();});
+ pullGate.resolve();const reconciliation=ctx.cloudPull();
+ let timeout;await Promise.race([entered.promise,new Promise((_,reject)=>{timeout=setTimeout(()=>reject(Error('real reconciliation commit did not enter')),2000);})]);clearTimeout(timeout);
+ const readiness=prepareBackupFileFixtureSource(app,cloud);
+ // Deliver the held real commit only after the previous fixture setup would
+ // have declared readiness. A faithful helper must still be awaiting it.
+ let finished=false;readiness.then(()=>{finished=true;});await syncSettle(15);
+ const finishedBeforeAck=finished;
+ t.diagnostic('Held real source commit: '+JSON.stringify({fixtureReturned:finishedBeforeAck,headAcknowledged:(await store.readHead()).hash===vm.runInContext('deviceHeadHash',ctx),...JSON.parse(vm.runInContext('JSON.stringify({pulling,cloudPushInFlight,syncDirty:state.syncDirty})',ctx))}));
+ commitGate.resolve();await readiness;await reconciliation;
+ // Also exercise the real file consumer after the helper's declared boundary.
+ const selected=JSON.parse(JSON.stringify(ctx.state));selected.tasks[0].title='Cloud file candidate';
+ const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.click=()=>{};
+ const get=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:get(id);
+ ctx.openSettings();await ctx.onAction('choose-backup-file',{});input.files=[new File([JSON.stringify(selected)],'cloud-readiness.json',{type:'application/json'})];await ctx.handleRestoreBackupFileChange(input);
+ const preview=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(preview,/data-act="confirm-file-restore"/,shim.document.getElementById('toast').textContent);
+ assert.equal(finishedBeforeAck,false,'fixture readiness must not return while the real reconciliation commit acknowledgement is held');
+ assert.doesNotMatch(preview.match(/<button\b[^>]*data-act="confirm-file-restore"[^>]*>/)?.[0]||'',/\sdisabled(?:\s|>|=)/,'a healthy fixture reaches enabled consent only after actual durable cloud acknowledgement');
+});

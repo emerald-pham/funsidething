@@ -12868,5 +12868,67 @@
       "result": "passed 37 tests with zero failures or skips across the focused file-restore, Help, and inventory cohort"
     },
     "comparison": "Exact cumulative tests.js diff against 52d4b2537bacbb60240ae7a53061224350ebd36f; all prior rationale objects remain byte-preserved and ordered."
+  },
+  {
+    "reason": "Repair the file-restore fixture readiness boundary after push CI 39160032516 failed on exact candidate C. The production source guards correctly reject changing sources; the prior fixture could begin file consent while its own ordinary save or signed-in reconciliation was still completing.",
+    "previousBehavior": "Add followed by await persist left the actual queued 350ms save producer alive. Signed-in cloudPull followed by a fixed 10ms delay did not establish durable reconciliation or acknowledgement. A selected file could cross that fixture work, misattribute an ordinary latest-backup commit to file selection, or fail the existing unchanged-source/consent guard. The unchanged C cohort passed 34 tests locally; the failed push remains a failed regression run, not an original preimplementation RED.",
+    "intendedBehavior": "Observe and await each real queued fixture save callback, its returned persistence promise, actual reconciled publication and exact cloud revision/payload acknowledgement, current accepted bytes and durable head/hash before capturing a file-restore baseline. The product is unchanged. New actual-file-consumer regressions impose real file-read latency and hold delivery of a real reconciliation commit result; they reject the previous fixture boundary while preserving restore source, account, ACK, cancellation and no-preview-write assertions.",
+    "preservedCoverage": [
+      "Every previous assertion line in the affected file-restore cohort remains present. Selection/preview/Cancel do not replace the accepted primary board or perform cloud writes; selected exact bytes and protected prior-board copies remain verified.",
+      "Cloud CAS, exact acknowledgement, account identity/auth epoch/pending evidence/revision changes, old-client conflicts, mid-read state/head/draft changes, backup failures, in-progress cancellation controls, archive exclusions and Undo all retain their original assertions.",
+      "All 506 prior rationale objects remain raw-byte-exact and ordered. No product, service worker, package, workflow, FAQ, changelog or generated fingerprint changes occur; the entire delivered graph stays identical to C."
+    ],
+    "replacementTests": [
+      "RISK BACKUP FILE RESTORE: fixture readiness leaves no ordinary save crossing delayed file reading",
+      "RISK BACKUP FILE RESTORE: fixture readiness waits for signed-in durable reconciliation before file consent"
+    ],
+    "redEvidence": {
+      "command": "TZ=UTC Node 22 record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK BACKUP FILE RESTORE: fixture readiness [leaves|waits for signed-in]\" tests.js (each named case was executed separately; see exact commands in the two records)",
+      "failure": "Before helper repair on C, record 0e85869c-8b49-4e21-906e-66ff2f72465d observed the real delayed Add save commit during actual file selection/preview and failed the zero-primary-writes assertion. Record d9f14ded-4791-48e3-b9f7-ae8bd68008dc held delivery of a real IndexedDB reconciliation commit, let the prior cloudPull+10ms setup return, then observed the actual file handler reject changing sources. Records 422139e3 and bb81201a were cancelled/probe-setup failures and are not meaningful REDs. Later sensitivity 68b1c104 changes only the helper back to the original setup: both repaired regressions fail at those causal assertions; held diagnostic fixtureReturned=true/headAcknowledged=false, versus fixtureReturned=false while the real ACK remains held under the repair.",
+      "records": [
+        "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/ci/pr205/fixture-repair/runs/2026-10-18T20-05-47-977Z-0e85869c-8b49-4e21-906e-66ff2f72465d.json",
+        "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/ci/pr205/fixture-repair/runs/2026-10-18T20-08-39-694Z-d9f14ded-4791-48e3-b9f7-ae8bd68008dc.json"
+      ],
+      "laterSensitivity": "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/ci/pr205/fixture-repair/runs/2026-10-18T20-10-56-366Z-68b1c104-7b0f-4731-b697-8f56cdbe116c.json"
+    },
+    "greenEvidence": {
+      "command": "TZ=UTC Node 22 record-run --purpose green -- node --test --test-name-pattern=\"^(?:RISK BACKUP FILE RESTORE:|RISK CLOUD ACCOUNT: signing out|RISK CLOUD STARTUP: a late write acknowledgement|RISK DEVICE STORAGE V2: migration|RISK saved view decision integration:|RISK test inventory:)\" tests.js",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/ci/pr205/fixture-repair/runs/2026-10-18T20-11-19-638Z-c9233a9f-6a3d-4ef3-a9dc-43118f56502e.json",
+      "result": "43 passed, zero failures/cancellations/skips; complete file-restore cohort and relevant account, durable publication, late ACK, atomic head CAS and risk inventory controls. No full suite, native browser, CI or deployment run is claimed."
+    },
+    "baseCommit": "4d8aca7cd8efecebd9a8825f3af88567ae1e7edf",
+    "testChangesSha256": "1038346985a7a5f44ed85b1518a76aa3901171c3d3a7e57bbc6ba9e6f3567f1a",
+    "comparison": "Exact tests.js diff against 4d8aca7cd8efecebd9a8825f3af88567ae1e7edf. This is the current C-to-repair tests-only change; the CI failure is retained as postimplementation regression history, separate from the new causal RED probes."
+  },
+  {
+    "reason": "Repair the file-restore fixture readiness boundary after push CI 39160032516 failed on exact candidate C. The production source guards correctly reject changing sources; the prior fixture could begin file consent while its own ordinary save or signed-in reconciliation was still completing.",
+    "previousBehavior": "Add followed by await persist left the actual queued 350ms save producer alive. Signed-in cloudPull followed by a fixed 10ms delay did not establish durable reconciliation or acknowledgement. A selected file could cross that fixture work, misattribute an ordinary latest-backup commit to file selection, or fail the existing unchanged-source/consent guard. The unchanged C cohort passed 34 tests locally; the failed push remains a failed regression run, not an original preimplementation RED.",
+    "intendedBehavior": "Observe and await each real queued fixture save callback, its returned persistence promise, actual reconciled publication and exact cloud revision/payload acknowledgement, current accepted bytes and durable head/hash before capturing a file-restore baseline. The product is unchanged. New actual-file-consumer regressions impose real file-read latency and hold delivery of a real reconciliation commit result; they reject the previous fixture boundary while preserving restore source, account, ACK, cancellation and no-preview-write assertions.",
+    "preservedCoverage": [
+      "Every previous assertion line in the affected file-restore cohort remains present. Selection/preview/Cancel do not replace the accepted primary board or perform cloud writes; selected exact bytes and protected prior-board copies remain verified.",
+      "Cloud CAS, exact acknowledgement, account identity/auth epoch/pending evidence/revision changes, old-client conflicts, mid-read state/head/draft changes, backup failures, in-progress cancellation controls, archive exclusions and Undo all retain their original assertions.",
+      "All 506 prior rationale objects remain raw-byte-exact and ordered. No product, service worker, package, workflow, FAQ, changelog or generated fingerprint changes occur; the entire delivered graph stays identical to C."
+    ],
+    "replacementTests": [
+      "RISK BACKUP FILE RESTORE: fixture readiness leaves no ordinary save crossing delayed file reading",
+      "RISK BACKUP FILE RESTORE: fixture readiness waits for signed-in durable reconciliation before file consent"
+    ],
+    "redEvidence": {
+      "command": "TZ=UTC Node 22 record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK BACKUP FILE RESTORE: fixture readiness [leaves|waits for signed-in]\" tests.js (each named case was executed separately; see exact commands in the two records)",
+      "failure": "Before helper repair on C, record 0e85869c-8b49-4e21-906e-66ff2f72465d observed the real delayed Add save commit during actual file selection/preview and failed the zero-primary-writes assertion. Record d9f14ded-4791-48e3-b9f7-ae8bd68008dc held delivery of a real IndexedDB reconciliation commit, let the prior cloudPull+10ms setup return, then observed the actual file handler reject changing sources. Records 422139e3 and bb81201a were cancelled/probe-setup failures and are not meaningful REDs. Later sensitivity 68b1c104 changes only the helper back to the original setup: both repaired regressions fail at those causal assertions; held diagnostic fixtureReturned=true/headAcknowledged=false, versus fixtureReturned=false while the real ACK remains held under the repair.",
+      "records": [
+        "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/ci/pr205/fixture-repair/runs/2026-10-18T20-05-47-977Z-0e85869c-8b49-4e21-906e-66ff2f72465d.json",
+        "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/ci/pr205/fixture-repair/runs/2026-10-18T20-08-39-694Z-d9f14ded-4791-48e3-b9f7-ae8bd68008dc.json"
+      ],
+      "laterSensitivity": "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/ci/pr205/fixture-repair/runs/2026-10-18T20-10-56-366Z-68b1c104-7b0f-4731-b697-8f56cdbe116c.json"
+    },
+    "greenEvidence": {
+      "command": "TZ=UTC Node 22 record-run --purpose green -- node --test --test-name-pattern=\"^(?:RISK BACKUP FILE RESTORE:|RISK CLOUD ACCOUNT: signing out|RISK CLOUD STARTUP: a late write acknowledgement|RISK DEVICE STORAGE V2: migration|RISK saved view decision integration:|RISK test inventory:)\" tests.js",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/ci/pr205/fixture-repair/runs/2026-10-18T20-11-19-638Z-c9233a9f-6a3d-4ef3-a9dc-43118f56502e.json",
+      "result": "43 passed, zero failures/cancellations/skips; complete file-restore cohort and relevant account, durable publication, late ACK, atomic head CAS and risk inventory controls. No full suite, native browser, CI or deployment run is claimed."
+    },
+    "baseCommit": "52d4b2537bacbb60240ae7a53061224350ebd36f",
+    "testChangesSha256": "0726c421c7e10f0ab1655bc53a5f83350e824860883580d7db4a359d490490bd",
+    "comparison": "Exact tests.js diff against 52d4b2537bacbb60240ae7a53061224350ebd36f. This aggregate binds cumulative history without relabeling any historical RED as contemporaneous; all earlier case-level records retain their exact bytes and chronology."
   }
 ]
