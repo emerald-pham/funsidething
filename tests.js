@@ -36010,6 +36010,7 @@ async function heldDecisionApp188(t,{fixture=heldDecisionFixture188(),failures={
      const stores=typeof names==='string'?[names]:Array.from(names);
      if(idbFault.readBackups&&mode==='readonly'&&stores.includes('backups'))throw Object.assign(Error('fixture storage read unavailable'),{name:'AbortError'});
      const tx=target.transaction(names,mode,...rest);
+     if(mode==='readonly')tx.addEventListener('complete',()=>idbFault.afterReadTransaction?.(stores));
      if(mode!=='readwrite'||!stores.includes('backups')&&!stores.includes('opaque'))return tx;
      return new Proxy(tx,{get(target,key){
       if(key==='objectStore')return name=>{const store=target.objectStore(name);return new Proxy(store,{get(target,key){
@@ -37252,4 +37253,24 @@ test('RISK resilient sync recovery: unrepresented pending intent requires explic
  assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev,'an exact acknowledged base cannot silently displace different pending intent');
  assert.ok(JSON.stringify([...backend.docs])===original,'unselected pending and damaged cloud originals stay unchanged');
  assert.deepEqual(await ctx.window.ScannerDeviceStore.getPendingUpload('owner'),pending,'pending authority remains until a supported deliberate recovery choice');
+});
+
+test('RISK resilient sync recovery: identity changes after durable source capture cannot bind an old response to a new account',async t=>{
+ const app=await damagedAcknowledgedApp187(t),{ctx,backend,originalRoot}=app;
+ let captureRead=false,injected=false;
+ app.idbFault.afterReadTransaction=names=>{
+  if(names.length===1&&names[0]==='opaque')captureRead=true;
+  if(!captureRead||injected||names.length!==1||names[0]!=='meta')return;
+  injected=true;
+  // Deliver an external Auth change after the real IDB receipt has completed
+  // and its promise continuations resume. No app verdict or port is replaced.
+  const later=count=>queueMicrotask(()=>count?later(count-1):backend.emitAuth({uid:'late-other-owner',email:'e@example.com'}));
+  later(5);
+ };
+ await ctx.cloudPull();await ctx.sendPush();await syncSettle(50);
+ assert.equal(injected,true,'the controlled external Auth change must actually fire');
+ assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev,'a cancelled reconstruction never publishes into its old account');
+ const foreign=await backend.CS.pull();
+ assert.ok(!foreign.payload||JSON.parse(foreign.payload).tasks.length===0,'an old response cannot publish old-account tasks into the changed identity');
+ assert.ok(ctx.state.syncIdentity!=='late-other-owner'||ctx.state.tasks.length===0,'old task membership never gains the new identity');
 });
