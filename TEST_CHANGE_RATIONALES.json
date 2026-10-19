@@ -1,5 +1,31 @@
 [
   {
+    "testChangesSha256": "ccb332893935698afe977ce440c19b7547e633ad37711e4a72448b7d81dc61fb",
+    "reason": "Apply the reviewed pending-original integrity contract to automatic exact-ACK rebuilding as well as explicit source recovery, preserving every prior assertion and correcting one conflicting FAQ exception without increasing its word budget.",
+    "previousBehavior": "Automatic rebuilding still used ordinary staging after protecting a JSON receipt: matched-hash lossy pending values could disappear, new valid peer intent could be overwritten after the initial pending read, and peer intent arriving after the own write could be published before refusal. A late same-generation undefined extra field also escaped JSON-only publication comparison.",
+    "intendedBehavior": "Exact ACK recovery refuses JSON-lossy pending authority before capture and carries the existing fourth recoveryContext through the normal reconciliation/save path. Atomic conditional staging, exact primitive own-pointer validation and lossless typed publication comparisons preserve newly arrived peer sources before cloud mutation. Context stays bound to backend/revision/UID/epoch and is cleared on identity change, suspension, healthy read or acknowledgement. Ordinary uploads remain on the released default path.",
+    "replacementTests": [
+      "RISK resilient sync recovery: JSON-lossy pending evidence cannot authorize automatic rebuilding",
+      "RISK resilient sync recovery: automatic rebuilding preserves peer pending intent across staging",
+      "RISK cloud source recovery publication: a device peer change during the SDK read invalidates consent before cloud mutation"
+    ],
+    "preservedCoverage": [
+      "Every prior behavioral assertion is retained, including the released account/callback semantic source contract deliberately migrated at86cb, exact cloud publication hash checks, UID ownership, startup and native File/Paste source preservation, raw-key collisions, local editing, durable ACK/reopen and compatibility/native gates.",
+      "Worker actual native pending RED65d0a225 and merged port-only REDef5b4092 both show cloud7 instead of6; first race preserves peer until late refusal and second loses the pointer. Store-only GREEN174404f4 is not native acceptance. Root consumer GREEN now passes both native races and all57 related tests in pending-cas-green-complete.log.",
+      "Existing root original RED925cbd3c, later857 sensitivity8351971f, invalid nested-field607f6ec3 correction, head-metadata RED70072105 and final86/86 source-shape GREEN retain their actual chronology in earlier entries and immutable outside-Git records. No setup or source spelling failure is claimed as behavioral RED.",
+      "Independent actual neutral-control visual RED86cb matches computed font700/transparent border/fill/shadow against established Cancel600/white/token-border/no shadow. The three new recovery controls now reuse btn subtle; a final rendered GREEN remains required. Text contrast suspicion was disproved, not a product failure.",
+      "Actual original REDd0349f77 before pendingJSON repair fails both public-port mismatch cases and native Apply; root narrow type/array-key guard thenGREEN07a41952 passes61/61 related cases. Prior264 full suite de1c638b was deliberately interrupted after rejection and is not a pass. First264 actualSDK exactACK/reopen/second-client case passed; explicit-device source UI lookup timed out and remains under investigation with added external diagnostics, not accepted recovery evidence.",
+      "Original automatic shape REDbce06f8d (both physical shapes cloud7vs6), automatic staging REDcdbfce68 (both exact external-IDB windows cloud7vs6), and late explicit SDK metadata RED8b6d517d precede each respective repair. Completed focusedGREENc8118036 passes78/78; final broad auto-pending-broad-green.log passes231/231 including startup/File/Paste/held decisions/auth/account/Add/WOOP/native source choices and all pending cases.",
+      "The first automatic-context repair GREEN attempt raised a temporary remote variable scope ReferenceError in finally; it is retained as a failed implementation check, then fixed by outer context/healthy-read flags. It is not an original behavioral RED. Prior df full-suite attempt was interrupted after rejection and is not a final pass.",
+      "Existing Restore FAQ assertions and130-word ceiling remain unchanged. Its128-word answer now distinguishes signed-in readable-board confirmation from unreadable-device local restoration under a cloud hold; no unrelated FAQ content was removed.",
+      "Predecessor df actual pinnedSDK full-app three cases passed after a bounded native Read sources again on an explicitly recorded changed-source refusal, with original pending and cloud revision exact before retry. Earlier timeout runs remain failed harness assumptions, not accepted evidence. A final exact new-source SDK/native/full run remains required."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <rootwork> --evidence-dir <usable-recovery>/auto-pending-shape --purpose preimplementation-red -- node --test --test-name-pattern=\"automatic rebuilding preserves peer pending intent across staging\" tests.js",
+      "failure": "Original cdbfce68 failed both actual automatic staging windows with revision7 instead of6; bce06f8d separately proved both lossy physical shapes and8b6d517d proved the late SDK undefined extra field. All preceded their bounded repairs.231/231 related GREEN follows them; temporary repair scope error is retained as failed GREEN, never relabeled RED."
+    }
+  },
+  {
     "testChangesSha256": "ee6238142a692576d679edfbfc34715f7356fc77042cc8ad0d553619db0088d6",
     "reason": "Reject JSON-lossy pending evidence before exact reviewed-pointer staging; retain the full native recovery and physical-row contracts from the previous candidate.",
     "previousBehavior": "A physical pending row with negative zero or an array hole plus a named unknown property compared equal to different JSON and could be replaced; actual native source selection published revision6 to7 and cleared the sole unknown marker without a lossless receipt.",

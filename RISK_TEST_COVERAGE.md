@@ -16,6 +16,8 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 - RISK resilient sync recovery: rebuilding retains an interrupted pending generation and its exact readable chunks
 - RISK resilient sync recovery: unrepresented pending intent requires explicit review before replacing a damaged cloud source
+- RISK resilient sync recovery: JSON-lossy pending evidence cannot authorize automatic rebuilding
+- RISK resilient sync recovery: automatic rebuilding preserves peer pending intent across staging
 
 - RISK unreadable device recovery: an unsupported saved version cannot be replaced by Quick start or ordinary saving
 - RISK unreadable device recovery: native Paste previews and restores a supported board while preserving unreadable originals

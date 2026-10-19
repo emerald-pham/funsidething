@@ -37750,6 +37750,34 @@ test('RISK resilient sync recovery: unrepresented pending intent requires explic
  assert.deepEqual(await ctx.window.ScannerDeviceStore.getPendingUpload('owner'),pending,'pending authority remains until a supported deliberate recovery choice');
 });
 
+test('RISK resilient sync recovery: JSON-lossy pending evidence cannot authorize automatic rebuilding',async t=>{
+ for(const shape of ['negative zero','sparse array with property'])await t.test(shape,async sub=>{
+  const app=await damagedAcknowledgedApp187(sub),{ctx,backend,originalRoot,originalHeader}=app,store=ctx.window.ScannerDeviceStore;
+  const future=new Array(1);future.future='sole automatic-recovery pending evidence';
+  const pending={generationId:'matched-ack-unknown-shape',payloadHash:originalHeader.hash,baseRev:originalRoot.rev,updatedAt:1,account:'owner',futurePending:shape==='negative zero'?-0:future};
+  await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>tx.objectStore('meta').put(pending,'pending:owner'));
+  const originalPending=await store.getPendingUpload('owner');
+  await ctx.cloudPull();await ctx.sendPush();await syncSettle(30);
+  assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev,'a matching known payload hash does not authorize loss of other pending evidence');
+  assert.deepEqual(await store.getPendingUpload('owner'),originalPending,'unknown physical pending values remain exact until compatible recovery');
+ });
+});
+
+test('RISK resilient sync recovery: automatic rebuilding preserves peer pending intent across staging',async t=>{
+ for(const window of ['after existing read','after own write'])await t.test(window,async sub=>{
+  const app=await damagedAcknowledgedApp187(sub),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+  const peer={generationId:'peer-auto-'+window,payloadHash:'e'.repeat(64),baseRev:originalRoot.rev,updatedAt:1};let fired=false,write;
+  app.idbFault[window==='after existing read'?'afterReadTransaction':'afterWriteTransaction']=names=>{
+   if(fired||names.length!==1||names[0]!=='meta'||backend.CS.status!=='syncing')return;
+   fired=true;write=store.setPendingUpload('owner',peer);
+  };
+  await ctx.cloudPull();await ctx.sendPush();await syncSettle(30);await write;
+  assert.equal(fired,true,'the peer stages at the actual automatic backend pending transaction boundary');
+  assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev,'unreviewed pending intent must stop automatic publication before cloud mutation');
+  assert.equal((await store.getPendingUpload('owner')).generationId,peer.generationId,'the peer pointer remains recoverable');
+ });
+});
+
 // Uses only the existing native consumer and real storage/backend. The failed
 // selected hash makes this a deliberate source choice, never an exact repair.
 async function divergentCloudSourceApp187(t,options){
@@ -38107,7 +38135,7 @@ test('RISK cloud source recovery prepared sources: earlier choices are disclosed
 });
 
 test('RISK cloud source recovery publication: a device peer change during the SDK read invalidates consent before cloud mutation',async t=>{
- for(const boundary of ['device head','head metadata','browser source','Add draft','pending pointer','prepared copy','device hold'])await t.test(boundary,async sub=>{
+ for(const boundary of ['device head','head metadata','browser source','Add draft','pending pointer','pending metadata','prepared copy','device hold'])await t.test(boundary,async sub=>{
  const app=await divergentCloudSourceApp187(sub),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
  await ctx.onAction('review-cloud-source-recovery',{});
  await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'generation:'+originalRoot.previousGeneration}});
@@ -38124,6 +38152,9 @@ test('RISK cloud source recovery publication: a device peer change during the SD
    const input=app.shim.document.getElementById('addInput');input.id='addInput';input.value='Draft entered after source consent';app.shim.document.dispatchEvent({type:'input',target:input});
   }else if(boundary==='pending pointer'){
    const pending=await store.getPendingUpload('owner');assert.ok(pending);assert.equal((await store.setPendingUpload('owner',{...pending,generationId:'peer-pending-after-consent'})).ok,true);
+  }else if(boundary==='pending metadata'){
+   const pending=await store.getPendingUpload('owner');assert.ok(pending);
+   await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>tx.objectStore('meta').put({...pending,futurePending:undefined},'pending:owner'));
   }else if(boundary==='prepared copy'){
    const prepared=(await store.listBackups()).find(row=>row.kind==='decision-recovery-choice');assert.ok(prepared);
    await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>tx.objectStore('backups').delete(prepared.id));
