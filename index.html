@@ -11652,22 +11652,25 @@ if(configured){
        replaced the first — with setDoc there was nothing to notice it. The
        caller treats a conflict as "go and reconcile", never as "try harder".
        Returns {ok:true, rev} | {conflict:true, rev} | {error:true}. */
-    CS.push = async (payload, updatedAt, baseRev)=>{
+    CS.push = async (payload, updatedAt, baseRev, recoveryContext=null)=>{
       const pushUser=auth.currentUser;
       if(suspended)return {cancelled:true};
       if(!pushUser) return { error:true };
-      CS.resume();
       const pushUid=pushUser.uid;
+      const recoveryStillCurrent=()=>!recoveryContext||(recoveryContext.recoveryIdentity===pushUid&&recoveryContext.recoveryEpoch===recoveryAuthEpoch);
+      if(!recoveryStillCurrent())return {cancelled:true};
+      CS.resume();
       if(!validRevision(baseRev)){cloudFailure("push",{code:"invalid-revision"});return {error:true};}
       const operation=++pushOperation;
+      const stillCurrent=()=>auth.currentUser?.uid===pushUid&&operation===pushOperation&&recoveryStillCurrent();
       clearCloudError();CS.status = "syncing"; ping();
       try{
         if(!generationStore||!window.ChainStorageV2)throw Object.assign(Error("Cloud generation codec unavailable"),{code:"codec-unavailable"});
         const payloadHash=await window.ChainStorageV2.hashPayload(payload);
-        if(auth.currentUser?.uid!==pushUid || operation!==pushOperation)return {cancelled:true};
+        if(!stillCurrent())return {cancelled:true};
         const pendingStore=window.ScannerDeviceStore;
         const existing=await pendingStore?.getPendingUpload?.(pushUid);
-        if(auth.currentUser?.uid!==pushUid || operation!==pushOperation)return {cancelled:true};
+        if(!stillCurrent())return {cancelled:true};
         const generationId=existing&&existing.payloadHash===payloadHash&&existing.baseRev===baseRev
           ? existing.generationId : (crypto.randomUUID?.()||Array.from(crypto.getRandomValues(new Uint8Array(16)),
             value=>value.toString(16).padStart(2,"0")).join(""));
@@ -11675,18 +11678,18 @@ if(configured){
           const recorded=await pendingStore?.setPendingUpload?.(pushUid,{generationId,payloadHash,baseRev,updatedAt});
           if(pendingStore&&recorded?.error)throw Object.assign(Error("Pending upload could not be saved"),{code:"pending-upload-storage"});
         }
-        if(auth.currentUser?.uid!==pushUid || operation!==pushOperation)return {cancelled:true};
+        if(!stillCurrent())return {cancelled:true};
         const res=await cloudDeadline((async()=>{
           await networkReady;
-          if(auth.currentUser?.uid!==pushUid || operation!==pushOperation)return {cancelled:true};
+          if(!stillCurrent())return {cancelled:true};
           return generationStore.push(pushUid,payload,updatedAt,baseRev,{generationId,
-            stillCurrent:()=>auth.currentUser?.uid===pushUid&&operation===pushOperation});
+            stillCurrent});
         })());
-        if(auth.currentUser?.uid!==pushUid || operation!==pushOperation) return {cancelled:true};
+        if(!stillCurrent()) return {cancelled:true};
         if(res?.error){cloudFailure("push",{code:res.code||"unknown"});return res;}
         if(res?.cancelled)return res;
         if(res.ok||res.conflict)await pendingStore?.clearPendingUpload?.(pushUid,generationId);
-        if(auth.currentUser?.uid!==pushUid || operation!==pushOperation) return {cancelled:true};
+        if(!stillCurrent()) return {cancelled:true};
         if(res.ok){
           // The publication already confirmed this revision. Timestamp metadata
           // may enrich that receipt, but cannot hold a saved board in syncing
@@ -11718,11 +11721,11 @@ if(configured){
             if(auth.currentUser?.uid===pushUid)await generationStore.collectGarbage(pushUid,{pendingGenerationIds:pins});
           })().catch(()=>{});
         }
-        if(auth.currentUser?.uid!==pushUid || operation!==pushOperation) return {cancelled:true};
+        if(!stillCurrent()) return {cancelled:true};
         clearCloudError();CS.status = "ok"; ping();
         return res;
       }catch(e){
-        if(auth.currentUser?.uid!==pushUid || operation!==pushOperation) return {cancelled:true};
+        if(!stillCurrent()) return {cancelled:true};
         pushOperation++;cloudFailure("push",e); return { error:true };
       }
     };
