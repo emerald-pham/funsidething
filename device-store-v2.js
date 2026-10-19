@@ -172,6 +172,20 @@
       return typeof root.structuredClone==="function" ? root.structuredClone(visible) : visible;
     }
 
+    async function protectRecoverySource({expectedHash,key,raw}={}){
+      ensureOpen();
+      if(typeof expectedHash!=="string"||typeof key!=="string"||!key||typeof raw!=="string")return false;
+      const tx=db.transaction(["meta","opaque"],"readwrite"),done=transactionDone(tx);
+      const head=await requestResult(tx.objectStore("meta").get("head"));
+      const store=tx.objectStore("opaque"),existing=await requestResult(store.get(key));
+      // A peer edit or different evidence at this identity invalidates the
+      // capture. Recovery never replaces an earlier protected original.
+      if(head?.hash!==expectedHash||existing&&existing.raw!==raw){tx.abort();try{await done;}catch{}return false;}
+      if(!existing)store.put({key,raw,order:Date.now()},key);
+      await done;
+      return (await listOpaqueArchives()).some(row=>row.key===key&&row.raw===raw);
+    }
+
     async function migrateLegacy(legacy){
       ensureOpen();
       if(!legacy||typeof legacy.headPayload!=="string") return {error:true,code:"invalid-legacy-head"};
@@ -347,7 +361,7 @@
     }
 
     async function close(){if(db){db.close();db=null;}}
-    const api={open,close,readRawExportSnapshot,readHead,withCurrentHead,listBackups,listOpaqueArchives,migrateLegacy,commitHead,putBackup,
+    const api={open,close,readRawExportSnapshot,readHead,withCurrentHead,listBackups,listOpaqueArchives,protectRecoverySource,migrateLegacy,commitHead,putBackup,
       updateBackupKind,deleteBackup,getPendingUpload,setPendingUpload,clearPendingUpload,setLegacyFingerprint};
     return api;
   }

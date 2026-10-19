@@ -1,5 +1,27 @@
 [
   {
+    "testChangesSha256": "2cd9629819180fa2f767508f728ebeccb7ce2fd654fda61245709e2398bf1ded",
+    "reason": "Extend existing187 recovery through the agreed actual full-app consumer: exact acknowledged generation recovery, retry preservation, identity races, unsupported device source protection, and a deliberately RED native Paste recovery slice. Existing passing assertions stay intact. External SDK/IndexedDB fixture hooks model server read identity changes and transaction aborts; no application verdict is mocked.",
+    "previousBehavior": "A corrupt published generation blocks ordinary app sync despite a byte-exact acknowledged local copy. Recovery retry evidence keyed only by generation cannot admit later local work. Email-only device ownership can reintroduce old-account tasks after an authenticated UID switch. Future saved board versions can be downgraded by hydration and ordinary saves; native Paste refuses an unaccepted source.",
+    "intendedBehavior": "Publish a complete new validated generation conditionally from a proved exact acknowledged copy, preserve damaged/previous/pending sources, retry after later edits, bind device bookkeeping to authenticated identity, preserve unsupported device originals and provide a deliberate native supported restore path. The native Paste slice remains intentionally failing at this checkpoint and is not release-ready.",
+    "replacementTests": [
+      "RISK unreadable device recovery: an unsupported saved version cannot be replaced by Quick start or ordinary saving",
+      "RISK unreadable device recovery: native Paste previews and restores a supported board while preserving unreadable originals",
+      "RISK resilient sync recovery: an exact acknowledged copy recovers missing cloud chunks and publishes subsequent local work",
+      "RISK resilient sync recovery: a failed rebuild protects every source and retries after another local edit",
+      "RISK resilient sync recovery: unsupported unverifiable and foreign sources never authorize a replacement"
+    ],
+    "preservedCoverage": [
+      "Every preexisting test and passing assertion is retained, including transaction integrity, decision recovery, history, ratings, opaque fields, source preservation, account/CAS/ACK and compatibility floors.",
+      "The full-app helpers reuse real IndexedDB and the real production module/adapter with isolated external SDK docs and file/native handlers. Provider originals are synthetic; incident uploads remain private and outside Git.",
+      "Initial timestamp cloning and missing fault-reference failures are setup errors, not behavioral REDs. The first test now waits through the existing real ACK+durable-head consumer; final baseline sensitivity remains required. Account-control assertions distinguish the untouched original namespace from an explicitly requested empty sync in a different identity."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <incident-worktree> --evidence-dir <persistent-usable-recovery>/test-runs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern='RISK resilient sync recovery: an exact' tests.js",
+      "failure": "Observed375dc27b before product edits: exact acknowledged copy still returns corrupt-generation and no subsequent edit sync. Retryf9c01f72 before immutable capture digest fix: actual remote ACK+durablehead failed5s. Account8f52434d before UID bookkeeping: original-account recovery can proceed across same-email UID change; later test refinement verifies no old task reaches foreign account. Device59fb1e82 before guard: persist true rather than false downgrades unsupportedv99 source. NativePastee96b4bb2 currently remains RED: preview false rather than true. Provenance files retained externally; no release claim."
+    }
+  },
+  {
     "testChangesSha256": "81d0ee0a54eae2766b43a43ffbd1c95abad273eef1f328c75b1faabe69d06c60",
     "reason": "Prevent missing or partial uploaded generation sources from being sealed or published through the production Firebase adapter. Add independent digest and consumer controls while preserving all existing assertions. Full exact-candidate run exposed the same external TextEncoder/VM Uint8Array mismatch in the full-app fixture plus an over-specific source signature assertion; correct fixture fidelity and migrate that signature while preserving every behavioral assertion. Complete the codec fixture audit: pair external TextEncoder with its Uint8Array in standalone storage, standalone CloudStore, real-SDK decision and compatibility VMs; require independent server header hashes so shared fixture errors cannot satisfy wire compatibility.",
     "previousBehavior": "The ordinary uploader verified all bytes before sealing, but a source removed after that read could still be sealed or published because the state-changing transactions checked metadata alone. This admitted mechanism does not identify the production actor or recover the damaged active payload.",

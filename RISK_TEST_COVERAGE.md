@@ -12,6 +12,12 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 ## Task state, eligibility, and scanner controls
 
+- RISK unreadable device recovery: an unsupported saved version cannot be replaced by Quick start or ordinary saving
+- RISK unreadable device recovery: native Paste previews and restores a supported board while preserving unreadable originals
+- RISK resilient sync recovery: an exact acknowledged copy recovers missing cloud chunks and publishes subsequent local work
+- RISK resilient sync recovery: a failed rebuild protects every source and retries after another local edit
+- RISK resilient sync recovery: unsupported unverifiable and foreign sources never authorize a replacement
+
 - RISK saved-board startup: a large legacy completion board opens and saves responsively while retaining exact facts
 - RISK completion source reuse: async host acknowledgement requires the exact source and preserves a newer foreign write
 - RISK historical board file recovery: conflicting saved ratings require an explicit source-preserving preview choice

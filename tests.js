@@ -9,6 +9,131 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
+test('RISK unreadable device recovery: an unsupported saved version cannot be replaced by Quick start or ordinary saving',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='unsupported-device-187-'+Math.random();
+ const source=(await loadApp()).ctx.defaultState();source.v=99;source.futureAuthority={opaque:['original',17]};source.seenQuickStart=false;
+ const raw=JSON.stringify(source),store=loadStorageV2({indexedDB}).createDeviceStore({indexedDB,crypto:webcrypto,dbName:deviceDbName});
+ await store.open();assert.equal((await store.commitHead({expectedHash:null,payload:raw,account:null})).ok,true);
+ const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName,seedStorage:{'fvp:chain-scanner:device-store-v2':'1'}}),{ctx,shim}=app;
+ t.after(()=>closeLegacyApp173(app));t.after(()=>store.close());
+ ctx.onAction('ok-quickstart',{});
+ assert.equal(await ctx.persist(),false,'ordinary saving must refuse an unsupported source rather than downgrade and overwrite it');
+ assert.equal((await store.readHead()).payload,raw,'the exact unknown original remains the selected device source');
+ ctx.openSettings();ctx.onAction('view-current-board',{});
+ assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/id="currentBoardData"/,'a placeholder is never exported as a recovered board');
+});
+
+test('RISK unreadable device recovery: native Paste previews and restores a supported board while preserving unreadable originals',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='unreadable-restore-187-'+Math.random();
+ const original='{ "tasks": [ truncated original \ud800';
+ const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName,seedStorage:{[SYNC_STORE_KEY]:original,[LOCAL_HEAD_KEY]:original}}),{ctx,shim}=app;
+ t.after(()=>closeLegacyApp173(app));
+ const source=ctx.defaultState();source.seenQuickStart=true;source.tasks=[{id:'chosen-187',title:'Deliberately chosen recovery board',ctx:[],mu:25,sigma:8.333333333333334,createdAt:1,opaqueTask:{keep:['all','fields']}}];
+ ctx.onAction('settings',{});ctx.onAction('open-paste-recovery',{});
+ shim.document.getElementById('jsonBox').value=JSON.stringify(source);
+ assert.equal(await ctx.onAction('preview-pasted-recovery',{}),true,'an unaccepted startup source must have a usable native supported-restore path');
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/unreadable|unsupported|could not be loaded/i,'the preview identifies the unavailable original rather than claiming zero existing tasks');
+ assert.equal(shim.localStorage.getItem(SYNC_STORE_KEY),original,'preview never overwrites the original browser source');
+ assert.equal(await ctx.onAction('confirm-file-restore',{}),true,'deliberate validated restore becomes a usable local board');
+ assert.equal(ctx.state.tasks[0].id,'chosen-187');assert.deepEqual(JSON.parse(JSON.stringify(ctx.state.tasks[0].opaqueTask)),{keep:['all','fields']});
+ const protectedSources=await ctx.window.ScannerDeviceStore.listOpaqueArchives();
+ assert.ok(protectedSources.some(row=>JSON.stringify(row).includes(JSON.stringify(original).slice(1,-1))),'the exact unreadable source remains protected through the actual storage consumer');
+ const cold=await loadApp({indexedDBProvider:indexedDB,deviceDbName,sharedStorage:shim.localStorage});t.after(()=>closeLegacyApp173(cold));
+ assert.equal(cold.ctx.state.tasks[0].id,'chosen-187','explicitly restored work survives durable reopen');
+});
+
+async function damagedAcknowledgedApp187(t){
+ const fixture=heldDecisionFixture188();fixture.local=structuredClone(fixture.remote);
+ const faults={},app=await heldDecisionApp188(t,{fixture,failures:faults}),{ctx,shim,backend}=app;
+ ctx.window.CLOUD_PUSH_DELAY_MS=60000;
+ shim.document.getElementById('addInput').value='Acknowledged before source damage';
+ await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ await ctx.sendPush();await settleRecovery188(app);
+ shim.document.getElementById('addInput').value='Second acknowledged source';
+ await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ await ctx.sendPush();await settleRecovery188(app);
+ const originalRoot={...backend.docs.get('users/owner')};
+ assert.equal(originalRoot.schemaVersion,2,'the setup must produce a real chunk-generation ACK');
+ const originalHeader={...backend.docs.get('users/owner/generations/'+originalRoot.activeGeneration)};
+ const acknowledged=ctx.state.decisionBase.payload;
+ assert.equal(createHash('sha256').update(acknowledged,'utf8').digest('hex'),originalHeader.hash,'the retained source is independently proved byte exact');
+ const acknowledgedTasks=JSON.parse(acknowledged).tasks;
+ const previousPath='users/owner/generations/'+originalRoot.previousGeneration;
+ const previousSource=[...backend.docs].filter(([key])=>key===previousPath||key.startsWith(previousPath+'/')).map(([key,value])=>[key,JSON.stringify(value)]);
+ assert.ok(previousSource.length>1,'the damaged root also names a complete previous source');
+ for(const key of [...backend.docs.keys()])if(key.startsWith('users/owner/generations/'+originalRoot.activeGeneration+'/chunks/'))backend.docs.delete(key);
+ return {...app,faults,originalRoot,originalHeader,acknowledgedTasks,previousSource};
+}
+
+test('RISK resilient sync recovery: an exact acknowledged copy recovers missing cloud chunks and publishes subsequent local work',async t=>{
+ const app=await damagedAcknowledgedApp187(t),{ctx,shim,backend,originalRoot,originalHeader,acknowledgedTasks}=app;
+ shim.document.getElementById('addInput').value='Local work after source damage';
+ await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ const held=await backend.CS.pull();assert.equal(held.code,'corrupt-generation','the external fixture must reach the genuine missing-chunk decoder failure');
+ await ctx.cloudPull();await ctx.sendPush();
+ const {remote:recovered}=await settleRecovery188(app);
+ assert.equal(recovered.error,undefined,'a verified exact acknowledged copy must restore functional sync instead of indefinitely holding every push');
+ assert.ok(recovered.rev>originalRoot.rev,'recovery publishes through a new conditional revision');
+ assert.notEqual(backend.docs.get('users/owner').activeGeneration,originalRoot.activeGeneration,'the damaged published generation is never refilled or overwritten');
+ const board=JSON.parse(recovered.payload);
+ for(const task of acknowledgedTasks)assert.deepEqual(board.tasks.find(row=>row.id===task.id),task,'acknowledged tasks retain their complete fields');
+ assert.ok(board.tasks.some(row=>row.title==='Local work after source damage'),'the subsequent accepted edit reaches the actual cloud payload');
+ assert.deepEqual(backend.docs.get('users/owner/generations/'+originalRoot.activeGeneration),originalHeader,'the damaged source header remains exact');
+ await settleRecovery188(app);
+ const reopened=await loadApp({sharedStorage:shim.localStorage,indexedDBProvider:app.indexedDB,deviceDbName:app.deviceDbName});
+ t.after(()=>closeLegacyApp173(reopened));
+ assert.ok(reopened.ctx.state.tasks.some(row=>row.title==='Local work after source damage'),'the recovered ACK and edit survive durable reopen');
+ assert.equal(reopened.ctx.state.syncDirty,false,'only the actual acknowledged result is called synced');
+ for(const [key,raw] of app.previousSource)assert.equal(JSON.stringify(backend.docs.get(key)),raw,'recovery keeps the formerly previous complete source even after publication');
+});
+
+test('RISK resilient sync recovery: a failed rebuild protects every source and retries after another local edit',async t=>{
+ const app=await damagedAcknowledgedApp187(t),{ctx,shim,backend,originalRoot}=app;
+ app.faults.push=Object.assign(Error('isolated offline rebuild'),{code:'unavailable'});
+ await ctx.cloudPull();
+ for(let i=0;i<100&&backend.CS.errorStage!=='push';i++)await syncSettle(10);
+ assert.equal(backend.CS.errorCode,'unavailable','the genuine SDK-boundary upload fails after recovery evidence was captured');
+ assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev);
+ const preserved=await ctx.window.ScannerDeviceStore.listOpaqueArchives();
+ assert.ok(preserved.some(row=>row.key.startsWith('cloud-generation-recovery:')),'the failed attempt has durable protected evidence');
+ shim.document.getElementById('addInput').value='Accepted between recovery attempts';
+ await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ delete app.faults.push;
+ await ctx.cloudPull();await ctx.sendPush();
+ const {remote}=await settleRecovery188(app);
+ assert.ok(JSON.parse(remote.payload).tasks.some(row=>row.title==='Accepted between recovery attempts'),'a later edit cannot invalidate all future safe recovery');
+ const retained=await ctx.window.ScannerDeviceStore.listOpaqueArchives();
+ for(const row of preserved)assert.ok(retained.some(copy=>copy.key===row.key&&copy.raw===row.raw),'a later attempt never replaces the earlier exact evidence');
+});
+
+test('RISK resilient sync recovery: unsupported unverifiable and foreign sources never authorize a replacement',async t=>{
+ for(const control of ['different hash','unsupported header','foreign identity','unavailable server','failed protection'])await t.test(control,async t=>{
+  const app=await damagedAcknowledgedApp187(t),{ctx,backend,originalRoot}=app;
+  assert.equal(ctx.state.syncIdentity,'owner','the setup must durably bind the successful acknowledgement to its authenticated identity');
+  const path='users/owner/generations/'+originalRoot.activeGeneration;
+  if(control==='different hash')backend.docs.set(path,{...backend.docs.get(path),hash:'f'.repeat(64)});
+  if(control==='unsupported header')backend.docs.set(path,{...backend.docs.get(path),schemaVersion:99});
+  if(control==='foreign identity'){
+   let headerReads=0;
+   app.faults.serverRead=async key=>{if(key===path&&++headerReads===2)backend.emitAuth({uid:'other-owner',email:'e@example.com'});};
+  }
+  if(control==='unavailable server')app.faults.serverOffline=true;
+  if(control==='failed protection')app.idbFault.abortOpaque=true;
+  const original=JSON.stringify([...backend.docs]),local=JSON.stringify(ctx.state);
+  await ctx.cloudPull();await ctx.sendPush();await syncSettle(30);
+  const originalNamespace=[...backend.docs].filter(([key])=>key==='users/owner'||key.startsWith('users/owner/'));
+  assert.ok(JSON.stringify(originalNamespace)===original,'unproved recovery performs no mutation in the original account');
+  if(control==='foreign identity'){
+   assert.equal(ctx.state.tasks.length,0,'an empty different authenticated identity never inherits the old board; '+JSON.stringify({identity:backend.CS.recoveryIdentity(),localIdentity:ctx.state.syncIdentity,localRevision:ctx.state.syncRev,otherPaths:[...backend.docs.keys()].filter(key=>!key.startsWith('users/owner'))}));
+   assert.ok(ctx.readLocalBackups().some(row=>row.payload===local),'the displaced account source remains exact and recoverable');
+   const foreign=await backend.CS.pull();
+   if(foreign.payload)assert.equal(JSON.parse(foreign.payload).tasks.length,0,'an explicit ordinary sync under the new identity cannot publish old-account tasks');
+  }else assert.ok(JSON.stringify(ctx.state)===local,'unproved source never replaces the accepted board');
+  assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev);
+  if(control==='failed protection')assert.ok(app.idbFault.aborts>0,'the external IndexedDB boundary genuinely aborted source preservation');
+ });
+});
+
 test('RISK optional oldest start: enabled Start offers a candidate without dotting or learning',async()=>{
  const {ctx,shim}=await loadApp({seed:182});
  Object.assign(ctx.addTask('Oldest optional-start task',false),{id:'optional-oldest',createdAt:1});
@@ -11640,8 +11765,8 @@ async function loadCloudBackendV2({artifacts=null,rootData=null,batchFailureAt=I
  };
  const readDoc=F.getDoc,readDocs=F.getDocs;
  F.getDoc=async reference=>failures.cacheMiss?{exists:()=>false}:readDoc(reference);
- F.getDocFromServer=async reference=>{network.push('server:'+reference.path);if(failures.serverOffline)throw Object.assign(Error('offline'),{code:'unavailable'});return readDoc(reference);};
- F.getDocsFromServer=async reference=>{network.push('server:'+reference.path);if(failures.serverOffline)throw Object.assign(Error('offline'),{code:'unavailable'});return readDocs(reference);};
+ F.getDocFromServer=async reference=>{network.push('server:'+reference.path);if(failures.serverOffline)throw Object.assign(Error('offline'),{code:'unavailable'});await failures.serverRead?.(reference.path,docs);return readDoc(reference);};
+ F.getDocsFromServer=async reference=>{network.push('server:'+reference.path);if(failures.serverOffline)throw Object.assign(Error('offline'),{code:'unavailable'});await failures.serverRead?.(reference.path,docs);return readDocs(reference);};
  F.disableNetwork=async()=>{network.push('disable');if(failures.disable)throw failures.disable;};
  F.enableNetwork=async()=>{network.push('enable');if(failures.enablePending)await failures.enablePending;};
  const subscriptions=[];
@@ -35885,11 +36010,12 @@ async function heldDecisionApp188(t,{fixture=heldDecisionFixture188(),failures={
      const stores=typeof names==='string'?[names]:Array.from(names);
      if(idbFault.readBackups&&mode==='readonly'&&stores.includes('backups'))throw Object.assign(Error('fixture storage read unavailable'),{name:'AbortError'});
      const tx=target.transaction(names,mode,...rest);
-     if(mode!=='readwrite'||!stores.includes('backups'))return tx;
+     if(mode!=='readwrite'||!stores.includes('backups')&&!stores.includes('opaque'))return tx;
      return new Proxy(tx,{get(target,key){
       if(key==='objectStore')return name=>{const store=target.objectStore(name);return new Proxy(store,{get(target,key){
        if(key==='put'&&name==='backups')return(...args)=>{const result=target.put(...args);if(idbFault.abortBackup){idbFault.aborts=(idbFault.aborts||0)+1;tx.abort();}return result;};
        if(key==='put'&&name==='meta')return(...args)=>{const result=target.put(...args);if(idbFault.abortHead&&args[1]==='head'){idbFault.aborts=(idbFault.aborts||0)+1;tx.abort();}return result;};
+       if(key==='put'&&name==='opaque')return(...args)=>{const result=target.put(...args);if(idbFault.abortOpaque){idbFault.aborts=(idbFault.aborts||0)+1;tx.abort();}return result;};
        const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;
       }});};
       const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;
