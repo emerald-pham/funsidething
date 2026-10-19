@@ -9414,7 +9414,7 @@ function cloudSourceRecoveryAvailable(){
 function cloudSourceRecoveryOpen(p){return cloudSourceRecoveryPreview===p&&p.serial===cloudSourceRecoverySerial;}
 function cloudSourceRecoveryDraft(){return JSON.stringify(quickAddAppearanceValues());}
 function cloudSourceRecoverySame(a,b,{afterPublication=false}={}){
-  return a.backend===b.backend&&a.account===b.account&&a.local===b.local&&a.headHash===b.headHash&&a.head===b.head&&a.draft===b.draft&&
+  return a.backend===b.backend&&a.account===b.account&&a.local===b.local&&a.headHash===b.headHash&&a.head===b.head&&JSON.stringify(a.headRecord)===JSON.stringify(b.headRecord)&&a.draft===b.draft&&
     JSON.stringify(a.browser)===JSON.stringify(b.browser)&&JSON.stringify(a.hold)===JSON.stringify(b.hold)&&
     a.evidence.identity===b.evidence.identity&&a.evidence.epoch===b.evidence.epoch&&
     (afterPublication||JSON.stringify(a.evidence.pending)===JSON.stringify(b.evidence.pending)&&JSON.stringify(a.source)===JSON.stringify(b.source))&&
@@ -9443,7 +9443,7 @@ async function cloudSourceRecoverySources(){
     JSON.stringify(finalBrowser)!==JSON.stringify(browser)||JSON.stringify(state)!==local||cloudSourceRecoveryDraft()!==draft||
     window.CloudSync!==backend||backend.user!==account||backend.recoveryIdentity?.()!==evidence.identity)
     throw Error("A device source, draft or signed-in account changed during the read. Review the current sources again.");
-  return {backend,account,local,draft,head:head.payload,headHash:head.hash,browser,hold,evidence,source,holds:decisionRecoveryHolds(account)};
+  return {backend,account,local,draft,head:head.payload,headHash:head.hash,headRecord:head,browser,hold,evidence,source,holds:decisionRecoveryHolds(account)};
 }
 function cloudSourceRecoveryBoard(raw,account){
   try{
@@ -9548,7 +9548,7 @@ async function applyCloudSourceRecovery(){
   try{
     renderCloudSourceRecovery("Verifying protected originals before applying…");await recheck();
     const raw=JSON.stringify({format:"chain-scanner.cloud-recovery-source",version:1,identity:p.evidence.identity,
-      manifest:p.source.manifest,generations:p.source.generations,deviceSource:p.local,deviceHead:p.head,browserSources:p.browser,pending:p.evidence.pending,deviceRecoveryHold:p.hold,preparedChoices:p.holds});
+      manifest:p.source.manifest,generations:p.source.generations,deviceSource:p.local,deviceHead:p.head,deviceHeadRecord:p.headRecord,browserSources:p.browser,pending:p.evidence.pending,deviceRecoveryHold:p.hold,preparedChoices:p.holds});
     const key="cloud-generation-recovery:"+encodeURIComponent(p.evidence.identity)+":"+p.rev+":"+(p.source.manifest?.activeGeneration||"empty")+":"+await ChainStorageV2.hashPayload(raw);
     if(!await deviceStore.protectRecoverySource({expectedHash:p.headHash,key,raw}))fail("The original sources could not be saved and verified. Nothing was applied; retry when storage is available.");
     const copies=[];
@@ -9587,6 +9587,7 @@ async function applyCloudSourceRecovery(){
       return cloudSourceRecoveryOpen(p)&&JSON.stringify(state)===p.local&&cloudSourceRecoveryDraft()===p.draft&&
         window.CloudSync===p.backend&&p.backend.user===p.account&&p.backend.recoveryIdentity?.()===p.evidence.identity&&
         head?.hash===p.headHash&&saved?.hash===p.headHash&&saved.payload===p.head&&
+        JSON.stringify({...head,payload:saved.payload})===JSON.stringify(p.headRecord)&&
         JSON.stringify(row("meta","recoveryCloudHold")??null)===JSON.stringify(p.hold)&&
         JSON.stringify(row("meta","pending:"+p.evidence.identity)??null)===JSON.stringify(publicationPending)&&
         JSON.stringify(browser)===JSON.stringify(p.browser)&&opaque?.key===key&&opaque.raw===raw&&
