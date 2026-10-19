@@ -169,6 +169,16 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK CLOUD V2: a multi-megabyte board publishes only after verified chunks and pulls byte-exactly
 - RISK CLOUD V2: crash resume, concurrent revisions, and account cancellation never publish partial data
 - RISK CLOUD V2: corrupt active data fails closed, manifest races retry, and garbage collection keeps recovery generations
+- RISK CLOUD TRANSACTION: the SDK consumer verifies published UTF8 bytes against an independent digest
+- RISK CLOUD TRANSACTION: missing and partial sources cannot be sealed after the earlier upload read
+- RISK CLOUD TRANSACTION: missing and partial sealed sources cannot be published
+- RISK CLOUD TRANSACTION: changed metadata corrupted bytes and transaction read failures retain the previous source
+- RISK CLOUD TRANSACTION: a newer revision and account or lifecycle change prevent late publication
+- RISK CLOUD TRANSACTION: a cached released CloudStore remains compatible with the current adapter
+- RISK CLOUD TRANSACTION: cached module verification uses observed row bounds and rejects changed sources
+- RISK CLOUD TRANSACTION: cancelled sealing retains its source without publishing or clearing pending evidence
+- RISK CLOUD TRANSACTION: an expired verification cannot publish after its delayed read finishes
+- RISK CLOUD TRANSACTION guidance: mounted help explains incomplete saves without claiming damaged source recovery
 - RISK CLOUD V2 ADAPTER: production migrates a legacy root to verified chunks and pulls the exact multi-megabyte board
 - RISK CLOUD V2 ADAPTER: an interrupted upload stays invisible and resumes its account-bound generation
 - RISK CLOUD V2 ADAPTER: production garbage collection retains current and previous complete generations only

@@ -11611,7 +11611,7 @@ async function loadCloudBackend({ serverData={rev:4}, serverExists=true, failure
   return {...h,getStored:()=>({exists:h.docs.has('users/owner'),data:h.docs.get('users/owner')})};
 }
 
-async function loadCloudBackendV2({artifacts=null,rootData=null,batchFailureAt=Infinity,failures={},timeoutMs=25,recordSyncError,cryptoProvider=webcrypto,runtimeWindow=null}={}){
+async function loadCloudBackendV2({artifacts=null,rootData=null,batchFailureAt=Infinity,failures={},timeoutMs=25,recordSyncError,cryptoProvider=webcrypto,runtimeWindow=null,firebaseSDK=null,timerProvider=null}={}){
  const moduleMatch=(artifacts?.html||html).match(/<script type="module">([\s\S]*?)<\/script>/);assert.ok(moduleMatch);
  const moduleSource=moduleMatch[1].replace(/const \[appMod, A, F\] = await Promise\.all\(\[[\s\S]*?\]\);/,
   'const [appMod, A, F] = globalThis.__cloudModules;');
@@ -11634,7 +11634,7 @@ async function loadCloudBackendV2({artifacts=null,rootData=null,batchFailureAt=I
   getFirestore:()=>({}),doc:(_db,...parts)=>ref(...parts),collection:(_db,...parts)=>ref(...parts),
   getDoc:async reference=>{if(reference.path===rootPath&&docs.get(rootPath)?.schemaVersion===2&&failures.stampPending)return failures.stampPending;if(reference.path===rootPath&&failures.pullPending)return failures.pullPending;if(reference.path===rootPath&&failures.pull)throw failures.pull;return snap(reference);},getDocs:async collectionRef=>{queries.push(collectionRef.path);return {docs:directRows(collectionRef)};},
   serverTimestamp:()=>({__serverTimestamp:true}),
-  runTransaction:async(_db,fn)=>{transactionCalls++;if(failures.pushPending)return failures.pushPending;if(failures.push)throw failures.push;const operations=[],tx={get:async reference=>snap(reference),set:(reference,value)=>operations.push({type:'set',ref:reference,value}),update:(reference,value)=>operations.push({type:'update',ref:reference,value}),delete:reference=>operations.push({type:'delete',ref:reference})};const result=await fn(tx);if(failures.publishPending&&operations.some(op=>op.ref.path===rootPath)){failures.publicationStarted=true;await failures.publishPending;}for(const operation of operations){if(failures.enforceDeletingTransition&&operation.type==='update'&&operation.value.state==='deleting'&&docs.get(operation.ref.path)?.state==='deleting')throw Object.assign(Error('rules reject deleting to deleting'),{code:'permission-denied'});apply(operation);}return result;},
+  runTransaction:async(_db,fn)=>{transactionCalls++;await failures.beforeTransaction?.(docs);if(failures.pushPending)return failures.pushPending;if(failures.push)throw failures.push;const operations=[],tx={get:async reference=>{await failures.transactionRead?.(reference.path,docs);return snap(reference);},set:(reference,value)=>operations.push({type:'set',ref:reference,value}),update:(reference,value)=>operations.push({type:'update',ref:reference,value}),delete:reference=>operations.push({type:'delete',ref:reference})};const result=await fn(tx);if(failures.publishPending&&operations.some(op=>op.ref.path===rootPath)){failures.publicationStarted=true;await failures.publishPending;}for(const operation of operations){if(failures.enforceDeletingTransition&&operation.type==='update'&&operation.value.state==='deleting'&&docs.get(operation.ref.path)?.state==='deleting')throw Object.assign(Error('rules reject deleting to deleting'),{code:'permission-denied'});apply(operation);}await failures.afterTransaction?.(docs);return result;},
   writeBatch:()=>{const operations=[];return {set:(reference,value)=>operations.push({type:'set',ref:reference,value}),delete:reference=>operations.push({type:'delete',ref:reference}),async commit(){batchCommits++;if(batchCommits===batchFailureAt)throw Object.assign(Error('batch unavailable'),{code:'unavailable'});for(const operation of operations)apply(operation);}};},
  };
  const readDoc=F.getDoc,readDocs=F.getDocs;
@@ -11664,8 +11664,8 @@ async function loadCloudBackendV2({artifacts=null,rootData=null,batchFailureAt=I
   };
  }
  if(!runtimeWindow||recordSyncError!==undefined)window.recordSyncError=recordSyncError;
- const context=vm.createContext({window,CustomEvent:class{constructor(type,options){this.type=type;this.detail=options?.detail;}},__cloudModules:[{initializeApp:()=>({})},A,F],
-  console,crypto:cryptoProvider,TextEncoder,TextDecoder,structuredClone,setTimeout,clearTimeout});context.globalThis=context;
+ const context=vm.createContext({window,CustomEvent:class{constructor(type,options){this.type=type;this.detail=options?.detail;}},__cloudModules:[{initializeApp:()=>({})},A,firebaseSDK?{...F,...firebaseSDK}:F],
+  console,crypto:cryptoProvider,TextEncoder,TextDecoder,Uint8Array,structuredClone,setTimeout:timerProvider?.setTimeout??setTimeout,clearTimeout:timerProvider?.clearTimeout??clearTimeout});context.globalThis=context;
  for(const file of ['device-store-v2.js','cloud-store-v2.js'])vm.runInContext(artifacts?(file==='device-store-v2.js'?artifacts.storage:artifacts.cloud):fs.readFileSync(path.join(__dirname,file),'utf8'),context,{filename:file});
  if(!runtimeWindow)window.ChainStorageV2=context.ChainStorageV2;window.ChainCloudV2=context.ChainCloudV2;
  await vm.runInContext(`(async()=>{${moduleSource}\n})()`,context,{filename:'index.html#cloud-v2-backend'});
@@ -11704,6 +11704,228 @@ test('RISK decision capability recovery: sole baseline recovery activates the fe
  assert.equal((await h.CS.push(payload,1,0)).ok,true);
  assert.equal(h.docs.get('users/owner').decisionCapability,1,'baseline recovery is authority even without an active baseline or stream');
  assert.equal((await h.CS.pull()).payload,payload);
+});
+
+test('RISK CLOUD TRANSACTION: the SDK consumer verifies published UTF8 bytes against an independent digest',async()=>{
+ const payload=JSON.stringify({tasks:[{id:'transaction-complete',title:'Complete Unicode source 😀'}],futureOpaque:'retained '.repeat(40000)});
+ const h=await loadCloudBackendV2({timeoutMs:5000});
+ const result=await h.CS.push(payload,1,0);assert.equal(result.ok,true);
+ const root=h.docs.get('users/owner'),header=h.docs.get('users/owner/generations/'+root.activeGeneration);
+ assert.equal(header.hash,createHash('sha256').update(payload,'utf8').digest('hex'),
+  'the external SDK harness must preserve the actual UTF8 byte digest, not a self-consistent cross-realm substitute');
+ assert.equal((await h.CS.pull()).payload,payload,'a complete multi-chunk source stays exactly readable');
+});
+
+test('RISK CLOUD TRANSACTION: missing and partial sources cannot be sealed after the earlier upload read',async t=>{
+ for(const missing of ['all','last'])await t.test(missing,async t=>{
+  const previous=JSON.stringify({tasks:[{id:'kept-previous',title:'Previous complete source'}],futureOpaque:{keep:[1,2]}});
+  const payload=JSON.stringify({tasks:[{id:'new-source',title:'New complete source 😀'}],futureOpaque:'retain '.repeat(80000)});
+  let interrupted=false,removed=0;
+  const h=await loadCloudBackendV2({rootData:{payload:previous,rev:4,updatedAt:1,serverUpdatedAt:1},timeoutMs:5000,failures:{
+   beforeTransaction(docs){
+    if(interrupted)return;
+    const generation=[...docs].find(([key,value])=>/^users\/owner\/generations\/[^/]+$/.test(key)&&value.state==='staging');
+    if(!generation)return;
+    const keys=[...docs.keys()].filter(key=>key.startsWith(generation[0]+'/chunks/'));
+    if(keys.length<2)return;
+    interrupted=true;
+    for(const key of missing==='all'?keys:keys.slice(-1)){docs.delete(key);removed++;}
+   }
+  }});t.after(()=>h.CS.suspend());
+  const pushed=await h.CS.push(payload,2,4);
+  assert.equal(interrupted,true,'external storage loss occurs only after a complete upload reached its state-change transaction');
+  assert.ok(removed>0);
+  assert.equal(pushed.error,true,'an incomplete source must be rejected before sealing or publishing it');
+  assert.equal((await h.CS.pull()).payload,previous,'the last readable cloud source remains exact');
+  assert.equal(h.writes.length,0,'no revision publication follows the failed seal');
+  assert.equal(h.docs.get('users/owner/generations/'+pushed.generationId).state,'staging');
+  assert.equal(h.pending.get('owner').generationId,pushed.generationId,'the exact interrupted generation remains resumable');
+ });
+});
+
+test('RISK CLOUD TRANSACTION: missing and partial sealed sources cannot be published',async t=>{
+ for(const missing of ['all','last'])await t.test(missing,async t=>{
+  const previous=JSON.stringify({tasks:[{id:'kept-before-publication',title:'Readable previous source'}],futureOpaque:{keep:[3,4]}});
+  const payload=JSON.stringify({tasks:[{id:'sealed-source',title:'Sealed complete source 😀'}],futureOpaque:'retain '.repeat(80000)});
+  let interrupted=false,removed=0;
+  const h=await loadCloudBackendV2({rootData:{payload:previous,rev:4,updatedAt:1,serverUpdatedAt:1},timeoutMs:5000,failures:{
+   beforeTransaction(docs){
+    if(interrupted)return;
+    const generation=[...docs].find(([key,value])=>/^users\/owner\/generations\/[^/]+$/.test(key)&&value.state==='sealed');
+    if(!generation)return;
+    const keys=[...docs.keys()].filter(key=>key.startsWith(generation[0]+'/chunks/'));
+    if(keys.length<2)return;
+    interrupted=true;
+    for(const key of missing==='all'?keys:keys.slice(-1)){docs.delete(key);removed++;}
+   }
+  }});t.after(()=>h.CS.suspend());
+  const pushed=await h.CS.push(payload,2,4);
+  assert.equal(interrupted,true,'external storage loss occurs after sealing and before the publication transaction');
+  assert.ok(removed>0);
+  assert.equal(pushed.error,true,'publication must independently reject an incomplete sealed source');
+  assert.equal((await h.CS.pull()).payload,previous,'failed publication retains the last readable cloud source');
+  assert.equal(h.writes.length,0);
+  assert.equal(h.docs.get('users/owner/generations/'+pushed.generationId).state,'sealed');
+  assert.equal(h.pending.get('owner').generationId,pushed.generationId,'failed publication retains the exact pending generation');
+ });
+});
+
+test('RISK CLOUD TRANSACTION: changed metadata corrupted bytes and transaction read failures retain the previous source',async t=>{
+ for(const fault of ['count','payload-hash','unavailable','permission-denied'])await t.test(fault,async t=>{
+  const previous=JSON.stringify({tasks:[{id:'protected-source'}],futureOpaque:{keep:'prior'}}),payload=JSON.stringify({tasks:[{id:'prepared-source'}],futureOpaque:'retain '.repeat(80000)});
+  let injected=false;
+  const h=await loadCloudBackendV2({rootData:{payload:previous,rev:4,updatedAt:1,serverUpdatedAt:1},timeoutMs:5000,failures:{
+   beforeTransaction(docs){
+    if(injected||!['count','payload-hash'].includes(fault))return;
+    const generation=[...docs].find(([key,value])=>/^users\/owner\/generations\/[^/]+$/.test(key)&&value.state==='sealed');if(!generation)return;
+    injected=true;
+    if(fault==='count')docs.set(generation[0],{...generation[1],chunkCount:Number.MAX_SAFE_INTEGER});
+    else{
+     const key=generation[0]+'/chunks/00000000',chunk=docs.get(key),text='x'+chunk.text.slice(1);
+     docs.set(key,{...chunk,text,hash:createHash('sha256').update(text,'utf8').digest('hex')});
+    }
+   },
+   transactionRead(reference,docs){
+    if(injected||!['unavailable','permission-denied'].includes(fault)||!reference.includes('/chunks/'))return;
+    const header=docs.get(reference.split('/chunks/')[0]);if(header?.state!=='sealed')return;
+    injected=true;throw Object.assign(Error('Isolated SDK read failure'),{code:fault});
+   }
+  }});t.after(()=>h.CS.suspend());
+  const pushed=await h.CS.push(payload,2,4);assert.equal(injected,true);
+  assert.equal(pushed.error,true);assert.equal(pushed.code,['unavailable','permission-denied'].includes(fault)?fault:'verification-failed');
+  assert.equal((await h.CS.pull()).payload,previous);assert.equal(h.writes.length,0);
+  assert.equal(h.pending.get('owner').generationId,pushed.generationId,'the failed source stays account-bound and resumable');
+ });
+});
+
+test('RISK CLOUD TRANSACTION: a newer revision and account or lifecycle change prevent late publication',async t=>{
+ for(const change of ['revision','account','suspend'])await t.test(change,async t=>{
+  const previous=JSON.stringify({tasks:[{id:'prior-owner-source'}]}),peer=JSON.stringify({tasks:[{id:'newer-peer-source'}],futureOpaque:'retain-peer'}),payload=JSON.stringify({tasks:[{id:'pending-source'}],futureOpaque:'retain '.repeat(80000)});
+  let injected=false;
+  const h=await loadCloudBackendV2({rootData:{payload:previous,rev:4,updatedAt:1,serverUpdatedAt:1},timeoutMs:5000,failures:{
+   beforeTransaction(docs){
+    if(change!=='revision'||injected||![...docs.values()].some(value=>value.state==='sealed'))return;
+    injected=true;docs.set('users/owner',{payload:peer,rev:5,updatedAt:3,serverUpdatedAt:3});
+   },
+   transactionRead(reference,docs){
+    if(change==='revision'||injected||!reference.includes('/chunks/')||docs.get(reference.split('/chunks/')[0])?.state!=='sealed')return;
+    injected=true;if(change==='account')h.emitAuth({uid:'other-owner',email:'other@example.test'});else h.CS.suspend();
+   }
+  }});t.after(()=>h.CS.suspend());
+  const pushed=await h.CS.push(payload,2,4);assert.equal(injected,true);
+  if(change==='revision'){assert.equal(pushed.conflict,true);assert.equal(pushed.rev,5);}
+  else assert.equal(pushed.cancelled,true);
+  assert.equal(h.writes.length,0,'late cancellation must stop the transaction write itself, not merely suppress its acknowledgement');
+  if(change==='account')h.emitAuth({uid:'owner',email:'owner@example.test'});if(change==='suspend')h.CS.resume();
+  assert.equal((await h.CS.pull()).payload,change==='revision'?peer:previous);
+  if(change!=='revision')assert.ok(h.pending.get('owner'),'cancelled publication retains the old account pending evidence');
+ });
+});
+
+test('Firestore rules: production chunk verification retries reject source loss before seal and publication',{skip:!process.env.FIRESTORE_EMULATOR_HOST},async t=>{
+ const {initializeTestEnvironment}=await import('@firebase/rules-unit-testing'),F=await import('firebase/firestore');
+ for(const phase of ['seal','publish'])await t.test(phase,async()=>{
+  const env=await initializeTestEnvironment({projectId:'demo-chunk-transaction-'+phase,firestore:{rules:fs.readFileSync(path.join(__dirname,'firestore.rules'),'utf8')}});
+  const db=env.authenticatedContext('owner').firestore(),previous=JSON.stringify({tasks:[{id:'retained-emulator-source'}],futureOpaque:{retain:[5,6]}}),payload=JSON.stringify({tasks:[{id:'complete-emulator-source'}],futureOpaque:'retain 😀 '.repeat(70000)});
+  let injected=false,targetAttempts=0,backend;
+  try{
+   await env.withSecurityRulesDisabled(context=>F.setDoc(F.doc(context.firestore(),'users','owner'),{payload:previous,rev:4,updatedAt:1,serverUpdatedAt:F.serverTimestamp()}));
+   const sdk={...F,getFirestore:()=>db,
+    writeBatch(database){const batch=F.writeBatch(database);return {set:(ref,value)=>batch.set(ref,{...value}),delete:ref=>batch.delete(ref),commit:()=>batch.commit()};},
+    runTransaction(database,callback){let targeted=false,attempts=0;return F.runTransaction(database,async tx=>{
+     attempts++;let selected=false,chunkRef;
+     const result=await callback({get:ref=>{if(ref.path.includes('/chunks/'))chunkRef??=ref;return tx.get(ref);},
+      set:(ref,value)=>{if(phase==='publish'&&ref.path==='users/owner')selected=true;return tx.set(ref,{...value});},
+      update:(ref,value)=>{if(phase==='seal'&&value.state==='sealed')selected=true;return tx.update(ref,{...value});},delete:ref=>tx.delete(ref)});
+     if(selected&&!injected){
+      assert.ok(chunkRef,'the actual state-changing transaction must read the source chunk it depends on');
+      targeted=true;injected=true;
+      // This disposable emulator-only admin fault occurs after the real callback
+      // queues its state change. The actual SDK must retry its stale read set.
+      await env.withSecurityRulesDisabled(context=>F.deleteDoc(F.doc(context.firestore(),chunkRef.path)));
+     }
+     if(targeted)targetAttempts=attempts;return result;
+    });}
+   };
+   backend=await loadCloudBackendV2({timeoutMs:15000,firebaseSDK:sdk});
+   const result=await backend.CS.push(payload,2,4);
+   assert.equal(injected,true);assert.ok(targetAttempts>=2,'the real Firestore SDK retries after a read chunk changes');
+   assert.equal(result.error,true);assert.equal(result.code,phase==='seal'?'seal-failed':'verification-failed');
+   assert.equal((await backend.CS.pull()).payload,previous,'a retried incomplete source cannot replace the readable root');
+   const doc=await F.getDocFromServer(F.doc(db,'users','owner','generations',result.generationId));
+   assert.equal(doc.data().state,phase==='seal'?'staging':'sealed');
+   assert.equal(backend.pending.get('owner').generationId,result.generationId);
+   t.diagnostic(JSON.stringify({phase,targetAttempts,injected,rootRetained:true}));
+  }finally{backend?.CS.suspend();await env.cleanup();}
+ });
+});
+
+test('RISK CLOUD TRANSACTION: a cached released CloudStore remains compatible with the current adapter',async t=>{
+ const {readReleasedClient}=await import('./scripts/backward-compatibility.mjs');
+ const released=readReleasedClient(__dirname,'01b95ef42414d6ba7817ff9c5ebac6e3be3d6350');
+ const payload=JSON.stringify({tasks:[{id:'mixed-complete-source'}],futureOpaque:'retained 😀 '.repeat(70000)});
+ const h=await loadCloudBackendV2({artifacts:{html,storage:fs.readFileSync(path.join(__dirname,'device-store-v2.js'),'utf8'),cloud:released.cloud},timeoutMs:5000});t.after(()=>h.CS.suspend());
+ const pushed=await h.CS.push(payload,1,0);
+ assert.equal(pushed.ok,true,'a valid cached CloudStore module must still publish through the updated adapter');
+ assert.equal((await h.CS.pull()).payload,payload);
+ assert.equal(h.docs.get('users/owner/generations/'+pushed.generationId).hash,createHash('sha256').update(payload,'utf8').digest('hex'));
+});
+
+test('RISK CLOUD TRANSACTION: cached module verification uses observed row bounds and rejects changed sources',async t=>{
+ const {readReleasedClient}=await import('./scripts/backward-compatibility.mjs'),released=readReleasedClient(__dirname,'01b95ef42414d6ba7817ff9c5ebac6e3be3d6350');
+ for(const fault of ['all','last','count'])await t.test(fault,async t=>{
+  const previous=JSON.stringify({tasks:[{id:'mixed-prior'}]}),payload=JSON.stringify({tasks:[{id:'mixed-pending'}],futureOpaque:'retain '.repeat(80000)});let injected=false;
+  const h=await loadCloudBackendV2({artifacts:{html,storage:fs.readFileSync(path.join(__dirname,'device-store-v2.js'),'utf8'),cloud:released.cloud},rootData:{payload:previous,rev:4,updatedAt:1,serverUpdatedAt:1},timeoutMs:5000,failures:{beforeTransaction(docs){
+   if(injected)return;const generation=[...docs].find(([key,value])=>/^users\/owner\/generations\/[^/]+$/.test(key)&&value.state==='sealed');if(!generation)return;injected=true;
+   if(fault==='count')docs.set(generation[0],{...generation[1],chunkCount:Number.MAX_SAFE_INTEGER});
+   else{const keys=[...docs.keys()].filter(key=>key.startsWith(generation[0]+'/chunks/'));for(const key of fault==='all'?keys:keys.slice(-1))docs.delete(key);}
+  }}});t.after(()=>h.CS.suspend());
+  const result=await h.CS.push(payload,2,4);assert.equal(injected,true);assert.equal(result.error,true);
+  assert.equal((await h.CS.pull()).payload,previous);assert.equal(h.writes.length,0);assert.ok(h.pending.get('owner'));
+ });
+});
+
+test('RISK CLOUD TRANSACTION: cancelled sealing retains its source without publishing or clearing pending evidence',async t=>{
+ for(const change of ['account','suspend'])await t.test(change,async t=>{
+  const previous=JSON.stringify({tasks:[{id:'seal-cancel-prior'}]}),payload=JSON.stringify({tasks:[{id:'seal-cancel-pending'}],futureOpaque:'retain '.repeat(80000)});let injected=false;
+  let settled;const transactionFinished=new Promise(resolve=>{settled=resolve;});
+  const h=await loadCloudBackendV2({rootData:{payload:previous,rev:4,updatedAt:1,serverUpdatedAt:1},timeoutMs:5000,failures:{transactionRead(reference,docs){
+   if(injected||!reference.includes('/chunks/')||docs.get(reference.split('/chunks/')[0])?.state!=='staging')return;
+   injected=true;if(change==='account')h.emitAuth({uid:'other-owner',email:'other@example.test'});else h.CS.suspend();
+  },afterTransaction(){if(injected)settled();}}});t.after(()=>h.CS.suspend());
+  const result=await h.CS.push(payload,2,4);assert.equal(injected,true);assert.equal(result.cancelled,true);assert.equal(h.writes.length,0);
+  await transactionFinished;
+  const pending=h.pending.get('owner');assert.ok(pending);const generation='users/owner/generations/'+pending.generationId,header=h.docs.get(generation);
+  assert.ok(['staging','sealed'].includes(header.state),'cancellation may retain an unreferenced verified seal; it never grants publication authority');
+  const chunks=[...h.docs].filter(([key])=>key.startsWith(generation+'/chunks/')).map(([,value])=>value).sort((a,b)=>a.index-b.index);
+  assert.equal(chunks.map(row=>row.text).join(''),payload,'all pending source bytes remain after the transaction settles');assert.equal(h.writes.length,0);
+  if(change==='account')h.emitAuth({uid:'owner',email:'owner@example.test'});else h.CS.resume();
+  assert.equal((await h.CS.pull()).payload,previous);
+ });
+});
+
+test('RISK CLOUD TRANSACTION: an expired verification cannot publish after its delayed read finishes',{timeout:5000},async t=>{
+ const previous=JSON.stringify({tasks:[{id:'deadline-prior'}]}),payload=JSON.stringify({tasks:[{id:'deadline-pending'}]});let release,enter,settle,nextTimer=0,verificationEntered=false;
+ const gate=new Promise(resolve=>{release=resolve;}),entered=new Promise(resolve=>{enter=resolve;}),finished=new Promise(resolve=>{settle=resolve;}),timers=new Map();
+ const h=await loadCloudBackendV2({rootData:{payload:previous,rev:4,updatedAt:1,serverUpdatedAt:1},timeoutMs:1000,
+  timerProvider:{setTimeout(callback,delay){const id=++nextTimer;timers.set(id,{callback,delay});return id;},clearTimeout:id=>timers.delete(id)},
+  failures:{async transactionRead(reference,docs){
+   if(!reference.includes('/chunks/')||docs.get(reference.split('/chunks/')[0])?.state!=='sealed')return;verificationEntered=true;enter();await gate;
+  },afterTransaction(){if(verificationEntered)settle();}}});t.after(()=>{release();h.CS.suspend();});
+ const pending=h.CS.push(payload,2,4);await entered;
+ const deadline=[...timers.values()].find(timer=>timer.delay===1000);assert.ok(deadline,'drive the actual cloud deadline only after its verification read is pending');deadline.callback();
+ const result=await pending;assert.equal(result.error,true);assert.equal(h.CS.errorCode,'deadline-exceeded');
+ release();await finished;assert.equal(h.writes.length,0,'the bounded operation cannot acquire late publication authority');
+ assert.equal((await h.CS.pull()).payload,previous);assert.ok(h.pending.get('owner'));
+});
+
+test('RISK CLOUD TRANSACTION guidance: mounted help explains incomplete saves without claiming damaged source recovery',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(help,/Cloud saves recheck the complete uploaded board before making it current/);
+ assert.match(help,/Missing or damaged upload data stops that save and keeps its pending evidence/);
+ assert.match(help,/does not reconstruct a cloud copy that is already damaged or choose an older board/);
+ const notes=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];
+ assert.match(notes,/Cloud saves check uploaded data again before publication, so incomplete uploads stay pending/);
 });
 
 test('RISK CLOUD V2 ADAPTER: production migrates a legacy root to verified chunks and pulls the exact multi-megabyte board',async()=>{

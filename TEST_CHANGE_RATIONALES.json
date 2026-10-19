@@ -1,5 +1,33 @@
 [
   {
+    "testChangesSha256": "6f88cb95206e36c6e353858f05d59671cb0bdcdd8ef8052d9990f36eed73206a",
+    "reason": "Prevent missing or partial uploaded generation sources from being sealed or published through the production Firebase adapter. Add independent digest and consumer controls while preserving all existing assertions.",
+    "previousBehavior": "The ordinary uploader verified all bytes before sealing, but a source removed after that read could still be sealed or published because the state-changing transactions checked metadata alone. This admitted mechanism does not identify the production actor or recover the damaged active payload.",
+    "intendedBehavior": "Verify canonical chunks and their complete payload digest within each seal and publication transaction. A missing, partial, changed, unreadable, stale, cancelled or expired source cannot advance the root; retain the pending source and the prior board. Complete sources and mixed released-module clients remain compatible.",
+    "replacementTests": [
+      "RISK CLOUD TRANSACTION: the SDK consumer verifies published UTF8 bytes against an independent digest",
+      "RISK CLOUD TRANSACTION: missing and partial sources cannot be sealed after the earlier upload read",
+      "RISK CLOUD TRANSACTION: missing and partial sealed sources cannot be published",
+      "RISK CLOUD TRANSACTION: changed metadata corrupted bytes and transaction read failures retain the previous source",
+      "RISK CLOUD TRANSACTION: a newer revision and account or lifecycle change prevent late publication",
+      "RISK CLOUD TRANSACTION: a cached released CloudStore remains compatible with the current adapter",
+      "RISK CLOUD TRANSACTION: cached module verification uses observed row bounds and rejects changed sources",
+      "RISK CLOUD TRANSACTION: cancelled sealing retains its source without publishing or clearing pending evidence",
+      "RISK CLOUD TRANSACTION: an expired verification cannot publish after its delayed read finishes",
+      "RISK CLOUD TRANSACTION guidance: mounted help explains incomplete saves without claiming damaged source recovery"
+    ],
+    "preservedCoverage": [
+      "Every previous test and passing assertion is retained. The same-realm Uint8Array addition fixes the VM harness pairing with Node TextEncoder; a separately recorded independent raw digest control establishes its fidelity.",
+      "Faults enter the external SDK storage boundary after the real CloudStore upload verification. Actual source bytes, prior root payload, pending generation, revision and publication writes are checked rather than substituting a product verdict.",
+      "Real Firestore SDK transactions retry when emulator-only deletion invalidates the read set before seal or publication. Cached released CloudStore, valid complete multi-megabyte data, metadata bounds, changed bytes, transport failures, account/lifecycle cancellation and actual configured deadline delivery remain distinct controls.",
+      "The canonical transaction reads do not prove absence of extra noncanonical documents inserted after the collection read, identify the production actor, repair the existing corrupt generation, or establish affected iPad recovery. Exact-candidate full, rules, compatibility, pinned browser SDK, independent review and release gates remain required."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <owned-worktree> --evidence-dir <private-artifacts>/runs --purpose preimplementation-red -- node --test --test-name-pattern='RISK CLOUD TRANSACTION' tests.js",
+      "failure": "Chronological product REDs: 18:01:48Z 94f69d1c observed missing/all and partial/last source seal accepted before adapter edits; 18:02:29Z 557665c1 observed missing sealed source publication accepted before publisher edits. Their respective GREENs are 7cba19a1 and 08bbbd1f. Independent review found mixed-release compatibility; tracked RED 22bb8f96 at18:07:48Z precedes fallback repair GREEN0f0ac63f. Mounted-help RED9955e83d precedes guidance edit. Harness-only independent digest RED60fd7e99 and GREENd1f79d3c are separately retained, not attributed to production. New seal-cancel test81190fcd initially assumed synchronous sealing despite cancellation; corrected test awaits transport completion and accepts protected staging/sealed states without weakening existing assertions. Controlled-deadline completion was tightened to await the gated publication transaction rather than the preceding seal. Latest focused d3e8b8cf passes29/29 zero skips. Real SDK emulator387e14fe passes3/3 with two transaction attempts for each source-loss case. Later controls and baseline sensitivity are not called the original RED."
+    }
+  },
+  {
     "testChangesSha256": "ff966442bba5910742b21664b9d43ee2ebb4be5e28910273eb83e4bbbcba20a6",
     "reason": "Implement admitted spec187/ticket188 at the actual native app recovery, real device persistence and real revision-conditional cloud adapter seams. Add coverage only; retain every existing test and assertion, including integrated185/186 regressions.",
     "previousBehavior": "The real mixed-release original and minimized sources reached reconcile:unprojectable-decision-evidence. The visible sync dialog offered no actionable review. Same-value native theme selection made no fresh fact and ordinary backup Restore remained held.",
