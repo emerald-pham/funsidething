@@ -11,6 +11,48 @@
     ],
     "preservedCoverage": [
       "All original tests and assertions remain; no test threshold, required native outcome, protocol, rules or review gate is removed or weakened. Existing exact ACK, explicit-source, late UID, pending and held-decision consumer cohort remains protected.",
+      "All original passing assertions remain. New final-task WOOP acceptance additionally saves and deletes the native plan through its mounted binding; an intermediate fixture ctx.taskById call was unavailable, recorded as setup failure and corrected to read actual state.",
+      "Root permanent repair RED925cbd3c is meaningful for actual publication revision7 instead of6, accepted Add text and cancelled WOOP before the bounded repairs. The earlier607f6ec3 nested opaque-object expectation overreached established indivisible-field semantics; that never-green fixture is corrected to independent top-level extension fields. It must not be cited as proof of a UID defect. Final refined ancestor and six publication controls fail on unchanged857 in later-baseline-sensitivity8351971f; current final focused consumer cohort passes10/10. These are retrospective sensitivity, not original feature RED chronology."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <root-worktree> --evidence-dir <usable-recovery>/test-runs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern=RISK_cloud_source_recovery_publication_or_recovery_identity_consumers tests.js",
+      "failure": "925cbd3c actual3/3 assertion failures BEFORE publication/owner-capture repair: cloud revision7!==6 after peer head changes inside the SDK publication read, accepted native Add leaves draft text, and native final-task WOOP closes at Next. Final independent-top-level-extension test and all six late publication boundaries have separate later857 sensitivity8351971f0/8pass. Intermediate607 nested-object expectation was not a discriminating UID test and is explicitly superseded; correction record links its immutable original."
+    },
+    "testChangesSha256": "ed5367bf823ac681760ec06b2f4ec0d1bbe541648ae1d92eb8083a619a96281a"
+  },
+  {
+    "reason": "Repair exact-candidate independent-review findings at actual native Add, WOOP, cloud publication and populated cold-source adoption consumers. Keep UID namespace isolation while carrying verified identity at transient and trusted source boundaries.",
+    "previousBehavior": "The857 candidate could publish a stale recovery choice after a late device-head change, leave a durably saved signed-in Add draft uncleared, cancel a same-account WOOP walkthrough, and drop an independent saved extension edit because wire/ancestor payloads intentionally omit device UID metadata.",
+    "intendedBehavior": "Validate one atomic complete device snapshot after cloud transaction reads and before publication writes, including exact originals/prepared copies/pending/hold/browser/draft. Capture full local owner identity for Add/WOOP, and bind verified source UID only at trusted cloud and ancestor reconstruction boundaries. Keep foreign UID and uncertain authority protections.",
+    "replacementTests": [
+      "RISK cloud source recovery publication: a device peer change during the SDK read invalidates consent before cloud mutation",
+      "RISK recovery identity consumers: signed-in Add clears its captured draft after recovery",
+      "RISK recovery identity consumers: final-task WOOP advances after acknowledged recovery",
+      "RISK recovery identity consumers: verified cloud adoption rebases independent saved extension fields for the same UID"
+    ],
+    "preservedCoverage": [
+      "All original tests and assertions remain; no test threshold, required native outcome, protocol, rules or review gate is removed or weakened. Existing exact ACK, explicit-source, late UID, pending and held-decision consumer cohort remains protected.",
+      "All original passing assertions remain. New final-task WOOP acceptance additionally saves and deletes the native plan through its mounted binding; an intermediate fixture ctx.taskById call was unavailable, recorded as setup failure and corrected to read actual state.",
+      "Root permanent repair RED925cbd3c is meaningful for actual publication revision7 instead of6, accepted Add text and cancelled WOOP before the bounded repairs. The earlier607f6ec3 nested opaque-object expectation overreached established indivisible-field semantics; that never-green fixture is corrected to independent top-level extension fields. It must not be cited as proof of a UID defect. Final refined ancestor and six publication controls fail on unchanged857 in later-baseline-sensitivity8351971f; current final focused consumer cohort passes10/10. These are retrospective sensitivity, not original feature RED chronology."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <root-worktree> --evidence-dir <usable-recovery>/test-runs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern=RISK_cloud_source_recovery_publication_or_recovery_identity_consumers tests.js",
+      "failure": "925cbd3c actual3/3 assertion failures BEFORE publication/owner-capture repair: cloud revision7!==6 after peer head changes inside the SDK publication read, accepted native Add leaves draft text, and native final-task WOOP closes at Next. Final independent-top-level-extension test and all six late publication boundaries have separate later857 sensitivity8351971f0/8pass. Intermediate607 nested-object expectation was not a discriminating UID test and is explicitly superseded; correction record links its immutable original."
+    },
+    "testChangesSha256": "769b9e4753f2db385369dc2b8099f2b1c37cb913b26285b6be0d2582d6af597d"
+  },
+  {
+    "reason": "Repair exact-candidate independent-review findings at actual native Add, WOOP, cloud publication and populated cold-source adoption consumers. Keep UID namespace isolation while carrying verified identity at transient and trusted source boundaries.",
+    "previousBehavior": "The857 candidate could publish a stale recovery choice after a late device-head change, leave a durably saved signed-in Add draft uncleared, cancel a same-account WOOP walkthrough, and drop an independent saved extension edit because wire/ancestor payloads intentionally omit device UID metadata.",
+    "intendedBehavior": "Validate one atomic complete device snapshot after cloud transaction reads and before publication writes, including exact originals/prepared copies/pending/hold/browser/draft. Capture full local owner identity for Add/WOOP, and bind verified source UID only at trusted cloud and ancestor reconstruction boundaries. Keep foreign UID and uncertain authority protections.",
+    "replacementTests": [
+      "RISK cloud source recovery publication: a device peer change during the SDK read invalidates consent before cloud mutation",
+      "RISK recovery identity consumers: signed-in Add clears its captured draft after recovery",
+      "RISK recovery identity consumers: final-task WOOP advances after acknowledged recovery",
+      "RISK recovery identity consumers: verified cloud adoption rebases independent saved extension fields for the same UID"
+    ],
+    "preservedCoverage": [
+      "All original tests and assertions remain; no test threshold, required native outcome, protocol, rules or review gate is removed or weakened. Existing exact ACK, explicit-source, late UID, pending and held-decision consumer cohort remains protected.",
       "Independent857 diagnostic failures are retrospective review reproductions. Root permanent repair RED925cbd3c observed actual cloud revision7 instead of6, uncleared accepted Add and cancelled WOOP before these repair edits. RED607f6ec3 observed the independent durable extension edit replaced by before, before verified ancestor/source UID propagation.",
       "The five additional publication-source boundaries were added after the general peer-head guard implementation and are supplementary coverage; final857 baseline sensitivity is separately required and must not be described as the original RED. The original857 full suite51d7cc65 was deliberately interrupted after review rejection, not passed."
     ],

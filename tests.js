@@ -37939,24 +37939,28 @@ test('RISK recovery identity consumers: final-task WOOP advances after acknowled
  assert.match(shim.document.getElementById('modalRoot').innerHTML,/best outcome/i);
  woopStep(app,'A supported signed-in outcome');
  assert.match(shim.document.getElementById('modalRoot').innerHTML,/obstacle could get in your way/i,'a same-identity WOOP session must advance instead of cancelling its draft');
+ woopStep(app,'A real signed-in obstacle');woopStep(app,'If blocked, take one small step.');assert.equal(await ctx.persist(),true);
+ const task=ctx.state.tasks.find(row=>row.id===app.task.id);assert.equal(task.woopPlan.plan,'If blocked, take one small step.');ctx.renderScan();
+ const button=shim.document.getElementById('scan').innerHTML.match(/<button[^>]*data-act="woop-delete"[^>]*>/)?.[0];assert.ok(button);
+ const data=Object.fromEntries([...button.matchAll(/data-([a-z]+)="([^"]*)"/g)].map(match=>[match[1],match[2]]));await ctx.onAction('woop-delete',{dataset:data});assert.equal(task.woopPlan,null,'the mounted same-UID Delete control retains its complete owner binding');assert.equal(await ctx.persist(),true);
 });
 
 
 
 test('RISK recovery identity consumers: verified cloud adoption rebases independent saved extension fields for the same UID',async t=>{
- const fixture=heldDecisionFixture188();fixture.local.settings.theme='light';fixture.local.futureExtension={device:'before',peer:'before'};fixture.remote=JSON.parse(JSON.stringify(fixture.local));
+ const fixture=heldDecisionFixture188();fixture.local.settings.theme='light';fixture.local.futureDeviceExtension='before';fixture.local.futurePeerExtension='before';fixture.remote=JSON.parse(JSON.stringify(fixture.local));
  const app=await heldDecisionApp188(t,{fixture}),{ctx,backend}=app;await ctx.sendPush();await settleRecovery188(app);
  assert.equal(ctx.state.syncIdentity,'owner');
- const head=await ctx.window.ScannerDeviceStore.readHead(),local=JSON.parse(head.payload),peer=JSON.parse(ctx.state.decisionBase.payload);local.futureExtension.device='saved device edit';local.syncDirty=true;peer.futureExtension.peer='saved cloud edit';
+ const head=await ctx.window.ScannerDeviceStore.readHead(),local=JSON.parse(head.payload),peer=JSON.parse(ctx.state.decisionBase.payload);local.futureDeviceExtension='saved device edit';local.syncDirty=true;peer.futurePeerExtension='saved cloud edit';
  const producer=await loadCloudBackendV2({failures:{authPending:true},timeoutMs:5000});t.after(()=>producer.CS.suspend());for(const [key,value]of backend.docs)producer.docs.set(key,value);producer.emitAuth({uid:'owner',email:'e@example.com'});
  const published=await producer.CS.push(JSON.stringify(peer),1792323001000,ctx.state.syncRev);assert.equal(published.ok,true,'the independent cloud writer really publishes a new generation');
  backend.CS.suspend();await closeLegacyApp173(app);
  const store=loadStorageV2({indexedDB:app.indexedDB}).createDeviceStore({indexedDB:app.indexedDB,crypto:webcrypto,dbName:app.deviceDbName});await store.open();
  assert.equal((await store.commitHead({expectedHash:head.hash,payload:JSON.stringify(local),account:'e@example.com',sourceFingerprint:head.sourceFingerprint})).ok,true);await store.close();
  const cold=await loadAppAtTime(1792323000000,{indexedDBProvider:app.indexedDB,deviceDbName:app.deviceDbName,sharedStorage:app.shim.localStorage});t.after(()=>closeLegacyApp173(cold));
- assert.equal(cold.ctx.state.futureExtension.device,'saved device edit','the actual cold source contains the independent device change');
+ assert.equal(cold.ctx.state.futureDeviceExtension,'saved device edit','the actual cold source contains the independent device change');
  const reader=await loadCloudBackendV2({runtimeWindow:cold.ctx.window,failures:{authPending:true},timeoutMs:5000});t.after(()=>reader.CS.suspend());for(const [key,value]of producer.docs)reader.docs.set(key,value);reader.emitAuth({uid:'owner',email:'e@example.com'});await cold.ctx.cloudPull();await cold.ctx.sendPush();await settleRecovery188({...cold,backend:reader});
- assert.equal(cold.ctx.state.futureExtension.device,'saved device edit','UID-less wire and ancestor payloads must gain only the verified source identity before same-owner rebasing');
- assert.equal(cold.ctx.state.futureExtension.peer,'saved cloud edit');
+ assert.equal(cold.ctx.state.futureDeviceExtension,'saved device edit','UID-less wire and ancestor payloads must gain only the verified source identity before same-owner rebasing');
+ assert.equal(cold.ctx.state.futurePeerExtension,'saved cloud edit');
  assert.equal((await cold.ctx.window.ScannerDeviceStore.readHead()).payload,JSON.stringify(cold.ctx.state));
 });
