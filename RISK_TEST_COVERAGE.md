@@ -12,6 +12,11 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 ## Task state, eligibility, and scanner controls
 
+- RISK saved-board startup: a large legacy completion board opens and saves responsively while retaining exact facts
+- RISK completion source reuse: async host acknowledgement requires the exact source and preserves a newer foreign write
+- RISK historical board file recovery: conflicting saved ratings require an explicit source-preserving preview choice
+- RISK raw backup file recovery: explicit selection restores only a supported board while preserving damaged and pending evidence
+
 - RISK optional oldest start: Quick start countdown and immediate-save inventory describe unpaired starts
 
 - RISK optional oldest start: the visible Resume action keeps an empty paused pass and its saved draw
@@ -1543,6 +1548,15 @@ Actual populated-editor ordinary Done, an offline Dot that an independent peer c
 - RISK legacy completion FAQ: older saved boards keep completed tasks out and explain safe return
 - RISK legacy completion inherited cancellation: an actual guest Done Undo stays reversed after authorized first sign-in
 
+## Completion-upgrade recovery-copy reuse
+
+- RISK completion source reuse: an exact daily source remains protected when a duplicate backup write is refused
+- RISK completion source reuse: native exact daily source is read back and committed atomically
+- RISK completion source reuse: latest-only and ambiguous IDs remain held
+- RISK completion source reuse: a source removed after lookup cannot authorize the primary save
+
+The startup completion-upgrade guard may reuse an already durable source only after exact payload readback, a unique stable backup identity, and a final unchanged-index check. The fallback case proves the existing daily copy survives the actual completion save, cold reopen, expiry, and rotation; the native case forces an optional-backup quota retry and proves the same source identity stays in the IndexedDB head transaction. Latest-only rows, duplicate IDs, an unreadable backup index, and a source removed during lookup remain held with both primary copies intact.
+
 ## Divergent fallback source preservation (final review repair)
 
 - `RISK legacy completion divergent sources: both literal guarded copies are safe before reconciliation writes`
@@ -1628,3 +1642,26 @@ The candidate worker precaches while predecessor clients remain on their existin
 A pure native Done/theme/editor Save overlap holds the successful response from the earlier real350ms save while stale-cloud adoption attempts its mandatory backup. Actual IndexedDB expected-head conflicts must resolve through a verified successful local save and one guarded reconciliation wakeup, with no added fixture persist, immediate push or focus event before acceptance. The exact editor fields, original facts, all recovery paints/writes, verified recovery row, account/head/cloud acknowledgement, pressed control and cold reopen remain checked. Failed native-save acknowledgements, quota and unavailable backups after a prior conflict, never-armed quota, changed account, page suspension and active drafts prevent unsafe automatic retry. Actual focusout alone resumes the draft-held control.
 
 The existing editor consumer still executes its original fixture persists and immediate publication, after observing all real native/deferred persistence producers; its required-five-consumer runtime title/selector/count/deadline remain unchanged. The evergreen-return Undo consumer retains completion-time phase labels and every-write assertions while awaiting actual prior/Undo native saves, including a delayed successful prior response. The form consumer delivers a real completion-bearing response into an active draft before natural focusout; a250ms resumed response remains pending until actual delivery and semantic acknowledgement. The Mac-first IndexedDB No-recovery matrix retains150ms real SDK publication latency and awaits the actual publication and device/account acknowledgement before original remote assertions. Other order/backend leaves and offline Phone expectations remain. These current CI-regression/causal controls do not rewrite the historical #172 product-RED chronology or establish the exact untraced CI schedule.
+
+## Populated-board startup and import incident
+
+- RISK pasted board recovery: raw backups and historical ratings use explicit protected preview and retain the cancelled draft
+- RISK login rating recovery: held cloud ratings require explicit source choice with exact ACK and retained peer decisions
+- RISK login rating recovery: unavailable protection and changing consent never publish or replace the active board
+- RISK saved-board startup: a large witnessed archive remains responsive and never reuses changed evidence
+- RISK saved-board startup: a witness codec failure leaves the original board usable and safely unsupported
+
+## Visible pasted recovery and draft consent
+
+- RISK pasted recovery UI: Settings opens an editable protected preview and only applies after explicit restore
+- RISK pasted recovery UI: a newer DOM-only draft invalidates a delayed backup preview
+- RISK pasted recovery UI: closing during delayed protection reopens the latest draft without a late preview
+- RISK pasted recovery UI: archive and raw backup text use the visible Settings route and explicit rating choice
+
+The real Settings action opens a separate paste editor. Ordinary boards, full recovery archives, raw backup lists and saved-versus-recorded rating choices use the same exact-source/current-board protection and explicit restore preview as file recovery. Delayed durable backup work is bound to the editor session, input revision and live textarea value; closing during pending work retains the exact draft and Settings values without allowing a late preview. Held cloud choices remain a separate review and merge path.
+
+## Saved rating numerical preservation
+
+Cold populated startup, pairwise display, real saving and cold reopen preserve healthy and boundary ratings, normalize unsupported numeric values, retain frozen pass and opaque fields, and create no comparison learning. This supplements the unchanged three-second populated-board responsiveness budget.
+
+- RISK saved rating normalization: cold startup display save and reopen preserve numeric boundaries without learning

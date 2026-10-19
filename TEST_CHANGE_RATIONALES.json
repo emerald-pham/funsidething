@@ -13458,5 +13458,278 @@
     "baseCommit": "52d4b2537bacbb60240ae7a53061224350ebd36f",
     "testChangesSha256": "b9a0b55e7f14dfe7d9ed359b5ffbebedc95340210d970930f8351efa75d9727d",
     "comparison": "Exact protected tests.js fingerprint against 52d4b2537bacbb60240ae7a53061224350ebd36f. Cumulative52d historical binding preserves all original chronology."
+  },
+  {
+    "baseCommit": "382d062f83c0e745abc74595344b5e74efb1f860",
+    "testChangesSha256": "7b5e31182e299e9ef999f5fedea90a650dc47469ecda8fdee9bb41b14eb1ae9e",
+    "reason": "Add a real saved-board cold-start and persistence responsiveness regression after a private replay exposed repeated full-baseline hashing. This from-scratch fixture contains no supplied user data and changes no existing assertions.",
+    "previousBehavior": "A supported434-task legacy board with172 prior facts and40 completion candidates needed7382ms for actual cold startup and save, exceeding the new three-second responsiveness budget while all preservation assertions passed.",
+    "intendedBehavior": "Keep exact existing identity and authority validation results, avoid hashing for an empty archival traversal and avoid calculating a legacy identity after a current identity already matches. The same actual startup/save remains within three seconds and retains every prior fact, one completion boundary per source, opaque fields and exact original recovery bytes.",
+    "replacementTests": [
+      "RISK saved-board startup: a large legacy completion board opens and saves responsively while retaining exact facts"
+    ],
+    "preservedCoverage": [
+      "All prior tests and assertions remain byte-exact. Legacy supported identities, nonempty replacement and inheritance validation, source protections, scoped Undo, account isolation, failed/quota recovery and installed-client compatibility remain required.",
+      "The synthetic fixture uses434 generated tasks,172 supported immutable facts and40 legacy completion sources through actual loadState initialization and persist. Its data is from scratch; private originals never enter Git, CI, public browsers or this rationale.",
+      "This focused result proves a local performance repair, not the reported physical crash, actual production storage capacity, completed import recovery, full-suite, review, deployment or live acceptance."
+    ],
+    "redEvidence": {
+      "command": "TZ=UTC Node22 recorder preimplementation-red -- node --test --test-name-pattern='^RISK saved-board startup:' tests.js",
+      "failure": "Actual contemporaneous record05855fe1-f0f6-4949-9e23-04b54b2c799d at2026-10-19T06:37:30.684Z failed only the three-second responsiveness assertion with7382ms before any application edit. Supported-source,172 exact prior facts,40 new boundaries, unknown fields and exact original-source backup assertions passed. Earlier external synthetic proba767900d also measured7529ms; it is separately recorded and does not replace this repository RED."
+    },
+    "greenEvidence": {
+      "command": "TZ=UTC Node22 recorder green -- node --test --test-name-pattern='^RISK saved-board startup:' tests.js",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/startup-import-device-save-20261019/recorded-runs/2026-10-19T06-38-00-634Z-07af2b7d-3953-494c-8ffc-ff1fc6970b67.json",
+      "result": "Same genuine test passed733ms with all existing source/fact/unknown-field assertions and the unchanged three-second budget."
+    }
+  },
+  {
+    "baseCommit": "382d062f83c0e745abc74595344b5e74efb1f860",
+    "testChangesSha256": "8beeda123dcb2fb30b54f6c24826a8477424378034c68f00675ba8b76c2eef43",
+    "reason": "Add permanent from-scratch app-consumer coverage for the authorized populated-board startup/import/device-save P0. Preserve every pre-existing assertion and all historical rationale bytes; private supplied data stays outside Git and CI.",
+    "previousBehavior": "Large legacy startup/save took7382ms; witnessed archive startup/save10672ms against the unchanged3s budget. Raw arrays and pasted supported rating conflicts had no protected chooser. Actual login delivery held supported saved-rating differences without an actionable choice. The first immutable witness-cache draft let a codec exception escape the prior unsupported-result guard during actual bootstrap.",
+    "intendedBehavior": "Open and save populated supported boards responsively without changing identity algorithms or authority checks. Require explicit raw-source and saved/recorded-rating choices with literal source recovery, cancellation, pending/account/revision guards and exact durable/cloud acknowledgement. Cache only exact immutable bytes and deterministic structural/hash results with bounded retention. Unsupported authority and unavailable recovery remain safely held.",
+    "replacementTests": [
+      "RISK saved-board startup: a large legacy completion board opens and saves responsively while retaining exact facts",
+      "RISK raw backup file recovery: explicit selection restores only a supported board while preserving damaged and pending evidence",
+      "RISK historical board file recovery: conflicting saved ratings require an explicit source-preserving preview choice",
+      "RISK pasted board recovery: raw backups and historical ratings use explicit protected preview and retain the cancelled draft",
+      "RISK login rating recovery: held cloud ratings require explicit source choice with exact ACK and retained peer decisions",
+      "RISK login rating recovery: unavailable protection and changing consent never publish or replace the active board",
+      "RISK saved-board startup: a large witnessed archive remains responsive and never reuses changed evidence",
+      "RISK saved-board startup: a witness codec failure leaves the original board usable and safely unsupported"
+    ],
+    "preservedCoverage": [
+      "All earlier tests and assertions remain byte-exact against382d062. Completion/Undo, independent comparisons, legacy identities, nonempty replacement/inheritance, task deletion/history, account separation, CAS, failed storage and native installed-client delivery remain required.",
+      "New fixtures are from scratch. Actual loadApp/bootstrap, file change and paste actions, native fakeIndexedDB, real conditional Firebase module/fake transport, original source copies and final local/cloud readback are exercised. Private original replays are separate isolated Node evidence, never committed.",
+      "Safety controls retain unknown fields, exact witnessed prior facts, all rating History, no invented comparisons, no default selection, source/draft/account/pending/revision changes, failed protection, uncertain ACK and cold prepared-choice holds. Explicit file Restore replaces the snapshot after its safety copy; it is not an implicit task union.",
+      "No chronology is rewritten. d7924f1e/53d3062f/82147d6d were historical-file fixture preparation/identity failures, not intended product REDs. aebb4786 is later immutable-baseline sensitivity after the corrected8053ab93 GREEN. Raw0826ef31 had a new-test mistaken task-union expectation, corrected to existing explicit Restore semantics. Archive448c10aa introduced an ambiguous fixture completion before its performance acceptance; corrected4f83fb91 is the intended performance RED.",
+      "Copied README guidance maps prior empty/small/modern proof gaps to these populated consumer triggers, without inventing physical-crash or actual user-quota attribution. Earlier release evidence and failed/no-op attempts are retained with their original scope."
+    ],
+    "redEvidence": {
+      "command": "TZ=UTC Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=<bounded actual consumer> tests.js",
+      "failure": "Actual before-implementation records:05855fe1 legacy7382ms;68dead76 raw chooser absent;5c5c2bed paste preview absent;a06c8559 login cloud-rating choice absent;4f83fb91 witnessed archive10672ms;9955c225 actual startup unhandled synthetic witness-codec exception before its guard repair. Private initial actual current/file/paste/login rejection and minimized rating mismatch are retained in DIAGNOSTIC-CHECKPOINT-0628. Historical-file fixture misfires and later sensitivity are explicitly separate above."
+    },
+    "greenEvidence": {
+      "command": "TZ=UTC Node22 recorder focused actual-consumer cohorts and isolated original-source replays",
+      "result": "File/raw/paste/rating acceptance and safety72-case cohort390a88f3 passed; rating safety11-caseaba5603f passed. Large source/refined archive/codec cohortd6335824 passed253ms/1182ms/usable unsupported hold. Broad851da0e8 had172/173 passes and only an existing FAQ word-limit failure; separate3cc518ed passed after preserving the original answer and adding separate questions. Actual original raw file7bace332 retains source bytes/facts/history/native/fakecloudACK. Actual cloud-module original replayc174967c eventually retains434tasks/212facts/2327history/exact source/native/cloudACK with no held error; its transient false apply return remains separately traced, not relabeled success at that instant."
+    }
+  },
+  {
+    "reason": "Reuse an already durable exact completion source so a redundant duplicate-backup refusal does not keep a recoverable board in completion-upgrade recovery-unavailable, while preserving the fail-closed guard when proof is missing or unstable.",
+    "previousBehavior": "Startup required a new before-completion-upgrade row even when the exact old board already existed as a readable stable daily backup. A refused duplicate write then reported recovery-unavailable and blocked the primary completion upgrade despite the existing source remaining durable.",
+    "intendedBehavior": "Reuse only an exact readable non-latest source whose backup identity is unique and unchanged on final readback. Keep its source proof pending until primary acknowledgement, pin the row through normal expiry and rotation, and include it atomically with native head commits. Latest-only, duplicate-ID, unreadable-index, disappeared, or otherwise unverifiable sources remain held.",
+    "preservedCoverage": [
+      "Existing legacy-completion assertions remain untouched. The fallback startup test uses a synthetic old-completion board with unknown fields, checks actual primary acknowledgements and unchanged task facts, and verifies the same exact source across cold reopen and normal expiry/rotation.",
+      "The real fake-indexeddb adapter test seeds a native daily source with the matching legacy-copy fingerprint, awaits the actual startup completion save, forces an optional-backup quota retry, verifies source identity stays in the same head transaction, then cold reopens and confirms native rotation retains the exact bytes.",
+      "Negative controls prove latest-only rows, duplicate backup IDs, and an unreadable index still report recovery-unavailable without changing guarded primary bytes, and a source removed after lookup cannot authorize the primary save or become pinned."
+    ],
+    "replacementTests": [
+      "RISK completion source reuse: an exact daily source remains protected when a duplicate backup write is refused",
+      "RISK completion source reuse: native exact daily source is read back and committed atomically",
+      "RISK completion source reuse: latest-only and ambiguous IDs remain held",
+      "RISK completion source reuse: a source removed after lookup cannot authorize the primary save"
+    ],
+    "redEvidence": {
+      "command": "Node22 TZ=UTC recorder preimplementation-red: node --test --test-name-pattern='RISK completion source reuse:' tests.js on base 382d062f83c0e745abc74595344b5e74efb1f860 with only the new regression group added; a later focused pre-repair native quota-fallback RED is separately recorded in failure details.",
+      "failure": "Before the index.html change, the actual cold-start consumer found one exact readable daily source, then three refused before-completion-upgrade writes still yielded persist false and device-save:completion-upgrade/recovery-unavailable. The first test failed its expected true acknowledgement against false while the original source bytes remained available. A separate forced-quota native check then failed because the optional-backup retry omitted the reused row from its head transaction; focused RED record: /Users/emeraldpham/.codex/task-artifacts/startup-import-device-save-20261019/completion-backup-reuse/runs/2026-10-19T07-26-57-823Z-5f61f759-049c-4c82-a841-330b46855866.json.",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/startup-import-device-save-20261019/completion-backup-reuse/runs/2026-10-19T07-05-20-844Z-2b26f2be-8fe8-4b4e-bfe0-e738834d8efb.json"
+    },
+    "greenEvidence": {
+      "command": "Node22 TZ=UTC recorder green: node --test --test-name-pattern='RISK completion source reuse:' tests.js.",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/startup-import-device-save-20261019/completion-backup-reuse/runs/2026-10-19T07-27-15-425Z-0e065d0f-4b1c-45e7-8ad5-10ea37e13574.json",
+      "actualGateProof": "All four new RISK registrations and seven top-level/subtest outcomes pass. The fallback refusal is avoided without a duplicate write; native IndexedDB reuses the exact source in the atomic head transaction, including retry after a controlled optional-backup quota refusal; latest-only, ambiguous identity, unreadable-index, and post-lookup deletion controls remain held with source and primary facts preserved."
+    },
+    "baseCommit": "382d062f83c0e745abc74595344b5e74efb1f860",
+    "testChangesSha256": "94408484e5d310b2cb42ef168b96c3c831f6fa1e216a5ef311c42cbb73977032",
+    "comparison": "Protected tests.js diff fingerprint against immutable base 382d062f83c0e745abc74595344b5e74efb1f860. Only four dedicated completion-source-reuse RISK registrations are added; all prior assertions are unchanged."
+  },
+  {
+    "baseCommit": "382d062f83c0e745abc74595344b5e74efb1f860",
+    "testChangesSha256": "8ad7120e9837a54a3c7299c41f23d0d3b6423191b4f5d634ec7794d9373b0926",
+    "reason": "Add permanent from-scratch app-consumer coverage for the authorized populated-board startup/import/device-save P0. Preserve every pre-existing assertion and all historical rationale bytes; private supplied data stays outside Git and CI.",
+    "previousBehavior": "Large legacy startup/save took7382ms; witnessed archive startup/save10672ms against the unchanged3s budget. Raw arrays and pasted supported rating conflicts had no protected chooser. Actual login delivery held supported saved-rating differences without an actionable choice. The first immutable witness-cache draft let a codec exception escape the prior unsupported-result guard during actual bootstrap. The actual synthetic completion-source consumer refused a redundant backup despite an exact daily row, and a forced native quota retry initially omitted that mandatory source proof.",
+    "intendedBehavior": "Open and save populated supported boards responsively without changing identity algorithms or authority checks. Require explicit raw-source and saved/recorded-rating choices with literal source recovery, cancellation, pending/account/revision guards and exact durable/cloud acknowledgement. Cache only exact immutable bytes and deterministic structural/hash results with bounded retention. Unsupported authority and unavailable recovery remain safely held. Reuse a uniquely identified stable exact source only after readback; retain its pin and exact row through fallback/native acknowledgement, quota retry and rotation. Missing, unreadable, latest-only, ambiguous or raced evidence remains held.",
+    "replacementTests": [
+      "RISK completion source reuse: an exact daily source remains protected when a duplicate backup write is refused",
+      "RISK completion source reuse: native exact daily source is read back and committed atomically",
+      "RISK completion source reuse: latest-only and ambiguous IDs remain held",
+      "RISK completion source reuse: a source removed after lookup cannot authorize the primary save",
+      "RISK saved-board startup: a large legacy completion board opens and saves responsively while retaining exact facts",
+      "RISK raw backup file recovery: explicit selection restores only a supported board while preserving damaged and pending evidence",
+      "RISK historical board file recovery: conflicting saved ratings require an explicit source-preserving preview choice",
+      "RISK pasted board recovery: raw backups and historical ratings use explicit protected preview and retain the cancelled draft",
+      "RISK login rating recovery: held cloud ratings require explicit source choice with exact ACK and retained peer decisions",
+      "RISK login rating recovery: unavailable protection and changing consent never publish or replace the active board",
+      "RISK saved-board startup: a large witnessed archive remains responsive and never reuses changed evidence",
+      "RISK saved-board startup: a witness codec failure leaves the original board usable and safely unsupported"
+    ],
+    "preservedCoverage": [
+      "All earlier tests and assertions remain byte-exact against382d062. Completion/Undo, independent comparisons, legacy identities, nonempty replacement/inheritance, task deletion/history, account separation, CAS, failed storage and native installed-client delivery remain required.",
+      "New fixtures are from scratch. Actual loadApp/bootstrap, file change and paste actions, native fakeIndexedDB, real conditional Firebase module/fake transport, original source copies and final local/cloud readback are exercised. Private original replays are separate isolated Node evidence, never committed.",
+      "Safety controls retain unknown fields, exact witnessed prior facts, all rating History, no invented comparisons, no default selection, source/draft/account/pending/revision changes, failed protection, uncertain ACK and cold prepared-choice holds. Explicit file Restore replaces the snapshot after its safety copy; it is not an implicit task union.",
+      "No chronology is rewritten. d7924f1e/53d3062f/82147d6d were historical-file fixture preparation/identity failures, not intended product REDs. aebb4786 is later immutable-baseline sensitivity after the corrected8053ab93 GREEN. Raw0826ef31 had a new-test mistaken task-union expectation, corrected to existing explicit Restore semantics. Archive448c10aa introduced an ambiguous fixture completion before its performance acceptance; corrected4f83fb91 is the intended performance RED.",
+      "Copied README guidance maps prior empty/small/modern proof gaps to these populated consumer triggers, without inventing physical-crash or actual user-quota attribution. Earlier release evidence and failed/no-op attempts are retained with their original scope."
+    ],
+    "redEvidence": {
+      "command": "TZ=UTC Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=<bounded actual consumer> tests.js",
+      "failure": "Actual before-implementation records:05855fe1 legacy7382ms;68dead76 raw chooser absent;5c5c2bed paste preview absent;a06c8559 login cloud-rating choice absent;4f83fb91 witnessed archive10672ms;9955c225 actual startup unhandled synthetic witness-codec exception before its guard repair. Private initial actual current/file/paste/login rejection and minimized rating mismatch are retained in DIAGNOSTIC-CHECKPOINT-0628. Historical-file fixture misfires and later sensitivity are explicitly separate above. Luna actual consumer2b26f2be reproduced exact completion-upgrade/recovery-unavailable before its implementation;5f61f759 observed a mandatory source proof omitted by native quota fallback before its repair."
+    },
+    "greenEvidence": {
+      "command": "TZ=UTC Node22 recorder focused actual-consumer cohorts and isolated original-source replays",
+      "result": "File/raw/paste/rating acceptance and safety72-case cohort390a88f3 passed; rating safety11-caseaba5603f passed. Large source/refined archive/codec cohortd6335824 passed253ms/1182ms/usable unsupported hold. Broad851da0e8 had172/173 passes and only an existing FAQ word-limit failure; separate3cc518ed passed after preserving the original answer and adding separate questions. Actual original raw file7bace332 retains source bytes/facts/history/native/fakecloudACK. Actual cloud-module original replayc174967c eventually retains434tasks/212facts/2327history/exact source/native/cloudACK with no held error; its transient false apply return remains separately traced, not relabeled success at that instant. Worker source-reuse cohort0e065d0f passed7/7 including native quota retry, rotation/reopen, unreadable/ambiguous/latest-only/removed-source controls; integration reused its exact local commitfe7913ad."
+    }
+  },
+  {
+    "baseCommit": "382d062f83c0e745abc74595344b5e74efb1f860",
+    "testChangesSha256": "b3fd38a96b88e65910c7970c61f1983668f3f7744a4a5bb6881b0ebf9930b4e2",
+    "reason": "Close the independently found completion-upgrade proof race in the actual asynchronous host-storage startup consumer. Add coverage only; all earlier tests/assertions and530 rationale objects remain exact.",
+    "previousBehavior": "A reused exact recovery source removed or changed while awaiting host storage acknowledgement still let persist return true, clear the completion source marker and accept an unprotected upgraded primary.",
+    "intendedBehavior": "Keep the original completion upgrade pending when its exact recovery source disappears across host awaits. Restore only this attempted host value; preserve a newer foreign write. An intact source remains a successful positive control. Existing Restore host safety and original FAQ contracts remain intact.",
+    "replacementTests": [
+      "RISK completion source reuse: async host acknowledgement requires the exact source and preserves a newer foreign write"
+    ],
+    "preservedCoverage": [
+      "All earlier test text and assertions unchanged. Existing root/Luna twelve P0 contracts and all protected source/history/account/revision/conditional-write controls remain required.",
+      "Actual loadAppAtTime startup + hostStorage.set await, with removed, replaced, newer-host and retained controls. No private source, helper verdict replacement, environment/schema/permission changes.",
+      "C1 full866352a7 showed2297pass/1FAQcopyfail/48emulator-onlyskips and both mandatory installed-native cases passed. Copy repair restores the old exact safety-copy phrase under the existing130word bound; no test weakened. C2 requires fresh coherent gates."
+    ],
+    "redEvidence": {
+      "command": "TZ=UTC Node22 recorder --purpose preimplementation-red -- node --test --test-name-pattern=\"async host acknowledgement requires\" tests.js",
+      "failure": "a5b14182-ceda-46c7-bbc2-880fe2a3826b: removed/replaced/newer-host actual saves returned true despite lost exact proof; retained positive control passed."
+    },
+    "greenEvidence": {
+      "command": "TZ=UTC Node22 recorder --purpose green -- node --test --test-name-pattern=\"async host acknowledgement requires|RISK LOCAL BACKUPS:.*host|RISK legacy completion FAQ|RISK completion source reuse\" tests.js",
+      "result": "06421906-49d2-4d77-8e31-86674add4c90:16/16pass,0skip, including conditionalrollback preserving newerhost, oldRestore hostguards, all priorreuse/nativecontrols and exactFAQ."
+    }
+  },
+  {
+    "baseCommit": "382d062f83c0e745abc74595344b5e74efb1f860",
+    "testChangesSha256": "8a26187379bd1900c882de1a567f1960028c246139964404c2bdc4c376fa5512",
+    "reason": "Make pasted recovery reachable from Settings and preserve exact draft consent through the protected restore pipeline. Cover the native user route and supported pasted formats without changing held-cloud choice authority.",
+    "previousBehavior": "Settings only offered file selection. Pasted recovery was reachable only through an old hidden import control, whose tests fabricated jsonBox directly. A textarea value changed during awaited backup preparation could still authorize a preview for older text, and cancel/reopen could nest modal markup or allow pending work to replace the editor.",
+    "intendedBehavior": "Settings → Data and backups → Paste board JSON opens a separate editor. Ordinary boards, complete archives and raw backup lists use exact source/current-board protection and explicit restore choices. Consent is bound to session, input revision and live textarea value during awaits; close/reopen keeps the latest exact draft and Settings fields, and old work cannot install a late preview. Held cloud decisions remain on their separate merge-review path.",
+    "replacementTests": [
+      "RISK pasted recovery UI: Settings opens an editable protected preview and only applies after explicit restore",
+      "RISK pasted recovery UI: a newer DOM-only draft invalidates a delayed backup preview",
+      "RISK pasted recovery UI: closing during delayed protection reopens the latest draft without a late preview",
+      "RISK pasted recovery UI: archive and raw backup text use the visible Settings route and explicit rating choice"
+    ],
+    "preservedCoverage": [
+      "All pre-existing tests and assertions remain byte-exact against immutable base 382d062. The legacy hidden import-json action still routes supported inputs into the protected preview, and existing file-restore source, account, pending-upload, CAS and cold-reopen guards remain covered.",
+      "The native app consumer begins with the delegated Settings action, opens the visible Paste board JSON action, edits the separate textarea, previews, cancels, repeats and explicitly restores. Ordinary board, complete archive, raw backup row and saved-versus-recorded rating paths assert exact source bytes, protected current board/head, unknown facts, durable readback and cold reopen.",
+      "Delayed actual IndexedDB backup writes test a newer DOM-only textarea value and closing/reopening while work is pending. The exact latest text and numeric Settings draft remain available, while stale text is never represented as selected source and pending work cannot install a preview.",
+      "The FAQ names the visible Settings path, explains snapshot replacement choices and distinguishes them from Review saved decisions, which combines held device/cloud choices. New copy remains within the 130-word answer limit."
+    ],
+    "redEvidence": {
+      "command": "TZ=UTC Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern='RISK pasted recovery UI' tests.js",
+      "failure": "Actual consumer RED before app edits, record /Users/emeraldpham/.codex/task-artifacts/startup-import-device-save-20261019/paste-recovery-ui/runs/2026-10-19T07-48-31-479Z-16d06e96-2144-4b2d-bea0-9a51ce197ba0.json: delegated Settings showed no open-paste-recovery action. After adding only the separate visible editor/route, the delayed durable-backup test produced a second actual RED, record /Users/emeraldpham/.codex/task-artifacts/startup-import-device-save-20261019/paste-recovery-ui/runs/2026-10-19T07-51-00-997Z-8f76141b-5cd8-4550-8e9f-c83b093322c5.json: the actual preview displayed First pasted draft after textarea.value had become Newer DOM-only pasted draft. Final browser-like combined focus /Users/emeraldpham/.codex/task-artifacts/startup-import-device-save-20261019/paste-recovery-ui/runs/2026-10-19T08-02-01-487Z-45ec013e-7f0c-4a37-9bed-f05737af706c.json passes all 6 top-level registrations and 10 outcomes, including the legacy importer and file-preview compatibility controls."
+    },
+    "comparison": "Protected test diff fingerprint against immutable base 382d062f83c0e745abc74595344b5e74efb1f860. Four new pasted-recovery UI RISK registrations only; existing tests remain unchanged."
+  },
+  {
+    "baseCommit": "382d062f83c0e745abc74595344b5e74efb1f860",
+    "testChangesSha256": "fde81d0687a82ad1d372c4392435e81b3da059b58c212e0ff04da45b51ef525f",
+    "reason": "Reconcile the complete authorized P0 candidate and close the independent real-paste-consumer and async-host proof findings. This cumulative entry binds all executable additions while retaining all532 prior rationale objects exactly and every earlier test assertion unchanged.",
+    "previousBehavior": "Initial populated-board startup/hash and witness decoding stalled, raw exports and saved-rating differences were rejected, duplicate completion-source copies could block healthy saves. C1 review additionally found no visible paste route, stale DOM-only drafts during delayed protection, nested cancel shells, and a host acknowledgement accepting lost exact completion-source proof.",
+    "intendedBehavior": "A discoverable Settings paste editor sends board/archive/raw input through protected explicit snapshot preview, source/rating choices and guarded durable restore. Latest editor text/session and Settings draft survive stale continuations, close/reopen and repeated cancellation with one modal. All earlier performance, source preservation, recorded comparison/history, account/revision/ACK and old-client guards remain required; asynchronous host proof loss stays held without overwriting a newer foreign write.",
+    "replacementTests": [
+      "RISK completion source reuse: an exact daily source remains protected when a duplicate backup write is refused",
+      "RISK completion source reuse: native exact daily source is read back and committed atomically",
+      "RISK completion source reuse: latest-only and ambiguous IDs remain held",
+      "RISK completion source reuse: a source removed after lookup cannot authorize the primary save",
+      "RISK saved-board startup: a large legacy completion board opens and saves responsively while retaining exact facts",
+      "RISK raw backup file recovery: explicit selection restores only a supported board while preserving damaged and pending evidence",
+      "RISK historical board file recovery: conflicting saved ratings require an explicit source-preserving preview choice",
+      "RISK pasted recovery UI: Settings opens an editable protected preview and only applies after explicit restore",
+      "RISK pasted recovery UI: a newer DOM-only draft invalidates a delayed backup preview",
+      "RISK pasted recovery UI: closing during delayed protection reopens the latest draft without a late preview",
+      "RISK pasted recovery UI: archive and raw backup text use the visible Settings route and explicit rating choice",
+      "RISK pasted board recovery: raw backups and historical ratings use explicit protected preview and retain the cancelled draft",
+      "RISK login rating recovery: held cloud ratings require explicit source choice with exact ACK and retained peer decisions",
+      "RISK login rating recovery: unavailable protection and changing consent never publish or replace the active board",
+      "RISK saved-board startup: a large witnessed archive remains responsive and never reuses changed evidence",
+      "RISK saved-board startup: a witness codec failure leaves the original board usable and safely unsupported",
+      "RISK completion source reuse: async host acknowledgement requires the exact source and preserves a newer foreign write"
+    ],
+    "preservedCoverage": [
+      "All pre-existing tests/assertions remain byte-exact, with no deleted executable lines against382d062. Base526, earlier root/worker530, host531 and paste worker532 rationale objects are retained without reserialization.",
+      "The four added visible paste RISKs use actual Settings/open action and delegated click/input/change consumers, real app + actual native adapter/fakeIndexedDB boundaries. Browser-like absence of detached textarea is modeled in new fixtures; existing hidden-action regression assertions remain unchanged.",
+      "Paste preview does not apply or publish. Positive restore and cold reopen retain exact current/source copies, unknown facts and chosen ratings; no invented comparisons. Native account/pending/revision/draft guards, no-default choices, no source removal and held uncertain acknowledgement remain required.",
+      "Private originals stay outside Git/CI/browser/network; their isolated Node aggregate evidence remains separate from synthetic regressions. Physical startup crash and actual user quota remain unconfirmed. Required coherent full/native/rules/compatibility/rendered/CI/live gates run after this candidate is committed."
+    ],
+    "redEvidence": {
+      "command": "Actual Node22 recorder preimplementation-red consumers on their stated baseline; see earlier preserved entries for populated startup/raw/rating/login/codec RED chronology.",
+      "failure": "Luna16d06e96 actual Settings route absent; after first UI slice,8f76141b newer DOM-only draft still reached stale preview while actual native backup completion was held. Roota5b14182 removed/replaced/newer-host sources still acknowledged true, retained positivecontrol passed. Fixture generator4ed9a06c undefined/null was a separate preparation failure, never product RED."
+    },
+    "greenEvidence": {
+      "command": "TZ=UTC Node22 recorder focused merged actual-consumer cohort before final shell packaging.",
+      "result": "Merged0e5a3910-303b-48e5-a174-ef285ffa86bd passes26/26,0skips: four visible paste RISKs, old board/raw paste and file rating consumer guards, host conditional rollback/reuse/native controls, original FAQ and Quickstart. Luna final45ec013e passed10outcomes. Earlier private trace13d52333 and source/performance records retain their original source/timing limits; final exact candidate gates are separately recorded after commit."
+    }
+  },
+  {
+    "baseCommit": "382d062f83c0e745abc74595344b5e74efb1f860",
+    "testChangesSha256": "2105def49483f96e3d7a9fae2ec8b6a4b2d8dfa9e00517b50344bd0009465420",
+    "reason": "Retain the real C2 witnessed-startup CI performance failure and protect the narrow C3 normalization optimization through actual cold saved-board startup, pairwise display, save and reopen. The final upstream-aware preflight also correctly required a new RISK registration for this app delta; no existing test, bound or gate is weakened.",
+    "previousBehavior": "C2 retained correct numeric normalization but its witnessed populated-board startup took3048ms in push CI39234327207, exceeding the unchanged3000ms gate. C3 avoids repeated clamping for healthy plain saved ratings. This later consumer regression supplements existing hydration/extreme and frozen-function contracts; it does not retroactively claim test-first ordering for C3.",
+    "intendedBehavior": "Cold startup and frozen opponents preserve exact healthy/inclusive-boundary ratings, clamp out-of-range finite values, default invalid means or nonpositive uncertainty, retain unknown fields and frozen draw identity, and produce finite normalized read-only display shares. Actual device persistence and cold reopening retain these values without inventing comparison facts or History.",
+    "replacementTests": [
+      "RISK completion source reuse: an exact daily source remains protected when a duplicate backup write is refused",
+      "RISK completion source reuse: native exact daily source is read back and committed atomically",
+      "RISK completion source reuse: latest-only and ambiguous IDs remain held",
+      "RISK completion source reuse: a source removed after lookup cannot authorize the primary save",
+      "RISK saved-board startup: a large legacy completion board opens and saves responsively while retaining exact facts",
+      "RISK raw backup file recovery: explicit selection restores only a supported board while preserving damaged and pending evidence",
+      "RISK historical board file recovery: conflicting saved ratings require an explicit source-preserving preview choice",
+      "RISK pasted recovery UI: Settings opens an editable protected preview and only applies after explicit restore",
+      "RISK pasted recovery UI: a newer DOM-only draft invalidates a delayed backup preview",
+      "RISK pasted recovery UI: closing during delayed protection reopens the latest draft without a late preview",
+      "RISK pasted recovery UI: archive and raw backup text use the visible Settings route and explicit rating choice",
+      "RISK pasted board recovery: raw backups and historical ratings use explicit protected preview and retain the cancelled draft",
+      "RISK login rating recovery: held cloud ratings require explicit source choice with exact ACK and retained peer decisions",
+      "RISK login rating recovery: unavailable protection and changing consent never publish or replace the active board",
+      "RISK saved-board startup: a large witnessed archive remains responsive and never reuses changed evidence",
+      "RISK saved-board startup: a witness codec failure leaves the original board usable and safely unsupported",
+      "RISK completion source reuse: async host acknowledgement requires the exact source and preserves a newer foreign write",
+      "RISK saved rating normalization: cold startup display save and reopen preserve numeric boundaries without learning"
+    ],
+    "preservedCoverage": [
+      "Every earlier tests.js byte remains the unchanged C3 prefix; this adds one46-line consumer registration and no executable deletion. All533 earlier rationale objects and the existing three-second startup budget remain intact.",
+      "The original legacy/witnessed startup, codec, file/raw/visible-paste, explicit ratings, source-proof, account/revision/CAS/ACK, native installed-client and supported-client compatibility regressions remain required.",
+      "The added synthetic JSON board reaches actual cold boot/hydration and scanner rendering, pairwise display, real persist and cold reopen; it never calls normalizeRating directly or accesses private originals. Separate isolated actual-source mutations establish sensitivity to healthy resets, mean/sigma upper escape and sigma-floor escape."
+    ],
+    "redEvidence": {
+      "command": "Actual push CI39234327207 on C2; later Node22 recorder --purpose later-baseline-sensitivity -- node --import rating-consumer-sensitivity-loader.mjs --test --test-name-pattern=^RISK saved rating normalization: tests.js on immutable C3 app source.",
+      "failure": "Contemporaneous performance RED: witnessed startup3048ms exceeded3000ms before C3. Later controls2026-10-19T10-38-10-548Z-01d27636-8d44-4499-9ad0-5b760a7e5cb2 (mean100000.00001 escaped100000), a95abe5e-b64f-4bd6-ac67-ee68fbc95c8a (sigma10000.00001 escaped10000),1f063513-83c1-4e6f-a3fd-971ebd5417bb (healthy37.25 reset25), and10-38-29-968Z-c6bc7bbb-1e30-4a90-a001-ba77c921d641 (sigma0.7999999999 escaped0.8) fail the new actual cold-start assertions. These are explicitly postimplementation isolated broken-fastpath sensitivities, not fabricated preimplementation REDs. A first positive preparation03f0e277 used an expired/incomplete frozen-pass fixture and correctly got a new pass; v2 supplies actual pass identity/time/settings and passes5c6660e8 with no app edit."
+    },
+    "greenEvidence": {
+      "command": "Node22 recorder --purpose green, actual C3 app plus exact appended regression",
+      "result": "2026-10-19T10-38-03-526Z-5c6660e8-10d6-4f94-9a52-c1e5459d5369 passes the complete new consumer before permanent append. Final committed focused/full/native and upstream-aware preflight evidence follow separately."
+    },
+    "chronology": "The new coverage was authored after the C3 source repair and before any further app change. No product source change is made for this test-only follow-up."
+  },
+  {
+    "baseCommit": "2912592ae6879b940ecdf585b82e8ba9f13982a8",
+    "testChangesSha256": "06e1e7c4e388f1b32f8f7082eeeab900d2b4cc0b7f179a57b24357f5c9ec8ae9",
+    "reason": "Retain the real C2 witnessed-startup CI performance failure and protect the narrow C3 normalization optimization through actual cold saved-board startup, pairwise display, save and reopen. The final upstream-aware preflight also correctly required a new RISK registration for this app delta; no existing test, bound or gate is weakened.",
+    "previousBehavior": "C2 retained correct numeric normalization but its witnessed populated-board startup took3048ms in push CI39234327207, exceeding the unchanged3000ms gate. C3 avoids repeated clamping for healthy plain saved ratings. This later consumer regression supplements existing hydration/extreme and frozen-function contracts; it does not retroactively claim test-first ordering for C3.",
+    "intendedBehavior": "Cold startup and frozen opponents preserve exact healthy/inclusive-boundary ratings, clamp out-of-range finite values, default invalid means or nonpositive uncertainty, retain unknown fields and frozen draw identity, and produce finite normalized read-only display shares. Actual device persistence and cold reopening retain these values without inventing comparison facts or History.",
+    "replacementTests": [
+      "RISK saved rating normalization: cold startup display save and reopen preserve numeric boundaries without learning"
+    ],
+    "preservedCoverage": [
+      "Every earlier tests.js byte remains the unchanged C3 prefix; this adds one46-line consumer registration and no executable deletion. All533 earlier rationale objects and the existing three-second startup budget remain intact.",
+      "The original legacy/witnessed startup, codec, file/raw/visible-paste, explicit ratings, source-proof, account/revision/CAS/ACK, native installed-client and supported-client compatibility regressions remain required.",
+      "The added synthetic JSON board reaches actual cold boot/hydration and scanner rendering, pairwise display, real persist and cold reopen; it never calls normalizeRating directly or accesses private originals. Separate isolated actual-source mutations establish sensitivity to healthy resets, mean/sigma upper escape and sigma-floor escape."
+    ],
+    "redEvidence": {
+      "command": "Actual push CI39234327207 on C2; later Node22 recorder --purpose later-baseline-sensitivity -- node --import rating-consumer-sensitivity-loader.mjs --test --test-name-pattern=^RISK saved rating normalization: tests.js on immutable C3 app source.",
+      "failure": "Contemporaneous performance RED: witnessed startup3048ms exceeded3000ms before C3. Later controls2026-10-19T10-38-10-548Z-01d27636-8d44-4499-9ad0-5b760a7e5cb2 (mean100000.00001 escaped100000), a95abe5e-b64f-4bd6-ac67-ee68fbc95c8a (sigma10000.00001 escaped10000),1f063513-83c1-4e6f-a3fd-971ebd5417bb (healthy37.25 reset25), and10-38-29-968Z-c6bc7bbb-1e30-4a90-a001-ba77c921d641 (sigma0.7999999999 escaped0.8) fail the new actual cold-start assertions. These are explicitly postimplementation isolated broken-fastpath sensitivities, not fabricated preimplementation REDs. A first positive preparation03f0e277 used an expired/incomplete frozen-pass fixture and correctly got a new pass; v2 supplies actual pass identity/time/settings and passes5c6660e8 with no app edit."
+    },
+    "greenEvidence": {
+      "command": "Node22 recorder --purpose green, actual C3 app plus exact appended regression",
+      "result": "2026-10-19T10-38-03-526Z-5c6660e8-10d6-4f94-9a52-c1e5459d5369 passes the complete new consumer before permanent append. Final committed focused/full/native and upstream-aware preflight evidence follow separately."
+    },
+    "chronology": "The new coverage was authored after the C3 source repair and before any further app change. No product source change is made for this test-only follow-up."
   }
 ]

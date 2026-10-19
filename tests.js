@@ -802,6 +802,190 @@ test('RISK completion lifecycle Changelog: the mounted release notes describe ol
   'the mounted final Changelog includes the approved concise recovery outcome');
 });
 
+test('RISK completion source reuse: an exact daily source remains protected when a duplicate backup write is refused',async t=>{
+ const f=await legacyCompletionSource173(t),sourceBoard=JSON.parse(f.completed);
+ sourceBoard.opaqueCompletionReuseSource={version:3,marker:['retain','exactly']};
+ const source=JSON.stringify(sourceBoard),day=new Date(f.at).toISOString().slice(0,10);
+ const prior={id:'completion-reuse-exact-daily',day,at:f.at,kind:'daily',payload:source};
+ const storage=sharedScannerStorage({
+  [SYNC_STORE_KEY]:source,[LOCAL_HEAD_KEY]:source,[LOCAL_BACKUPS_KEY]:JSON.stringify([prior]),
+ });
+ const write=storage.setItem;let runtime,startupSave,toastText='',refusedWrites=0,sourceAtStartup=[];
+ storage.setItem=(key,value)=>{
+  if(key===LOCAL_BACKUPS_KEY){
+   const proposed=runtime?.parseBackupIndex(String(value));
+   if(proposed?.some(row=>row?.kind==='before-completion-upgrade'&&row.payload===source)){
+    refusedWrites++;
+    const error=Error('controlled completion-upgrade backup refusal');error.name='QuotaExceededError';throw error;
+   }
+  }
+  return write(key,value);
+ };
+ const app=await loadAppAtTime(f.at+3*3600000,{sharedStorage:storage,beforeStateReady(ctx,shim){
+  runtime=ctx;sourceAtStartup=ctx.readLocalBackups().filter(row=>row.id===prior.id&&row.kind==='daily'&&row.payload===source);const persist=ctx.persist;
+  ctx.persist=(...args)=>{const pending=persist(...args);if(args[0]===true&&!startupSave)startupSave=pending;return pending;};
+  const toast=shim.document.getElementById('toast'),initial=toast.textContent;
+  Object.defineProperty(toast,'textContent',{configurable:true,get:()=>toastText||initial,set:value=>{toastText=String(value);}});
+ }});t.after(()=>closeLegacyApp173(app));
+ assert.equal(sourceAtStartup.length,1,'the actual startup consumer reads one exact stable daily source');
+ assert.ok(startupSave,'the actual startup completion-upgrade save ran');
+ const saved=await startupSave;
+ t.diagnostic(JSON.stringify({saved,refusedWrites,sourceAtStartup:sourceAtStartup.length,issue:app.ctx.deviceSaveIssue(),toast:toastText}));
+ assert.equal(refusedWrites,0,'the app reuses the verified daily source without attempting a duplicate full-board recovery write');
+ assert.equal(saved,true,'the existing exact daily source should satisfy the recovery guard when the duplicate write is refused');
+ const rows=app.ctx.readLocalBackups(),reused=rows.filter(row=>row.id===prior.id&&row.kind==='daily'&&row.payload===source);
+ assert.equal(reused.length,1,'the exact daily source remains readable with its original identity and bytes');
+ assert.ok(app.ctx.state.protectedBackupIds.includes(prior.id),'the reused source is pinned by the saved completion upgrade');
+ assert.equal(rows.filter(row=>row.payload===source).length,1,'completion upgrade does not create a second full-board copy');
+ assert.doesNotMatch(toastText,/device-save:completion-upgrade\/recovery-unavailable/);
+ const savedHead=storage.getItem(SYNC_STORE_KEY),savedBoard=JSON.parse(savedHead),original=JSON.parse(source);
+ assert.equal(storage.getItem(LOCAL_HEAD_KEY),savedHead,'both guarded primary keys acknowledge the same upgraded bytes');
+ assert.equal(savedHead,JSON.stringify(app.ctx.state),'the actual app state matches the persisted primary acknowledgement');
+ assert.deepEqual(savedBoard.opaqueCompletionReuseSource,original.opaqueCompletionReuseSource,'unknown source facts survive the upgrade');
+ for(const task of original.tasks){
+  const current=app.ctx.state.tasks.find(row=>row.id===task.id);
+  assert.ok(current,`source task ${task.id} remains present`);
+  assert.equal(JSON.stringify(Object.fromEntries(Object.keys(task).map(key=>[key,current[key]]))),JSON.stringify(task),
+   `all original facts for ${task.id} remain unchanged`);
+ }
+ const cold=await loadAppAtTime(f.at+10*24*3600000,{sharedStorage:storage});t.after(()=>closeLegacyApp173(cold));
+ assert.ok(cold.ctx.state.protectedBackupIds.includes(prior.id),'cold startup retains the source pin after normal expiry');
+ assert.equal(await cold.ctx.persist(),true,'the actual later save completes after normal automatic rotation');
+ const afterRotation=cold.ctx.readLocalBackups().find(row=>row.id===prior.id);
+ assert.ok(afterRotation,'normal expiry and backup rotation retain the pinned source');
+ assert.equal(afterRotation.payload,source,'rotation preserves the exact old source bytes');
+});
+
+test('RISK completion source reuse: native exact daily source is read back and committed atomically',{timeout:10000},async t=>{
+ const f=await legacyCompletionSource173(t),sourceBoard=JSON.parse(f.completed);
+ sourceBoard.opaqueCompletionReuseSource={version:3,marker:['native','exact']};
+ const source=JSON.stringify(sourceBoard),day=new Date(f.at).toISOString().slice(0,10),
+  prior={id:'completion-reuse-native-daily',day,at:f.at,kind:'daily',payload:source},
+  {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='completion-reuse-native-'+Math.random();
+ const storageV2=loadStorageV2({indexedDB}),sourceFingerprint=await storageV2.hashPayload(JSON.stringify([
+  {key:LOCAL_HEAD_KEY,raw:source},{key:SYNC_STORE_KEY,raw:source},
+ ])),seedStore=storageV2.createDeviceStore({indexedDB,crypto:webcrypto,dbName:deviceDbName});
+ await seedStore.open();
+ const migrated=await seedStore.migrateLegacy({headPayload:source,sourceFingerprint,backups:[prior],opaqueArchives:[]});
+ assert.equal(migrated.ok,true,'the exact old source and daily recovery row are seeded through the real IndexedDB adapter');
+ await seedStore.close();
+ const storage=sharedScannerStorage({[SYNC_STORE_KEY]:source,[LOCAL_HEAD_KEY]:source});
+ let store,startupSave,resolveUpgrade,forcedQuotaFallbacks=0;const duplicateWrites=[],atomicProofCommits=[],upgradeCommitted=new Promise(resolve=>resolveUpgrade=resolve);
+ const app=await loadAppAtTime(f.at+3*3600000,{sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName,beforeStateReady(ctx,shim){
+  const persist=ctx.persist;ctx.persist=(...args)=>{const pending=persist(...args);if(args[0]===true&&!startupSave)startupSave=pending;return pending;};
+  Object.defineProperty(shim.window,'ScannerDeviceStore',{configurable:true,get:()=>store,set(value){
+   store=value;if(!value)return;
+   const putBackup=value.putBackup.bind(value);value.putBackup=async options=>{
+    if(options?.backup?.kind==='before-completion-upgrade')duplicateWrites.push(options.backup);
+    return putBackup(options);
+   };
+   const commitHead=value.commitHead.bind(value);value.commitHead=async options=>{
+    const includesProof=options?.backups?.some(row=>row?.id===prior.id&&row.payload===source);
+    if(includesProof&&forcedQuotaFallbacks===0){forcedQuotaFallbacks++;return {error:true,code:'quota-exhausted'};}
+    const result=await commitHead(options);
+    if(includesProof&&result?.ok)atomicProofCommits.push(options);
+    if(result?.ok&&JSON.parse(options.payload).decisionEvents?.some(row=>row.kind==='completion-boundary'))resolveUpgrade(result);
+    return result;
+   };
+  }});
+ }});t.after(()=>closeLegacyApp173(app));
+ await upgradeCommitted;
+ assert.ok(startupSave,'the actual native startup completion-upgrade persist is tracked');
+ assert.equal(await startupSave,true,'the native startup save acknowledges after its source proof is durable');
+ const startupHead=await store.readHead();
+ assert.ok(startupHead.payload===JSON.stringify(app.ctx.state),'the actual native startup upgrade is acknowledged in the durable head');
+ assert.deepEqual(duplicateWrites,[],'reusing a verified native row does not create another completion-upgrade backup');
+ assert.equal(forcedQuotaFallbacks,1,'the real optional-backup quota fallback was exercised');
+ assert.ok(atomicProofCommits.length>0,'the existing source identity is included in the native head transaction');
+ let rows=await store.listBackups(),reused=rows.filter(row=>row.id===prior.id);
+ assert.equal(reused.length,1,'the native source ID remains unique');assert.equal(reused[0].payload,source,'the native source payload remains byte-exact');
+ assert.ok((app.ctx.state.protectedBackupIds||[]).includes(prior.id),'the acknowledged native head protects the source row');
+ const head=await store.readHead();assert.equal(head.payload,JSON.stringify(app.ctx.state),'the native source proof and upgraded primary head are acknowledged together');
+ assert.equal(JSON.parse(head.payload).opaqueCompletionReuseSource.version,3,'unknown source facts survive native recovery');
+ const cold=await loadAppAtTime(f.at+10*24*3600000,{sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName});t.after(()=>closeLegacyApp173(cold));
+ assert.ok((cold.ctx.state.protectedBackupIds||[]).includes(prior.id),'cold native reopen retains the durable source pin past normal expiry');
+ assert.equal(await cold.ctx.persist(),true,'a later native save and automatic rotation complete');
+ rows=await cold.ctx.window.ScannerDeviceStore.listBackups();reused=rows.filter(row=>row.id===prior.id);
+ assert.equal(reused.length,1,'native expiry and rotation retain the same unique source');assert.equal(reused[0].payload,source,'native rotation preserves the exact source bytes');
+});
+
+test('RISK completion source reuse: latest-only and ambiguous IDs remain held',async t=>{
+ const f=await legacyCompletionSource173(t),sourceBoard=JSON.parse(f.completed);
+ sourceBoard.opaqueCompletionReuseSource={version:3,marker:['retain','exactly']};
+ const source=JSON.stringify(sourceBoard),day=new Date(f.at).toISOString().slice(0,10);
+ const cases=[
+  {name:'latest-only',rows:[{id:'completion-reuse-latest',day,at:f.at,kind:'latest',payload:source}]},
+  {name:'duplicate-id',rows:[
+   {id:'completion-reuse-collision',day,at:f.at,kind:'daily',payload:source},
+   {id:'completion-reuse-collision',day,at:f.at+1,kind:'manual',payload:JSON.stringify({...sourceBoard,opaqueCompletionReuseSource:{version:3,marker:['different']}})},
+  ]},
+  {name:'unreadable-index',unreadable:true,rows:[{id:'completion-reuse-unreadable',day,at:f.at,kind:'daily',payload:source}]},
+ ];
+ for(const scenario of cases)await t.test(scenario.name,async t=>{
+  const backupRaw=JSON.stringify(scenario.rows),storage=sharedScannerStorage({
+   [SYNC_STORE_KEY]:source,[LOCAL_HEAD_KEY]:source,[LOCAL_BACKUPS_KEY]:backupRaw,
+  });
+  const write=storage.setItem,read=storage.getItem;let runtime,startupSave,refusedWrites=0,toastText='',backupRawAtSave=null,backupIndexUnreadable=false;
+  storage.getItem=key=>{
+   if(key===LOCAL_BACKUPS_KEY&&backupIndexUnreadable)throw Error('controlled unreadable recovery index');
+   return read(key);
+  };
+  storage.setItem=(key,value)=>{
+   if(key===LOCAL_BACKUPS_KEY){
+    const proposed=runtime?.parseBackupIndex(String(value));
+    if(proposed?.some(row=>row?.kind==='before-completion-upgrade'&&row.payload===source)){
+     refusedWrites++;const error=Error('controlled completion-upgrade backup refusal');error.name='QuotaExceededError';throw error;
+    }
+   }
+   return write(key,value);
+  };
+  const app=await loadAppAtTime(f.at+3*3600000,{sharedStorage:storage,beforeStateReady(ctx,shim){
+   runtime=ctx;const persist=ctx.persist;
+   ctx.persist=(...args)=>{if(args[0]===true&&!startupSave){backupRawAtSave=read(LOCAL_BACKUPS_KEY);if(scenario.unreadable)backupIndexUnreadable=true;startupSave=persist(...args);return startupSave;}return persist(...args);};
+   const toast=shim.document.getElementById('toast'),initial=toast.textContent;
+   Object.defineProperty(toast,'textContent',{configurable:true,get:()=>toastText||initial,set:value=>{toastText=String(value);}});
+  }});t.after(()=>closeLegacyApp173(app));
+  assert.ok(startupSave);
+  assert.equal(await startupSave,false,'without a uniquely identified readable stable source, the completion upgrade stays held');
+  backupIndexUnreadable=false;
+  if(scenario.unreadable)assert.equal(refusedWrites,0,'the unreadable source index is not treated as a verified recovery copy');
+  else assert.ok(refusedWrites>0,'the source was not silently treated as a successful recovery copy');
+  const issue=app.ctx.deviceSaveIssue();assert.equal(issue?.stage,'completion-upgrade');assert.equal(issue?.code,'recovery-unavailable');
+  assert.match(toastText,/device-save:completion-upgrade\/recovery-unavailable/);
+  assert.equal(storage.getItem(SYNC_STORE_KEY),source);
+  assert.equal(storage.getItem(LOCAL_HEAD_KEY),source);
+  assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),backupRawAtSave,'the ambiguous or volatile row bytes remain unchanged during the guarded save');
+ });
+});
+
+test('RISK completion source reuse: a source removed after lookup cannot authorize the primary save',async t=>{
+ const f=await legacyCompletionSource173(t),sourceBoard=JSON.parse(f.completed);
+ sourceBoard.opaqueCompletionReuseSource={version:3,marker:['retain','exactly']};
+ const source=JSON.stringify(sourceBoard),day=new Date(f.at).toISOString().slice(0,10);
+ const prior={id:'completion-reuse-raced-daily',day,at:f.at,kind:'daily',payload:source},backupRaw=JSON.stringify([prior]);
+ const storage=sharedScannerStorage({
+  [SYNC_STORE_KEY]:source,[LOCAL_HEAD_KEY]:source,[LOCAL_BACKUPS_KEY]:backupRaw,
+ });
+ const write=storage.setItem;let startupSave,removed=false;
+ const app=await loadAppAtTime(f.at+3*3600000,{sharedStorage:storage,beforeStateReady(ctx){
+  const verify=ctx.verifyCompletionBackupReadback;ctx.verifyCompletionBackupReadback=async(...args)=>{
+   const result=await verify(...args);
+   if(result&&args[0]?.id===prior.id&&!removed){removed=true;queueMicrotask(()=>write(LOCAL_BACKUPS_KEY,JSON.stringify([])));}
+   return result;
+  };
+  const persist=ctx.persist;
+  ctx.persist=(...args)=>{const pending=persist(...args);if(args[0]===true&&!startupSave)startupSave=pending;return pending;};
+ }});t.after(()=>closeLegacyApp173(app));
+ assert.ok(startupSave);
+ assert.equal(await startupSave,false,'a source that disappears after async lookup cannot unlock a completion primary write');
+ assert.ok(removed,'the controlled local-storage mutation occurred after the exact row had been looked up');
+ const issue=app.ctx.deviceSaveIssue();assert.equal(issue?.stage,'completion-upgrade');assert.equal(issue?.code,'recovery-unavailable');
+ assert.equal(storage.getItem(SYNC_STORE_KEY),source);
+ assert.equal(storage.getItem(LOCAL_HEAD_KEY),source);
+ assert.deepEqual(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)),[],'the source removal is observed before the guarded primary save');
+ assert.equal((app.ctx.state.protectedBackupIds||[]).includes(prior.id),false,'a disappeared source ID is never pinned without readback');
+});
+
 test('Firestore rules: immutable decision-aware full shell conflicts then safely holds same-account completion-upgrade authority and its local edit',{skip:!process.env.FIRESTORE_EMULATOR_HOST},async t=>{
  const {readReleasedClient}=await import('./scripts/backward-compatibility.mjs'),{initializeTestEnvironment}=await import('@firebase/rules-unit-testing'),F=await import('firebase/firestore');
  const artifacts=readReleasedClient(__dirname,LEGACY_COMPLETION_RELEASE),f=await legacyCompletionSource173(t,LEGACY_COMPLETION_RELEASE,'e@example.com'),env=await initializeTestEnvironment({projectId:'demo-legacy-completion-173',firestore:{rules:fs.readFileSync(path.join(__dirname,'firestore.rules'),'utf8')}}),handles=[],apps=[];
@@ -36056,4 +36240,526 @@ test('RISK BACKUP FILE RESTORE: fixture readiness waits for signed-in durable re
  assert.match(preview,/data-act="confirm-file-restore"/,shim.document.getElementById('toast').textContent);
  assert.equal(finishedBeforeAck,false,'fixture readiness must not return while the real reconciliation commit acknowledgement is held');
  assert.doesNotMatch(preview.match(/<button\b[^>]*data-act="confirm-file-restore"[^>]*>/)?.[0]||'',/\sdisabled(?:\s|>|=)/,'a healthy fixture reaches enabled consent only after actual durable cloud acknowledgement');
+});
+
+test('RISK saved-board startup: a large legacy completion board opens and saves responsively while retaining exact facts',{timeout:15000},async t=>{
+ const helper=await loadApp({seed:219}),at=Date.parse('2026-10-18T12:00:00Z');
+ const source=syncState({tasks:Array.from({length:434},(_,i)=>({...syncTask('synthetic-task-'+i,'Synthetic recovery task '+i),futureTask:{keep:i},
+  ...(i<172?{done:true,completedAt:at+i}:i<212?{done:false,lastDoneAt:at+i}:{})})),syncDirty:false,futureBoard:{keep:true}});
+ source.decisionBaseline=helper.ctx.baselineFromSource(source,{account:null,baseId:null});
+ source.decisionBaseline.observedRatingHistoryIds=Array.from({length:873},(_,i)=>'synthetic-observed-history-'+i);
+ source.decisionEvents=Array.from({length:172},(_,i)=>({v:1,id:'synthetic-boundary-'+i,at:at+i,account:null,baseId:null,passId:null,passAt:0,
+  scanMode:'descending',chainIds:[],observedActionIds:[],kind:'completion-boundary',meaning:'imported-completion-evidence',
+  taskId:'synthetic-task-'+i,sourceEvidence:JSON.stringify(['synthetic-task-'+i,null,at+i]),baselineId:source.decisionBaseline.id}));
+ assert.ok(helper.ctx.supportedDecisionBaseline(source.decisionBaseline));
+ assert.ok(source.decisionEvents.every(event=>helper.ctx.supportedDecisionEvent(event)),'the from-scratch fixture carries supported immutable facts');
+ const raw=JSON.stringify(source),facts=source.decisionEvents.map(event=>JSON.stringify(event)),started=performance.now();
+ const app=await loadApp({seed:220,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw,[LOCAL_BACKUPS_KEY]:'[]'}});
+ const saved=await app.ctx.persist(),elapsedMs=performance.now()-started;
+ assert.equal(saved,true,'the actual cold-start migration and subsequent device save succeed');
+ assert.equal(app.ctx.state.tasks.length,434);
+ assert.ok(facts.every(fact=>app.ctx.state.decisionEvents.some(event=>JSON.stringify(event)===fact)),'every prior immutable decision fact remains exact');
+ assert.equal(app.ctx.state.decisionEvents.length,212,'the forty retained legacy completion sources get exactly one boundary each');
+ assert.ok(app.ctx.readLocalBackups().some(row=>row.payload===raw),'the literal pre-upgrade source remains recoverable');
+ assert.deepEqual(JSON.parse(JSON.stringify(app.ctx.state.futureBoard)),{keep:true});
+ assert.ok(app.ctx.state.tasks.every((task,i)=>task.futureTask.keep===i),'opaque task fields remain intact');
+ assert.ok(app.shim.document.getElementById('scan').innerHTML,'the actual scanner renders');
+ t.diagnostic('Actual large-board cold startup and device save: '+Math.round(elapsedMs)+'ms');
+ assert.ok(elapsedMs<3000,'The large saved board must open and save within the three-second responsiveness budget; observed '+Math.round(elapsedMs)+'ms');
+});
+
+test('RISK raw backup file recovery: explicit selection restores only a supported board while preserving damaged and pending evidence',{timeout:10000},async t=>{
+ const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb');
+ const app=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'raw-backup-file-'+Date.now()}),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+ t.after(async()=>{await store.close();});ctx.addTask('Current protected task',false);await prepareBackupFileFixtureSource(app);
+ const selected=syncState({tasks:[{...syncTask('raw-restored','Readable historical backup task'),futureTask:{keep:9}}],futureBoard:{keep:true}});
+ const rows=[{id:'readable-row',day:'2026-10-18',at:1792324800000,kind:'manual',payload:'\n '+JSON.stringify(selected)+'\n',futureRow:{keep:5}},
+  {id:'damaged-row',day:'2026-10-18',at:1792324800001,kind:'manual',payload:'{"tasks":['},
+  {id:'pending-row',day:'2026-10-18',at:1792324800002,kind:'decision-recovery-pending',payload:JSON.stringify({tasks:[],pending:{opaque:'Retain pending evidence'}})},
+  {id:'future-row',day:'2026-10-18',at:1792324800003,kind:'future-unknown-kind',payload:JSON.stringify(selected)}];
+ const fileRaw='\n'+JSON.stringify(rows,null,2)+'\n',file=new File([fileRaw],'raw-local-backups.json',{type:'application/json'});
+ const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;const get=shim.document.getElementById.bind(shim.document);
+ shim.document.getElementById=id=>id==='restoreBackupFile'?input:get(id);
+ const settle=async()=>{const deadline=Date.now()+5000;while(vm.runInContext('fileRestoreBusy',ctx)&&Date.now()<deadline)await flush();assert.equal(vm.runInContext('fileRestoreBusy',ctx),false);};
+ const choose=async value=>{const control=shim.document.getElementById('fileRestoreBackupChoice');control.id='fileRestoreBackupChoice';control.value=value;control.matches=()=>false;shim.document.dispatchEvent({type:'change',target:control});await settle();};
+ ctx.openSettings();const before=JSON.stringify(ctx.state),head=await store.readHead();await ctx.onAction('choose-backup-file',{});input.files=[file];shim.document.dispatchEvent({type:'change',target:input});await settle();
+ let preview=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(preview,/id="fileRestoreBackupChoice"/,'a raw backup array reaches a supported board chooser after exact-source recovery');
+ assert.match(preview,/4 entries/);assert.match(preview,/1 supported board/);assert.match(preview,/3.*evidence/);
+ assert.match(preview.match(/<button\b[^>]*data-act="confirm-file-restore"[^>]*>/)?.[0]||'',/\sdisabled(?:\s|>|=)/,'raw arrays never guess which saved board to apply');
+ await ctx.onAction('confirm-file-restore',{});assert.equal(JSON.stringify(ctx.state),before);assert.equal((await store.readHead()).hash,head.hash);
+ await choose('1');assert.equal(JSON.stringify(ctx.state),before,'a damaged entry cannot become a replacement');
+ await choose('2');assert.equal(JSON.stringify(ctx.state),before,'pending evidence cannot be interpreted as an empty board');
+ await choose('3');assert.equal(JSON.stringify(ctx.state),before,'an unknown future kind remains evidence even with a readable tasks array');
+ await choose('0');preview=shim.document.getElementById('modalRoot').innerHTML;assert.doesNotMatch(preview.match(/<button\b[^>]*data-act="confirm-file-restore"[^>]*>/)?.[0]||'',/\sdisabled(?:\s|>|=)/);
+ await ctx.onAction('cancel-file-restore',{});assert.equal(JSON.stringify(ctx.state),before,'cancelling a selected raw backup does not apply it');
+ ctx.openSettings();await ctx.onAction('choose-backup-file',{});input.files=[file];shim.document.dispatchEvent({type:'change',target:input});await settle();await choose('0');
+ await ctx.onAction('confirm-file-restore',{});
+ assert.equal(ctx.state.tasks.some(task=>task.title==='Current protected task'),false,'explicit Restore replaces the current snapshot after its exact safety copy and preview');
+ assert.equal(ctx.state.tasks.find(task=>task.id==='raw-restored').futureTask.keep,9);assert.equal(ctx.state.futureBoard.keep,true);
+ assert.equal(ctx.state.tasks.length,1,'only the chosen ordinary board is restored; damaged and pending rows remain evidence');
+ const backups=await store.listBackups();assert.ok(backups.some(row=>row.kind==='before-file-restore'&&row.payload===before));
+ assert.ok(backups.some(row=>row.kind==='restore-file-source'&&Buffer.from(row.restoreFile?.bytesBase64||'','base64').equals(Buffer.from(fileRaw))),'all raw rows and unknown metadata retain their exact original UTF-8 bytes');
+ assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state),'the actual native head acknowledges the chosen restored board');
+});
+
+test('RISK historical board file recovery: conflicting saved ratings require an explicit source-preserving preview choice',{timeout:15000},async t=>{
+ const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb');
+ const account='e@example.com',sourceState=syncState({tasks:[{...syncTask('legacy-rating','Historical saved task'),futureTask:{keep:7}}],
+  syncAccount:account,syncRev:4,syncDirty:false,futureBoard:{keep:true}});
+ const raw=JSON.stringify(sourceState),source=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'historical-file-source-'+Date.now(),seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
+ t.after(async()=>{await source.ctx.window.ScannerDeviceStore.close();});
+ source.ctx.onAction('cycle-theme',{});await prepareBackupFileFixtureSource(source);
+ const selected=JSON.parse(source.ctx.currentBoardExportPayload());selected.tasks[0].mu=26;
+ const sourceFacts=selected.decisionEvents.map(event=>JSON.stringify(event)),fileRaw=JSON.stringify(selected),file=new File([fileRaw],'historical-ratings.json',{type:'application/json'});
+ assert.equal(source.ctx.decisionEvidenceIssue(selected,account),'unrepresented-legacy-learning','the fixture reproduces the historical saved-rating disagreement');
+ for(const [choice,expectedMu]of [['saved',26],['recorded',25]])await t.test(choice,async subtest=>{
+  const initial=syncState({syncAccount:account,syncRev:4,syncDirty:false}),initialRaw=JSON.stringify(initial),h=makeSyncHarness({remote:initial,rev:4,delayMs:1});
+  const factory=()=>{const backend=h.factory();backend.recoveryIdentity=()=>backend.user===account?'historical-file-identity':null;
+   backend.recoveryEvidence=async()=>({identity:backend.recoveryIdentity(),epoch:1,pending:false});return backend;};
+  const app=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'historical-file-'+choice+'-'+Date.now(),
+   seedStorage:{[SYNC_STORE_KEY]:initialRaw,[LOCAL_HEAD_KEY]:initialRaw},cloudSyncFactory:factory}),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+  subtest.after(async()=>{ctx.window.CloudSync.user=null;ctx.suspendCloudSync();await store.close();});
+  await prepareBackupFileFixtureSource(app,h);ctx.openSettings();const before=JSON.stringify(ctx.state),head=await store.readHead();h.calls.length=0;
+  const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;const get=shim.document.getElementById.bind(shim.document);
+  shim.document.getElementById=id=>id==='restoreBackupFile'?input:get(id);
+  await ctx.onAction('choose-backup-file',{});input.files=[file];shim.document.dispatchEvent({type:'change',target:input});
+  let deadline=Date.now()+5000;while(vm.runInContext('fileRestoreBusy',ctx)&&Date.now()<deadline)await flush();
+  let preview=shim.document.getElementById('modalRoot').innerHTML;
+  if(!preview.includes('id="fileRestoreLearningChoice"'))assert.equal(ctx.window.CloudSync.errorCode,'unrepresented-legacy-learning','a baseline rejection must reach the real historical-rating verdict, not fail fixture identity or storage preparation');
+  assert.match(preview,/id="fileRestoreLearningChoice"/,'the actual file consumer offers recovery for supported historical ratings instead of rejecting the board');
+  assert.match(preview,/Keep the file.s saved ratings/);assert.match(preview,/Use the recorded ratings/);
+  assert.match(preview.match(/<button\b[^>]*data-act="confirm-file-restore"[^>]*>/)?.[0]||'',/\sdisabled(?:\s|>|=)/,'neither interpretation is selected automatically');
+  assert.equal(JSON.stringify(ctx.state),before,'preview leaves the current board intact');assert.equal((await store.readHead()).hash,head.hash);
+  assert.deepEqual(h.calls,[],'selection and preview never read or write cloud');
+  const copied=await store.listBackups();assert.ok(copied.some(row=>row.kind==='before-file-restore'&&row.payload===before));
+  assert.ok(copied.some(row=>row.kind==='restore-file-source'&&Buffer.from(row.restoreFile?.bytesBase64||'','base64').equals(Buffer.from(fileRaw))),'the literal selected bytes are verified before offering a choice');
+  const control=shim.document.getElementById('fileRestoreLearningChoice');control.id='fileRestoreLearningChoice';control.value=choice;control.matches=()=>false;
+  shim.document.dispatchEvent({type:'change',target:control});deadline=Date.now()+5000;while(vm.runInContext('fileRestoreBusy',ctx)&&Date.now()<deadline)await flush();
+  preview=shim.document.getElementById('modalRoot').innerHTML;
+  assert.doesNotMatch(preview.match(/<button\b[^>]*data-act="confirm-file-restore"[^>]*>/)?.[0]||'',/\sdisabled(?:\s|>|=)/,'a deliberate supported choice enables the existing Restore confirmation');
+  assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(h.calls,[],'choosing an interpretation still does not apply or upload it');
+  await ctx.onAction('confirm-file-restore',{});await settleSavedViewPublication(app,h,'Historical file recovery');
+  assert.equal(ctx.state.tasks.find(task=>task.id==='legacy-rating').mu,expectedMu);
+  const retained=ctx.retainedDecisionFacts(JSON.parse(ctx.currentBoardExportPayload()));
+  for(const fact of sourceFacts){const expected=JSON.parse(fact),copies=retained.filter(event=>event.id===expected.id);assert.ok(copies.length,'earlier immutable facts remain in the exported journal or its witnessed recovery lineage');for(const copy of copies)assert.deepEqual(JSON.parse(JSON.stringify(copy)),expected);}
+  assert.equal(ctx.state.decisionEvents.filter(event=>['comparison','no'].includes(event.kind)).length,0,'restoring a snapshot never invents a comparison');
+  assert.equal(ctx.state.tasks[0].futureTask.keep,7);assert.equal(ctx.state.futureBoard.keep,true);
+  assert.equal(ctx.decisionEvidenceIssue(ctx.state,account),null,'the selected result is usable by the ordinary supported reader');
+  assert.equal(h.remoteState().tasks.find(task=>task.id==='legacy-rating').mu,expectedMu,'actual revision-conditional publication and readback retain the chosen rating');
+  assert.ok((await store.listBackups()).some(row=>row.kind==='restore-file-source'&&Buffer.from(row.restoreFile?.bytesBase64||'','base64').equals(Buffer.from(fileRaw))));
+ });
+});
+
+test('RISK pasted recovery UI: Settings opens an editable protected preview and only applies after explicit restore',{timeout:20000},async t=>{
+ const {IDBFactory}=await import('fake-indexeddb');
+ const indexedDB=new IDBFactory(),deviceDbName='pasted-settings-ui-'+Date.now()+'-'+Math.random(),sharedStorage=sharedScannerStorage();
+ const app=await loadBackupFileFixtureApp({indexedDBProvider:indexedDB,deviceDbName,sharedStorage}),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+ t.after(async()=>{await store.close();});
+ ctx.addTask('Current pasted UI task',false);await prepareBackupFileFixtureSource(app);
+ const current=JSON.stringify(ctx.state),head=await store.readHead(),board=JSON.parse(ctx.currentBoardExportPayload());
+ board.tasks[0].title='Explicitly selected pasted task';board.futurePasteBoardField={keep:'unknown board data'};
+ const raw='\n '+JSON.stringify(board,null,2)+'\n';
+ const root=shim.document.getElementById('modalRoot'),getElementById=shim.document.getElementById.bind(shim.document);
+ shim.document.getElementById=id=>id==='jsonBox'&&!root.innerHTML.includes('id="jsonBox"')?null:getElementById(id);
+ const dispatch=action=>{const target=makeFakeElement();target.dataset={act:action};target.closest=selector=>selector==='[data-act]'?target:null;shim.document.dispatchEvent({type:'click',target,detail:1});};
+ assert.match(html,/<button class="ghost" data-act="settings"/,'the header exposes the Settings button that opens this route');
+ dispatch('settings');
+ const settings=root.innerHTML;assert.match(settings,/<h2>Settings<\/h2>/,'the visible header Settings action opens Settings');
+ const pasteButton=settings.match(/<button\b(?=[^>]*data-act="open-paste-recovery")[^>]*>\s*Paste board JSON\s*<\/button>/);
+ assert.ok(pasteButton,'Settings exposes a visible Paste board JSON action');
+ assert.doesNotMatch(settings,/id="jsonBox"/,'the editable paste area stays in its own dialog');
+ const numericDraft=shim.document.getElementById('stHorizon');numericDraft.value='77';
+ root.querySelectorAll=selector=>selector==='input,select,textarea'?[numericDraft]:[];
+ const click=action=>{
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,new RegExp('data-act="'+action+'"'),'the clicked control is present in the current UI');
+  dispatch(action);
+ };
+ const oneDialog=message=>{
+  const markup=shim.document.getElementById('modalRoot').innerHTML;
+  assert.equal((markup.match(/class="mback"/g)||[]).length,1,message+' keeps one backdrop');
+  assert.equal((markup.match(/class="modal" role="dialog"/g)||[]).length,1,message+' keeps one dialog');
+  return markup;
+ };
+ click('open-paste-recovery');
+ assert.match(oneDialog('Opening paste recovery'),/id="jsonBox"/,'the visible Settings route opens an editable text area');
+ const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=raw;shim.document.dispatchEvent({type:'input',target:box});
+ const waitForPreview=async()=>{
+  for(let attempt=0;attempt<160&&!shim.document.getElementById('modalRoot').innerHTML.includes('data-act="confirm-file-restore"');attempt++)await flush();
+  return shim.document.getElementById('modalRoot').innerHTML;
+ };
+ click('preview-pasted-recovery');
+ let preview=await waitForPreview();
+ assert.match(preview,/Explicitly selected pasted task/,'ordinary board paste reaches the protected explicit preview');
+ assert.match(preview,/unknown board data/);
+ assert.equal(JSON.stringify(ctx.state),current,'preview leaves the current in-memory board unchanged');
+ assert.equal((await store.readHead()).hash,head.hash,'preview leaves the durable current head unchanged');
+ let backups=await store.listBackups();
+ const currentCopy=backups.find(row=>row.kind==='before-file-restore'&&row.payload===current);
+ const sourceCopy=backups.find(row=>row.kind==='restore-file-source'&&row.restoreFile?.fileName==='Pasted board.json');
+ assert.ok(currentCopy,'the exact current board is saved before preview');assert.ok(sourceCopy,'the exact pasted source is saved before preview');
+ assert.equal(Buffer.from(sourceCopy.restoreFile.bytesBase64,'base64').toString('utf8'),raw,'the saved source readback retains exact text bytes');
+ click('cancel-file-restore');
+ let editor=oneDialog('Cancelling pasted preview');
+ assert.equal(shim.document.getElementById('jsonBox').value,raw,'Cancel retains every pasted character');
+ assert.equal(JSON.stringify(ctx.state),current,'Cancel keeps the live board');
+ for(let cycle=0;cycle<2;cycle++){
+  click('preview-pasted-recovery');preview=await waitForPreview();assert.match(preview,/Explicitly selected pasted task/);
+  click('cancel-file-restore');editor=oneDialog('Repeating pasted preview and cancel');
+  assert.equal(shim.document.getElementById('jsonBox').value,raw,'repeat Cancel retains the exact draft');
+ }
+ click('preview-pasted-recovery');preview=await waitForPreview();assert.match(preview,/data-act="confirm-file-restore"/);
+ click('confirm-file-restore');
+ for(let attempt=0;attempt<160&&ctx.state.tasks[0].title!=='Explicitly selected pasted task';attempt++)await flush();
+ assert.equal(ctx.state.tasks[0].title,'Explicitly selected pasted task','only explicit confirmation applies the selected board');
+ assert.deepEqual(ctx.state.futurePasteBoardField,{keep:'unknown board data'},'unknown board facts survive the selected restore');
+ assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state),'the selected board is durably committed and read back');
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/<h2>Settings<\/h2>/,'completion returns to Settings');
+ assert.equal(shim.document.getElementById('stHorizon').value,'77','Settings numeric draft survives the paste round trip');
+ backups=await store.listBackups();assert.ok(backups.some(row=>row.id===sourceCopy.id&&Buffer.from(row.restoreFile?.bytesBase64||'','base64').toString('utf8')===raw),'the pasted source remains protected after adoption');
+ await store.close();
+ const reopened=await loadApp({indexedDBProvider:indexedDB,deviceDbName,sharedStorage});
+ t.after(async()=>{await reopened.ctx.window.ScannerDeviceStore.close();});
+ assert.equal(reopened.ctx.state.tasks[0].title,'Explicitly selected pasted task','the actual pasted restore survives a cold reopen');
+ assert.deepEqual(reopened.ctx.state.futurePasteBoardField,{keep:'unknown board data'});
+});
+
+test('RISK pasted recovery UI: a newer DOM-only draft invalidates a delayed backup preview',{timeout:12000},async t=>{
+ const {IDBFactory}=await import('fake-indexeddb');
+ const app=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'pasted-draft-race-'+Date.now()+'-'+Math.random()}),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+ t.after(async()=>{await store.close();});
+ ctx.addTask('Current draft-race task',false);await prepareBackupFileFixtureSource(app);
+ const current=JSON.stringify(ctx.state),head=await store.readHead(),oldBoard=JSON.parse(ctx.currentBoardExportPayload());
+ oldBoard.tasks[0].title='First pasted draft';const oldRaw=JSON.stringify(oldBoard);
+ const latestBoard=JSON.parse(JSON.stringify(oldBoard));latestBoard.tasks[0].title='Newer DOM-only pasted draft';const latestRaw=JSON.stringify(latestBoard);
+ const root=shim.document.getElementById('modalRoot'),getElementById=shim.document.getElementById.bind(shim.document);
+ shim.document.getElementById=id=>id==='jsonBox'&&!root.innerHTML.includes('id="jsonBox"')?null:getElementById(id);
+ const click=action=>{
+  const markup=shim.document.getElementById('modalRoot').innerHTML;assert.match(markup,new RegExp('data-act="'+action+'"'));
+  const target=makeFakeElement();target.dataset={act:action};target.closest=selector=>selector==='[data-act]'?target:null;
+  shim.document.dispatchEvent({type:'click',target,detail:1});
+ };
+ const dispatch=action=>{const target=makeFakeElement();target.dataset={act:action};target.closest=selector=>selector==='[data-act]'?target:null;shim.document.dispatchEvent({type:'click',target,detail:1});};
+ dispatch('settings');assert.match(shim.document.getElementById('modalRoot').innerHTML,/<h2>Settings<\/h2>/);
+ dispatch('open-paste-recovery');
+ const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=oldRaw;shim.document.dispatchEvent({type:'input',target:box});
+ let enteredResolve,releaseWrite;const entered=new Promise(resolve=>enteredResolve=resolve),writeGate=new Promise(resolve=>releaseWrite=resolve);
+ const originalPut=store.putBackup.bind(store);let delayed=false;
+ store.putBackup=async options=>{
+  const result=await originalPut(options);
+  if(!delayed&&options?.backup?.kind==='restore-file-source'){delayed=true;enteredResolve();await writeGate;}
+  return result;
+ };
+ click('preview-pasted-recovery');
+ try{
+  await entered;
+  box.value=latestRaw; // Model a user typing into the real editor while IndexedDB has accepted the older source row.
+  releaseWrite();
+  const deadline=Date.now()+5000;
+  while(vm.runInContext('fileRestoreBusy',ctx)&&Date.now()<deadline)await flush();
+  assert.equal(vm.runInContext('fileRestoreBusy',ctx),false,'the delayed preparation settles');
+  const markup=shim.document.getElementById('modalRoot').innerHTML;
+  assert.doesNotMatch(markup,/data-act="confirm-file-restore"/,'a preview for the older pasted text is never shown');
+  assert.match(markup,/id="jsonBox"/,'the editable paste dialog remains available');
+  assert.equal(box.value,latestRaw,'the latest textarea value survives the stale preparation');
+  assert.equal(JSON.stringify(ctx.state),current,'stale paste consent never changes the live board');
+  assert.equal((await store.readHead()).hash,head.hash,'stale paste consent never changes the durable head');
+  const exactRows=(await store.listBackups()).filter(row=>row.kind==='restore-file-source');
+  assert.ok(exactRows.some(row=>Buffer.from(row.restoreFile?.bytesBase64||'','base64').toString('utf8')===oldRaw),'the source already written before typing remains honest recovery evidence');
+  assert.ok(!exactRows.some(row=>Buffer.from(row.restoreFile?.bytesBase64||'','base64').toString('utf8')===latestRaw),'the newer draft is not mislabeled as the selected protected source');
+ }finally{releaseWrite();store.putBackup=originalPut;}
+});
+
+test('RISK pasted recovery UI: closing during delayed protection reopens the latest draft without a late preview',{timeout:12000},async t=>{
+ const {IDBFactory}=await import('fake-indexeddb');
+ const app=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'pasted-close-race-'+Date.now()+'-'+Math.random()}),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+ t.after(async()=>{await store.close();});
+ ctx.addTask('Current close-race task',false);await prepareBackupFileFixtureSource(app);
+ const current=JSON.stringify(ctx.state),head=await store.readHead(),board=JSON.parse(ctx.currentBoardExportPayload());board.tasks[0].title='Latest closed-dialog draft';const raw=JSON.stringify(board);
+ const root=shim.document.getElementById('modalRoot'),getElementById=shim.document.getElementById.bind(shim.document);
+ shim.document.getElementById=id=>id==='jsonBox'&&!root.innerHTML.includes('id="jsonBox"')?null:getElementById(id);
+ const dispatch=action=>{const target=makeFakeElement();target.dataset={act:action};target.closest=selector=>selector==='[data-act]'?target:null;shim.document.dispatchEvent({type:'click',target,detail:1});};
+ dispatch('settings');assert.match(shim.document.getElementById('modalRoot').innerHTML,/<h2>Settings<\/h2>/,'the real Settings route is active');
+ const horizon=shim.document.getElementById('stHorizon');horizon.value='83';shim.document.getElementById('modalRoot').querySelectorAll=selector=>selector==='input,select,textarea'?[horizon]:[];
+ dispatch('open-paste-recovery');const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=raw;shim.document.dispatchEvent({type:'input',target:box});
+ let enteredResolve,releaseWrite,writeFinishedResolve;const entered=new Promise(resolve=>enteredResolve=resolve),writeGate=new Promise(resolve=>releaseWrite=resolve),writeFinished=new Promise(resolve=>writeFinishedResolve=resolve);
+ const originalPut=store.putBackup.bind(store);let delayed=false;
+ store.putBackup=async options=>{const result=await originalPut(options);if(!delayed&&options?.backup?.kind==='restore-file-source'){delayed=true;enteredResolve();await writeGate;writeFinishedResolve();}return result;};
+ dispatch('preview-pasted-recovery');
+ try{
+  await entered;assert.equal((await store.listBackups()).filter(row=>row.kind==='restore-file-source').length,1,'the exact source was durably written before the held response');
+  dispatch('close-paste-recovery');
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/<h2>Settings<\/h2>/,'closing a pending paste returns to Settings');
+  assert.equal(shim.document.getElementById('stHorizon').value,'83','the Settings numeric draft survives a pending close');
+  dispatch('open-paste-recovery');assert.equal(shim.document.getElementById('jsonBox').value,raw,'reopening restores the exact latest paste text');
+  releaseWrite();await writeFinished;for(let attempt=0;attempt<40;attempt++)await flush();
+  const markup=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(markup,/id="jsonBox"/,'the reopened editor stays available after old work settles');
+  assert.doesNotMatch(markup,/data-act="confirm-file-restore"/,'cancelled work cannot install a late preview in the reopened editor');
+  assert.equal(JSON.stringify(ctx.state),current,'pending close leaves the active board unchanged');assert.equal((await store.readHead()).hash,head.hash);
+  const rows=(await store.listBackups()).filter(row=>row.kind==='restore-file-source');
+  assert.ok(rows.some(row=>Buffer.from(row.restoreFile?.bytesBase64||'','base64').toString('utf8')===raw),'the exact pasted source remains protected after cancellation');
+ }finally{releaseWrite();store.putBackup=originalPut;}
+});
+
+test('RISK pasted recovery UI: archive and raw backup text use the visible Settings route and explicit rating choice',{timeout:18000},async t=>{
+ const {IDBFactory}=await import('fake-indexeddb');
+ const source=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'pasted-format-source-'+Date.now()});
+ t.after(async()=>{await source.ctx.window.ScannerDeviceStore.close();});source.ctx.addTask('Saved pasted task',false);source.ctx.onAction('cycle-theme',{});await prepareBackupFileFixtureSource(source);
+ const board=JSON.parse(source.ctx.currentBoardExportPayload());board.tasks[0].mu+=1;board.futurePasteFormatField={keep:31};
+ assert.equal(source.ctx.decisionEvidenceIssue(board,null),'unrepresented-legacy-learning');
+ const archive={format:'chain-scanner.recovery-archive',formatVersion:1,capturedAt:new Date().toISOString(),currentBoard:board,
+  manifest:{status:'complete',consistency:'synthetic-test',sources:{currentBoard:{status:'included'}},failures:[]}};
+ for(const format of ['archive','raw'])await t.test(format,async subtest=>{
+  const app=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'pasted-format-'+format+'-'+Date.now()}),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+  subtest.after(async()=>{await store.close();});ctx.addTask('Current pasted format task',false);await prepareBackupFileFixtureSource(app);
+  const raw='\n '+JSON.stringify(format==='archive'?archive:[{id:'daily-source',kind:'daily',day:'2026-10-18',at:1792324800000,payload:JSON.stringify(board)}],null,2)+'\n';
+  const before=JSON.stringify(ctx.state),head=await store.readHead();
+  const root=shim.document.getElementById('modalRoot'),getElementById=shim.document.getElementById.bind(shim.document);
+  shim.document.getElementById=id=>id==='jsonBox'&&!root.innerHTML.includes('id="jsonBox"')?null:getElementById(id);
+  const dispatch=action=>{const target=makeFakeElement();target.dataset={act:action};target.closest=selector=>selector==='[data-act]'?target:null;shim.document.dispatchEvent({type:'click',target,detail:1});};
+  dispatch('settings');assert.match(shim.document.getElementById('modalRoot').innerHTML,/<h2>Settings<\/h2>/,'pasting starts from the visible Settings control');
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="open-paste-recovery"/);
+  dispatch('open-paste-recovery');const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=raw;shim.document.dispatchEvent({type:'input',target:box});
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="preview-pasted-recovery"/);
+  dispatch('preview-pasted-recovery');
+  const expectedChoice=format==='raw'?'fileRestoreBackupChoice':'fileRestoreLearningChoice';
+  for(let attempt=0;attempt<200&&!shim.document.getElementById('modalRoot').innerHTML.includes('id="'+expectedChoice+'"');attempt++)await flush();
+  let preview=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(preview,new RegExp('id="'+expectedChoice+'"'),'the pasted format reaches its supported explicit choice');
+  assert.equal(JSON.stringify(ctx.state),before);assert.equal((await store.readHead()).hash,head.hash);
+  assert.ok((await store.listBackups()).some(row=>row.kind==='restore-file-source'&&Buffer.from(row.restoreFile?.bytesBase64||'','base64').toString('utf8')===raw),'the complete archive or raw list is protected byte for byte');
+  dispatch('cancel-file-restore');assert.equal(shim.document.getElementById('jsonBox').value,raw,'cancel preserves the entire selected paste');
+  dispatch('preview-pasted-recovery');
+  for(let attempt=0;attempt<200&&!shim.document.getElementById('modalRoot').innerHTML.includes('id="'+expectedChoice+'"');attempt++)await flush();
+  const choose=async(id,value)=>{const control=shim.document.getElementById(id);control.id=id;control.value=value;control.matches=()=>false;shim.document.dispatchEvent({type:'change',target:control});const deadline=Date.now()+5000;while(vm.runInContext('fileRestoreBusy',ctx)&&Date.now()<deadline)await flush();assert.equal(vm.runInContext('fileRestoreBusy',ctx),false);};
+  if(format==='raw')await choose('fileRestoreBackupChoice','0');await choose('fileRestoreLearningChoice','saved');
+  preview=shim.document.getElementById('modalRoot').innerHTML;assert.match(preview,/data-act="confirm-file-restore"/);
+  assert.equal(JSON.stringify(ctx.state),before,'format and rating choices remain previews until confirmation');
+  dispatch('confirm-file-restore');
+  for(let attempt=0;attempt<160&&ctx.state.tasks[0].mu!==board.tasks[0].mu;attempt++)await flush();
+  assert.equal(ctx.state.tasks[0].mu,board.tasks[0].mu,'the deliberate saved-rating selection is applied');
+  assert.equal(ctx.state.futurePasteFormatField.keep,31,'unknown board fields survive archive and raw restoration');
+  assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state),'the chosen board is durably committed and read back');
+ });
+ source.ctx.openHelp();
+ const help=source.shim.document.getElementById('modalRoot').innerHTML,faq=help.match(/<dt>How do I paste a saved board\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
+ assert.ok(faq,'the extended Data and backups FAQ explains pasted recovery');
+ assert.ok(faq.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the pasted-recovery FAQ keeps its word limit');
+ assert.match(faq,/Settings → Data and backups → Paste board JSON/,'the FAQ names the visible Settings route');
+ assert.match(faq,/separate from Review saved decisions.*combines device and cloud choices/,'the FAQ distinguishes snapshot restore from held-cloud choice merging');
+});
+
+test('RISK pasted board recovery: raw backups and historical ratings use explicit protected preview and retain the cancelled draft',{timeout:15000},async t=>{
+ const {IDBFactory}=await import('fake-indexeddb');
+ const source=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'pasted-source-'+Date.now()});
+ t.after(async()=>{await source.ctx.window.ScannerDeviceStore.close();});source.ctx.addTask('Saved pasted task',false);source.ctx.onAction('cycle-theme',{});await prepareBackupFileFixtureSource(source);
+ const board=JSON.parse(source.ctx.currentBoardExportPayload());board.tasks[0].mu+=1;board.futureBoard={keep:13};
+ assert.equal(source.ctx.decisionEvidenceIssue(board,null),'unrepresented-legacy-learning');
+ for(const format of ['board','raw'])await t.test(format,async subtest=>{
+  const app=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'pasted-'+format+'-'+Date.now()}),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+  subtest.after(async()=>{await store.close();});ctx.addTask('Current pasted recovery task',false);await prepareBackupFileFixtureSource(app);
+  const raw='\n '+JSON.stringify(format==='board'?board:[{id:'daily-source',kind:'daily',day:'2026-10-18',at:1792324800000,payload:JSON.stringify(board)}],null,2)+'\n';
+  const before=JSON.stringify(ctx.state),head=await store.readHead();shim.document.getElementById('jsonBox').value=raw;
+  await ctx.onAction('import-json',{});
+  let preview=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(preview,format==='raw'?/id="fileRestoreBackupChoice"/:/id="fileRestoreLearningChoice"/);
+  assert.equal(JSON.stringify(ctx.state),before);assert.equal((await store.readHead()).hash,head.hash);
+  assert.ok((await store.listBackups()).some(row=>row.kind==='restore-file-source'&&Buffer.from(row.restoreFile?.bytesBase64||'','base64').equals(Buffer.from(raw))),'literal pasted source is durable before any choice');
+  await ctx.onAction('cancel-file-restore',{});assert.equal(shim.document.getElementById('jsonBox').value,raw,'cancellation retains every pasted character');assert.equal(JSON.stringify(ctx.state),before);
+  assert.equal(await ctx.onAction('import-json',{}),true);
+  const choose=async(id,value)=>{const control=shim.document.getElementById(id);control.id=id;control.value=value;control.matches=()=>false;shim.document.dispatchEvent({type:'change',target:control});const deadline=Date.now()+5000;while(vm.runInContext('fileRestoreBusy',ctx)&&Date.now()<deadline)await flush();assert.equal(vm.runInContext('fileRestoreBusy',ctx),false);};
+  if(format==='raw')await choose('fileRestoreBackupChoice','0');await choose('fileRestoreLearningChoice','saved');
+  await ctx.onAction('confirm-file-restore',{});
+  assert.equal(ctx.state.tasks[0].mu,board.tasks[0].mu);assert.equal(ctx.state.futureBoard.keep,13);assert.equal(ctx.decisionEvidenceIssue(ctx.state,null),null);
+  assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state));
+ });
+});
+
+test('RISK login rating recovery: held cloud ratings require explicit source choice with exact ACK and retained peer decisions',{timeout:20000},async t=>{
+ const account='e@example.com',initial=syncState({tasks:[syncTask('rating-a','First saved rating task'),syncTask('rating-b','Other saved rating task')],syncAccount:account,syncRev:4,syncDirty:false});
+ const initialRaw=JSON.stringify(initial),base=await loadAppAtTime(1792322900000,{seed:1900,seedStorage:{[SYNC_STORE_KEY]:initialRaw,[LOCAL_HEAD_KEY]:initialRaw}}),actors=[];
+ t.after(()=>{for(const app of [base,...actors])vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry()',app.ctx);});
+ base.ctx.onAction('cycle-theme',{});base.ctx.onAction('dot-task',{dataset:{id:'rating-a'}});await base.ctx.persist();const common=JSON.stringify(base.ctx.state);
+ for(const n of [1,2]){const actor=await loadAppAtTime(1792322900000+n,{seed:1900+n,seedStorage:{[SYNC_STORE_KEY]:common,[LOCAL_HEAD_KEY]:common}});actors.push(actor);actor.ctx.state.candidateId='rating-b';actor.ctx.renderScan();actor.ctx.onAction('no',{dataset:{candidate:'rating-b',benchmark:'rating-a'}});await actor.ctx.persist();}
+ const remote=JSON.parse(JSON.stringify(actors[1].ctx.state));remote.tasks[0].mu+=1;remote.futureCloud={keep:17};remote.workLog.push({id:'rating-cloud-history',at:2,kind:'fixture',title:'Retained cloud History'});
+ assert.equal(actors[1].ctx.decisionEvidenceIssue(remote,account),'unrepresented-legacy-learning');
+ const local=JSON.parse(JSON.stringify(actors[0].ctx.state));local.futureDevice={keep:19};local.workLog.push({id:'rating-device-history',at:1,kind:'fixture',title:'Retained device History'});
+ for(const [shape,choice]of [['empty','cloud-ratings'],['empty','recorded-ratings'],['peer','cloud-ratings']])await t.test(shape+' '+choice,async subtest=>{
+  const fixture={local:shape==='empty'?syncState({syncAccount:account,syncRev:4,syncDirty:false}):local,remote,rev:4};
+  const app=await heldDecisionApp188(subtest,{fixture}),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+  assert.equal(backend.CS.errorCode,'unrepresented-legacy-learning','the actual login delivery reaches the historical-rating hold');
+  const before=JSON.stringify(ctx.state),head=await store.readHead(),originalCloud=backend.docs.get('users/owner').payload;
+  ctx.onAction('sync',{});assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="review-decision-recovery"/);await ctx.onAction('review-decision-recovery',{});
+  let preview=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(preview,/data-value="cloud-ratings"/,'held login offers an explicit cloud saved-rating choice');assert.match(preview,/data-value="recorded-ratings"/);
+  assert.doesNotMatch(preview,/data-act="choose-decision-recovery"[^>]*aria-pressed="true"/);assert.equal(await ctx.onAction('apply-decision-recovery',{}),false);
+  assert.equal(JSON.stringify(ctx.state),before);assert.equal((await store.readHead()).hash,head.hash);assert.equal(backend.docs.get('users/owner').payload,originalCloud);
+  ctx.onAction('choose-decision-recovery',{dataset:{value:choice}});assert.equal(JSON.stringify(ctx.state),before);assert.equal(await ctx.onAction('apply-decision-recovery',{}),true);
+  const accepted=await settleRecovery188(app),saved=JSON.parse(accepted.remote.payload),facts=ctx.retainedDecisionFacts(saved);
+  const originals=[fixture.local,remote].flatMap(board=>board.decisionEvents||[]);for(const event of originals)assert.ok(facts.some(row=>ctx.canonicalDecisionFact(row)===ctx.canonicalDecisionFact(event)),'all independent original decisions remain exact in supported retained lineage');
+  const expected={a:{mu:25,sigma:8.333333333333334},b:{mu:25,sigma:8.333333333333334}},engine=loadEngine(1900);engine.updatePair(expected.a,expected.b);if(shape==='peer')engine.updatePair(expected.a,expected.b);
+  assert.equal(saved.tasks.find(task=>task.id==='rating-a').mu,choice==='cloud-ratings'?remote.tasks[0].mu:expected.a.mu);
+  assert.equal(saved.tasks.find(task=>task.id==='rating-b').mu,expected.b.mu,'an unaffected participant retains every independent comparison effect');
+  assert.equal(saved.futureCloud.keep,17);if(shape==='peer'){assert.equal(saved.futureDevice.keep,19);assert.ok(saved.workLog.some(row=>row.id==='rating-device-history'));}
+  assert.ok(saved.workLog.some(row=>row.id==='rating-cloud-history'));assert.equal(ctx.decisionEvidenceIssue(saved,account),null);
+  const backups=await store.listBackups();assert.ok(backups.some(row=>row.kind==='decision-recovery-cloud'&&row.payload===originalCloud));assert.ok(backups.some(row=>row.kind==='decision-recovery-device'&&row.payload===before));
+  assert.equal(accepted.head.payload,JSON.stringify(ctx.state));assert.equal(accepted.remote.payload,ctx.cloudPayload());assert.equal(accepted.remote.rev,5);
+ });
+});
+
+test('RISK login rating recovery: unavailable protection and changing consent never publish or replace the active board',{timeout:10000},async t=>{
+ for(const fault of ['backup abort','pending changes','account changes','close during copies','revision conflict','uncertain acknowledgement'])await t.test(fault,async subtest=>{
+  const fixture=heldDecisionFixture188();fixture.local.settings.theme='light';fixture.local.tasks[0].mu=26;
+  const failures={},app=await heldDecisionApp188(subtest,{fixture,failures,timeoutMs:150}),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+  await ctx.onAction('review-decision-recovery',{});assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-value="device-ratings"/);ctx.onAction('choose-decision-recovery',{dataset:{value:'device-ratings'}});
+  const before=JSON.stringify(ctx.state),head=await store.readHead(),cloud=backend.docs.get('users/owner').payload;
+  if(fault==='backup abort')app.idbFault.abortBackup=true;
+  if(['pending changes','close during copies'].includes(fault)){const put=store.putBackup.bind(store);let once=true;store.putBackup=async options=>{const result=await put(options);if(once){once=false;if(fault==='close during copies')ctx.closeModal();else await store.setPendingUpload('owner',{generationId:'changed-rating-pending',payloadHash:'a'.repeat(64),baseRev:4,updatedAt:1});}return result;};}
+  if(fault==='account changes')backend.emitAuth({uid:'other-owner',email:'other@example.test'});
+  if(fault==='revision conflict'){const push=backend.CS.push;backend.CS.push=async(...args)=>{const root=backend.docs.get('users/owner'),peer=JSON.parse(root.payload);peer.tasks.push(syncTask('rating-cas-peer','Peer retained through conflict'));backend.docs.set('users/owner',{...root,rev:5,payload:JSON.stringify(peer)});return push(...args);};}
+  let release;if(fault==='uncertain acknowledgement'){failures.publishPending=new Promise(resolve=>release=resolve);subtest.after(()=>release());}
+  assert.equal(await ctx.onAction('apply-decision-recovery',{}),false);
+  assert.equal(JSON.stringify(ctx.state),before,'an unconfirmed rating choice never enters the active board');assert.equal((await store.readHead()).payload,head.payload);
+  assert.equal(backend.docs.get('users/owner').rev,fault==='revision conflict'?5:4);if(fault!=='revision conflict')assert.equal(backend.docs.get('users/owner').payload,cloud);
+  if(fault==='revision conflict'||fault==='uncertain acknowledgement'){
+   const holds=(await store.listBackups()).filter(row=>row.kind==='decision-recovery-choice');assert.equal(holds.length,1);const prepared=JSON.parse(holds[0].payload);assert.equal(prepared.recoveryChoice.kind,'ratings');assert.equal(prepared.tasks[0].mu,26);
+   const remoteBefore=backend.docs.get('users/owner').payload;ctx.closeModal();await ctx.cloudPull();await ctx.sendPush();await settleRecoveryOperations188(ctx);assert.equal(backend.docs.get('users/owner').payload,remoteBefore,'ordinary Retry cannot publish a prepared rating choice after its exact source lost consent');
+   backend.CS.suspend();await store.close();const cold=await loadAppAtTime(1792323002000,{sharedStorage:shim.localStorage,indexedDBProvider:app.indexedDB,deviceDbName:app.deviceDbName});subtest.after(()=>cold.ctx.window.ScannerDeviceStore.close());assert.equal(cold.ctx.state.tasks[0].mu,26);assert.equal(JSON.stringify(cold.ctx.state.decisionBaseline),JSON.stringify(JSON.parse(head.payload).decisionBaseline),'cold open retains original active authority rather than the archived prepared snapshot');assert.ok((await cold.ctx.window.ScannerDeviceStore.listBackups()).some(row=>row.id===holds[0].id&&row.payload===holds[0].payload));
+  }
+ });
+});
+
+test('RISK saved-board startup: a large witnessed archive remains responsive and never reuses changed evidence',{timeout:30000},async t=>{
+ const initial=syncState({tasks:Array.from({length:434},(_,i)=>({...syncTask('archive-task-'+i,'Synthetic archived task '+i),futureTask:{keep:i}})),syncDirty:false});
+ const rawInitial=JSON.stringify(initial),source=await loadAppAtTime(1792322900000,{seed:2191,seedStorage:{[SYNC_STORE_KEY]:rawInitial,[LOCAL_HEAD_KEY]:rawInitial}});
+ t.after(()=>vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry()',source.ctx));
+ source.ctx.onAction('start-scan',{dataset:{mode:'squared'}});
+ const board=JSON.parse(JSON.stringify(source.ctx.state)),startFacts=board.decisionEvents.map(event=>JSON.parse(JSON.stringify(event)));
+ assert.equal(startFacts.length,2,'an actual Start supplies the supported paired draw and chain evidence');
+ const originalFacts=Array.from({length:20},(_,i)=>startFacts.map(event=>({...event,id:'archive-fact-'+i+'-'+event.target.property,actionId:'archive-start-'+i,target:{...event.target,id:'archive-pass-'+i}}))).flat();
+ const oldBaseline=board.decisionBaseline;delete board.decisionBase;
+ board.decisionBaseline=source.ctx.baselineFromSource(board,{account:null,baseId:null});
+ board.decisionBaseline.replacement=[{v:1,reason:'explicit-restore',account:null,actionId:'archive-recovery-gesture',at:1792322901000,baseline:oldBaseline,
+  facts:originalFacts.map(event=>({id:event.id,witness:source.ctx.LZString.compressToUTF16(source.ctx.canonicalDecisionFact(event))}))}];
+ board.decisionEvents=[];for(let i=1;i<=40;i++)board.tasks[i].lastDoneAt=1792322800000+i;
+ assert.equal(source.ctx.decisionEvidenceIssue(board,null),null,'the full witnessed fixture is ordinary supported saved data');
+ const raw=JSON.stringify(board),start=performance.now(),app=await loadAppAtTime(1792322902000,{seed:2192,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw,[LOCAL_BACKUPS_KEY]:'[]'}});
+ assert.equal(await app.ctx.persist(),true);const elapsed=performance.now()-start;
+ const retained=app.ctx.retainedDecisionFacts(JSON.parse(app.ctx.currentBoardExportPayload()));
+ for(const fact of originalFacts)assert.ok(retained.some(event=>app.ctx.canonicalDecisionFact(event)===app.ctx.canonicalDecisionFact(fact)),'earlier immutable facts remain exact');
+ assert.ok(app.ctx.readLocalBackups().some(row=>row.payload===raw));assert.equal(app.ctx.state.tasks.length,434);assert.equal(app.ctx.state.tasks[433].futureTask.keep,433);
+ const damaged=JSON.parse(JSON.stringify(app.ctx.state));damaged.decisionBaseline.replacement[0].facts[0].witness=source.ctx.LZString.compressToUTF16('{"v":99}');
+ assert.equal(app.ctx.decisionSourceIssue(damaged,null),'unsupported-decision-evidence','a changed immutable witness is validated again and cannot inherit cached authority');
+ const receipt=JSON.parse(JSON.stringify(app.ctx.state.decisionBaseline.replacement[0]));receipt.futureAuthority={unsupported:true};
+ assert.equal(app.ctx.supportedDecisionReplacement(receipt,null),false,'a warm decoded fact never bypasses new receipt authority fields');delete receipt.futureAuthority;
+ receipt.account='other@example.test';receipt.baseline.account=receipt.account;receipt.baseline.id=app.ctx.decisionBaselineIdentity(receipt.account,receipt.baseline.ratings,receipt.baseline.includedActionIds);
+ assert.equal(app.ctx.supportedDecisionReplacement(receipt,receipt.account),false,'the same warm witness cannot acquire a different account without its exact attestation');
+ const base=app.ctx.makeDecisionBase('cached@example.test',4,raw);assert.equal(app.ctx.validDecisionBase(base,'cached@example.test',4),true);
+ assert.equal(app.ctx.validDecisionBase({...base,payload:raw+' '},'cached@example.test',4),false,'even whitespace changes invalidate the exact cached payload identity');
+
+ t.diagnostic('Actual witnessed large-board startup and save: '+Math.round(elapsed)+'ms; source bytes: '+Buffer.byteLength(raw));
+ assert.ok(elapsed<3000,'The witnessed saved board must open and save within the three-second responsiveness budget; observed '+Math.round(elapsed)+'ms');
+});
+
+test('RISK saved-board startup: a witness codec failure leaves the original board usable and safely unsupported',async()=>{
+ const helper=await loadApp({seed:2199}),board=syncState({tasks:[{...syncTask('codec-old','Archived completion'),done:true,completedAt:1000},{...syncTask('codec-live','Preserved legacy task'),lastDoneAt:2000}]});
+ const baseline=helper.ctx.baselineFromSource(board,{account:null,baseId:null}),event={v:1,id:'codec-fact',at:1000,account:null,baseId:null,passId:null,passAt:0,scanMode:'descending',chainIds:[],observedActionIds:[],kind:'completion-boundary',meaning:'imported-completion-evidence',taskId:'codec-old',sourceEvidence:JSON.stringify(['codec-old',null,1000]),baselineId:baseline.id};
+ const witness=helper.ctx.LZString.compressToUTF16(helper.ctx.canonicalDecisionFact(event));
+ board.decisionBaseline={...baseline,replacement:[{v:1,reason:'explicit-restore',account:null,actionId:'codec-restore',at:2001,baseline,facts:[{id:event.id,witness}]}]};board.decisionEvents=[];
+ assert.equal(helper.ctx.decisionSourceIssue(board,null),null);const raw=JSON.stringify(board);
+ const app=await loadApp({seed:2200,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},beforeStateReady(ctx){const decode=ctx.LZString.decompressFromUTF16;ctx.LZString.decompressFromUTF16=value=>{if(value===witness)throw Error('synthetic codec failure');return decode(value);};}});
+ assert.equal(app.ctx.state.tasks.length,2);assert.ok(app.shim.document.getElementById('scan').innerHTML,'a failed witness decode cannot stop the actual scanner bootstrap');
+ assert.doesNotThrow(()=>assert.equal(app.ctx.decisionSourceIssue(app.ctx.state,null),'unsupported-decision-evidence'),'codec failures stay inside the existing unsupported-source guard');
+ assert.equal(app.shim.localStorage.getItem(SYNC_STORE_KEY),raw);assert.equal(app.shim.localStorage.getItem(LOCAL_HEAD_KEY),raw,'the sole exact original is never overwritten by the held codec failure');
+});
+
+test('RISK completion source reuse: async host acknowledgement requires the exact source and preserves a newer foreign write',async t=>{
+ const f=await legacyCompletionSource173(t),source=f.completed,day=new Date(f.at).toISOString().slice(0,10);
+ for(const fault of ['removed','replaced','newer-host','retained'])await t.test(fault,async t=>{
+  const prior={id:'completion-host-source',day,at:f.at,kind:'daily',payload:source};
+  const storage=sharedScannerStorage({[LOCAL_BACKUPS_KEY]:JSON.stringify([prior])});
+  let startupSave,release,hostSet;
+  const app=await loadAppAtTime(f.at+3*3600000,{sharedStorage:storage,hostStorage:{[SYNC_STORE_KEY]:source},beforeStateReady(ctx,shim){
+   const persist=ctx.persist;ctx.persist=(...args)=>{const pending=persist(...args);if(args[0]===true&&!startupSave)startupSave=pending;return pending;};
+   hostSet=shim.window.storage.set.bind(shim.window.storage);
+   shim.window.storage.set=async(key,payload)=>{
+    await hostSet(key,payload);
+    if(key===SYNC_STORE_KEY&&payload!==source&&!release)await new Promise(resolve=>{release=resolve;});
+   };
+  }});t.after(()=>closeLegacyApp173(app));
+  for(let i=0;i<20&&!release;i++)await flush();
+  assert.ok(startupSave,'the actual host startup completion-upgrade save ran');
+  assert.equal(typeof release,'function','the actual host write is awaiting acknowledgement');
+  const attempted=app.shim.window.storage._map.get(SYNC_STORE_KEY);
+  assert.notEqual(attempted,source,'the upgrade reached the asynchronous host consumer');
+  const foreign=JSON.stringify({...JSON.parse(source),opaqueForeignHostWrite:{version:1,retained:true}});
+  if(fault!=='retained'){
+   const rows=JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY));
+   storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(fault==='replaced'?rows.map(row=>row.id===prior.id?{...row,payload:foreign}:row):rows.filter(row=>row.id!==prior.id)));
+  }
+  if(fault==='newer-host')await hostSet(SYNC_STORE_KEY,foreign);
+  release();const saved=await startupSave;
+  if(fault==='retained'){
+   assert.equal(saved,true,'an intact exact source permits the completion upgrade');
+   assert.equal(app.shim.window.storage._map.get(SYNC_STORE_KEY),attempted);
+   assert.equal(vm.runInContext('pendingLegacyCompletionSource',app.ctx),null);
+   assert.ok(app.ctx.state.protectedBackupIds.includes(prior.id));
+   assert.equal(app.ctx.deviceSaveIssue(),null);
+  }else{
+   assert.equal(saved,false,'lost exact source proof cannot acknowledge an upgraded host primary');
+   assert.equal(app.shim.window.storage._map.get(SYNC_STORE_KEY),fault==='newer-host'?foreign:source,
+    'rollback restores only this attempted host value and leaves a newer foreign write exact');
+   assert.equal(vm.runInContext('pendingLegacyCompletionSource',app.ctx),source,'the source upgrade remains pending');
+   assert.equal(app.ctx.deviceSaveIssue()?.stage,'completion-upgrade');
+   assert.equal(app.ctx.deviceSaveIssue()?.code,'recovery-unavailable');
+   assert.equal((app.ctx.state.protectedBackupIds||[]).includes(prior.id),false,'the missing or changed source is not acknowledged as pinned');
+  }
+ });
+});
+
+test('RISK saved rating normalization: cold startup display save and reopen preserve numeric boundaries without learning',async t=>{
+ const cases=[
+  ['healthy',37.25,1.125,37.25,1.125],
+  ['negative',-37.25,3.5,-37.25,3.5],
+  ['lower',-100000,.8,-100000,.8],
+  ['upper',100000,10000,100000,10000],
+  ['above',100000.00001,10000.00001,100000,10000],
+  ['below',-100000.00001,.7999999999,-100000,.8],
+  ['zero',0,0,0,25/3],
+  ['negative-sigma',25,-1,25,25/3],
+  ['missing',null,null,25,25/3],
+  ['text','37.25','1.125',25,25/3],
+ ];
+ const at=1792322900000,board=syncState({v:2,tasks:cases.map(([id,mu,sigma],i)=>({...syncTask('rating-'+id,'Saved rating '+id),mu,sigma,createdAt:i+1,futureTask:{keep:id}})),
+  chain:['rating-healthy'],candidateId:'rating-negative',scanMode:'chance',listOpen:true,passId:'saved-rating-pass-id',passStartedAt:at,
+  chance:{seed:'saved-rating-pass',at,weights:{},opponents:cases.slice(0,6).map(([id,mu,sigma])=>({id:'rating-'+id,mu,sigma,futureOpponent:{keep:id}}))},futureBoard:{keep:'numeric-roundtrip'}});
+ board.settings.scanMode='chance';board.settings.squaredDefaultVersion=1;
+ const raw=JSON.stringify(board),app=await loadAppAtTime(at+1000,{seed:2271,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
+ const cleanup=ctx=>vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry()',ctx);
+ t.after(()=>cleanup(app.ctx));
+ const verify=(ctx,label)=>{
+  assert.equal(ctx.state.tasks.length,cases.length,label+': all saved tasks remain');
+  for(const [id,,,mu,sigma]of cases){const task=ctx.state.tasks.find(row=>row.id==='rating-'+id);
+   assert.deepEqual([task.mu,task.sigma],[mu,sigma],label+': numeric contract '+id);
+   assert.equal(task.futureTask.keep,id,label+': unknown task fields remain');
+   assert.deepEqual(Array.from(task.ratingHistory||[]),[],label+': opening/displaying creates no comparison history');
+  }
+  assert.equal(ctx.state.futureBoard.keep,'numeric-roundtrip');
+  assert.equal(ctx.state.chance.seed,'saved-rating-pass',label+': frozen draw identity remains');
+  for(const [id,,,mu,sigma]of cases.slice(0,6)){const opponent=ctx.state.chance.opponents.find(row=>row.id==='rating-'+id);
+   assert.deepEqual([opponent.mu,opponent.sigma],[mu,sigma],label+': frozen opponent contract '+id);
+   assert.equal(opponent.futureOpponent.keep,id);
+  }
+  assert.equal((ctx.state.decisionEvents||[]).filter(event=>event.kind==='comparison').length,0,label+': no invented comparison fact');
+ };
+ verify(app.ctx,'cold startup');assert.ok(app.shim.document.getElementById('scan').innerHTML,'actual scanner renders the populated saved board');
+ const before=JSON.stringify(app.ctx.state),stats=app.ctx.chanceDisplayStats('chance');
+ assert.equal(stats.size,cases.length);for(const entry of stats.values())assert.ok(Number.isFinite(entry.probability)&&entry.probability>=0&&entry.probability<=1,'actual pairwise display probability stays finite and bounded');
+ assert.ok(Math.abs(Array.from(stats.values()).reduce((n,row)=>n+row.probability,0)-1)<1e-12,'display shares retain a normalized eligible pool');
+ app.ctx.render();assert.equal(JSON.stringify(app.ctx.state),before,'display and render do not learn or rewrite the saved pass');
+ assert.equal(await app.ctx.persist(),true,'normalized saved board is accepted by the actual persistence consumer');
+ const saved=app.shim.localStorage.getItem(SYNC_STORE_KEY);assert.equal(saved,JSON.stringify(app.ctx.state),'device save contains the exact accepted board');
+ const reopened=await loadAppAtTime(at+2000,{seed:2272,seedStorage:{[SYNC_STORE_KEY]:saved,[LOCAL_HEAD_KEY]:saved}});t.after(()=>cleanup(reopened.ctx));
+ verify(reopened.ctx,'cold reopen');
 });
