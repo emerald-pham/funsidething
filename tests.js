@@ -4849,6 +4849,7 @@ async function loadApp({ appSource=appSrc, artifacts=null, seed, cloudSyncFactor
     indexedDB:indexedDBProvider,
     TextEncoder,
     TextDecoder,
+    Uint8Array,
     structuredClone,
     // NOTE: deliberately NOT injecting the outer process's `Date` here — it's
     // passed by reference, so overriding Date.now on it (for time-travel
@@ -11599,7 +11600,7 @@ test('CLOUD ACCOUNT: a transaction binds its document before auth can switch', (
   assert.match(push,/const pushUser\s*=\s*auth\.currentUser/);
   assert.match(push,/const pushUid\s*=\s*pushUser\.uid/);
   assert.match(html,/const rootRef=uid=>F\.doc\(db,"users",uid\)/);
-  assert.match(html,/publishGeneration\(uid,id,\{baseRev,updatedAt,stillCurrent,decisionCapability\}\)/);
+  assert.match(html,/publishGeneration\(uid,id,\{baseRev,updatedAt,hash,expectedHeader,stillCurrent,decisionCapability\}\)/);
   assert.match(html,/if\(stillCurrent&&!stillCurrent\(\)\)return \{cancelled:true\}/,'the manifest transaction rechecks identity after its reads');
   assert.match(push,/stillCurrent:\(\)=>auth\.currentUser\?\.uid===pushUid&&operation===pushOperation/);
   assert.match(push,/auth\.currentUser\?\.uid\s*!==\s*pushUid/,'a late result from an earlier account cannot change current cloud status');
@@ -11704,6 +11705,17 @@ test('RISK decision capability recovery: sole baseline recovery activates the fe
  assert.equal((await h.CS.push(payload,1,0)).ok,true);
  assert.equal(h.docs.get('users/owner').decisionCapability,1,'baseline recovery is authority even without an active baseline or stream');
  assert.equal((await h.CS.pull()).payload,payload);
+});
+
+test('RISK CLOUD TRANSACTION: full app codec and backend share the independent UTF8 digest',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb');
+ const app=await loadApp({indexedDBProvider:new IDBFactory(),deviceDbName:'app-codec-digest-'+Math.random()});
+ t.after(async()=>{await app.ctx.window.ScannerDeviceStore?.close?.();});
+ const payload=JSON.stringify({tasks:[{id:'full-app-digest',title:'Unicode 😀'}],futureOpaque:'retain '.repeat(20)});
+ const expected=createHash('sha256').update(payload,'utf8').digest('hex');
+ assert.equal(await app.ctx.window.ChainStorageV2.hashPayload(payload),expected,'the full-app codec must see the bytes produced by the injected TextEncoder');
+ const h=await loadCloudBackendV2({runtimeWindow:app.ctx.window,timeoutMs:5000});t.after(()=>h.CS.suspend());
+ const pushed=await h.CS.push(payload,1,0);assert.equal(pushed.ok,true);assert.equal((await h.CS.pull()).payload,payload);
 });
 
 test('RISK CLOUD TRANSACTION: the SDK consumer verifies published UTF8 bytes against an independent digest',async()=>{
