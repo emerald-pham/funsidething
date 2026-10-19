@@ -1729,3 +1729,5 @@ The native needs-attention action uses real IndexedDB and the production backend
 - RISK cloud source recovery: an empty preview cannot overwrite a legacy root published at the transaction boundary
 
 - RISK cloud source recovery: native restored-device hold clears only after exact cloud ACK and durable current-head recovery
+
+- RISK cloud source recovery metadata: native preview distinguishes server save time upload clock and missing decision time

@@ -37844,3 +37844,10 @@ test('RISK cloud source recovery: native restored-device hold clears only after 
   assert.equal(cold.ctx.cloudPayload(),remote.payload);assert.equal(await cold.ctx.window.ScannerDeviceStore.getRecoveryCloudHold(),null);assert.equal(cold.ctx.state.syncDirty,false);
  });
 });
+
+test('RISK cloud source recovery metadata: native preview distinguishes server save time upload clock and missing decision time',async t=>{
+ const app=await divergentCloudSourceApp187(t),{ctx,shim}=app;
+ assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);const preview=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(preview,/Confirmed server save time for the current cloud revision:/);assert.ok(preview.includes(new Date(1234).toLocaleString()),'the actual known synthetic server timestamp is shown in the device locale');
+ assert.match(preview,/Upload creation time \(device clock\):/);assert.match(preview,/Decision time for missing or unrecorded changes: unavailable/);assert.match(preview,/does not establish which board is newer/);
+});

@@ -9506,16 +9506,20 @@ async function reviewCloudSourceRecovery(message=""){
     return false;
   }finally{cloudSourceRecoveryBusy=false;if(cloudSourceRecoveryPreview)renderCloudSourceRecovery(message);}
 }
+function cloudSourceRecoveryTime(value){
+  const at=serverTimeMs(value);return at!==null&&Number.isFinite(+new Date(at))?new Date(at).toLocaleString():"unavailable";
+}
 function renderCloudSourceRecovery(message=""){
   const p=cloudSourceRecoveryPreview;if(!p)return;
   const selected=p.candidates.find(row=>row.id===p.choice&&row.board),disabled=cloudSourceRecoveryBusy||!!p.issue;
   modalShell('<div class="mtop"><h2>Review cloud recovery sources</h2><button class="x" data-act="close-modal" aria-label="Close"'+(p.publishing?' disabled':'')+'>✕</button></div>'
     +(message?'<p role="status">'+esc(message)+'</p>':'')
     +'<p>Signed in as <b>'+esc(p.account)+'</b>. '+(p.source.manifest?'Current cloud revision '+p.rev+'.':'Cloud was read successfully and has no saved board.')+'</p>'
+    +'<p>Confirmed server save time for the current cloud revision: '+esc(cloudSourceRecoveryTime(p.source.manifest?.serverUpdatedAt))+'. This is publication metadata, not the decision time of missing changes.</p>'
     +'<p>The damaged or unavailable source may contain unknown newer changes. Its missing tasks, History and decision times cannot be reconstructed here. Choosing a complete source makes that source current; it does not recover missing data or combine the other sources automatically.</p>'
     +'<p>Nothing is selected by default. Each exact device source, readable cloud generation and pending upload will stay separately protected before publication. Local work is not confirmed in cloud until its exact new save is read back.</p>'
     +p.candidates.map(row=>'<section class="settings-section"><h3>'+esc(row.label)+'</h3>'
-      +(row.generationId?'<p>Generation <code>'+esc(row.generationId)+'</code>. Upload based on revision '+esc(Number.isSafeInteger(row.header?.baseRev)?row.header.baseRev:"unavailable")+'. This does not establish which board is newer. Confirmed decision time for missing data: unavailable.</p>':'<p>Device revision '+esc(Number.isSafeInteger(state.syncRev)?state.syncRev:"unavailable")+'. Device-only changes may not have reached cloud.</p>')
+      +(row.generationId?'<p>Generation <code>'+esc(row.generationId)+'</code>. Upload based on revision '+esc(Number.isSafeInteger(row.header?.baseRev)?row.header.baseRev:"unavailable")+'. Upload creation time (device clock): '+esc(cloudSourceRecoveryTime(row.header?.createdAt))+'. This does not establish which board is newer. Confirmed decision time for missing data: unavailable.</p>':'<p>Device revision '+esc(Number.isSafeInteger(state.syncRev)?state.syncRev:"unavailable")+'. Device-only changes may not have reached cloud.</p>')
       +cloudSourceRecoveryFacts(row)+'<div class="mbtns"><button class="btn '+(p.choice===row.id?'setting-choice setting-set':'subtle')+'" data-act="choose-cloud-recovery-source" data-value="'+esc(row.id)+'" aria-pressed="'+(p.choice===row.id)+'"'+(disabled||!row.board?' disabled':'')+'>Use '+esc(row.label.toLowerCase())+'</button></div></section>').join('')
     +(p.issue?'<p role="status">'+esc(p.issue)+'</p>':'')
     +(selected?'<h3>'+esc(selected.label)+' will become the shared board</h3><p>The listed other values and unknown missing changes will not become current. Their exact originals remain recoverable; no historical decision time is invented.</p>'+fileRestoreEffectsHtml(JSON.parse(p.local),selected.board):'')
