@@ -5,7 +5,6 @@
     "previousBehavior": "An unreadable or missing selected device source could lose its raw-readable handle, revive stale retained legacy data, stop startup on hash-valid malformed JSON, block ordinary File/Paste recovery, create placeholder backups, or admit unsupported selected decision evidence. Ordinary snapshot cleanup could discard partial raw rows during local recovery.",
     "intendedBehavior": "Retain exact raw device/browser sources; explicitly preview and confirm only a supported selected board through raw-source transaction CAS; stop failures and stale identity/draft/source consent; keep malformed and orphan rows, selected-file bytes and unknown/pending sources exact. Local recovered work persists under a device-only cloud hold until root-owned validated cloud-source recovery.",
     "replacementTests": [
-      "RISK unreadable device recovery: native Paste previews and restores a supported board while preserving unreadable originals",
       "RISK unreadable device recovery: raw startup preserves sources and supports native File restore",
       "RISK unreadable device recovery: raw source export excludes the placeholder and preserves exact device evidence",
       "RISK unreadable device recovery: locally restored work stays durable and visibly pending across sign-in and reopen",
