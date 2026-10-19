@@ -13543,5 +13543,41 @@
     "baseCommit": "382d062f83c0e745abc74595344b5e74efb1f860",
     "testChangesSha256": "94408484e5d310b2cb42ef168b96c3c831f6fa1e216a5ef311c42cbb73977032",
     "comparison": "Protected tests.js diff fingerprint against immutable base 382d062f83c0e745abc74595344b5e74efb1f860. Only four dedicated completion-source-reuse RISK registrations are added; all prior assertions are unchanged."
+  },
+  {
+    "baseCommit": "382d062f83c0e745abc74595344b5e74efb1f860",
+    "testChangesSha256": "8ad7120e9837a54a3c7299c41f23d0d3b6423191b4f5d634ec7794d9373b0926",
+    "reason": "Add permanent from-scratch app-consumer coverage for the authorized populated-board startup/import/device-save P0. Preserve every pre-existing assertion and all historical rationale bytes; private supplied data stays outside Git and CI.",
+    "previousBehavior": "Large legacy startup/save took7382ms; witnessed archive startup/save10672ms against the unchanged3s budget. Raw arrays and pasted supported rating conflicts had no protected chooser. Actual login delivery held supported saved-rating differences without an actionable choice. The first immutable witness-cache draft let a codec exception escape the prior unsupported-result guard during actual bootstrap. The actual synthetic completion-source consumer refused a redundant backup despite an exact daily row, and a forced native quota retry initially omitted that mandatory source proof.",
+    "intendedBehavior": "Open and save populated supported boards responsively without changing identity algorithms or authority checks. Require explicit raw-source and saved/recorded-rating choices with literal source recovery, cancellation, pending/account/revision guards and exact durable/cloud acknowledgement. Cache only exact immutable bytes and deterministic structural/hash results with bounded retention. Unsupported authority and unavailable recovery remain safely held. Reuse a uniquely identified stable exact source only after readback; retain its pin and exact row through fallback/native acknowledgement, quota retry and rotation. Missing, unreadable, latest-only, ambiguous or raced evidence remains held.",
+    "replacementTests": [
+      "RISK completion source reuse: an exact daily source remains protected when a duplicate backup write is refused",
+      "RISK completion source reuse: native exact daily source is read back and committed atomically",
+      "RISK completion source reuse: latest-only and ambiguous IDs remain held",
+      "RISK completion source reuse: a source removed after lookup cannot authorize the primary save",
+      "RISK saved-board startup: a large legacy completion board opens and saves responsively while retaining exact facts",
+      "RISK raw backup file recovery: explicit selection restores only a supported board while preserving damaged and pending evidence",
+      "RISK historical board file recovery: conflicting saved ratings require an explicit source-preserving preview choice",
+      "RISK pasted board recovery: raw backups and historical ratings use explicit protected preview and retain the cancelled draft",
+      "RISK login rating recovery: held cloud ratings require explicit source choice with exact ACK and retained peer decisions",
+      "RISK login rating recovery: unavailable protection and changing consent never publish or replace the active board",
+      "RISK saved-board startup: a large witnessed archive remains responsive and never reuses changed evidence",
+      "RISK saved-board startup: a witness codec failure leaves the original board usable and safely unsupported"
+    ],
+    "preservedCoverage": [
+      "All earlier tests and assertions remain byte-exact against382d062. Completion/Undo, independent comparisons, legacy identities, nonempty replacement/inheritance, task deletion/history, account separation, CAS, failed storage and native installed-client delivery remain required.",
+      "New fixtures are from scratch. Actual loadApp/bootstrap, file change and paste actions, native fakeIndexedDB, real conditional Firebase module/fake transport, original source copies and final local/cloud readback are exercised. Private original replays are separate isolated Node evidence, never committed.",
+      "Safety controls retain unknown fields, exact witnessed prior facts, all rating History, no invented comparisons, no default selection, source/draft/account/pending/revision changes, failed protection, uncertain ACK and cold prepared-choice holds. Explicit file Restore replaces the snapshot after its safety copy; it is not an implicit task union.",
+      "No chronology is rewritten. d7924f1e/53d3062f/82147d6d were historical-file fixture preparation/identity failures, not intended product REDs. aebb4786 is later immutable-baseline sensitivity after the corrected8053ab93 GREEN. Raw0826ef31 had a new-test mistaken task-union expectation, corrected to existing explicit Restore semantics. Archive448c10aa introduced an ambiguous fixture completion before its performance acceptance; corrected4f83fb91 is the intended performance RED.",
+      "Copied README guidance maps prior empty/small/modern proof gaps to these populated consumer triggers, without inventing physical-crash or actual user-quota attribution. Earlier release evidence and failed/no-op attempts are retained with their original scope."
+    ],
+    "redEvidence": {
+      "command": "TZ=UTC Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=<bounded actual consumer> tests.js",
+      "failure": "Actual before-implementation records:05855fe1 legacy7382ms;68dead76 raw chooser absent;5c5c2bed paste preview absent;a06c8559 login cloud-rating choice absent;4f83fb91 witnessed archive10672ms;9955c225 actual startup unhandled synthetic witness-codec exception before its guard repair. Private initial actual current/file/paste/login rejection and minimized rating mismatch are retained in DIAGNOSTIC-CHECKPOINT-0628. Historical-file fixture misfires and later sensitivity are explicitly separate above. Luna actual consumer2b26f2be reproduced exact completion-upgrade/recovery-unavailable before its implementation;5f61f759 observed a mandatory source proof omitted by native quota fallback before its repair."
+    },
+    "greenEvidence": {
+      "command": "TZ=UTC Node22 recorder focused actual-consumer cohorts and isolated original-source replays",
+      "result": "File/raw/paste/rating acceptance and safety72-case cohort390a88f3 passed; rating safety11-caseaba5603f passed. Large source/refined archive/codec cohortd6335824 passed253ms/1182ms/usable unsupported hold. Broad851da0e8 had172/173 passes and only an existing FAQ word-limit failure; separate3cc518ed passed after preserving the original answer and adding separate questions. Actual original raw file7bace332 retains source bytes/facts/history/native/fakecloudACK. Actual cloud-module original replayc174967c eventually retains434tasks/212facts/2327history/exact source/native/cloudACK with no held error; its transient false apply return remains separately traced, not relabeled success at that instant. Worker source-reuse cohort0e065d0f passed7/7 including native quota retry, rotation/reopen, unreadable/ambiguous/latest-only/removed-source controls; integration reused its exact local commitfe7913ad."
+    }
   }
 ]
