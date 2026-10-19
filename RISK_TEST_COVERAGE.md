@@ -1659,3 +1659,9 @@ The existing editor consumer still executes its original fixture persists and im
 - RISK pasted recovery UI: archive and raw backup text use the visible Settings route and explicit rating choice
 
 The real Settings action opens a separate paste editor. Ordinary boards, full recovery archives, raw backup lists and saved-versus-recorded rating choices use the same exact-source/current-board protection and explicit restore preview as file recovery. Delayed durable backup work is bound to the editor session, input revision and live textarea value; closing during pending work retains the exact draft and Settings values without allowing a late preview. Held cloud choices remain a separate review and merge path.
+
+## Saved rating numerical preservation
+
+Cold populated startup, pairwise display, real saving and cold reopen preserve healthy and boundary ratings, normalize unsupported numeric values, retain frozen pass and opaque fields, and create no comparison learning. This supplements the unchanged three-second populated-board responsiveness budget.
+
+- RISK saved rating normalization: cold startup display save and reopen preserve numeric boundaries without learning

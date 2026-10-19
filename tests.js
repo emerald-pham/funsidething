@@ -36717,3 +36717,49 @@ test('RISK completion source reuse: async host acknowledgement requires the exac
   }
  });
 });
+
+test('RISK saved rating normalization: cold startup display save and reopen preserve numeric boundaries without learning',async t=>{
+ const cases=[
+  ['healthy',37.25,1.125,37.25,1.125],
+  ['negative',-37.25,3.5,-37.25,3.5],
+  ['lower',-100000,.8,-100000,.8],
+  ['upper',100000,10000,100000,10000],
+  ['above',100000.00001,10000.00001,100000,10000],
+  ['below',-100000.00001,.7999999999,-100000,.8],
+  ['zero',0,0,0,25/3],
+  ['negative-sigma',25,-1,25,25/3],
+  ['missing',null,null,25,25/3],
+  ['text','37.25','1.125',25,25/3],
+ ];
+ const at=1792322900000,board=syncState({v:2,tasks:cases.map(([id,mu,sigma],i)=>({...syncTask('rating-'+id,'Saved rating '+id),mu,sigma,createdAt:i+1,futureTask:{keep:id}})),
+  chain:['rating-healthy'],candidateId:'rating-negative',scanMode:'chance',listOpen:true,passId:'saved-rating-pass-id',passStartedAt:at,
+  chance:{seed:'saved-rating-pass',at,weights:{},opponents:cases.slice(0,6).map(([id,mu,sigma])=>({id:'rating-'+id,mu,sigma,futureOpponent:{keep:id}}))},futureBoard:{keep:'numeric-roundtrip'}});
+ board.settings.scanMode='chance';board.settings.squaredDefaultVersion=1;
+ const raw=JSON.stringify(board),app=await loadAppAtTime(at+1000,{seed:2271,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
+ const cleanup=ctx=>vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry()',ctx);
+ t.after(()=>cleanup(app.ctx));
+ const verify=(ctx,label)=>{
+  assert.equal(ctx.state.tasks.length,cases.length,label+': all saved tasks remain');
+  for(const [id,,,mu,sigma]of cases){const task=ctx.state.tasks.find(row=>row.id==='rating-'+id);
+   assert.deepEqual([task.mu,task.sigma],[mu,sigma],label+': numeric contract '+id);
+   assert.equal(task.futureTask.keep,id,label+': unknown task fields remain');
+   assert.deepEqual(Array.from(task.ratingHistory||[]),[],label+': opening/displaying creates no comparison history');
+  }
+  assert.equal(ctx.state.futureBoard.keep,'numeric-roundtrip');
+  assert.equal(ctx.state.chance.seed,'saved-rating-pass',label+': frozen draw identity remains');
+  for(const [id,,,mu,sigma]of cases.slice(0,6)){const opponent=ctx.state.chance.opponents.find(row=>row.id==='rating-'+id);
+   assert.deepEqual([opponent.mu,opponent.sigma],[mu,sigma],label+': frozen opponent contract '+id);
+   assert.equal(opponent.futureOpponent.keep,id);
+  }
+  assert.equal((ctx.state.decisionEvents||[]).filter(event=>event.kind==='comparison').length,0,label+': no invented comparison fact');
+ };
+ verify(app.ctx,'cold startup');assert.ok(app.shim.document.getElementById('scan').innerHTML,'actual scanner renders the populated saved board');
+ const before=JSON.stringify(app.ctx.state),stats=app.ctx.chanceDisplayStats('chance');
+ assert.equal(stats.size,cases.length);for(const entry of stats.values())assert.ok(Number.isFinite(entry.probability)&&entry.probability>=0&&entry.probability<=1,'actual pairwise display probability stays finite and bounded');
+ assert.ok(Math.abs(Array.from(stats.values()).reduce((n,row)=>n+row.probability,0)-1)<1e-12,'display shares retain a normalized eligible pool');
+ app.ctx.render();assert.equal(JSON.stringify(app.ctx.state),before,'display and render do not learn or rewrite the saved pass');
+ assert.equal(await app.ctx.persist(),true,'normalized saved board is accepted by the actual persistence consumer');
+ const saved=app.shim.localStorage.getItem(SYNC_STORE_KEY);assert.equal(saved,JSON.stringify(app.ctx.state),'device save contains the exact accepted board');
+ const reopened=await loadAppAtTime(at+2000,{seed:2272,seedStorage:{[SYNC_STORE_KEY]:saved,[LOCAL_HEAD_KEY]:saved}});t.after(()=>cleanup(reopened.ctx));
+ verify(reopened.ctx,'cold reopen');
+});
