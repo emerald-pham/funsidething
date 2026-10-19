@@ -1,4 +1,4 @@
-import { test } from "node:test";
+import { test as nodeTest } from "node:test";
 import assert from "node:assert/strict";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash, webcrypto } from "node:crypto";
@@ -8,6 +8,22 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+
+// Every top-level test owns its app fixtures. Nested t.test cases inherit the
+// parent scope so a shared fixture remains live until all its consumers finish.
+const appFixtureScope = new AsyncLocalStorage();
+function test(...args){
+ const run=args.at(-1);
+ if(typeof run!=="function")return nodeTest(...args);
+ return nodeTest(...args.slice(0,-1),async context=>{
+  const fixtures=new Set();
+  try{return await appFixtureScope.run(fixtures,()=>run(context));}
+  finally{context.after(async()=>{
+   try{for(const fixture of fixtures)await fixture.dispose();}
+   finally{fixtures.clear();}
+  });}
+ });
+}
 
 test('RISK unreadable device recovery: an unsupported saved version cannot be replaced by Quick start or ordinary saving',async t=>{
  const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='unsupported-device-187-'+Math.random();
@@ -732,7 +748,7 @@ test('RISK optional oldest start: skips before the first choice survive that cho
 });
 
 test('RISK optional oldest start: an unseeded descending pass clears first skips at the ordinary day boundary',async()=>{
- const at=Date.parse('2026-10-18T01:00:00Z'),{ctx}=await loadAppAtTime(at,{seed:188});
+ const at=+new Date(2026,9,18,1),{ctx}=await loadAppAtTime(at,{seed:188});
  Object.assign(ctx.addTask('Day boundary lower task',false),{id:'day-lower',createdAt:1});
  Object.assign(ctx.addTask('Day boundary first task',false),{id:'day-first',createdAt:2,mu:30});
  ctx.state.settings.skipOldestFirstDot=true;ctx.onAction('start-scan',{dataset:{mode:'descending'}});
@@ -5435,6 +5451,21 @@ const flush = () => new Promise((r) => setTimeout(r, 0));
 
 async function loadApp({ appSource=appSrc, artifacts=null, seed, cloudSyncFactory, prefersDark = false, noMatchMedia = false, seedStorage, sharedStorage, hostStorage, hostStorageDelayMs = 0, beforeStateReady, navigatorProvider, cryptoProvider = webcrypto, indexedDBProvider, deviceDbName, deviceOpenTimeoutMs, withSceneModules = false, sceneModulesAfterDomReady = false } = {}) {
   const shim = makeDomShim({ prefersDark, sharedStorage });
+  const ownedTimers=new Set();let disposed=false,sandbox;
+  const fixture={async dispose(){
+    if(disposed)return;
+    disposed=true;sandbox?.suspendCloudSync?.();
+    for(const timer of ownedTimers)clearTimeout(timer);
+    ownedTimers.clear();await shim.window.ScannerDeviceStore?.close?.();
+  }};
+  appFixtureScope.getStore()?.add(fixture); // before startup, including failed boots
+  const schedule=(fn,ms,...args)=>{
+    // A late in-flight continuation cannot revive a disposed fixture.
+    const timer=setTimeout(()=>{ownedTimers.delete(timer);if(!disposed)fn(...args);},ms);
+    if(disposed)clearTimeout(timer);else ownedTimers.add(timer);
+    timer.unref?.();return timer;
+  };
+  const cancel=timer=>{ownedTimers.delete(timer);clearTimeout(timer);};
   if (noMatchMedia) delete shim.window.matchMedia;   // old browser / bare JS host
   if (seedStorage) for (const [k, v] of Object.entries(seedStorage)) shim.localStorage.setItem(k, v);
   /* The OTHER persistence backend. loadState() prefers window.storage (the
@@ -5456,7 +5487,7 @@ async function loadApp({ appSource=appSrc, artifacts=null, seed, cloudSyncFactor
   if (deviceDbName) shim.window.CHAIN_STORAGE_DB_NAME = deviceDbName;
   if (deviceOpenTimeoutMs) shim.window.CHAIN_STORAGE_OPEN_TIMEOUT_MS = deviceOpenTimeoutMs;
   if (indexedDBProvider) shim.window.indexedDB = indexedDBProvider;
-  const sandbox = {
+  sandbox = {
     navigator:navigatorProvider,
     window: shim.window,
     document: shim.document,
@@ -5475,9 +5506,9 @@ async function loadApp({ appSource=appSrc, artifacts=null, seed, cloudSyncFactor
     // vm context auto-provisions its own separate, safely-overridable Date;
     // see setFakeTime() below, which overrides it via in-context code only.
     CustomEvent: class CustomEvent { constructor(type, opts) { this.type = type; Object.assign(this, opts || {}); } },
-    setTimeout: (fn, ms, ...a) => { const t = setTimeout(fn, ms, ...a); t.unref?.(); return t; },
-    clearTimeout,
-    requestAnimationFrame: (fn) => setTimeout(fn, 0),
+    setTimeout: schedule,
+    clearTimeout: cancel,
+    requestAnimationFrame: (fn) => schedule(fn, 0),
     confirm: () => true,
     alert: () => {},
     prompt: () => null,
@@ -5538,8 +5569,21 @@ async function loadApp({ appSource=appSrc, artifacts=null, seed, cloudSyncFactor
     while(vm.runInContext("state",sandbox)===null && Date.now()<deadline) await flush();
     assert.notEqual(vm.runInContext("state",sandbox),null,"App durable startup did not finish within 5 seconds");
   }
-  return { ctx: sandbox, shim };
+  return { ctx: sandbox, shim, dispose:fixture.dispose };
 }
+
+test("app harness: disposal cancels its real wake and late timers while another fixture still runs",async()=>{
+ const closed=await loadApp(),neighbor=await loadApp();let stale=false,late=false;
+ const wake=vm.runInContext("scanWakeTimer",closed.ctx),otherWake=vm.runInContext("scanWakeTimer",neighbor.ctx);
+ assert.ok(wake&&!wake._destroyed,"the actual scanner owns a pending long-lived wake");
+ closed.ctx.setTimeout(()=>{stale=true;},0);
+ await closed.dispose();assert.equal(wake._destroyed,true);
+ closed.ctx.setTimeout(()=>{late=true;},0);
+ await new Promise(resolve=>neighbor.ctx.setTimeout(resolve,0).ref());
+ assert.equal(stale,false,"closed app callbacks never run after their owning test");
+ assert.equal(late,false,"late continuations cannot revive a closed app");
+ assert.equal(otherWake._destroyed,false,"another live app retains its own wake");
+});
 
 // Overrides Date.now() *inside one vm context only*, via in-context code —
 // never touches the outer process's real Date, so it can't leak across tests.
@@ -37771,7 +37815,7 @@ test('RISK resilient sync recovery: automatic rebuilding preserves peer pending 
    if(fired||names.length!==1||names[0]!=='meta'||backend.CS.status!=='syncing')return;
    fired=true;write=store.setPendingUpload('owner',peer);
   };
-  await ctx.cloudPull();await ctx.sendPush();await syncSettle(30);await write;
+  await ctx.cloudPull();await settleRecoveryOperations188(ctx);await write;
   assert.equal(fired,true,'the peer stages at the actual automatic backend pending transaction boundary');
   assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev,'unreviewed pending intent must stop automatic publication before cloud mutation');
   assert.equal((await store.getPendingUpload('owner')).generationId,peer.generationId,'the peer pointer remains recoverable');

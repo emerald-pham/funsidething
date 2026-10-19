@@ -1,5 +1,26 @@
 [
   {
+    "testChangesSha256": "7a07a474af920040ab8bfd9ca6bac2212512819e9cc8c9c68825ff39845a7e65",
+    "reason": "Repair full-suite discovered pre-hydration source protection and supported chronology holds; preserve exact existing consumer assertions and make test fixture lifetime and race completion explicit.",
+    "previousBehavior": "Exact5a full run failed legacy/account/pinned recovery and retained FAQ assertions, then reached4GiB heap OOM before complete full/native evidence. Its pre-init backup guard refused actual older-shell protection; semantic completion ambiguity was classified unreadable. A timezone fixture and fixed30ms staging observation also failed independently of intended behavior.",
+    "intendedBehavior": "Narrow pre-init protection copies only validated literal supported other-browser sources, preserves chosen ambiguous source under the existing chronology hold, and names unreadable backup evidence. FAQ retention wording remains within130 words. Owned test timers are disposed after existing hooks with no persist, heap increase or skip; automatic staging waits actual operation completion and the day-boundary fixture crosses local2AM.",
+    "replacementTests": [
+      "app harness: disposal cancels its real wake and late timers while another fixture still runs",
+      "RISK optional oldest start: an unseeded descending pass clears first skips at the ordinary day boundary",
+      "RISK resilient sync recovery: automatic rebuilding preserves peer pending intent across staging"
+    ],
+    "preservedCoverage": [
+      "All earlier rationale entries and original RED records remain unchanged; every old startup/account/pinned backup/chronology assertion and FAQ retention wording assertion is retained, with52/52 startup controls and68/68 fixture/recovery checks now green.",
+      "The original5a full failure record e68dc5fd shows2473pass19fail49skip plus OOM before full/native completion; it remains rejected, not an interrupted or passing run. Independent causal40default/10held fixture experiments identify long-lived scan/error timers retaining VMs; no claim that this alone proves the entire OOM cause.",
+      "The unchanged immutable-main local-day test passesUTC and failsNewYork; later source/runner manifests preserve that fixture diagnosis. The corrected local timestamp and actual-operation wait change setup, not accepted behavior, and are not original feature REDs.",
+      "A full exact new candidate suite including both mandatory native installed cases, SDK, rules, compatibility, privacy-safe original aggregate, final affected reviews, CI and public proof remain required. No5a approval or runtime proof is relabeled."
+    ],
+    "redEvidence": {
+      "command": "Node22 npm test on exact5a recorded by record-run as usable-recovery/final-suite-5a6daa1/e68dc5fd; independent immutable5a owned-timers and delayed-commit experiments under reviews/specialist/full-suite-5a6daa1 and immutable-main UTC/NewYork evidence under reviews/standards/startup-diagnosis.",
+      "failure": "The actual full run failed pre-init backup/readback, legacy chronology and FAQ preservation assertions; later OOM prevented full acceptance. Independent delayed150ms commit shows fixed30ms boundaryfiredfalse while push remains in flight; completion observation reaches the real hook and preserves cloud6/peer. Owned-timer teardown removes retained VM fixtures without increasing heap."
+    }
+  },
+  {
     "testChangesSha256": "5dd99a60539142d576c13ebf50fc5d3ee32fd054f572ab26ef60cd49c8985839",
     "reason": "Retire a failed automatic rebuild context after a positively empty cloud read or a complete explicit recovery ACK, retaining protected source receipts and every prior assertion; wrap long free-text recovery facts within the existing preview.",
     "previousBehavior": "A failed automatic context bound to revision6 remained after positively reading empty cloud revision0 or completing an explicit source ACK7, so later ordinary uploads were held on a stale revision. Separately an actual enlarged narrow recovery preview clipped a long unbroken task title.",

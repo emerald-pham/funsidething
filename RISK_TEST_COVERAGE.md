@@ -1753,3 +1753,12 @@ The native needs-attention action uses real IndexedDB and the production backend
 - RISK recovery identity consumers: signed-in Add clears its captured draft after recovery
 - RISK recovery identity consumers: final-task WOOP advances after acknowledged recovery
 - RISK recovery identity consumers: verified cloud adoption rebases independent saved extension fields for the same UID
+
+## Full-suite startup preservation and fixture lifetime
+
+The complete recovery suite also retains the released pre-hydration older-tab backup/readback/CAS path and usable supported-but-ambiguous completion holds. Only literal strictly supported other-browser sources can be protected before hydration; a recovery placeholder cannot create a manual or ordinary backup. Unreadable backup-only startup names its actual protected cause. Existing account, legacy-tab, pinned-ID, released-Start and FAQ retention assertions remain. The local2AM fixture uses a local calendar time in UTC and New York; the original immutable-main timezone failure is retained as a fixture correction. Automatic recovery race checks await actual operation completion and still require the real pending boundary, unchanged cloud revision and exact peer intent. Test app fixtures cancel every owned timer after existing hooks without persisting, retaining neighboring fixtures and refusing late timer resurrection; this fixes measured VM retention without raising the heap or skipping tests.
+
+- app harness: disposal cancels its real wake and late timers while another fixture still runs
+- RISK optional oldest start: an unseeded descending pass clears first skips at the ordinary day boundary
+- RISK legacy completion released Start: normally acknowledged expired return is preserved or explicitly held before rewrite
+- RISK resilient sync recovery: automatic rebuilding preserves peer pending intent across staging
