@@ -37211,3 +37211,45 @@ test('RISK PWA retained caches: mounted update help explains current-version del
  assert.match(help,/If a save fails, keep the tab open/,'the update fix never tells an unsaved user to discard the session');
  assert.match(html,/Downloaded updates open the current version even when an older offline copy remains/,'current release notes describe the user-facing improvement');
 });
+
+test('RISK resilient sync recovery: rebuilding retains an interrupted pending generation and its exact readable chunks',async t=>{
+ const app=await damagedAcknowledgedApp187(t),{ctx,backend,originalRoot}=app;
+ const pendingPayload=ctx.state.decisionBase.payload;
+ assert.equal(createHash('sha256').update(pendingPayload,'utf8').digest('hex'),app.originalHeader.hash,'the interrupted upload is independently proved to contain the acknowledged source');
+ app.faults.transactionRead=async(path,docs)=>{
+  if(path.startsWith('users/owner/generations/')&&!path.includes('/chunks/')&&docs.get(path)?.state==='staging'&&
+    [...docs.keys()].some(key=>key.startsWith(path+'/chunks/')))throw Object.assign(Error('isolated pending seal interruption'),{code:'unavailable'});
+ };
+ const interrupted=await backend.CS.push(pendingPayload,1792322999999,originalRoot.rev);
+ assert.equal(interrupted.error,true);assert.equal(interrupted.code,'unavailable');
+ delete app.faults.transactionRead;
+ const pending=await ctx.window.ScannerDeviceStore.getPendingUpload('owner');
+ assert.ok(pending?.generationId,'the setup must retain actual pending upload metadata');
+ const prefix='users/owner/generations/'+pending.generationId;
+ backend.docs.set(prefix,{...backend.docs.get(prefix),createdAt:1});
+ const originals=[...backend.docs].filter(([key])=>key===prefix||key.startsWith(prefix+'/')).map(([key,value])=>[key,JSON.stringify(value)]);
+ assert.ok(originals.length>1,'the pending source has real readable staged chunks');
+ app.shim.document.getElementById('addInput').value='Local work after interrupted duplicate';
+ await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ await ctx.cloudPull();await ctx.sendPush();await settleRecovery188(app);await syncSettle(30);
+ for(const [key,raw] of originals)assert.equal(JSON.stringify(backend.docs.get(key)),raw,'recovery must not collect an interrupted original even after its ordinary staging grace');
+ const captures=(await ctx.window.ScannerDeviceStore.listOpaqueArchives()).filter(row=>row.key.startsWith('cloud-generation-recovery:')).map(row=>JSON.parse(row.raw));
+ assert.ok(captures.some(source=>source.pending?.generationId===pending.generationId&&source.generations.some(generation=>generation.id===pending.generationId)),'durable recovery evidence includes the pending generation itself as well as its pointer');
+});
+
+test('RISK resilient sync recovery: unrepresented pending intent requires explicit review before replacing a damaged cloud source',async t=>{
+ const app=await damagedAcknowledgedApp187(t),{ctx,backend,originalRoot}=app;
+ const pendingPayload=JSON.stringify({v:2,tasks:[{id:'unrepresented-187',title:'Work only in the interrupted upload',ctx:[]}],futurePendingAuthority:{retain:'unknown original'}});
+ app.faults.transactionRead=async(path,docs)=>{
+  if(path.startsWith('users/owner/generations/')&&!path.includes('/chunks/')&&docs.get(path)?.state==='staging'&&
+    [...docs.keys()].some(key=>key.startsWith(path+'/chunks/')))throw Object.assign(Error('isolated pending original'),{code:'unavailable'});
+ };
+ assert.equal((await backend.CS.push(pendingPayload,1792322999999,originalRoot.rev)).error,true);
+ delete app.faults.transactionRead;
+ const pending=await ctx.window.ScannerDeviceStore.getPendingUpload('owner'),original=JSON.stringify([...backend.docs]);
+ assert.ok(pending?.generationId);
+ await ctx.cloudPull();await ctx.sendPush();await syncSettle(30);
+ assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev,'an exact acknowledged base cannot silently displace different pending intent');
+ assert.ok(JSON.stringify([...backend.docs])===original,'unselected pending and damaged cloud originals stay unchanged');
+ assert.deepEqual(await ctx.window.ScannerDeviceStore.getPendingUpload('owner'),pending,'pending authority remains until a supported deliberate recovery choice');
+});

@@ -4440,7 +4440,7 @@ async function exactAcknowledgedCloudSource(failed,account){
     !deviceStore?.protectRecoverySource||typeof backend?.readRecoverySource!=="function"||
     state.syncAccount!==account||!validDecisionBase(base,account,state.syncRev))return null;
   try{
-    const evidence=await backend.recoveryEvidence(),source=await backend.readRecoverySource();
+    const evidence=await backend.recoveryEvidence(),source=await backend.readRecoverySource({pendingGenerationId:evidence.pending?.generationId});
     const manifest=source.manifest,header=source.generations[0]?.header;
     const current=()=>window.CloudSync===backend&&backend.user===account&&JSON.stringify(state)===board&&
       !cloudSuspended&&!cloudResumePending&&!hasActiveEditor()&&!scannerGestureActive;
@@ -4452,6 +4452,13 @@ async function exactAcknowledgedCloudSource(failed,account){
       await ChainStorageV2.hashPayload(base.payload)!==header.hash)return null;
     const decoded=JSON.parse(base.payload);
     if(currentChoiceSourceIssue(decoded)||decisionEvidenceIssue(decoded,account,false)||decisionProjectionIssue(decoded))return null;
+    if(evidence.pending){
+      const currentHash=await ChainStorageV2.hashPayload(cloudPayload());
+      // A pending pointer may describe work absent from both this board and
+      // the acknowledged source. Preserve its authority for explicit review;
+      // exact reconstruction of the published base cannot choose its fate.
+      if(evidence.pending.payloadHash!==header.hash&&evidence.pending.payloadHash!==currentHash)return null;
+    }
     const raw=JSON.stringify({format:"chain-scanner.cloud-recovery-source",version:1,
       identity:source.identity,manifest,generations:source.generations,deviceSource:board,pending:evidence.pending});
     const captureHash=await ChainStorageV2.hashPayload(raw);
@@ -11435,7 +11442,7 @@ if(configured){
       if(auth.currentUser?.uid!==user.uid||epoch!==recoveryAuthEpoch)throw Error("The signed-in account changed. Review again.");
       return {identity:user.uid,epoch,pending};
     };
-    CS.readRecoverySource=async()=>{
+    CS.readRecoverySource=async({pendingGenerationId}={})=>{
       const user=auth.currentUser,epoch=recoveryAuthEpoch;
       if(!user||suspended)throw Error("Cloud source is unavailable.");
       const current=()=>auth.currentUser?.uid===user.uid&&recoveryAuthEpoch===epoch&&!suspended;
@@ -11445,7 +11452,7 @@ if(configured){
         const manifest=await cloudAdapter.readRoot(user.uid);
         if(!current()||manifest?.schemaVersion!==2||!Number.isSafeInteger(manifest.rev)||manifest.rev<1||
           typeof manifest.activeGeneration!=="string")throw Error("Cloud source is unsupported.");
-        const ids=[...new Set([manifest.activeGeneration,manifest.previousGeneration].filter(id=>typeof id==="string"&&id))];
+        const ids=[...new Set([manifest.activeGeneration,manifest.previousGeneration,pendingGenerationId].filter(id=>typeof id==="string"&&id))];
         const generations=await Promise.all(ids.map(async id=>({id,
           header:await cloudAdapter.readGeneration(user.uid,id),chunks:await cloudAdapter.readChunks(user.uid,id)})));
         const latest=await cloudAdapter.readRoot(user.uid);

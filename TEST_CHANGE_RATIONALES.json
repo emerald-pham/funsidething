@@ -1,5 +1,24 @@
 [
   {
+    "testChangesSha256": "c34ea68fb687e04edf75560a91c44053da27005f1f8872eb2920038adcf1eeea",
+    "reason": "Protect pending generation evidence during exact acknowledged-source recovery and refuse automatic replacement when a pending source represents different unselected intent. This adds two actual full-app regressions; previous assertions remain intact.",
+    "previousBehavior": "A new recovery publication could retire an old staged pending generation whose metadata was preserved but whose chunks were not captured or pinned. An acknowledged source could also authorize a new publication while a different unrepresented pending upload was silently superseded.",
+    "intendedBehavior": "Capture and durably pin current, previous and pending generations before rebuilding. Only an acknowledged duplicate or exact current-payload pending source may proceed automatically; unrepresented pending evidence waits for a supported explicit source-selection path.",
+    "replacementTests": [
+      "RISK resilient sync recovery: rebuilding retains an interrupted pending generation and its exact readable chunks",
+      "RISK resilient sync recovery: unrepresented pending intent requires explicit review before replacing a damaged cloud source"
+    ],
+    "preservedCoverage": [
+      "Existing exact ACK, durable reopen, retry/new local edit, unsupported hash/header, authenticated identity changes, failed storage and previous complete-source preservation assertions remain unchanged.",
+      "Faults enter the actual external SDK transaction boundary; pending upload metadata comes from the actual adapter and real IndexedDB. An independent digest proves the interrupted duplicate matches the acknowledged header before source damage recovery.",
+      "The new unknown-pending control preserves every provider row and the exact pending pointer rather than silently merging or discarding opaque source authority. No incident private data or live/provider writes were used."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern='RISK resilient sync recovery: rebuilding retains|RISK resilient sync recovery: unrepresented pending' tests.js",
+      "failure": "Observed4ad82529 before pending generation capture: old interrupted acknowledged duplicate header/chunks were deleted after rebuild (undefined rather than original raw header). Observedd2d53c74 before pending eligibility guard: unrepresented pending intent was silently displaced by cloud revision7 rather than retained revision6. GREEN19dfc50a verifies all10 resilient-sync assertions/subtests."
+    }
+  },
+  {
     "testChangesSha256": "2cd9629819180fa2f767508f728ebeccb7ce2fd654fda61245709e2398bf1ded",
     "reason": "Extend existing187 recovery through the agreed actual full-app consumer: exact acknowledged generation recovery, retry preservation, identity races, unsupported device source protection, and a deliberately RED native Paste recovery slice. Existing passing assertions stay intact. External SDK/IndexedDB fixture hooks model server read identity changes and transaction aborts; no application verdict is mocked.",
     "previousBehavior": "A corrupt published generation blocks ordinary app sync despite a byte-exact acknowledged local copy. Recovery retry evidence keyed only by generation cannot admit later local work. Email-only device ownership can reintroduce old-account tasks after an authenticated UID switch. Future saved board versions can be downgraded by hydration and ordinary saves; native Paste refuses an unaccepted source.",
