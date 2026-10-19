@@ -116,7 +116,7 @@
         const sealed=["sealed","published"].includes(existing.state) ? existing : await adapter.sealGeneration(uid,generationId,header);
         if(!sealed||!["sealed","published"].includes(sealed.state)) return {error:true,code:"seal-failed",generationId};
         if(!current(stillCurrent)) return {cancelled:true,generationId};
-        const result=await adapter.publishGeneration(uid,generationId,{baseRev,updatedAt,hash:encoded.hash,stillCurrent,decisionCapability:needsDecisionCapability(payload)?1:undefined});
+        const result=await adapter.publishGeneration(uid,generationId,{baseRev,updatedAt,hash:encoded.hash,expectedHeader:header,stillCurrent,decisionCapability:needsDecisionCapability(payload)?1:undefined});
         if(!current(stillCurrent)) return {cancelled:true,generationId};
         return {...result,generationId};
       }catch(error){
