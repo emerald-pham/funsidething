@@ -84,6 +84,36 @@ cannot prove that a person actually performed the review; repository writers
 with status permission and protection-bypassing administrators remain inside
 the trust boundary.
 
+## Saved-board incident review
+
+For fixes to reported populated-board startup, import or cloud-login adoption,
+use the existing memory/cloud/sync specialist review to close each confirmed
+defect's coverage gap. Record why prior tests or release proof missed that
+trigger and which permanent safe regression now reaches it.
+
+Inspect from-scratch or minimized fixtures through the actual affected
+consumer: populated cold startup and save; format-aware current-board or raw
+backup file selection and paste import; cloud-login adoption; and failed or
+missing required recovery copies. Choose cases for the confirmed defect and
+changed risk. Verify usable, noncrashing recovery UI, explicit source/rating
+choices where needed, and preservation of original facts, unknown fields and
+exact recovery sources. Keep explicit snapshot replacement distinct from
+merging current tasks. Require durable local readback and account/revision/
+cloud acknowledgement for claimed adoption or sync; retain safe held behavior
+when recovery protection cannot be established.
+
+Inspect meaningful behavioral REDs and positive controls, with actual chronology
+and baseline/candidate/source identities. Revalidate the authorized original
+source after the minimized regression passes, using the existing privacy-safe
+isolated route; keep private originals outside Git, CI, browser fixtures and
+public environments. Report aggregate preservation and timing, not private
+payloads. Missing original-source access or runtime coverage remains a named
+gap. Separate measured CPU stalls and supported-format/rating holds from
+unconfirmed physical crashes or user quota causes. Earlier full/native or
+empty-profile public passes retain their original scope; they do not establish
+recovery of a newly reported populated source. This adds no review role or
+blanket runtime matrix; existing exact-candidate and release gates still apply.
+
 ## Independent typography review for final releases
 
 Owner instruction, 2026-10-08: every final product checkpoint release and
