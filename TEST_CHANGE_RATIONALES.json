@@ -6,7 +6,6 @@
     "intendedBehavior": "Narrow pre-init protection copies only validated literal supported other-browser sources, preserves chosen ambiguous source under the existing chronology hold, and names unreadable backup evidence. FAQ retention wording remains within130 words. Owned test timers are disposed after existing hooks with no persist, heap increase or skip; automatic staging waits actual operation completion and the day-boundary fixture crosses local2AM.",
     "replacementTests": [
       "app harness: disposal cancels its real wake and late timers while another fixture still runs",
-      "RISK optional oldest start: an unseeded descending pass clears first skips at the ordinary day boundary",
       "RISK resilient sync recovery: automatic rebuilding preserves peer pending intent across staging"
     ],
     "preservedCoverage": [
