@@ -42,9 +42,9 @@ test('RISK unreadable device recovery: native Paste previews and restores a supp
  assert.equal(cold.ctx.state.tasks[0].id,'chosen-187','explicitly restored work survives durable reopen');
 });
 
-async function damagedAcknowledgedApp187(t){
+async function damagedAcknowledgedApp187(t,{timeoutMs=5000}={}){
  const fixture=heldDecisionFixture188();fixture.local=structuredClone(fixture.remote);
- const faults={},app=await heldDecisionApp188(t,{fixture,failures:faults}),{ctx,shim,backend}=app;
+ const faults={},app=await heldDecisionApp188(t,{fixture,failures:faults,timeoutMs}),{ctx,shim,backend}=app;
  ctx.window.CLOUD_PUSH_DELAY_MS=60000;
  shim.document.getElementById('addInput').value='Acknowledged before source damage';
  await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
@@ -36014,7 +36014,7 @@ async function heldDecisionApp188(t,{fixture=heldDecisionFixture188(),failures={
      return new Proxy(tx,{get(target,key){
       if(key==='objectStore')return name=>{const store=target.objectStore(name);return new Proxy(store,{get(target,key){
        if(key==='put'&&name==='backups')return(...args)=>{const result=target.put(...args);if(idbFault.abortBackup){idbFault.aborts=(idbFault.aborts||0)+1;tx.abort();}return result;};
-       if(key==='put'&&name==='meta')return(...args)=>{const result=target.put(...args);if(idbFault.abortHead&&args[1]==='head'){idbFault.aborts=(idbFault.aborts||0)+1;tx.abort();}return result;};
+       if(key==='put'&&name==='meta')return(...args)=>{const result=target.put(...args);if(args[1]==='head'&&idbFault.afterHeadCommit)tx.addEventListener('complete',()=>idbFault.afterHeadCommit());if(idbFault.abortHead&&args[1]==='head'){idbFault.aborts=(idbFault.aborts||0)+1;tx.abort();}return result;};
        if(key==='put'&&name==='opaque')return(...args)=>{const result=target.put(...args);if(idbFault.abortOpaque){idbFault.aborts=(idbFault.aborts||0)+1;tx.abort();}return result;};
        const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;
       }});};
@@ -37252,4 +37252,206 @@ test('RISK resilient sync recovery: unrepresented pending intent requires explic
  assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev,'an exact acknowledged base cannot silently displace different pending intent');
  assert.ok(JSON.stringify([...backend.docs])===original,'unselected pending and damaged cloud originals stay unchanged');
  assert.deepEqual(await ctx.window.ScannerDeviceStore.getPendingUpload('owner'),pending,'pending authority remains until a supported deliberate recovery choice');
+});
+
+// Uses only the existing native consumer and real storage/backend. The failed
+// selected hash makes this a deliberate source choice, never an exact repair.
+async function divergentCloudSourceApp187(t,options){
+ const app=await damagedAcknowledgedApp187(t,options),{ctx,shim,backend,originalRoot}=app;
+ const path='users/owner/generations/'+originalRoot.activeGeneration;
+ backend.docs.set(path,{...backend.docs.get(path),hash:'f'.repeat(64)});
+ shim.document.getElementById('addInput').value='Device source only';
+ await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ await ctx.cloudPull();await ctx.sendPush();await settleRecoveryOperations188(ctx);
+ assert.equal((await backend.CS.pull()).code,'corrupt-generation');
+ return app;
+}
+
+test('RISK cloud source recovery: native explicit source choice publishes a complete generation with exact originals and durable reopen',async t=>{
+ for(const selected of ['device','previous'])await t.test(selected,async sub=>{
+  const app=await divergentCloudSourceApp187(sub),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+  const local=JSON.stringify(ctx.state),head=await store.readHead(),originals=[...backend.docs].map(([key,value])=>[key,JSON.stringify(value)]);
+  ctx.onAction('sync',{});
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="review-cloud-source-recovery"/,'the actual needs-attention modal exposes deliberate complete-source review');
+  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);
+  let preview=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(preview,/unknown newer changes/i);assert.match(preview,/Device source only/);assert.match(preview,/History/);assert.match(preview,/Decision time/);
+  assert.doesNotMatch(preview,/data-act="choose-cloud-recovery-source"[^>]*aria-pressed="true"/);
+  assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),false,'no source is selected by default');
+  assert.equal(JSON.stringify(ctx.state),local);assert.equal((await store.readHead()).hash,head.hash);
+  const choice=selected==='device'?'device':'generation:'+originalRoot.previousGeneration;
+  assert.equal(await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:choice}}),true);
+  preview=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(preview,/will become the shared board/i);assert.match(preview,/data-act="apply-cloud-source-recovery"/);
+  assert.equal(JSON.stringify(ctx.state),local,'selection alone never replaces current work');
+  assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),true);
+  const {remote,head:accepted}=await settleRecovery188(app),saved=JSON.parse(remote.payload);
+  assert.equal(remote.rev,originalRoot.rev+1);assert.notEqual(backend.docs.get('users/owner').activeGeneration,originalRoot.activeGeneration);
+  assert.equal(saved.tasks.some(row=>row.title==='Device source only'),selected==='device','the cloud content follows the deliberate source, never the newest date');
+  assert.equal(accepted.payload,JSON.stringify(ctx.state));assert.equal(ctx.state.syncIdentity,'owner');assert.equal(ctx.state.syncDirty,false);
+  for(const [key,raw]of originals)if(key!=='users/owner')assert.equal(JSON.stringify(backend.docs.get(key)),raw,'every original generation header and chunk stays exact');
+  const rawSources=await store.listOpaqueArchives(),capture=rawSources.map(row=>{try{return JSON.parse(row.raw);}catch{return null;}}).find(row=>row?.format==='chain-scanner.cloud-recovery-source'&&row.deviceSource===local);
+  assert.ok(capture);assert.equal(capture.manifest.rev,originalRoot.rev);assert.ok(capture.generations.some(row=>row.id===originalRoot.previousGeneration&&row.chunks.length));
+  const backups=await store.listBackups();assert.ok(backups.some(row=>row.payload===local));
+  backend.CS.suspend();await store.close();
+  const cold=await loadAppAtTime(1792323000000,{sharedStorage:shim.localStorage,indexedDBProvider:app.indexedDB,deviceDbName:app.deviceDbName});sub.after(()=>closeLegacyApp173(cold));
+  assert.equal(cold.ctx.cloudPayload(),remote.payload,'the exact acknowledged chosen state survives durable reopen');assert.equal(cold.ctx.state.syncDirty,false);
+  const peer=await loadAppAtTime(1792323000000,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(syncState({syncDirty:false})),[LOCAL_HEAD_KEY]:JSON.stringify(syncState({syncDirty:false}))}});sub.after(()=>closeLegacyApp173(peer));
+  const peerBackend=await loadCloudBackendV2({runtimeWindow:peer.ctx.window,failures:{authPending:true},timeoutMs:5000});sub.after(()=>peerBackend.CS.suspend());
+  for(const [key,value]of backend.docs)peerBackend.docs.set(key,value);
+  peerBackend.emitAuth({uid:'owner',email:'e@example.com'});await peer.ctx.cloudPull();await settleRecoveryOperations188(peer.ctx);
+  assert.equal(peer.ctx.cloudPayload(),remote.payload,'another isolated app receives the complete exact chosen board through the actual backend');
+ });
+});
+
+test('RISK cloud source recovery: complete pending intent is selectable but mismatched partial and unknown sources stay unavailable',async t=>{
+ for(const shape of ['complete','mismatched pointer','missing chunk','malformed JSON','unsupported board','unknown decision','partial History'])await t.test(shape,async sub=>{
+  const app=await divergentCloudSourceApp187(sub),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+  const board=JSON.parse(ctx.cloudPayload());board.tasks.push(syncTask('pending-only-source','Pending source unique task'));board.futurePending={keep:['opaque',17]};board.workLog.push({id:'pending-history',title:'Pending original History',kind:'fixture',at:1});
+  if(shape==='unsupported board')board.v=99;
+  if(shape==='unknown decision')board.decisionEvents=[{v:99,id:'unknown-original-authority',opaque:['keep']}];
+  if(shape==='partial History')board.workLog.push(null);
+  const raw=shape==='malformed JSON'?'{"tasks":[truncated':JSON.stringify(board),encoded=await ctx.window.ChainStorageV2.encodeSnapshot(raw),id='synthetic-pending-source';
+  backend.docs.set('users/owner/generations/'+id,{...encoded,chunks:undefined,state:'staging',baseRev:originalRoot.rev,createdAt:1});
+  for(const chunk of encoded.chunks)if(shape!=='missing chunk')backend.docs.set('users/owner/generations/'+id+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
+  assert.equal((await store.setPendingUpload('owner',{generationId:id,payloadHash:shape==='mismatched pointer'?'a'.repeat(64):encoded.hash,baseRev:originalRoot.rev,updatedAt:1})).ok,true);
+  const pending=await store.getPendingUpload('owner'),local=JSON.stringify(ctx.state),originals=[...backend.docs].map(([key,value])=>[key,JSON.stringify(value)]);
+  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);
+  const preview=shim.document.getElementById('modalRoot').innerHTML,button=preview.match(/<button[^>]*data-act="choose-cloud-recovery-source"[^>]*data-value="generation:synthetic-pending-source"[^>]*>/)?.[0];assert.ok(button);
+  if(shape!=='complete'){
+   assert.match(button,/disabled/,'unverified pending intent cannot masquerade as a supported complete source: '+shape);
+   assert.equal(await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'generation:'+id}}),false);
+   assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),false);ctx.onAction('close-modal',{});
+   assert.equal(JSON.stringify(ctx.state),local);assert.deepEqual(await store.getPendingUpload('owner'),pending);assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev);
+  }else{
+   assert.doesNotMatch(button,/disabled/);assert.match(preview,/Pending source unique task/);assert.match(preview,/Pending original History/);
+   assert.equal(await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'generation:'+id}}),true);assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),true);
+   const {remote}=await settleRecovery188(app),saved=JSON.parse(remote.payload);assert.ok(saved.tasks.some(row=>row.id==='pending-only-source'));assert.ok(saved.workLog.some(row=>row.id==='pending-history'));assert.deepEqual(saved.futurePending,{keep:['opaque',17]});
+   const capture=(await store.listOpaqueArchives()).map(row=>JSON.parse(row.raw)).find(row=>row.pending?.generationId===id);assert.ok(capture);assert.equal(JSON.stringify(capture.pending),JSON.stringify(pending));
+  }
+  for(const [key,value]of originals)if(key!=='users/owner')assert.equal(JSON.stringify(backend.docs.get(key)),value,'the original unsupported/complete pending bytes stay exact');
+ });
+});
+
+test('RISK cloud source recovery: an explicitly held local board can recover into a positively read empty cloud',async t=>{
+ const app=await divergentCloudSourceApp187(t),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+ assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'device'}});
+ app.faults.push=Object.assign(Error('synthetic offline publication'),{code:'unavailable'});assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),false);delete app.faults.push;
+ assert.ok((await store.listBackups()).some(row=>row.kind==='decision-recovery-choice'));
+ backend.docs.delete('users/owner');ctx.closeModal();
+ assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true,'a positively read empty account must offer explicit complete local recovery rather than a permanent hold');
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/has no saved board/);assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),false);
+ await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'device'}});assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),true);
+ const {remote}=await settleRecovery188(app);assert.equal(remote.rev,1);assert.ok(JSON.parse(remote.payload).tasks.some(row=>row.title==='Device source only'));
+});
+
+test('RISK cloud source recovery: a late browser pending or peer change cannot be called a confirmed local recovery',async t=>{
+ for(const fault of ['browser source','pending upload','peer publication'])await t.test(fault,async sub=>{
+  const app=await divergentCloudSourceApp187(sub),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+  await ctx.onAction('review-cloud-source-recovery',{});await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'device'}});
+  const before=JSON.stringify(ctx.state),peerRoot={...originalRoot,rev:originalRoot.rev+2};let fired=false;
+  app.idbFault.afterHeadCommit=()=>{
+   if(fired)return;fired=true;
+   if(fault==='browser source')shim.localStorage.setItem(SYNC_STORE_KEY,'{"tasks":[],"opaquePeer":"exact later browser source"}');
+   if(fault==='pending upload')store.setPendingUpload('owner',{generationId:'later-pending-intent',payloadHash:'b'.repeat(64),baseRev:originalRoot.rev+1,updatedAt:1});
+   if(fault==='peer publication')backend.docs.set('users/owner',peerRoot);
+  };
+  assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),false,'a change during the final local commit must retain the hold and request fresh consent');
+  assert.equal(fired,true,'the race must enter through the actual external IndexedDB transaction completion');
+  assert.equal(JSON.stringify(ctx.state),before,'the stale selected board is never installed into the open tab');
+  assert.ok((await store.listBackups()).some(row=>row.kind==='decision-recovery-choice'));
+  assert.ok((await store.listOpaqueArchives()).some(row=>JSON.parse(row.raw).deviceSource===before));
+  if(fault==='browser source')assert.equal(JSON.parse(shim.localStorage.getItem(SYNC_STORE_KEY)).opaquePeer,'exact later browser source');
+  if(fault==='pending upload')assert.equal((await store.getPendingUpload('owner')).generationId,'later-pending-intent');
+  if(fault==='peer publication')assert.equal(backend.docs.get('users/owner').rev,peerRoot.rev,'newer peer authority is never rolled back');
+ });
+});
+
+test('RISK cloud source recovery: chosen prior membership remains deliberate while an unseen peer task and decision history survive',async t=>{
+ const app=await divergentCloudSourceApp187(t),{ctx,backend,originalRoot}=app;
+ ctx.onAction('start-scan',{dataset:{mode:'descending'}});await ctx.persist();await ctx.sendPush();
+ const before=JSON.stringify(ctx.state),originalFacts=JSON.parse(before).decisionEvents||[];
+ assert.ok(originalFacts.length>0,'the native prior state contains actual recorded decisions');
+ await ctx.onAction('review-cloud-source-recovery',{});await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'generation:'+originalRoot.previousGeneration}});
+ assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),true);
+ const {remote}=await settleRecovery188(app),saved=JSON.parse(remote.payload),facts=ctx.retainedDecisionFacts(saved);
+ for(const fact of originalFacts)assert.ok(facts.some(row=>ctx.canonicalDecisionFact(row)===ctx.canonicalDecisionFact(fact)),'all known current decision records remain exact in witnessed lineage');
+ const peer=await loadAppAtTime(1792323000000,{indexedDBProvider:app.indexedDB,deviceDbName:app.deviceDbName+'-peer',seedStorage:{[SYNC_STORE_KEY]:before,[LOCAL_HEAD_KEY]:before}});t.after(()=>closeLegacyApp173(peer));
+ peer.shim.document.getElementById('addInput').value='Unseen peer task survives explicit recovery';await peer.ctx.onAction('add',{});await peer.ctx.persist();
+ const peerBackend=await loadCloudBackendV2({runtimeWindow:peer.ctx.window,failures:{authPending:true},timeoutMs:5000});t.after(()=>peerBackend.CS.suspend());for(const [key,value]of backend.docs)peerBackend.docs.set(key,value);
+ peer.ctx.window.CLOUD_PUSH_DELAY_MS=0;peerBackend.emitAuth({uid:'owner',email:'e@example.com'});await peer.ctx.cloudPull();await settleRecoveryOperations188(peer.ctx);await peer.ctx.sendPush();
+ const final=await settleRecovery188({...peer,backend:peerBackend}),combined=JSON.parse(final.remote.payload);
+ assert.equal(combined.tasks.some(row=>row.title==='Device source only'),false,'a peer that already held the displaced current source cannot silently revive its intentionally omitted task');
+ assert.ok(combined.tasks.some(row=>row.title==='Unseen peer task survives explicit recovery'),'a deliberate replacement cannot erase a task it never observed');
+ for(const fact of originalFacts)assert.ok(peer.ctx.retainedDecisionFacts(combined).some(row=>peer.ctx.canonicalDecisionFact(row)===peer.ctx.canonicalDecisionFact(fact)));
+});
+
+test('RISK cloud source recovery: changed consent and external failures retain originals without blind publication',async t=>{
+ for(const fault of ['local edit','Add draft','peer device head','browser source','pending upload','cloud revision','account','same-email UID','auth epoch','offline read','opaque abort','backup abort','upload failure','local commit abort','cancel'])await t.test(fault,async sub=>{
+  const app=await divergentCloudSourceApp187(sub),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+  await ctx.onAction('review-cloud-source-recovery',{});await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'device'}});
+  const originalLocal=JSON.stringify(ctx.state),originalHead=await store.readHead();
+  if(fault==='local edit'){shim.document.getElementById('addInput').value='Later accepted device edit';await ctx.onAction('add',{});await ctx.persist();}
+  if(fault==='Add draft')shim.document.getElementById('addInput').value='Keep this unfinished draft exactly';
+  if(fault==='peer device head'){const peer=JSON.parse(originalHead.payload);peer.tasks.push(syncTask('external-device-peer','Later external head'));assert.equal((await store.commitHead({expectedHash:originalHead.hash,payload:JSON.stringify(peer),account:'e@example.com'})).ok,true);}
+  if(fault==='browser source')shim.localStorage.setItem(SYNC_STORE_KEY,'{"tasks":[],"opaque":"later-browser-source"}');
+  if(fault==='pending upload')await store.setPendingUpload('owner',{generationId:'new-pending',payloadHash:'c'.repeat(64),baseRev:originalRoot.rev,updatedAt:1});
+  if(fault==='cloud revision')backend.docs.set('users/owner',{...originalRoot,rev:originalRoot.rev+1});
+  if(fault==='account')backend.emitAuth({uid:'other-owner',email:'other@example.test'});
+  if(fault==='same-email UID')backend.emitAuth({uid:'other-owner',email:'e@example.com'});
+  if(fault==='auth epoch'){backend.emitAuth(null);backend.emitAuth({uid:'owner',email:'e@example.com'});}
+  if(fault==='offline read')app.faults.serverOffline=true;
+  if(fault==='opaque abort')app.idbFault.abortOpaque=true;
+  if(fault==='backup abort')app.idbFault.abortBackup=true;
+  if(fault==='upload failure')app.faults.push=Object.assign(Error('synthetic upload unavailable'),{code:'unavailable'});
+  if(fault==='local commit abort')app.idbFault.abortHead=true;
+  if(fault==='cancel')ctx.closeModal();
+  const before=JSON.stringify(ctx.state),head=await store.readHead(),pending=await store.getPendingUpload('owner');
+  assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),false);
+  assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev+(fault==='cloud revision'||fault==='local commit abort'?1:0),'only the intentionally confirmed cloud save or external peer revision may advance');
+  if(!['account','same-email UID','auth epoch'].includes(fault))assert.equal(JSON.stringify(ctx.state),before,'failed or stale consent never replaces accepted open-tab work');
+  assert.equal((await store.readHead()).payload,head.payload,'a failed adoption never overwrites a newer head');
+  if(['pending upload','offline read','cancel'].includes(fault))assert.equal(JSON.stringify(await store.getPendingUpload('owner')),JSON.stringify(pending));
+  if(fault==='Add draft')assert.equal(shim.document.getElementById('addInput').value,'Keep this unfinished draft exactly');
+  if(fault==='local edit')assert.ok(ctx.state.tasks.some(row=>row.title==='Later accepted device edit'));
+  if(fault==='local commit abort'){
+   assert.match(shim.document.getElementById('modalRoot').innerHTML,/Cloud saved the selected source/);
+   assert.ok((await store.listOpaqueArchives()).some(row=>JSON.parse(row.raw).deviceSource===originalLocal));
+  }
+ });
+});
+
+test('RISK cloud source recovery: uncertain ACK stays held through cold open and requires a new native choice',async t=>{
+ const app=await divergentCloudSourceApp187(t,{timeoutMs:150}),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ await ctx.onAction('review-cloud-source-recovery',{});await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'device'}});
+ const originalLocal=JSON.stringify(ctx.state),originalHead=await store.readHead();let release;const gate=new Promise(resolve=>release=resolve);t.after(()=>release());
+ app.faults.afterTransaction=async docs=>{if(docs.get('users/owner')?.rev===originalRoot.rev+1)await gate;};
+ assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),false,'a real publication whose response never arrives cannot confirm recovery');
+ assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev+1,'the external transaction actually published before losing its acknowledgement');
+ assert.equal(JSON.stringify(ctx.state),originalLocal);assert.equal((await store.readHead()).payload,originalHead.payload);
+ const held=(await store.listBackups()).find(row=>row.kind==='decision-recovery-choice');assert.ok(held);
+ delete app.faults.afterTransaction;release();await flush();
+ ctx.closeModal();await ctx.cloudPull();await ctx.sendPush();assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev+1,'Retry never reuses expired source consent');
+ backend.CS.suspend();await store.close();
+ const cold=await loadAppAtTime(1792323000000,{indexedDBProvider:app.indexedDB,deviceDbName:app.deviceDbName,sharedStorage:shim.localStorage});t.after(()=>closeLegacyApp173(cold));
+ assert.equal(JSON.stringify(cold.ctx.state),originalLocal,'cold open keeps the original active authority, not the prepared snapshot');
+ assert.ok((await cold.ctx.window.ScannerDeviceStore.listBackups()).some(row=>row.id===held.id&&row.payload===held.payload));
+ const fresh=await loadCloudBackendV2({runtimeWindow:cold.ctx.window,failures:{authPending:true},timeoutMs:5000});t.after(()=>fresh.CS.suspend());for(const [key,value]of backend.docs)fresh.docs.set(key,value);fresh.emitAuth({uid:'owner',email:'e@example.com'});await cold.ctx.cloudPull();await cold.ctx.sendPush();
+ assert.equal(fresh.docs.get('users/owner').rev,originalRoot.rev+1);assert.equal(await cold.ctx.onAction('review-cloud-source-recovery',{}),true);assert.equal(await cold.ctx.onAction('apply-cloud-source-recovery',{}),false);
+ await cold.ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'generation:'+fresh.docs.get('users/owner').activeGeneration}});assert.equal(await cold.ctx.onAction('apply-cloud-source-recovery',{}),true);
+ assert.equal((await settleRecovery188({...cold,backend:fresh})).remote.rev,originalRoot.rev+2);
+});
+
+test('RISK cloud source recovery guidance: mounted FAQ and changelog explain deliberate sources and unknown missing changes',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(help,/What if a cloud save is damaged/);assert.match(help,/Review cloud recovery sources/);assert.match(help,/missing data is unknown/i);assert.match(help,/Nothing is selected by default/);
+ const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];assert.match(current,/complete recovery source/);
+});
+
+test('RISK cloud source recovery controls: native Apply stays subdued until a complete source is selected',async t=>{
+ const app=await divergentCloudSourceApp187(t),{ctx,shim}=app;
+ await ctx.onAction('review-cloud-source-recovery',{});
+ const apply=()=>shim.document.getElementById('modalRoot').innerHTML.match(/<button[^>]*data-act="apply-cloud-source-recovery"[^>]*>/)[0];
+ assert.match(apply(),/class="btn subtle"/);assert.match(apply(),/disabled/);
+ await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'device'}});assert.match(apply(),/class="btn primary"/);assert.doesNotMatch(apply(),/disabled/);
 });

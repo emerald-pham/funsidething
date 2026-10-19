@@ -1,5 +1,31 @@
 [
   {
+    "testChangesSha256": "b6fdc851c829fde2ef8ac41a652c89751e9a91f09025a64fc92f1fc8a972b2c5",
+    "reason": "Implement parent-authorized explicit complete cloud source recovery through existing full-app native actions, real IndexedDB and production backend at isolated external SDK boundaries. Preserve every existing assertion and document actual RED/GREEN chronology.",
+    "previousBehavior": "A damaged selected generation with no exact acknowledged copy leaves no supported source choice. Pending pointers can disagree with readable bytes; late browser/pending/cloud changes can be called confirmed, and prior-source membership can revive on a stale peer.",
+    "intendedBehavior": "Offer no default; validate separately identified complete sources and unknown-data displacement, durably protect all readable originals and pending metadata, conditionally publish a new complete generation, verify exact ACK and durable head, retain stale/failed choices across reopen and preserve unseen peer intent.",
+    "replacementTests": [
+      "RISK cloud source recovery: native explicit source choice publishes a complete generation with exact originals and durable reopen",
+      "RISK cloud source recovery: complete pending intent is selectable but mismatched partial and unknown sources stay unavailable",
+      "RISK cloud source recovery: an explicitly held local board can recover into a positively read empty cloud",
+      "RISK cloud source recovery: a late browser pending or peer change cannot be called a confirmed local recovery",
+      "RISK cloud source recovery: chosen prior membership remains deliberate while an unseen peer task and decision history survive",
+      "RISK cloud source recovery: changed consent and external failures retain originals without blind publication",
+      "RISK cloud source recovery: uncertain ACK stays held through cold open and requires a new native choice",
+      "RISK cloud source recovery guidance: mounted FAQ and changelog explain deliberate sources and unknown missing changes",
+      "RISK cloud source recovery controls: native Apply stays subdued until a complete source is selected"
+    ],
+    "preservedCoverage": [
+      "Every preexisting passing feature assertion remains. Additive helper arguments retain the prior default timeout; external IDB transaction-complete injection adds no mocked application verdict. All incident inputs are synthetic and no live provider writes occurred.",
+      "Native tests include device and prior choices, complete/partial/unsupported pending controls, actual recorded decision lineage and stale-peer adoption, exact originals and opaque pins, changed account/UID/epoch/local/draft/head/cloud/pending state, storage/upload/commit/cancel failures and uncertain ACK across cold reopen.",
+      "The empty-root native test is intentionally RED at this checkpoint pending the separately parent-owned authenticated neutral source-reader commit b3da257; merge and GREEN are required before final handoff. Initial dependency failure f138d27e, unsettled debounce96bcdcca and codec fixture3549fe2c/aae1d721 are setup errors, not behavioral REDs."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <cloud-choice-worktree> --evidence-dir <usable-recovery>/cloud-choice-worker/test-runs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern='RISK cloud source recovery:' tests.js",
+      "failure": "Actual native entry RED8eb6e280 preceded all product edits; first GREENf38e96f5 followed same-time cold fixture correction. Pending-pointer RED52459bf8 -> GREEN66775c92; late browser/pending/peer RED77977707 -> GREENea7f6b1b; stale peer revival RED9404bf3a -> GREEN6cbf18b5. Empty root RED1f935b2b routed to parent-owned reader change; FAQ RED1ed79355 -> GREEN5e278964 (all failure/unknown ACK controls already passed), disabled-control REDf1a800f8 -> GREEN38daffcf. External provenance retains the exact source and chronology; no rendered/production/physical-device claim."
+    }
+  },
+  {
     "testChangesSha256": "c34ea68fb687e04edf75560a91c44053da27005f1f8872eb2920038adcf1eeea",
     "reason": "Protect pending generation evidence during exact acknowledged-source recovery and refuse automatic replacement when a pending source represents different unselected intent. This adds two actual full-app regressions; previous assertions remain intact.",
     "previousBehavior": "A new recovery publication could retire an old staged pending generation whose metadata was preserved but whose chunks were not captured or pinned. An acknowledged source could also authorize a new publication while a different unrepresented pending upload was silently superseded.",

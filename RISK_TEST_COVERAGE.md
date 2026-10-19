@@ -1696,3 +1696,17 @@ The real Settings action opens a separate paste editor. Ordinary boards, full re
 Cold populated startup, pairwise display, real saving and cold reopen preserve healthy and boundary ratings, normalize unsupported numeric values, retain frozen pass and opaque fields, and create no comparison learning. This supplements the unchanged three-second populated-board responsiveness budget.
 
 - RISK saved rating normalization: cold startup display save and reopen preserve numeric boundaries without learning
+
+## Explicit complete cloud source recovery
+
+- RISK cloud source recovery: native explicit source choice publishes a complete generation with exact originals and durable reopen
+- RISK cloud source recovery: complete pending intent is selectable but mismatched partial and unknown sources stay unavailable
+- RISK cloud source recovery: an explicitly held local board can recover into a positively read empty cloud
+- RISK cloud source recovery: a late browser pending or peer change cannot be called a confirmed local recovery
+- RISK cloud source recovery: chosen prior membership remains deliberate while an unseen peer task and decision history survive
+- RISK cloud source recovery: changed consent and external failures retain originals without blind publication
+- RISK cloud source recovery: uncertain ACK stays held through cold open and requires a new native choice
+- RISK cloud source recovery guidance: mounted FAQ and changelog explain deliberate sources and unknown missing changes
+- RISK cloud source recovery controls: native Apply stays subdued until a complete source is selected
+
+The native needs-attention action uses real IndexedDB and the production backend against isolated external SDK boundaries. Coverage separates complete device, previous and pending sources; unavailable malformed, partial or unknown authority; no default consent; raw source pins; conditional publication, exact acknowledgement and durable reopen; cold held retry; late local, pending, peer and identity changes. Rendered and physical-device recovery remain separate release evidence.
