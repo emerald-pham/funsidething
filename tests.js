@@ -294,7 +294,8 @@ test('RISK unreadable device recovery: opaque identity collisions and unsupporte
   const store=ctx.window.ScannerDeviceStore,selected=JSON.stringify(syncState({tasks:[syncTask('retained-choice','Selected supported board')]}));
   if(mode==='collision'){
    assert.equal(await ctx.previewPastedRecovery(selected),true);const protectedRows=await store.readRawExportSnapshot();ctx.cancelFileRestore();
-   assert.equal(await ctx.previewPastedRecovery(selected),false,'different source evidence at an existing immutable identity cannot be overwritten');
+   const differentSelected=JSON.stringify(syncState({tasks:[syncTask('different-selected','Different file bytes at the same immutable key')]}));
+   assert.equal(await ctx.previewPastedRecovery(differentSelected),false,'different source evidence at an existing immutable identity cannot be overwritten');
    assert.deepEqual(await store.readRawExportSnapshot(),protectedRows);
   }else{
    await editRawDevice187(indexedDB,deviceDbName,tx=>tx.objectStore('opaque').put(/future-unsupported-type/,'future-raw'));
@@ -303,6 +304,18 @@ test('RISK unreadable device recovery: opaque identity collisions and unsupporte
   }
   assert.equal(ctx.state.tasks.length,0);assert.equal(await ctx.confirmFileRestore(),false);
  });
+});
+
+test('RISK unreadable device recovery: repeated cancelled previews reuse exact originals without recursive archive growth',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='repeated-raw-preview-'+Math.random();
+ const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName,seedStorage:{[SYNC_STORE_KEY]:'{broken original '+ 'x'.repeat(32768)}}),{ctx}=app;t.after(()=>closeLegacyApp173(app));
+ const selected=JSON.stringify(syncState({tasks:[syncTask('repeat-selected','Same deliberate recovery source')]})),store=ctx.window.ScannerDeviceStore;
+ assert.equal(await ctx.previewPastedRecovery(selected),true);const original=await store.readRawExportSnapshot();
+ for(let i=0;i<4;i++){
+  assert.equal(ctx.cancelFileRestore(),true);assert.equal(await ctx.previewPastedRecovery(selected),true);
+  assert.deepEqual(await store.readRawExportSnapshot(),original,'unchanged raw originals and file bytes are already protected; cancelling must not recursively archive prior receipts');
+ }
+ assert.equal(await ctx.confirmFileRestore(),true);assert.equal(ctx.state.tasks[0].id,'repeat-selected');
 });
 
 async function damagedAcknowledgedApp187(t){

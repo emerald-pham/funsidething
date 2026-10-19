@@ -9976,14 +9976,29 @@ function fileRestoreAccount(){
 }
 function rawRecoverySourceIdentity(snapshot){return JSON.stringify(encodeManualArchiveSnapshot(snapshot).stores);}
 async function protectUnacceptedFileRestore(baseline,restoreFile){
-  const original={format:"chain-scanner.device-recovery-source",formatVersion:1,
-    reason:baseline.unacceptedSource.reason,localStorage:baseline.rawLocalSources,
-    indexedDB:encodeManualArchiveSnapshot(baseline.rawDeviceSnapshot).stores};
-  const rawRecoveryArchives=[{key:"device-recovery-original:"+uid(),raw:JSON.stringify(original)},
-    {key:"device-recovery-file:"+uid(),raw:JSON.stringify(restoreFile)}];
+  const prior=baseline.unacceptedSource.capture,source=baseline.rawDeviceSnapshot.stores.opaque;
+  const known=new Map((prior?.archives||[]).map(row=>[row.key,row.raw]));
+  const intact=prior&&prior.archives.every(row=>{const index=source.keys.indexOf(row.key);return index>=0&&source.values[index]?.raw===row.raw;});
+  const keep=source.keys.map((key,index)=>!known.has(key)||source.values[index]?.raw!==known.get(key));
+  const withoutReceipts={stores:{...baseline.rawDeviceSnapshot.stores,opaque:{
+    keys:source.keys.filter((key,index)=>keep[index]),values:source.values.filter((row,index)=>keep[index])}}};
+  const reuse=intact&&JSON.stringify(prior.localSources)===JSON.stringify(baseline.rawLocalSources)&&
+    rawRecoverySourceIdentity(withoutReceipts)===prior.sourceIdentity;
+  // Only our exact verified receipt additions may be excluded for reuse. A
+  // peer's unknown row still changes the full transaction CAS. Cancel/retry
+  // must not recursively archive already protected receipts and fill storage.
+  const original=reuse?prior.original:{key:"device-recovery-original:"+uid(),raw:JSON.stringify({
+    format:"chain-scanner.device-recovery-source",formatVersion:1,reason:baseline.unacceptedSource.reason,
+    localStorage:baseline.rawLocalSources,indexedDB:encodeManualArchiveSnapshot(baseline.rawDeviceSnapshot).stores})};
+  const fileRaw=JSON.stringify(restoreFile),file=reuse&&prior.archives.find(row=>row.key.startsWith("device-recovery-file:")&&row.raw===fileRaw)
+    ||{key:"device-recovery-file:"+uid(),raw:fileRaw};
+  const rawRecoveryArchives=[original,file];
   const result=await baseline.deviceStore.writeRecoveredSource({expectedSource:baseline.rawSourceIdentity,
     encodeSource:rawRecoverySourceIdentity,archives:rawRecoveryArchives,guard:()=>fileRestoreSourcesMatchSync(baseline)});
   if(!result?.ok)throw Error("The saved source changed or its exact recovery copies could not be protected. Nothing was replaced; preview again.");
+  baseline.unacceptedSource.capture={original,localSources:baseline.rawLocalSources,
+    sourceIdentity:reuse?prior.sourceIdentity:baseline.rawSourceIdentity,
+    archives:[...new Map([...(reuse?prior.archives:[]),...rawRecoveryArchives].map(row=>[row.key,row])).values()]};
   baseline.rawRecoveryArchives=rawRecoveryArchives;baseline.rawSourceIdentity=rawRecoverySourceIdentity(result.snapshot);
   await verifyFileRestoreCopies(baseline);
   return {id:rawRecoveryArchives[0].key,fileId:rawRecoveryArchives[1].key};

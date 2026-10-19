@@ -27,6 +27,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK unreadable device recovery: raw transaction CAS refuses peer source changes after the last preview read
 - RISK unreadable device recovery: partial raw rows remain exact while the restored board accepts later local edits
 - RISK unreadable device recovery: opaque identity collisions and unsupported raw types preserve every original
+- RISK unreadable device recovery: repeated cancelled previews reuse exact originals without recursive archive growth
 - RISK unreadable device recovery: Quick start and current Changelog explain preserved sources and local pending recovery
 - RISK resilient sync recovery: an exact acknowledged copy recovers missing cloud chunks and publishes subsequent local work
 - RISK resilient sync recovery: a failed rebuild protects every source and retries after another local edit
