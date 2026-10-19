@@ -1,5 +1,47 @@
 [
   {
+    "reason": "Repair exact-candidate independent-review findings at actual native Add, WOOP, cloud publication and populated cold-source adoption consumers. Keep UID namespace isolation while carrying verified identity at transient and trusted source boundaries.",
+    "previousBehavior": "The857 candidate could publish a stale recovery choice after a late device-head change, leave a durably saved signed-in Add draft uncleared, cancel a same-account WOOP walkthrough, and drop an independent saved extension edit because wire/ancestor payloads intentionally omit device UID metadata.",
+    "intendedBehavior": "Validate one atomic complete device snapshot after cloud transaction reads and before publication writes, including exact originals/prepared copies/pending/hold/browser/draft. Capture full local owner identity for Add/WOOP, and bind verified source UID only at trusted cloud and ancestor reconstruction boundaries. Keep foreign UID and uncertain authority protections.",
+    "replacementTests": [
+      "RISK cloud source recovery publication: a device peer change during the SDK read invalidates consent before cloud mutation",
+      "RISK recovery identity consumers: signed-in Add clears its captured draft after recovery",
+      "RISK recovery identity consumers: final-task WOOP advances after acknowledged recovery",
+      "RISK recovery identity consumers: verified cloud adoption rebases independent saved extension fields for the same UID"
+    ],
+    "preservedCoverage": [
+      "All original tests and assertions remain; no test threshold, required native outcome, protocol, rules or review gate is removed or weakened. Existing exact ACK, explicit-source, late UID, pending and held-decision consumer cohort remains protected.",
+      "Independent857 diagnostic failures are retrospective review reproductions. Root permanent repair RED925cbd3c observed actual cloud revision7 instead of6, uncleared accepted Add and cancelled WOOP before these repair edits. RED607f6ec3 observed the independent durable extension edit replaced by before, before verified ancestor/source UID propagation.",
+      "The five additional publication-source boundaries were added after the general peer-head guard implementation and are supplementary coverage; final857 baseline sensitivity is separately required and must not be described as the original RED. The original857 full suite51d7cc65 was deliberately interrupted after review rejection, not passed."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <root-worktree> --evidence-dir <usable-recovery>/test-runs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern=RISK_cloud_source_recovery_publication_or_recovery_identity_consumers tests.js",
+      "failure": "925cbd3c: actual cloud revision7!==6 after a real peer device commit inside SDK publication root-read; accepted native Add retains its text; final-task native WOOP closes at Next. 607f6ec3: actual cold saved same-UID extension value becomes before instead of saved device edit after real producer publication/cloud adoption. Both observed before their bounded repair edits."
+    },
+    "testChangesSha256": "eb2ee66a3e03732582637872aea86a7b839ffd1f041543cc3c51e7e2af624ede"
+  },
+  {
+    "reason": "Repair exact-candidate independent-review findings at actual native Add, WOOP, cloud publication and populated cold-source adoption consumers. Keep UID namespace isolation while carrying verified identity at transient and trusted source boundaries.",
+    "previousBehavior": "The857 candidate could publish a stale recovery choice after a late device-head change, leave a durably saved signed-in Add draft uncleared, cancel a same-account WOOP walkthrough, and drop an independent saved extension edit because wire/ancestor payloads intentionally omit device UID metadata.",
+    "intendedBehavior": "Validate one atomic complete device snapshot after cloud transaction reads and before publication writes, including exact originals/prepared copies/pending/hold/browser/draft. Capture full local owner identity for Add/WOOP, and bind verified source UID only at trusted cloud and ancestor reconstruction boundaries. Keep foreign UID and uncertain authority protections.",
+    "replacementTests": [
+      "RISK cloud source recovery publication: a device peer change during the SDK read invalidates consent before cloud mutation",
+      "RISK recovery identity consumers: signed-in Add clears its captured draft after recovery",
+      "RISK recovery identity consumers: final-task WOOP advances after acknowledged recovery",
+      "RISK recovery identity consumers: verified cloud adoption rebases independent saved extension fields for the same UID"
+    ],
+    "preservedCoverage": [
+      "All original tests and assertions remain; no test threshold, required native outcome, protocol, rules or review gate is removed or weakened. Existing exact ACK, explicit-source, late UID, pending and held-decision consumer cohort remains protected.",
+      "Independent857 diagnostic failures are retrospective review reproductions. Root permanent repair RED925cbd3c observed actual cloud revision7 instead of6, uncleared accepted Add and cancelled WOOP before these repair edits. RED607f6ec3 observed the independent durable extension edit replaced by before, before verified ancestor/source UID propagation.",
+      "The five additional publication-source boundaries were added after the general peer-head guard implementation and are supplementary coverage; final857 baseline sensitivity is separately required and must not be described as the original RED. The original857 full suite51d7cc65 was deliberately interrupted after review rejection, not passed."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <root-worktree> --evidence-dir <usable-recovery>/test-runs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern=RISK_cloud_source_recovery_publication_or_recovery_identity_consumers tests.js",
+      "failure": "925cbd3c: actual cloud revision7!==6 after a real peer device commit inside SDK publication root-read; accepted native Add retains its text; final-task native WOOP closes at Next. 607f6ec3: actual cold saved same-UID extension value becomes before instead of saved device edit after real producer publication/cloud adoption. Both observed before their bounded repair edits."
+    },
+    "testChangesSha256": "2a71156152521160b7016ebee3210a8c9d64239093a0acdf79214b1c310b858c"
+  },
+  {
     "testChangesSha256": "3ca35350cbed99373153c8d6349a186b263b927ea5466da90b08d6f343d11cb3",
     "reason": "Reconcile the final exact integrated origin/main test diff while preserving every original feature assertion. Final owner review closes Settings draft loss and stale earlier-prepared-source consent through actual native recovery consumers.",
     "previousBehavior": "Complete cloud recovery lacked an actionable native path. After the main slice, entering source review from Settings could discard an unsaved draft, and an earlier prepared choice was neither concretely shown nor required exact in the last protection checks before publication.",

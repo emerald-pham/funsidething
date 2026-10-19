@@ -1734,3 +1734,8 @@ The native needs-attention action uses real IndexedDB and the production backend
 
 - RISK cloud source recovery drafts: Settings drafts survive native review cancel delayed reads and confirmed recovery
 - RISK cloud source recovery prepared sources: earlier choices are disclosed and must stay exact before a replacement publishes
+
+- RISK cloud source recovery publication: a device peer change during the SDK read invalidates consent before cloud mutation
+- RISK recovery identity consumers: signed-in Add clears its captured draft after recovery
+- RISK recovery identity consumers: final-task WOOP advances after acknowledged recovery
+- RISK recovery identity consumers: verified cloud adoption rebases independent saved extension fields for the same UID

@@ -37886,3 +37886,77 @@ test('RISK cloud source recovery prepared sources: earlier choices are disclosed
   }
  });
 });
+
+test('RISK cloud source recovery publication: a device peer change during the SDK read invalidates consent before cloud mutation',async t=>{
+ for(const boundary of ['device head','browser source','Add draft','pending pointer','prepared copy','device hold'])await t.test(boundary,async sub=>{
+ const app=await divergentCloudSourceApp187(sub),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ await ctx.onAction('review-cloud-source-recovery',{});
+ await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'generation:'+originalRoot.previousGeneration}});
+ let fired=false;
+ app.faults.transactionRead=async(path,docs)=>{
+  if(fired||path!=='users/owner')return;
+  fired=true;
+  if(boundary==='device head'){
+   const head=await store.readHead(),peer=JSON.parse(head.payload);peer.tasks.push(syncTask('peer-after-consent','New peer device work'));
+   assert.equal((await store.commitHead({expectedHash:head.hash,payload:JSON.stringify(peer),account:'e@example.com'})).ok,true);
+  }else if(boundary==='browser source')app.shim.localStorage.setItem(LOCAL_HEAD_KEY,app.shim.localStorage.getItem(LOCAL_HEAD_KEY)+' ');
+  else if(boundary==='Add draft'){
+   const input=app.shim.document.getElementById('addInput');input.id='addInput';input.value='Draft entered after source consent';app.shim.document.dispatchEvent({type:'input',target:input});
+  }else if(boundary==='pending pointer'){
+   const pending=await store.getPendingUpload('owner');assert.ok(pending);assert.equal((await store.setPendingUpload('owner',{...pending,generationId:'peer-pending-after-consent'})).ok,true);
+  }else if(boundary==='prepared copy'){
+   const prepared=(await store.listBackups()).find(row=>row.kind==='decision-recovery-choice');assert.ok(prepared);
+   await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>tx.objectStore('backups').delete(prepared.id));
+  }else await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>tx.objectStore('meta').put({reason:'new-peer-hold',identity:'owner'},'recoveryCloudHold'));
+ };
+ const result=await ctx.onAction('apply-cloud-source-recovery',{});
+ assert.equal(fired,true,'the external device change occurs inside the actual SDK transaction read');
+ assert.equal(result,false);
+ assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev,'changed source consent must stop publication, not just reject local adoption after overwriting cloud');
+ });
+});
+
+test('RISK recovery identity consumers: signed-in Add clears its captured draft after recovery',async t=>{
+ const app=await divergentCloudSourceApp187(t),{ctx,shim}=app;
+ await ctx.onAction('review-cloud-source-recovery',{});
+ await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'device'}});
+ assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),true);
+ assert.equal(ctx.state.syncIdentity,'owner');
+ const input=shim.document.getElementById('addInput');input.id='addInput';input.value='One signed-in Add after recovery';
+ shim.document.dispatchEvent({type:'input',target:input});
+ assert.equal(await ctx.onAction('add',{}),true);
+ assert.equal(ctx.state.tasks.filter(row=>row.title==='One signed-in Add after recovery').length,1);
+ assert.equal((await ctx.window.ScannerDeviceStore.readHead()).payload,JSON.stringify(ctx.state));
+ assert.equal(input.value,'','a durably accepted same-identity Add must clear its captured draft');
+});
+
+test('RISK recovery identity consumers: final-task WOOP advances after acknowledged recovery',async t=>{
+ const app=await damagedAcknowledgedApp187(t),{ctx,shim}=app;
+ await ctx.cloudPull();await ctx.sendPush();await settleRecovery188(app);
+ assert.equal(ctx.state.syncIdentity,'owner');
+ app.task=ctx.state.tasks[0];woopDislodgeTwice(app);
+ ctx.onAction('woop-start',{dataset:{benchmark:app.task.id}});
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/best outcome/i);
+ woopStep(app,'A supported signed-in outcome');
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/obstacle could get in your way/i,'a same-identity WOOP session must advance instead of cancelling its draft');
+});
+
+
+
+test('RISK recovery identity consumers: verified cloud adoption rebases independent saved extension fields for the same UID',async t=>{
+ const fixture=heldDecisionFixture188();fixture.local.settings.theme='light';fixture.local.futureExtension={device:'before',peer:'before'};fixture.remote=JSON.parse(JSON.stringify(fixture.local));
+ const app=await heldDecisionApp188(t,{fixture}),{ctx,backend}=app;await ctx.sendPush();await settleRecovery188(app);
+ assert.equal(ctx.state.syncIdentity,'owner');
+ const head=await ctx.window.ScannerDeviceStore.readHead(),local=JSON.parse(head.payload),peer=JSON.parse(ctx.state.decisionBase.payload);local.futureExtension.device='saved device edit';local.syncDirty=true;peer.futureExtension.peer='saved cloud edit';
+ const producer=await loadCloudBackendV2({failures:{authPending:true},timeoutMs:5000});t.after(()=>producer.CS.suspend());for(const [key,value]of backend.docs)producer.docs.set(key,value);producer.emitAuth({uid:'owner',email:'e@example.com'});
+ const published=await producer.CS.push(JSON.stringify(peer),1792323001000,ctx.state.syncRev);assert.equal(published.ok,true,'the independent cloud writer really publishes a new generation');
+ backend.CS.suspend();await closeLegacyApp173(app);
+ const store=loadStorageV2({indexedDB:app.indexedDB}).createDeviceStore({indexedDB:app.indexedDB,crypto:webcrypto,dbName:app.deviceDbName});await store.open();
+ assert.equal((await store.commitHead({expectedHash:head.hash,payload:JSON.stringify(local),account:'e@example.com',sourceFingerprint:head.sourceFingerprint})).ok,true);await store.close();
+ const cold=await loadAppAtTime(1792323000000,{indexedDBProvider:app.indexedDB,deviceDbName:app.deviceDbName,sharedStorage:app.shim.localStorage});t.after(()=>closeLegacyApp173(cold));
+ assert.equal(cold.ctx.state.futureExtension.device,'saved device edit','the actual cold source contains the independent device change');
+ const reader=await loadCloudBackendV2({runtimeWindow:cold.ctx.window,failures:{authPending:true},timeoutMs:5000});t.after(()=>reader.CS.suspend());for(const [key,value]of producer.docs)reader.docs.set(key,value);reader.emitAuth({uid:'owner',email:'e@example.com'});await cold.ctx.cloudPull();await cold.ctx.sendPush();await settleRecovery188({...cold,backend:reader});
+ assert.equal(cold.ctx.state.futureExtension.device,'saved device edit','UID-less wire and ancestor payloads must gain only the verified source identity before same-owner rebasing');
+ assert.equal(cold.ctx.state.futureExtension.peer,'saved cloud edit');
+ assert.equal((await cold.ctx.window.ScannerDeviceStore.readHead()).payload,JSON.stringify(cold.ctx.state));
+});
