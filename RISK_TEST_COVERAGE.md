@@ -1650,3 +1650,12 @@ The existing editor consumer still executes its original fixture persists and im
 - RISK login rating recovery: unavailable protection and changing consent never publish or replace the active board
 - RISK saved-board startup: a large witnessed archive remains responsive and never reuses changed evidence
 - RISK saved-board startup: a witness codec failure leaves the original board usable and safely unsupported
+
+## Visible pasted recovery and draft consent
+
+- RISK pasted recovery UI: Settings opens an editable protected preview and only applies after explicit restore
+- RISK pasted recovery UI: a newer DOM-only draft invalidates a delayed backup preview
+- RISK pasted recovery UI: closing during delayed protection reopens the latest draft without a late preview
+- RISK pasted recovery UI: archive and raw backup text use the visible Settings route and explicit rating choice
+
+The real Settings action opens a separate paste editor. Ordinary boards, full recovery archives, raw backup lists and saved-versus-recorded rating choices use the same exact-source/current-board protection and explicit restore preview as file recovery. Delayed durable backup work is bound to the editor session, input revision and live textarea value; closing during pending work retains the exact draft and Settings values without allowing a late preview. Held cloud choices remain a separate review and merge path.

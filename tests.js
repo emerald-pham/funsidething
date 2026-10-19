@@ -36351,6 +36351,205 @@ test('RISK historical board file recovery: conflicting saved ratings require an 
  });
 });
 
+test('RISK pasted recovery UI: Settings opens an editable protected preview and only applies after explicit restore',{timeout:20000},async t=>{
+ const {IDBFactory}=await import('fake-indexeddb');
+ const indexedDB=new IDBFactory(),deviceDbName='pasted-settings-ui-'+Date.now()+'-'+Math.random(),sharedStorage=sharedScannerStorage();
+ const app=await loadBackupFileFixtureApp({indexedDBProvider:indexedDB,deviceDbName,sharedStorage}),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+ t.after(async()=>{await store.close();});
+ ctx.addTask('Current pasted UI task',false);await prepareBackupFileFixtureSource(app);
+ const current=JSON.stringify(ctx.state),head=await store.readHead(),board=JSON.parse(ctx.currentBoardExportPayload());
+ board.tasks[0].title='Explicitly selected pasted task';board.futurePasteBoardField={keep:'unknown board data'};
+ const raw='\n '+JSON.stringify(board,null,2)+'\n';
+ const root=shim.document.getElementById('modalRoot'),getElementById=shim.document.getElementById.bind(shim.document);
+ shim.document.getElementById=id=>id==='jsonBox'&&!root.innerHTML.includes('id="jsonBox"')?null:getElementById(id);
+ const dispatch=action=>{const target=makeFakeElement();target.dataset={act:action};target.closest=selector=>selector==='[data-act]'?target:null;shim.document.dispatchEvent({type:'click',target,detail:1});};
+ assert.match(html,/<button class="ghost" data-act="settings"/,'the header exposes the Settings button that opens this route');
+ dispatch('settings');
+ const settings=root.innerHTML;assert.match(settings,/<h2>Settings<\/h2>/,'the visible header Settings action opens Settings');
+ const pasteButton=settings.match(/<button\b(?=[^>]*data-act="open-paste-recovery")[^>]*>\s*Paste board JSON\s*<\/button>/);
+ assert.ok(pasteButton,'Settings exposes a visible Paste board JSON action');
+ assert.doesNotMatch(settings,/id="jsonBox"/,'the editable paste area stays in its own dialog');
+ const numericDraft=shim.document.getElementById('stHorizon');numericDraft.value='77';
+ root.querySelectorAll=selector=>selector==='input,select,textarea'?[numericDraft]:[];
+ const click=action=>{
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,new RegExp('data-act="'+action+'"'),'the clicked control is present in the current UI');
+  dispatch(action);
+ };
+ const oneDialog=message=>{
+  const markup=shim.document.getElementById('modalRoot').innerHTML;
+  assert.equal((markup.match(/class="mback"/g)||[]).length,1,message+' keeps one backdrop');
+  assert.equal((markup.match(/class="modal" role="dialog"/g)||[]).length,1,message+' keeps one dialog');
+  return markup;
+ };
+ click('open-paste-recovery');
+ assert.match(oneDialog('Opening paste recovery'),/id="jsonBox"/,'the visible Settings route opens an editable text area');
+ const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=raw;shim.document.dispatchEvent({type:'input',target:box});
+ const waitForPreview=async()=>{
+  for(let attempt=0;attempt<160&&!shim.document.getElementById('modalRoot').innerHTML.includes('data-act="confirm-file-restore"');attempt++)await flush();
+  return shim.document.getElementById('modalRoot').innerHTML;
+ };
+ click('preview-pasted-recovery');
+ let preview=await waitForPreview();
+ assert.match(preview,/Explicitly selected pasted task/,'ordinary board paste reaches the protected explicit preview');
+ assert.match(preview,/unknown board data/);
+ assert.equal(JSON.stringify(ctx.state),current,'preview leaves the current in-memory board unchanged');
+ assert.equal((await store.readHead()).hash,head.hash,'preview leaves the durable current head unchanged');
+ let backups=await store.listBackups();
+ const currentCopy=backups.find(row=>row.kind==='before-file-restore'&&row.payload===current);
+ const sourceCopy=backups.find(row=>row.kind==='restore-file-source'&&row.restoreFile?.fileName==='Pasted board.json');
+ assert.ok(currentCopy,'the exact current board is saved before preview');assert.ok(sourceCopy,'the exact pasted source is saved before preview');
+ assert.equal(Buffer.from(sourceCopy.restoreFile.bytesBase64,'base64').toString('utf8'),raw,'the saved source readback retains exact text bytes');
+ click('cancel-file-restore');
+ let editor=oneDialog('Cancelling pasted preview');
+ assert.equal(shim.document.getElementById('jsonBox').value,raw,'Cancel retains every pasted character');
+ assert.equal(JSON.stringify(ctx.state),current,'Cancel keeps the live board');
+ for(let cycle=0;cycle<2;cycle++){
+  click('preview-pasted-recovery');preview=await waitForPreview();assert.match(preview,/Explicitly selected pasted task/);
+  click('cancel-file-restore');editor=oneDialog('Repeating pasted preview and cancel');
+  assert.equal(shim.document.getElementById('jsonBox').value,raw,'repeat Cancel retains the exact draft');
+ }
+ click('preview-pasted-recovery');preview=await waitForPreview();assert.match(preview,/data-act="confirm-file-restore"/);
+ click('confirm-file-restore');
+ for(let attempt=0;attempt<160&&ctx.state.tasks[0].title!=='Explicitly selected pasted task';attempt++)await flush();
+ assert.equal(ctx.state.tasks[0].title,'Explicitly selected pasted task','only explicit confirmation applies the selected board');
+ assert.deepEqual(ctx.state.futurePasteBoardField,{keep:'unknown board data'},'unknown board facts survive the selected restore');
+ assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state),'the selected board is durably committed and read back');
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/<h2>Settings<\/h2>/,'completion returns to Settings');
+ assert.equal(shim.document.getElementById('stHorizon').value,'77','Settings numeric draft survives the paste round trip');
+ backups=await store.listBackups();assert.ok(backups.some(row=>row.id===sourceCopy.id&&Buffer.from(row.restoreFile?.bytesBase64||'','base64').toString('utf8')===raw),'the pasted source remains protected after adoption');
+ await store.close();
+ const reopened=await loadApp({indexedDBProvider:indexedDB,deviceDbName,sharedStorage});
+ t.after(async()=>{await reopened.ctx.window.ScannerDeviceStore.close();});
+ assert.equal(reopened.ctx.state.tasks[0].title,'Explicitly selected pasted task','the actual pasted restore survives a cold reopen');
+ assert.deepEqual(reopened.ctx.state.futurePasteBoardField,{keep:'unknown board data'});
+});
+
+test('RISK pasted recovery UI: a newer DOM-only draft invalidates a delayed backup preview',{timeout:12000},async t=>{
+ const {IDBFactory}=await import('fake-indexeddb');
+ const app=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'pasted-draft-race-'+Date.now()+'-'+Math.random()}),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+ t.after(async()=>{await store.close();});
+ ctx.addTask('Current draft-race task',false);await prepareBackupFileFixtureSource(app);
+ const current=JSON.stringify(ctx.state),head=await store.readHead(),oldBoard=JSON.parse(ctx.currentBoardExportPayload());
+ oldBoard.tasks[0].title='First pasted draft';const oldRaw=JSON.stringify(oldBoard);
+ const latestBoard=JSON.parse(JSON.stringify(oldBoard));latestBoard.tasks[0].title='Newer DOM-only pasted draft';const latestRaw=JSON.stringify(latestBoard);
+ const root=shim.document.getElementById('modalRoot'),getElementById=shim.document.getElementById.bind(shim.document);
+ shim.document.getElementById=id=>id==='jsonBox'&&!root.innerHTML.includes('id="jsonBox"')?null:getElementById(id);
+ const click=action=>{
+  const markup=shim.document.getElementById('modalRoot').innerHTML;assert.match(markup,new RegExp('data-act="'+action+'"'));
+  const target=makeFakeElement();target.dataset={act:action};target.closest=selector=>selector==='[data-act]'?target:null;
+  shim.document.dispatchEvent({type:'click',target,detail:1});
+ };
+ const dispatch=action=>{const target=makeFakeElement();target.dataset={act:action};target.closest=selector=>selector==='[data-act]'?target:null;shim.document.dispatchEvent({type:'click',target,detail:1});};
+ dispatch('settings');assert.match(shim.document.getElementById('modalRoot').innerHTML,/<h2>Settings<\/h2>/);
+ dispatch('open-paste-recovery');
+ const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=oldRaw;shim.document.dispatchEvent({type:'input',target:box});
+ let enteredResolve,releaseWrite;const entered=new Promise(resolve=>enteredResolve=resolve),writeGate=new Promise(resolve=>releaseWrite=resolve);
+ const originalPut=store.putBackup.bind(store);let delayed=false;
+ store.putBackup=async options=>{
+  const result=await originalPut(options);
+  if(!delayed&&options?.backup?.kind==='restore-file-source'){delayed=true;enteredResolve();await writeGate;}
+  return result;
+ };
+ click('preview-pasted-recovery');
+ try{
+  await entered;
+  box.value=latestRaw; // Model a user typing into the real editor while IndexedDB has accepted the older source row.
+  releaseWrite();
+  const deadline=Date.now()+5000;
+  while(vm.runInContext('fileRestoreBusy',ctx)&&Date.now()<deadline)await flush();
+  assert.equal(vm.runInContext('fileRestoreBusy',ctx),false,'the delayed preparation settles');
+  const markup=shim.document.getElementById('modalRoot').innerHTML;
+  assert.doesNotMatch(markup,/data-act="confirm-file-restore"/,'a preview for the older pasted text is never shown');
+  assert.match(markup,/id="jsonBox"/,'the editable paste dialog remains available');
+  assert.equal(box.value,latestRaw,'the latest textarea value survives the stale preparation');
+  assert.equal(JSON.stringify(ctx.state),current,'stale paste consent never changes the live board');
+  assert.equal((await store.readHead()).hash,head.hash,'stale paste consent never changes the durable head');
+  const exactRows=(await store.listBackups()).filter(row=>row.kind==='restore-file-source');
+  assert.ok(exactRows.some(row=>Buffer.from(row.restoreFile?.bytesBase64||'','base64').toString('utf8')===oldRaw),'the source already written before typing remains honest recovery evidence');
+  assert.ok(!exactRows.some(row=>Buffer.from(row.restoreFile?.bytesBase64||'','base64').toString('utf8')===latestRaw),'the newer draft is not mislabeled as the selected protected source');
+ }finally{releaseWrite();store.putBackup=originalPut;}
+});
+
+test('RISK pasted recovery UI: closing during delayed protection reopens the latest draft without a late preview',{timeout:12000},async t=>{
+ const {IDBFactory}=await import('fake-indexeddb');
+ const app=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'pasted-close-race-'+Date.now()+'-'+Math.random()}),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+ t.after(async()=>{await store.close();});
+ ctx.addTask('Current close-race task',false);await prepareBackupFileFixtureSource(app);
+ const current=JSON.stringify(ctx.state),head=await store.readHead(),board=JSON.parse(ctx.currentBoardExportPayload());board.tasks[0].title='Latest closed-dialog draft';const raw=JSON.stringify(board);
+ const root=shim.document.getElementById('modalRoot'),getElementById=shim.document.getElementById.bind(shim.document);
+ shim.document.getElementById=id=>id==='jsonBox'&&!root.innerHTML.includes('id="jsonBox"')?null:getElementById(id);
+ const dispatch=action=>{const target=makeFakeElement();target.dataset={act:action};target.closest=selector=>selector==='[data-act]'?target:null;shim.document.dispatchEvent({type:'click',target,detail:1});};
+ dispatch('settings');assert.match(shim.document.getElementById('modalRoot').innerHTML,/<h2>Settings<\/h2>/,'the real Settings route is active');
+ const horizon=shim.document.getElementById('stHorizon');horizon.value='83';shim.document.getElementById('modalRoot').querySelectorAll=selector=>selector==='input,select,textarea'?[horizon]:[];
+ dispatch('open-paste-recovery');const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=raw;shim.document.dispatchEvent({type:'input',target:box});
+ let enteredResolve,releaseWrite,writeFinishedResolve;const entered=new Promise(resolve=>enteredResolve=resolve),writeGate=new Promise(resolve=>releaseWrite=resolve),writeFinished=new Promise(resolve=>writeFinishedResolve=resolve);
+ const originalPut=store.putBackup.bind(store);let delayed=false;
+ store.putBackup=async options=>{const result=await originalPut(options);if(!delayed&&options?.backup?.kind==='restore-file-source'){delayed=true;enteredResolve();await writeGate;writeFinishedResolve();}return result;};
+ dispatch('preview-pasted-recovery');
+ try{
+  await entered;assert.equal((await store.listBackups()).filter(row=>row.kind==='restore-file-source').length,1,'the exact source was durably written before the held response');
+  dispatch('close-paste-recovery');
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/<h2>Settings<\/h2>/,'closing a pending paste returns to Settings');
+  assert.equal(shim.document.getElementById('stHorizon').value,'83','the Settings numeric draft survives a pending close');
+  dispatch('open-paste-recovery');assert.equal(shim.document.getElementById('jsonBox').value,raw,'reopening restores the exact latest paste text');
+  releaseWrite();await writeFinished;for(let attempt=0;attempt<40;attempt++)await flush();
+  const markup=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(markup,/id="jsonBox"/,'the reopened editor stays available after old work settles');
+  assert.doesNotMatch(markup,/data-act="confirm-file-restore"/,'cancelled work cannot install a late preview in the reopened editor');
+  assert.equal(JSON.stringify(ctx.state),current,'pending close leaves the active board unchanged');assert.equal((await store.readHead()).hash,head.hash);
+  const rows=(await store.listBackups()).filter(row=>row.kind==='restore-file-source');
+  assert.ok(rows.some(row=>Buffer.from(row.restoreFile?.bytesBase64||'','base64').toString('utf8')===raw),'the exact pasted source remains protected after cancellation');
+ }finally{releaseWrite();store.putBackup=originalPut;}
+});
+
+test('RISK pasted recovery UI: archive and raw backup text use the visible Settings route and explicit rating choice',{timeout:18000},async t=>{
+ const {IDBFactory}=await import('fake-indexeddb');
+ const source=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'pasted-format-source-'+Date.now()});
+ t.after(async()=>{await source.ctx.window.ScannerDeviceStore.close();});source.ctx.addTask('Saved pasted task',false);source.ctx.onAction('cycle-theme',{});await prepareBackupFileFixtureSource(source);
+ const board=JSON.parse(source.ctx.currentBoardExportPayload());board.tasks[0].mu+=1;board.futurePasteFormatField={keep:31};
+ assert.equal(source.ctx.decisionEvidenceIssue(board,null),'unrepresented-legacy-learning');
+ const archive={format:'chain-scanner.recovery-archive',formatVersion:1,capturedAt:new Date().toISOString(),currentBoard:board,
+  manifest:{status:'complete',consistency:'synthetic-test',sources:{currentBoard:{status:'included'}},failures:[]}};
+ for(const format of ['archive','raw'])await t.test(format,async subtest=>{
+  const app=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'pasted-format-'+format+'-'+Date.now()}),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+  subtest.after(async()=>{await store.close();});ctx.addTask('Current pasted format task',false);await prepareBackupFileFixtureSource(app);
+  const raw='\n '+JSON.stringify(format==='archive'?archive:[{id:'daily-source',kind:'daily',day:'2026-10-18',at:1792324800000,payload:JSON.stringify(board)}],null,2)+'\n';
+  const before=JSON.stringify(ctx.state),head=await store.readHead();
+  const root=shim.document.getElementById('modalRoot'),getElementById=shim.document.getElementById.bind(shim.document);
+  shim.document.getElementById=id=>id==='jsonBox'&&!root.innerHTML.includes('id="jsonBox"')?null:getElementById(id);
+  const dispatch=action=>{const target=makeFakeElement();target.dataset={act:action};target.closest=selector=>selector==='[data-act]'?target:null;shim.document.dispatchEvent({type:'click',target,detail:1});};
+  dispatch('settings');assert.match(shim.document.getElementById('modalRoot').innerHTML,/<h2>Settings<\/h2>/,'pasting starts from the visible Settings control');
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="open-paste-recovery"/);
+  dispatch('open-paste-recovery');const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=raw;shim.document.dispatchEvent({type:'input',target:box});
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="preview-pasted-recovery"/);
+  dispatch('preview-pasted-recovery');
+  const expectedChoice=format==='raw'?'fileRestoreBackupChoice':'fileRestoreLearningChoice';
+  for(let attempt=0;attempt<200&&!shim.document.getElementById('modalRoot').innerHTML.includes('id="'+expectedChoice+'"');attempt++)await flush();
+  let preview=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(preview,new RegExp('id="'+expectedChoice+'"'),'the pasted format reaches its supported explicit choice');
+  assert.equal(JSON.stringify(ctx.state),before);assert.equal((await store.readHead()).hash,head.hash);
+  assert.ok((await store.listBackups()).some(row=>row.kind==='restore-file-source'&&Buffer.from(row.restoreFile?.bytesBase64||'','base64').toString('utf8')===raw),'the complete archive or raw list is protected byte for byte');
+  dispatch('cancel-file-restore');assert.equal(shim.document.getElementById('jsonBox').value,raw,'cancel preserves the entire selected paste');
+  dispatch('preview-pasted-recovery');
+  for(let attempt=0;attempt<200&&!shim.document.getElementById('modalRoot').innerHTML.includes('id="'+expectedChoice+'"');attempt++)await flush();
+  const choose=async(id,value)=>{const control=shim.document.getElementById(id);control.id=id;control.value=value;control.matches=()=>false;shim.document.dispatchEvent({type:'change',target:control});const deadline=Date.now()+5000;while(vm.runInContext('fileRestoreBusy',ctx)&&Date.now()<deadline)await flush();assert.equal(vm.runInContext('fileRestoreBusy',ctx),false);};
+  if(format==='raw')await choose('fileRestoreBackupChoice','0');await choose('fileRestoreLearningChoice','saved');
+  preview=shim.document.getElementById('modalRoot').innerHTML;assert.match(preview,/data-act="confirm-file-restore"/);
+  assert.equal(JSON.stringify(ctx.state),before,'format and rating choices remain previews until confirmation');
+  dispatch('confirm-file-restore');
+  for(let attempt=0;attempt<160&&ctx.state.tasks[0].mu!==board.tasks[0].mu;attempt++)await flush();
+  assert.equal(ctx.state.tasks[0].mu,board.tasks[0].mu,'the deliberate saved-rating selection is applied');
+  assert.equal(ctx.state.futurePasteFormatField.keep,31,'unknown board fields survive archive and raw restoration');
+  assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state),'the chosen board is durably committed and read back');
+ });
+ source.ctx.openHelp();
+ const help=source.shim.document.getElementById('modalRoot').innerHTML,faq=help.match(/<dt>How do I paste a saved board\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
+ assert.ok(faq,'the extended Data and backups FAQ explains pasted recovery');
+ assert.ok(faq.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the pasted-recovery FAQ keeps its word limit');
+ assert.match(faq,/Settings → Data and backups → Paste board JSON/,'the FAQ names the visible Settings route');
+ assert.match(faq,/separate from Review saved decisions.*combines device and cloud choices/,'the FAQ distinguishes snapshot restore from held-cloud choice merging');
+});
+
 test('RISK pasted board recovery: raw backups and historical ratings use explicit protected preview and retain the cancelled draft',{timeout:15000},async t=>{
  const {IDBFactory}=await import('fake-indexeddb');
  const source=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'pasted-source-'+Date.now()});
