@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { webcrypto } from 'node:crypto';
+import { webcrypto, createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -69,7 +69,7 @@ function loadBackend(artifacts,db,F,uid){
   }
   const window={FIREBASE_CONFIG:{apiKey:'emulator-only'},dispatchEvent(){}};
   const A={getAuth:()=>auth,setPersistence:async()=>{},browserLocalPersistence:{},onAuthStateChanged:(_,fn)=>fn(auth.currentUser)};
-  const context=vm.createContext({window,crypto:webcrypto,TextEncoder,TextDecoder,structuredClone,
+  const context=vm.createContext({window,crypto:webcrypto,TextEncoder,TextDecoder,Uint8Array,structuredClone,
     console,setTimeout,clearTimeout,CustomEvent:class{},__modules:[{initializeApp:()=>({})},A,sdk]});
   for(const [file,code] of [['device-store-v2.js',artifacts.storage],['cloud-store-v2.js',artifacts.cloud]]){
     if(code)vm.runInContext(code,context,{filename:`${artifacts.label}/${file}`});
@@ -124,23 +124,32 @@ export async function runCompatibilityMatrix(root,{base}={}){
         const old=await start(released,uid),next=await start(candidate,uid);
         for(const client of [old,next])assert.equal((await client.pull()).payload,legacy,`${direction}: legacy read`);
         const first=direction==='old-client/new-rules'?old:next,second=first===old?next:old;
+        const assertWireHash=async payload=>{
+          const db=env.authenticatedContext(uid).firestore();
+          const root=(await F.getDocFromServer(F.doc(db,'users',uid))).data();
+          const header=(await F.getDocFromServer(F.doc(db,'users',uid,'generations',root.activeGeneration))).data();
+          assert.equal(header.hash,createHash('sha256').update(payload,'utf8').digest('hex'),`${direction}: published header must match independent UTF8 bytes`);
+        };
         await assertRoundTrip(first,legacy,0,`${direction}: migrate legacy board`);
+        await assertWireHash(legacy);
         assert.equal((await second.pull()).payload,legacy,`${direction}: peer reads migration`);
         const large=JSON.stringify({...JSON.parse(legacy),future:{keep:'unknown data',blob:'😀 retained '.repeat(100000)}});
         assert.ok(Buffer.byteLength(large)>1048576,'exercise real chunked storage beyond the old document limit');
         await assertRoundTrip(second,large,1,`${direction}: peer writes large board`);
+        await assertWireHash(large);
         assert.equal((await first.pull()).payload,large,`${direction}: older/newer reader preserves large payload`);
         const stale=await first.push('stale overwrite',2,1);
         assert.equal(stale?.conflict,true,`${direction}: stale write must conflict`);
         assert.equal((await second.pull()).payload,large,`${direction}: conflict must preserve board`);
         await assertRoundTrip(first,legacy,2,`${direction}: original client edits after peer`);
+        await assertWireHash(legacy);
         assert.equal((await second.pull()).payload,legacy,`${direction}: final cross-version read`);
         const stranger=env.authenticatedContext('other-account').firestore(),guest=env.unauthenticatedContext().firestore();
         await assertFails(F.getDoc(F.doc(stranger,'users',uid)));
         await assertFails(F.getDoc(F.doc(guest,'users',uid)));
         await assertFails(F.setDoc(F.doc(stranger,'users',uid),{payload:'overwrite',updatedAt:1,rev:4,serverUpdatedAt:F.serverTimestamp()}));
         await assertFails(F.deleteDoc(F.doc(env.authenticatedContext(uid).firestore(),'users',uid)));
-        report.cases.push({baseline:sha,direction,legacyMigration:true,staleWriteRejected:true,ownerIsolation:true,largePayload:true});
+        report.cases.push({baseline:sha,direction,legacyMigration:true,staleWriteRejected:true,ownerIsolation:true,largePayload:true,utf8HashVerified:true});
         if(!report.historicalBreakDetected){
           const historical={label:HISTORICAL_BREAK,html:git(root,'show',`${HISTORICAL_BREAK}:index.html`)};
           const broken=await start(historical,'historical-negative-control');

@@ -169,6 +169,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK CLOUD V2: a multi-megabyte board publishes only after verified chunks and pulls byte-exactly
 - RISK CLOUD V2: crash resume, concurrent revisions, and account cancellation never publish partial data
 - RISK CLOUD V2: corrupt active data fails closed, manifest races retry, and garbage collection keeps recovery generations
+- RISK repository process: compatibility round trips preserve independently hashed production bytes
 - RISK CLOUD TRANSACTION: full app codec and backend share the independent UTF8 digest
 - RISK CLOUD TRANSACTION: the SDK consumer verifies published UTF8 bytes against an independent digest
 - RISK CLOUD TRANSACTION: missing and partial sources cannot be sealed after the earlier upload read

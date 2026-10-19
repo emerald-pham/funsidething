@@ -11707,6 +11707,15 @@ test('RISK decision capability recovery: sole baseline recovery activates the fe
  assert.equal((await h.CS.pull()).payload,payload);
 });
 
+test('RISK repository process: compatibility round trips preserve independently hashed production bytes',async t=>{
+ const {assertRoundTrip}=await import('./scripts/backward-compatibility.mjs');
+ const h=await loadCloudBackendV2({timeoutMs:5000});t.after(()=>h.CS.suspend());
+ const payload=JSON.stringify({tasks:[{id:'compatibility-utf8',title:'Unicode 😀'}],futureOpaque:{retain:[1,2]}});
+ await assertRoundTrip(h.CS,payload,0,'independent UTF8 compatibility');
+ const root=h.docs.get('users/owner'),header=h.docs.get('users/owner/generations/'+root.activeGeneration);
+ assert.equal(header.hash,createHash('sha256').update(payload,'utf8').digest('hex'));
+});
+
 test('RISK CLOUD TRANSACTION: full app codec and backend share the independent UTF8 digest',async t=>{
  const {IDBFactory}=await import('fake-indexeddb');
  const app=await loadApp({indexedDBProvider:new IDBFactory(),deviceDbName:'app-codec-digest-'+Math.random()});
@@ -11714,6 +11723,10 @@ test('RISK CLOUD TRANSACTION: full app codec and backend share the independent U
  const payload=JSON.stringify({tasks:[{id:'full-app-digest',title:'Unicode 😀'}],futureOpaque:'retain '.repeat(20)});
  const expected=createHash('sha256').update(payload,'utf8').digest('hex');
  assert.equal(await app.ctx.window.ChainStorageV2.hashPayload(payload),expected,'the full-app codec must see the bytes produced by the injected TextEncoder');
+ assert.equal(await loadStorageV2().hashPayload(payload),expected,'the standalone fixture codec must agree with the real app and independently hashed bytes');
+ const adapter=cloudV2Adapter(),isolated=loadCloudV2().createCloudStore({adapter,crypto:webcrypto});
+ const complete=await isolated.push('owner',payload,1,0);assert.equal(complete.ok,true);
+ assert.equal(adapter.generations.get('owner/'+complete.generationId).header.hash,expected,'the standalone CloudStore fixture must publish standard UTF8 bytes');
  const h=await loadCloudBackendV2({runtimeWindow:app.ctx.window,timeoutMs:5000});t.after(()=>h.CS.suspend());
  const pushed=await h.CS.push(payload,1,0);assert.equal(pushed.ok,true);assert.equal((await h.CS.pull()).payload,payload);
 });
@@ -25199,7 +25212,7 @@ test('RISK CLOUD LOOP: repeated revision conflicts cannot spin even when every r
 function loadStorageV2({indexedDB}={}){
  const file=path.join(__dirname,'device-store-v2.js');
  assert.ok(fs.existsSync(file),'the scalable local/cloud storage module must ship with the offline app');
- const sandbox=vm.createContext({console,crypto:webcrypto,TextEncoder,TextDecoder,indexedDB,
+ const sandbox=vm.createContext({console,crypto:webcrypto,TextEncoder,TextDecoder,Uint8Array,indexedDB,
   setTimeout,clearTimeout,structuredClone});
  sandbox.globalThis=sandbox;
  vm.runInContext(fs.readFileSync(file,'utf8'),sandbox,{filename:'device-store-v2.js'});
@@ -25374,7 +25387,7 @@ test('RISK DEVICE STORAGE V2: unreferenced immutable snapshots retire while head
 });
 
 function loadCloudV2(){
- const sandbox=vm.createContext({console,crypto:webcrypto,TextEncoder,TextDecoder,setTimeout,clearTimeout,structuredClone});
+ const sandbox=vm.createContext({console,crypto:webcrypto,TextEncoder,TextDecoder,Uint8Array,setTimeout,clearTimeout,structuredClone});
  sandbox.globalThis=sandbox;
  for(const file of ['device-store-v2.js','cloud-store-v2.js']){
   assert.ok(fs.existsSync(path.join(__dirname,file)),'the scalable cloud module must ship with the offline app: '+file);
@@ -25478,7 +25491,7 @@ async function decisionBackend146(artifacts,db,F,uid='owner',{beforePublication=
  };
  const window={FIREBASE_CONFIG:{apiKey:'emulator-only'},CLOUD_SYNC_TIMEOUT_MS:5000,dispatchEvent:event=>events.push(event)};
  const A={getAuth:()=>auth,setPersistence:async()=>{},browserLocalPersistence:{},onAuthStateChanged:(_,fn)=>fn(auth.currentUser)};
- const context=vm.createContext({window,crypto:webcrypto,TextEncoder,TextDecoder,structuredClone,console,setTimeout,clearTimeout,CustomEvent:class{},__modules:[{initializeApp:()=>({})},A,sdk]});
+ const context=vm.createContext({window,crypto:webcrypto,TextEncoder,TextDecoder,Uint8Array,structuredClone,console,setTimeout,clearTimeout,CustomEvent:class{},__modules:[{initializeApp:()=>({})},A,sdk]});
  for(const [file,code] of [['device-store-v2.js',artifacts.storage],['cloud-store-v2.js',artifacts.cloud]])vm.runInContext(code,context,{filename:file});
  window.ChainStorageV2=context.ChainStorageV2;window.ChainCloudV2=context.ChainCloudV2;
  const module=artifacts.html.match(/<script type="module">([\s\S]*?)<\/script>/)[1].replace(/const \[appMod, A, F\] = await Promise\.all\(\[[\s\S]*?\]\);/,'const [appMod,A,F]=globalThis.__modules;');
@@ -25529,6 +25542,8 @@ test('Firestore rules: real pinned writer reads decision authority then holds it
   else assert.equal(loser.rev,3,'a conflict identifies the actual winning revision');
   const root=(await F.getDocFromServer(F.doc(env.authenticatedContext('owner').firestore(),'users/owner'))).data();
   assert.equal(root.rev,3);assert.equal(winner.rev,3);assert.equal(root.activeGeneration,winner.generationId);
+  const winningHeader=(await F.getDocFromServer(F.doc(env.authenticatedContext('owner').firestore(),'users','owner','generations',root.activeGeneration))).data();
+  assert.equal(winningHeader.hash,createHash('sha256').update(activated.ok?decided:plain,'utf8').digest('hex'),'real SDK fixture publication must use the independent UTF8 digest');
   assert.equal(root.decisionCapability,activated.ok?1:undefined,'only an actual winning activation installs the fence');
   const winning=await next.CS.pull();assert.equal(winning.rev,3);assert.equal(winning.payload,activated.ok?decided:plain,'the losing transaction cannot replace any winning bytes');
   assert.equal(f.ctx.cloudPayload(),decided);assert.equal(f.ctx.state.syncDirty,true,'the actual-app decision source stays pending');
