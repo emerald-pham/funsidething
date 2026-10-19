@@ -12,6 +12,41 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 ## Task state, eligibility, and scanner controls
 
+- RISK resilient sync recovery: identity changes after durable source capture cannot bind an old response to a new account
+
+- RISK resilient sync recovery: rebuilding retains an interrupted pending generation and its exact readable chunks
+- RISK resilient sync recovery: unrepresented pending intent requires explicit review before replacing a damaged cloud source
+- RISK resilient sync recovery: JSON-lossy pending evidence cannot authorize automatic rebuilding
+- RISK resilient sync recovery: automatic rebuilding preserves peer pending intent across staging
+- RISK resilient sync recovery: verified empty and explicit ACK transitions release failed rebuild contexts
+
+- RISK unreadable device recovery: an unsupported saved version cannot be replaced by Quick start or ordinary saving
+- RISK unreadable device recovery: native Paste previews and restores a supported board while preserving unreadable originals
+- RISK unreadable device recovery: raw startup preserves sources and supports native File restore
+- RISK unreadable device recovery: raw source export excludes the placeholder and preserves exact device evidence
+- RISK unreadable device recovery: locally restored work stays durable and visibly pending across sign-in and reopen
+- RISK unreadable device recovery: placeholder actions cannot create backups and unsupported selected decisions stay evidence
+- RISK unreadable device recovery: preservation refusals transaction failures and late identity changes never accept a source
+- RISK unreadable device recovery: raw transaction CAS refuses peer source changes after the last preview read
+- RISK unreadable device recovery: partial raw rows remain exact while the restored board accepts later local edits
+- RISK unreadable device recovery: opaque identity collisions and unsupported raw types preserve every original
+- RISK unreadable device recovery: repeated cancelled previews reuse exact originals without recursive archive growth
+- RISK unreadable device recovery review: partial saved collections cannot lose rows during startup or legacy migration
+- RISK unreadable device recovery review: native File and Paste retain unsupported partial selected collections without a restore preview
+- RISK unreadable device recovery review: the native header reaches SDK sign-in and Settings account correction while sources stay held
+- RISK unreadable device recovery review: preserved partial raw rows permit native cloud choice ACK and cold reopen
+- RISK unreadable device recovery review: receipt collisions never overwrite a raw unknown row at the same physical key
+- RISK DEVICE STORAGE V2: conditional pending writes compare complete physical rows and preserve ordinary staging
+- RISK cloud source recovery pending capture: a peer pending pointer arriving between own pending write and read is never consented
+- RISK cloud source recovery pending capture: peer pending intent created after the existing read is never overwritten by recovery staging
+- RISK cloud source recovery pending capture: a cached device store without conditional staging keeps the choice held
+- RISK DEVICE STORAGE V2: conditional pending writes refuse JSON-lossy unknown evidence
+- RISK cloud source recovery pending capture: native recovery cannot discard a named array extension
+- RISK unreadable device recovery: Quick start and current Changelog explain preserved sources and local pending recovery
+- RISK resilient sync recovery: an exact acknowledged copy recovers missing cloud chunks and publishes subsequent local work
+- RISK resilient sync recovery: a failed rebuild protects every source and retries after another local edit
+- RISK resilient sync recovery: unsupported unverifiable and foreign sources never authorize a replacement
+
 - RISK saved-board startup: a large legacy completion board opens and saves responsively while retaining exact facts
 - RISK completion source reuse: async host acknowledgement requires the exact source and preserves a newer foreign write
 - RISK historical board file recovery: conflicting saved ratings require an explicit source-preserving preview choice
@@ -1687,3 +1722,43 @@ The real Settings action opens a separate paste editor. Ordinary boards, full re
 Cold populated startup, pairwise display, real saving and cold reopen preserve healthy and boundary ratings, normalize unsupported numeric values, retain frozen pass and opaque fields, and create no comparison learning. This supplements the unchanged three-second populated-board responsiveness budget.
 
 - RISK saved rating normalization: cold startup display save and reopen preserve numeric boundaries without learning
+
+## Explicit complete cloud source recovery
+
+- RISK cloud source recovery: native explicit source choice publishes a complete generation with exact originals and durable reopen
+- RISK cloud source recovery: complete pending intent is selectable but mismatched partial and unknown sources stay unavailable
+- RISK cloud source recovery: an explicitly held local board can recover into a positively read empty cloud
+- RISK cloud source recovery: a late browser pending or peer change cannot be called a confirmed local recovery
+- RISK cloud source recovery: chosen prior membership remains deliberate while an unseen peer task and decision history survive
+- RISK cloud source recovery: changed consent and external failures retain originals without blind publication
+- RISK cloud source recovery: uncertain ACK stays held through cold open and requires a new native choice
+- RISK cloud source recovery guidance: mounted FAQ and changelog explain deliberate sources and unknown missing changes
+- RISK cloud source recovery controls: native Apply stays subdued until a complete source is selected
+
+The native needs-attention action uses real IndexedDB and the production backend against isolated external SDK boundaries. Coverage separates complete device, previous and pending sources; unavailable malformed, partial or unknown authority; no default consent; raw source pins; conditional publication, exact acknowledgement and durable reopen; cold held retry; late local, pending, peer and identity changes. Rendered and physical-device recovery remain separate release evidence.
+
+- RISK cloud source recovery: a same-UID auth epoch change at the last preservation read invalidates publication consent
+- RISK cloud source recovery: native Cancel stops delayed source checks and stays held during conditional publication
+- RISK cloud source recovery: account changes during final hold completion never report the old recovery complete
+- RISK cloud source recovery: an empty preview cannot overwrite a legacy root published at the transaction boundary
+
+- RISK cloud source recovery: native restored-device hold clears only after exact cloud ACK and durable current-head recovery
+
+- RISK cloud source recovery metadata: native preview distinguishes server save time upload clock and missing decision time
+
+- RISK cloud source recovery drafts: Settings drafts survive native review cancel delayed reads and confirmed recovery
+- RISK cloud source recovery prepared sources: earlier choices are disclosed and must stay exact before a replacement publishes
+
+- RISK cloud source recovery publication: a device peer change during the SDK read invalidates consent before cloud mutation
+- RISK recovery identity consumers: signed-in Add clears its captured draft after recovery
+- RISK recovery identity consumers: final-task WOOP advances after acknowledged recovery
+- RISK recovery identity consumers: verified cloud adoption rebases independent saved extension fields for the same UID
+
+## Full-suite startup preservation and fixture lifetime
+
+The complete recovery suite also retains the released pre-hydration older-tab backup/readback/CAS path and usable supported-but-ambiguous completion holds. Only literal strictly supported other-browser sources can be protected before hydration; a recovery placeholder cannot create a manual or ordinary backup. Unreadable backup-only startup names its actual protected cause. Existing account, legacy-tab, pinned-ID, released-Start and FAQ retention assertions remain. The local2AM fixture uses a local calendar time in UTC and New York; the original immutable-main timezone failure is retained as a fixture correction. Automatic recovery race checks await actual operation completion and still require the real pending boundary, unchanged cloud revision and exact peer intent. Test app fixtures cancel every owned timer after existing hooks without persisting, retaining neighboring fixtures and refusing late timer resurrection; this fixes measured VM retention without raising the heap or skipping tests.
+
+- app harness: disposal cancels its real wake and late timers while another fixture still runs
+- RISK optional oldest start: an unseeded descending pass clears first skips at the ordinary day boundary
+- RISK legacy completion released Start: normally acknowledged expired return is preserved or explicitly held before rewrite
+- RISK resilient sync recovery: automatic rebuilding preserves peer pending intent across staging

@@ -1,5 +1,708 @@
 [
   {
+    "testChangesSha256": "7a07a474af920040ab8bfd9ca6bac2212512819e9cc8c9c68825ff39845a7e65",
+    "reason": "Repair full-suite discovered pre-hydration source protection and supported chronology holds; preserve exact existing consumer assertions and make test fixture lifetime and race completion explicit.",
+    "previousBehavior": "Exact5a full run failed legacy/account/pinned recovery and retained FAQ assertions, then reached4GiB heap OOM before complete full/native evidence. Its pre-init backup guard refused actual older-shell protection; semantic completion ambiguity was classified unreadable. A timezone fixture and fixed30ms staging observation also failed independently of intended behavior.",
+    "intendedBehavior": "Narrow pre-init protection copies only validated literal supported other-browser sources, preserves chosen ambiguous source under the existing chronology hold, and names unreadable backup evidence. FAQ retention wording remains within130 words. Owned test timers are disposed after existing hooks with no persist, heap increase or skip; automatic staging waits actual operation completion and the day-boundary fixture crosses local2AM.",
+    "replacementTests": [
+      "app harness: disposal cancels its real wake and late timers while another fixture still runs",
+      "RISK resilient sync recovery: automatic rebuilding preserves peer pending intent across staging"
+    ],
+    "preservedCoverage": [
+      "All earlier rationale entries and original RED records remain unchanged; every old startup/account/pinned backup/chronology assertion and FAQ retention wording assertion is retained, with52/52 startup controls and68/68 fixture/recovery checks now green.",
+      "The original5a full failure record e68dc5fd shows2473pass19fail49skip plus OOM before full/native completion; it remains rejected, not an interrupted or passing run. Independent causal40default/10held fixture experiments identify long-lived scan/error timers retaining VMs; no claim that this alone proves the entire OOM cause.",
+      "The unchanged immutable-main local-day test passesUTC and failsNewYork; later source/runner manifests preserve that fixture diagnosis. The corrected local timestamp and actual-operation wait change setup, not accepted behavior, and are not original feature REDs.",
+      "A full exact new candidate suite including both mandatory native installed cases, SDK, rules, compatibility, privacy-safe original aggregate, final affected reviews, CI and public proof remain required. No5a approval or runtime proof is relabeled."
+    ],
+    "redEvidence": {
+      "command": "Node22 npm test on exact5a recorded by record-run as usable-recovery/final-suite-5a6daa1/e68dc5fd; independent immutable5a owned-timers and delayed-commit experiments under reviews/specialist/full-suite-5a6daa1 and immutable-main UTC/NewYork evidence under reviews/standards/startup-diagnosis.",
+      "failure": "The actual full run failed pre-init backup/readback, legacy chronology and FAQ preservation assertions; later OOM prevented full acceptance. Independent delayed150ms commit shows fixed30ms boundaryfiredfalse while push remains in flight; completion observation reaches the real hook and preserves cloud6/peer. Owned-timer teardown removes retained VM fixtures without increasing heap."
+    }
+  },
+  {
+    "testChangesSha256": "5dd99a60539142d576c13ebf50fc5d3ee32fd054f572ab26ef60cd49c8985839",
+    "reason": "Retire a failed automatic rebuild context after a positively empty cloud read or a complete explicit recovery ACK, retaining protected source receipts and every prior assertion; wrap long free-text recovery facts within the existing preview.",
+    "previousBehavior": "A failed automatic context bound to revision6 remained after positively reading empty cloud revision0 or completing an explicit source ACK7, so later ordinary uploads were held on a stale revision. Separately an actual enlarged narrow recovery preview clipped a long unbroken task title.",
+    "intendedBehavior": "Verified empty reads and complete explicit cloud/device recovery retire the superseded automatic context; subsequent ordinary seeding or native Add sync succeeds while original source receipts remain. The existing source-facts details use scoped overflow wrapping for tasks, History and decision rows.",
+    "replacementTests": [
+      "RISK resilient sync recovery: verified empty and explicit ACK transitions release failed rebuild contexts"
+    ],
+    "preservedCoverage": [
+      "Every prior behavioral assertion is retained, including the released account/callback semantic source contract deliberately migrated at86cb, exact cloud publication hash checks, UID ownership, startup and native File/Paste source preservation, raw-key collisions, local editing, durable ACK/reopen and compatibility/native gates.",
+      "Worker actual native pending RED65d0a225 and merged port-only REDef5b4092 both show cloud7 instead of6; first race preserves peer until late refusal and second loses the pointer. Store-only GREEN174404f4 is not native acceptance. Root consumer GREEN now passes both native races and all57 related tests in pending-cas-green-complete.log.",
+      "Existing root original RED925cbd3c, later857 sensitivity8351971f, invalid nested-field607f6ec3 correction, head-metadata RED70072105 and final86/86 source-shape GREEN retain their actual chronology in earlier entries and immutable outside-Git records. No setup or source spelling failure is claimed as behavioral RED.",
+      "Independent actual neutral-control visual RED86cb matches computed font700/transparent border/fill/shadow against established Cancel600/white/token-border/no shadow. The three new recovery controls now reuse btn subtle; a final rendered GREEN remains required. Text contrast suspicion was disproved, not a product failure.",
+      "Actual original REDd0349f77 before pendingJSON repair fails both public-port mismatch cases and native Apply; root narrow type/array-key guard thenGREEN07a41952 passes61/61 related cases. Prior264 full suite de1c638b was deliberately interrupted after rejection and is not a pass. First264 actualSDK exactACK/reopen/second-client case passed; explicit-device source UI lookup timed out and remains under investigation with added external diagnostics, not accepted recovery evidence.",
+      "Original automatic shape REDbce06f8d (both physical shapes cloud7vs6), automatic staging REDcdbfce68 (both exact external-IDB windows cloud7vs6), and late explicit SDK metadata RED8b6d517d precede each respective repair. Completed focusedGREENc8118036 passes78/78; final broad auto-pending-broad-green.log passes231/231 including startup/File/Paste/held decisions/auth/account/Add/WOOP/native source choices and all pending cases.",
+      "The first automatic-context repair GREEN attempt raised a temporary remote variable scope ReferenceError in finally; it is retained as a failed implementation check, then fixed by outer context/healthy-read flags. It is not an original behavioral RED. Prior df full-suite attempt was interrupted after rejection and is not a final pass.",
+      "Existing Restore FAQ assertions and130-word ceiling remain unchanged. Its128-word answer now distinguishes signed-in readable-board confirmation from unreadable-device local restoration under a cloud hold; no unrelated FAQ content was removed.",
+      "Predecessor df actual pinnedSDK full-app three cases passed after a bounded native Read sources again on an explicitly recorded changed-source refusal, with original pending and cloud revision exact before retry. Earlier timeout runs remain failed harness assumptions, not accepted evidence. A final exact new-source SDK/native/full run remains required.",
+      "Original independent Standards actual full-app RED8a3939fb and specialist context-lifecycle-probe.log on immutabledd99 precede the two lifecycle fixes. Root first permanent attempt context-lifecycle-red.log over-invoked sendPush after cloudPull had already started its failed upload, failing the setup error-code assertion; its failed GREEN companion is retained. Neither setup failure is claimed as original behavioral RED.",
+      "Refined native-consumer test removes only that duplicate setup push. CandidateGREEN060f742d passes3/3. Later unchanged immutabledd99 product archive plus refined tests fails both intended lifecycle assertions; manifestrefined-sensitivity-manifest.json identifies product/test bytes and labels this later sensitivity honestly. Final context-lifecycle-broad-green-refined.log passes234/234.",
+      "Independent actual long-title visual RED on immutable264 (same recovery markup/styles throughdd99), reportlong-title-probe-2026-10-19T22-33-27-068Z/report.json, measured modalclient232/scroll1539 and taskli113/1459 at390x844 enlarged1.5. Scoped wrapping follows that actual RED; final visual GREEN and exact source rebind still required.",
+      "All prior data/UID/pending/ACK/storage/account/File/Paste/WOOP/compatibility contracts remain. Earlier local full attempts remain interrupted after concrete candidate rejection, not passed or CI cancellations. Final new-source full/native/SDK/review/CI/main/public gates remain necessary."
+    ],
+    "redEvidence": {
+      "command": "Independent unchanged-dd99 actual full-app probes: reviews/standards/automatic-context-probe-dd99.mjs and reviews/specialist/dd99a6e/context-lifecycle-probe.mjs; root later refined sensitivity command is recorded separately in context-lifecycle artifacts.",
+      "failure": "Original independent actual consumer REDs show no cloud payload after positively empty read and no revision advance after native Add following complete explicit ACK. Root refined later unchanged-dd99 sensitivity fails both same intended assertions; refined candidate GREEN060f742d and234/234 broad GREEN follow the two-line lifecycle repair. Initial duplicate-send setup failures are retained but do not count as behavioral RED."
+    }
+  },
+  {
+    "testChangesSha256": "ccb332893935698afe977ce440c19b7547e633ad37711e4a72448b7d81dc61fb",
+    "reason": "Apply the reviewed pending-original integrity contract to automatic exact-ACK rebuilding as well as explicit source recovery, preserving every prior assertion and correcting one conflicting FAQ exception without increasing its word budget.",
+    "previousBehavior": "Automatic rebuilding still used ordinary staging after protecting a JSON receipt: matched-hash lossy pending values could disappear, new valid peer intent could be overwritten after the initial pending read, and peer intent arriving after the own write could be published before refusal. A late same-generation undefined extra field also escaped JSON-only publication comparison.",
+    "intendedBehavior": "Exact ACK recovery refuses JSON-lossy pending authority before capture and carries the existing fourth recoveryContext through the normal reconciliation/save path. Atomic conditional staging, exact primitive own-pointer validation and lossless typed publication comparisons preserve newly arrived peer sources before cloud mutation. Context stays bound to backend/revision/UID/epoch and is cleared on identity change, suspension, healthy read or acknowledgement. Ordinary uploads remain on the released default path.",
+    "replacementTests": [
+      "RISK resilient sync recovery: JSON-lossy pending evidence cannot authorize automatic rebuilding",
+      "RISK resilient sync recovery: automatic rebuilding preserves peer pending intent across staging",
+      "RISK cloud source recovery publication: a device peer change during the SDK read invalidates consent before cloud mutation"
+    ],
+    "preservedCoverage": [
+      "Every prior behavioral assertion is retained, including the released account/callback semantic source contract deliberately migrated at86cb, exact cloud publication hash checks, UID ownership, startup and native File/Paste source preservation, raw-key collisions, local editing, durable ACK/reopen and compatibility/native gates.",
+      "Worker actual native pending RED65d0a225 and merged port-only REDef5b4092 both show cloud7 instead of6; first race preserves peer until late refusal and second loses the pointer. Store-only GREEN174404f4 is not native acceptance. Root consumer GREEN now passes both native races and all57 related tests in pending-cas-green-complete.log.",
+      "Existing root original RED925cbd3c, later857 sensitivity8351971f, invalid nested-field607f6ec3 correction, head-metadata RED70072105 and final86/86 source-shape GREEN retain their actual chronology in earlier entries and immutable outside-Git records. No setup or source spelling failure is claimed as behavioral RED.",
+      "Independent actual neutral-control visual RED86cb matches computed font700/transparent border/fill/shadow against established Cancel600/white/token-border/no shadow. The three new recovery controls now reuse btn subtle; a final rendered GREEN remains required. Text contrast suspicion was disproved, not a product failure.",
+      "Actual original REDd0349f77 before pendingJSON repair fails both public-port mismatch cases and native Apply; root narrow type/array-key guard thenGREEN07a41952 passes61/61 related cases. Prior264 full suite de1c638b was deliberately interrupted after rejection and is not a pass. First264 actualSDK exactACK/reopen/second-client case passed; explicit-device source UI lookup timed out and remains under investigation with added external diagnostics, not accepted recovery evidence.",
+      "Original automatic shape REDbce06f8d (both physical shapes cloud7vs6), automatic staging REDcdbfce68 (both exact external-IDB windows cloud7vs6), and late explicit SDK metadata RED8b6d517d precede each respective repair. Completed focusedGREENc8118036 passes78/78; final broad auto-pending-broad-green.log passes231/231 including startup/File/Paste/held decisions/auth/account/Add/WOOP/native source choices and all pending cases.",
+      "The first automatic-context repair GREEN attempt raised a temporary remote variable scope ReferenceError in finally; it is retained as a failed implementation check, then fixed by outer context/healthy-read flags. It is not an original behavioral RED. Prior df full-suite attempt was interrupted after rejection and is not a final pass.",
+      "Existing Restore FAQ assertions and130-word ceiling remain unchanged. Its128-word answer now distinguishes signed-in readable-board confirmation from unreadable-device local restoration under a cloud hold; no unrelated FAQ content was removed.",
+      "Predecessor df actual pinnedSDK full-app three cases passed after a bounded native Read sources again on an explicitly recorded changed-source refusal, with original pending and cloud revision exact before retry. Earlier timeout runs remain failed harness assumptions, not accepted evidence. A final exact new-source SDK/native/full run remains required."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <rootwork> --evidence-dir <usable-recovery>/auto-pending-shape --purpose preimplementation-red -- node --test --test-name-pattern=\"automatic rebuilding preserves peer pending intent across staging\" tests.js",
+      "failure": "Original cdbfce68 failed both actual automatic staging windows with revision7 instead of6; bce06f8d separately proved both lossy physical shapes and8b6d517d proved the late SDK undefined extra field. All preceded their bounded repairs.231/231 related GREEN follows them; temporary repair scope error is retained as failed GREEN, never relabeled RED."
+    }
+  },
+  {
+    "testChangesSha256": "ee6238142a692576d679edfbfc34715f7356fc77042cc8ad0d553619db0088d6",
+    "reason": "Reject JSON-lossy pending evidence before exact reviewed-pointer staging; retain the full native recovery and physical-row contracts from the previous candidate.",
+    "previousBehavior": "A physical pending row with negative zero or an array hole plus a named unknown property compared equal to different JSON and could be replaced; actual native source selection published revision6 to7 and cleared the sole unknown marker without a lossless receipt.",
+    "intendedBehavior": "Conditional recovery staging fails closed for negative zero, sparse or extended arrays and hidden object fields before overwriting any physical row. Ordinary valid JSON reviewed-pointer staging and ordinary three-argument uploads remain unchanged.",
+    "replacementTests": [
+      "RISK DEVICE STORAGE V2: conditional pending writes refuse JSON-lossy unknown evidence",
+      "RISK cloud source recovery pending capture: native recovery cannot discard a named array extension"
+    ],
+    "preservedCoverage": [
+      "Every prior behavioral assertion is retained, including the released account/callback semantic source contract deliberately migrated at86cb, exact cloud publication hash checks, UID ownership, startup and native File/Paste source preservation, raw-key collisions, local editing, durable ACK/reopen and compatibility/native gates.",
+      "Worker actual native pending RED65d0a225 and merged port-only REDef5b4092 both show cloud7 instead of6; first race preserves peer until late refusal and second loses the pointer. Store-only GREEN174404f4 is not native acceptance. Root consumer GREEN now passes both native races and all57 related tests in pending-cas-green-complete.log.",
+      "Existing root original RED925cbd3c, later857 sensitivity8351971f, invalid nested-field607f6ec3 correction, head-metadata RED70072105 and final86/86 source-shape GREEN retain their actual chronology in earlier entries and immutable outside-Git records. No setup or source spelling failure is claimed as behavioral RED.",
+      "Independent actual neutral-control visual RED86cb matches computed font700/transparent border/fill/shadow against established Cancel600/white/token-border/no shadow. The three new recovery controls now reuse btn subtle; a final rendered GREEN remains required. Text contrast suspicion was disproved, not a product failure.",
+      "Actual original REDd0349f77 before pendingJSON repair fails both public-port mismatch cases and native Apply; root narrow type/array-key guard thenGREEN07a41952 passes61/61 related cases. Prior264 full suite de1c638b was deliberately interrupted after rejection and is not a pass. First264 actualSDK exactACK/reopen/second-client case passed; explicit-device source UI lookup timed out and remains under investigation with added external diagnostics, not accepted recovery evidence."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <rootwork> --evidence-dir <usable-recovery>/pending-shape --purpose preimplementation-red -- node --test --test-name-pattern=\"conditional pending writes refuse JSON-lossy|native recovery cannot discard a named array\" tests.js",
+      "failure": "Actual originald0349f77: two distinct physical pending rows were incorrectly overwritten and native Apply returned true instead of false. The narrow validator repair follows those observed assertion failures;61/61 related GREEN07a41952 preserves marker and unchanged cloud revision."
+    }
+  },
+  {
+    "testChangesSha256": "6148524ab7309c92485e52eeb1602a5d87ae7d88450802425e3bfca88355d4b0",
+    "reason": "Bind explicit recovery pending staging to the complete reviewed pointer and an explicit atomic store capability; preserve all earlier recovery, identity, raw-source, migration and installed-client assertions. Add cached-capability refusal at the actual native chooser consumer.",
+    "previousBehavior": "The initial existing-pointer read and unconditional pending write could overwrite a new peer pointer; a peer pointer appearing after the own write could become the publication guard baseline and allow cloud revision6 to7 before a late refusal.",
+    "intendedBehavior": "Recovery compares the reviewed pointer, conditionally stages it in one physical-row-aware transaction, and verifies the full reread is the current operation pointer before any generation publication. A missing cached-device-store capability fails held. Ordinary three-argument pushes retain the released unconditional staging contract.",
+    "replacementTests": [
+      "RISK cloud source recovery pending capture: a peer pending pointer arriving between own pending write and read is never consented",
+      "RISK cloud source recovery pending capture: peer pending intent created after the existing read is never overwritten by recovery staging",
+      "RISK cloud source recovery pending capture: a cached device store without conditional staging keeps the choice held"
+    ],
+    "preservedCoverage": [
+      "Every prior behavioral assertion is retained, including the released account/callback semantic source contract deliberately migrated at86cb, exact cloud publication hash checks, UID ownership, startup and native File/Paste source preservation, raw-key collisions, local editing, durable ACK/reopen and compatibility/native gates.",
+      "Worker actual native pending RED65d0a225 and merged port-only REDef5b4092 both show cloud7 instead of6; first race preserves peer until late refusal and second loses the pointer. Store-only GREEN174404f4 is not native acceptance. Root consumer GREEN now passes both native races and all57 related tests in pending-cas-green-complete.log.",
+      "Existing root original RED925cbd3c, later857 sensitivity8351971f, invalid nested-field607f6ec3 correction, head-metadata RED70072105 and final86/86 source-shape GREEN retain their actual chronology in earlier entries and immutable outside-Git records. No setup or source spelling failure is claimed as behavioral RED.",
+      "Independent actual neutral-control visual RED86cb matches computed font700/transparent border/fill/shadow against established Cancel600/white/token-border/no shadow. The three new recovery controls now reuse btn subtle; a final rendered GREEN remains required. Text contrast suspicion was disproved, not a product failure."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <device-worktree> --evidence-dir <usable-recovery>/device-worker/review-repairs --purpose preimplementation-red -- node --test --test-name-pattern=\"RISK cloud source recovery pending capture:\" tests.js",
+      "failure": "Actual native RED65d0a225 before port and ef5b4092 after port both advanced cloud revision6 to7 for unreviewed pending changes. Root consumer integration follows those REDs; final related57/57 GREEN retains both peer pointers and prevents cloud mutation. The cached-capability case adds fail-closed preservation coverage after the same bounded fix; it is not a separately claimed original RED."
+    }
+  },
+  {
+    "testChangesSha256": "c7c6d696282c0d8600c8d20eba497d1c76e77fd3aaf1c38034afabb93061e8e6",
+    "reason": "Reconcile the bounded device and pending CAS port test diff after merging parent86cb2e0, preserving all parent callback/head-record repairs and all historical rationale bytes. Repair independent-review findings at actual startup, native selected-source, native authentication and device raw-row consumer boundaries; retain all prior tests and use external SDK counters for authentication. Add an explicit atomic pending-pointer port for parent-owned publication capture, following two independent actual native pending races.",
+    "previousBehavior": "Hydration could filter malformed History/context/deletion entries before startup or selected-file acceptance; recovery guards blocked native sign-in; retained null or broken auxiliary rows prevented complete cloud recovery and immutable receipt writes could replace null/undefined at a physical key. Recovery staging also unconditionally replaced a peer pending pointer created after its read or accepted a peer pointer after its own write, advancing cloud revision6→7 before later local refusal.",
+    "intendedBehavior": "Reject unsupported partial collections before normalization while retaining released legacy defaults and migrations; preserve exact source bytes and Paste drafts; allow configured native sign-in/account correction while all adoption/publication holds remain; read only valid backup receipts and omit malformed auxiliary rows only after durable exact raw protection; reject every same-key immutable collision without mutation. The explicit setPendingUploadIfCurrent capability compares the entire reviewed JSON and physical row presence in one readwrite transaction; null expectations require a truly absent key, unknown fields participate, and ordinary setPendingUpload retains its released unconditional behavior. Parent must bind this port into actual publication capture before the native races become GREEN.",
+    "replacementTests": [
+      "RISK unreadable device recovery review: partial saved collections cannot lose rows during startup or legacy migration",
+      "RISK unreadable device recovery review: native File and Paste retain unsupported partial selected collections without a restore preview",
+      "RISK unreadable device recovery review: the native header reaches SDK sign-in and Settings account correction while sources stay held",
+      "RISK unreadable device recovery review: preserved partial raw rows permit native cloud choice ACK and cold reopen",
+      "RISK unreadable device recovery review: receipt collisions never overwrite a raw unknown row at the same physical key",
+      "RISK DEVICE STORAGE V2: conditional pending writes compare complete physical rows and preserve ordinary staging",
+      "RISK cloud source recovery pending capture: a peer pending pointer arriving between own pending write and read is never consented",
+      "RISK cloud source recovery pending capture: peer pending intent created after the existing read is never overwritten by recovery staging"
+    ],
+    "preservedCoverage": [
+      "All preexisting assertions remain unchanged, including startup/migration, source preservation, File/Paste, SDK account races, cloud choice ACK, cold reopen and physical-key receipts. Only the external SDK fixture gains a sign-out effect counter; actual app/storage/auth verdicts are not mocked.",
+      "Actual startup RED1a3ee30b failed all12 subcases before the partial-collection guard; GREENba58213d passed13/13. Actual native File/Paste RED88029b36 failed16 subcases before its guard; GREEN038a6851 passed17/17. Direct hydrateState migration/default normalization remains unchanged.",
+      "Actual native SDK popup REDf2128372 showed0 rather than1 popup in unreadable startup and locally restored states plus unreachable account correction; GREEN699b5a65 passed4/4. The hold, raw graph, accepted board and provider writes stay unchanged through authentication.",
+      "Actual raw-store startup→native Paste→local edit→native cloud choice→ACK→cold reopen RED0b10b807 failed Apply, then GREENf90e3df4 passed. Further physical-key RED6638d4a8 and RED17508fff proved opaque/putBackup/commitHead null collisions; final targeted review cohort22593624 passed39/39. Unknown/null/orphan/pending rows remain exact, while unprotected new malformed rows still reject interpreted reading.",
+      "Broader related cohortfccf1888 passed186/187 at857+device repairs; its sole failure is the existing backend inline-stillCurrent source-shape assertion, already obsolete in base857 and still present at parentdd78. Root explicitly owns its named-callback assertion update; device worker preserves the assertion unchanged. No full suite, browser/native rendered check, provider writes, push, PR, CI or release claim.",
+      "Permanent native pending-capture RED65d0a225 on committed2493380 reproduced both actual external-IDB races: cloud revision7 instead of6; the post-read race also lost the peer pointer. Separate capability RED4762dd44 is honestly a missing-method failure; portGREEN174404f4 covers full JSON, physical null/undefined/falsy rows, exact unknown fields, one-winner concurrent CAS and unchanged ordinary staging. The two native REDs intentionally remain unresolved until parent consumer integration; port-only GREEN does not establish their recovery outcome. Merged pre-port cohortaf942a43 passed193/193 and preflight93e73bec passed; sole obsolete backend spelling assertion excluded with parent ownership.",
+      "Parent86cb2e0 now owns the obsolete source-shape assertion migration and full-head metadata guard. Device-only port checkpoint still intentionally retains the two actual native pending-capture REDs awaiting parent CS consumer integration. Final local focused evidence must distinguish these from passing device repairs and CAS capability."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <device-worktree> --evidence-dir <usable-recovery>/device-worker/review-repairs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern='RISK cloud source recovery pending capture:' tests.js",
+      "failure": "Actual pre-port native RED65d0a225 proves both pending capture races with cloud revision7 rather than6. Port-only capability RED4762dd44 reports missing method, thenGREEN174404f4 passes physical/full-JSON CAS. Existing repair RED/GREEN chronology is preserved in this and all previous entries. The parent owns consumer integration and eventual native pending race GREEN; no final acceptance is claimed from the store test."
+    }
+  },
+  {
+    "testChangesSha256": "dc241799fab4b3ab4d0afe4b7caaeed70ba9c828662369ad676a6cadd2b83c44",
+    "reason": "Repair independent-review findings at actual startup, native selected-source, native authentication and device raw-row consumer boundaries; retain all prior tests and use external SDK counters for authentication. Add an explicit atomic pending-pointer port for parent-owned publication capture, following two independent actual native pending races.",
+    "previousBehavior": "Hydration could filter malformed History/context/deletion entries before startup or selected-file acceptance; recovery guards blocked native sign-in; retained null or broken auxiliary rows prevented complete cloud recovery and immutable receipt writes could replace null/undefined at a physical key. Recovery staging also unconditionally replaced a peer pending pointer created after its read or accepted a peer pointer after its own write, advancing cloud revision6→7 before later local refusal.",
+    "intendedBehavior": "Reject unsupported partial collections before normalization while retaining released legacy defaults and migrations; preserve exact source bytes and Paste drafts; allow configured native sign-in/account correction while all adoption/publication holds remain; read only valid backup receipts and omit malformed auxiliary rows only after durable exact raw protection; reject every same-key immutable collision without mutation. The explicit setPendingUploadIfCurrent capability compares the entire reviewed JSON and physical row presence in one readwrite transaction; null expectations require a truly absent key, unknown fields participate, and ordinary setPendingUpload retains its released unconditional behavior. Parent must bind this port into actual publication capture before the native races become GREEN.",
+    "replacementTests": [
+      "RISK unreadable device recovery review: partial saved collections cannot lose rows during startup or legacy migration",
+      "RISK unreadable device recovery review: native File and Paste retain unsupported partial selected collections without a restore preview",
+      "RISK unreadable device recovery review: the native header reaches SDK sign-in and Settings account correction while sources stay held",
+      "RISK unreadable device recovery review: preserved partial raw rows permit native cloud choice ACK and cold reopen",
+      "RISK unreadable device recovery review: receipt collisions never overwrite a raw unknown row at the same physical key",
+      "RISK DEVICE STORAGE V2: conditional pending writes compare complete physical rows and preserve ordinary staging",
+      "RISK cloud source recovery pending capture: a peer pending pointer arriving between own pending write and read is never consented",
+      "RISK cloud source recovery pending capture: peer pending intent created after the existing read is never overwritten by recovery staging"
+    ],
+    "preservedCoverage": [
+      "All preexisting assertions remain unchanged, including startup/migration, source preservation, File/Paste, SDK account races, cloud choice ACK, cold reopen and physical-key receipts. Only the external SDK fixture gains a sign-out effect counter; actual app/storage/auth verdicts are not mocked.",
+      "Actual startup RED1a3ee30b failed all12 subcases before the partial-collection guard; GREENba58213d passed13/13. Actual native File/Paste RED88029b36 failed16 subcases before its guard; GREEN038a6851 passed17/17. Direct hydrateState migration/default normalization remains unchanged.",
+      "Actual native SDK popup REDf2128372 showed0 rather than1 popup in unreadable startup and locally restored states plus unreachable account correction; GREEN699b5a65 passed4/4. The hold, raw graph, accepted board and provider writes stay unchanged through authentication.",
+      "Actual raw-store startup→native Paste→local edit→native cloud choice→ACK→cold reopen RED0b10b807 failed Apply, then GREENf90e3df4 passed. Further physical-key RED6638d4a8 and RED17508fff proved opaque/putBackup/commitHead null collisions; final targeted review cohort22593624 passed39/39. Unknown/null/orphan/pending rows remain exact, while unprotected new malformed rows still reject interpreted reading.",
+      "Broader related cohortfccf1888 passed186/187 at857+device repairs; its sole failure is the existing backend inline-stillCurrent source-shape assertion, already obsolete in base857 and still present at parentdd78. Root explicitly owns its named-callback assertion update; device worker preserves the assertion unchanged. No full suite, browser/native rendered check, provider writes, push, PR, CI or release claim.",
+      "Permanent native pending-capture RED65d0a225 on committed2493380 reproduced both actual external-IDB races: cloud revision7 instead of6; the post-read race also lost the peer pointer. Separate capability RED4762dd44 is honestly a missing-method failure; portGREEN174404f4 covers full JSON, physical null/undefined/falsy rows, exact unknown fields, one-winner concurrent CAS and unchanged ordinary staging. The two native REDs intentionally remain unresolved until parent consumer integration; port-only GREEN does not establish their recovery outcome. Merged pre-port cohortaf942a43 passed193/193 and preflight93e73bec passed; sole obsolete backend spelling assertion excluded with parent ownership."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <device-worktree> --evidence-dir <usable-recovery>/device-worker/review-repairs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern='RISK cloud source recovery pending capture:' tests.js",
+      "failure": "Actual pre-port native RED65d0a225 proves both pending capture races with cloud revision7 rather than6. Port-only capability RED4762dd44 reports missing method, thenGREEN174404f4 passes physical/full-JSON CAS. Existing repair RED/GREEN chronology is preserved in this and all previous entries. The parent owns consumer integration and eventual native pending race GREEN; no final acceptance is claimed from the store test."
+    }
+  },
+  {
+    "testChangesSha256": "ba355cb09ffcd381c6c34155df7449d0f813affb359a990003bea67f039045aa",
+    "reason": "Repair independent-review findings at actual startup, native selected-source, native authentication and device raw-row consumer boundaries; retain all prior tests and use external SDK counters for authentication.",
+    "previousBehavior": "Hydration could filter malformed History/context/deletion entries before startup or selected-file acceptance; recovery guards blocked native sign-in; retained null or broken auxiliary rows prevented complete cloud recovery and immutable receipt writes could replace null/undefined at a physical key.",
+    "intendedBehavior": "Reject unsupported partial collections before normalization while retaining released legacy defaults and migrations; preserve exact source bytes and Paste drafts; allow configured native sign-in/account correction while all adoption/publication holds remain; read only valid backup receipts and omit malformed auxiliary rows only after durable exact raw protection; reject every same-key immutable collision without mutation.",
+    "replacementTests": [
+      "RISK unreadable device recovery review: partial saved collections cannot lose rows during startup or legacy migration",
+      "RISK unreadable device recovery review: native File and Paste retain unsupported partial selected collections without a restore preview",
+      "RISK unreadable device recovery review: the native header reaches SDK sign-in and Settings account correction while sources stay held",
+      "RISK unreadable device recovery review: preserved partial raw rows permit native cloud choice ACK and cold reopen",
+      "RISK unreadable device recovery review: receipt collisions never overwrite a raw unknown row at the same physical key"
+    ],
+    "preservedCoverage": [
+      "All preexisting assertions remain unchanged, including startup/migration, source preservation, File/Paste, SDK account races, cloud choice ACK, cold reopen and physical-key receipts. Only the external SDK fixture gains a sign-out effect counter; actual app/storage/auth verdicts are not mocked.",
+      "Actual startup RED1a3ee30b failed all12 subcases before the partial-collection guard; GREENba58213d passed13/13. Actual native File/Paste RED88029b36 failed16 subcases before its guard; GREEN038a6851 passed17/17. Direct hydrateState migration/default normalization remains unchanged.",
+      "Actual native SDK popup REDf2128372 showed0 rather than1 popup in unreadable startup and locally restored states plus unreachable account correction; GREEN699b5a65 passed4/4. The hold, raw graph, accepted board and provider writes stay unchanged through authentication.",
+      "Actual raw-store startup→native Paste→local edit→native cloud choice→ACK→cold reopen RED0b10b807 failed Apply, then GREENf90e3df4 passed. Further physical-key RED6638d4a8 and RED17508fff proved opaque/putBackup/commitHead null collisions; final targeted review cohort22593624 passed39/39. Unknown/null/orphan/pending rows remain exact, while unprotected new malformed rows still reject interpreted reading.",
+      "Broader related cohortfccf1888 passed186/187 at857+device repairs; its sole failure is the existing backend inline-stillCurrent source-shape assertion, already obsolete in base857 and still present at parentdd78. Root explicitly owns its named-callback assertion update; device worker preserves the assertion unchanged. No full suite, browser/native rendered check, provider writes, push, PR, CI or release claim."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <device-worktree> --evidence-dir <usable-recovery>/device-worker/review-repairs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern='RISK unreadable device recovery review:' tests.js",
+      "failure": "Contemporaneous individual records: startup1a3ee30b persistedtrue despite partial History/context/deletion/task-context rows; File/Paste88029b36 previewedtrue despite unsupported selected records; nativeauthf2128372 popup0vs1 and missing account-correction action; actual partialraw native cloud Apply0b10b807 returnedfalse; immutable opaque/putBackup6638d4a8 and commitHead17508fff replaced unknown null rows. The record command above describes the final group; each actual discriminating command and working-tree fingerprint is retained in its individual recorder JSON, rather than claiming the final combined group ran before all repairs."
+    }
+  },
+  {
+    "reason": "Complete recovery publication consent checks for device-head metadata, and migrate the existing account-binding source-shape assertions to the shared named callback required by exact recovery guard forwarding. Preserve actual account namespace, operation and late-result behavior.",
+    "previousBehavior": "A changed legacy-source fingerprint kept the same payload hash, so recovery could publish from expired device-source consent. The old account source contract required literal inline callback spelling even though the new shared named closure retains UID/operation guards and also binds recovery epoch.",
+    "intendedBehavior": "Retain the complete observed head metadata with its protected raw source and compare it in current-source review and the final atomic prepublication device snapshot. Existing source assertions protect captured UID/operation/recovery guard, exact callback forwarding, and late-result refusal with its new spelling; actual SDK race tests retain behavioral proof.",
+    "replacementTests": [
+      "RISK cloud source recovery publication: a device peer change during the SDK read invalidates consent before cloud mutation",
+      "RISK recovery identity consumers: signed-in Add clears its captured draft after recovery",
+      "RISK recovery identity consumers: final-task WOOP advances after acknowledged recovery",
+      "RISK recovery identity consumers: verified cloud adoption rebases independent saved extension fields for the same UID",
+      "CLOUD ACCOUNT: a transaction binds its document before auth can switch"
+    ],
+    "preservedCoverage": [
+      "All original tests and assertions remain; no test threshold, required native outcome, protocol, rules or review gate is removed or weakened. Existing exact ACK, explicit-source, late UID, pending and held-decision consumer cohort remains protected.",
+      "All original passing assertions remain. New final-task WOOP acceptance additionally saves and deletes the native plan through its mounted binding; an intermediate fixture ctx.taskById call was unavailable, recorded as setup failure and corrected to read actual state.",
+      "Root permanent repair RED925cbd3c is meaningful for actual publication revision7 instead of6, accepted Add text and cancelled WOOP before the bounded repairs. The earlier607f6ec3 nested opaque-object expectation overreached established indivisible-field semantics; that never-green fixture is corrected to independent top-level extension fields. It must not be cited as proof of a UID defect. Final refined ancestor and six publication controls fail on unchanged857 in later-baseline-sensitivity8351971f; current final focused consumer cohort passes10/10. These are retrospective sensitivity, not original feature RED chronology.",
+      "Only the two obsolete inline-spelling assertions in the existing account-binding test change: one becomes named-guard body plus exact forwarding assertions; the other checks the same late-result refusal through that guard. Existing captured pushUser/pushUid, root binding, manifest-transaction callback checks and all actual SDK/account race cases remain. This is a structural contract migration, not a claimed new behavioral UID RED.",
+      "70072105 observed meaningful native head-metadata RED (Apply true instead of false after actual setLegacyFingerprint at SDK root read) before complete headRecord protection, alongside the acknowledged inline-spelling regex failure. Following repair and explicit source-assertion migration,86/86 affected recovery/account checks pass; no prior passing behavioral assertion is removed."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <root-worktree> --evidence-dir <usable-recovery>/test-runs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern=RISK_cloud_source_recovery_publication_or_CLOUD_ACCOUNT_transaction_binding tests.js",
+      "failure": "70072105: head metadata changed through the actual durable API during SDK publication root read; native Apply returns true, expectedfalse. Separate source-shape assertion rejects named callback spelling before the assertion migration; this is not a namespace behavior failure. Earlier925cbd3c remains actual late-head/Add/WOOP repairRED; later857 baseline8351971f is retrospective sensitivity.86/86GREEN follows these bounded changes."
+    },
+    "testChangesSha256": "feb6cd78bf7baa4749c03eae803ce6c80cf7b3f5cdb9eb568fbcf492ef8d1297"
+  },
+  {
+    "reason": "Complete recovery publication consent checks for device-head metadata, and migrate the existing account-binding source-shape assertions to the shared named callback required by exact recovery guard forwarding. Preserve actual account namespace, operation and late-result behavior.",
+    "previousBehavior": "A changed legacy-source fingerprint kept the same payload hash, so recovery could publish from expired device-source consent. The old account source contract required literal inline callback spelling even though the new shared named closure retains UID/operation guards and also binds recovery epoch.",
+    "intendedBehavior": "Retain the complete observed head metadata with its protected raw source and compare it in current-source review and the final atomic prepublication device snapshot. Existing source assertions protect captured UID/operation/recovery guard, exact callback forwarding, and late-result refusal with its new spelling; actual SDK race tests retain behavioral proof.",
+    "replacementTests": [
+      "RISK cloud source recovery publication: a device peer change during the SDK read invalidates consent before cloud mutation",
+      "RISK recovery identity consumers: signed-in Add clears its captured draft after recovery",
+      "RISK recovery identity consumers: final-task WOOP advances after acknowledged recovery",
+      "RISK recovery identity consumers: verified cloud adoption rebases independent saved extension fields for the same UID",
+      "CLOUD ACCOUNT: a transaction binds its document before auth can switch"
+    ],
+    "preservedCoverage": [
+      "All original tests and assertions remain; no test threshold, required native outcome, protocol, rules or review gate is removed or weakened. Existing exact ACK, explicit-source, late UID, pending and held-decision consumer cohort remains protected.",
+      "All original passing assertions remain. New final-task WOOP acceptance additionally saves and deletes the native plan through its mounted binding; an intermediate fixture ctx.taskById call was unavailable, recorded as setup failure and corrected to read actual state.",
+      "Root permanent repair RED925cbd3c is meaningful for actual publication revision7 instead of6, accepted Add text and cancelled WOOP before the bounded repairs. The earlier607f6ec3 nested opaque-object expectation overreached established indivisible-field semantics; that never-green fixture is corrected to independent top-level extension fields. It must not be cited as proof of a UID defect. Final refined ancestor and six publication controls fail on unchanged857 in later-baseline-sensitivity8351971f; current final focused consumer cohort passes10/10. These are retrospective sensitivity, not original feature RED chronology.",
+      "Only the two obsolete inline-spelling assertions in the existing account-binding test change: one becomes named-guard body plus exact forwarding assertions; the other checks the same late-result refusal through that guard. Existing captured pushUser/pushUid, root binding, manifest-transaction callback checks and all actual SDK/account race cases remain. This is a structural contract migration, not a claimed new behavioral UID RED.",
+      "70072105 observed meaningful native head-metadata RED (Apply true instead of false after actual setLegacyFingerprint at SDK root read) before complete headRecord protection, alongside the acknowledged inline-spelling regex failure. Following repair and explicit source-assertion migration,86/86 affected recovery/account checks pass; no prior passing behavioral assertion is removed."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <root-worktree> --evidence-dir <usable-recovery>/test-runs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern=RISK_cloud_source_recovery_publication_or_CLOUD_ACCOUNT_transaction_binding tests.js",
+      "failure": "70072105: head metadata changed through the actual durable API during SDK publication root read; native Apply returns true, expectedfalse. Separate source-shape assertion rejects named callback spelling before the assertion migration; this is not a namespace behavior failure. Earlier925cbd3c remains actual late-head/Add/WOOP repairRED; later857 baseline8351971f is retrospective sensitivity.86/86GREEN follows these bounded changes."
+    },
+    "testChangesSha256": "20ff2d11a305e4e98250cdebc0b86a8861112965492b9b409659f34d08feeb54"
+  },
+  {
+    "reason": "Complete recovery publication consent checks for device-head metadata, and migrate the existing account-binding source-shape assertions to the shared named callback required by exact recovery guard forwarding. Preserve actual account namespace, operation and late-result behavior.",
+    "previousBehavior": "A changed legacy-source fingerprint kept the same payload hash, so recovery could publish from expired device-source consent. The old account source contract required literal inline callback spelling even though the new shared named closure retains UID/operation guards and also binds recovery epoch.",
+    "intendedBehavior": "Retain the complete observed head metadata with its protected raw source and compare it in current-source review and the final atomic prepublication device snapshot. Existing source assertions protect captured UID/operation/recovery guard, exact callback forwarding, and late-result refusal with its new spelling; actual SDK race tests retain behavioral proof.",
+    "replacementTests": [
+      "RISK cloud source recovery publication: a device peer change during the SDK read invalidates consent before cloud mutation",
+      "RISK recovery identity consumers: signed-in Add clears its captured draft after recovery",
+      "RISK recovery identity consumers: final-task WOOP advances after acknowledged recovery",
+      "RISK recovery identity consumers: verified cloud adoption rebases independent saved extension fields for the same UID",
+      "CLOUD ACCOUNT: a transaction binds its document before auth can switch"
+    ],
+    "preservedCoverage": [
+      "All original tests and assertions remain; no test threshold, required native outcome, protocol, rules or review gate is removed or weakened. Existing exact ACK, explicit-source, late UID, pending and held-decision consumer cohort remains protected.",
+      "All original passing assertions remain. New final-task WOOP acceptance additionally saves and deletes the native plan through its mounted binding; an intermediate fixture ctx.taskById call was unavailable, recorded as setup failure and corrected to read actual state.",
+      "Root permanent repair RED925cbd3c is meaningful for actual publication revision7 instead of6, accepted Add text and cancelled WOOP before the bounded repairs. The earlier607f6ec3 nested opaque-object expectation overreached established indivisible-field semantics; that never-green fixture is corrected to independent top-level extension fields. It must not be cited as proof of a UID defect. Final refined ancestor and six publication controls fail on unchanged857 in later-baseline-sensitivity8351971f; current final focused consumer cohort passes10/10. These are retrospective sensitivity, not original feature RED chronology.",
+      "Only the two obsolete inline-spelling assertions in the existing account-binding test change: one becomes named-guard body plus exact forwarding assertions; the other checks the same late-result refusal through that guard. Existing captured pushUser/pushUid, root binding, manifest-transaction callback checks and all actual SDK/account race cases remain. This is a structural contract migration, not a claimed new behavioral UID RED.",
+      "70072105 observed meaningful native head-metadata RED (Apply true instead of false after actual setLegacyFingerprint at SDK root read) before complete headRecord protection, alongside the acknowledged inline-spelling regex failure. Following repair and explicit source-assertion migration,86/86 affected recovery/account checks pass; no prior passing behavioral assertion is removed."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <root-worktree> --evidence-dir <usable-recovery>/test-runs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern=RISK_cloud_source_recovery_publication_or_CLOUD_ACCOUNT_transaction_binding tests.js",
+      "failure": "70072105: head metadata changed through the actual durable API during SDK publication root read; native Apply returns true, expectedfalse. Separate source-shape assertion rejects named callback spelling before the assertion migration; this is not a namespace behavior failure. Earlier925cbd3c remains actual late-head/Add/WOOP repairRED; later857 baseline8351971f is retrospective sensitivity.86/86GREEN follows these bounded changes."
+    },
+    "testChangesSha256": "75983f283f6b0f1f5045bc01a7b4ddd506e7ef58811e2336fbb6db4b0520a64f"
+  },
+  {
+    "reason": "Repair exact-candidate independent-review findings at actual native Add, WOOP, cloud publication and populated cold-source adoption consumers. Keep UID namespace isolation while carrying verified identity at transient and trusted source boundaries.",
+    "previousBehavior": "The857 candidate could publish a stale recovery choice after a late device-head change, leave a durably saved signed-in Add draft uncleared, cancel a same-account WOOP walkthrough, and drop an independent saved extension edit because wire/ancestor payloads intentionally omit device UID metadata.",
+    "intendedBehavior": "Validate one atomic complete device snapshot after cloud transaction reads and before publication writes, including exact originals/prepared copies/pending/hold/browser/draft. Capture full local owner identity for Add/WOOP, and bind verified source UID only at trusted cloud and ancestor reconstruction boundaries. Keep foreign UID and uncertain authority protections.",
+    "replacementTests": [
+      "RISK cloud source recovery publication: a device peer change during the SDK read invalidates consent before cloud mutation",
+      "RISK recovery identity consumers: signed-in Add clears its captured draft after recovery",
+      "RISK recovery identity consumers: final-task WOOP advances after acknowledged recovery",
+      "RISK recovery identity consumers: verified cloud adoption rebases independent saved extension fields for the same UID"
+    ],
+    "preservedCoverage": [
+      "All original tests and assertions remain; no test threshold, required native outcome, protocol, rules or review gate is removed or weakened. Existing exact ACK, explicit-source, late UID, pending and held-decision consumer cohort remains protected.",
+      "All original passing assertions remain. New final-task WOOP acceptance additionally saves and deletes the native plan through its mounted binding; an intermediate fixture ctx.taskById call was unavailable, recorded as setup failure and corrected to read actual state.",
+      "Root permanent repair RED925cbd3c is meaningful for actual publication revision7 instead of6, accepted Add text and cancelled WOOP before the bounded repairs. The earlier607f6ec3 nested opaque-object expectation overreached established indivisible-field semantics; that never-green fixture is corrected to independent top-level extension fields. It must not be cited as proof of a UID defect. Final refined ancestor and six publication controls fail on unchanged857 in later-baseline-sensitivity8351971f; current final focused consumer cohort passes10/10. These are retrospective sensitivity, not original feature RED chronology."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <root-worktree> --evidence-dir <usable-recovery>/test-runs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern=RISK_cloud_source_recovery_publication_or_recovery_identity_consumers tests.js",
+      "failure": "925cbd3c actual3/3 assertion failures BEFORE publication/owner-capture repair: cloud revision7!==6 after peer head changes inside the SDK publication read, accepted native Add leaves draft text, and native final-task WOOP closes at Next. Final independent-top-level-extension test and all six late publication boundaries have separate later857 sensitivity8351971f0/8pass. Intermediate607 nested-object expectation was not a discriminating UID test and is explicitly superseded; correction record links its immutable original."
+    },
+    "testChangesSha256": "ed5367bf823ac681760ec06b2f4ec0d1bbe541648ae1d92eb8083a619a96281a"
+  },
+  {
+    "reason": "Repair exact-candidate independent-review findings at actual native Add, WOOP, cloud publication and populated cold-source adoption consumers. Keep UID namespace isolation while carrying verified identity at transient and trusted source boundaries.",
+    "previousBehavior": "The857 candidate could publish a stale recovery choice after a late device-head change, leave a durably saved signed-in Add draft uncleared, cancel a same-account WOOP walkthrough, and drop an independent saved extension edit because wire/ancestor payloads intentionally omit device UID metadata.",
+    "intendedBehavior": "Validate one atomic complete device snapshot after cloud transaction reads and before publication writes, including exact originals/prepared copies/pending/hold/browser/draft. Capture full local owner identity for Add/WOOP, and bind verified source UID only at trusted cloud and ancestor reconstruction boundaries. Keep foreign UID and uncertain authority protections.",
+    "replacementTests": [
+      "RISK cloud source recovery publication: a device peer change during the SDK read invalidates consent before cloud mutation",
+      "RISK recovery identity consumers: signed-in Add clears its captured draft after recovery",
+      "RISK recovery identity consumers: final-task WOOP advances after acknowledged recovery",
+      "RISK recovery identity consumers: verified cloud adoption rebases independent saved extension fields for the same UID"
+    ],
+    "preservedCoverage": [
+      "All original tests and assertions remain; no test threshold, required native outcome, protocol, rules or review gate is removed or weakened. Existing exact ACK, explicit-source, late UID, pending and held-decision consumer cohort remains protected.",
+      "All original passing assertions remain. New final-task WOOP acceptance additionally saves and deletes the native plan through its mounted binding; an intermediate fixture ctx.taskById call was unavailable, recorded as setup failure and corrected to read actual state.",
+      "Root permanent repair RED925cbd3c is meaningful for actual publication revision7 instead of6, accepted Add text and cancelled WOOP before the bounded repairs. The earlier607f6ec3 nested opaque-object expectation overreached established indivisible-field semantics; that never-green fixture is corrected to independent top-level extension fields. It must not be cited as proof of a UID defect. Final refined ancestor and six publication controls fail on unchanged857 in later-baseline-sensitivity8351971f; current final focused consumer cohort passes10/10. These are retrospective sensitivity, not original feature RED chronology."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <root-worktree> --evidence-dir <usable-recovery>/test-runs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern=RISK_cloud_source_recovery_publication_or_recovery_identity_consumers tests.js",
+      "failure": "925cbd3c actual3/3 assertion failures BEFORE publication/owner-capture repair: cloud revision7!==6 after peer head changes inside the SDK publication read, accepted native Add leaves draft text, and native final-task WOOP closes at Next. Final independent-top-level-extension test and all six late publication boundaries have separate later857 sensitivity8351971f0/8pass. Intermediate607 nested-object expectation was not a discriminating UID test and is explicitly superseded; correction record links its immutable original."
+    },
+    "testChangesSha256": "769b9e4753f2db385369dc2b8099f2b1c37cb913b26285b6be0d2582d6af597d"
+  },
+  {
+    "reason": "Repair exact-candidate independent-review findings at actual native Add, WOOP, cloud publication and populated cold-source adoption consumers. Keep UID namespace isolation while carrying verified identity at transient and trusted source boundaries.",
+    "previousBehavior": "The857 candidate could publish a stale recovery choice after a late device-head change, leave a durably saved signed-in Add draft uncleared, cancel a same-account WOOP walkthrough, and drop an independent saved extension edit because wire/ancestor payloads intentionally omit device UID metadata.",
+    "intendedBehavior": "Validate one atomic complete device snapshot after cloud transaction reads and before publication writes, including exact originals/prepared copies/pending/hold/browser/draft. Capture full local owner identity for Add/WOOP, and bind verified source UID only at trusted cloud and ancestor reconstruction boundaries. Keep foreign UID and uncertain authority protections.",
+    "replacementTests": [
+      "RISK cloud source recovery publication: a device peer change during the SDK read invalidates consent before cloud mutation",
+      "RISK recovery identity consumers: signed-in Add clears its captured draft after recovery",
+      "RISK recovery identity consumers: final-task WOOP advances after acknowledged recovery",
+      "RISK recovery identity consumers: verified cloud adoption rebases independent saved extension fields for the same UID"
+    ],
+    "preservedCoverage": [
+      "All original tests and assertions remain; no test threshold, required native outcome, protocol, rules or review gate is removed or weakened. Existing exact ACK, explicit-source, late UID, pending and held-decision consumer cohort remains protected.",
+      "Independent857 diagnostic failures are retrospective review reproductions. Root permanent repair RED925cbd3c observed actual cloud revision7 instead of6, uncleared accepted Add and cancelled WOOP before these repair edits. RED607f6ec3 observed the independent durable extension edit replaced by before, before verified ancestor/source UID propagation.",
+      "The five additional publication-source boundaries were added after the general peer-head guard implementation and are supplementary coverage; final857 baseline sensitivity is separately required and must not be described as the original RED. The original857 full suite51d7cc65 was deliberately interrupted after review rejection, not passed."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <root-worktree> --evidence-dir <usable-recovery>/test-runs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern=RISK_cloud_source_recovery_publication_or_recovery_identity_consumers tests.js",
+      "failure": "925cbd3c: actual cloud revision7!==6 after a real peer device commit inside SDK publication root-read; accepted native Add retains its text; final-task native WOOP closes at Next. 607f6ec3: actual cold saved same-UID extension value becomes before instead of saved device edit after real producer publication/cloud adoption. Both observed before their bounded repair edits."
+    },
+    "testChangesSha256": "eb2ee66a3e03732582637872aea86a7b839ffd1f041543cc3c51e7e2af624ede"
+  },
+  {
+    "reason": "Repair exact-candidate independent-review findings at actual native Add, WOOP, cloud publication and populated cold-source adoption consumers. Keep UID namespace isolation while carrying verified identity at transient and trusted source boundaries.",
+    "previousBehavior": "The857 candidate could publish a stale recovery choice after a late device-head change, leave a durably saved signed-in Add draft uncleared, cancel a same-account WOOP walkthrough, and drop an independent saved extension edit because wire/ancestor payloads intentionally omit device UID metadata.",
+    "intendedBehavior": "Validate one atomic complete device snapshot after cloud transaction reads and before publication writes, including exact originals/prepared copies/pending/hold/browser/draft. Capture full local owner identity for Add/WOOP, and bind verified source UID only at trusted cloud and ancestor reconstruction boundaries. Keep foreign UID and uncertain authority protections.",
+    "replacementTests": [
+      "RISK cloud source recovery publication: a device peer change during the SDK read invalidates consent before cloud mutation",
+      "RISK recovery identity consumers: signed-in Add clears its captured draft after recovery",
+      "RISK recovery identity consumers: final-task WOOP advances after acknowledged recovery",
+      "RISK recovery identity consumers: verified cloud adoption rebases independent saved extension fields for the same UID"
+    ],
+    "preservedCoverage": [
+      "All original tests and assertions remain; no test threshold, required native outcome, protocol, rules or review gate is removed or weakened. Existing exact ACK, explicit-source, late UID, pending and held-decision consumer cohort remains protected.",
+      "Independent857 diagnostic failures are retrospective review reproductions. Root permanent repair RED925cbd3c observed actual cloud revision7 instead of6, uncleared accepted Add and cancelled WOOP before these repair edits. RED607f6ec3 observed the independent durable extension edit replaced by before, before verified ancestor/source UID propagation.",
+      "The five additional publication-source boundaries were added after the general peer-head guard implementation and are supplementary coverage; final857 baseline sensitivity is separately required and must not be described as the original RED. The original857 full suite51d7cc65 was deliberately interrupted after review rejection, not passed."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <root-worktree> --evidence-dir <usable-recovery>/test-runs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern=RISK_cloud_source_recovery_publication_or_recovery_identity_consumers tests.js",
+      "failure": "925cbd3c: actual cloud revision7!==6 after a real peer device commit inside SDK publication root-read; accepted native Add retains its text; final-task native WOOP closes at Next. 607f6ec3: actual cold saved same-UID extension value becomes before instead of saved device edit after real producer publication/cloud adoption. Both observed before their bounded repair edits."
+    },
+    "testChangesSha256": "2a71156152521160b7016ebee3210a8c9d64239093a0acdf79214b1c310b858c"
+  },
+  {
+    "testChangesSha256": "3ca35350cbed99373153c8d6349a186b263b927ea5466da90b08d6f343d11cb3",
+    "reason": "Reconcile the final exact integrated origin/main test diff while preserving every original feature assertion. Final owner review closes Settings draft loss and stale earlier-prepared-source consent through actual native recovery consumers.",
+    "previousBehavior": "Complete cloud recovery lacked an actionable native path. After the main slice, entering source review from Settings could discard an unsaved draft, and an earlier prepared choice was neither concretely shown nor required exact in the last protection checks before publication.",
+    "intendedBehavior": "Keep all original device/cloud/pending/prepared sources separately recoverable; disclose prior prepared choices and abandonment before consent; verify every captured earlier row remains exact before publication; preserve and restore Settings drafts through cancel, delayed read and completion; retain all conditional publication, identity/epoch, ACK, durable-head, source-hold and peer safety.",
+    "replacementTests": [
+      "RISK unreadable device recovery: an unsupported saved version cannot be replaced by Quick start or ordinary saving",
+      "RISK unreadable device recovery: native Paste previews and restores a supported board while preserving unreadable originals",
+      "RISK unreadable device recovery: raw startup preserves sources and supports native File restore",
+      "RISK unreadable device recovery: raw source export excludes the placeholder and preserves exact device evidence",
+      "RISK unreadable device recovery: locally restored work stays durable and visibly pending across sign-in and reopen",
+      "RISK unreadable device recovery: placeholder actions cannot create backups and unsupported selected decisions stay evidence",
+      "RISK unreadable device recovery: preservation refusals transaction failures and late identity changes never accept a source",
+      "RISK unreadable device recovery: raw transaction CAS refuses peer source changes after the last preview read",
+      "RISK unreadable device recovery: Quick start and current Changelog explain preserved sources and local pending recovery",
+      "RISK unreadable device recovery: partial raw rows remain exact while the restored board accepts later local edits",
+      "RISK unreadable device recovery: opaque identity collisions and unsupported raw types preserve every original",
+      "RISK unreadable device recovery: repeated cancelled previews reuse exact originals without recursive archive growth",
+      "RISK resilient sync recovery: an exact acknowledged copy recovers missing cloud chunks and publishes subsequent local work",
+      "RISK resilient sync recovery: a failed rebuild protects every source and retries after another local edit",
+      "RISK resilient sync recovery: unsupported unverifiable and foreign sources never authorize a replacement",
+      "RISK resilient sync recovery: rebuilding retains an interrupted pending generation and its exact readable chunks",
+      "RISK resilient sync recovery: unrepresented pending intent requires explicit review before replacing a damaged cloud source",
+      "RISK cloud source recovery: native explicit source choice publishes a complete generation with exact originals and durable reopen",
+      "RISK cloud source recovery: complete pending intent is selectable but mismatched partial and unknown sources stay unavailable",
+      "RISK cloud source recovery: an explicitly held local board can recover into a positively read empty cloud",
+      "RISK cloud source recovery: a late browser pending or peer change cannot be called a confirmed local recovery",
+      "RISK cloud source recovery: chosen prior membership remains deliberate while an unseen peer task and decision history survive",
+      "RISK cloud source recovery: changed consent and external failures retain originals without blind publication",
+      "RISK cloud source recovery: uncertain ACK stays held through cold open and requires a new native choice",
+      "RISK cloud source recovery guidance: mounted FAQ and changelog explain deliberate sources and unknown missing changes",
+      "RISK cloud source recovery controls: native Apply stays subdued until a complete source is selected",
+      "RISK resilient sync recovery: identity changes after durable source capture cannot bind an old response to a new account",
+      "RISK cloud source recovery: a same-UID auth epoch change at the last preservation read invalidates publication consent",
+      "RISK cloud source recovery: native Cancel stops delayed source checks and stays held during conditional publication",
+      "RISK cloud source recovery: account changes during final hold completion never report the old recovery complete",
+      "RISK cloud source recovery: an empty preview cannot overwrite a legacy root published at the transaction boundary",
+      "RISK cloud source recovery: native restored-device hold clears only after exact cloud ACK and durable current-head recovery",
+      "RISK cloud source recovery metadata: native preview distinguishes server save time upload clock and missing decision time",
+      "RISK cloud source recovery drafts: Settings drafts survive native review cancel delayed reads and confirmed recovery",
+      "RISK cloud source recovery prepared sources: earlier choices are disclosed and must stay exact before a replacement publishes"
+    ],
+    "preservedCoverage": [
+      "All preexisting passing assertions and the integrated parent/device/source tests remain intact. External SDK, real IndexedDB, native actions and actual device-store methods establish behavior; no app verdict or hold method is mocked.",
+      "Native prepared-source REDa9b8b73a showed missing prior-choice disclosure and actual publication revision7 instead of6 after an earlier row disappeared at external IDB boundary; GREEN5edf6f40 keeps it held and preserves exact raw prepared payloads. Settings draft RED39077e24 -> GREEN6da5957b covers normal Cancel, delayed-read Cancel and confirmed return without implicit Save.",
+      "All source/authority REDs and setup corrections from earlier exact entries remain truthful. Main source/device/decision cohort2ffa2c64 passed163/163 before the two owner-review slices; final committed focused cohort and preflight remain required. Metadata821bd236 -> b5e3072c; FAQ brevity1e5b8d5e ->7282a8bd preserves the130word contract.",
+      "No private incident sources, production/provider writes, push, PR, CI, rendered review or release were performed. Parent owns independent code/sync/FAQ reviews, exact final regression, rendered native/browser, compatibility, release metadata/fingerprints, deployment and actual affected-device recovery evidence."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <cloud-choice-worktree> --evidence-dir <usable-recovery>/cloud-choice-worker/test-runs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern='RISK cloud source recovery prepared sources:|RISK cloud source recovery drafts:' tests.js",
+      "failure": "Actual observed preimplementation source entry8eb6e280; pending52459bf8; late sources77977707; stale-peer9404bf3a; empty1f935b2b; auth epochd297275b; finalholdb399733d; empty/legacy transactionaff1fd42; metadata821bd236; Settingsdraft39077e24; prepared evidencea9b8b73a. Their GREENs and fixture/infrastructure-only failures are preserved individually outside Git; final relevant cohort must be read from the exact final committed run, not inferred from these labels."
+    }
+  },
+  {
+    "testChangesSha256": "d6b92a9574cf07014ec310c8e4396ae0616226f2e1bfef017e3bfcb091f2b35b",
+    "reason": "Reconcile the final exact integrated be8e8d3 test diff while preserving every original feature assertion. Final owner review closes Settings draft loss and stale earlier-prepared-source consent through actual native recovery consumers.",
+    "previousBehavior": "Complete cloud recovery lacked an actionable native path. After the main slice, entering source review from Settings could discard an unsaved draft, and an earlier prepared choice was neither concretely shown nor required exact in the last protection checks before publication.",
+    "intendedBehavior": "Keep all original device/cloud/pending/prepared sources separately recoverable; disclose prior prepared choices and abandonment before consent; verify every captured earlier row remains exact before publication; preserve and restore Settings drafts through cancel, delayed read and completion; retain all conditional publication, identity/epoch, ACK, durable-head, source-hold and peer safety.",
+    "replacementTests": [
+      "RISK cloud source recovery: native explicit source choice publishes a complete generation with exact originals and durable reopen",
+      "RISK cloud source recovery: complete pending intent is selectable but mismatched partial and unknown sources stay unavailable",
+      "RISK cloud source recovery: an explicitly held local board can recover into a positively read empty cloud",
+      "RISK cloud source recovery: a late browser pending or peer change cannot be called a confirmed local recovery",
+      "RISK cloud source recovery: chosen prior membership remains deliberate while an unseen peer task and decision history survive",
+      "RISK cloud source recovery: changed consent and external failures retain originals without blind publication",
+      "RISK cloud source recovery: uncertain ACK stays held through cold open and requires a new native choice",
+      "RISK cloud source recovery guidance: mounted FAQ and changelog explain deliberate sources and unknown missing changes",
+      "RISK cloud source recovery controls: native Apply stays subdued until a complete source is selected",
+      "RISK cloud source recovery: a same-UID auth epoch change at the last preservation read invalidates publication consent",
+      "RISK cloud source recovery: native Cancel stops delayed source checks and stays held during conditional publication",
+      "RISK cloud source recovery: account changes during final hold completion never report the old recovery complete",
+      "RISK cloud source recovery: an empty preview cannot overwrite a legacy root published at the transaction boundary",
+      "RISK cloud source recovery: native restored-device hold clears only after exact cloud ACK and durable current-head recovery",
+      "RISK cloud source recovery metadata: native preview distinguishes server save time upload clock and missing decision time",
+      "RISK cloud source recovery drafts: Settings drafts survive native review cancel delayed reads and confirmed recovery",
+      "RISK cloud source recovery prepared sources: earlier choices are disclosed and must stay exact before a replacement publishes"
+    ],
+    "preservedCoverage": [
+      "All preexisting passing assertions and the integrated parent/device/source tests remain intact. External SDK, real IndexedDB, native actions and actual device-store methods establish behavior; no app verdict or hold method is mocked.",
+      "Native prepared-source REDa9b8b73a showed missing prior-choice disclosure and actual publication revision7 instead of6 after an earlier row disappeared at external IDB boundary; GREEN5edf6f40 keeps it held and preserves exact raw prepared payloads. Settings draft RED39077e24 -> GREEN6da5957b covers normal Cancel, delayed-read Cancel and confirmed return without implicit Save.",
+      "All source/authority REDs and setup corrections from earlier exact entries remain truthful. Main source/device/decision cohort2ffa2c64 passed163/163 before the two owner-review slices; final committed focused cohort and preflight remain required. Metadata821bd236 -> b5e3072c; FAQ brevity1e5b8d5e ->7282a8bd preserves the130word contract.",
+      "No private incident sources, production/provider writes, push, PR, CI, rendered review or release were performed. Parent owns independent code/sync/FAQ reviews, exact final regression, rendered native/browser, compatibility, release metadata/fingerprints, deployment and actual affected-device recovery evidence."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <cloud-choice-worktree> --evidence-dir <usable-recovery>/cloud-choice-worker/test-runs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern='RISK cloud source recovery prepared sources:|RISK cloud source recovery drafts:' tests.js",
+      "failure": "Actual observed preimplementation source entry8eb6e280; pending52459bf8; late sources77977707; stale-peer9404bf3a; empty1f935b2b; auth epochd297275b; finalholdb399733d; empty/legacy transactionaff1fd42; metadata821bd236; Settingsdraft39077e24; prepared evidencea9b8b73a. Their GREENs and fixture/infrastructure-only failures are preserved individually outside Git; final relevant cohort must be read from the exact final committed run, not inferred from these labels."
+    }
+  },
+  {
+    "testChangesSha256": "126b48100a824bba6ab50e5c90c626ad8019aa8ad1ef60015b10186867c6e02f",
+    "reason": "Reconcile the exact integrated test diff against origin/main after native complete-source recovery, parent-owned raw-device and authenticated backend guards. Preserve historical rationale layout and every existing assertion; add truthful available timestamp display with a discriminating native preview RED.",
+    "previousBehavior": "Damaged cloud sources and unreadable device storage could leave no actionable supported path. Explicit source consent also needed pending hash validation, final storage/account guards, stale-peer membership intent, exact epoch binding and atomic empty-root distinction. The native preview omitted available server/upload times.",
+    "intendedBehavior": "Preserve exact raw originals and pending evidence, leave no source selected, show actual supported choices and honest unknown displacement, publish a complete new generation under existing integrity/auth/revision/empty-root conditions, require exact ACK and durable local current-head/hold readback, and preserve all unobserved peer intent and historical facts.",
+    "replacementTests": [
+      "RISK unreadable device recovery: an unsupported saved version cannot be replaced by Quick start or ordinary saving",
+      "RISK unreadable device recovery: native Paste previews and restores a supported board while preserving unreadable originals",
+      "RISK unreadable device recovery: raw startup preserves sources and supports native File restore",
+      "RISK unreadable device recovery: raw source export excludes the placeholder and preserves exact device evidence",
+      "RISK unreadable device recovery: locally restored work stays durable and visibly pending across sign-in and reopen",
+      "RISK unreadable device recovery: placeholder actions cannot create backups and unsupported selected decisions stay evidence",
+      "RISK unreadable device recovery: preservation refusals transaction failures and late identity changes never accept a source",
+      "RISK unreadable device recovery: raw transaction CAS refuses peer source changes after the last preview read",
+      "RISK unreadable device recovery: Quick start and current Changelog explain preserved sources and local pending recovery",
+      "RISK unreadable device recovery: partial raw rows remain exact while the restored board accepts later local edits",
+      "RISK unreadable device recovery: opaque identity collisions and unsupported raw types preserve every original",
+      "RISK unreadable device recovery: repeated cancelled previews reuse exact originals without recursive archive growth",
+      "RISK resilient sync recovery: an exact acknowledged copy recovers missing cloud chunks and publishes subsequent local work",
+      "RISK resilient sync recovery: a failed rebuild protects every source and retries after another local edit",
+      "RISK resilient sync recovery: unsupported unverifiable and foreign sources never authorize a replacement",
+      "RISK resilient sync recovery: rebuilding retains an interrupted pending generation and its exact readable chunks",
+      "RISK resilient sync recovery: unrepresented pending intent requires explicit review before replacing a damaged cloud source",
+      "RISK cloud source recovery: native explicit source choice publishes a complete generation with exact originals and durable reopen",
+      "RISK cloud source recovery: complete pending intent is selectable but mismatched partial and unknown sources stay unavailable",
+      "RISK cloud source recovery: an explicitly held local board can recover into a positively read empty cloud",
+      "RISK cloud source recovery: a late browser pending or peer change cannot be called a confirmed local recovery",
+      "RISK cloud source recovery: chosen prior membership remains deliberate while an unseen peer task and decision history survive",
+      "RISK cloud source recovery: changed consent and external failures retain originals without blind publication",
+      "RISK cloud source recovery: uncertain ACK stays held through cold open and requires a new native choice",
+      "RISK cloud source recovery guidance: mounted FAQ and changelog explain deliberate sources and unknown missing changes",
+      "RISK cloud source recovery controls: native Apply stays subdued until a complete source is selected",
+      "RISK resilient sync recovery: identity changes after durable source capture cannot bind an old response to a new account",
+      "RISK cloud source recovery: a same-UID auth epoch change at the last preservation read invalidates publication consent",
+      "RISK cloud source recovery: native Cancel stops delayed source checks and stays held during conditional publication",
+      "RISK cloud source recovery: account changes during final hold completion never report the old recovery complete",
+      "RISK cloud source recovery: an empty preview cannot overwrite a legacy root published at the transaction boundary",
+      "RISK cloud source recovery: native restored-device hold clears only after exact cloud ACK and durable current-head recovery",
+      "RISK cloud source recovery metadata: native preview distinguishes server save time upload clock and missing decision time"
+    ],
+    "preservedCoverage": [
+      "All preexisting passing feature assertions and all root/device/source-worker tests remain intact. Additional consumers use real native actions, actual get/clearRecoveryCloudHold, real IndexedDB, production modules/backend and isolated external SDK/IDB/file/time/auth boundaries; no application verdict is mocked.",
+      "Actual chronology is retained in usable-recovery/cloud-choice-worker/test-runs and sibling/root evidence. Source cohort2ffa2c64 passed163/163 after mergebe8e8d3, including sameUID epoch and empty→legacy transaction controls. Metadata821bd236 failed before product labels; b5e3072c passed after implementation and correcting the fixture’s UTC-only1970 expectation to device locale.",
+      "Every source, active/prior/pending generation, selected-file original, opaque extension, decision witness and History preservation boundary retains focused protection. Cancel-before-publication, protected-in-flight publication, uncertain ACK, later local/head/browser/pending/cloud/auth changes and cold reopen have actual native controls.",
+      "Rendered screenshots, independent code/sync/FAQ review, full/rules/compatibility/CI/deployment and actual affected iOS/account recovery remain parent-owned gates and are not claimed here. Legacy root replacement itself remains honestly unsupported; an empty-root preview cannot overwrite a legacy root arriving inside publication."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <cloud-choice-worktree> --evidence-dir <usable-recovery>/cloud-choice-worker/test-runs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern='RISK cloud source recovery:' tests.js",
+      "failure": "Observed preimplementation native entry8eb6e280; pending pointer52459bf8; late browser/pending/peer77977707; stale-peer membership9404bf3a; empty-source1f935b2b; sameUID epochd297275b; finalhold-accountb399733d; empty→legacy publicationaff1fd42; metadata821bd236. Final relevant integrated163/163GREEN2ffa2c64 and metadataGREENb5e3072c. Initial dependency/debounce/codec/nativeinput/JSONsubstring/timezone fixture errors are separately recorded in earlier exact entries and external chronology, never relabeled as product REDs."
+    }
+  },
+  {
+    "testChangesSha256": "a8ea0788d0944e54a33d97c63880b5dec41ec671a0204010b1c231ae9273288d",
+    "reason": "Reconcile the exact integrated test diff against be8e8d3 after native complete-source recovery, parent-owned raw-device and authenticated backend guards. Preserve historical rationale layout and every existing assertion; add truthful available timestamp display with a discriminating native preview RED.",
+    "previousBehavior": "Damaged cloud sources and unreadable device storage could leave no actionable supported path. Explicit source consent also needed pending hash validation, final storage/account guards, stale-peer membership intent, exact epoch binding and atomic empty-root distinction. The native preview omitted available server/upload times.",
+    "intendedBehavior": "Preserve exact raw originals and pending evidence, leave no source selected, show actual supported choices and honest unknown displacement, publish a complete new generation under existing integrity/auth/revision/empty-root conditions, require exact ACK and durable local current-head/hold readback, and preserve all unobserved peer intent and historical facts.",
+    "replacementTests": [
+      "RISK cloud source recovery: native explicit source choice publishes a complete generation with exact originals and durable reopen",
+      "RISK cloud source recovery: complete pending intent is selectable but mismatched partial and unknown sources stay unavailable",
+      "RISK cloud source recovery: an explicitly held local board can recover into a positively read empty cloud",
+      "RISK cloud source recovery: a late browser pending or peer change cannot be called a confirmed local recovery",
+      "RISK cloud source recovery: chosen prior membership remains deliberate while an unseen peer task and decision history survive",
+      "RISK cloud source recovery: changed consent and external failures retain originals without blind publication",
+      "RISK cloud source recovery: uncertain ACK stays held through cold open and requires a new native choice",
+      "RISK cloud source recovery guidance: mounted FAQ and changelog explain deliberate sources and unknown missing changes",
+      "RISK cloud source recovery controls: native Apply stays subdued until a complete source is selected",
+      "RISK cloud source recovery: a same-UID auth epoch change at the last preservation read invalidates publication consent",
+      "RISK cloud source recovery: native Cancel stops delayed source checks and stays held during conditional publication",
+      "RISK cloud source recovery: account changes during final hold completion never report the old recovery complete",
+      "RISK cloud source recovery: an empty preview cannot overwrite a legacy root published at the transaction boundary",
+      "RISK cloud source recovery: native restored-device hold clears only after exact cloud ACK and durable current-head recovery",
+      "RISK cloud source recovery metadata: native preview distinguishes server save time upload clock and missing decision time"
+    ],
+    "preservedCoverage": [
+      "All preexisting passing feature assertions and all root/device/source-worker tests remain intact. Additional consumers use real native actions, actual get/clearRecoveryCloudHold, real IndexedDB, production modules/backend and isolated external SDK/IDB/file/time/auth boundaries; no application verdict is mocked.",
+      "Actual chronology is retained in usable-recovery/cloud-choice-worker/test-runs and sibling/root evidence. Source cohort2ffa2c64 passed163/163 after mergebe8e8d3, including sameUID epoch and empty→legacy transaction controls. Metadata821bd236 failed before product labels; b5e3072c passed after implementation and correcting the fixture’s UTC-only1970 expectation to device locale.",
+      "Every source, active/prior/pending generation, selected-file original, opaque extension, decision witness and History preservation boundary retains focused protection. Cancel-before-publication, protected-in-flight publication, uncertain ACK, later local/head/browser/pending/cloud/auth changes and cold reopen have actual native controls.",
+      "Rendered screenshots, independent code/sync/FAQ review, full/rules/compatibility/CI/deployment and actual affected iOS/account recovery remain parent-owned gates and are not claimed here. Legacy root replacement itself remains honestly unsupported; an empty-root preview cannot overwrite a legacy root arriving inside publication."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <cloud-choice-worktree> --evidence-dir <usable-recovery>/cloud-choice-worker/test-runs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern='RISK cloud source recovery:' tests.js",
+      "failure": "Observed preimplementation native entry8eb6e280; pending pointer52459bf8; late browser/pending/peer77977707; stale-peer membership9404bf3a; empty-source1f935b2b; sameUID epochd297275b; finalhold-accountb399733d; empty→legacy publicationaff1fd42; metadata821bd236. Final relevant integrated163/163GREEN2ffa2c64 and metadataGREENb5e3072c. Initial dependency/debounce/codec/nativeinput/JSONsubstring/timezone fixture errors are separately recorded in earlier exact entries and external chronology, never relabeled as product REDs."
+    }
+  },
+  {
+    "testChangesSha256": "f80af35034f526517a055af77d018e9f591f9faef66d9155d92afa0bc94c302a",
+    "reason": "Exercise the real integrated persistent device recovery hold through native Paste, later local edit, separate cloud-source review, actual publication ACK and durable reopen against damaged, healthy v2 and positively empty cloud sources. No hold/store collaborator is mocked.",
+    "previousBehavior": "The worker source-choice tests did not yet consume the sibling implementation’s actual native raw-restore hold. Separate source paths could appear valid without proving that later-edited restored local work can resume confirmed sync.",
+    "intendedBehavior": "A real native restored-device hold keeps ordinary sync pending, survives later edits, and clears through exact real-store current-head/hold CAS only after deliberate complete-source publication, exact ACK, verified local head and retained original bytes. Healthy cloud choice and positively empty account choice remain usable.",
+    "replacementTests": [
+      "RISK cloud source recovery: native restored-device hold clears only after exact cloud ACK and durable current-head recovery"
+    ],
+    "preservedCoverage": [
+      "All earlier feature assertions remain. The test uses real getRecoveryCloudHold/clearRecoveryCloudHold through native UI and exact opaque rows before/after; no internal verdict or consumer is replaced. The initial malformed source includes an unpaired surrogate and every original receipt stays byte-exact.",
+      "The actual source-choice entry RED8eb6e280 and empty-source RED1f935b2b predate implementation; this is additional integrated acceptance, not a fabricated new product RED. Failed attempts334d724b/56308573 omitted the native textarea input event;831e18fa used a double-JSON substring assertion rather than decoding the actual raw receipt. The fixture was corrected without app changes, then32e87187 passed4/4."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern='RISK cloud source recovery: native explicit|RISK cloud source recovery: an explicitly held' tests.js",
+      "failure": "Original native source entry RED8eb6e280 and empty-account RED1f935b2b establish implementation sensitivity before product edits. Integrated real-hold acceptance32e87187 confirms all3 source shapes and later current-head clearing after root215d5c5/device6d0bccc merge. Empty→legacy transaction REDaff1fd42 now consumes the separately parent-owned recoveryRootAbsent optional flag; guard GREEN remains required after mergebe8e8d3."
+    }
+  },
+  {
+    "testChangesSha256": "dd436b369570f8c8d9378a6a1356e2fe34afb2dc798a99d1b1031a30aa30ac22",
+    "reason": "Preserve actual final storage/auth consent boundaries and prove native cancellation/transaction-bound source changes after root integration. All existing assertions remain unchanged.",
+    "previousBehavior": "The final protected-copy await can outlive consent after signout and same-UID sign-in. An account change during final hold completion can be reported complete. Existing revision-zero CAS also conflates a positively absent root with a concurrently published unversioned legacy source.",
+    "intendedBehavior": "Bind explicit publication to the captured backend identity and auth epoch through the existing upload guard; require final local-head/account consent after hold completion, keep Cancel responsive before publication and protected during it, and reject concurrent legacy publication against empty-root consent.",
+    "replacementTests": [
+      "RISK cloud source recovery: a same-UID auth epoch change at the last preservation read invalidates publication consent",
+      "RISK cloud source recovery: native Cancel stops delayed source checks and stays held during conditional publication",
+      "RISK cloud source recovery: account changes during final hold completion never report the old recovery complete",
+      "RISK cloud source recovery: an empty preview cannot overwrite a legacy root published at the transaction boundary"
+    ],
+    "preservedCoverage": [
+      "Only additive native full-app tests and external SDK/IndexedDB transaction-completion injection. Existing source choice, pending, old data, late peer, ACK, cold reopen and cross-client contracts remain exact. No production/provider source was used.",
+      "Root owns the backend epoch and empty-root transaction guards. This checkpoint carries their real native REDs plus captured fourth-argument identity/epoch consumer, and must merge parent guards before final handoff. Initial final-hold fault167e1748 did not fire; app guard was reverted, the external fault repaired, and actual REDb399733d observed before reinstating the guard."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern='RISK cloud source recovery: a same-UID|RISK cloud source recovery: account changes during final|RISK cloud source recovery: an empty preview' tests.js",
+      "failure": "Meaningful sameUID epoch REDd297275b: expired consent published revision7 instead of6; routed to root215d5c5 fourthargument guard. Meaningful final-hold REDb399733d -> GREENe0ddbf75 after final account/head check. Empty→legacy actual publicationtransaction REDaff1fd42: applytrue instead offalse; routed to root for conditional absent-root guard. NativeCancel external delayed-read/publication coverage passed0ed6b976 and does not claim an additional RED."
+    }
+  },
+  {
+    "testChangesSha256": "b6fdc851c829fde2ef8ac41a652c89751e9a91f09025a64fc92f1fc8a972b2c5",
+    "reason": "Implement parent-authorized explicit complete cloud source recovery through existing full-app native actions, real IndexedDB and production backend at isolated external SDK boundaries. Preserve every existing assertion and document actual RED/GREEN chronology.",
+    "previousBehavior": "A damaged selected generation with no exact acknowledged copy leaves no supported source choice. Pending pointers can disagree with readable bytes; late browser/pending/cloud changes can be called confirmed, and prior-source membership can revive on a stale peer.",
+    "intendedBehavior": "Offer no default; validate separately identified complete sources and unknown-data displacement, durably protect all readable originals and pending metadata, conditionally publish a new complete generation, verify exact ACK and durable head, retain stale/failed choices across reopen and preserve unseen peer intent.",
+    "replacementTests": [
+      "RISK cloud source recovery: native explicit source choice publishes a complete generation with exact originals and durable reopen",
+      "RISK cloud source recovery: complete pending intent is selectable but mismatched partial and unknown sources stay unavailable",
+      "RISK cloud source recovery: an explicitly held local board can recover into a positively read empty cloud",
+      "RISK cloud source recovery: a late browser pending or peer change cannot be called a confirmed local recovery",
+      "RISK cloud source recovery: chosen prior membership remains deliberate while an unseen peer task and decision history survive",
+      "RISK cloud source recovery: changed consent and external failures retain originals without blind publication",
+      "RISK cloud source recovery: uncertain ACK stays held through cold open and requires a new native choice",
+      "RISK cloud source recovery guidance: mounted FAQ and changelog explain deliberate sources and unknown missing changes",
+      "RISK cloud source recovery controls: native Apply stays subdued until a complete source is selected"
+    ],
+    "preservedCoverage": [
+      "Every preexisting passing feature assertion remains. Additive helper arguments retain the prior default timeout; external IDB transaction-complete injection adds no mocked application verdict. All incident inputs are synthetic and no live provider writes occurred.",
+      "Native tests include device and prior choices, complete/partial/unsupported pending controls, actual recorded decision lineage and stale-peer adoption, exact originals and opaque pins, changed account/UID/epoch/local/draft/head/cloud/pending state, storage/upload/commit/cancel failures and uncertain ACK across cold reopen.",
+      "The empty-root native test is intentionally RED at this checkpoint pending the separately parent-owned authenticated neutral source-reader commit b3da257; merge and GREEN are required before final handoff. Initial dependency failure f138d27e, unsettled debounce96bcdcca and codec fixture3549fe2c/aae1d721 are setup errors, not behavioral REDs."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <cloud-choice-worktree> --evidence-dir <usable-recovery>/cloud-choice-worker/test-runs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern='RISK cloud source recovery:' tests.js",
+      "failure": "Actual native entry RED8eb6e280 preceded all product edits; first GREENf38e96f5 followed same-time cold fixture correction. Pending-pointer RED52459bf8 -> GREEN66775c92; late browser/pending/peer RED77977707 -> GREENea7f6b1b; stale peer revival RED9404bf3a -> GREEN6cbf18b5. Empty root RED1f935b2b routed to parent-owned reader change; FAQ RED1ed79355 -> GREEN5e278964 (all failure/unknown ACK controls already passed), disabled-control REDf1a800f8 -> GREEN38daffcf. External provenance retains the exact source and chronology; no rendered/production/physical-device claim."
+    }
+  },
+  {
+    "testChangesSha256": "c4e11075ec742ad8289760d0103a11abc0be0c8f8365cac61897f28a408c1009",
+    "reason": "Complete the root-authorized raw device-source recovery slice at the existing full-app startup, native File/Paste, device persistence and Settings export consumers. Keep every earlier passing assertion and add exact malformed-source, transaction, account, peer, placeholder and durable-reopen coverage. Final self-review closes repeated-Cancel archive growth without weakening source CAS or immutable evidence protection.",
+    "previousBehavior": "An unreadable or missing selected device source could lose its raw-readable handle, revive stale retained legacy data, stop startup on hash-valid malformed JSON, block ordinary File/Paste recovery, create placeholder backups, or admit unsupported selected decision evidence. Ordinary snapshot cleanup could discard partial raw rows during local recovery.",
+    "intendedBehavior": "Retain exact raw device/browser sources; explicitly preview and confirm only a supported selected board through raw-source transaction CAS; stop failures and stale identity/draft/source consent; keep malformed and orphan rows, selected-file bytes and unknown/pending sources exact. Local recovered work persists under a device-only cloud hold until root-owned validated cloud-source recovery.",
+    "replacementTests": [
+      "RISK unreadable device recovery: raw startup preserves sources and supports native File restore",
+      "RISK unreadable device recovery: raw source export excludes the placeholder and preserves exact device evidence",
+      "RISK unreadable device recovery: locally restored work stays durable and visibly pending across sign-in and reopen",
+      "RISK unreadable device recovery: placeholder actions cannot create backups and unsupported selected decisions stay evidence",
+      "RISK unreadable device recovery: preservation refusals transaction failures and late identity changes never accept a source",
+      "RISK unreadable device recovery: raw transaction CAS refuses peer source changes after the last preview read",
+      "RISK unreadable device recovery: Quick start and current Changelog explain preserved sources and local pending recovery",
+      "RISK unreadable device recovery: partial raw rows remain exact while the restored board accepts later local edits",
+      "RISK unreadable device recovery: opaque identity collisions and unsupported raw types preserve every original",
+      "RISK unreadable device recovery: repeated cancelled previews reuse exact originals without recursive archive growth"
+    ],
+    "preservedCoverage": [
+      "All previously passing feature assertions remain, including accepted-board File/Paste, signed-in conditional publication/ACK, durable hydration, legacy migration, manual export, completion, ratings, History, Undo and opaque fields. Related existing consumer cohort passed 81/81 before the final partial-row additions.",
+      "The prior never-green Paste fixture now dispatches its actual jsonBox input event and compares exact decoded raw archive strings for both browser keys; the former JSON.stringify substring would double-escape nested raw evidence. Original RED4600958f and17c5973c remain; final refined fixture later-baseline55b71443 again fails on0e7829e at actual preview refusal.",
+      "Raw-CAS peer cases were added after that intended CAS was implemented and are later sensitivity, not original preimplementation RED. The isolated CAS comparison bypass6edcbb8e makes all four peer-source cases fail; the DOM draft control stays protected. Unsupported raw type and immutable collision cases are preservation coverage, not claimed new REDs.",
+      "Exact matching-hash truncated JSON setup was narrowed after the first startup RED to omit unrelated corrupt backups and legacy interference; later baseline evidence is separately labelled. No actual browser, physical-device, production/provider write, CI, deployment, rules or compatibility-emulator claim is made.",
+      "The collision test still requires refusal and exact original preservation at an existing immutable identity. Its second file now has different bytes, so reusing an already verified identical file is not confused with a true collision. Prior coherent merged cohort7839b64e passed91/91 before this bounded retry repair; final device cohort passes33/33. Mixed-runtime04d139ca is invalid and retained; serial correctivefdc166f4 passed87/87 before mergingb3da."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <device-worktree> --evidence-dir <usable-recovery>/device-worker --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern=<named unreadable-device consumer slice> tests.js",
+      "failure": "Observed actual REDs: nativePaste4600958f/17c5973c refuses preview; startup six-sourcee7b01d9e loses raw handle/adopts unsupported source/refuses File; raw-export+visiblehold1cca6dcd lacks raw action and pending notice; placeholder+unsupporteddecisions041fbe98 writes placeholder manual backup and accepts v99 decisions; final awaited authd2c0cbca reports success after UID changes; FAQe9372030 missing explanation; partialraw82cecd9c cannot confirm with null/orphan raw rows. Repairs followed each observed assertion. Final refined native baseline55b71443 and CAS mutant6edcbb8e are later sensitivity only; external provenance records retain actual chronology. Late post-hold peer-write0464b7d7 observed success despite a newer durable peer head; final head readback now rejects it before installation. Fully refined startup baseline641b5918 independently reproduces the hash-valid truncated-JSON boot deadline; this is later sensitivity, not original chronology. Repeated-Cancela87ce26f before receipt reuse observed new nested original/file rows on an unchanged source; subsequente182c83b33/33 device checks preserve exact original rows through four repeat previews and explicit confirm."
+    }
+  },
+  {
+    "testChangesSha256": "8b23f46f6cb6d4c0e72f5b53f56d8e2bee58b8c753fd48a4a2b8f51a6104e5b1",
+    "reason": "Complete the root-authorized raw device-source recovery slice at the existing full-app startup, native File/Paste, device persistence and Settings export consumers. Keep every earlier passing assertion and add exact malformed-source, transaction, account, peer, placeholder and durable-reopen coverage.",
+    "previousBehavior": "An unreadable or missing selected device source could lose its raw-readable handle, revive stale retained legacy data, stop startup on hash-valid malformed JSON, block ordinary File/Paste recovery, create placeholder backups, or admit unsupported selected decision evidence. Ordinary snapshot cleanup could discard partial raw rows during local recovery.",
+    "intendedBehavior": "Retain exact raw device/browser sources; explicitly preview and confirm only a supported selected board through raw-source transaction CAS; stop failures and stale identity/draft/source consent; keep malformed and orphan rows, selected-file bytes and unknown/pending sources exact. Local recovered work persists under a device-only cloud hold until root-owned validated cloud-source recovery.",
+    "replacementTests": [
+      "RISK unreadable device recovery: raw startup preserves sources and supports native File restore",
+      "RISK unreadable device recovery: raw source export excludes the placeholder and preserves exact device evidence",
+      "RISK unreadable device recovery: locally restored work stays durable and visibly pending across sign-in and reopen",
+      "RISK unreadable device recovery: placeholder actions cannot create backups and unsupported selected decisions stay evidence",
+      "RISK unreadable device recovery: preservation refusals transaction failures and late identity changes never accept a source",
+      "RISK unreadable device recovery: raw transaction CAS refuses peer source changes after the last preview read",
+      "RISK unreadable device recovery: Quick start and current Changelog explain preserved sources and local pending recovery",
+      "RISK unreadable device recovery: partial raw rows remain exact while the restored board accepts later local edits",
+      "RISK unreadable device recovery: opaque identity collisions and unsupported raw types preserve every original"
+    ],
+    "preservedCoverage": [
+      "All previously passing feature assertions remain, including accepted-board File/Paste, signed-in conditional publication/ACK, durable hydration, legacy migration, manual export, completion, ratings, History, Undo and opaque fields. Related existing consumer cohort passed 81/81 before the final partial-row additions.",
+      "The prior never-green Paste fixture now dispatches its actual jsonBox input event and compares exact decoded raw archive strings for both browser keys; the former JSON.stringify substring would double-escape nested raw evidence. Original RED4600958f and17c5973c remain; final refined fixture later-baseline55b71443 again fails on0e7829e at actual preview refusal.",
+      "Raw-CAS peer cases were added after that intended CAS was implemented and are later sensitivity, not original preimplementation RED. The isolated CAS comparison bypass6edcbb8e makes all four peer-source cases fail; the DOM draft control stays protected. Unsupported raw type and immutable collision cases are preservation coverage, not claimed new REDs.",
+      "Exact matching-hash truncated JSON setup was narrowed after the first startup RED to omit unrelated corrupt backups and legacy interference; later baseline evidence is separately labelled. No actual browser, physical-device, production/provider write, CI, deployment, rules or compatibility-emulator claim is made."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <device-worktree> --evidence-dir <usable-recovery>/device-worker --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern=<named unreadable-device consumer slice> tests.js",
+      "failure": "Observed actual REDs: nativePaste4600958f/17c5973c refuses preview; startup six-sourcee7b01d9e loses raw handle/adopts unsupported source/refuses File; raw-export+visiblehold1cca6dcd lacks raw action and pending notice; placeholder+unsupporteddecisions041fbe98 writes placeholder manual backup and accepts v99 decisions; final awaited authd2c0cbca reports success after UID changes; FAQe9372030 missing explanation; partialraw82cecd9c cannot confirm with null/orphan raw rows. Repairs followed each observed assertion. Final refined native baseline55b71443 and CAS mutant6edcbb8e are later sensitivity only; external provenance records retain actual chronology. Late post-hold peer-write0464b7d7 observed success despite a newer durable peer head; final head readback now rejects it before installation. Fully refined startup baseline641b5918 independently reproduces the hash-valid truncated-JSON boot deadline; this is later sensitivity, not original chronology."
+    }
+  },
+  {
+    "testChangesSha256": "ef474daddbc252c7a8e98cb2aea984d731fdbffaba838db366ad3f2d0d6cfa34",
+    "reason": "Close an authenticated identity race after durable source capture through the actual full-app cloud reconciliation consumer. Add a controlled completion event at the external IndexedDB boundary without replacing an app method. Also provide neutral positively-empty raw source reads required by the independently observed native cloud-choice consumer RED.",
+    "previousBehavior": "The original cloud response was checked before source capture, but later storage awaits could let a same-email UID change bind that old response and old tasks to a different authenticated identity. The raw source reader rejected positively absent roots so explicit held-local recovery could not preview a valid empty account.",
+    "intendedBehavior": "Keep the backend object, account and UID bound across recovery, post-read device checks and write-authority release. A changed identity cannot publish old-account tasks. The explicit raw-source reader may return manifest:null only after two successful authenticated absence reads; retain any pending generation source and preserve ordinary CloudSync pull error semantics.",
+    "replacementTests": [
+      "RISK resilient sync recovery: identity changes after durable source capture cannot bind an old response to a new account"
+    ],
+    "preservedCoverage": [
+      "All previous exact ACK, retry, source/pending preservation, unsupported data and account protections remain intact; 63 relevant authority/sync checks pass000bf501 after the late identity repair.",
+      "The new fault delivers an actual Auth callback after the real IndexedDB receipt completion and promise continuations; semantic assertions verify no old task reaches another identity. It does not mock the application verdict.",
+      "The empty-root native source-choice RED1f935b2b is recorded in the sibling implementation worktree before this backend extension. Its final GREEN must be consumed after merge; no release or affected-device claim is made here."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern='RISK resilient sync recovery: identity changes after' tests.js",
+      "failure": "Observed0fad9a5d before post-await identity checks: old-account tasks published into the new authenticated identity. GREEN000bf50163/63 relevant checks; a5fb17ae exact+lateidentity2/2. Sibling native empty-source review RED1f935b2b before neutral empty-reader extension: preview returnedfalse rather thantrue; source/chronology retained externally."
+    }
+  },
+  {
+    "testChangesSha256": "c34ea68fb687e04edf75560a91c44053da27005f1f8872eb2920038adcf1eeea",
+    "reason": "Protect pending generation evidence during exact acknowledged-source recovery and refuse automatic replacement when a pending source represents different unselected intent. This adds two actual full-app regressions; previous assertions remain intact.",
+    "previousBehavior": "A new recovery publication could retire an old staged pending generation whose metadata was preserved but whose chunks were not captured or pinned. An acknowledged source could also authorize a new publication while a different unrepresented pending upload was silently superseded.",
+    "intendedBehavior": "Capture and durably pin current, previous and pending generations before rebuilding. Only an acknowledged duplicate or exact current-payload pending source may proceed automatically; unrepresented pending evidence waits for a supported explicit source-selection path.",
+    "replacementTests": [
+      "RISK resilient sync recovery: rebuilding retains an interrupted pending generation and its exact readable chunks",
+      "RISK resilient sync recovery: unrepresented pending intent requires explicit review before replacing a damaged cloud source"
+    ],
+    "preservedCoverage": [
+      "Existing exact ACK, durable reopen, retry/new local edit, unsupported hash/header, authenticated identity changes, failed storage and previous complete-source preservation assertions remain unchanged.",
+      "Faults enter the actual external SDK transaction boundary; pending upload metadata comes from the actual adapter and real IndexedDB. An independent digest proves the interrupted duplicate matches the acknowledged header before source damage recovery.",
+      "The new unknown-pending control preserves every provider row and the exact pending pointer rather than silently merging or discarding opaque source authority. No incident private data or live/provider writes were used."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern='RISK resilient sync recovery: rebuilding retains|RISK resilient sync recovery: unrepresented pending' tests.js",
+      "failure": "Observed4ad82529 before pending generation capture: old interrupted acknowledged duplicate header/chunks were deleted after rebuild (undefined rather than original raw header). Observedd2d53c74 before pending eligibility guard: unrepresented pending intent was silently displaced by cloud revision7 rather than retained revision6. GREEN19dfc50a verifies all10 resilient-sync assertions/subtests."
+    }
+  },
+  {
+    "testChangesSha256": "2cd9629819180fa2f767508f728ebeccb7ce2fd654fda61245709e2398bf1ded",
+    "reason": "Extend existing187 recovery through the agreed actual full-app consumer: exact acknowledged generation recovery, retry preservation, identity races, unsupported device source protection, and a deliberately RED native Paste recovery slice. Existing passing assertions stay intact. External SDK/IndexedDB fixture hooks model server read identity changes and transaction aborts; no application verdict is mocked.",
+    "previousBehavior": "A corrupt published generation blocks ordinary app sync despite a byte-exact acknowledged local copy. Recovery retry evidence keyed only by generation cannot admit later local work. Email-only device ownership can reintroduce old-account tasks after an authenticated UID switch. Future saved board versions can be downgraded by hydration and ordinary saves; native Paste refuses an unaccepted source.",
+    "intendedBehavior": "Publish a complete new validated generation conditionally from a proved exact acknowledged copy, preserve damaged/previous/pending sources, retry after later edits, bind device bookkeeping to authenticated identity, preserve unsupported device originals and provide a deliberate native supported restore path. The native Paste slice remains intentionally failing at this checkpoint and is not release-ready.",
+    "replacementTests": [
+      "RISK unreadable device recovery: an unsupported saved version cannot be replaced by Quick start or ordinary saving",
+      "RISK unreadable device recovery: native Paste previews and restores a supported board while preserving unreadable originals",
+      "RISK resilient sync recovery: an exact acknowledged copy recovers missing cloud chunks and publishes subsequent local work",
+      "RISK resilient sync recovery: a failed rebuild protects every source and retries after another local edit",
+      "RISK resilient sync recovery: unsupported unverifiable and foreign sources never authorize a replacement"
+    ],
+    "preservedCoverage": [
+      "Every preexisting test and passing assertion is retained, including transaction integrity, decision recovery, history, ratings, opaque fields, source preservation, account/CAS/ACK and compatibility floors.",
+      "The full-app helpers reuse real IndexedDB and the real production module/adapter with isolated external SDK docs and file/native handlers. Provider originals are synthetic; incident uploads remain private and outside Git.",
+      "Initial timestamp cloning and missing fault-reference failures are setup errors, not behavioral REDs. The first test now waits through the existing real ACK+durable-head consumer; final baseline sensitivity remains required. Account-control assertions distinguish the untouched original namespace from an explicitly requested empty sync in a different identity."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <incident-worktree> --evidence-dir <persistent-usable-recovery>/test-runs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern='RISK resilient sync recovery: an exact' tests.js",
+      "failure": "Observed375dc27b before product edits: exact acknowledged copy still returns corrupt-generation and no subsequent edit sync. Retryf9c01f72 before immutable capture digest fix: actual remote ACK+durablehead failed5s. Account8f52434d before UID bookkeeping: original-account recovery can proceed across same-email UID change; later test refinement verifies no old task reaches foreign account. Device59fb1e82 before guard: persist true rather than false downgrades unsupportedv99 source. NativePastee96b4bb2 currently remains RED: preview false rather than true. Provenance files retained externally; no release claim."
+    }
+  },
+  {
     "testChangesSha256": "81d0ee0a54eae2766b43a43ffbd1c95abad273eef1f328c75b1faabe69d06c60",
     "reason": "Prevent missing or partial uploaded generation sources from being sealed or published through the production Firebase adapter. Add independent digest and consumer controls while preserving all existing assertions. Full exact-candidate run exposed the same external TextEncoder/VM Uint8Array mismatch in the full-app fixture plus an over-specific source signature assertion; correct fixture fidelity and migrate that signature while preserving every behavioral assertion. Complete the codec fixture audit: pair external TextEncoder with its Uint8Array in standalone storage, standalone CloudStore, real-SDK decision and compatibility VMs; require independent server header hashes so shared fixture errors cannot satisfy wire compatibility.",
     "previousBehavior": "The ordinary uploader verified all bytes before sealing, but a source removed after that read could still be sealed or published because the state-changing transactions checked metadata alone. This admitted mechanism does not identify the production actor or recover the damaged active payload.",
