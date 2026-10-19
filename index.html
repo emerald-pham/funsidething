@@ -4410,7 +4410,7 @@ function currentChoiceSourceIssue(board){
 function persistedDecisionAncestor(account,revision){
   const base=state?.decisionBase;
   if(!validDecisionBase(base,account,revision))return null;
-  const ancestor=JSON.parse(base.payload);hydrateState(ancestor);ancestor.syncAccount=account;ancestor.syncRev=revision;
+  const ancestor=JSON.parse(base.payload);hydrateState(ancestor);ancestor.syncAccount=account;ancestor.syncIdentity=state.syncIdentity??null;ancestor.syncRev=revision;
   return ancestor;
 }
 /* Explicit replacement must preserve this device's account-bound publication
@@ -4838,8 +4838,8 @@ async function cloudPull(){
           && priorMarkers.lastKnownCloudRevision===localRev && validSavedPayload(priorMarkers.lastKnownCloudPayload)
           ? JSON.parse(priorMarkers.lastKnownCloudPayload) : null;
         const ancestor=memoryAncestor || (!switchedAccount && localRev!==null ? persistedDecisionAncestor(acct,localRev) : null);
-        if(ancestor){hydrateState(ancestor);ancestor.syncAccount=acct;}
-        st.syncAccount=acct;
+        if(ancestor){hydrateState(ancestor);ancestor.syncAccount=acct;ancestor.syncIdentity=pullIdentity;}
+        st.syncAccount=acct;st.syncIdentity=pullIdentity;
         const recoveredFields=!switchedAccount && rebasePendingBoardFields(st,state,ancestor);
         recoveredTasks = (!switchedAccount && mergeUndeletedTasks(st, state)) || recoveredFields;
         const mergedDecisionIssue=decisionEvidenceIssue(st,acct);
@@ -5956,7 +5956,7 @@ const taskActionOwnerBundle=(()=>{
         // Reset frame. Recover its source before restoring its available Undo;
         // archived event identities, times and original owners stay unchanged.
         if(!await inheritDecisionAuthority(next,state.syncAccount,"guest-first-empty-account",frame.snapshot)||!current())return false;
-        next.syncAccount=state.syncAccount;
+        next.syncAccount=state.syncAccount;next.syncIdentity=state.syncIdentity;
       }
       if(!await prepareDecisionReplacement(next,state,"explicit-undo"))return false;
       if(JSON.stringify(state)!==prior||window.CloudSync!==backend||(window.CloudSync?.user??null)!==account||undoStack.at(-1)!==frame){
@@ -6321,11 +6321,11 @@ function submitQuickAdd(text=document.getElementById("addInput").value){
       const ids=state.tasks.filter(t=>!prior.has(t.id)).map(t=>t.id);
       // A synchronous commit error can follow insertion. Keep that acceptance
       // for retry too, rather than manufacturing a second copy of the task.
-      if(ids.length)quickAddSubmission={draft,generation,owner:{syncAccount:state.syncAccount},ids,result:{added:ids.length},saving:null,needsCommit:true};
+      if(ids.length)quickAddSubmission={draft,generation,owner:{syncAccount:state.syncAccount,syncIdentity:state.syncIdentity},ids,result:{added:ids.length},saving:null,needsCommit:true};
       throw error;
     }
     if(!result.added && !result.skipped && !result.completed)return false;
-    submission={draft,generation,owner:{syncAccount:state.syncAccount},ids:state.tasks.filter(t=>!prior.has(t.id)).map(t=>t.id),result,saving:null};
+    submission={draft,generation,owner:{syncAccount:state.syncAccount,syncIdentity:state.syncIdentity},ids:state.tasks.filter(t=>!prior.has(t.id)).map(t=>t.id),result,saving:null};
     quickAddSubmission=submission;
   }
   if(submission.saving)return submission.saving;
@@ -8446,7 +8446,7 @@ function woopHTML(task){
   if(!supportedWoopEvidence(task))return '<p class="kv">This WOOP plan has unrecognized or conflicting evidence. Its saved data is preserved.</p>';
   const plan=task.woopPlan;
   if(validWoopPlan(plan)){
-    woopDeleteBinding={id:uid(),board:state,account:window.CloudSync?.user||null,owner:{syncAccount:state.syncAccount},taskId:task.id,head:task.woopHead||'',plan:JSON.stringify(plan)};
+    woopDeleteBinding={id:uid(),board:state,account:window.CloudSync?.user||null,owner:{syncAccount:state.syncAccount,syncIdentity:state.syncIdentity},taskId:task.id,head:task.woopHead||'',plan:JSON.stringify(plan)};
     return '<div class="notice woop-saved"><dl><dt>Best outcome</dt><dd>'+esc(plan.outcome)+'</dd><dt>Obstacle</dt><dd>'+esc(plan.obstacle)+'</dd><dt>If/then plan</dt><dd>'+esc(plan.plan)+'</dd></dl><button class="btn woop-delete" data-act="woop-delete" data-benchmark="'+esc(task.id)+'" data-plan="'+esc(plan.id)+'" data-head="'+esc(task.woopHead||'')+'" data-binding="'+esc(woopDeleteBinding.id)+'">Delete WOOP plan</button></div>';
   }
   if(plan!==undefined && plan!==null)return '<p class="kv">This WOOP plan uses an unrecognized format. Its saved data is preserved.</p>';
@@ -8460,7 +8460,7 @@ function overdueWoopCandidate(task){
 }
 function overdueWoopControl(task){
   if(!overdueWoopCandidate(task))return "";
-  overdueWoopBinding={id:uid(),board:state,task,account:window.CloudSync?.user||null,owner:{syncAccount:state.syncAccount},benchmark:benchmark().id};
+  overdueWoopBinding={id:uid(),board:state,task,account:window.CloudSync?.user||null,owner:{syncAccount:state.syncAccount,syncIdentity:state.syncIdentity},benchmark:benchmark().id};
   return '<button class="btn subtle" data-act="run-woop" data-candidate="'+esc(task.id)+'" data-benchmark="'+esc(benchmark().id)+'" data-binding="'+esc(overdueWoopBinding.id)+'">Run WOOP</button>';
 }
 function validOverdueWoopSession(task){
@@ -8468,7 +8468,7 @@ function validOverdueWoopSession(task){
   return !!session && session.board===state && session.task===task && sameListOwner(session.owner,state) && session.account===(window.CloudSync?.user||null) && state.mode==="work" && !state.interventionActive && benchmark()===task && task.due===session.due && dueInfo(task.due)?.cls==="due-overdue" && eligibleTasks().includes(task);
 }
 function overdueWoopWalkthrough(task){
-  woopDraft={id:uid(),source:"overdue",taskId:task.id,board:state,owner:{syncAccount:state.syncAccount},account:window.CloudSync?.user||null,plan:JSON.stringify(task.woopPlan),step:0,answers:[]};renderWoop();
+  woopDraft={id:uid(),source:"overdue",taskId:task.id,board:state,owner:{syncAccount:state.syncAccount,syncIdentity:state.syncIdentity},account:window.CloudSync?.user||null,plan:JSON.stringify(task.woopPlan),step:0,answers:[]};renderWoop();
 }
 function runOverdueWoop(data){
   const binding=overdueWoopBinding,task=taskById(data.candidate);
@@ -8476,7 +8476,7 @@ function runOverdueWoop(data){
   // This user action chooses the existing Dot signal once. Cancel only drops
   // unfinished answers; Undo can reverse the explicit choice separately.
   if(!TaskActionOwner.perform({type:"overdue-woop-dot",taskId:task.id}))return;
-  overdueWoopSession={board:state,task,due:task.due,owner:{syncAccount:state.syncAccount},account:window.CloudSync?.user||null};
+  overdueWoopSession={board:state,task,due:task.due,owner:{syncAccount:state.syncAccount,syncIdentity:state.syncIdentity},account:window.CloudSync?.user||null};
   if(supportedWoopEvidence(task) && task.woopPlan==null)overdueWoopWalkthrough(task);
   else modalShell('<div class="mtop"><h2>WOOP plan</h2><button class="x" data-act="close-modal" aria-label="Close">✕</button></div><p>'+esc(task.title)+'</p>'+woopHTML(task)+'<div class="mbtns"><button class="btn subtle" data-act="close-modal">Close</button></div>');
 }
@@ -8484,7 +8484,7 @@ let woopDraft=null;
 function startWoop(id){
   const task=taskById(id);
   if(!finalWoopTask(task) || !supportedWoopEvidence(task) || taskDislodgeCount(task)<2 || task.woopPlan!=null || woopDraft)return;
-  woopDraft={id:uid(),taskId:id,board:state,owner:{syncAccount:state.syncAccount},account:window.CloudSync?.user||null,plan:JSON.stringify(task.woopPlan),step:0,answers:[]};
+  woopDraft={id:uid(),taskId:id,board:state,owner:{syncAccount:state.syncAccount,syncIdentity:state.syncIdentity},account:window.CloudSync?.user||null,plan:JSON.stringify(task.woopPlan),step:0,answers:[]};
   renderWoop();
 }
 function validWoopDraft(){
@@ -9261,9 +9261,9 @@ function carryMissingRecoveryFields(target,source){
 function mergedDecisionRecoverySources(p){
   const next=JSON.parse(p.local);
   if(p.cloud){
-    const cloud=JSON.parse(JSON.stringify(p.cloud));cloud.syncAccount=p.account;
+    const cloud=JSON.parse(JSON.stringify(p.cloud));cloud.syncAccount=p.account;cloud.syncIdentity=p.evidence.identity;
     const base=validDecisionBase(next.decisionBase,p.account,next.syncRev)?JSON.parse(next.decisionBase.payload):null;
-    if(base){hydrateState(base);base.syncAccount=p.account;rebasePendingBoardFields(next,cloud,base);}
+    if(base){hydrateState(base);base.syncAccount=p.account;base.syncIdentity=next.syncIdentity??null;rebasePendingBoardFields(next,cloud,base);}
     carryMissingRecoveryFields(next,cloud);
     for(const task of next.tasks){const peer=cloud.tasks.find(row=>row.id===task.id);if(peer)carryMissingRecoveryFields(task,peer);}
     mergeUndeletedTasks(next,cloud);carryProtectedBackupIds(next,cloud);
@@ -9591,7 +9591,25 @@ async function applyCloudSourceRecovery(){
     p.holds=decisionRecoveryHolds(p.account);
     await recheck();if(!await verifyCopies())fail("A recovery copy changed before publication. Read the sources again.");
     p.publishing=true;renderCloudSourceRecovery("Saving the selected complete source. Keep this preview open until cloud confirmation finishes…");
-    const result=await p.backend.push(payload,next.updatedAt,p.rev,{recoveryIdentity:p.evidence.identity,recoveryEpoch:p.evidence.epoch,recoveryRootAbsent:p.source.manifest===null});
+    // Take one atomic raw device snapshot after every cloud transaction read
+    // and before publication writes. Later local adoption still uses head CAS.
+    const validateBeforePublish=async publicationPending=>{
+      const snapshot=await deviceStore.readRawExportSnapshot(),stores=snapshot.stores;
+      const row=(name,key)=>{const source=stores[name],at=source.keys.indexOf(key);return at<0?undefined:source.values[at];};
+      const head=row("meta","head"),saved=row("snapshots",p.headHash),opaque=row("opaque",key);
+      const exactCopy=copy=>{const saved=row("backups",copy.id);return saved?.id===copy.id&&
+        (!copy.kind||saved.kind===copy.kind)&&row("snapshots",saved.payloadHash)?.payload===copy.payload;};
+      const browser=useLocal?[LOCAL_HEAD_KEY,STORE_KEY].map(key=>({key,raw:localStorage.getItem(key)})):[];
+      return cloudSourceRecoveryOpen(p)&&JSON.stringify(state)===p.local&&cloudSourceRecoveryDraft()===p.draft&&
+        window.CloudSync===p.backend&&p.backend.user===p.account&&p.backend.recoveryIdentity?.()===p.evidence.identity&&
+        head?.hash===p.headHash&&saved?.hash===p.headHash&&saved.payload===p.head&&
+        JSON.stringify(row("meta","recoveryCloudHold")??null)===JSON.stringify(p.hold)&&
+        JSON.stringify(row("meta","pending:"+p.evidence.identity)??null)===JSON.stringify(publicationPending)&&
+        JSON.stringify(browser)===JSON.stringify(p.browser)&&opaque?.key===key&&opaque.raw===raw&&
+        exactCopy({...hold,payload:holdPayload})&&copies.every(exactCopy)&&originalHolds.every(exactCopy);
+    };
+    const result=await p.backend.push(payload,next.updatedAt,p.rev,{recoveryIdentity:p.evidence.identity,recoveryEpoch:p.evidence.epoch,
+      recoveryRootAbsent:p.source.manifest===null,validateBeforePublish});
     if(!result?.ok)fail(result?.conflict?"Another device saved first. The active board stays unchanged; read the new sources and choose again.":"Cloud confirmation is unavailable. The active board and prepared choice remain protected; read sources again before retrying.");
     const acknowledged=await p.backend.pull(),identity=await p.backend.recoveryEvidence();
     if(window.CloudSync!==p.backend||p.backend.user!==p.account||identity.identity!==p.evidence.identity||identity.epoch!==p.evidence.epoch||identity.pending||acknowledged?.payload!==payload||acknowledged.rev!==result.rev)fail("The exact cloud confirmation could not be verified. The active board and every source stay protected; read sources again.");
@@ -11682,7 +11700,7 @@ if(configured){
     let pullOperation=0,pushOperation=0,recoveryAuthEpoch=0,backendAuthUid=auth.currentUser?.uid || null;
     // Keep explicit empty-source consent inside this backend, including when a
     // released cached CloudStore forwards only the existing operation callback.
-    const recoveryAbsentRoots=new WeakSet();
+    const recoveryPublicationGuards=new WeakMap();
     let authStorageFailure=null,suspended=false,networkFailed=false,networkReady=Promise.resolve();
     let rootSubscription=null,rootSubscriptionEpoch=0;
     function stopRootSubscription(){
@@ -11778,12 +11796,14 @@ if(configured){
           const [rootSnapshot,generationSnapshot]=await Promise.all([tx.get(root),tx.get(generation)]);
           if(stillCurrent&&!stillCurrent())return {cancelled:true};
           const current=snapshotData(rootSnapshot),header=snapshotData(generationSnapshot),revision=current?.rev??0;
-          if(recoveryAbsentRoots.has(stillCurrent)&&rootSnapshot.exists())return {conflict:true,rev:revision};
+          const recoveryGuard=recoveryPublicationGuards.get(stillCurrent);
+          if(recoveryGuard?.rootAbsent&&rootSnapshot.exists())return {conflict:true,rev:revision};
           if(!validRevision(revision)||revision===Number.MAX_SAFE_INTEGER)return {error:true,code:"invalid-revision"};
           if(revision!==baseRev)return {conflict:true,rev:revision};
           if(!header||header.state!=="sealed")return {error:true,code:"unsealed-generation"};
           const expected=expectedHeader||{...header,hash,chunkCount:observedCount,baseRev};
           if(!await verifiedGeneration(tx,uid,id,expected,header))return {error:true,code:"verification-failed"};
+          if(recoveryGuard?.verify&&!await recoveryGuard.verify())return {cancelled:true};
           if(stillCurrent&&!stillCurrent())return {cancelled:true};
           const next={schemaVersion:2,rev:revision+1,activeGeneration:id,
             previousGeneration:current?.schemaVersion===2?current.activeGeneration:null,
@@ -11914,7 +11934,7 @@ if(configured){
       if(!validRevision(baseRev)){cloudFailure("push",{code:"invalid-revision"});return {error:true};}
       const operation=++pushOperation;
       const stillCurrent=()=>auth.currentUser?.uid===pushUid&&operation===pushOperation&&recoveryStillCurrent();
-      if(recoveryContext?.recoveryRootAbsent===true)recoveryAbsentRoots.add(stillCurrent);
+
       clearCloudError();CS.status = "syncing"; ping();
       try{
         if(!generationStore||!window.ChainStorageV2)throw Object.assign(Error("Cloud generation codec unavailable"),{code:"codec-unavailable"});
@@ -11931,6 +11951,12 @@ if(configured){
           if(pendingStore&&recorded?.error)throw Object.assign(Error("Pending upload could not be saved"),{code:"pending-upload-storage"});
         }
         if(!stillCurrent())return {cancelled:true};
+        if(recoveryContext){
+          const publicationPending=await pendingStore?.getPendingUpload?.(pushUid)??null;
+          if(!stillCurrent())return {cancelled:true};
+          recoveryPublicationGuards.set(stillCurrent,{rootAbsent:recoveryContext.recoveryRootAbsent===true,
+            verify:typeof recoveryContext.validateBeforePublish==="function"?()=>recoveryContext.validateBeforePublish(publicationPending):null});
+        }
         const res=await cloudDeadline((async()=>{
           await networkReady;
           if(!stillCurrent())return {cancelled:true};
