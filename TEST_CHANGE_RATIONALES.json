@@ -1,5 +1,93 @@
 [
   {
+    "testChangesSha256": "3ca35350cbed99373153c8d6349a186b263b927ea5466da90b08d6f343d11cb3",
+    "reason": "Reconcile the final exact integrated origin/main test diff while preserving every original feature assertion. Final owner review closes Settings draft loss and stale earlier-prepared-source consent through actual native recovery consumers.",
+    "previousBehavior": "Complete cloud recovery lacked an actionable native path. After the main slice, entering source review from Settings could discard an unsaved draft, and an earlier prepared choice was neither concretely shown nor required exact in the last protection checks before publication.",
+    "intendedBehavior": "Keep all original device/cloud/pending/prepared sources separately recoverable; disclose prior prepared choices and abandonment before consent; verify every captured earlier row remains exact before publication; preserve and restore Settings drafts through cancel, delayed read and completion; retain all conditional publication, identity/epoch, ACK, durable-head, source-hold and peer safety.",
+    "replacementTests": [
+      "RISK unreadable device recovery: an unsupported saved version cannot be replaced by Quick start or ordinary saving",
+      "RISK unreadable device recovery: native Paste previews and restores a supported board while preserving unreadable originals",
+      "RISK unreadable device recovery: raw startup preserves sources and supports native File restore",
+      "RISK unreadable device recovery: raw source export excludes the placeholder and preserves exact device evidence",
+      "RISK unreadable device recovery: locally restored work stays durable and visibly pending across sign-in and reopen",
+      "RISK unreadable device recovery: placeholder actions cannot create backups and unsupported selected decisions stay evidence",
+      "RISK unreadable device recovery: preservation refusals transaction failures and late identity changes never accept a source",
+      "RISK unreadable device recovery: raw transaction CAS refuses peer source changes after the last preview read",
+      "RISK unreadable device recovery: Quick start and current Changelog explain preserved sources and local pending recovery",
+      "RISK unreadable device recovery: partial raw rows remain exact while the restored board accepts later local edits",
+      "RISK unreadable device recovery: opaque identity collisions and unsupported raw types preserve every original",
+      "RISK unreadable device recovery: repeated cancelled previews reuse exact originals without recursive archive growth",
+      "RISK resilient sync recovery: an exact acknowledged copy recovers missing cloud chunks and publishes subsequent local work",
+      "RISK resilient sync recovery: a failed rebuild protects every source and retries after another local edit",
+      "RISK resilient sync recovery: unsupported unverifiable and foreign sources never authorize a replacement",
+      "RISK resilient sync recovery: rebuilding retains an interrupted pending generation and its exact readable chunks",
+      "RISK resilient sync recovery: unrepresented pending intent requires explicit review before replacing a damaged cloud source",
+      "RISK cloud source recovery: native explicit source choice publishes a complete generation with exact originals and durable reopen",
+      "RISK cloud source recovery: complete pending intent is selectable but mismatched partial and unknown sources stay unavailable",
+      "RISK cloud source recovery: an explicitly held local board can recover into a positively read empty cloud",
+      "RISK cloud source recovery: a late browser pending or peer change cannot be called a confirmed local recovery",
+      "RISK cloud source recovery: chosen prior membership remains deliberate while an unseen peer task and decision history survive",
+      "RISK cloud source recovery: changed consent and external failures retain originals without blind publication",
+      "RISK cloud source recovery: uncertain ACK stays held through cold open and requires a new native choice",
+      "RISK cloud source recovery guidance: mounted FAQ and changelog explain deliberate sources and unknown missing changes",
+      "RISK cloud source recovery controls: native Apply stays subdued until a complete source is selected",
+      "RISK resilient sync recovery: identity changes after durable source capture cannot bind an old response to a new account",
+      "RISK cloud source recovery: a same-UID auth epoch change at the last preservation read invalidates publication consent",
+      "RISK cloud source recovery: native Cancel stops delayed source checks and stays held during conditional publication",
+      "RISK cloud source recovery: account changes during final hold completion never report the old recovery complete",
+      "RISK cloud source recovery: an empty preview cannot overwrite a legacy root published at the transaction boundary",
+      "RISK cloud source recovery: native restored-device hold clears only after exact cloud ACK and durable current-head recovery",
+      "RISK cloud source recovery metadata: native preview distinguishes server save time upload clock and missing decision time",
+      "RISK cloud source recovery drafts: Settings drafts survive native review cancel delayed reads and confirmed recovery",
+      "RISK cloud source recovery prepared sources: earlier choices are disclosed and must stay exact before a replacement publishes"
+    ],
+    "preservedCoverage": [
+      "All preexisting passing assertions and the integrated parent/device/source tests remain intact. External SDK, real IndexedDB, native actions and actual device-store methods establish behavior; no app verdict or hold method is mocked.",
+      "Native prepared-source REDa9b8b73a showed missing prior-choice disclosure and actual publication revision7 instead of6 after an earlier row disappeared at external IDB boundary; GREEN5edf6f40 keeps it held and preserves exact raw prepared payloads. Settings draft RED39077e24 -> GREEN6da5957b covers normal Cancel, delayed-read Cancel and confirmed return without implicit Save.",
+      "All source/authority REDs and setup corrections from earlier exact entries remain truthful. Main source/device/decision cohort2ffa2c64 passed163/163 before the two owner-review slices; final committed focused cohort and preflight remain required. Metadata821bd236 -> b5e3072c; FAQ brevity1e5b8d5e ->7282a8bd preserves the130word contract.",
+      "No private incident sources, production/provider writes, push, PR, CI, rendered review or release were performed. Parent owns independent code/sync/FAQ reviews, exact final regression, rendered native/browser, compatibility, release metadata/fingerprints, deployment and actual affected-device recovery evidence."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <cloud-choice-worktree> --evidence-dir <usable-recovery>/cloud-choice-worker/test-runs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern='RISK cloud source recovery prepared sources:|RISK cloud source recovery drafts:' tests.js",
+      "failure": "Actual observed preimplementation source entry8eb6e280; pending52459bf8; late sources77977707; stale-peer9404bf3a; empty1f935b2b; auth epochd297275b; finalholdb399733d; empty/legacy transactionaff1fd42; metadata821bd236; Settingsdraft39077e24; prepared evidencea9b8b73a. Their GREENs and fixture/infrastructure-only failures are preserved individually outside Git; final relevant cohort must be read from the exact final committed run, not inferred from these labels."
+    }
+  },
+  {
+    "testChangesSha256": "d6b92a9574cf07014ec310c8e4396ae0616226f2e1bfef017e3bfcb091f2b35b",
+    "reason": "Reconcile the final exact integrated be8e8d3 test diff while preserving every original feature assertion. Final owner review closes Settings draft loss and stale earlier-prepared-source consent through actual native recovery consumers.",
+    "previousBehavior": "Complete cloud recovery lacked an actionable native path. After the main slice, entering source review from Settings could discard an unsaved draft, and an earlier prepared choice was neither concretely shown nor required exact in the last protection checks before publication.",
+    "intendedBehavior": "Keep all original device/cloud/pending/prepared sources separately recoverable; disclose prior prepared choices and abandonment before consent; verify every captured earlier row remains exact before publication; preserve and restore Settings drafts through cancel, delayed read and completion; retain all conditional publication, identity/epoch, ACK, durable-head, source-hold and peer safety.",
+    "replacementTests": [
+      "RISK cloud source recovery: native explicit source choice publishes a complete generation with exact originals and durable reopen",
+      "RISK cloud source recovery: complete pending intent is selectable but mismatched partial and unknown sources stay unavailable",
+      "RISK cloud source recovery: an explicitly held local board can recover into a positively read empty cloud",
+      "RISK cloud source recovery: a late browser pending or peer change cannot be called a confirmed local recovery",
+      "RISK cloud source recovery: chosen prior membership remains deliberate while an unseen peer task and decision history survive",
+      "RISK cloud source recovery: changed consent and external failures retain originals without blind publication",
+      "RISK cloud source recovery: uncertain ACK stays held through cold open and requires a new native choice",
+      "RISK cloud source recovery guidance: mounted FAQ and changelog explain deliberate sources and unknown missing changes",
+      "RISK cloud source recovery controls: native Apply stays subdued until a complete source is selected",
+      "RISK cloud source recovery: a same-UID auth epoch change at the last preservation read invalidates publication consent",
+      "RISK cloud source recovery: native Cancel stops delayed source checks and stays held during conditional publication",
+      "RISK cloud source recovery: account changes during final hold completion never report the old recovery complete",
+      "RISK cloud source recovery: an empty preview cannot overwrite a legacy root published at the transaction boundary",
+      "RISK cloud source recovery: native restored-device hold clears only after exact cloud ACK and durable current-head recovery",
+      "RISK cloud source recovery metadata: native preview distinguishes server save time upload clock and missing decision time",
+      "RISK cloud source recovery drafts: Settings drafts survive native review cancel delayed reads and confirmed recovery",
+      "RISK cloud source recovery prepared sources: earlier choices are disclosed and must stay exact before a replacement publishes"
+    ],
+    "preservedCoverage": [
+      "All preexisting passing assertions and the integrated parent/device/source tests remain intact. External SDK, real IndexedDB, native actions and actual device-store methods establish behavior; no app verdict or hold method is mocked.",
+      "Native prepared-source REDa9b8b73a showed missing prior-choice disclosure and actual publication revision7 instead of6 after an earlier row disappeared at external IDB boundary; GREEN5edf6f40 keeps it held and preserves exact raw prepared payloads. Settings draft RED39077e24 -> GREEN6da5957b covers normal Cancel, delayed-read Cancel and confirmed return without implicit Save.",
+      "All source/authority REDs and setup corrections from earlier exact entries remain truthful. Main source/device/decision cohort2ffa2c64 passed163/163 before the two owner-review slices; final committed focused cohort and preflight remain required. Metadata821bd236 -> b5e3072c; FAQ brevity1e5b8d5e ->7282a8bd preserves the130word contract.",
+      "No private incident sources, production/provider writes, push, PR, CI, rendered review or release were performed. Parent owns independent code/sync/FAQ reviews, exact final regression, rendered native/browser, compatibility, release metadata/fingerprints, deployment and actual affected-device recovery evidence."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <cloud-choice-worktree> --evidence-dir <usable-recovery>/cloud-choice-worker/test-runs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern='RISK cloud source recovery prepared sources:|RISK cloud source recovery drafts:' tests.js",
+      "failure": "Actual observed preimplementation source entry8eb6e280; pending52459bf8; late sources77977707; stale-peer9404bf3a; empty1f935b2b; auth epochd297275b; finalholdb399733d; empty/legacy transactionaff1fd42; metadata821bd236; Settingsdraft39077e24; prepared evidencea9b8b73a. Their GREENs and fixture/infrastructure-only failures are preserved individually outside Git; final relevant cohort must be read from the exact final committed run, not inferred from these labels."
+    }
+  },
+  {
     "testChangesSha256": "126b48100a824bba6ab50e5c90c626ad8019aa8ad1ef60015b10186867c6e02f",
     "reason": "Reconcile the exact integrated test diff against origin/main after native complete-source recovery, parent-owned raw-device and authenticated backend guards. Preserve historical rationale layout and every existing assertion; add truthful available timestamp display with a discriminating native preview RED.",
     "previousBehavior": "Damaged cloud sources and unreadable device storage could leave no actionable supported path. Explicit source consent also needed pending hash validation, final storage/account guards, stale-peer membership intent, exact epoch binding and atomic empty-root distinction. The native preview omitted available server/upload times.",

@@ -1731,3 +1731,6 @@ The native needs-attention action uses real IndexedDB and the production backend
 - RISK cloud source recovery: native restored-device hold clears only after exact cloud ACK and durable current-head recovery
 
 - RISK cloud source recovery metadata: native preview distinguishes server save time upload clock and missing decision time
+
+- RISK cloud source recovery drafts: Settings drafts survive native review cancel delayed reads and confirmed recovery
+- RISK cloud source recovery prepared sources: earlier choices are disclosed and must stay exact before a replacement publishes

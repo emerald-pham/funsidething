@@ -37851,3 +37851,38 @@ test('RISK cloud source recovery metadata: native preview distinguishes server s
  assert.match(preview,/Confirmed server save time for the current cloud revision:/);assert.ok(preview.includes(new Date(1234).toLocaleString()),'the actual known synthetic server timestamp is shown in the device locale');
  assert.match(preview,/Upload creation time \(device clock\):/);assert.match(preview,/Decision time for missing or unrecorded changes: unavailable/);assert.match(preview,/does not establish which board is newer/);
 });
+
+test('RISK cloud source recovery drafts: Settings drafts survive native review cancel delayed reads and confirmed recovery',async t=>{
+ for(const outcome of ['cancel','cancel during read','confirm'])await t.test(outcome,async sub=>{
+  const app=await divergentCloudSourceApp187(sub),{ctx,shim}=app;
+  ctx.onAction('settings',{});const root=shim.document.getElementById('modalRoot'),control=shim.document.getElementById('stWorkedHrs');control.id='stWorkedHrs';control.type='number';control.value='37';
+  root.querySelectorAll=()=>root.innerHTML.includes('<h2>Settings</h2>')?[control]:[];
+  let release;if(outcome==='cancel during read'){const gate=new Promise(resolve=>release=resolve);sub.after(()=>release());app.faults.serverRead=async()=>gate;}
+  const reviewing=ctx.onAction('review-cloud-source-recovery',{});
+  if(outcome==='cancel during read'){
+   for(let n=0;n<100&&!root.innerHTML.includes('Reading the separate');n++)await flush();control.value='16';ctx.onAction('close-modal',{});delete app.faults.serverRead;release();assert.equal(await reviewing,false);
+  }else{
+   assert.equal(await reviewing,true);control.value='16';
+   if(outcome==='confirm'){await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'device'}});assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),true);}else ctx.onAction('close-modal',{});
+  }
+  assert.match(root.innerHTML,/<h2>Settings<\/h2>/,'review returns to the originating Settings pane');
+  assert.equal(control.value,'37','the actual unsaved Settings value is restored instead of being silently discarded');assert.equal(ctx.state.settings.workedHours,16,'restoring the draft never saves it implicitly');
+ });
+});
+
+test('RISK cloud source recovery prepared sources: earlier choices are disclosed and must stay exact before a replacement publishes',async t=>{
+ for(const boundary of ['visible earlier choice','lost earlier copy'])await t.test(boundary,async sub=>{
+  const app=await divergentCloudSourceApp187(sub),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+  await ctx.onAction('review-cloud-source-recovery',{});await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'device'}});app.faults.push=Object.assign(Error('synthetic unavailable publication'),{code:'unavailable'});assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),false);delete app.faults.push;
+  const earlier=(await store.listBackups()).find(row=>row.kind==='decision-recovery-choice'),choice=JSON.parse(earlier.payload).recoveryChoice;assert.ok(earlier);
+  await ctx.onAction('review-cloud-source-recovery',{});
+  if(boundary==='visible earlier choice'){
+   const preview=shim.document.getElementById('modalRoot').innerHTML;assert.match(preview,/Earlier prepared recovery choices/);assert.ok(preview.includes(choice.choiceId));assert.match(preview,/abandons their publication/);
+  }else{
+   await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'device'}});let fired=false,lost;
+   app.idbFault.afterReadTransaction=names=>{if(fired||names.length!==1||names[0]!=='opaque')return;fired=true;lost=editRawDevice187(app.indexedDB,app.deviceDbName,tx=>tx.objectStore('backups').delete(earlier.id));};
+   assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),false);await lost;assert.equal(fired,true);
+   assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev,'changed earlier prepared evidence must invalidate consent before publication');
+  }
+ });
+});

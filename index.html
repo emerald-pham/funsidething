@@ -9031,12 +9031,14 @@ function renderHistory(){
    ================================================================ */
 function closeModal(){
   if(cloudSourceRecoveryPreview?.publishing){toast("A protected cloud save is in progress. Keep this preview open until confirmation finishes.",6000);return false;}
-  cloudSourceRecoverySerial++;cloudSourceRecoveryPreview=null;
   if(fileRestorePreview?.irreversible){toast("A protected save is in progress. Keep this preview open until it finishes.",6000);return false;}
   if(fileRestorePreview)return cancelFileRestore();
   if(pasteEditorSession)return closePasteDialog();
   if(fileRestoreBusy){fileRestoreConsentGeneration++;fileRestoreBusy=false;}
+  const sourceSettingsDraft=cloudSourceRecoverySettingsDraft;
+  cloudSourceRecoverySerial++;cloudSourceRecoveryPreview=null;cloudSourceRecoverySettingsDraft=null;
   decisionRecoveryReviewSerial++;decisionRecoveryPreview=null;allTasksView.cancelBulkEdit(); woopDraft=null; overdueWoopSession=null; document.getElementById("modalRoot").innerHTML=""; setTimeout(()=>{ resumeDeferredBrowserCopy(); resumeDeferredCloudPull(); showAppUpdateNotice(); window.applyPendingAppUpdate?.(); }, 0);
+  if(sourceSettingsDraft){openSettings();restoreSettingsDraft(sourceSettingsDraft);}
   return true;
 }
 function modalShell(inner){
@@ -9404,7 +9406,7 @@ async function applyDecisionRecovery(){
 /* A damaged selected generation cannot prove what its missing bytes meant.
    Only a fresh, deliberate complete-source choice can replace that authority.
    Opaque originals pin every readable generation before the ordinary CAS. */
-let cloudSourceRecoveryPreview=null,cloudSourceRecoveryBusy=false,cloudSourceRecoverySerial=0;
+let cloudSourceRecoveryPreview=null,cloudSourceRecoveryBusy=false,cloudSourceRecoverySerial=0,cloudSourceRecoverySettingsDraft=null;
 function cloudSourceRecoveryAvailable(){
   return window.CloudSync?.errorCode==="corrupt-generation"||!!window.ScannerDeviceRecoveryHold||
     decisionRecoveryHolds().some(row=>{try{return JSON.parse(row.payload).recoveryChoice?.kind==="cloud-source";}catch{return false;}});
@@ -9474,6 +9476,7 @@ function cloudSourceRecoveryFacts(candidate){
 }
 async function reviewCloudSourceRecovery(message=""){
   if(cloudSourceRecoveryBusy)return false;
+  cloudSourceRecoverySettingsDraft=captureSettingsDraft()??cloudSourceRecoverySettingsDraft;
   const serial=++cloudSourceRecoverySerial;cloudSourceRecoveryPreview=null;cloudSourceRecoveryBusy=true;
   modalShell('<div class="mtop"><h2>Review cloud recovery sources</h2><button class="x" data-act="close-modal" aria-label="Close">✕</button></div><p role="status">Reading the separate device and cloud sources…</p>');
   try{
@@ -9506,6 +9509,15 @@ async function reviewCloudSourceRecovery(message=""){
     return false;
   }finally{cloudSourceRecoveryBusy=false;if(cloudSourceRecoveryPreview)renderCloudSourceRecovery(message);}
 }
+function cloudSourceRecoveryPrepared(p){
+  if(!p.holds.length)return "";
+  return '<h3>Earlier prepared recovery choices</h3><p>A new confirmed choice abandons their publication. Their exact payloads remain separately recoverable as superseded archives; none is selected automatically.</p>'
+    +p.holds.map(row=>{
+      try{const board=JSON.parse(row.payload),choice=board.recoveryChoice,source=cloudSourceRecoveryBoard(row.payload,p.account);
+        return '<details class="settings-section"><summary>Prepared choice '+esc(choice?.choiceId||"unavailable")+'</summary><p>'+esc(choice?.kind==="cloud-source"?"Complete-source choice":choice?.kind==="ratings"?"Saved rating choice":"Saved appearance choice")+'. Recorded selection: <code>'+esc(choice?.source??choice?.value??board.settings?.theme??"unavailable")+'</code>. This is a prepared copy, not proof of cloud confirmation.</p>'+cloudSourceRecoveryFacts(source)+'</details>';
+      }catch{return '<p role="status">An earlier prepared choice cannot be interpreted. Its exact original remains protected; no missing decision is guessed.</p>';}
+    }).join("");
+}
 function cloudSourceRecoveryTime(value){
   const at=serverTimeMs(value);return at!==null&&Number.isFinite(+new Date(at))?new Date(at).toLocaleString():"unavailable";
 }
@@ -9521,6 +9533,7 @@ function renderCloudSourceRecovery(message=""){
     +p.candidates.map(row=>'<section class="settings-section"><h3>'+esc(row.label)+'</h3>'
       +(row.generationId?'<p>Generation <code>'+esc(row.generationId)+'</code>. Upload based on revision '+esc(Number.isSafeInteger(row.header?.baseRev)?row.header.baseRev:"unavailable")+'. Upload creation time (device clock): '+esc(cloudSourceRecoveryTime(row.header?.createdAt))+'. This does not establish which board is newer. Confirmed decision time for missing data: unavailable.</p>':'<p>Device revision '+esc(Number.isSafeInteger(state.syncRev)?state.syncRev:"unavailable")+'. Device-only changes may not have reached cloud.</p>')
       +cloudSourceRecoveryFacts(row)+'<div class="mbtns"><button class="btn '+(p.choice===row.id?'setting-choice setting-set':'subtle')+'" data-act="choose-cloud-recovery-source" data-value="'+esc(row.id)+'" aria-pressed="'+(p.choice===row.id)+'"'+(disabled||!row.board?' disabled':'')+'>Use '+esc(row.label.toLowerCase())+'</button></div></section>').join('')
+    +cloudSourceRecoveryPrepared(p)
     +(p.issue?'<p role="status">'+esc(p.issue)+'</p>':'')
     +(selected?'<h3>'+esc(selected.label)+' will become the shared board</h3><p>The listed other values and unknown missing changes will not become current. Their exact originals remain recoverable; no historical decision time is invented.</p>'+fileRestoreEffectsHtml(JSON.parse(p.local),selected.board):'')
     +'<p>'+(p.evidence.pending?'An unfinished upload is present. Selecting a source abandons its pending publication only after protecting its exact pointer and every readable byte.':'No unfinished cloud upload is recorded.')+'</p>'
@@ -9535,7 +9548,7 @@ async function applyCloudSourceRecovery(){
   try{
     renderCloudSourceRecovery("Verifying protected originals before applying…");await recheck();
     const raw=JSON.stringify({format:"chain-scanner.cloud-recovery-source",version:1,identity:p.evidence.identity,
-      manifest:p.source.manifest,generations:p.source.generations,deviceSource:p.local,deviceHead:p.head,browserSources:p.browser,pending:p.evidence.pending,deviceRecoveryHold:p.hold});
+      manifest:p.source.manifest,generations:p.source.generations,deviceSource:p.local,deviceHead:p.head,browserSources:p.browser,pending:p.evidence.pending,deviceRecoveryHold:p.hold,preparedChoices:p.holds});
     const key="cloud-generation-recovery:"+encodeURIComponent(p.evidence.identity)+":"+p.rev+":"+(p.source.manifest?.activeGeneration||"empty")+":"+await ChainStorageV2.hashPayload(raw);
     if(!await deviceStore.protectRecoverySource({expectedHash:p.headHash,key,raw}))fail("The original sources could not be saved and verified. Nothing was applied; retry when storage is available.");
     const copies=[];
@@ -9550,13 +9563,14 @@ async function applyCloudSourceRecovery(){
     if(currentChoiceSourceIssue(next)||decisionEvidenceIssue(next,p.account))fail("The selected source cannot be represented safely. Review saved decisions when available; originals remain protected.");
     const payload=cloudPayloadFor(next),choiceId=uid();
     const holdPayload=JSON.stringify({...next,recoveryChoice:{kind:"cloud-source",identity:p.evidence.identity,account:p.account,revision:p.rev,choiceId,source:selected.id,deviceSource:p.local,cloudSource:p.source,pending:p.evidence.pending}});
+    const originalHolds=p.holds;
     const hold=await saveDurableBackup("decision-recovery-choice",holdPayload);if(!hold?.id)fail("The prepared choice could not be protected. Nothing was applied.");
     const verifyCopies=async()=>{
       const rows=await deviceStore.listBackups(),opaque=await deviceStore.listOpaqueArchives();
-      return rows.some(row=>row.id===hold.id&&row.kind==="decision-recovery-choice"&&row.payload===holdPayload)&&copies.every(copy=>rows.some(row=>row.id===copy.id&&row.payload===copy.payload))&&opaque.some(row=>row.key===key&&row.raw===raw);
+      return rows.some(row=>row.id===hold.id&&row.kind==="decision-recovery-choice"&&row.payload===holdPayload)&&copies.every(copy=>rows.some(row=>row.id===copy.id&&row.payload===copy.payload))&&
+        originalHolds.every(copy=>rows.some(row=>row.id===copy.id&&row.kind==="decision-recovery-choice"&&row.payload===copy.payload))&&opaque.some(row=>row.key===key&&row.raw===raw);
     };
     if(!await verifyCopies())fail("Recovery copies could not be read back exactly. Nothing was applied; retry when storage is available.");
-    const originalHolds=p.holds;p.holds=[...p.holds,{...hold,payload:holdPayload}];
     // Cache order follows the same real backup reader used by ordinary holds.
     p.holds=decisionRecoveryHolds(p.account);
     await recheck();if(!await verifyCopies())fail("A recovery copy changed before publication. Read the sources again.");
@@ -9722,7 +9736,7 @@ function openHelp(){
     + '<dt>What can I do when saved appearances disagree?</dt><dd>Choose Review saved decisions from the cloud error or Settings → Data and backups. The review shows this device and cloud, their revisions, available times and actual appearance values. Expand What stays with either appearance for changed field paths, source values and which displaced values remain in backups. Missing times are unavailable; device clocks do not order cloud saves. No choice is selected by default. The disabled “Save choice and sync” button appears subdued until you select a value. Choosing an offered System, Light or Dark value makes a fresh appearance decision while keeping earlier decisions, compatible task edits, comparisons, ratings and History.</dd>'
     + '<dt>How are recovery sources and pending choices protected?</dt><dd>Before publishing, exact copies of both sources and pending upload evidence must save and read back on this device. The prepared choice stays in a protected backup. The active board stays unchanged until its exact cloud save is confirmed and local application succeeds. A new review lists earlier prepared values and IDs. Confirming its new choice abandons their publication, retaining exact superseded archives. A changed source or account requires another review. A pending choice stays protected through close, reload and reconnect; its backup cannot be deleted while pending. If cloud confirms but local application fails, the message distinguishes them and keeps recovery copies. Evidence-only archives cannot restore empty boards. Failed saves remain retryable without clearing storage or reinstalling.</dd>'
     + '<dt>What if a cloud save is damaged?</dt><dd>An exact verified acknowledged copy can rebuild a complete cloud save automatically. Otherwise open Review cloud recovery sources from the cloud warning or restored-device hold. Compare the separate device, current cloud, previous cloud and pending sources that are readable. The preview shows tasks, ratings, History, recorded decisions, available revisions and times, and what each choice displaces. Missing data is unknown; missing chunks never mean an empty board or deleted tasks. Nothing is selected by default. Applying a complete source makes it current without reconstructing unknown newer changes. Unsupported choices remain unavailable; older cloud formats may need a compatible recovery update.</dd>'
-    + '<dt>When does a reviewed recovery source become synced?</dt><dd>Exact originals and pending evidence must save and read back on this device before the conditional cloud save. A changed board, draft, account or source requires a fresh review. Recovery finishes only after exact cloud confirmation and a verified durable local save. Earlier sources stay separately recoverable. Uncertain confirmation or failed storage keeps the sources protected through reopening and retry; Retry alone never publishes a prepared choice. Local work remains usable while its cloud recovery is pending.</dd>'
+    + '<dt>When does a reviewed recovery source become synced?</dt><dd>Exact originals and pending evidence must save and read back on this device before the conditional cloud save. A changed board, draft, account or source requires a fresh review. Recovery finishes only after exact cloud confirmation and a verified durable local save. Earlier sources stay separately recoverable. Uncertain confirmation or failed storage keeps the sources protected through reopening and retry; Retry alone never publishes a prepared choice. Local work remains usable while its cloud recovery is pending. Returning from review keeps any unfinished Settings draft without saving it.</dd>'
     + '<dt>What cannot this appearance recovery resolve?</dt><dd>Unknown, corrupt, nonappearance or foreign-account evidence stays held for a compatible app; recovery does not guess at those cases. The review shows nonpersonal app origin, fingerprint and recovery category. The origin excludes the page path, query and fragment; diagnostics exclude account identifiers and board contents. These diagnostics stay on this device; the app sends no diagnostic report.</dd>'
     + '<dt>Why can an incomplete cloud upload stay pending?</dt><dd>Cloud saves recheck the complete uploaded board before making it current. Missing or damaged upload data stops that save and keeps its pending evidence. A rejected upload leaves the current cloud board unchanged. This check does not reconstruct a cloud copy that is already damaged or choose an older board for you.</dd>'
     + '<dt>What can I do if a save or sync fails?</dt><dd>Keep the tab open if the latest edit could not save locally. Export current board JSON in Settings includes accepted unsaved edits; View / copy current board remains available when a download fails. Device-save warnings name a stage and code. The cloud error button offers Retry sync, Reload app, and Sign out; reload waits for edits to save. After a lost reply, Retry sync checks the current saved cloud board before trying again; an error alone does not confirm the save. Recent sync errors keeps safe timestamped codes for one hour, without task content or account details. Recorded errors describe failed attempts and can remain after a later successful sync. Interrupted cloud cleanup resumes without changing your current or previous synced board. Synced requires server acknowledgement of the latest save.</dd>'
