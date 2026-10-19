@@ -1,5 +1,25 @@
 [
   {
+    "testChangesSha256": "dd436b369570f8c8d9378a6a1356e2fe34afb2dc798a99d1b1031a30aa30ac22",
+    "reason": "Preserve actual final storage/auth consent boundaries and prove native cancellation/transaction-bound source changes after root integration. All existing assertions remain unchanged.",
+    "previousBehavior": "The final protected-copy await can outlive consent after signout and same-UID sign-in. An account change during final hold completion can be reported complete. Existing revision-zero CAS also conflates a positively absent root with a concurrently published unversioned legacy source.",
+    "intendedBehavior": "Bind explicit publication to the captured backend identity and auth epoch through the existing upload guard; require final local-head/account consent after hold completion, keep Cancel responsive before publication and protected during it, and reject concurrent legacy publication against empty-root consent.",
+    "replacementTests": [
+      "RISK cloud source recovery: a same-UID auth epoch change at the last preservation read invalidates publication consent",
+      "RISK cloud source recovery: native Cancel stops delayed source checks and stays held during conditional publication",
+      "RISK cloud source recovery: account changes during final hold completion never report the old recovery complete",
+      "RISK cloud source recovery: an empty preview cannot overwrite a legacy root published at the transaction boundary"
+    ],
+    "preservedCoverage": [
+      "Only additive native full-app tests and external SDK/IndexedDB transaction-completion injection. Existing source choice, pending, old data, late peer, ACK, cold reopen and cross-client contracts remain exact. No production/provider source was used.",
+      "Root owns the backend epoch and empty-root transaction guards. This checkpoint carries their real native REDs plus captured fourth-argument identity/epoch consumer, and must merge parent guards before final handoff. Initial final-hold fault167e1748 did not fire; app guard was reverted, the external fault repaired, and actual REDb399733d observed before reinstating the guard."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern='RISK cloud source recovery: a same-UID|RISK cloud source recovery: account changes during final|RISK cloud source recovery: an empty preview' tests.js",
+      "failure": "Meaningful sameUID epoch REDd297275b: expired consent published revision7 instead of6; routed to root215d5c5 fourthargument guard. Meaningful final-hold REDb399733d -> GREENe0ddbf75 after final account/head check. Empty→legacy actual publicationtransaction REDaff1fd42: applytrue instead offalse; routed to root for conditional absent-root guard. NativeCancel external delayed-read/publication coverage passed0ed6b976 and does not claim an additional RED."
+    }
+  },
+  {
     "testChangesSha256": "b6fdc851c829fde2ef8ac41a652c89751e9a91f09025a64fc92f1fc8a972b2c5",
     "reason": "Implement parent-authorized explicit complete cloud source recovery through existing full-app native actions, real IndexedDB and production backend at isolated external SDK boundaries. Preserve every existing assertion and document actual RED/GREEN chronology.",
     "previousBehavior": "A damaged selected generation with no exact acknowledged copy leaves no supported source choice. Pending pointers can disagree with readable bytes; late browser/pending/cloud changes can be called confirmed, and prior-source membership can revive on a stale peer.",

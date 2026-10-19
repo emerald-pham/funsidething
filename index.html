@@ -9447,7 +9447,7 @@ async function reviewCloudSourceRecovery(message=""){
       const candidate={id:"generation:"+row.id,label:roles.join(" / "),generationId:row.id,header:row.header};
       try{
         if(!row.header||!["staging","sealed","published"].includes(row.header.state)||
-          row.id!==p.evidence.pending?.generationId&&! ["sealed","published"].includes(row.header.state))throw Error();
+          row.id!==p.evidence.pending?.generationId&&!["sealed","published"].includes(row.header.state))throw Error();
         if(row.id===p.evidence.pending?.generationId&&(p.evidence.pending.payloadHash!==row.header.hash||p.evidence.pending.baseRev!==row.header.baseRev))throw Error();
         const raw=await ChainStorageV2.decodeSnapshot(row.header,row.chunks);
         Object.assign(candidate,cloudSourceRecoveryBoard(raw,p.account),{raw});
@@ -9518,7 +9518,7 @@ async function applyCloudSourceRecovery(){
     p.holds=decisionRecoveryHolds(p.account);
     await recheck();if(!await verifyCopies())fail("A recovery copy changed before publication. Read the sources again.");
     p.publishing=true;renderCloudSourceRecovery("Saving the selected complete source. Keep this preview open until cloud confirmation finishes…");
-    const result=await p.backend.push(payload,next.updatedAt,p.rev);
+    const result=await p.backend.push(payload,next.updatedAt,p.rev,{recoveryIdentity:p.evidence.identity,recoveryEpoch:p.evidence.epoch});
     if(!result?.ok)fail(result?.conflict?"Another device saved first. The active board stays unchanged; read the new sources and choose again.":"Cloud confirmation is unavailable. The active board and prepared choice remain protected; read sources again before retrying.");
     const acknowledged=await p.backend.pull(),identity=await p.backend.recoveryEvidence();
     if(window.CloudSync!==p.backend||p.backend.user!==p.account||identity.identity!==p.evidence.identity||identity.epoch!==p.evidence.epoch||identity.pending||acknowledged?.payload!==payload||acknowledged.rev!==result.rev)fail("The exact cloud confirmation could not be verified. The active board and every source stay protected; read sources again.");
@@ -9542,6 +9542,11 @@ async function applyCloudSourceRecovery(){
     deviceHeadHash=saved.hash;lastPersistedRaw=applied;persistedChanceSeed=next.chance?.seed??null;
     sealUndoFrame();state=next;liveBoardAccepted=true;applyTheme();applyScenePreferences();render();clearDeviceSaveIssue();
     if(!await completeDecisionRecoveryHolds({...hold,payload:holdPayload},originalHolds))fail("The chosen source saved, but its publication hold could not finish. Sources stay protected; read them again.");
+    const completedHead=await deviceStore.readHead(),completedIdentity=await p.backend.recoveryEvidence();
+    if(!cloudSourceRecoveryOpen(p)||window.CloudSync!==p.backend||p.backend.user!==p.account||
+      completedIdentity.identity!==p.evidence.identity||completedIdentity.epoch!==p.evidence.epoch||completedIdentity.pending||
+      completedHead?.hash!==saved.hash||completedHead?.payload!==applied||JSON.stringify(state)!==applied||cloudSourceRecoveryDraft()!==p.draft)
+      fail("The selected source was saved, but the account or device changed while recovery finished. All originals remain protected; review the current account and sources again.");
     lastKnownCloudPayload=payload;lastKnownCloudAccount=p.account;lastKnownCloudRevision=result.rev;lastPushed=payload;reconciledAs=p.account;pendingPush=false;cloudAdoptionHeld=false;cloudResumePending=false;deferredCloudPull=false;cloudWriteFailure=null;clearCloudRetry();
     p.publishing=false;cloudSourceRecoveryPreview=null;cloudSourceRecoveryBusy=false;closeModal();renderSync();return true;
   }catch(error){

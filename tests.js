@@ -37476,3 +37476,63 @@ test('RISK resilient sync recovery: identity changes after durable source captur
  assert.ok(!foreign.payload||JSON.parse(foreign.payload).tasks.length===0,'an old response cannot publish old-account tasks into the changed identity');
  assert.ok(ctx.state.syncIdentity!=='late-other-owner'||ctx.state.tasks.length===0,'old task membership never gains the new identity');
 });
+
+test('RISK cloud source recovery: a same-UID auth epoch change at the last preservation read invalidates publication consent',async t=>{
+ const app=await divergentCloudSourceApp187(t),{ctx,backend,originalRoot}=app;
+ await ctx.onAction('review-cloud-source-recovery',{});await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'device'}});
+ const epoch=(await backend.CS.recoveryEvidence()).epoch;let opaqueReads=0,fired=false;
+ app.idbFault.afterReadTransaction=names=>{
+  if(names.length!==1||names[0]!=='opaque'||++opaqueReads!==3)return;
+  fired=true;backend.emitAuth(null);backend.emitAuth({uid:'owner',email:'e@example.com'});
+ };
+ assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),false);
+ assert.equal(fired,true,'auth changes at the actual last protected-copy transaction');
+ assert.ok((await backend.CS.recoveryEvidence()).epoch>epoch);
+ assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev,'expired consent must not publish even when display account and UID have returned to the same values');
+});
+
+test('RISK cloud source recovery: native Cancel stops delayed source checks and stays held during conditional publication',async t=>{
+ for(const stage of ['source read','publication'])await t.test(stage,async sub=>{
+  const app=await divergentCloudSourceApp187(sub),{ctx,shim,backend,originalRoot}=app;
+  await ctx.onAction('review-cloud-source-recovery',{});await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'device'}});
+  let release,started=false;const gate=new Promise(resolve=>release=resolve);sub.after(()=>release());
+  if(stage==='source read')app.faults.serverRead=async()=>{started=true;await gate;};else app.faults.publishPending=gate;
+  const applying=ctx.onAction('apply-cloud-source-recovery',{});
+  for(let n=0;n<1000&&!(started||app.faults.publicationStarted);n++)await new Promise(resolve=>setTimeout(resolve,1));
+  assert.ok(started||app.faults.publicationStarted,'the external pending operation genuinely started');
+  ctx.onAction('close-modal',{});
+  if(stage==='source read')assert.equal(shim.document.getElementById('modalRoot').innerHTML,'','Cancel remains responsive before publication');
+  else{const modal=shim.document.getElementById('modalRoot').innerHTML;assert.match(modal,/Keep this preview open/);assert.match(modal,/data-act="close-modal"[^>]*disabled/);}
+  delete app.faults.serverRead;release();
+  assert.equal(await applying,stage==='publication');
+  assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev+(stage==='publication'?1:0));
+  if(stage==='publication')await settleRecovery188(app);
+ });
+});
+
+test('RISK cloud source recovery: account changes during final hold completion never report the old recovery complete',async t=>{
+ const app=await divergentCloudSourceApp187(t),{ctx,backend}=app;
+ await ctx.onAction('review-cloud-source-recovery',{});await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'device'}});
+ let opaqueReads=0,fired=false;
+ app.idbFault.afterReadTransaction=names=>{
+  if(names.length===1&&names[0]==='opaque')opaqueReads++;
+  if(fired||opaqueReads<5||!names.includes('backups'))return;
+  fired=true;backend.emitAuth({uid:'final-other-owner',email:'e@example.com'});
+ };
+ const result=await ctx.onAction('apply-cloud-source-recovery',{});assert.equal(fired,true,'the external account change must actually reach the final hold readback');
+ assert.equal(result,false,'completion belongs to the exact consented account through the final hold readback');
+ await ctx.sendPush();await syncSettle(20);
+ const foreign=await backend.CS.pull();assert.ok(!foreign.payload||JSON.parse(foreign.payload).tasks.length===0,'the old selected board never becomes another identity’s cloud source');
+});
+
+test('RISK cloud source recovery: an empty preview cannot overwrite a legacy root published at the transaction boundary',async t=>{
+ const app=await divergentCloudSourceApp187(t),{ctx,backend}=app;
+ await ctx.onAction('review-cloud-source-recovery',{});await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'device'}});
+ app.faults.push=Object.assign(Error('synthetic offline publication'),{code:'unavailable'});assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),false);delete app.faults.push;
+ backend.docs.delete('users/owner');ctx.closeModal();assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'device'}});
+ const legacy={payload:JSON.stringify({v:2,tasks:[syncTask('legacy-boundary-peer','Unversioned peer source must survive')],futureLegacy:{keep:29}}),updatedAt:1};let fired=false;
+ app.faults.transactionRead=async path=>{if(!fired&&path==='users/owner'){fired=true;backend.docs.set(path,legacy);}};
+ const result=await ctx.onAction('apply-cloud-source-recovery',{});assert.equal(fired,true,'the external peer source must arrive inside the real publication transaction read');
+ assert.equal(result,false,'a legacy source newly published at revision zero invalidates empty-root consent');
+ assert.equal(JSON.stringify(backend.docs.get('users/owner')),JSON.stringify(legacy),'an absent-root CAS cannot treat a newly present unversioned source as the same empty state');
+});

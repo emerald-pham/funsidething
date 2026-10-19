@@ -1712,3 +1712,8 @@ Cold populated startup, pairwise display, real saving and cold reopen preserve h
 - RISK cloud source recovery controls: native Apply stays subdued until a complete source is selected
 
 The native needs-attention action uses real IndexedDB and the production backend against isolated external SDK boundaries. Coverage separates complete device, previous and pending sources; unavailable malformed, partial or unknown authority; no default consent; raw source pins; conditional publication, exact acknowledgement and durable reopen; cold held retry; late local, pending, peer and identity changes. Rendered and physical-device recovery remain separate release evidence.
+
+- RISK cloud source recovery: a same-UID auth epoch change at the last preservation read invalidates publication consent
+- RISK cloud source recovery: native Cancel stops delayed source checks and stays held during conditional publication
+- RISK cloud source recovery: account changes during final hold completion never report the old recovery complete
+- RISK cloud source recovery: an empty preview cannot overwrite a legacy root published at the transaction boundary
