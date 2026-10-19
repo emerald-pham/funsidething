@@ -14,6 +14,15 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 - RISK unreadable device recovery: an unsupported saved version cannot be replaced by Quick start or ordinary saving
 - RISK unreadable device recovery: native Paste previews and restores a supported board while preserving unreadable originals
+- RISK unreadable device recovery: raw startup preserves sources and supports native File restore
+- RISK unreadable device recovery: raw source export excludes the placeholder and preserves exact device evidence
+- RISK unreadable device recovery: locally restored work stays durable and visibly pending across sign-in and reopen
+- RISK unreadable device recovery: placeholder actions cannot create backups and unsupported selected decisions stay evidence
+- RISK unreadable device recovery: preservation refusals transaction failures and late identity changes never accept a source
+- RISK unreadable device recovery: raw transaction CAS refuses peer source changes after the last preview read
+- RISK unreadable device recovery: partial raw rows remain exact while the restored board accepts later local edits
+- RISK unreadable device recovery: opaque identity collisions and unsupported raw types preserve every original
+- RISK unreadable device recovery: Quick start and current Changelog explain preserved sources and local pending recovery
 - RISK resilient sync recovery: an exact acknowledged copy recovers missing cloud chunks and publishes subsequent local work
 - RISK resilient sync recovery: a failed rebuild protects every source and retries after another local edit
 - RISK resilient sync recovery: unsupported unverifiable and foreign sources never authorize a replacement

@@ -122,7 +122,9 @@
       ]);
       await done;
       if(!meta) return null;
-      const snapshot=snapshots.find(row=>row.hash===meta.hash);
+      if(typeof meta!=="object"||meta.schemaVersion!==SCHEMA_VERSION||typeof meta.hash!=="string"||!/^[0-9a-f]{64}$/.test(meta.hash))
+        throw new Error("Durable device head format is unsupported");
+      const snapshot=snapshots.find(row=>row?.hash===meta.hash);
       if(!snapshot||typeof snapshot.payload!=="string"||await sha(snapshot.payload)!==meta.hash)
         throw new Error("Durable device head is corrupt");
       return {...meta,payload:snapshot.payload};
@@ -186,6 +188,66 @@
       return (await listOpaqueArchives()).some(row=>row.key===key&&row.raw===raw);
     }
 
+    async function rawTransactionSnapshot(tx){
+      const entries=await Promise.all(storeNames.map(async name=>{
+        const store=tx.objectStore(name);
+        const [keys,values]=await Promise.all([requestResult(store.getAllKeys()),requestResult(store.getAll())]);
+        return [name,{keys,values}];
+      }));
+      return {stores:Object.fromEntries(entries)};
+    }
+    // Recovery compares the entire losslessly encoded raw source, including an
+    // absent/malformed head and orphan rows. A hash-only CAS cannot distinguish
+    // changes to corrupt bytes or preserve evidence it cannot interpret.
+    async function writeRecoveredSource({expectedSource,encodeSource,archives=[],payload,account=null,sourceFingerprint=null,hold=null,guard=()=>true}={}){
+      ensureOpen();
+      if(typeof expectedSource!=="string"||typeof encodeSource!=="function"||typeof guard!=="function"||
+         !Array.isArray(archives)||archives.some(row=>!row||typeof row.key!=="string"||!row.key||typeof row.raw!=="string"))
+        return {error:true,code:"invalid-recovery-source"};
+      if(payload!==undefined&&typeof payload!=="string")return {error:true,code:"invalid-payload"};
+      const nextHash=payload===undefined?null:await sha(payload);
+      const tx=db.transaction(storeNames,"readwrite"),done=transactionDone(tx);
+      try{
+        const source=await rawTransactionSnapshot(tx);
+        if(encodeSource(source)!==expectedSource||guard()!==true){tx.abort();try{await done;}catch{}return {conflict:true};}
+        const opaque=tx.objectStore("opaque");
+        for(const row of archives){
+          const existing=await requestResult(opaque.get(row.key));
+          if(existing!==undefined&&(!existing||existing.key!==row.key||existing.raw!==row.raw)){
+            tx.abort();try{await done;}catch{}return {error:true,code:"recovery-evidence-collision"};
+          }
+          if(existing===undefined)opaque.put({key:row.key,raw:row.raw,order:Date.now()},row.key);
+        }
+        if(guard()!==true){tx.abort();try{await done;}catch{}return {conflict:true};}
+        if(payload!==undefined){
+          tx.objectStore("snapshots").put({hash:nextHash,payload},nextHash);
+          tx.objectStore("meta").put({hash:nextHash,account,sourceFingerprint,schemaVersion:SCHEMA_VERSION,committedAt:Date.now()},"head");
+          if(hold)tx.objectStore("meta").put({...hold,headHash:nextHash},"recoveryCloudHold");
+          // Keep every unknown/orphan snapshot and pending record. The exact
+          // overwritten metadata already lives in the immutable raw archive.
+        }
+        const snapshot=await rawTransactionSnapshot(tx);
+        await done;
+        if(payload===undefined)return {ok:true,snapshot};
+        const head=await readHead();
+        if(head?.hash!==nextHash||head?.payload!==payload)return {conflict:true,committedHash:nextHash,head};
+        return {ok:true,hash:nextHash,head};
+      }catch(error){try{tx.abort();}catch{}try{await done;}catch{}throw error;}
+    }
+    async function getRecoveryCloudHold(){
+      ensureOpen();const tx=db.transaction("meta","readonly"),done=transactionDone(tx);
+      const hold=await requestResult(tx.objectStore("meta").get("recoveryCloudHold"));await done;return hold??null;
+    }
+    async function clearRecoveryCloudHold({expectedHeadHash,expectedHold}={}){
+      ensureOpen();if(typeof expectedHeadHash!=="string"||!expectedHold)return false;
+      const tx=db.transaction("meta","readwrite"),done=transactionDone(tx),store=tx.objectStore("meta");
+      const [head,hold]=await Promise.all([requestResult(store.get("head")),requestResult(store.get("recoveryCloudHold"))]);
+      if(head?.hash!==expectedHeadHash||JSON.stringify(hold)!==JSON.stringify(expectedHold)){
+        tx.abort();try{await done;}catch{}return false;
+      }
+      store.delete("recoveryCloudHold");await done;return true;
+    }
+
     async function migrateLegacy(legacy){
       ensureOpen();
       if(!legacy||typeof legacy.headPayload!=="string") return {error:true,code:"invalid-legacy-head"};
@@ -230,15 +292,15 @@
         ids.add(candidate.id);preparedBackups.push({...candidate,payloadHash:await sha(candidate.payload)});
       }
       const tx=db.transaction(["meta","snapshots","backups"],"readwrite"),metaStore=tx.objectStore("meta"),snapshotStore=tx.objectStore("snapshots"),backupStore=tx.objectStore("backups");
-      const [current,backupRows,snapshotKeys]=await Promise.all([
-        requestResult(metaStore.get("head")),requestResult(backupStore.getAll()),requestResult(snapshotStore.getAllKeys()),
+      const [current,backupRows,snapshotKeys,recoveryHold]=await Promise.all([
+        requestResult(metaStore.get("head")),requestResult(backupStore.getAll()),requestResult(snapshotStore.getAllKeys()),requestResult(metaStore.get("recoveryCloudHold")),
       ]);
       if((current?.hash??null)!==(expectedHash??null)){
         tx.abort();try{await transactionDone(tx);}catch(e){}
         return {conflict:true,hash:current?.hash??null};
       }
       for(const prepared of preparedBackups){
-        const existing=backupRows.find(row=>row.id===prepared.id);
+        const existing=backupRows.find(row=>row?.id===prepared.id);
         if(existing&&existing.payloadHash!==prepared.payloadHash){
           tx.abort();try{await transactionDone(tx);}catch(e){}
           return {error:true,code:"backup-id-collision"};
@@ -256,14 +318,16 @@
       // number of recovery references. Retire only blobs that will have no
       // reference after this transaction; interrupted commits keep the old
       // graph because IndexedDB rolls the whole transaction back.
-      const nextBackupRows=backupRows.filter(row=>!removeIds.has(row.id));
+      const nextBackupRows=backupRows.filter(row=>!removeIds.has(row?.id));
       for(const prepared of preparedBackups){
-        const at=nextBackupRows.findIndex(row=>row.id===prepared.id);
+        const at=nextBackupRows.findIndex(row=>row?.id===prepared.id);
         if(at>=0)nextBackupRows[at]=prepared;else nextBackupRows.push(prepared);
       }
-      const referenced=new Set(nextBackupRows.map(row=>row.payloadHash));
+      const referenced=new Set(nextBackupRows.map(row=>row?.payloadHash));
       referenced.add(nextHash);
-      for(const key of snapshotKeys) if(!referenced.has(key)) snapshotStore.delete(key);
+      // Unknown recovery rows remain in place while the recovered workspace
+      // is awaiting a deliberate cloud choice, including during local edits.
+      if(!recoveryHold)for(const key of snapshotKeys) if(!referenced.has(key)) snapshotStore.delete(key);
       await transactionDone(tx);
       const verified=await readHead();
       if(!verified) throw new Error("Device head verification failed");
@@ -361,7 +425,7 @@
     }
 
     async function close(){if(db){db.close();db=null;}}
-    const api={open,close,readRawExportSnapshot,readHead,withCurrentHead,listBackups,listOpaqueArchives,protectRecoverySource,migrateLegacy,commitHead,putBackup,
+    const api={open,close,readRawExportSnapshot,readHead,withCurrentHead,listBackups,listOpaqueArchives,protectRecoverySource,writeRecoveredSource,getRecoveryCloudHold,clearRecoveryCloudHold,migrateLegacy,commitHead,putBackup,
       updateBackupKind,deleteBackup,getPendingUpload,setPendingUpload,clearPendingUpload,setLegacyFingerprint};
     return api;
   }

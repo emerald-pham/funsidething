@@ -1,5 +1,33 @@
 [
   {
+    "testChangesSha256": "8b23f46f6cb6d4c0e72f5b53f56d8e2bee58b8c753fd48a4a2b8f51a6104e5b1",
+    "reason": "Complete the root-authorized raw device-source recovery slice at the existing full-app startup, native File/Paste, device persistence and Settings export consumers. Keep every earlier passing assertion and add exact malformed-source, transaction, account, peer, placeholder and durable-reopen coverage.",
+    "previousBehavior": "An unreadable or missing selected device source could lose its raw-readable handle, revive stale retained legacy data, stop startup on hash-valid malformed JSON, block ordinary File/Paste recovery, create placeholder backups, or admit unsupported selected decision evidence. Ordinary snapshot cleanup could discard partial raw rows during local recovery.",
+    "intendedBehavior": "Retain exact raw device/browser sources; explicitly preview and confirm only a supported selected board through raw-source transaction CAS; stop failures and stale identity/draft/source consent; keep malformed and orphan rows, selected-file bytes and unknown/pending sources exact. Local recovered work persists under a device-only cloud hold until root-owned validated cloud-source recovery.",
+    "replacementTests": [
+      "RISK unreadable device recovery: native Paste previews and restores a supported board while preserving unreadable originals",
+      "RISK unreadable device recovery: raw startup preserves sources and supports native File restore",
+      "RISK unreadable device recovery: raw source export excludes the placeholder and preserves exact device evidence",
+      "RISK unreadable device recovery: locally restored work stays durable and visibly pending across sign-in and reopen",
+      "RISK unreadable device recovery: placeholder actions cannot create backups and unsupported selected decisions stay evidence",
+      "RISK unreadable device recovery: preservation refusals transaction failures and late identity changes never accept a source",
+      "RISK unreadable device recovery: raw transaction CAS refuses peer source changes after the last preview read",
+      "RISK unreadable device recovery: Quick start and current Changelog explain preserved sources and local pending recovery",
+      "RISK unreadable device recovery: partial raw rows remain exact while the restored board accepts later local edits",
+      "RISK unreadable device recovery: opaque identity collisions and unsupported raw types preserve every original"
+    ],
+    "preservedCoverage": [
+      "All previously passing feature assertions remain, including accepted-board File/Paste, signed-in conditional publication/ACK, durable hydration, legacy migration, manual export, completion, ratings, History, Undo and opaque fields. Related existing consumer cohort passed 81/81 before the final partial-row additions.",
+      "The prior never-green Paste fixture now dispatches its actual jsonBox input event and compares exact decoded raw archive strings for both browser keys; the former JSON.stringify substring would double-escape nested raw evidence. Original RED4600958f and17c5973c remain; final refined fixture later-baseline55b71443 again fails on0e7829e at actual preview refusal.",
+      "Raw-CAS peer cases were added after that intended CAS was implemented and are later sensitivity, not original preimplementation RED. The isolated CAS comparison bypass6edcbb8e makes all four peer-source cases fail; the DOM draft control stays protected. Unsupported raw type and immutable collision cases are preservation coverage, not claimed new REDs.",
+      "Exact matching-hash truncated JSON setup was narrowed after the first startup RED to omit unrelated corrupt backups and legacy interference; later baseline evidence is separately labelled. No actual browser, physical-device, production/provider write, CI, deployment, rules or compatibility-emulator claim is made."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <device-worktree> --evidence-dir <usable-recovery>/device-worker --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern=<named unreadable-device consumer slice> tests.js",
+      "failure": "Observed actual REDs: nativePaste4600958f/17c5973c refuses preview; startup six-sourcee7b01d9e loses raw handle/adopts unsupported source/refuses File; raw-export+visiblehold1cca6dcd lacks raw action and pending notice; placeholder+unsupporteddecisions041fbe98 writes placeholder manual backup and accepts v99 decisions; final awaited authd2c0cbca reports success after UID changes; FAQe9372030 missing explanation; partialraw82cecd9c cannot confirm with null/orphan raw rows. Repairs followed each observed assertion. Final refined native baseline55b71443 and CAS mutant6edcbb8e are later sensitivity only; external provenance records retain actual chronology. Late post-hold peer-write0464b7d7 observed success despite a newer durable peer head; final head readback now rejects it before installation. Fully refined startup baseline641b5918 independently reproduces the hash-valid truncated-JSON boot deadline; this is later sensitivity, not original chronology."
+    }
+  },
+  {
     "testChangesSha256": "2cd9629819180fa2f767508f728ebeccb7ce2fd654fda61245709e2398bf1ded",
     "reason": "Extend existing187 recovery through the agreed actual full-app consumer: exact acknowledged generation recovery, retry preservation, identity races, unsupported device source protection, and a deliberately RED native Paste recovery slice. Existing passing assertions stay intact. External SDK/IndexedDB fixture hooks model server read identity changes and transaction aborts; no application verdict is mocked.",
     "previousBehavior": "A corrupt published generation blocks ordinary app sync despite a byte-exact acknowledged local copy. Recovery retry evidence keyed only by generation cannot admit later local work. Email-only device ownership can reintroduce old-account tasks after an authenticated UID switch. Future saved board versions can be downgraded by hydration and ordinary saves; native Paste refuses an unaccepted source.",

@@ -30,16 +30,279 @@ test('RISK unreadable device recovery: native Paste previews and restores a supp
  t.after(()=>closeLegacyApp173(app));
  const source=ctx.defaultState();source.seenQuickStart=true;source.tasks=[{id:'chosen-187',title:'Deliberately chosen recovery board',ctx:[],mu:25,sigma:8.333333333333334,createdAt:1,opaqueTask:{keep:['all','fields']}}];
  ctx.onAction('settings',{});ctx.onAction('open-paste-recovery',{});
- shim.document.getElementById('jsonBox').value=JSON.stringify(source);
- assert.equal(await ctx.onAction('preview-pasted-recovery',{}),true,'an unaccepted startup source must have a usable native supported-restore path');
+ const pasteBox=shim.document.getElementById('jsonBox');pasteBox.id='jsonBox';pasteBox.value=JSON.stringify(source);shim.document.dispatchEvent({type:'input',target:pasteBox});
+ const previewed=await ctx.onAction('preview-pasted-recovery',{});assert.equal(previewed,true,'an unaccepted startup source must have a usable native supported-restore path: '+shim.document.getElementById('toast').textContent);
  assert.match(shim.document.getElementById('modalRoot').innerHTML,/unreadable|unsupported|could not be loaded/i,'the preview identifies the unavailable original rather than claiming zero existing tasks');
  assert.equal(shim.localStorage.getItem(SYNC_STORE_KEY),original,'preview never overwrites the original browser source');
+ assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/0 now/,'the placeholder is not represented as an observed empty original');
+ assert.equal(ctx.cancelFileRestore(),true,'Cancel retains the source without adoption');
+ assert.equal(shim.localStorage.getItem(SYNC_STORE_KEY),original);
+ assert.equal(ctx.state.tasks.length,0);
+ assert.equal(await ctx.onAction('preview-pasted-recovery',{}),true,'the retained exact pasted draft can be previewed again');
  assert.equal(await ctx.onAction('confirm-file-restore',{}),true,'deliberate validated restore becomes a usable local board');
  assert.equal(ctx.state.tasks[0].id,'chosen-187');assert.deepEqual(JSON.parse(JSON.stringify(ctx.state.tasks[0].opaqueTask)),{keep:['all','fields']});
  const protectedSources=await ctx.window.ScannerDeviceStore.listOpaqueArchives();
- assert.ok(protectedSources.some(row=>JSON.stringify(row).includes(JSON.stringify(original).slice(1,-1))),'the exact unreadable source remains protected through the actual storage consumer');
+ for(const key of [SYNC_STORE_KEY,LOCAL_HEAD_KEY])assert.ok(protectedSources.some(row=>{
+  try{return JSON.parse(row.raw).localStorage?.some(source=>source.key===key&&source.raw===original);}catch{return false;}
+ }),'the exact unreadable '+key+' source remains protected through the actual storage consumer');
  const cold=await loadApp({indexedDBProvider:indexedDB,deviceDbName,sharedStorage:shim.localStorage});t.after(()=>closeLegacyApp173(cold));
  assert.equal(cold.ctx.state.tasks[0].id,'chosen-187','explicitly restored work survives durable reopen');
+});
+
+async function editRawDevice187(indexedDB,dbName,visit){
+ const db=await new Promise((resolve,reject)=>{const r=indexedDB.open(dbName,1);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
+ try{await new Promise((resolve,reject)=>{const tx=db.transaction(['meta','snapshots','backups','opaque'],'readwrite');visit(tx);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||Error('Synthetic raw transaction aborted'));});}finally{db.close();}
+}
+test('RISK unreadable device recovery: raw startup preserves sources and supports native File restore',async t=>{
+ for(const fault of ['missing-marked-head','orphan-only','unsupported-head','broken-hash','partial-task','truncated-json'])await t.test(fault,async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='raw-startup-187-'+fault+'-'+Math.random();
+ const good=syncState({tasks:[syncTask('stale-legacy','Stale retained legacy board')]}),legacy=JSON.stringify(good);
+ const saved=fault==='truncated-json'?'{"tasks":[':JSON.stringify(fault==='partial-task'?{...good,tasks:[good.tasks[0],null]}:good);
+ const store=loadStorageV2({indexedDB}).createDeviceStore({indexedDB,crypto:webcrypto,dbName:deviceDbName});await store.open();
+ assert.equal((await store.commitHead({expectedHash:null,payload:saved})).ok,true);const head=await store.readHead();
+ await editRawDevice187(indexedDB,deviceDbName,tx=>{
+  if(fault==='missing-marked-head'||fault==='orphan-only')tx.objectStore('meta').delete('head');
+  if(fault==='unsupported-head')tx.objectStore('meta').put({...head,schemaVersion:99},'head');
+  if(fault==='broken-hash')tx.objectStore('snapshots').put({hash:head.hash,payload:'exact damaged source \ud800'},head.hash);
+  tx.objectStore('snapshots').put({unknown:true,raw:'unreferenced original'},'orphan-original');
+  if(fault!=='truncated-json')tx.objectStore('backups').put({unknownBackup:99,payloadHash:'missing'},'unreadable-original');
+  tx.objectStore('meta').put({generationId:'pending-original',futurePending:[1,2]},'pending:unknown');
+ });
+ const before=await store.readRawExportSnapshot();let bootError=null;
+ const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName,
+  appSource:appSrc.replace('(async function init(){','window.syntheticBoot187=(async function init(){'),
+  seedStorage:fault==='orphan-only'?{}:fault==='truncated-json'?{'fvp:chain-scanner:device-store-v2':'1'}:{'fvp:chain-scanner:device-store-v2':'1',[SYNC_STORE_KEY]:legacy,[LOCAL_HEAD_KEY]:legacy},
+  beforeStateReady(ctx){ctx.window.syntheticBoot187.catch(error=>{bootError=error;});}});
+ const {ctx,shim}=app;t.after(()=>closeLegacyApp173(app));t.after(()=>store.close());
+ assert.equal(bootError,null,'malformed saved JSON must be contained by actual startup');
+ assert.equal(ctx.state.tasks.length,0,'unreadable or missing authoritative data must never adopt retained legacy tasks');
+ assert.ok(shim.document.getElementById('scan').innerHTML,'the recovery shell remains usable');
+ assert.ok(ctx.window.ScannerDeviceStore,'a successfully opened raw-readable store remains available');
+ assert.equal(await ctx.persist(),false,'Quick start and incidental save producers cannot create a placeholder head');
+ assert.deepEqual(await store.readRawExportSnapshot(),before,'startup leaves all raw rows exact');
+ const selected=JSON.stringify(syncState({tasks:[syncTask('file-selected','Supported deliberate File recovery')],futureSelected:{keep:97}}));
+ ctx.openSettings();const bytes=new TextEncoder().encode(selected);
+ const input=shim.document.getElementById('restoreBackupFile');input.id='restoreBackupFile';input.files=[{name:'supported.json',type:'application/json',arrayBuffer:async()=>bytes.buffer}];
+ assert.equal(await ctx.handleRestoreBackupFileChange(input),true,'the real native file selection consumer prepares a supported recovery');
+ assert.equal(await ctx.confirmFileRestore(),true,'explicit File confirmation saves the chosen complete board');
+ assert.equal(ctx.state.tasks[0].id,'file-selected');assert.equal(ctx.state.futureSelected.keep,97);
+ const rawAfter=await store.readRawExportSnapshot();
+ assert.deepEqual(rawAfter.stores.backups,before.stores.backups,'unknown and corrupt backup rows remain exact');
+ assert.deepEqual(rawAfter.stores.snapshots.values.find(row=>row?.unknown),before.stores.snapshots.values.find(row=>row?.unknown),'orphan snapshots are retained');
+ assert.deepEqual(rawAfter.stores.meta.values[rawAfter.stores.meta.keys.indexOf('pending:unknown')],{generationId:'pending-original',futurePending:[1,2]});
+ assert.ok(await store.getRecoveryCloudHold(),'local recovery never invents cloud authority');
+ const cold=await loadApp({indexedDBProvider:indexedDB,deviceDbName,sharedStorage:shim.localStorage});t.after(()=>closeLegacyApp173(cold));
+ assert.equal(cold.ctx.state.tasks[0].id,'file-selected','a supported chosen source survives a cold reopen despite unreadable retained rows');
+ });
+});
+
+test('RISK unreadable device recovery: raw source export excludes the placeholder and preserves exact device evidence',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='raw-source-export-'+Math.random(),original='{unsupported raw \ud800';
+ const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName,seedStorage:{[SYNC_STORE_KEY]:original,[LOCAL_HEAD_KEY]:'different broken head',[LOCAL_BACKUPS_KEY]:'{broken backup index'}}),{ctx,shim}=app;
+ t.after(()=>closeLegacyApp173(app));const store=ctx.window.ScannerDeviceStore,before=await store.readRawExportSnapshot();
+ let blob;const downloads=[],link=makeFakeElement();link.remove=()=>{};link.click=()=>downloads.push(blob.text);
+ shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();ctx.Blob=class{constructor(parts){this.text=parts.join('');}};
+ ctx.URL={createObjectURL(value){blob=value;return 'blob:source-only';},revokeObjectURL(){}};
+ ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="download-raw-device-sources"/,'the unavailable-board view exposes raw-source export');
+ await ctx.onAction('download-current-board',{});assert.equal(downloads.length,0,'the shell cannot be exported as an accepted board');
+ assert.equal(await ctx.onAction('download-raw-device-sources',{}),true,'the native Settings raw-source action downloads readable exact evidence');
+ const archive=JSON.parse(downloads[0]);assert.equal(archive.currentBoard,null);assert.equal(archive.manifest.sources.currentBoard.status,'unavailable');
+ for(const [key,raw]of [[SYNC_STORE_KEY,original],[LOCAL_HEAD_KEY,'different broken head'],[LOCAL_BACKUPS_KEY,'{broken backup index']])assert.equal(archive.appSources.localStorage.find(row=>row.key===key).raw,raw);
+ assert.throws(()=>ctx.decodeBackupFileBoard(downloads[0]),/incomplete|supported/,'source-only evidence cannot become an empty imported board');
+ assert.deepEqual(await store.readRawExportSnapshot(),before,'raw evidence export never writes or prunes device data');
+});
+
+test('RISK unreadable device recovery: locally restored work stays durable and visibly pending across sign-in and reopen',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='held-local-recovery-'+Math.random(),original='{broken saved board';
+ const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName,seedStorage:{[SYNC_STORE_KEY]:original,[LOCAL_HEAD_KEY]:original}}),{ctx,shim}=app;
+ t.after(()=>closeLegacyApp173(app));const source=JSON.stringify(syncState({tasks:[syncTask('local-recovered','Recovered local task')]}));
+ assert.equal(await ctx.previewPastedRecovery(source),true);assert.equal(await ctx.confirmFileRestore(),true);
+ const backend=await loadCloudBackendV2({rootData:{payload:JSON.stringify(syncState({tasks:[syncTask('remote-unknown','Unknown cloud task')]})),rev:8,updatedAt:1},failures:{authPending:true},timeoutMs:5000,runtimeWindow:shim.window});
+ backend.emitAuth({uid:'actual-recovery-owner',email:'owner@example.test'});t.after(()=>backend.CS.suspend());
+ await ctx.cloudPull();await ctx.sendPush();
+ assert.equal(backend.writes.length,0,'sign-in cannot publish a selected local board before a deliberate cloud-source choice');
+ assert.equal(ctx.state.tasks[0].id,'local-recovered','auth callbacks cannot silently replace the selected local source');
+ ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/cloud recovery.*pending|pending.*cloud recovery/i,'local durability is visibly distinguished from confirmed sync');
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="review-cloud-source-recovery"/,'the pending hold has an actionable cloud review link');
+ assert.notEqual(shim.document.getElementById('syncBtn').textContent,'☁ synced','a held local board is never labelled synced');
+ shim.document.getElementById('addInput').value='New local work during recovery';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ const store=ctx.window.ScannerDeviceStore,hold=await store.getRecoveryCloudHold(),head=await store.readHead();
+ assert.ok(head.hash!==hold.headHash,'ordinary accepted local edits can advance the durable head without losing the hold');
+ const cold=await loadApp({indexedDBProvider:indexedDB,deviceDbName,sharedStorage:shim.localStorage});t.after(()=>closeLegacyApp173(cold));
+ assert.ok(cold.ctx.state.tasks.some(row=>row.title==='New local work during recovery'));assert.deepEqual(await cold.ctx.window.ScannerDeviceStore.getRecoveryCloudHold(),hold);
+ assert.equal(await store.clearRecoveryCloudHold({expectedHeadHash:hold.headHash,expectedHold:hold}),false,'the original restore head cannot clear consent after a later edit');
+ assert.equal(await store.clearRecoveryCloudHold({expectedHeadHash:head.hash,expectedHold:{...hold,originalKey:'wrong'}}),false,'an altered hold cannot clear recovery authority');
+ assert.equal(await store.clearRecoveryCloudHold({expectedHeadHash:head.hash,expectedHold:hold}),true,'a fresh current head and exact original hold can clear after owner-verified cloud ACK');
+});
+
+test('RISK unreadable device recovery: placeholder actions cannot create backups and unsupported selected decisions stay evidence',async t=>{
+ for(const mode of ['placeholder-backup','unsupported-decisions'])await t.test(mode,async t=>{
+  const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='raw-recovery-authority-'+Math.random(),original='{broken original';
+  const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName,seedStorage:{[SYNC_STORE_KEY]:original,[LOCAL_HEAD_KEY]:original}}),{ctx,shim}=app;t.after(()=>closeLegacyApp173(app));
+  const store=ctx.window.ScannerDeviceStore,before=await store.readRawExportSnapshot(),beforeIndex=shim.localStorage.getItem(LOCAL_BACKUPS_KEY);
+  if(mode==='placeholder-backup'){
+   ctx.onAction('ok-quickstart',{});await ctx.onAction('make-manual-backup',{});await ctx.persist();
+   assert.equal(shim.localStorage.getItem(LOCAL_BACKUPS_KEY),beforeIndex,'manual backups cannot misrepresent the hydration placeholder as a real original');
+   assert.deepEqual(await store.readRawExportSnapshot(),before);
+   assert.match(shim.document.getElementById('scan').innerHTML,/saved.*source.*recovery|recover.*saved.*source/i,'the scanner explains recovery instead of an ordinary empty board');
+  }else{
+   const selected=syncState({tasks:[syncTask('unsupported-choice','Unsupported source must remain evidence')],decisionEvents:[{v:99,kind:'future-authority',unknown:['retain',9]}]});
+   assert.equal(await ctx.previewPastedRecovery(JSON.stringify(selected)),false,'unknown selected decision authority never becomes a confirmable supported board');
+   assert.equal(ctx.state.tasks.length,0);assert.equal(await ctx.confirmFileRestore(),false);
+   const raw=await store.readRawExportSnapshot();assert.deepEqual(raw.stores.meta,before.stores.meta,'the rejected source cannot become primary');
+   assert.ok(raw.stores.opaque.values.some(row=>JSON.parse(row.raw).bytesBase64===Buffer.from(JSON.stringify(selected)).toString('base64')),'the complete unsupported selected source is retained exactly');
+  }
+ });
+});
+
+function deviceFaultProvider187(factory,control){
+ return {open(...args){const request=factory.open(...args);return new Proxy(request,{
+  get(target,key){
+   if(key==='result'){const db=Reflect.get(target,key,target);if(!db?.transaction)return db;return new Proxy(db,{get(target,key){
+    if(key!=='transaction'){const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;}
+    return(names,mode,...rest)=>{
+     const stores=typeof names==='string'?[names]:Array.from(names);
+     if(control.readFailure&&mode==='readonly'&&stores.includes('opaque'))throw Object.assign(Error('Synthetic raw read failure'),{name:'AbortError'});
+     const tx=target.transaction(names,mode,...rest);
+     return new Proxy(tx,{get(target,key){
+      if(key==='objectStore')return name=>{const store=target.objectStore(name);return new Proxy(store,{get(target,key){
+       if(key==='put')return(...args)=>{
+        if(name==='opaque'&&control.quotaOpaque)throw Object.assign(Error('Synthetic recovery quota refusal'),{name:'QuotaExceededError'});
+        const result=target.put(...args);
+        if(name==='opaque'&&control.abortOpaque||name==='meta'&&args[1]==='head'&&control.abortHead)tx.abort();
+        return result;
+       };
+       if(key==='get'&&name==='meta')return(...args)=>{
+        const result=target.get(...args);
+        if(args[0]!=='recoveryCloudHold')return result;
+        return new Proxy(result,{get(target,key){return Reflect.get(target,key,target);},set(target,key,value){
+         if(key==='onsuccess'){target.onsuccess=event=>{if(result.result?.reason==='device-source-recovery')control.afterHoldRead?.(db);value.call(target,event);};return true;}
+         return Reflect.set(target,key,value,target);
+        }});
+       };
+       const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;
+      }});};
+      const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;
+     },set(target,key,value){return Reflect.set(target,key,value,target);}});
+    };
+   }});}
+   const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;
+  },set(target,key,value){return Reflect.set(target,key,value,target);}
+ });}};
+}
+
+test('RISK unreadable device recovery: preservation refusals transaction failures and late identity changes never accept a source',async t=>{
+ for(const fault of ['readFailure','quotaOpaque','abortOpaque','abortHead','afterHoldRead','afterHoldPeer'])await t.test(fault,async t=>{
+  const {IDBFactory}=await import('fake-indexeddb'),factory=new IDBFactory(),control={},indexedDB=deviceFaultProvider187(factory,control),deviceDbName='raw-refusal-'+fault+'-'+Math.random();
+  const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName,seedStorage:{[SYNC_STORE_KEY]:'{unreadable original',[LOCAL_HEAD_KEY]:'{other original'}}),{ctx,shim}=app;
+  t.after(()=>{for(const key of Object.keys(control))delete control[key];return closeLegacyApp173(app);});
+  const inspector=loadStorageV2({indexedDB:factory}).createDeviceStore({indexedDB:factory,crypto:webcrypto,dbName:deviceDbName});await inspector.open();t.after(()=>inspector.close());
+  let backend;
+  if(fault==='afterHoldRead'){
+   backend=await loadCloudBackendV2({rootData:null,failures:{authPending:true},timeoutMs:5000,runtimeWindow:shim.window});backend.emitAuth({uid:'first',email:'owner@example.test'});t.after(()=>backend.CS.suspend());
+  }
+  const original=await inspector.readRawExportSnapshot(),selected=JSON.stringify(syncState({tasks:[syncTask('not-accepted','Unaccepted selected task')]}));
+  if(['readFailure','quotaOpaque','abortOpaque'].includes(fault))control[fault]=true;
+  const preview=await ctx.previewPastedRecovery(selected);
+  if(['readFailure','quotaOpaque','abortOpaque'].includes(fault)){
+   assert.equal(preview,false,'failed raw capture or original preservation cannot enable consent');
+   assert.deepEqual(await inspector.readRawExportSnapshot(),original,'an aborted original-preservation transaction leaves every raw row exact');
+  }else{
+   assert.equal(preview,true);const protectedSource=await inspector.readRawExportSnapshot();
+   if(fault==='abortHead')control.abortHead=true;
+   else if(fault==='afterHoldRead')control.afterHoldRead=()=>{control.afterHoldRead=null;backend.emitAuth({uid:'second',email:'owner@example.test'});};
+   else control.afterHoldRead=db=>{
+    control.afterHoldRead=null;const payload=JSON.stringify(syncState({tasks:[syncTask('late-peer','Peer after durable readback')]})),hash=createHash('sha256').update(payload).digest('hex');
+    const tx=db.transaction(['meta','snapshots'],'readwrite');tx.objectStore('snapshots').put({hash,payload},hash);tx.objectStore('meta').put({hash,account:null,schemaVersion:2},'head');
+   };
+   assert.equal(await ctx.confirmFileRestore(),false,'a failed primary transaction or final awaited identity change cannot report recovery success');
+   assert.equal(ctx.state.tasks.length,0,'the selected board is not installed into the changed session');
+   if(fault==='abortHead')assert.deepEqual(await inspector.readRawExportSnapshot(),protectedSource,'primary abort preserves the old raw source and exact file receipts');
+   else{
+    assert.ok(await inspector.getRecoveryCloudHold(),'a committed selected source remains protected and cannot auto-publish after an auth race');
+    assert.equal(backend?.writes.length??0,0);
+   }
+  }
+  assert.equal(shim.localStorage.getItem(SYNC_STORE_KEY),'{unreadable original');assert.equal(shim.localStorage.getItem(LOCAL_HEAD_KEY),'{other original');
+ });
+});
+
+test('RISK unreadable device recovery: raw transaction CAS refuses peer source changes after the last preview read',async t=>{
+ for(const fault of ['same-corrupt-hash','peer-head','head-appears','pending-source','dom-draft'])await t.test(fault,async t=>{
+  const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='raw-race-'+fault+'-'+Math.random();
+  const inspector=loadStorageV2({indexedDB}).createDeviceStore({indexedDB,crypto:webcrypto,dbName:deviceDbName});await inspector.open();t.after(()=>inspector.close());
+  let oldHead=null;
+  if(fault!=='head-appears'){
+   await inspector.commitHead({expectedHash:null,payload:JSON.stringify(syncState({tasks:[syncTask('original','Original source')]}))});oldHead=await inspector.readHead();
+   await editRawDevice187(indexedDB,deviceDbName,tx=>tx.objectStore('snapshots').put({hash:oldHead.hash,payload:'corrupt before preview'},oldHead.hash));
+  }
+  let onDigest=null;
+  const cryptoProvider={randomUUID:()=>webcrypto.randomUUID(),getRandomValues:value=>webcrypto.getRandomValues(value),subtle:{async digest(...args){if(onDigest){const act=onDigest;onDigest=null;await act();}return webcrypto.subtle.digest(...args);}}};
+  const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName,cryptoProvider,seedStorage:{[SYNC_STORE_KEY]:'{broken legacy',[LOCAL_HEAD_KEY]:'{other legacy'}}),{ctx,shim}=app;t.after(()=>closeLegacyApp173(app));
+  assert.equal(await ctx.previewPastedRecovery(JSON.stringify(syncState({tasks:[syncTask('candidate','Never overwrite a peer')]}))),true);
+  let peer;
+  if(fault==='dom-draft')shim.document.getElementById('addInput').value='Unfinished newer local draft';
+  else onDigest=async()=>{
+   if(fault==='peer-head'||fault==='head-appears'){
+    await inspector.commitHead({expectedHash:oldHead?.hash??null,payload:JSON.stringify(syncState({tasks:[syncTask('peer-current','Peer current source')]}))});
+   }else await editRawDevice187(indexedDB,deviceDbName,tx=>fault==='same-corrupt-hash'
+    ?tx.objectStore('snapshots').put({hash:oldHead.hash,payload:'different corrupt peer bytes'},oldHead.hash)
+    :tx.objectStore('meta').put({generationId:'peer-pending',payload:'unknown peer pending'},'pending:peer'));
+   peer=await inspector.readRawExportSnapshot();
+  };
+  assert.equal(await ctx.confirmFileRestore(),false,'changed raw source or unfinished draft invalidates the old explicit consent');
+  assert.equal(ctx.state.tasks.length,0);
+  if(peer)assert.deepEqual(await inspector.readRawExportSnapshot(),peer,'the recovery transaction leaves the changed peer source exact');
+  if(fault==='dom-draft')assert.equal(shim.document.getElementById('addInput').value,'Unfinished newer local draft');
+ });
+});
+
+test('RISK unreadable device recovery: Quick start and current Changelog explain preserved sources and local pending recovery',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();
+ const help=shim.document.getElementById('modalRoot').innerHTML,answer=help.match(/<dt>What if my saved device source cannot be read\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
+ assert.ok(answer,'the extended FAQ covers unreadable missing unsupported and partial device sources');
+ assert.match(answer,/Restore from backup file.*Paste board JSON/);assert.match(answer,/raw device sources/);
+ assert.match(answer,/not an empty recovered board/);assert.match(answer,/Cloud recovery stays pending/);
+ assert.match(html,/Damaged device saves now offer protected file or paste recovery without treating missing data as an empty board/,'the current changelog describes the concrete delivered behavior');
+});
+
+test('RISK unreadable device recovery: partial raw rows remain exact while the restored board accepts later local edits',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='partial-raw-rows-'+Math.random();
+ const inspector=loadStorageV2({indexedDB}).createDeviceStore({indexedDB,crypto:webcrypto,dbName:deviceDbName});await inspector.open();t.after(()=>inspector.close());
+ await editRawDevice187(indexedDB,deviceDbName,tx=>{
+  tx.objectStore('snapshots').put(null,'!null-snapshot');tx.objectStore('snapshots').put({future:true,payload:'orphan unknown bytes'},'!orphan');
+  tx.objectStore('backups').put(null,'!null-backup');tx.objectStore('opaque').put(null,'!null-opaque');
+  tx.objectStore('meta').put(false,'head');
+ });
+ const original=await inspector.readRawExportSnapshot(),app=await loadApp({indexedDBProvider:indexedDB,deviceDbName,seedStorage:{[SYNC_STORE_KEY]:'{broken old source'}}),{ctx,shim}=app;
+ t.after(()=>closeLegacyApp173(app));assert.equal(await ctx.previewPastedRecovery(JSON.stringify(syncState({tasks:[syncTask('partial-chosen','Chosen complete source')]}))),true);
+ assert.equal(await ctx.confirmFileRestore(),true,'unrelated malformed raw rows cannot prevent supported deliberate local recovery');
+ shim.document.getElementById('addInput').value='Later real local edit';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true,'the accepted recovered board remains usable while cloud recovery is pending');
+ const after=await inspector.readRawExportSnapshot();
+ for(const name of ['snapshots','backups','opaque'])for(let i=0;i<original.stores[name].keys.length;i++){
+  const key=original.stores[name].keys[i],index=after.stores[name].keys.indexOf(key);assert.ok(index>=0,'raw '+name+' key '+key+' is retained during recovery');
+  assert.deepEqual(after.stores[name].values[index],original.stores[name].values[i],'raw '+name+' source remains exact');
+ }
+ assert.ok(JSON.parse((await inspector.readHead()).payload).tasks.some(row=>row.title==='Later real local edit'));
+});
+
+test('RISK unreadable device recovery: opaque identity collisions and unsupported raw types preserve every original',async t=>{
+ for(const mode of ['collision','unsupported-type'])await t.test(mode,async t=>{
+  const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='raw-source-evidence-'+mode+'-'+Math.random();
+  const cryptoProvider={subtle:webcrypto.subtle,getRandomValues:value=>webcrypto.getRandomValues(value),randomUUID:()=> 'fixed-fixture-identity'};
+  const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName,cryptoProvider,seedStorage:{[SYNC_STORE_KEY]:'{unreadable sole original'}}),{ctx}=app;t.after(()=>closeLegacyApp173(app));
+  const store=ctx.window.ScannerDeviceStore,selected=JSON.stringify(syncState({tasks:[syncTask('retained-choice','Selected supported board')]}));
+  if(mode==='collision'){
+   assert.equal(await ctx.previewPastedRecovery(selected),true);const protectedRows=await store.readRawExportSnapshot();ctx.cancelFileRestore();
+   assert.equal(await ctx.previewPastedRecovery(selected),false,'different source evidence at an existing immutable identity cannot be overwritten');
+   assert.deepEqual(await store.readRawExportSnapshot(),protectedRows);
+  }else{
+   await editRawDevice187(indexedDB,deviceDbName,tx=>tx.objectStore('opaque').put(/future-unsupported-type/,'future-raw'));
+   const before=await store.readRawExportSnapshot();assert.equal(await ctx.previewPastedRecovery(selected),false,'an unsupported lossless encoding stops before recovery consent');
+   assert.deepEqual(await store.readRawExportSnapshot(),before,'the unsupported structured-clone original remains exact');
+  }
+  assert.equal(ctx.state.tasks.length,0);assert.equal(await ctx.confirmFileRestore(),false);
+ });
 });
 
 async function damagedAcknowledgedApp187(t){
