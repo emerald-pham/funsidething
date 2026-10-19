@@ -437,10 +437,12 @@
     }
     function pendingJSON(value){
       const ancestors=new Set(),valid=value=>{
-        if(value===null||typeof value==="string"||typeof value==="boolean"||typeof value==="number"&&Number.isFinite(value))return true;
+        if(value===null||typeof value==="string"||typeof value==="boolean"||typeof value==="number"&&Number.isFinite(value)&&!Object.is(value,-0))return true;
         if(!value||typeof value!=="object"||ancestors.has(value))return false;
         const array=Array.isArray(value),keys=Reflect.ownKeys(value);
-        if(!array&&Object.prototype.toString.call(value)!=="[object Object]"||keys.some(key=>typeof key!=="string")||array&&keys.length!==value.length+1)return false;
+        if(!array&&(Object.prototype.toString.call(value)!=="[object Object]"||Object.keys(value).length!==keys.length)||
+          keys.some(key=>typeof key!=="string")||array&&(keys.length!==value.length+1||
+            keys.some((key,index)=>key!==(index<value.length?String(index):"length"))))return false;
         ancestors.add(value);const supported=keys.every(key=>array&&key==="length"||valid(value[key]));ancestors.delete(value);return supported;
       };
       if(!valid(value))throw new TypeError("Pending source is not complete JSON");

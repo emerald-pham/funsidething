@@ -37,6 +37,8 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK cloud source recovery pending capture: a peer pending pointer arriving between own pending write and read is never consented
 - RISK cloud source recovery pending capture: peer pending intent created after the existing read is never overwritten by recovery staging
 - RISK cloud source recovery pending capture: a cached device store without conditional staging keeps the choice held
+- RISK DEVICE STORAGE V2: conditional pending writes refuse JSON-lossy unknown evidence
+- RISK cloud source recovery pending capture: native recovery cannot discard a named array extension
 - RISK unreadable device recovery: Quick start and current Changelog explain preserved sources and local pending recovery
 - RISK resilient sync recovery: an exact acknowledged copy recovers missing cloud chunks and publishes subsequent local work
 - RISK resilient sync recovery: a failed rebuild protects every source and retries after another local edit

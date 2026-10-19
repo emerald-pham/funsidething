@@ -507,6 +507,33 @@ test('RISK cloud source recovery pending capture: a cached device store without 
  assert.match(shim.document.getElementById('modalRoot').innerHTML,/prepared choice remain protected/);
 });
 
+test('RISK DEVICE STORAGE V2: conditional pending writes refuse JSON-lossy unknown evidence',async t=>{
+ for(const shape of ['negative zero','sparse array with property'])await t.test(shape,async sub=>{
+  const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='pending-lossy-shape-'+Math.random();
+  const store=loadStorageV2({indexedDB}).createDeviceStore({indexedDB,crypto:webcrypto,dbName:deviceDbName});await store.open();sub.after(()=>store.close());
+  const common={generationId:'original',payloadHash:'a'.repeat(64),baseRev:6,updatedAt:1,account:'owner'};let original,expected;
+  if(shape==='negative zero'){original={...common,futurePending:-0};expected={...common,futurePending:0};}
+  else{const items=new Array(1);items.future='sole unknown pending evidence';original={...common,futurePending:items};expected={...common,futurePending:[null]};}
+  await editRawDevice187(indexedDB,deviceDbName,tx=>tx.objectStore('meta').put(original,'pending:owner'));const before=await store.readRawExportSnapshot();
+  const result=await store.setPendingUploadIfCurrent('owner',{generationId:'replacement',payloadHash:'b'.repeat(64),baseRev:6,updatedAt:2},expected);
+  assert.equal(result.ok,undefined,'distinct physical unknown evidence cannot compare equal through JSON conversion');
+  assert.deepEqual(await store.readRawExportSnapshot(),before,'unsupported complete rows remain exact');
+ });
+});
+
+test('RISK cloud source recovery pending capture: native recovery cannot discard a named array extension',async t=>{
+ const app=await divergentCloudSourceApp187(t),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ const gen=originalRoot.previousGeneration,header=backend.docs.get('users/owner/generations/'+gen),future=new Array(1),marker='SOLE-UNKNOWN-PENDING-ARRAY-EVIDENCE';future.future=marker;
+ const pending={generationId:gen,payloadHash:header.hash,baseRev:header.baseRev,updatedAt:1,account:'owner',futurePending:future};
+ await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>tx.objectStore('meta').put(pending,'pending:owner'));
+ assert.equal((await store.getPendingUpload('owner')).futurePending.future,marker);
+ assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);assert.equal(await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'device'}}),true);
+ const result=await ctx.onAction('apply-cloud-source-recovery',{});
+ assert.equal(result,false,'a choice whose pending original cannot be represented losslessly stays held');
+ assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev,'no publication may precede this source validation');
+ assert.equal((await store.getPendingUpload('owner')).futurePending.future,marker,'the sole unknown evidence remains in its exact original physical row');
+});
+
 
 async function damagedAcknowledgedApp187(t,{timeoutMs=5000}={}){
  const fixture=heldDecisionFixture188();fixture.local=structuredClone(fixture.remote);
