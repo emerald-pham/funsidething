@@ -4471,7 +4471,7 @@ async function exactAcknowledgedCloudSource(failed,account){
     !deviceStore?.protectRecoverySource||typeof backend?.readRecoverySource!=="function"||
     state.syncAccount!==account||!validDecisionBase(base,account,state.syncRev))return null;
   try{
-    const evidence=await backend.recoveryEvidence(),source=await backend.readRecoverySource();
+    const evidence=await backend.recoveryEvidence(),source=await backend.readRecoverySource({pendingGenerationId:evidence.pending?.generationId});
     const manifest=source.manifest,header=source.generations[0]?.header;
     const current=()=>window.CloudSync===backend&&backend.user===account&&JSON.stringify(state)===board&&
       !cloudSuspended&&!cloudResumePending&&!hasActiveEditor()&&!scannerGestureActive;
@@ -4483,6 +4483,13 @@ async function exactAcknowledgedCloudSource(failed,account){
       await ChainStorageV2.hashPayload(base.payload)!==header.hash)return null;
     const decoded=JSON.parse(base.payload);
     if(currentChoiceSourceIssue(decoded)||decisionEvidenceIssue(decoded,account,false)||decisionProjectionIssue(decoded))return null;
+    if(evidence.pending){
+      const currentHash=await ChainStorageV2.hashPayload(cloudPayload());
+      // A pending pointer may describe work absent from both this board and
+      // the acknowledged source. Preserve its authority for explicit review;
+      // exact reconstruction of the published base cannot choose its fate.
+      if(evidence.pending.payloadHash!==header.hash&&evidence.pending.payloadHash!==currentHash)return null;
+    }
     const raw=JSON.stringify({format:"chain-scanner.cloud-recovery-source",version:1,
       identity:source.identity,manifest,generations:source.generations,deviceSource:board,pending:evidence.pending});
     const captureHash=await ChainStorageV2.hashPayload(raw);
@@ -4535,7 +4542,10 @@ async function cloudPull(){
   if(hasActiveEditor() || scannerGestureActive){ deferredCloudPull = true; return; }
   const firstReconcile = !reconciled();
   const acct = window.CloudSync.user; // bind the response to the identity that requested it
+  const pullBackend=window.CloudSync;
   const pullIdentity=cloudAccountIdentity();
+  const pullStillCurrent=()=>cloudReady()&&window.CloudSync===pullBackend&&pullBackend.user===acct&&
+    cloudAccountIdentity()===pullIdentity&&!cloudSuspended&&!cloudResumePending;
   pulling = true;
   let rebuildingCloudSource=false;
   // Starting a fresh read suspends the earlier read's write authority. A
@@ -4558,6 +4568,7 @@ async function cloudPull(){
       const exact=await exactAcknowledgedCloudSource(remote,acct);
       if(exact){remote=exact;rebuildingCloudSource=true;}
     }
+    if(!pullStillCurrent())return;
     const haveRemote = !!(remote && remote.payload);
     if(remote?.error){scheduleCloudRetry(acct);return;}
     if(!haveRemote && !(remote && remote.empty)){reportCloudReconcileError("malformed-response");return;}
@@ -4586,12 +4597,13 @@ async function cloudPull(){
       resumeCloudAfterBrowserRecovery(browserRecoveryAfterRead,acct);
       return;
     }
+    if(!pullStillCurrent())return;
     const switchedAccount = state.syncAccount != null && state.syncAccount !== acct ||
       state.syncIdentity!=null&&pullIdentity!==null&&state.syncIdentity!==pullIdentity;
     if(!haveRemote && !switchedAccount && state.syncAccount==null
       && (Object.hasOwn(state,"decisionBaseline") || Array.isArray(state.decisionEvents) && state.decisionEvents.length)){
       if(!await inheritDecisionAuthority(state,acct,"guest-first-empty-account"))return;
-      if(!cloudReady() || window.CloudSync.user!==acct)return;
+      if(!pullStillCurrent())return;
     }
     const effectiveNow=Date.now();
     const decisionIssue=(haveRemote && decisionEvidenceIssue(remoteState,acct,false)) || (!switchedAccount && decisionEvidenceIssue(state,acct,false));
@@ -4688,6 +4700,7 @@ async function cloudPull(){
       return;
     }
     const priorMarkers = remoteWins ? {reconciledAs,lastKnownCloudPayload,lastKnownCloudAccount,lastKnownCloudRevision,deferredCloudPull,lastPushed,pendingPush,undoStack:undoStack.slice(),generation:chanceGeneration} : null;
+    if(!pullStillCurrent())return;
     cloudAdoptionHeld = false;
     deferredCloudPull = false;
     reconciledAs = window.CloudSync.user;
@@ -4829,7 +4842,7 @@ async function cloudPull(){
           // a later acknowledgement fails closed instead of losing the row.
           await reclassifyDurableCloudRecoveryBackup(stablePrior.id,stablePrior.payload,recoveryKind,!!stablePrior.newRecovery);
         }
-        if(!cloudReady() || window.CloudSync.user!==acct || cloudSuspended || cloudResumePending ||
+      if(!pullStillCurrent() ||
            cloudPayload()!==cloudPayloadFor(JSON.parse(priorBoard))){
           // Reclassification awaited storage. Its backup covers priorBoard,
           // not a newer gesture; leave that gesture live and reconcile again.
@@ -4922,7 +4935,7 @@ async function cloudPull(){
     pulling = false;
     queueDeviceCloudBackupReconcile();
     scheduleLiveCloudPull();
-    if(rebuildingCloudSource&&window.CloudSync?.user===acct&&reconciled()){
+    if(rebuildingCloudSource&&pullStillCurrent()&&reconciled()){
       state.syncDirty=true;lastPushed="";pendingPush=true;
     }
     if(reconciled() && state?.syncDirty===false && lastKnownCloudPayload===cloudPayload()) cloudWriteFailure=null;
@@ -11554,7 +11567,7 @@ if(configured){
       if(auth.currentUser?.uid!==user.uid||epoch!==recoveryAuthEpoch)throw Error("The signed-in account changed. Review again.");
       return {identity:user.uid,epoch,pending};
     };
-    CS.readRecoverySource=async()=>{
+    CS.readRecoverySource=async({pendingGenerationId}={})=>{
       const user=auth.currentUser,epoch=recoveryAuthEpoch;
       if(!user||suspended)throw Error("Cloud source is unavailable.");
       const current=()=>auth.currentUser?.uid===user.uid&&recoveryAuthEpoch===epoch&&!suspended;
@@ -11562,15 +11575,17 @@ if(configured){
         await networkReady;
         if(!current())throw Error("Account changed.");
         const manifest=await cloudAdapter.readRoot(user.uid);
-        if(!current()||manifest?.schemaVersion!==2||!Number.isSafeInteger(manifest.rev)||manifest.rev<1||
-          typeof manifest.activeGeneration!=="string")throw Error("Cloud source is unsupported.");
-        const ids=[...new Set([manifest.activeGeneration,manifest.previousGeneration].filter(id=>typeof id==="string"&&id))];
+        const empty=manifest===null;
+        if(!current()||!empty&&(manifest?.schemaVersion!==2||!Number.isSafeInteger(manifest.rev)||manifest.rev<1||
+          typeof manifest.activeGeneration!=="string"))throw Error("Cloud source is unsupported.");
+        const ids=[...new Set([manifest?.activeGeneration,manifest?.previousGeneration,pendingGenerationId].filter(id=>typeof id==="string"&&id))];
         const generations=await Promise.all(ids.map(async id=>({id,
           header:await cloudAdapter.readGeneration(user.uid,id),chunks:await cloudAdapter.readChunks(user.uid,id)})));
+        if(!current())throw Error("Account changed.");
         const latest=await cloudAdapter.readRoot(user.uid);
-        if(!current()||latest?.schemaVersion!==2||latest.rev!==manifest.rev||
-          latest.activeGeneration!==manifest.activeGeneration||latest.previousGeneration!==manifest.previousGeneration)
-          throw Error("Cloud source changed.");
+        const sameRoot=empty?latest===null:latest?.schemaVersion===2&&latest.rev===manifest.rev&&
+          latest.activeGeneration===manifest.activeGeneration&&latest.previousGeneration===manifest.previousGeneration;
+        if(!current()||!sameRoot)throw Error("Cloud source changed.");
         return {identity:user.uid,epoch,manifest,generations};
       })());
     };
