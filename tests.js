@@ -4452,12 +4452,12 @@ test("PWA contract: service worker precaches the app and uses a cache-first fetc
   assert.match(worker, /event\.respondWith\(/,
     "fetch handling must control the response with event.respondWith()");
   assert.match(worker, /caches\.match\(/, "fetch handling must check the cache first");
-  assert.match(worker, /caches\.match\(\s*event\.request\s*\)[\s\S]{0,240}\|\|\s*fetch\(\s*event\.request\s*\)/,
+  assert.match(worker, /caches\.match\(\s*event\.request\s*,\s*\{\s*cacheName\s*:\s*CACHE_NAME\s*\}\s*\)[\s\S]{0,240}\|\|\s*fetch\(\s*event\.request\s*\)/,
     "fetch handling must return the cached response before falling back to the network request");
   assert.match(worker, /addEventListener\(\s*["']activate["']/,
     "service worker must activate and retire old shell caches");
   assert.match(worker, /clients\.claim\(\)/, "service worker must claim already-open app clients");
-  assert.match(worker, /caches\.match\(\s*["']\.\/index\.html["']\s*\)/,
+  assert.match(worker, /caches\.match\(\s*["']\.\/index\.html["']\s*,\s*\{\s*cacheName\s*:\s*CACHE_NAME\s*\}\s*\)/,
     "failed navigations must fall back to the cached app shell");
 });
 
@@ -36088,7 +36088,7 @@ test('RISK held decision recovery: new reviewed consent supersedes prior prepare
 });
 
 
-test('RISK repository process: required installed-client native outcomes execute exactly once',t=>{
+test('RISK repository process: required installed-client native outcomes and artifacts execute exactly once',t=>{
  const required=['RISK native installed-client delivery: signed-out','RISK native installed-client delivery: reconcile-held'];
  const env={...process.env,CHAIN_INSTALLED_NATIVE_CHILD:'1'};delete env.NODE_TEST_CONTEXT;
  const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^RISK native installed-client delivery: (signed-out|reconcile-held)$','tests.js'],{cwd:__dirname,env,encoding:'utf8',timeout:405000,maxBuffer:32*1024*1024});
@@ -36106,6 +36106,23 @@ test('RISK repository process: required installed-client native outcomes execute
  assert.equal(lines.filter(line=>/^1\.\.\d+$/.test(line)).at(-1),'1..'+required.length,'Native TAP plan must be complete and exact');
  assert.match(result.stdout||'',/^# cancelled 0$/m);assert.match(result.stdout||'',/^# skipped 0$/m);assert.match(result.stdout||'',/^# todo 0$/m);
  assert.ok(!/^not ok /m.test(result.stdout||''),'No native failure or cancellation may be hidden: '+output);
+ const artifacts=lines.map(line=>line.match(/^# Native evidence: (.+)$/)?.[1]).filter(Boolean);
+ assert.equal(artifacts.length,required.length,'Each required native outcome must retain an evidence artifact');
+ assert.equal(new Set(artifacts).size,required.length,'Required native evidence artifacts must be distinct');
+ const modes=new Set();
+ for(const file of artifacts){
+  assert.equal(path.dirname(path.resolve(file)),path.resolve(env.CHAIN_NATIVE_OUTPUT),'Required native evidence must be inside the declared artifact directory');
+  assert.ok(fs.existsSync(file),'Required native evidence artifact is missing: '+file);
+  const report=JSON.parse(fs.readFileSync(file,'utf8'));
+  assert.ok(['signed-out','reconcile-held'].includes(report.mode),'Required native artifact must identify a known case');
+  assert.ok(!modes.has(report.mode),'Required native artifact case must not be duplicated');modes.add(report.mode);
+  assert.equal(report.status,'passed','Required native artifact must record a successful case');
+  assert.equal(report.oldCommit,'779defa4e8c3465fdf535fe17dbe2227d2b76ea1','Required native artifact keeps the immutable installed baseline');
+  assert.equal(report.candidateCommit,env.CHAIN_NATIVE_CANDIDATE_SHA,'Required native artifact must identify the exact candidate');
+  assert.equal(report.candidateTree,env.CHAIN_NATIVE_CANDIDATE_TREE,'Required native artifact must identify the exact tree');
+  for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(report.cleanup?.[key],true,'Required native artifact cleanup: '+key);
+ }
+ assert.deepEqual([...modes].sort(),['reconcile-held','signed-out'],'Both required native case artifacts must be retained');
 });
 
 
@@ -36128,7 +36145,7 @@ if(process.env.CHAIN_INSTALLED_NATIVE_SENSITIVITY==='process'){
  test('RISK repository process: installed-client native registration sensitivities fail closed',async t=>{
   assert.ok(process.env.CHAIN_NATIVE_OUTPUT,'durable sensitivity output required');
   const source=fs.readFileSync(path.join(__dirname,'tests.js'),'utf8');
-  const start=source.indexOf("test('RISK repository process: required installed-client native outcomes execute exactly once'");
+  const start=source.indexOf("test('RISK repository process: required installed-client native outcomes and artifacts execute exactly once'");
   const end=source.indexOf('\n// Installed-client sensitivity controls');assert.ok(start>=0&&end>start);
   const actual=source.slice(start,end),heldStart=actual.indexOf(" test('RISK native installed-client delivery: reconcile-held'");
   const heldEnd=actual.indexOf('\n });',heldStart)+5;assert.ok(heldStart>0&&heldEnd>heldStart);
@@ -36137,26 +36154,28 @@ if(process.env.CHAIN_INSTALLED_NATIVE_SENSITIVITY==='process'){
   const directory=fs.mkdtempSync(path.join(process.env.CHAIN_NATIVE_OUTPUT,'process-sensitivity-'));
   const hash=value=>createHash('sha256').update(value).digest('hex');
   const records=[];
-  for(const variant of ['omission','duplicate','skip']){
+  for(const variant of ['omission','duplicate','skip','missing-artifact']){
    const root=path.join(directory,variant);fs.mkdirSync(root);
    fs.writeFileSync(path.join(root,'package.json'),JSON.stringify({type:'module'}));
    fs.symlinkSync(path.join(__dirname,'scripts'),path.join(root,'scripts'),'junction');
-   const replacement=variant==='omission'?'':variant==='duplicate'?held+'\n'+held:held.replace('{timeout:210000}','{timeout:210000,skip:true}');
+   const artifactFault='fs.copyFileSync(result.reportPath,'+JSON.stringify(path.join(root,'removed-report-preserved.json'))+');fs.unlinkSync(result.reportPath);';
+   const replacement=variant==='omission'?'':variant==='duplicate'?held+'\n'+held:variant==='skip'?held.replace('{timeout:210000}','{timeout:210000,skip:true}'):held.replace("t.diagnostic('Native evidence: '",artifactFault+"t.diagnostic('Native evidence: '");
    const mutated=actual.slice(0,heldStart)+replacement+actual.slice(heldEnd);
-   assert.equal(mutated.split(nativeBody).length-1,variant==='omission'?0:variant==='duplicate'?2:1,'actual native callback bytes retained in source variant');
+   if(variant==='missing-artifact')assert.equal(replacement.replace(artifactFault,''),held,'only the external completed artifact is removed; actual callback bytes remain');
+   else assert.equal(mutated.split(nativeBody).length-1,variant==='omission'?0:variant==='duplicate'?2:1,'actual native callback bytes retained in source variant');
    // Only the command's fixture location changes; the independent TAP consumer
    // and all remaining real native callback/import bytes are copied unchanged.
-   const fixtureSource='import {test} from "node:test";import assert from "node:assert/strict";import {spawnSync} from "node:child_process";import path from "node:path";import {fileURLToPath} from "node:url";\nconst __dirname='+JSON.stringify(__dirname)+';const variantRoot=path.dirname(fileURLToPath(import.meta.url));\n'+mutated.replace('cwd:__dirname,env,','cwd:variantRoot,env,');
+   const fixtureSource='import {test} from "node:test";import assert from "node:assert/strict";import {spawnSync} from "node:child_process";import fs from "node:fs";import path from "node:path";import {fileURLToPath} from "node:url";\nconst __dirname='+JSON.stringify(__dirname)+';const variantRoot=path.dirname(fileURLToPath(import.meta.url));\n'+mutated.replace('cwd:__dirname,env,','cwd:variantRoot,env,');
    const file=path.join(root,'tests.js');fs.writeFileSync(file,fixtureSource);
    const env={...process.env};delete env.NODE_TEST_CONTEXT;delete env.CHAIN_INSTALLED_NATIVE_CHILD;
-   const args=['--test','--test-reporter=tap','--test-name-pattern=^RISK repository process: required installed-client native outcomes execute exactly once$','tests.js'];
+   const args=['--test','--test-reporter=tap','--test-name-pattern=^RISK repository process: required installed-client native outcomes and artifacts execute exactly once$','tests.js'];
    const result=spawnSync(process.execPath,args,{cwd:root,env,encoding:'utf8',timeout:405000,maxBuffer:32*1024*1024});
    const output=[result.stdout,result.stderr].filter(Boolean).join('\n');
    const record={variant,file,sourceSha256:hash(fixtureSource),canonicalRegionSha256:hash(actual),realNativeBodySha256:hash(nativeBody),importedModuleSha256:hash(fs.readFileSync(path.join(__dirname,'scripts/installed-client-regression.mjs'))),command:[process.execPath,...args],cwd:root,status:result.status,signal:result.signal,error:result.error?.message,output};records.push(record);
    fs.writeFileSync(path.join(directory,'report.json'),JSON.stringify(records,null,2)+'\n');
    assert.equal(result.error,undefined,result.error?.message);assert.equal(result.signal,null);assert.notEqual(result.status,0,'actual command must reject '+variant+' native registration');
    assert.ok(!/Cannot find (?:module|package)|ERR_MODULE_NOT_FOUND|SyntaxError/.test(output),'infrastructure failure is not a qualifying native registration control');
-   assert.match(output,variant==='skip'?/Required native case must actually execute: RISK native installed-client delivery: reconcile-held/:/Required native case absent or duplicated: RISK native installed-client delivery: reconcile-held/,'the unchanged TAP consumer must reject the actual registration fault');
+   assert.match(output,variant==='missing-artifact'?/Required native evidence artifact is missing:/:variant==='skip'?/Required native case must actually execute: RISK native installed-client delivery: reconcile-held/:/Required native case absent or duplicated: RISK native installed-client delivery: reconcile-held/,'the required consumer must reject the actual registration or artifact fault');
   }
   t.diagnostic('Actual process sensitivity evidence: '+path.join(directory,'report.json'));
  });
@@ -36762,4 +36781,58 @@ test('RISK saved rating normalization: cold startup display save and reopen pres
  const saved=app.shim.localStorage.getItem(SYNC_STORE_KEY);assert.equal(saved,JSON.stringify(app.ctx.state),'device save contains the exact accepted board');
  const reopened=await loadAppAtTime(at+2000,{seed:2272,seedStorage:{[SYNC_STORE_KEY]:saved,[LOCAL_HEAD_KEY]:saved}});t.after(()=>cleanup(reopened.ctx));
  verify(reopened.ctx,'cold reopen');
+});
+
+function retainedWorkerCacheHarness(){
+ const origin='https://scanner.example',worker=serviceWorkerSource(),current=appShellContract(worker).cacheName;
+ const previous='chain-scanner-shell-retained-predecessor',handlers={},network=[];
+ const key=request=>new URL(typeof request==='string'?request:request.url,origin+'/').href;
+ const entries=values=>new Map(Object.entries(values).map(([url,body])=>[key(url),body]));
+ const records=new Map([
+  [previous,entries({'/':'PREDECESSOR HTML','/index.html':'PREDECESSOR HTML','/device-store-v2.js':'PREDECESSOR MODULE','/old-only.js':'PREDECESSOR ONLY MODULE'})],
+  [current,entries({'/':'CURRENT HTML','/index.html':'CURRENT HTML','/device-store-v2.js':'CURRENT MODULE'})],
+  ['unrelated-cache',entries({'/':'UNRELATED HTML'})],
+ ]);
+ let offline=false,claims=0,skips=0;
+ const caches={
+  async keys(){return [...records.keys()];},
+  async delete(name){if(name===previous)throw Object.assign(Error('Synthetic external cache retirement failure'),{name:'UnknownError'});return records.delete(name);},
+  async open(name){if(!records.has(name))records.set(name,new Map());return {async put(request,response){records.get(name).set(key(request),await response.clone().text());}};},
+  async match(request,options={}){
+   const names=options.cacheName===undefined?[...records.keys()]:[options.cacheName];
+   for(const name of names){const body=records.get(name)?.get(key(request));if(body!==undefined)return new Response(body);}
+  },
+ };
+ vm.runInNewContext(worker,{caches,URL,Request,console,
+  fetch:async request=>{const url=key(request);network.push(url);if(offline)throw TypeError('Synthetic offline transport');return new Response('NETWORK:'+new URL(url).pathname);},
+  self:{location:{origin},addEventListener(type,handler){handlers[type]=handler;},skipWaiting(){skips++;return Promise.resolve();},clients:{claim(){claims++;return Promise.resolve();}}},
+ },{filename:'sw.js'});
+ return {handlers,records,network,current,previous,setOffline(value){offline=value;},claims:()=>claims,skips:()=>skips,
+  async request(url,mode='cors'){
+   let response;handlers.fetch({request:{url:new URL(url,origin+'/').href,method:'GET',mode},respondWith(value){response=value;}});
+   assert.ok(response,'the actual worker fetch consumer must handle this same-origin request');return response;
+  },
+ };
+}
+
+test('RISK PWA retained caches: active shell and offline navigation never use predecessor bytes after retirement fails',async()=>{
+ const h=retainedWorkerCacheHarness(),activation=[];
+ h.handlers.activate({waitUntil(promise){activation.push(promise);}});await Promise.allSettled(activation);
+ assert.ok(h.records.has(h.previous),'the external retirement failure really retains the predecessor cache');
+ assert.equal(await (await h.request('/','navigate')).text(),'CURRENT HTML','an activated worker must serve its own installed HTML, even when an older cache remains first');
+ assert.equal(await (await h.request('/device-store-v2.js')).text(),'CURRENT MODULE','module requests cannot mix in an older installed version');
+ assert.deepEqual(h.network,[],'current installed shell bytes remain available without a network request');
+ assert.equal(await (await h.request('/old-only.js')).text(),'NETWORK:/old-only.js','a miss in the active cache fetches current origin bytes instead of using an obsolete cache entry');
+ h.setOffline(true);
+ assert.equal(await (await h.request('/?ordinary-launch=1','navigate')).text(),'CURRENT HTML','an offline navigation miss falls back only to the active shell');
+ assert.equal(h.records.get(h.previous).get('https://scanner.example/index.html'),'PREDECESSOR HTML','failed automatic cache retirement does not erase retained bytes');
+ assert.ok(h.records.has('unrelated-cache'),'unrelated origin caches stay untouched');assert.equal(h.skips(),0,'this repair must not force worker activation');
+});
+
+test('RISK PWA retained caches: mounted update help explains current-version delivery without discarding open work',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(help,/An activated update uses its own offline copy, even if an older copy could not be removed/,'the visible extended FAQ explains the repaired installed delivery');
+ assert.match(help,/After all app windows and tabs close, reopen to use the downloaded version/,'the existing safe update lifecycle remains documented');
+ assert.match(help,/If a save fails, keep the tab open/,'the update fix never tells an unsaved user to discard the session');
+ assert.match(html,/Downloaded updates open the current version even when an older offline copy remains/,'current release notes describe the user-facing improvement');
 });

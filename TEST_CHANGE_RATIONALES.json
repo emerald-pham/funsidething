@@ -13731,5 +13731,68 @@
       "result": "2026-10-19T10-38-03-526Z-5c6660e8-10d6-4f94-9a52-c1e5459d5369 passes the complete new consumer before permanent append. Final committed focused/full/native and upstream-aware preflight evidence follow separately."
     },
     "chronology": "The new coverage was authored after the C3 source repair and before any further app change. No product source change is made for this test-only follow-up."
+  },
+  {
+    "testChangesSha256": "91fceedfce41e6be499e359d8807bb9bfb0d0c6c048addc9c25a4a6ac04686ae",
+    "reason": "Prevent an activated installed worker from serving retained predecessor bytes when optional CacheStorage retirement fails. Add direct real-worker fetch/offline consumers and mounted FAQ coverage; preserve all existing behavior checks while migrating two source-shape assertions to require the standard cacheName scope.",
+    "previousBehavior": "Current native old779 to b91 activated the exact current worker after safe owned draft submission, durable backup readback and last-client close, but a native CacheStorage.delete UnknownError left the old cache first and normal reopening returned exact old779 HTML. The previous required native cases only exercised successful cache retirement; source-shape checks required unscoped global cache lookup.",
+    "intendedBehavior": "Only the active fingerprinted cache may answer a cached document/module request or offline-navigation fallback. Old or unrelated caches cannot override it. A missing active entry uses the ordinary network path. Predecessor waiting, unsubmitted drafts, durable source preservation, account/remote holds and natural last-client activation remain unchanged. The mandatory signed-out native case now retains the predecessor cache through a real external API failure; both native cases use64 synthetic tasks and a one-MiB unknown field.",
+    "replacementTests": [
+      "RISK PWA retained caches: active shell and offline navigation never use predecessor bytes after retirement fails",
+      "RISK PWA retained caches: mounted update help explains current-version delivery without discarding open work"
+    ],
+    "preservedCoverage": [
+      "All existing tests and original assertions remain except two implementation-shape regular expressions, which still require cache-first network fallback and offline HTML fallback while now additionally requiring active-cache scope. Existing offline-module/lifecycle/session/draft tests pass.",
+      "The existing required signed-out and reconcile-held outcomes still execute exactly once; no new process command, skip, timer budget, forced activation, reload bypass, storage clear, or private fixture was introduced. The held native case retains successful cache retirement as a positive control.",
+      "Required native exact candidate/cache/inline identities, accepted Add draft, prior head, unknown fields, manual/protected backups, opaque archives, nonempty account-bound pending generation, remote exact/get-only behavior and real offline transport remain asserted.",
+      "The historical clean-window comparison records a deliberate #177 policy transition at dd4300; its automatic15s expectation conflicts with the accepted waiting policy and is not used to justify this fix. User reinstall/sync/latest-data recovery does not identify the affected-device cause.",
+      "The separate transient native-write/cloud-idle RED is retained as an independent unshipped finding, not claimed as the cause of the recovered human session. Physical-device and authenticated production recovery still require their own evidence."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/device-write-update-p0-20261019/records --purpose preimplementation-red -- node --test --test-name-pattern=\"RISK PWA retained caches:\" tests.js",
+      "failure": "Before worker edits, permanent consumer RED5d9bdc10 (12:38:24UTC) returned PREDECESSOR HTML instead of CURRENT HTML. Native contemporaneous RED9e05a4ed and repeated db92cf00 returned old779 HTML SHAe56e60f1 rather than b91 SHA747d7ad7 after actual candidate activation; external native old-cache deletion failure was armed, hit and read back, both caches remained. Native no-fault positive ce55c2bb passed the same populated lifecycle. After the scoped-read implementation, new consumer passed while old source-shape check failed9f959f9d; only those two cache-call regular expressions were migrated, then four focused tests passed ec416e04. Mounted FAQ guidance RED2351258d preceded the copy edit; focused FAQ/new-consumer GREEN4a66479a retained old safe-close/save-failure guidance. Earlier dependency import and navigation-observer failures remain infrastructure/adapter errors, not product RED. No causal human first-bad commit is asserted for retained-cache failure."
+    }
+  },
+  {
+    "baseCommit": "8495ec3c4b326b188ab3acbbff37d4fa5036031d",
+    "testChangesSha256": "13104a99b450e7c788b2ae2c125693ee4cf5d342e00dd1ba89ef497759a6d64f",
+    "reason": "Honor the explicit human requirement that automatic updates remain a required repo/CI test and missing required artifacts fail clearly. Strengthen the existing actual installed-client command, without a parallel harness or optional-only positive cohort.",
+    "previousBehavior": "The existing required command checked exactly two successful non-skipped TAP outcomes, but diagnostic f9b3fbce ran both actual native modes, preserved then removed only the completed reconcile-held report, and the command still exited0 with just one uploadable case report. An empty-directory-only upload check could not reject that missing individual artifact.",
+    "intendedBehavior": "Keep every existing child/TAP/runtime assertion and require two distinct readable successful artifacts for the two expected modes, immutable old baseline, exact candidate/tree, declared directory and complete owned cleanup. Both native outcomes remain mandatory once in ordinary npm test and CI. Extend the existing owner process sensitivity with a removed-artifact case while preserving omission/duplicate/skip controls.",
+    "replacementTests": [
+      "RISK repository process: required installed-client native outcomes and artifacts execute exactly once"
+    ],
+    "preservedCoverage": [
+      "The old required process RISK is renamed to include artifacts; all original exact-count, skip/TODO/cancel, exit/signal, TAP-plan and infrastructure assertions remain byte-for-byte. The same two real native callbacks and mandatory CI command remain; no extra normal native invocation or new framework is introduced.",
+      "Candidate A app/worker/all35 shell asset bytes are unchanged. Its actual cache-failure RED/repeat/control, permanent worker/FAQ REDs, focused43, full2312/0/48, native2 and rules10/compat15 plus32 live-inspected rendered captures retain their original source scope; final candidate gets focused mandatory native validation and new exact CI before release.",
+      "All536 earlier rationale objects are retained exactly. Account/remote holds, accepted draft and durable recovery before normal close, exact pending/head/protected/manual/browser/opaque/unknown sources and genuine offline transport remain required; no forced activation, reset or private originals.",
+      "The new missing-artifact owner sensitivity preserves the exact completed report before removing only its isolated uploadable fixture file. That is a deterministic gate fault, not a product data deletion. Original omission/duplicate/skip controls remain and gain only the filesystem import needed by the stronger actual consumer.",
+      "The source shape and accepted user-visible cache behavior remain the same as A. No closure of the separate transient-write retry gap, affected-human causal claim, manual updater, Beta work, model or speed change is included."
+    ],
+    "redEvidence": {
+      "command": "TZ=UTC Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node /Users/emeraldpham/.codex/task-artifacts/device-write-update-p0-20261019/probe-required-artifact-gap.mjs",
+      "failure": "Actual record2026-10-19T13-28-47-687Z-f9b3fbce-7189-4920-bc04-47e7045dd8f1 failed ERR_ASSERTION: Required auto-update command must reject a missing required native case artifact. The actual source command exited0 after both real native cases passed but one report was copied outside the artifact directory then removed; exactly one report remained. No missing module, syntax or runtime infrastructure failure qualified as RED. The gate checks were added only afterward."
+    }
+  },
+  {
+    "baseCommit": "b91e2e0d27f8243823f8358221df36fffbdd729b",
+    "testChangesSha256": "f9b3d3d4c92d76d91a55237856f49a8eea0fc6d0585b8519d8dddf1ed5bd52e8",
+    "reason": "Honor the explicit human requirement that automatic updates remain a required repo/CI test and missing required artifacts fail clearly. Strengthen the existing actual installed-client command, without a parallel harness or optional-only positive cohort. This exact comparison also retains the unreleased active-cache update repair and mounted FAQ coverage already reviewed in candidate A.",
+    "previousBehavior": "The existing required command checked exactly two successful non-skipped TAP outcomes, but diagnostic f9b3fbce ran both actual native modes, preserved then removed only the completed reconcile-held report, and the command still exited0 with just one uploadable case report. An empty-directory-only upload check could not reject that missing individual artifact.",
+    "intendedBehavior": "Keep every existing child/TAP/runtime assertion and require two distinct readable successful artifacts for the two expected modes, immutable old baseline, exact candidate/tree, declared directory and complete owned cleanup. Both native outcomes remain mandatory once in ordinary npm test and CI. Extend the existing owner process sensitivity with a removed-artifact case while preserving omission/duplicate/skip controls.",
+    "replacementTests": [
+      "RISK repository process: required installed-client native outcomes and artifacts execute exactly once"
+    ],
+    "preservedCoverage": [
+      "The old required process RISK is renamed to include artifacts; all original exact-count, skip/TODO/cancel, exit/signal, TAP-plan and infrastructure assertions remain byte-for-byte. The same two real native callbacks and mandatory CI command remain; no extra normal native invocation or new framework is introduced.",
+      "Candidate A app/worker/all35 shell asset bytes are unchanged. Its actual cache-failure RED/repeat/control, permanent worker/FAQ REDs, focused43, full2312/0/48, native2 and rules10/compat15 plus32 live-inspected rendered captures retain their original source scope; final candidate gets focused mandatory native validation and new exact CI before release.",
+      "All536 earlier rationale objects are retained exactly. Account/remote holds, accepted draft and durable recovery before normal close, exact pending/head/protected/manual/browser/opaque/unknown sources and genuine offline transport remain required; no forced activation, reset or private originals.",
+      "The new missing-artifact owner sensitivity preserves the exact completed report before removing only its isolated uploadable fixture file. That is a deterministic gate fault, not a product data deletion. Original omission/duplicate/skip controls remain and gain only the filesystem import needed by the stronger actual consumer.",
+      "The source shape and accepted user-visible cache behavior remain the same as A. No closure of the separate transient-write retry gap, affected-human causal claim, manual updater, Beta work, model or speed change is included."
+    ],
+    "redEvidence": {
+      "command": "TZ=UTC Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node /Users/emeraldpham/.codex/task-artifacts/device-write-update-p0-20261019/probe-required-artifact-gap.mjs",
+      "failure": "Actual record2026-10-19T13-28-47-687Z-f9b3fbce-7189-4920-bc04-47e7045dd8f1 failed ERR_ASSERTION: Required auto-update command must reject a missing required native case artifact. The actual source command exited0 after both real native cases passed but one report was copied outside the artifact directory then removed; exactly one report remained. No missing module, syntax or runtime infrastructure failure qualified as RED. The gate checks were added only afterward."
+    }
   }
 ]
