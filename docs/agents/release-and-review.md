@@ -30,6 +30,10 @@ close. Reopening must deliver the exact candidate shell and retain the board,
 pending generation, manual/protected backups, opaque archives and unknown fields.
 The held remote payload/revision remains exact with zero writes.
 
+The same required command also reads both distinct case artifacts, requiring
+their successful modes, exact baseline/candidate/tree and complete owned cleanup.
+Missing, duplicate, failed or mismatched reports fail before artifact upload.
+
 Both cases use a populated synthetic board with a large unknown field. The
 signed-out case makes predecessor-cache retirement fail through the native
 worker storage boundary, verifies the old cache remains, and still requires

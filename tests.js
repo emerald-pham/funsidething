@@ -36088,7 +36088,7 @@ test('RISK held decision recovery: new reviewed consent supersedes prior prepare
 });
 
 
-test('RISK repository process: required installed-client native outcomes execute exactly once',t=>{
+test('RISK repository process: required installed-client native outcomes and artifacts execute exactly once',t=>{
  const required=['RISK native installed-client delivery: signed-out','RISK native installed-client delivery: reconcile-held'];
  const env={...process.env,CHAIN_INSTALLED_NATIVE_CHILD:'1'};delete env.NODE_TEST_CONTEXT;
  const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^RISK native installed-client delivery: (signed-out|reconcile-held)$','tests.js'],{cwd:__dirname,env,encoding:'utf8',timeout:405000,maxBuffer:32*1024*1024});
@@ -36106,6 +36106,23 @@ test('RISK repository process: required installed-client native outcomes execute
  assert.equal(lines.filter(line=>/^1\.\.\d+$/.test(line)).at(-1),'1..'+required.length,'Native TAP plan must be complete and exact');
  assert.match(result.stdout||'',/^# cancelled 0$/m);assert.match(result.stdout||'',/^# skipped 0$/m);assert.match(result.stdout||'',/^# todo 0$/m);
  assert.ok(!/^not ok /m.test(result.stdout||''),'No native failure or cancellation may be hidden: '+output);
+ const artifacts=lines.map(line=>line.match(/^# Native evidence: (.+)$/)?.[1]).filter(Boolean);
+ assert.equal(artifacts.length,required.length,'Each required native outcome must retain an evidence artifact');
+ assert.equal(new Set(artifacts).size,required.length,'Required native evidence artifacts must be distinct');
+ const modes=new Set();
+ for(const file of artifacts){
+  assert.equal(path.dirname(path.resolve(file)),path.resolve(env.CHAIN_NATIVE_OUTPUT),'Required native evidence must be inside the declared artifact directory');
+  assert.ok(fs.existsSync(file),'Required native evidence artifact is missing: '+file);
+  const report=JSON.parse(fs.readFileSync(file,'utf8'));
+  assert.ok(['signed-out','reconcile-held'].includes(report.mode),'Required native artifact must identify a known case');
+  assert.ok(!modes.has(report.mode),'Required native artifact case must not be duplicated');modes.add(report.mode);
+  assert.equal(report.status,'passed','Required native artifact must record a successful case');
+  assert.equal(report.oldCommit,'779defa4e8c3465fdf535fe17dbe2227d2b76ea1','Required native artifact keeps the immutable installed baseline');
+  assert.equal(report.candidateCommit,env.CHAIN_NATIVE_CANDIDATE_SHA,'Required native artifact must identify the exact candidate');
+  assert.equal(report.candidateTree,env.CHAIN_NATIVE_CANDIDATE_TREE,'Required native artifact must identify the exact tree');
+  for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(report.cleanup?.[key],true,'Required native artifact cleanup: '+key);
+ }
+ assert.deepEqual([...modes].sort(),['reconcile-held','signed-out'],'Both required native case artifacts must be retained');
 });
 
 
@@ -36128,7 +36145,7 @@ if(process.env.CHAIN_INSTALLED_NATIVE_SENSITIVITY==='process'){
  test('RISK repository process: installed-client native registration sensitivities fail closed',async t=>{
   assert.ok(process.env.CHAIN_NATIVE_OUTPUT,'durable sensitivity output required');
   const source=fs.readFileSync(path.join(__dirname,'tests.js'),'utf8');
-  const start=source.indexOf("test('RISK repository process: required installed-client native outcomes execute exactly once'");
+  const start=source.indexOf("test('RISK repository process: required installed-client native outcomes and artifacts execute exactly once'");
   const end=source.indexOf('\n// Installed-client sensitivity controls');assert.ok(start>=0&&end>start);
   const actual=source.slice(start,end),heldStart=actual.indexOf(" test('RISK native installed-client delivery: reconcile-held'");
   const heldEnd=actual.indexOf('\n });',heldStart)+5;assert.ok(heldStart>0&&heldEnd>heldStart);
@@ -36137,26 +36154,28 @@ if(process.env.CHAIN_INSTALLED_NATIVE_SENSITIVITY==='process'){
   const directory=fs.mkdtempSync(path.join(process.env.CHAIN_NATIVE_OUTPUT,'process-sensitivity-'));
   const hash=value=>createHash('sha256').update(value).digest('hex');
   const records=[];
-  for(const variant of ['omission','duplicate','skip']){
+  for(const variant of ['omission','duplicate','skip','missing-artifact']){
    const root=path.join(directory,variant);fs.mkdirSync(root);
    fs.writeFileSync(path.join(root,'package.json'),JSON.stringify({type:'module'}));
    fs.symlinkSync(path.join(__dirname,'scripts'),path.join(root,'scripts'),'junction');
-   const replacement=variant==='omission'?'':variant==='duplicate'?held+'\n'+held:held.replace('{timeout:210000}','{timeout:210000,skip:true}');
+   const artifactFault='fs.copyFileSync(result.reportPath,'+JSON.stringify(path.join(root,'removed-report-preserved.json'))+');fs.unlinkSync(result.reportPath);';
+   const replacement=variant==='omission'?'':variant==='duplicate'?held+'\n'+held:variant==='skip'?held.replace('{timeout:210000}','{timeout:210000,skip:true}'):held.replace("t.diagnostic('Native evidence: '",artifactFault+"t.diagnostic('Native evidence: '");
    const mutated=actual.slice(0,heldStart)+replacement+actual.slice(heldEnd);
-   assert.equal(mutated.split(nativeBody).length-1,variant==='omission'?0:variant==='duplicate'?2:1,'actual native callback bytes retained in source variant');
+   if(variant==='missing-artifact')assert.equal(replacement.replace(artifactFault,''),held,'only the external completed artifact is removed; actual callback bytes remain');
+   else assert.equal(mutated.split(nativeBody).length-1,variant==='omission'?0:variant==='duplicate'?2:1,'actual native callback bytes retained in source variant');
    // Only the command's fixture location changes; the independent TAP consumer
    // and all remaining real native callback/import bytes are copied unchanged.
-   const fixtureSource='import {test} from "node:test";import assert from "node:assert/strict";import {spawnSync} from "node:child_process";import path from "node:path";import {fileURLToPath} from "node:url";\nconst __dirname='+JSON.stringify(__dirname)+';const variantRoot=path.dirname(fileURLToPath(import.meta.url));\n'+mutated.replace('cwd:__dirname,env,','cwd:variantRoot,env,');
+   const fixtureSource='import {test} from "node:test";import assert from "node:assert/strict";import {spawnSync} from "node:child_process";import fs from "node:fs";import path from "node:path";import {fileURLToPath} from "node:url";\nconst __dirname='+JSON.stringify(__dirname)+';const variantRoot=path.dirname(fileURLToPath(import.meta.url));\n'+mutated.replace('cwd:__dirname,env,','cwd:variantRoot,env,');
    const file=path.join(root,'tests.js');fs.writeFileSync(file,fixtureSource);
    const env={...process.env};delete env.NODE_TEST_CONTEXT;delete env.CHAIN_INSTALLED_NATIVE_CHILD;
-   const args=['--test','--test-reporter=tap','--test-name-pattern=^RISK repository process: required installed-client native outcomes execute exactly once$','tests.js'];
+   const args=['--test','--test-reporter=tap','--test-name-pattern=^RISK repository process: required installed-client native outcomes and artifacts execute exactly once$','tests.js'];
    const result=spawnSync(process.execPath,args,{cwd:root,env,encoding:'utf8',timeout:405000,maxBuffer:32*1024*1024});
    const output=[result.stdout,result.stderr].filter(Boolean).join('\n');
    const record={variant,file,sourceSha256:hash(fixtureSource),canonicalRegionSha256:hash(actual),realNativeBodySha256:hash(nativeBody),importedModuleSha256:hash(fs.readFileSync(path.join(__dirname,'scripts/installed-client-regression.mjs'))),command:[process.execPath,...args],cwd:root,status:result.status,signal:result.signal,error:result.error?.message,output};records.push(record);
    fs.writeFileSync(path.join(directory,'report.json'),JSON.stringify(records,null,2)+'\n');
    assert.equal(result.error,undefined,result.error?.message);assert.equal(result.signal,null);assert.notEqual(result.status,0,'actual command must reject '+variant+' native registration');
    assert.ok(!/Cannot find (?:module|package)|ERR_MODULE_NOT_FOUND|SyntaxError/.test(output),'infrastructure failure is not a qualifying native registration control');
-   assert.match(output,variant==='skip'?/Required native case must actually execute: RISK native installed-client delivery: reconcile-held/:/Required native case absent or duplicated: RISK native installed-client delivery: reconcile-held/,'the unchanged TAP consumer must reject the actual registration fault');
+   assert.match(output,variant==='missing-artifact'?/Required native evidence artifact is missing:/:variant==='skip'?/Required native case must actually execute: RISK native installed-client delivery: reconcile-held/:/Required native case absent or duplicated: RISK native installed-client delivery: reconcile-held/,'the required consumer must reject the actual registration or artifact fault');
   }
   t.diagnostic('Actual process sensitivity evidence: '+path.join(directory,'report.json'));
  });

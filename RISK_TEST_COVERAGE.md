@@ -1641,7 +1641,7 @@ activation, then requires exact current HTML, modules, offline reopening and all
 original head, draft, pending and recovery-source preservation. The held case
 retains normal cleanup as its positive control. Neither case forces activation.
 
-- RISK repository process: required installed-client native outcomes execute exactly once
+- RISK repository process: required installed-client native outcomes and artifacts execute exactly once
 - RISK native installed-client delivery: signed-out
 - RISK native installed-client delivery: reconcile-held
 - RISK repository process: installed-client native registration sensitivities fail closed
