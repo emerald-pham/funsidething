@@ -495,6 +495,18 @@ test('RISK cloud source recovery pending capture: peer pending intent created af
  assert.equal((await store.getPendingUpload('owner')).generationId,peer.generationId,'the newly created peer pointer stays recoverable rather than being overwritten and cleared');
 });
 
+test('RISK cloud source recovery pending capture: a cached device store without conditional staging keeps the choice held',async t=>{
+ const app=await divergentCloudSourceApp187(t),{ctx,backend,originalRoot,shim}=app,store=ctx.window.ScannerDeviceStore;
+ await ctx.onAction('review-cloud-source-recovery',{});await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'generation:'+originalRoot.previousGeneration}});
+ const originalPending=await store.getPendingUpload('owner'),originalHead=await store.readHead();
+ delete store.setPendingUploadIfCurrent;
+ assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),false);
+ assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev,'an older capability must refuse before cloud publication');
+ assert.deepEqual(await store.getPendingUpload('owner'),originalPending,'the reviewed pointer remains exact');
+ assert.deepEqual(await store.readHead(),originalHead,'no unacknowledged choice replaces the accepted device board');
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/prepared choice remain protected/);
+});
+
 
 async function damagedAcknowledgedApp187(t,{timeoutMs=5000}={}){
  const fixture=heldDecisionFixture188();fixture.local=structuredClone(fixture.remote);

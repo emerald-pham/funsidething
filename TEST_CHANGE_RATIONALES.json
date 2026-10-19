@@ -1,5 +1,26 @@
 [
   {
+    "testChangesSha256": "6148524ab7309c92485e52eeb1602a5d87ae7d88450802425e3bfca88355d4b0",
+    "reason": "Bind explicit recovery pending staging to the complete reviewed pointer and an explicit atomic store capability; preserve all earlier recovery, identity, raw-source, migration and installed-client assertions. Add cached-capability refusal at the actual native chooser consumer.",
+    "previousBehavior": "The initial existing-pointer read and unconditional pending write could overwrite a new peer pointer; a peer pointer appearing after the own write could become the publication guard baseline and allow cloud revision6 to7 before a late refusal.",
+    "intendedBehavior": "Recovery compares the reviewed pointer, conditionally stages it in one physical-row-aware transaction, and verifies the full reread is the current operation pointer before any generation publication. A missing cached-device-store capability fails held. Ordinary three-argument pushes retain the released unconditional staging contract.",
+    "replacementTests": [
+      "RISK cloud source recovery pending capture: a peer pending pointer arriving between own pending write and read is never consented",
+      "RISK cloud source recovery pending capture: peer pending intent created after the existing read is never overwritten by recovery staging",
+      "RISK cloud source recovery pending capture: a cached device store without conditional staging keeps the choice held"
+    ],
+    "preservedCoverage": [
+      "Every prior behavioral assertion is retained, including the released account/callback semantic source contract deliberately migrated at86cb, exact cloud publication hash checks, UID ownership, startup and native File/Paste source preservation, raw-key collisions, local editing, durable ACK/reopen and compatibility/native gates.",
+      "Worker actual native pending RED65d0a225 and merged port-only REDef5b4092 both show cloud7 instead of6; first race preserves peer until late refusal and second loses the pointer. Store-only GREEN174404f4 is not native acceptance. Root consumer GREEN now passes both native races and all57 related tests in pending-cas-green-complete.log.",
+      "Existing root original RED925cbd3c, later857 sensitivity8351971f, invalid nested-field607f6ec3 correction, head-metadata RED70072105 and final86/86 source-shape GREEN retain their actual chronology in earlier entries and immutable outside-Git records. No setup or source spelling failure is claimed as behavioral RED.",
+      "Independent actual neutral-control visual RED86cb matches computed font700/transparent border/fill/shadow against established Cancel600/white/token-border/no shadow. The three new recovery controls now reuse btn subtle; a final rendered GREEN remains required. Text contrast suspicion was disproved, not a product failure."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <device-worktree> --evidence-dir <usable-recovery>/device-worker/review-repairs --purpose preimplementation-red -- node --test --test-name-pattern=\"RISK cloud source recovery pending capture:\" tests.js",
+      "failure": "Actual native RED65d0a225 before port and ef5b4092 after port both advanced cloud revision6 to7 for unreviewed pending changes. Root consumer integration follows those REDs; final related57/57 GREEN retains both peer pointers and prevents cloud mutation. The cached-capability case adds fail-closed preservation coverage after the same bounded fix; it is not a separately claimed original RED."
+    }
+  },
+  {
     "testChangesSha256": "c7c6d696282c0d8600c8d20eba497d1c76e77fd3aaf1c38034afabb93061e8e6",
     "reason": "Reconcile the bounded device and pending CAS port test diff after merging parent86cb2e0, preserving all parent callback/head-record repairs and all historical rationale bytes. Repair independent-review findings at actual startup, native selected-source, native authentication and device raw-row consumer boundaries; retain all prior tests and use external SDK counters for authentication. Add an explicit atomic pending-pointer port for parent-owned publication capture, following two independent actual native pending races.",
     "previousBehavior": "Hydration could filter malformed History/context/deletion entries before startup or selected-file acceptance; recovery guards blocked native sign-in; retained null or broken auxiliary rows prevented complete cloud recovery and immutable receipt writes could replace null/undefined at a physical key. Recovery staging also unconditionally replaced a peer pending pointer created after its read or accepted a peer pointer after its own write, advancing cloud revision6→7 before later local refusal.",
