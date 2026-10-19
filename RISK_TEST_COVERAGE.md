@@ -1727,3 +1727,5 @@ The native needs-attention action uses real IndexedDB and the production backend
 - RISK cloud source recovery: native Cancel stops delayed source checks and stays held during conditional publication
 - RISK cloud source recovery: account changes during final hold completion never report the old recovery complete
 - RISK cloud source recovery: an empty preview cannot overwrite a legacy root published at the transaction boundary
+
+- RISK cloud source recovery: native restored-device hold clears only after exact cloud ACK and durable current-head recovery

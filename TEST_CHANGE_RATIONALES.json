@@ -1,5 +1,22 @@
 [
   {
+    "testChangesSha256": "f80af35034f526517a055af77d018e9f591f9faef66d9155d92afa0bc94c302a",
+    "reason": "Exercise the real integrated persistent device recovery hold through native Paste, later local edit, separate cloud-source review, actual publication ACK and durable reopen against damaged, healthy v2 and positively empty cloud sources. No hold/store collaborator is mocked.",
+    "previousBehavior": "The worker source-choice tests did not yet consume the sibling implementation’s actual native raw-restore hold. Separate source paths could appear valid without proving that later-edited restored local work can resume confirmed sync.",
+    "intendedBehavior": "A real native restored-device hold keeps ordinary sync pending, survives later edits, and clears through exact real-store current-head/hold CAS only after deliberate complete-source publication, exact ACK, verified local head and retained original bytes. Healthy cloud choice and positively empty account choice remain usable.",
+    "replacementTests": [
+      "RISK cloud source recovery: native restored-device hold clears only after exact cloud ACK and durable current-head recovery"
+    ],
+    "preservedCoverage": [
+      "All earlier feature assertions remain. The test uses real getRecoveryCloudHold/clearRecoveryCloudHold through native UI and exact opaque rows before/after; no internal verdict or consumer is replaced. The initial malformed source includes an unpaired surrogate and every original receipt stays byte-exact.",
+      "The actual source-choice entry RED8eb6e280 and empty-source RED1f935b2b predate implementation; this is additional integrated acceptance, not a fabricated new product RED. Failed attempts334d724b/56308573 omitted the native textarea input event;831e18fa used a double-JSON substring assertion rather than decoding the actual raw receipt. The fixture was corrected without app changes, then32e87187 passed4/4."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern='RISK cloud source recovery: native explicit|RISK cloud source recovery: an explicitly held' tests.js",
+      "failure": "Original native source entry RED8eb6e280 and empty-account RED1f935b2b establish implementation sensitivity before product edits. Integrated real-hold acceptance32e87187 confirms all3 source shapes and later current-head clearing after root215d5c5/device6d0bccc merge. Empty→legacy transaction REDaff1fd42 now consumes the separately parent-owned recoveryRootAbsent optional flag; guard GREEN remains required after mergebe8e8d3."
+    }
+  },
+  {
     "testChangesSha256": "dd436b369570f8c8d9378a6a1356e2fe34afb2dc798a99d1b1031a30aa30ac22",
     "reason": "Preserve actual final storage/auth consent boundaries and prove native cancellation/transaction-bound source changes after root integration. All existing assertions remain unchanged.",
     "previousBehavior": "The final protected-copy await can outlive consent after signout and same-UID sign-in. An account change during final hold completion can be reported complete. Existing revision-zero CAS also conflates a positively absent root with a concurrently published unversioned legacy source.",

@@ -37812,3 +37812,35 @@ test('RISK cloud source recovery: an empty preview cannot overwrite a legacy roo
  assert.equal(result,false,'a legacy source newly published at revision zero invalidates empty-root consent');
  assert.equal(JSON.stringify(backend.docs.get('users/owner')),JSON.stringify(legacy),'an absent-root CAS cannot treat a newly present unversioned source as the same empty state');
 });
+
+test('RISK cloud source recovery: native restored-device hold clears only after exact cloud ACK and durable current-head recovery',async t=>{
+ for(const shape of ['damaged device choice','healthy cloud choice','empty device choice'])await t.test(shape,async sub=>{
+  const cloud=await divergentCloudSourceApp187(sub),{IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='actual-device-cloud-hold-'+Math.random();
+  if(shape==='healthy cloud choice'){
+   const encoded=await cloud.ctx.window.ChainStorageV2.encodeSnapshot(cloud.ctx.state.decisionBase.payload),path='users/owner/generations/'+cloud.originalRoot.activeGeneration;
+   cloud.backend.docs.set(path,cloud.originalHeader);for(const chunk of encoded.chunks)cloud.backend.docs.set(path+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
+  }
+  if(shape==='empty device choice')cloud.backend.docs.delete('users/owner');
+  const original='{ "tasks": [ same-device original truncated \ud800',app=await loadAppAtTime(1792323000000,{indexedDBProvider:indexedDB,deviceDbName,seedStorage:{[SYNC_STORE_KEY]:original,[LOCAL_HEAD_KEY]:original}}),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;sub.after(()=>closeLegacyApp173(app));
+  const backend=await loadCloudBackendV2({runtimeWindow:ctx.window,failures:{authPending:true},timeoutMs:5000});sub.after(()=>backend.CS.suspend());for(const [key,value]of cloud.backend.docs)backend.docs.set(key,value);backend.emitAuth({uid:'owner',email:'e@example.com'});await ctx.cloudPull();
+  const selected=syncState({tasks:[syncTask('restored-local-choice','Deliberately restored local task')],seenQuickStart:true,syncAccount:'e@example.com',syncRev:0,syncDirty:true});selected.futureRestored={keep:['original-selected',31]};
+  ctx.onAction('settings',{});ctx.onAction('open-paste-recovery',{});const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=JSON.stringify(selected);shim.document.dispatchEvent({type:'input',target:box});
+  assert.equal(await ctx.onAction('preview-pasted-recovery',{}),true,'native restore preview: '+shim.document.getElementById('toast').textContent);assert.equal(await ctx.onAction('confirm-file-restore',{}),true,'native restore confirm: '+shim.document.getElementById('modalRoot').innerHTML.slice(-2200));
+  const protectedOriginals=await store.listOpaqueArchives();assert.ok(protectedOriginals.some(row=>{try{return JSON.parse(row.raw).localStorage?.some(source=>source.raw===original);}catch{return false;}}),'the native local restore must first protect the exact unreadable original');
+  const hold=await store.getRecoveryCloudHold();assert.ok(hold,'the actual native device restore creates the real persistent hold');assert.equal(hold.identity,'owner');
+  shim.document.getElementById('addInput').value='Local work after recovered head';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+  assert.notEqual((await store.readHead()).hash,hold.headHash,'later local edits advance the current head without changing the hold’s provenance');
+  const initialRoot=backend.docs.get('users/owner'),initialRootRaw=JSON.stringify(initialRoot),before=JSON.stringify(ctx.state);
+  await ctx.cloudPull();await ctx.sendPush();assert.equal(JSON.stringify(backend.docs.get('users/owner')),initialRootRaw,'ordinary sync cannot publish the locally recovered source before consent');assert.equal(JSON.stringify(ctx.state),before);
+  ctx.onAction('settings',{});assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="review-cloud-source-recovery"/);
+  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),false);
+  const value=shape==='healthy cloud choice'?'generation:'+initialRoot.activeGeneration:'device';assert.equal(await ctx.onAction('choose-cloud-recovery-source',{dataset:{value}}),true);
+  assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),true,'the actual real hold consumer must finish instead of stranding locally restored work');
+  const {remote,head}=await settleRecovery188({...app,backend});assert.equal(await store.getRecoveryCloudHold(),null);assert.equal(ctx.window.ScannerDeviceRecoveryHold,null);
+  assert.equal(remote.rev,(initialRoot?.rev??0)+1);assert.equal(head.payload,JSON.stringify(ctx.state));assert.equal(ctx.state.syncIdentity,'owner');assert.equal(ctx.state.syncDirty,false);
+  const saved=JSON.parse(remote.payload);assert.equal(saved.tasks.some(row=>row.id==='restored-local-choice'),shape!=='healthy cloud choice');assert.equal(saved.tasks.some(row=>row.title==='Local work after recovered head'),shape!=='healthy cloud choice');
+  const afterSources=await store.listOpaqueArchives();for(const row of protectedOriginals)assert.ok(afterSources.some(copy=>copy.key===row.key&&copy.raw===row.raw),'every original unreadable device/source-file byte remains exact after cloud recovery');
+  backend.CS.suspend();await store.close();const cold=await loadAppAtTime(1792323000000,{indexedDBProvider:indexedDB,deviceDbName,sharedStorage:shim.localStorage});sub.after(()=>closeLegacyApp173(cold));
+  assert.equal(cold.ctx.cloudPayload(),remote.payload);assert.equal(await cold.ctx.window.ScannerDeviceStore.getRecoveryCloudHold(),null);assert.equal(cold.ctx.state.syncDirty,false);
+ });
+});
