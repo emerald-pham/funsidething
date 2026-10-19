@@ -26,6 +26,24 @@
     }
   },
   {
+    "testChangesSha256": "ef474daddbc252c7a8e98cb2aea984d731fdbffaba838db366ad3f2d0d6cfa34",
+    "reason": "Close an authenticated identity race after durable source capture through the actual full-app cloud reconciliation consumer. Add a controlled completion event at the external IndexedDB boundary without replacing an app method. Also provide neutral positively-empty raw source reads required by the independently observed native cloud-choice consumer RED.",
+    "previousBehavior": "The original cloud response was checked before source capture, but later storage awaits could let a same-email UID change bind that old response and old tasks to a different authenticated identity. The raw source reader rejected positively absent roots so explicit held-local recovery could not preview a valid empty account.",
+    "intendedBehavior": "Keep the backend object, account and UID bound across recovery, post-read device checks and write-authority release. A changed identity cannot publish old-account tasks. The explicit raw-source reader may return manifest:null only after two successful authenticated absence reads; retain any pending generation source and preserve ordinary CloudSync pull error semantics.",
+    "replacementTests": [
+      "RISK resilient sync recovery: identity changes after durable source capture cannot bind an old response to a new account"
+    ],
+    "preservedCoverage": [
+      "All previous exact ACK, retry, source/pending preservation, unsupported data and account protections remain intact; 63 relevant authority/sync checks pass000bf501 after the late identity repair.",
+      "The new fault delivers an actual Auth callback after the real IndexedDB receipt completion and promise continuations; semantic assertions verify no old task reaches another identity. It does not mock the application verdict.",
+      "The empty-root native source-choice RED1f935b2b is recorded in the sibling implementation worktree before this backend extension. Its final GREEN must be consumed after merge; no release or affected-device claim is made here."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern='RISK resilient sync recovery: identity changes after' tests.js",
+      "failure": "Observed0fad9a5d before post-await identity checks: old-account tasks published into the new authenticated identity. GREEN000bf50163/63 relevant checks; a5fb17ae exact+lateidentity2/2. Sibling native empty-source review RED1f935b2b before neutral empty-reader extension: preview returnedfalse rather thantrue; source/chronology retained externally."
+    }
+  },
+  {
     "testChangesSha256": "c34ea68fb687e04edf75560a91c44053da27005f1f8872eb2920038adcf1eeea",
     "reason": "Protect pending generation evidence during exact acknowledged-source recovery and refuse automatic replacement when a pending source represents different unselected intent. This adds two actual full-app regressions; previous assertions remain intact.",
     "previousBehavior": "A new recovery publication could retire an old staged pending generation whose metadata was preserved but whose chunks were not captured or pinned. An acknowledged source could also authorize a new publication while a different unrepresented pending upload was silently superseded.",
