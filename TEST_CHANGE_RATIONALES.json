@@ -13579,5 +13579,28 @@
       "command": "TZ=UTC Node22 recorder focused actual-consumer cohorts and isolated original-source replays",
       "result": "File/raw/paste/rating acceptance and safety72-case cohort390a88f3 passed; rating safety11-caseaba5603f passed. Large source/refined archive/codec cohortd6335824 passed253ms/1182ms/usable unsupported hold. Broad851da0e8 had172/173 passes and only an existing FAQ word-limit failure; separate3cc518ed passed after preserving the original answer and adding separate questions. Actual original raw file7bace332 retains source bytes/facts/history/native/fakecloudACK. Actual cloud-module original replayc174967c eventually retains434tasks/212facts/2327history/exact source/native/cloudACK with no held error; its transient false apply return remains separately traced, not relabeled success at that instant. Worker source-reuse cohort0e065d0f passed7/7 including native quota retry, rotation/reopen, unreadable/ambiguous/latest-only/removed-source controls; integration reused its exact local commitfe7913ad."
     }
+  },
+  {
+    "baseCommit": "382d062f83c0e745abc74595344b5e74efb1f860",
+    "testChangesSha256": "b3fd38a96b88e65910c7970c61f1983668f3f7744a4a5bb6881b0ebf9930b4e2",
+    "reason": "Close the independently found completion-upgrade proof race in the actual asynchronous host-storage startup consumer. Add coverage only; all earlier tests/assertions and530 rationale objects remain exact.",
+    "previousBehavior": "A reused exact recovery source removed or changed while awaiting host storage acknowledgement still let persist return true, clear the completion source marker and accept an unprotected upgraded primary.",
+    "intendedBehavior": "Keep the original completion upgrade pending when its exact recovery source disappears across host awaits. Restore only this attempted host value; preserve a newer foreign write. An intact source remains a successful positive control. Existing Restore host safety and original FAQ contracts remain intact.",
+    "replacementTests": [
+      "RISK completion source reuse: async host acknowledgement requires the exact source and preserves a newer foreign write"
+    ],
+    "preservedCoverage": [
+      "All earlier test text and assertions unchanged. Existing root/Luna twelve P0 contracts and all protected source/history/account/revision/conditional-write controls remain required.",
+      "Actual loadAppAtTime startup + hostStorage.set await, with removed, replaced, newer-host and retained controls. No private source, helper verdict replacement, environment/schema/permission changes.",
+      "C1 full866352a7 showed2297pass/1FAQcopyfail/48emulator-onlyskips and both mandatory installed-native cases passed. Copy repair restores the old exact safety-copy phrase under the existing130word bound; no test weakened. C2 requires fresh coherent gates."
+    ],
+    "redEvidence": {
+      "command": "TZ=UTC Node22 recorder --purpose preimplementation-red -- node --test --test-name-pattern=\"async host acknowledgement requires\" tests.js",
+      "failure": "a5b14182-ceda-46c7-bbc2-880fe2a3826b: removed/replaced/newer-host actual saves returned true despite lost exact proof; retained positive control passed."
+    },
+    "greenEvidence": {
+      "command": "TZ=UTC Node22 recorder --purpose green -- node --test --test-name-pattern=\"async host acknowledgement requires|RISK LOCAL BACKUPS:.*host|RISK legacy completion FAQ|RISK completion source reuse\" tests.js",
+      "result": "06421906-49d2-4d77-8e31-86674add4c90:16/16pass,0skip, including conditionalrollback preserving newerhost, oldRestore hostguards, all priorreuse/nativecontrols and exactFAQ."
+    }
   }
 ]

@@ -13,6 +13,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 ## Task state, eligibility, and scanner controls
 
 - RISK saved-board startup: a large legacy completion board opens and saves responsively while retaining exact facts
+- RISK completion source reuse: async host acknowledgement requires the exact source and preserves a newer foreign write
 - RISK historical board file recovery: conflicting saved ratings require an explicit source-preserving preview choice
 - RISK raw backup file recovery: explicit selection restores only a supported board while preserving damaged and pending evidence
 

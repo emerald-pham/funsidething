@@ -36474,3 +36474,47 @@ test('RISK saved-board startup: a witness codec failure leaves the original boar
  assert.doesNotThrow(()=>assert.equal(app.ctx.decisionSourceIssue(app.ctx.state,null),'unsupported-decision-evidence'),'codec failures stay inside the existing unsupported-source guard');
  assert.equal(app.shim.localStorage.getItem(SYNC_STORE_KEY),raw);assert.equal(app.shim.localStorage.getItem(LOCAL_HEAD_KEY),raw,'the sole exact original is never overwritten by the held codec failure');
 });
+
+test('RISK completion source reuse: async host acknowledgement requires the exact source and preserves a newer foreign write',async t=>{
+ const f=await legacyCompletionSource173(t),source=f.completed,day=new Date(f.at).toISOString().slice(0,10);
+ for(const fault of ['removed','replaced','newer-host','retained'])await t.test(fault,async t=>{
+  const prior={id:'completion-host-source',day,at:f.at,kind:'daily',payload:source};
+  const storage=sharedScannerStorage({[LOCAL_BACKUPS_KEY]:JSON.stringify([prior])});
+  let startupSave,release,hostSet;
+  const app=await loadAppAtTime(f.at+3*3600000,{sharedStorage:storage,hostStorage:{[SYNC_STORE_KEY]:source},beforeStateReady(ctx,shim){
+   const persist=ctx.persist;ctx.persist=(...args)=>{const pending=persist(...args);if(args[0]===true&&!startupSave)startupSave=pending;return pending;};
+   hostSet=shim.window.storage.set.bind(shim.window.storage);
+   shim.window.storage.set=async(key,payload)=>{
+    await hostSet(key,payload);
+    if(key===SYNC_STORE_KEY&&payload!==source&&!release)await new Promise(resolve=>{release=resolve;});
+   };
+  }});t.after(()=>closeLegacyApp173(app));
+  for(let i=0;i<20&&!release;i++)await flush();
+  assert.ok(startupSave,'the actual host startup completion-upgrade save ran');
+  assert.equal(typeof release,'function','the actual host write is awaiting acknowledgement');
+  const attempted=app.shim.window.storage._map.get(SYNC_STORE_KEY);
+  assert.notEqual(attempted,source,'the upgrade reached the asynchronous host consumer');
+  const foreign=JSON.stringify({...JSON.parse(source),opaqueForeignHostWrite:{version:1,retained:true}});
+  if(fault!=='retained'){
+   const rows=JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY));
+   storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(fault==='replaced'?rows.map(row=>row.id===prior.id?{...row,payload:foreign}:row):rows.filter(row=>row.id!==prior.id)));
+  }
+  if(fault==='newer-host')await hostSet(SYNC_STORE_KEY,foreign);
+  release();const saved=await startupSave;
+  if(fault==='retained'){
+   assert.equal(saved,true,'an intact exact source permits the completion upgrade');
+   assert.equal(app.shim.window.storage._map.get(SYNC_STORE_KEY),attempted);
+   assert.equal(vm.runInContext('pendingLegacyCompletionSource',app.ctx),null);
+   assert.ok(app.ctx.state.protectedBackupIds.includes(prior.id));
+   assert.equal(app.ctx.deviceSaveIssue(),null);
+  }else{
+   assert.equal(saved,false,'lost exact source proof cannot acknowledge an upgraded host primary');
+   assert.equal(app.shim.window.storage._map.get(SYNC_STORE_KEY),fault==='newer-host'?foreign:source,
+    'rollback restores only this attempted host value and leaves a newer foreign write exact');
+   assert.equal(vm.runInContext('pendingLegacyCompletionSource',app.ctx),source,'the source upgrade remains pending');
+   assert.equal(app.ctx.deviceSaveIssue()?.stage,'completion-upgrade');
+   assert.equal(app.ctx.deviceSaveIssue()?.code,'recovery-unavailable');
+   assert.equal((app.ctx.state.protectedBackupIds||[]).includes(prior.id),false,'the missing or changed source is not acknowledged as pinned');
+  }
+ });
+});
