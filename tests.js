@@ -802,6 +802,190 @@ test('RISK completion lifecycle Changelog: the mounted release notes describe ol
   'the mounted final Changelog includes the approved concise recovery outcome');
 });
 
+test('RISK completion source reuse: an exact daily source remains protected when a duplicate backup write is refused',async t=>{
+ const f=await legacyCompletionSource173(t),sourceBoard=JSON.parse(f.completed);
+ sourceBoard.opaqueCompletionReuseSource={version:3,marker:['retain','exactly']};
+ const source=JSON.stringify(sourceBoard),day=new Date(f.at).toISOString().slice(0,10);
+ const prior={id:'completion-reuse-exact-daily',day,at:f.at,kind:'daily',payload:source};
+ const storage=sharedScannerStorage({
+  [SYNC_STORE_KEY]:source,[LOCAL_HEAD_KEY]:source,[LOCAL_BACKUPS_KEY]:JSON.stringify([prior]),
+ });
+ const write=storage.setItem;let runtime,startupSave,toastText='',refusedWrites=0,sourceAtStartup=[];
+ storage.setItem=(key,value)=>{
+  if(key===LOCAL_BACKUPS_KEY){
+   const proposed=runtime?.parseBackupIndex(String(value));
+   if(proposed?.some(row=>row?.kind==='before-completion-upgrade'&&row.payload===source)){
+    refusedWrites++;
+    const error=Error('controlled completion-upgrade backup refusal');error.name='QuotaExceededError';throw error;
+   }
+  }
+  return write(key,value);
+ };
+ const app=await loadAppAtTime(f.at+3*3600000,{sharedStorage:storage,beforeStateReady(ctx,shim){
+  runtime=ctx;sourceAtStartup=ctx.readLocalBackups().filter(row=>row.id===prior.id&&row.kind==='daily'&&row.payload===source);const persist=ctx.persist;
+  ctx.persist=(...args)=>{const pending=persist(...args);if(args[0]===true&&!startupSave)startupSave=pending;return pending;};
+  const toast=shim.document.getElementById('toast'),initial=toast.textContent;
+  Object.defineProperty(toast,'textContent',{configurable:true,get:()=>toastText||initial,set:value=>{toastText=String(value);}});
+ }});t.after(()=>closeLegacyApp173(app));
+ assert.equal(sourceAtStartup.length,1,'the actual startup consumer reads one exact stable daily source');
+ assert.ok(startupSave,'the actual startup completion-upgrade save ran');
+ const saved=await startupSave;
+ t.diagnostic(JSON.stringify({saved,refusedWrites,sourceAtStartup:sourceAtStartup.length,issue:app.ctx.deviceSaveIssue(),toast:toastText}));
+ assert.equal(refusedWrites,0,'the app reuses the verified daily source without attempting a duplicate full-board recovery write');
+ assert.equal(saved,true,'the existing exact daily source should satisfy the recovery guard when the duplicate write is refused');
+ const rows=app.ctx.readLocalBackups(),reused=rows.filter(row=>row.id===prior.id&&row.kind==='daily'&&row.payload===source);
+ assert.equal(reused.length,1,'the exact daily source remains readable with its original identity and bytes');
+ assert.ok(app.ctx.state.protectedBackupIds.includes(prior.id),'the reused source is pinned by the saved completion upgrade');
+ assert.equal(rows.filter(row=>row.payload===source).length,1,'completion upgrade does not create a second full-board copy');
+ assert.doesNotMatch(toastText,/device-save:completion-upgrade\/recovery-unavailable/);
+ const savedHead=storage.getItem(SYNC_STORE_KEY),savedBoard=JSON.parse(savedHead),original=JSON.parse(source);
+ assert.equal(storage.getItem(LOCAL_HEAD_KEY),savedHead,'both guarded primary keys acknowledge the same upgraded bytes');
+ assert.equal(savedHead,JSON.stringify(app.ctx.state),'the actual app state matches the persisted primary acknowledgement');
+ assert.deepEqual(savedBoard.opaqueCompletionReuseSource,original.opaqueCompletionReuseSource,'unknown source facts survive the upgrade');
+ for(const task of original.tasks){
+  const current=app.ctx.state.tasks.find(row=>row.id===task.id);
+  assert.ok(current,`source task ${task.id} remains present`);
+  assert.equal(JSON.stringify(Object.fromEntries(Object.keys(task).map(key=>[key,current[key]]))),JSON.stringify(task),
+   `all original facts for ${task.id} remain unchanged`);
+ }
+ const cold=await loadAppAtTime(f.at+10*24*3600000,{sharedStorage:storage});t.after(()=>closeLegacyApp173(cold));
+ assert.ok(cold.ctx.state.protectedBackupIds.includes(prior.id),'cold startup retains the source pin after normal expiry');
+ assert.equal(await cold.ctx.persist(),true,'the actual later save completes after normal automatic rotation');
+ const afterRotation=cold.ctx.readLocalBackups().find(row=>row.id===prior.id);
+ assert.ok(afterRotation,'normal expiry and backup rotation retain the pinned source');
+ assert.equal(afterRotation.payload,source,'rotation preserves the exact old source bytes');
+});
+
+test('RISK completion source reuse: native exact daily source is read back and committed atomically',{timeout:10000},async t=>{
+ const f=await legacyCompletionSource173(t),sourceBoard=JSON.parse(f.completed);
+ sourceBoard.opaqueCompletionReuseSource={version:3,marker:['native','exact']};
+ const source=JSON.stringify(sourceBoard),day=new Date(f.at).toISOString().slice(0,10),
+  prior={id:'completion-reuse-native-daily',day,at:f.at,kind:'daily',payload:source},
+  {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='completion-reuse-native-'+Math.random();
+ const storageV2=loadStorageV2({indexedDB}),sourceFingerprint=await storageV2.hashPayload(JSON.stringify([
+  {key:LOCAL_HEAD_KEY,raw:source},{key:SYNC_STORE_KEY,raw:source},
+ ])),seedStore=storageV2.createDeviceStore({indexedDB,crypto:webcrypto,dbName:deviceDbName});
+ await seedStore.open();
+ const migrated=await seedStore.migrateLegacy({headPayload:source,sourceFingerprint,backups:[prior],opaqueArchives:[]});
+ assert.equal(migrated.ok,true,'the exact old source and daily recovery row are seeded through the real IndexedDB adapter');
+ await seedStore.close();
+ const storage=sharedScannerStorage({[SYNC_STORE_KEY]:source,[LOCAL_HEAD_KEY]:source});
+ let store,startupSave,resolveUpgrade,forcedQuotaFallbacks=0;const duplicateWrites=[],atomicProofCommits=[],upgradeCommitted=new Promise(resolve=>resolveUpgrade=resolve);
+ const app=await loadAppAtTime(f.at+3*3600000,{sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName,beforeStateReady(ctx,shim){
+  const persist=ctx.persist;ctx.persist=(...args)=>{const pending=persist(...args);if(args[0]===true&&!startupSave)startupSave=pending;return pending;};
+  Object.defineProperty(shim.window,'ScannerDeviceStore',{configurable:true,get:()=>store,set(value){
+   store=value;if(!value)return;
+   const putBackup=value.putBackup.bind(value);value.putBackup=async options=>{
+    if(options?.backup?.kind==='before-completion-upgrade')duplicateWrites.push(options.backup);
+    return putBackup(options);
+   };
+   const commitHead=value.commitHead.bind(value);value.commitHead=async options=>{
+    const includesProof=options?.backups?.some(row=>row?.id===prior.id&&row.payload===source);
+    if(includesProof&&forcedQuotaFallbacks===0){forcedQuotaFallbacks++;return {error:true,code:'quota-exhausted'};}
+    const result=await commitHead(options);
+    if(includesProof&&result?.ok)atomicProofCommits.push(options);
+    if(result?.ok&&JSON.parse(options.payload).decisionEvents?.some(row=>row.kind==='completion-boundary'))resolveUpgrade(result);
+    return result;
+   };
+  }});
+ }});t.after(()=>closeLegacyApp173(app));
+ await upgradeCommitted;
+ assert.ok(startupSave,'the actual native startup completion-upgrade persist is tracked');
+ assert.equal(await startupSave,true,'the native startup save acknowledges after its source proof is durable');
+ const startupHead=await store.readHead();
+ assert.ok(startupHead.payload===JSON.stringify(app.ctx.state),'the actual native startup upgrade is acknowledged in the durable head');
+ assert.deepEqual(duplicateWrites,[],'reusing a verified native row does not create another completion-upgrade backup');
+ assert.equal(forcedQuotaFallbacks,1,'the real optional-backup quota fallback was exercised');
+ assert.ok(atomicProofCommits.length>0,'the existing source identity is included in the native head transaction');
+ let rows=await store.listBackups(),reused=rows.filter(row=>row.id===prior.id);
+ assert.equal(reused.length,1,'the native source ID remains unique');assert.equal(reused[0].payload,source,'the native source payload remains byte-exact');
+ assert.ok((app.ctx.state.protectedBackupIds||[]).includes(prior.id),'the acknowledged native head protects the source row');
+ const head=await store.readHead();assert.equal(head.payload,JSON.stringify(app.ctx.state),'the native source proof and upgraded primary head are acknowledged together');
+ assert.equal(JSON.parse(head.payload).opaqueCompletionReuseSource.version,3,'unknown source facts survive native recovery');
+ const cold=await loadAppAtTime(f.at+10*24*3600000,{sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName});t.after(()=>closeLegacyApp173(cold));
+ assert.ok((cold.ctx.state.protectedBackupIds||[]).includes(prior.id),'cold native reopen retains the durable source pin past normal expiry');
+ assert.equal(await cold.ctx.persist(),true,'a later native save and automatic rotation complete');
+ rows=await cold.ctx.window.ScannerDeviceStore.listBackups();reused=rows.filter(row=>row.id===prior.id);
+ assert.equal(reused.length,1,'native expiry and rotation retain the same unique source');assert.equal(reused[0].payload,source,'native rotation preserves the exact source bytes');
+});
+
+test('RISK completion source reuse: latest-only and ambiguous IDs remain held',async t=>{
+ const f=await legacyCompletionSource173(t),sourceBoard=JSON.parse(f.completed);
+ sourceBoard.opaqueCompletionReuseSource={version:3,marker:['retain','exactly']};
+ const source=JSON.stringify(sourceBoard),day=new Date(f.at).toISOString().slice(0,10);
+ const cases=[
+  {name:'latest-only',rows:[{id:'completion-reuse-latest',day,at:f.at,kind:'latest',payload:source}]},
+  {name:'duplicate-id',rows:[
+   {id:'completion-reuse-collision',day,at:f.at,kind:'daily',payload:source},
+   {id:'completion-reuse-collision',day,at:f.at+1,kind:'manual',payload:JSON.stringify({...sourceBoard,opaqueCompletionReuseSource:{version:3,marker:['different']}})},
+  ]},
+  {name:'unreadable-index',unreadable:true,rows:[{id:'completion-reuse-unreadable',day,at:f.at,kind:'daily',payload:source}]},
+ ];
+ for(const scenario of cases)await t.test(scenario.name,async t=>{
+  const backupRaw=JSON.stringify(scenario.rows),storage=sharedScannerStorage({
+   [SYNC_STORE_KEY]:source,[LOCAL_HEAD_KEY]:source,[LOCAL_BACKUPS_KEY]:backupRaw,
+  });
+  const write=storage.setItem,read=storage.getItem;let runtime,startupSave,refusedWrites=0,toastText='',backupRawAtSave=null,backupIndexUnreadable=false;
+  storage.getItem=key=>{
+   if(key===LOCAL_BACKUPS_KEY&&backupIndexUnreadable)throw Error('controlled unreadable recovery index');
+   return read(key);
+  };
+  storage.setItem=(key,value)=>{
+   if(key===LOCAL_BACKUPS_KEY){
+    const proposed=runtime?.parseBackupIndex(String(value));
+    if(proposed?.some(row=>row?.kind==='before-completion-upgrade'&&row.payload===source)){
+     refusedWrites++;const error=Error('controlled completion-upgrade backup refusal');error.name='QuotaExceededError';throw error;
+    }
+   }
+   return write(key,value);
+  };
+  const app=await loadAppAtTime(f.at+3*3600000,{sharedStorage:storage,beforeStateReady(ctx,shim){
+   runtime=ctx;const persist=ctx.persist;
+   ctx.persist=(...args)=>{if(args[0]===true&&!startupSave){backupRawAtSave=read(LOCAL_BACKUPS_KEY);if(scenario.unreadable)backupIndexUnreadable=true;startupSave=persist(...args);return startupSave;}return persist(...args);};
+   const toast=shim.document.getElementById('toast'),initial=toast.textContent;
+   Object.defineProperty(toast,'textContent',{configurable:true,get:()=>toastText||initial,set:value=>{toastText=String(value);}});
+  }});t.after(()=>closeLegacyApp173(app));
+  assert.ok(startupSave);
+  assert.equal(await startupSave,false,'without a uniquely identified readable stable source, the completion upgrade stays held');
+  backupIndexUnreadable=false;
+  if(scenario.unreadable)assert.equal(refusedWrites,0,'the unreadable source index is not treated as a verified recovery copy');
+  else assert.ok(refusedWrites>0,'the source was not silently treated as a successful recovery copy');
+  const issue=app.ctx.deviceSaveIssue();assert.equal(issue?.stage,'completion-upgrade');assert.equal(issue?.code,'recovery-unavailable');
+  assert.match(toastText,/device-save:completion-upgrade\/recovery-unavailable/);
+  assert.equal(storage.getItem(SYNC_STORE_KEY),source);
+  assert.equal(storage.getItem(LOCAL_HEAD_KEY),source);
+  assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),backupRawAtSave,'the ambiguous or volatile row bytes remain unchanged during the guarded save');
+ });
+});
+
+test('RISK completion source reuse: a source removed after lookup cannot authorize the primary save',async t=>{
+ const f=await legacyCompletionSource173(t),sourceBoard=JSON.parse(f.completed);
+ sourceBoard.opaqueCompletionReuseSource={version:3,marker:['retain','exactly']};
+ const source=JSON.stringify(sourceBoard),day=new Date(f.at).toISOString().slice(0,10);
+ const prior={id:'completion-reuse-raced-daily',day,at:f.at,kind:'daily',payload:source},backupRaw=JSON.stringify([prior]);
+ const storage=sharedScannerStorage({
+  [SYNC_STORE_KEY]:source,[LOCAL_HEAD_KEY]:source,[LOCAL_BACKUPS_KEY]:backupRaw,
+ });
+ const write=storage.setItem;let startupSave,removed=false;
+ const app=await loadAppAtTime(f.at+3*3600000,{sharedStorage:storage,beforeStateReady(ctx){
+  const verify=ctx.verifyCompletionBackupReadback;ctx.verifyCompletionBackupReadback=async(...args)=>{
+   const result=await verify(...args);
+   if(result&&args[0]?.id===prior.id&&!removed){removed=true;queueMicrotask(()=>write(LOCAL_BACKUPS_KEY,JSON.stringify([])));}
+   return result;
+  };
+  const persist=ctx.persist;
+  ctx.persist=(...args)=>{const pending=persist(...args);if(args[0]===true&&!startupSave)startupSave=pending;return pending;};
+ }});t.after(()=>closeLegacyApp173(app));
+ assert.ok(startupSave);
+ assert.equal(await startupSave,false,'a source that disappears after async lookup cannot unlock a completion primary write');
+ assert.ok(removed,'the controlled local-storage mutation occurred after the exact row had been looked up');
+ const issue=app.ctx.deviceSaveIssue();assert.equal(issue?.stage,'completion-upgrade');assert.equal(issue?.code,'recovery-unavailable');
+ assert.equal(storage.getItem(SYNC_STORE_KEY),source);
+ assert.equal(storage.getItem(LOCAL_HEAD_KEY),source);
+ assert.deepEqual(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)),[],'the source removal is observed before the guarded primary save');
+ assert.equal((app.ctx.state.protectedBackupIds||[]).includes(prior.id),false,'a disappeared source ID is never pinned without readback');
+});
+
 test('Firestore rules: immutable decision-aware full shell conflicts then safely holds same-account completion-upgrade authority and its local edit',{skip:!process.env.FIRESTORE_EMULATOR_HOST},async t=>{
  const {readReleasedClient}=await import('./scripts/backward-compatibility.mjs'),{initializeTestEnvironment}=await import('@firebase/rules-unit-testing'),F=await import('firebase/firestore');
  const artifacts=readReleasedClient(__dirname,LEGACY_COMPLETION_RELEASE),f=await legacyCompletionSource173(t,LEGACY_COMPLETION_RELEASE,'e@example.com'),env=await initializeTestEnvironment({projectId:'demo-legacy-completion-173',firestore:{rules:fs.readFileSync(path.join(__dirname,'firestore.rules'),'utf8')}}),handles=[],apps=[];

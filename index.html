@@ -2666,7 +2666,94 @@ function deviceAutomaticBackupPlan(payload,preserveBackupId=null){
   ).map(row=>row.id);
   return {backups,removeBackupIds};
 }
+function persistedBackupRecord(row){
+  if(!row||typeof row!=="object")return null;
+  const record=Object.assign({},row);delete record.newRecovery;return record;
+}
+function exactStableCompletionBackup(row,payload){
+  const record=persistedBackupRecord(row);
+  return !!(record&&record.id&&record.payload===payload&&record.kind!=="latest"&&readableBackupRow(record));
+}
+function uniqueBackupIndexRecord(rows,record){
+  if(!Array.isArray(rows))return false;
+  const matches=rows.filter(row=>row?.id===record?.id);
+  return matches.length===1&&backupRowIdentity(matches[0])===backupRowIdentity(record);
+}
+function reusableLocalCompletionBackup(payload){
+  const index=inspectBackupIndex();
+  if(index.raw===null||!Array.isArray(index.rows))return null;
+  const identity=readLocalBackups().filter(row=>exactStableCompletionBackup(row,payload));
+  for(const candidate of identity){
+    const record=persistedBackupRecord(candidate);
+    if(!uniqueBackupIndexRecord(index.rows,record))continue;
+    try{if(localStorage.getItem(LOCAL_BACKUPS_KEY)!==index.raw)return null;}
+    catch(e){return null;}
+    return record;
+  }
+  return null;
+}
+async function reusableDeviceCompletionBackup(payload){
+  let rows;
+  try{rows=await deviceStore.listBackups();}
+  catch(e){return null;}
+  const index=inspectBackupIndex();
+  if(!Array.isArray(index.rows))return null;
+  const candidates=rows.filter(row=>exactStableCompletionBackup(row,payload));
+  for(const candidate of candidates){
+    const record=persistedBackupRecord(candidate);
+    const sameId=rows.filter(row=>row?.id===record.id);
+    const mirrors=(index.rows||[]).filter(row=>row?.id===record.id);
+    if(sameId.length!==1||backupRowIdentity(sameId[0])!==backupRowIdentity(record)||
+       mirrors.length>1||(mirrors.length===1&&backupRowIdentity(mirrors[0])!==backupRowIdentity(record)))continue;
+    try{if(localStorage.getItem(LOCAL_BACKUPS_KEY)!==index.raw)return null;}
+    catch(e){return null;}
+    deviceBackupCache=rows;deviceBackupCacheReadable=true;
+    return record;
+  }
+  return null;
+}
+async function verifyCompletionBackupReadback(row,payload){
+  const record=persistedBackupRecord(row);
+  if(!exactStableCompletionBackup(record,payload))return false;
+  const identity=backupRowIdentity(record);
+  if(identity===null)return false;
+  const index=inspectBackupIndex();
+  if(!Array.isArray(index.rows))return false;
+  if(deviceStorageAuthority&&deviceStore){
+    let rows;
+    try{rows=await deviceStore.listBackups();}
+    catch(e){return false;}
+    const matches=rows.filter(candidate=>candidate?.id===record.id);
+    const mirrors=(index.rows||[]).filter(candidate=>candidate?.id===record.id);
+    if(matches.length!==1||backupRowIdentity(matches[0])!==identity||mirrors.length>1||
+       (mirrors.length===1&&backupRowIdentity(mirrors[0])!==identity))return false;
+    try{if(localStorage.getItem(LOCAL_BACKUPS_KEY)!==index.raw)return false;}
+    catch(e){return false;}
+    deviceBackupCache=rows;deviceBackupCacheReadable=true;
+    return true;
+  }
+  if(index.raw===null||!uniqueBackupIndexRecord(index.rows,record))return false;
+  const visible=readLocalBackups().filter(candidate=>candidate?.id===record.id);
+  if(visible.length!==1||backupRowIdentity(visible[0])!==identity)return false;
+  try{return localStorage.getItem(LOCAL_BACKUPS_KEY)===index.raw;}
+  catch(e){return false;}
+}
+function completionBackupStillInLocalIndex(row,payload){
+  const record=persistedBackupRecord(row);
+  if(!exactStableCompletionBackup(record,payload))return false;
+  const index=inspectBackupIndex();
+  if(index.raw===null||!Array.isArray(index.rows)||!uniqueBackupIndexRecord(index.rows,record))return false;
+  const visible=readLocalBackups().filter(candidate=>candidate?.id===record.id);
+  if(visible.length!==1||backupRowIdentity(visible[0])!==backupRowIdentity(record))return false;
+  try{return localStorage.getItem(LOCAL_BACKUPS_KEY)===index.raw;}
+  catch(e){return false;}
+}
 async function saveDurableBackup(kind,payload,metadata=null){
+  if(kind==="before-completion-upgrade"){
+    const existing=(!deviceStorageAuthority||!deviceStore)
+      ? reusableLocalCompletionBackup(payload) : await reusableDeviceCompletionBackup(payload);
+    if(existing)return existing;
+  }
   if(!deviceStorageAuthority||!deviceStore) return saveLocalBackup(kind,payload,false,0,null,null,metadata) ?
     readLocalBackups().filter(row=>row.kind===kind&&row.payload===payload&&
       (!metadata?.restoreFile||backupRowIdentity(row)===backupRowIdentity({id:row.id,day:row.day,at:row.at,kind,payload,...metadata})))
@@ -3027,11 +3114,22 @@ function deviceQuotaFailure(error){
    a 2-second write loop with no edit behind it. */
 async function persist(backupAlreadySafe=false,preserveBackupId=null,deviceRetry=0){
   if(!storageOK) return reportDeviceSaveFailure("storage","unavailable","Keep this tab open; use Diagnostics download in Settings before closing it.");
+  let completionSourceBackup=null,completionSourcePayload=null,priorCompletionProtection=null,completionProtection=null;
+  const failCompletionRecovery=()=>{
+    if(completionProtection&&JSON.stringify(state?.protectedBackupIds)===JSON.stringify(completionProtection)){
+      if(priorCompletionProtection===null) delete state.protectedBackupIds;
+      else state.protectedBackupIds=priorCompletionProtection;
+    }
+    return reportDeviceSaveFailure("completion-upgrade","recovery-unavailable","The older saved board is retained; its completion upgrade will retry when a recovery copy can be saved.");
+  };
   if(pendingLegacyCompletionSource!==null){
     const source=pendingLegacyCompletionSource,safe=await saveDurableBackup("before-completion-upgrade",source);
-    if(!safe?.id)return reportDeviceSaveFailure("completion-upgrade","recovery-unavailable","The older saved board is retained; its completion upgrade will retry when a recovery copy can be saved.");
-    if(pendingLegacyCompletionSource===source)pendingLegacyCompletionSource=null;
-    state.protectedBackupIds=[...new Set([...(state.protectedBackupIds||[]),safe.id])];
+    if(!safe?.id||!await verifyCompletionBackupReadback(safe,source))
+      return reportDeviceSaveFailure("completion-upgrade","recovery-unavailable","The older saved board is retained; its completion upgrade will retry when a recovery copy can be saved.");
+    completionSourceBackup=persistedBackupRecord(safe);completionSourcePayload=source;
+    priorCompletionProtection=Array.isArray(state.protectedBackupIds)?[...state.protectedBackupIds]:null;
+    completionProtection=[...new Set([...(state.protectedBackupIds||[]),safe.id])];
+    state.protectedBackupIds=completionProtection;
   }
   if(ambiguousLegacyCompletion(state))return reportDeviceSaveFailure("completion-upgrade","ambiguous-legacy-completion","This older board has a saved Start and completion whose order cannot be proved. Its exact source stays protected; keep this tab open while sync waits for compatible recovery.");
   const ancestorRaw=lastPersistedRaw; // capture before any storage await can advance the marker
@@ -3055,14 +3153,18 @@ async function persist(backupAlreadySafe=false,preserveBackupId=null,deviceRetry
         catch(error){if(deviceQuotaFailure(error))return {error:true,code:"quota-exhausted"};throw error;}
       };
       const legacyIndex=backupAlreadySafe?null:inspectBackupIndex();
+      if(completionSourceBackup&&!await verifyCompletionBackupReadback(completionSourceBackup,completionSourcePayload))
+        return failCompletionRecovery();
       const automatic=backupAlreadySafe?{backups:[],removeBackupIds:[]}:deviceAutomaticBackupPlan(payload,preserveBackupId);
+      if(completionSourceBackup)automatic.backups=[...automatic.backups,completionSourceBackup];
       let result=await commit({expectedHash:deviceHeadHash,payload,account:state.syncAccount??null,...automatic});
       if(result?.code==="quota-exhausted"){
         // Daily/latest rows are optional. If adding one reaches the device
         // quota, atomically retire only unprotected automatic references and
         // write the primary board. Manual and replacement proofs remain.
         const removeBackupIds=[...new Set([...automatic.removeBackupIds,...retirableDeviceAutomaticIds(preserveBackupId)])];
-        result=await commit({expectedHash:deviceHeadHash,payload,account:state.syncAccount??null,backups:[],removeBackupIds});
+        result=await commit({expectedHash:deviceHeadHash,payload,account:state.syncAccount??null,
+          backups:completionSourceBackup?[completionSourceBackup]:[],removeBackupIds});
       }
       let committedPayload=payload,observedPayload=payload,mergedState=null;
       if(result?.superseded){
@@ -3096,6 +3198,7 @@ async function persist(backupAlreadySafe=false,preserveBackupId=null,deviceRetry
           mergeUndeletedTasks(next,mine);carryProtectedBackupIds(next,mine);
           const merged=JSON.stringify(next),at=Date.now();
           result=await commit({expectedHash:latest.hash,payload:merged,account:next.syncAccount??null,
+            ...(completionSourceBackup?{backups:[completionSourceBackup]}:{}),
             backup:{id:deviceBackupId("stale-tab-draft"),day:backupDay(at),at,kind:"stale-tab-draft",payload:draft}});
           committedPayload=merged;observedPayload=draft;mergedState=next;
           if(result?.superseded){
@@ -3147,6 +3250,7 @@ async function persist(backupAlreadySafe=false,preserveBackupId=null,deviceRetry
         if(deviceRetry>=3) return reportDeviceSaveFailure("device-store","changed-during-save","The board kept changing while it was being saved; keep this tab open and try again.");
         return persist(backupAlreadySafe,preserveBackupId,deviceRetry+1);
       }
+      if(completionSourcePayload!==null&&pendingLegacyCompletionSource===completionSourcePayload)pendingLegacyCompletionSource=null;
       clearDeviceSaveIssue();if(pendingDeviceCloudBackup)await acknowledgeDeviceCloudBackupSave(result.hash,committedPayload);return true;
     }catch(e){return reportDeviceSaveFailure("device-store","write-failed","The previous durable board remains unchanged; keep this tab open and try again.");}
   }
@@ -3159,6 +3263,8 @@ async function persist(backupAlreadySafe=false,preserveBackupId=null,deviceRetry
     if(expectedStore!==lastPersistedRaw || (expectedHead!==null && expectedHead!==lastPersistedRaw)){
       warnUnsavedBrowserChange(); return false;
     }
+    if(completionSourceBackup&&!completionBackupStillInLocalIndex(completionSourceBackup,completionSourcePayload))
+      return failCompletionRecovery();
     // Cloud adoption has already kept the previous board, while the remote
     // document remains a durable source for the new one. Its merged board
     // must still reach the browser store before adoption is accepted.
@@ -3182,6 +3288,10 @@ async function persist(backupAlreadySafe=false,preserveBackupId=null,deviceRetry
     if(!renewPendingRestoreSafetyRows()){
       return reportDeviceSaveFailure("restore-safety","missing-or-changed","The board that Restore replaced is no longer in its exact safety copy, so the protected board was left unchanged.");
     }
+    if(completionSourceBackup&&!await verifyCompletionBackupReadback(completionSourceBackup,completionSourcePayload))
+      return failCompletionRecovery();
+    if(completionSourceBackup&&!completionBackupStillInLocalIndex(completionSourceBackup,completionSourcePayload))
+      return failCompletionRecovery();
     const checkSafety=pendingRestoreSafetyIds.size ? pendingRestoreSafetyStored : null;
     const captureWriteFailure=error=>{writeFailure=error;quota=backupQuotaError(error);};
     let written=writeBrowserPairIfCurrent(expectedHead,expectedStore,payload,captureWriteFailure,checkSafety);
@@ -3195,6 +3305,7 @@ async function persist(backupAlreadySafe=false,preserveBackupId=null,deviceRetry
     }
     if(written){
       pendingRestoreSafetyIds.clear();
+      if(completionSourcePayload!==null&&pendingLegacyCompletionSource===completionSourcePayload)pendingLegacyCompletionSource=null;
       lastPersistedRaw=payload; persistedChanceSeed = chanceSeed; clearDeviceSaveIssue(); return true;
     }
     if(quota) return reportDeviceSaveFailure("primary-write","quota-exhausted","The protected board copies do not fit in local storage. Keep this tab open and use Diagnostics download in Settings before choosing whether to delete an older backup.");
@@ -3214,6 +3325,8 @@ async function persist(backupAlreadySafe=false,preserveBackupId=null,deviceRetry
   // write must never clear a later Restore's pending marker.
   const write = persistQueue.then(async()=>{
     if(!renewPendingRestoreSafetyRows(restoreProofs)) return false;
+    if(completionSourceBackup&&!completionBackupStillInLocalIndex(completionSourceBackup,completionSourcePayload))
+      return failCompletionRecovery();
     let priorRaw=null;
     if(restoreProofs.size){
       const prior=await window.storage.get(STORE_KEY);
@@ -3238,6 +3351,7 @@ async function persist(backupAlreadySafe=false,preserveBackupId=null,deviceRetry
     if(!await write){ toast("Couldn't save this edit on this device. Keep this tab open and try again.",7000); return false; }
     for(const [id,prior] of restoreProofs)
       if(pendingRestoreSafetyIds.get(id)===prior) pendingRestoreSafetyIds.delete(id);
+    if(completionSourcePayload!==null&&pendingLegacyCompletionSource===completionSourcePayload)pendingLegacyCompletionSource=null;
     lastPersistedRaw=payload; persistedChanceSeed = chanceSeed; clearDeviceSaveIssue(); return true;
   }
   catch(e){ toast("Couldn't save just now — will retry on your next change."); return false; }

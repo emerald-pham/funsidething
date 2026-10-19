@@ -1547,6 +1547,15 @@ Actual populated-editor ordinary Done, an offline Dot that an independent peer c
 - RISK legacy completion FAQ: older saved boards keep completed tasks out and explain safe return
 - RISK legacy completion inherited cancellation: an actual guest Done Undo stays reversed after authorized first sign-in
 
+## Completion-upgrade recovery-copy reuse
+
+- RISK completion source reuse: an exact daily source remains protected when a duplicate backup write is refused
+- RISK completion source reuse: native exact daily source is read back and committed atomically
+- RISK completion source reuse: latest-only and ambiguous IDs remain held
+- RISK completion source reuse: a source removed after lookup cannot authorize the primary save
+
+The startup completion-upgrade guard may reuse an already durable source only after exact payload readback, a unique stable backup identity, and a final unchanged-index check. The fallback case proves the existing daily copy survives the actual completion save, cold reopen, expiry, and rotation; the native case forces an optional-backup quota retry and proves the same source identity stays in the IndexedDB head transaction. Latest-only rows, duplicate IDs, an unreadable backup index, and a source removed during lookup remain held with both primary copies intact.
+
 ## Divergent fallback source preservation (final review repair)
 
 - `RISK legacy completion divergent sources: both literal guarded copies are safe before reconciliation writes`

@@ -13514,5 +13514,34 @@
       "command": "TZ=UTC Node22 recorder focused actual-consumer cohorts and isolated original-source replays",
       "result": "File/raw/paste/rating acceptance and safety72-case cohort390a88f3 passed; rating safety11-caseaba5603f passed. Large source/refined archive/codec cohortd6335824 passed253ms/1182ms/usable unsupported hold. Broad851da0e8 had172/173 passes and only an existing FAQ word-limit failure; separate3cc518ed passed after preserving the original answer and adding separate questions. Actual original raw file7bace332 retains source bytes/facts/history/native/fakecloudACK. Actual cloud-module original replayc174967c eventually retains434tasks/212facts/2327history/exact source/native/cloudACK with no held error; its transient false apply return remains separately traced, not relabeled success at that instant."
     }
+  },
+  {
+    "reason": "Reuse an already durable exact completion source so a redundant duplicate-backup refusal does not keep a recoverable board in completion-upgrade recovery-unavailable, while preserving the fail-closed guard when proof is missing or unstable.",
+    "previousBehavior": "Startup required a new before-completion-upgrade row even when the exact old board already existed as a readable stable daily backup. A refused duplicate write then reported recovery-unavailable and blocked the primary completion upgrade despite the existing source remaining durable.",
+    "intendedBehavior": "Reuse only an exact readable non-latest source whose backup identity is unique and unchanged on final readback. Keep its source proof pending until primary acknowledgement, pin the row through normal expiry and rotation, and include it atomically with native head commits. Latest-only, duplicate-ID, unreadable-index, disappeared, or otherwise unverifiable sources remain held.",
+    "preservedCoverage": [
+      "Existing legacy-completion assertions remain untouched. The fallback startup test uses a synthetic old-completion board with unknown fields, checks actual primary acknowledgements and unchanged task facts, and verifies the same exact source across cold reopen and normal expiry/rotation.",
+      "The real fake-indexeddb adapter test seeds a native daily source with the matching legacy-copy fingerprint, awaits the actual startup completion save, forces an optional-backup quota retry, verifies source identity stays in the same head transaction, then cold reopens and confirms native rotation retains the exact bytes.",
+      "Negative controls prove latest-only rows, duplicate backup IDs, and an unreadable index still report recovery-unavailable without changing guarded primary bytes, and a source removed after lookup cannot authorize the primary save or become pinned."
+    ],
+    "replacementTests": [
+      "RISK completion source reuse: an exact daily source remains protected when a duplicate backup write is refused",
+      "RISK completion source reuse: native exact daily source is read back and committed atomically",
+      "RISK completion source reuse: latest-only and ambiguous IDs remain held",
+      "RISK completion source reuse: a source removed after lookup cannot authorize the primary save"
+    ],
+    "redEvidence": {
+      "command": "Node22 TZ=UTC recorder preimplementation-red: node --test --test-name-pattern='RISK completion source reuse:' tests.js on base 382d062f83c0e745abc74595344b5e74efb1f860 with only the new regression group added; a later focused pre-repair native quota-fallback RED is separately recorded in failure details.",
+      "failure": "Before the index.html change, the actual cold-start consumer found one exact readable daily source, then three refused before-completion-upgrade writes still yielded persist false and device-save:completion-upgrade/recovery-unavailable. The first test failed its expected true acknowledgement against false while the original source bytes remained available. A separate forced-quota native check then failed because the optional-backup retry omitted the reused row from its head transaction; focused RED record: /Users/emeraldpham/.codex/task-artifacts/startup-import-device-save-20261019/completion-backup-reuse/runs/2026-10-19T07-26-57-823Z-5f61f759-049c-4c82-a841-330b46855866.json.",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/startup-import-device-save-20261019/completion-backup-reuse/runs/2026-10-19T07-05-20-844Z-2b26f2be-8fe8-4b4e-bfe0-e738834d8efb.json"
+    },
+    "greenEvidence": {
+      "command": "Node22 TZ=UTC recorder green: node --test --test-name-pattern='RISK completion source reuse:' tests.js.",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/startup-import-device-save-20261019/completion-backup-reuse/runs/2026-10-19T07-27-15-425Z-0e065d0f-4b1c-45e7-8ad5-10ea37e13574.json",
+      "actualGateProof": "All four new RISK registrations and seven top-level/subtest outcomes pass. The fallback refusal is avoided without a duplicate write; native IndexedDB reuses the exact source in the atomic head transaction, including retry after a controlled optional-backup quota refusal; latest-only, ambiguous identity, unreadable-index, and post-lookup deletion controls remain held with source and primary facts preserved."
+    },
+    "baseCommit": "382d062f83c0e745abc74595344b5e74efb1f860",
+    "testChangesSha256": "94408484e5d310b2cb42ef168b96c3c831f6fa1e216a5ef311c42cbb73977032",
+    "comparison": "Protected tests.js diff fingerprint against immutable base 382d062f83c0e745abc74595344b5e74efb1f860. Only four dedicated completion-source-reuse RISK registrations are added; all prior assertions are unchanged."
   }
 ]
