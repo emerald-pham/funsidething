@@ -37778,6 +37778,27 @@ test('RISK resilient sync recovery: automatic rebuilding preserves peer pending 
  });
 });
 
+test('RISK resilient sync recovery: verified empty and explicit ACK transitions release failed rebuild contexts',async t=>{
+ for(const transition of ['verified empty cloud','explicit source ACK'])await t.test(transition,async sub=>{
+  const app=await damagedAcknowledgedApp187(sub),{ctx,shim,backend,originalRoot}=app;
+  app.faults.push=Object.assign(Error('temporary offline rebuild'),{code:'unavailable'});
+  await ctx.cloudPull();await settleRecoveryOperations188(ctx);
+  assert.equal(backend.CS.errorCode,'unavailable','the actual automatic rebuild really failed');delete app.faults.push;
+  if(transition==='verified empty cloud'){
+   backend.docs.delete('users/owner');await ctx.cloudPull();await ctx.sendPush();await syncSettle(40);
+   assert.ok((await backend.CS.pull()).payload,'a positively empty account can receive the current board under ordinary seeding rules');
+  }else{
+   const path='users/owner/generations/'+originalRoot.activeGeneration;backend.docs.set(path,{...backend.docs.get(path),hash:'f'.repeat(64)});await ctx.cloudPull();
+   assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'device'}});
+   assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),true);const selectedRevision=backend.docs.get('users/owner').rev;
+   const input=shim.document.getElementById('addInput');input.id='addInput';input.value='Ordinary work after explicit recovery';shim.document.dispatchEvent({type:'input',target:input});
+   assert.equal(await ctx.onAction('add',{}),true);assert.equal(await ctx.persist(),true);await ctx.sendPush();await syncSettle(30);
+   assert.ok(backend.docs.get('users/owner').rev>selectedRevision,'a confirmed deliberate source choice must allow the next ordinary native Add to sync');
+  }
+  assert.ok((await ctx.window.ScannerDeviceStore.listOpaqueArchives()).some(row=>row.key.startsWith('cloud-generation-recovery:')),'the superseded automatic source receipt stays protected');
+ });
+});
+
 // Uses only the existing native consumer and real storage/backend. The failed
 // selected hash makes this a deliberate source choice, never an exact repair.
 async function divergentCloudSourceApp187(t,options){
