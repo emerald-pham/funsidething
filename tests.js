@@ -1284,7 +1284,7 @@ test('RISK scoped Undo recovery: a true Undo cancels only its compound Dot while
  cold.ctx.window.CloudSync.ready=true;await cold.ctx.cloudPull();assert.deepEqual(Array.from(cold.ctx.state.chain),[referenceId]);
  assert.deepEqual(Array.from(cold.ctx.state.tasks,row=>[row.id,row.mu,row.sigma]),Array.from(cloud.tasks,row=>[row.id,row.mu,row.sigma]));
 });
-test('RISK scoped Undo recovery: Undo of an informed evergreen return survives older source and permits an acknowledged later return',{timeout:15000},async t=>{
+test("RISK scoped Undo recovery: Undo of an informed evergreen return survives older source and permits an acknowledged later return",{timeout:15000},async t=>{
  const {IDBFactory}=await import('fake-indexeddb'),at=Date.parse('2026-10-17T15:00:00Z'),indexedDB=new IDBFactory(),
   deviceDbName=`scoped-undo-return-${Date.now()}-${Math.random()}`,targetId='undo-return-target',referenceId='undo-return-reference',
   peerCandidateId='undo-return-peer-choice',peerFieldId='undo-return-peer-field';
@@ -1293,12 +1293,25 @@ test('RISK scoped Undo recovery: Undo of an informed evergreen return survives o
   chain:[referenceId,targetId],candidateId:targetId,passId:'undo-return-pass',passStartedAt:at-60000,syncRev:4,syncAccount:'e@example.com',syncDirty:false,
   settings:{horizonMin:60,thresholdPct:0,samples:80,cantMin:30,workedHours:8,theme:'system'}});
  const remote=structuredClone(initial);for(const key of ['syncRev','syncAccount','syncDirty'])delete remote[key];
- const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},
+ const h=makeSyncHarness({remote,rev:4,delayMs:100}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},
   local=await loadAppAtTime(at,{seedStorage,indexedDBProvider:indexedDB,deviceDbName,cloudSyncFactory:h.factory}),
   peer=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory}),fixtures=[local,peer];
  const closed=new WeakSet(),closeFixture=async app=>{if(!app||closed.has(app))return;closed.add(app);try{app.ctx.window.CloudSync.user=null;app.ctx.suspendCloudSync?.();vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer);clearTimeout(saveTimer);',app.ctx);}catch{}try{await app.ctx.window.ScannerDeviceStore?.close?.();}catch{}};
- t.after(async()=>{for(const app of fixtures)await closeFixture(app);});
- const nativeSaves=observeQueuedNativeSaves(local.ctx,t);
+ t.after(async()=>{releasePreUndoResponse.resolve();try{await nativeSaves.settle('Undo fixture cleanup');}finally{clearTimeout(responseWatchdog);for(const app of fixtures)await closeFixture(app);}});
+ const nativeSaves=observeQueuedNativeSaves(local.ctx,t),store=local.ctx.window.ScannerDeviceStore,commit=store.commitHead.bind(store),writes=[],
+  preUndoResponse=deferredSyncFixture(),releasePreUndoResponse=deferredSyncFixture(),responseWatchdog=setTimeout(()=>{},15000);
+ let phase='idle',delayedNativeResponse=false,preUndoResponseArmed=false,preUndoResponseReturned=false;
+ store.commitHead=async options=>{const result=await commit(options);
+  // Observe before the native return can fire. Hold its actual successful
+  // device response until the older-source phase, independent of SDK speed.
+  if(result?.ok&&nativeSaves.active()&&preUndoResponseArmed&&!delayedNativeResponse
+   &&JSON.parse(options.payload).decisionEvents.some(event=>event.kind==='comparison'&&event.action==='dot'&&event.taskId===targetId)){
+   delayedNativeResponse=true;preUndoResponse.resolve();await releasePreUndoResponse.promise;await syncSettle(100);preUndoResponseReturned=true;
+  }
+  if(result?.ok&&phase!=='idle'){
+  const board=JSON.parse(options.payload);writes.push({phase,chain:board.chain.slice(),events:board.decisionEvents.map(event=>event.id)});
+ }return result;};
+
  await local.ctx.cloudPull();await peer.ctx.cloudPull();local.ctx.window.CloudSync.ready=false;peer.ctx.window.CloudSync.ready=false;
  setFakeTime(local.ctx,at+100);hydrateUnchangedEditorDraft(local,targetId);local.ctx.onAction('done-task',{dataset:{id:targetId}});await local.ctx.persist();
  const firstCompletion=JSON.parse(JSON.stringify(local.ctx.state.decisionEvents.find(event=>event.kind==='completion'&&event.taskId===targetId)));
@@ -1309,7 +1322,7 @@ test('RISK scoped Undo recovery: Undo of an informed evergreen return survives o
  assert.equal(local.ctx.isEligible(local.ctx.state.tasks.find(row=>row.id===targetId)),true,'the first evergreen rest expires');
  assert.deepEqual(Array.from(local.ctx.state.chain),[referenceId],'expiry alone never restores chain membership');
  setFakeTime(local.ctx,at+2*3600000+10);hydrateUnchangedEditorDraft(local,targetId);local.shim.document.getElementById('etTitle').value='First return edit';
- local.shim.document.getElementById('etDue').value='2026-11-01';local.ctx.onAction('dot-task',{dataset:{id:targetId}});await local.ctx.persist();
+ local.shim.document.getElementById('etDue').value='2026-11-01';preUndoResponseArmed=true;local.ctx.onAction('dot-task',{dataset:{id:targetId}});await local.ctx.persist();
  const firstReturn=JSON.parse(JSON.stringify(local.ctx.state.decisionEvents.find(event=>event.kind==='comparison'&&event.action==='dot'&&event.taskId===targetId)));
  const returnGroup=Array.from(local.ctx.state.decisionEvents).filter(event=>event.actionId===firstReturn.actionId);
  assert.ok(firstReturn?.observedActionIds.includes(firstCompletion.id),'the actual post-rest return observes the original Done');
@@ -1328,24 +1341,22 @@ test('RISK scoped Undo recovery: Undo of an informed evergreen return survives o
  assert.ok(peerChoice,'the peer makes a real independent comparison');
  const expectedBeforeUndo=rated(firstReturn,peerChoice);
  for(const row of local.ctx.state.tasks){assert.equal(row.mu,expectedBeforeUndo[row.id].mu,`${row.id}: both local return and peer Yes are learned before Undo`);assert.equal(row.sigma,expectedBeforeUndo[row.id].sigma);}
- const scan=local.shim.document.getElementById('scan'),store=local.ctx.window.ScannerDeviceStore,commit=store.commitHead.bind(store),paints=[],writes=[];
- let phase='idle',markup=scan.innerHTML,delayedNativeResponse=false;
+ const scan=local.shim.document.getElementById('scan'),paints=[];
+ let markup=scan.innerHTML;
  Object.defineProperty(scan,'innerHTML',{configurable:true,get:()=>markup,set(value){markup=value;if(phase!=='idle'){
   const visible=[...String(value).matchAll(/data-act="reveal" data-id="([^"]+)"/g)].map(match=>match[1]),bench=String(value).match(/data-act="bench-done" data-benchmark="([^"]+)"/);if(bench)visible.push(bench[1]);
   paints.push({phase,chain:Array.from(local.ctx.state.chain),visible});
  }}});
- store.commitHead=async options=>{const result=await commit(options);
-  // A real pre-Undo native producer may finish after the head already matches.
-  // Keep its successful delayed response in the phase that actually awaits it.
-  if(result?.ok&&nativeSaves.active()&&phase==='pre-undo-source'&&!delayedNativeResponse){delayedNativeResponse=true;await syncSettle(100);}
-  if(result?.ok&&phase!=='idle'){
-  const board=JSON.parse(options.payload);writes.push({phase,chain:board.chain.slice(),events:board.decisionEvents.map(event=>event.id)});
- }return result;};
+ await preUndoResponse.promise;
+ assert.equal(preUndoResponseReturned,false,'the actual successful native return response remains held before older-source recovery');
  phase='pre-undo-source';h.writeBehindBack(olderCompletionSource);await local.ctx.cloudPull();await local.ctx.cloudPushNow();await settleSavedViewPublication(local,h,'RISK scoped Undo recovery coherent publication 5');
  assert.deepEqual(Array.from(local.ctx.state.chain),[referenceId,targetId,peerCandidateId],'the older completion-only source cannot erase the informed return or peer pass progress before Undo');
  assert.ok(local.ctx.state.decisionEvents.some(event=>event.id===firstReturn.id));
  const completionBytes=JSON.stringify(local.ctx.state.decisionEvents.find(event=>event.id===firstCompletion.id));
+ assert.equal(preUndoResponseReturned,false,'older-source recovery finishes before releasing the successful native device response');
+ releasePreUndoResponse.resolve();
  const beforeUndoSaves=await nativeSaves.settle('pre-Undo native saves');
+ assert.equal(preUndoResponseReturned,true,'the held native device response actually completes before Undo');
  assert.equal(delayedNativeResponse,true,'the actual queued pre-Undo save exercises delayed successful device response delivery');
  await settleSavedViewPublication(local,h,'pre-Undo native producer and durable acknowledgement');
  phase='undo-action';
