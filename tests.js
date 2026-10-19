@@ -12181,8 +12181,9 @@ test('CLOUD ACCOUNT: a transaction binds its document before auth can switch', (
   assert.match(html,/const rootRef=uid=>F\.doc\(db,"users",uid\)/);
   assert.match(html,/publishGeneration\(uid,id,\{baseRev,updatedAt,hash,expectedHeader,stillCurrent,decisionCapability\}\)/);
   assert.match(html,/if\(stillCurrent&&!stillCurrent\(\)\)return \{cancelled:true\}/,'the manifest transaction rechecks identity after its reads');
-  assert.match(push,/stillCurrent:\(\)=>auth\.currentUser\?\.uid===pushUid&&operation===pushOperation/);
-  assert.match(push,/auth\.currentUser\?\.uid\s*!==\s*pushUid/,'a late result from an earlier account cannot change current cloud status');
+  assert.match(push,/const stillCurrent=\(\)=>auth\.currentUser\?\.uid===pushUid&&operation===pushOperation&&recoveryStillCurrent\(\)/,'the shared named guard retains both captured identity and operation');
+  assert.match(push,/generationStore\.push\(pushUid,[\s\S]*?stillCurrent\}\)/,'the exact captured guard reaches the publication adapter');
+  assert.match(push,/if\(!stillCurrent\(\)\) return \{cancelled:true\}/,'a late result from an earlier account cannot change current cloud status');
 });
 
 async function loadCloudBackend({ serverData={rev:4}, serverExists=true, failures={}, timeoutMs=25, cryptoProvider=webcrypto }={}){
@@ -38067,7 +38068,7 @@ test('RISK cloud source recovery prepared sources: earlier choices are disclosed
 });
 
 test('RISK cloud source recovery publication: a device peer change during the SDK read invalidates consent before cloud mutation',async t=>{
- for(const boundary of ['device head','browser source','Add draft','pending pointer','prepared copy','device hold'])await t.test(boundary,async sub=>{
+ for(const boundary of ['device head','head metadata','browser source','Add draft','pending pointer','prepared copy','device hold'])await t.test(boundary,async sub=>{
  const app=await divergentCloudSourceApp187(sub),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
  await ctx.onAction('review-cloud-source-recovery',{});
  await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'generation:'+originalRoot.previousGeneration}});
@@ -38078,7 +38079,8 @@ test('RISK cloud source recovery publication: a device peer change during the SD
   if(boundary==='device head'){
    const head=await store.readHead(),peer=JSON.parse(head.payload);peer.tasks.push(syncTask('peer-after-consent','New peer device work'));
    assert.equal((await store.commitHead({expectedHash:head.hash,payload:JSON.stringify(peer),account:'e@example.com'})).ok,true);
-  }else if(boundary==='browser source')app.shim.localStorage.setItem(LOCAL_HEAD_KEY,app.shim.localStorage.getItem(LOCAL_HEAD_KEY)+' ');
+  }else if(boundary==='head metadata'){const head=await store.readHead();assert.equal(await store.setLegacyFingerprint(head.hash,'changed-after-consent'),true);}
+  else if(boundary==='browser source')app.shim.localStorage.setItem(LOCAL_HEAD_KEY,app.shim.localStorage.getItem(LOCAL_HEAD_KEY)+' ');
   else if(boundary==='Add draft'){
    const input=app.shim.document.getElementById('addInput');input.id='addInput';input.value='Draft entered after source consent';app.shim.document.dispatchEvent({type:'input',target:input});
   }else if(boundary==='pending pointer'){
