@@ -1,5 +1,29 @@
 [
   {
+    "testChangesSha256": "ba355cb09ffcd381c6c34155df7449d0f813affb359a990003bea67f039045aa",
+    "reason": "Repair independent-review findings at actual startup, native selected-source, native authentication and device raw-row consumer boundaries; retain all prior tests and use external SDK counters for authentication.",
+    "previousBehavior": "Hydration could filter malformed History/context/deletion entries before startup or selected-file acceptance; recovery guards blocked native sign-in; retained null or broken auxiliary rows prevented complete cloud recovery and immutable receipt writes could replace null/undefined at a physical key.",
+    "intendedBehavior": "Reject unsupported partial collections before normalization while retaining released legacy defaults and migrations; preserve exact source bytes and Paste drafts; allow configured native sign-in/account correction while all adoption/publication holds remain; read only valid backup receipts and omit malformed auxiliary rows only after durable exact raw protection; reject every same-key immutable collision without mutation.",
+    "replacementTests": [
+      "RISK unreadable device recovery review: partial saved collections cannot lose rows during startup or legacy migration",
+      "RISK unreadable device recovery review: native File and Paste retain unsupported partial selected collections without a restore preview",
+      "RISK unreadable device recovery review: the native header reaches SDK sign-in and Settings account correction while sources stay held",
+      "RISK unreadable device recovery review: preserved partial raw rows permit native cloud choice ACK and cold reopen",
+      "RISK unreadable device recovery review: receipt collisions never overwrite a raw unknown row at the same physical key"
+    ],
+    "preservedCoverage": [
+      "All preexisting assertions remain unchanged, including startup/migration, source preservation, File/Paste, SDK account races, cloud choice ACK, cold reopen and physical-key receipts. Only the external SDK fixture gains a sign-out effect counter; actual app/storage/auth verdicts are not mocked.",
+      "Actual startup RED1a3ee30b failed all12 subcases before the partial-collection guard; GREENba58213d passed13/13. Actual native File/Paste RED88029b36 failed16 subcases before its guard; GREEN038a6851 passed17/17. Direct hydrateState migration/default normalization remains unchanged.",
+      "Actual native SDK popup REDf2128372 showed0 rather than1 popup in unreadable startup and locally restored states plus unreachable account correction; GREEN699b5a65 passed4/4. The hold, raw graph, accepted board and provider writes stay unchanged through authentication.",
+      "Actual raw-store startup→native Paste→local edit→native cloud choice→ACK→cold reopen RED0b10b807 failed Apply, then GREENf90e3df4 passed. Further physical-key RED6638d4a8 and RED17508fff proved opaque/putBackup/commitHead null collisions; final targeted review cohort22593624 passed39/39. Unknown/null/orphan/pending rows remain exact, while unprotected new malformed rows still reject interpreted reading.",
+      "Broader related cohortfccf1888 passed186/187 at857+device repairs; its sole failure is the existing backend inline-stillCurrent source-shape assertion, already obsolete in base857 and still present at parentdd78. Root explicitly owns its named-callback assertion update; device worker preserves the assertion unchanged. No full suite, browser/native rendered check, provider writes, push, PR, CI or release claim."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <device-worktree> --evidence-dir <usable-recovery>/device-worker/review-repairs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern='RISK unreadable device recovery review:' tests.js",
+      "failure": "Contemporaneous individual records: startup1a3ee30b persistedtrue despite partial History/context/deletion/task-context rows; File/Paste88029b36 previewedtrue despite unsupported selected records; nativeauthf2128372 popup0vs1 and missing account-correction action; actual partialraw native cloud Apply0b10b807 returnedfalse; immutable opaque/putBackup6638d4a8 and commitHead17508fff replaced unknown null rows. The record command above describes the final group; each actual discriminating command and working-tree fingerprint is retained in its individual recorder JSON, rather than claiming the final combined group ran before all repairs."
+    }
+  },
+  {
     "testChangesSha256": "3ca35350cbed99373153c8d6349a186b263b927ea5466da90b08d6f343d11cb3",
     "reason": "Reconcile the final exact integrated origin/main test diff while preserving every original feature assertion. Final owner review closes Settings draft loss and stale earlier-prepared-source consent through actual native recovery consumers.",
     "previousBehavior": "Complete cloud recovery lacked an actionable native path. After the main slice, entering source review from Settings could discard an unsaved draft, and an earlier prepared choice was neither concretely shown nor required exact in the last protection checks before publication.",

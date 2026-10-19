@@ -62,7 +62,7 @@
     transaction.onabort=()=>reject(transaction.error||new Error("IndexedDB transaction aborted"));
   });
 
-  function createDeviceStore({indexedDB=root.indexedDB,crypto=root.crypto,dbName="chain-scanner-v2",openTimeoutMs=5000}={}){
+  function createDeviceStore({indexedDB=root.indexedDB,crypto=root.crypto,dbName="chain-scanner-v2",openTimeoutMs=5000,encodeRecoveryValue=null}={}){
     if(!indexedDB) throw new Error("IndexedDB is unavailable");
     if(!crypto?.subtle) throw new Error("Web Crypto is unavailable");
     if(!Number.isFinite(openTimeoutMs)||openTimeoutMs<1) throw new Error("IndexedDB open timeout is invalid");
@@ -151,16 +151,42 @@
       }catch(error){try{tx.abort();}catch(e){}try{await done;}catch(e){}throw error;}
     }
 
+    function protectedRawRowReader(keys,values){
+      // Interpreted lists may omit an unreadable auxiliary row only when an
+      // exact lossless copy already exists durably. The original row stays
+      // untouched; without the app's lossless encoder these readers stay strict.
+      let originals=null;
+      return (name,key,value)=>{
+        if(typeof encodeRecoveryValue!=="function")return false;
+        try{
+          if(originals===null)originals=values.flatMap((row,index)=>{
+            if(typeof keys[index]!=="string"||!keys[index].startsWith("device-recovery-original:")||row?.key!==keys[index]||typeof row.raw!=="string")return [];
+            try{const source=JSON.parse(row.raw);return source?.format==="chain-scanner.device-recovery-source"&&source.formatVersion===1&&source.indexedDB?[source.indexedDB]:[];}catch{return [];}
+          });
+          const encodedKey=JSON.stringify(encodeRecoveryValue(key,"recovery "+name+" key")),encodedValue=JSON.stringify(encodeRecoveryValue(value,"recovery "+name+" value"));
+          return originals.some(source=>Array.isArray(source[name])&&source[name].some(row=>
+            JSON.stringify(row?.key)===encodedKey&&JSON.stringify(row?.value)===encodedValue));
+        }catch{return false;}
+      };
+    }
     async function listBackups(){
       ensureOpen();
-      const tx=db.transaction(["backups","snapshots"],"readonly"),backupStore=tx.objectStore("backups"),snapshotStore=tx.objectStore("snapshots");
+      const tx=db.transaction(["backups","snapshots","opaque"],"readonly"),backupStore=tx.objectStore("backups"),snapshotStore=tx.objectStore("snapshots"),opaqueStore=tx.objectStore("opaque");
       const done=transactionDone(tx);
-      const [rows,snapshots]=await Promise.all([requestResult(backupStore.getAll()),requestResult(snapshotStore.getAll())]),result=[];
+      const [rows,keys,snapshots,snapshotKeys,opaque,opaqueKeys]=await Promise.all([requestResult(backupStore.getAll()),requestResult(backupStore.getAllKeys()),
+        requestResult(snapshotStore.getAll()),requestResult(snapshotStore.getAllKeys()),requestResult(opaqueStore.getAll()),requestResult(opaqueStore.getAllKeys())]),result=[];
       await done;
-      for(const row of rows){
-        const snapshot=snapshots.find(candidate=>candidate.hash===row.payloadHash);
-        if(!snapshot||typeof snapshot.payload!=="string"||await sha(snapshot.payload)!==row.payloadHash)
+      const protectedRaw=protectedRawRowReader(opaqueKeys,opaque);
+      for(const [index,row]of rows.entries()){
+        if(!row||typeof row!=="object"||Array.isArray(row)||typeof row.id!=="string"||row.id!==keys[index]||typeof row.payloadHash!=="string"){
+          if(protectedRaw("backups",keys[index],row))continue;
+          throw new Error("Durable recovery row is corrupt or unprotected");
+        }
+        const at=snapshots.findIndex(candidate=>candidate?.hash===row.payloadHash),snapshot=snapshots[at];
+        if(!snapshot||typeof snapshot.payload!=="string"||await sha(snapshot.payload)!==row.payloadHash){
+          if(protectedRaw("backups",keys[index],row)&&(at<0||protectedRaw("snapshots",snapshotKeys[at],snapshot)))continue;
           throw new Error("Durable recovery snapshot is corrupt");
+        }
         const {payloadHash,...visible}=row;result.push({...visible,payload:snapshot.payload});
       }
       return result.sort((a,b)=>(b.at||0)-(a.at||0)||String(a.id).localeCompare(String(b.id)));
@@ -168,9 +194,15 @@
 
     async function listOpaqueArchives(){
       ensureOpen();
-      const tx=db.transaction("opaque","readonly"),done=transactionDone(tx),rows=await requestResult(tx.objectStore("opaque").getAll());
+      const tx=db.transaction("opaque","readonly"),done=transactionDone(tx),store=tx.objectStore("opaque");
+      const [rows,keys]=await Promise.all([requestResult(store.getAll()),requestResult(store.getAllKeys())]);
       await done;
-      const visible=rows.sort((a,b)=>(a.order||0)-(b.order||0)).map(({order,...row})=>row);
+      const protectedRaw=protectedRawRowReader(keys,rows),readable=rows.filter((row,index)=>{
+        if(row&&Object.prototype.toString.call(row)==="[object Object]")return true;
+        if(protectedRaw("opaque",keys[index],row))return false;
+        throw new Error("Durable opaque recovery row is corrupt or unprotected");
+      });
+      const visible=readable.sort((a,b)=>(a.order||0)-(b.order||0)).map(({order,...row})=>row);
       return typeof root.structuredClone==="function" ? root.structuredClone(visible) : visible;
     }
 
@@ -179,11 +211,11 @@
       if(typeof expectedHash!=="string"||typeof key!=="string"||!key||typeof raw!=="string")return false;
       const tx=db.transaction(["meta","opaque"],"readwrite"),done=transactionDone(tx);
       const head=await requestResult(tx.objectStore("meta").get("head"));
-      const store=tx.objectStore("opaque"),existing=await requestResult(store.get(key));
+      const store=tx.objectStore("opaque"),[existingKey,existing]=await Promise.all([requestResult(store.getKey(key)),requestResult(store.get(key))]);
       // A peer edit or different evidence at this identity invalidates the
       // capture. Recovery never replaces an earlier protected original.
-      if(head?.hash!==expectedHash||existing&&existing.raw!==raw){tx.abort();try{await done;}catch{}return false;}
-      if(!existing)store.put({key,raw,order:Date.now()},key);
+      if(head?.hash!==expectedHash||existingKey!==undefined&&(existing?.key!==key||existing?.raw!==raw)){tx.abort();try{await done;}catch{}return false;}
+      if(existingKey===undefined)store.put({key,raw,order:Date.now()},key);
       await done;
       return (await listOpaqueArchives()).some(row=>row.key===key&&row.raw===raw);
     }
@@ -212,11 +244,11 @@
         if(encodeSource(source)!==expectedSource||guard()!==true){tx.abort();try{await done;}catch{}return {conflict:true};}
         const opaque=tx.objectStore("opaque");
         for(const row of archives){
-          const existing=await requestResult(opaque.get(row.key));
-          if(existing!==undefined&&(!existing||existing.key!==row.key||existing.raw!==row.raw)){
+          const [existingKey,existing]=await Promise.all([requestResult(opaque.getKey(row.key)),requestResult(opaque.get(row.key))]);
+          if(existingKey!==undefined&&(!existing||existing.key!==row.key||existing.raw!==row.raw)){
             tx.abort();try{await done;}catch{}return {error:true,code:"recovery-evidence-collision"};
           }
-          if(existing===undefined)opaque.put({key:row.key,raw:row.raw,order:Date.now()},row.key);
+          if(existingKey===undefined)opaque.put({key:row.key,raw:row.raw,order:Date.now()},row.key);
         }
         if(guard()!==true){tx.abort();try{await done;}catch{}return {conflict:true};}
         if(payload!==undefined){
@@ -292,16 +324,17 @@
         ids.add(candidate.id);preparedBackups.push({...candidate,payloadHash:await sha(candidate.payload)});
       }
       const tx=db.transaction(["meta","snapshots","backups"],"readwrite"),metaStore=tx.objectStore("meta"),snapshotStore=tx.objectStore("snapshots"),backupStore=tx.objectStore("backups");
-      const [current,backupRows,snapshotKeys,recoveryHold]=await Promise.all([
+      const [current,backupRows,snapshotKeys,recoveryHold,backupKeys]=await Promise.all([
         requestResult(metaStore.get("head")),requestResult(backupStore.getAll()),requestResult(snapshotStore.getAllKeys()),requestResult(metaStore.get("recoveryCloudHold")),
+        requestResult(backupStore.getAllKeys()),
       ]);
       if((current?.hash??null)!==(expectedHash??null)){
         tx.abort();try{await transactionDone(tx);}catch(e){}
         return {conflict:true,hash:current?.hash??null};
       }
       for(const prepared of preparedBackups){
-        const existing=backupRows.find(row=>row?.id===prepared.id);
-        if(existing&&existing.payloadHash!==prepared.payloadHash){
+        const at=backupKeys.indexOf(prepared.id),existing=backupRows[at];
+        if(at>=0&&(!existing||existing.id!==prepared.id||existing.payloadHash!==prepared.payloadHash)){
           tx.abort();try{await transactionDone(tx);}catch(e){}
           return {error:true,code:"backup-id-collision"};
         }
@@ -348,17 +381,17 @@
       const payloadHash=await sha(backup.payload);
       const tx=db.transaction(["meta","snapshots","backups"],"readwrite"),done=transactionDone(tx);
       const metaStore=tx.objectStore("meta"),snapshotStore=tx.objectStore("snapshots"),backupStore=tx.objectStore("backups");
-      const [current,existing]=await Promise.all([requestResult(metaStore.get("head")),requestResult(backupStore.get(backup.id))]);
+      const [current,existing,existingKey]=await Promise.all([requestResult(metaStore.get("head")),requestResult(backupStore.get(backup.id)),requestResult(backupStore.getKey(backup.id))]);
       if((current?.hash??null)!==(expectedHash??null)){
         tx.abort();try{await done;}catch(e){}
         return {conflict:true,hash:current?.hash??null};
       }
-      if(existing&&existing.payloadHash!==payloadHash){
+      if(existingKey!==undefined&&(!existing||existing.id!==backup.id||existing.payloadHash!==payloadHash)){
         tx.abort();try{await done;}catch(e){}
         return {error:true,code:"backup-id-collision"};
       }
       snapshotStore.put({hash:payloadHash,payload:backup.payload},payloadHash);
-      if(!existing){const {payload,...saved}=backup;backupStore.put({...saved,payloadHash},saved.id);}
+      if(existingKey===undefined){const {payload,...saved}=backup;backupStore.put({...saved,payloadHash},saved.id);}
       await done;
       const verified=(await listBackups()).find(row=>row.id===backup.id);
       if(!verified||verified.payload!==backup.payload) throw new Error("Device recovery verification failed");

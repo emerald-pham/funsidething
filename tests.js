@@ -318,6 +318,126 @@ test('RISK unreadable device recovery: repeated cancelled previews reuse exact o
  assert.equal(await ctx.confirmFileRestore(),true);assert.equal(ctx.state.tasks[0].id,'repeat-selected');
 });
 
+function partialSavedBoard187(collection){
+ const board=syncState({tasks:[syncTask('partial-kept-task','Supported task stays in exact original')],seenQuickStart:true});
+ if(collection==='History')board.workLog=[{id:'readable',title:'Readable History',at:1},{id:'opaque-history',title:'Unknown History',at:'future-time',opaque:['keep',17]}];
+ if(collection==='contexts')board.contexts=[{id:'readable-context',name:'Readable context',active:true},{id:'opaque-context',name:{future:'context'},opaque:['keep',19]}];
+ if(collection==='deletions')board.deletionLog=[{id:'readable-delete',taskId:'older-task',kind:'task',at:1},{id:'opaque-delete',taskId:'future-task',kind:'future-kind',at:2,opaque:['keep',23]}];
+ if(collection==='task contexts')board.tasks[0].ctx=['unavailable-context',{future:'context-ref',opaque:['keep',29]}];
+ return board;
+}
+test('RISK unreadable device recovery review: partial saved collections cannot lose rows during startup or legacy migration',async t=>{
+ for(const backend of ['durable head','legacy migration','browser fallback'])for(const collection of ['History','contexts','deletions','task contexts'])await t.test(backend+' '+collection,async t=>{
+  const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='partial-collections-'+Math.random(),raw=JSON.stringify(partialSavedBoard187(collection));
+  const store=loadStorageV2({indexedDB}).createDeviceStore({indexedDB,crypto:webcrypto,dbName:deviceDbName});await store.open();t.after(()=>store.close());
+  if(backend==='durable head')assert.equal((await store.commitHead({expectedHash:null,payload:raw})).ok,true);
+  const before=await store.readRawExportSnapshot(),storage=sharedScannerStorage(backend==='durable head'?{'fvp:chain-scanner:device-store-v2':'1'}:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw});
+  const app=await loadApp({sharedStorage:storage,...(backend==='browser fallback'?{}:{indexedDBProvider:indexedDB,deviceDbName})}),{ctx,shim}=app;t.after(()=>closeLegacyApp173(app));
+  assert.equal(await ctx.persist(),false,'unsupported '+collection+' rows must be retained before normalization can authorize a lossy save');
+  assert.equal(vm.runInContext('liveBoardAccepted',ctx),false);assert.match(shim.document.getElementById('scan').innerHTML,/saved.*source.*recovery|recover.*saved.*source/i);
+  assert.deepEqual(await store.readRawExportSnapshot(),before,'no authority, migration, normalization or incidental save may change the original raw graph');
+  if(backend!=='durable head'){assert.equal(storage.getItem(SYNC_STORE_KEY),raw);assert.equal(storage.getItem(LOCAL_HEAD_KEY),raw);}
+ });
+});
+
+test('RISK unreadable device recovery review: native File and Paste retain unsupported partial selected collections without a restore preview',async t=>{
+ for(const prior of ['accepted board','unaccepted source'])for(const route of ['File','Paste'])for(const collection of ['History','contexts','deletions','task contexts'])await t.test(prior+' '+route+' '+collection,async t=>{
+  const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='partial-native-source-'+Math.random();
+  const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName,...(prior==='unaccepted source'?{seedStorage:{[SYNC_STORE_KEY]:'{unreadable original'}}:{})}),{ctx,shim}=app;t.after(()=>closeLegacyApp173(app));
+  if(prior==='accepted board')assert.equal(await ctx.persist(),true);
+  const store=ctx.window.ScannerDeviceStore,before=await store.readHead(),selected=JSON.stringify(partialSavedBoard187(collection)),bytes=new TextEncoder().encode(selected);
+  ctx.openSettings();let result;
+  if(route==='Paste'){
+   ctx.onAction('open-paste-recovery',{});const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=selected;shim.document.dispatchEvent({type:'input',target:box});
+   result=await ctx.onAction('preview-pasted-recovery',{});
+   assert.equal(box.value,selected,'rejected partial source keeps the exact native pasted draft');
+  }else{
+   const input=shim.document.getElementById('restoreBackupFile');input.id='restoreBackupFile';input.files=[{name:'partial-'+collection+'.json',type:'application/json',arrayBuffer:async()=>bytes.buffer}];
+   result=await ctx.handleRestoreBackupFileChange(input);
+  }
+  assert.equal(result,false,'partial selected '+collection+' data cannot be normalized into a falsely complete supported restore');
+  assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/<h2>Preview backup file<\/h2>/);
+  assert.deepEqual(await store.readHead(),before,'the prior board/head authority stays unchanged');
+  const protectedFile=prior==='unaccepted source'?(await store.listOpaqueArchives()).some(row=>{try{return JSON.parse(row.raw).bytesBase64===Buffer.from(selected).toString('base64');}catch{return false;}})
+   :(await store.listBackups()).some(row=>row.kind==='restore-file-source'&&row.restoreFile?.bytesBase64===Buffer.from(selected).toString('base64'));
+  assert.equal(protectedFile,true,'the exact partial selected source remains durable recovery evidence');
+ });
+});
+
+test('RISK unreadable device recovery review: the native header reaches SDK sign-in and Settings account correction while sources stay held',async t=>{
+ for(const mode of ['unaccepted startup','locally restored','wrong account'])await t.test(mode,async t=>{
+  const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='recovery-native-auth-'+Math.random(),original='{protected unreadable original';
+  const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName,seedStorage:{[SYNC_STORE_KEY]:original,[LOCAL_HEAD_KEY]:original}}),{ctx,shim}=app;t.after(()=>closeLegacyApp173(app));
+  if(mode!=='unaccepted startup'){
+   ctx.onAction('open-paste-recovery',{});const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=JSON.stringify(syncState({tasks:[syncTask('native-auth-source','Chosen supported local source')]}));shim.document.dispatchEvent({type:'input',target:box});
+   assert.equal(await ctx.onAction('preview-pasted-recovery',{}),true);assert.equal(await ctx.onAction('confirm-file-restore',{}),true);
+  }
+  const store=ctx.window.ScannerDeviceStore,before=await store.readRawExportSnapshot(),board=JSON.stringify(ctx.state),backend=await loadCloudBackendV2({runtimeWindow:ctx.window,failures:{authPending:true},timeoutMs:5000});t.after(()=>backend.CS.suspend());
+  backend.emitAuth(null);ctx.closeModal();
+  if(mode==='wrong account'){
+   backend.emitAuth({uid:'wrong-account',email:'wrong@example.test'});ctx.openSettings();
+   assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="sync-signout"/,'a signed-in recovery pane must expose account correction');
+   ctx.onAction('sync-signout',{});await flush();assert.equal(backend.authCalls.filter(value=>value==='signOut').length,1,'the native correction action reaches actual external SDK sign-out');
+   backend.emitAuth(null);ctx.onAction('sync',{});await flush();assert.equal(backend.popupProviders.length,1,'account correction leaves the actual account-chooser sign-in reachable');
+  }else{
+   ctx.onAction('sync',{});await flush();assert.equal(backend.popupProviders.length,1,'the actual native header must reach the external SDK popup while recovery is held');
+   assert.deepEqual(JSON.parse(JSON.stringify(backend.popupProviders[0].customParameters)),{prompt:'select_account'});
+   backend.emitAuth({uid:'actual-native-signin',email:'owner@example.test'});
+   await ctx.cloudPull();await ctx.sendPush();
+  }
+  assert.equal(JSON.stringify(ctx.state),board,'auth alone cannot choose or replace the protected device source');assert.equal(backend.writes.length,0,'auth cannot release the save/publication hold');
+  assert.deepEqual(await store.readRawExportSnapshot(),before,'the native auth path preserves original sources and hold exactly');
+  ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/How do I sign in during recovery\?/);assert.match(shim.document.getElementById('modalRoot').innerHTML,/Authentication alone never chooses a board/);
+  assert.equal(shim.localStorage.getItem(SYNC_STORE_KEY),original);assert.equal(shim.localStorage.getItem(LOCAL_HEAD_KEY),original);
+ });
+});
+
+test('RISK unreadable device recovery review: preserved partial raw rows permit native cloud choice ACK and cold reopen',async t=>{
+ const cloud=await divergentCloudSourceApp187(t),{IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='partial-raw-cloud-choice-'+Math.random();
+ const inspector=loadStorageV2({indexedDB}).createDeviceStore({indexedDB,crypto:webcrypto,dbName:deviceDbName});await inspector.open();t.after(()=>inspector.close());
+ await editRawDevice187(indexedDB,deviceDbName,tx=>{
+  tx.objectStore('backups').put(null,'unknown-null-backup');tx.objectStore('backups').put({payloadHash:'missing-raw-blob',futureBackup:['retain',7]},'unknown-broken-backup');
+  tx.objectStore('opaque').put(null,'unknown-null-opaque');tx.objectStore('snapshots').put({futureSnapshot:['retain',11]},'unknown-orphan-snapshot');
+  tx.objectStore('meta').put({futurePending:['retain',13]},'pending:unknown-original');
+ });
+ const original=await inspector.readRawExportSnapshot(),app=await loadAppAtTime(1792323000000,{indexedDBProvider:indexedDB,deviceDbName,seedStorage:{[SYNC_STORE_KEY]:'{broken original'}}),{ctx,shim}=app;t.after(()=>closeLegacyApp173(app));
+ const backend=await loadCloudBackendV2({runtimeWindow:ctx.window,failures:{authPending:true},timeoutMs:5000});t.after(()=>backend.CS.suspend());for(const [key,value]of cloud.backend.docs)backend.docs.set(key,value);backend.emitAuth({uid:'owner',email:'e@example.com'});
+ const selected=syncState({tasks:[syncTask('partial-recovered','Supported deliberate source')],seenQuickStart:true,syncAccount:'e@example.com',syncDirty:true});
+ ctx.onAction('open-paste-recovery',{});const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=JSON.stringify(selected);shim.document.dispatchEvent({type:'input',target:box});
+ assert.equal(await ctx.onAction('preview-pasted-recovery',{}),true);assert.equal(await ctx.onAction('confirm-file-restore',{}),true);
+ shim.document.getElementById('addInput').value='Local work before cloud recovery';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);assert.equal(await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'device'}}),true);
+ assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),true,'already protected malformed auxiliary rows cannot permanently block the actual complete-source publication/ACK chain');
+ const result=await settleRecovery188({...app,backend}),remote=JSON.parse(result.remote.payload);assert.ok(remote.tasks.some(row=>row.title==='Local work before cloud recovery'));
+ assert.equal(ctx.state.syncDirty,false);assert.equal(await ctx.window.ScannerDeviceStore.getRecoveryCloudHold(),null);
+ const after=await inspector.readRawExportSnapshot();
+ for(const name of ['backups','opaque','snapshots','meta'])for(let i=0;i<original.stores[name].keys.length;i++){
+  const key=original.stores[name].keys[i],index=after.stores[name].keys.indexOf(key);assert.ok(index>=0,'original raw '+name+' key stays present');assert.deepEqual(after.stores[name].values[index],original.stores[name].values[i]);
+ }
+ const lists=await ctx.window.ScannerDeviceStore.listBackups();assert.ok(lists.some(row=>row.kind==='cloud-source-recovery-device'),'only valid supported backup receipts are interpreted');
+ assert.ok((await ctx.window.ScannerDeviceStore.listOpaqueArchives()).some(row=>{try{return JSON.parse(row.raw).format==='chain-scanner.device-recovery-source';}catch{return false;}}),'the exact original raw archive remains durable after cloud acknowledgement');
+ const cold=await loadAppAtTime(1792323000001,{indexedDBProvider:indexedDB,deviceDbName,sharedStorage:shim.localStorage});t.after(()=>closeLegacyApp173(cold));
+ assert.equal(cold.ctx.cloudPayload(),result.remote.payload,'the actual acknowledged complete source survives cold reopen');assert.equal(cold.ctx.state.syncDirty,false);
+ await editRawDevice187(indexedDB,deviceDbName,tx=>tx.objectStore('backups').put(null,'new-unprotected-null-backup'));
+ await assert.rejects(()=>ctx.window.ScannerDeviceStore.listBackups(),/corrupt|unsupported|unprotected/i,'a new row without durable exact raw protection cannot silently disappear from an interpreted read');
+});
+
+test('RISK unreadable device recovery review: receipt collisions never overwrite a raw unknown row at the same physical key',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='raw-unknown-key-collision-'+Math.random(),app=await loadApp({indexedDBProvider:indexedDB,deviceDbName}),{ctx}=app;t.after(()=>closeLegacyApp173(app));assert.equal(await ctx.persist(),true);
+ const store=ctx.window.ScannerDeviceStore,head=await store.readHead();
+ for(const name of ['opaque','backups','head receipt'])await t.test(name,async()=>{
+  for(const value of [null,undefined,false,{future:'raw evidence'}]){
+   await editRawDevice187(indexedDB,deviceDbName,tx=>tx.objectStore(name==='opaque'?'opaque':'backups').put(value,'reserved-raw-key'));
+   const before=await store.readRawExportSnapshot();try{
+    if(name==='opaque')await store.protectRecoverySource({expectedHash:head.hash,key:'reserved-raw-key',raw:'replacement receipt'});
+    else if(name==='backups')await store.putBackup({expectedHash:head.hash,backup:{id:'reserved-raw-key',payload:head.payload,kind:'manual',day:'2026-10-19',at:1}});
+    else await store.commitHead({expectedHash:head.hash,payload:head.payload,backups:[{id:'reserved-raw-key',payload:head.payload,kind:'manual',day:'2026-10-19',at:1}]});
+   }catch{}
+   assert.deepEqual(await store.readRawExportSnapshot(),before,'receipt protection must never replace an existing unknown raw value, including undefined');
+  }
+ });
+});
+
 async function damagedAcknowledgedApp187(t,{timeoutMs=5000}={}){
  const fixture=heldDecisionFixture188();fixture.local=structuredClone(fixture.remote);
  const faults={},app=await heldDecisionApp188(t,{fixture,failures:faults,timeoutMs}),{ctx,shim,backend}=app;
@@ -12025,7 +12145,7 @@ async function loadCloudBackendV2({artifacts=null,rootData=null,batchFailureAt=I
  const snap=reference=>({id:reference.id,ref:reference,exists:()=>docs.has(reference.path),data:()=>clone(docs.get(reference.path))});
  const directRows=collectionRef=>[...docs].filter(([key])=>key.startsWith(collectionRef.path+'/')&&
   !key.slice(collectionRef.path.length+1).includes('/')).map(([key])=>snap(ref(...key.split('/'))));
- const writes=[],popupProviders=[],queries=[],network=[];let batchCommits=0,transactionCalls=0;
+ const writes=[],popupProviders=[],authCalls=[],queries=[],network=[];let batchCommits=0,transactionCalls=0;
  const normalize=value=>Object.fromEntries(Object.entries(value).map(([key,item])=>[key,item?.__serverTimestamp?{toMillis:()=>1234}:item]));
  const apply=(operation)=>{
   if(operation.type==='set'){docs.set(operation.ref.path,normalize(clone(operation.value)));if(operation.ref.path===rootPath)writes.push(clone(docs.get(rootPath)));}
@@ -12052,7 +12172,7 @@ async function loadCloudBackendV2({artifacts=null,rootData=null,batchFailureAt=I
  };
  let authListener=null;
  const auth={currentUser:{uid:'owner',email:'owner@example.test'}},A={browserLocalPersistence:{},getAuth:()=>auth,setPersistence:async()=>{if(failures.persistence)throw failures.persistence;},
-  signInWithPopup:async(_auth,provider)=>{popupProviders.push(provider);if(failures.signIn)throw failures.signIn;},signOut:async()=>{if(failures.signOut)throw failures.signOut;},GoogleAuthProvider:class{setCustomParameters(value){this.customParameters=value;}},onAuthStateChanged(_auth,listener){authListener=listener;if(!failures.authPending)listener(auth.currentUser);}};
+  signInWithPopup:async(_auth,provider)=>{popupProviders.push(provider);if(failures.signIn)throw failures.signIn;},signOut:async()=>{authCalls.push('signOut');if(failures.signOut)throw failures.signOut;},GoogleAuthProvider:class{setCustomParameters(value){this.customParameters=value;}},onAuthStateChanged(_auth,listener){authListener=listener;if(!failures.authPending)listener(auth.currentUser);}};
  const events=[],pending=new Map(),window=runtimeWindow||{FIREBASE_CONFIG:{apiKey:'test-key'},CLOUD_SYNC_TIMEOUT_MS:timeoutMs,dispatchEvent:event=>{events.push(event);return true;}};
  window.FIREBASE_CONFIG??={apiKey:'test-key'};window.CLOUD_SYNC_TIMEOUT_MS??=timeoutMs;window.window=window;
  if(runtimeWindow){
@@ -12071,7 +12191,7 @@ async function loadCloudBackendV2({artifacts=null,rootData=null,batchFailureAt=I
  for(const file of ['device-store-v2.js','cloud-store-v2.js'])vm.runInContext(artifacts?(file==='device-store-v2.js'?artifacts.storage:artifacts.cloud):fs.readFileSync(path.join(__dirname,file),'utf8'),context,{filename:file});
  if(!runtimeWindow)window.ChainStorageV2=context.ChainStorageV2;window.ChainCloudV2=context.ChainCloudV2;
  await vm.runInContext(`(async()=>{${moduleSource}\n})()`,context,{filename:'index.html#cloud-v2-backend'});
- return {CS:window.CloudSync,auth,docs,pending,events,batchCommits,writes,popupProviders,transactionCalls,queries,network,subscriptions,
+ return {CS:window.CloudSync,auth,docs,pending,events,batchCommits,writes,popupProviders,authCalls,transactionCalls,queries,network,subscriptions,
   emitSnapshot(entry,data,{fromCache=false,hasPendingWrites=false}={}){entry.next({exists:()=>data!==null,data:()=>clone(data),metadata:{fromCache,hasPendingWrites}});},
   emitAuth(user){auth.currentUser=user;authListener?.(user);}};
 }
