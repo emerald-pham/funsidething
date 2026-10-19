@@ -11433,6 +11433,9 @@ if(configured){
     const auth = A.getAuth(app);
     const db   = F.getFirestore(app);
     let pullOperation=0,pushOperation=0,recoveryAuthEpoch=0,backendAuthUid=auth.currentUser?.uid || null;
+    // Keep explicit empty-source consent inside this backend, including when a
+    // released cached CloudStore forwards only the existing operation callback.
+    const recoveryAbsentRoots=new WeakSet();
     let authStorageFailure=null,suspended=false,networkFailed=false,networkReady=Promise.resolve();
     let rootSubscription=null,rootSubscriptionEpoch=0;
     function stopRootSubscription(){
@@ -11528,6 +11531,7 @@ if(configured){
           const [rootSnapshot,generationSnapshot]=await Promise.all([tx.get(root),tx.get(generation)]);
           if(stillCurrent&&!stillCurrent())return {cancelled:true};
           const current=snapshotData(rootSnapshot),header=snapshotData(generationSnapshot),revision=current?.rev??0;
+          if(recoveryAbsentRoots.has(stillCurrent)&&rootSnapshot.exists())return {conflict:true,rev:revision};
           if(!validRevision(revision)||revision===Number.MAX_SAFE_INTEGER)return {error:true,code:"invalid-revision"};
           if(revision!==baseRev)return {conflict:true,rev:revision};
           if(!header||header.state!=="sealed")return {error:true,code:"unsealed-generation"};
@@ -11663,6 +11667,7 @@ if(configured){
       if(!validRevision(baseRev)){cloudFailure("push",{code:"invalid-revision"});return {error:true};}
       const operation=++pushOperation;
       const stillCurrent=()=>auth.currentUser?.uid===pushUid&&operation===pushOperation&&recoveryStillCurrent();
+      if(recoveryContext?.recoveryRootAbsent===true)recoveryAbsentRoots.add(stillCurrent);
       clearCloudError();CS.status = "syncing"; ping();
       try{
         if(!generationStore||!window.ChainStorageV2)throw Object.assign(Error("Cloud generation codec unavailable"),{code:"codec-unavailable"});
