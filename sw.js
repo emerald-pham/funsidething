@@ -3,7 +3,7 @@
    same-origin additions to fill the cache as they are requested. */
 // The shell key is a fingerprint of every local asset in the addAll list.
 // Update it with any shell change so installed workers cannot serve stale UI.
-const CACHE_NAME = "chain-scanner-shell-c8188cf3cd2df498470b7d9f2d514317b455f4ed02454558d2681b51f20781cb";
+const CACHE_NAME = "chain-scanner-shell-a0c72a1e71538a48b4f1c881d64a1de0f30f1088197682e708916a451658775e";
 
 self.addEventListener("install", event => {
   event.waitUntil(
@@ -67,7 +67,9 @@ self.addEventListener("fetch", event => {
   if(requestUrl.origin !== self.location.origin) return;
 
   event.respondWith(
-    caches.match(event.request).then(cached => cached || fetch(event.request)
+    // Retirement may fail after this worker activates. Never let a retained
+    // predecessor cache choose the document or modules for this shell.
+    caches.match(event.request, {cacheName:CACHE_NAME}).then(cached => cached || fetch(event.request)
       .then(response => {
         if(response.ok && response.type === "basic"){
           const copy = response.clone();
@@ -76,7 +78,7 @@ self.addEventListener("fetch", event => {
         return response;
       })
       .catch(error => event.request.mode === "navigate"
-        ? caches.match("./index.html")
+        ? caches.match("./index.html", {cacheName:CACHE_NAME})
         : Promise.reject(error)))
   );
 });

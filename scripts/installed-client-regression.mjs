@@ -75,9 +75,13 @@ export async function runInstalledClientCase({mode,repo,oldCommit,candidateCommi
   const reportPath=path.join(outputDir,mode+'-'+randomUUID()+'.json');
   const report={mode,control,oldCommit,candidateCommit,candidateTree,startedAt:new Date().toISOString(),status:'prepared',shells:{old,candidate},checkout:git('rev-parse','HEAD').toString().trim(),runnerDiff:hash(git('diff','HEAD')),requests:[],responses:[],observations:{},cleanup:{},limits:['Synthetic external SDK only; real app, IDB, worker and cache.','Local ephemeral Chromium profile, not physical-device or deployed acceptance.','Dirty runner serving explicit committed app is not final clean-candidate proof.']};
   const save=()=>fs.writeFileSync(reportPath,JSON.stringify(report,null,2)+'\n');save();
+  const cacheRetirementWorkers=[];
+  report.cacheRetirement={injected:mode==='signed-out',workers:[]};
   let browser,context,server,watchdog,phase=OLD;
   const prefix='/installed-'+randomUUID()+'/',sdkPrefix='/fixture-sdk-'+randomUUID()+'/',dbName='installed-'+randomUUID();
   const board=fixture(mode),raw=JSON.stringify(board),remotePayload=JSON.stringify({...board,decisionBaseline:{v:99,opaque:'synthetic future authority'},futureRemote:{opaque:'exact'}});
+  assert.equal(board.tasks.length,64,'required native delivery starts with a populated saved board');
+  assert.ok(Buffer.byteLength(raw)>1024*1024,'required native delivery retains a realistic large unknown field');
   const remote=new Map(mode==='reconcile-held'?[['users/owner',{payload:remotePayload,rev:4,updatedAt:1}]]:[]),remoteBefore=JSON.stringify([...remote]),calls=[];
   const errors=[],external=[];
   try{
@@ -98,6 +102,22 @@ export async function runInstalledClientCase({mode,repo,oldCommit,candidateCommi
     browser=await chromium.launch({headless:true});report.runtime={engine:'chromium',version:browser.version(),launchOptions:{headless:true},executableOverride:false,playwright:'1.62.1'};
     watchdog=setTimeout(()=>{report.deadline=true;save();void browser?.close();server?.closeAllConnections();},timeoutMs);
     context=await browser.newContext({serviceWorkers:'allow',viewport:{width:1000,height:800},reducedMotion:'reduce'});
+    // Exercise optional old-cache retirement failing in one required case.
+    // App/worker bytes stay immutable; only this external storage API fails.
+    context.on('serviceworker',worker=>{
+      if(mode!=='signed-out'||phase!==candidateCommit)return;
+      const row={scriptURL:worker.url(),applied:false};report.cacheRetirement.workers.push(row);
+      const target={worker,row};cacheRetirementWorkers.push(target);
+      target.ready=worker.evaluate(({oldCache,currentCache})=>{
+        self.__installedCacheRetirementFailures=[];
+        const remove=CacheStorage.prototype.delete;
+        CacheStorage.prototype.delete=function(name){
+          if(name===oldCache){self.__installedCacheRetirementFailures.push(name);return Promise.reject(new DOMException('Synthetic old-cache retirement failure','UnknownError'));}
+          return remove.call(this,name);
+        };
+        return {actualCache:CACHE_NAME,expectedCache:currentCache};
+      },{oldCache:old.cacheName,currentCache:candidate.cacheName}).then(identity=>{row.applied=true;row.identity=identity;}).catch(error=>{row.error=String(error);});
+    });
     await context.exposeBinding('__installedRPC',(_,kind,args)=>{calls.push({kind,args});if(kind==='get')return structuredClone(remote.get(args[0])??null);if(kind==='list')return [...remote].filter(([key])=>key.startsWith(args[0]+'/'));throw Error('Unexpected cloud write');});
     await context.addInitScript(browserInit,{dbName,authMode:mode,sdkBase:origin+sdkPrefix});
     await context.route('**/*',async route=>{const request=route.request(),u=new URL(request.url());if(u.origin===origin)return route.continue();external.push(u.origin+u.pathname);return route.abort();});
@@ -136,6 +156,10 @@ export async function runInstalledClientCase({mode,repo,oldCommit,candidateCommi
       return rows;
     }
     report.stagedCache=await verifyCache();
+    if(mode==='signed-out'){
+      await Promise.all(cacheRetirementWorkers.map(target=>target.ready));
+      assert.ok(cacheRetirementWorkers.some(target=>target.row.applied&&target.row.identity.actualCache===candidate.cacheName),'candidate native cache-retirement fault is armed before activation');
+    }
     await page.close();
     const oneLeft=report.observations.oneLeft=await observe(second);assert.ok(oneLeft.waiting);assert.equal(oneLeft.documentId,used.documentId);assert.equal(oneLeft.draft,used.draft);assertRetention(used,oneLeft);
     if(control!=='unsafe-quiescence'){
@@ -164,6 +188,13 @@ export async function runInstalledClientCase({mode,repo,oldCommit,candidateCommi
     }
     await second.close();
     await until(()=>observer.evaluate(async scope=>{const r=await navigator.serviceWorker.getRegistration(scope);return r?.active?.state==='activated'&&!r.waiting;},url),'natural last-client activation');
+    if(mode==='signed-out'){
+      report.cacheRetirement.readback=await Promise.all(cacheRetirementWorkers.map(target=>target.worker.evaluate(()=>({actualCache:CACHE_NAME,failures:self.__installedCacheRetirementFailures}))));
+      assert.ok(report.cacheRetirement.readback.some(row=>row.actualCache===candidate.cacheName&&row.failures.includes(old.cacheName)),'native predecessor-cache deletion really failed during activation');
+      report.cacheRetirement.retainedCaches=await observer.evaluate(()=>caches.keys());
+      assert.ok(report.cacheRetirement.retainedCaches.includes(old.cacheName),'the obsolete cache remains present for the delivery assertion');
+      assert.ok(report.cacheRetirement.retainedCaches.includes(candidate.cacheName),'the complete candidate cache remains present too');
+    }
     page=await context.newPage();attach(page);let response=await page.goto(url);assert.equal(hash(await response.body()),candidate.identities['index.html'],'delivered document exact candidate');
     await ready(page);await page.waitForFunction(()=>!!navigator.serviceWorker.controller);
     const reopened=report.observations.reopened=await observe(page);assert.equal(reopened.build,candidate.build);assert.equal(reopened.inlineSha256,candidate.inlineSha256,'delivered actual inline consumer');

@@ -1631,6 +1631,16 @@ The candidate worker precaches while predecessor clients remain on their existin
 
 ## Installed-client required release command
 
+- RISK PWA retained caches: active shell and offline navigation never use predecessor bytes after retirement fails
+- RISK PWA retained caches: mounted update help explains current-version delivery without discarding open work
+
+The required native cases now begin with 64 synthetic saved tasks and a one-MiB
+unknown field. The signed-out case injects a real worker CacheStorage deletion
+failure, verifies that both predecessor and current caches remain after natural
+activation, then requires exact current HTML, modules, offline reopening and all
+original head, draft, pending and recovery-source preservation. The held case
+retains normal cleanup as its positive control. Neither case forces activation.
+
 - RISK repository process: required installed-client native outcomes execute exactly once
 - RISK native installed-client delivery: signed-out
 - RISK native installed-client delivery: reconcile-held

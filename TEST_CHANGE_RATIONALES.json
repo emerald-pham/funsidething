@@ -13731,5 +13731,26 @@
       "result": "2026-10-19T10-38-03-526Z-5c6660e8-10d6-4f94-9a52-c1e5459d5369 passes the complete new consumer before permanent append. Final committed focused/full/native and upstream-aware preflight evidence follow separately."
     },
     "chronology": "The new coverage was authored after the C3 source repair and before any further app change. No product source change is made for this test-only follow-up."
+  },
+  {
+    "testChangesSha256": "91fceedfce41e6be499e359d8807bb9bfb0d0c6c048addc9c25a4a6ac04686ae",
+    "reason": "Prevent an activated installed worker from serving retained predecessor bytes when optional CacheStorage retirement fails. Add direct real-worker fetch/offline consumers and mounted FAQ coverage; preserve all existing behavior checks while migrating two source-shape assertions to require the standard cacheName scope.",
+    "previousBehavior": "Current native old779 to b91 activated the exact current worker after safe owned draft submission, durable backup readback and last-client close, but a native CacheStorage.delete UnknownError left the old cache first and normal reopening returned exact old779 HTML. The previous required native cases only exercised successful cache retirement; source-shape checks required unscoped global cache lookup.",
+    "intendedBehavior": "Only the active fingerprinted cache may answer a cached document/module request or offline-navigation fallback. Old or unrelated caches cannot override it. A missing active entry uses the ordinary network path. Predecessor waiting, unsubmitted drafts, durable source preservation, account/remote holds and natural last-client activation remain unchanged. The mandatory signed-out native case now retains the predecessor cache through a real external API failure; both native cases use64 synthetic tasks and a one-MiB unknown field.",
+    "replacementTests": [
+      "RISK PWA retained caches: active shell and offline navigation never use predecessor bytes after retirement fails",
+      "RISK PWA retained caches: mounted update help explains current-version delivery without discarding open work"
+    ],
+    "preservedCoverage": [
+      "All existing tests and original assertions remain except two implementation-shape regular expressions, which still require cache-first network fallback and offline HTML fallback while now additionally requiring active-cache scope. Existing offline-module/lifecycle/session/draft tests pass.",
+      "The existing required signed-out and reconcile-held outcomes still execute exactly once; no new process command, skip, timer budget, forced activation, reload bypass, storage clear, or private fixture was introduced. The held native case retains successful cache retirement as a positive control.",
+      "Required native exact candidate/cache/inline identities, accepted Add draft, prior head, unknown fields, manual/protected backups, opaque archives, nonempty account-bound pending generation, remote exact/get-only behavior and real offline transport remain asserted.",
+      "The historical clean-window comparison records a deliberate #177 policy transition at dd4300; its automatic15s expectation conflicts with the accepted waiting policy and is not used to justify this fix. User reinstall/sync/latest-data recovery does not identify the affected-device cause.",
+      "The separate transient native-write/cloud-idle RED is retained as an independent unshipped finding, not claimed as the cause of the recovered human session. Physical-device and authenticated production recovery still require their own evidence."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/device-write-update-p0-20261019/records --purpose preimplementation-red -- node --test --test-name-pattern=\"RISK PWA retained caches:\" tests.js",
+      "failure": "Before worker edits, permanent consumer RED5d9bdc10 (12:38:24UTC) returned PREDECESSOR HTML instead of CURRENT HTML. Native contemporaneous RED9e05a4ed and repeated db92cf00 returned old779 HTML SHAe56e60f1 rather than b91 SHA747d7ad7 after actual candidate activation; external native old-cache deletion failure was armed, hit and read back, both caches remained. Native no-fault positive ce55c2bb passed the same populated lifecycle. After the scoped-read implementation, new consumer passed while old source-shape check failed9f959f9d; only those two cache-call regular expressions were migrated, then four focused tests passed ec416e04. Mounted FAQ guidance RED2351258d preceded the copy edit; focused FAQ/new-consumer GREEN4a66479a retained old safe-close/save-failure guidance. Earlier dependency import and navigation-observer failures remain infrastructure/adapter errors, not product RED. No causal human first-bad commit is asserted for retained-cache failure."
+    }
   }
 ]
