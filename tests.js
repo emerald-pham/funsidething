@@ -438,6 +438,64 @@ test('RISK unreadable device recovery review: receipt collisions never overwrite
  });
 });
 
+test('RISK DEVICE STORAGE V2: conditional pending writes compare complete physical rows and preserve ordinary staging',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='pending-physical-cas-'+Math.random(),store=loadStorageV2({indexedDB}).createDeviceStore({indexedDB,crypto:webcrypto,dbName:deviceDbName});await store.open();t.after(()=>store.close());
+ const next={generationId:'next-reviewed',payloadHash:'a'.repeat(64),baseRev:6,updatedAt:1},expected={...next,account:'owner',futurePending:{retain:['unknown',17]}};
+ assert.equal((await store.setPendingUploadIfCurrent('owner',next,null)).ok,true);
+ assert.equal((await store.setPendingUploadIfCurrent('owner',{...next,generationId:'stale-empty'},null)).conflict,true);
+ await editRawDevice187(indexedDB,deviceDbName,tx=>tx.objectStore('meta').put(expected,'pending:owner'));
+ const before=await store.readRawExportSnapshot();
+ assert.equal((await store.setPendingUploadIfCurrent('owner',next,{...next,account:'owner'})).conflict,true,'unknown reviewed fields participate in the comparison');
+ assert.deepEqual(await store.readRawExportSnapshot(),before);
+ assert.equal((await store.setPendingUploadIfCurrent('owner',next,expected)).ok,true,'the complete exact reviewed pointer can be replaced');
+ for(const value of [null,undefined,false,0,'']){
+  await editRawDevice187(indexedDB,deviceDbName,tx=>tx.objectStore('meta').put(value,'pending:owner'));const original=await store.readRawExportSnapshot();
+  assert.equal((await store.setPendingUploadIfCurrent('owner',next,null)).conflict,true,'physical pending rows cannot masquerade as absence');
+  assert.deepEqual(await store.readRawExportSnapshot(),original);
+ }
+ await editRawDevice187(indexedDB,deviceDbName,tx=>tx.objectStore('meta').delete('pending:owner'));
+ const competing=await Promise.all([store.setPendingUploadIfCurrent('owner',next,null),store.setPendingUploadIfCurrent('owner',{...next,generationId:'competing-review'},null)]);
+ assert.equal(competing.filter(row=>row.ok).length,1);assert.equal(competing.filter(row=>row.conflict).length,1,'one IndexedDB transaction wins the exact absent-row CAS');
+ const prior=await store.readRawExportSnapshot();assert.equal((await store.setPendingUploadIfCurrent('owner',next,undefined)).error,true);assert.deepEqual(await store.readRawExportSnapshot(),prior);
+ assert.equal((await store.setPendingUploadIfCurrent('owner',next,{...expected,futurePending:undefined})).error,true,'an expectation that JSON would silently truncate cannot authorize replacement');assert.deepEqual(await store.readRawExportSnapshot(),prior);
+ assert.equal((await store.setPendingUpload('owner',{...next,generationId:'ordinary-staging'})).ok,true,'ordinary staging preserves its released unconditional behavior');
+ assert.equal((await store.getPendingUpload('owner')).generationId,'ordinary-staging');
+});
+
+test('RISK cloud source recovery pending capture: a peer pending pointer arriving between own pending write and read is never consented',async t=>{
+ const app=await divergentCloudSourceApp187(t),{ctx,backend,originalRoot,shim}=app,store=ctx.window.ScannerDeviceStore;
+ await ctx.onAction('review-cloud-source-recovery',{});await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'generation:'+originalRoot.previousGeneration}});
+ const peer={generationId:'new-peer-pending-at-own-capture',payloadHash:'c'.repeat(64),baseRev:originalRoot.rev,updatedAt:1792323000500};let fired=false,write;
+ app.idbFault.afterWriteTransaction=names=>{
+  if(fired||names.length!==1||names[0]!=='meta'||!shim.document.getElementById('modalRoot').innerHTML.includes('Saving the selected complete source'))return;
+  fired=true;write=store.setPendingUpload('owner',peer);
+ };
+ const result=await ctx.onAction('apply-cloud-source-recovery',{});await write;
+ assert.equal(fired,true,'the peer update really occurs after the recovery pending write transaction');
+ assert.equal((await store.getPendingUpload('owner')).generationId,peer.generationId,'the peer source remains pending');
+ assert.equal(result,false,'late unreviewed pending intent prevents completion');
+ t.diagnostic(JSON.stringify({result,rev:backend.docs.get('users/owner').rev,pending:await store.getPendingUpload('owner')}));
+ assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev,'late unreviewed pending intent must prevent publication, not only local application');
+});
+
+
+test('RISK cloud source recovery pending capture: peer pending intent created after the existing read is never overwritten by recovery staging',async t=>{
+ const app=await divergentCloudSourceApp187(t),{ctx,backend,originalRoot,shim}=app,store=ctx.window.ScannerDeviceStore;
+ await ctx.onAction('review-cloud-source-recovery',{});await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'generation:'+originalRoot.previousGeneration}});
+ const peer={generationId:'peer-between-existing-and-own-write',payloadHash:'d'.repeat(64),baseRev:originalRoot.rev,updatedAt:1792323000500};let fired=false,write;
+ app.idbFault.afterReadTransaction=names=>{
+  if(fired||names.length!==1||names[0]!=='meta'||!shim.document.getElementById('modalRoot').innerHTML.includes('Saving the selected complete source'))return;
+  fired=true;write=store.setPendingUpload('owner',peer);
+ };
+ const result=await ctx.onAction('apply-cloud-source-recovery',{});await write;
+ assert.equal(fired,true,'the peer stages new pending intent after the actual existing pending read');
+ t.diagnostic(JSON.stringify({result,rev:backend.docs.get('users/owner').rev,pending:await store.getPendingUpload('owner'),peerPointerProtected:(await store.listOpaqueArchives()).some(row=>row.raw.includes(peer.generationId))}));
+ assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev,'unreviewed peer intent must prevent publication before replacing its pointer');
+ assert.equal(result,false);
+ assert.equal((await store.getPendingUpload('owner')).generationId,peer.generationId,'the newly created peer pointer stays recoverable rather than being overwritten and cleared');
+});
+
+
 async function damagedAcknowledgedApp187(t,{timeoutMs=5000}={}){
  const fixture=heldDecisionFixture188();fixture.local=structuredClone(fixture.remote);
  const faults={},app=await heldDecisionApp188(t,{fixture,failures:faults,timeoutMs}),{ctx,shim,backend}=app;
@@ -36407,6 +36465,7 @@ async function heldDecisionApp188(t,{fixture=heldDecisionFixture188(),failures={
      if(idbFault.readBackups&&mode==='readonly'&&stores.includes('backups'))throw Object.assign(Error('fixture storage read unavailable'),{name:'AbortError'});
      const tx=target.transaction(names,mode,...rest);
      if(mode==='readonly')tx.addEventListener('complete',()=>idbFault.afterReadTransaction?.(stores));
+     if(mode==='readwrite')tx.addEventListener('complete',()=>idbFault.afterWriteTransaction?.(stores));
      if(mode!=='readwrite'||!stores.includes('backups')&&!stores.includes('opaque'))return tx;
      return new Proxy(tx,{get(target,key){
       if(key==='objectStore')return name=>{const store=target.objectStore(name);return new Proxy(store,{get(target,key){

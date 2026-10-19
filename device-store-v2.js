@@ -435,14 +435,45 @@
       const tx=db.transaction("meta","readonly"),done=transactionDone(tx),value=await requestResult(tx.objectStore("meta").get(pendingKey(account)));
       await done;return value||null;
     }
-    async function setPendingUpload(account,record){
+    function pendingJSON(value){
+      const ancestors=new Set(),valid=value=>{
+        if(value===null||typeof value==="string"||typeof value==="boolean"||typeof value==="number"&&Number.isFinite(value))return true;
+        if(!value||typeof value!=="object"||ancestors.has(value))return false;
+        const array=Array.isArray(value),keys=Reflect.ownKeys(value);
+        if(!array&&Object.prototype.toString.call(value)!=="[object Object]"||keys.some(key=>typeof key!=="string")||array&&keys.length!==value.length+1)return false;
+        ancestors.add(value);const supported=keys.every(key=>array&&key==="length"||valid(value[key]));ancestors.delete(value);return supported;
+      };
+      if(!valid(value))throw new TypeError("Pending source is not complete JSON");
+      return JSON.stringify(value);
+    }
+    async function writePendingUpload(account,record,conditional=false,expected){
       ensureOpen();
       if(typeof account!=="string"||!account||!record||typeof record.generationId!=="string"||
          !/^[0-9a-f]{64}$/.test(record.payloadHash)||!Number.isSafeInteger(record.baseRev)||record.baseRev<0)
         return {error:true,code:"invalid-pending-upload"};
+      let expectedJSON;
+      if(conditional){
+        if(expected!==null&&(!expected||typeof expected!=="object"||Array.isArray(expected)))return {error:true,code:"invalid-pending-expectation"};
+        try{expectedJSON=pendingJSON(expected);}catch{return {error:true,code:"invalid-pending-expectation"};}
+      }
       const value={generationId:record.generationId,payloadHash:record.payloadHash,baseRev:record.baseRev,
         updatedAt:Number.isFinite(record.updatedAt)?record.updatedAt:0,account};
-      const tx=db.transaction("meta","readwrite"),done=transactionDone(tx);tx.objectStore("meta").put(value,pendingKey(account));await done;return {ok:true};
+      const tx=db.transaction("meta","readwrite"),done=transactionDone(tx),store=tx.objectStore("meta");
+      try{
+        if(conditional){
+          const [key,current]=await Promise.all([requestResult(store.getKey(pendingKey(account))),requestResult(store.get(pendingKey(account)))]);
+          let matches=expected===null?key===undefined:false;
+          if(expected!==null&&key!==undefined)try{matches=pendingJSON(current)===expectedJSON;}catch{}
+          if(!matches){tx.abort();try{await done;}catch{}return {conflict:true};}
+        }
+        store.put(value,pendingKey(account));await done;return {ok:true};
+      }catch(error){try{tx.abort();}catch{}try{await done;}catch{}throw error;}
+    }
+    async function setPendingUpload(account,record){return writePendingUpload(account,record);}
+    // An explicit capability keeps cached stores from silently ignoring a new
+    // optional argument. Null means physical absence; an unknown row is present.
+    async function setPendingUploadIfCurrent(account,record,expected){
+      try{return await writePendingUpload(account,record,true,expected);}catch{return {error:true,code:"pending-upload-write-failed"};}
     }
     async function clearPendingUpload(account,generationId){
       ensureOpen();if(typeof account!=="string"||!account)return false;
@@ -459,7 +490,7 @@
 
     async function close(){if(db){db.close();db=null;}}
     const api={open,close,readRawExportSnapshot,readHead,withCurrentHead,listBackups,listOpaqueArchives,protectRecoverySource,writeRecoveredSource,getRecoveryCloudHold,clearRecoveryCloudHold,migrateLegacy,commitHead,putBackup,
-      updateBackupKind,deleteBackup,getPendingUpload,setPendingUpload,clearPendingUpload,setLegacyFingerprint};
+      updateBackupKind,deleteBackup,getPendingUpload,setPendingUpload,setPendingUploadIfCurrent,clearPendingUpload,setLegacyFingerprint};
     return api;
   }
 
