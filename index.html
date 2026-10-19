@@ -8918,6 +8918,7 @@ function renderHistory(){
 function closeModal(){
   if(fileRestorePreview?.irreversible){toast("A protected save is in progress. Keep this preview open until it finishes.",6000);return false;}
   if(fileRestorePreview)return cancelFileRestore();
+  if(pasteEditorSession)return closePasteDialog();
   if(fileRestoreBusy){fileRestoreConsentGeneration++;fileRestoreBusy=false;}
   decisionRecoveryReviewSerial++;decisionRecoveryPreview=null;allTasksView.cancelBulkEdit(); woopDraft=null; overdueWoopSession=null; document.getElementById("modalRoot").innerHTML=""; setTimeout(()=>{ resumeDeferredBrowserCopy(); resumeDeferredCloudPull(); showAppUpdateNotice(); window.applyPendingAppUpdate?.(); }, 0);
   return true;
@@ -9386,6 +9387,7 @@ function openHelp(){
     + '</details>'
     + '<details class="help-faq"><summary><h3>Data and backups</h3></summary><dl>'
     + '<dt>Can I undo, restore, or remove a task?</dt><dd>Undo in the header reverses the whole action, including editor changes with Done, Dot, or Return as candidate, and its comparison-learning effect, keeping unrelated decisions from either device. Sync and reopening preserve the reversal, and older saved or cloud copies cannot reapply it. Ordinary Done tasks appear in History and can be restored. Delete removes a task entirely. Import, backup Restore, and Reset everything retain their deliberate replacement and safety-copy rules. Settings → Data and backups offers daily and manual backups, Restore, and Reset everything. Backup deletion asks for confirmation and keeps the current board. A red Delete button marks a backup more than seven days old; opening Settings does not delete it. If deletion is unavailable or the copy changes during confirmation, reopen Settings and use its recovery options.</dd>'
+    + '<dt>How do I paste a saved board?</dt><dd>Open Settings → Data and backups → Paste board JSON. Paste an ordinary board, complete recovery archive, or raw backup list; the exact text and current board stay protected on this device while you preview. Choose an archive’s current board, a supported row from a raw list, or saved versus recorded ratings when they differ. Nothing applies until you confirm Restore. This snapshot replacement path is separate from Review saved decisions for held cloud changes; that review combines device and cloud choices while preserving each side’s decisions. Cancel keeps the exact pasted text and returns you to its editor.</dd>'
     + '<dt>How do I save Settings?</dt><dd>Save settings is at the bottom, after Data and backups. Open the sections you need, make changes, then save. Controls that save immediately are listed below. Closing Settings discards unsaved numeric fields.</dd>'
     + '<dt>What happens when I sign in while my saved board is opening?</dt><dd>The app opens this device\'s saved board before checking for newer cloud changes. If browser storage is unavailable, sync stays held and the app shows a warning.</dd>'
     + '<dt>Can I use the app offline or on another device?</dt><dd>Tasks save on this device. Sign in to share your board; offline decisions stay saved through closing and reopening, then combine when you reconnect. Independent choices from both devices survive, including their effects on ratings and dotted tasks. A separately made comparison remains learning evidence even when it repeats the same pair or gives a different answer. Retrying the same recorded action counts it once. Returning during a cloud save waits for that write before checking newer changes. Updates from another device wait for unfinished edits and pressed controls. If overlapping device saves briefly delay a recovery copy, sync resumes after this device confirms the save. A failed recovery copy still keeps sync held. The installed app works offline.</dd>'
@@ -9693,6 +9695,8 @@ function openSettings(){
     + '<div class="mbtns"><button class="btn subtle" data-act="download-current-board">Export current board JSON</button><button class="btn subtle" data-act="download-recovery-archive">Export recovery archive JSON</button></div>'
     + '<h3>Restore from a JSON file</h3><p class="kv">Choose an ordinary current-board JSON file or a complete supported recovery archive. The app keeps the exact file and current board on this device before showing a preview. Recovery sources inside an archive are not replayed.</p>'
     + '<div class="mbtns"><button class="btn subtle" data-act="choose-backup-file">Restore from backup file</button><input id="restoreBackupFile" type="file" accept=".json,application/json" hidden aria-label="Choose a board backup JSON file"/></div>'
+    + '<h3>Paste a saved board</h3><p class="kv">Paste a board, full recovery archive, or raw backup list for the same protected restore preview.</p>'
+    + '<div class="mbtns"><button class="btn subtle" data-act="open-paste-recovery">Paste board JSON</button></div>'
     + '<h3>Diagnostics download</h3><p class="kv">View, copy, or download the board currently open in this tab. This also works when its latest edit could not be saved on this device.</p>'
     + '<div class="mbtns"><button class="btn subtle" data-act="view-current-board">View / copy current board</button><button class="btn subtle" data-act="download-current-board">Download current board</button></div>'
     + '<h3>Recent sync errors</h3><p class="kv">Errors from the past hour, newest first, including attempts that later recovered. Each code appears at most once every ten minutes. Entries expire one hour after they appear. Stored only in this browser; task content and account details are excluded.</p>'
@@ -9806,6 +9810,45 @@ function restoreSettingsDraft(snapshot){
     if(Number.isInteger(item.selectedIndex))el.selectedIndex=item.selectedIndex;
   }
 }
+let pasteEditorSession=null,pasteDraftBuffer=null,pasteEditorSerial=0;
+function pasteDialogMarkup(){
+  return '<div class="mtop"><h2>Paste a saved board</h2><button class="x" data-act="close-paste-recovery" aria-label="Close">✕</button></div>'
+    +'<p class="kv">Paste an ordinary board, complete recovery archive, or raw backup list. The app protects this exact text and the current board before showing a restore preview.</p>'
+    +'<textarea id="jsonBox" aria-label="Saved board JSON" rows="10" spellcheck="false"></textarea>'
+    +'<div class="mbtns"><button class="btn primary" data-act="preview-pasted-recovery">Preview pasted board</button><button class="btn subtle" data-act="close-paste-recovery">Close</button></div>';
+}
+function openPasteDialog(raw="",settingsDraft=null){
+  const value=String(raw??"");
+  pasteEditorSession={id:++pasteEditorSerial,raw:value,revision:0,settingsDraft};
+  modalShell(pasteDialogMarkup());
+  const box=document.getElementById("jsonBox");if(box)box.value=value;
+  return true;
+}
+function pasteDraftIsCurrent(p){
+  const draft=p?.pasteDraft??p;
+  if(!draft||draft.sessionId===null||draft.sessionId===undefined)return true;
+  const session=pasteEditorSession,box=document.getElementById("jsonBox");
+  if(!session||session.id!==draft.sessionId||session.revision!==draft.revision||session.raw!==draft.raw)return false;
+  // The editable dialog is replaced by a restore preview. While that preview
+  // is open, the session's revisioned snapshot remains authoritative; when the
+  // textarea is visible, also compare its live value to catch changes that did
+  // not dispatch an input event.
+  const editorOpen=document.getElementById("modalRoot")?.innerHTML?.includes('id="jsonBox"');
+  return !editorOpen||!!box&&box.value===draft.raw;
+}
+function closePasteDialog(){
+  const session=pasteEditorSession;if(!session)return false;
+  const box=document.getElementById("jsonBox");if(box)session.raw=box.value;
+  pasteDraftBuffer={raw:session.raw,settingsDraft:session.settingsDraft};
+  // Closing while source/readback work is pending revokes consent before the
+  // late continuation can replace this newer editor state with a stale preview.
+  if(fileRestoreBusy){fileRestoreConsentGeneration++;fileRestoreBusy=false;}
+  pasteEditorSession=null;
+  document.getElementById("modalRoot").innerHTML="";
+  if(session.settingsDraft!==null&&session.settingsDraft!==undefined){openSettings();restoreSettingsDraft(session.settingsDraft);}
+  else setTimeout(()=>{resumeDeferredBrowserCopy();resumeDeferredCloudPull();showAppUpdateNotice();window.applyPendingAppUpdate?.();},0);
+  return true;
+}
 function fileRestoreAccount(){
   const saved=typeof state?.syncAccount==="string"&&state.syncAccount?state.syncAccount:null;
   const active=cloudReady()&&typeof window.CloudSync?.user==="string"&&window.CloudSync.user?window.CloudSync.user:null;
@@ -9829,14 +9872,14 @@ function fileRestoreReadinessReason(p){
     return "A saved decision is still waiting for review. The file and current board are protected here; finish that review before restoring.";
   return null;
 }
-async function captureFileRestoreBaseline(){
+async function captureFileRestoreBaseline({pasteDraft=null}={}){
   if(!liveBoardAccepted||!state||!Array.isArray(state.tasks))throw Error("The accepted board is not ready. No file restore was started.");
   if(deviceStorageRequired&&!deviceStorageAuthority)throw Error("This device's durable board storage is unavailable. The current board stays open.");
   const currentRaw=JSON.stringify(state),backend=window.CloudSync,cloudUser=backend?.user??null;
   let cloudIdentity=null;
   try{cloudIdentity=backend?.recoveryIdentity?.()??null;}catch(error){throw Error("The signed-in account could not be verified. The current board stays open.");}
   const boundAccount=fileRestoreAccount();
-  const baseline={currentRaw,stateRef:state,backend,cloudUser,cloudIdentity,boundAccount,
+  const baseline={currentRaw,stateRef:state,backend,cloudUser,cloudIdentity,boundAccount,pasteDraft,
     accountBound:!!boundAccount,deviceStorageAuthority,deviceStorageRequired,deviceStore,
     deviceHeadHash,marker:null,localHead:null,localStore:null,
     quickAddDraftRaw:JSON.stringify(quickAddAppearanceValues()),cloudEvidence:null,
@@ -9855,11 +9898,13 @@ async function captureFileRestoreBaseline(){
     try{baseline.cloudEvidence=await backend.recoveryEvidence();}
     catch(error){throw Error("The signed-in account changed while its recovery source was checked. The current board stays open.");}
     if(baseline.cloudEvidence?.identity!==cloudIdentity)throw Error("The signed-in account changed while its recovery source was checked. The current board stays open.");
+    if(!pasteDraftIsCurrent(baseline))throw Error("The pasted text changed while its sources were checked. Review the latest text and preview again.");
   }
   if(deviceStorageAuthority){
     if(!deviceStore||typeof deviceStore.readHead!=="function")throw Error("This device's open durable store is unavailable. The current board stays open.");
     try{baseline.deviceHead=await deviceStore.readHead();}catch(error){throw Error("This device's saved board could not be read. The current board stays open.");}
     if(!baseline.deviceHead||baseline.deviceHead.hash!==deviceHeadHash)throw Error("The saved board changed before the file was opened. Check Settings and try again.");
+    if(!pasteDraftIsCurrent(baseline))throw Error("The pasted text changed while its sources were checked. Review the latest text and preview again.");
   }else if(!useLocal)throw Error("This tab has no supported durable board storage. The current board stays open.");
   if(JSON.stringify(state)!==currentRaw||window.CloudSync!==backend||(backend?.user??null)!==cloudUser)
     throw Error("The board or signed-in account changed while its source was checked. Choose the file again.");
@@ -9893,7 +9938,7 @@ async function verifyFileRestoreCopies(p){
   return true;
 }
 function fileRestoreSourcesMatchSync(p){
-  if(p.consentGeneration!==fileRestoreConsentGeneration)return false;
+  if(p.consentGeneration!==fileRestoreConsentGeneration||!pasteDraftIsCurrent(p))return false;
   let identity=null;try{identity=p.backend?.recoveryIdentity?.()??null;}catch(error){return false;}
   if(!liveBoardAccepted||state!==p.stateRef||JSON.stringify(state)!==p.currentRaw||
      window.CloudSync!==p.backend||(p.backend?.user??null)!==p.cloudUser||identity!==p.cloudIdentity||
@@ -9912,18 +9957,18 @@ function fileRestoreSourcesMatchSync(p){
 async function fileRestoreSourcesStillCurrent(p){
   if(!fileRestoreSourcesMatchSync(p))return false;
   if(p.deviceStorageAuthority){
-    try{const head=await p.deviceStore.readHead();if(!head||head.hash!==p.deviceHead.hash||head.payload!==p.deviceHead.payload)return false;}
+    try{const head=await p.deviceStore.readHead();if(!fileRestoreSourcesMatchSync(p)||!head||head.hash!==p.deviceHead.hash||head.payload!==p.deviceHead.payload)return false;}
     catch(error){return false;}
   }
-  if(p.currentCopyId&&p.fileCopyId)try{await verifyFileRestoreCopies(p);}catch(error){return false;}
+  if(p.currentCopyId&&p.fileCopyId)try{await verifyFileRestoreCopies(p);if(!fileRestoreSourcesMatchSync(p))return false;}catch(error){return false;}
   if(p.deviceStorageAuthority){
-    try{const head=await p.deviceStore.readHead();if(!head||head.hash!==p.deviceHead.hash||head.payload!==p.deviceHead.payload)return false;}
+    try{const head=await p.deviceStore.readHead();if(!fileRestoreSourcesMatchSync(p)||!head||head.hash!==p.deviceHead.hash||head.payload!==p.deviceHead.payload)return false;}
     catch(error){return false;}
   }
   if(p.cloudEvidence){
     try{
       const evidence=await p.backend.recoveryEvidence();
-      if(evidence?.identity!==p.cloudEvidence.identity||evidence?.epoch!==p.cloudEvidence.epoch||evidence?.pending)return false;
+      if(!fileRestoreSourcesMatchSync(p)||evidence?.identity!==p.cloudEvidence.identity||evidence?.epoch!==p.cloudEvidence.epoch||evidence?.pending)return false;
     }catch(error){return false;}
   }
   // The durable and backup reads above yield to other tabs and UI events. Recheck
@@ -10152,23 +10197,27 @@ async function handleFileRestoreBackupChange(value){
 }
 async function handleRestoreBackupFileChange(input,{pasteDraft=null}={}){
   const file=input?.files?.[0];if(!file||fileRestoreBusy)return false;
-  const consentGeneration=++fileRestoreConsentGeneration,settingsDraft=captureSettingsDraft();fileRestoreBusy=true;
+  const consentGeneration=++fileRestoreConsentGeneration,settingsDraft=pasteDraft?.settingsDraft??captureSettingsDraft();fileRestoreBusy=true;
   try{
-    const baseline=await captureFileRestoreBaseline();
+    const baseline=await captureFileRestoreBaseline({pasteDraft});
     baseline.consentGeneration=consentGeneration;
+    if(!fileRestoreSourcesMatchSync(baseline))throw Error("The board, recovery sources or pasted text changed. Review the current source and try again.");
     if(typeof file.arrayBuffer!=="function")throw Error("This browser cannot read exact file bytes. The current board stays open; use a supported browser to try again.");
     const buffer=await file.arrayBuffer(),bytes=new Uint8Array(buffer);
+    if(!fileRestoreSourcesMatchSync(baseline))throw Error("The board, recovery sources or pasted text changed while the file was read. Review the current source and try again.");
     if(!await fileRestoreSourcesStillCurrent({...baseline,currentCopyId:null,fileCopyId:null}))throw Error("The board or signed-in account changed while the file was read. Choose the file again.");
     const restoreFile={format:RESTORE_FILE_SOURCE_FORMAT,formatVersion:1,
       fileName:typeof file.name==="string"?file.name:"backup.json",mediaType:typeof file.type==="string"?file.type:"",
       byteLength:bytes.byteLength,bytesBase64:manualArchiveBase64(buffer)};
     const currentCopy=await saveDurableBackup("before-file-restore",baseline.currentRaw);
     if(!currentCopy?.id)throw Error("The current board could not be backed up. Nothing was restored.");
+    if(!fileRestoreSourcesMatchSync(baseline))throw Error("The pasted text changed while the current board was protected. Review the latest text and preview again.");
     const fileCopy=await saveDurableBackup("restore-file-source",baseline.currentRaw,{restoreFile});
     if(!fileCopy?.id)throw Error("The exact selected file could not be backed up. The current board remains unchanged.");
     const p={...baseline,file,fileName:restoreFile.fileName,byteLength:restoreFile.byteLength,restoreFile,
       currentCopyId:currentCopy.id,fileCopyId:fileCopy.id,settingsDraft,pasteDraft};
     await verifyFileRestoreCopies(p);
+    if(!fileRestoreSourcesMatchSync(p))throw Error("The pasted text changed while its recovery copy was verified. Review the latest text and preview again.");
     let text;
     try{text=new TextDecoder("utf-8",{fatal:true}).decode(bytes);}
     catch(error){throw Error("That file is not valid UTF-8. Its exact bytes and the current board were kept in Settings backups; nothing was restored.");}
@@ -10179,9 +10228,11 @@ async function handleRestoreBackupFileChange(input,{pasteDraft=null}={}){
       if(!p.deviceStorageAuthority)p.backupIndexRaw=inspectBackupIndex().raw;
       if(!await fileRestoreSourcesStillCurrent(p))throw Error("A board or recovery source changed. Both copies remain protected; choose the file again.");
     }else await prepareFileRestoreSelection(p,decoded);
+    if(!fileRestoreSourcesMatchSync(p))throw Error("The board, recovery sources or pasted text changed while the preview was prepared. Review the current source and try again.");
     fileRestorePreview=p;renderFileRestorePreview(p);return true;
   }catch(error){
     if(consentGeneration!==fileRestoreConsentGeneration)return false;
+    if(pasteDraft&&!pasteDraftIsCurrent(pasteDraft))return false;
     toast(String(error?.message||"The selected file could not be prepared. The current board remains unchanged."),7000);return false;
   }finally{
     if(consentGeneration===fileRestoreConsentGeneration){
@@ -10192,8 +10243,8 @@ async function handleRestoreBackupFileChange(input,{pasteDraft=null}={}){
   }
 }
 function previewPastedRecovery(raw){
-  const bytes=new TextEncoder().encode(raw),root=document.getElementById("modalRoot");
-  const pasteDraft={raw,markup:root?.innerHTML?.includes('id="jsonBox"')?root.innerHTML:null};
+  const bytes=new TextEncoder().encode(raw),session=pasteEditorSession;
+  const pasteDraft={raw,settingsDraft:session?.settingsDraft??captureSettingsDraft(),sessionId:session?.id??null,revision:session?.revision??null};
   return handleRestoreBackupFileChange({files:[{name:"Pasted board.json",type:"application/json",arrayBuffer:async()=>bytes.buffer}]},{pasteDraft});
 }
 async function handleFileRestoreLearningChange(value){
@@ -10316,7 +10367,7 @@ async function confirmFileRestore(){
     if(p.accountBound)await fileRestoreCloudWrite(p);
     const payload=await commitFileRestoreLocally(p);
     installFileRestoreState(p,payload);
-    const settingsDraft=p.settingsDraft;fileRestorePreview=null;fileRestoreBusy=false;closeModal();
+    const settingsDraft=p.settingsDraft;fileRestorePreview=null;fileRestoreBusy=false;pasteEditorSession=null;pasteDraftBuffer=null;closeModal();
     if(settingsDraft!==null){openSettings();restoreSettingsDraft(settingsDraft);}
     toast(p.accountBound?"The exact board was confirmed by cloud and saved on this device.":"The board was restored on this device.",6000);
     return true;
@@ -10331,12 +10382,9 @@ async function confirmFileRestore(){
 function cancelFileRestore(){
   if(fileRestorePreview?.irreversible){toast("A protected save is in progress. Keep this preview open until it finishes.",6000);return false;}
   const snapshot=fileRestorePreview?.settingsDraft,pasteDraft=fileRestorePreview?.pasteDraft;
-  fileRestoreConsentGeneration++;fileRestorePreview=null;fileRestoreBusy=false;closeModal();
-  if(snapshot!==null&&snapshot!==undefined){openSettings();restoreSettingsDraft(snapshot);}
-  else if(pasteDraft){
-    modalShell(pasteDraft.markup||'<div class="mtop"><h2>Import saved board</h2><button class="x" data-act="close-modal" aria-label="Close">✕</button></div><textarea id="jsonBox" aria-label="Saved board JSON"></textarea><div class="mbtns"><button class="btn primary" data-act="import-json">Preview import</button><button class="btn subtle" data-act="close-modal">Close</button></div>');
-    document.getElementById("jsonBox").value=pasteDraft.raw;
-  }
+  fileRestoreConsentGeneration++;fileRestorePreview=null;fileRestoreBusy=false;pasteEditorSession=null;closeModal();
+  if(pasteDraft)openPasteDialog(pasteDraft.raw,snapshot??pasteDraft.settingsDraft??null);
+  else if(snapshot!==null&&snapshot!==undefined){openSettings();restoreSettingsDraft(snapshot);}
   return true;
 }
 let resetInFlight=false;
@@ -10541,6 +10589,14 @@ function onAction(act, el){
     }
     case "cycle-theme": setTheme(nextTheme()); break;
     case "settings": openSettings(); break;
+    case "open-paste-recovery": {
+      const settingsDraft=captureSettingsDraft(),raw=pasteDraftBuffer?.raw||"";
+      pasteDraftBuffer=null;openPasteDialog(raw,settingsDraft);break;
+    }
+    case "preview-pasted-recovery": {
+      const box=document.getElementById("jsonBox");if(box)return previewPastedRecovery(box.value);break;
+    }
+    case "close-paste-recovery": return closePasteDialog();
     case "choose-backup-file": {
       const input=document.getElementById("restoreBackupFile");
       if(input&&!fileRestoreBusy)input.click();
@@ -10897,6 +10953,7 @@ function updateBulkDraftInput(el){
 }
 document.addEventListener("input", e=>{
   const el = e.target;
+  if(el?.id==="jsonBox"&&pasteEditorSession){pasteEditorSession.raw=el.value;pasteEditorSession.revision++;}
   updateBulkDraftInput(el);
   syncTaskDateClear(el?.id);
   if(["add","edit"].includes(el?.dataset?.dependencySearch)){

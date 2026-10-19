@@ -13579,5 +13579,29 @@
       "command": "TZ=UTC Node22 recorder focused actual-consumer cohorts and isolated original-source replays",
       "result": "File/raw/paste/rating acceptance and safety72-case cohort390a88f3 passed; rating safety11-caseaba5603f passed. Large source/refined archive/codec cohortd6335824 passed253ms/1182ms/usable unsupported hold. Broad851da0e8 had172/173 passes and only an existing FAQ word-limit failure; separate3cc518ed passed after preserving the original answer and adding separate questions. Actual original raw file7bace332 retains source bytes/facts/history/native/fakecloudACK. Actual cloud-module original replayc174967c eventually retains434tasks/212facts/2327history/exact source/native/cloudACK with no held error; its transient false apply return remains separately traced, not relabeled success at that instant. Worker source-reuse cohort0e065d0f passed7/7 including native quota retry, rotation/reopen, unreadable/ambiguous/latest-only/removed-source controls; integration reused its exact local commitfe7913ad."
     }
+  },
+  {
+    "baseCommit": "382d062f83c0e745abc74595344b5e74efb1f860",
+    "testChangesSha256": "8a26187379bd1900c882de1a567f1960028c246139964404c2bdc4c376fa5512",
+    "reason": "Make pasted recovery reachable from Settings and preserve exact draft consent through the protected restore pipeline. Cover the native user route and supported pasted formats without changing held-cloud choice authority.",
+    "previousBehavior": "Settings only offered file selection. Pasted recovery was reachable only through an old hidden import control, whose tests fabricated jsonBox directly. A textarea value changed during awaited backup preparation could still authorize a preview for older text, and cancel/reopen could nest modal markup or allow pending work to replace the editor.",
+    "intendedBehavior": "Settings → Data and backups → Paste board JSON opens a separate editor. Ordinary boards, complete archives and raw backup lists use exact source/current-board protection and explicit restore choices. Consent is bound to session, input revision and live textarea value during awaits; close/reopen keeps the latest exact draft and Settings fields, and old work cannot install a late preview. Held cloud decisions remain on their separate merge-review path.",
+    "replacementTests": [
+      "RISK pasted recovery UI: Settings opens an editable protected preview and only applies after explicit restore",
+      "RISK pasted recovery UI: a newer DOM-only draft invalidates a delayed backup preview",
+      "RISK pasted recovery UI: closing during delayed protection reopens the latest draft without a late preview",
+      "RISK pasted recovery UI: archive and raw backup text use the visible Settings route and explicit rating choice"
+    ],
+    "preservedCoverage": [
+      "All pre-existing tests and assertions remain byte-exact against immutable base 382d062. The legacy hidden import-json action still routes supported inputs into the protected preview, and existing file-restore source, account, pending-upload, CAS and cold-reopen guards remain covered.",
+      "The native app consumer begins with the delegated Settings action, opens the visible Paste board JSON action, edits the separate textarea, previews, cancels, repeats and explicitly restores. Ordinary board, complete archive, raw backup row and saved-versus-recorded rating paths assert exact source bytes, protected current board/head, unknown facts, durable readback and cold reopen.",
+      "Delayed actual IndexedDB backup writes test a newer DOM-only textarea value and closing/reopening while work is pending. The exact latest text and numeric Settings draft remain available, while stale text is never represented as selected source and pending work cannot install a preview.",
+      "The FAQ names the visible Settings path, explains snapshot replacement choices and distinguishes them from Review saved decisions, which combines held device/cloud choices. New copy remains within the 130-word answer limit."
+    ],
+    "redEvidence": {
+      "command": "TZ=UTC Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern='RISK pasted recovery UI' tests.js",
+      "failure": "Actual consumer RED before app edits, record /Users/emeraldpham/.codex/task-artifacts/startup-import-device-save-20261019/paste-recovery-ui/runs/2026-10-19T07-48-31-479Z-16d06e96-2144-4b2d-bea0-9a51ce197ba0.json: delegated Settings showed no open-paste-recovery action. After adding only the separate visible editor/route, the delayed durable-backup test produced a second actual RED, record /Users/emeraldpham/.codex/task-artifacts/startup-import-device-save-20261019/paste-recovery-ui/runs/2026-10-19T07-51-00-997Z-8f76141b-5cd8-4550-8e9f-c83b093322c5.json: the actual preview displayed First pasted draft after textarea.value had become Newer DOM-only pasted draft. Final browser-like combined focus /Users/emeraldpham/.codex/task-artifacts/startup-import-device-save-20261019/paste-recovery-ui/runs/2026-10-19T08-02-01-487Z-45ec013e-7f0c-4a37-9bed-f05737af706c.json passes all 6 top-level registrations and 10 outcomes, including the legacy importer and file-preview compatibility controls."
+    },
+    "comparison": "Protected test diff fingerprint against immutable base 382d062f83c0e745abc74595344b5e74efb1f860. Four new pasted-recovery UI RISK registrations only; existing tests remain unchanged."
   }
 ]
