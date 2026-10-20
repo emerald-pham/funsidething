@@ -1,5 +1,153 @@
 [
   {
+    "baseCommit": "010b9473ba44ae6fb859e028ebcdd7f69d38c545",
+    "testChangesSha256": "20c553ab739f746680b2ecb05922948901f354b054181dc14c9f6f1d735ac0ef",
+    "reason": "Complete the authorized P0 candidate with the original persistence promise contract restored and the two existing coverage references updated for the approved support-diagnostics label migration.",
+    "previousBehavior": "The rejected ac2 timer-lifecycle repair dropped the persistence result returned by its callback; four established completion/Undo consumers and a controlled five-consumer subprocess failed. The old Diagnostics FAQ group literal and current-board RISK inventory row also retained the prior label.",
+    "intendedBehavior": "Clear the actual fired debounce token while returning the existing persist promise and retaining350ms scheduling, durable completion and refusal semantics. Update only the approved group label and inventory reference; preserve all existing behavioral assertions.",
+    "replacementTests": [
+      "RISK support diagnostics: native debounce reports scheduled, saving, and drained work accurately"
+    ],
+    "preservedCoverage": [
+      "The exact ac2 full run is retained as2550pass6fail49explicitly gated skips, not a pass; both native installed-client cases passed only that exact rejected candidate. A focused selection of the six existing failed cases was observed RED before these three-line repairs; the six plus native-debounce control then pass7/7 with zero skips. Four existing runtime assertions are unchanged.",
+      "All previous rationale bytes remain intact. This is a cumulative fingerprint for the complete base-to-candidate test diff, including the already authorized board-export/support-report label distinction. No preservation, account, held ACK, source-choice, privacy, byte-limit, FAQ length or negative-control assertion is weakened. Fresh exact full/native, emulator compatibility, private-original and independent final evidence remains required."
+    ],
+    "redEvidence": {
+      "command": "Node22 record-run preimplementation-red for the six exact ac2 full failures, retained under /Users/emeraldpham/.codex/task-artifacts/p0-pull-recurrence-20261020/full-ac2-repair-red; GREEN companion full-ac2-repair-green.",
+      "failure": "Six selected cases fail before repair: persistence callback result undefined instead of true in Undo/completion and controlled five-consumer startup, missing renamed current-board RISK inventory row, and old Diagnostics FAQ group. The seven-case GREEN retains original assertions and the native pending/saving/drained control."
+    }
+  },
+  {
+    "baseCommit": "010b9473ba44ae6fb859e028ebcdd7f69d38c545",
+    "testChangesSha256": "ae58b82d0e150b072c95ef99e260949c661c5d14c63ea97178c5f2a961714773",
+    "reason": "Resolve the consolidated exact6bac independent Code, specialist/Spec and rendered diagnostics findings while retaining the complete authorized P0 regression and source-preservation scope.",
+    "previousBehavior": "The unshipped report retained a fired debounce as pending, carried current acknowledgement metadata across account/backend transitions, omitted the effective SDK deadline and explicit recovery-copy availability/matching fields, and forced long compact reports onto one horizontal line.",
+    "intendedBehavior": "Observe the actual token-safe debounce lifecycle; invalidate current ACK/revision/request coverage on already observed backend/user/UID/epoch changes while retaining bounded historical events. Passively report the existing bounded SDK deadline and booleans from existing exact-copy/pending checks, otherwise unobserved/unavailable/expired. Soft-wrap both readonly fields without changing values or export bytes. Keep all source-read, hash, publication, pending and preservation decisions unchanged.",
+    "replacementTests": [
+      "RISK support diagnostics: native debounce reports scheduled, saving, and drained work accurately",
+      "RISK support diagnostics: accepted acknowledgements expire with their account and backend context",
+      "RISK support diagnostics: source operations report the effective bounded SDK deadline",
+      "RISK support diagnostics: recovery-copy checks are explicit, passive, and preserve unmatched pending work"
+    ],
+    "preservedCoverage": [
+      "All earlier rationale bytes and old assertions remain. Exact cumulative coverage retains the preview/account/DOM repairs, Cant/Return stale replay, ten distinct rapid actions, genuine save refusal and complete diagnostics worker cases. Current account/backend ACK coverage is distinct from an explicitly stale old response and from retained historical events.",
+      "The native debounce RED observes two accepted changes, a superseding scheduled timer and a real held IndexedDB commit before failing true versus false for a fired timer. ACK transition REDs begin with actual caller-accepted SDK revision6 and fail after sign-out, same-email UID change, same-UID new epoch or backend replacement. Deadline REDs use actual completed native source reads with150ms, capped60000ms and default20000ms settings.",
+      "Recovery-copy RED executes the actual damaged-generation cloudPull and existing exact acknowledged-source/pending comparisons before checking report availability. GREEN retains the unmatched pending pointer, exact device head and unchanged cloud root. Diagnostics adds no storage scan, read, payload hash, auth request, source choice or publication. Existing validDecisionBase/hash/revision/pending results are reused as typed booleans.",
+      "The first focused repair run retained39pass3fail: the established backend-stale assertion remained unchanged, and an actual root-stall report returned the minimal truncation fallback. A separate explicit assertion RED precedes the budget repair: truncation labels increased a just-trimmed report beyond24KiB. Drop accounting now participates in the same byte loop; all stage/timeout/late/size assertions stay.150 related outcomes then pass zero failures/skips.",
+      "Independent actual rendered wrap RED measured168481px content in a177px textarea; pre-wrap changes only rendering. Exact value/copy/download contract and Settings draft remain. A denied native download assertion is a postrepair preservation control, not an original RED. The new FAQ measurement assertions have their own pre-copy RED and retain the130-word ceiling.",
+      "The exact6bac full run was deliberately interrupted after independent source changes were required; recorder stateincomplete/SIGTERM/owned process cleanup completed. It is not a full/native pass. Exact6bac rules13/compat15 and private436task/280fact preservation retain only their old source scope; new exact candidate full/native/reviews/CI/live delivery remain required."
+    ],
+    "redEvidence": {
+      "command": "Node22 record-run preimplementation-red selected native debounce, accepted acknowledgements, effective source deadline and recovery-copy checks before functional edits; review-repair-6bac-red and review-repair-6bac-context-source-red under /Users/emeraldpham/.codex/task-artifacts/p0-pull-recurrence-20261020/. Separate review-report-budget-red and review-repair-faq-red before their repairs.",
+      "failure": "2026-10-20T13-06-57-186Z-028808c3-27d2-4fda-9b5e-ef90cf63ec45.json fails fired-timertrue, priorACKacknowledged, missing bounded deadlines150/60000/20000, missing source observations. The later context-source RED independently retains all4 real transition failures and executes damaged-source checks before missing-field assertion. Budget RED2026-10-20T13-12-09-720Z-25845d64-7e52-413c-9cee-82c599fda4d1.json explicitly fails absent sourceOperations at338-byte fallback. FAQ REDd3802a68 fails new deadline guidance before copy."
+    }
+  },
+  {
+    "baseCommit": "010b9473ba44ae6fb859e028ebcdd7f69d38c545",
+    "testChangesSha256": "c1ce671902b2cb76b1d08836c9347cbaf29ad7e04bd172b3c99aeb8eef489197",
+    "reason": "Integrate the authorized P0 recovery preview, Cant/Return and sustained rapid-action repairs with bounded local support diagnostics; correct the final owner-observed retry counter and retain the existing brief Help contract.",
+    "previousBehavior": "The released source lacked a local metadata report and had the separately reproduced Cant/Return replay and successful-snapshot retry exhaustion defects. The unshipped diagnostics candidate counted retry depths 1+2+3 as six attempts and added a Help answer exceeding the retained130-word limit.",
+    "intendedBehavior": "Retain every source-preserving runtime repair and existing consumer assertion. Report each actual persistence retry once without changing its refusal budget, committed head or unsaved tail. Split support guidance into two short complete answers; keep current-board export separate, report metadata bounded/redacted and recovery authority unchanged.",
+    "replacementTests": [
+      "RISK support diagnostics: real device retries count attempts while unexplained churn remains refused"
+    ],
+    "preservedCoverage": [
+      "All previous rationale bytes remain intact. The exact cumulative diff retains the original preview, UID/privacy/render-budget, Cant/Return and ten-distinct-action regressions; the diagnostics worker handoff and base1dd rationale map its original feature REDs and later six actual-consumer repair findings. No earlier test assertion is removed or relaxed by this owner repair.",
+      "The new permanent consumer ports the independently observed real IndexedDB unexplained-churn negative: initial snapshot plus three retries must still returnfalse with changed-during-save, exact current durable marker/head and an open unsaved tail. It observes native report data and fails only the six-versus-three retry count before the one-line scalar repair.",
+      "Existing board export, Restore/source choice, pending/unknown copies, account/backend transitions, held cloud ACK, peer/cold-reopen, worker delivery, rules and compatibility gates remain required. The Help length limit and all existing diagnostic privacy/publication wording assertions are retained byte-for-byte.",
+      "The worker checkpoint itself reported a possible instrumentation ReferenceError; root referred back to that checkpoint. No literal exception/stack record is retained. Only the recorded assertion failures and actual consumer GREEN support the diagnostics repair; none establishes the production iOS stall cause."
+    ],
+    "redEvidence": {
+      "command": "Node22 record-run preimplementation-red -- node --test --test-name-pattern=\"RISK support diagnostics: real device retries\" tests.js; separate RISK Quick start content before either owner edit. Artifacts under /Users/emeraldpham/.codex/task-artifacts/p0-pull-recurrence-20261020/.",
+      "failure": "retry-count-c5ff-red/2026-10-20T12-55-04-531Z-3e6fdc3e-314d-47f7-a44d-a6aecb2b55fb.json fails6!==3 after proving four successful real snapshots, integrity refusal and unsaved-tail preservation. faq-length-c5ff-red/2026-10-20T12-53-45-798Z-25fb31d3-3985-4088-98a2-16f24e7fe307.json fails the existing Help answer limit before copy splitting."
+    }
+  },
+  {
+    "testChangesSha256": "a712c134412fc39fd692dbb85ee67882206bdae921f29d3356736ef0571581a5",
+    "reason": "Repair confirmed issue222 stale Cant/Return chain replay and false save retry exhaustion across ten distinct accepted native actions, retaining the approved read-only recovery preview.",
+    "previousBehavior": "A stale pre-Cant chain could revive its old dot after Return; sustained accepted input across four successful local snapshots exhausted the integrity retry counter and emitted a false changed-during-save failure.",
+    "intendedBehavior": "Cant removes earlier chain membership during current and supported legacy-pass replay while a later explicit Dot remains valid. New accepted save requests follow successful snapshots without spending the unrelated churn budget; real storage, account, CAS and recovery failures remain visible and retain all sources.",
+    "replacementTests": [
+      "RISK Cant Return replay: a stale cloud chain cannot revive an old dot after a deliberate return to the pool",
+      "RISK rapid action durability: ten distinct mixed native actions progress through slow successful saves without a false failure",
+      "RISK rapid action durability: real storage refusal stays visible and retry retains distinct accepted work",
+      "RISK rapid action guidance: mounted Help distinguishes later accepted work from real device and cloud failures",
+      "RISK rapid action durability: ten distinct actions remain pending through a held cloud acknowledgement then reach peer and cold reopen"
+    ],
+    "preservedCoverage": [
+      "Every prior passing assertion and older rationale remains unchanged. The original preview and independent-review repairs retain their exact RED/GREEN evidence. Existing Start, empty/single pool, Undo, stale-control, account, peer CAS, source-choice, pending, exact ACK and full/native/compatibility gates remain required.",
+      "Cant permanent RED failed both same/peer Return after stale replay before runtime edits. First Cant-only repair did not fix legacy null-pass projection; its failed result remains. The bounded currentChoicePassId repair then passed; current-pass and later explicit Dot controls were subsequently added honestly. Cant FAQ RED preceded its copy.",
+      "The original ten-native-action RED accepted ten distinct IDs and retained durable/cold-reopen work but observed the exact false changed-during-save warning after four successful snapshots, before any save runtime edit. A stale duplicate is excluded from the ten. The earlier Quick Add variant was a positive result, not a RED. The real quota-refusal test is a postrepair preservation control, not the original RED.",
+      "The separate frozen cloud companion now passes10 distinct native actions with exact final ACK and peer durability. It observes one same-owner putBackup CAS conflict followed by success, without proving the prior pre-fix recovery-failed cause. The new permanent cloud test is a postrepair preservation control, not an original RED: it holds an actual successful cloud-write acknowledgement across10 actions and delayed successful IDB ACKs, then checks pending status, exact final ACK, peer, cold reopen and unchanged protected sources. First attempt failed initial noncanonical cloud fixture equality before the burst; the corrected setup uses native toggle-list plus actual acknowledged cloud publication. Both artifacts remain. No synthetic or released proof is actual physical iOS/account recovery."
+    ],
+    "redEvidence": {
+      "command": "record-run preimplementation-red under /Users/emeraldpham/.codex/task-artifacts/p0-pull-recurrence-20261020/: cant-return-permanent-red; rapid-actions-permanent-red/2026-10-20T11-18-13-303Z-6065c892-eb7a-44e3-a01d-1bfb2fcab96a.json; separate cant-return-faq-red and rapid-actions-faq-red.",
+      "failure": "Cant/Return stale cloud replay expected only anchor but revived target; sustained native-action test completed all10 independent actions and cold reopen, then failed the exact false board-kept-changing warning assertion before generation repair. Mounted Help assertions each failed before their copy edits."
+    }
+  },
+  {
+    "testChangesSha256": "9a0a7db5cc3f4f2639dab3a9492d41490a49cdefb884fb070ee4a66d7437a09a",
+    "reason": "Repair confirmed issue222 stale Cant/Return chain replay and false save retry exhaustion across ten distinct accepted native actions, retaining the approved read-only recovery preview.",
+    "previousBehavior": "A stale pre-Cant chain could revive its old dot after Return; sustained accepted input across four successful local snapshots exhausted the integrity retry counter and emitted a false changed-during-save failure.",
+    "intendedBehavior": "Cant removes earlier chain membership during current and supported legacy-pass replay while a later explicit Dot remains valid. New accepted save requests follow successful snapshots without spending the unrelated churn budget; real storage, account, CAS and recovery failures remain visible and retain all sources.",
+    "replacementTests": [
+      "RISK Cant Return replay: a stale cloud chain cannot revive an old dot after a deliberate return to the pool",
+      "RISK rapid action durability: ten distinct mixed native actions progress through slow successful saves without a false failure",
+      "RISK rapid action durability: real storage refusal stays visible and retry retains distinct accepted work",
+      "RISK rapid action guidance: mounted Help distinguishes later accepted work from real device and cloud failures"
+    ],
+    "preservedCoverage": [
+      "Every prior passing assertion and older rationale remains unchanged. The original preview and independent-review repairs retain their exact RED/GREEN evidence. Existing Start, empty/single pool, Undo, stale-control, account, peer CAS, source-choice, pending, exact ACK and full/native/compatibility gates remain required.",
+      "Cant permanent RED failed both same/peer Return after stale replay before runtime edits. First Cant-only repair did not fix legacy null-pass projection; its failed result remains. The bounded currentChoicePassId repair then passed; current-pass and later explicit Dot controls were subsequently added honestly. Cant FAQ RED preceded its copy.",
+      "The original ten-native-action RED accepted ten distinct IDs and retained durable/cold-reopen work but observed the exact false changed-during-save warning after four successful snapshots, before any save runtime edit. A stale duplicate is excluded from the ten. The earlier Quick Add variant was a positive result, not a RED. The real quota-refusal test is a postrepair preservation control, not the original RED.",
+      "The separate cloud companion recovery-failed observation is not conflated with the successful-write retry defect and remains under bounded diagnosis. No synthetic or released proof is called actual physical iOS/account recovery."
+    ],
+    "redEvidence": {
+      "command": "record-run preimplementation-red under /Users/emeraldpham/.codex/task-artifacts/p0-pull-recurrence-20261020/: cant-return-permanent-red; rapid-actions-permanent-red/2026-10-20T11-18-13-303Z-6065c892-eb7a-44e3-a01d-1bfb2fcab96a.json; separate cant-return-faq-red and rapid-actions-faq-red.",
+      "failure": "Cant/Return stale cloud replay expected only anchor but revived target; sustained native-action test completed all10 independent actions and cold reopen, then failed the exact false board-kept-changing warning assertion before generation repair. Mounted Help assertions each failed before their copy edits."
+    }
+  },
+  {
+    "testChangesSha256": "f165f3d3aacb93697b7bf8351df3b00d6ba89bc757b1cb20f81e1b4437e51972",
+    "reason": "Complete the read-only recovery preview with independent-review privacy and bounded-rendering repairs, preserving the original preview and known-UID protections.",
+    "previousBehavior": "The new pending/error preview rendered every task immediately and remained visible after an Auth UID transition until the unresolved server read settled; the original source-review screen also hid available local work during timeouts.",
+    "intendedBehavior": "Keep the accepted local board inspectable without source authority, render at most50 titles with the total and clear limit, promptly redact a pending/error preview on account transition and prevent late read completion from restoring it. Preserve drafts, head, pending evidence and original namespace.",
+    "replacementTests": [
+      "RISK cloud source recovery: readable device work stays visible read-only during pending and timed-out cloud checks",
+      "RISK cloud source recovery: read-only inspection does not expose unreadable placeholders or foreign identity work",
+      "RISK cloud source recovery: preliminary device inspection revokes account changes during pending and failed reads",
+      "RISK cloud source recovery: preliminary inspection bounds large device task lists without changing saved work"
+    ],
+    "preservedCoverage": [
+      "All pre-existing passing test assertions remain unchanged; the first preview/UID permanent regressions and their original RED evidence remain intact. Existing complete-source choice, publication, exact ACK, raw source, account/pending races, native, rules and compatibility gates remain required.",
+      "The review-repair-red run observed both pending and failed actual-consumer UID changes leaving earlier titles visible before repair. The separate review-budget-red run observed the eager DOM-row budget failure before the slice(0,50) edit. The first large-fixture run failed an incidental count expectation after normal reconciliation restored four original tasks; it is retained and not used as the DOM defect RED.",
+      "The repair FAQ assertion failed before copy; focused8/8 then passed the actual new runtime controls. No claim that local tests recover missing cloud bytes or establish the physical iOS timeout cause."
+    ],
+    "redEvidence": {
+      "command": "record-run preimplementation-red node --test --test-name-pattern=\"preliminary device inspection revokes|preliminary inspection bounds\" tests.js (review-repair-red); corrected DOM-budget-only review-budget-red; readable-device FAQ review-repair-faq-red, all under /Users/emeraldpham/.codex/task-artifacts/p0-pull-recurrence-20261020/.",
+      "failure": "Observed pending and timed-out source modal still exposing Device source only after emitAuth other-owner with same email; later independent budget RED failed pending inspection must not eagerly create a DOM row for every accepted task. Both preceded their runtime edits. FAQ RED failed Large device boards show at most50 task titles assertion before copy. Original preview RED and UID guard RED remain in the prior rationale and immutable records."
+    }
+  },
+  {
+    "testChangesSha256": "d1df2531438d9c42442663c4a0069c1f372849615c71c3c189dfc3b0e07ee8ee",
+    "reason": "Keep available device work inspectable during repeated cloud-source discovery timeouts, and reject known account-ID mismatches before full recovery candidates are exposed.",
+    "previousBehavior": "Source review showed only a loading message or deadline error until two aggregate cloud reads completed. A same-email different-UID transition could also create a full preview from the prior UID device board before ordinary account reconciliation settled.",
+    "intendedBehavior": "Pending/error review displays current accepted device tasks read-only with explicit unverified-cloud state and no source choice. Existing fully verified choices retain every publication/preservation guard. A known device UID mismatch refuses before reading cloud candidates; unreadable placeholders remain unavailable.",
+    "replacementTests": [
+      "RISK cloud source recovery: readable device work stays visible read-only during pending and timed-out cloud checks",
+      "RISK cloud source recovery: read-only inspection does not expose unreadable placeholders or foreign identity work"
+    ],
+    "preservedCoverage": [
+      "Every prior passing assertion remains unchanged. Existing recovery, device source preservation, exact-ACK rebuilding, conditional source choice, pending races, account transitions, File/Paste restore, full/native/rules/compatibility gates remain required.",
+      "The first permanent consumer RED observed a real unresolved SDK server read and missing local preview before any runtime edit; UI copy and the known-UID source guard each have their own subsequent observed RED before their repair. New controls verify no placeholder/foreign source, exact raw originals and pending rows, no implicit choice/publication and usable verified retry.",
+      "The separate Node150ms diagnostic and historical original-source controls retain their limited scope. Actual repeated iOS timeout cause, affected installed delivery and account recovery are not inferred from these new passing tests. V1/V2 external diagnostic retirement expectations and the initial WebKit ACK setup failure remain preserved, not product REDs."
+    ],
+    "redEvidence": {
+      "command": "record-run preimplementation-red: node --test --test-reporter=spec --test-name-pattern=\"RISK cloud source recovery: readable device work stays visible read-only\" tests.js (readonly-preview-red and readonly-preview-faq-red); separate read-only inspection pattern (readonly-preview-uid-red and readonly-preview-uid-faq-red). Evidence under /Users/emeraldpham/.codex/task-artifacts/p0-pull-recurrence-20261020/.",
+      "failure": "Observed10:17:49UTC: actual pending modal contains only Reading the separate device and cloud sources and lacks data-cloud-source-readonly. The later permanent UID RED returns true instead of false after same-email other-owner Auth callback before UID guard edit. FAQ REDs fail exact visible Help assertions before their respective copy edits. Focused original/FAQ/UID GREEN and160-case recovery cohort are retained separately."
+    }
+  },
+  {
     "testChangesSha256": "7a07a474af920040ab8bfd9ca6bac2212512819e9cc8c9c68825ff39845a7e65",
     "reason": "Repair full-suite discovered pre-hydration source protection and supported chronology holds; preserve exact existing consumer assertions and make test fixture lifetime and race completion explicit.",
     "previousBehavior": "Exact5a full run failed legacy/account/pinned recovery and retained FAQ assertions, then reached4GiB heap OOM before complete full/native evidence. Its pre-init backup guard refused actual older-shell protection; semantic completion ambiguity was classified unreadable. A timezone fixture and fixed30ms staging observation also failed independently of intended behavior.",
@@ -14588,5 +14736,101 @@
       "command": "TZ=UTC Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node /Users/emeraldpham/.codex/task-artifacts/device-write-update-p0-20261019/probe-required-artifact-gap.mjs",
       "failure": "Actual record2026-10-19T13-28-47-687Z-f9b3fbce-7189-4920-bc04-47e7045dd8f1 failed ERR_ASSERTION: Required auto-update command must reject a missing required native case artifact. The actual source command exited0 after both real native cases passed but one report was copied outside the artifact directory then removed; exactly one report remained. No missing module, syntax or runtime infrastructure failure qualified as RED. The gate checks were added only afterward."
     }
+  },
+  {
+    "baseCommit": "1dd57d743c6c30fcf00d5dc9cbd3c21cf0e94558",
+    "testChangesSha256": "47bd5e86af48b19cd489c7f5a10e9fa29e6fd54939c6a00d5ea57fa9d687889b",
+    "reason": "Provide a local, redacted incident report from existing save and cloud-source work, preserving the current-board export and all recovery authority. Make measured local durability, accepted server acknowledgement, current document/script identity, worker/cache names, bounded SDK stages, and report availability during an accepted publication explicit without a new persistence or network protocol.",
+    "previousBehavior": "Settings labeled current-board view/copy/download as Diagnostics download and had no separate report for actual saves or source reads. Save/ACK timing and stage outcomes could not be observed together. Report navigation had no late-source ownership guard, and an unfinished Settings draft could be lost when returning.",
+    "intendedBehavior": "Settings names the existing board export accurately and offers a local versioned metadata report, capped at 80 events/one hour/512 bytes each/8 source operations/24 KiB. The report uses fixed field and error-code allowlists; distinguishes local accepted-request durability from accepted server acknowledgement; distinguishes embedded build fingerprint and running-script SHA from observed worker/cache key names; records actual network-ready, first/second complete aggregate, root/header/chunk/final-root, validation, timeout, stale and late stages with honest per-field status; and preserves the Settings draft. Opening diagnostics during an unverified source review invalidates only that preview and cannot authorize a choice; during an accepted source publication the report stays inline in the same recovery dialog without changing its source, serial, choice, guards or outcome. Existing board export and saved-source semantics remain unchanged.",
+    "replacementTests": [
+      "RISK support diagnostics: Settings names the existing board export for its contents",
+      "RISK support diagnostics: local report stays redacted, bounded, and separate from board recovery",
+      "RISK support diagnostics: a held local save and cloud acknowledgement stay visibly pending",
+      "RISK support diagnostics: a held snapshot does not claim durability for a later accepted action",
+      "RISK support diagnostics: held cloud acknowledgements stay bound to their accepted request and identity",
+      "RISK support diagnostics: opening the report supersedes a timed-out source review and rejects its late callback",
+      "RISK support diagnostics: report navigation cannot cancel an accepted source publication while its real push is held",
+      "RISK support diagnostics: existing source review records ordered safe stages without source identifiers",
+      "RISK support diagnostics: second complete source aggregate identifies its held root read",
+      "RISK support diagnostics: an actual empty chunk query is observed as zero and incomplete",
+      "RISK support diagnostics: observer clock failure cannot alter an actual source read",
+      "RISK support diagnostics: report names only a safe origin and separates build from executing-script identity",
+      "RISK support diagnostics: root, chunk, and final-root SDK stalls retain the correct stage and report owner",
+      "RISK support diagnostics: event retention and malformed observer input stay bounded and redacted",
+      "RISK support diagnostics worker: controller reports only its fixed shell identity",
+      "RISK support diagnostics: executing document and observed worker/cache identities remain distinct and bounded",
+      "RISK support diagnostics: download bytes, selectable copy fallback, and Return preserve an unsaved Settings draft after slow worker capture"
+    ],
+    "preservedCoverage": [
+      "The old Settings board view/copy/download semantics and supported import/archive behavior remain; only the visible heading and matching guidance were migrated from the inaccurate Diagnostics download label to current-board export wording.",
+      "Report capture, refresh, selection, copy and download do not initiate cloud/storage work, upload report data, modify the board, or serialize task/recovery contents. Account IDs, paths, raw errors and cached app bodies are excluded; arbitrary event metadata is rejected by allowlists.",
+      "Actual held host-storage and CloudSync.push consumers distinguish accepted request count, debounce state, active persist calls, retry attempts, local durable-through generation, and server ACK. A held snapshot cannot claim a later accepted action; a held successful response remains pending until existing caller acceptance of backend/account and request context.",
+      "The report records actual source SDK stages and two real complete-source aggregate reads under one local alias. It does not label recovery-evidence probes as aggregates, read extra sources, or alter source deadlines. Root, chunk, and final-root stall controls separately verify timed-out and late status.",
+      "Read-only access during accepted Apply stays inside the same recovery preview; viewed/downloaded report, selectable clipboard fallback, and slow worker capture preserve the original preview, serial, selection, publication guards and eventual exact cloud acknowledgement.",
+      "Generation observations distinguish encoding, declared/received counts, validation and completeness. Received-byte totals remain explicitly unobserved because diagnostics do not scan/decode chunk payloads to calculate them.",
+      "Identity records the safe origin, embedded build fingerprint, executing script SHA, and bounded worker/cache names as observations only. It does not read or hash cached app bodies; release channel remains unavailable when no source value exists.",
+      "Observer clock failures, malformed/nonserializable metadata, report truncation, retention limits, native report/download bytes, and board/export preservation have focused consumer coverage. The unchanged SYNC ERROR LOG cohort remains green.",
+      "Local fixtures validate the diagnostic consumer only. They do not establish the cause of an iOS stall, production account recovery, or rendered/native release behavior; the parent owns final integration and those release checks."
+    ],
+    "redEvidence": {
+      "command": "record-run with `node --test --test-name-pattern='RISK support diagnostics:' tests.js` against the isolated fixture before functional report/collector edits.",
+      "record": "2026-10-20T11-54-50-582Z-02f379f9-91b3-42d0-acdf-40ce2d080b23.json",
+      "failure": "Six actual-consumer assertions failed before runtime edits: the held accepted-action consumer had no report observation API; a held SDK source review had no diagnostics dialog to replace it; successful source review had no ordered stage report; retention had no bounded observer; and Settings still labeled the current-board controls Diagnostics download."
+    },
+    "additionalRedEvidence": {
+      "record": "2026-10-20T12-10-05-032Z-476f8518-00f0-42c3-a90a-b37f71a1a09b.json",
+      "failure": "The actual held local write had no durable-through-request observation, and the Settings → report → Return consumer lost the unsaved Settings draft because no Return action existed. Download bytes, selectable clipboard fallback, and an explicit late-stage capture had already passed in that same run."
+    },
+    "workerRedEvidence": {
+      "record": "2026-10-20T12-00-33-810Z-6982e517-5beb-4937-b4a4-2cd3ddf07357.json",
+      "failure": "The native service-worker fixture had no fixed read-only diagnostics message route; the controller identity assertion failed before worker edits."
+    },
+    "stageStallSensitivityEvidence": {
+      "command": "Node22 --test --test-name-pattern='RISK support diagnostics: root, chunk, and final-root SDK stalls' tests.js",
+      "failure": "The first actual SDK-stage stall run passed initial root and final-root cases but failed the active chunk timeout assertion. SDK reads active and previous generation chunks concurrently; one mutable activeStage slot was overwritten by a sibling read, so the held stage had a later completion but no timeout event.",
+      "repair": "Each in-flight native source stage now has its own entry in a per-call Set. On the existing deadline, every active stage is observed as timed-out; late completion remains separately observed. No SDK calls, deadlines, source selection or publication behavior changed.",
+      "green": "The three separate held SDK stages pass; green record 2026-10-20T12-21-34-004Z-a9754c89-6aca-4d3c-9cba-64cd51766b81.json passes the complete support diagnostics, board export and sync-error cohort: 20 top-level tests and 23 TAP outcomes."
+    },
+    "heldApplyAccessEvidence": {
+      "record": "2026-10-20T12-19-32-553Z-e949f8db-5951-46ca-a3a5-121319254c17.json",
+      "classification": "post-edit actual-consumer sensitivity, not an original preimplementation RED",
+      "failure": "The held real CloudSync.push response test failed because the report view action refused during accepted Apply. This was an implementation limitation, not agreed behavior.",
+      "repair": "Expose the report inline in the existing preview. The 12:47 complete focused cohort verifies view/select/download, failed clipboard fallback, unchanged preview/serial/selection and normal exact publication outcome.",
+      "greenRecord": "2026-10-20T12-51-05-074Z-055bd32c-a560-47d3-b619-4a4fca400a78.json"
+    },
+    "publicationAndBusySensitivity": "The initial busy/read-through-timeout controls and accepted-publication preservation guard were added after earlier observer wiring and are post-edit sensitivities, not claimed preimplementation REDs. After the product requirement clarified that local diagnostics must remain usable during an accepted Apply, the newly edited actual held-push consumer produced heldApplyAccessEvidence before the inline implementation. The earlier modal-replacement refusal was an implementation limitation, not agreed product behavior; the inline repair keeps the same accepted publication and exposes local report actions in its existing preview.",
+    "ownerPrefinalRedEvidence": {
+      "records": [
+        "2026-10-20T12-32-51-429Z-e1db88ac-7c6c-47ae-835e-f100324426d6.json: held snapshot correctly exposed the defect that a later accepted request could be mislabeled durable.",
+        "2026-10-20T12-33-17-499Z-64f6788f-08d2-4930-9d7d-8819b4228670.json: held server response did not remain bound to the accepted request and account identity.",
+        "2026-10-20T12-34-11-058Z-4e5da6ef-7eb7-42bd-ba63-07283543b3a9.json: actual consumers exposed missing validation/completeness/origin/script identity and incorrect first/second aggregate expectations.",
+        "2026-10-20T12-34-20-727Z-766fdb44-80a5-45cb-9c29-7887ac6126f1.json: a throwing observer clock altered the real source-read consumer before the no-throw clock/metadata repair."
+      ],
+      "note": "These are later source-review findings and actual-consumer repair regressions, not a claim that they preceded the original diagnostics implementation."
+    },
+    "sourceStageSensitivityEvidence": {
+      "recordedAssertionFailure": "2026-10-20T12-41-25-262Z-e4934304-617b-4d09-91aa-7abd89ef0de0.json",
+      "command": "node --test --test-name-pattern='second complete source aggregate|root, chunk, and final-root SDK stalls' tests.js",
+      "observation": "The retained failure is assertion-based: the actual second aggregate/root/chunk/final-root consumers did not emit the expected timed-out/late observations for the held operation. It is not a preserved ReferenceError stack.",
+      "repair": "Source-stage errors now use a guarded safe-code mapper inside the SDK module; each in-flight actual SDK stage has its own bounded Set entry so sibling reads cannot overwrite timeout attribution. The caller-visible SDK deadline, stage operation, source choice, and publication logic are unchanged.",
+      "greenRecord": "2026-10-20T12-51-05-074Z-055bd32c-a560-47d3-b619-4a4fca400a78.json",
+      "green": "All three isolated real SDK stalls (root, chunks, final-root) and the actual second complete aggregate pass with correct stage, timeout, late and report-owner observations."
+    },
+    "instrumentationReferenceErrorNote": {
+      "classification": "instrumentation-candidate defect only; separate from the unconfirmed production/iOS stall cause",
+      "sourceLevelRepair": "The isolated SDK module now reads the safe error-code mapper through a guarded window property rather than assuming the app-script lexical binding is in its module realm.",
+      "evidenceLimit": "A parent checkpoint reported a ReferenceError during instrumentation self-review, but no literal-error output or stack was retained in the record-run artifacts. The retained 12:41 run is an assertion-failure artifact. Do not infer the original incident cause from this test behavior.",
+      "greenRecord": "2026-10-20T12-51-05-074Z-055bd32c-a560-47d3-b619-4a4fca400a78.json"
+    },
+    "greenEvidence": {
+      "record": "2026-10-20T12-51-05-074Z-055bd32c-a560-47d3-b619-4a4fca400a78.json",
+      "command": "TZ=UTC Node22 scripts/agent-tools/record-run.mjs --purpose green -- node --test --test-name-pattern='RISK support diagnostics|RISK current-board export|RISK SYNC ERROR LOG' tests.js",
+      "result": "29 TAP outcomes passed across 26 selected top-level tests, including the newest held snapshot, held ACK/backend replacement and UID controls, second actual aggregate, three separate SDK stalls, board export, and existing sync-error cohort.",
+      "candidateCommitAtRun": "1687a556feefc94d76b7ae6a5a1ccdc45acd76db",
+      "note": "The run used the integrated source/test commit listed above; the final follow-up commit changes only the rationale fingerprint and evidence pointers, not app or test source."
+    },
+    "candidateLimit": "No full native/browser/production release proof is claimed; root owns final reconciliation, shell fingerprint refresh, integration and release checks.",
+    "implementationStartedAtBase": "4faa4ecac8b852eb120bbc015119249029d4a494"
   }
 ]

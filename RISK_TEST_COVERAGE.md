@@ -43,6 +43,8 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK DEVICE STORAGE V2: conditional pending writes refuse JSON-lossy unknown evidence
 - RISK cloud source recovery pending capture: native recovery cannot discard a named array extension
 - RISK unreadable device recovery: Quick start and current Changelog explain preserved sources and local pending recovery
+- RISK cloud source recovery: readable device work stays visible read-only during pending and timed-out cloud checks
+- RISK cloud source recovery: read-only inspection does not expose unreadable placeholders or foreign identity work
 - RISK resilient sync recovery: an exact acknowledged copy recovers missing cloud chunks and publishes subsequent local work
 - RISK resilient sync recovery: a failed rebuild protects every source and retries after another local edit
 - RISK resilient sync recovery: unsupported unverifiable and foreign sources never authorize a replacement
@@ -451,7 +453,7 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK chance forecast: adaptive integration resolves narrow shared-benchmark transitions
 - RISK TrueSkill truncation: inverse-Mills tails match references through the former cutoff and extreme upset
 - RISK rating bounds: hydration and frozen chance opponents normalize extremes without changing healthy ratings
-- RISK Diagnostics download: Settings and save directions retain current-board recovery actions
+- RISK current-board export: Settings and save directions retain board recovery actions
 
 ## Returning-user first upload
 
@@ -504,6 +506,17 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK night shows: festival and standalone sparks enter the shared mirror before foreground hills
 - RISK Landscape browser: both night shows reflect actual sparks and exposed windows visibly switch on and off
 - RISK fireworks realism: uneven blooms leave ballistic trails and fading embers
+
+## Incident support diagnostics
+
+- RISK support diagnostics: native debounce reports scheduled, saving, and drained work accurately
+- RISK support diagnostics: accepted acknowledgements expire with their account and backend context
+- RISK support diagnostics: source operations report the effective bounded SDK deadline
+- RISK support diagnostics: recovery-copy checks are explicit, passive, and preserve unmatched pending work
+- RISK support diagnostics: real device retries count attempts while unexplained churn remains refused
+- RISK support diagnostics: Settings names the existing board export for its contents
+- RISK support diagnostics: local report stays redacted, bounded, and separate from board recovery
+- RISK support diagnostics: download bytes, selectable copy fallback, and Return preserve an unsaved Settings draft after slow worker capture
 
 ## Retained sync diagnostics
 
@@ -1754,6 +1767,30 @@ The native needs-attention action uses real IndexedDB and the production backend
 - RISK recovery identity consumers: final-task WOOP advances after acknowledged recovery
 - RISK recovery identity consumers: verified cloud adoption rebases independent saved extension fields for the same UID
 
+## Incident support diagnostics
+
+- RISK support diagnostics: Settings names the existing board export for its contents
+- RISK support diagnostics: local report stays redacted, bounded, and separate from board recovery
+- RISK support diagnostics: a held local save and cloud acknowledgement stay visibly pending
+- RISK support diagnostics: a held snapshot does not claim durability for a later accepted action
+- RISK support diagnostics: held cloud acknowledgements stay bound to their accepted request and identity
+- RISK support diagnostics: opening the report supersedes a timed-out source review and rejects its late callback
+- RISK support diagnostics: report navigation cannot cancel an accepted source publication while its real push is held
+- RISK support diagnostics: existing source review records ordered safe stages without source identifiers
+- RISK support diagnostics: second complete source aggregate identifies its held root read
+- RISK support diagnostics: an actual empty chunk query is observed as zero and incomplete
+- RISK support diagnostics: observer clock failure cannot alter an actual source read
+- RISK support diagnostics: report names only a safe origin and separates build from executing-script identity
+- RISK support diagnostics: root, chunk, and final-root SDK stalls retain the correct stage and report owner
+- RISK support diagnostics: event retention and malformed observer input stay bounded and redacted
+- RISK support diagnostics worker: controller reports only its fixed shell identity
+- RISK support diagnostics: executing document and observed worker/cache identities remain distinct and bounded
+- RISK support diagnostics: download bytes, selectable copy fallback, and Return preserve an unsaved Settings draft after slow worker capture
+
+These consumers use the existing Settings controls, held host-storage commit, real CloudSync push response, and native cloud-source review against an isolated SDK fixture. They distinguish embedded app build fingerprint and executing-script SHA from controller, active, waiting and installing worker shell identities; cache-key inspection is limited and does not read cached bodies. They capture only measured source stages and safe role-based generation metadata; keep local durability separate from server acknowledgement; and verify root, chunk, and final-root stalls through the actual SDK boundary. First and second aggregate labels wrap the two actual complete source consumers under one local review alias; local recovery-evidence probes are not described as cloud aggregates. A held snapshot covers only its captured accepted request, and a held push advances acknowledgement only after the caller accepts the same backend and account. Leaving an unverified source review clears its preview so late results cannot change the dialog or grant a choice; the read itself follows its existing deadline. During an accepted source publication, the report appears inline in the same recovery preview and does not change its serial, source choice, busy guard, or publication outcome. The report consumer checks downloaded bytes, selectable clipboard fallback and return to an unsaved Settings draft after bounded worker observation. Retention, malformed observer input, invalid clocks, report bytes, board-data privacy, and unchanged ordinary board/archive exports remain explicit checks.
+
+Final review adds the missing post-ACK context transition, real debounce lifecycle and effective configured-deadline consumers. Current ACK/revision/request coverage expires on sign-out, UID/epoch or backend changes; bounded historical events remain. Existing recovery-copy and pending checks supply only safe availability/matching booleans, with unobserved or expired fields when no current observation exists. No extra source read, payload hash, storage scan or eligibility decision is introduced. The four consumer REDs precede their repairs. A subsequent retained actual root-stall RED exposes report truncation flags tipping a just-trimmed report over its byte limit; trimming now budgets those flags as it drops entries. All original stage and byte assertions remain. The download-denial assertion is an additive postrepair preservation control, not an original RED. Independent rendered review found forced one-line report text; both fields now soft-wrap while exact values and export bytes remain unchanged.
+
 ## Full-suite startup preservation and fixture lifetime
 
 The complete recovery suite also retains the released pre-hydration older-tab backup/readback/CAS path and usable supported-but-ambiguous completion holds. Only literal strictly supported other-browser sources can be protected before hydration; a recovery placeholder cannot create a manual or ordinary backup. Unreadable backup-only startup names its actual protected cause. Existing account, legacy-tab, pinned-ID, released-Start and FAQ retention assertions remain. The local2AM fixture uses a local calendar time in UTC and New York; the original immutable-main timezone failure is retained as a fixture correction. Automatic recovery race checks await actual operation completion and still require the real pending boundary, unchanged cloud revision and exact peer intent. Test app fixtures cancel every owned timer after existing hooks without persisting, retaining neighboring fixtures and refusing late timer resurrection; this fixes measured VM retention without raising the heap or skipping tests.
@@ -1762,3 +1799,15 @@ The complete recovery suite also retains the released pre-hydration older-tab ba
 - RISK optional oldest start: an unseeded descending pass clears first skips at the ordinary day boundary
 - RISK legacy completion released Start: normally acknowledged expired return is preserved or explicitly held before rewrite
 - RISK resilient sync recovery: automatic rebuilding preserves peer pending intent across staging
+
+- `RISK cloud source recovery: preliminary device inspection revokes account changes during pending and failed reads` — promptly hide prior-account titles, reject late callbacks, retain draft, device head, pending upload and original namespace.
+- `RISK cloud source recovery: preliminary inspection bounds large device task lists without changing saved work` — render at most 50 task titles with the honest total and omitted-list notice; preserve accepted board and raw sources.
+
+- `RISK Cant Return replay: a stale cloud chain cannot revive an old dot after a deliberate return to the pool` — real scanner and editor controls, duplicate detached Can’t, same/peer Return, supported older/current passes, stale cloud replay, exact decision retention, durable acknowledgement/reopen and later explicit Dot.
+
+- `RISK rapid action durability: ten distinct mixed native actions progress through slow successful saves without a false failure` — ten accepted scanner/editor intents without save waits, a separate inert duplicate, delayed successful real IndexedDB acknowledgement, coherent snapshot progress, exact latest head/marker, cold reopen, original action IDs/times, manual backup, foreign pending evidence and unknown fields.
+- `RISK rapid action durability: real storage refusal stays visible and retry retains distinct accepted work` — actual IndexedDB read/write refusal retains the prior durable head and manual backup, keeps all accepted work with a visible quota warning, then saves the exact current board after storage recovers.
+- `RISK rapid action durability: ten distinct actions remain pending through a held cloud acknowledgement then reach peer and cold reopen` — hold a real successful cloud-write acknowledgement across ten native scanner/editor actions and slow successful IndexedDB acknowledgements; retain pending status, all original facts, manual and foreign pending evidence, then require exact latest cloud/local acknowledgement, a separate peer durable read and cold reopen.
+- `RISK rapid action guidance: mounted Help distinguishes later accepted work from real device and cloud failures` — the shared extended FAQ explains rapid input, retained failures and the separate cloud acknowledgement boundary; current changelog names the repaired behavior.
+
+Earlier controls covered individual saves and a third edit during one overlap, but did not sustain ten distinct native actions across four successful snapshot acknowledgements. The new regression reaches the exact false retry-exhaustion warning while separately proving complete durable retention. The storage refusal control was added after repair as a preservation guard, not claimed as the original RED. Cant/Return previously lacked a stale pre-hold cloud chain replay after the hold ended; the new same/peer and legacy/current-pass cases retain later deliberate selection as a positive control.
