@@ -15586,5 +15586,55 @@
     "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- Node22 --test --test-name-pattern=\"^RISK cloud source fresh check: (one between-capture|continuing peer churn)\" tests.js; diagnostics-terminal-red.output.txt. Actual download RED before report projection repair: download-retention-red.output.txt. Raw immutable records remain under integration216/p0-fresh-source-retry/runs.",
     "failure": "Actual support report had zero stale operations rather than one; actual stopped dialog still said until the checks finish. Both assertions failed before their fixes. The event-only repair still failed; then actual downloaded support bytes also lacked the old comparison refusal before projection compaction. Subsequent21 outcomes passed. Earlier supplementary UID/epoch copy expectation failure is an invalid test expectation, retained separately, not product RED."
   }
+},
+{
+  "baseCommit": "4e3bcb7e317ae251c8e8a030291802a52ffdefa0",
+  "testChangesSha256": "cf0ef8fec16666a2d98fa1ebd8b2d427049b9e2c354e7192afa5ca782bad991f",
+  "reason": "Reconcile preserved backup/Restore and exact notice work with the current user-authorized P0 fresh-source verification, terminal-state clarity and bounded diagnostic retention, retaining every original consumer RED and all prior assertions.",
+  "previousBehavior": "Separate board-data entry points remain on Stable; current source review stops after one transient between-capture difference, reuses waiting text after stopping, and report projection can evict the original refusal when a fresh verification follows.",
+  "intendedBehavior": "One consolidated Download backup and Restore retain every original safe format/route. A typed transient source inconsistency permits at most one complete fresh pair within the same original minute and authority/controller/serial. Only finite committedAt-only head differences qualify; no source is chosen. Reports preserve essential refusal/result facts within unchanged privacy and size limits.",
+  "replacementTests": [
+    "RISK backup and Restore consolidation: Settings keeps one guarded action with all formats",
+    "RISK cloud source fresh check: one between-capture cloud change verifies again within the same review",
+    "RISK cloud source fresh check: changed head ownership and unknown record facts cannot count as harmless metadata"
+  ],
+  "preservedCoverage": [
+    "All607 prior raw rationale objects remain byte-exact. No earlier passing assertion is removed; original #216, reader, metadata type, initial P0 and follow-up RED/GREEN chronology remains in preceding records and external handoffs.",
+    "Every complete source comparison, accepted state/draft/head payload+hash/browser/pending/prepared/device-hold/account/actual UID/auth epoch guard remains binding. Cancel/deadline and late-result retirement remain effective; ordinary pull/write deadlines remain unchanged.",
+    "The report retains the typed allowlist, no source/private reads or payload hashes, one-hour80-event/512-byte/8-operation/24KiB limits, actual push/ACK priority, generation summaries and honest truncation/fallback. Captured history is not rewritten.",
+    "The failed first event-only retention repair, broad compaction regression against two unchanged generation assertions, regex setup failure and invalid supplemental UID/epoch copy expectation remain distinctly classified, not disguised as qualifying feature RED.",
+    "The existing precise apology copy, account/channel dismissal, unchanged original Beta expiry and independent Stable window, metadata fail-closed legacy ordering and real CLI malformed-proof refusal remain intact."
+  ],
+  "redEvidence": {
+    "command": "Original exact commands are retained under integration216/p0-fresh-source-retry/HANDOFF.json chronology and immutable run records: peer3154d417, head authority38c355e6, mounted Helpd155ef53, report/terminalc2becbf5 and actual download681f9548. Original #216 and reader/type RED records remain in earlier rationale objects.",
+    "failure": "The actual source-review consumer returned false instead of a same-attempt verified unselected preview after a one-time peer change. The first broad head exception then failed permanent owner/sourceFingerprint/unknown-authority controls. Mounted Help and terminal text assertions failed before their copy repairs; the actual support download omitted original stale refusal before projection repair. All preceded their corresponding runtime repairs. Root reconciliation is not a new RED."
+  },
+  "greenEvidence": "Worker final158/158 recovery/identity/diagnostics outcomes, focused23/23 and hygiene3/3 pass at9cbab2d; current root cumulative source still requires final exact full/native/rules/compat/rendered/independent/CI/live gates.",
+  "evidenceClassification": "retained-source-present-vertical-tdd-with-cumulative-owner-integration"
+},
+{
+  "baseCommit": "b50ac1694502090a51503fdaa79d97d19d13d43e",
+  "testChangesSha256": "53e32a0a8cb48a8fe0609112666e8661ef1d9bcbce8b7f44baabfcc74f7b1372",
+  "reason": "Reconcile preserved backup/Restore and exact notice work with the current user-authorized P0 fresh-source verification, terminal-state clarity and bounded diagnostic retention, retaining every original consumer RED and all prior assertions.",
+  "previousBehavior": "Separate board-data entry points remain on Stable; current source review stops after one transient between-capture difference, reuses waiting text after stopping, and report projection can evict the original refusal when a fresh verification follows.",
+  "intendedBehavior": "One consolidated Download backup and Restore retain every original safe format/route. A typed transient source inconsistency permits at most one complete fresh pair within the same original minute and authority/controller/serial. Only finite committedAt-only head differences qualify; no source is chosen. Reports preserve essential refusal/result facts within unchanged privacy and size limits.",
+  "replacementTests": [
+    "RISK backup and Restore consolidation: Settings keeps one guarded action with all formats",
+    "RISK cloud source fresh check: one between-capture cloud change verifies again within the same review",
+    "RISK cloud source fresh check: changed head ownership and unknown record facts cannot count as harmless metadata"
+  ],
+  "preservedCoverage": [
+    "All607 prior raw rationale objects remain byte-exact. No earlier passing assertion is removed; original #216, reader, metadata type, initial P0 and follow-up RED/GREEN chronology remains in preceding records and external handoffs.",
+    "Every complete source comparison, accepted state/draft/head payload+hash/browser/pending/prepared/device-hold/account/actual UID/auth epoch guard remains binding. Cancel/deadline and late-result retirement remain effective; ordinary pull/write deadlines remain unchanged.",
+    "The report retains the typed allowlist, no source/private reads or payload hashes, one-hour80-event/512-byte/8-operation/24KiB limits, actual push/ACK priority, generation summaries and honest truncation/fallback. Captured history is not rewritten.",
+    "The failed first event-only retention repair, broad compaction regression against two unchanged generation assertions, regex setup failure and invalid supplemental UID/epoch copy expectation remain distinctly classified, not disguised as qualifying feature RED.",
+    "The existing precise apology copy, account/channel dismissal, unchanged original Beta expiry and independent Stable window, metadata fail-closed legacy ordering and real CLI malformed-proof refusal remain intact."
+  ],
+  "redEvidence": {
+    "command": "Original exact commands are retained under integration216/p0-fresh-source-retry/HANDOFF.json chronology and immutable run records: peer3154d417, head authority38c355e6, mounted Helpd155ef53, report/terminalc2becbf5 and actual download681f9548. Original #216 and reader/type RED records remain in earlier rationale objects.",
+    "failure": "The actual source-review consumer returned false instead of a same-attempt verified unselected preview after a one-time peer change. The first broad head exception then failed permanent owner/sourceFingerprint/unknown-authority controls. Mounted Help and terminal text assertions failed before their copy repairs; the actual support download omitted original stale refusal before projection repair. All preceded their corresponding runtime repairs. Root reconciliation is not a new RED."
+  },
+  "greenEvidence": "Worker final158/158 recovery/identity/diagnostics outcomes, focused23/23 and hygiene3/3 pass at9cbab2d; current root cumulative source still requires final exact full/native/rules/compat/rendered/independent/CI/live gates.",
+  "evidenceClassification": "retained-source-present-vertical-tdd-with-cumulative-owner-integration"
 }
 ]
