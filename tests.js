@@ -677,6 +677,137 @@ test('RISK cloud source recovery: preliminary inspection bounds large device tas
  assert.equal(JSON.stringify(ctx.state),original);assert.deepEqual(await ctx.window.ScannerDeviceStore.readRawExportSnapshot(),raw);
 });
 
+test('RISK Cant Return replay: a stale cloud chain cannot revive an old dot after a deliberate return to the pool',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb');
+ for(const passId of [null,'cant-current-pass'])for(const returnDevice of [0,1])await t.test((passId?'current pass: ':'older pass: ')+(returnDevice?'Return on peer':'Return on originating device'),async sub=>{
+  const board=syncState({tasks:[syncTask('cant-anchor','Anchor'),syncTask('cant-target','Target'),syncTask('cant-other','Other')],chain:['cant-anchor'],candidateId:'cant-target',passId,passStartedAt:passId?Date.now():0,mode:'scan',scanMode:'descending',snooze:100,syncAccount:'e@example.com',syncRev:5,syncDirty:false});
+  const raw=JSON.stringify(board),h=makeSyncHarness({remote:board,rev:5,delayMs:5}),apps=[];
+  sub.after(async()=>{for(const app of apps){app.ctx.suspendCloudSync();vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry()',app.ctx);await app.ctx.window.ScannerDeviceStore?.close?.();await app.dispose();}});
+  for(const name of ['first','peer'])apps.push(await loadApp({seed:424,indexedDBProvider:new IDBFactory(),deviceDbName:'cant-return-replay-'+name+'-'+Math.random(),seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:()=>h.factory()}));
+  const [a,b]=apps;await a.ctx.cloudPull();await b.ctx.cloudPull();
+  a.ctx.onAction('yes',{dataset:{candidate:'cant-target',benchmark:'cant-anchor'}});
+  await a.ctx.cloudPushNow();await settleSavedViewPublication(a,h,'original explicit Yes');
+  await b.ctx.cloudPull();await settleSavedViewPublication(b,h,'peer original Yes');
+  const stale=h.remoteState(),cantControl={dataset:{benchmark:'cant-target'}};
+  a.ctx.onAction('bench-cant',cantControl);const once=JSON.stringify(a.ctx.state.decisionEvents);
+  a.ctx.onAction('bench-cant',cantControl);assert.equal(JSON.stringify(a.ctx.state.decisionEvents),once,'duplicate detached Can\'t cannot affect the replacement benchmark');
+  await a.ctx.cloudPushNow();await settleSavedViewPublication(a,h,'original Cant');
+  await b.ctx.cloudPull();await settleSavedViewPublication(b,h,'peer Cant');
+  const returning=apps[returnDevice],other=apps[1-returnDevice],ratings=JSON.stringify(returning.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma]));
+  hydrateUnchangedEditorDraft(returning,'cant-target');returning.ctx.onAction('return-candidate',{dataset:{id:'cant-target'}});
+  assert.deepEqual([...returning.ctx.state.chain],['cant-anchor']);
+  await returning.ctx.cloudPushNow();await settleSavedViewPublication(returning,h,'native Return');
+  await other.ctx.cloudPull();await settleSavedViewPublication(other,h,'peer Return');
+  const facts=JSON.parse(JSON.stringify(returning.ctx.state.decisionEvents)),history=JSON.stringify(returning.ctx.state.workLog);
+  assert.equal(facts.filter(event=>event.kind==='comparison').length,1,'Return does not invent another comparison');
+  h.writeBehindBack(stale);
+  await returning.ctx.cloudPull();await returning.ctx.cloudPushNow();await settleSavedViewPublication(returning,h,'stale source after Return');
+  assert.deepEqual([...returning.ctx.state.chain],['cant-anchor'],'replaying the old Yes after Cant and Return must leave the target outside the chain');
+  assert.ok(returning.ctx.pool().some(task=>task.id==='cant-target'));assert.equal(returning.ctx.state.considered['cant-target'],undefined);
+  assert.equal(JSON.stringify(returning.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),ratings);assert.equal(JSON.stringify(returning.ctx.state.workLog),history);
+  for(const event of facts)assert.deepEqual(JSON.parse(JSON.stringify(returning.ctx.state.decisionEvents.find(row=>row.id===event.id))),event,'original decision IDs, times and meaning survive replay');
+  await other.ctx.cloudPull();await settleSavedViewPublication(other,h,'peer repaired Return');
+  assert.deepEqual([...other.ctx.state.chain],['cant-anchor']);assert.deepEqual(h.remoteChain(),['cant-anchor']);
+  const durable=await returning.ctx.window.ScannerDeviceStore.readHead(),reopened=await loadApp({seedStorage:{[SYNC_STORE_KEY]:durable.payload,[LOCAL_HEAD_KEY]:durable.payload}});apps.push(reopened);
+  assert.deepEqual([...reopened.ctx.state.chain],['cant-anchor'],'durable reopen cannot revive the earlier dot');
+  hydrateUnchangedEditorDraft(returning,'cant-target');returning.ctx.onAction('dot-task',{dataset:{id:'cant-target'}});
+  await returning.ctx.cloudPushNow();await settleSavedViewPublication(returning,h,'later explicit Dot');
+  assert.deepEqual([...returning.ctx.state.chain],['cant-anchor','cant-target'],'a later valid explicit selection remains available');
+  const selectedFacts=JSON.parse(JSON.stringify(returning.ctx.state.decisionEvents));
+  h.writeBehindBack(stale);await returning.ctx.cloudPull();await returning.ctx.cloudPushNow();await settleSavedViewPublication(returning,h,'duplicate stale source after later Dot');
+  assert.deepEqual([...returning.ctx.state.chain],['cant-anchor','cant-target'],'old holds cannot suppress a new deliberate Dot');
+  assert.equal(returning.ctx.state.decisionEvents.length,selectedFacts.length,'replaying a source cannot invent another accepted action');
+  for(const event of selectedFacts)assert.deepEqual(JSON.parse(JSON.stringify(returning.ctx.state.decisionEvents.find(row=>row.id===event.id))),event);
+  returning.ctx.openHelp();assert.match(returning.shim.document.getElementById('modalRoot').innerHTML,/Return keeps the task in the candidate pool; an old dot cannot put it back in the chain after cloud refresh/);
+ });
+});
+
+test('RISK rapid action durability: ten distinct mixed native actions progress through slow successful saves without a false failure',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),dbName='rapid-native-save-'+Math.random(),at=Date.parse('2026-10-20T15:00:00Z');
+ const tasks=[syncTask('rapid-anchor','Anchor'),syncTask('rapid-bench','Benchmark'),syncTask('rapid-cant','Candidate to skip and return'),syncTask('rapid-warmup','Next candidate'),...Array.from({length:12},(_,i)=>syncTask('rapid-candidate-'+i,'Candidate '+i)),syncTask('rapid-edit','Editor target'),syncTask('rapid-done','Completion target')];
+ const board=syncState({tasks,chain:['rapid-anchor','rapid-bench'],candidateId:'rapid-cant',mode:'scan',scanMode:'descending',passId:'rapid-native-pass',passStartedAt:at-HOUR,snooze:100,syncAccount:null,syncRev:0,syncDirty:false,updatedAt:at-HOUR,futureRapid:{keep:'unknown original',values:[1,2,3]},settings:{horizonMin:60,thresholdPct:0,samples:250,cantMin:30,workedHours:8,theme:'system'}}),raw=JSON.stringify(board);
+ const quietCloud=()=>({configured:false,ready:false,user:null,status:'off',async pull(){return {error:true};},async push(){return {error:true};}});
+ const app=await loadAppAtTime(at,{seed:314159,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},indexedDBProvider:indexedDB,deviceDbName:dbName,cloudSyncFactory:quietCloud}),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+ assert.equal(await ctx.persist(),true);assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state));
+ const manual=await ctx.saveDurableBackup('manual',JSON.stringify(ctx.state)),originalManual=(await store.listBackups()).find(row=>row.id===manual.id);
+ assert.ok(originalManual);assert.equal((await store.setPendingUpload('pending-original-owner',{generationId:'rapid-pending-original',payloadHash:'a'.repeat(64),baseRev:4,updatedAt:at})).ok,true);
+ const originalPending=await store.getPendingUpload('pending-original-owner'),commit=store.commitHead.bind(store),calls=[],inFlight=new Set(),messages=[],toast=shim.document.getElementById('toast');let message=toast.textContent,delaying=true,entered;
+ Object.defineProperty(toast,'textContent',{configurable:true,get:()=>message,set(value){message=value;messages.push(value);}});
+ const firstCommit=new Promise(resolve=>entered=resolve);
+ store.commitHead=async options=>{
+  const call={payload:options.payload,finished:false},pending=(async()=>{const result=await commit(options);call.ok=result?.ok===true;call.committedAt=performance.now();calls.push(call);if(call.ok){entered(call);if(delaying)await new Promise(resolve=>setTimeout(resolve,700));}call.finished=true;return result;})();
+  inFlight.add(pending);try{return await pending;}finally{inFlight.delete(pending);}
+ };
+ t.after(async()=>{delaying=false;ctx.suspendCloudSync();vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry()',ctx);await Promise.allSettled([...inFlight]);store.commitHead=commit;await app.dispose();});
+ ctx.onAction('toggle-list',{});
+ const first=await Promise.race([firstCommit,new Promise((_,reject)=>setTimeout(()=>reject(Error('ordinary background save did not reach real durability')),5000))]);
+ assert.equal((await store.readHead()).payload,first.payload);assert.equal(first.finished,false,'the actual prior snapshot is durable while its acknowledgement remains pending');
+ const facts=[],intentIds=new Set(),actionTimes=[],start=performance.now();
+ const act=(name,invoke,check)=>{
+  const before=new Set((ctx.state.decisionEvents||[]).map(event=>event.id));invoke();
+  const added=ctx.state.decisionEvents.filter(event=>!before.has(event.id));assert.equal(added.length,1,name+' must be one distinct accepted intent');assert.equal(check(),true,name+' reaches its independently specified result');
+  assert.ok(!intentIds.has(added[0].actionId));intentIds.add(added[0].actionId);facts.push(JSON.parse(JSON.stringify(added[0])));actionTimes.push(performance.now()-start);
+ };
+ const pause=()=>new Promise(resolve=>setTimeout(resolve,280)),editor=(id,action)=>{hydrateUnchangedEditorDraft(app,id);ctx.onAction(action,{dataset:{id}});};
+ const firstControl={dataset:{candidate:'rapid-cant',benchmark:'rapid-bench'}};
+ act('first Cant',()=>ctx.onAction('cant',firstControl),()=>ctx.state.considered['rapid-cant']==='cant');
+ const afterFirst=JSON.stringify(ctx.state);ctx.onAction('cant',firstControl);assert.equal(JSON.stringify(ctx.state),afterFirst,'duplicate delivery of one detached control is not an eleventh intent');
+ await pause();act('first Return',()=>editor('rapid-cant','return-candidate'),()=>ctx.state.considered['rapid-cant']===undefined&&!ctx.state.chain.includes('rapid-cant'));
+ await pause();assert.equal(ctx.state.candidateId,'rapid-warmup');act('second Cant',()=>ctx.onAction('cant',{dataset:{candidate:'rapid-warmup',benchmark:'rapid-bench'}}),()=>ctx.state.considered['rapid-warmup']==='cant');
+ await pause();act('second Return',()=>editor('rapid-warmup','return-candidate'),()=>ctx.state.considered['rapid-warmup']===undefined);
+ await pause();assert.equal(ctx.state.candidateId,'rapid-cant');act('No',()=>ctx.onAction('no',{dataset:{candidate:'rapid-cant',benchmark:'rapid-bench'}}),()=>ctx.state.considered['rapid-cant']==='no');
+ await pause();act('editor Save',()=>{hydrateUnchangedEditorDraft(app,'rapid-edit');shim.document.getElementById('etTitle').value='Changed during rapid actions';ctx.onAction('save-edit',{dataset:{id:'rapid-edit'}});},()=>ctx.state.tasks.find(task=>task.id==='rapid-edit').title==='Changed during rapid actions');
+ await pause();act('Worked',()=>ctx.onAction('worked',{dataset:{benchmark:'rapid-bench'}}),()=>ctx.state.considered['rapid-bench']==='worked'&&ctx.state.workLog.filter(row=>row.taskId==='rapid-bench'&&row.kind==='worked').length===1);
+ await pause();act('Worked Return',()=>editor('rapid-bench','return-candidate'),()=>ctx.state.considered['rapid-bench']===undefined);
+ await pause();assert.equal(ctx.state.candidateId,'rapid-warmup');act('Dot',()=>editor('rapid-warmup','dot-task'),()=>JSON.stringify(ctx.state.chain)===JSON.stringify(['rapid-anchor','rapid-warmup']));
+ await pause();assert.equal(ctx.state.candidateId,'rapid-bench');act('last Cant',()=>ctx.onAction('cant',{dataset:{candidate:'rapid-bench',benchmark:'rapid-warmup'}}),()=>ctx.state.considered['rapid-bench']==='cant');
+ assert.equal(facts.length,10);assert.equal(intentIds.size,10);
+ const end=performance.now()+12000;let head;
+ do{head=await store.readHead();if(!inFlight.size&&head?.payload===JSON.stringify(ctx.state)&&vm.runInContext('lastPersistedRaw',ctx)===head.payload)break;await new Promise(resolve=>setTimeout(resolve,25));}while(performance.now()<end);
+ assert.equal(head.payload,JSON.stringify(ctx.state),'latest accepted work is actually durable');assert.equal(vm.runInContext('lastPersistedRaw',ctx),head.payload);
+ for(const fact of facts)assert.deepEqual(JSON.parse(JSON.stringify(ctx.state.decisionEvents.find(event=>event.id===fact.id))),fact,'snapshot progress cannot replace original action IDs or times');
+ assert.equal(ctx.state.decisionEvents.length,10);assert.deepEqual(JSON.parse(JSON.stringify(ctx.state.futureRapid)),board.futureRapid);
+ assert.deepEqual(await store.getPendingUpload('pending-original-owner'),originalPending);assert.deepEqual((await store.listBackups()).find(row=>row.id===manual.id),originalManual);
+ assert.deepEqual([...ctx.state.chain],['rapid-anchor','rapid-warmup']);assert.equal(ctx.state.considered['rapid-bench'],'cant');assert.equal(ctx.state.considered['rapid-cant'],'no');assert.equal(ctx.state.workLog.filter(row=>row.taskId==='rapid-bench'&&row.kind==='worked').length,1);
+ t.diagnostic(JSON.stringify({distinctIntents:intentIds.size,actionTimes,successfulSnapshots:calls.filter(call=>call.ok).length,firstSnapshotStillPendingAtBurst:true,warningMessages:messages.filter(value=>/device-save:/.test(value))}));
+ delaying=false;await app.dispose();
+ const reopened=await loadAppAtTime(at+10000,{sharedStorage:shim.localStorage,indexedDBProvider:indexedDB,deviceDbName:dbName,cloudSyncFactory:quietCloud});t.after(()=>reopened.dispose());
+ assert.equal((await reopened.ctx.window.ScannerDeviceStore.readHead()).payload,head.payload);assert.equal(JSON.stringify(reopened.ctx.state),head.payload,'cold reopen retains the complete accepted sequence');
+ assert.doesNotMatch(messages.join('\n'),/device-save:.*changed-during-save|board kept changing while it was being saved/,'successful snapshots plus later accepted input are normal work, never an interaction-stopping save failure');
+ assert.equal(ctx.deviceSaveIssue(),null);
+});
+
+test('RISK rapid action durability: real storage refusal stays visible and retry retains distinct accepted work',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),factory=new IDBFactory();let refusing=false;
+ const wrapDatabase=db=>new Proxy(db,{get(target,key){
+  if(key==='transaction')return(...args)=>{if(refusing&&args[1]==='readwrite')throw Object.assign(Error('isolated storage quota refusal'),{name:'QuotaExceededError'});return target.transaction(...args);};
+  const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;
+ }});
+ const indexedDBProvider={open(...args){const request=factory.open(...args);return new Proxy(request,{get(target,key){if(key==='result'){const db=Reflect.get(target,key,target);return db&&typeof db.transaction==='function'?wrapDatabase(db):db;}const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;},set(target,key,value){return Reflect.set(target,key,value,target);}});}};
+ const board=syncState({tasks:[syncTask('quota-anchor','Anchor'),syncTask('quota-target','Target')],chain:['quota-anchor'],candidateId:'quota-target',mode:'scan',scanMode:'descending',passId:'rapid-quota-pass',passStartedAt:Date.now(),snooze:100,futureRapid:{original:'kept'}}),raw=JSON.stringify(board);
+ const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},indexedDBProvider,deviceDbName:'rapid-quota-'+Math.random()}),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;t.after(async()=>{refusing=false;await app.dispose();});
+ assert.equal(await ctx.persist(),true);const head=await store.readHead(),manual=await ctx.saveDurableBackup('manual',head.payload),originalManual=(await store.listBackups()).find(row=>row.id===manual.id);
+ refusing=true;ctx.onAction('cant',{dataset:{candidate:'quota-target',benchmark:'quota-anchor'}});hydrateUnchangedEditorDraft(app,'quota-target');ctx.onAction('return-candidate',{dataset:{id:'quota-target'}});
+ hydrateUnchangedEditorDraft(app,'quota-target');shim.document.getElementById('etTitle').value='Later edit retained during refusal';ctx.onAction('save-edit',{dataset:{id:'quota-target'}});
+ const facts=JSON.parse(JSON.stringify(ctx.state.decisionEvents));assert.equal(new Set(facts.map(event=>event.actionId)).size,3);
+ assert.equal(await ctx.persist(),false,'actual IndexedDB write refusal must remain an honest failed save');assert.equal(ctx.deviceSaveIssue()?.code,'quota-exhausted');
+ assert.match(shim.document.getElementById('toast').textContent,/Couldn't save this edit/);assert.equal((await store.readHead()).payload,head.payload);assert.equal(vm.runInContext('lastPersistedRaw',ctx),head.payload);
+ assert.equal(ctx.state.tasks.find(task=>task.id==='quota-target').title,'Later edit retained during refusal');assert.equal(ctx.state.syncDirty,true);assert.deepEqual((await store.listBackups()).find(row=>row.id===manual.id),originalManual);
+ refusing=false;assert.equal(await ctx.persist(),true);assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state));assert.equal(ctx.deviceSaveIssue(),null);
+ for(const fact of facts)assert.deepEqual(JSON.parse(JSON.stringify(ctx.state.decisionEvents.find(event=>event.id===fact.id))),fact);
+ assert.deepEqual(JSON.parse(JSON.stringify(ctx.state.futureRapid)),board.futureRapid);assert.equal(ctx.state.decisionEvents.length,3);
+});
+
+test('RISK rapid action guidance: mounted Help distinguishes later accepted work from real device and cloud failures',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();
+ const help=app.shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(help,/<dt>Can I make several changes quickly\?<\/dt>/);
+ assert.match(help,/Later accepted actions follow the snapshot already saving; you do not need to wait between actions/);
+ assert.match(help,/A real device-save failure keeps its warning and unsaved work in this tab/);
+ assert.match(help,/Cloud confirmation is separate: Synced requires acknowledgement of the latest saved board/);
+ assert.match(html,/Rapid valid actions keep saving without a false repeated-change warning/);
+});
+
 test('RISK resilient sync recovery: an exact acknowledged copy recovers missing cloud chunks and publishes subsequent local work',async t=>{
  const app=await damagedAcknowledgedApp187(t),{ctx,shim,backend,originalRoot,originalHeader,acknowledgedTasks}=app;
  shim.document.getElementById('addInput').value='Local work after source damage';

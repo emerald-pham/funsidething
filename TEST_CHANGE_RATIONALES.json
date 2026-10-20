@@ -1,5 +1,27 @@
 [
   {
+    "testChangesSha256": "9a0a7db5cc3f4f2639dab3a9492d41490a49cdefb884fb070ee4a66d7437a09a",
+    "reason": "Repair confirmed issue222 stale Cant/Return chain replay and false save retry exhaustion across ten distinct accepted native actions, retaining the approved read-only recovery preview.",
+    "previousBehavior": "A stale pre-Cant chain could revive its old dot after Return; sustained accepted input across four successful local snapshots exhausted the integrity retry counter and emitted a false changed-during-save failure.",
+    "intendedBehavior": "Cant removes earlier chain membership during current and supported legacy-pass replay while a later explicit Dot remains valid. New accepted save requests follow successful snapshots without spending the unrelated churn budget; real storage, account, CAS and recovery failures remain visible and retain all sources.",
+    "replacementTests": [
+      "RISK Cant Return replay: a stale cloud chain cannot revive an old dot after a deliberate return to the pool",
+      "RISK rapid action durability: ten distinct mixed native actions progress through slow successful saves without a false failure",
+      "RISK rapid action durability: real storage refusal stays visible and retry retains distinct accepted work",
+      "RISK rapid action guidance: mounted Help distinguishes later accepted work from real device and cloud failures"
+    ],
+    "preservedCoverage": [
+      "Every prior passing assertion and older rationale remains unchanged. The original preview and independent-review repairs retain their exact RED/GREEN evidence. Existing Start, empty/single pool, Undo, stale-control, account, peer CAS, source-choice, pending, exact ACK and full/native/compatibility gates remain required.",
+      "Cant permanent RED failed both same/peer Return after stale replay before runtime edits. First Cant-only repair did not fix legacy null-pass projection; its failed result remains. The bounded currentChoicePassId repair then passed; current-pass and later explicit Dot controls were subsequently added honestly. Cant FAQ RED preceded its copy.",
+      "The original ten-native-action RED accepted ten distinct IDs and retained durable/cold-reopen work but observed the exact false changed-during-save warning after four successful snapshots, before any save runtime edit. A stale duplicate is excluded from the ten. The earlier Quick Add variant was a positive result, not a RED. The real quota-refusal test is a postrepair preservation control, not the original RED.",
+      "The separate cloud companion recovery-failed observation is not conflated with the successful-write retry defect and remains under bounded diagnosis. No synthetic or released proof is called actual physical iOS/account recovery."
+    ],
+    "redEvidence": {
+      "command": "record-run preimplementation-red under /Users/emeraldpham/.codex/task-artifacts/p0-pull-recurrence-20261020/: cant-return-permanent-red; rapid-actions-permanent-red/2026-10-20T11-18-13-303Z-6065c892-eb7a-44e3-a01d-1bfb2fcab96a.json; separate cant-return-faq-red and rapid-actions-faq-red.",
+      "failure": "Cant/Return stale cloud replay expected only anchor but revived target; sustained native-action test completed all10 independent actions and cold reopen, then failed the exact false board-kept-changing warning assertion before generation repair. Mounted Help assertions each failed before their copy edits."
+    }
+  },
+  {
     "testChangesSha256": "f165f3d3aacb93697b7bf8351df3b00d6ba89bc757b1cb20f81e1b4437e51972",
     "reason": "Complete the read-only recovery preview with independent-review privacy and bounded-rendering repairs, preserving the original preview and known-UID protections.",
     "previousBehavior": "The new pending/error preview rendered every task immediately and remained visible after an Auth UID transition until the unresolved server read settled; the original source-review screen also hid available local work during timeouts.",
