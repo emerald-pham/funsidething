@@ -93,6 +93,7 @@ test('RISK unreadable device recovery: raw startup preserves sources and support
  assert.equal(bootError,null,'malformed saved JSON must be contained by actual startup');
  assert.equal(ctx.state.tasks.length,0,'unreadable or missing authoritative data must never adopt retained legacy tasks');
  assert.ok(shim.document.getElementById('scan').innerHTML,'the recovery shell remains usable');
+ assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/data-act="open-paste-recovery"/,'the empty recovery surface routes Paste through the shared Settings Restore action');
  assert.ok(ctx.window.ScannerDeviceStore,'a successfully opened raw-readable store remains available');
  assert.equal(await ctx.persist(),false,'Quick start and incidental save producers cannot create a placeholder head');
  assert.deepEqual(await store.readRawExportSnapshot(),before,'startup leaves all raw rows exact');
@@ -119,9 +120,16 @@ test('RISK unreadable device recovery: raw source export excludes the placeholde
  let blob;const downloads=[],link=makeFakeElement();link.remove=()=>{};link.click=()=>downloads.push(blob.text);
  shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();ctx.Blob=class{constructor(parts){this.text=parts.join('');}};
  ctx.URL={createObjectURL(value){blob=value;return 'blob:source-only';},revokeObjectURL(){}};
- ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="download-raw-device-sources"/,'the unavailable-board view exposes raw-source export');
+ ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
+ const download=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Download backup\s*<\/button>/);
+ assert.ok(download,'the unavailable-board view exposes the shared Download backup action');
+ assert.equal((settings.match(/data-act="download-backup"/g)||[]).length,1,'raw evidence stays within the one board-data download action');
+ assert.match(settings,/value="raw-device-sources"/,'the unaccepted source is offered as a source-only archive');
+ const selectedFormat=makeFakeElement();selectedFormat.value='raw-device-sources';
+ const originalGet=shim.document.getElementById.bind(shim.document);
+ shim.document.getElementById=id=>id==='backupDownloadFormat'?selectedFormat:originalGet(id);
  await ctx.onAction('download-current-board',{});assert.equal(downloads.length,0,'the shell cannot be exported as an accepted board');
- assert.equal(await ctx.onAction('download-raw-device-sources',{}),true,'the native Settings raw-source action downloads readable exact evidence');
+ assert.equal(await ctx.onAction(download[1],{}),true,'the native Settings action downloads readable exact evidence');
  const archive=JSON.parse(downloads[0]);assert.equal(archive.currentBoard,null);assert.equal(archive.manifest.sources.currentBoard.status,'unavailable');
  for(const [key,raw]of [[SYNC_STORE_KEY,original],[LOCAL_HEAD_KEY,'different broken head'],[LOCAL_BACKUPS_KEY,'{broken backup index']])assert.equal(archive.appSources.localStorage.find(row=>row.key===key).raw,raw);
  assert.throws(()=>ctx.decodeBackupFileBoard(downloads[0]),/incomplete|supported/,'source-only evidence cannot become an empty imported board');
@@ -277,9 +285,10 @@ test('RISK unreadable device recovery: Quick start and current Changelog explain
  const {ctx,shim}=await loadApp();ctx.openHelp();
  const help=shim.document.getElementById('modalRoot').innerHTML,answer=help.match(/<dt>What if my saved device source cannot be read\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
  assert.ok(answer,'the extended FAQ covers unreadable missing unsupported and partial device sources');
- assert.match(answer,/Restore from backup file.*Paste board JSON/);assert.match(answer,/raw device sources/);
+ assert.match(answer,/one Restore action.*choose a JSON file or Paste JSON/i);assert.match(answer,/Download backup offers Raw device sources/i);
  assert.match(answer,/not an empty recovered board/);assert.match(answer,/Cloud recovery stays pending/);
- assert.match(html,/Damaged device saves now offer protected file or paste recovery without treating missing data as an empty board/,'the current changelog describes the concrete delivered behavior');
+ assert.match(html,/one guarded Restore action for a file or pasted JSON/,'the current changelog describes the consolidated restore route');
+ assert.match(html,/unreadable device data offers a source-only archive/,'the current changelog preserves the raw-source recovery limit');
 });
 
 test('RISK unreadable device recovery: partial raw rows remain exact while the restored board accepts later local edits',async t=>{
@@ -631,6 +640,179 @@ function recoveryReadClock187(){
   async advance(ms){const target=elapsed+ms;while(true){const due=[...timers].filter(([,timer])=>timer.at<=target).sort((a,b)=>a[1].at-b[1].at)[0];if(!due)break;elapsed=due[1].at;setFakeTime(ctx,start+elapsed);timers.delete(due[0]);due[1].fn();await flush();}elapsed=target;setFakeTime(ctx,start+elapsed);await flush();},
   stop(){active=false;timers.clear();}};
 }
+
+test('RISK cloud source fresh check: one between-capture cloud change verifies again within the same review',async t=>{
+ const app=await divergentCloudSourceApp187(t),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+ await fixtureDeadline((async()=>{while(true){const save=ctx.buildSupportDiagnosticsReport().save;if(!save.debouncePending.value&&!save.activePersistCalls.value)return;await flush();}})(),'fixture saves finish before measuring source preservation');
+ const before=JSON.stringify(ctx.state),head=await store.readHead(),pending=await store.getPendingUpload('owner'),raw=await store.readRawExportSnapshot(),writes=backend.writes.length;
+ let roots=0,expectedCloud=JSON.stringify([...backend.docs]);
+ app.faults.serverRead=async path=>{if(path==='users/owner'&&++roots===3){backend.docs.set(path,{...backend.docs.get(path),rev:app.originalRoot.rev+1});expectedCloud=JSON.stringify([...backend.docs]);}};
+ t.after(()=>{delete app.faults.serverRead;});
+ assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true,'one transient peer change reaches a fresh verified preview in the same user attempt');
+ const modal=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(modal,/data-act="choose-cloud-recovery-source"/);assert.doesNotMatch(modal,/data-act="choose-cloud-recovery-source"[^>]*aria-pressed="true"/);
+ assert.match(modal,/data-act="apply-cloud-source-recovery"[^>]*disabled/);assert.equal(roots,8,'one restart reads two entirely fresh complete captures');
+ assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(await store.readHead(),head);assert.deepEqual(await store.getPendingUpload('owner'),pending);
+ assert.deepEqual(await store.readRawExportSnapshot(),raw);assert.equal(JSON.stringify([...backend.docs]),expectedCloud);assert.equal(backend.writes.length,writes,'verification never publishes or selects a source');
+ let download=null,blob=null;const link=makeFakeElement();link.remove=()=>{};link.click=()=>{download=blob;};
+ shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();ctx.Blob=class{constructor(parts){blob=parts.join('');}};
+ ctx.URL={createObjectURL(){return 'blob:fresh-source-diagnostics';},revokeObjectURL(){}};
+ ctx.onAction('view-support-diagnostics',{});await ctx.onAction('download-support-diagnostics',{});assert.equal(typeof download,'string');
+ const report=JSON.parse(download),operations=report.sourceOperations;
+ assert.equal(report.metadataOnly,true);assert.equal(report.boardDataIncluded,false);assert.ok(Buffer.byteLength(download,'utf8')<=24*1024);assert.ok(report.events.length<=80);assert.ok(operations.length<=8);
+ assert.equal(report.retention.truncated.value,true,'compacted diagnostic detail is explicitly disclosed');assert.ok(report.retention.dropped.value>0);
+ assert.equal(operations.filter(operation=>operation.status==='stale').length,1,'the report retains the original cross-capture refusal after automatic recovery: '+JSON.stringify(operations.map(operation=>({alias:operation.alias,status:operation.status,events:operation.events.map(event=>event.stage+":"+event.status)}))));
+ assert.equal(operations.filter(operation=>operation.status==='completed').length,1,'the fresh verification has a separate completed operation');
+ assert.ok(operations[0].events.some(event=>event.stage==='source-read'&&event.status==='stale'));
+ assert.doesNotMatch(download,/owner|generationId|Fixture A|Device source only/,'the actual downloaded retry trace stays redacted');
+ assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(await store.readHead(),head);assert.deepEqual(await store.getPendingUpload('owner'),pending);assert.deepEqual(await store.readRawExportSnapshot(),raw);assert.equal(backend.writes.length,writes);
+});
+
+async function freshSourceCheckFixture187(t,options={}){
+ const app=await divergentCloudSourceApp187(t,options);
+ app.ctx.window.CLOUD_PUSH_DELAY_MS=60000;
+ await fixtureDeadline((async()=>{while(true){const save=app.ctx.buildSupportDiagnosticsReport().save;if(!save.debouncePending.value&&!save.activePersistCalls.value)return;await flush();}})(),'fixture saves finish before fresh-check controls');
+ return app;
+}
+
+test('RISK cloud source fresh check: head metadata alone permits one fresh pair and visible cancellable progress',async t=>{
+ const app=await freshSourceCheckFixture187(t),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore,readHead=store.readHead.bind(store),gate=deferredSyncFixture();
+ const before=JSON.stringify(ctx.state),head=await readHead(),pending=await store.getPendingUpload('owner'),raw=await store.readRawExportSnapshot(),cloud=JSON.stringify([...backend.docs]),writes=backend.writes.length;
+ let heads=0,roots=0,review;store.readHead=async()=>{const value=await readHead();return ++heads>=3?{...value,committedAt:(value.committedAt||0)+1}:value;};
+ app.faults.serverRead=async path=>{if(path==='users/owner'&&++roots===5)await gate.promise;};
+ t.after(async()=>{gate.resolve();store.readHead=readHead;delete app.faults.serverRead;await review;});
+ review=ctx.onAction('review-cloud-source-recovery',{});
+ await fixtureDeadline((async()=>{while(roots<5)await flush();})(),'the entirely fresh pair enters its real SDK root read');
+ const progress=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(progress,/Checking fresh sources within the same one-minute limit/);assert.match(progress,/data-act="close-modal">Cancel/);assert.match(progress,/data-cloud-source-readonly/);assert.match(progress,/until the checks finish/,'the fresh check is actually running');
+ gate.resolve();assert.equal(await review,true);assert.equal(roots,8);
+ assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(await readHead(),head);assert.deepEqual(await store.getPendingUpload('owner'),pending);assert.deepEqual(await store.readRawExportSnapshot(),raw);
+ assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal(backend.writes.length,writes);
+});
+
+test('RISK cloud source fresh check: changed head ownership and unknown record facts cannot count as harmless metadata',async t=>{
+ for(const field of ['account','sourceFingerprint','futureHeadAuthority'])await t.test(field,async sub=>{
+  const app=await freshSourceCheckFixture187(sub),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore,readHead=store.readHead.bind(store);
+  const before=JSON.stringify(ctx.state),head=await readHead(),pending=await store.getPendingUpload('owner'),cloud=JSON.stringify([...backend.docs]),writes=backend.writes.length;let heads=0,roots=0;
+  store.readHead=async()=>{const value=await readHead();return ++heads>=3?{...value,[field]:'different protected head fact'}:value;};
+  app.faults.serverRead=async path=>{if(path==='users/owner')roots++;};sub.after(()=>{store.readHead=readHead;delete app.faults.serverRead;});
+  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),false,'a changed head owner, source identity or unknown authority cannot be rebound by a fresh check');
+  assert.equal(roots,4,'unsafe head facts cannot start another complete capture');assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="choose-cloud-recovery-source"/);
+  assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(await readHead(),head);assert.deepEqual(await store.getPendingUpload('owner'),pending);assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal(backend.writes.length,writes);
+ });
+});
+
+test('RISK cloud source fresh check: structured-clone head facts cannot be erased by the metadata exception',async t=>{
+ const cases=[
+  ['NaN to null',()=>({futureHeadAuthority:NaN}),()=>({futureHeadAuthority:null})],
+  ['missing to undefined',()=>({}),()=>({futureHeadAuthority:undefined})],
+  ['negative zero to zero',()=>({futureHeadAuthority:-0}),()=>({futureHeadAuthority:0})],
+  ['named array property',()=>({futureHeadAuthority:Object.assign(['same'],{authority:'original'})}),()=>({futureHeadAuthority:Object.assign(['same'],{authority:'changed'})})],
+  ['unchanged typed authority',()=>({futureHeadAuthority:{nan:NaN,optional:undefined,zero:-0,list:Object.assign(['same'],{authority:'original'})}}),()=>({futureHeadAuthority:{nan:NaN,optional:undefined,zero:-0,list:Object.assign(['same'],{authority:'original'})}}),true]
+ ];
+ for(const [name,firstFacts,nextFacts,mayRefresh=false] of cases)await t.test(name,async sub=>{
+  const app=await freshSourceCheckFixture187(sub),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+  const original=await store.readHead(),{payload,...meta}=original,firstHead={...meta,...firstFacts()},nextHead={...meta,...nextFacts(),committedAt:meta.committedAt+1};
+  await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>tx.objectStore('meta').put(firstHead,'head'));
+  assert.deepEqual(structuredClone(await store.readHead()),{...firstHead,payload},'the actual device consumer preserves the initial typed unknown facts');
+  const before=JSON.stringify(ctx.state),pending=await store.getPendingUpload('owner'),raw=await store.readRawExportSnapshot(),cloud=JSON.stringify([...backend.docs]),writes=backend.writes.length;
+  const expectedRaw=structuredClone(raw),headIndex=expectedRaw.stores.meta.keys.indexOf('head');assert.ok(headIndex>=0);expectedRaw.stores.meta.values[headIndex]=structuredClone(nextHead);
+  let roots=0;app.faults.serverRead=async path=>{if(path==='users/owner'&&++roots===2)await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>tx.objectStore('meta').put(nextHead,'head'));};
+  sub.after(()=>{delete app.faults.serverRead;});
+  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),mayRefresh,'only unchanged typed authority can permit the committedAt-only fresh pair');
+  assert.equal(roots,mayRefresh?8:4,'changed typed authority cannot start extra captures; unchanged authority still permits one fresh pair');
+  const modal=shim.document.getElementById('modalRoot').innerHTML;
+  if(mayRefresh){assert.match(modal,/data-act="choose-cloud-recovery-source"/);assert.doesNotMatch(modal,/data-act="choose-cloud-recovery-source"[^>]*aria-pressed="true"/);assert.match(modal,/data-act="apply-cloud-source-recovery"[^>]*disabled/);}
+  else{assert.doesNotMatch(modal,/data-act="choose-cloud-recovery-source"/);assert.match(modal,/Checks have stopped/);}
+  assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(structuredClone(await store.readHead()),{...nextHead,payload});assert.deepEqual(await store.getPendingUpload('owner'),pending);
+  assert.deepEqual(structuredClone(await store.readRawExportSnapshot()),expectedRaw,'only the intentional external head change exists; all typed original sources remain exact');
+  assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal(backend.writes.length,writes);
+ });
+});
+
+test('RISK cloud source fresh check: continuing peer churn stops after four complete captures without choosing',async t=>{
+ const app=await freshSourceCheckFixture187(t),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+ const before=JSON.stringify(ctx.state),head=await store.readHead(),pending=await store.getPendingUpload('owner'),raw=await store.readRawExportSnapshot(),writes=backend.writes.length;
+ let roots=0,expectedCloud;app.faults.serverRead=async path=>{if(path==='users/owner'){roots++;if(roots===3||roots===7)backend.docs.set(path,{...backend.docs.get(path),rev:backend.docs.get(path).rev+1});expectedCloud=JSON.stringify([...backend.docs]);}};
+ t.after(()=>{delete app.faults.serverRead;});
+ assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),false);assert.equal(roots,8,'a second inconsistency cannot start a third pair');
+ const modal=shim.document.getElementById('modalRoot').innerHTML;assert.match(modal,/The sources changed while they were read/);assert.doesNotMatch(modal,/data-act="choose-cloud-recovery-source"/);
+ assert.match(modal,/Checks have stopped. Source choices remain unavailable. Read sources again to make a fresh check/);
+ assert.doesNotMatch(modal,/until the checks finish|Keep this app open while the sources are checked/,'terminal refusal cannot imply a check is still running');assert.match(modal,/data-cloud-source-readonly/);
+ assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(await store.readHead(),head);assert.deepEqual(await store.getPendingUpload('owner'),pending);assert.deepEqual(await store.readRawExportSnapshot(),raw);
+ assert.equal(JSON.stringify([...backend.docs]),expectedCloud);assert.equal(backend.writes.length,writes);
+});
+
+test('RISK cloud source fresh check: the restart shares the original minute and late replies remain powerless',async t=>{
+ const clock=recoveryReadClock187(),app=await freshSourceCheckFixture187(t,{timeoutMs:20000,recoveryTimeoutMs:null,timerProvider:clock.provider}),{ctx,shim,backend}=app;
+ const first=deferredSyncFixture(),second=deferredSyncFixture(),fresh=deferredSyncFixture();let roots=0,settled=false,review;
+ app.faults.serverRead=async path=>{if(path==='users/owner'){roots++;if(roots===1)await first.promise;if(roots===3){backend.docs.set(path,{...backend.docs.get(path),rev:app.originalRoot.rev+1});await second.promise;}if(roots===5)await fresh.promise;}};
+ t.after(async()=>{first.resolve();second.resolve();fresh.resolve();delete app.faults.serverRead;clock.stop();await review;});
+ const before=JSON.stringify(ctx.state),head=await ctx.window.ScannerDeviceStore.readHead(),pending=await ctx.window.ScannerDeviceStore.getPendingUpload('owner'),writes=backend.writes.length;clock.activate(app);
+ review=ctx.onAction('review-cloud-source-recovery',{}).finally(()=>{settled=true;});await fixtureDeadline((async()=>{while(roots<1)await flush();})(),'first SDK root enters');
+ await clock.advance(26000);first.resolve();await fixtureDeadline((async()=>{while(roots<3)await flush();})(),'second complete capture enters');await clock.advance(24000);second.resolve();
+ await fixtureDeadline((async()=>{while(roots<5)await flush();})(),'fresh restart enters with only ten seconds remaining');
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/Checking fresh sources/);await clock.advance(9999);assert.equal(settled,false);await clock.advance(1);assert.equal(settled,true);assert.equal(await review,false);
+ const failed=shim.document.getElementById('modalRoot').innerHTML;assert.match(failed,/Cloud request timed out/);assert.match(failed,/Checks have stopped/);assert.doesNotMatch(failed,/until the checks finish/);fresh.resolve();for(let n=0;n<20;n++)await flush();assert.equal(shim.document.getElementById('modalRoot').innerHTML,failed);
+ assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(await ctx.window.ScannerDeviceStore.readHead(),head);assert.deepEqual(await ctx.window.ScannerDeviceStore.getPendingUpload('owner'),pending);assert.equal(backend.writes.length,writes);
+});
+
+test('RISK cloud source fresh check: Cancel and reopen revoke a stalled fresh pair and its late callback',async t=>{
+ const app=await freshSourceCheckFixture187(t),{ctx,shim,backend}=app,gate=deferredSyncFixture();let roots=0,review,settled=false;
+ app.faults.serverRead=async path=>{if(path==='users/owner'){roots++;if(roots===3)backend.docs.set(path,{...backend.docs.get(path),rev:app.originalRoot.rev+1});if(roots===5)await gate.promise;}};
+ t.after(async()=>{gate.resolve();delete app.faults.serverRead;await review;});
+ const before=JSON.stringify(ctx.state),head=await ctx.window.ScannerDeviceStore.readHead(),pending=await ctx.window.ScannerDeviceStore.getPendingUpload('owner'),writes=backend.writes.length;
+ review=ctx.onAction('review-cloud-source-recovery',{}).finally(()=>{settled=true;});await fixtureDeadline((async()=>{while(roots<5)await flush();})(),'fresh pair is held');
+ await ctx.onAction('close-modal',{});await flush();await flush();assert.equal(settled,true);assert.equal(await review,false);
+ assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);const current=shim.document.getElementById('modalRoot').innerHTML;gate.resolve();for(let n=0;n<20;n++)await flush();assert.equal(shim.document.getElementById('modalRoot').innerHTML,current);
+ assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(await ctx.window.ScannerDeviceStore.readHead(),head);assert.deepEqual(await ctx.window.ScannerDeviceStore.getPendingUpload('owner'),pending);assert.equal(backend.writes.length,writes);
+});
+
+test('RISK cloud source fresh check: changed local authority and unsupported or failed reads never restart',async t=>{
+ for(const change of ['same-email other UID','auth epoch','draft','accepted edit','pending','browser raw','device hold','storage failure','unsupported cloud'])await t.test(change,async sub=>{
+  const app=await freshSourceCheckFixture187(sub),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore,readHead=store.readHead.bind(store);
+  const before=JSON.stringify(ctx.state),head=await readHead(),writes=backend.writes.length;let roots=0,expectedLocal=before,expectedPending=await store.getPendingUpload('owner');
+  app.faults.serverRead=async path=>{if(path==='users/owner'&&++roots===3){
+   if(change==='same-email other UID')backend.emitAuth({uid:'another-owner',email:'e@example.com'});
+   if(change==='auth epoch'){backend.emitAuth(null);backend.emitAuth({uid:'owner',email:'e@example.com'});}
+   if(change==='draft')shim.document.getElementById('addInput').value='Preserve this draft';
+   if(change==='accepted edit'){shim.document.getElementById('addInput').value='Accepted while sources change';await ctx.onAction('add',{});await ctx.persist();expectedLocal=JSON.stringify(ctx.state);}
+   if(change==='pending'){expectedPending={account:'owner',generationId:'new-protected-pending',payloadHash:'a'.repeat(64),baseRev:4,updatedAt:1};await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>tx.objectStore('meta').put(expectedPending,'pending:owner'));}
+   if(change==='browser raw')shim.localStorage.setItem(LOCAL_HEAD_KEY,'sole changed browser source');
+   if(change==='device hold')await store.setRecoveryCloudHold({account:'e@example.com',identity:'owner',futureHold:'retain'});
+   if(change==='storage failure')store.readHead=async()=>{throw Error('controlled device read refusal');};
+   if(change==='unsupported cloud')backend.docs.set(path,{...backend.docs.get(path),schemaVersion:99});
+  }};
+  sub.after(()=>{store.readHead=readHead;delete app.faults.serverRead;});
+  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),false);assert.ok(roots<=4,'unsafe changes cannot start the fresh third capture');
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,change==='same-email other UID'||change==='auth epoch'?/The signed-in account changed/:/Checks have stopped/);assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/until the checks finish|Keep this app open while the sources are checked/);
+  assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="choose-cloud-recovery-source"/);assert.equal(JSON.stringify(ctx.state),expectedLocal);assert.deepEqual(await store.getPendingUpload('owner'),expectedPending);assert.equal(backend.writes.length,writes);
+  if(change==='accepted edit')assert.ok(JSON.parse((await readHead()).payload).tasks.some(row=>row.title==='Accepted while sources change'));
+  else assert.equal((await readHead()).hash,head.hash);
+  if(change==='draft')assert.equal(shim.document.getElementById('addInput').value,'Preserve this draft');
+  if(change==='browser raw')assert.equal(shim.localStorage.getItem(LOCAL_HEAD_KEY),'sole changed browser source');
+ });
+});
+
+test('RISK cloud source fresh check: a draft changed as fresh progress opens cannot become the new baseline',async t=>{
+ const app=await freshSourceCheckFixture187(t),{ctx,shim,backend}=app,root=shim.document.getElementById('modalRoot');
+ let markup=root.innerHTML,roots=0,changed=false;
+ Object.defineProperty(root,'innerHTML',{configurable:true,get:()=>markup,set:value=>{markup=value;if(!changed&&value.includes('Checking fresh sources')){changed=true;shim.document.getElementById('addInput').value='Draft typed as the fresh check opens';}}});
+ app.faults.serverRead=async path=>{if(path==='users/owner'&&++roots===3)backend.docs.set(path,{...backend.docs.get(path),rev:app.originalRoot.rev+1});};
+ t.after(()=>{delete app.faults.serverRead;});
+ const before=JSON.stringify(ctx.state),head=await ctx.window.ScannerDeviceStore.readHead(),pending=await ctx.window.ScannerDeviceStore.getPendingUpload('owner'),writes=backend.writes.length;
+ assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),false);assert.equal(changed,true);assert.equal(roots,6,'the fresh first capture cannot rebind an altered draft or start its second capture');
+ assert.equal(shim.document.getElementById('addInput').value,'Draft typed as the fresh check opens');assert.doesNotMatch(markup,/data-act="choose-cloud-recovery-source"/);
+ assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(await ctx.window.ScannerDeviceStore.readHead(),head);assert.deepEqual(await ctx.window.ScannerDeviceStore.getPendingUpload('owner'),pending);assert.equal(backend.writes.length,writes);
+});
+
+test('RISK cloud source fresh check guidance: mounted Help explains one fresh check without choosing',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ const answer=help.split('<dt>What can I inspect while cloud checks wait?</dt><dd>')[1]?.split('</dd>')[0];
+ assert.ok(answer);assert.match(answer,/When safe, changed sources get one fresh check within that minute; nothing is chosen automatically/);
+ assert.match(answer,/Cancel stops the review without choosing or changing a source/);assert.match(answer,/The whole source review has a one-minute limit/);
+ assert.match(html,/Recovery rechecks changed sources once within the original minute, without choosing a source/);
+});
 
 test('RISK recovery read minute: native source review accepts headers arriving at twenty-six seconds within one minute',async t=>{
  const clock=recoveryReadClock187(),app=await divergentCloudSourceApp187(t,{timeoutMs:20000,timerProvider:clock.provider,recoveryTimeoutMs:null}),{ctx,shim,backend,originalRoot}=app;
@@ -1192,6 +1374,31 @@ test('RISK resilient sync recovery: unsupported unverifiable and foreign sources
   if(control==='failed protection')assert.ok(app.idbFault.aborts>0,'the external IndexedDB boundary genuinely aborted source preservation');
  });
 });
+const APOLOGY_NOTICE_ID = "sync-stability-2026-10";
+const ORIGINAL_APOLOGY = `Hey users! Terribly sorry about sync and stability issues that have happened in the past twenty four hours. App will be moving to a proper stable and beta approach in the future, with beta versions tested by me and only released to users like you on the stable version (the one you are on) after I have beta tested them myself in ways automated tests and reviews sometimes fail to catch (like today). Thank you for your patience as I am adopting sensible software dev approaches late because this blew up from a personal project to something a little bigger real fast, and as someone who is a theatre major - well, it’s all still a big shock.
+
+Have a great day, and keep whittling those todo lists! <3 Emerald`;
+
+function channelReleaseEnvelope(channel, startsAt, deployedAt = startsAt) {
+  const destination = channel === "beta"
+    ? { origin: "https://chain-scanner.web.app", basePath: "/" }
+    : { origin: "https://emerald-pham.github.io", basePath: "/funsidething/" };
+  const current = html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1];
+  const appFingerprint = current?.match(/data-app-fingerprint="([a-f0-9]{64})"/)?.[1];
+  assert.ok(appFingerprint, "the current app shell supplies its own product fingerprint");
+  return {
+    schemaVersion: 1,
+    channel,
+    ...destination,
+    product: {
+      sourceRevision: "01b95ef42414d6ba7817ff9c5ebac6e3be3d6350",
+      tree: "37248116fc2cac8bd35e7d966c92b45c7744b728",
+      appFingerprint,
+    },
+    deployedAt: new Date(deployedAt).toISOString(),
+    notices: { [APOLOGY_NOTICE_ID]: { startsAt: new Date(startsAt).toISOString() } },
+  };
+}
 
 test('RISK optional oldest start: enabled Start offers a candidate without dotting or learning',async()=>{
  const {ctx,shim}=await loadApp({seed:182});
@@ -5738,6 +5945,32 @@ function serviceWorkerHarness(worker, existingCacheNames = []) {
   return { handlers, cacheRecords, skipWaitingCalls: () => skipWaitingCalls, claimCalls: () => claimCalls };
 }
 
+test('RISK PWA release metadata: exact scoped identity bypasses stale shell cache',async()=>{
+ for(const {origin,basePath} of [
+  {origin:'https://chain-scanner.web.app',basePath:'/'},
+  {origin:'https://emerald-pham.github.io',basePath:'/funsidething/'},
+ ]){
+  const handlers={},cacheReads=[],networkRequests=[];let online=true;
+  const caches={match:async request=>{cacheReads.push(new URL(request.url).pathname);return new Response('stale shell metadata');}};
+  const worker=serviceWorkerSource(),scope=origin+basePath;
+  vm.runInNewContext(worker,{caches,URL,Request,fetch:async request=>{
+   const url=new URL(request.url);networkRequests.push(url.href);if(!online)throw Error('offline');return new Response('fresh metadata');
+  },self:{location:{origin},registration:{scope},addEventListener(type,handler){handlers[type]=handler;},clients:{claim(){return Promise.resolve();}}}},{filename:'sw.js'});
+  const request=async url=>{let response;handlers.fetch({request:new Request(url),respondWith(value){response=value;}});assert.ok(response,'the service worker handles same-origin GETs');return response;};
+  const metadataUrl=new URL('channel-release.json?release=one',scope).href;
+  const fresh=await request(metadataUrl);
+  assert.equal(await fresh.text(),'fresh metadata','a cached envelope must never identify the running release');
+  assert.deepEqual(cacheReads,[],'the exact scoped metadata request skips cache lookup');
+  online=false;
+  await assert.rejects(request(new URL('channel-release.json?release=offline',scope).href),/offline/,'offline metadata has no stale shell fallback');
+  assert.deepEqual(cacheReads,[],'metadata remains network-only when the network fails');
+  const shell=await request(new URL('index.html',scope).href);
+  assert.equal(await shell.text(),'stale shell metadata','ordinary shell assets retain the existing cache-first behavior');
+  assert.equal(cacheReads.length,1,'only the ordinary shell request consulted the cache');
+  assert.equal(networkRequests.length,2,'both metadata requests reached the network; the offline ordinary cached shell did not');
+ }
+});
+
 test("PWA lifecycle: shell waits for prior clients and normal activation retires prior caches", async () => {
   const worker = serviceWorkerSource();
   const { cacheName, rawPaths } = appShellContract(worker);
@@ -5999,7 +6232,7 @@ function makeDomShim({ prefersDark = false, sharedStorage = null } = {}) {
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
-async function loadApp({ appSource=appSrc, artifacts=null, seed, cloudSyncFactory, prefersDark = false, noMatchMedia = false, seedStorage, sharedStorage, hostStorage, hostStorageDelayMs = 0, beforeStateReady, navigatorProvider, cryptoProvider = webcrypto, indexedDBProvider, deviceDbName, deviceOpenTimeoutMs, withSceneModules = false, sceneModulesAfterDomReady = false } = {}) {
+async function loadApp({ appSource=appSrc, artifacts=null, seed, cloudSyncFactory, prefersDark = false, noMatchMedia = false, seedStorage, sharedStorage, hostStorage, hostStorageDelayMs = 0, beforeStateReady, navigatorProvider, cryptoProvider = webcrypto, indexedDBProvider, deviceDbName, deviceOpenTimeoutMs, withSceneModules = false, sceneModulesAfterDomReady = false, locationHref, fetchProvider } = {}) {
   const shim = makeDomShim({ prefersDark, sharedStorage });
   const ownedTimers=new Set();let disposed=false,sandbox;
   const fixture={async dispose(){
@@ -6016,6 +6249,8 @@ async function loadApp({ appSource=appSrc, artifacts=null, seed, cloudSyncFactor
     timer.unref?.();return timer;
   };
   const cancel=timer=>{ownedTimers.delete(timer);clearTimeout(timer);};
+  if(locationHref)shim.window.location=new URL(locationHref);
+  if(fetchProvider){shim.window.fetch=fetchProvider;shim.window.AbortController=AbortController;}
   if (noMatchMedia) delete shim.window.matchMedia;   // old browser / bare JS host
   if (seedStorage) for (const [k, v] of Object.entries(seedStorage)) shim.localStorage.setItem(k, v);
   /* The OTHER persistence backend. loadState() prefers window.storage (the
@@ -6042,6 +6277,9 @@ async function loadApp({ appSource=appSrc, artifacts=null, seed, cloudSyncFactor
     window: shim.window,
     document: shim.document,
     localStorage: shim.localStorage,
+    URL,
+    AbortController,
+    fetch:fetchProvider,
     console,
     JSON,
     crypto:cryptoProvider,
@@ -6094,6 +6332,8 @@ async function loadApp({ appSource=appSrc, artifacts=null, seed, cloudSyncFactor
   vm.runInContext(appSource, sandbox, { filename: "index.html#app" });
   shim.document.currentScript=null;
   beforeStateReady?.(sandbox, shim);
+  if(/<script\b[^>]*\bsrc=["']app-release\.js["']/i.test(html))
+    vm.runInContext(fs.readFileSync(path.join(__dirname,"app-release.js"),"utf8"),sandbox,{filename:"app-release.js"});
   if (sceneModulesAfterDomReady) {
     await flush(); // the inline boot script can resume before deferred modules execute
     const installTimeHook=installSceneModules();
@@ -6154,6 +6394,325 @@ test("app harness: boots cleanly with an empty state", async () => {
   assert.equal(ctx.state.tasks.length, 0);
   assert.equal(ctx.state.chain.length, 0);
   assert.equal(ctx.state.mode, "scan");
+});
+
+test('RISK apology notice: an eligible Beta login shows the exact original apology',async()=>{
+ const at=Date.parse('2026-10-20T12:00:00.000Z'),startsAt=at-60*60*1000,requests=[];
+ assert.equal(createHash('sha256').update(ORIGINAL_APOLOGY,'utf8').digest('hex'),'5ddea3c755f9477e33908f16b94867a0ee9e4004e46ab169131cd814cf7188b2');
+ const envelope=channelReleaseEnvelope('beta',startsAt,startsAt);
+ const app=await loadAppAtTime(at,{
+  locationHref:'https://chain-scanner.web.app/',
+  fetchProvider:async(url,options)=>{
+   requests.push({url:String(url),options});
+   return {ok:true,redirected:false,type:'basic',url:String(url),json:async()=>envelope};
+  },
+  cloudSyncFactory:()=>({ready:false,user:null,status:'idle',configured:true,recoveryIdentity:()=> 'beta-uid'}),
+  beforeStateReady:(_ctx,shim)=>{shim.document.getElementById('appChangelogCurrent').innerHTML=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];},
+ });
+ app.ctx.closeModal();
+ const cloud=app.ctx.window.CloudSync;cloud.ready=true;cloud.user='beta-account';
+ app.ctx.window.dispatchEvent(new app.ctx.CustomEvent('cloudsync'));
+ const modal=app.shim.document.getElementById('modalRoot').innerHTML;
+ const expectedHtml=ORIGINAL_APOLOGY.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n\n/g,'<br><br>');
+ assert.ok(modal.includes(expectedHtml),'the real signed-in app consumer should show the original copy inside its automatic Beta window');
+ assert.equal(requests.length,1,'the page obtains channel identity from the public release envelope');
+ assert.equal(new URL(requests[0].url).pathname,'/channel-release.json');
+ assert.equal(requests[0].options.credentials,'omit');
+ assert.equal(requests[0].options.cache,'no-store');
+ assert.equal(requests[0].options.redirect,'error');
+ assert.equal(app.ctx.window.ChainRelease?.current?.channel,'beta');
+});
+
+function publishedBetaContinuation(){
+ const startsAt='2026-10-20T19:42:33.722Z';
+ return {schemaVersion:1,channel:'beta',origin:'https://chain-scanner.web.app',basePath:'/',noticeId:APOLOGY_NOTICE_ID,
+  originalProduct:{sourceRevision:'b50ac1694502090a51503fdaa79d97d19d13d43e',tree:'d0a89f3232179b5fe6368744b9a69a82b533f547',appFingerprint:'cc008c890dc3f5de3ce1e5fb35c8a3dede880d3aec5d6881e4c563fce722ec48'},
+  originalDeployedAt:startsAt,originalStartsAt:startsAt,
+  evidence:{artifactSha256:'c3f68dab62ed156e413e88d78c0901c761f9f013edb97528a5fadb8e29ae880e',publicationSha256:'1'.repeat(64),publicVerificationSha256:'2'.repeat(64)}};
+}
+
+test('RISK apology release identity: a later Beta product retains the published notice window',async()=>{
+ const startsAt='2026-10-20T19:42:33.722Z',deployedAt='2026-10-22T12:00:00.000Z',at=Date.parse('2026-10-23T12:00:00.000Z');
+ const envelope=channelReleaseEnvelope('beta',startsAt,deployedAt),continuation=publishedBetaContinuation();
+ envelope.notices[APOLOGY_NOTICE_ID].continuation=continuation;
+ const app=await loadAppAtTime(at,{
+  locationHref:'https://chain-scanner.web.app/',
+  fetchProvider:async url=>({ok:true,redirected:false,type:'basic',url:String(url),json:async()=>envelope}),
+  cloudSyncFactory:()=>({ready:false,user:null,status:'idle',configured:true,recoveryIdentity:()=> 'continued-beta-uid'}),
+  beforeStateReady:(_ctx,shim)=>{shim.document.getElementById('appChangelogCurrent').innerHTML=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];},
+ });
+ assert.equal(app.ctx.window.ChainRelease?.status,'verified','the actual metadata consumer accepts explicit original-publication provenance for a later product');
+ const release=app.ctx.window.ChainRelease.current;
+ assert.equal(release.deployedAt,deployedAt,'the product keeps its own later publication time');
+ assert.equal(release.notices[APOLOGY_NOTICE_ID].startsAt,startsAt,'the campaign keeps its original start');
+ assert.equal(JSON.stringify(release.notices[APOLOGY_NOTICE_ID].continuation),JSON.stringify(continuation),'the validated provenance remains inspectable');
+ assert.equal(Object.isFrozen(release.notices[APOLOGY_NOTICE_ID].continuation.evidence),true,'nested public provenance is immutable');
+ const before=JSON.stringify(app.ctx.state);
+ app.ctx.closeModal();const cloud=app.ctx.window.CloudSync;cloud.ready=true;cloud.user='continued@example.invalid';
+ app.ctx.window.dispatchEvent(new app.ctx.CustomEvent('cloudsync'));
+ assert.match(app.shim.document.getElementById('modalRoot').innerHTML,/data-apology-notice="sync-stability-2026-10"/,'the signed-in consumer remains eligible within the original window');
+ assert.equal(JSON.stringify(app.ctx.state),before,'release metadata and display do not alter the board');
+});
+
+test('RISK apology release identity: malformed continuation fails closed at the network consumer',async()=>{
+ const startsAt='2026-10-20T19:42:33.722Z',deployedAt='2026-10-22T12:00:00.000Z',at=Date.parse('2026-10-23T12:00:00.000Z');
+ const cases=[
+  ['null',notice=>{notice.continuation=null;}],
+  ['array',notice=>{notice.continuation=[];}],
+  ['unknown field',notice=>{notice.continuation.path='/private/evidence';}],
+  ['wrong schema',notice=>{notice.continuation.schemaVersion=2;}],
+  ['wrong channel',notice=>{notice.continuation.channel='stable';}],
+  ['wrong origin',notice=>{notice.continuation.origin='https://unverified.example';}],
+  ['wrong path',notice=>{notice.continuation.basePath='/funsidething/';}],
+  ['wrong notice',notice=>{notice.continuation.noticeId='another-notice';}],
+  ['bad product',notice=>{notice.continuation.originalProduct.tree='bad';}],
+  ['array original source',notice=>{notice.continuation.originalProduct.sourceRevision=[notice.continuation.originalProduct.sourceRevision];}],
+  ['array original tree',notice=>{notice.continuation.originalProduct.tree=[notice.continuation.originalProduct.tree];}],
+  ['array original fingerprint',notice=>{notice.continuation.originalProduct.appFingerprint=[notice.continuation.originalProduct.appFingerprint];}],
+  ['array current source',(_notice,envelope)=>{envelope.product.sourceRevision=[envelope.product.sourceRevision];}],
+  ['array current tree',(_notice,envelope)=>{envelope.product.tree=[envelope.product.tree];}],
+  ['extra product field',notice=>{notice.continuation.originalProduct.extra=true;}],
+  ['missing evidence',notice=>{delete notice.continuation.evidence.publicationSha256;}],
+  ['bad evidence hash',notice=>{notice.continuation.evidence.artifactSha256='bad';}],
+  ['extra evidence field',notice=>{notice.continuation.evidence.path='/private';}],
+  ['noncanonical time',notice=>{notice.continuation.originalDeployedAt='2026-10-20T19:42:33Z';}],
+  ['original starts before publication',notice=>{notice.continuation.originalDeployedAt='2026-10-21T00:00:00.000Z';}],
+  ['original publication after current',notice=>{notice.startsAt='2026-10-24T12:00:00.000Z';notice.continuation.originalStartsAt=notice.startsAt;notice.continuation.originalDeployedAt=notice.startsAt;}],
+  ['renewed start',notice=>{notice.startsAt=deployedAt;}],
+  ['malformed proof with otherwise valid legacy order',notice=>{notice.startsAt=deployedAt;notice.continuation=null;}],
+ ];
+ for(const [label,mutate] of cases){
+  const envelope=channelReleaseEnvelope('beta',startsAt,deployedAt);envelope.notices[APOLOGY_NOTICE_ID].continuation=publishedBetaContinuation();mutate(envelope.notices[APOLOGY_NOTICE_ID],envelope);
+  const app=await loadAppAtTime(at,{locationHref:'https://chain-scanner.web.app/',
+   fetchProvider:async url=>({ok:true,redirected:false,type:'basic',url:String(url),json:async()=>envelope}),
+   cloudSyncFactory:()=>({ready:false,user:null,status:'idle',configured:true,recoveryIdentity:()=> 'invalid-continuation-uid'}),
+   beforeStateReady:(_ctx,shim)=>{shim.document.getElementById('appChangelogCurrent').innerHTML=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];},
+  });
+  assert.equal(app.ctx.window.ChainRelease?.status,'unavailable',label);
+  const before=JSON.stringify(app.ctx.state);app.ctx.closeModal();const cloud=app.ctx.window.CloudSync;cloud.ready=true;cloud.user='invalid@example.invalid';app.ctx.window.dispatchEvent(new app.ctx.CustomEvent('cloudsync'));
+  assert.doesNotMatch(app.shim.document.getElementById('modalRoot').innerHTML,/data-apology-notice=/,label+': no automatic notice');
+  assert.equal(JSON.stringify(app.ctx.state),before,label+': board retained');
+  assert.equal(app.shim.localStorage.getItem('fvp:chain-scanner:release-notice:v1:sync-stability-2026-10:beta:invalid-continuation-uid'),null,label+': no notice marker');
+ }
+});
+
+test('RISK apology notice: continuation preserves expiry dismissal manual reopen and separate Stable',async()=>{
+ const startsAt=Date.parse('2026-10-20T19:42:33.722Z'),day=86400000,values=new Map();
+ const storage={getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,String(value)),removeItem:key=>values.delete(key)};
+ const setup=async(channel,at,uid)=>{
+  const envelope=channelReleaseEnvelope(channel,channel==='beta'?startsAt:at-day/24,channel==='beta'?startsAt+day:at-day/24);
+  if(channel==='beta')envelope.notices[APOLOGY_NOTICE_ID].continuation=publishedBetaContinuation();
+  const app=await loadAppAtTime(at,{locationHref:channel==='beta'?'https://chain-scanner.web.app/':'https://emerald-pham.github.io/funsidething/',sharedStorage:storage,
+   fetchProvider:async url=>({ok:true,redirected:false,type:'basic',url:String(url),json:async()=>envelope}),
+   cloudSyncFactory:()=>({ready:false,user:null,status:'idle',configured:true,recoveryIdentity:()=>uid}),
+   beforeStateReady:(_ctx,shim)=>{shim.document.getElementById('appChangelogCurrent').innerHTML=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];},
+  });
+  assert.equal(app.ctx.window.ChainRelease.status,'verified');app.ctx.closeModal();const cloud=app.ctx.window.CloudSync;cloud.ready=true;cloud.user=uid+'@example.invalid';app.ctx.window.dispatchEvent(new app.ctx.CustomEvent('cloudsync'));return app;
+ };
+ const first=await setup('beta',startsAt+2*day,'continued-dismissed');
+ assert.match(first.shim.document.getElementById('modalRoot').innerHTML,/data-apology-notice=/);first.ctx.closeModal();
+ const key='fvp:chain-scanner:release-notice:v1:sync-stability-2026-10:beta:continued-dismissed';assert.equal(storage.getItem(key),'dismissed');
+ const returning=await setup('beta',startsAt+3*day,'continued-dismissed');
+ assert.doesNotMatch(returning.shim.document.getElementById('modalRoot').innerHTML,/data-apology-notice=/,'a later product does not clear the account dismissal');
+ const expired=await setup('beta',startsAt+7*day,'continued-unshown');
+ assert.doesNotMatch(expired.shim.document.getElementById('modalRoot').innerHTML,/data-apology-notice=/,'the original expiry applies even though this product is newer');
+ assert.equal(storage.getItem(key.replace('continued-dismissed','continued-unshown')),null,'expiry does not consume a new marker');
+ expired.ctx.openHelp();const before=[...values];expired.ctx.onAction('reopen-apology',{});
+ assert.ok(expired.shim.document.getElementById('modalRoot').innerHTML.includes(ORIGINAL_APOLOGY.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n\n/g,'<br><br>')),'manual reopen retains the exact original copy after expiry');
+ assert.deepEqual([...values],before,'manual reopen does not renew the window or change saved facts');
+ const stable=await setup('stable',startsAt+8*day,'continued-dismissed');
+ assert.match(stable.shim.document.getElementById('modalRoot').innerHTML,/data-apology-notice=/,'Stable retains a separate fresh ordinary window for that account');
+});
+
+test('RISK apology notice: Help explains that later Beta builds retain the window',async()=>{
+ const app=await loadApp({seed:207216});app.ctx.closeModal();app.ctx.openHelp();
+ assert.match(app.shim.document.getElementById('modalRoot').innerHTML,/Beta and Stable windows are separate; later Beta updates keep the same window/,'the actual Help consumer explains the retained campaign window');
+});
+
+test('RISK apology notice: refreshing an unchanged release keeps the open message',async()=>{
+ const at=Date.parse('2026-10-24T12:00:00.000Z'),startsAt=at-60*60*1000,envelope=channelReleaseEnvelope('beta',startsAt,startsAt);
+ let requests=0;
+ const app=await loadAppAtTime(at,{
+  locationHref:'https://chain-scanner.web.app/',
+  fetchProvider:async url=>{requests++;return {ok:true,redirected:false,type:'basic',url:String(url),json:async()=>envelope};},
+  cloudSyncFactory:()=>({ready:false,user:null,status:'idle',configured:true,pull:async()=>({error:true}),recoveryIdentity:()=> 'refresh-uid'}),
+  beforeStateReady:(_ctx,shim)=>{shim.document.getElementById('appChangelogCurrent').innerHTML=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];},
+ });
+ app.ctx.closeModal();const cloud=app.ctx.window.CloudSync;cloud.ready=true;cloud.user='refresh@example.invalid';
+ app.ctx.window.dispatchEvent(new app.ctx.CustomEvent('cloudsync'));
+ const originalRelease=app.ctx.window.ChainRelease.current,modal=app.shim.document.getElementById('modalRoot');
+ assert.match(modal.innerHTML,/data-apology-notice="sync-stability-2026-10"/,'the verified signed-in user sees the apology');
+ app.ctx.window.dispatchEvent(new app.ctx.CustomEvent('focus'));await flush();await flush();
+ assert.equal(requests,2,'focus obtains a fresh public envelope');
+ assert.notEqual(app.ctx.window.ChainRelease.current,originalRelease,'refresh publishes a newly validated envelope object');
+ assert.match(modal.innerHTML,/data-apology-notice="sync-stability-2026-10"/,'a refresh of the same release identity must not dismiss the open message');
+});
+
+test('RISK apology release identity: invalid metadata stays silent without touching the board',async()=>{
+ const at=Date.parse('2026-10-23T12:00:00.000Z'),startsAt=at-60*60*1000;
+ const cases=[
+  ['wrong origin',envelope=>{envelope.origin='https://unverified.example';return {ok:true,redirected:false,type:'basic'};}],
+  ['wrong app fingerprint',envelope=>{envelope.product.appFingerprint='f'.repeat(64);return {ok:true,redirected:false,type:'basic'};}],
+  ['start before deployment',envelope=>{envelope.notices[APOLOGY_NOTICE_ID].startsAt=new Date(startsAt-1).toISOString();return {ok:true,redirected:false,type:'basic'};}],
+  ['redirected response',()=>({ok:true,redirected:true,type:'basic',url:'https://unverified.example/channel-release.json'})],
+  ['offline response',()=>{throw new TypeError('offline');}],
+ ];
+ for(const [label,responseFor] of cases){
+  const envelope=channelReleaseEnvelope('beta',startsAt,startsAt);
+  const app=await loadAppAtTime(at,{
+   locationHref:'https://chain-scanner.web.app/',
+   fetchProvider:async url=>({url:String(url),json:async()=>envelope,...responseFor(envelope)}),
+   cloudSyncFactory:()=>({ready:false,user:null,status:'idle',configured:true,recoveryIdentity:()=> 'invalid-envelope-uid'}),
+   beforeStateReady:(_ctx,shim)=>{shim.document.getElementById('appChangelogCurrent').innerHTML=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];},
+  });
+  assert.equal(app.ctx.window.ChainRelease?.status,'unavailable',label+': invalid or unavailable metadata is rejected');
+  assert.equal(app.ctx.window.ChainRelease?.current,null,label+': no channel is guessed');
+  const boardBefore=JSON.stringify(app.ctx.state);
+  app.ctx.closeModal();const cloud=app.ctx.window.CloudSync;cloud.ready=true;cloud.user='invalid@example.invalid';
+  app.ctx.window.dispatchEvent(new app.ctx.CustomEvent('cloudsync'));await flush();
+  assert.doesNotMatch(app.shim.document.getElementById('modalRoot').innerHTML,/data-apology-notice=/,label+': the real signed-in consumer remains silent');
+  assert.equal(JSON.stringify(app.ctx.state),boardBefore,label+': rejecting release metadata does not change the board');
+  assert.equal(app.shim.localStorage.getItem('fvp:chain-scanner:release-notice:v1:sync-stability-2026-10:beta:invalid-envelope-uid'),null,label+': rejected metadata does not persist notice state');
+ }
+});
+
+test('RISK apology notice: account dismissal and Stable window stay independent',async()=>{
+ const at=Date.parse('2026-10-21T12:00:00.000Z'),betaStarts=at-60*60*1000,stableStarts=at+60*60*1000;
+ const values=new Map(),storage={getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,String(value)),removeItem:key=>values.delete(key)};
+ let uid='beta-uid-a';
+ const setup=async(channel,startsAt,deployedAt,href,time)=>loadAppAtTime(time,{
+  locationHref:href,
+  fetchProvider:async url=>({ok:true,redirected:false,type:'basic',url:String(url),json:async()=>channelReleaseEnvelope(channel,startsAt,deployedAt)}),
+  sharedStorage:storage,
+  cloudSyncFactory:()=>({ready:false,user:null,status:'idle',configured:true,recoveryIdentity:()=>uid}),
+  beforeStateReady:(_ctx,shim)=>{shim.document.getElementById('appChangelogCurrent').innerHTML=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];},
+ });
+ const beta=await setup('beta',betaStarts,betaStarts,'https://chain-scanner.web.app/',at);beta.ctx.closeModal();
+ const cloud=beta.ctx.window.CloudSync;cloud.ready=true;cloud.user='first@example.invalid';beta.ctx.window.dispatchEvent(new beta.ctx.CustomEvent('cloudsync'));
+ const expected=ORIGINAL_APOLOGY.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n\n/g,'<br><br>');
+ const betaKey='fvp:chain-scanner:release-notice:v1:sync-stability-2026-10:beta:beta-uid-a';
+ assert.ok(beta.shim.document.getElementById('modalRoot').innerHTML.includes(expected),'the first signed-in Beta account receives its own notice');
+ assert.equal(storage.getItem(betaKey),'shown');beta.ctx.closeModal();assert.equal(storage.getItem(betaKey),'dismissed');
+ beta.ctx.window.dispatchEvent(new beta.ctx.CustomEvent('cloudsync'));
+ assert.doesNotMatch(beta.shim.document.getElementById('modalRoot').innerHTML,/data-apology-notice=/,'the dismissed account is not shown the automatic notice twice');
+ uid='beta-uid-b';cloud.user='second@example.invalid';beta.ctx.window.dispatchEvent(new beta.ctx.CustomEvent('cloudsync'));
+ const betaBKey=betaKey.replace('beta-uid-a','beta-uid-b');
+ assert.ok(beta.shim.document.getElementById('modalRoot').innerHTML.includes(expected),'the notice key follows the Auth UID rather than the display email');
+ beta.ctx.closeModal();assert.equal(storage.getItem(betaBKey),'dismissed');
+ const stable=await setup('stable',stableStarts,at,'https://emerald-pham.github.io/funsidething/',at);stable.ctx.closeModal();
+ const stableCloud=stable.ctx.window.CloudSync;stableCloud.ready=true;stableCloud.user='second@example.invalid';stable.ctx.window.dispatchEvent(new stable.ctx.CustomEvent('cloudsync'));
+ const stableKey='fvp:chain-scanner:release-notice:v1:sync-stability-2026-10:stable:beta-uid-b';
+ assert.doesNotMatch(stable.shim.document.getElementById('modalRoot').innerHTML,/data-apology-notice=/,'the Beta preview does not consume the later Stable window');
+ assert.equal(storage.getItem(stableKey),null);
+ setFakeTime(stable.ctx,stableStarts);stable.ctx.window.dispatchEvent(new stable.ctx.CustomEvent('cloudsync'));
+ assert.ok(stable.shim.document.getElementById('modalRoot').innerHTML.includes(expected),'the independent Stable window starts on its own date');
+ stable.ctx.closeModal();assert.equal(storage.getItem(stableKey),'dismissed');
+ setFakeTime(stable.ctx,stableStarts+7*24*60*60*1000);stable.ctx.openHelp();
+ const help=stable.shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(help,/data-help-changelog[\s\S]*data-act="reopen-apology"/,'Help exposes a direct Changelog action for rereading the notice');
+ const savedNoticeRows=[...values].filter(([key])=>key.startsWith('fvp:chain-scanner:release-notice:v1:'));
+ stable.ctx.onAction('reopen-apology',{});
+ assert.ok(stable.shim.document.getElementById('modalRoot').innerHTML.includes(expected),'the deliberate Changelog action reopens the original copy after expiry');
+ assert.deepEqual([...values].filter(([key])=>key.startsWith('fvp:chain-scanner:release-notice:v1:')),savedNoticeRows,'manual reopen does not consume or renew an automatic window');
+});
+
+test('RISK apology notice: automatic display waits for a modal and unfinished Add draft',async()=>{
+ const at=Date.parse('2026-10-22T12:00:00.000Z'),startsAt=at-60*60*1000;
+ const app=await loadAppAtTime(at,{
+  locationHref:'https://chain-scanner.web.app/',
+  fetchProvider:async url=>({ok:true,redirected:false,type:'basic',url:String(url),json:async()=>channelReleaseEnvelope('beta',startsAt,startsAt)}),
+  cloudSyncFactory:()=>({ready:false,user:null,status:'idle',configured:true,recoveryIdentity:()=> 'idle-test-uid'}),
+  beforeStateReady:(_ctx,shim)=>{shim.document.getElementById('appChangelogCurrent').innerHTML=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];},
+ });
+ const modal=app.shim.document.getElementById('modalRoot'),draft=app.shim.document.getElementById('addInput');
+ assert.match(modal.innerHTML,/Quick start/,'the user already has the app’s first-run Help modal');
+ draft.value='unfinished personal task';
+ const cloud=app.ctx.window.CloudSync;cloud.ready=true;cloud.user='idle@example.invalid';app.ctx.window.dispatchEvent(new app.ctx.CustomEvent('cloudsync'));
+ assert.match(modal.innerHTML,/Quick start/,'automatic notice must leave the existing modal open');
+ assert.doesNotMatch(modal.innerHTML,/data-apology-notice=/,'the notice does not replace user-owned Help');
+ assert.equal(draft.value,'unfinished personal task','the page draft remains exactly as entered');
+ app.ctx.closeModal();await flush();
+ assert.equal(modal.innerHTML,'','closing Help does not replace a still-unfinished draft');
+ assert.equal(draft.value,'unfinished personal task');
+ draft.value='';app.shim.document.dispatchEvent({type:'input',target:draft});app.shim.document.dispatchEvent({type:'focusout',target:draft});await flush();
+ const expected=ORIGINAL_APOLOGY.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n\n/g,'<br><br>');
+ assert.ok(modal.innerHTML.includes(expected),'once the user-owned UI is idle, the pending signed-in notice appears');
+ assert.equal(draft.value,'','notice display keeps the completed field state intact');
+});
+
+test('RISK apology notice: a context-only Add draft waits before consuming its window',async()=>{
+ const at=Date.parse('2026-10-22T13:00:00.000Z'),startsAt=at-60*60*1000;
+ const app=await loadAppAtTime(at,{
+  locationHref:'https://chain-scanner.web.app/',
+  fetchProvider:async url=>({ok:true,redirected:false,type:'basic',url:String(url),json:async()=>channelReleaseEnvelope('beta',startsAt,startsAt)}),
+  cloudSyncFactory:()=>({ready:false,user:null,status:'idle',configured:true,recoveryIdentity:()=> 'context-draft-uid'}),
+  beforeStateReady:(_ctx,shim)=>{shim.document.getElementById('appChangelogCurrent').innerHTML=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];},
+ });
+ app.ctx.closeModal();await flush();
+ const context=app.ctx.state.contexts[0];assert.ok(context,'the saved board supplies a context choice');
+ app.ctx.onAction('qctx',{dataset:{id:context.id}});
+ const cloud=app.ctx.window.CloudSync;cloud.ready=true;cloud.user='context-draft@example.invalid';
+ app.ctx.window.dispatchEvent(new app.ctx.CustomEvent('cloudsync'));await flush();
+ const modal=app.shim.document.getElementById('modalRoot'),key='fvp:chain-scanner:release-notice:v1:sync-stability-2026-10:beta:context-draft-uid';
+ assert.match(app.shim.document.getElementById('quickCtxRow').innerHTML,/aria-pressed="true"/,'the actual quick-add context action leaves the selected chip visible');
+ assert.doesNotMatch(modal.innerHTML,/data-apology-notice=/,'an Add context selection is an unfinished draft even when title and dates are empty');
+ assert.equal(app.shim.localStorage.getItem(key),null,'holding the notice does not consume this account’s automatic window');
+ app.ctx.onAction('qctx',{dataset:{id:context.id}});
+ app.shim.document.dispatchEvent({type:'focusout',target:app.shim.document.getElementById('addInput')});await flush();
+ assert.match(modal.innerHTML,/data-apology-notice="sync-stability-2026-10"/,'clearing the context draft lets the pending notice appear in the same account window');
+ assert.equal(app.shim.localStorage.getItem(key),'shown');
+});
+
+test('RISK apology notice: a later dependency row keeps its Add draft protected',async()=>{
+ const at=Date.parse('2026-10-22T14:00:00.000Z'),startsAt=at-60*60*1000;
+ const app=await loadAppAtTime(at,{
+  locationHref:'https://chain-scanner.web.app/',
+  fetchProvider:async url=>({ok:true,redirected:false,type:'basic',url:String(url),json:async()=>channelReleaseEnvelope('beta',startsAt,startsAt)}),
+  cloudSyncFactory:()=>({ready:false,user:null,status:'idle',configured:true,recoveryIdentity:()=> 'dependency-draft-uid'}),
+  beforeStateReady:(_ctx,shim)=>{shim.document.getElementById('appChangelogCurrent').innerHTML=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];},
+ });
+ app.ctx.closeModal();
+ const firstTask=app.ctx.addTask('First unfinished prerequisite',false),laterTask=app.ctx.addTask('Later unfinished prerequisite',false);
+ const first=app.shim.document.getElementById('addPrerequisite');first.value=firstTask.id;
+ app.shim.document.dispatchEvent({type:'change',target:first});
+ app.ctx.onAction('add-dependency',{dataset:{scope:'add'}});
+ const later=app.shim.document.getElementById('addPrerequisite1');later.value=laterTask.id;
+ app.shim.document.dispatchEvent({type:'change',target:later});
+ const boardBefore=JSON.stringify(app.ctx.state),cloud=app.ctx.window.CloudSync;
+ cloud.ready=true;cloud.user='dependency-draft@example.invalid';app.ctx.window.dispatchEvent(new app.ctx.CustomEvent('cloudsync'));await flush();
+ const modal=app.shim.document.getElementById('modalRoot'),key='fvp:chain-scanner:release-notice:v1:sync-stability-2026-10:beta:dependency-draft-uid';
+ assert.equal(app.shim.document.getElementById('addPrerequisite').value,firstTask.id,'the first dependency remains selected');
+ assert.equal(app.shim.document.getElementById('addPrerequisite1').value,laterTask.id,'the later dependency remains selected');
+ assert.doesNotMatch(modal.innerHTML,/data-apology-notice=/,'a selected later dependency is an unfinished Add draft even with blank title and dates');
+ assert.equal(app.shim.localStorage.getItem(key),null,'the pending notice does not consume the eligible account window');
+ assert.equal(JSON.stringify(app.ctx.state),boardBefore,'holding the notice leaves the saved board unchanged');
+ const firstField=app.shim.document.getElementById('addPrerequisite'),laterField=app.shim.document.getElementById('addPrerequisite1');
+ firstField.value='';laterField.value='';app.shim.document.dispatchEvent({type:'change',target:laterField});
+ app.shim.document.dispatchEvent({type:'focusout',target:app.shim.document.getElementById('addInput')});await flush();
+ assert.match(modal.innerHTML,/data-apology-notice="sync-stability-2026-10"/,'removing the dependency draft lets the pending notice display');
+ assert.equal(app.shim.localStorage.getItem(key),'shown');
+ assert.equal(JSON.stringify(app.ctx.state),boardBefore,'the automatic notice never mutates the board');
+});
+
+test('RISK apology notice: a held scanner gesture defers without consuming its window',async()=>{
+ const at=Date.parse('2026-10-22T15:00:00.000Z'),startsAt=at-60*60*1000;
+ const app=await loadAppAtTime(at,{
+  locationHref:'https://chain-scanner.web.app/',
+  fetchProvider:async url=>({ok:true,redirected:false,type:'basic',url:String(url),json:async()=>channelReleaseEnvelope('beta',startsAt,startsAt)}),
+  cloudSyncFactory:()=>({ready:false,user:null,status:'idle',configured:true,recoveryIdentity:()=> 'gesture-notice-uid'}),
+  beforeStateReady:(_ctx,shim)=>{shim.document.getElementById('appChangelogCurrent').innerHTML=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];},
+ });
+ app.ctx.closeModal();await flush();
+ const cloud=app.ctx.window.CloudSync;cloud.ready=true;cloud.user='gesture-notice@example.invalid';
+ app.shim.document.dispatchEvent({type:'pointerdown'});
+ app.ctx.window.dispatchEvent(new app.ctx.CustomEvent('cloudsync'));await flush();
+ const modal=app.shim.document.getElementById('modalRoot'),key='fvp:chain-scanner:release-notice:v1:sync-stability-2026-10:beta:gesture-notice-uid';
+ assert.doesNotMatch(modal.innerHTML,/data-apology-notice=/,'an eligible cloud event cannot open a modal during a held scanner gesture');
+ assert.equal(app.shim.localStorage.getItem(key),null,'a held gesture cannot consume or dismiss the notice window');
+ app.shim.document.dispatchEvent({type:'pointerup'});
+ await new Promise(resolve=>setTimeout(resolve,400));await flush();
+ assert.match(modal.innerHTML,/data-apology-notice="sync-stability-2026-10"/,'ordinary pointer release retries and delivers the still-eligible notice');
+ assert.equal(app.shim.localStorage.getItem(key),'shown');
 });
 
 /* ---------- state mutations ---------- */
@@ -7002,18 +7561,62 @@ test("RISK rating bounds: hydration and frozen chance opponents normalize extrem
   assert.ok(loser.sigma >= sigmaFloor && loser.sigma <= sigmaLimit);
 });
 
-test("RISK current-board export: Settings and save directions retain board recovery actions", async () => {
+test("RISK backup and Restore consolidation: Settings keeps one guarded action with all formats", async () => {
   const { ctx, shim } = await loadApp();
   ctx.openSettings();
   const panel = shim.document.getElementById("modalRoot").innerHTML;
-  assert.match(panel, /<h3>Current-board view, copy, and download<\/h3>/);
+  assert.match(panel, /<h3>Current-board view and copy<\/h3>/);
   assert.match(panel, /<h3>Support diagnostics<\/h3>/);
   assert.match(panel, /data-act="view-current-board"/);
-  assert.match(panel, /data-act="download-current-board"/);
+  assert.equal((panel.match(/data-act="download-backup"/g) || []).length, 1, "the board-data area has one Download backup action");
+  assert.equal((panel.match(/data-act="restore-backup"/g) || []).length, 1, "the board-data area has one guarded Restore action");
+  assert.match(panel, /id="backupDownloadFormat"[\s\S]*?value="current-board"[\s\S]*?value="recovery-archive"/);
+  assert.match(panel, /id="backupRestoreSource"[\s\S]*?value="file"[\s\S]*?value="paste"/);
+  assert.doesNotMatch(panel, /data-act="download-current-board"|data-act="download-recovery-archive"/);
+  assert.doesNotMatch(panel, /data-act="choose-backup-file"|data-act="open-paste-recovery"/);
   assert.doesNotMatch(panel, /Current board recovery/i);
   assert.match(html, /use View \/ copy current board in Settings before closing it/);
   assert.match(html, /use View \/ copy current board in Settings before choosing whether to delete an older backup/);
   assert.doesNotMatch(html, /Current board recovery/);
+});
+
+test('RISK backup format safety: raw-source qualification remains outside the native selector',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),original='{unreadable original backup source';
+ const app=await loadApp({indexedDBProvider:new IDBFactory(),deviceDbName:'raw-format-safety-'+Math.random(),seedStorage:{[SYNC_STORE_KEY]:original,[LOCAL_HEAD_KEY]:'different protected original'}}),{ctx,shim}=app;
+ t.after(()=>closeLegacyApp173(app));const before=await ctx.window.ScannerDeviceStore.readRawExportSnapshot();
+ ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
+ const format=settings.match(/<select\b[^>]*id="backupDownloadFormat"[^>]*>[\s\S]*?<\/select>/)?.[0];assert.ok(format);
+ assert.match(settings.replace(/<select\b[^>]*>[\s\S]*?<\/select>/g,''),/Raw device sources are not a board and cannot be restored as one\./,'the safety qualification is readable text outside the potentially truncated native option');
+ const describedBy=format.match(/aria-describedby="([^"]+)"/)?.[1];assert.ok(describedBy,'the native format control names its visible safety explanation');assert.ok(settings.includes('id="'+describedBy+'"'));
+ assert.deepEqual(await ctx.window.ScannerDeviceStore.readRawExportSnapshot(),before);assert.equal(shim.localStorage.getItem(SYNC_STORE_KEY),original);
+});
+
+test('RISK backup format browser: enlarged unreadable Settings keeps native selectors and safety text readable',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT),{resolveExpectedFirstRunHelp}=await import('./scripts/browser-fixture-setup.mjs');
+ const origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin,browser=await chromium.launch({headless:true});
+ const evidence=process.env.BACKUP_CONTROL_EVIDENCE_DIR;if(evidence)fs.mkdirSync(evidence,{recursive:true});
+ try{for(const theme of ['dark','light'])await t.test(theme,async()=>{
+  const context=await browser.newContext({viewport:{width:390,height:844},colorScheme:theme,reducedMotion:'reduce',serviceWorkers:'block'});
+  try{
+   await context.addInitScript(()=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:null,writable:false,configurable:false});localStorage.setItem('fvp:chain-scanner:v1','{unreadable original source');localStorage.setItem('fvp:chain-scanner:protected:v1','different protected original');localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced');});
+   await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+   const page=await context.newPage(),response=await page.goto(process.env.LANDSCAPE_BROWSER_URL);assert.equal(await response.text(),html,'native geometry consumer serves this exact app shell');
+   await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&window.ScannerDeviceStore);
+   const motion=page.locator('#motionDialog [data-landscape-motion="reduced"]');if(await motion.isVisible())await motion.click();await resolveExpectedFirstRunHelp(page);
+   assert.equal(await page.evaluate(()=>liveBoardAccepted),false);
+   await page.locator('[data-act="settings"]').first().click();const section=page.locator('#modalRoot details').filter({has:page.locator('#backupDownloadFormat')});if(!await section.evaluate(e=>e.open))await section.locator(':scope > summary').click();
+   const before=await page.evaluate(()=>ScannerDeviceStore.readRawExportSnapshot());
+   await page.addStyleTag({content:'#backupDownloadFormat,#backupRestoreSource,#stDateFormat{font-size:22.5px!important} #modalRoot .modal .kv{font-size:20.25px!important}'});
+   await page.evaluate(()=>document.fonts.ready);await page.locator('#backupDownloadFormat').scrollIntoViewIfNeeded();
+   assert.deepEqual(await page.locator('#backupDownloadFormat option').evaluateAll(es=>es.map(e=>e.value)),['raw-device-sources']);
+   const geometry=await page.locator('#backupDownloadFormat,#backupRestoreSource').evaluateAll(es=>es.map(e=>{const r=e.getBoundingClientRect(),p=e.parentElement.getBoundingClientRect(),s=getComputedStyle(e),probe=document.createElement('select'),option=document.createElement('option');option.textContent=e.selectedOptions[0].textContent;probe.appendChild(option);probe.style.cssText='position:fixed;visibility:hidden;width:max-content;max-width:none;min-width:0;';probe.style.font=s.font;probe.style.padding=s.padding;probe.style.border=s.border;probe.style.appearance=s.appearance;document.body.appendChild(probe);const nativeIntrinsicWidth=probe.getBoundingClientRect().width;probe.remove();return{id:e.id,left:r.left,right:r.right,width:r.width,parentLeft:p.left,parentRight:p.right,fontSize:s.fontSize,text:e.selectedOptions[0].textContent,nativeIntrinsicWidth,appearance:s.appearance};}));
+   if(evidence)await page.screenshot({path:path.join(evidence,theme+'-raw-format.png')});t.diagnostic(JSON.stringify({theme,geometry}));
+   for(const r of geometry){assert.equal(r.fontSize,'22.5px');assert.ok(r.left>=r.parentLeft-1&&r.right<=r.parentRight+1,r.id+' must remain inside its real Settings row');assert.ok(r.nativeIntrinsicWidth<=r.width+1,r.id+' leaves room for its complete label and native arrow compared with an unconstrained native reference');assert.notEqual(r.appearance,'none');}
+   const help=page.getByText('Raw device sources are not a board and cannot be restored as one.',{exact:true});assert.equal(await help.isVisible(),true);assert.equal(await page.locator('#backupDownloadFormat').getAttribute('aria-describedby'),await help.getAttribute('id'));
+   assert.equal(await help.evaluate(e=>e.scrollWidth<=e.clientWidth+1),true);
+   await page.locator('#backupRestoreSource').selectOption('paste');assert.equal(await page.locator('#backupRestoreSource').inputValue(),'paste');assert.deepEqual(await page.evaluate(()=>ScannerDeviceStore.readRawExportSnapshot()),before);assert.equal(await page.evaluate(()=>liveBoardAccepted),false);
+  }finally{await context.close();}
+ });}finally{await browser.close();}
 });
 
 test("median: odd, even, and empty arrays", () => {
@@ -15697,7 +16300,7 @@ test('RISK RECOVERY EXPORT: an unsaved in-memory board remains copyable without 
   ctx.openSettings();
   const settings=shim.document.getElementById('modalRoot').innerHTML;
   assert.match(settings,/data-act="view-current-board"/);
-  assert.match(settings,/data-act="download-current-board"/);
+  assert.match(settings,/data-act="download-backup"/);
   assert.doesNotMatch(settings,/data-act="import-json"|id="jsonBox"/,'bulk import stays out of Settings');
   ctx.onAction('view-current-board',{});
   const recovery=shim.document.getElementById('modalRoot').innerHTML;
@@ -15709,7 +16312,11 @@ test('RISK RECOVERY EXPORT: an unsaved in-memory board remains copyable without 
   shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();
   ctx.Blob=class Blob{constructor(parts,options){this.text=parts.join('');this.type=options.type;}};
   ctx.URL={createObjectURL(blob){download={blob};return 'blob:current-board';},revokeObjectURL(){}};
-  ctx.onAction('download-current-board',{});
+  ctx.onAction('settings',{});
+  const selectedFormat=makeFakeElement();selectedFormat.value='current-board';
+  const originalGet=shim.document.getElementById.bind(shim.document);
+  shim.document.getElementById=id=>id==='backupDownloadFormat'?selectedFormat:originalGet(id);
+  ctx.onAction('download-backup',{});
   assert.equal(download.name,'chain-scanner-current-board.json');assert.equal(download.href,'blob:current-board');
   assert.match(download.blob.text,/Only in this open tab/);assert.doesNotMatch(download.blob.text,/device-only-recovery-id/);
 });
@@ -15797,14 +16404,19 @@ test('RISK MANUAL JSON EXPORT: the actual Settings actions download current boar
 
   ctx.openSettings();
   const settings=shim.document.getElementById('modalRoot').innerHTML;
-  const currentControl=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Export current board JSON\s*<\/button>/);
-  const archiveControl=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Export recovery archive JSON\s*<\/button>/);
-  assert.ok(currentControl,'Settings exposes the clearly named current-board JSON export');
-  assert.ok(archiveControl,'Settings exposes the separate recovery-archive JSON export');
+  const downloadControl=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Download backup\s*<\/button>/);
+  assert.ok(downloadControl,'Settings exposes one Download backup action');
+  assert.equal((settings.match(/data-act="download-backup"/g)||[]).length,1,'Settings has exactly one board-data download action');
+  assert.match(settings,/id="backupDownloadFormat"[\s\S]*?value="current-board"[\s\S]*?value="recovery-archive"/,'the action offers ordinary board JSON and the complete recovery archive');
+  assert.doesNotMatch(settings,/data-act="download-current-board"|data-act="download-recovery-archive"/,'format choices are routed through the single Settings action');
   assert.match(settings,/not an ordinary board[- ]import file/i,'Settings explains that the recovery archive is not a normal board import');
   assert.match(settings,/pending|recovery source/i,'Settings explains the archive recovery contents');
 
-  await ctx.onAction(currentControl[1],{});
+  const selectedFormat=makeFakeElement();selectedFormat.value='current-board';
+  const originalGetForFormat=shim.document.getElementById.bind(shim.document);
+  shim.document.getElementById=id=>id==='backupDownloadFormat'?selectedFormat:originalGetForFormat(id);
+
+  await ctx.onAction(downloadControl[1],{});
   for(let attempt=0;attempt<100&&downloads.length<1;attempt++)await flush();
   assert.equal(downloads.length,1,'the current-board Settings action reaches the real download consumer');
   assert.equal(downloads[0].name,'chain-scanner-current-board.json');
@@ -15814,7 +16426,8 @@ test('RISK MANUAL JSON EXPORT: the actual Settings actions download current boar
   assert.deepEqual(board.futureManualExportBoardField,{keep:true});
   assert.doesNotMatch(downloads[0].blob.text,/Unsubmitted DOM draft must stay out of exports/);
 
-  await ctx.onAction(archiveControl[1],{});
+  selectedFormat.value='recovery-archive';
+  await ctx.onAction(downloadControl[1],{});
   for(let attempt=0;attempt<100&&downloads.length<2;attempt++)await flush();
   assert.equal(downloads.length,2,'the recovery-archive Settings action reaches the real download consumer');
   assert.equal(downloads[1].name,'chain-scanner-recovery-archive.json');
@@ -15861,10 +16474,12 @@ test('RISK MANUAL JSON EXPORT: the actual Settings actions download current boar
   const currentTextArea=makeFakeElement();currentTextArea.focus=()=>{selection.currentFocus=true;};currentTextArea.select=()=>{selection.currentSelect=true;};
   const archiveTextArea=makeFakeElement();archiveTextArea.focus=()=>{selection.archiveFocus=true;};archiveTextArea.select=()=>{selection.archiveSelect=true;};
   ctx.URL={createObjectURL(){throw new Error('fixture download unavailable');},revokeObjectURL(){}};
-  await ctx.onAction(currentControl[1],{});assert.match(shim.document.getElementById('modalRoot').innerHTML,/currentBoardData/);
+  selectedFormat.value='current-board';
+  await ctx.onAction(downloadControl[1],{});assert.match(shim.document.getElementById('modalRoot').innerHTML,/currentBoardData/);
   shim.document.getElementById=id=>id==='currentBoardData'?currentTextArea:id==='recoveryArchiveData'?archiveTextArea:originalGetId(id);
   ctx.onAction('select-current-board',{});assert.equal(selection.currentFocus,true);assert.equal(selection.currentSelect,true);
-  await ctx.onAction(archiveControl[1],{});assert.match(shim.document.getElementById('modalRoot').innerHTML,/recoveryArchiveData/);
+  selectedFormat.value='recovery-archive';
+  await ctx.onAction(downloadControl[1],{});assert.match(shim.document.getElementById('modalRoot').innerHTML,/recoveryArchiveData/);
   assert.match(shim.document.getElementById('modalRoot').innerHTML,/chain-scanner\.recovery-archive/);
   ctx.onAction('select-recovery-archive',{});assert.equal(selection.archiveFocus,true);assert.equal(selection.archiveSelect,true);
   ctx.URL={createObjectURL(blob){createdBlob=blob;return 'blob:manual-export-restored';},revokeObjectURL(){}};
@@ -15879,12 +16494,14 @@ test('RISK MANUAL JSON EXPORT: the actual Settings actions download current boar
   assert.equal(JSON.stringify(roundTrip.ctx.state),roundTripBefore,'the versioned archive is rejected by the ordinary board importer without changing the board');
 
   ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
-  const exportFaq=help.match(/<dt>What do the two JSON exports contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
-  assert.ok(exportFaq,'the extended FAQ explains both exports');
+  const exportFaq=help.match(/<dt>What does Download backup contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
+  assert.ok(exportFaq,'the extended FAQ explains the single Download backup action');
   assert.ok(exportFaq.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the export FAQ keeps the existing answer word limit');
-  assert.match(exportFaq,/ordinary board data.*accepted edits that may not have saved/i);
+  assert.match(exportFaq,/Current board JSON.*ordinary board data.*accepted edits that may not have saved/i);
+  assert.match(exportFaq,/Full recovery archive.*local backup, pending.*recovery sources/i);
   assert.match(exportFaq,/not an ordinary board-import file.*pending work is never replayed/i);
-  assert.match(exportFaq,/If a source changes.*no archive file is made/i);
+  assert.match(exportFaq,/Raw device sources only.*cannot be imported as a board/i);
+  assert.match(exportFaq,/If a source changes.*no recovery archive is made/i);
 
   assert.equal(JSON.stringify(ctx.state),memoryBefore,'export leaves the accepted in-memory board untouched');
   assert.deepEqual(deviceWrites,[],'export performs no device-store write');
@@ -15900,9 +16517,11 @@ test('RISK MANUAL JSON EXPORT: unreadable, unsupported and hydration-placeholder
   const downloads=[],link=makeFakeElement();link.remove=()=>{};link.click=()=>downloads.push(link.download);
   shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();ctx.Blob=class ExportBlob{constructor(parts,options){this.text=parts.join('');this.type=options.type;}};ctx.URL={createObjectURL(){return 'blob:unexpected';},revokeObjectURL(){}};
   ctx.openSettings();let settings=shim.document.getElementById('modalRoot').innerHTML;
-  const current=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Export current board JSON\s*<\/button>/),archive=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Export recovery archive JSON\s*<\/button>/);
-  assert.ok(current&&archive,'both Settings exports are available for the failure case');
-  await ctx.onAction(current[1],{});await ctx.onAction(archive[1],{});await flush();
+  const download=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Download backup\s*<\/button>/);
+  assert.ok(download,'the unaccepted-source recovery view still exposes one Download backup action');
+  assert.match(settings,/value="raw-device-sources"/,'only the source-only recovery export is offered without an accepted board');
+  assert.doesNotMatch(settings,/value="current-board"|value="recovery-archive"/,'an unaccepted source is not presented as an ordinary board or complete archive');
+  await ctx.onAction('download-current-board',{});await ctx.onAction('download-recovery-archive',{});await flush();
   assert.deepEqual(downloads,[],'a hydration placeholder never becomes a complete export');
 
   const valid=await loadApp({sharedStorage:sharedScannerStorage(),indexedDBProvider:new IDBFactory(),deviceDbName:dbName+'-unsupported'});
@@ -15912,8 +16531,12 @@ test('RISK MANUAL JSON EXPORT: unreadable, unsupported and hydration-placeholder
   validStore.readRawExportSnapshot=async()=>{const snapshot=await rawSnapshot();snapshot.stores.opaque.keys.push('unsupported-export-fixture-190');snapshot.stores.opaque.values.push(/unsupported/);return snapshot;};
   const validDownloads=[],validLink=makeFakeElement();validLink.remove=()=>{};validLink.click=()=>validDownloads.push(validLink.download);
   valid.shim.document.createElement=tag=>tag==='a'?validLink:makeFakeElement();valid.ctx.Blob=ctx.Blob;valid.ctx.URL=ctx.URL;valid.ctx.openSettings();
-  const validSettings=valid.shim.document.getElementById('modalRoot').innerHTML,validArchive=validSettings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Export recovery archive JSON\s*<\/button>/);
-  assert.ok(validArchive);await valid.ctx.onAction(validArchive[1],{});await flush();
+  const validSettings=valid.shim.document.getElementById('modalRoot').innerHTML,validArchive=validSettings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Download backup\s*<\/button>/);
+  assert.ok(validArchive,'the accepted board has one archive path through Download backup');
+  const selectedFormat=makeFakeElement();selectedFormat.value='recovery-archive';
+  const originalGet=valid.shim.document.getElementById.bind(valid.shim.document);
+  valid.shim.document.getElementById=id=>id==='backupDownloadFormat'?selectedFormat:originalGet(id);
+  await valid.ctx.onAction(validArchive[1],{});await flush();
   assert.deepEqual(validDownloads,[],'a structured-clone type without a lossless representation stops the archive');
   assert.ok(shownErrors.some(message=>/IndexedDB opaque key.*unsupported RegExp/i.test(message)),'the failure names its exact app-owned source and unsupported type');
   const cycle={};cycle.self=cycle;
@@ -15945,14 +16568,17 @@ test('RISK BACKUP FILE RESTORE: current decisions survive file selection and cro
   app.shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();
   app.ctx.Blob=class Blob{constructor(parts,options){this.text=parts.join('');this.type=options.type;}};
   app.ctx.URL={createObjectURL(blob){download={blob};return 'blob:current-board-fixture';},revokeObjectURL(){}};
-  app.ctx.openSettings();assert.match(app.shim.document.getElementById('modalRoot').innerHTML,/data-act="download-current-board"/);
-  app.ctx.onAction('download-current-board',{});assert.ok(download?.blob,'the actual Settings download produced a board file');
+  app.ctx.openSettings();assert.match(app.shim.document.getElementById('modalRoot').innerHTML,/data-act="download-backup"/);
+  const selectedFormat=makeFakeElement();selectedFormat.value='current-board';
+  const originalGet=app.shim.document.getElementById.bind(app.shim.document);
+  app.shim.document.getElementById=id=>id==='backupDownloadFormat'?selectedFormat:originalGet(id);
+  app.ctx.onAction('download-backup',{});assert.ok(download?.blob,'the actual Settings download produced a board file');
   assert.equal(download.name,'chain-scanner-current-board.json');
   return new File([download.blob.text],name,{type:'application/json'});
  }
  async function selectFile(app,file){
   app.ctx.openSettings();const settings=app.shim.document.getElementById('modalRoot').innerHTML;
-  const action=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);
+  const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
   assert.ok(action,'the actual Settings file action is available');
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
   const originalGet=app.shim.document.getElementById.bind(app.shim.document);
@@ -16053,7 +16679,7 @@ test('RISK BACKUP FILE RESTORE: irreversible preview shows Restore and close as 
  const file=new File([JSON.stringify(source)],'selected-recovery.json',{type:'application/json'});
  ctx.openSettings();
  const settings=shim.document.getElementById('modalRoot').innerHTML;
- const action=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);
+ const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
  assert.ok(action,'the real Settings restore-file control is available');
  const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
  const originalGet=shim.document.getElementById.bind(shim.document);
@@ -16162,13 +16788,17 @@ test('RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exac
 
   ctx.openSettings();
   const settings=shim.document.getElementById('modalRoot').innerHTML;
-  const restoreAction=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);
-  assert.ok(restoreAction,'Settings exposes the clearly named backup-file restore action');
+  const restoreAction=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
+  assert.ok(restoreAction,'Settings exposes the single guarded Restore action');
+  assert.equal((settings.match(/data-act="restore-backup"/g)||[]).length,1,'the board-data area has exactly one Restore action');
+  assert.match(settings,/id="backupRestoreSource"[\s\S]*?value="file"[\s\S]*?value="paste"/,'the Restore action routes either a native file or paste source');
+  assert.doesNotMatch(settings,/data-act="choose-backup-file"|data-act="open-paste-recovery"/,'the board-data area has no competing file or paste action');
   assert.match(settings,/<input\b(?=[^>]*type="file")(?=[^>]*id="restoreBackupFile")[^>]*>/,'the action uses a native JSON file input');
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;
   let pickerOpened=0;input.click=()=>{pickerOpened++;};
+  const restoreSource=makeFakeElement();restoreSource.value='file';
   const originalGet=shim.document.getElementById.bind(shim.document);
-  shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
+  shim.document.getElementById=id=>id==='restoreBackupFile'?input:id==='backupRestoreSource'?restoreSource:originalGet(id);
   const cloudPushCalls=[],originalPush=ctx.window.CloudSync?.push?.bind(ctx.window.CloudSync);
   if(originalPush)ctx.window.CloudSync.push=(...args)=>{cloudPushCalls.push(args);return originalPush(...args);};
   async function selectFile(selected){
@@ -16230,7 +16860,7 @@ test('RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exac
 
   reopened.ctx.openSettings();
   const reopenedSettings=reopened.shim.document.getElementById('modalRoot').innerHTML;
-  const reopenedAction=reopenedSettings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);
+  const reopenedAction=reopenedSettings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
   assert.ok(reopenedAction,'the same Settings control remains available after reopen');
   const archiveInput=makeFakeElement();archiveInput.id='restoreBackupFile';archiveInput.files=[];archiveInput.matches=()=>false;
   const reopenedGet=reopened.shim.document.getElementById.bind(reopened.shim.document);
@@ -16297,7 +16927,7 @@ test('RISK BACKUP FILE RESTORE: compact settings and unknown board fields stay i
   incoming[longBoardFieldName]={keep:'full preview value'};
   const file=new File([JSON.stringify(incoming)],'compact-preview.json',{type:'application/json'});
   ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
-  const restoreAction=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);
+  const restoreAction=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
   assert.ok(restoreAction,'the actual Settings file restore action is available');
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
   const originalGet=shim.document.getElementById.bind(shim.document);
@@ -16347,7 +16977,7 @@ test('RISK BACKUP FILE RESTORE: a signed-in file waits for explicit CAS and exac
   const file=new File([JSON.stringify(selected)],'account-board.json',{type:'application/json'});
   ctx.openSettings();
   const settings=shim.document.getElementById('modalRoot').innerHTML;
-  const action=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);
+  const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
   assert.ok(action,'the account-bound route begins at the actual Settings control');
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;
   const originalGet=shim.document.getElementById.bind(shim.document);
@@ -16411,7 +17041,7 @@ test('RISK BACKUP FILE RESTORE: account-bound files stay protected while cloud i
   const selected=JSON.parse(sourceRaw);selected.tasks[0].title='Offline prospective account board';
   const file=new File([JSON.stringify(selected)],'offline-account-board.json',{type:'application/json'});
   ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
-  const action=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);
+  const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
   assert.ok(action);
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
   const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
@@ -16444,7 +17074,7 @@ test('RISK BACKUP FILE RESTORE: IDB authority does not hide changed legacy board
     const file=new File([JSON.stringify(next)],'legacy-race.json',{type:'application/json'}),writes=[],commit=store.commitHead.bind(store);
     store.commitHead=options=>{writes.push(options);return commit(options);};
     ctx.openSettings();const markup=shim.document.getElementById('modalRoot').innerHTML;
-    const action=markup.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);
+    const action=markup.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
     assert.ok(action,'the race starts from the real Settings control');
     const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
     const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
@@ -16475,7 +17105,7 @@ test('RISK BACKUP FILE RESTORE: source changes during final awaited copy readbac
   const file=new File([JSON.stringify(next)],'final-readback-race.json',{type:'application/json'}),writes=[],commit=store.commitHead.bind(store);
   store.commitHead=options=>{writes.push(options);return commit(options);};
   ctx.openSettings();const markup=shim.document.getElementById('modalRoot').innerHTML;
-  const action=markup.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);
+  const action=markup.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
   assert.ok(action,'the race starts from the real Settings control');
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
   const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
@@ -16512,7 +17142,7 @@ test('RISK BACKUP FILE RESTORE: state, device-head, and draft-only changes expir
     const file=new File([JSON.stringify(prospective)],'stale-source.json',{type:'application/json'}),writes=[],commit=store.commitHead.bind(store);
     store.commitHead=options=>{writes.push(options);return commit(options);};
     ctx.openSettings();const markup=shim.document.getElementById('modalRoot').innerHTML;
-    const action=markup.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);
+    const action=markup.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
     assert.ok(action,'the case begins from the Settings backup-file action');
     const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
     const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
@@ -16549,7 +17179,7 @@ test('RISK BACKUP FILE RESTORE: cancel and file reselection bind confirmation to
   const firstFile=new File([JSON.stringify(first)],'cancelled-first.json',{type:'application/json'});
   const secondFile=new File([JSON.stringify(second)],'confirmed-second.json',{type:'application/json'});
   ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
-  const action=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);
+  const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
   assert.ok(action);
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
   const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
@@ -16559,7 +17189,7 @@ test('RISK BACKUP FILE RESTORE: cancel and file reselection bind confirmation to
   await ctx.onAction('confirm-file-restore',{});
   assert.equal(ctx.state.tasks[0].title,'Current before reselection','a detached confirmation after Cancel cannot use its former preview');
   ctx.openSettings();const reopened=shim.document.getElementById('modalRoot').innerHTML;
-  const secondAction=reopened.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);assert.ok(secondAction);
+  const secondAction=reopened.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);assert.ok(secondAction);
   await ctx.onAction(secondAction[1],{});assert.match(await select(secondFile),/confirmed-second\.json/);
   await ctx.onAction('confirm-file-restore',{});
   assert.equal(ctx.state.tasks[0].title,'Confirmed second file','only the current selection is adopted after explicit confirmation');
@@ -16581,7 +17211,7 @@ test('RISK BACKUP FILE RESTORE: closing the preview cancels an in-flight source 
   const cloudPushes=[],originalPush=ctx.window.CloudSync?.push?.bind(ctx.window.CloudSync);
   if(originalPush)ctx.window.CloudSync.push=(...args)=>{cloudPushes.push(args);return originalPush(...args);};
   ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
-  const action=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);
+  const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
   assert.ok(action,'the test enters through the actual Settings restore action');
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
   const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
@@ -16626,7 +17256,7 @@ test('RISK BACKUP FILE RESTORE: backdrop and Escape cancel a pending source chec
     const cloudPushes=[],originalPush=ctx.window.CloudSync?.push?.bind(ctx.window.CloudSync);
     if(originalPush)ctx.window.CloudSync.push=(...args)=>{cloudPushes.push(args);return originalPush(...args);};
     ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
-    const action=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);
+    const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
     assert.ok(action,'the generic close case begins at the real Settings restore action');
     const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
     const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
@@ -16672,7 +17302,7 @@ test('RISK BACKUP FILE RESTORE: in-progress primary save blocks Cancel and modal
   const next=JSON.parse(JSON.stringify(ctx.state));next.tasks[0].title='Selected board after protected save';
   const file=new File([JSON.stringify(next)],'commit-inflight.json',{type:'application/json'});
   ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
-  const action=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);
+  const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
   assert.ok(action,'the test enters through the real Settings file action');
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
   const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
@@ -16729,7 +17359,7 @@ test('RISK BACKUP FILE RESTORE: in-progress cloud publication blocks Cancel and 
   const next=JSON.parse(JSON.stringify(ctx.state));next.tasks[0].title='Cloud file after protected publication';
   const file=new File([JSON.stringify(next)],'cloud-commit-inflight.json',{type:'application/json'});
   ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
-  const action=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);
+  const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
   assert.ok(action,'the bound case starts through the real Settings file control');
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
   const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
@@ -16792,7 +17422,7 @@ test('RISK BACKUP FILE RESTORE: backup CAS abort and readback failure keep the a
       return list(...args);
     };
     ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
-    const action=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);assert.ok(action);
+    const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);assert.ok(action);
     const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
     const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
     const toastBefore=shim.document.getElementById('toast').textContent;
@@ -16836,13 +17466,13 @@ test('RISK BACKUP FILE RESTORE: unsupported and ambiguous selected files stop wi
   ];
   const writes=[],commit=store.commitHead.bind(store);store.commitHead=options=>{writes.push(options);return commit(options);};
   ctx.openSettings();let settings=shim.document.getElementById('modalRoot').innerHTML;
-  let action=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);assert.ok(action);
+  let action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);assert.ok(action);
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
   const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
   for(const [name,bytes] of cases){
     shim.document.getElementById('toast').textContent='';
-    if(!shim.document.getElementById('modalRoot').innerHTML.includes('Restore from backup file'))ctx.openSettings();
-    settings=shim.document.getElementById('modalRoot').innerHTML;action=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);assert.ok(action,`Settings can retry ${name}`);
+    if(!shim.document.getElementById('modalRoot').innerHTML.includes('data-act="restore-backup"'))ctx.openSettings();
+    settings=shim.document.getElementById('modalRoot').innerHTML;action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);assert.ok(action,`Settings can retry ${name}`);
     const file=new File([bytes],name,{type:'application/json'});await ctx.onAction(action[1],{});input.files=[file];shim.document.dispatchEvent({type:'change',target:input});
     for(let attempt=0;attempt<100&&shim.document.getElementById('toast').textContent==='';attempt++)await flush();
     assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="confirm-file-restore"/,`${name} cannot create a restore confirmation`);
@@ -16873,7 +17503,7 @@ test('RISK BACKUP FILE RESTORE: account, auth epoch, pending evidence, and cloud
     const file=new File([JSON.stringify(next)],'cloud-source.json',{type:'application/json'}),writes=[],commit=store.commitHead.bind(store);
     store.commitHead=options=>{writes.push(options);return commit(options);};
     ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
-    const action=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);assert.ok(action);
+    const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);assert.ok(action);
     const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
     const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
     await ctx.onAction(action[1],{});input.files=[file];shim.document.dispatchEvent({type:'change',target:input});
@@ -16925,7 +17555,7 @@ test('RISK BACKUP FILE RESTORE: a released old client wins CAS before the prospe
   const file=new File([JSON.stringify(selected)],'old-client-cas.json',{type:'application/json'});
   const primaryWrites=[],commit=store.commitHead.bind(store);store.commitHead=options=>{primaryWrites.push(options);return commit(options);};
   current.ctx.openSettings();const settings=current.shim.document.getElementById('modalRoot').innerHTML;
-  const action=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);assert.ok(action);
+  const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);assert.ok(action);
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
   const originalGet=current.shim.document.getElementById.bind(current.shim.document);current.shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
   await current.ctx.onAction(action[1],{});input.files=[file];current.shim.document.dispatchEvent({type:'change',target:input});
@@ -16998,7 +17628,7 @@ test('RISK BACKUP FILE RESTORE: replacement preserves completion, History, ratin
   assert.equal(ctx.conflictingDecisionEvidence(next,ctx.state),false,'the replacement does not collide with a different decision event');
   const file=new File([JSON.stringify(next)],'lifecycle-replacement.json',{type:'application/json'});
   ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
-  const action=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Restore from backup file\s*<\/button>/);assert.ok(action);
+  const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);assert.ok(action);
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
   const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
   await ctx.onAction(action[1],{});input.files=[file];shim.document.dispatchEvent({type:'change',target:input});
@@ -21668,6 +22298,12 @@ test('Cyclist knees: both legs attach to the seated hip and bend forward through
   assert.ok(Math.abs(Math.hypot(leg.footX-2,leg.footY)-1.7)<1e-9);
  }
  assert.match(fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),/line\(g,leg.hipX,leg.hipY,leg.kneeX/);
+});
+
+test('RISK repository process: Beta packaging preserves exact committed product bytes and separate channel identity',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-name-pattern=preserves committed product bytes','scripts/agent-tools/channel-release.test.mjs'],{cwd:__dirname,encoding:'utf8',env,maxBuffer:4*1024*1024});
+ assert.equal(result.status,0,result.stdout+result.stderr);
 });
 
 test('Settings changelog: every app asset change requires a current changelog entry',()=>{
@@ -27883,7 +28519,7 @@ test('RISK SYNC ERROR LOG: backend failures remain under Settings diagnostics af
  app.ctx.openSettings();
  const rendered=app.shim.document.getElementById('modalRoot').innerHTML;
  assert.match(rendered,/Recent sync errors/);
- assert.ok(rendered.indexOf('Recent sync errors')>rendered.indexOf('Current-board view, copy, and download'));
+ assert.ok(rendered.indexOf('Recent sync errors')>rendered.indexOf('Current-board view and copy'));
  assert.ok(rendered.indexOf('Recent sync errors')<rendered.indexOf('Daily local backups'));
  assert.match(rendered,/push.*unavailable/);
  assert.match(rendered,/<time datetime="[^"]+"/);
@@ -31126,7 +31762,7 @@ test('RISK backup help: expiry, protected-copy deletion, and archive limits rema
  const countdown=answer('What do the countdown tags mean?');
  const taskHelp=answer('Can I undo, restore, or remove a task?');
  const backups=answer('How do backups and Restore work?');
- const exports=answer('What do the two JSON exports contain?');
+ const exports=answer('What does Download backup contain?');
  const worked=answer('What does Worked on it mean?');
  assert.match(countdown,/Start clears expired.*before building.*eligible pool/,'expired holds clear before the next eligible pool is built');
  assert.match(taskHelp,/Backup deletion asks for confirmation and keeps the current board/);
@@ -31139,8 +31775,11 @@ test('RISK backup help: expiry, protected-copy deletion, and archive limits rema
  assert.match(backups,/Manual and protected recovery copies remain/);
  assert.match(backups,/Matching duplicate backups appear once/);
  assert.match(backups,/Long before-and-after values wrap inside the preview\./);
- assert.match(exports,/current board JSON is ordinary board data/);
- assert.match(exports,/versioned archive is not an ordinary board-import file/);
+ assert.match(exports,/one Download backup action/i);
+ assert.match(exports,/Current board JSON for ordinary board data/);
+ assert.match(exports,/Full recovery archive.*local backup, pending/i);
+ assert.match(exports,/Raw device sources only.*cannot be imported as a board/i);
+ assert.match(exports,/versioned recovery archive is not an ordinary board-import file/);
  assert.match(exports,/pending work is never replayed/);
  assert.match(exports,/File restore keeps supported recorded choices and protects displaced decisions\./);
  assert.match(worked,/It leaves the dotted chain and stays off it through saving and syncing\./);
@@ -35400,6 +36039,7 @@ test('RISK motion safety: export clicks do not renew consent while actual choice
  vm.runInContext(update+listener,c);
  assert.equal(typeof handler,'function','the extracted production document listener is registered');
  const click=node=>handler({target:node});
+ click(element('BUTTON',{act:'download-backup'},body));
  click(element('BUTTON',{act:'download-current-board'},body));
  click(element('BUTTON',{act:'download-recovery-archive'},body));
  click(element('A',{download:'chain-scanner-current-board.json'},body));
@@ -37044,10 +37684,10 @@ test('RISK device save warning browser: actual held Add keeps every text line on
    await page.locator('[data-act="settings"]').click();
    await poll(page,()=>!document.querySelector('#toast.show'),null,'natural warning expiry');
    const data=page.locator('#modalRoot details').filter({has:page.locator('[data-act="make-manual-backup"]')});for(const panel of await data.all())if(await panel.getAttribute('open')===null)await panel.locator(':scope > summary').click();
-   assert.equal(await page.locator('[data-act="make-manual-backup"]').isVisible(),true);assert.match(await page.locator('#modalRoot').innerText(),/Current-board view, copy, and download/);
+   assert.equal(await page.locator('[data-act="make-manual-backup"]').isVisible(),true);assert.match(await page.locator('#modalRoot').innerText(),/Current-board view and copy/);
    const issue=page.locator('#modalRoot .kv').filter({hasText:'Last device save issue:'});await issue.scrollIntoViewIfNeeded();assert.equal(await issue.isVisible(),true);assert.match(await issue.innerText(),/Last device save issue:.*device-save:completion-upgrade\/ambiguous-legacy-completion/s);
    row.details=await issue.evaluate(el=>{const b=el.getBoundingClientRect(),code=el.querySelector('code'),r=code.getBoundingClientRect();return {text:el.textContent,rect:{x:b.x,y:b.y,w:b.width,h:b.height},code:{x:r.x,y:r.y,w:r.width,h:r.height},scrollWidth:el.scrollWidth,clientWidth:el.clientWidth};});assert.ok(row.details.scrollWidth<=row.details.clientWidth+1);assert.ok(row.details.code.x>=row.details.rect.x&&row.details.code.x+row.details.code.w<=row.details.rect.x+row.details.rect.w+1);
-   await page.evaluate(()=>document.fonts.ready);fonts.details=await platformFonts('#modalRoot p.kv:has(code)');for(const act of ['view-current-board','download-current-board'])fonts[act]=await platformFonts('#modalRoot [data-act="'+act+'"]');await session.detach();
+   await page.evaluate(()=>document.fonts.ready);fonts.details=await platformFonts('#modalRoot p.kv:has(code)');for(const act of ['view-current-board','download-backup'])fonts[act]=await platformFonts('#modalRoot [data-act="'+act+'"]');await session.detach();
    if(evidence){fs.writeFileSync(path.join(evidence,theme+'-'+scale+'.json'),JSON.stringify(row,null,2));await page.screenshot({path:path.join(evidence,theme+'-'+scale+'-details.png')});
     if(process.env.TOAST_REVIEW_PAUSE==='1'){const ack=path.join(evidence,theme+'-'+scale+'-details-inspected');const end=Date.now()+180000;while(!fs.existsSync(ack)&&Date.now()<end)await new Promise(r=>setTimeout(r,100));assert.ok(fs.existsSync(ack),'owner inspected actual native details before closing its context');}}
    assert.equal(await page.evaluate(()=>localStorage.getItem('fvp:chain-scanner:v1')),exactOldDevice);assert.equal(await page.evaluate(()=>localStorage.getItem('fvp:chain-scanner:protected:v1')),exactOldDevice);
@@ -37855,14 +38495,17 @@ test('RISK pasted recovery UI: Settings opens an editable protected preview and 
  const current=JSON.stringify(ctx.state),head=await store.readHead(),board=JSON.parse(ctx.currentBoardExportPayload());
  board.tasks[0].title='Explicitly selected pasted task';board.futurePasteBoardField={keep:'unknown board data'};
  const raw='\n '+JSON.stringify(board,null,2)+'\n';
- const root=shim.document.getElementById('modalRoot'),getElementById=shim.document.getElementById.bind(shim.document);
- shim.document.getElementById=id=>id==='jsonBox'&&!root.innerHTML.includes('id="jsonBox"')?null:getElementById(id);
+ const root=shim.document.getElementById('modalRoot'),getElementById=shim.document.getElementById.bind(shim.document),restoreSource=makeFakeElement();
+ restoreSource.value='paste';
+ shim.document.getElementById=id=>id==='jsonBox'&&!root.innerHTML.includes('id="jsonBox"')?null:id==='backupRestoreSource'?restoreSource:getElementById(id);
  const dispatch=action=>{const target=makeFakeElement();target.dataset={act:action};target.closest=selector=>selector==='[data-act]'?target:null;shim.document.dispatchEvent({type:'click',target,detail:1});};
  assert.match(html,/<button class="ghost" data-act="settings"/,'the header exposes the Settings button that opens this route');
  dispatch('settings');
  const settings=root.innerHTML;assert.match(settings,/<h2>Settings<\/h2>/,'the visible header Settings action opens Settings');
- const pasteButton=settings.match(/<button\b(?=[^>]*data-act="open-paste-recovery")[^>]*>\s*Paste board JSON\s*<\/button>/);
- assert.ok(pasteButton,'Settings exposes a visible Paste board JSON action');
+ const restoreButton=settings.match(/<button\b(?=[^>]*data-act="restore-backup")[^>]*>\s*Restore\s*<\/button>/);
+ assert.ok(restoreButton,'Settings exposes one guarded Restore action');
+ assert.match(settings,/id="backupRestoreSource"[\s\S]*?value="file"[\s\S]*?value="paste"/,'the same Restore action offers native file and paste sources');
+ assert.doesNotMatch(settings,/data-act="choose-backup-file"|data-act="open-paste-recovery"/,'file and paste are choices, not competing Settings actions');
  assert.doesNotMatch(settings,/id="jsonBox"/,'the editable paste area stays in its own dialog');
  const numericDraft=shim.document.getElementById('stHorizon');numericDraft.value='77';
  root.querySelectorAll=selector=>selector==='input,select,textarea'?[numericDraft]:[];
@@ -37876,7 +38519,7 @@ test('RISK pasted recovery UI: Settings opens an editable protected preview and 
   assert.equal((markup.match(/class="modal" role="dialog"/g)||[]).length,1,message+' keeps one dialog');
   return markup;
  };
- click('open-paste-recovery');
+ click('restore-backup');
  assert.match(oneDialog('Opening paste recovery'),/id="jsonBox"/,'the visible Settings route opens an editable text area');
  const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=raw;shim.document.dispatchEvent({type:'input',target:box});
  const waitForPreview=async()=>{
@@ -38010,12 +38653,13 @@ test('RISK pasted recovery UI: archive and raw backup text use the visible Setti
   subtest.after(async()=>{await store.close();});ctx.addTask('Current pasted format task',false);await prepareBackupFileFixtureSource(app);
   const raw='\n '+JSON.stringify(format==='archive'?archive:[{id:'daily-source',kind:'daily',day:'2026-10-18',at:1792324800000,payload:JSON.stringify(board)}],null,2)+'\n';
   const before=JSON.stringify(ctx.state),head=await store.readHead();
-  const root=shim.document.getElementById('modalRoot'),getElementById=shim.document.getElementById.bind(shim.document);
-  shim.document.getElementById=id=>id==='jsonBox'&&!root.innerHTML.includes('id="jsonBox"')?null:getElementById(id);
+  const root=shim.document.getElementById('modalRoot'),getElementById=shim.document.getElementById.bind(shim.document),restoreSource=makeFakeElement();
+  restoreSource.value='paste';
+  shim.document.getElementById=id=>id==='jsonBox'&&!root.innerHTML.includes('id="jsonBox"')?null:id==='backupRestoreSource'?restoreSource:getElementById(id);
   const dispatch=action=>{const target=makeFakeElement();target.dataset={act:action};target.closest=selector=>selector==='[data-act]'?target:null;shim.document.dispatchEvent({type:'click',target,detail:1});};
   dispatch('settings');assert.match(shim.document.getElementById('modalRoot').innerHTML,/<h2>Settings<\/h2>/,'pasting starts from the visible Settings control');
-  assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="open-paste-recovery"/);
-  dispatch('open-paste-recovery');const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=raw;shim.document.dispatchEvent({type:'input',target:box});
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="restore-backup"/);
+  dispatch('restore-backup');const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=raw;shim.document.dispatchEvent({type:'input',target:box});
   assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="preview-pasted-recovery"/);
   dispatch('preview-pasted-recovery');
   const expectedChoice=format==='raw'?'fileRestoreBackupChoice':'fileRestoreLearningChoice';
@@ -38041,7 +38685,7 @@ test('RISK pasted recovery UI: archive and raw backup text use the visible Setti
  const help=source.shim.document.getElementById('modalRoot').innerHTML,faq=help.match(/<dt>How do I paste a saved board\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
  assert.ok(faq,'the extended Data and backups FAQ explains pasted recovery');
  assert.ok(faq.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the pasted-recovery FAQ keeps its word limit');
- assert.match(faq,/Settings → Data and backups → Paste board JSON/,'the FAQ names the visible Settings route');
+ assert.match(faq,/Settings → Data and backups → Restore.*choose Paste JSON.*select Restore/,'the FAQ names the consolidated Settings route');
  assert.match(faq,/separate from Review saved decisions.*combines device and cloud choices/,'the FAQ distinguishes snapshot restore from held-cloud choice merging');
 });
 
@@ -38846,9 +39490,9 @@ test('RISK recovery identity consumers: verified cloud adoption rebases independ
 test('RISK support diagnostics: Settings names the existing board export for its contents',async t=>{
  const app=await loadApp();t.after(()=>app.dispose());app.ctx.openSettings();
  const settings=app.shim.document.getElementById('modalRoot').innerHTML;
- assert.match(settings,/Current-board view, copy, and download/i,'the existing current-board export is named for the board it contains');
+ assert.match(settings,/Current-board view and copy/i,'the existing current-board view remains distinct from the download chooser');
  assert.match(settings,/data-act="view-current-board"/,'the existing board view/copy action remains available');
- assert.match(settings,/data-act="download-current-board"/,'the existing board download action remains available');
+ assert.match(settings,/data-act="download-backup"/,'the one consolidated board download action remains available');
  app.ctx.openHelp();const help=app.shim.document.getElementById('modalRoot').innerHTML;
  const faq=help.match(/<dt>What does Support diagnostics contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
  assert.ok(faq,'the extended FAQ describes the separate report');

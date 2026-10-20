@@ -3,7 +3,7 @@
    same-origin additions to fill the cache as they are requested. */
 // The shell key is a fingerprint of every local asset in the addAll list.
 // Update it with any shell change so installed workers cannot serve stale UI.
-const CACHE_NAME = "chain-scanner-shell-86de841d59e2ab898e8f24fcd9d27d6902f84aa03516335c4fe6e0ca04302b98";
+const CACHE_NAME = "chain-scanner-shell-dfc5f2df49f21061c3f150f5d5ed4a45dc61985155260b6183b83886c90e7b6a";
 
 self.addEventListener("message", event => {
   if(event?.data?.type!=="chain-scanner-support-diagnostics-v1") return;
@@ -18,6 +18,7 @@ self.addEventListener("install", event => {
       .then(cache => cache.addAll([
         "./",
         "./index.html",
+        "./app-release.js",
         "./manifest.webmanifest",
         "./icon.svg",
         "./icon-41f9327e19b3.svg",
@@ -72,6 +73,15 @@ self.addEventListener("fetch", event => {
   if(event.request.method !== "GET") return;
   const requestUrl = new URL(event.request.url);
   if(requestUrl.origin !== self.location.origin) return;
+
+  // Release identity is deployment-specific, so it is never served from an
+  // installed shell cache and never falls back to a stale envelope offline.
+  const scopeUrl = self.registration?.scope ? new URL(self.registration.scope) : null;
+  const releaseUrl = scopeUrl ? new URL("./channel-release.json", scopeUrl) : null;
+  if(releaseUrl && requestUrl.origin === releaseUrl.origin && requestUrl.pathname === releaseUrl.pathname){
+    event.respondWith(fetch(event.request));
+    return;
+  }
 
   event.respondWith(
     // Retirement may fail after this worker activates. Never let a retained

@@ -1,5 +1,34 @@
 [
   {
+    "baseCommit": "4e3bcb7e317ae251c8e8a030291802a52ffdefa0",
+    "testChangesSha256": "d81091e196e009ccd2832251c3693273de4d96357ef2cb920af357e5869e4aca",
+    "reason": "Reconcile the already qualified first-Beta207 apology and minimum208 packaging onto the newly released P0main, preserving both feature scopes and every original runtime assertion. This additive record binds the exact integrated test diff rather than reusing an older fingerprint.",
+    "previousBehavior": "Prepared218 was based onf38Stable and had earned source/local/rendered acceptance only. It lacked the subsequently shipped one-minute recovery, guarded exact-copy resumption and known-damage menu lifecycle fromPR225. Both branches carried independent appended/prepended test rationale and coverage additions.",
+    "intendedBehavior": "Retain all shippedP0source/read/Cancel/account/repair protections while adding only the prepared exact-copy seven-day per-channel apology and reviewed-identity Beta staging command. Current full-app consumers keep exact copy, UID/channel dismissal, expiry, unchanged metadata refresh and modal/Add/gesture deferral. Staging remains separate from actual firstBeta delivery and cannot approve Stable promotion.",
+    "replacementTests": [
+      "RISK PWA release metadata: exact scoped identity bypasses stale shell cache",
+      "RISK apology notice: an eligible Beta login shows the exact original apology",
+      "RISK apology notice: refreshing an unchanged release keeps the open message",
+      "RISK apology release identity: invalid metadata stays silent without touching the board",
+      "RISK apology notice: account dismissal and Stable window stay independent",
+      "RISK apology notice: automatic display waits for a modal and unfinished Add draft",
+      "RISK apology notice: a context-only Add draft waits before consuming its window",
+      "RISK apology notice: a later dependency row keeps its Add draft protected",
+      "RISK apology notice: a held scanner gesture defers without consuming its window",
+      "RISK repository process: Beta packaging preserves exact committed product bytes and separate channel identity"
+    ],
+    "preservedCoverage": [
+      "All595 combined prior rationale raw objects are preserved exactly:591fromBeta218 and580fromcurrentmain with576shared baseline. Every existingP0 runtime test/assertion stays intact; Beta uses the existing fixture cleanup with its release boundary additions. No unsaved work, report privacy, exact ACK/CAS, source consent, old-client compatibility or actual native delivery assertion is removed or relaxed.",
+      "The merge conflicts were only current changelog, appended RISK inventory and shell fingerprint. Both note/coverage sets are retained; final shell metadata is recomputed for the complete merged public inventory. No new feature implementation or manufactured RED is claimed for reconciliation. Actual prior207/208 behavioral RED chronology remains in the15scoped imported records and their immutable recorder outputs.",
+      "Old218 reviews/full/native/rendered keep their exact prior scope and are not approval of this candidate. Fresh exact integrated focused/full/native/rules/compatibility, affected source/FAQ/typography and screenshot/CI/actual-output reviews remain mandatory. PublicP0delivery and private incident limits remain separate.",
+      "Minimum208 preparer binds committed source/tree and channel identity without publishing, modifying rules/Auth, enabling navigation or promoting Stable. FirstBeta207 must actually deploy before216integration;209separate exact-tested-artifact approval remains required for Stable promotion."
+    ],
+    "redEvidence": {
+      "command": "Original207/208 source-present preimplementationRED commands and14prior repair records retained in TEST_CHANGE_RATIONALES.json; task-artifacts/post-p0-rca-coverage-20261019/apology207/runs includes16:07contextdraft and16:10gesture REDs. Source/currentHelp repair run2026-10-20T16-00-39-165Z-0ba8704a-4627-4bd6-8afe-7c32af1581fa retained under next-stable-backup-consolidation-20261020. Current merge/working-source focus is labelled GREEN, not originalRED.",
+      "failure": "Before original fixes, actual signed-in eligibility lacked the required exact apology; context-only/later dependency drafts and a held scanner gesture were covered and consumed the notice prematurely. Current-sourceHelp RED required unchanged summary→release-note order before moving only the reopen paragraph. The preserved qualifier records specify each observed failure; simply merging the already tested scopes is not claimed a new product RED."
+    }
+  },
+  {
     "baseCommit": "f38c02dd7a29b41515fb3abbf234582845a6ccde",
     "testChangesSha256": "4fe2f91d78b0a226d494d22001293bd984454a5d9dad75eab676ef4d8b9a7890",
     "reason": "Preserve the existing second-source diagnostic contract while waiting within its established fixture bound for actual SDK timeout observation after the newly shared whole-attempt deadline returns.",
@@ -14963,5 +14992,840 @@
     },
     "candidateLimit": "No full native/browser/production release proof is claimed; root owns final reconciliation, shell fingerprint refresh, integration and release checks.",
     "implementationStartedAtBase": "4faa4ecac8b852eb120bbc015119249029d4a494"
+  },
+{
+  "testChangesSha256": "29e3bd1c7b21b777269bda50ec2906a2ac8899cc699fafe785b06592ab1158a9",
+  "reason": "Add an isolated release-command consumer regression for minimal Beta packaging under approved issue208 without weakening existing product assertions.",
+  "previousBehavior": "The existing runnable git archive packaging preserves product bytes but supplies no independently bound Beta channel envelope.",
+  "intendedBehavior": "Stage exact committed product assets with a separate deterministic Beta envelope, explicit preview limitations, strict source identity and existing receipt validation.",
+  "replacementTests": [
+    "RISK repository process: Beta packaging preserves exact committed product bytes and separate channel identity"
+  ],
+  "preservedCoverage": [
+    "Existing app, data, native installed-client, shared state and deployment assertions are retained unchanged; this fixture-only child launches no browser, emulator or production network."
+  ],
+  "redEvidence": {
+    "command": "node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/post-p0-rca-coverage-20261019/deployment208/test-runs --purpose preimplementation-red -- node --test --test-name-pattern=\"RISK repository process: Beta packaging\" tests.js",
+    "failure": "Actual 2026-10-19T15:17:31Z record8be9f36e observes committed index bytes retained then fails expected staged channel identity (false !== true) on runnable existing git archive adapter before envelope implementation. Earlier215555cf was an ENOBUFS archiver infrastructure defect and is not behavioral RED. Subsequent observed command REDs:137645ef exact tree;87bc512b existing destination;1936c4cf receipt default;e954716d explicit preview inventory;ec3b8578 stale fingerprint;7bc5de14 symlink;4a904e69 collision;56a98b1a ISO;d13372bb staging aliases;4beae42b atomic visibility;6a60a53a real receipt digest;a3e5ed40 bare tree;52d02f24 stage-setup cleanup. Each was followed by recorded GREEN.08e3546b used a future fixture report time, repaired before real receipt-binding RED; not behavioral RED. Final483c21c7 passes17 cases with real Git/receipt fixtures and no browser, emulator or production network. Owner self-review found tab truncation in complete Git paths; actual9a037418 RED precedes complete-path parsing repair and e4765b02 GREEN. Extra dirty-source, archive-failure and traversal sensitivities were passing controls when introduced, not fabricated REDs."
+  }
+},
+{
+  "testChangesSha256": "6bd96636abea1a914f06c74dd2c39e83b87dfd7a44aa32fa1a1c82d742c39b92",
+  "reason": "Add one real full-app signed-in lifecycle regression for ticket 207 and expose only browser URL, external fetch, and time to the existing VM harness. Preserve all existing feature assertions.",
+  "previousBehavior": "The app had no channel-release envelope consumer or apology notice. A cloud account becoming ready did not display the user-written apology, and there was no deployed-channel identity to distinguish Beta preview from a later Stable window.",
+  "intendedBehavior": "A verified Beta release envelope for the actual Beta origin, matching the current app fingerprint and a startsAt within seven days, causes the real CloudSync ready/account lifecycle to show the exact SHA-bound apology. The release loader fetches without credentials or cache and rejects redirects. This is a notice-only interaction with no board or cloud-write effect.",
+  "replacementTests": [
+    "RISK apology notice: an eligible Beta login shows the exact original apology"
+  ],
+  "preservedCoverage": [
+    "All existing CloudSync identity, account-switch, saved-board reconciliation, backup, update, Help, FAQ, and Changelog assertions remain unchanged.",
+    "The new consumer uses a synthetic account and isolated VM storage; it does not seed or mutate a production or private board.",
+    "The test asserts the full original message against the ticket SHA and drives the existing CloudSync event path rather than setting a private notice or channel test hook."
+  ],
+  "redEvidence": {
+    "command": "/Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/post-p0-rca-coverage-20261019/apology207/runs --purpose preimplementation-red -- /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern='^RISK apology notice: an eligible Beta login shows the exact original apology$' tests.js",
+    "failure": "Observed 2026-10-19T15:17:30Z assertion failure: `the real signed-in app consumer should show the original copy inside its automatic Beta window` failed because the actual modal did not include the expected message after the real app VM received CloudSync.ready=true, CloudSync.user=beta-account, and the cloudsync event. Recorder outcome is assertion-failure; there was no import, syntax, or setup error. Record: 2026-10-19T15-17-30-880Z-7584e0e0-3abb-406f-8ee8-d6a25f4ec36f.json."
+  }
+},
+{
+  "testChangesSha256": "edb14685f6d350d311bf995958fc9855781c6de088ba89a3915f1d655e7e47e2",
+  "reason": "Populate the real current Changelog template in the existing full-app VM so the production release loader can validate the same rendered fingerprint the user sees. This is the smallest fixture addition for the Beta apology consumer.",
+  "previousBehavior": "The full-app VM leaves appChangelogCurrent empty even though the actual index.html contains its current release fingerprint; a real production identity loader therefore correctly fails closed and the consumer cannot reach the intended notice path.",
+  "intendedBehavior": "The VM consumer reads the actual current Changelog template from the production HTML, allowing the production loader and exact visible apology to be exercised through signed-in CloudSync lifecycle without a private release or notice hook.",
+  "replacementTests": [
+    "RISK apology notice: an eligible Beta login shows the exact original apology"
+  ],
+  "preservedCoverage": [
+    "All existing CloudSync identity, account-switch, saved-board reconciliation, backup, update, Help, FAQ, and Changelog assertions remain unchanged.",
+    "The new consumer uses a synthetic account and isolated VM storage; it does not seed or mutate a production or private board."
+  ],
+  "redEvidence": {
+    "command": "/Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/post-p0-rca-coverage-20261019/apology207/runs --purpose preimplementation-red -- /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern=\"^RISK apology notice: an eligible Beta login shows the exact original apology$\" tests.js",
+    "failure": "Observed 2026-10-19T15:20:29Z assertion failure: the actual signed-in app consumer still did not show the exact original apology after CloudSync.ready=true, CloudSync.user=beta-account, and the real cloudsync event. The actual app VM had the real appChangelogCurrent template hydrated from index.html; failure was the expected visible-notice assertion, not import, syntax, or fixture setup. Record: 2026-10-19T15-20-29-263Z-02acf9ad-4f59-43a2-a323-ecbf7d406dca.json."
+  }
+},
+{
+  "testChangesSha256": "d253e98f072e46cd487537877eb4017212e4d618fc0c32ddbf2e9c5406815f07",
+  "reason": "Bind the actual Beta apology consumer to the verified Auth UID and start the behavior from an idle app surface. This prevents email-label changes or a pre-existing Help modal from acting as a private test identity or replacing user-owned UI.",
+  "previousBehavior": "The initial regression fixture identified only a display string and left the first-run Help modal open, so it could not establish UID-bound dismissal or a genuinely idle automatic-notice surface.",
+  "intendedBehavior": "The existing full-app lifecycle regression supplies the established recoveryIdentity UID and closes the existing Help modal before the real signed-in CloudSync event. A missing production consumer still fails at the visible exact-copy assertion.",
+  "replacementTests": [
+    "RISK apology notice: an eligible Beta login shows the exact original apology"
+  ],
+  "preservedCoverage": [
+    "The test drives the actual full-app CloudSync event path and requires the complete original message after exact SHA verification.",
+    "All existing CloudSync identity, account-switch, saved-board reconciliation, backup, update, Help, FAQ, and Changelog assertions remain unchanged."
+  ],
+  "redEvidence": {
+    "command": "/Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/post-p0-rca-coverage-20261019/apology207/runs --purpose preimplementation-red -- /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern=\"^RISK apology notice: an eligible Beta login shows the exact original apology$\" tests.js",
+    "failure": "Observed 2026-10-19T15:23:36Z assertion failure at the exact original-copy consumer assertion after CloudSync.ready=true, CloudSync.user=beta-account, recoveryIdentity()=beta-uid, and the real cloudsync event. The app has no release loader/automatic apology yet; failure was not setup/import/syntax. Record: 2026-10-19T15-23-36-976Z-d5656573-0408-42a3-a135-54a1adc556e5.json."
+  }
+},
+{
+  "testChangesSha256": "b8c376b0e0540e78be6cd4a1388ef261598e6391659f8ccc0fbcb98d917c2e9b",
+  "reason": "Keep release metadata fresh under the existing network-only identity contract while preserving cache-first delivery for ordinary installed shell assets.",
+  "previousBehavior": "The actual service worker cache-first handler returned an older cached channel-release.json before checking the network and could continue using it offline as if it were current release identity.",
+  "intendedBehavior": "For both verified Beta and Stable scopes, the exact channel-release.json path bypasses cache lookup and stale fallback; it must reach the network while ordinary index.html retains the existing shell cache behavior.",
+  "replacementTests": [
+    "RISK PWA release metadata: exact scoped identity bypasses stale shell cache"
+  ],
+  "preservedCoverage": [
+    "The ordinary app-shell cache-first response and exact offline script delivery remain covered by existing PWA risk tests.",
+    "The worker uses its actual deployed scope, so the same focused consumer covers the root Beta site and Stable project subpath without a browser or production fixture."
+  ],
+  "redEvidence": {
+    "command": "/Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/post-p0-rca-coverage-20261019/apology207/runs --purpose preimplementation-red -- /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern=\"^RISK PWA release metadata: exact scoped identity bypasses stale shell cache$\" tests.js",
+    "failure": "Observed 2026-10-19T15:28:49Z assertion failure: the exact Beta-scope channel-release.json request returned the cached body `stale shell metadata` instead of `fresh metadata`. The Stable scope iteration was not reached after that first assertion. This was the actual worker consumer returning stale cached metadata, not a missing module or syntax failure. Record: 2026-10-19T15-28-49-110Z-f15574cb-af55-4726-83be-fb32ad3eec31.json."
+  }
+},
+{
+  "testChangesSha256": "a4ade1130e1d1625a382050eaad5abeaccc712af43ea5737ec924c5e653c00e7",
+  "reason": "Correct the network-count oracle in the exact-scope cache regression so it counts the online and offline metadata attempts while proving ordinary shell assets still use cache.",
+  "previousBehavior": "The first focused green reached the intended network-only worker behavior, but the test expected one network call after it had deliberately made two metadata requests, including the offline attempt.",
+  "intendedBehavior": "The test records two metadata network attempts and no network attempt for the ordinary cached index.html, preserving the meaningful stale-envelope RED and narrow bypass contract.",
+  "replacementTests": [
+    "RISK PWA release metadata: exact scoped identity bypasses stale shell cache"
+  ],
+  "preservedCoverage": [
+    "The original recorded RED still demonstrates that the released worker returned stale cached metadata before the fix.",
+    "Both Beta and Stable paths, offline no-fallback, and ordinary cache-first delivery remain asserted."
+  ],
+  "redEvidence": {
+    "command": "/Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/post-p0-rca-coverage-20261019/apology207/runs --purpose preimplementation-red -- /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern=\"^RISK PWA release metadata: exact scoped identity bypasses stale shell cache$\" tests.js",
+    "failure": "The meaningful preimplementation RED at 2026-10-19T15:28:49Z showed exact Beta channel-release.json returned `stale shell metadata` instead of `fresh metadata`; record 2026-10-19T15-28-49-110Z-f15574cb-af55-4726-83be-fb32ad3eec31.json. A later first GREEN attempt exposed only the test oracle count (the two metadata fetches were expected); it did not fail the metadata or shell behavior assertion."
+  }
+},
+{
+  "testChangesSha256": "cb708bbe8f3e0a7e2dca6eb53d77bc098b9be141dd3b5243c074a9f0c6a37a6c",
+  "reason": "Exercise the complete signed-in apology lifecycle across account-specific dismissal, independent Beta/Stable windows, expiry, and the real Help-to-Changelog reopen action.",
+  "previousBehavior": "There was no user-facing release notice consumer, persisted account dismissal, channel-separated window, or way to reopen the original message after the automatic interval.",
+  "intendedBehavior": "The first Beta account sees the exact copy once and stores a dismissal under its UID; a second UID gets its own notice. The Stable account and future start remain independent of the Beta preview, and an explicit Changelog action reopens the exact copy after expiry without changing automatic state.",
+  "replacementTests": [
+    "RISK apology notice: account dismissal and Stable window stay independent"
+  ],
+  "preservedCoverage": [
+    "All board state and cloud-sync state remain outside the notice lifecycle; the test uses only the real full-app VM, external clock, local storage, public network envelope, and Auth UID.",
+    "The original SHA-bound exact-copy test and all CloudSync account-switch, Help, Changelog, and saved-board cases remain intact."
+  ],
+  "redEvidence": {
+    "command": "Original raw test invocation (its purpose label was corrected by 2026-10-19T15-32-39-321Z-90165560-55b6-4930-8d9f-aae2e62f1059): /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/post-p0-rca-coverage-20261019/apology207/runs --purpose preimplementation-red -- /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern=\"^RISK apology notice: account dismissal and Stable window stay independent$\" tests.js",
+    "failure": "CHRONOLOGY CORRECTION: The account/window lifecycle implementation already existed when this test was authored and the first visible apology consumer had passed at 15:26:40Z. The 15:30:53Z failure was captured after temporarily removing source solely for retrospective baseline comparison; it is not a qualifying preimplementation RED. Preserve raw assertion-failure record 2026-10-19T15-30-53-121Z-9a07f4ff-eeba-49fc-a03e-a76fe673669f; linked append-only correction 2026-10-19T15-32-39-321Z-90165560-55b6-4930-8d9f-aae2e62f1059. This is baseline sensitivity only, not a preimplementation RED."
+  },
+  "evidenceClassification": "supplemental-baseline-sensitivity-only",
+  "baselineSensitivity": {
+    "originalRunId": "2026-10-19T15-30-53-121Z-9a07f4ff-eeba-49fc-a03e-a76fe673669f",
+    "appendOnlyCorrectionRunId": "2026-10-19T15-32-39-321Z-90165560-55b6-4930-8d9f-aae2e62f1059",
+    "chronology": "The account/window lifecycle implementation already existed when this test was authored and the first visible apology consumer had passed at 15:26:40Z. The 15:30:53Z failure was captured after temporarily removing source solely for retrospective baseline comparison; it is not a qualifying preimplementation RED.",
+    "originalCommand": "/Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/post-p0-rca-coverage-20261019/apology207/runs --purpose preimplementation-red -- /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern=\"^RISK apology notice: account dismissal and Stable window stay independent$\" tests.js"
+  }
+},
+{
+  "testChangesSha256": "592457fb0527bb1b304003771510d271c9338646ebaef93142da19f667198b26",
+  "reason": "Protect an open Help modal and unfinished Add draft from automatic release notice display, then deliver the pending notice when the real page becomes idle.",
+  "previousBehavior": "Automatic notice evaluation had no regression for first-run Help or an unsaved page draft; no test ensured a deferred notice could resume without replacing or clearing that input.",
+  "intendedBehavior": "With a signed-in account and verified Beta metadata, the existing Help modal remains intact and a non-empty Add draft remains untouched. After Help closes and the draft is explicitly cleared/focus leaves, the pending notice appears through the real lifecycle.",
+  "replacementTests": [
+    "RISK apology notice: automatic display waits for a modal and unfinished Add draft"
+  ],
+  "preservedCoverage": [
+    "All state, draft, account and board assertions remain on the actual VM consumer; the notice uses isolated local storage and public metadata only.",
+    "The existing modal, cloud recovery, Restore and Edit protections remain unchanged and continue to own their user-visible sessions."
+  ],
+  "redEvidence": {
+    "command": "Original raw test invocation (its purpose label was corrected by 2026-10-19T15-32-43-620Z-9d8af9f4-24fc-4605-8129-9087ae35dcb8): /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/post-p0-rca-coverage-20261019/apology207/runs --purpose preimplementation-red -- /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern=\"^RISK apology notice: automatic display waits for a modal and unfinished Add draft$\" tests.js",
+    "failure": "CHRONOLOGY CORRECTION: The modal/draft preservation implementation already existed when this test was authored, after lifecycle GREEN at 15:31:08Z. The 15:31:36Z failure was captured after temporarily removing source solely for retrospective baseline comparison; it is not a qualifying preimplementation RED. Preserve raw assertion-failure record 2026-10-19T15-31-36-609Z-bf78b4bb-bd52-4ae0-8b39-d009975ca5f0; linked append-only correction 2026-10-19T15-32-43-620Z-9d8af9f4-24fc-4605-8129-9087ae35dcb8. This is baseline sensitivity only, not a preimplementation RED."
+  },
+  "evidenceClassification": "supplemental-baseline-sensitivity-only",
+  "baselineSensitivity": {
+    "originalRunId": "2026-10-19T15-31-36-609Z-bf78b4bb-bd52-4ae0-8b39-d009975ca5f0",
+    "appendOnlyCorrectionRunId": "2026-10-19T15-32-43-620Z-9d8af9f4-24fc-4605-8129-9087ae35dcb8",
+    "chronology": "The modal/draft preservation implementation already existed when this test was authored, after lifecycle GREEN at 15:31:08Z. The 15:31:36Z failure was captured after temporarily removing source solely for retrospective baseline comparison; it is not a qualifying preimplementation RED.",
+    "originalCommand": "/Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/post-p0-rca-coverage-20261019/apology207/runs --purpose preimplementation-red -- /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern=\"^RISK apology notice: automatic display waits for a modal and unfinished Add draft$\" tests.js"
+  }
+},
+{
+  "testChangesSha256": "32c5ecf3d6e72126d3ea7547d9e03020057718c753a0d875d3d8d8a0c4f06005",
+  "reason": "Add supplemental fail-closed coverage for the actual public release loader and signed-in apology consumer when release identity, product fingerprint, notice timing, redirect state or network availability is invalid.",
+  "previousBehavior": "The actual loader had fail-closed branches, but the consumer suite did not observe those branches through the production module while a real signed-in account was waiting for the apology.",
+  "intendedBehavior": "Invalid or unavailable public metadata leaves ChainRelease unverified, suppresses the automatic notice, does not persist dismissal state and leaves the accepted board unchanged.",
+  "replacementTests": [
+    "RISK apology release identity: invalid metadata stays silent without touching the board"
+  ],
+  "preservedCoverage": [
+    "Existing exact-copy, account dismissal, independent Stable window, Help reopen and modal/draft assertions remain intact.",
+    "The test loads app-release.js in the ordinary full-app VM and controls only the external network response and existing Auth identity."
+  ],
+  "evidenceClassification": "supplemental-current-source-green-only",
+  "supplementalGreen": {
+    "runId": "2026-10-19T15-35-47-416Z-e84526c8-3aaa-45d3-9e9a-37594f10d7ee",
+    "purpose": "green",
+    "outcome": "passed"
+  },
+  "redEvidence": {
+    "command": "PATH=/Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin:$PATH TZ=UTC node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/post-p0-rca-coverage-20261019/apology207/runs --purpose green -- /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern=\"^RISK apology release identity:\" tests.js; run 2026-10-19T15:35:47.416Z-e84526c8-3aaa-45d3-9e9a-37594f10d7ee.",
+    "failure": "No qualifying preimplementation RED exists for this supplemental test: app-release.js and the visible lifecycle implementation already existed before the test was authored. Its first observed execution against the current source passed; classify this as supplemental GREEN only, not a test-first cycle."
+  }
+},
+{
+  "testChangesSha256": "3668ebc82e037d18336430bd8d1865393161e0e469d3f3046a305345325df848",
+  "reason": "Reconcile the exact combined tests.js diff after merging the approved Beta packaging preparation with ticket 207, while preserving each worker\u2019s scoped rationale and evidence record.",
+  "previousBehavior": "The integration base had neither the signed-in apology consumer nor the Beta package identity command, and installed release metadata could be served from a stale shell cache.",
+  "intendedBehavior": "The full app shows the exact apology only with verified channel identity and established account UID; invalid release metadata stays silent and board-neutral; Beta and Stable windows and dismissals remain independent; the Help changelog can reopen the copy; the worker bypasses stale release metadata; and packaging preserves exact committed product bytes. Revalidating an unchanged release preserves an already-open apology; an account or validated release identity change still closes it safely.",
+  "replacementTests": [
+    "RISK apology notice: an eligible Beta login shows the exact original apology",
+    "RISK apology notice: refreshing an unchanged release keeps the open message",
+    "RISK apology release identity: invalid metadata stays silent without touching the board",
+    "RISK apology notice: account dismissal and Stable window stay independent",
+    "RISK apology notice: automatic display waits for a modal and unfinished Add draft",
+    "RISK PWA release metadata: exact scoped identity bypasses stale shell cache",
+    "RISK repository process: Beta packaging preserves exact committed product bytes and separate channel identity"
+  ],
+  "preservedCoverage": [
+    "Every original app assertion and each worker\u2019s dedicated rationale remain present; this combined record exists only so the exact post-merge tests.js diff also has a fingerprinted rationale.",
+    "Account/window and modal/draft cases are explicitly classified as retrospective baseline-sensitivity comparisons, and invalid-envelope coverage as supplemental source-present GREEN; neither is represented as a source-before-implementation RED."
+  ],
+  "evidenceClassification": "integrated-diff-with-scoped-reds-supplemental-green-and-current-source-fix-red",
+  "redEvidence": {
+    "command": "Node22 focused records: 2026-10-19T15-17-30-880Z-7584e0e0-3abb-406f-8ee8-d6a25f4ec36f (exact apology consumer); 2026-10-19T15-28-49-110Z-f15574cb-af55-4726-83be-fb32ad3eec31 (network-only worker consumer); Beta packaging raw RED 8be9f36e at 15:17:31Z in /Users/emeraldpham/.codex/task-artifacts/post-p0-rca-coverage-20261019/deployment208/test-runs.",
+    "failure": "Qualifying source-before-implementation REDs are the initial exact-copy signed-in app consumer, the worker returning stale channel-release.json, and the real Beta packaging consumer failing to stage identity metadata. The account/window and modal/draft records were corrected as baseline sensitivity only; invalid-envelope is supplemental GREEN only. These classifications and their original and correction records remain individually preserved in the scoped rationale entries. The 15:41:17Z focus-refresh failure is a separate genuine current-source RED for the release-identity refresh repair; its fixture predecessor is append-only corrected as adapter-only."
+  }
+},
+{
+  "testChangesSha256": "3668ebc82e037d18336430bd8d1865393161e0e469d3f3046a305345325df848",
+  "reason": "Keep an already-open apology visible when the public loader refreshes metadata for the same exact deployed release; focus and pageshow refreshes return a newly validated object even when its identity is unchanged.",
+  "previousBehavior": "The consumer compared the release object by reference, so a routine metadata refresh returned a different frozen object, closed the apology already on screen and the persisted shown state prevented it from reopening.",
+  "intendedBehavior": "Revalidation of the same channel, origin, base path, source revision, tree, app fingerprint, deployment time and notice start preserves the open message. A signed-in account or validated release identity transition still invalidates the old automatic notice.",
+  "replacementTests": [
+    "RISK apology notice: refreshing an unchanged release keeps the open message"
+  ],
+  "preservedCoverage": [
+    "The test uses the actual app-release.js fetch/event lifecycle and the existing signed-in app consumer; it changes no board data and adds no private release test hook.",
+    "Existing account dismissal, separate Stable window, explicit Changelog reopen and modal/draft protections remain covered."
+  ],
+  "evidenceClassification": "source-present-current-implementation-red-before-repair",
+  "redEvidence": {
+    "command": "PATH=/Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin:$PATH TZ=UTC node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/post-p0-rca-coverage-20261019/apology207/runs --purpose preimplementation-red -- /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern=\"^RISK apology notice: refreshing an unchanged release keeps the open message$\" tests.js; raw record 2026-10-19T15-41-17-057Z-567b905a-2dd4-49d1-9d7b-d9d6de02bba0.",
+    "failure": "With source present, an actual focus-triggered metadata refresh published a different frozen object for the same envelope; the active notice was closed and the visible consumer assertion failed. This follows the true behavior assertion; the earlier 15:40:29Z run is separately corrected as a missing pull() test-double method, not product RED."
+  },
+  "supplementalGreen": {
+    "runId": "2026-10-19T15-42-39-667Z-bba12357-dd6c-43e9-abf5-8bd75679630e",
+    "purpose": "green",
+    "outcome": "passed"
+  }
+},
+{
+  "testChangesSha256": "aca6ff29d49ef6166e54a879b42904af92ecc7f1e5c58024762928076f67dff9",
+  "reason": "Protect a context-only Quick Add draft when a signed-in release notice becomes eligible, keeping the visible context choice and automatic window pending until the draft is cleared.",
+  "previousBehavior": "The notice guard inspected title and date inputs, recurrence activation, and only the first dependency control. Selecting a quick-add context with blank title and dates therefore looked idle and the automatic notice replaced the user's working surface.",
+  "intendedBehavior": "A selected Quick Add context is an unfinished draft even when title and dates are empty. The automatic notice remains pending without consuming the account window until the context selection is cleared and the normal lifecycle retry runs.",
+  "replacementTests": [
+    "RISK apology notice: a context-only Add draft waits before consuming its window"
+  ],
+  "preservedCoverage": [
+    "The regression uses the existing signed-in full-app consumer, actual qctx action, public metadata fixture, and existing focusout retry; it adds no private application hook.",
+    "Existing default-state eligibility, visible original-copy, account dismissal, Stable-window, Changelog-reopen, and modal/title-draft assertions remain intact."
+  ],
+  "evidenceClassification": "current-source-red-before-repair",
+  "redEvidence": {
+    "command": "/Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/post-p0-rca-coverage-20261019/apology207/runs --purpose preimplementation-red -- /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern='^RISK apology notice: a context-only Add draft waits before consuming its window$' tests.js; run 2026-10-19T16-07-32-026Z-a48a2c82-cbe5-44b5-8887-378c7bffc5a9.",
+    "failure": "With candidate cd9717e source present, the actual signed-in consumer applied qctx while title and dates were blank, then a real cloudsync event opened the apology over the selected context draft. The behavioral assertion failed at the visible modal, before later checks; no source was removed or edited to manufacture this RED."
+  }
+},
+{
+  "testChangesSha256": "c1158321f494d43580c5364e7f9aaf567ba1bb243a1485808e5aae15a2cc1eb0",
+  "reason": "Extend apology draft protection coverage from the observed context-only RED to a selected later dependency row, preserving the user's second dependency and the pending signed-in notice until the complete draft is cleared.",
+  "previousBehavior": "The prior notice guard checked only the first dependency control, so a meaningful value in a later Quick Add dependency row was invisible to the automatic notice gate. The full appearance snapshot repair now covers all existing rows.",
+  "intendedBehavior": "Every non-default value represented by the existing Quick Add appearance snapshot, including a later selected dependency, defers the automatic notice; clearing the draft permits delivery in the still-eligible account window without changing the board.",
+  "replacementTests": [
+    "RISK apology notice: a context-only Add draft waits before consuming its window",
+    "RISK apology notice: a later dependency row keeps its Add draft protected"
+  ],
+  "preservedCoverage": [
+    "The context-only case is a genuine signed-in full-app consumer RED on candidate cd9717ef0444a8c8d09392914ed979857a06963c, before the shared snapshot guard repair; its exact assertion output remains in the recorded run.",
+    "The later dependency-row case was authored after the shared snapshot guard landed and is supplemental source-present GREEN only. It uses real dependency form change events and adds no private hook; no later-row RED is claimed.",
+    "Existing default-state eligibility, exact original copy, modal/title drafts, account dismissal, independent Stable window, and deliberate Changelog reopen remain protected."
+  ],
+  "evidenceClassification": "context-only-current-source-red-plus-later-row-supplemental-green",
+  "redEvidence": {
+    "command": "/Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/post-p0-rca-coverage-20261019/apology207/runs --purpose preimplementation-red -- /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern='^RISK apology notice: a context-only Add draft waits before consuming its window$' tests.js; run 2026-10-19T16-07-32-026Z-a48a2c82-cbe5-44b5-8887-378c7bffc5a9.",
+    "failure": "On the unchanged C source, the actual signed-in consumer's context-only Add draft was replaced by the apology; the no-notice assertion failed. This is the qualifying source-present RED for the full Add appearance snapshot repair."
+  },
+  "supplementalGreen": {
+    "runId": "2026-10-19T16-09-24-101Z-4c69a838-5184-41da-82b0-dd7aca688948",
+    "purpose": "green",
+    "candidate": "32308aa3da4d2ecc723eb85634e78899c0303996",
+    "outcome": "passed"
+  }
+},
+{
+  "testChangesSha256": "b79a5e7e5250203de11c8e3bf4ec2cac51e7459c5811eafd5011d37ef69975fa",
+  "reason": "Prevent the automatic apology from covering an in-progress scanner pointer gesture, and retry the same still-eligible account notice after the existing gesture completion boundary.",
+  "previousBehavior": "An eligible cloudsync event during pointerdown passed the idle guard, opened a modal over the pressed scanner control and marked the account window shown before the gesture finished.",
+  "intendedBehavior": "A held scanner gesture defers automatic display without writing a notice key. The existing pointer release/cancel completion path retries, and an ordinary release delivers the notice if the signed-in identity and eligibility window still match.",
+  "replacementTests": [
+    "RISK apology notice: a context-only Add draft waits before consuming its window",
+    "RISK apology notice: a later dependency row keeps its Add draft protected",
+    "RISK apology notice: a held scanner gesture defers without consuming its window"
+  ],
+  "preservedCoverage": [
+    "The context-only Add draft has a source-present RED on original integrated candidate cd9717ef0444a8c8d09392914ed979857a06963c before commit 32308aa; see run 2026-10-19T16-07-32-026Z-a48a2c82-cbe5-44b5-8887-378c7bffc5a9.",
+    "The later dependency-row test was authored after commit 32308aa and is supplemental GREEN only; see run 2026-10-19T16-09-24-101Z-4c69a838-5184-41da-82b0-dd7aca688948.",
+    "The pointer regression runs through the existing full-app VM consumer with real document pointerdown/cloudsync events and has a genuine current-source failure before the gesture-specific repair. No code is removed to create a baseline failure.",
+    "Existing exact-copy, default eligibility, account transition, dismissal, Stable window, Changelog reopen, and modal/title-draft coverage remains intact."
+  ],
+  "evidenceClassification": "context-red-and-gesture-red-with-later-dependency-supplemental-green",
+  "redEvidence": {
+    "command": "/Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/post-p0-rca-coverage-20261019/apology207/runs --purpose preimplementation-red -- /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern='^RISK apology notice: a held scanner gesture defers without consuming its window$' tests.js; run 2026-10-19T16-10-16-573Z-85f70736-e297-4966-b14f-aa77e7352220.",
+    "failure": "On the current candidate before the gesture fix, an actual pointerdown followed by signed-in cloudsync opened the apology while the scanner gesture was held. The visible-modal assertion failed; the source-present failure is retained as run 2026-10-19T16-10-16-573Z-85f70736-e297-4966-b14f-aa77e7352220."
+  },
+  "supplementalGreen": [
+    {
+      "runId": "2026-10-19T16-08-26-419Z-264048c8-eed3-441b-94c3-76750e120092",
+      "purpose": "green",
+      "outcome": "passed"
+    },
+    {
+      "runId": "2026-10-19T16-09-24-101Z-4c69a838-5184-41da-82b0-dd7aca688948",
+      "purpose": "green",
+      "outcome": "passed"
+    }
+  ]
+},
+{
+  "testChangesSha256": "04bcbf7505ee2a284032fb397ab4f27bc0009f7c39c2ff63197447e445ae533d",
+  "reason": "Reconcile only prepared207 apology and minimum208 artifact packaging onto the current f38c02d Stable baseline, retaining all current P0 consumer assertions and the original prepared TDD chronology.",
+  "previousBehavior": "The prepared source was based on01b95ef and its historical integrated candidate failed full regression. Current Stable has no release-specific apology; the current fixture cleanup and all223 report/source guards must remain.",
+  "intendedBehavior": "The existing full-app consumers exercise exact signed-in apology eligibility, UID/channel dismissal, original copy, seven-day windows, unchanged metadata refresh, modal/Add/gesture deferral and network-only metadata. The Beta-only staging command binds exact committed bytes without publication or Stable promotion.",
+  "replacementTests": [
+    "RISK apology notice: an eligible Beta login shows the exact original apology",
+    "RISK apology notice: refreshing an unchanged release keeps the open message",
+    "RISK PWA release metadata: exact scoped identity bypasses stale shell cache",
+    "RISK repository process: Beta packaging preserves exact committed product bytes and separate channel identity"
+  ],
+  "preservedCoverage": [
+    "All current f38c02d appFixtureScope timer/store cleanup, account/source/restore/report preservation and existing passing assertions remain. The additive loadApp URL/fetch providers retain current sandbox scheduling and disposal.",
+    "Original207/208 source-present RED and subsequent GREEN records remain in the14 imported scoped rationale entries and external post-p0 artifact folder; integration is not claimed to recreate their test authorship chronology.",
+    "The current preimplementation-red-labeled run10789bbb unexpectedly passed10 cases and is GREEN only. The actual existing Help consumer failed its release-notes-first assertion in run0ba8704a before moving the new apology-reopen paragraph after the unchanged notes div.",
+    "The isolated preflight fixture had missing app-release.js infrastructure failures in runa8b4e80f; copying the required module repaired the fixture without altering assertions. Its37 focused tooling cases then passed; this infrastructure error is not feature RED."
+  ],
+  "evidenceClassification": "prepared-source-integration-with-retained-original-tdd-and-current-regression-repair",
+  "redEvidence": {
+    "command": "Original207/208 commands in the14 scoped rationale records. Current existing Help contract: Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=FAQ/changelog contracts tests.js; run2026-10-20T16-00-39-165Z-0ba8704a-4627-4bd6-8afe-7c32af1581fa.",
+    "failure": "Before the current integration repair, RISK FAQ redundant changelog question failed its actual mounted Help assertion that summary is immediately followed by release notes. The source was present and the assertion was preserved. After moving only the new reopen paragraph after notes, run3f973fff passed10 cases. No new feature RED is claimed from the unexpectedly passing prior run or missing fixture module."
+  }
+}
+,
+{
+    "baseCommit": "f38c02dd7a29b41515fb3abbf234582845a6ccde",
+    "testChangesSha256": "60e55a72a59f41377bff04cb8d2d7455f293575195998048c612d382adaeae0e",
+    "reason": "Consolidate the board-data download entry while retaining ordinary current-board JSON, complete recovery archives, copy/view, accepted unsaved edits, and exact source preservation.",
+    "previousBehavior": "Settings exposed separate current-board and recovery-archive download buttons plus another current-board download in the copy view.",
+    "intendedBehavior": "Settings presents one Download backup action with an explicit current-board or recovery-archive format selection. Both existing consumers remain distinct and read-only; the current-board view/copy path remains available and the separate Support diagnostics and lower app-backup controls stay distinct.",
+    "replacementTests": [
+      "RISK current-board export: Settings and save directions retain board recovery actions",
+      "RISK MANUAL JSON EXPORT: the actual Settings actions download current board and recovery archive"
+    ],
+    "preservedCoverage": [
+      "The actual Settings action still downloads ordinary current-board JSON with accepted unsaved edits and excludes unsubmitted DOM drafts.",
+      "The recovery archive retains exact named localStorage sources and the read-only meta, snapshots, backups, and opaque IndexedDB snapshot with completeness and consistency checks.",
+      "The archive remains distinct from ordinary board import; unsafe, changed, unavailable, or unsupported sources stop without a partial file.",
+      "Neither export writes browser/device storage, saves, syncs, or replays pending work; current-board view/select/copy and separate Support diagnostics remain present."
+    ],
+    "redEvidence": {
+      "records": [
+        "/Users/emeraldpham/.codex/task-artifacts/next-stable-backup-consolidation-20261020/backup216-implementation/phase1-download/red-green-runs/2026-10-20T16-04-38-876Z-dea2f708-468a-470a-9af9-b0d8fdfe3744.json",
+        "/Users/emeraldpham/.codex/task-artifacts/next-stable-backup-consolidation-20261020/backup216-implementation/phase1-download/red-green-runs/2026-10-20T16-05-04-731Z-ba7ef70a-6894-47ce-b6df-b2838e9d9cff.json"
+      ],
+      "command": "TZ=UTC node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"RISK MANUAL JSON EXPORT: the actual Settings actions download current board and recovery archive|RISK current-board export: Settings and save directions retain board recovery actions\" tests.js",
+      "failure": "The actual Settings export consumer failed at its new single-action assertion because the base still exposed separate export buttons; the surface consumer failed because the board-data area still used the old current-board view/copy/download heading. Both are assertion failures captured before product edits."
+    },
+    "setupFailureEvidence": {
+      "record": "/Users/emeraldpham/.codex/task-artifacts/next-stable-backup-consolidation-20261020/backup216-implementation/phase1-download/red-green-runs/2026-10-20T16-04-25-365Z-a164e3f4-130b-444b-b40d-ec47ec2b7290.json",
+      "classification": "test-harness syntax error, not behavioral RED",
+      "failure": "The first recorded test launch found a duplicate local binding in the newly edited test. The binding was renamed; the corrected recorded runs then reached the expected assertion failures. No product file was changed."
+    }
+  },
+{
+    "baseCommit": "f38c02dd7a29b41515fb3abbf234582845a6ccde",
+    "testChangesSha256": "165abf62575d601f95bab4323d2b45e1f4d8178e8350ee49e4dd1643e94cb6e8",
+    "reason": "Consolidate the board-data backup and Restore entry points while retaining every supported format, visible view/copy, accepted unsaved edits, and the existing protected-source and durable-restore contracts.",
+    "previousBehavior": "Settings had separate current-board and full-recovery-archive download buttons, a second current-board download beside view/copy, and separate file and paste restore buttons. The unreadable-startup empty state also opened a second Paste route outside Settings.",
+    "intendedBehavior": "Settings has one Download backup action with current-board JSON and full recovery archive choices when a board is accepted, or source-only raw device evidence when it is not. One Restore action selects native File or Paste and delegates to the existing guarded preview/confirmation consumers. The unreadable-startup empty state routes through that same Settings chooser.",
+    "replacementTests": [
+      "RISK backup and Restore consolidation: Settings keeps one guarded action with all formats"
+    ],
+    "preservedCoverage": [
+      "The actual Settings download consumer exercises both formats through the single action: current-board JSON keeps accepted unsaved board edits and excludes DOM-only drafts; the full archive retains exact app-owned recovery sources and stops on incomplete or unsupported reads. Separate source-only export remains available when no accepted board exists and cannot be imported as an empty board.",
+      "Actual file and paste consumers use the shared Restore route and retain exact selected bytes, existing device/current-board preservation, explicit preview and confirmation, cancel/close behavior, account and revision checks, CAS, ACK, drafts, unknown fields, held/pending sources, and durable reopen. Raw arrays remain supported inputs and are not replayed.",
+      "Current-board View / copy remains available and distinct from downloads. Support diagnostics continues to use the existing #223/#224 report and unchanged collector/privacy/timeout/progress contracts; no new diagnostics exporter, source read, storage scan, private hash, or identifier was added.",
+      "The unreadable-startup view points to Settings and the same Restore selector; its raw source download is routed through the one Download backup action. Existing exact opaque, pending, unknown, and protected source assertions remain.",
+      "The changed index.html hunks do not alter bottom local/app-backup management controls or app-update controls. They remain outside the consolidation and retain their prior actions and behavior."
+    ],
+    "redEvidence": {
+      "command": "The linked record-run evidence contains the exact TZ=UTC node --test consumer commands, each captured before its corresponding implementation slice.",
+      "failure": "Observed assertion REDs: Settings still exposed separate download actions (backup216-implementation/phase1-download/red-green-runs/2026-10-20T16-04-38-876Z-dea2f708-468a-470a-9af9-b0d8fdfe3744.json); old view/copy/download heading remained (2026-10-20T16-05-04-731Z-ba7ef70a-6894-47ce-b6df-b2838e9d9cff.json); the single Restore action was absent (phase2-restore/red-green-runs/2026-10-20T16-07-46-705Z-7e1e1a2e-f130-4535-b682-6c52085b81f1.json); actual file and paste consumers lacked the shared route (2026-10-20T16-08-49-184Z-b04607ef-66ad-42ba-8eb7-eeb78f542e50.json and 2026-10-20T16-08-52-615Z-c7a2ea88-eb00-4440-a85b-cab925f940ae.json); FAQ/changelog copy assertions exposed the old wording (phase3-copy/red-green-runs/2026-10-20T16-11-05-910Z-3f8b782b-32b9-4353-af42-f5fa6b899434.json); and all six actual unreadable-startup cases exposed the duplicate direct Paste route (phase4-empty-state/red-green-runs/2026-10-20T16-16-38-935Z-9f255400-c8c2-4fb1-ba85-8c5f8057bf7e.json). The separate initial test syntax error is retained in the earlier phase-one rationale and was not counted as a behavioral RED."
+    },
+    "greenEvidence": {
+      "phase1": "backup216-implementation/phase1-download/red-green-runs/2026-10-20T16-07-03-806Z-c4da8285-38bc-4a9b-a208-398226d9f091.json: 5/5 actual consumer tests passed for current-board/archive export, unreadable source-only export, accepted unsaved edits, and diagnostics separation.",
+      "phase2": "backup216-implementation/phase2-restore/red-green-runs/2026-10-20T16-09-18-519Z-bfe33e45-774e-477c-92a4-d079b0108118.json: 6/6 actual Settings surface/file/paste outcomes passed; the same phase also records full file-restore, pasted-recovery, unreadable-device, and diagnostics cohorts.",
+      "phase3": "backup216-implementation/phase3-copy/red-green-runs/2026-10-20T16-13-17-180Z-db08b77f-ba18-4c8c-9545-bfcfe7853b25.json: 6/6 FAQ/changelog copy outcomes passed.",
+      "phase4": "backup216-implementation/phase4-empty-state/red-green-runs/2026-10-20T16-16-44-873Z-fc31c804-0c0b-4bb7-a2fc-0038b931367a.json: 6 raw-startup scenarios, 7/7 TAP outcomes passed.",
+      "finalFocused": "backup216-implementation/final-focused/red-green-runs/2026-10-20T16-17-41-118Z-5b33c0ec-17f7-4afb-a8ce-020dd02ee1d0.json: 112/112 focused TAP outcomes passed across the consolidated surface, manual exports, file/paste restoration, unreadable-source preservation, Support diagnostics, backup FAQ, and motion-consent safety."
+    },
+    "validationHistory": "The first final-focused run (backup216-implementation/final-focused/red-green-runs/2026-10-20T16-17-08-391Z-e10b16c8-4351-45da-a2e8-ea8392bdffc2.json) had 111 passes and one stale FAQ assertion expecting “stops before adoption”; the concise FAQ already said “stops adoption.” Updated the assertion to the rendered copy, then reran the full focused cohort to 112/112. No product behavior failed in that run.",
+    "releaseLimits": "Focused local Node/VM tests only. Full suite, native installed-client, browser/rendered typography and focus, CI, Beta acceptance, deployment, actual affected-device recovery, and exact Stable-artifact approval remain outstanding and are owned by the root integration/release task."
+  },
+{
+  "baseCommit": "4e3bcb7e317ae251c8e8a030291802a52ffdefa0",
+  "testChangesSha256": "1cb8aeeb7250552285f61a08832d6a50825698ab644523a627eb36df33cb0c97",
+  "reason": "Reconcile the preserved #216 backup and Restore consumer work onto the published b50 Beta and current P0 Stable baseline, retaining original source-present test-first evidence and every unrelated protection.",
+  "previousBehavior": "The current Beta and Stable expose separate board-data download and Restore entry points; prepared #216 work was authored against f38 before the latest P0 and apology delivery.",
+  "intendedBehavior": "The actual Settings file, paste, current-board, archive and raw-source consumers share the consolidated entry points while retaining protected previews, source bytes, diagnostics and separate bottom app-backup controls.",
+  "replacementTests": [
+    "RISK backup and Restore consolidation: Settings keeps one guarded action with all formats"
+  ],
+  "preservedCoverage": [
+    "All previous P0 source-review timing, cancellation, current-account, draft, unreadable-source and exact recovery-copy assertions remain unchanged.",
+    "All b50 exact apology text, Auth UID and channel dismissal, seven-day timing, metadata refresh, interaction deferral and manual reopen assertions remain unchanged.",
+    "Worker evidence retains the actual source-present REDs and later repairs; the integration-only 198-pass cohort is supplemental GREEN, not new test authorship or a recreated RED."
+  ],
+  "redEvidence": {
+    "command": "Original #216 recorded consumer commands and raw run paths remain in the two preceding imported rationale records; the owner reconciliation command is recorded in integration216/focused-combined.output.txt.",
+    "failure": "Before the original corresponding implementation, actual Settings download, file/paste Restore, FAQ and unreadable-startup consumers failed their new consolidation assertions. The original failed setup and stale-copy attempts retain their distinct classifications; no failure is invented for this reconciliation."
+  },
+  "evidenceClassification": "preserved-original-test-first-evidence-with-current-198-pass-integration"
+},
+{
+  "baseCommit": "b50ac1694502090a51503fdaa79d97d19d13d43e",
+  "testChangesSha256": "ff155537fa71dc3a041f3982836787f9aa5ff29c13a4e0e23cf765e771280bd4",
+  "reason": "Reconcile the preserved #216 backup and Restore consumer work onto the published b50 Beta and current P0 Stable baseline, retaining original source-present test-first evidence and every unrelated protection.",
+  "previousBehavior": "The current Beta and Stable expose separate board-data download and Restore entry points; prepared #216 work was authored against f38 before the latest P0 and apology delivery.",
+  "intendedBehavior": "The actual Settings file, paste, current-board, archive and raw-source consumers share the consolidated entry points while retaining protected previews, source bytes, diagnostics and separate bottom app-backup controls.",
+  "replacementTests": [
+    "RISK backup and Restore consolidation: Settings keeps one guarded action with all formats"
+  ],
+  "preservedCoverage": [
+    "All previous P0 source-review timing, cancellation, current-account, draft, unreadable-source and exact recovery-copy assertions remain unchanged.",
+    "All b50 exact apology text, Auth UID and channel dismissal, seven-day timing, metadata refresh, interaction deferral and manual reopen assertions remain unchanged.",
+    "Worker evidence retains the actual source-present REDs and later repairs; the integration-only 198-pass cohort is supplemental GREEN, not new test authorship or a recreated RED."
+  ],
+  "redEvidence": {
+    "command": "Original #216 recorded consumer commands and raw run paths remain in the two preceding imported rationale records; the owner reconciliation command is recorded in integration216/focused-combined.output.txt.",
+    "failure": "Before the original corresponding implementation, actual Settings download, file/paste Restore, FAQ and unreadable-startup consumers failed their new consolidation assertions. The original failed setup and stale-copy attempts retain their distinct classifications; no failure is invented for this reconciliation."
+  },
+  "evidenceClassification": "preserved-original-test-first-evidence-with-current-198-pass-integration"
+},
+{
+  "baseCommit": "4e3bcb7e317ae251c8e8a030291802a52ffdefa0",
+  "testChangesSha256": "e21dbae4074bc9be8ee0eaae283162b9cc9c3c9fa687bc4dcfd668fb19111984",
+  "reason": "Preserve the published Beta apology campaign when a later product has a new truthful publication time, with explicit original-publication provenance at the existing metadata-network consumer and packaging command.",
+  "previousBehavior": "The metadata reader rejects any notice start before product deployment. Reusing that rule for a later Beta product would either reject the existing campaign or require an unauthorized renewal or false product timestamp.",
+  "intendedBehavior": "An explicitly scoped validated Beta continuation retains the original notice start and its evidence references. Missing or malformed provenance fails closed; ordinary envelopes keep their previous ordering rule and Stable keeps its independent window.",
+  "replacementTests": [
+    "RISK apology release identity: a later Beta product retains the published notice window",
+    "RISK apology release identity: malformed continuation fails closed at the network consumer",
+    "RISK apology notice: continuation preserves expiry dismissal manual reopen and separate Stable",
+    "RISK apology notice: Help explains that later Beta builds retain the window"
+  ],
+  "preservedCoverage": [
+    "All previous executable assertions and all earlier rationale objects remain intact; current #216 consolidation changes retain their imported original consumer REDs and subsequent GREEN evidence.",
+    "The unchanged invalid start-before-deployment network case and actual packaging command legacy refusal/positive controls retain their assertions.",
+    "Metadata remains network-only, credential-free, scoped to the current page fingerprint and fixed origin, and fails closed. The app adds no board/auth/cloud reads or storage writes.",
+    "Supplemental malformed-provenance and expiry/dismissal/manual reopen/Stable cases passed after the initial reader repair; they are preservation evidence and are not claimed as additional preimplementation REDs."
+  ],
+  "redEvidence": {
+    "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=<exact new consumer name> tests.js; raw records integration216/notice-reader-runs/2026-10-20T20-07-08-636Z-4d9d5f1a-cb4e-4b7a-969f-9006e631cef8.json and 2026-10-20T20-09-02-502Z-c410736c-88fd-48a0-ba86-95dcd60374d7.json.",
+    "failure": "Before app-release.js changed, the source-present actual network consumer rejected valid retained provenance with status unavailable instead of verified. Its subsequent GREEN passed. Before Help copy changed, the actual mounted Help assertion failed because the retained-window explanation was absent. The original #216 REDs and reconciliation classification remain in the preceding records."
+  },
+  "greenEvidence": "Reader GREEN b63f0a58-6052-424c-b180-6882e9c3b3d6; focused apology/help preservation cohort integration216/notice-help-green.output.txt:14 pass,0 fail,0 skip.",
+  "evidenceClassification": "current-source-consumer-red-green-with-honest-supplemental-preservation"
+},
+{
+  "baseCommit": "b50ac1694502090a51503fdaa79d97d19d13d43e",
+  "testChangesSha256": "775e1f84c08276b741b062853e73c3e471ebbe4aef7bf1246fee033b0aa12843",
+  "reason": "Preserve the published Beta apology campaign when a later product has a new truthful publication time, with explicit original-publication provenance at the existing metadata-network consumer and packaging command.",
+  "previousBehavior": "The metadata reader rejects any notice start before product deployment. Reusing that rule for a later Beta product would either reject the existing campaign or require an unauthorized renewal or false product timestamp.",
+  "intendedBehavior": "An explicitly scoped validated Beta continuation retains the original notice start and its evidence references. Missing or malformed provenance fails closed; ordinary envelopes keep their previous ordering rule and Stable keeps its independent window.",
+  "replacementTests": [
+    "RISK apology release identity: a later Beta product retains the published notice window",
+    "RISK apology release identity: malformed continuation fails closed at the network consumer",
+    "RISK apology notice: continuation preserves expiry dismissal manual reopen and separate Stable",
+    "RISK apology notice: Help explains that later Beta builds retain the window"
+  ],
+  "preservedCoverage": [
+    "All previous executable assertions and all earlier rationale objects remain intact; current #216 consolidation changes retain their imported original consumer REDs and subsequent GREEN evidence.",
+    "The unchanged invalid start-before-deployment network case and actual packaging command legacy refusal/positive controls retain their assertions.",
+    "Metadata remains network-only, credential-free, scoped to the current page fingerprint and fixed origin, and fails closed. The app adds no board/auth/cloud reads or storage writes.",
+    "Supplemental malformed-provenance and expiry/dismissal/manual reopen/Stable cases passed after the initial reader repair; they are preservation evidence and are not claimed as additional preimplementation REDs."
+  ],
+  "redEvidence": {
+    "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=<exact new consumer name> tests.js; raw records integration216/notice-reader-runs/2026-10-20T20-07-08-636Z-4d9d5f1a-cb4e-4b7a-969f-9006e631cef8.json and 2026-10-20T20-09-02-502Z-c410736c-88fd-48a0-ba86-95dcd60374d7.json.",
+    "failure": "Before app-release.js changed, the source-present actual network consumer rejected valid retained provenance with status unavailable instead of verified. Its subsequent GREEN passed. Before Help copy changed, the actual mounted Help assertion failed because the retained-window explanation was absent. The original #216 REDs and reconciliation classification remain in the preceding records."
+  },
+  "greenEvidence": "Reader GREEN b63f0a58-6052-424c-b180-6882e9c3b3d6; focused apology/help preservation cohort integration216/notice-help-green.output.txt:14 pass,0 fail,0 skip.",
+  "evidenceClassification": "current-source-consumer-red-green-with-honest-supplemental-preservation"
+},
+{
+  "baseCommit": "05d0c3756dc92cfb8179513bb63b72a21aa2b62a",
+  "testChangesSha256": "3342d97c85b07de172505a2535c56849ca3e686a974053226eb525b83444a412",
+  "reason": "Preserve the published Beta apology campaign when a later product has a new truthful publication time, with explicit original-publication provenance at the existing metadata-network consumer and packaging command.",
+  "previousBehavior": "The metadata reader rejects any notice start before product deployment. Reusing that rule for a later Beta product would either reject the existing campaign or require an unauthorized renewal or false product timestamp.",
+  "intendedBehavior": "An explicitly scoped validated Beta continuation retains the original notice start and its evidence references. Missing or malformed provenance fails closed; ordinary envelopes keep their previous ordering rule and Stable keeps its independent window.",
+  "replacementTests": [
+    "RISK apology release identity: a later Beta product retains the published notice window",
+    "RISK apology release identity: malformed continuation fails closed at the network consumer",
+    "RISK apology notice: continuation preserves expiry dismissal manual reopen and separate Stable",
+    "RISK apology notice: Help explains that later Beta builds retain the window"
+  ],
+  "preservedCoverage": [
+    "All previous executable assertions and all earlier rationale objects remain intact; current #216 consolidation changes retain their imported original consumer REDs and subsequent GREEN evidence.",
+    "The unchanged invalid start-before-deployment network case and actual packaging command legacy refusal/positive controls retain their assertions.",
+    "Metadata remains network-only, credential-free, scoped to the current page fingerprint and fixed origin, and fails closed. The app adds no board/auth/cloud reads or storage writes.",
+    "Supplemental malformed-provenance and expiry/dismissal/manual reopen/Stable cases passed after the initial reader repair; they are preservation evidence and are not claimed as additional preimplementation REDs."
+  ],
+  "redEvidence": {
+    "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=<exact new consumer name> tests.js; raw records integration216/notice-reader-runs/2026-10-20T20-07-08-636Z-4d9d5f1a-cb4e-4b7a-969f-9006e631cef8.json and 2026-10-20T20-09-02-502Z-c410736c-88fd-48a0-ba86-95dcd60374d7.json.",
+    "failure": "Before app-release.js changed, the source-present actual network consumer rejected valid retained provenance with status unavailable instead of verified. Its subsequent GREEN passed. Before Help copy changed, the actual mounted Help assertion failed because the retained-window explanation was absent. The original #216 REDs and reconciliation classification remain in the preceding records."
+  },
+  "greenEvidence": "Reader GREEN b63f0a58-6052-424c-b180-6882e9c3b3d6; focused apology/help preservation cohort integration216/notice-help-green.output.txt:14 pass,0 fail,0 skip.",
+  "evidenceClassification": "current-source-consumer-red-green-with-honest-supplemental-preservation"
+},
+{
+  "baseCommit": "4e3bcb7e317ae251c8e8a030291802a52ffdefa0",
+  "testChangesSha256": "395263ee9a1c793d32e0cb71b48f18713cef3775f7db2ea71ad90b59346960f1",
+  "reason": "Repair independent review P2 by rejecting array-valued hexadecimal product identifiers instead of JavaScript regex coercion, retaining the original consumer test-first history and all216 protection coverage.",
+  "previousBehavior": "A JSON array containing a single valid source, tree or fingerprint string could pass regex validation and enter the immutable original-publication provenance; current source/tree identifiers had the same coercion gap.",
+  "intendedBehavior": "The existing metadata network consumer requires real strings before validating current and original product identifiers. Malformed arrays fail closed without changing board or notice storage.",
+  "replacementTests": [
+    "RISK apology release identity: malformed continuation fails closed at the network consumer"
+  ],
+  "preservedCoverage": [
+    "All603 prior rationale objects and all original passing tests are retained unchanged except additive malformed-type cases and their shared test mutation input.",
+    "Existing valid continuation, missing-proof legacy ordering, exact apology, expiry, dismissed UID, manual reopening, independent Stable, source/data/restore protection and named216 original RED/GREEN records remain intact.",
+    "Independent Code and Specialist separately identified the same P2 in pinned ddcf349; owner permanent consumer RED4c9f65dc preceded the two reader type checks."
+  ],
+  "redEvidence": {
+    "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK apology release identity: malformed continuation fails closed at the network consumer$\" tests.js; integration216/notice-reader-runs/2026-10-20T20-14-10-865Z-4c9f65dc-aa72-4979-94cb-43594ee3eb59.json.",
+    "failure": "The actual full-app network consumer returned verified for array original source rather than unavailable. The source-present assertion failed before string guards were added; subsequent full apology cohort passed. Earlier original feature and Help REDs remain in preceding records."
+  },
+  "greenEvidence": "integration216/notice-type-green.output.txt: all apology/identity consumer cases pass after the type guard; supplemental malformed cases retain their actual classification."
+},
+{
+  "baseCommit": "b50ac1694502090a51503fdaa79d97d19d13d43e",
+  "testChangesSha256": "75c32c02f76c6f3cd58877b0892296ba6962a000b0629867645dff3dbe9067de",
+  "reason": "Repair independent review P2 by rejecting array-valued hexadecimal product identifiers instead of JavaScript regex coercion, retaining the original consumer test-first history and all216 protection coverage.",
+  "previousBehavior": "A JSON array containing a single valid source, tree or fingerprint string could pass regex validation and enter the immutable original-publication provenance; current source/tree identifiers had the same coercion gap.",
+  "intendedBehavior": "The existing metadata network consumer requires real strings before validating current and original product identifiers. Malformed arrays fail closed without changing board or notice storage.",
+  "replacementTests": [
+    "RISK apology release identity: malformed continuation fails closed at the network consumer"
+  ],
+  "preservedCoverage": [
+    "All603 prior rationale objects and all original passing tests are retained unchanged except additive malformed-type cases and their shared test mutation input.",
+    "Existing valid continuation, missing-proof legacy ordering, exact apology, expiry, dismissed UID, manual reopening, independent Stable, source/data/restore protection and named216 original RED/GREEN records remain intact.",
+    "Independent Code and Specialist separately identified the same P2 in pinned ddcf349; owner permanent consumer RED4c9f65dc preceded the two reader type checks."
+  ],
+  "redEvidence": {
+    "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK apology release identity: malformed continuation fails closed at the network consumer$\" tests.js; integration216/notice-reader-runs/2026-10-20T20-14-10-865Z-4c9f65dc-aa72-4979-94cb-43594ee3eb59.json.",
+    "failure": "The actual full-app network consumer returned verified for array original source rather than unavailable. The source-present assertion failed before string guards were added; subsequent full apology cohort passed. Earlier original feature and Help REDs remain in preceding records."
+  },
+  "greenEvidence": "integration216/notice-type-green.output.txt: all apology/identity consumer cases pass after the type guard; supplemental malformed cases retain their actual classification."
+},
+{
+  "baseCommit": "d2b85004a2c430b519e2b61d1f810ee1e790005e",
+  "testChangesSha256": "71f1e55e1021c3ca78a9d1e2f2cc619e6232038661f2c8137ac93f319f6a9f85",
+  "reason": "Implement the explicitly authorized one fresh whole-source verification for a confirmed transient cross-capture mismatch, retaining every prior assertion and all original source/publication safeguards.",
+  "previousBehavior": "One changed cloud revision between otherwise individually stable complete reads immediately returned a terminal source-changed message. The same real consumer verified on a fresh manual call after the transient stopped. There was no automatic fresh pair within the original read budget.",
+  "intendedBehavior": "At most one fresh pair follows only a typed cross-capture mismatch while the complete original local/identity/authority baseline remains safe. Only cloud snapshot and confirmed finite committedAt-only head differences are eligible. The same monotonic minute/controller/serial, all validation, cancellation and explicit consent remain mandatory; ordinary pull/write and publication behavior do not change.",
+  "replacementTests": [
+    "RISK cloud source fresh check: one between-capture cloud change verifies again within the same review",
+    "RISK cloud source fresh check: head metadata alone permits one fresh pair and visible cancellable progress",
+    "RISK cloud source fresh check: changed head ownership and unknown record facts cannot count as harmless metadata",
+    "RISK cloud source fresh check: continuing peer churn stops after four complete captures without choosing",
+    "RISK cloud source fresh check: the restart shares the original minute and late replies remain powerless",
+    "RISK cloud source fresh check: Cancel and reopen revoke a stalled fresh pair and its late callback",
+    "RISK cloud source fresh check: changed local authority and unsupported or failed reads never restart",
+    "RISK cloud source fresh check: a draft changed as fresh progress opens cannot become the new baseline",
+    "RISK cloud source fresh check guidance: mounted Help explains one fresh check without choosing"
+  ],
+  "preservedCoverage": [
+    "All605 prior rationale raw objects and every preexisting runtime assertion remain unchanged. Only new full-app tests and a fixture wrapper are added; no old expectation is weakened or relabelled.",
+    "Exact accepted state, head payload/hash and ownership/unknown metadata, browser raw, pending, device holds, prepared choices, UID/auth epoch and drafts remain binding. No cloud writes, source choice or prepared publication occur during verification.",
+    "The first permanent peer-change actual consumer failed false-versus-true before the first runtime edit, then passed. Later head account/sourceFingerprint/unknown-authority controls exposed an overly broad metadata allowance through a new true-versus-false consumer RED before the committedAt-only repair.",
+    "The first guidance attempt had a new-test regex syntax infrastructure failure, retained as nonqualifying. After repairing only test syntax the mounted Help assertion failed for absent copy; only then were FAQ and current changelog updated.",
+    "Head committedAt, bounded churn, same total minute, Cancel/reopen/late callback, local/identity/source refusal and fresh-progress draft controls were authored after initial implementation and are supplemental GREEN controls, not fabricated preimplementation RED. Existing one-minute/ordinary20second and finite passive diagnostics contracts remain required.",
+    "No generic SDK/network failure, storage refusal, unsupported evidence, account/local edit or source-choice/publication phase enters automatic retry. No source byte/identity/revision/CAS/ACK proof is weakened. Full/native/rendered/emulator/CI/live and actual private affected-device recovery remain outside this worker handoff."
+  ],
+  "redEvidence": {
+    "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- Node22 --test --test-name-pattern=\"^RISK cloud source fresh check: one between-capture cloud change\" tests.js; exact raw records under integration216/p0-fresh-source-retry/runs and peer-change-red.output.txt. Separate head-authority-red.output.txt and guidance-consumer-red.output.txt precede their repairs.",
+    "failure": "Actual same-attempt peer-change assertion failed false !== true on exactd2b8500 before implementation. Subsequent actual head owner/sourceFingerprint/unknown-field control failed true !== false before restricting metadata to finite committedAt. Mounted Help failed the fresh-check sentence assertion before copy; earlier syntax-only record0211f05a remains infrastructure failure and is not behavioral RED."
+  }
+},
+{
+  "baseCommit": "d2b85004a2c430b519e2b61d1f810ee1e790005e",
+  "testChangesSha256": "9fdb68ddf9bd2cb5d65a1604b1ffa61a2db733df6c843edbb664f9c21a985c5d",
+  "reason": "Preserve bounded redacted evidence of the original cross-capture refusal and each fresh verification, and distinguish terminal source-review refusal from genuinely pending progress under the newly reviewed safe automatic recovery guide.",
+  "previousBehavior": "The first implementation recovered a transient source comparison safely, but its support report erased the comparison failure. Adding a source-read/stale event alone was insufficient because report byte trimming discarded the whole older operation. The stopped failure dialog also reused pending-only wait language.",
+  "intendedBehavior": "Record the existing allowlisted comparison refusal and compact expendable successful operation detail before whole-operation eviction, preserving operation starts, source refusal/terminal facts, generation summaries and all push events within unchanged limits. Terminal dialogs say checks stopped and offer a fresh check; running checks keep their existing wait message.",
+  "replacementTests": [
+    "RISK cloud source fresh check: one between-capture cloud change verifies again within the same review",
+    "RISK cloud source fresh check: continuing peer churn stops after four complete captures without choosing",
+    "RISK cloud source fresh check: head metadata alone permits one fresh pair and visible cancellable progress",
+    "RISK cloud source fresh check: the restart shares the original minute and late replies remain powerless",
+    "RISK cloud source fresh check: changed local authority and unsupported or failed reads never restart"
+  ],
+  "preservedCoverage": [
+    "All605 original raw rationale objects and the complete initial worker record remain byte-identical. No preexisting passing assertion is deleted. The initial peer-change, head-authority and mounted FAQ RED chronology remains recorded in the preceding entry.",
+    "The original full-app cross-capture success, exact board/head/pending/browser raw/cloud preservation and zero-write assertions remain. The actual downloaded metadata report additionally proves refusal plus fresh-completion retention, no private source identifiers/content, unchanged24KiB/80event/8operation caps and honest truncation accounting.",
+    "Report compaction changes only the disposable projection. It does not change captured history, generation summaries, typed allowlists, one-hour expiry,512-byte captured event limit, operation ordering or actual push/ACK/failure records; existing whole-operation and minimal-report fallback remain.",
+    "The terminal-copy RED used actual continuing churn after the one allowed restart; stopped unsafe/deadline paths are supplemental controls. An added overly broad control initially expected generic stopped text for UID/epoch invalidation; its failure is retained and the control now preserves the existing specific signed-in-account-changed terminal message while forbidding pending wait language.",
+    "The first stale-event-only repair genuinely failed the support-report consumer because the old operation was evicted. That failed attempt, safe trace observation, and subsequent actual download RED all remain preserved. No test failure is relabeled as product RED, and no prior expectations are weakened.",
+    "Same original minute/controller/serial and baseline guards, no network catch-all, fresh unselected preview, pending/device/browser/prepared source protections and all consent/UID/epoch/publication contracts remain mandatory. Full/native/rendered/emulator/CI/live and actual affected-device recovery are not proved by this worker.",
+    "The first broad report compaction passed the new consumer but caused2 unchanged diagnostics assertions to see an older unverified routine read before the later validated operation; diagnostics-final-preservation.output.txt retains156pass/2fail. The repair keeps existing older routine-operation eviction and compacts detail only to protect actual source refusal/terminal failure or publication evidence. Existing generation assertions pass unchanged in report-regression-repair-green.output.txt,23outcomes."
+  ],
+  "redEvidence": {
+    "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- Node22 --test --test-name-pattern=\"^RISK cloud source fresh check: (one between-capture|continuing peer churn)\" tests.js; diagnostics-terminal-red.output.txt. Actual download RED before report projection repair: download-retention-red.output.txt. Raw immutable records remain under integration216/p0-fresh-source-retry/runs.",
+    "failure": "Actual support report had zero stale operations rather than one; actual stopped dialog still said until the checks finish. Both assertions failed before their fixes. The event-only repair still failed; then actual downloaded support bytes also lacked the old comparison refusal before projection compaction. Subsequent21 outcomes passed. Earlier supplementary UID/epoch copy expectation failure is an invalid test expectation, retained separately, not product RED."
+  }
+},
+{
+  "baseCommit": "4e3bcb7e317ae251c8e8a030291802a52ffdefa0",
+  "testChangesSha256": "cf0ef8fec16666a2d98fa1ebd8b2d427049b9e2c354e7192afa5ca782bad991f",
+  "reason": "Reconcile preserved backup/Restore and exact notice work with the current user-authorized P0 fresh-source verification, terminal-state clarity and bounded diagnostic retention, retaining every original consumer RED and all prior assertions.",
+  "previousBehavior": "Separate board-data entry points remain on Stable; current source review stops after one transient between-capture difference, reuses waiting text after stopping, and report projection can evict the original refusal when a fresh verification follows.",
+  "intendedBehavior": "One consolidated Download backup and Restore retain every original safe format/route. A typed transient source inconsistency permits at most one complete fresh pair within the same original minute and authority/controller/serial. Only finite committedAt-only head differences qualify; no source is chosen. Reports preserve essential refusal/result facts within unchanged privacy and size limits.",
+  "replacementTests": [
+    "RISK backup and Restore consolidation: Settings keeps one guarded action with all formats",
+    "RISK cloud source fresh check: one between-capture cloud change verifies again within the same review",
+    "RISK cloud source fresh check: changed head ownership and unknown record facts cannot count as harmless metadata"
+  ],
+  "preservedCoverage": [
+    "All607 prior raw rationale objects remain byte-exact. No earlier passing assertion is removed; original #216, reader, metadata type, initial P0 and follow-up RED/GREEN chronology remains in preceding records and external handoffs.",
+    "Every complete source comparison, accepted state/draft/head payload+hash/browser/pending/prepared/device-hold/account/actual UID/auth epoch guard remains binding. Cancel/deadline and late-result retirement remain effective; ordinary pull/write deadlines remain unchanged.",
+    "The report retains the typed allowlist, no source/private reads or payload hashes, one-hour80-event/512-byte/8-operation/24KiB limits, actual push/ACK priority, generation summaries and honest truncation/fallback. Captured history is not rewritten.",
+    "The failed first event-only retention repair, broad compaction regression against two unchanged generation assertions, regex setup failure and invalid supplemental UID/epoch copy expectation remain distinctly classified, not disguised as qualifying feature RED.",
+    "The existing precise apology copy, account/channel dismissal, unchanged original Beta expiry and independent Stable window, metadata fail-closed legacy ordering and real CLI malformed-proof refusal remain intact."
+  ],
+  "redEvidence": {
+    "command": "Original exact commands are retained under integration216/p0-fresh-source-retry/HANDOFF.json chronology and immutable run records: peer3154d417, head authority38c355e6, mounted Helpd155ef53, report/terminalc2becbf5 and actual download681f9548. Original #216 and reader/type RED records remain in earlier rationale objects.",
+    "failure": "The actual source-review consumer returned false instead of a same-attempt verified unselected preview after a one-time peer change. The first broad head exception then failed permanent owner/sourceFingerprint/unknown-authority controls. Mounted Help and terminal text assertions failed before their copy repairs; the actual support download omitted original stale refusal before projection repair. All preceded their corresponding runtime repairs. Root reconciliation is not a new RED."
+  },
+  "greenEvidence": "Worker final158/158 recovery/identity/diagnostics outcomes, focused23/23 and hygiene3/3 pass at9cbab2d; current root cumulative source still requires final exact full/native/rules/compat/rendered/independent/CI/live gates.",
+  "evidenceClassification": "retained-source-present-vertical-tdd-with-cumulative-owner-integration"
+},
+{
+  "baseCommit": "b50ac1694502090a51503fdaa79d97d19d13d43e",
+  "testChangesSha256": "53e32a0a8cb48a8fe0609112666e8661ef1d9bcbce8b7f44baabfcc74f7b1372",
+  "reason": "Reconcile preserved backup/Restore and exact notice work with the current user-authorized P0 fresh-source verification, terminal-state clarity and bounded diagnostic retention, retaining every original consumer RED and all prior assertions.",
+  "previousBehavior": "Separate board-data entry points remain on Stable; current source review stops after one transient between-capture difference, reuses waiting text after stopping, and report projection can evict the original refusal when a fresh verification follows.",
+  "intendedBehavior": "One consolidated Download backup and Restore retain every original safe format/route. A typed transient source inconsistency permits at most one complete fresh pair within the same original minute and authority/controller/serial. Only finite committedAt-only head differences qualify; no source is chosen. Reports preserve essential refusal/result facts within unchanged privacy and size limits.",
+  "replacementTests": [
+    "RISK backup and Restore consolidation: Settings keeps one guarded action with all formats",
+    "RISK cloud source fresh check: one between-capture cloud change verifies again within the same review",
+    "RISK cloud source fresh check: changed head ownership and unknown record facts cannot count as harmless metadata"
+  ],
+  "preservedCoverage": [
+    "All607 prior raw rationale objects remain byte-exact. No earlier passing assertion is removed; original #216, reader, metadata type, initial P0 and follow-up RED/GREEN chronology remains in preceding records and external handoffs.",
+    "Every complete source comparison, accepted state/draft/head payload+hash/browser/pending/prepared/device-hold/account/actual UID/auth epoch guard remains binding. Cancel/deadline and late-result retirement remain effective; ordinary pull/write deadlines remain unchanged.",
+    "The report retains the typed allowlist, no source/private reads or payload hashes, one-hour80-event/512-byte/8-operation/24KiB limits, actual push/ACK priority, generation summaries and honest truncation/fallback. Captured history is not rewritten.",
+    "The failed first event-only retention repair, broad compaction regression against two unchanged generation assertions, regex setup failure and invalid supplemental UID/epoch copy expectation remain distinctly classified, not disguised as qualifying feature RED.",
+    "The existing precise apology copy, account/channel dismissal, unchanged original Beta expiry and independent Stable window, metadata fail-closed legacy ordering and real CLI malformed-proof refusal remain intact."
+  ],
+  "redEvidence": {
+    "command": "Original exact commands are retained under integration216/p0-fresh-source-retry/HANDOFF.json chronology and immutable run records: peer3154d417, head authority38c355e6, mounted Helpd155ef53, report/terminalc2becbf5 and actual download681f9548. Original #216 and reader/type RED records remain in earlier rationale objects.",
+    "failure": "The actual source-review consumer returned false instead of a same-attempt verified unselected preview after a one-time peer change. The first broad head exception then failed permanent owner/sourceFingerprint/unknown-authority controls. Mounted Help and terminal text assertions failed before their copy repairs; the actual support download omitted original stale refusal before projection repair. All preceded their corresponding runtime repairs. Root reconciliation is not a new RED."
+  },
+  "greenEvidence": "Worker final158/158 recovery/identity/diagnostics outcomes, focused23/23 and hygiene3/3 pass at9cbab2d; current root cumulative source still requires final exact full/native/rules/compat/rendered/independent/CI/live gates.",
+  "evidenceClassification": "retained-source-present-vertical-tdd-with-cumulative-owner-integration"
+},
+{
+  "baseCommit": "53d9c98b25c1dbe089b1b41f0def870cea9973c5",
+  "testChangesSha256": "604a9b6b7e6d1799fc12ad734f05b057f72b84a9520fdfe3b2e7d6d0b6299ea4",
+  "reason": "Repair the independently confirmed P2 in the new fresh-source retry exemption: JSON comparison erased structured-clone distinctions in unknown head authority facts alongside a committedAt-only refresh.",
+  "previousBehavior": "A real durable head change from NaN to null, missing to undefined, negative zero to zero or a changed named array property could satisfy the new JSON-normalized head equality and incorrectly restart source verification. The full-app consumer returned verified true after the changed authority instead of staying held.",
+  "intendedBehavior": "Use the existing lossless typed recovery evidence comparator for complete head records and finite committedAt-only normalized copies. Changed unknown typed facts stay held; unchanged typed facts still permit the existing single unselected fresh pair. No other comparison, budget, source, consent or publication behavior changes.",
+  "replacementTests": [
+    "RISK cloud source fresh check: structured-clone head facts cannot be erased by the metadata exception"
+  ],
+  "preservedCoverage": [
+    "All609 prior raw rationale objects and every original passing assertion are retained byte-for-byte. The new regression uses the existing actual full-app review action, external SDK timing and actual IndexedDB meta/head writes plus device readback; it does not replace readHead or test the private comparison helper.",
+    "Each of the four changed typed cases first proves its exact initial representation survives actual device readHead, then observes the review remain held after the intentional peer metadata change. Exact accepted state, head payload/hash, typed raw source rows, pending upload and cloud bytes are retained; no SDK writes or default choice occur.",
+    "All four cases produced a meaningful true-versus-false consumer RED before runtime edits. The first run failed only at a VM cross-realm deepStrictEqual fixture expectation; it remains preserved as a nonqualifying fixture failure. Structured-cloning both observed readbacks into the host realm fixed that fixture without changing type/value facts, then the real action assertions failed.",
+    "One unchanged typed-authority positive case was added after implementation and is explicitly a supplemental GREEN control, not retroactive RED. It still reaches an entirely fresh pair with no source selected and Apply disabled.",
+    "The preexisting cloudSourceRecoverySame comparator is unchanged, as are original strict baseline/account/UID/epoch/local/draft/pending/browser/hold guards, one-minute/controller/serial limit, Cancel, diagnostics projection and ordinary pull/write deadlines. No storage codec, backend, Auth/rules, fingerprint or private fixture changes."
+  ],
+  "redEvidence": {
+    "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- Node22 --test --test-name-pattern=\"^RISK cloud source fresh check: structured-clone head facts\" tests.js; integration216/p0-fresh-source-retry/typed-head-repair/typed-head-consumer-red.output.txt and immutable runs/*.json.",
+    "failure": "After actual typed durable readback passed, all4 consumer cases returned true rather than false for changed protected authority; parent test plus subtests produced5 failures. This occurred on exact53d before replacing either JSON head comparison. The earlier typed-head-red.output.txt is retained as fixture failure only. Then26/26 fresh outcomes passed, and27/27 passed with the supplemental unchanged typed control."
+  }
+},
+  {
+    "baseCommit": "4e3bcb7e317ae251c8e8a030291802a52ffdefa0",
+    "testChangesSha256": "b02e4ae746f22735fe92aabd05bf635670e18759d5edbc04951dd15a8b93c6b1",
+    "reason": "Correct the final integration rationale test-title metadata after preflight rejected unregistered names; all original records are preserved.",
+    "previousBehavior": "Candidate53d had a lossy JSON head-metadata exemption and unnecessarily shortened existing backup lifecycle guidance; full validation and an independent specialist exposed the defects.",
+    "intendedBehavior": "Only finite committedAt-only changes with all other structured-clone head facts losslessly equal may permit one fresh pair in the original minute. Unknown facts remain binding. The published backup/Restore FAQ and original lexical assertions are restored; all new format/route and protected-choice guidance remains.",
+    "replacementTests": [
+      "RISK cloud source fresh check: structured-clone head facts cannot be erased by the metadata exception",
+      "RISK cloud source fresh check: changed head ownership and unknown record facts cannot count as harmless metadata"
+    ],
+    "preservedCoverage": [
+      "All612 prior raw rationale objects remain byte-exact, including the two failed metadata preparations. Corrected records precede same-fingerprint malformed preparations solely because validator uses first match; no source, test, fingerprint or acceptance has changed.",
+      "All610 preceding raw rationale objects remain byte-exact. All609 prior records also verified by worker. Original old feature assertions restored where #216 unnecessarily migrated unchanged lexical contracts; none removed or weakened.",
+      "Actual IDB/head/readback review consumer covers NaN/null, missing/own undefined, -0/0 and named array properties; positive unchanged typed facts preserve safe committedAt-only retry. Existing full comparison and accepted state/draft/head hash+payload/owner/sourceFingerprint/unknown-field/browser/pending/holds/account/UID/auth epoch protections remain.",
+      "Cancel, original monotonic deadline/controller/serial, late-result retirement, no default selection/adoption/write, terminal copy, bounded safe report projection, native lifecycle, earlier backup and notice/CLI acceptance remain unchanged.",
+      "Original53d failed full2FAQ, initial FAQ repair stale-literal failure, typed fixture cross-realm setup failure, and all earlier failed repairs retained with their honest classification."
+    ],
+    "redEvidence": {
+      "command": "Retained actual run records: final-53d9c98 full recorder d225aded; typed-head-repair/runs afc4699d; prior feature REDs remain in original immutable records and HANDOFF files.",
+      "failure": "Before functional repair, all four actual structured-clone metadata transitions returned verified true instead of held false. Before copy repair the full suite failed two unchanged original FAQ contracts. Cross-realm fixture infrastructure failure is separately retained, not a feature RED."
+    },
+    "greenEvidence": "Worker164/164 recovery/identity/report,27/27 focused,3/3 hygiene and committed preflight passed; owner FAQ repair5/5 and independent Code pass. Final exact full/native/rules/compatibility/rendered/review/CI/public evidence remains required.",
+    "evidenceClassification": "metadata-only-correction-after-preflight-no-functional-change"
+  },
+  {
+    "baseCommit": "b50ac1694502090a51503fdaa79d97d19d13d43e",
+    "testChangesSha256": "8091e6bb5126fb411f085e378b56577e7687422070f378f19575d4883bc1e3a9",
+    "reason": "Correct the final integration rationale test-title metadata after preflight rejected unregistered names; all original records are preserved.",
+    "previousBehavior": "Candidate53d had a lossy JSON head-metadata exemption and unnecessarily shortened existing backup lifecycle guidance; full validation and an independent specialist exposed the defects.",
+    "intendedBehavior": "Only finite committedAt-only changes with all other structured-clone head facts losslessly equal may permit one fresh pair in the original minute. Unknown facts remain binding. The published backup/Restore FAQ and original lexical assertions are restored; all new format/route and protected-choice guidance remains.",
+    "replacementTests": [
+      "RISK cloud source fresh check: structured-clone head facts cannot be erased by the metadata exception",
+      "RISK cloud source fresh check: changed head ownership and unknown record facts cannot count as harmless metadata"
+    ],
+    "preservedCoverage": [
+      "All612 prior raw rationale objects remain byte-exact, including the two failed metadata preparations. Corrected records precede same-fingerprint malformed preparations solely because validator uses first match; no source, test, fingerprint or acceptance has changed.",
+      "All610 preceding raw rationale objects remain byte-exact. All609 prior records also verified by worker. Original old feature assertions restored where #216 unnecessarily migrated unchanged lexical contracts; none removed or weakened.",
+      "Actual IDB/head/readback review consumer covers NaN/null, missing/own undefined, -0/0 and named array properties; positive unchanged typed facts preserve safe committedAt-only retry. Existing full comparison and accepted state/draft/head hash+payload/owner/sourceFingerprint/unknown-field/browser/pending/holds/account/UID/auth epoch protections remain.",
+      "Cancel, original monotonic deadline/controller/serial, late-result retirement, no default selection/adoption/write, terminal copy, bounded safe report projection, native lifecycle, earlier backup and notice/CLI acceptance remain unchanged.",
+      "Original53d failed full2FAQ, initial FAQ repair stale-literal failure, typed fixture cross-realm setup failure, and all earlier failed repairs retained with their honest classification."
+    ],
+    "redEvidence": {
+      "command": "Retained actual run records: final-53d9c98 full recorder d225aded; typed-head-repair/runs afc4699d; prior feature REDs remain in original immutable records and HANDOFF files.",
+      "failure": "Before functional repair, all four actual structured-clone metadata transitions returned verified true instead of held false. Before copy repair the full suite failed two unchanged original FAQ contracts. Cross-realm fixture infrastructure failure is separately retained, not a feature RED."
+    },
+    "greenEvidence": "Worker164/164 recovery/identity/report,27/27 focused,3/3 hygiene and committed preflight passed; owner FAQ repair5/5 and independent Code pass. Final exact full/native/rules/compatibility/rendered/review/CI/public evidence remains required.",
+    "evidenceClassification": "metadata-only-correction-after-preflight-no-functional-change"
+  },
+  {
+    "baseCommit": "4e3bcb7e317ae251c8e8a030291802a52ffdefa0",
+    "testChangesSha256": "b02e4ae746f22735fe92aabd05bf635670e18759d5edbc04951dd15a8b93c6b1",
+    "reason": "Bind the coherent backup/Restore, notice continuation and bounded P0 verification candidate after genuine independent-review and full-suite repairs; preserve all original rationale records and feature assertions.",
+    "previousBehavior": "Candidate53d had a lossy JSON head-metadata exemption and unnecessarily shortened existing backup lifecycle guidance; full validation and an independent specialist exposed the defects.",
+    "intendedBehavior": "Only finite committedAt-only changes with all other structured-clone head facts losslessly equal may permit one fresh pair in the original minute. Unknown facts remain binding. The published backup/Restore FAQ and original lexical assertions are restored; all new format/route and protected-choice guidance remains.",
+    "replacementTests": [
+      "RISK cloud source fresh check: changed unknown structured-clone head facts cannot count as harmless metadata",
+      "RISK cloud source fresh check: unchanged typed head facts allow only the committedAt refresh",
+      "RISK backup mirror FAQ: confirmed matching-copy deletion and ambiguous recovery preserve the seven-day age cue",
+      "RISK legacy automatic expiry FAQ: save rotation permanently removes expired upgrade copies while safety exceptions and Settings age cues remain clear"
+    ],
+    "preservedCoverage": [
+      "All610 preceding raw rationale objects remain byte-exact. All609 prior records also verified by worker. Original old feature assertions restored where #216 unnecessarily migrated unchanged lexical contracts; none removed or weakened.",
+      "Actual IDB/head/readback review consumer covers NaN/null, missing/own undefined, -0/0 and named array properties; positive unchanged typed facts preserve safe committedAt-only retry. Existing full comparison and accepted state/draft/head hash+payload/owner/sourceFingerprint/unknown-field/browser/pending/holds/account/UID/auth epoch protections remain.",
+      "Cancel, original monotonic deadline/controller/serial, late-result retirement, no default selection/adoption/write, terminal copy, bounded safe report projection, native lifecycle, earlier backup and notice/CLI acceptance remain unchanged.",
+      "Original53d failed full2FAQ, initial FAQ repair stale-literal failure, typed fixture cross-realm setup failure, and all earlier failed repairs retained with their honest classification."
+    ],
+    "redEvidence": {
+      "command": "Retained actual run records: final-53d9c98 full recorder d225aded; typed-head-repair/runs afc4699d; prior feature REDs remain in original immutable records and HANDOFF files.",
+      "failure": "Before functional repair, all four actual structured-clone metadata transitions returned verified true instead of held false. Before copy repair the full suite failed two unchanged original FAQ contracts. Cross-realm fixture infrastructure failure is separately retained, not a feature RED."
+    },
+    "greenEvidence": "Worker164/164 recovery/identity/report,27/27 focused,3/3 hygiene and committed preflight passed; owner FAQ repair5/5 and independent Code pass. Final exact full/native/rules/compatibility/rendered/review/CI/public evidence remains required.",
+    "evidenceClassification": "actual-consumer-red-green-with-cumulative-owner-integration"
+  },
+  {
+    "baseCommit": "b50ac1694502090a51503fdaa79d97d19d13d43e",
+    "testChangesSha256": "8091e6bb5126fb411f085e378b56577e7687422070f378f19575d4883bc1e3a9",
+    "reason": "Bind the coherent backup/Restore, notice continuation and bounded P0 verification candidate after genuine independent-review and full-suite repairs; preserve all original rationale records and feature assertions.",
+    "previousBehavior": "Candidate53d had a lossy JSON head-metadata exemption and unnecessarily shortened existing backup lifecycle guidance; full validation and an independent specialist exposed the defects.",
+    "intendedBehavior": "Only finite committedAt-only changes with all other structured-clone head facts losslessly equal may permit one fresh pair in the original minute. Unknown facts remain binding. The published backup/Restore FAQ and original lexical assertions are restored; all new format/route and protected-choice guidance remains.",
+    "replacementTests": [
+      "RISK cloud source fresh check: changed unknown structured-clone head facts cannot count as harmless metadata",
+      "RISK cloud source fresh check: unchanged typed head facts allow only the committedAt refresh",
+      "RISK backup mirror FAQ: confirmed matching-copy deletion and ambiguous recovery preserve the seven-day age cue",
+      "RISK legacy automatic expiry FAQ: save rotation permanently removes expired upgrade copies while safety exceptions and Settings age cues remain clear"
+    ],
+    "preservedCoverage": [
+      "All610 preceding raw rationale objects remain byte-exact. All609 prior records also verified by worker. Original old feature assertions restored where #216 unnecessarily migrated unchanged lexical contracts; none removed or weakened.",
+      "Actual IDB/head/readback review consumer covers NaN/null, missing/own undefined, -0/0 and named array properties; positive unchanged typed facts preserve safe committedAt-only retry. Existing full comparison and accepted state/draft/head hash+payload/owner/sourceFingerprint/unknown-field/browser/pending/holds/account/UID/auth epoch protections remain.",
+      "Cancel, original monotonic deadline/controller/serial, late-result retirement, no default selection/adoption/write, terminal copy, bounded safe report projection, native lifecycle, earlier backup and notice/CLI acceptance remain unchanged.",
+      "Original53d failed full2FAQ, initial FAQ repair stale-literal failure, typed fixture cross-realm setup failure, and all earlier failed repairs retained with their honest classification."
+    ],
+    "redEvidence": {
+      "command": "Retained actual run records: final-53d9c98 full recorder d225aded; typed-head-repair/runs afc4699d; prior feature REDs remain in original immutable records and HANDOFF files.",
+      "failure": "Before functional repair, all four actual structured-clone metadata transitions returned verified true instead of held false. Before copy repair the full suite failed two unchanged original FAQ contracts. Cross-realm fixture infrastructure failure is separately retained, not a feature RED."
+    },
+    "greenEvidence": "Worker164/164 recovery/identity/report,27/27 focused,3/3 hygiene and committed preflight passed; owner FAQ repair5/5 and independent Code pass. Final exact full/native/rules/compatibility/rendered/review/CI/public evidence remains required.",
+    "evidenceClassification": "actual-consumer-red-green-with-cumulative-owner-integration"
+  },
+  {
+    "baseCommit": "d0ecd5f3ce6e810036063f7df1e0027f5c1a2293",
+    "testChangesSha256": "36ffadc29d15db114200bbeb161840ca21b0a470c5477703af0d949a3a2cb5db",
+    "reason": "Repair independently observed enlarged unreadable Settings overflow through the existing mounted and native browser consumers, preserving every original assertion and raw rationale object.",
+    "previousBehavior": "At390px and22.5px native selector text, the raw-only option was379px wide/right420 beyond its308px Settings row and clipped the not-a-board qualification and native arrow.",
+    "intendedBehavior": "Only the two new backup/Restore selectors reuse the existing bounded native-select rule. Raw device sources keeps its unchanged value and source-only archive semantics, with the full wrapping not-a-board qualification outside the native select and linked by aria-describedby. FAQ/current changelog explain readable narrow/enlarged controls.",
+    "replacementTests": [
+      "RISK backup format safety: raw-source qualification remains outside the native selector",
+      "RISK backup format browser: enlarged unreadable Settings keeps native selectors and safety text readable"
+    ],
+    "preservedCoverage": [
+      "All614 preceding raw rationale objects remain byte-exact. No passing existing assertion, native format/download/file/paste/Cancel/source-protection guard or release/source identity contract is removed or weakened.",
+      "Actual native dark/light Settings tests use the established LANDSCAPE_BROWSER_URL/Playwright route and named browser consumer, at390x844 withselect22.5px andhelper20.25px diagnostic font sizes. They verify row bounds, actual same-font native intrinsic label/arrow reference, accessible visible qualification, native source selection and raw-source equality. They do not claim physical device/native zoom or full typography coverage.",
+      "The added browser case is environment-gated like the existing browser cohorts; it was actually executed withzero skips in RED/GREEN and final full rendered matrix remains mandatory. The added mounted consumer is unconditional in ordinary CI.",
+      "Original meaningful browser overflow RED and mounted missing-qualification RED precede app edits. First failed GREEN exposed an uncalibrated24px arrow heuristic; original/failed/repaired records remain. The probe now compares actual same-font/padding/native-appearance intrinsic width rather than weakening row containment.",
+      "Existing colors/fonts/padding/borders/actions are unchanged; only newcontrol IDs receive min-width0/max-width100. Unrelated selectors, storage/cloud/auth, all current P0 identity/budget/consent and bounded diagnostics remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "Actual recorder bc6cc8aa-d672-4f33-be06-5894444cb781: node --test --test-name-pattern=^RISK backup format tests.js with established localhost browser URL/module and isolated malformed source, exact d0 app before runtime edit.",
+      "failure": "Mounted Settings had no visible not-a-board qualification outside select; native dark and light fields exceeded their real Settings row.4of4 actual outcomes failed assertions,0skip, before CSS/label/helper repair. Independent rendered finding raw-select.json independently records379px/right420."
+    },
+    "greenEvidence": "Corrected probe7of7 pass6558bf3a; final narrowly scoped CSS recheck7of7 passb0201f82. Initial failed GREEN9cc15355 retained as probe-assumption failure, not feature RED. New exact full/native/rules/compatibility/rendered/reviews/CI/live acceptance still required.",
+    "evidenceClassification": "contemporaneous-mounted-and-native-consumer-red-green"
+  },
+  {
+    "baseCommit": "4e3bcb7e317ae251c8e8a030291802a52ffdefa0",
+    "testChangesSha256": "7fc44af8c8bf7c257660df1770216ef44b13f1667779b2b20ce9fcb77274e346",
+    "reason": "Repair independently observed enlarged unreadable Settings overflow through the existing mounted and native browser consumers, preserving every original assertion and raw rationale object.",
+    "previousBehavior": "At390px and22.5px native selector text, the raw-only option was379px wide/right420 beyond its308px Settings row and clipped the not-a-board qualification and native arrow.",
+    "intendedBehavior": "Only the two new backup/Restore selectors reuse the existing bounded native-select rule. Raw device sources keeps its unchanged value and source-only archive semantics, with the full wrapping not-a-board qualification outside the native select and linked by aria-describedby. FAQ/current changelog explain readable narrow/enlarged controls.",
+    "replacementTests": [
+      "RISK backup format safety: raw-source qualification remains outside the native selector",
+      "RISK backup format browser: enlarged unreadable Settings keeps native selectors and safety text readable"
+    ],
+    "preservedCoverage": [
+      "All614 preceding raw rationale objects remain byte-exact. No passing existing assertion, native format/download/file/paste/Cancel/source-protection guard or release/source identity contract is removed or weakened.",
+      "Actual native dark/light Settings tests use the established LANDSCAPE_BROWSER_URL/Playwright route and named browser consumer, at390x844 withselect22.5px andhelper20.25px diagnostic font sizes. They verify row bounds, actual same-font native intrinsic label/arrow reference, accessible visible qualification, native source selection and raw-source equality. They do not claim physical device/native zoom or full typography coverage.",
+      "The added browser case is environment-gated like the existing browser cohorts; it was actually executed withzero skips in RED/GREEN and final full rendered matrix remains mandatory. The added mounted consumer is unconditional in ordinary CI.",
+      "Original meaningful browser overflow RED and mounted missing-qualification RED precede app edits. First failed GREEN exposed an uncalibrated24px arrow heuristic; original/failed/repaired records remain. The probe now compares actual same-font/padding/native-appearance intrinsic width rather than weakening row containment.",
+      "Existing colors/fonts/padding/borders/actions are unchanged; only newcontrol IDs receive min-width0/max-width100. Unrelated selectors, storage/cloud/auth, all current P0 identity/budget/consent and bounded diagnostics remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "Actual recorder bc6cc8aa-d672-4f33-be06-5894444cb781: node --test --test-name-pattern=^RISK backup format tests.js with established localhost browser URL/module and isolated malformed source, exact d0 app before runtime edit.",
+      "failure": "Mounted Settings had no visible not-a-board qualification outside select; native dark and light fields exceeded their real Settings row.4of4 actual outcomes failed assertions,0skip, before CSS/label/helper repair. Independent rendered finding raw-select.json independently records379px/right420."
+    },
+    "greenEvidence": "Corrected probe7of7 pass6558bf3a; final narrowly scoped CSS recheck7of7 passb0201f82. Initial failed GREEN9cc15355 retained as probe-assumption failure, not feature RED. New exact full/native/rules/compatibility/rendered/reviews/CI/live acceptance still required.",
+    "evidenceClassification": "contemporaneous-mounted-and-native-consumer-red-green"
+  },
+  {
+    "baseCommit": "b50ac1694502090a51503fdaa79d97d19d13d43e",
+    "testChangesSha256": "7baa985629d1fd579e4f6fd68780999e9601f345e6f0aeea1464dfe627868e20",
+    "reason": "Repair independently observed enlarged unreadable Settings overflow through the existing mounted and native browser consumers, preserving every original assertion and raw rationale object.",
+    "previousBehavior": "At390px and22.5px native selector text, the raw-only option was379px wide/right420 beyond its308px Settings row and clipped the not-a-board qualification and native arrow.",
+    "intendedBehavior": "Only the two new backup/Restore selectors reuse the existing bounded native-select rule. Raw device sources keeps its unchanged value and source-only archive semantics, with the full wrapping not-a-board qualification outside the native select and linked by aria-describedby. FAQ/current changelog explain readable narrow/enlarged controls.",
+    "replacementTests": [
+      "RISK backup format safety: raw-source qualification remains outside the native selector",
+      "RISK backup format browser: enlarged unreadable Settings keeps native selectors and safety text readable"
+    ],
+    "preservedCoverage": [
+      "All614 preceding raw rationale objects remain byte-exact. No passing existing assertion, native format/download/file/paste/Cancel/source-protection guard or release/source identity contract is removed or weakened.",
+      "Actual native dark/light Settings tests use the established LANDSCAPE_BROWSER_URL/Playwright route and named browser consumer, at390x844 withselect22.5px andhelper20.25px diagnostic font sizes. They verify row bounds, actual same-font native intrinsic label/arrow reference, accessible visible qualification, native source selection and raw-source equality. They do not claim physical device/native zoom or full typography coverage.",
+      "The added browser case is environment-gated like the existing browser cohorts; it was actually executed withzero skips in RED/GREEN and final full rendered matrix remains mandatory. The added mounted consumer is unconditional in ordinary CI.",
+      "Original meaningful browser overflow RED and mounted missing-qualification RED precede app edits. First failed GREEN exposed an uncalibrated24px arrow heuristic; original/failed/repaired records remain. The probe now compares actual same-font/padding/native-appearance intrinsic width rather than weakening row containment.",
+      "Existing colors/fonts/padding/borders/actions are unchanged; only newcontrol IDs receive min-width0/max-width100. Unrelated selectors, storage/cloud/auth, all current P0 identity/budget/consent and bounded diagnostics remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "Actual recorder bc6cc8aa-d672-4f33-be06-5894444cb781: node --test --test-name-pattern=^RISK backup format tests.js with established localhost browser URL/module and isolated malformed source, exact d0 app before runtime edit.",
+      "failure": "Mounted Settings had no visible not-a-board qualification outside select; native dark and light fields exceeded their real Settings row.4of4 actual outcomes failed assertions,0skip, before CSS/label/helper repair. Independent rendered finding raw-select.json independently records379px/right420."
+    },
+    "greenEvidence": "Corrected probe7of7 pass6558bf3a; final narrowly scoped CSS recheck7of7 passb0201f82. Initial failed GREEN9cc15355 retained as probe-assumption failure, not feature RED. New exact full/native/rules/compatibility/rendered/reviews/CI/live acceptance still required.",
+    "evidenceClassification": "contemporaneous-mounted-and-native-consumer-red-green"
   }
 ]

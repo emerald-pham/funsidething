@@ -12,6 +12,9 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 ## Task state, eligibility, and scanner controls
 
+- RISK backup format safety: raw-source qualification remains outside the native selector
+- RISK backup format browser: enlarged unreadable Settings keeps native selectors and safety text readable
+
 - RISK resilient sync recovery: identity changes after durable source capture cannot bind an old response to a new account
 
 - RISK resilient sync recovery: rebuilding retains an interrupted pending generation and its exact readable chunks
@@ -453,7 +456,9 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK chance forecast: adaptive integration resolves narrow shared-benchmark transitions
 - RISK TrueSkill truncation: inverse-Mills tails match references through the former cutoff and extreme upset
 - RISK rating bounds: hydration and frozen chance opponents normalize extremes without changing healthy ratings
-- RISK current-board export: Settings and save directions retain board recovery actions
+- RISK backup and Restore consolidation: Settings keeps one guarded action with all formats
+
+The Settings board-data area exposes one Download backup action with current-board JSON, complete recovery archive, and source-only raw export formats as applicable, plus one Restore action that routes File or Paste into the existing protected preview. The unreadable-startup empty state routes through that shared Settings chooser instead of opening a second paste route. The actual download, file restore, pasted recovery, and unreadable-device consumers retain their exact-source, unsaved-edit, cancellation, and readback checks. Current-board view/copy and Support diagnostics remain separate; lower local/app backup controls are outside this consolidation.
 
 ## Returning-user first upload
 
@@ -1812,6 +1817,26 @@ The complete recovery suite also retains the released pre-hydration older-tab ba
 
 Earlier controls covered individual saves and a third edit during one overlap, but did not sustain ten distinct native actions across four successful snapshot acknowledgements. The new regression reaches the exact false retry-exhaustion warning while separately proving complete durable retention. The storage refusal control was added after repair as a preservation guard, not claimed as the original RED. Cant/Return previously lacked a stale pre-hold cloud chain replay after the hold ended; the new same/peer and legacy/current-pass cases retain later deliberate selection as a positive control.
 
+## Beta release packaging
+
+- `RISK repository process: Beta packaging preserves exact committed product bytes and separate channel identity` — immutable committed Beta packaging and additive channel identity at the release-command consumer.
+
+## Stable and Beta apology notice
+
+- RISK apology notice: an eligible Beta login shows the exact original apology
+- RISK apology notice: refreshing an unchanged release keeps the open message
+- RISK apology release identity: invalid metadata stays silent without touching the board
+- RISK apology release identity: a later Beta product retains the published notice window
+- RISK apology release identity: malformed continuation fails closed at the network consumer
+- RISK apology notice: continuation preserves expiry dismissal manual reopen and separate Stable
+- RISK apology notice: Help explains that later Beta builds retain the window
+- RISK apology notice: account dismissal and Stable window stay independent
+- RISK apology notice: automatic display waits for a modal and unfinished Add draft
+- RISK apology notice: a context-only Add draft waits before consuming its window
+- RISK apology notice: a later dependency row keeps its Add draft protected
+- RISK apology notice: a held scanner gesture defers without consuming its window
+- RISK PWA release metadata: exact scoped identity bypasses stale shell cache
+
 ## iOS report-shaped source overlap
 
 - RISK iOS source replay: a fresh native review offers a validated previous board after timed-out headers settle late
@@ -1837,3 +1862,22 @@ The real app consumers use synthetic independently verified generations and exte
 - RISK recovery read minute: known-damage entry clears on healthy reads and identity change without broadening ordinary timeouts
 
 An ordinary timeout does not clear a previously verified damage finding. The native menu still reaches fresh guarded source review, without selecting or publishing anything. A healthy source or account change clears that finding; an obsolete account read and a never-damaged timeout cannot create it. Accepted board, device head, pending evidence and cloud bytes remain exact throughout.
+
+## One fresh guarded source verification (#187)
+
+- RISK cloud source fresh check: one between-capture cloud change verifies again within the same review
+- RISK cloud source fresh check: head metadata alone permits one fresh pair and visible cancellable progress
+- RISK cloud source fresh check: changed head ownership and unknown record facts cannot count as harmless metadata
+- RISK cloud source fresh check: structured-clone head facts cannot be erased by the metadata exception
+- RISK cloud source fresh check: continuing peer churn stops after four complete captures without choosing
+- RISK cloud source fresh check: the restart shares the original minute and late replies remain powerless
+- RISK cloud source fresh check: Cancel and reopen revoke a stalled fresh pair and its late callback
+- RISK cloud source fresh check: changed local authority and unsupported or failed reads never restart
+- RISK cloud source fresh check: a draft changed as fresh progress opens cannot become the new baseline
+- RISK cloud source fresh check guidance: mounted Help explains one fresh check without choosing
+
+One transient between-capture cloud snapshot or finite committedAt-only head metadata change can restart both complete captures once within the original monotonic minute. No source is selected or published. Accepted work, drafts, UID/epoch, head ownership and unknown fields, pending/browser/hold/prepared sources stay binding; churn, cancellation, unsupported sources and refused storage remain held. Synthetic SDK/time/DOM/IDB consumers preserve exact sources and ordinary pull/write deadlines; actual affected-iOS source validity and recovery remain unverified.
+
+The recovered review's actual downloaded support report retains the original cross-capture refusal and separate fresh verification, with redaction, truncation accounting and unchanged byte/event/operation caps. Report-only compaction preserves source start/terminal facts, generation summaries and publication events. Pending progress and terminal refusal now have distinct wording: stopped checks never ask the user to keep waiting. The same tests retain exact board/head/pending/raw/cloud sources and no writes.
+
+The committedAt-only exemption compares complete head records losslessly. Actual durable readback retains NaN/null, missing/undefined, negative-zero/zero and named-array-property distinctions; any such changed unknown authority stays held. Unchanged typed facts still permit the one bounded metadata-only fresh pair without selecting or writing.
