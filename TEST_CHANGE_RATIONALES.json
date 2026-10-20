@@ -1,6 +1,31 @@
 [
   {
     "baseCommit": "010b9473ba44ae6fb859e028ebcdd7f69d38c545",
+    "testChangesSha256": "ae58b82d0e150b072c95ef99e260949c661c5d14c63ea97178c5f2a961714773",
+    "reason": "Resolve the consolidated exact6bac independent Code, specialist/Spec and rendered diagnostics findings while retaining the complete authorized P0 regression and source-preservation scope.",
+    "previousBehavior": "The unshipped report retained a fired debounce as pending, carried current acknowledgement metadata across account/backend transitions, omitted the effective SDK deadline and explicit recovery-copy availability/matching fields, and forced long compact reports onto one horizontal line.",
+    "intendedBehavior": "Observe the actual token-safe debounce lifecycle; invalidate current ACK/revision/request coverage on already observed backend/user/UID/epoch changes while retaining bounded historical events. Passively report the existing bounded SDK deadline and booleans from existing exact-copy/pending checks, otherwise unobserved/unavailable/expired. Soft-wrap both readonly fields without changing values or export bytes. Keep all source-read, hash, publication, pending and preservation decisions unchanged.",
+    "replacementTests": [
+      "RISK support diagnostics: native debounce reports scheduled, saving, and drained work accurately",
+      "RISK support diagnostics: accepted acknowledgements expire with their account and backend context",
+      "RISK support diagnostics: source operations report the effective bounded SDK deadline",
+      "RISK support diagnostics: recovery-copy checks are explicit, passive, and preserve unmatched pending work"
+    ],
+    "preservedCoverage": [
+      "All earlier rationale bytes and old assertions remain. Exact cumulative coverage retains the preview/account/DOM repairs, Cant/Return stale replay, ten distinct rapid actions, genuine save refusal and complete diagnostics worker cases. Current account/backend ACK coverage is distinct from an explicitly stale old response and from retained historical events.",
+      "The native debounce RED observes two accepted changes, a superseding scheduled timer and a real held IndexedDB commit before failing true versus false for a fired timer. ACK transition REDs begin with actual caller-accepted SDK revision6 and fail after sign-out, same-email UID change, same-UID new epoch or backend replacement. Deadline REDs use actual completed native source reads with150ms, capped60000ms and default20000ms settings.",
+      "Recovery-copy RED executes the actual damaged-generation cloudPull and existing exact acknowledged-source/pending comparisons before checking report availability. GREEN retains the unmatched pending pointer, exact device head and unchanged cloud root. Diagnostics adds no storage scan, read, payload hash, auth request, source choice or publication. Existing validDecisionBase/hash/revision/pending results are reused as typed booleans.",
+      "The first focused repair run retained39pass3fail: the established backend-stale assertion remained unchanged, and an actual root-stall report returned the minimal truncation fallback. A separate explicit assertion RED precedes the budget repair: truncation labels increased a just-trimmed report beyond24KiB. Drop accounting now participates in the same byte loop; all stage/timeout/late/size assertions stay.150 related outcomes then pass zero failures/skips.",
+      "Independent actual rendered wrap RED measured168481px content in a177px textarea; pre-wrap changes only rendering. Exact value/copy/download contract and Settings draft remain. A denied native download assertion is a postrepair preservation control, not an original RED. The new FAQ measurement assertions have their own pre-copy RED and retain the130-word ceiling.",
+      "The exact6bac full run was deliberately interrupted after independent source changes were required; recorder stateincomplete/SIGTERM/owned process cleanup completed. It is not a full/native pass. Exact6bac rules13/compat15 and private436task/280fact preservation retain only their old source scope; new exact candidate full/native/reviews/CI/live delivery remain required."
+    ],
+    "redEvidence": {
+      "command": "Node22 record-run preimplementation-red selected native debounce, accepted acknowledgements, effective source deadline and recovery-copy checks before functional edits; review-repair-6bac-red and review-repair-6bac-context-source-red under /Users/emeraldpham/.codex/task-artifacts/p0-pull-recurrence-20261020/. Separate review-report-budget-red and review-repair-faq-red before their repairs.",
+      "failure": "2026-10-20T13-06-57-186Z-028808c3-27d2-4fda-9b5e-ef90cf63ec45.json fails fired-timertrue, priorACKacknowledged, missing bounded deadlines150/60000/20000, missing source observations. The later context-source RED independently retains all4 real transition failures and executes damaged-source checks before missing-field assertion. Budget RED2026-10-20T13-12-09-720Z-25845d64-7e52-413c-9cee-82c599fda4d1.json explicitly fails absent sourceOperations at338-byte fallback. FAQ REDd3802a68 fails new deadline guidance before copy."
+    }
+  },
+  {
+    "baseCommit": "010b9473ba44ae6fb859e028ebcdd7f69d38c545",
     "testChangesSha256": "c1ce671902b2cb76b1d08836c9347cbaf29ad7e04bd172b3c99aeb8eef489197",
     "reason": "Integrate the authorized P0 recovery preview, Cant/Return and sustained rapid-action repairs with bounded local support diagnostics; correct the final owner-observed retry counter and retain the existing brief Help contract.",
     "previousBehavior": "The released source lacked a local metadata report and had the separately reproduced Cant/Return replay and successful-snapshot retry exhaustion defects. The unshipped diagnostics candidate counted retry depths 1+2+3 as six attempts and added a Help answer exceeding the retained130-word limit.",

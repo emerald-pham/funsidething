@@ -509,6 +509,10 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 
 ## Incident support diagnostics
 
+- RISK support diagnostics: native debounce reports scheduled, saving, and drained work accurately
+- RISK support diagnostics: accepted acknowledgements expire with their account and backend context
+- RISK support diagnostics: source operations report the effective bounded SDK deadline
+- RISK support diagnostics: recovery-copy checks are explicit, passive, and preserve unmatched pending work
 - RISK support diagnostics: real device retries count attempts while unexplained churn remains refused
 - RISK support diagnostics: Settings names the existing board export for its contents
 - RISK support diagnostics: local report stays redacted, bounded, and separate from board recovery
@@ -1784,6 +1788,8 @@ The native needs-attention action uses real IndexedDB and the production backend
 - RISK support diagnostics: download bytes, selectable copy fallback, and Return preserve an unsaved Settings draft after slow worker capture
 
 These consumers use the existing Settings controls, held host-storage commit, real CloudSync push response, and native cloud-source review against an isolated SDK fixture. They distinguish embedded app build fingerprint and executing-script SHA from controller, active, waiting and installing worker shell identities; cache-key inspection is limited and does not read cached bodies. They capture only measured source stages and safe role-based generation metadata; keep local durability separate from server acknowledgement; and verify root, chunk, and final-root stalls through the actual SDK boundary. First and second aggregate labels wrap the two actual complete source consumers under one local review alias; local recovery-evidence probes are not described as cloud aggregates. A held snapshot covers only its captured accepted request, and a held push advances acknowledgement only after the caller accepts the same backend and account. Leaving an unverified source review clears its preview so late results cannot change the dialog or grant a choice; the read itself follows its existing deadline. During an accepted source publication, the report appears inline in the same recovery preview and does not change its serial, source choice, busy guard, or publication outcome. The report consumer checks downloaded bytes, selectable clipboard fallback and return to an unsaved Settings draft after bounded worker observation. Retention, malformed observer input, invalid clocks, report bytes, board-data privacy, and unchanged ordinary board/archive exports remain explicit checks.
+
+Final review adds the missing post-ACK context transition, real debounce lifecycle and effective configured-deadline consumers. Current ACK/revision/request coverage expires on sign-out, UID/epoch or backend changes; bounded historical events remain. Existing recovery-copy and pending checks supply only safe availability/matching booleans, with unobserved or expired fields when no current observation exists. No extra source read, payload hash, storage scan or eligibility decision is introduced. The four consumer REDs precede their repairs. A subsequent retained actual root-stall RED exposes report truncation flags tipping a just-trimmed report over its byte limit; trimming now budgets those flags as it drops entries. All original stage and byte assertions remain. The download-denial assertion is an additive postrepair preservation control, not an original RED. Independent rendered review found forced one-line report text; both fields now soft-wrap while exact values and export bytes remain unchanged.
 
 ## Full-suite startup preservation and fixture lifetime
 

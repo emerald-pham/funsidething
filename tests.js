@@ -38577,6 +38577,9 @@ test('RISK support diagnostics: Settings names the existing board export for its
  assert.match(faq,/does not start a cloud read or change saved data/i);assert.match(faq,/clears an unverified source-review preview/i);
  assert.match(faq,/During an accepted source save, you can view, select, copy, or download the report inside the existing recovery preview/i);
  assert.match(faq,/never cancels that publication/i);assert.match(faq,/never uploaded/i);assert.match(faq,/does not create a board backup/i);
+ const measures=help.match(/<dt>What does the support report measure\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
+ assert.match(measures,/effective cloud-read deadline/i);assert.match(measures,/Recovery-copy availability and matching reflect existing checks only/i);
+ assert.match(measures,/Account changes clear current acknowledgement observations/i);
 });
 
 test('RISK support diagnostics: local report stays redacted, bounded, and separate from board recovery',async t=>{
@@ -38627,6 +38630,83 @@ test('RISK support diagnostics: real device retries count attempts while unexpla
  assert.equal(report.persistCalls.value-before.persistCalls.value,snapshots,'each real persistence call has one measured attempt');
  assert.equal(report.localFailureCode.value,'changed-during-save','the original integrity refusal remains visible');
  assert.equal(report.retryAttempts.value-before.retryAttempts.value,snapshots-1,'the report counts three actual retries once each');
+});
+
+test('RISK support diagnostics: native debounce reports scheduled, saving, and drained work accurately',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb');
+ const app=await loadApp({indexedDBProvider:new IDBFactory(),deviceDbName:'diagnostics-debounce-'+Math.random()}),{ctx}=app,store=ctx.window.ScannerDeviceStore;
+ assert.equal(await ctx.persist(),true);
+ const before=ctx.buildSupportDiagnosticsReport().save,commit=store.commitHead.bind(store),entered=deferredSyncFixture(),gate=deferredSyncFixture();let commits=0;
+ store.commitHead=async options=>{commits++;entered.resolve();await gate.promise;return commit(options);};
+ t.after(async()=>{gate.resolve();for(let n=0;n<100&&ctx.buildSupportDiagnosticsReport().save.activePersistCalls.value;n++)await flush();store.commitHead=commit;await app.dispose();});
+ ctx.onAction('toggle-list',{});ctx.onAction('toggle-list',{});
+ assert.equal(ctx.buildSupportDiagnosticsReport().save.acceptedRequests.value,before.acceptedRequests.value+2,'both native changes are accepted before the debounce');
+ assert.equal(ctx.buildSupportDiagnosticsReport().save.debouncePending.value,true,'the superseding ordinary save is actually scheduled');
+ await fixtureDeadline(entered.promise,'the native debounce did not reach its actual device commit');
+ const saving=ctx.buildSupportDiagnosticsReport().save;
+ assert.equal(saving.activePersistCalls.value,1,'the scheduled action has entered its real held device save');
+ assert.equal(saving.debouncePending.value,false,'a fired debounce is not a pending timer while storage is held');
+ gate.resolve();
+ await fixtureDeadline((async()=>{while(ctx.buildSupportDiagnosticsReport().save.activePersistCalls.value)await flush();})(),'the real device save did not drain');
+ const head=await store.readHead(),drained=ctx.buildSupportDiagnosticsReport().save;
+ assert.equal(head.payload,JSON.stringify(ctx.state),'the native changes reached an exact durable snapshot');
+ assert.equal(commits,1,'the superseded older timer cannot add a second save');
+ assert.equal(drained.localDurability.value,'durable');assert.equal(drained.debouncePending.value,false);
+});
+
+test('RISK support diagnostics: accepted acknowledgements expire with their account and backend context',async t=>{
+ for(const transition of ['sign-out','same-email UID change','same-UID new epoch','backend replacement'])await t.test(transition,async sub=>{
+  const app=await damagedAcknowledgedApp187(sub),{ctx,backend}=app;
+  const before=ctx.buildSupportDiagnosticsReport().save,stateBefore=JSON.stringify(ctx.state),account=backend.CS.user;
+  assert.equal(before.serverAcknowledgement.value,'acknowledged','the setup receives a real caller-accepted cloud acknowledgement');
+  assert.ok(before.serverRevision.value>0);
+  if(transition==='backend replacement')ctx.window.CloudSync={...backend.CS};
+  else if(transition==='same-email UID change')backend.emitAuth({uid:'other-owner',email:account});
+  else{backend.emitAuth(null);if(transition==='same-UID new epoch')backend.emitAuth({uid:'owner',email:account});}
+  ctx.onAction('view-support-diagnostics',{});const after=ctx.buildSupportDiagnosticsReport();
+  assert.notEqual(after.save.serverAcknowledgement.value,'acknowledged',transition+' revokes the current-context acknowledgement claim');
+  assert.equal(after.save.serverRevision.value,null,'the earlier account revision is not a current revision');
+  assert.equal(after.save.acknowledgedThroughRequest.status,'unobserved','the new context inherits no earlier request coverage');
+  assert.ok(after.events.some(event=>event.stage==='push'&&event.status==='acknowledged'),'bounded historical events remain available as events');
+  assert.equal(JSON.stringify(ctx.state),stateBefore,'diagnostic invalidation does not replace the retained board');
+ });
+});
+
+test('RISK support diagnostics: source operations report the effective bounded SDK deadline',async t=>{
+ for(const [configured,expected] of [[150,150],[999999,60000],[1,20000]])await t.test(String(configured),async sub=>{
+  const app=await divergentCloudSourceApp187(sub,{timeoutMs:configured}),{ctx}=app;
+  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true,'the actual source consumer completes normally');
+  ctx.onAction('view-support-diagnostics',{});const operations=ctx.buildSupportDiagnosticsReport().sourceOperations;
+  assert.ok(operations.length>0);
+  for(const operation of operations){
+   assert.equal(operation.deadlineMs?.value,expected,'the report records the effective SDK limit rather than elapsed time or raw configuration');
+   assert.equal(operation.deadlineMs?.status,'observed');assert.ok(operation.deadlineMs.observedAt);
+  }
+ });
+});
+
+test('RISK support diagnostics: recovery-copy checks are explicit, passive, and preserve unmatched pending work',async t=>{
+ const initial=await loadApp();t.after(()=>initial.dispose());
+ initial.ctx.onAction('view-support-diagnostics',{});const unobserved=initial.ctx.buildSupportDiagnosticsReport().recoverySources;
+ const app=await damagedAcknowledgedApp187(t),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ await store.setPendingUpload('owner',{generationId:'private-unmatched-pending',payloadHash:'e'.repeat(64),baseRev:originalRoot.rev,updatedAt:Date.now()});
+ const pending=await store.getPendingUpload('owner'),head=await store.readHead(),root=JSON.stringify(backend.docs.get('users/owner'));
+ await ctx.cloudPull();ctx.onAction('view-support-diagnostics',{});
+ const report=ctx.buildSupportDiagnosticsReport(),sources=report.recoverySources;
+ assert.ok(sources,'the native report represents the existing actual recovery-copy and pending checks');
+ assert.ok(unobserved,'a report explicitly represents recovery-source observations before any check');
+ for(const field of ['available','matchesCurrentGeneration'])assert.equal(unobserved.exactAcknowledgedCopy[field].status,'unobserved');
+ for(const field of ['available','matchesAcknowledgedCopy','matchesCurrentBoard'])assert.equal(unobserved.pendingSource[field].status,'unobserved');
+ assert.equal(sources.exactAcknowledgedCopy.available.value,true,'the existing acknowledged-copy guard actually validated an available copy');
+ assert.equal(sources.exactAcknowledgedCopy.matchesCurrentGeneration.value,true,'the existing source hash and revision checks actually matched');
+ assert.equal(sources.pendingSource.available.value,true,'the existing pending read actually returned a pointer');
+ assert.equal(sources.pendingSource.matchesAcknowledgedCopy.value,false);
+ assert.equal(sources.pendingSource.matchesCurrentBoard.value,false,'unknown pending work is not inferred eligible for automatic recovery');
+ assert.deepEqual(await store.getPendingUpload('owner'),pending,'the unmatched pointer remains exact');
+ assert.deepEqual(await store.readHead(),head,'observing recovery refusal leaves the durable device source exact');
+ assert.equal(JSON.stringify(backend.docs.get('users/owner')),root,'the unmatched source is never published');
+ assert.doesNotMatch(ctx.supportDiagnosticsText(),/private-unmatched-pending|users\/owner|generationId|payloadHash/,'the report contains only safe availability and matching metadata');
+ assert.equal(originalRoot.rev,backend.docs.get('users/owner').rev);
 });
 
 test('RISK support diagnostics: a held local save and cloud acknowledgement stay visibly pending',async t=>{
@@ -38940,7 +39020,11 @@ test('RISK support diagnostics: root, chunk, and final-root SDK stalls retain th
   await fixtureDeadline((async()=>{while(!held)await flush();})(),target+' SDK read did not enter the held native call');
   ctx.onAction('view-support-diagnostics',{});
   assert.match(shim.document.getElementById('modalRoot').innerHTML,/<h2>Support diagnostics<\/h2>/,'the report owns the visible dialog while its source operation is pending');
-  const observed=()=>ctx.buildSupportDiagnosticsReport().sourceOperations.flatMap(operation=>operation.events);
+  const observed=()=>{
+   const report=ctx.buildSupportDiagnosticsReport();
+   assert.ok(Array.isArray(report.sourceOperations),'bounded source report must retain its stage observations: '+JSON.stringify({keys:Object.keys(report),retention:report.retention,bytes:Buffer.byteLength(JSON.stringify(report))}));
+   return report.sourceOperations.flatMap(operation=>operation.events);
+  };
   assert.ok(observed().some(event=>event.stage===target&&event.status==='started'),target+' is identified from its real SDK stage before timeout');
   assert.equal(await reviewing,false,target+' source review reaches its ordinary SDK deadline');
   const stageEvents=observed().filter(event=>event.stage===target);
@@ -39043,6 +39127,11 @@ test('RISK support diagnostics: download bytes, selectable copy fallback, and Re
  await new Promise(resolve=>setTimeout(resolve,170));await flush();
  assert.match(root.innerHTML,/<h2>Support diagnostics<\/h2>/,'a slow worker observer cannot replace the current diagnostics dialog');
  assert.match(root.innerHTML,/supportDiagnosticsData/);
+ const beforeFailedDownload=JSON.stringify(ctx.state);
+ ctx.URL.createObjectURL=()=>{throw Error('isolated download unavailable');};
+ assert.equal(await ctx.onAction('download-support-diagnostics',{}),false,'a denied native download leaves local report access usable');
+ assert.match(root.innerHTML,/supportDiagnosticsData/,'the report remains locally selectable after download failure');
+ assert.equal(JSON.stringify(ctx.state),beforeFailedDownload,'download failure cannot alter the board');
  assert.equal(await ctx.onAction('return-support-diagnostics',{}),true,'the explicit Return action reopens the originating Settings panel');
  assert.match(root.innerHTML,/<h2>Settings<\/h2>/);
  assert.equal(control.value,'37','Return restores the actual unsaved Settings control value');
