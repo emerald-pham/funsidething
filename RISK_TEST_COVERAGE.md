@@ -453,7 +453,9 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK chance forecast: adaptive integration resolves narrow shared-benchmark transitions
 - RISK TrueSkill truncation: inverse-Mills tails match references through the former cutoff and extreme upset
 - RISK rating bounds: hydration and frozen chance opponents normalize extremes without changing healthy ratings
-- RISK current-board export: Settings and save directions retain board recovery actions
+- RISK backup and Restore consolidation: Settings keeps one guarded action with all formats
+
+The Settings board-data area exposes one Download backup action with current-board JSON, complete recovery archive, and source-only raw export formats as applicable, plus one Restore action that routes File or Paste into the existing protected preview. The unreadable-startup empty state routes through that shared Settings chooser instead of opening a second paste route. The actual download, file restore, pasted recovery, and unreadable-device consumers retain their exact-source, unsaved-edit, cancellation, and readback checks. Current-board view/copy and Support diagnostics remain separate; lower local/app backup controls are outside this consolidation.
 
 ## Returning-user first upload
 
