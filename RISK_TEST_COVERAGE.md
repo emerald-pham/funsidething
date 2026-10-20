@@ -507,6 +507,12 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK Landscape browser: both night shows reflect actual sparks and exposed windows visibly switch on and off
 - RISK fireworks realism: uneven blooms leave ballistic trails and fading embers
 
+## Incident support diagnostics
+
+- RISK support diagnostics: Settings names the existing board export for its contents
+- RISK support diagnostics: local report stays redacted, bounded, and separate from board recovery
+- RISK support diagnostics: download bytes, selectable copy fallback, and Return preserve an unsaved Settings draft after slow worker capture
+
 ## Retained sync diagnostics
 
 - RISK SYNC ERROR LOG: backend failures remain under Settings diagnostics after recovery and reload
@@ -1755,6 +1761,28 @@ The native needs-attention action uses real IndexedDB and the production backend
 - RISK recovery identity consumers: signed-in Add clears its captured draft after recovery
 - RISK recovery identity consumers: final-task WOOP advances after acknowledged recovery
 - RISK recovery identity consumers: verified cloud adoption rebases independent saved extension fields for the same UID
+
+## Incident support diagnostics
+
+- RISK support diagnostics: Settings names the existing board export for its contents
+- RISK support diagnostics: local report stays redacted, bounded, and separate from board recovery
+- RISK support diagnostics: a held local save and cloud acknowledgement stay visibly pending
+- RISK support diagnostics: a held snapshot does not claim durability for a later accepted action
+- RISK support diagnostics: held cloud acknowledgements stay bound to their accepted request and identity
+- RISK support diagnostics: opening the report supersedes a timed-out source review and rejects its late callback
+- RISK support diagnostics: report navigation cannot cancel an accepted source publication while its real push is held
+- RISK support diagnostics: existing source review records ordered safe stages without source identifiers
+- RISK support diagnostics: second complete source aggregate identifies its held root read
+- RISK support diagnostics: an actual empty chunk query is observed as zero and incomplete
+- RISK support diagnostics: observer clock failure cannot alter an actual source read
+- RISK support diagnostics: report names only a safe origin and separates build from executing-script identity
+- RISK support diagnostics: root, chunk, and final-root SDK stalls retain the correct stage and report owner
+- RISK support diagnostics: event retention and malformed observer input stay bounded and redacted
+- RISK support diagnostics worker: controller reports only its fixed shell identity
+- RISK support diagnostics: executing document and observed worker/cache identities remain distinct and bounded
+- RISK support diagnostics: download bytes, selectable copy fallback, and Return preserve an unsaved Settings draft after slow worker capture
+
+These consumers use the existing Settings controls, held host-storage commit, real CloudSync push response, and native cloud-source review against an isolated SDK fixture. They distinguish embedded app build fingerprint and executing-script SHA from controller, active, waiting and installing worker shell identities; cache-key inspection is limited and does not read cached bodies. They capture only measured source stages and safe role-based generation metadata; keep local durability separate from server acknowledgement; and verify root, chunk, and final-root stalls through the actual SDK boundary. First and second aggregate labels wrap the two actual complete source consumers under one local review alias; local recovery-evidence probes are not described as cloud aggregates. A held snapshot covers only its captured accepted request, and a held push advances acknowledgement only after the caller accepts the same backend and account. Leaving an unverified source review clears its preview so late results cannot change the dialog or grant a choice; the read itself follows its existing deadline. During an accepted source publication, the report appears inline in the same recovery preview and does not change its serial, source choice, busy guard, or publication outcome. The report consumer checks downloaded bytes, selectable clipboard fallback and return to an unsaved Settings draft after bounded worker observation. Retention, malformed observer input, invalid clocks, report bytes, board-data privacy, and unchanged ordinary board/archive exports remain explicit checks.
 
 ## Full-suite startup preservation and fixture lifetime
 

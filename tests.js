@@ -5812,7 +5812,9 @@ async function loadApp({ appSource=appSrc, artifacts=null, seed, cloudSyncFactor
   };
   if (withSceneModules && !sceneModulesAfterDomReady) installSceneModules()();
   if (sceneModulesAfterDomReady) shim.document.readyState = "loading";
+  shim.document.currentScript={textContent:appSource,src:""};
   vm.runInContext(appSource, sandbox, { filename: "index.html#app" });
+  shim.document.currentScript=null;
   beforeStateReady?.(sandbox, shim);
   if (sceneModulesAfterDomReady) {
     await flush(); // the inline boot script can resume before deferred modules execute
@@ -6722,16 +6724,17 @@ test("RISK rating bounds: hydration and frozen chance opponents normalize extrem
   assert.ok(loser.sigma >= sigmaFloor && loser.sigma <= sigmaLimit);
 });
 
-test("RISK Diagnostics download: Settings and save directions retain current-board recovery actions", async () => {
+test("RISK current-board export: Settings and save directions retain board recovery actions", async () => {
   const { ctx, shim } = await loadApp();
   ctx.openSettings();
   const panel = shim.document.getElementById("modalRoot").innerHTML;
-  assert.match(panel, /<h3>Diagnostics download<\/h3>/);
+  assert.match(panel, /<h3>Current-board view, copy, and download<\/h3>/);
+  assert.match(panel, /<h3>Support diagnostics<\/h3>/);
   assert.match(panel, /data-act="view-current-board"/);
   assert.match(panel, /data-act="download-current-board"/);
   assert.doesNotMatch(panel, /Current board recovery/i);
-  assert.match(html, /use Diagnostics download in Settings before closing it/);
-  assert.match(html, /use Diagnostics download in Settings before choosing whether to delete an older backup/);
+  assert.match(html, /use View \/ copy current board in Settings before closing it/);
+  assert.match(html, /use View \/ copy current board in Settings before choosing whether to delete an older backup/);
   assert.doesNotMatch(html, /Current board recovery/);
 });
 
@@ -11621,6 +11624,11 @@ test('RISK saved view fallback: corrupt or blocked local presentation storage le
 // Explicit external-IO controls for the five delivery-sensitive consumers below.
 // They observe real application promises; no loader, production state or timer changes.
 function deferredSyncFixture(){let resolve;const promise=new Promise(done=>{resolve=done;});return{promise,resolve};}
+async function fixtureDeadline(promise,message,ms=5000){
+ let timer;
+ try{return await Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(message)),ms);})]);}
+ finally{clearTimeout(timer);}
+}
 function observeSyncFixtureCalls(ctx,name){
  const original=ctx[name],calls=[];
  ctx[name]=(...args)=>{const promise=original(...args),call={promise,settled:false};calls.push(call);Promise.resolve(promise).finally(()=>{call.settled=true;});return promise;};
@@ -27596,7 +27604,7 @@ test('RISK SYNC ERROR LOG: backend failures remain under Settings diagnostics af
  app.ctx.openSettings();
  const rendered=app.shim.document.getElementById('modalRoot').innerHTML;
  assert.match(rendered,/Recent sync errors/);
- assert.ok(rendered.indexOf('Recent sync errors')>rendered.indexOf('Diagnostics download'));
+ assert.ok(rendered.indexOf('Recent sync errors')>rendered.indexOf('Current-board view, copy, and download'));
  assert.ok(rendered.indexOf('Recent sync errors')<rendered.indexOf('Daily local backups'));
  assert.match(rendered,/push.*unavailable/);
  assert.match(rendered,/<time datetime="[^"]+"/);
@@ -36757,7 +36765,7 @@ test('RISK device save warning browser: actual held Add keeps every text line on
    await page.locator('[data-act="settings"]').click();
    await poll(page,()=>!document.querySelector('#toast.show'),null,'natural warning expiry');
    const data=page.locator('#modalRoot details').filter({has:page.locator('[data-act="make-manual-backup"]')});for(const panel of await data.all())if(await panel.getAttribute('open')===null)await panel.locator(':scope > summary').click();
-   assert.equal(await page.locator('[data-act="make-manual-backup"]').isVisible(),true);assert.match(await page.locator('#modalRoot').innerText(),/Diagnostics download/);
+   assert.equal(await page.locator('[data-act="make-manual-backup"]').isVisible(),true);assert.match(await page.locator('#modalRoot').innerText(),/Current-board view, copy, and download/);
    const issue=page.locator('#modalRoot .kv').filter({hasText:'Last device save issue:'});await issue.scrollIntoViewIfNeeded();assert.equal(await issue.isVisible(),true);assert.match(await issue.innerText(),/Last device save issue:.*device-save:completion-upgrade\/ambiguous-legacy-completion/s);
    row.details=await issue.evaluate(el=>{const b=el.getBoundingClientRect(),code=el.querySelector('code'),r=code.getBoundingClientRect();return {text:el.textContent,rect:{x:b.x,y:b.y,w:b.width,h:b.height},code:{x:r.x,y:r.y,w:r.width,h:r.height},scrollWidth:el.scrollWidth,clientWidth:el.clientWidth};});assert.ok(row.details.scrollWidth<=row.details.clientWidth+1);assert.ok(row.details.code.x>=row.details.rect.x&&row.details.code.x+row.details.code.w<=row.details.rect.x+row.details.rect.w+1);
    await page.evaluate(()=>document.fonts.ready);fonts.details=await platformFonts('#modalRoot p.kv:has(code)');for(const act of ['view-current-board','download-current-board'])fonts[act]=await platformFonts('#modalRoot [data-act="'+act+'"]');await session.detach();
@@ -38553,4 +38561,470 @@ test('RISK recovery identity consumers: verified cloud adoption rebases independ
  assert.equal(cold.ctx.state.futureDeviceExtension,'saved device edit','UID-less wire and ancestor payloads must gain only the verified source identity before same-owner rebasing');
  assert.equal(cold.ctx.state.futurePeerExtension,'saved cloud edit');
  assert.equal((await cold.ctx.window.ScannerDeviceStore.readHead()).payload,JSON.stringify(cold.ctx.state));
+});
+
+
+test('RISK support diagnostics: Settings names the existing board export for its contents',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());app.ctx.openSettings();
+ const settings=app.shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(settings,/Current-board view, copy, and download/i,'the existing current-board export is named for the board it contains');
+ assert.match(settings,/data-act="view-current-board"/,'the existing board view/copy action remains available');
+ assert.match(settings,/data-act="download-current-board"/,'the existing board download action remains available');
+ app.ctx.openHelp();const help=app.shim.document.getElementById('modalRoot').innerHTML;
+ const faq=help.match(/<dt>What does Support diagnostics contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
+ assert.ok(faq,'the extended FAQ describes the separate report');
+ assert.match(faq,/local metadata report/i);assert.match(faq,/never includes task or recovery-source contents, account IDs, paths, cached app bodies, or arbitrary error text/i);
+ assert.match(faq,/does not start a cloud read or change saved data/i);assert.match(faq,/clears an unverified source-review preview/i);
+ assert.match(faq,/During an accepted source save, you can view, select, copy, or download the report inside the existing recovery preview/i);
+ assert.match(faq,/never cancels that publication/i);assert.match(faq,/never uploaded/i);assert.match(faq,/does not create a board backup/i);
+});
+
+test('RISK support diagnostics: local report stays redacted, bounded, and separate from board recovery',async t=>{
+ const secret='private-account-leak-94fce7';
+ const raw=JSON.stringify(syncState({tasks:[syncTask('private-task-id','PRIVATE-TASK-CONTENT-94fce7')],syncAccount:secret}));
+ const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw,
+  'fvp:chain-scanner:sync-error-log:v1':JSON.stringify([{at:Date.now(),stage:'push',code:secret}])}});t.after(()=>app.dispose());
+ app.ctx.window.CloudSync={configured:true,ready:true,user:secret,status:'error',errorStage:'pull',errorCode:secret,
+  async pull(){throw Error('diagnostics must not start a source read');},async push(){throw Error('diagnostics must not start a write');},
+  async readRecoverySource(){throw Error('diagnostics must not read recovery sources');},signIn(){throw Error('diagnostics must not sign in');}};
+ const beforeState=JSON.stringify(app.ctx.state),beforeStorage=[SYNC_STORE_KEY,LOCAL_HEAD_KEY,'fvp:chain-scanner:sync-error-log:v1'].map(key=>app.shim.localStorage.getItem(key));
+ app.ctx.openSettings();const settings=app.shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(settings,/Support diagnostics/i,'Settings offers a separate support report');
+ assert.match(settings,/data-act="view-support-diagnostics"/);assert.match(settings,/data-act="copy-support-diagnostics"/);assert.match(settings,/data-act="download-support-diagnostics"/);
+ assert.match(settings,/metadata report.*not a board backup/i,'the local report cannot be mistaken for restorable board data');
+ app.ctx.onAction('view-support-diagnostics',{});
+ let report=app.ctx.buildSupportDiagnosticsReport();
+ for(let i=0;i<100&&report.app.executingScriptSha256.status==='pending';i++){await flush();report=app.ctx.buildSupportDiagnosticsReport();}
+ const text=app.ctx.supportDiagnosticsText();
+ assert.equal(report.schema,'funsidething.support-diagnostics');assert.equal(report.version,1);
+ assert.equal(report.metadataOnly,true);assert.equal(report.boardDataIncluded,false);
+ assert.equal(report.app.executingScriptSha256.status,'observed','the report hashes the exact app script the document executed');
+ assert.match(report.app.executingScriptSha256.value,/^[a-f0-9]{64}$/);
+ assert.ok(Buffer.byteLength(text,'utf8')<=24*1024,'the serialized report respects the declared byte cap');
+ assert.ok(report.events.length<=80,'the in-memory event history is finite');
+ assert.ok(report.recentErrors.every(row=>row.code?.value==='unknown'||['permission-denied','unauthenticated','unavailable','deadline-exceeded','resource-exhausted','aborted','failed-precondition','network-request-failed','write-failed','storage-denied','quota-exhausted','concurrent-change','changed-during-save','account-changed','recovery-unavailable','corrupt-generation','invalid-manifest','invalid-revision','conflict','cancelled','offline'].includes(row.code?.value)),'error codes come from the fixed support-code allowlist: '+JSON.stringify(report.recentErrors.map(row=>row.code?.value)));
+ assert.doesNotMatch(text,/PRIVATE-TASK-CONTENT-94fce7|private-task-id|private-account-leak-94fce7/,'task content, task IDs, and account identifiers never enter the report');
+ assert.equal(JSON.stringify(app.ctx.state),beforeState,'viewing diagnostics does not alter the board');
+ assert.deepEqual([SYNC_STORE_KEY,LOCAL_HEAD_KEY,'fvp:chain-scanner:sync-error-log:v1'].map(key=>app.shim.localStorage.getItem(key)),beforeStorage,'viewing diagnostics does not write local or sync state');
+ assert.match(app.shim.document.getElementById('modalRoot').innerHTML,/supportDiagnosticsData/,'the report is viewable and selectable even when clipboard access is unavailable');
+});
+
+test('RISK support diagnostics: a held local save and cloud acknowledgement stay visibly pending',async t=>{
+ const app=await loadApp({hostStorage:{}}),{ctx}=app;t.after(()=>app.dispose());
+ if(vm.runInContext('saveTimer',ctx)){vm.runInContext('clearTimeout(saveTimer);saveTimer=null',ctx);}
+ assert.equal(await ctx.persist(),true,'the fixture begins with a settled local snapshot');
+ const storage=ctx.window.storage,realSet=storage.set.bind(storage),storeKey=vm.runInContext('STORE_KEY',ctx),entered=deferredSyncFixture(),localGate=deferredSyncFixture(),pushGate=deferredSyncFixture();let holdLocal=true;
+ storage.set=async(key,value)=>{if(key===storeKey&&holdLocal){holdLocal=false;entered.resolve(key);await localGate.promise;}return realSet(key,value);};
+ let pushEntered=null;
+ try{
+  ctx.addTask('Support diagnostics local save fixture',false);
+  await fixtureDeadline(entered.promise,'accepted save never reached held host-storage write');
+  assert.equal(await entered.promise,storeKey,'the accepted action reaches the actual held storage write');
+  ctx.onAction('view-support-diagnostics',{});
+  assert.equal(typeof ctx.buildSupportDiagnosticsReport,'function','the native report exposes observations from an actual accepted save');
+  const local=ctx.buildSupportDiagnosticsReport().save;
+  assert.ok(local.acceptedRequests.value>=1,'the actual save consumer reports accepted requests');
+  assert.equal(local.activePersistCalls.value,1,'an in-flight persist is an observed active call, not a queued count');
+  assert.equal(local.localDurability.value,'pending','a held local commit is not described as durable');
+  assert.equal(local.durableThroughRequest.status,'pending','the report does not claim a request is durable before its actual commit');
+  localGate.resolve();storage.set=realSet;assert.equal(await ctx.persist(),true,'the held local snapshot eventually completes');
+  assert.equal(storage._map.get(storeKey),JSON.stringify(ctx.state),'the held write eventually commits the accepted board');
+  const durable=ctx.buildSupportDiagnosticsReport().save;
+  assert.equal(durable.durableThroughRequest.value,durable.acceptedRequests.value,'local durability is tied to the accepted request generation that actually reached storage');
+
+  ctx.state.syncAccount='owner';ctx.state.syncRev=1;ctx.state.syncDirty=true;assert.equal(await ctx.persist(),true);
+  pushEntered=deferredSyncFixture();
+  ctx.window.CloudSync={configured:true,ready:true,user:'owner',status:'ok',async pull(){return {empty:true};},
+   async push(){pushEntered.resolve();return pushGate.promise;},signIn(){},signOut(){}};
+  vm.runInContext("reconciledAs='owner';lastKnownCloudPayload=JSON.stringify(state);lastKnownCloudAccount='owner';lastKnownCloudRevision=1;lastPushed=''",ctx);
+  const pushing=ctx.sendPush();
+  await fixtureDeadline(pushEntered.promise,'actual cloud push did not enter its held SDK call');
+  ctx.onAction('view-support-diagnostics',{});
+  assert.equal(ctx.buildSupportDiagnosticsReport().save.serverAcknowledgement.value,'pending','a held push response is not presented as server-acknowledged');
+  pushGate.resolve({ok:true,rev:2});await pushing;
+  assert.equal(ctx.buildSupportDiagnosticsReport().save.serverAcknowledgement.value,'acknowledged','only the real successful push response advances the acknowledgement field');
+ }finally{localGate.resolve();pushGate.resolve({error:true});storage.set=realSet;}
+});
+
+test('RISK support diagnostics: a held snapshot does not claim durability for a later accepted action',async t=>{
+ const app=await loadApp({hostStorage:{}}),{ctx}=app;t.after(()=>app.dispose());
+ if(vm.runInContext('saveTimer',ctx))vm.runInContext('clearTimeout(saveTimer);saveTimer=null',ctx);
+ const storage=ctx.window.storage,realSet=storage.set.bind(storage),storeKey=vm.runInContext('STORE_KEY',ctx),entered=deferredSyncFixture(),gate=deferredSyncFixture();let hold=true;
+ storage.set=async(key,value)=>{if(key===storeKey&&hold){hold=false;entered.resolve(value);await gate.promise;}return realSet(key,value);};
+ try{
+  ctx.addTask('Snapshot captured before later action',false);
+  const firstPayload=await fixtureDeadline(entered.promise,'the native accepted action did not reach its actual held host-storage write');
+  const before=ctx.buildSupportDiagnosticsReport().save.acceptedRequests.value;
+  ctx.addTask('Later accepted action while first snapshot is held',false);
+  const after=ctx.buildSupportDiagnosticsReport().save.acceptedRequests.value;
+  assert.ok(after>before,'the later native action advances the accepted request count while the first write is held');
+  assert.notEqual(firstPayload,JSON.stringify(ctx.state),'the first storage payload does not contain the later accepted action');
+  gate.resolve();storage.set=realSet;
+  for(let n=0;n<30&&vm.runInContext('supportDiagnosticsActivePersistCalls',ctx)>0;n++)await flush();
+  const firstResult=ctx.buildSupportDiagnosticsReport().save;
+  assert.equal(firstResult.durableThroughRequest.value,before,'a completed old snapshot covers only the request it captured');
+  assert.equal(firstResult.durableThroughRequest.status,'pending','the later accepted request remains pending until its own snapshot');
+  assert.equal(storage._map.get(storeKey),firstPayload,'the held native write commits its exact earlier snapshot');
+  assert.equal(await ctx.persist(),true,'the later native action can still reach its ordinary follow-up snapshot');
+  const final=ctx.buildSupportDiagnosticsReport().save;
+  assert.equal(final.durableThroughRequest.value,final.acceptedRequests.value,'the follow-up snapshot durably covers the later request');
+ }finally{gate.resolve();storage.set=realSet;}
+});
+
+test('RISK support diagnostics: held cloud acknowledgements stay bound to their accepted request and identity',async t=>{
+ const app=await loadApp({hostStorage:{}}),{ctx}=app;t.after(()=>app.dispose());
+ ctx.state.syncAccount='owner';ctx.state.syncRev=1;ctx.state.syncDirty=true;assert.equal(await ctx.persist(),true);
+ const entered=[deferredSyncFixture(),deferredSyncFixture()],gates=[deferredSyncFixture(),deferredSyncFixture()];let calls=0,replacementGate=null;
+ const backend={configured:true,ready:true,user:'owner',status:'ok',async pull(){return {empty:true};},async push(){const index=calls++;entered[index]?.resolve();await gates[index]?.promise;return {ok:true,rev:2+index};},signIn(){},signOut(){}};
+ ctx.window.CloudSync=backend;
+ vm.runInContext("reconciledAs='owner';lastKnownCloudPayload=JSON.stringify(state);lastKnownCloudAccount='owner';lastKnownCloudRevision=1;lastPushed=''",ctx);
+ try{
+  ctx.addTask('Request captured before cloud acknowledgement',false);
+  const firstRequest=ctx.buildSupportDiagnosticsReport().save.acceptedRequests.value;
+  const first=ctx.sendPush();await fixtureDeadline(entered[0].promise,'the actual first cloud push did not reach its held SDK response');
+  ctx.addTask('Newer accepted action while older cloud request is held',false);
+  const latestRequest=ctx.buildSupportDiagnosticsReport().save.acceptedRequests.value;
+  assert.ok(latestRequest>firstRequest,'the second native action is a distinct later accepted request');
+  gates[0].resolve();await first;
+  await fixtureDeadline(entered[1].promise,'the accepted newer action did not reach its follow-up held cloud push');
+  const newer=ctx.buildSupportDiagnosticsReport().save;
+  assert.ok(newer.acknowledgedThroughRequest.value<latestRequest,'the older response cannot claim the newer accepted request');
+  assert.equal(newer.serverAcknowledgement.value,'pending','the newer actual cloud push remains held');
+  gates[1].resolve();
+  for(let n=0;n<40&&vm.runInContext('supportDiagnosticsActivePushCalls',ctx)>0;n++)await flush();
+  const current=ctx.buildSupportDiagnosticsReport().save;
+  assert.equal(current.acknowledgedThroughRequest.value,latestRequest,'the newer request advances only after its own actual cloud reply');
+  assert.equal(current.serverAcknowledgement.value,'acknowledged');
+
+  ctx.addTask('Request whose cloud account changes while held',false);
+  const staleEntered=deferredSyncFixture(),staleGate=deferredSyncFixture();
+  backend.push=async()=>{staleEntered.resolve();await staleGate.promise;return {ok:true,rev:5};};
+  const stalePush=ctx.sendPush();await fixtureDeadline(staleEntered.promise,'the actual account-bound push did not reach its held response');
+  backend.user='different-uid';staleGate.resolve();await stalePush;
+  const stale=ctx.buildSupportDiagnosticsReport().save;
+  assert.notEqual(stale.serverAcknowledgement.value,'acknowledged','a reply refused by the existing UID guard is not a current acknowledgement');
+  assert.ok(stale.acknowledgedThroughRequest.value<stale.acceptedRequests.value,'the stale reply cannot advance current request coverage');
+
+  backend.user='owner';ctx.window.CloudSync=backend;
+  ctx.addTask('Request whose backend object changes while held',false);
+  const backendEntered=deferredSyncFixture();replacementGate=deferredSyncFixture();
+  backend.push=async()=>{backendEntered.resolve();await replacementGate.promise;return {ok:true,rev:6};};
+  const backendPush=ctx.sendPush();await fixtureDeadline(backendEntered.promise,'the actual backend-bound push did not reach its held response');
+  ctx.window.CloudSync={configured:true,ready:true,user:'owner',status:'ok',async pull(){return {empty:true};},async push(){return {ok:true,rev:7};},signIn(){},signOut(){}};
+  replacementGate.resolve();await backendPush;
+  const replaced=ctx.buildSupportDiagnosticsReport().save;
+  assert.equal(replaced.serverAcknowledgement.value,'stale','a response from a replaced backend object is not reported as the current server acknowledgement');
+  assert.ok(replaced.acknowledgedThroughRequest.value<replaced.acceptedRequests.value,'the replaced backend response does not advance current request coverage');
+ }finally{gates.forEach(gate=>gate.resolve());replacementGate?.resolve();}
+});
+
+test('RISK support diagnostics: opening the report supersedes a timed-out source review and rejects its late callback',async t=>{
+ const app=await divergentCloudSourceApp187(t,{timeoutMs:150}),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ const beforeState=JSON.stringify(ctx.state),beforeCloud=JSON.stringify([...backend.docs]),beforeHead=await store.readHead(),beforePending=await store.getPendingUpload('owner');
+ let release,started=false;const gate=new Promise(resolve=>release=resolve);
+ app.faults.serverRead=async()=>{started=true;await gate;};
+ const reviewing=ctx.onAction('review-cloud-source-recovery',{});t.after(async()=>{delete app.faults.serverRead;release();await reviewing;});
+ for(let n=0;n<200&&!started;n++)await flush();
+ assert.equal(started,true,'the actual SDK-boundary recovery source read is held');
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-cloud-source-readonly/,'the source review was the visible dialog before diagnostics opened');
+ ctx.onAction('view-support-diagnostics',{});
+ let modal=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(modal,/<h2>Support diagnostics<\/h2>/,'the report replaces the in-progress source review');
+ assert.match(modal,/supportDiagnosticsData/,'the local report is visible and selectable');
+ assert.doesNotMatch(modal,/data-act="(?:choose-cloud-recovery-source|apply-cloud-source-recovery)"/,'opening diagnostics grants no source choice');
+ assert.equal(vm.runInContext('cloudSourceRecoveryBusy',ctx),true,'opening a report does not pretend the timed source read has settled');
+ assert.equal(await reviewing,false,'the old source review reaches its real deadline');
+ assert.equal(vm.runInContext('cloudSourceRecoveryBusy',ctx),false,'the ordinary read lifecycle releases its busy guard at the deadline');
+ modal=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(modal,/<h2>Support diagnostics<\/h2>/,'the timed-out callback cannot replace the current report dialog');
+ assert.doesNotMatch(modal,/data-act="(?:choose-cloud-recovery-source|apply-cloud-source-recovery)"/);
+ delete app.faults.serverRead;release();for(let n=0;n<20;n++)await flush();
+ modal=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(modal,/<h2>Support diagnostics<\/h2>/,'a late source completion cannot replace the report after timeout');
+ const currentReport=ctx.buildSupportDiagnosticsReport();
+ const lateOperation=currentReport.sourceOperations.find(operation=>operation.events.some(event=>event.status==='late'));
+ assert.ok(lateOperation,'the report retains an explicit late stage when the SDK read completes after the deadline');
+ assert.equal(lateOperation.status,'late','the source operation summary preserves late state');
+ assert.equal(JSON.stringify(ctx.state),beforeState,'the abandoned read changes no board state');
+ assert.equal(JSON.stringify([...backend.docs]),beforeCloud,'the abandoned read changes no cloud source');
+ assert.deepEqual(await store.readHead(),beforeHead,'opening the report does not change the durable device head');
+ assert.deepEqual(await store.getPendingUpload('owner'),beforePending,'opening the report does not grant or stage recovery consent');
+ assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev,'no late callback publishes a source');
+});
+
+test('RISK support diagnostics: report navigation cannot cancel an accepted source publication while its real push is held',async t=>{
+ const app=await divergentCloudSourceApp187(t),{ctx,shim,backend,originalRoot}=app;
+ assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);
+ assert.equal(await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'device'}}),true);
+ const source=vm.runInContext('cloudSourceRecoveryPreview',ctx),serial=vm.runInContext('cloudSourceRecoverySerial',ctx);
+ const realPush=ctx.window.CloudSync.push.bind(ctx.window.CloudSync),entered=deferredSyncFixture(),gate=deferredSyncFixture();
+ ctx.window.CloudSync.push=async(...args)=>{entered.resolve();await gate.promise;return realPush(...args);};
+ let applying;
+ try{
+  applying=ctx.onAction('apply-cloud-source-recovery',{});
+  await fixtureDeadline(entered.promise,'accepted source publication never reached the actual held cloud push');
+  assert.equal(source.publishing,true,'the existing source review is in its protected publication phase');
+  assert.equal(ctx.onAction('view-support-diagnostics',{}),true,'a local report remains available while the accepted source push is held');
+  let modal=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(modal,/data-support-diagnostics-inline/,'the report is presented inside the existing recovery dialog');
+  assert.match(modal,/supportDiagnosticsData/,'the report text stays locally viewable while the accepted push is held');
+  for(const action of ['select-support-diagnostics','copy-support-diagnostics','download-support-diagnostics','refresh-support-diagnostics'])
+   assert.match(modal,new RegExp('data-act="'+action+'"'),'the in-dialog report exposes '+action);
+  let download=null,blob=null;const link=makeFakeElement();link.remove=()=>{};link.click=()=>{download={blob,href:link.href,name:link.download};};
+  shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();ctx.Blob=class DiagnosticsBlob{constructor(parts,options){blob={text:parts.join(''),type:options.type};}};
+  ctx.URL={createObjectURL(){return 'blob:held-source-support-diagnostics';},revokeObjectURL(){}};
+  ctx.navigator={clipboard:{async writeText(){throw Error('clipboard unavailable');}}};
+  assert.equal(await ctx.onAction('select-support-diagnostics',{}),true,'the inline report remains selectable');
+  assert.equal(await ctx.onAction('download-support-diagnostics',{}),true,'the inline report can be downloaded while the push is held');
+  assert.equal(download.name,'chain-scanner-support-diagnostics.json');assert.equal(download.blob.type,'application/json');
+  assert.equal(JSON.parse(download.blob.text).schema,'funsidething.support-diagnostics','the real download contains the local report bytes');
+  const downloadedReport=JSON.parse(download.blob.text);
+  assert.equal(downloadedReport.save.serverAcknowledgement.value,'pending','the actual downloaded report preserves the held publication status');
+  assert.ok(downloadedReport.sourceOperations.flatMap(operation=>operation.events).some(event=>event.stage==='push'&&event.status==='started'),
+    'the actual downloaded report keeps the source push joined to its operation');
+  const pendingReport=ctx.buildSupportDiagnosticsReport();
+  assert.equal(pendingReport.save.serverAcknowledgement.value,'pending','the held source publication is not misreported as an earlier acknowledged save');
+  assert.ok(pendingReport.sourceOperations.flatMap(operation=>operation.events).some(event=>event.stage==='push'&&event.status==='started'),
+    'the actual recovery push remains joined to its bounded source operation');
+  assert.equal(await ctx.onAction('copy-support-diagnostics',{}),false,'a failed clipboard copy leaves the report selectable inline');
+  modal=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(modal,/Saving the selected complete source/,'report export leaves the accepted publication status visible');
+  assert.match(modal,/supportDiagnosticsData/,'a failed clipboard copy retains the inline report');
+  assert.equal(vm.runInContext('cloudSourceRecoveryPreview',ctx),source,'the same publication preview retains its authority');
+  assert.equal(vm.runInContext('cloudSourceRecoverySerial',ctx),serial,'read-only navigation does not reset the publication guard');
+  assert.equal(source.choice,'device');assert.equal(source.publishing,true);
+  assert.match(modal,/<h2>Review cloud recovery sources<\/h2>/,'the accepted recovery dialog remains the current modal');
+  assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev,'the held push has not changed the cloud root early');
+  gate.resolve();assert.equal(await applying,true,'the accepted source action finishes after the real push reply arrives');
+  assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev+1);
+  const confirmedReport=ctx.buildSupportDiagnosticsReport();
+  assert.equal(confirmedReport.save.serverAcknowledgement.value,'acknowledged','the real source push acknowledgement is reported after its response');
+  assert.ok(confirmedReport.sourceOperations.flatMap(operation=>operation.events).some(event=>event.stage==='push'&&event.status==='acknowledged'),
+    'the same source operation retains its real publication acknowledgement');
+ }finally{gate.resolve();ctx.window.CloudSync.push=realPush;if(applying)await applying;}
+});
+
+test('RISK support diagnostics: existing source review records ordered safe stages without source identifiers',async t=>{
+ const app=await divergentCloudSourceApp187(t,{timeoutMs:1000}),{ctx,backend}=app;
+ assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true,'the actual existing source review completes');
+ ctx.onAction('view-support-diagnostics',{});
+ assert.equal(typeof ctx.buildSupportDiagnosticsReport,'function','the native report exposes observed source operations');
+ const report=ctx.buildSupportDiagnosticsReport(),operations=report.sourceOperations;
+ assert.ok(operations.length>=1&&operations.length<=8,'only a bounded set of actual source operations is retained');
+ const events=operations.flatMap(operation=>operation.events),stages=events.map(event=>event.stage);
+ for(const stage of ['network-ready','aggregate','root','header','chunks','final-root'])assert.ok(stages.includes(stage),'the existing source consumer records '+stage);
+ assert.ok(operations.every(operation=>operation.startedAt.status==='observed'),'operation start times come from the actual first source-read event');
+ assert.ok(events.some(event=>event.stage==='aggregate'&&event.role==='first'),'the first existing evidence aggregate is labelled by sequence');
+ assert.ok(events.some(event=>event.stage==='aggregate'&&event.role==='second'),'the second existing evidence aggregate is labelled by sequence');
+ assert.ok(events.some(event=>event.stage==='final-root'&&event.status==='completed'),'the final root recheck is distinct from the initial root read');
+ const generation=operations.flatMap(operation=>operation.generations||[]).find(row=>row.role==='current');
+ assert.ok(generation,'the native report provides role-based generation observations without identifiers');
+ for(const field of ['encoding','declaredChunks','receivedChunks','declaredBytes','receivedBytes','validation','completeness'])
+  assert.ok(generation[field]&&Object.hasOwn(generation[field],'value')&&Object.hasOwn(generation[field],'status'),field+' has an explicit value and observation status');
+ assert.equal(generation.encoding.value,'utf8');assert.equal(generation.encoding.status,'observed');
+ assert.equal(generation.receivedChunks.status,'observed','an actual chunk query reports its returned count');
+ assert.equal(generation.receivedBytes.status,'unobserved','diagnostics does not scan chunk bodies to invent a byte count');
+ assert.equal(generation.validation.value,'failed','a damaged current source is reported as failed validation');
+ assert.equal(generation.completeness.value,'incomplete','missing bytes remain explicitly incomplete');
+ const previous=operations.flatMap(operation=>operation.generations||[]).find(row=>row.role==='previous');
+ assert.equal(previous.validation.value,'verified','the independently read complete previous source is verified');
+ assert.equal(previous.completeness.value,'complete');
+ assert.doesNotMatch(ctx.supportDiagnosticsText(),/owner|generationId|Fixture A|Device source only/,'the report excludes account, generation, and board content values');
+ assert.ok(backend.docs.has('users/owner'),'the test uses the real external SDK fixture but the report does not expose its document path');
+});
+
+test('RISK support diagnostics: second complete source aggregate identifies its held root read',async t=>{
+ const app=await divergentCloudSourceApp187(t,{timeoutMs:150}),{ctx,shim}=app;
+ let rootReads=0,release;const gate=new Promise(resolve=>release=resolve),rootPath='users/owner';
+ app.faults.serverRead=async path=>{if(path===rootPath&&++rootReads===3)await gate;};
+ const reviewing=ctx.onAction('review-cloud-source-recovery',{});
+ t.after(async()=>{release();delete app.faults.serverRead;await reviewing;});
+ await fixtureDeadline((async()=>{while(rootReads<3)await flush();})(),'the second complete source aggregate did not reach its held SDK root read');
+ ctx.onAction('view-support-diagnostics',{});
+ assert.equal(await reviewing,false,'the second aggregate reaches its ordinary source deadline');
+ const operations=ctx.buildSupportDiagnosticsReport().sourceOperations;
+ const review=operations.find(operation=>operation.events.some(event=>event.stage==='aggregate'&&event.role==='first'));
+ assert.ok(review,'the complete source consumer records a first aggregate');
+ const aggregates=review.events.filter(event=>event.stage==='aggregate');
+ const aggregateRoles=aggregates.map(event=>event.role).filter((role,index,all)=>index===0||role!==all[index-1]);
+ assert.equal(Array.from(aggregateRoles).join(','),'first,second','first and second identify actual complete source consumers under one local review alias');
+ assert.ok(aggregates.some(event=>event.role==='first'&&event.status==='completed'),'the first complete source read succeeds before the second stalls');
+ assert.ok(aggregates.some(event=>event.role==='second'&&event.status==='timed-out'),'the second complete source read carries the held result');
+ assert.ok(review.events.some(event=>event.stage==='root'&&event.status==='timed-out'),'the report joins the second aggregate to its actual held root SDK stage');
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/<h2>Support diagnostics<\/h2>/,'the timed-out second read cannot reclaim the report dialog');
+ release();delete app.faults.serverRead;for(let n=0;n<20;n++)await flush();
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/<h2>Support diagnostics<\/h2>/,'a late second-root completion keeps the report current');
+});
+
+test('RISK support diagnostics: an actual empty chunk query is observed as zero and incomplete',async t=>{
+ const app=await divergentCloudSourceApp187(t),{ctx,backend}=app;
+ const prefix='users/owner/generations/'+app.originalRoot.activeGeneration+'/chunks/';
+ for(const key of [...backend.docs.keys()])if(key.startsWith(prefix))backend.docs.delete(key);
+ assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true,'the ordinary source review still completes with an incomplete candidate');
+ ctx.onAction('view-support-diagnostics',{});
+ const current=ctx.buildSupportDiagnosticsReport().sourceOperations.flatMap(operation=>operation.generations||[]).find(row=>row.role==='current');
+ assert.ok(current,'the actual cloud source query yields a role-only generation summary');
+ assert.equal(current.encoding.value,'utf8');assert.equal(current.encoding.status,'observed');
+ assert.ok(current.declaredChunks.value>0);assert.equal(current.declaredChunks.status,'observed');
+ assert.equal(current.receivedChunks.value,0,'the completed external query reports its real zero-length result');
+ assert.equal(current.receivedChunks.status,'observed','zero returned rows are distinct from an unreturned query');
+ assert.equal(current.receivedBytes.value,null);assert.equal(current.receivedBytes.status,'unobserved');
+ assert.equal(current.validation.value,'failed');assert.equal(current.completeness.value,'incomplete');
+ assert.doesNotMatch(ctx.supportDiagnosticsText(),/generationId|owner|Device source only/,'summary metadata contains no source identifiers or board content');
+});
+
+test('RISK support diagnostics: observer clock failure cannot alter an actual source read',async t=>{
+ const app=await divergentCloudSourceApp187(t,{timeoutMs:150}),{ctx,shim}=app;
+ ctx.__diagnosticsDateNow=vm.runInContext('Date.now.bind(Date)',ctx);
+ vm.runInContext('Date.now=()=>{throw Error("private observer clock detail")}',ctx);
+ ctx.window.__chainSupportDiagnosticsObserve=()=>{throw Error('private observer failure detail');};
+ try{
+  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true,'a throwing diagnostics clock or observer cannot change the actual SDK read result');
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/<h2>Review cloud recovery sources<\/h2>/,'the native source preview still opens after observer failure');
+  assert.doesNotMatch(ctx.supportDiagnosticsText(),/private observer/,'collector failures and raw details stay out of the report');
+ }finally{vm.runInContext('Date.now=__diagnosticsDateNow;delete globalThis.__diagnosticsDateNow',ctx);}
+});
+
+test('RISK support diagnostics: report names only a safe origin and separates build from executing-script identity',async t=>{
+ const app=await loadApp(),{ctx,shim}=app;t.after(()=>app.dispose());
+ shim.window.location={origin:'https://fixture.example.test',href:'https://fixture.example.test/private-board?account=private#secret'};
+ ctx.location=shim.window.location;
+ shim.document.getElementById('appChangelogCurrent').innerHTML='<div data-app-fingerprint="'+('a'.repeat(64))+'"></div>';
+ ctx.onAction('view-support-diagnostics',{});
+ const report=ctx.buildSupportDiagnosticsReport(),text=ctx.supportDiagnosticsText();
+ for(let i=0;i<100&&report.app.executingScriptSha256.status==='pending';i++){await flush();}
+ const readyReport=ctx.buildSupportDiagnosticsReport();
+ assert.equal(readyReport.app.origin.value,'https://fixture.example.test','the report includes the page origin without its path');
+ assert.equal(readyReport.app.releaseChannel.status,'unavailable','a category inferred from origin is not a verified release channel');
+ assert.equal(readyReport.app.documentBuildFingerprint.value,'a'.repeat(64),'the embedded app build fingerprint remains separately observable');
+ assert.match(readyReport.app.executingScriptSha256.value,/^[a-f0-9]{64}$/,'the running inline script hash has an honest distinct label');
+ assert.doesNotMatch(text,/private-board|account=private|#secret|e@example\.com/,'the origin never expands to a route or account detail');
+});
+
+test('RISK support diagnostics: root, chunk, and final-root SDK stalls retain the correct stage and report owner',async t=>{
+ for(const target of ['root','chunks','final-root'])await t.test(target,async sub=>{
+  const app=await divergentCloudSourceApp187(sub,{timeoutMs:150}),{ctx,shim}=app;
+  let release,held=false,rootReads=0,reviewing,readError=null;
+  const gate=new Promise(resolve=>release=resolve),expectedPath=target==='chunks'
+   ?'users/owner/generations/'+app.originalRoot.activeGeneration+'/chunks':'users/owner';
+  const originalRead=ctx.window.CloudSync.readRecoverySource.bind(ctx.window.CloudSync);
+  ctx.window.CloudSync.readRecoverySource=async(...args)=>{try{return await originalRead(...args);}catch(error){readError={name:error?.name,code:error?.code};throw error;}};
+  app.faults.serverRead=async path=>{
+   if(path!==expectedPath)return;
+   if(target==='final-root'&&++rootReads<2)return;
+   if(target==='root')rootReads++;
+   held=true;await gate;
+  };
+  reviewing=ctx.onAction('review-cloud-source-recovery',{});
+  sub.after(async()=>{release();delete app.faults.serverRead;await reviewing;});
+  await fixtureDeadline((async()=>{while(!held)await flush();})(),target+' SDK read did not enter the held native call');
+  ctx.onAction('view-support-diagnostics',{});
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/<h2>Support diagnostics<\/h2>/,'the report owns the visible dialog while its source operation is pending');
+  const observed=()=>ctx.buildSupportDiagnosticsReport().sourceOperations.flatMap(operation=>operation.events);
+  assert.ok(observed().some(event=>event.stage===target&&event.status==='started'),target+' is identified from its real SDK stage before timeout');
+  assert.equal(await reviewing,false,target+' source review reaches its ordinary SDK deadline');
+  const stageEvents=observed().filter(event=>event.stage===target);
+  assert.equal(readError?.code,'deadline-exceeded',target+' control holds the real SDK until its ordinary deadline');
+  assert.ok(stageEvents.some(event=>event.status==='timed-out'),target+' timeout is attributed to the held stage; held='+held+' rootReads='+rootReads+' error='+JSON.stringify(readError)+' events='+JSON.stringify(observed().map(event=>({stage:event.stage,status:event.status,role:event.role,operation:event.operation,code:event.code?.value}))));
+  if(target==='chunks'){
+   const timedOutOperation=ctx.buildSupportDiagnosticsReport().sourceOperations.find(operation=>operation.events.some(event=>event.stage==='chunks'&&event.status==='timed-out'));
+   const generation=(timedOutOperation?.generations||[]).find(row=>row.role==='current');
+   assert.equal(generation?.receivedChunks.status,'unavailable','a held query is not reported as an observed zero-length result: '+JSON.stringify(timedOutOperation));
+  }
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/<h2>Support diagnostics<\/h2>/,'a stage timeout cannot replace the current report with the old source-review dialog');
+  release();delete app.faults.serverRead;
+  for(let n=0;n<20;n++)await flush();
+  assert.ok(observed().some(event=>event.stage===target&&event.status==='late'),target+' late SDK completion remains distinct from its timeout');
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/<h2>Support diagnostics<\/h2>/,'a late stage completion keeps the report current');
+ });
+});
+
+test('RISK support diagnostics: event retention and malformed observer input stay bounded and redacted',async t=>{
+ const app=await loadApp(),{ctx}=app;t.after(()=>app.dispose());
+ ctx.onAction('view-support-diagnostics',{});
+ assert.equal(typeof ctx.window.__chainSupportDiagnosticsObserve,'function','the internal observer is available to existing operation consumers');
+ vm.runInContext('Date.now=()=>1000000',ctx);
+ for(let i=0;i<95;i++)ctx.window.__chainSupportDiagnosticsObserve('root','completed','current',null,2,7,'published',3,3,1200,1200,'unknown',i);
+ ctx.window.__chainSupportDiagnosticsObserve('account-private-8fd12','account-private-8fd12','owner@example.test','private-generation-8fd12','bad','bad','private-board');
+ const circular={};circular.self=circular;
+ assert.doesNotThrow(()=>ctx.window.__chainSupportDiagnosticsObserve('root',circular,circular,null,circular,circular,circular,circular,circular,circular,circular,circular,circular),
+  'circular and otherwise nonserializable observer metadata is discarded without throwing');
+ const report=ctx.buildSupportDiagnosticsReport(),text=ctx.supportDiagnosticsText();
+ assert.ok(report.events.length<=80,'event retention never exceeds 80 entries');
+ assert.ok(report.retention.dropped.value>=16,'the report accounts for events dropped at the finite capacity');
+ assert.ok(report.events.every(event=>Buffer.byteLength(JSON.stringify(event),'utf8')<=512),'each retained event stays within its own byte budget');
+ assert.ok(Buffer.byteLength(text,'utf8')<=24*1024,'the complete report stays below its byte cap');
+ assert.ok(report.events.every(event=>event.stage!=='account-private-8fd12'&&event.status!=='account-private-8fd12'),'observer metadata is mapped through fixed stage and status allowlists');
+ assert.doesNotMatch(text,/owner@example\\.test|private-generation-8fd12|private-board|account-private-8fd12/,'malformed observer arguments cannot add private strings');
+ vm.runInContext('Date.now=()=>1000000+60*60*1000+1',ctx);
+ const expired=ctx.buildSupportDiagnosticsReport();assert.equal(expired.events.length,0,'events older than the one-hour retention window are removed');
+ vm.runInContext('Date.now=()=>NaN',ctx);
+ const invalidClock=ctx.buildSupportDiagnosticsReport();
+ assert.equal(invalidClock.capturedAt.status,'unavailable','an invalid local clock is reported unavailable');
+ assert.doesNotThrow(()=>ctx.supportDiagnosticsText(),'a nonserializable clock cannot break local report generation');
+});
+
+test('RISK support diagnostics worker: controller reports only its fixed shell identity',()=>{
+ const handlers={},shell=appShellContract(serviceWorkerSource()),responses=[];let cacheReads=0;
+ vm.runInNewContext(serviceWorkerSource(),{
+  caches:{keys(){cacheReads++;return Promise.resolve([]);}},
+  self:{location:{origin:'https://scanner.example'},addEventListener(type,handler){handlers[type]=handler;}}
+ },{filename:'sw.js'});
+ assert.equal(typeof handlers.message,'function','the installed worker has a read-only diagnostics message route');
+ handlers.message({data:{type:'chain-scanner-support-diagnostics-v1'},ports:[{postMessage(value){responses.push(value);}}]});
+ assert.equal(responses.length,1,'the request receives one response');
+ assert.equal(responses[0].type,'chain-scanner-support-diagnostics-v1');
+ assert.equal(responses[0].cacheName,shell.cacheName,'the controller returns only the fixed shell cache identity');
+ assert.equal(cacheReads,0,'the worker does not scan CacheStorage or read cached application bodies to answer');
+ const before=responses.length;handlers.message({data:{type:'other-message'},ports:[{postMessage(value){responses.push(value);}}]});
+ assert.equal(responses.length,before,'unrecognized messages receive no diagnostics response');
+});
+
+test('RISK support diagnostics: executing document and observed worker/cache identities remain distinct and bounded',async t=>{
+ const {MessageChannel}=await import('node:worker_threads'),app=await loadApp(),{ctx}=app;t.after(()=>app.dispose());
+ ctx.MessageChannel=MessageChannel;
+ const makeWorker=identity=>({postMessage(message,ports){ports[0].postMessage({type:message.type,cacheName:'chain-scanner-shell-'+identity});}});
+ const identities=['a','b','c','d','e','f','0','1','2'].map(value=>value.repeat(64));
+ ctx.navigator={serviceWorker:{controller:makeWorker(identities[0]),async getRegistration(){return{active:makeWorker(identities[1]),waiting:makeWorker(identities[2]),installing:makeWorker(identities[3])};}}};
+ ctx.caches={async keys(){return identities.map(identity=>'chain-scanner-shell-'+identity);}};
+ await ctx.supportDiagnosticsInspectWorker();
+ const report=ctx.buildSupportDiagnosticsReport(),worker=report.serviceWorker;
+ assert.equal(worker.controller.value,identities[0]);assert.equal(worker.active.value,identities[1]);
+ assert.equal(worker.waiting.value,identities[2]);assert.equal(worker.installing.value,identities[3]);
+ assert.notEqual(report.app.executingScriptSha256.value,worker.controller.value,'the executing-script hash is not labelled as the service-worker shell identity');
+ assert.deepEqual(Array.from(worker.cacheShellKeys.value),identities.slice(0,8),'only the first eight actual shell-cache keys are inspected');
+ assert.equal(worker.cacheShellKeys.status,'truncated');
+ assert.deepEqual(worker.cacheKeysTruncated.value,true);assert.equal(worker.cacheKeysTruncated.status,'truncated');
+ assert.doesNotMatch(ctx.supportDiagnosticsText(),/users\/|private-account|task-title/,'worker reporting excludes arbitrary cache names and page/account data');
+});
+
+test('RISK support diagnostics: download bytes, selectable copy fallback, and Return preserve an unsaved Settings draft after slow worker capture',async t=>{
+ const app=await loadApp(),{ctx,shim}=app;t.after(()=>app.dispose());
+ ctx.onAction('settings',{});const root=shim.document.getElementById('modalRoot'),control=shim.document.getElementById('stWorkedHrs');
+ control.id='stWorkedHrs';control.type='number';control.value='37';
+ root.querySelectorAll=()=>root.innerHTML.includes('<h2>Settings</h2>')?[control]:[];
+ let download=null;const link=makeFakeElement();link.remove=()=>{};link.click=()=>{download={blob,href:link.href,name:link.download};};
+ let blob=null;shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();
+ ctx.Blob=class DiagnosticsBlob{constructor(parts,options){blob={text:parts.join(''),type:options.type};}};
+ ctx.URL={createObjectURL(){return 'blob:support-diagnostics';},revokeObjectURL(){}};
+ const selection={};const reportBox=makeFakeElement();reportBox.focus=()=>{selection.focused=true;};reportBox.select=()=>{selection.selected=true;};
+ const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='supportDiagnosticsData'?reportBox:originalGet(id);
+ ctx.navigator={clipboard:{async writeText(){throw Error('clipboard denied');}},serviceWorker:{controller:null,
+  getRegistration(){return new Promise(resolve=>setTimeout(()=>resolve({active:null,waiting:null,installing:null}),140));}}};
+ ctx.onAction('view-support-diagnostics',{});
+ await ctx.onAction('download-support-diagnostics',{});
+ assert.equal(download.name,'chain-scanner-support-diagnostics.json');assert.equal(download.href,'blob:support-diagnostics');
+ assert.equal(download.blob.type,'application/json');
+ const downloaded=JSON.parse(download.blob.text);
+ assert.equal(downloaded.schema,'funsidething.support-diagnostics');assert.equal(downloaded.metadataOnly,true);
+ assert.equal(downloaded.boardDataIncluded,false,'the actual downloaded bytes are the metadata report, not board JSON');
+ assert.equal(await ctx.onAction('copy-support-diagnostics',{}),false,'clipboard failure remains recoverable by selecting the local report');
+ assert.equal(selection.focused,true);assert.equal(selection.selected,true);
+ await new Promise(resolve=>setTimeout(resolve,170));await flush();
+ assert.match(root.innerHTML,/<h2>Support diagnostics<\/h2>/,'a slow worker observer cannot replace the current diagnostics dialog');
+ assert.match(root.innerHTML,/supportDiagnosticsData/);
+ assert.equal(await ctx.onAction('return-support-diagnostics',{}),true,'the explicit Return action reopens the originating Settings panel');
+ assert.match(root.innerHTML,/<h2>Settings<\/h2>/);
+ assert.equal(control.value,'37','Return restores the actual unsaved Settings control value');
+ assert.equal(ctx.state.settings.workedHours,16,'restoring the draft does not silently save it');
 });

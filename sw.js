@@ -5,6 +5,13 @@
 // Update it with any shell change so installed workers cannot serve stale UI.
 const CACHE_NAME = "chain-scanner-shell-62f3ec90295b1c13857c78d4e4767142b7dd6f2694e9aee0716cf8eaad997ccf";
 
+self.addEventListener("message", event => {
+  if(event?.data?.type!=="chain-scanner-support-diagnostics-v1") return;
+  const port=event.ports?.[0];
+  if(!port||typeof port.postMessage!=="function") return;
+  try{port.postMessage({type:"chain-scanner-support-diagnostics-v1",cacheName:CACHE_NAME});}catch(_){ /* Diagnostics never affect worker behavior. */ }
+});
+
 self.addEventListener("install", event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
