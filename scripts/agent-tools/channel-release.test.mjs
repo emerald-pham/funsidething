@@ -336,3 +336,102 @@ test('Beta packaging refuses unsafe tab-bearing committed paths even outside the
   assert.match(result.stderr, /safe regular/i);
   assert.equal(fs.existsSync(f.output), false);
 });
+
+test('Beta packaging continues the original notice after a later deployment when retained proof is valid', t => {
+  const f = reviewedFixture(t);
+  const originalOutput = path.join(f.root, 'original-reviewed');
+  const originalDeployedAt = '2026-10-19T16:00:00.000Z';
+  const originalStartsAt = '2026-10-19T16:00:00.000Z';
+  const original = prepare({ ...f, output: originalOutput, deployedAt: originalDeployedAt, startsAt: originalStartsAt }, [], false);
+  assert.equal(original.status, 0, original.stderr);
+
+  const manifestPath = path.join(originalOutput, 'artifact.json');
+  const manifestBytes = fs.readFileSync(manifestPath);
+  const manifest = JSON.parse(manifestBytes);
+  const originalEnvelope = JSON.parse(fs.readFileSync(path.join(originalOutput, 'public/channel-release.json'), 'utf8'));
+  const digest = bytes => createHash('sha256').update(bytes).digest('hex');
+  const publicationPath = path.join(f.root, 'provider-release.json');
+  const publication = {
+    project: 'chain-scanner', site: 'chain-scanner', channel: 'live',
+    channelName: 'projects/chain-scanner/sites/chain-scanner/channels/live',
+    url: 'https://chain-scanner.web.app',
+    release: {
+      name: 'projects/chain-scanner/sites/chain-scanner/channels/live/releases/123456',
+      versionName: 'projects/chain-scanner/sites/chain-scanner/versions/abcdef0123456789',
+      type: 'DEPLOY', message: 'fixture-original-product', releaseTime: originalDeployedAt,
+    },
+    canonicalProductPublicationTime: originalDeployedAt,
+    observedAt: '2026-10-19T16:00:02.000Z',
+  };
+  fs.writeFileSync(publicationPath, JSON.stringify(publication, null, 2) + '\n');
+
+  const origin = 'https://chain-scanner.web.app/';
+  const responses = Object.entries(manifest.files).map(([file, identity]) => {
+    const url = new URL(file, origin);
+    url.searchParams.set('verify', 'fixture');
+    return { file, url: url.href, status: 200, sha256: identity.sha256, bytes: identity.bytes,
+      headers: { 'cache-control': file === 'index.html' || file === 'sw.js' ? 'no-cache' :
+        file === 'channel-release.json' ? 'no-store, max-age=0' : 'max-age=3600' } };
+  });
+  const rootUrl = new URL('./', origin);
+  rootUrl.searchParams.set('verify', 'fixture');
+  const index = manifest.files['index.html'];
+  responses.push({ file: './', url: rootUrl.href, status: 200, sha256: index.sha256, bytes: index.bytes,
+    headers: { 'cache-control': 'no-cache' } });
+  const publicVerificationPath = path.join(f.root, 'public-verification.json');
+  const publicVerification = {
+    startedAt: '2026-10-19T16:00:03.000Z', origin, mode: 'final',
+    manifestSha256: digest(manifestBytes), product: manifest.product, status: 'passed',
+    responses, envelope: originalEnvelope, completedAt: '2026-10-19T16:00:04.000Z',
+  };
+  fs.writeFileSync(publicVerificationPath, JSON.stringify(publicVerification, null, 2) + '\n');
+
+  const proofPath = path.join(f.root, 'continuation-proof.json');
+  fs.writeFileSync(proofPath, JSON.stringify({
+    artifactDirectory: originalOutput,
+    publicationPath,
+    publicVerificationPath,
+  }, null, 2) + '\n');
+
+  fs.appendFileSync(path.join(f.repository, 'fixture-doc.md'), 'Follow-up candidate after the original notice.\n');
+  git(f.repository, 'add', 'fixture-doc.md');
+  git(f.repository, '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'fixture later product build');
+  const source = git(f.repository, 'rev-parse', 'HEAD');
+  const tree = git(f.repository, 'rev-parse', 'HEAD^{tree}');
+  const deployedAt = '2026-10-20T21:00:00.000Z';
+  const output = path.join(f.root, 'continued-preview');
+  const result = prepare({ ...f, source, tree, output, deployedAt, startsAt: originalStartsAt }, ['--continue-notice', proofPath]);
+
+  assert.equal(result.status, 0, result.stderr);
+  const envelope = JSON.parse(fs.readFileSync(path.join(output, 'public/channel-release.json'), 'utf8'));
+  const artifact = JSON.parse(fs.readFileSync(path.join(output, 'artifact.json'), 'utf8'));
+  assert.equal(envelope.deployedAt, deployedAt, 'the later product publication time belongs to the new build');
+  assert.equal(envelope.notices['sync-stability-2026-10'].startsAt, originalStartsAt,
+    'a later product build keeps the existing notice start');
+  assert.notEqual(envelope.product.sourceRevision, manifest.product.sourceRevision,
+    'the continuation is attached to the later source candidate');
+  assert.deepEqual(envelope.notices['sync-stability-2026-10'].continuation, {
+    schemaVersion: 1, channel: 'beta', origin: 'https://chain-scanner.web.app', basePath: '/',
+    noticeId: 'sync-stability-2026-10', originalProduct: manifest.product,
+    originalDeployedAt, originalStartsAt,
+    evidence: {
+      artifactSha256: manifest.artifactSha256,
+      publicationSha256: digest(fs.readFileSync(publicationPath)),
+      publicVerificationSha256: digest(fs.readFileSync(publicVerificationPath)),
+    },
+  }, 'public continuation retains the reviewed origin proof without local paths');
+  assert.equal(artifact.mode, 'preview');
+  assert.equal(artifact.publishable, false, 'proof validation does not turn a preview into a publishable artifact');
+
+  fs.writeFileSync(proofPath, JSON.stringify({
+    artifactDirectory: originalOutput,
+    publicationPath,
+    publicVerificationPath,
+    unexpected: true,
+  }, null, 2) + '\n');
+  const malformedOutput = path.join(f.root, 'malformed-continuation-preview');
+  const malformed = prepare({ ...f, source, tree, output: malformedOutput, deployedAt, startsAt: originalStartsAt }, ['--continue-notice', proofPath]);
+  assert.notEqual(malformed.status, 0, 'supplied malformed proof must fail closed even though startsAt predates deployedAt');
+  assert.match(malformed.stderr, /bundle has an invalid shape/i);
+  assert.equal(fs.existsSync(malformedOutput), false, 'malformed proof must fail before reserving output');
+});
