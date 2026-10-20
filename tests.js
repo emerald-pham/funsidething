@@ -32295,7 +32295,7 @@ test('RISK repository process: FAQ coverage needs a distinct exact-candidate rev
 test('RISK FAQ sections: mounted Quick start matches Settings groups and covers WOOP lifecycle and dependency filter',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  for(const section of ['Scene and appearance','Scanning and recurrence','Contexts','Data and backups','Changelog'])assert.match(help,new RegExp('<h3>'+section+'</h3>'));
- for(const text of ['Last task WOOP','Filter dependencies','two recorded','Delete WOOP plan','Turning it off','Diagnostics'])assert.ok(help.includes(text),text);
+ for(const text of ['Last task WOOP','Filter dependencies','two recorded','Delete WOOP plan','Turning it off','Support diagnostics'])assert.ok(help.includes(text),text);
  assert.doesNotMatch(help,/In all three modes/);
 });
 

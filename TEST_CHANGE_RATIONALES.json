@@ -1,6 +1,24 @@
 [
   {
     "baseCommit": "010b9473ba44ae6fb859e028ebcdd7f69d38c545",
+    "testChangesSha256": "20c553ab739f746680b2ecb05922948901f354b054181dc14c9f6f1d735ac0ef",
+    "reason": "Complete the authorized P0 candidate with the original persistence promise contract restored and the two existing coverage references updated for the approved support-diagnostics label migration.",
+    "previousBehavior": "The rejected ac2 timer-lifecycle repair dropped the persistence result returned by its callback; four established completion/Undo consumers and a controlled five-consumer subprocess failed. The old Diagnostics FAQ group literal and current-board RISK inventory row also retained the prior label.",
+    "intendedBehavior": "Clear the actual fired debounce token while returning the existing persist promise and retaining350ms scheduling, durable completion and refusal semantics. Update only the approved group label and inventory reference; preserve all existing behavioral assertions.",
+    "replacementTests": [
+      "RISK support diagnostics: native debounce reports scheduled, saving, and drained work accurately"
+    ],
+    "preservedCoverage": [
+      "The exact ac2 full run is retained as2550pass6fail49explicitly gated skips, not a pass; both native installed-client cases passed only that exact rejected candidate. A focused selection of the six existing failed cases was observed RED before these three-line repairs; the six plus native-debounce control then pass7/7 with zero skips. Four existing runtime assertions are unchanged.",
+      "All previous rationale bytes remain intact. This is a cumulative fingerprint for the complete base-to-candidate test diff, including the already authorized board-export/support-report label distinction. No preservation, account, held ACK, source-choice, privacy, byte-limit, FAQ length or negative-control assertion is weakened. Fresh exact full/native, emulator compatibility, private-original and independent final evidence remains required."
+    ],
+    "redEvidence": {
+      "command": "Node22 record-run preimplementation-red for the six exact ac2 full failures, retained under /Users/emeraldpham/.codex/task-artifacts/p0-pull-recurrence-20261020/full-ac2-repair-red; GREEN companion full-ac2-repair-green.",
+      "failure": "Six selected cases fail before repair: persistence callback result undefined instead of true in Undo/completion and controlled five-consumer startup, missing renamed current-board RISK inventory row, and old Diagnostics FAQ group. The seven-case GREEN retains original assertions and the native pending/saving/drained control."
+    }
+  },
+  {
+    "baseCommit": "010b9473ba44ae6fb859e028ebcdd7f69d38c545",
     "testChangesSha256": "ae58b82d0e150b072c95ef99e260949c661c5d14c63ea97178c5f2a961714773",
     "reason": "Resolve the consolidated exact6bac independent Code, specialist/Spec and rendered diagnostics findings while retaining the complete authorized P0 regression and source-preservation scope.",
     "previousBehavior": "The unshipped report retained a fired debounce as pending, carried current acknowledgement metadata across account/backend transitions, omitted the effective SDK deadline and explicit recovery-copy availability/matching fields, and forced long compact reports onto one horizontal line.",

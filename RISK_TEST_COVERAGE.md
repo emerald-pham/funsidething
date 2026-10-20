@@ -453,7 +453,7 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK chance forecast: adaptive integration resolves narrow shared-benchmark transitions
 - RISK TrueSkill truncation: inverse-Mills tails match references through the former cutoff and extreme upset
 - RISK rating bounds: hydration and frozen chance opponents normalize extremes without changing healthy ratings
-- RISK Diagnostics download: Settings and save directions retain current-board recovery actions
+- RISK current-board export: Settings and save directions retain board recovery actions
 
 ## Returning-user first upload
 
