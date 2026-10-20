@@ -1811,3 +1811,19 @@ The complete recovery suite also retains the released pre-hydration older-tab ba
 - `RISK rapid action guidance: mounted Help distinguishes later accepted work from real device and cloud failures` — the shared extended FAQ explains rapid input, retained failures and the separate cloud acknowledgement boundary; current changelog names the repaired behavior.
 
 Earlier controls covered individual saves and a third edit during one overlap, but did not sustain ten distinct native actions across four successful snapshot acknowledgements. The new regression reaches the exact false retry-exhaustion warning while separately proving complete durable retention. The storage refusal control was added after repair as a preservation guard, not claimed as the original RED. Cant/Return previously lacked a stale pre-hold cloud chain replay after the hold ended; the new same/peer and legacy/current-pass cases retain later deliberate selection as a positive control.
+
+## Beta release packaging
+
+- `RISK repository process: Beta packaging preserves exact committed product bytes and separate channel identity` — immutable committed Beta packaging and additive channel identity at the release-command consumer.
+
+## Stable and Beta apology notice
+
+- RISK apology notice: an eligible Beta login shows the exact original apology
+- RISK apology notice: refreshing an unchanged release keeps the open message
+- RISK apology release identity: invalid metadata stays silent without touching the board
+- RISK apology notice: account dismissal and Stable window stay independent
+- RISK apology notice: automatic display waits for a modal and unfinished Add draft
+- RISK apology notice: a context-only Add draft waits before consuming its window
+- RISK apology notice: a later dependency row keeps its Add draft protected
+- RISK apology notice: a held scanner gesture defers without consuming its window
+- RISK PWA release metadata: exact scoped identity bypasses stale shell cache

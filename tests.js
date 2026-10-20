@@ -916,6 +916,31 @@ test('RISK resilient sync recovery: unsupported unverifiable and foreign sources
   if(control==='failed protection')assert.ok(app.idbFault.aborts>0,'the external IndexedDB boundary genuinely aborted source preservation');
  });
 });
+const APOLOGY_NOTICE_ID = "sync-stability-2026-10";
+const ORIGINAL_APOLOGY = `Hey users! Terribly sorry about sync and stability issues that have happened in the past twenty four hours. App will be moving to a proper stable and beta approach in the future, with beta versions tested by me and only released to users like you on the stable version (the one you are on) after I have beta tested them myself in ways automated tests and reviews sometimes fail to catch (like today). Thank you for your patience as I am adopting sensible software dev approaches late because this blew up from a personal project to something a little bigger real fast, and as someone who is a theatre major - well, it’s all still a big shock.
+
+Have a great day, and keep whittling those todo lists! <3 Emerald`;
+
+function channelReleaseEnvelope(channel, startsAt, deployedAt = startsAt) {
+  const destination = channel === "beta"
+    ? { origin: "https://chain-scanner.web.app", basePath: "/" }
+    : { origin: "https://emerald-pham.github.io", basePath: "/funsidething/" };
+  const current = html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1];
+  const appFingerprint = current?.match(/data-app-fingerprint="([a-f0-9]{64})"/)?.[1];
+  assert.ok(appFingerprint, "the current app shell supplies its own product fingerprint");
+  return {
+    schemaVersion: 1,
+    channel,
+    ...destination,
+    product: {
+      sourceRevision: "01b95ef42414d6ba7817ff9c5ebac6e3be3d6350",
+      tree: "37248116fc2cac8bd35e7d966c92b45c7744b728",
+      appFingerprint,
+    },
+    deployedAt: new Date(deployedAt).toISOString(),
+    notices: { [APOLOGY_NOTICE_ID]: { startsAt: new Date(startsAt).toISOString() } },
+  };
+}
 
 test('RISK optional oldest start: enabled Start offers a candidate without dotting or learning',async()=>{
  const {ctx,shim}=await loadApp({seed:182});
@@ -5462,6 +5487,32 @@ function serviceWorkerHarness(worker, existingCacheNames = []) {
   return { handlers, cacheRecords, skipWaitingCalls: () => skipWaitingCalls, claimCalls: () => claimCalls };
 }
 
+test('RISK PWA release metadata: exact scoped identity bypasses stale shell cache',async()=>{
+ for(const {origin,basePath} of [
+  {origin:'https://chain-scanner.web.app',basePath:'/'},
+  {origin:'https://emerald-pham.github.io',basePath:'/funsidething/'},
+ ]){
+  const handlers={},cacheReads=[],networkRequests=[];let online=true;
+  const caches={match:async request=>{cacheReads.push(new URL(request.url).pathname);return new Response('stale shell metadata');}};
+  const worker=serviceWorkerSource(),scope=origin+basePath;
+  vm.runInNewContext(worker,{caches,URL,Request,fetch:async request=>{
+   const url=new URL(request.url);networkRequests.push(url.href);if(!online)throw Error('offline');return new Response('fresh metadata');
+  },self:{location:{origin},registration:{scope},addEventListener(type,handler){handlers[type]=handler;},clients:{claim(){return Promise.resolve();}}}},{filename:'sw.js'});
+  const request=async url=>{let response;handlers.fetch({request:new Request(url),respondWith(value){response=value;}});assert.ok(response,'the service worker handles same-origin GETs');return response;};
+  const metadataUrl=new URL('channel-release.json?release=one',scope).href;
+  const fresh=await request(metadataUrl);
+  assert.equal(await fresh.text(),'fresh metadata','a cached envelope must never identify the running release');
+  assert.deepEqual(cacheReads,[],'the exact scoped metadata request skips cache lookup');
+  online=false;
+  await assert.rejects(request(new URL('channel-release.json?release=offline',scope).href),/offline/,'offline metadata has no stale shell fallback');
+  assert.deepEqual(cacheReads,[],'metadata remains network-only when the network fails');
+  const shell=await request(new URL('index.html',scope).href);
+  assert.equal(await shell.text(),'stale shell metadata','ordinary shell assets retain the existing cache-first behavior');
+  assert.equal(cacheReads.length,1,'only the ordinary shell request consulted the cache');
+  assert.equal(networkRequests.length,2,'both metadata requests reached the network; the offline ordinary cached shell did not');
+ }
+});
+
 test("PWA lifecycle: shell waits for prior clients and normal activation retires prior caches", async () => {
   const worker = serviceWorkerSource();
   const { cacheName, rawPaths } = appShellContract(worker);
@@ -5723,7 +5774,7 @@ function makeDomShim({ prefersDark = false, sharedStorage = null } = {}) {
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
-async function loadApp({ appSource=appSrc, artifacts=null, seed, cloudSyncFactory, prefersDark = false, noMatchMedia = false, seedStorage, sharedStorage, hostStorage, hostStorageDelayMs = 0, beforeStateReady, navigatorProvider, cryptoProvider = webcrypto, indexedDBProvider, deviceDbName, deviceOpenTimeoutMs, withSceneModules = false, sceneModulesAfterDomReady = false } = {}) {
+async function loadApp({ appSource=appSrc, artifacts=null, seed, cloudSyncFactory, prefersDark = false, noMatchMedia = false, seedStorage, sharedStorage, hostStorage, hostStorageDelayMs = 0, beforeStateReady, navigatorProvider, cryptoProvider = webcrypto, indexedDBProvider, deviceDbName, deviceOpenTimeoutMs, withSceneModules = false, sceneModulesAfterDomReady = false, locationHref, fetchProvider } = {}) {
   const shim = makeDomShim({ prefersDark, sharedStorage });
   const ownedTimers=new Set();let disposed=false,sandbox;
   const fixture={async dispose(){
@@ -5740,6 +5791,8 @@ async function loadApp({ appSource=appSrc, artifacts=null, seed, cloudSyncFactor
     timer.unref?.();return timer;
   };
   const cancel=timer=>{ownedTimers.delete(timer);clearTimeout(timer);};
+  if(locationHref)shim.window.location=new URL(locationHref);
+  if(fetchProvider){shim.window.fetch=fetchProvider;shim.window.AbortController=AbortController;}
   if (noMatchMedia) delete shim.window.matchMedia;   // old browser / bare JS host
   if (seedStorage) for (const [k, v] of Object.entries(seedStorage)) shim.localStorage.setItem(k, v);
   /* The OTHER persistence backend. loadState() prefers window.storage (the
@@ -5766,6 +5819,9 @@ async function loadApp({ appSource=appSrc, artifacts=null, seed, cloudSyncFactor
     window: shim.window,
     document: shim.document,
     localStorage: shim.localStorage,
+    URL,
+    AbortController,
+    fetch:fetchProvider,
     console,
     JSON,
     crypto:cryptoProvider,
@@ -5816,6 +5872,8 @@ async function loadApp({ appSource=appSrc, artifacts=null, seed, cloudSyncFactor
   vm.runInContext(appSource, sandbox, { filename: "index.html#app" });
   shim.document.currentScript=null;
   beforeStateReady?.(sandbox, shim);
+  if(/<script\b[^>]*\bsrc=["']app-release\.js["']/i.test(html))
+    vm.runInContext(fs.readFileSync(path.join(__dirname,"app-release.js"),"utf8"),sandbox,{filename:"app-release.js"});
   if (sceneModulesAfterDomReady) {
     await flush(); // the inline boot script can resume before deferred modules execute
     const installTimeHook=installSceneModules();
@@ -5876,6 +5934,219 @@ test("app harness: boots cleanly with an empty state", async () => {
   assert.equal(ctx.state.tasks.length, 0);
   assert.equal(ctx.state.chain.length, 0);
   assert.equal(ctx.state.mode, "scan");
+});
+
+test('RISK apology notice: an eligible Beta login shows the exact original apology',async()=>{
+ const at=Date.parse('2026-10-20T12:00:00.000Z'),startsAt=at-60*60*1000,requests=[];
+ assert.equal(createHash('sha256').update(ORIGINAL_APOLOGY,'utf8').digest('hex'),'5ddea3c755f9477e33908f16b94867a0ee9e4004e46ab169131cd814cf7188b2');
+ const envelope=channelReleaseEnvelope('beta',startsAt,startsAt);
+ const app=await loadAppAtTime(at,{
+  locationHref:'https://chain-scanner.web.app/',
+  fetchProvider:async(url,options)=>{
+   requests.push({url:String(url),options});
+   return {ok:true,redirected:false,type:'basic',url:String(url),json:async()=>envelope};
+  },
+  cloudSyncFactory:()=>({ready:false,user:null,status:'idle',configured:true,recoveryIdentity:()=> 'beta-uid'}),
+  beforeStateReady:(_ctx,shim)=>{shim.document.getElementById('appChangelogCurrent').innerHTML=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];},
+ });
+ app.ctx.closeModal();
+ const cloud=app.ctx.window.CloudSync;cloud.ready=true;cloud.user='beta-account';
+ app.ctx.window.dispatchEvent(new app.ctx.CustomEvent('cloudsync'));
+ const modal=app.shim.document.getElementById('modalRoot').innerHTML;
+ const expectedHtml=ORIGINAL_APOLOGY.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n\n/g,'<br><br>');
+ assert.ok(modal.includes(expectedHtml),'the real signed-in app consumer should show the original copy inside its automatic Beta window');
+ assert.equal(requests.length,1,'the page obtains channel identity from the public release envelope');
+ assert.equal(new URL(requests[0].url).pathname,'/channel-release.json');
+ assert.equal(requests[0].options.credentials,'omit');
+ assert.equal(requests[0].options.cache,'no-store');
+ assert.equal(requests[0].options.redirect,'error');
+ assert.equal(app.ctx.window.ChainRelease?.current?.channel,'beta');
+});
+
+test('RISK apology notice: refreshing an unchanged release keeps the open message',async()=>{
+ const at=Date.parse('2026-10-24T12:00:00.000Z'),startsAt=at-60*60*1000,envelope=channelReleaseEnvelope('beta',startsAt,startsAt);
+ let requests=0;
+ const app=await loadAppAtTime(at,{
+  locationHref:'https://chain-scanner.web.app/',
+  fetchProvider:async url=>{requests++;return {ok:true,redirected:false,type:'basic',url:String(url),json:async()=>envelope};},
+  cloudSyncFactory:()=>({ready:false,user:null,status:'idle',configured:true,pull:async()=>({error:true}),recoveryIdentity:()=> 'refresh-uid'}),
+  beforeStateReady:(_ctx,shim)=>{shim.document.getElementById('appChangelogCurrent').innerHTML=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];},
+ });
+ app.ctx.closeModal();const cloud=app.ctx.window.CloudSync;cloud.ready=true;cloud.user='refresh@example.invalid';
+ app.ctx.window.dispatchEvent(new app.ctx.CustomEvent('cloudsync'));
+ const originalRelease=app.ctx.window.ChainRelease.current,modal=app.shim.document.getElementById('modalRoot');
+ assert.match(modal.innerHTML,/data-apology-notice="sync-stability-2026-10"/,'the verified signed-in user sees the apology');
+ app.ctx.window.dispatchEvent(new app.ctx.CustomEvent('focus'));await flush();await flush();
+ assert.equal(requests,2,'focus obtains a fresh public envelope');
+ assert.notEqual(app.ctx.window.ChainRelease.current,originalRelease,'refresh publishes a newly validated envelope object');
+ assert.match(modal.innerHTML,/data-apology-notice="sync-stability-2026-10"/,'a refresh of the same release identity must not dismiss the open message');
+});
+
+test('RISK apology release identity: invalid metadata stays silent without touching the board',async()=>{
+ const at=Date.parse('2026-10-23T12:00:00.000Z'),startsAt=at-60*60*1000;
+ const cases=[
+  ['wrong origin',envelope=>{envelope.origin='https://unverified.example';return {ok:true,redirected:false,type:'basic'};}],
+  ['wrong app fingerprint',envelope=>{envelope.product.appFingerprint='f'.repeat(64);return {ok:true,redirected:false,type:'basic'};}],
+  ['start before deployment',envelope=>{envelope.notices[APOLOGY_NOTICE_ID].startsAt=new Date(startsAt-1).toISOString();return {ok:true,redirected:false,type:'basic'};}],
+  ['redirected response',()=>({ok:true,redirected:true,type:'basic',url:'https://unverified.example/channel-release.json'})],
+  ['offline response',()=>{throw new TypeError('offline');}],
+ ];
+ for(const [label,responseFor] of cases){
+  const envelope=channelReleaseEnvelope('beta',startsAt,startsAt);
+  const app=await loadAppAtTime(at,{
+   locationHref:'https://chain-scanner.web.app/',
+   fetchProvider:async url=>({url:String(url),json:async()=>envelope,...responseFor(envelope)}),
+   cloudSyncFactory:()=>({ready:false,user:null,status:'idle',configured:true,recoveryIdentity:()=> 'invalid-envelope-uid'}),
+   beforeStateReady:(_ctx,shim)=>{shim.document.getElementById('appChangelogCurrent').innerHTML=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];},
+  });
+  assert.equal(app.ctx.window.ChainRelease?.status,'unavailable',label+': invalid or unavailable metadata is rejected');
+  assert.equal(app.ctx.window.ChainRelease?.current,null,label+': no channel is guessed');
+  const boardBefore=JSON.stringify(app.ctx.state);
+  app.ctx.closeModal();const cloud=app.ctx.window.CloudSync;cloud.ready=true;cloud.user='invalid@example.invalid';
+  app.ctx.window.dispatchEvent(new app.ctx.CustomEvent('cloudsync'));await flush();
+  assert.doesNotMatch(app.shim.document.getElementById('modalRoot').innerHTML,/data-apology-notice=/,label+': the real signed-in consumer remains silent');
+  assert.equal(JSON.stringify(app.ctx.state),boardBefore,label+': rejecting release metadata does not change the board');
+  assert.equal(app.shim.localStorage.getItem('fvp:chain-scanner:release-notice:v1:sync-stability-2026-10:beta:invalid-envelope-uid'),null,label+': rejected metadata does not persist notice state');
+ }
+});
+
+test('RISK apology notice: account dismissal and Stable window stay independent',async()=>{
+ const at=Date.parse('2026-10-21T12:00:00.000Z'),betaStarts=at-60*60*1000,stableStarts=at+60*60*1000;
+ const values=new Map(),storage={getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,String(value)),removeItem:key=>values.delete(key)};
+ let uid='beta-uid-a';
+ const setup=async(channel,startsAt,deployedAt,href,time)=>loadAppAtTime(time,{
+  locationHref:href,
+  fetchProvider:async url=>({ok:true,redirected:false,type:'basic',url:String(url),json:async()=>channelReleaseEnvelope(channel,startsAt,deployedAt)}),
+  sharedStorage:storage,
+  cloudSyncFactory:()=>({ready:false,user:null,status:'idle',configured:true,recoveryIdentity:()=>uid}),
+  beforeStateReady:(_ctx,shim)=>{shim.document.getElementById('appChangelogCurrent').innerHTML=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];},
+ });
+ const beta=await setup('beta',betaStarts,betaStarts,'https://chain-scanner.web.app/',at);beta.ctx.closeModal();
+ const cloud=beta.ctx.window.CloudSync;cloud.ready=true;cloud.user='first@example.invalid';beta.ctx.window.dispatchEvent(new beta.ctx.CustomEvent('cloudsync'));
+ const expected=ORIGINAL_APOLOGY.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n\n/g,'<br><br>');
+ const betaKey='fvp:chain-scanner:release-notice:v1:sync-stability-2026-10:beta:beta-uid-a';
+ assert.ok(beta.shim.document.getElementById('modalRoot').innerHTML.includes(expected),'the first signed-in Beta account receives its own notice');
+ assert.equal(storage.getItem(betaKey),'shown');beta.ctx.closeModal();assert.equal(storage.getItem(betaKey),'dismissed');
+ beta.ctx.window.dispatchEvent(new beta.ctx.CustomEvent('cloudsync'));
+ assert.doesNotMatch(beta.shim.document.getElementById('modalRoot').innerHTML,/data-apology-notice=/,'the dismissed account is not shown the automatic notice twice');
+ uid='beta-uid-b';cloud.user='second@example.invalid';beta.ctx.window.dispatchEvent(new beta.ctx.CustomEvent('cloudsync'));
+ const betaBKey=betaKey.replace('beta-uid-a','beta-uid-b');
+ assert.ok(beta.shim.document.getElementById('modalRoot').innerHTML.includes(expected),'the notice key follows the Auth UID rather than the display email');
+ beta.ctx.closeModal();assert.equal(storage.getItem(betaBKey),'dismissed');
+ const stable=await setup('stable',stableStarts,at,'https://emerald-pham.github.io/funsidething/',at);stable.ctx.closeModal();
+ const stableCloud=stable.ctx.window.CloudSync;stableCloud.ready=true;stableCloud.user='second@example.invalid';stable.ctx.window.dispatchEvent(new stable.ctx.CustomEvent('cloudsync'));
+ const stableKey='fvp:chain-scanner:release-notice:v1:sync-stability-2026-10:stable:beta-uid-b';
+ assert.doesNotMatch(stable.shim.document.getElementById('modalRoot').innerHTML,/data-apology-notice=/,'the Beta preview does not consume the later Stable window');
+ assert.equal(storage.getItem(stableKey),null);
+ setFakeTime(stable.ctx,stableStarts);stable.ctx.window.dispatchEvent(new stable.ctx.CustomEvent('cloudsync'));
+ assert.ok(stable.shim.document.getElementById('modalRoot').innerHTML.includes(expected),'the independent Stable window starts on its own date');
+ stable.ctx.closeModal();assert.equal(storage.getItem(stableKey),'dismissed');
+ setFakeTime(stable.ctx,stableStarts+7*24*60*60*1000);stable.ctx.openHelp();
+ const help=stable.shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(help,/data-help-changelog[\s\S]*data-act="reopen-apology"/,'Help exposes a direct Changelog action for rereading the notice');
+ const savedNoticeRows=[...values].filter(([key])=>key.startsWith('fvp:chain-scanner:release-notice:v1:'));
+ stable.ctx.onAction('reopen-apology',{});
+ assert.ok(stable.shim.document.getElementById('modalRoot').innerHTML.includes(expected),'the deliberate Changelog action reopens the original copy after expiry');
+ assert.deepEqual([...values].filter(([key])=>key.startsWith('fvp:chain-scanner:release-notice:v1:')),savedNoticeRows,'manual reopen does not consume or renew an automatic window');
+});
+
+test('RISK apology notice: automatic display waits for a modal and unfinished Add draft',async()=>{
+ const at=Date.parse('2026-10-22T12:00:00.000Z'),startsAt=at-60*60*1000;
+ const app=await loadAppAtTime(at,{
+  locationHref:'https://chain-scanner.web.app/',
+  fetchProvider:async url=>({ok:true,redirected:false,type:'basic',url:String(url),json:async()=>channelReleaseEnvelope('beta',startsAt,startsAt)}),
+  cloudSyncFactory:()=>({ready:false,user:null,status:'idle',configured:true,recoveryIdentity:()=> 'idle-test-uid'}),
+  beforeStateReady:(_ctx,shim)=>{shim.document.getElementById('appChangelogCurrent').innerHTML=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];},
+ });
+ const modal=app.shim.document.getElementById('modalRoot'),draft=app.shim.document.getElementById('addInput');
+ assert.match(modal.innerHTML,/Quick start/,'the user already has the app’s first-run Help modal');
+ draft.value='unfinished personal task';
+ const cloud=app.ctx.window.CloudSync;cloud.ready=true;cloud.user='idle@example.invalid';app.ctx.window.dispatchEvent(new app.ctx.CustomEvent('cloudsync'));
+ assert.match(modal.innerHTML,/Quick start/,'automatic notice must leave the existing modal open');
+ assert.doesNotMatch(modal.innerHTML,/data-apology-notice=/,'the notice does not replace user-owned Help');
+ assert.equal(draft.value,'unfinished personal task','the page draft remains exactly as entered');
+ app.ctx.closeModal();await flush();
+ assert.equal(modal.innerHTML,'','closing Help does not replace a still-unfinished draft');
+ assert.equal(draft.value,'unfinished personal task');
+ draft.value='';app.shim.document.dispatchEvent({type:'input',target:draft});app.shim.document.dispatchEvent({type:'focusout',target:draft});await flush();
+ const expected=ORIGINAL_APOLOGY.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n\n/g,'<br><br>');
+ assert.ok(modal.innerHTML.includes(expected),'once the user-owned UI is idle, the pending signed-in notice appears');
+ assert.equal(draft.value,'','notice display keeps the completed field state intact');
+});
+
+test('RISK apology notice: a context-only Add draft waits before consuming its window',async()=>{
+ const at=Date.parse('2026-10-22T13:00:00.000Z'),startsAt=at-60*60*1000;
+ const app=await loadAppAtTime(at,{
+  locationHref:'https://chain-scanner.web.app/',
+  fetchProvider:async url=>({ok:true,redirected:false,type:'basic',url:String(url),json:async()=>channelReleaseEnvelope('beta',startsAt,startsAt)}),
+  cloudSyncFactory:()=>({ready:false,user:null,status:'idle',configured:true,recoveryIdentity:()=> 'context-draft-uid'}),
+  beforeStateReady:(_ctx,shim)=>{shim.document.getElementById('appChangelogCurrent').innerHTML=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];},
+ });
+ app.ctx.closeModal();await flush();
+ const context=app.ctx.state.contexts[0];assert.ok(context,'the saved board supplies a context choice');
+ app.ctx.onAction('qctx',{dataset:{id:context.id}});
+ const cloud=app.ctx.window.CloudSync;cloud.ready=true;cloud.user='context-draft@example.invalid';
+ app.ctx.window.dispatchEvent(new app.ctx.CustomEvent('cloudsync'));await flush();
+ const modal=app.shim.document.getElementById('modalRoot'),key='fvp:chain-scanner:release-notice:v1:sync-stability-2026-10:beta:context-draft-uid';
+ assert.match(app.shim.document.getElementById('quickCtxRow').innerHTML,/aria-pressed="true"/,'the actual quick-add context action leaves the selected chip visible');
+ assert.doesNotMatch(modal.innerHTML,/data-apology-notice=/,'an Add context selection is an unfinished draft even when title and dates are empty');
+ assert.equal(app.shim.localStorage.getItem(key),null,'holding the notice does not consume this account’s automatic window');
+ app.ctx.onAction('qctx',{dataset:{id:context.id}});
+ app.shim.document.dispatchEvent({type:'focusout',target:app.shim.document.getElementById('addInput')});await flush();
+ assert.match(modal.innerHTML,/data-apology-notice="sync-stability-2026-10"/,'clearing the context draft lets the pending notice appear in the same account window');
+ assert.equal(app.shim.localStorage.getItem(key),'shown');
+});
+
+test('RISK apology notice: a later dependency row keeps its Add draft protected',async()=>{
+ const at=Date.parse('2026-10-22T14:00:00.000Z'),startsAt=at-60*60*1000;
+ const app=await loadAppAtTime(at,{
+  locationHref:'https://chain-scanner.web.app/',
+  fetchProvider:async url=>({ok:true,redirected:false,type:'basic',url:String(url),json:async()=>channelReleaseEnvelope('beta',startsAt,startsAt)}),
+  cloudSyncFactory:()=>({ready:false,user:null,status:'idle',configured:true,recoveryIdentity:()=> 'dependency-draft-uid'}),
+  beforeStateReady:(_ctx,shim)=>{shim.document.getElementById('appChangelogCurrent').innerHTML=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];},
+ });
+ app.ctx.closeModal();
+ const firstTask=app.ctx.addTask('First unfinished prerequisite',false),laterTask=app.ctx.addTask('Later unfinished prerequisite',false);
+ const first=app.shim.document.getElementById('addPrerequisite');first.value=firstTask.id;
+ app.shim.document.dispatchEvent({type:'change',target:first});
+ app.ctx.onAction('add-dependency',{dataset:{scope:'add'}});
+ const later=app.shim.document.getElementById('addPrerequisite1');later.value=laterTask.id;
+ app.shim.document.dispatchEvent({type:'change',target:later});
+ const boardBefore=JSON.stringify(app.ctx.state),cloud=app.ctx.window.CloudSync;
+ cloud.ready=true;cloud.user='dependency-draft@example.invalid';app.ctx.window.dispatchEvent(new app.ctx.CustomEvent('cloudsync'));await flush();
+ const modal=app.shim.document.getElementById('modalRoot'),key='fvp:chain-scanner:release-notice:v1:sync-stability-2026-10:beta:dependency-draft-uid';
+ assert.equal(app.shim.document.getElementById('addPrerequisite').value,firstTask.id,'the first dependency remains selected');
+ assert.equal(app.shim.document.getElementById('addPrerequisite1').value,laterTask.id,'the later dependency remains selected');
+ assert.doesNotMatch(modal.innerHTML,/data-apology-notice=/,'a selected later dependency is an unfinished Add draft even with blank title and dates');
+ assert.equal(app.shim.localStorage.getItem(key),null,'the pending notice does not consume the eligible account window');
+ assert.equal(JSON.stringify(app.ctx.state),boardBefore,'holding the notice leaves the saved board unchanged');
+ const firstField=app.shim.document.getElementById('addPrerequisite'),laterField=app.shim.document.getElementById('addPrerequisite1');
+ firstField.value='';laterField.value='';app.shim.document.dispatchEvent({type:'change',target:laterField});
+ app.shim.document.dispatchEvent({type:'focusout',target:app.shim.document.getElementById('addInput')});await flush();
+ assert.match(modal.innerHTML,/data-apology-notice="sync-stability-2026-10"/,'removing the dependency draft lets the pending notice display');
+ assert.equal(app.shim.localStorage.getItem(key),'shown');
+ assert.equal(JSON.stringify(app.ctx.state),boardBefore,'the automatic notice never mutates the board');
+});
+
+test('RISK apology notice: a held scanner gesture defers without consuming its window',async()=>{
+ const at=Date.parse('2026-10-22T15:00:00.000Z'),startsAt=at-60*60*1000;
+ const app=await loadAppAtTime(at,{
+  locationHref:'https://chain-scanner.web.app/',
+  fetchProvider:async url=>({ok:true,redirected:false,type:'basic',url:String(url),json:async()=>channelReleaseEnvelope('beta',startsAt,startsAt)}),
+  cloudSyncFactory:()=>({ready:false,user:null,status:'idle',configured:true,recoveryIdentity:()=> 'gesture-notice-uid'}),
+  beforeStateReady:(_ctx,shim)=>{shim.document.getElementById('appChangelogCurrent').innerHTML=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];},
+ });
+ app.ctx.closeModal();await flush();
+ const cloud=app.ctx.window.CloudSync;cloud.ready=true;cloud.user='gesture-notice@example.invalid';
+ app.shim.document.dispatchEvent({type:'pointerdown'});
+ app.ctx.window.dispatchEvent(new app.ctx.CustomEvent('cloudsync'));await flush();
+ const modal=app.shim.document.getElementById('modalRoot'),key='fvp:chain-scanner:release-notice:v1:sync-stability-2026-10:beta:gesture-notice-uid';
+ assert.doesNotMatch(modal.innerHTML,/data-apology-notice=/,'an eligible cloud event cannot open a modal during a held scanner gesture');
+ assert.equal(app.shim.localStorage.getItem(key),null,'a held gesture cannot consume or dismiss the notice window');
+ app.shim.document.dispatchEvent({type:'pointerup'});
+ await new Promise(resolve=>setTimeout(resolve,400));await flush();
+ assert.match(modal.innerHTML,/data-apology-notice="sync-stability-2026-10"/,'ordinary pointer release retries and delivers the still-eligible notice');
+ assert.equal(app.shim.localStorage.getItem(key),'shown');
 });
 
 /* ---------- state mutations ---------- */
@@ -21389,6 +21660,12 @@ test('Cyclist knees: both legs attach to the seated hip and bend forward through
   assert.ok(Math.abs(Math.hypot(leg.footX-2,leg.footY)-1.7)<1e-9);
  }
  assert.match(fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),/line\(g,leg.hipX,leg.hipY,leg.kneeX/);
+});
+
+test('RISK repository process: Beta packaging preserves exact committed product bytes and separate channel identity',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-name-pattern=preserves committed product bytes','scripts/agent-tools/channel-release.test.mjs'],{cwd:__dirname,encoding:'utf8',env,maxBuffer:4*1024*1024});
+ assert.equal(result.status,0,result.stdout+result.stderr);
 });
 
 test('Settings changelog: every app asset change requires a current changelog entry',()=>{

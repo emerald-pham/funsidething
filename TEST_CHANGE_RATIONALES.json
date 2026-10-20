@@ -14832,5 +14832,326 @@
     },
     "candidateLimit": "No full native/browser/production release proof is claimed; root owns final reconciliation, shell fingerprint refresh, integration and release checks.",
     "implementationStartedAtBase": "4faa4ecac8b852eb120bbc015119249029d4a494"
+  },
+{
+  "testChangesSha256": "29e3bd1c7b21b777269bda50ec2906a2ac8899cc699fafe785b06592ab1158a9",
+  "reason": "Add an isolated release-command consumer regression for minimal Beta packaging under approved issue208 without weakening existing product assertions.",
+  "previousBehavior": "The existing runnable git archive packaging preserves product bytes but supplies no independently bound Beta channel envelope.",
+  "intendedBehavior": "Stage exact committed product assets with a separate deterministic Beta envelope, explicit preview limitations, strict source identity and existing receipt validation.",
+  "replacementTests": [
+    "RISK repository process: Beta packaging preserves exact committed product bytes and separate channel identity"
+  ],
+  "preservedCoverage": [
+    "Existing app, data, native installed-client, shared state and deployment assertions are retained unchanged; this fixture-only child launches no browser, emulator or production network."
+  ],
+  "redEvidence": {
+    "command": "node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/post-p0-rca-coverage-20261019/deployment208/test-runs --purpose preimplementation-red -- node --test --test-name-pattern=\"RISK repository process: Beta packaging\" tests.js",
+    "failure": "Actual 2026-10-19T15:17:31Z record8be9f36e observes committed index bytes retained then fails expected staged channel identity (false !== true) on runnable existing git archive adapter before envelope implementation. Earlier215555cf was an ENOBUFS archiver infrastructure defect and is not behavioral RED. Subsequent observed command REDs:137645ef exact tree;87bc512b existing destination;1936c4cf receipt default;e954716d explicit preview inventory;ec3b8578 stale fingerprint;7bc5de14 symlink;4a904e69 collision;56a98b1a ISO;d13372bb staging aliases;4beae42b atomic visibility;6a60a53a real receipt digest;a3e5ed40 bare tree;52d02f24 stage-setup cleanup. Each was followed by recorded GREEN.08e3546b used a future fixture report time, repaired before real receipt-binding RED; not behavioral RED. Final483c21c7 passes17 cases with real Git/receipt fixtures and no browser, emulator or production network. Owner self-review found tab truncation in complete Git paths; actual9a037418 RED precedes complete-path parsing repair and e4765b02 GREEN. Extra dirty-source, archive-failure and traversal sensitivities were passing controls when introduced, not fabricated REDs."
   }
+},
+{
+  "testChangesSha256": "6bd96636abea1a914f06c74dd2c39e83b87dfd7a44aa32fa1a1c82d742c39b92",
+  "reason": "Add one real full-app signed-in lifecycle regression for ticket 207 and expose only browser URL, external fetch, and time to the existing VM harness. Preserve all existing feature assertions.",
+  "previousBehavior": "The app had no channel-release envelope consumer or apology notice. A cloud account becoming ready did not display the user-written apology, and there was no deployed-channel identity to distinguish Beta preview from a later Stable window.",
+  "intendedBehavior": "A verified Beta release envelope for the actual Beta origin, matching the current app fingerprint and a startsAt within seven days, causes the real CloudSync ready/account lifecycle to show the exact SHA-bound apology. The release loader fetches without credentials or cache and rejects redirects. This is a notice-only interaction with no board or cloud-write effect.",
+  "replacementTests": [
+    "RISK apology notice: an eligible Beta login shows the exact original apology"
+  ],
+  "preservedCoverage": [
+    "All existing CloudSync identity, account-switch, saved-board reconciliation, backup, update, Help, FAQ, and Changelog assertions remain unchanged.",
+    "The new consumer uses a synthetic account and isolated VM storage; it does not seed or mutate a production or private board.",
+    "The test asserts the full original message against the ticket SHA and drives the existing CloudSync event path rather than setting a private notice or channel test hook."
+  ],
+  "redEvidence": {
+    "command": "/Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/post-p0-rca-coverage-20261019/apology207/runs --purpose preimplementation-red -- /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern='^RISK apology notice: an eligible Beta login shows the exact original apology$' tests.js",
+    "failure": "Observed 2026-10-19T15:17:30Z assertion failure: `the real signed-in app consumer should show the original copy inside its automatic Beta window` failed because the actual modal did not include the expected message after the real app VM received CloudSync.ready=true, CloudSync.user=beta-account, and the cloudsync event. Recorder outcome is assertion-failure; there was no import, syntax, or setup error. Record: 2026-10-19T15-17-30-880Z-7584e0e0-3abb-406f-8ee8-d6a25f4ec36f.json."
+  }
+},
+{
+  "testChangesSha256": "edb14685f6d350d311bf995958fc9855781c6de088ba89a3915f1d655e7e47e2",
+  "reason": "Populate the real current Changelog template in the existing full-app VM so the production release loader can validate the same rendered fingerprint the user sees. This is the smallest fixture addition for the Beta apology consumer.",
+  "previousBehavior": "The full-app VM leaves appChangelogCurrent empty even though the actual index.html contains its current release fingerprint; a real production identity loader therefore correctly fails closed and the consumer cannot reach the intended notice path.",
+  "intendedBehavior": "The VM consumer reads the actual current Changelog template from the production HTML, allowing the production loader and exact visible apology to be exercised through signed-in CloudSync lifecycle without a private release or notice hook.",
+  "replacementTests": [
+    "RISK apology notice: an eligible Beta login shows the exact original apology"
+  ],
+  "preservedCoverage": [
+    "All existing CloudSync identity, account-switch, saved-board reconciliation, backup, update, Help, FAQ, and Changelog assertions remain unchanged.",
+    "The new consumer uses a synthetic account and isolated VM storage; it does not seed or mutate a production or private board."
+  ],
+  "redEvidence": {
+    "command": "/Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/post-p0-rca-coverage-20261019/apology207/runs --purpose preimplementation-red -- /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern=\"^RISK apology notice: an eligible Beta login shows the exact original apology$\" tests.js",
+    "failure": "Observed 2026-10-19T15:20:29Z assertion failure: the actual signed-in app consumer still did not show the exact original apology after CloudSync.ready=true, CloudSync.user=beta-account, and the real cloudsync event. The actual app VM had the real appChangelogCurrent template hydrated from index.html; failure was the expected visible-notice assertion, not import, syntax, or fixture setup. Record: 2026-10-19T15-20-29-263Z-02acf9ad-4f59-43a2-a323-ecbf7d406dca.json."
+  }
+},
+{
+  "testChangesSha256": "d253e98f072e46cd487537877eb4017212e4d618fc0c32ddbf2e9c5406815f07",
+  "reason": "Bind the actual Beta apology consumer to the verified Auth UID and start the behavior from an idle app surface. This prevents email-label changes or a pre-existing Help modal from acting as a private test identity or replacing user-owned UI.",
+  "previousBehavior": "The initial regression fixture identified only a display string and left the first-run Help modal open, so it could not establish UID-bound dismissal or a genuinely idle automatic-notice surface.",
+  "intendedBehavior": "The existing full-app lifecycle regression supplies the established recoveryIdentity UID and closes the existing Help modal before the real signed-in CloudSync event. A missing production consumer still fails at the visible exact-copy assertion.",
+  "replacementTests": [
+    "RISK apology notice: an eligible Beta login shows the exact original apology"
+  ],
+  "preservedCoverage": [
+    "The test drives the actual full-app CloudSync event path and requires the complete original message after exact SHA verification.",
+    "All existing CloudSync identity, account-switch, saved-board reconciliation, backup, update, Help, FAQ, and Changelog assertions remain unchanged."
+  ],
+  "redEvidence": {
+    "command": "/Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/post-p0-rca-coverage-20261019/apology207/runs --purpose preimplementation-red -- /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern=\"^RISK apology notice: an eligible Beta login shows the exact original apology$\" tests.js",
+    "failure": "Observed 2026-10-19T15:23:36Z assertion failure at the exact original-copy consumer assertion after CloudSync.ready=true, CloudSync.user=beta-account, recoveryIdentity()=beta-uid, and the real cloudsync event. The app has no release loader/automatic apology yet; failure was not setup/import/syntax. Record: 2026-10-19T15-23-36-976Z-d5656573-0408-42a3-a135-54a1adc556e5.json."
+  }
+},
+{
+  "testChangesSha256": "b8c376b0e0540e78be6cd4a1388ef261598e6391659f8ccc0fbcb98d917c2e9b",
+  "reason": "Keep release metadata fresh under the existing network-only identity contract while preserving cache-first delivery for ordinary installed shell assets.",
+  "previousBehavior": "The actual service worker cache-first handler returned an older cached channel-release.json before checking the network and could continue using it offline as if it were current release identity.",
+  "intendedBehavior": "For both verified Beta and Stable scopes, the exact channel-release.json path bypasses cache lookup and stale fallback; it must reach the network while ordinary index.html retains the existing shell cache behavior.",
+  "replacementTests": [
+    "RISK PWA release metadata: exact scoped identity bypasses stale shell cache"
+  ],
+  "preservedCoverage": [
+    "The ordinary app-shell cache-first response and exact offline script delivery remain covered by existing PWA risk tests.",
+    "The worker uses its actual deployed scope, so the same focused consumer covers the root Beta site and Stable project subpath without a browser or production fixture."
+  ],
+  "redEvidence": {
+    "command": "/Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/post-p0-rca-coverage-20261019/apology207/runs --purpose preimplementation-red -- /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern=\"^RISK PWA release metadata: exact scoped identity bypasses stale shell cache$\" tests.js",
+    "failure": "Observed 2026-10-19T15:28:49Z assertion failure: the exact Beta-scope channel-release.json request returned the cached body `stale shell metadata` instead of `fresh metadata`. The Stable scope iteration was not reached after that first assertion. This was the actual worker consumer returning stale cached metadata, not a missing module or syntax failure. Record: 2026-10-19T15-28-49-110Z-f15574cb-af55-4726-83be-fb32ad3eec31.json."
+  }
+},
+{
+  "testChangesSha256": "a4ade1130e1d1625a382050eaad5abeaccc712af43ea5737ec924c5e653c00e7",
+  "reason": "Correct the network-count oracle in the exact-scope cache regression so it counts the online and offline metadata attempts while proving ordinary shell assets still use cache.",
+  "previousBehavior": "The first focused green reached the intended network-only worker behavior, but the test expected one network call after it had deliberately made two metadata requests, including the offline attempt.",
+  "intendedBehavior": "The test records two metadata network attempts and no network attempt for the ordinary cached index.html, preserving the meaningful stale-envelope RED and narrow bypass contract.",
+  "replacementTests": [
+    "RISK PWA release metadata: exact scoped identity bypasses stale shell cache"
+  ],
+  "preservedCoverage": [
+    "The original recorded RED still demonstrates that the released worker returned stale cached metadata before the fix.",
+    "Both Beta and Stable paths, offline no-fallback, and ordinary cache-first delivery remain asserted."
+  ],
+  "redEvidence": {
+    "command": "/Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/post-p0-rca-coverage-20261019/apology207/runs --purpose preimplementation-red -- /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern=\"^RISK PWA release metadata: exact scoped identity bypasses stale shell cache$\" tests.js",
+    "failure": "The meaningful preimplementation RED at 2026-10-19T15:28:49Z showed exact Beta channel-release.json returned `stale shell metadata` instead of `fresh metadata`; record 2026-10-19T15-28-49-110Z-f15574cb-af55-4726-83be-fb32ad3eec31.json. A later first GREEN attempt exposed only the test oracle count (the two metadata fetches were expected); it did not fail the metadata or shell behavior assertion."
+  }
+},
+{
+  "testChangesSha256": "cb708bbe8f3e0a7e2dca6eb53d77bc098b9be141dd3b5243c074a9f0c6a37a6c",
+  "reason": "Exercise the complete signed-in apology lifecycle across account-specific dismissal, independent Beta/Stable windows, expiry, and the real Help-to-Changelog reopen action.",
+  "previousBehavior": "There was no user-facing release notice consumer, persisted account dismissal, channel-separated window, or way to reopen the original message after the automatic interval.",
+  "intendedBehavior": "The first Beta account sees the exact copy once and stores a dismissal under its UID; a second UID gets its own notice. The Stable account and future start remain independent of the Beta preview, and an explicit Changelog action reopens the exact copy after expiry without changing automatic state.",
+  "replacementTests": [
+    "RISK apology notice: account dismissal and Stable window stay independent"
+  ],
+  "preservedCoverage": [
+    "All board state and cloud-sync state remain outside the notice lifecycle; the test uses only the real full-app VM, external clock, local storage, public network envelope, and Auth UID.",
+    "The original SHA-bound exact-copy test and all CloudSync account-switch, Help, Changelog, and saved-board cases remain intact."
+  ],
+  "redEvidence": {
+    "command": "Original raw test invocation (its purpose label was corrected by 2026-10-19T15-32-39-321Z-90165560-55b6-4930-8d9f-aae2e62f1059): /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/post-p0-rca-coverage-20261019/apology207/runs --purpose preimplementation-red -- /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern=\"^RISK apology notice: account dismissal and Stable window stay independent$\" tests.js",
+    "failure": "CHRONOLOGY CORRECTION: The account/window lifecycle implementation already existed when this test was authored and the first visible apology consumer had passed at 15:26:40Z. The 15:30:53Z failure was captured after temporarily removing source solely for retrospective baseline comparison; it is not a qualifying preimplementation RED. Preserve raw assertion-failure record 2026-10-19T15-30-53-121Z-9a07f4ff-eeba-49fc-a03e-a76fe673669f; linked append-only correction 2026-10-19T15-32-39-321Z-90165560-55b6-4930-8d9f-aae2e62f1059. This is baseline sensitivity only, not a preimplementation RED."
+  },
+  "evidenceClassification": "supplemental-baseline-sensitivity-only",
+  "baselineSensitivity": {
+    "originalRunId": "2026-10-19T15-30-53-121Z-9a07f4ff-eeba-49fc-a03e-a76fe673669f",
+    "appendOnlyCorrectionRunId": "2026-10-19T15-32-39-321Z-90165560-55b6-4930-8d9f-aae2e62f1059",
+    "chronology": "The account/window lifecycle implementation already existed when this test was authored and the first visible apology consumer had passed at 15:26:40Z. The 15:30:53Z failure was captured after temporarily removing source solely for retrospective baseline comparison; it is not a qualifying preimplementation RED.",
+    "originalCommand": "/Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/post-p0-rca-coverage-20261019/apology207/runs --purpose preimplementation-red -- /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern=\"^RISK apology notice: account dismissal and Stable window stay independent$\" tests.js"
+  }
+},
+{
+  "testChangesSha256": "592457fb0527bb1b304003771510d271c9338646ebaef93142da19f667198b26",
+  "reason": "Protect an open Help modal and unfinished Add draft from automatic release notice display, then deliver the pending notice when the real page becomes idle.",
+  "previousBehavior": "Automatic notice evaluation had no regression for first-run Help or an unsaved page draft; no test ensured a deferred notice could resume without replacing or clearing that input.",
+  "intendedBehavior": "With a signed-in account and verified Beta metadata, the existing Help modal remains intact and a non-empty Add draft remains untouched. After Help closes and the draft is explicitly cleared/focus leaves, the pending notice appears through the real lifecycle.",
+  "replacementTests": [
+    "RISK apology notice: automatic display waits for a modal and unfinished Add draft"
+  ],
+  "preservedCoverage": [
+    "All state, draft, account and board assertions remain on the actual VM consumer; the notice uses isolated local storage and public metadata only.",
+    "The existing modal, cloud recovery, Restore and Edit protections remain unchanged and continue to own their user-visible sessions."
+  ],
+  "redEvidence": {
+    "command": "Original raw test invocation (its purpose label was corrected by 2026-10-19T15-32-43-620Z-9d8af9f4-24fc-4605-8129-9087ae35dcb8): /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/post-p0-rca-coverage-20261019/apology207/runs --purpose preimplementation-red -- /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern=\"^RISK apology notice: automatic display waits for a modal and unfinished Add draft$\" tests.js",
+    "failure": "CHRONOLOGY CORRECTION: The modal/draft preservation implementation already existed when this test was authored, after lifecycle GREEN at 15:31:08Z. The 15:31:36Z failure was captured after temporarily removing source solely for retrospective baseline comparison; it is not a qualifying preimplementation RED. Preserve raw assertion-failure record 2026-10-19T15-31-36-609Z-bf78b4bb-bd52-4ae0-8b39-d009975ca5f0; linked append-only correction 2026-10-19T15-32-43-620Z-9d8af9f4-24fc-4605-8129-9087ae35dcb8. This is baseline sensitivity only, not a preimplementation RED."
+  },
+  "evidenceClassification": "supplemental-baseline-sensitivity-only",
+  "baselineSensitivity": {
+    "originalRunId": "2026-10-19T15-31-36-609Z-bf78b4bb-bd52-4ae0-8b39-d009975ca5f0",
+    "appendOnlyCorrectionRunId": "2026-10-19T15-32-43-620Z-9d8af9f4-24fc-4605-8129-9087ae35dcb8",
+    "chronology": "The modal/draft preservation implementation already existed when this test was authored, after lifecycle GREEN at 15:31:08Z. The 15:31:36Z failure was captured after temporarily removing source solely for retrospective baseline comparison; it is not a qualifying preimplementation RED.",
+    "originalCommand": "/Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/post-p0-rca-coverage-20261019/apology207/runs --purpose preimplementation-red -- /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern=\"^RISK apology notice: automatic display waits for a modal and unfinished Add draft$\" tests.js"
+  }
+},
+{
+  "testChangesSha256": "32c5ecf3d6e72126d3ea7547d9e03020057718c753a0d875d3d8d8a0c4f06005",
+  "reason": "Add supplemental fail-closed coverage for the actual public release loader and signed-in apology consumer when release identity, product fingerprint, notice timing, redirect state or network availability is invalid.",
+  "previousBehavior": "The actual loader had fail-closed branches, but the consumer suite did not observe those branches through the production module while a real signed-in account was waiting for the apology.",
+  "intendedBehavior": "Invalid or unavailable public metadata leaves ChainRelease unverified, suppresses the automatic notice, does not persist dismissal state and leaves the accepted board unchanged.",
+  "replacementTests": [
+    "RISK apology release identity: invalid metadata stays silent without touching the board"
+  ],
+  "preservedCoverage": [
+    "Existing exact-copy, account dismissal, independent Stable window, Help reopen and modal/draft assertions remain intact.",
+    "The test loads app-release.js in the ordinary full-app VM and controls only the external network response and existing Auth identity."
+  ],
+  "evidenceClassification": "supplemental-current-source-green-only",
+  "supplementalGreen": {
+    "runId": "2026-10-19T15-35-47-416Z-e84526c8-3aaa-45d3-9e9a-37594f10d7ee",
+    "purpose": "green",
+    "outcome": "passed"
+  },
+  "redEvidence": {
+    "command": "PATH=/Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin:$PATH TZ=UTC node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/post-p0-rca-coverage-20261019/apology207/runs --purpose green -- /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern=\"^RISK apology release identity:\" tests.js; run 2026-10-19T15:35:47.416Z-e84526c8-3aaa-45d3-9e9a-37594f10d7ee.",
+    "failure": "No qualifying preimplementation RED exists for this supplemental test: app-release.js and the visible lifecycle implementation already existed before the test was authored. Its first observed execution against the current source passed; classify this as supplemental GREEN only, not a test-first cycle."
+  }
+},
+{
+  "testChangesSha256": "3668ebc82e037d18336430bd8d1865393161e0e469d3f3046a305345325df848",
+  "reason": "Reconcile the exact combined tests.js diff after merging the approved Beta packaging preparation with ticket 207, while preserving each worker\u2019s scoped rationale and evidence record.",
+  "previousBehavior": "The integration base had neither the signed-in apology consumer nor the Beta package identity command, and installed release metadata could be served from a stale shell cache.",
+  "intendedBehavior": "The full app shows the exact apology only with verified channel identity and established account UID; invalid release metadata stays silent and board-neutral; Beta and Stable windows and dismissals remain independent; the Help changelog can reopen the copy; the worker bypasses stale release metadata; and packaging preserves exact committed product bytes. Revalidating an unchanged release preserves an already-open apology; an account or validated release identity change still closes it safely.",
+  "replacementTests": [
+    "RISK apology notice: an eligible Beta login shows the exact original apology",
+    "RISK apology notice: refreshing an unchanged release keeps the open message",
+    "RISK apology release identity: invalid metadata stays silent without touching the board",
+    "RISK apology notice: account dismissal and Stable window stay independent",
+    "RISK apology notice: automatic display waits for a modal and unfinished Add draft",
+    "RISK PWA release metadata: exact scoped identity bypasses stale shell cache",
+    "RISK repository process: Beta packaging preserves exact committed product bytes and separate channel identity"
+  ],
+  "preservedCoverage": [
+    "Every original app assertion and each worker\u2019s dedicated rationale remain present; this combined record exists only so the exact post-merge tests.js diff also has a fingerprinted rationale.",
+    "Account/window and modal/draft cases are explicitly classified as retrospective baseline-sensitivity comparisons, and invalid-envelope coverage as supplemental source-present GREEN; neither is represented as a source-before-implementation RED."
+  ],
+  "evidenceClassification": "integrated-diff-with-scoped-reds-supplemental-green-and-current-source-fix-red",
+  "redEvidence": {
+    "command": "Node22 focused records: 2026-10-19T15-17-30-880Z-7584e0e0-3abb-406f-8ee8-d6a25f4ec36f (exact apology consumer); 2026-10-19T15-28-49-110Z-f15574cb-af55-4726-83be-fb32ad3eec31 (network-only worker consumer); Beta packaging raw RED 8be9f36e at 15:17:31Z in /Users/emeraldpham/.codex/task-artifacts/post-p0-rca-coverage-20261019/deployment208/test-runs.",
+    "failure": "Qualifying source-before-implementation REDs are the initial exact-copy signed-in app consumer, the worker returning stale channel-release.json, and the real Beta packaging consumer failing to stage identity metadata. The account/window and modal/draft records were corrected as baseline sensitivity only; invalid-envelope is supplemental GREEN only. These classifications and their original and correction records remain individually preserved in the scoped rationale entries. The 15:41:17Z focus-refresh failure is a separate genuine current-source RED for the release-identity refresh repair; its fixture predecessor is append-only corrected as adapter-only."
+  }
+},
+{
+  "testChangesSha256": "3668ebc82e037d18336430bd8d1865393161e0e469d3f3046a305345325df848",
+  "reason": "Keep an already-open apology visible when the public loader refreshes metadata for the same exact deployed release; focus and pageshow refreshes return a newly validated object even when its identity is unchanged.",
+  "previousBehavior": "The consumer compared the release object by reference, so a routine metadata refresh returned a different frozen object, closed the apology already on screen and the persisted shown state prevented it from reopening.",
+  "intendedBehavior": "Revalidation of the same channel, origin, base path, source revision, tree, app fingerprint, deployment time and notice start preserves the open message. A signed-in account or validated release identity transition still invalidates the old automatic notice.",
+  "replacementTests": [
+    "RISK apology notice: refreshing an unchanged release keeps the open message"
+  ],
+  "preservedCoverage": [
+    "The test uses the actual app-release.js fetch/event lifecycle and the existing signed-in app consumer; it changes no board data and adds no private release test hook.",
+    "Existing account dismissal, separate Stable window, explicit Changelog reopen and modal/draft protections remain covered."
+  ],
+  "evidenceClassification": "source-present-current-implementation-red-before-repair",
+  "redEvidence": {
+    "command": "PATH=/Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin:$PATH TZ=UTC node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/post-p0-rca-coverage-20261019/apology207/runs --purpose preimplementation-red -- /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern=\"^RISK apology notice: refreshing an unchanged release keeps the open message$\" tests.js; raw record 2026-10-19T15-41-17-057Z-567b905a-2dd4-49d1-9d7b-d9d6de02bba0.",
+    "failure": "With source present, an actual focus-triggered metadata refresh published a different frozen object for the same envelope; the active notice was closed and the visible consumer assertion failed. This follows the true behavior assertion; the earlier 15:40:29Z run is separately corrected as a missing pull() test-double method, not product RED."
+  },
+  "supplementalGreen": {
+    "runId": "2026-10-19T15-42-39-667Z-bba12357-dd6c-43e9-abf5-8bd75679630e",
+    "purpose": "green",
+    "outcome": "passed"
+  }
+},
+{
+  "testChangesSha256": "aca6ff29d49ef6166e54a879b42904af92ecc7f1e5c58024762928076f67dff9",
+  "reason": "Protect a context-only Quick Add draft when a signed-in release notice becomes eligible, keeping the visible context choice and automatic window pending until the draft is cleared.",
+  "previousBehavior": "The notice guard inspected title and date inputs, recurrence activation, and only the first dependency control. Selecting a quick-add context with blank title and dates therefore looked idle and the automatic notice replaced the user's working surface.",
+  "intendedBehavior": "A selected Quick Add context is an unfinished draft even when title and dates are empty. The automatic notice remains pending without consuming the account window until the context selection is cleared and the normal lifecycle retry runs.",
+  "replacementTests": [
+    "RISK apology notice: a context-only Add draft waits before consuming its window"
+  ],
+  "preservedCoverage": [
+    "The regression uses the existing signed-in full-app consumer, actual qctx action, public metadata fixture, and existing focusout retry; it adds no private application hook.",
+    "Existing default-state eligibility, visible original-copy, account dismissal, Stable-window, Changelog-reopen, and modal/title-draft assertions remain intact."
+  ],
+  "evidenceClassification": "current-source-red-before-repair",
+  "redEvidence": {
+    "command": "/Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/post-p0-rca-coverage-20261019/apology207/runs --purpose preimplementation-red -- /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern='^RISK apology notice: a context-only Add draft waits before consuming its window$' tests.js; run 2026-10-19T16-07-32-026Z-a48a2c82-cbe5-44b5-8887-378c7bffc5a9.",
+    "failure": "With candidate cd9717e source present, the actual signed-in consumer applied qctx while title and dates were blank, then a real cloudsync event opened the apology over the selected context draft. The behavioral assertion failed at the visible modal, before later checks; no source was removed or edited to manufacture this RED."
+  }
+},
+{
+  "testChangesSha256": "c1158321f494d43580c5364e7f9aaf567ba1bb243a1485808e5aae15a2cc1eb0",
+  "reason": "Extend apology draft protection coverage from the observed context-only RED to a selected later dependency row, preserving the user's second dependency and the pending signed-in notice until the complete draft is cleared.",
+  "previousBehavior": "The prior notice guard checked only the first dependency control, so a meaningful value in a later Quick Add dependency row was invisible to the automatic notice gate. The full appearance snapshot repair now covers all existing rows.",
+  "intendedBehavior": "Every non-default value represented by the existing Quick Add appearance snapshot, including a later selected dependency, defers the automatic notice; clearing the draft permits delivery in the still-eligible account window without changing the board.",
+  "replacementTests": [
+    "RISK apology notice: a context-only Add draft waits before consuming its window",
+    "RISK apology notice: a later dependency row keeps its Add draft protected"
+  ],
+  "preservedCoverage": [
+    "The context-only case is a genuine signed-in full-app consumer RED on candidate cd9717ef0444a8c8d09392914ed979857a06963c, before the shared snapshot guard repair; its exact assertion output remains in the recorded run.",
+    "The later dependency-row case was authored after the shared snapshot guard landed and is supplemental source-present GREEN only. It uses real dependency form change events and adds no private hook; no later-row RED is claimed.",
+    "Existing default-state eligibility, exact original copy, modal/title drafts, account dismissal, independent Stable window, and deliberate Changelog reopen remain protected."
+  ],
+  "evidenceClassification": "context-only-current-source-red-plus-later-row-supplemental-green",
+  "redEvidence": {
+    "command": "/Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/post-p0-rca-coverage-20261019/apology207/runs --purpose preimplementation-red -- /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern='^RISK apology notice: a context-only Add draft waits before consuming its window$' tests.js; run 2026-10-19T16-07-32-026Z-a48a2c82-cbe5-44b5-8887-378c7bffc5a9.",
+    "failure": "On the unchanged C source, the actual signed-in consumer's context-only Add draft was replaced by the apology; the no-notice assertion failed. This is the qualifying source-present RED for the full Add appearance snapshot repair."
+  },
+  "supplementalGreen": {
+    "runId": "2026-10-19T16-09-24-101Z-4c69a838-5184-41da-82b0-dd7aca688948",
+    "purpose": "green",
+    "candidate": "32308aa3da4d2ecc723eb85634e78899c0303996",
+    "outcome": "passed"
+  }
+},
+{
+  "testChangesSha256": "b79a5e7e5250203de11c8e3bf4ec2cac51e7459c5811eafd5011d37ef69975fa",
+  "reason": "Prevent the automatic apology from covering an in-progress scanner pointer gesture, and retry the same still-eligible account notice after the existing gesture completion boundary.",
+  "previousBehavior": "An eligible cloudsync event during pointerdown passed the idle guard, opened a modal over the pressed scanner control and marked the account window shown before the gesture finished.",
+  "intendedBehavior": "A held scanner gesture defers automatic display without writing a notice key. The existing pointer release/cancel completion path retries, and an ordinary release delivers the notice if the signed-in identity and eligibility window still match.",
+  "replacementTests": [
+    "RISK apology notice: a context-only Add draft waits before consuming its window",
+    "RISK apology notice: a later dependency row keeps its Add draft protected",
+    "RISK apology notice: a held scanner gesture defers without consuming its window"
+  ],
+  "preservedCoverage": [
+    "The context-only Add draft has a source-present RED on original integrated candidate cd9717ef0444a8c8d09392914ed979857a06963c before commit 32308aa; see run 2026-10-19T16-07-32-026Z-a48a2c82-cbe5-44b5-8887-378c7bffc5a9.",
+    "The later dependency-row test was authored after commit 32308aa and is supplemental GREEN only; see run 2026-10-19T16-09-24-101Z-4c69a838-5184-41da-82b0-dd7aca688948.",
+    "The pointer regression runs through the existing full-app VM consumer with real document pointerdown/cloudsync events and has a genuine current-source failure before the gesture-specific repair. No code is removed to create a baseline failure.",
+    "Existing exact-copy, default eligibility, account transition, dismissal, Stable window, Changelog reopen, and modal/title-draft coverage remains intact."
+  ],
+  "evidenceClassification": "context-red-and-gesture-red-with-later-dependency-supplemental-green",
+  "redEvidence": {
+    "command": "/Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/post-p0-rca-coverage-20261019/apology207/runs --purpose preimplementation-red -- /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern='^RISK apology notice: a held scanner gesture defers without consuming its window$' tests.js; run 2026-10-19T16-10-16-573Z-85f70736-e297-4966-b14f-aa77e7352220.",
+    "failure": "On the current candidate before the gesture fix, an actual pointerdown followed by signed-in cloudsync opened the apology while the scanner gesture was held. The visible-modal assertion failed; the source-present failure is retained as run 2026-10-19T16-10-16-573Z-85f70736-e297-4966-b14f-aa77e7352220."
+  },
+  "supplementalGreen": [
+    {
+      "runId": "2026-10-19T16-08-26-419Z-264048c8-eed3-441b-94c3-76750e120092",
+      "purpose": "green",
+      "outcome": "passed"
+    },
+    {
+      "runId": "2026-10-19T16-09-24-101Z-4c69a838-5184-41da-82b0-dd7aca688948",
+      "purpose": "green",
+      "outcome": "passed"
+    }
+  ]
+},
+{
+  "testChangesSha256": "04bcbf7505ee2a284032fb397ab4f27bc0009f7c39c2ff63197447e445ae533d",
+  "reason": "Reconcile only prepared207 apology and minimum208 artifact packaging onto the current f38c02d Stable baseline, retaining all current P0 consumer assertions and the original prepared TDD chronology.",
+  "previousBehavior": "The prepared source was based on01b95ef and its historical integrated candidate failed full regression. Current Stable has no release-specific apology; the current fixture cleanup and all223 report/source guards must remain.",
+  "intendedBehavior": "The existing full-app consumers exercise exact signed-in apology eligibility, UID/channel dismissal, original copy, seven-day windows, unchanged metadata refresh, modal/Add/gesture deferral and network-only metadata. The Beta-only staging command binds exact committed bytes without publication or Stable promotion.",
+  "replacementTests": [
+    "RISK apology notice: an eligible Beta login shows the exact original apology",
+    "RISK apology notice: refreshing an unchanged release keeps the open message",
+    "RISK PWA release metadata: exact scoped identity bypasses stale shell cache",
+    "RISK repository process: Beta packaging preserves exact committed product bytes and separate channel identity"
+  ],
+  "preservedCoverage": [
+    "All current f38c02d appFixtureScope timer/store cleanup, account/source/restore/report preservation and existing passing assertions remain. The additive loadApp URL/fetch providers retain current sandbox scheduling and disposal.",
+    "Original207/208 source-present RED and subsequent GREEN records remain in the14 imported scoped rationale entries and external post-p0 artifact folder; integration is not claimed to recreate their test authorship chronology.",
+    "The current preimplementation-red-labeled run10789bbb unexpectedly passed10 cases and is GREEN only. The actual existing Help consumer failed its release-notes-first assertion in run0ba8704a before moving the new apology-reopen paragraph after the unchanged notes div.",
+    "The isolated preflight fixture had missing app-release.js infrastructure failures in runa8b4e80f; copying the required module repaired the fixture without altering assertions. Its37 focused tooling cases then passed; this infrastructure error is not feature RED."
+  ],
+  "evidenceClassification": "prepared-source-integration-with-retained-original-tdd-and-current-regression-repair",
+  "redEvidence": {
+    "command": "Original207/208 commands in the14 scoped rationale records. Current existing Help contract: Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=FAQ/changelog contracts tests.js; run2026-10-20T16-00-39-165Z-0ba8704a-4627-4bd6-8afe-7c32af1581fa.",
+    "failure": "Before the current integration repair, RISK FAQ redundant changelog question failed its actual mounted Help assertion that summary is immediately followed by release notes. The source was present and the assertion was preserved. After moving only the new reopen paragraph after notes, run3f973fff passed10 cases. No new feature RED is claimed from the unexpectedly passing prior run or missing fixture module."
+  }
+}
 ]

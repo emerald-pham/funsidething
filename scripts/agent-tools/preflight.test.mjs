@@ -26,7 +26,7 @@ async function createAppFixture(t, suffix) {
   const fixtureRoot = await mkdtemp(path.join(os.tmpdir(), `chain-preflight-${suffix}-`));
   t.after(() => rm(fixtureRoot, { recursive: true, force: true }));
   const fixtureFiles = [
-    'tests.js', 'index.html', 'location.js', 'vendor/lz-string-1.5.0.min.js',
+    'tests.js', 'index.html', 'app-release.js', 'location.js', 'vendor/lz-string-1.5.0.min.js',
     'scripts/test-first-gate.mjs',
   ];
   for (const relative of fixtureFiles) {
