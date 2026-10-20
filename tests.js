@@ -702,6 +702,34 @@ test('RISK cloud source fresh check: changed head ownership and unknown record f
  });
 });
 
+test('RISK cloud source fresh check: structured-clone head facts cannot be erased by the metadata exception',async t=>{
+ const cases=[
+  ['NaN to null',()=>({futureHeadAuthority:NaN}),()=>({futureHeadAuthority:null})],
+  ['missing to undefined',()=>({}),()=>({futureHeadAuthority:undefined})],
+  ['negative zero to zero',()=>({futureHeadAuthority:-0}),()=>({futureHeadAuthority:0})],
+  ['named array property',()=>({futureHeadAuthority:Object.assign(['same'],{authority:'original'})}),()=>({futureHeadAuthority:Object.assign(['same'],{authority:'changed'})})],
+  ['unchanged typed authority',()=>({futureHeadAuthority:{nan:NaN,optional:undefined,zero:-0,list:Object.assign(['same'],{authority:'original'})}}),()=>({futureHeadAuthority:{nan:NaN,optional:undefined,zero:-0,list:Object.assign(['same'],{authority:'original'})}}),true]
+ ];
+ for(const [name,firstFacts,nextFacts,mayRefresh=false] of cases)await t.test(name,async sub=>{
+  const app=await freshSourceCheckFixture187(sub),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+  const original=await store.readHead(),{payload,...meta}=original,firstHead={...meta,...firstFacts()},nextHead={...meta,...nextFacts(),committedAt:meta.committedAt+1};
+  await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>tx.objectStore('meta').put(firstHead,'head'));
+  assert.deepEqual(structuredClone(await store.readHead()),{...firstHead,payload},'the actual device consumer preserves the initial typed unknown facts');
+  const before=JSON.stringify(ctx.state),pending=await store.getPendingUpload('owner'),raw=await store.readRawExportSnapshot(),cloud=JSON.stringify([...backend.docs]),writes=backend.writes.length;
+  const expectedRaw=structuredClone(raw),headIndex=expectedRaw.stores.meta.keys.indexOf('head');assert.ok(headIndex>=0);expectedRaw.stores.meta.values[headIndex]=structuredClone(nextHead);
+  let roots=0;app.faults.serverRead=async path=>{if(path==='users/owner'&&++roots===2)await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>tx.objectStore('meta').put(nextHead,'head'));};
+  sub.after(()=>{delete app.faults.serverRead;});
+  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),mayRefresh,'only unchanged typed authority can permit the committedAt-only fresh pair');
+  assert.equal(roots,mayRefresh?8:4,'changed typed authority cannot start extra captures; unchanged authority still permits one fresh pair');
+  const modal=shim.document.getElementById('modalRoot').innerHTML;
+  if(mayRefresh){assert.match(modal,/data-act="choose-cloud-recovery-source"/);assert.doesNotMatch(modal,/data-act="choose-cloud-recovery-source"[^>]*aria-pressed="true"/);assert.match(modal,/data-act="apply-cloud-source-recovery"[^>]*disabled/);}
+  else{assert.doesNotMatch(modal,/data-act="choose-cloud-recovery-source"/);assert.match(modal,/Checks have stopped/);}
+  assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(structuredClone(await store.readHead()),{...nextHead,payload});assert.deepEqual(await store.getPendingUpload('owner'),pending);
+  assert.deepEqual(structuredClone(await store.readRawExportSnapshot()),expectedRaw,'only the intentional external head change exists; all typed original sources remain exact');
+  assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal(backend.writes.length,writes);
+ });
+});
+
 test('RISK cloud source fresh check: continuing peer churn stops after four complete captures without choosing',async t=>{
  const app=await freshSourceCheckFixture187(t),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
  const before=JSON.stringify(ctx.state),head=await store.readHead(),pending=await store.getPendingUpload('owner'),raw=await store.readRawExportSnapshot(),writes=backend.writes.length;

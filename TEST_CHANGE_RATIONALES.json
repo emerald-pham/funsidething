@@ -15636,5 +15636,26 @@
   },
   "greenEvidence": "Worker final158/158 recovery/identity/diagnostics outcomes, focused23/23 and hygiene3/3 pass at9cbab2d; current root cumulative source still requires final exact full/native/rules/compat/rendered/independent/CI/live gates.",
   "evidenceClassification": "retained-source-present-vertical-tdd-with-cumulative-owner-integration"
+},
+{
+  "baseCommit": "53d9c98b25c1dbe089b1b41f0def870cea9973c5",
+  "testChangesSha256": "604a9b6b7e6d1799fc12ad734f05b057f72b84a9520fdfe3b2e7d6d0b6299ea4",
+  "reason": "Repair the independently confirmed P2 in the new fresh-source retry exemption: JSON comparison erased structured-clone distinctions in unknown head authority facts alongside a committedAt-only refresh.",
+  "previousBehavior": "A real durable head change from NaN to null, missing to undefined, negative zero to zero or a changed named array property could satisfy the new JSON-normalized head equality and incorrectly restart source verification. The full-app consumer returned verified true after the changed authority instead of staying held.",
+  "intendedBehavior": "Use the existing lossless typed recovery evidence comparator for complete head records and finite committedAt-only normalized copies. Changed unknown typed facts stay held; unchanged typed facts still permit the existing single unselected fresh pair. No other comparison, budget, source, consent or publication behavior changes.",
+  "replacementTests": [
+    "RISK cloud source fresh check: structured-clone head facts cannot be erased by the metadata exception"
+  ],
+  "preservedCoverage": [
+    "All609 prior raw rationale objects and every original passing assertion are retained byte-for-byte. The new regression uses the existing actual full-app review action, external SDK timing and actual IndexedDB meta/head writes plus device readback; it does not replace readHead or test the private comparison helper.",
+    "Each of the four changed typed cases first proves its exact initial representation survives actual device readHead, then observes the review remain held after the intentional peer metadata change. Exact accepted state, head payload/hash, typed raw source rows, pending upload and cloud bytes are retained; no SDK writes or default choice occur.",
+    "All four cases produced a meaningful true-versus-false consumer RED before runtime edits. The first run failed only at a VM cross-realm deepStrictEqual fixture expectation; it remains preserved as a nonqualifying fixture failure. Structured-cloning both observed readbacks into the host realm fixed that fixture without changing type/value facts, then the real action assertions failed.",
+    "One unchanged typed-authority positive case was added after implementation and is explicitly a supplemental GREEN control, not retroactive RED. It still reaches an entirely fresh pair with no source selected and Apply disabled.",
+    "The preexisting cloudSourceRecoverySame comparator is unchanged, as are original strict baseline/account/UID/epoch/local/draft/pending/browser/hold guards, one-minute/controller/serial limit, Cancel, diagnostics projection and ordinary pull/write deadlines. No storage codec, backend, Auth/rules, fingerprint or private fixture changes."
+  ],
+  "redEvidence": {
+    "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- Node22 --test --test-name-pattern=\"^RISK cloud source fresh check: structured-clone head facts\" tests.js; integration216/p0-fresh-source-retry/typed-head-repair/typed-head-consumer-red.output.txt and immutable runs/*.json.",
+    "failure": "After actual typed durable readback passed, all4 consumer cases returned true rather than false for changed protected authority; parent test plus subtests produced5 failures. This occurred on exact53d before replacing either JSON head comparison. The earlier typed-head-red.output.txt is retained as fixture failure only. Then26/26 fresh outcomes passed, and27/27 passed with the supplemental unchanged typed control."
+  }
 }
 ]

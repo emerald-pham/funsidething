@@ -10162,9 +10162,9 @@ function cloudSourceRecoveryFreshBaseline(a,b){
   const firstHead=a?.headRecord,nextHead=b?.headRecord;
   // committedAt is the observed metadata-only case. Ownership, source identity
   // and unknown record fields must never be treated as a harmless refresh.
-  const sameHead=JSON.stringify(firstHead)===JSON.stringify(nextHead)||
+  const sameHead=recoverySourceValueEqual(firstHead,nextHead)||
     Number.isFinite(firstHead?.committedAt)&&Number.isFinite(nextHead?.committedAt)&&
-    JSON.stringify({...firstHead,committedAt:0})===JSON.stringify({...nextHead,committedAt:0});
+    recoverySourceValueEqual({...firstHead,committedAt:0},{...nextHead,committedAt:0});
   return !!a&&!!b&&a.serial===cloudSourceRecoverySerial&&liveBoardAccepted&&deviceStorageAuthority&&
     cloudReady()&&!cloudSuspended&&!document.hidden&&window.CloudSync===a.backend&&
     a.backend.user===a.account&&a.backend.recoveryIdentity?.()===a.evidence.identity&&

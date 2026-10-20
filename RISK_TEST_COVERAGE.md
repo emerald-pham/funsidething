@@ -1865,6 +1865,7 @@ An ordinary timeout does not clear a previously verified damage finding. The nat
 - RISK cloud source fresh check: one between-capture cloud change verifies again within the same review
 - RISK cloud source fresh check: head metadata alone permits one fresh pair and visible cancellable progress
 - RISK cloud source fresh check: changed head ownership and unknown record facts cannot count as harmless metadata
+- RISK cloud source fresh check: structured-clone head facts cannot be erased by the metadata exception
 - RISK cloud source fresh check: continuing peer churn stops after four complete captures without choosing
 - RISK cloud source fresh check: the restart shares the original minute and late replies remain powerless
 - RISK cloud source fresh check: Cancel and reopen revoke a stalled fresh pair and its late callback
@@ -1875,3 +1876,5 @@ An ordinary timeout does not clear a previously verified damage finding. The nat
 One transient between-capture cloud snapshot or finite committedAt-only head metadata change can restart both complete captures once within the original monotonic minute. No source is selected or published. Accepted work, drafts, UID/epoch, head ownership and unknown fields, pending/browser/hold/prepared sources stay binding; churn, cancellation, unsupported sources and refused storage remain held. Synthetic SDK/time/DOM/IDB consumers preserve exact sources and ordinary pull/write deadlines; actual affected-iOS source validity and recovery remain unverified.
 
 The recovered review's actual downloaded support report retains the original cross-capture refusal and separate fresh verification, with redaction, truncation accounting and unchanged byte/event/operation caps. Report-only compaction preserves source start/terminal facts, generation summaries and publication events. Pending progress and terminal refusal now have distinct wording: stopped checks never ask the user to keep waiting. The same tests retain exact board/head/pending/raw/cloud sources and no writes.
+
+The committedAt-only exemption compares complete head records losslessly. Actual durable readback retains NaN/null, missing/undefined, negative-zero/zero and named-array-property distinctions; any such changed unknown authority stays held. Unchanged typed facts still permit the one bounded metadata-only fresh pair without selecting or writing.
