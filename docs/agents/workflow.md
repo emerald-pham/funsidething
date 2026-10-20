@@ -91,6 +91,11 @@ requirements, including native/device and named-engine checks. Missing coverage
 remains a gap. Keep full CDP access and security permissions unchanged; changes
 require separate explicit authorization.
 
+## Error recovery
+
+For error handling, retries, reconnects or stale reads, follow
+[Safe automatic recovery](error-recovery.md).
+
 ## Finish and hand off
 
 Review the exact final diff against requirements and standards. Keep independent
