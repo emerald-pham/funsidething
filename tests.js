@@ -718,6 +718,24 @@ test('RISK recovery read minute: changed account revision or drafts revoke a del
  });
 });
 
+test('RISK recovery read minute: elapsed validation and final verification cannot grant choices before a delayed timer fires',async t=>{
+ for(const phase of ['validation','final verification'])await t.test(phase,async sub=>{
+  const app=await divergentCloudSourceApp187(sub,{timeoutMs:20000,recoveryTimeoutMs:null}),{ctx,shim,backend}=app;
+  let elapsed=0,validated=0,roots=0;ctx.performance={now:()=>elapsed};
+  const codec=ctx.ChainStorageV2||ctx.window.ChainStorageV2;
+  const measured={...codec,async decodeSnapshot(...args){const value=await codec.decodeSnapshot(...args);validated++;if(phase==='validation')elapsed=60001;return value;}};
+  ctx.ChainStorageV2=measured;ctx.window.ChainStorageV2=measured;
+  app.faults.serverRead=async path=>{if(path==='users/owner'&&++roots===4&&phase==='final verification')elapsed=60001;};
+  const before=JSON.stringify(ctx.state),head=await ctx.window.ScannerDeviceStore.readHead(),pending=await ctx.window.ScannerDeviceStore.getPendingUpload('owner'),cloud=JSON.stringify([...backend.docs]);
+  const result=await ctx.onAction('review-cloud-source-recovery',{});
+  assert.ok(validated>0,'the actual complete-source codec executes before elapsed time advances');
+  assert.equal(result,false,'elapsed work cannot grant a source choice merely because its timeout callback is not delivered yet');
+  assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="choose-cloud-recovery-source"/);assert.match(shim.document.getElementById('modalRoot').innerHTML,/Cloud request timed out/);
+  if(phase==='validation')assert.equal(roots,2,'an expired first validation must not start a second server read');else assert.equal(roots,4,'the independent final verification also checks elapsed expiry');
+  assert.equal(JSON.stringify(ctx.state),before);assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal((await ctx.window.ScannerDeviceStore.readHead()).hash,head.hash);assert.deepEqual(await ctx.window.ScannerDeviceStore.getPendingUpload('owner'),pending);
+ });
+});
+
 test('RISK recovery read minute: an ordinary native save still expires at its existing twenty-second write limit',async t=>{
  const fixture=heldDecisionFixture188();fixture.local=structuredClone(fixture.remote);
  const clock=recoveryReadClock187(),faults={},app=await heldDecisionApp188(t,{fixture,failures:faults,timeoutMs:20000,recoveryTimeoutMs:null,timerProvider:clock.provider}),{ctx,shim,backend}=app;

@@ -1,6 +1,37 @@
 [
   {
     "baseCommit": "f38c02dd7a29b41515fb3abbf234582845a6ccde",
+    "testChangesSha256": "648e378e7d1b503856ee23e02c21d14a46e4c0bc94f0222df695f5e077bfde80",
+    "reason": "Close independent specialistP2 on78818c2: the shared minute must expire based on elapsed work even when validation and final server verification finish before a queued timeout callback. Retain the complete earlier one-minute/ACK-resume behavior and evidence.",
+    "previousBehavior": "Source SDK reads expired at the ordinary20-second deadline. Independent verification calls could each restart that budget. Cancelling a pending review retained its busy slot until its deadline. A modal opened during exact ACK inspection blocked safe repair but left neither deferredCloudPull nor a retry; safe close alone did not resume. The original exact cold-open repair and valid previous-choice overlap already pass and are not claimed incident REDs. The78818c2 native consumer could return true with selectable source choices at monotonic60001ms after successful real-codec validation; the timer callback had not yet executed.",
+    "intendedBehavior": "Use one monotonic roughly60000ms review budget through both guarded reads and validation, aligned SDK remaining time, visible progress/Cancel and immediate safe cancel. Reuse existing deferred-cloud reconciliation after a modal interrupts exact-copy checking. Keep normal pull/write deadlines, exact generation validation, protected originals, CAS, ACK, durable head, account and explicit older-source consent. Explicit budget checks abort and refuse before another read and after real validation/final verification, before granting preview authority. The timer remains the bound for a never-settling await.",
+    "replacementTests": [
+      "RISK iOS source replay: an exact acknowledged board repairs missing current chunks after a cold reopen without a new edit",
+      "RISK iOS source replay: a modal opened during exact-copy inspection defers repair and closing resumes without an edit",
+      "RISK recovery read minute: native source review accepts headers arriving at twenty-six seconds within one minute",
+      "RISK recovery read minute: the second native verification shares the original sixty-second budget",
+      "RISK recovery read minute: native Cancel releases the read immediately and a late old header cannot replace a fresh preview",
+      "RISK recovery read minute: stalled server stages expire once and retain protected sources after late replies",
+      "RISK recovery read minute: changed account revision or drafts revoke a delayed source preview",
+      "RISK recovery read minute: an ordinary native save still expires at its existing twenty-second write limit",
+      "RISK recovery read minute guidance: pending native review offers Cancel and explains the whole bounded read",
+      "RISK iOS source replay: a fresh native review offers a validated previous board after timed-out headers settle late",
+      "RISK recovery read minute: elapsed validation and final verification cannot grant choices before a delayed timer fires"
+    ],
+    "preservedCoverage": [
+      "All existing runtime and data-safety assertions remain intact. The only existing test expectation migration changes invalid recovery timeout configuration fallback from20000 to60000 under explicit user policy; ordinary configured save/pull timeouts retain their old fallback.",
+      "The existing held-stage diagnostics test still requires the real SDK deadline-exceeded error, correct timed-out stage and late observation; it now waits for the SDK wrapper rejection after the whole-attempt deadline can win first. The170/172 cohort failure is retained. No assertion was removed or relaxed.",
+      "Cold-reopen8chunk exact ACK repair, real durable readback and isolated receiver are positive coverage; valid previous8chunk timeout/fresh overlap is positive coverage. First overlap RED changed only rotating latest-backup ID at an unquiesced fixture; first cold receiver RED was an object prototype comparison. Both corrected fixture records remain, and neither counts as incident RED.",
+      "Existing matching/nonmatching ACK, divergent pending authority, all exact source protections, old saved data, consent, account/UID/revision changes, storage failures, native installed delivery, compatibility and finite passive diagnostics remain required. Actual private affected-account payload matching and physical iOS recovery remain unverified.",
+      "Specialist788 changes-required report and elapsed60001RED are preserved. The owner permanent native case advances only external performance time after actual real codec success or actual final-root SDK result; both fail on788 before runtime repair, then pass. No private payload used. Obsolete788 full was intentionally interrupted because this material source change required a new candidate; it is not called a full/native pass."
+    ],
+    "redEvidence": {
+      "command": "Node22 record-run --purpose preimplementation-red -- Node22 --test --test-name-pattern=\"^RISK recovery read minute: elapsed validation\" tests.js; actual record/output at /Users/emeraldpham/.codex/task-artifacts/p0-ios-diagnostics-20261020/minute-elapsed-validation-red.output.txt plus prior original qualifying RED records retained.",
+      "failure": "Both validation and final-verification native subcases return true instead of false after external monotonic time advances to60001ms without delivered timeout callback (2 failed subcases plus parent). The guarded successor passes both, the original26-second delayed headers and shared-second-read budget (5/5 assertions/outcomes); all original state/head/pending/cloud preservation assertions remain."
+    }
+  },
+  {
+    "baseCommit": "f38c02dd7a29b41515fb3abbf234582845a6ccde",
     "testChangesSha256": "f283e60ae679a4f59a7449e4a51024088b0542b0e7697964a1e071bb2d569b25",
     "reason": "Implement the explicitly requested one-minute recovery-source read policy and repair the observed modal interruption/resume defect through the existing real app/native consumers. Preserve original failing run chronology and every existing protection.",
     "previousBehavior": "Source SDK reads expired at the ordinary20-second deadline. Independent verification calls could each restart that budget. Cancelling a pending review retained its busy slot until its deadline. A modal opened during exact ACK inspection blocked safe repair but left neither deferredCloudPull nor a retry; safe close alone did not resume. The original exact cold-open repair and valid previous-choice overlap already pass and are not claimed incident REDs.",

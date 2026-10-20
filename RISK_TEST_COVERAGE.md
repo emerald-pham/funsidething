@@ -1831,3 +1831,5 @@ This synthetic native review drives held generation headers, late current zero-r
 
 The real app consumers use synthetic independently verified generations and external SDK/time boundaries. They cover one shared minute, immediate native Cancel, stale replies, changed authority, cold-open exact repair and dialog-close resumption. These checks do not validate the private affected source or prove physical iOS recovery. Existing mismatched/older-source consent, preserved originals and complete-generation publication checks remain required.
 - RISK recovery read minute: an ordinary native save still expires at its existing twenty-second write limit
+
+- RISK recovery read minute: elapsed validation and final verification cannot grant choices before a delayed timer fires
