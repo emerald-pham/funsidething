@@ -641,6 +641,151 @@ function recoveryReadClock187(){
   stop(){active=false;timers.clear();}};
 }
 
+test('RISK cloud source fresh check: one between-capture cloud change verifies again within the same review',async t=>{
+ const app=await divergentCloudSourceApp187(t),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+ await fixtureDeadline((async()=>{while(true){const save=ctx.buildSupportDiagnosticsReport().save;if(!save.debouncePending.value&&!save.activePersistCalls.value)return;await flush();}})(),'fixture saves finish before measuring source preservation');
+ const before=JSON.stringify(ctx.state),head=await store.readHead(),pending=await store.getPendingUpload('owner'),raw=await store.readRawExportSnapshot(),writes=backend.writes.length;
+ let roots=0,expectedCloud=JSON.stringify([...backend.docs]);
+ app.faults.serverRead=async path=>{if(path==='users/owner'&&++roots===3){backend.docs.set(path,{...backend.docs.get(path),rev:app.originalRoot.rev+1});expectedCloud=JSON.stringify([...backend.docs]);}};
+ t.after(()=>{delete app.faults.serverRead;});
+ assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true,'one transient peer change reaches a fresh verified preview in the same user attempt');
+ const modal=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(modal,/data-act="choose-cloud-recovery-source"/);assert.doesNotMatch(modal,/data-act="choose-cloud-recovery-source"[^>]*aria-pressed="true"/);
+ assert.match(modal,/data-act="apply-cloud-source-recovery"[^>]*disabled/);assert.equal(roots,8,'one restart reads two entirely fresh complete captures');
+ assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(await store.readHead(),head);assert.deepEqual(await store.getPendingUpload('owner'),pending);
+ assert.deepEqual(await store.readRawExportSnapshot(),raw);assert.equal(JSON.stringify([...backend.docs]),expectedCloud);assert.equal(backend.writes.length,writes,'verification never publishes or selects a source');
+ let download=null,blob=null;const link=makeFakeElement();link.remove=()=>{};link.click=()=>{download=blob;};
+ shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();ctx.Blob=class{constructor(parts){blob=parts.join('');}};
+ ctx.URL={createObjectURL(){return 'blob:fresh-source-diagnostics';},revokeObjectURL(){}};
+ ctx.onAction('view-support-diagnostics',{});await ctx.onAction('download-support-diagnostics',{});assert.equal(typeof download,'string');
+ const report=JSON.parse(download),operations=report.sourceOperations;
+ assert.equal(report.metadataOnly,true);assert.equal(report.boardDataIncluded,false);assert.ok(Buffer.byteLength(download,'utf8')<=24*1024);assert.ok(report.events.length<=80);assert.ok(operations.length<=8);
+ assert.equal(report.retention.truncated.value,true,'compacted diagnostic detail is explicitly disclosed');assert.ok(report.retention.dropped.value>0);
+ assert.equal(operations.filter(operation=>operation.status==='stale').length,1,'the report retains the original cross-capture refusal after automatic recovery: '+JSON.stringify(operations.map(operation=>({alias:operation.alias,status:operation.status,events:operation.events.map(event=>event.stage+":"+event.status)}))));
+ assert.equal(operations.filter(operation=>operation.status==='completed').length,1,'the fresh verification has a separate completed operation');
+ assert.ok(operations[0].events.some(event=>event.stage==='source-read'&&event.status==='stale'));
+ assert.doesNotMatch(download,/owner|generationId|Fixture A|Device source only/,'the actual downloaded retry trace stays redacted');
+ assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(await store.readHead(),head);assert.deepEqual(await store.getPendingUpload('owner'),pending);assert.deepEqual(await store.readRawExportSnapshot(),raw);assert.equal(backend.writes.length,writes);
+});
+
+async function freshSourceCheckFixture187(t,options={}){
+ const app=await divergentCloudSourceApp187(t,options);
+ app.ctx.window.CLOUD_PUSH_DELAY_MS=60000;
+ await fixtureDeadline((async()=>{while(true){const save=app.ctx.buildSupportDiagnosticsReport().save;if(!save.debouncePending.value&&!save.activePersistCalls.value)return;await flush();}})(),'fixture saves finish before fresh-check controls');
+ return app;
+}
+
+test('RISK cloud source fresh check: head metadata alone permits one fresh pair and visible cancellable progress',async t=>{
+ const app=await freshSourceCheckFixture187(t),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore,readHead=store.readHead.bind(store),gate=deferredSyncFixture();
+ const before=JSON.stringify(ctx.state),head=await readHead(),pending=await store.getPendingUpload('owner'),raw=await store.readRawExportSnapshot(),cloud=JSON.stringify([...backend.docs]),writes=backend.writes.length;
+ let heads=0,roots=0,review;store.readHead=async()=>{const value=await readHead();return ++heads>=3?{...value,committedAt:(value.committedAt||0)+1}:value;};
+ app.faults.serverRead=async path=>{if(path==='users/owner'&&++roots===5)await gate.promise;};
+ t.after(async()=>{gate.resolve();store.readHead=readHead;delete app.faults.serverRead;await review;});
+ review=ctx.onAction('review-cloud-source-recovery',{});
+ await fixtureDeadline((async()=>{while(roots<5)await flush();})(),'the entirely fresh pair enters its real SDK root read');
+ const progress=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(progress,/Checking fresh sources within the same one-minute limit/);assert.match(progress,/data-act="close-modal">Cancel/);assert.match(progress,/data-cloud-source-readonly/);assert.match(progress,/until the checks finish/,'the fresh check is actually running');
+ gate.resolve();assert.equal(await review,true);assert.equal(roots,8);
+ assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(await readHead(),head);assert.deepEqual(await store.getPendingUpload('owner'),pending);assert.deepEqual(await store.readRawExportSnapshot(),raw);
+ assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal(backend.writes.length,writes);
+});
+
+test('RISK cloud source fresh check: changed head ownership and unknown record facts cannot count as harmless metadata',async t=>{
+ for(const field of ['account','sourceFingerprint','futureHeadAuthority'])await t.test(field,async sub=>{
+  const app=await freshSourceCheckFixture187(sub),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore,readHead=store.readHead.bind(store);
+  const before=JSON.stringify(ctx.state),head=await readHead(),pending=await store.getPendingUpload('owner'),cloud=JSON.stringify([...backend.docs]),writes=backend.writes.length;let heads=0,roots=0;
+  store.readHead=async()=>{const value=await readHead();return ++heads>=3?{...value,[field]:'different protected head fact'}:value;};
+  app.faults.serverRead=async path=>{if(path==='users/owner')roots++;};sub.after(()=>{store.readHead=readHead;delete app.faults.serverRead;});
+  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),false,'a changed head owner, source identity or unknown authority cannot be rebound by a fresh check');
+  assert.equal(roots,4,'unsafe head facts cannot start another complete capture');assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="choose-cloud-recovery-source"/);
+  assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(await readHead(),head);assert.deepEqual(await store.getPendingUpload('owner'),pending);assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal(backend.writes.length,writes);
+ });
+});
+
+test('RISK cloud source fresh check: continuing peer churn stops after four complete captures without choosing',async t=>{
+ const app=await freshSourceCheckFixture187(t),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+ const before=JSON.stringify(ctx.state),head=await store.readHead(),pending=await store.getPendingUpload('owner'),raw=await store.readRawExportSnapshot(),writes=backend.writes.length;
+ let roots=0,expectedCloud;app.faults.serverRead=async path=>{if(path==='users/owner'){roots++;if(roots===3||roots===7)backend.docs.set(path,{...backend.docs.get(path),rev:backend.docs.get(path).rev+1});expectedCloud=JSON.stringify([...backend.docs]);}};
+ t.after(()=>{delete app.faults.serverRead;});
+ assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),false);assert.equal(roots,8,'a second inconsistency cannot start a third pair');
+ const modal=shim.document.getElementById('modalRoot').innerHTML;assert.match(modal,/The sources changed while they were read/);assert.doesNotMatch(modal,/data-act="choose-cloud-recovery-source"/);
+ assert.match(modal,/Checks have stopped. Source choices remain unavailable. Read sources again to make a fresh check/);
+ assert.doesNotMatch(modal,/until the checks finish|Keep this app open while the sources are checked/,'terminal refusal cannot imply a check is still running');assert.match(modal,/data-cloud-source-readonly/);
+ assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(await store.readHead(),head);assert.deepEqual(await store.getPendingUpload('owner'),pending);assert.deepEqual(await store.readRawExportSnapshot(),raw);
+ assert.equal(JSON.stringify([...backend.docs]),expectedCloud);assert.equal(backend.writes.length,writes);
+});
+
+test('RISK cloud source fresh check: the restart shares the original minute and late replies remain powerless',async t=>{
+ const clock=recoveryReadClock187(),app=await freshSourceCheckFixture187(t,{timeoutMs:20000,recoveryTimeoutMs:null,timerProvider:clock.provider}),{ctx,shim,backend}=app;
+ const first=deferredSyncFixture(),second=deferredSyncFixture(),fresh=deferredSyncFixture();let roots=0,settled=false,review;
+ app.faults.serverRead=async path=>{if(path==='users/owner'){roots++;if(roots===1)await first.promise;if(roots===3){backend.docs.set(path,{...backend.docs.get(path),rev:app.originalRoot.rev+1});await second.promise;}if(roots===5)await fresh.promise;}};
+ t.after(async()=>{first.resolve();second.resolve();fresh.resolve();delete app.faults.serverRead;clock.stop();await review;});
+ const before=JSON.stringify(ctx.state),head=await ctx.window.ScannerDeviceStore.readHead(),pending=await ctx.window.ScannerDeviceStore.getPendingUpload('owner'),writes=backend.writes.length;clock.activate(app);
+ review=ctx.onAction('review-cloud-source-recovery',{}).finally(()=>{settled=true;});await fixtureDeadline((async()=>{while(roots<1)await flush();})(),'first SDK root enters');
+ await clock.advance(26000);first.resolve();await fixtureDeadline((async()=>{while(roots<3)await flush();})(),'second complete capture enters');await clock.advance(24000);second.resolve();
+ await fixtureDeadline((async()=>{while(roots<5)await flush();})(),'fresh restart enters with only ten seconds remaining');
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/Checking fresh sources/);await clock.advance(9999);assert.equal(settled,false);await clock.advance(1);assert.equal(settled,true);assert.equal(await review,false);
+ const failed=shim.document.getElementById('modalRoot').innerHTML;assert.match(failed,/Cloud request timed out/);assert.match(failed,/Checks have stopped/);assert.doesNotMatch(failed,/until the checks finish/);fresh.resolve();for(let n=0;n<20;n++)await flush();assert.equal(shim.document.getElementById('modalRoot').innerHTML,failed);
+ assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(await ctx.window.ScannerDeviceStore.readHead(),head);assert.deepEqual(await ctx.window.ScannerDeviceStore.getPendingUpload('owner'),pending);assert.equal(backend.writes.length,writes);
+});
+
+test('RISK cloud source fresh check: Cancel and reopen revoke a stalled fresh pair and its late callback',async t=>{
+ const app=await freshSourceCheckFixture187(t),{ctx,shim,backend}=app,gate=deferredSyncFixture();let roots=0,review,settled=false;
+ app.faults.serverRead=async path=>{if(path==='users/owner'){roots++;if(roots===3)backend.docs.set(path,{...backend.docs.get(path),rev:app.originalRoot.rev+1});if(roots===5)await gate.promise;}};
+ t.after(async()=>{gate.resolve();delete app.faults.serverRead;await review;});
+ const before=JSON.stringify(ctx.state),head=await ctx.window.ScannerDeviceStore.readHead(),pending=await ctx.window.ScannerDeviceStore.getPendingUpload('owner'),writes=backend.writes.length;
+ review=ctx.onAction('review-cloud-source-recovery',{}).finally(()=>{settled=true;});await fixtureDeadline((async()=>{while(roots<5)await flush();})(),'fresh pair is held');
+ await ctx.onAction('close-modal',{});await flush();await flush();assert.equal(settled,true);assert.equal(await review,false);
+ assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);const current=shim.document.getElementById('modalRoot').innerHTML;gate.resolve();for(let n=0;n<20;n++)await flush();assert.equal(shim.document.getElementById('modalRoot').innerHTML,current);
+ assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(await ctx.window.ScannerDeviceStore.readHead(),head);assert.deepEqual(await ctx.window.ScannerDeviceStore.getPendingUpload('owner'),pending);assert.equal(backend.writes.length,writes);
+});
+
+test('RISK cloud source fresh check: changed local authority and unsupported or failed reads never restart',async t=>{
+ for(const change of ['same-email other UID','auth epoch','draft','accepted edit','pending','browser raw','device hold','storage failure','unsupported cloud'])await t.test(change,async sub=>{
+  const app=await freshSourceCheckFixture187(sub),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore,readHead=store.readHead.bind(store);
+  const before=JSON.stringify(ctx.state),head=await readHead(),writes=backend.writes.length;let roots=0,expectedLocal=before,expectedPending=await store.getPendingUpload('owner');
+  app.faults.serverRead=async path=>{if(path==='users/owner'&&++roots===3){
+   if(change==='same-email other UID')backend.emitAuth({uid:'another-owner',email:'e@example.com'});
+   if(change==='auth epoch'){backend.emitAuth(null);backend.emitAuth({uid:'owner',email:'e@example.com'});}
+   if(change==='draft')shim.document.getElementById('addInput').value='Preserve this draft';
+   if(change==='accepted edit'){shim.document.getElementById('addInput').value='Accepted while sources change';await ctx.onAction('add',{});await ctx.persist();expectedLocal=JSON.stringify(ctx.state);}
+   if(change==='pending'){expectedPending={account:'owner',generationId:'new-protected-pending',payloadHash:'a'.repeat(64),baseRev:4,updatedAt:1};await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>tx.objectStore('meta').put(expectedPending,'pending:owner'));}
+   if(change==='browser raw')shim.localStorage.setItem(LOCAL_HEAD_KEY,'sole changed browser source');
+   if(change==='device hold')await store.setRecoveryCloudHold({account:'e@example.com',identity:'owner',futureHold:'retain'});
+   if(change==='storage failure')store.readHead=async()=>{throw Error('controlled device read refusal');};
+   if(change==='unsupported cloud')backend.docs.set(path,{...backend.docs.get(path),schemaVersion:99});
+  }};
+  sub.after(()=>{store.readHead=readHead;delete app.faults.serverRead;});
+  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),false);assert.ok(roots<=4,'unsafe changes cannot start the fresh third capture');
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,change==='same-email other UID'||change==='auth epoch'?/The signed-in account changed/:/Checks have stopped/);assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/until the checks finish|Keep this app open while the sources are checked/);
+  assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="choose-cloud-recovery-source"/);assert.equal(JSON.stringify(ctx.state),expectedLocal);assert.deepEqual(await store.getPendingUpload('owner'),expectedPending);assert.equal(backend.writes.length,writes);
+  if(change==='accepted edit')assert.ok(JSON.parse((await readHead()).payload).tasks.some(row=>row.title==='Accepted while sources change'));
+  else assert.equal((await readHead()).hash,head.hash);
+  if(change==='draft')assert.equal(shim.document.getElementById('addInput').value,'Preserve this draft');
+  if(change==='browser raw')assert.equal(shim.localStorage.getItem(LOCAL_HEAD_KEY),'sole changed browser source');
+ });
+});
+
+test('RISK cloud source fresh check: a draft changed as fresh progress opens cannot become the new baseline',async t=>{
+ const app=await freshSourceCheckFixture187(t),{ctx,shim,backend}=app,root=shim.document.getElementById('modalRoot');
+ let markup=root.innerHTML,roots=0,changed=false;
+ Object.defineProperty(root,'innerHTML',{configurable:true,get:()=>markup,set:value=>{markup=value;if(!changed&&value.includes('Checking fresh sources')){changed=true;shim.document.getElementById('addInput').value='Draft typed as the fresh check opens';}}});
+ app.faults.serverRead=async path=>{if(path==='users/owner'&&++roots===3)backend.docs.set(path,{...backend.docs.get(path),rev:app.originalRoot.rev+1});};
+ t.after(()=>{delete app.faults.serverRead;});
+ const before=JSON.stringify(ctx.state),head=await ctx.window.ScannerDeviceStore.readHead(),pending=await ctx.window.ScannerDeviceStore.getPendingUpload('owner'),writes=backend.writes.length;
+ assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),false);assert.equal(changed,true);assert.equal(roots,6,'the fresh first capture cannot rebind an altered draft or start its second capture');
+ assert.equal(shim.document.getElementById('addInput').value,'Draft typed as the fresh check opens');assert.doesNotMatch(markup,/data-act="choose-cloud-recovery-source"/);
+ assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(await ctx.window.ScannerDeviceStore.readHead(),head);assert.deepEqual(await ctx.window.ScannerDeviceStore.getPendingUpload('owner'),pending);assert.equal(backend.writes.length,writes);
+});
+
+test('RISK cloud source fresh check guidance: mounted Help explains one fresh check without choosing',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ const answer=help.split('<dt>What can I inspect while cloud checks wait?</dt><dd>')[1]?.split('</dd>')[0];
+ assert.ok(answer);assert.match(answer,/When safe, changed sources get one fresh check within that minute; nothing is chosen automatically/);
+ assert.match(answer,/Cancel stops the review without choosing or changing a source/);assert.match(answer,/The whole source review has a one-minute limit/);
+ assert.match(html,/Recovery rechecks changed sources once within the original minute, without choosing a source/);
+});
+
 test('RISK recovery read minute: native source review accepts headers arriving at twenty-six seconds within one minute',async t=>{
  const clock=recoveryReadClock187(),app=await divergentCloudSourceApp187(t,{timeoutMs:20000,timerProvider:clock.provider,recoveryTimeoutMs:null}),{ctx,shim,backend,originalRoot}=app;
  await fixtureDeadline((async()=>{while(true){const save=ctx.buildSupportDiagnosticsReport().save;if(!save.debouncePending.value&&!save.activePersistCalls.value)return;await flush();}})(),'fixture saves are quiescent');
