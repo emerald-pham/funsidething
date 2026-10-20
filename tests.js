@@ -551,9 +551,11 @@ test('RISK cloud source recovery pending capture: native recovery cannot discard
 });
 
 
-async function damagedAcknowledgedApp187(t,{timeoutMs=5000}={}){
- const fixture=heldDecisionFixture188();fixture.local=structuredClone(fixture.remote);
- const faults={},app=await heldDecisionApp188(t,{fixture,failures:faults,timeoutMs}),{ctx,shim,backend}=app;
+async function damagedAcknowledgedApp187(t,{timeoutMs=5000,sourcePadding=0,timerProvider=null,recoveryTimeoutMs=timeoutMs}={}){
+ const fixture=heldDecisionFixture188();
+ if(sourcePadding)fixture.remote.futureIOSReportFixture={opaque:'q'.repeat(sourcePadding)};
+ fixture.local=structuredClone(fixture.remote);
+ const faults={},app=await heldDecisionApp188(t,{fixture,failures:faults,timeoutMs,timerProvider,recoveryTimeoutMs}),{ctx,shim,backend}=app;
  ctx.window.CLOUD_PUSH_DELAY_MS=60000;
  shim.document.getElementById('addInput').value='Acknowledged before source damage';
  await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
@@ -573,6 +575,280 @@ async function damagedAcknowledgedApp187(t,{timeoutMs=5000}={}){
  for(const key of [...backend.docs.keys()])if(key.startsWith('users/owner/generations/'+originalRoot.activeGeneration+'/chunks/'))backend.docs.delete(key);
  return {...app,faults,originalRoot,originalHeader,acknowledgedTasks,previousSource};
 }
+
+test('RISK iOS source replay: an exact acknowledged board repairs missing current chunks after a cold reopen without a new edit',async t=>{
+ const app=await damagedAcknowledgedApp187(t,{sourcePadding:2000000}),{backend,originalRoot,originalHeader,indexedDB,deviceDbName}=app;
+ await closeLegacyApp173(app);backend.CS.suspend();
+ const cold=await loadAppAtTime(1792323000000,{sharedStorage:app.shim.localStorage,indexedDBProvider:indexedDB,deviceDbName});t.after(()=>closeLegacyApp173(cold));
+ const reader=await loadCloudBackendV2({runtimeWindow:cold.ctx.window,failures:{authPending:true},timeoutMs:5000});t.after(()=>reader.CS.suspend());
+ for(const [key,value]of backend.docs)reader.docs.set(key,value);
+ const ack=cold.ctx.state.decisionBase.payload;
+ assert.equal(createHash('sha256').update(ack,'utf8').digest('hex'),originalHeader.hash,'cold-open bytes independently match the damaged current generation');
+ assert.equal(Buffer.byteLength(ack,'utf8'),originalHeader.byteLength,'the retained source has the exact declared byte length');
+ reader.emitAuth({uid:'owner',email:'e@example.com'});await cold.ctx.cloudPull();await cold.ctx.sendPush();
+ const {remote,head}=await settleRecovery188({...cold,backend:reader});
+ assert.ok(remote.rev>originalRoot.rev,'repair obtains an actual later revision ACK without needing a fresh task');
+ assert.deepEqual(JSON.parse(remote.payload).tasks,app.acknowledgedTasks);
+ assert.equal(JSON.parse(remote.payload).futureIOSReportFixture.opaque.length,2000000);
+ assert.equal(head.payload,JSON.stringify(cold.ctx.state));
+ const root=reader.docs.get('users/owner'),path='users/owner/generations/'+root.activeGeneration,header=reader.docs.get(path),chunks=[...reader.docs].filter(([key])=>key.startsWith(path+'/chunks/')).map(([,row])=>row).sort((a,b)=>a.index-b.index);
+ assert.equal(await cold.ctx.window.ChainStorageV2.decodeSnapshot(header,chunks),remote.payload,'repair publishes a complete independently decodable generation');
+ for(const [key,raw]of app.previousSource)assert.equal(JSON.stringify(reader.docs.get(key)),raw,'the older original stays exact');
+ const peer=await loadAppAtTime(1792323000000,{indexedDBProvider:indexedDB,deviceDbName:deviceDbName+'-independent-receiver'});t.after(()=>closeLegacyApp173(peer));
+ const receiving=await loadCloudBackendV2({runtimeWindow:peer.ctx.window,failures:{authPending:true},timeoutMs:5000});t.after(()=>receiving.CS.suspend());for(const [key,value]of reader.docs)receiving.docs.set(key,value);
+ receiving.emitAuth({uid:'owner',email:'e@example.com'});await peer.ctx.cloudPull();
+ assert.deepEqual(JSON.parse(JSON.stringify(peer.ctx.state.tasks)),app.acknowledgedTasks,'an isolated ordinary receiving client accepts every serialized field of the repaired board');
+ assert.equal(peer.ctx.state.futureIOSReportFixture.opaque.length,2000000);
+});
+
+test('RISK iOS source replay: a modal opened during exact-copy inspection defers repair and closing resumes without an edit',async t=>{
+ const app=await damagedAcknowledgedApp187(t),{ctx,shim,backend,originalRoot}=app;
+ const before=JSON.stringify(ctx.state),head=await ctx.window.ScannerDeviceStore.readHead(),pending=await ctx.window.ScannerDeviceStore.getPendingUpload('owner');
+ const query=shim.document.querySelector.bind(shim.document);shim.document.querySelector=selector=>selector==='.mback, dialog[open]'&&shim.document.getElementById('modalRoot').innerHTML?{}:query(selector);
+ const currentPath='users/owner/generations/'+originalRoot.activeGeneration,previousPath='users/owner/generations/'+originalRoot.previousGeneration,gate=deferredSyncFixture();let reads=0,entered=false,pull;
+ app.faults.serverRead=async path=>{if(path===currentPath&&++reads>=2||path===previousPath){entered=true;await gate.promise;}};
+ t.after(async()=>{gate.resolve();delete app.faults.serverRead;await pull;});
+ pull=ctx.cloudPull();await fixtureDeadline((async()=>{while(!entered)await flush();})(),'automatic exact-copy source inspection enters after the ordinary corrupt-generation read');
+ ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/Quick start/);gate.resolve();await pull;
+ assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev,'opening a modal cannot authorize a source swap');
+ assert.equal(ctx.buildSupportDiagnosticsReport().recoverySources.exactAcknowledgedCopy.matchesCurrentGeneration.status,'unobserved','an interrupted eligibility check is not a negative match');
+ assert.equal(JSON.stringify(ctx.state),before);assert.equal((await ctx.window.ScannerDeviceStore.readHead()).hash,head.hash);assert.deepEqual(await ctx.window.ScannerDeviceStore.getPendingUpload('owner'),pending);
+ t.diagnostic(JSON.stringify({probe:'ACK-modal-resume',deferred:vm.runInContext('deferredCloudPull',ctx),pulling:vm.runInContext('pulling',ctx),retryPending:vm.runInContext('!!cloudRetryTimer',ctx),headUnchanged:true,pendingUnchanged:true,stateUnchanged:true,cloudRevUnchanged:true}));
+ delete app.faults.serverRead;await ctx.onAction('close-modal',{});
+ const {remote}=await settleRecovery188(app);
+ assert.ok(remote.rev>originalRoot.rev,'safe close resumes exact repair without requiring a new accepted task');
+ assert.deepEqual(JSON.parse(remote.payload).tasks,app.acknowledgedTasks);
+ ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/Closing a dialog that paused an exact-copy check starts a fresh safe check; no new task is needed/);
+ assert.match(html,/Closing a dialog resumes a paused exact-copy repair check without another edit/);
+});
+
+function recoveryReadClock187(){
+ let active=false,elapsed=0,next=0,ctx;const start=1792323000000,timers=new Map(),scheduled=[];
+ const provider={Date:class extends Date{static now(){return active?start+elapsed:Date.now();}},performance:{now:()=>elapsed},
+  setTimeout(fn,delay,...args){if(!active)return setTimeout(fn,delay,...args);const id={recoveryClock187:++next};timers.set(id,{fn:()=>fn(...args),at:elapsed+Number(delay),delay:Number(delay)});scheduled.push(Number(delay));return id;},
+  clearTimeout(id){if(timers.has(id))timers.delete(id);else clearTimeout(id);}};
+ return {provider,timers,scheduled,get elapsed(){return elapsed;},activate(app){ctx=app.ctx;active=true;ctx.setTimeout=provider.setTimeout;ctx.clearTimeout=provider.clearTimeout;ctx.performance=provider.performance;setFakeTime(ctx,start);},
+  async advance(ms){const target=elapsed+ms;while(true){const due=[...timers].filter(([,timer])=>timer.at<=target).sort((a,b)=>a[1].at-b[1].at)[0];if(!due)break;elapsed=due[1].at;setFakeTime(ctx,start+elapsed);timers.delete(due[0]);due[1].fn();await flush();}elapsed=target;setFakeTime(ctx,start+elapsed);await flush();},
+  stop(){active=false;timers.clear();}};
+}
+
+test('RISK recovery read minute: native source review accepts headers arriving at twenty-six seconds within one minute',async t=>{
+ const clock=recoveryReadClock187(),app=await divergentCloudSourceApp187(t,{timeoutMs:20000,timerProvider:clock.provider,recoveryTimeoutMs:null}),{ctx,shim,backend,originalRoot}=app;
+ await fixtureDeadline((async()=>{while(true){const save=ctx.buildSupportDiagnosticsReport().save;if(!save.debouncePending.value&&!save.activePersistCalls.value)return;await flush();}})(),'fixture saves are quiescent');
+ const raw=await ctx.window.ScannerDeviceStore.readRawExportSnapshot(),cloud=JSON.stringify([...backend.docs]),before=JSON.stringify(ctx.state);
+ const gate=deferredSyncFixture();let headers=0,settled=false,review;
+ app.faults.serverRead=async path=>{if(/^users\/owner\/generations\/[^/]+$/.test(path)){headers++;if(headers<=2)await gate.promise;}};
+ t.after(async()=>{gate.resolve();delete app.faults.serverRead;clock.stop();await review;});clock.activate(app);
+ review=ctx.onAction('review-cloud-source-recovery',{}).finally(()=>{settled=true;});
+ await fixtureDeadline((async()=>{while(headers<2)await flush();})(),'both real SDK header reads enter');
+ await clock.advance(26000);
+ assert.equal(settled,false,'a twenty-six-second header read is still pending within the user-requested minute');
+ const pending=shim.document.getElementById('modalRoot').innerHTML;assert.match(pending,/Reading/);assert.match(pending,/data-cloud-source-readonly/);assert.match(pending,/data-act="close-modal"/);
+ gate.resolve();assert.equal(await fixtureDeadline(review,'native guarded source preview finishes'),true);
+ const modal=shim.document.getElementById('modalRoot').innerHTML;
+ assert.ok(modal.includes('data-value="generation:'+originalRoot.previousGeneration+'"'),'the validated previous source becomes a deliberate choice');
+ assert.doesNotMatch(modal,/data-act="choose-cloud-recovery-source"[^>]*aria-pressed="true"/);
+ assert.equal(JSON.stringify(ctx.state),before);assert.equal(JSON.stringify([...backend.docs]),cloud);assert.deepEqual(await ctx.window.ScannerDeviceStore.readRawExportSnapshot(),raw);
+ assert.ok(ctx.buildSupportDiagnosticsReport().sourceOperations.every(row=>row.deadlineMs.value===60000),'observed recovery deadlines describe the minute without changing ordinary write bounds');
+});
+
+test('RISK recovery read minute: the second native verification shares the original sixty-second budget',async t=>{
+ const clock=recoveryReadClock187(),app=await divergentCloudSourceApp187(t,{timeoutMs:20000,timerProvider:clock.provider,recoveryTimeoutMs:null}),{ctx,shim,backend}=app;
+ const first=deferredSyncFixture(),second=deferredSyncFixture();let headers=0,settled=false,review;
+ app.faults.serverRead=async path=>{if(/^users\/owner\/generations\/[^/]+$/.test(path)){headers++;await (headers<=2?first:second).promise;}};
+ t.after(async()=>{first.resolve();second.resolve();delete app.faults.serverRead;clock.stop();await review;});
+ const before=JSON.stringify(ctx.state),cloud=JSON.stringify([...backend.docs]);clock.activate(app);
+ review=ctx.onAction('review-cloud-source-recovery',{}).finally(()=>{settled=true;});
+ await fixtureDeadline((async()=>{while(headers<2)await flush();})(),'first headers enter');await clock.advance(26000);first.resolve();
+ await fixtureDeadline((async()=>{while(headers<4)await flush();})(),'second headers enter after complete first read and validation');
+ await clock.advance(33999);assert.equal(settled,false,'the attempt may use the remainder of its original minute');
+ await clock.advance(1);assert.equal(settled,true,'the second verification cannot reset one minute into two');assert.equal(await review,false);
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/Cloud request timed out/);assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-cloud-source-readonly/);
+ assert.equal(JSON.stringify(ctx.state),before);assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal(backend.docs.get('users/owner').rev,app.originalRoot.rev);
+ second.resolve();for(let n=0;n<20;n++)await flush();
+ assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="choose-cloud-recovery-source"/,'an expired final verification has no late preview authority');
+});
+
+test('RISK recovery read minute: native Cancel releases the read immediately and a late old header cannot replace a fresh preview',async t=>{
+ const clock=recoveryReadClock187(),app=await divergentCloudSourceApp187(t,{timeoutMs:20000,timerProvider:clock.provider,recoveryTimeoutMs:null}),{ctx,shim,backend}=app;
+ let headers=0,settled=false,review;const old=deferredSyncFixture();
+ app.faults.serverRead=async path=>{if(/^users\/owner\/generations\/[^/]+$/.test(path)&&++headers<=2)await old.promise;};
+ t.after(async()=>{old.resolve();delete app.faults.serverRead;clock.stop();await review;});
+ const before=JSON.stringify(ctx.state),cloud=JSON.stringify([...backend.docs]);clock.activate(app);
+ review=ctx.onAction('review-cloud-source-recovery',{}).finally(()=>{settled=true;});
+ await fixtureDeadline((async()=>{while(headers<2)await flush();})(),'old headers enter');await clock.advance(26000);
+ await ctx.onAction('close-modal',{});await flush();await flush();
+ assert.equal(settled,true,'Cancel releases the actual pending SDK read immediately rather than locking all fresh recovery behind the remaining minute');assert.equal(await review,false);
+ assert.equal(await fixtureDeadline(ctx.onAction('review-cloud-source-recovery',{}),'a fresh native read is admitted after Cancel'),true);
+ const fresh=shim.document.getElementById('modalRoot').innerHTML;assert.match(fresh,/data-act="choose-cloud-recovery-source"/);
+ old.resolve();for(let n=0;n<20;n++)await flush();
+ assert.equal(shim.document.getElementById('modalRoot').innerHTML,fresh,'cancelled old reply cannot replace or select the fresh preview');
+ assert.equal(JSON.stringify(ctx.state),before);assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal(backend.docs.get('users/owner').rev,app.originalRoot.rev);
+});
+
+test('RISK recovery read minute: stalled server stages expire once and retain protected sources after late replies',async t=>{
+ for(const stage of ['root','header','chunks','final-root'])await t.test(stage,async sub=>{
+  const clock=recoveryReadClock187(),app=await divergentCloudSourceApp187(sub,{timeoutMs:20000,timerProvider:clock.provider,recoveryTimeoutMs:null}),{ctx,shim,backend,originalRoot}=app;
+  const currentPath='users/owner/generations/'+originalRoot.activeGeneration,gate=deferredSyncFixture();let roots=0,entered=false,settled=false,review;
+  app.faults.serverRead=async path=>{if(path==='users/owner')roots++;const match=stage==='root'?path==='users/owner'&&roots===1:stage==='final-root'?path==='users/owner'&&roots===2:stage==='header'?path===currentPath:path===currentPath+'/chunks';if(match){entered=true;await gate.promise;}};
+  sub.after(async()=>{gate.resolve();delete app.faults.serverRead;clock.stop();await review;});
+  const before=JSON.stringify(ctx.state),cloud=JSON.stringify([...backend.docs]),head=await ctx.window.ScannerDeviceStore.readHead(),pending=await ctx.window.ScannerDeviceStore.getPendingUpload('owner');clock.activate(app);
+  review=ctx.onAction('review-cloud-source-recovery',{}).finally(()=>{settled=true;});await fixtureDeadline((async()=>{while(!entered)await flush();})(),stage+' real server stage enters');
+  await clock.advance(59999);assert.equal(settled,false);await clock.advance(1);assert.equal(settled,true);assert.equal(await review,false);
+  const timeout=shim.document.getElementById('modalRoot').innerHTML;assert.match(timeout,/Cloud request timed out/);assert.match(timeout,/Read sources again/);
+  gate.resolve();for(let n=0;n<20;n++)await flush();assert.equal(shim.document.getElementById('modalRoot').innerHTML,timeout);
+  assert.equal(JSON.stringify(ctx.state),before);assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal((await ctx.window.ScannerDeviceStore.readHead()).hash,head.hash);assert.deepEqual(await ctx.window.ScannerDeviceStore.getPendingUpload('owner'),pending);
+ });
+});
+
+test('RISK recovery read minute: changed account revision or drafts revoke a delayed source preview',async t=>{
+ for(const change of ['account','cloud revision','draft','local edit'])await t.test(change,async sub=>{
+  const clock=recoveryReadClock187(),app=await divergentCloudSourceApp187(sub,{timeoutMs:20000,timerProvider:clock.provider,recoveryTimeoutMs:null}),{ctx,shim,backend,originalRoot}=app;
+  const gate=deferredSyncFixture();let entered=false,review;
+  app.faults.serverRead=async path=>{if(/^users\/owner\/generations\/[^/]+$/.test(path)){entered=true;await gate.promise;}};
+  sub.after(async()=>{gate.resolve();delete app.faults.serverRead;clock.stop();await review;});clock.activate(app);
+  review=ctx.onAction('review-cloud-source-recovery',{});await fixtureDeadline((async()=>{while(!entered)await flush();})(),'real headers enter');await clock.advance(26000);
+  if(change==='account')backend.emitAuth({uid:'other-owner',email:'e@example.com'});
+  if(change==='cloud revision')backend.docs.set('users/owner',{...originalRoot,rev:originalRoot.rev+1});
+  if(change==='draft')shim.document.getElementById('addInput').value='Retain this unfinished draft';
+  if(change==='local edit'){shim.document.getElementById('addInput').value='Accepted during the delayed read';await ctx.onAction('add',{});await ctx.persist();}
+  const local=JSON.stringify(ctx.state),cloud=JSON.stringify([...backend.docs]);gate.resolve();assert.equal(await fixtureDeadline(review,'changed-source native review finishes'),false);
+  assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="choose-cloud-recovery-source"/);assert.equal(JSON.stringify(ctx.state),local);assert.equal(JSON.stringify([...backend.docs]),cloud);
+  if(change==='draft')assert.equal(shim.document.getElementById('addInput').value,'Retain this unfinished draft');
+ });
+});
+
+test('RISK recovery read minute: elapsed validation and final verification cannot grant choices before a delayed timer fires',async t=>{
+ for(const phase of ['validation','final verification'])await t.test(phase,async sub=>{
+  const app=await divergentCloudSourceApp187(sub,{timeoutMs:20000,recoveryTimeoutMs:null}),{ctx,shim,backend}=app;
+  let elapsed=0,validated=0,roots=0;ctx.performance={now:()=>elapsed};
+  const codec=ctx.ChainStorageV2||ctx.window.ChainStorageV2;
+  const measured={...codec,async decodeSnapshot(...args){const value=await codec.decodeSnapshot(...args);validated++;if(phase==='validation')elapsed=60001;return value;}};
+  ctx.ChainStorageV2=measured;ctx.window.ChainStorageV2=measured;
+  app.faults.serverRead=async path=>{if(path==='users/owner'&&++roots===4&&phase==='final verification')elapsed=60001;};
+  const before=JSON.stringify(ctx.state),head=await ctx.window.ScannerDeviceStore.readHead(),pending=await ctx.window.ScannerDeviceStore.getPendingUpload('owner'),cloud=JSON.stringify([...backend.docs]);
+  const result=await ctx.onAction('review-cloud-source-recovery',{});
+  assert.ok(validated>0,'the actual complete-source codec executes before elapsed time advances');
+  assert.equal(result,false,'elapsed work cannot grant a source choice merely because its timeout callback is not delivered yet');
+  assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="choose-cloud-recovery-source"/);assert.match(shim.document.getElementById('modalRoot').innerHTML,/Cloud request timed out/);
+  if(phase==='validation')assert.equal(roots,2,'an expired first validation must not start a second server read');else assert.equal(roots,4,'the independent final verification also checks elapsed expiry');
+  assert.equal(JSON.stringify(ctx.state),before);assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal((await ctx.window.ScannerDeviceStore.readHead()).hash,head.hash);assert.deepEqual(await ctx.window.ScannerDeviceStore.getPendingUpload('owner'),pending);
+ });
+});
+
+test('RISK recovery read minute: native recovery entry survives an ordinary timeout after cancelling a verified source preview',async t=>{
+ const clock=recoveryReadClock187(),app=await divergentCloudSourceApp187(t,{timeoutMs:20000,recoveryTimeoutMs:null,timerProvider:clock.provider}),{ctx,shim,backend}=app;
+ ctx.onAction('sync',{});assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="review-cloud-source-recovery"/);
+ assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);await ctx.onAction('close-modal',{});
+ const gate=deferredSyncFixture();let entered=false,pull;
+ app.faults.serverRead=async path=>{if(/^users\/owner\/generations\/[^/]+$/.test(path)){entered=true;await gate.promise;}};
+ t.after(async()=>{gate.resolve();delete app.faults.serverRead;clock.stop();await pull;});
+ const before=JSON.stringify(ctx.state),cloud=JSON.stringify([...backend.docs]),head=await ctx.window.ScannerDeviceStore.readHead(),pending=await ctx.window.ScannerDeviceStore.getPendingUpload('owner');clock.activate(app);
+ pull=ctx.cloudPull();await fixtureDeadline((async()=>{while(!entered)await flush();})(),'ordinary cloud pull enters the held generation header');
+ await clock.advance(20000);await pull;assert.equal(backend.CS.errorCode,'deadline-exceeded','ordinary cloud reads retain their existing twenty-second limit');
+ assert.equal(JSON.stringify(ctx.state),before);assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal((await ctx.window.ScannerDeviceStore.readHead()).hash,head.hash);assert.deepEqual(await ctx.window.ScannerDeviceStore.getPendingUpload('owner'),pending);
+ ctx.onAction('sync',{});const menu=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(menu,/data-act="review-cloud-source-recovery"/,'the real needs-attention menu must retain the minute-long recovery path for an unresolved known damaged source after an ordinary timeout');
+ const fresh=ctx.onAction('review-cloud-source-recovery',{});gate.resolve();assert.equal(await fixtureDeadline(fresh,'fresh native minute recovery remains reachable'),true);
+ assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="choose-cloud-recovery-source"[^>]*aria-pressed="true"/);
+ assert.equal(JSON.stringify(ctx.state),before);assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal((await ctx.window.ScannerDeviceStore.readHead()).hash,head.hash);assert.deepEqual(await ctx.window.ScannerDeviceStore.getPendingUpload('owner'),pending);
+ ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/The recovery entry stays available after timeouts for a cloud copy already found damaged/);
+ assert.match(html,/Timeouts keep recovery reachable for cloud copies already found damaged/);
+});
+
+test('RISK recovery read minute: known-damage entry clears on healthy reads and identity change without broadening ordinary timeouts',async t=>{
+ for(const outcome of ['healthy source','same-email other UID','late old-account read','never damaged'])await t.test(outcome,async sub=>{
+  let app;const clock=recoveryReadClock187();
+  if(outcome==='never damaged'){const fixture=heldDecisionFixture188(),faults={};fixture.local=structuredClone(fixture.remote);app={...await heldDecisionApp188(sub,{fixture,failures:faults,timeoutMs:20000,recoveryTimeoutMs:null,timerProvider:clock.provider}),faults};}
+  else app=await divergentCloudSourceApp187(sub,{timeoutMs:20000,recoveryTimeoutMs:null,timerProvider:clock.provider});
+  const {ctx,shim,backend}=app;
+  if(outcome==='healthy source'){
+   const current='users/owner/generations/'+app.originalRoot.activeGeneration,encoded=await ctx.window.ChainStorageV2.encodeSnapshot(ctx.state.decisionBase.payload);
+   assert.equal(encoded.hash,app.originalHeader.hash);backend.docs.set(current,app.originalHeader);for(const chunk of encoded.chunks)backend.docs.set(current+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
+   assert.equal((await backend.CS.pull()).payload,ctx.state.decisionBase.payload,'a real validated healthy source clears the earlier finding');
+  }else if(outcome==='same-email other UID')backend.emitAuth({uid:'other-owner',email:'e@example.com'});
+  else{
+   const gate=deferredSyncFixture();let entered=false,pull;const faults=app.faults||{};
+   if(!app.faults)throw Error('fixture must expose its existing external SDK fault boundary');
+   faults.serverRead=async()=>{entered=true;await gate.promise;};sub.after(async()=>{gate.resolve();delete faults.serverRead;clock.stop();await pull;});clock.activate(app);
+   pull=backend.CS.pull();await fixtureDeadline((async()=>{while(!entered)await flush();})(),'real ordinary SDK read enters');
+   if(outcome==='late old-account read'){backend.emitAuth({uid:'other-owner',email:'e@example.com'});gate.resolve();assert.equal((await pull).cancelled,true,'an obsolete old UID read cannot restore its finding');}
+   else{await clock.advance(20000);assert.equal((await pull).error,true);assert.equal(backend.CS.errorCode,'deadline-exceeded');}
+  }
+  backend.CS.reportError('reconcile','revision-conflict');ctx.onAction('sync',{});
+  assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="review-cloud-source-recovery"/,'only unresolved positively observed damage can retain this entry');
+  assert.equal(backend.CS.knownDamagedSource,false);
+ });
+});
+
+test('RISK recovery read minute: an ordinary native save still expires at its existing twenty-second write limit',async t=>{
+ const fixture=heldDecisionFixture188();fixture.local=structuredClone(fixture.remote);
+ const clock=recoveryReadClock187(),faults={},app=await heldDecisionApp188(t,{fixture,failures:faults,timeoutMs:20000,recoveryTimeoutMs:null,timerProvider:clock.provider}),{ctx,shim,backend}=app;
+ const gate=deferredSyncFixture(),before=JSON.stringify([...backend.docs]);let settled=false,push;
+ faults.pushPending=gate.promise;ctx.window.CLOUD_PUSH_DELAY_MS=60000;clock.activate(app);
+ t.after(async()=>{gate.resolve();delete faults.pushPending;clock.stop();await push;});
+ shim.document.getElementById('addInput').value='Accepted task retained after ordinary write timeout';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ push=ctx.sendPush().finally(()=>{settled=true;});
+ await fixtureDeadline((async()=>{while(!clock.scheduled.includes(20000))await flush();})(),'ordinary native save enters the unchanged SDK deadline');
+ await clock.advance(19999);assert.equal(settled,false);await clock.advance(1);assert.equal(settled,true);await push;
+ assert.equal(backend.CS.errorCode,'deadline-exceeded');assert.equal(JSON.stringify([...backend.docs]),before);
+ const head=await ctx.window.ScannerDeviceStore.readHead();assert.ok(JSON.parse(head.payload).tasks.some(row=>row.title==='Accepted task retained after ordinary write timeout'));
+ gate.resolve();for(let n=0;n<20;n++)await flush();assert.equal(backend.writes.length,0,'an ordinary expired write gets no late publication authority');
+});
+
+test('RISK recovery read minute guidance: pending native review offers Cancel and explains the whole bounded read',async t=>{
+ const app=await divergentCloudSourceApp187(t,{timeoutMs:150}),{ctx,shim}=app,gate=deferredSyncFixture();let started=false,review;
+ app.faults.serverRead=async()=>{started=true;await gate.promise;};
+ t.after(async()=>{gate.resolve();delete app.faults.serverRead;await review;});
+ review=ctx.onAction('review-cloud-source-recovery',{});await fixtureDeadline((async()=>{while(!started)await flush();})(),'native recovery SDK read enters');
+ const pending=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(pending,/This review can take up to one minute/,'the visible wait describes the bounded whole attempt');
+ assert.match(pending,/data-act="close-modal">Cancel<\/button>/,'Cancel is visible while discovery is pending');
+ assert.match(pending,/data-cloud-source-readonly/);
+ ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(help,/The whole source review has a one-minute limit/);assert.match(help,/Cancel stops the review without choosing or changing a source/);assert.match(help,/Ordinary saves keep their existing wait limit/);
+ const notes=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];assert.match(notes,/Recovery source checks allow up to one minute, with Cancel available throughout the check/);
+});
+
+test('RISK iOS source replay: a fresh native review offers a validated previous board after timed-out headers settle late',async t=>{
+ const app=await divergentCloudSourceApp187(t,{timeoutMs:1000,sourcePadding:2000000}),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ await fixtureDeadline((async()=>{while(true){const save=ctx.buildSupportDiagnosticsReport().save;if(save.debouncePending.value===false&&save.activePersistCalls.value===0)return;await flush();}})(),'ordinary fixture saves finish before source-inspection preservation is measured');
+ const currentPath='users/owner/generations/'+originalRoot.activeGeneration,previousPath='users/owner/generations/'+originalRoot.previousGeneration;
+ const previousHeader=backend.docs.get(previousPath),previousChunks=[...backend.docs].filter(([key])=>key.startsWith(previousPath+'/chunks/')).map(([,row])=>row).sort((a,b)=>a.index-b.index);
+ assert.equal(backend.docs.get(currentPath).chunkCount,8,'synthetic current source has the report-shaped declared chunk count');
+ assert.equal(previousChunks.length,8,'synthetic previous source has eight independently available rows');
+ const decoded=await ctx.window.ChainStorageV2.decodeSnapshot(previousHeader,previousChunks);
+ assert.equal(JSON.parse(decoded).futureIOSReportFixture.opaque.length,2000000,'the synthetic previous payload is independently complete and hash-validated, unlike an unverified diagnostic row count');
+ const local=JSON.stringify(ctx.state),head=await store.readHead(),pending=await store.getPendingUpload('owner'),raw=await store.readRawExportSnapshot(),cloud=JSON.stringify([...backend.docs]);
+ let releaseHeaders,releasePrevious,oldPreviousHeld=false,currentQuery=false,first,fresh;
+ const headersGate=new Promise(resolve=>releaseHeaders=resolve),previousGate=new Promise(resolve=>releasePrevious=resolve),headerReads=new Map();let previousQueries=0;
+ app.faults.serverRead=async path=>{
+  if(path===currentPath||path===previousPath){const count=(headerReads.get(path)||0)+1;headerReads.set(path,count);if(count===1)await headersGate;}
+  if(path===currentPath+'/chunks')currentQuery=true;
+  if(path===previousPath+'/chunks'&&++previousQueries===1){oldPreviousHeld=true;await previousGate;}
+ };
+ t.after(async()=>{releaseHeaders();releasePrevious();delete app.faults.serverRead;await Promise.allSettled([first,fresh].filter(Boolean));});
+ first=ctx.onAction('review-cloud-source-recovery',{});
+ await fixtureDeadline((async()=>{while(headerReads.size<2)await flush();})(),'both native generation headers must enter the held SDK boundary');
+ assert.equal(await first,false,'the native review reaches its ordinary SDK deadline');
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/Cloud request timed out/);
+ releaseHeaders();
+ await fixtureDeadline((async()=>{while(!oldPreviousHeld||!currentQuery)await flush();})(),'late first-read queries reach current zero rows and held previous rows');
+ fresh=ctx.onAction('review-cloud-source-recovery',{});
+ await fixtureDeadline((async()=>{while((headerReads.get(currentPath)||0)<2||(headerReads.get(previousPath)||0)<2)await flush();})(),'fresh native review overlaps the old unfinished previous-source query');
+ releasePrevious();
+ assert.equal(await fresh,true,'a fresh complete read must finish the actual guarded preview after an earlier timeout');
+ const modal=shim.document.getElementById('modalRoot').innerHTML;
+ const button=modal.match(new RegExp('<button[^>]*data-act="choose-cloud-recovery-source"[^>]*data-value="generation:'+originalRoot.previousGeneration+'"[^>]*>'))?.[0];
+ assert.ok(button,'the independently valid previous source remains a visible deliberate choice');
+ assert.doesNotMatch(button,/disabled/,'a previous valid board is selectable even though the current source has no chunks');
+ assert.doesNotMatch(modal,/data-act="choose-cloud-recovery-source"[^>]*aria-pressed="true"/,'nothing chooses the older board automatically');
+ assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),false,'no source choice is consent to replace the board');
+ assert.ok(JSON.stringify(ctx.state)===local,'accepted device work is unchanged');assert.equal((await store.readHead()).hash,head.hash);
+ assert.deepEqual(await store.getPendingUpload('owner'),pending);assert.deepEqual(await store.readRawExportSnapshot(),raw,'all original readable device sources remain exact');
+ assert.ok(JSON.stringify([...backend.docs])===cloud,'source discovery and a late obsolete result perform no cloud writes');
+ t.diagnostic(JSON.stringify({currentDeclaredChunks:8,currentReceivedChunks:0,previousReceivedChunks:8,previousIndependentlyValidated:true,oldTimeoutThenOverlappingFreshRead:true,visiblePreviousChoice:true,automaticChoice:false}));
+});
 
 test('RISK cloud source recovery: readable device work stays visible read-only during pending and timed-out cloud checks',async t=>{
  const app=await divergentCloudSourceApp187(t,{timeoutMs:150}),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
@@ -5830,6 +6106,8 @@ async function loadApp({ appSource=appSrc, artifacts=null, seed, cloudSyncFactor
     TextDecoder,
     Uint8Array,
     structuredClone,
+    AbortController,
+    performance,
     // NOTE: deliberately NOT injecting the outer process's `Date` here — it's
     // passed by reference, so overriding Date.now on it (for time-travel
     // tests) would leak into the whole Node process. Leave Date unset and the
@@ -12828,7 +13106,7 @@ async function loadCloudBackend({ serverData={rev:4}, serverExists=true, failure
   return {...h,getStored:()=>({exists:h.docs.has('users/owner'),data:h.docs.get('users/owner')})};
 }
 
-async function loadCloudBackendV2({artifacts=null,rootData=null,batchFailureAt=Infinity,failures={},timeoutMs=25,recordSyncError,cryptoProvider=webcrypto,runtimeWindow=null,firebaseSDK=null,timerProvider=null}={}){
+async function loadCloudBackendV2({artifacts=null,rootData=null,batchFailureAt=Infinity,failures={},timeoutMs=25,recoveryTimeoutMs=timeoutMs,recordSyncError,cryptoProvider=webcrypto,runtimeWindow=null,firebaseSDK=null,timerProvider=null}={}){
  const moduleMatch=(artifacts?.html||html).match(/<script type="module">([\s\S]*?)<\/script>/);assert.ok(moduleMatch);
  const moduleSource=moduleMatch[1].replace(/const \[appMod, A, F\] = await Promise\.all\(\[[\s\S]*?\]\);/,
   'const [appMod, A, F] = globalThis.__cloudModules;');
@@ -12870,6 +13148,7 @@ async function loadCloudBackendV2({artifacts=null,rootData=null,batchFailureAt=I
   signInWithPopup:async(_auth,provider)=>{popupProviders.push(provider);if(failures.signIn)throw failures.signIn;},signOut:async()=>{authCalls.push('signOut');if(failures.signOut)throw failures.signOut;},GoogleAuthProvider:class{setCustomParameters(value){this.customParameters=value;}},onAuthStateChanged(_auth,listener){authListener=listener;if(!failures.authPending)listener(auth.currentUser);}};
  const events=[],pending=new Map(),window=runtimeWindow||{FIREBASE_CONFIG:{apiKey:'test-key'},CLOUD_SYNC_TIMEOUT_MS:timeoutMs,dispatchEvent:event=>{events.push(event);return true;}};
  window.FIREBASE_CONFIG??={apiKey:'test-key'};window.CLOUD_SYNC_TIMEOUT_MS??=timeoutMs;window.window=window;
+ if(recoveryTimeoutMs!==null)window.CLOUD_RECOVERY_READ_TIMEOUT_MS=recoveryTimeoutMs;
  if(runtimeWindow){
   const dispatchEvent=window.dispatchEvent?.bind(window);
   window.dispatchEvent=event=>{events.push(event);return dispatchEvent?dispatchEvent(event):true;};
@@ -12882,7 +13161,7 @@ async function loadCloudBackendV2({artifacts=null,rootData=null,batchFailureAt=I
  }
  if(!runtimeWindow||recordSyncError!==undefined)window.recordSyncError=recordSyncError;
  const context=vm.createContext({window,CustomEvent:class{constructor(type,options){this.type=type;this.detail=options?.detail;}},__cloudModules:[{initializeApp:()=>({})},A,firebaseSDK?{...F,...firebaseSDK}:F],
-  console,crypto:cryptoProvider,TextEncoder,TextDecoder,Uint8Array,structuredClone,setTimeout:timerProvider?.setTimeout??setTimeout,clearTimeout:timerProvider?.clearTimeout??clearTimeout});context.globalThis=context;
+  console,crypto:cryptoProvider,TextEncoder,TextDecoder,Uint8Array,structuredClone,...(timerProvider?.Date?{Date:timerProvider.Date}:{}),setTimeout:timerProvider?.setTimeout??setTimeout,clearTimeout:timerProvider?.clearTimeout??clearTimeout});context.globalThis=context;
  for(const file of ['device-store-v2.js','cloud-store-v2.js'])vm.runInContext(artifacts?(file==='device-store-v2.js'?artifacts.storage:artifacts.cloud):fs.readFileSync(path.join(__dirname,file),'utf8'),context,{filename:file});
  if(!runtimeWindow)window.ChainStorageV2=context.ChainStorageV2;window.ChainCloudV2=context.ChainCloudV2;
  await vm.runInContext(`(async()=>{${moduleSource}\n})()`,context,{filename:'index.html#cloud-v2-backend'});
@@ -37097,7 +37376,7 @@ test('RISK CLOUD CONFORMANCE: controlled crypto delivery executes original adapt
 // Isolated original mixed-release replay: current typed light choice, then the
 // released pre-decision client saved dark while retaining that exact choice.
 function heldDecisionFixture188(){return {"local":{"v":2,"tasks":[{"id":"a","title":"Fixture A","url":null,"due":null,"evergreen":false,"ctx":[],"mu":25,"sigma":8.333333333333334,"done":false,"createdAt":1,"completedAt":null,"lastDoneAt":null,"startsAt":null,"prerequisiteRevision":0,"prerequisiteIds":[],"prerequisiteId":null,"prerequisiteMirror":null,"prerequisiteOps":{},"evergreenHours":18,"evergreenResetAtDay":true}],"contexts":[],"chain":[],"considered":{},"cantAt":{},"workedAt":{},"candidateId":null,"workLog":[],"interventionActive":false,"interventionP":0,"snooze":0,"mode":"scan","decisionsMs":[],"presentedAt":0,"passStartedAt":1792321140000,"listOpen":false,"ctxOpen":true,"histOpen":false,"seenQuickStart":true,"updatedAt":1792321201000,"settings":{"horizonMin":60,"thresholdPct":25,"samples":250,"cantMin":30,"workedHours":16,"postponeHours":1,"evergreenHours":18,"evergreenResetAtDay":true,"scanMode":"squared","squaredDefaultVersion":1,"listMetric":"rank","excludeNoContext":false,"lastTaskWoop":false,"floatingHeader":false,"patternedIndicators":false,"showPostpone":true,"theme":"dark","dateFormat":"system","hourlyQuotes":{},"scene":{"time":null,"season":null,"location":null},"skipOldestFirstDot":false},"passId":"mixed-rollout","scanMode":"descending","syncAccount":"e@example.com","syncRev":4,"syncDirty":true,"deletionLog":[],"deletedTaskIds":{},"clearedHistoryIds":{},"restoredTaskIds":{},"restoredHistoryIds":{},"restoredTaskOps":{},"restoredHistoryOps":{},"deletedAfterRestoreOps":{},"clearedAfterRestoreOps":{},"chance":null,"addOpen":true,"decisionBase":{"v":1,"id":"db1:ef0eff3a10121ebe968caa55bd33d2bb","account":"e@example.com","revision":4,"payload":"{\"v\":2,\"tasks\":[{\"id\":\"a\",\"title\":\"Fixture A\",\"url\":null,\"due\":null,\"evergreen\":false,\"ctx\":[],\"mu\":25,\"sigma\":8.333333333333334,\"done\":false,\"createdAt\":1,\"completedAt\":null,\"lastDoneAt\":null,\"startsAt\":null,\"prerequisiteRevision\":0,\"prerequisiteIds\":[],\"prerequisiteId\":null,\"prerequisiteMirror\":null,\"prerequisiteOps\":{},\"evergreenHours\":18,\"evergreenResetAtDay\":true}],\"contexts\":[],\"chain\":[],\"considered\":{},\"cantAt\":{},\"workedAt\":{},\"candidateId\":null,\"workLog\":[],\"interventionActive\":false,\"interventionP\":0,\"snooze\":0,\"mode\":\"scan\",\"decisionsMs\":[],\"presentedAt\":0,\"passStartedAt\":1792321140000,\"listOpen\":false,\"ctxOpen\":true,\"histOpen\":false,\"seenQuickStart\":true,\"updatedAt\":0,\"settings\":{\"horizonMin\":60,\"thresholdPct\":25,\"samples\":250,\"cantMin\":30,\"workedHours\":16,\"postponeHours\":1,\"evergreenHours\":18,\"evergreenResetAtDay\":true,\"scanMode\":\"squared\",\"squaredDefaultVersion\":1,\"listMetric\":\"rank\",\"excludeNoContext\":false,\"lastTaskWoop\":false,\"skipOldestFirstDot\":false,\"floatingHeader\":false,\"patternedIndicators\":false,\"showPostpone\":true,\"theme\":\"system\",\"dateFormat\":\"system\",\"hourlyQuotes\":{},\"scene\":{\"time\":null,\"season\":null,\"location\":null}},\"passId\":\"mixed-rollout\",\"scanMode\":\"descending\",\"deletionLog\":[],\"deletedTaskIds\":{},\"clearedHistoryIds\":{},\"restoredTaskIds\":{},\"restoredHistoryIds\":{},\"restoredTaskOps\":{},\"restoredHistoryOps\":{},\"deletedAfterRestoreOps\":{},\"clearedAfterRestoreOps\":{},\"chance\":null,\"addOpen\":true}"},"decisionBaseline":{"v":1,"account":"e@example.com","sourceBaseId":"db1:ef0eff3a10121ebe968caa55bd33d2bb","sourceRevision":4,"includedActionIds":[],"ratings":[{"taskId":"a","mu":25,"sigma":8.333333333333334}],"chainIds":[],"passId":"mixed-rollout","passAt":1792321140000,"considered":{},"cantAt":{},"workedAt":{},"observedRatingHistoryIds":[],"id":"dlb2:6b9e4e304cf1e2aa3f14f7dfde0b3097"},"decisionEvents":[{"v":1,"id":"te9703fc8-b286-48a2-ac2b-b42b9c803f19","at":1792321200000,"account":"e@example.com","baseId":"db1:ef0eff3a10121ebe968caa55bd33d2bb","kind":"current-choice","actionId":"tfa255a29-fb5d-40f6-ab66-73248fed8170","target":{"type":"setting","id":"board","property":"theme"},"value":"light","after":{"present":true},"before":{"present":true,"value":"system"},"passId":"mixed-rollout","passAt":1792321140000,"scanMode":"descending","chainIds":[],"observedActionIds":[]}]},"remote":{"v":1,"tasks":[{"id":"a","title":"Fixture A","url":null,"due":null,"evergreen":false,"ctx":[],"mu":25,"sigma":8.333333333333334,"done":false,"createdAt":1,"completedAt":null,"lastDoneAt":null}],"contexts":[],"chain":[],"considered":{},"cantAt":{},"workedAt":{},"candidateId":null,"workLog":[],"interventionActive":false,"interventionP":0,"snooze":0,"mode":"idle","decisionsMs":[],"presentedAt":0,"passStartedAt":1792321140000,"listOpen":false,"ctxOpen":true,"histOpen":false,"seenQuickStart":true,"updatedAt":0,"settings":{"horizonMin":60,"thresholdPct":25,"samples":250,"cantMin":30,"workedHours":8,"theme":"system"},"passId":"mixed-rollout","scanMode":"descending","syncAccount":"e@example.com","syncRev":4,"syncDirty":false},"rev":4,"producer":{"current":"52d4b25","old":"69a9fed","actions":["current cycle-theme system to light","old cycle-theme light to dark"]}};}
-async function heldDecisionApp188(t,{fixture=heldDecisionFixture188(),failures={},storageBackend="indexedDB",timeoutMs=5000}={}){
+async function heldDecisionApp188(t,{fixture=heldDecisionFixture188(),failures={},storageBackend="indexedDB",timeoutMs=5000,timerProvider=null,recoveryTimeoutMs=timeoutMs}={}){
  const {IDBFactory}=await import('fake-indexeddb'),factory=new IDBFactory(),deviceDbName='held-choice-188-'+Math.random(),idbFault={};
  const indexedDB={open(...args){const request=factory.open(...args);return new Proxy(request,{
   get(target,key){
@@ -37128,7 +37407,7 @@ async function heldDecisionApp188(t,{fixture=heldDecisionFixture188(),failures={
  const app=await loadAppAtTime(1792323000000,{seed:188,seedStorage:{[SYNC_STORE_KEY]:localRaw,[LOCAL_HEAD_KEY]:localRaw},...(storageBackend==='indexedDB'?{indexedDBProvider:indexedDB,deviceDbName}:{})});
  if(!app.ctx.window.ChainStorageV2){vm.runInContext(fs.readFileSync(path.join(__dirname,'device-store-v2.js'),'utf8'),app.ctx,{filename:'device-store-v2.js'});app.ctx.window.ChainStorageV2=app.ctx.ChainStorageV2;}
  failures.authPending=true;
- const backend=await loadCloudBackendV2({rootData:cloudRaw===null?null:{payload:cloudRaw,updatedAt:fixture.remote.updatedAt,rev:fixture.rev,serverUpdatedAt:1},failures,timeoutMs,recordSyncError:app.ctx.recordSyncError,runtimeWindow:app.ctx.window});
+ const backend=await loadCloudBackendV2({rootData:cloudRaw===null?null:{payload:cloudRaw,updatedAt:fixture.remote.updatedAt,rev:fixture.rev,serverUpdatedAt:1},failures,timeoutMs,timerProvider,recoveryTimeoutMs,recordSyncError:app.ctx.recordSyncError,runtimeWindow:app.ctx.window});
  backend.emitAuth({uid:'owner',email:'e@example.com'});app.ctx.window.CLOUD_PUSH_DELAY_MS=0;
  t.after(async()=>{backend.CS.suspend();vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);await app.ctx.window.ScannerDeviceStore?.close?.();});
  await app.ctx.cloudPull();
@@ -38950,7 +39229,7 @@ test('RISK support diagnostics: accepted acknowledgements expire with their acco
 });
 
 test('RISK support diagnostics: source operations report the effective bounded SDK deadline',async t=>{
- for(const [configured,expected] of [[150,150],[999999,60000],[1,20000]])await t.test(String(configured),async sub=>{
+ for(const [configured,expected] of [[150,150],[999999,60000],[1,60000]])await t.test(String(configured),async sub=>{
   const app=await divergentCloudSourceApp187(sub,{timeoutMs:configured}),{ctx}=app;
   assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true,'the actual source consumer completes normally');
   ctx.onAction('view-support-diagnostics',{});const operations=ctx.buildSupportDiagnosticsReport().sourceOperations;
@@ -39219,6 +39498,9 @@ test('RISK support diagnostics: second complete source aggregate identifies its 
  await fixtureDeadline((async()=>{while(rootReads<3)await flush();})(),'the second complete source aggregate did not reach its held SDK root read');
  ctx.onAction('view-support-diagnostics',{});
  assert.equal(await reviewing,false,'the second aggregate reaches its ordinary source deadline');
+ // The shared attempt can settle before its SDK rejection reaches the
+ // aggregate observer. Require that actual event within the existing bound.
+ await fixtureDeadline((async()=>{while(!ctx.buildSupportDiagnosticsReport().sourceOperations.some(operation=>operation.events.some(event=>event.stage==='aggregate'&&event.role==='second'&&event.status==='timed-out')))await flush();})(),'the held second aggregate must record its real SDK timeout');
  const operations=ctx.buildSupportDiagnosticsReport().sourceOperations;
  const review=operations.find(operation=>operation.events.some(event=>event.stage==='aggregate'&&event.role==='first'));
  assert.ok(review,'the complete source consumer records a first aggregate');
@@ -39304,6 +39586,9 @@ test('RISK support diagnostics: root, chunk, and final-root SDK stalls retain th
   };
   assert.ok(observed().some(event=>event.stage===target&&event.status==='started'),target+' is identified from its real SDK stage before timeout');
   assert.equal(await reviewing,false,target+' source review reaches its ordinary SDK deadline');
+  // The whole-attempt timer can settle before the SDK's abort rejection has
+  // crossed its wrapper. Still require that real error and stage observation.
+  await fixtureDeadline((async()=>{while(!readError)await flush();})(),target+' bounded SDK abort must settle');
   const stageEvents=observed().filter(event=>event.stage===target);
   assert.equal(readError?.code,'deadline-exceeded',target+' control holds the real SDK until its ordinary deadline');
   assert.ok(stageEvents.some(event=>event.status==='timed-out'),target+' timeout is attributed to the held stage; held='+held+' rootReads='+rootReads+' error='+JSON.stringify(readError)+' events='+JSON.stringify(observed().map(event=>({stage:event.stage,status:event.status,role:event.role,operation:event.operation,code:event.code?.value}))));
