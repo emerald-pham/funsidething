@@ -337,7 +337,7 @@ test('Beta packaging refuses unsafe tab-bearing committed paths even outside the
   assert.equal(fs.existsSync(f.output), false);
 });
 
-test('Beta packaging continues the original notice after a later deployment when retained proof is valid', t => {
+test('Beta packaging continues the original notice after a later deployment when retained proof is valid', async t => {
   const f = reviewedFixture(t);
   const originalOutput = path.join(f.root, 'original-reviewed');
   const originalDeployedAt = '2026-10-19T16:00:00.000Z';
@@ -434,4 +434,117 @@ test('Beta packaging continues the original notice after a later deployment when
   assert.notEqual(malformed.status, 0, 'supplied malformed proof must fail closed even though startsAt predates deployedAt');
   assert.match(malformed.stderr, /bundle has an invalid shape/i);
   assert.equal(fs.existsSync(malformedOutput), false, 'malformed proof must fail before reserving output');
+
+  await t.test('rejects mutated retained evidence before output reservation without changing originals or neighbors', t => {
+    const envelopePath = path.join(originalOutput, 'public/channel-release.json');
+    const configPath = path.join(originalOutput, 'firebase.json');
+    const sourceDocumentPath = path.join(f.repository, 'fixture-doc.md');
+    const reviewPath = path.join(f.root, 'fixture-review.md');
+    const neighborPath = path.join(f.root, 'protected-neighbor.txt');
+    fs.writeFileSync(proofPath, JSON.stringify({ artifactDirectory: originalOutput, publicationPath, publicVerificationPath }, null, 2) + '\n');
+    fs.writeFileSync(neighborPath, 'protected neighboring bytes\n');
+
+    const snapshotDirectory = directory => {
+      const files = new Map();
+      const visit = (current, prefix = '') => {
+        for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+          const relative = prefix ? prefix + '/' + entry.name : entry.name;
+          const absolute = path.join(current, entry.name);
+          if (entry.isDirectory()) visit(absolute, relative);
+          else {
+            assert.equal(entry.isFile(), true, 'fixture snapshots contain only regular files');
+            files.set(relative, fs.readFileSync(absolute));
+          }
+        }
+      };
+      visit(directory);
+      return files;
+    };
+    const writeJson = (file, value) => fs.writeFileSync(file, JSON.stringify(value, null, 2) + '\n');
+    const filePaths = [manifestPath, envelopePath, configPath, publicationPath, publicVerificationPath,
+      proofPath, sourceDocumentPath, reviewPath, neighborPath];
+    const protectedBytes = new Map(filePaths.map(file => [file, fs.readFileSync(file)]));
+    const artifactSnapshot = snapshotDirectory(originalOutput);
+    const previewSnapshot = snapshotDirectory(output);
+    const rootEntries = fs.readdirSync(f.root).sort();
+
+    const reject = ({ name, mutatedPaths = [], mutate = () => {}, startsAt = originalStartsAt,
+      deployedAt: attemptDeployedAt = deployedAt, expected }) => {
+      const saved = new Map(mutatedPaths.map(file => [file, fs.readFileSync(file)]));
+      const rejectedOutput = path.join(f.root, 'rejected-' + name.replace(/[^a-z0-9]+/gi, '-').toLowerCase());
+      assert.equal(fs.existsSync(rejectedOutput), false, name + ' output path starts absent');
+      let rejected;
+      try {
+        mutate();
+        rejected = prepare({ ...f, source, tree, output: rejectedOutput, deployedAt: attemptDeployedAt, startsAt }, ['--continue-notice', proofPath]);
+      } finally {
+        for (const [file, bytes] of saved) fs.writeFileSync(file, bytes);
+      }
+      assert.notEqual(rejected.status, 0, name + ' must be rejected by the real CLI');
+      assert.match(rejected.stderr, expected, name + ' must fail at its intended proof guard');
+      assert.equal(fs.existsSync(rejectedOutput), false, name + ' must fail before output reservation');
+      for (const [file, bytes] of protectedBytes) assert.deepEqual(fs.readFileSync(file), bytes, name + ' leaves ' + path.basename(file) + ' unchanged');
+      assert.deepEqual(snapshotDirectory(originalOutput), artifactSnapshot, name + ' leaves the full original artifact unchanged');
+      assert.deepEqual(snapshotDirectory(output), previewSnapshot, name + ' leaves the valid preview unchanged');
+      assert.deepEqual(fs.readdirSync(f.root).sort(), rootEntries, name + ' leaves neighboring entries unchanged');
+    };
+
+    reject({ name: 'artifact-digest', mutatedPaths: [manifestPath], expected: /original artifact digest is invalid/i,
+      mutate: () => { const value = JSON.parse(fs.readFileSync(manifestPath)); value.artifactSha256 = '0'.repeat(64); writeJson(manifestPath, value); } });
+    reject({ name: 'nonpublishable-artifact', mutatedPaths: [manifestPath], expected: /original artifact must be reviewed, publishable/i,
+      mutate: () => {
+        const value = JSON.parse(fs.readFileSync(manifestPath));
+        value.publishable = false;
+        const payload = { ...value };
+        delete payload.artifactSha256;
+        value.artifactSha256 = digest(Buffer.from(JSON.stringify(payload)));
+        writeJson(manifestPath, value);
+      } });
+    reject({ name: 'provider-project', mutatedPaths: [publicationPath], expected: /provider release record names the wrong project/i,
+      mutate: () => { const value = JSON.parse(fs.readFileSync(publicationPath)); value.project = 'wrong-project'; writeJson(publicationPath, value); } });
+    reject({ name: 'provider-time', mutatedPaths: [publicationPath], expected: /provider release time or resource identity/i,
+      mutate: () => { const value = JSON.parse(fs.readFileSync(publicationPath)); value.release.releaseTime = '2026-10-19T16:00:01.000Z'; writeJson(publicationPath, value); } });
+    reject({ name: 'provider-canonical-product-time', mutatedPaths: [publicationPath], expected: /provider release time or resource identity/i,
+      mutate: () => { const value = JSON.parse(fs.readFileSync(publicationPath)); value.canonicalProductPublicationTime = '2026-10-19T16:00:01.000Z'; writeJson(publicationPath, value); } });
+    reject({ name: 'report-manifest-hash', mutatedPaths: [publicVerificationPath], expected: /public verification does not prove/i,
+      mutate: () => { const value = JSON.parse(fs.readFileSync(publicVerificationPath)); value.manifestSha256 = '0'.repeat(64); writeJson(publicVerificationPath, value); } });
+    reject({ name: 'report-incomplete-inventory', mutatedPaths: [publicVerificationPath], expected: /incomplete or duplicate root\/asset inventory/i,
+      mutate: () => { const value = JSON.parse(fs.readFileSync(publicVerificationPath)); value.responses.pop(); writeJson(publicVerificationPath, value); } });
+    reject({ name: 'report-duplicate-inventory', mutatedPaths: [publicVerificationPath], expected: /unexpected or duplicate response/i,
+      mutate: () => {
+        const value = JSON.parse(fs.readFileSync(publicVerificationPath));
+        value.responses[value.responses.length - 1] = { ...value.responses[0] };
+        writeJson(publicVerificationPath, value);
+      } });
+    reject({ name: 'retained-start-mismatch', expected: /original notice dates do not continue/i, startsAt: '2026-10-19T16:00:01.000Z' });
+    reject({ name: 'earlier-new-deployment', expected: /original notice dates do not continue/i, deployedAt: '2026-10-19T15:59:00.000Z' });
+    reject({ name: 'recursive-original-continuation', mutatedPaths: [manifestPath, envelopePath, publicVerificationPath],
+      expected: /original notice has an invalid shape/i,
+      mutate: () => {
+        const value = JSON.parse(fs.readFileSync(envelopePath));
+        value.notices['sync-stability-2026-10'].continuation = {
+          schemaVersion: 1, channel: 'beta', origin: 'https://chain-scanner.web.app', basePath: '/',
+          noticeId: 'sync-stability-2026-10', originalProduct: manifest.product,
+          originalDeployedAt, originalStartsAt,
+          evidence: { artifactSha256: manifest.artifactSha256, publicationSha256: digest(fs.readFileSync(publicationPath)),
+            publicVerificationSha256: digest(fs.readFileSync(publicVerificationPath)) },
+        };
+        const envelopeBytes = Buffer.from(JSON.stringify(value, null, 2) + '\n');
+        fs.writeFileSync(envelopePath, envelopeBytes);
+        const changedManifest = JSON.parse(fs.readFileSync(manifestPath));
+        changedManifest.files['channel-release.json'] = { sha256: digest(envelopeBytes), bytes: envelopeBytes.length };
+        const payload = { ...changedManifest };
+        delete payload.artifactSha256;
+        changedManifest.artifactSha256 = digest(Buffer.from(JSON.stringify(payload)));
+        const manifestBytes = Buffer.from(JSON.stringify(changedManifest, null, 2) + '\n');
+        fs.writeFileSync(manifestPath, manifestBytes);
+        const report = JSON.parse(fs.readFileSync(publicVerificationPath));
+        report.manifestSha256 = digest(manifestBytes);
+        report.envelope = value;
+        const metadataResponse = report.responses.find(response => response.file === 'channel-release.json');
+        metadataResponse.sha256 = changedManifest.files['channel-release.json'].sha256;
+        metadataResponse.bytes = changedManifest.files['channel-release.json'].bytes;
+        writeJson(publicVerificationPath, report);
+      } });
+  });
 });
