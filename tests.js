@@ -16841,7 +16841,7 @@ test('RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exac
   assert.ok(restoreFaq,'the extended FAQ explains file restore');
   assert.ok(restoreFaq.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the Restore FAQ keeps its word limit');
   assert.match(restoreFaq,/exact bytes.*current board.*preview/);
-  assert.match(restoreFaq,/Cancel or close during source checks stops adoption/);
+  assert.match(restoreFaq,/Cancel or close during source checks stops before adoption/);
   assert.match(restoreFaq,/Archives apply only their current board.*offline or held sync leaves the board unchanged/);
   assert.match(restoreFaq,/Long before-and-after values wrap inside the preview\./,'the extended FAQ explains how long restore effects remain readable');
   assert.match(html,/Settings can restore a board JSON file with an explicit preview/,'the current changelog source explains guarded file restore');
@@ -31703,10 +31703,10 @@ test('RISK backup help: expiry, protected-copy deletion, and archive limits rema
  assert.match(taskHelp,/copy changes during confirmation, reopen Settings/);
  assert.match(taskHelp,/red Delete button.*more than seven days old/);
  assert.match(taskHelp,/opening Settings does not delete it/i);
- assert.match(backups,/Automatic backups cover today and six earlier local dates/);
- assert.match(backups,/older copies retire after successful saves without Undo/);
- assert.match(backups,/Manual and protected copies stay until deleted/);
- assert.match(backups,/Duplicate matches appear once/);
+ assert.match(backups,/Automatic backups cover today and the previous six local dates/);
+ assert.match(backups,/older automatic entries.*removed after a successful save, without Undo/);
+ assert.match(backups,/Manual and protected recovery copies remain/);
+ assert.match(backups,/Matching duplicate backups appear once/);
  assert.match(backups,/Long before-and-after values wrap inside the preview\./);
  assert.match(exports,/one Download backup action/i);
  assert.match(exports,/Current board JSON for ordinary board data/);
@@ -31714,10 +31714,10 @@ test('RISK backup help: expiry, protected-copy deletion, and archive limits rema
  assert.match(exports,/Raw device sources only.*cannot be imported as a board/i);
  assert.match(exports,/versioned recovery archive is not an ordinary board-import file/);
  assert.match(exports,/pending work is never replayed/);
- assert.match(backups,/File restore backs up exact bytes and the current board before preview, keeps supported recorded choices and protects displaced decisions/);
+ assert.match(exports,/File restore keeps supported recorded choices and protects displaced decisions\./);
  assert.match(worked,/It leaves the dotted chain and stays off it through saving and syncing\./);
- assert.match(backups,/File restore backs up exact bytes and the current board before preview/);
- assert.match(backups,/Cancel or close during source checks stops adoption/);
+ assert.match(backups,/File restore protects exact bytes and the current board in Settings backups/);
+ assert.match(backups,/Cancel or close during source checks stops before adoption/);
  assert.match(backups,/Disabled Restore and close controls look subdued/);
  assert.match(backups,/Archives apply only their current board/);
  assert.match(backups,/offline or held sync leaves the board unchanged/);
