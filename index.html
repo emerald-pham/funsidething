@@ -3984,6 +3984,25 @@ function supportDiagnosticsBuildReport(){
   while(bytes()>SUPPORT_DIAGNOSTICS_REPORT_BYTES&&report.recentErrors.length){
     report.recentErrors.pop();noteDrop();
   }
+  // Preserve the existing eviction of older routine reads. When the oldest
+  // operation records a refusal or publication, compact successful stage
+  // detail first, retaining starts, terminal facts and generation summaries.
+  while(bytes()>SUPPORT_DIAGNOSTICS_REPORT_BYTES&&report.sourceOperations.length){
+    const oldest=report.sourceOperations[0];
+    const outcome=oldest.events.some(event=>event.stage==="push"||event.stage==="source-read"&&
+      ["stale","failed","timed-out","cancelled","late"].includes(event.status));
+    if(!outcome){report.sourceOperations.shift();noteDrop();continue;}
+    let compacted=false;
+    for(const operation of report.sourceOperations){
+      const first=operation.events.find(event=>event.stage==="source-read"&&event.status==="started");
+      const last=operation.events.filter(event=>event.stage==="source-read").at(-1);
+      const index=operation.events.findIndex(event=>event!==first&&event!==last&&event.stage!=="push"&&
+        (event.status==="started"||event.status==="completed"));
+      if(index<0)continue;
+      operation.events.splice(index,1);noteDrop();compacted=true;break;
+    }
+    if(!compacted)break;
+  }
   while(bytes()>SUPPORT_DIAGNOSTICS_REPORT_BYTES&&report.sourceOperations.length){
     report.sourceOperations.shift();noteDrop();
   }
@@ -10238,15 +10257,15 @@ function cloudSourceRecoveryFacts(candidate){
     +'<h4>Saved decision records</h4><ul>'+events.map(event=>'<li><code>'+esc(event.id)+'</code> — '+esc(event.kind)+', recorded decision time '+esc(event.at)+'</li>').join('')+'</ul></details>'
     +'<details class="settings-section"><summary>Complete supported source, including other saved fields</summary><pre class="kv" style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(JSON.stringify(board,null,2))+'</pre></details>';
 }
-function cloudSourceRecoveryReadOnlyDevice(){
+function cloudSourceRecoveryReadOnlyDevice(reading=true){
   const backend=window.CloudSync,account=backend?.user;
   let identity=null;try{identity=backend?.recoveryIdentity?.()??null;}catch{}
   const unavailable=!liveBoardAccepted||!state||!Array.isArray(state.tasks)||!account||
     state.syncAccount!=null&&state.syncAccount!==account||
     state.decisionBaseline?.account!=null&&state.decisionBaseline.account!==account||
     state.syncIdentity!=null&&state.syncIdentity!==identity;
-  const status='<p class="kv">Cloud sources are not verified. Source choices stay unavailable until the checks finish.</p>';
-  if(unavailable)return status+'<p class="kv">A readable device board for this account is not available in this preview. Keep this app open while the sources are checked.</p>';
+  const status='<p class="kv">Cloud sources are not verified. '+(reading?"Source choices stay unavailable until the checks finish.":"Checks have stopped. Source choices remain unavailable. Read sources again to make a fresh check.")+'</p>';
+  if(unavailable)return status+'<p class="kv">A readable device board for this account is not available in this preview.'+(reading?" Keep this app open while the sources are checked.":" Current work remains protected.")+'</p>';
   // This displays existing local work only. It supplies no recovery candidate,
   // consent or publication authority, and never serializes opaque source data.
   return status+'<section data-cloud-source-readonly><h3>Board open on this device</h3>'
@@ -10313,6 +10332,7 @@ async function reviewCloudSourceRecovery(message=""){
     const checked=await cloudSourceRecoverySources(diagnosticOperation,"second",readAttempt);
     if(serial!==cloudSourceRecoverySerial||readAttempt.signal.aborted)return false;
     if(!cloudSourceRecoverySame(p,checked)){
+      supportDiagnosticsObserve("source-read","stale","current",diagnosticOperation,null,null,null,null,null,null,null,null,"unknown");
       changedSources=checked;
       throw Object.assign(Error("The sources changed while they were read. Review again before choosing."),{code:"recovery-source-changed"});
     }
@@ -10330,7 +10350,7 @@ async function reviewCloudSourceRecovery(message=""){
     },read);
   }catch(error){
     if(serial===cloudSourceRecoverySerial){
-      modalShell('<div class="mtop"><h2>Review cloud recovery sources</h2><button class="x" data-act="close-modal" aria-label="Close">✕</button></div><p role="status">'+esc(error.message||"The sources could not be verified. Current work remains protected.")+'</p>'+cloudSourceRecoveryReadOnlyDevice()+'<div class="mbtns"><button class="btn subtle" data-act="review-cloud-source-recovery">Read sources again</button><button class="btn subtle" data-act="close-modal">Cancel</button></div>');
+      modalShell('<div class="mtop"><h2>Review cloud recovery sources</h2><button class="x" data-act="close-modal" aria-label="Close">✕</button></div><p role="status">'+esc(error.message||"The sources could not be verified. Current work remains protected.")+'</p>'+cloudSourceRecoveryReadOnlyDevice(false)+'<div class="mbtns"><button class="btn subtle" data-act="review-cloud-source-recovery">Read sources again</button><button class="btn subtle" data-act="close-modal">Cancel</button></div>');
       cloudSourceRecoveryInspection=true;
     }
     return false;

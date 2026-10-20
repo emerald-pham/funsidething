@@ -654,6 +654,18 @@ test('RISK cloud source fresh check: one between-capture cloud change verifies a
  assert.match(modal,/data-act="apply-cloud-source-recovery"[^>]*disabled/);assert.equal(roots,8,'one restart reads two entirely fresh complete captures');
  assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(await store.readHead(),head);assert.deepEqual(await store.getPendingUpload('owner'),pending);
  assert.deepEqual(await store.readRawExportSnapshot(),raw);assert.equal(JSON.stringify([...backend.docs]),expectedCloud);assert.equal(backend.writes.length,writes,'verification never publishes or selects a source');
+ let download=null,blob=null;const link=makeFakeElement();link.remove=()=>{};link.click=()=>{download=blob;};
+ shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();ctx.Blob=class{constructor(parts){blob=parts.join('');}};
+ ctx.URL={createObjectURL(){return 'blob:fresh-source-diagnostics';},revokeObjectURL(){}};
+ ctx.onAction('view-support-diagnostics',{});await ctx.onAction('download-support-diagnostics',{});assert.equal(typeof download,'string');
+ const report=JSON.parse(download),operations=report.sourceOperations;
+ assert.equal(report.metadataOnly,true);assert.equal(report.boardDataIncluded,false);assert.ok(Buffer.byteLength(download,'utf8')<=24*1024);assert.ok(report.events.length<=80);assert.ok(operations.length<=8);
+ assert.equal(report.retention.truncated.value,true,'compacted diagnostic detail is explicitly disclosed');assert.ok(report.retention.dropped.value>0);
+ assert.equal(operations.filter(operation=>operation.status==='stale').length,1,'the report retains the original cross-capture refusal after automatic recovery: '+JSON.stringify(operations.map(operation=>({alias:operation.alias,status:operation.status,events:operation.events.map(event=>event.stage+":"+event.status)}))));
+ assert.equal(operations.filter(operation=>operation.status==='completed').length,1,'the fresh verification has a separate completed operation');
+ assert.ok(operations[0].events.some(event=>event.stage==='source-read'&&event.status==='stale'));
+ assert.doesNotMatch(download,/owner|generationId|Fixture A|Device source only/,'the actual downloaded retry trace stays redacted');
+ assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(await store.readHead(),head);assert.deepEqual(await store.getPendingUpload('owner'),pending);assert.deepEqual(await store.readRawExportSnapshot(),raw);assert.equal(backend.writes.length,writes);
 });
 
 async function freshSourceCheckFixture187(t,options={}){
@@ -672,7 +684,7 @@ test('RISK cloud source fresh check: head metadata alone permits one fresh pair 
  review=ctx.onAction('review-cloud-source-recovery',{});
  await fixtureDeadline((async()=>{while(roots<5)await flush();})(),'the entirely fresh pair enters its real SDK root read');
  const progress=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(progress,/Checking fresh sources within the same one-minute limit/);assert.match(progress,/data-act="close-modal">Cancel/);assert.match(progress,/data-cloud-source-readonly/);
+ assert.match(progress,/Checking fresh sources within the same one-minute limit/);assert.match(progress,/data-act="close-modal">Cancel/);assert.match(progress,/data-cloud-source-readonly/);assert.match(progress,/until the checks finish/,'the fresh check is actually running');
  gate.resolve();assert.equal(await review,true);assert.equal(roots,8);
  assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(await readHead(),head);assert.deepEqual(await store.getPendingUpload('owner'),pending);assert.deepEqual(await store.readRawExportSnapshot(),raw);
  assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal(backend.writes.length,writes);
@@ -697,6 +709,8 @@ test('RISK cloud source fresh check: continuing peer churn stops after four comp
  t.after(()=>{delete app.faults.serverRead;});
  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),false);assert.equal(roots,8,'a second inconsistency cannot start a third pair');
  const modal=shim.document.getElementById('modalRoot').innerHTML;assert.match(modal,/The sources changed while they were read/);assert.doesNotMatch(modal,/data-act="choose-cloud-recovery-source"/);
+ assert.match(modal,/Checks have stopped. Source choices remain unavailable. Read sources again to make a fresh check/);
+ assert.doesNotMatch(modal,/until the checks finish|Keep this app open while the sources are checked/,'terminal refusal cannot imply a check is still running');assert.match(modal,/data-cloud-source-readonly/);
  assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(await store.readHead(),head);assert.deepEqual(await store.getPendingUpload('owner'),pending);assert.deepEqual(await store.readRawExportSnapshot(),raw);
  assert.equal(JSON.stringify([...backend.docs]),expectedCloud);assert.equal(backend.writes.length,writes);
 });
@@ -711,7 +725,7 @@ test('RISK cloud source fresh check: the restart shares the original minute and 
  await clock.advance(26000);first.resolve();await fixtureDeadline((async()=>{while(roots<3)await flush();})(),'second complete capture enters');await clock.advance(24000);second.resolve();
  await fixtureDeadline((async()=>{while(roots<5)await flush();})(),'fresh restart enters with only ten seconds remaining');
  assert.match(shim.document.getElementById('modalRoot').innerHTML,/Checking fresh sources/);await clock.advance(9999);assert.equal(settled,false);await clock.advance(1);assert.equal(settled,true);assert.equal(await review,false);
- const failed=shim.document.getElementById('modalRoot').innerHTML;assert.match(failed,/Cloud request timed out/);fresh.resolve();for(let n=0;n<20;n++)await flush();assert.equal(shim.document.getElementById('modalRoot').innerHTML,failed);
+ const failed=shim.document.getElementById('modalRoot').innerHTML;assert.match(failed,/Cloud request timed out/);assert.match(failed,/Checks have stopped/);assert.doesNotMatch(failed,/until the checks finish/);fresh.resolve();for(let n=0;n<20;n++)await flush();assert.equal(shim.document.getElementById('modalRoot').innerHTML,failed);
  assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(await ctx.window.ScannerDeviceStore.readHead(),head);assert.deepEqual(await ctx.window.ScannerDeviceStore.getPendingUpload('owner'),pending);assert.equal(backend.writes.length,writes);
 });
 
@@ -743,6 +757,7 @@ test('RISK cloud source fresh check: changed local authority and unsupported or 
   }};
   sub.after(()=>{store.readHead=readHead;delete app.faults.serverRead;});
   assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),false);assert.ok(roots<=4,'unsafe changes cannot start the fresh third capture');
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,change==='same-email other UID'||change==='auth epoch'?/The signed-in account changed/:/Checks have stopped/);assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/until the checks finish|Keep this app open while the sources are checked/);
   assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="choose-cloud-recovery-source"/);assert.equal(JSON.stringify(ctx.state),expectedLocal);assert.deepEqual(await store.getPendingUpload('owner'),expectedPending);assert.equal(backend.writes.length,writes);
   if(change==='accepted edit')assert.ok(JSON.parse((await readHead()).payload).tasks.some(row=>row.title==='Accepted while sources change'));
   else assert.equal((await readHead()).hash,head.hash);
