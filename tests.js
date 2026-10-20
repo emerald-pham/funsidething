@@ -38609,6 +38609,26 @@ test('RISK support diagnostics: local report stays redacted, bounded, and separa
  assert.match(app.shim.document.getElementById('modalRoot').innerHTML,/supportDiagnosticsData/,'the report is viewable and selectable even when clipboard access is unavailable');
 });
 
+test('RISK support diagnostics: real device retries count attempts while unexplained churn remains refused',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb');
+ const app=await loadApp({indexedDBProvider:new IDBFactory(),deviceDbName:'diagnostics-retry-'+Math.random()}),{ctx}=app,store=ctx.window.ScannerDeviceStore;
+ assert.equal(await ctx.persist(),true);
+ vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry()',ctx);
+ const before=ctx.buildSupportDiagnosticsReport().save,commit=store.commitHead.bind(store);let snapshots=0;
+ store.commitHead=async options=>{const result=await commit(options);if(result?.ok){snapshots++;ctx.state.futureUnexplainedRetry=snapshots;}return result;};
+ t.after(async()=>{store.commitHead=commit;vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry()',ctx);await app.dispose();});
+ const result=await ctx.persist(),head=await store.readHead();
+ assert.equal(result,false);assert.equal(ctx.deviceSaveIssue()?.code,'changed-during-save');
+ assert.equal(snapshots,4,'the existing integrity budget retains the initial snapshot and three actual retries');
+ assert.equal(vm.runInContext('lastPersistedRaw',ctx),head.payload);
+ assert.notEqual(head.payload,JSON.stringify(ctx.state),'the unexplained unsaved tail remains open without a durability claim');
+ ctx.onAction('view-support-diagnostics',{});const report=ctx.buildSupportDiagnosticsReport().save;
+ assert.equal(report.acceptedRequests.value,before.acceptedRequests.value,'unexplained churn is not invented accepted input');
+ assert.equal(report.persistCalls.value-before.persistCalls.value,snapshots,'each real persistence call has one measured attempt');
+ assert.equal(report.localFailureCode.value,'changed-during-save','the original integrity refusal remains visible');
+ assert.equal(report.retryAttempts.value-before.retryAttempts.value,snapshots-1,'the report counts three actual retries once each');
+});
+
 test('RISK support diagnostics: a held local save and cloud acknowledgement stay visibly pending',async t=>{
  const app=await loadApp({hostStorage:{}}),{ctx}=app;t.after(()=>app.dispose());
  if(vm.runInContext('saveTimer',ctx)){vm.runInContext('clearTimeout(saveTimer);saveTimer=null',ctx);}

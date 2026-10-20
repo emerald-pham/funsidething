@@ -509,6 +509,7 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 
 ## Incident support diagnostics
 
+- RISK support diagnostics: real device retries count attempts while unexplained churn remains refused
 - RISK support diagnostics: Settings names the existing board export for its contents
 - RISK support diagnostics: local report stays redacted, bounded, and separate from board recovery
 - RISK support diagnostics: download bytes, selectable copy fallback, and Return preserve an unsaved Settings draft after slow worker capture

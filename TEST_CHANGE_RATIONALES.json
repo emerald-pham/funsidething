@@ -1,5 +1,25 @@
 [
   {
+    "baseCommit": "010b9473ba44ae6fb859e028ebcdd7f69d38c545",
+    "testChangesSha256": "c1ce671902b2cb76b1d08836c9347cbaf29ad7e04bd172b3c99aeb8eef489197",
+    "reason": "Integrate the authorized P0 recovery preview, Cant/Return and sustained rapid-action repairs with bounded local support diagnostics; correct the final owner-observed retry counter and retain the existing brief Help contract.",
+    "previousBehavior": "The released source lacked a local metadata report and had the separately reproduced Cant/Return replay and successful-snapshot retry exhaustion defects. The unshipped diagnostics candidate counted retry depths 1+2+3 as six attempts and added a Help answer exceeding the retained130-word limit.",
+    "intendedBehavior": "Retain every source-preserving runtime repair and existing consumer assertion. Report each actual persistence retry once without changing its refusal budget, committed head or unsaved tail. Split support guidance into two short complete answers; keep current-board export separate, report metadata bounded/redacted and recovery authority unchanged.",
+    "replacementTests": [
+      "RISK support diagnostics: real device retries count attempts while unexplained churn remains refused"
+    ],
+    "preservedCoverage": [
+      "All previous rationale bytes remain intact. The exact cumulative diff retains the original preview, UID/privacy/render-budget, Cant/Return and ten-distinct-action regressions; the diagnostics worker handoff and base1dd rationale map its original feature REDs and later six actual-consumer repair findings. No earlier test assertion is removed or relaxed by this owner repair.",
+      "The new permanent consumer ports the independently observed real IndexedDB unexplained-churn negative: initial snapshot plus three retries must still returnfalse with changed-during-save, exact current durable marker/head and an open unsaved tail. It observes native report data and fails only the six-versus-three retry count before the one-line scalar repair.",
+      "Existing board export, Restore/source choice, pending/unknown copies, account/backend transitions, held cloud ACK, peer/cold-reopen, worker delivery, rules and compatibility gates remain required. The Help length limit and all existing diagnostic privacy/publication wording assertions are retained byte-for-byte.",
+      "The worker checkpoint itself reported a possible instrumentation ReferenceError; root referred back to that checkpoint. No literal exception/stack record is retained. Only the recorded assertion failures and actual consumer GREEN support the diagnostics repair; none establishes the production iOS stall cause."
+    ],
+    "redEvidence": {
+      "command": "Node22 record-run preimplementation-red -- node --test --test-name-pattern=\"RISK support diagnostics: real device retries\" tests.js; separate RISK Quick start content before either owner edit. Artifacts under /Users/emeraldpham/.codex/task-artifacts/p0-pull-recurrence-20261020/.",
+      "failure": "retry-count-c5ff-red/2026-10-20T12-55-04-531Z-3e6fdc3e-314d-47f7-a44d-a6aecb2b55fb.json fails6!==3 after proving four successful real snapshots, integrity refusal and unsaved-tail preservation. faq-length-c5ff-red/2026-10-20T12-53-45-798Z-25fb31d3-3985-4088-98a2-16f24e7fe307.json fails the existing Help answer limit before copy splitting."
+    }
+  },
+  {
     "testChangesSha256": "a712c134412fc39fd692dbb85ee67882206bdae921f29d3356736ef0571581a5",
     "reason": "Repair confirmed issue222 stale Cant/Return chain replay and false save retry exhaustion across ten distinct accepted native actions, retaining the approved read-only recovery preview.",
     "previousBehavior": "A stale pre-Cant chain could revive its old dot after Return; sustained accepted input across four successful local snapshots exhausted the integrity retry counter and emitted a false changed-during-save failure.",
