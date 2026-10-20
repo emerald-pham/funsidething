@@ -1,5 +1,24 @@
 [
   {
+    "testChangesSha256": "d1df2531438d9c42442663c4a0069c1f372849615c71c3c189dfc3b0e07ee8ee",
+    "reason": "Keep available device work inspectable during repeated cloud-source discovery timeouts, and reject known account-ID mismatches before full recovery candidates are exposed.",
+    "previousBehavior": "Source review showed only a loading message or deadline error until two aggregate cloud reads completed. A same-email different-UID transition could also create a full preview from the prior UID device board before ordinary account reconciliation settled.",
+    "intendedBehavior": "Pending/error review displays current accepted device tasks read-only with explicit unverified-cloud state and no source choice. Existing fully verified choices retain every publication/preservation guard. A known device UID mismatch refuses before reading cloud candidates; unreadable placeholders remain unavailable.",
+    "replacementTests": [
+      "RISK cloud source recovery: readable device work stays visible read-only during pending and timed-out cloud checks",
+      "RISK cloud source recovery: read-only inspection does not expose unreadable placeholders or foreign identity work"
+    ],
+    "preservedCoverage": [
+      "Every prior passing assertion remains unchanged. Existing recovery, device source preservation, exact-ACK rebuilding, conditional source choice, pending races, account transitions, File/Paste restore, full/native/rules/compatibility gates remain required.",
+      "The first permanent consumer RED observed a real unresolved SDK server read and missing local preview before any runtime edit; UI copy and the known-UID source guard each have their own subsequent observed RED before their repair. New controls verify no placeholder/foreign source, exact raw originals and pending rows, no implicit choice/publication and usable verified retry.",
+      "The separate Node150ms diagnostic and historical original-source controls retain their limited scope. Actual repeated iOS timeout cause, affected installed delivery and account recovery are not inferred from these new passing tests. V1/V2 external diagnostic retirement expectations and the initial WebKit ACK setup failure remain preserved, not product REDs."
+    ],
+    "redEvidence": {
+      "command": "record-run preimplementation-red: node --test --test-reporter=spec --test-name-pattern=\"RISK cloud source recovery: readable device work stays visible read-only\" tests.js (readonly-preview-red and readonly-preview-faq-red); separate read-only inspection pattern (readonly-preview-uid-red and readonly-preview-uid-faq-red). Evidence under /Users/emeraldpham/.codex/task-artifacts/p0-pull-recurrence-20261020/.",
+      "failure": "Observed10:17:49UTC: actual pending modal contains only Reading the separate device and cloud sources and lacks data-cloud-source-readonly. The later permanent UID RED returns true instead of false after same-email other-owner Auth callback before UID guard edit. FAQ REDs fail exact visible Help assertions before their respective copy edits. Focused original/FAQ/UID GREEN and160-case recovery cohort are retained separately."
+    }
+  },
+  {
     "testChangesSha256": "7a07a474af920040ab8bfd9ca6bac2212512819e9cc8c9c68825ff39845a7e65",
     "reason": "Repair full-suite discovered pre-hydration source protection and supported chronology holds; preserve exact existing consumer assertions and make test fixture lifetime and race completion explicit.",
     "previousBehavior": "Exact5a full run failed legacy/account/pinned recovery and retained FAQ assertions, then reached4GiB heap OOM before complete full/native evidence. Its pre-init backup guard refused actual older-shell protection; semantic completion ambiguity was classified unreadable. A timezone fixture and fixed30ms staging observation also failed independently of intended behavior.",

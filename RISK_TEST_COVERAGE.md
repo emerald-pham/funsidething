@@ -43,6 +43,8 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK DEVICE STORAGE V2: conditional pending writes refuse JSON-lossy unknown evidence
 - RISK cloud source recovery pending capture: native recovery cannot discard a named array extension
 - RISK unreadable device recovery: Quick start and current Changelog explain preserved sources and local pending recovery
+- RISK cloud source recovery: readable device work stays visible read-only during pending and timed-out cloud checks
+- RISK cloud source recovery: read-only inspection does not expose unreadable placeholders or foreign identity work
 - RISK resilient sync recovery: an exact acknowledged copy recovers missing cloud chunks and publishes subsequent local work
 - RISK resilient sync recovery: a failed rebuild protects every source and retries after another local edit
 - RISK resilient sync recovery: unsupported unverifiable and foreign sources never authorize a replacement

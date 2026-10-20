@@ -574,6 +574,65 @@ async function damagedAcknowledgedApp187(t,{timeoutMs=5000}={}){
  return {...app,faults,originalRoot,originalHeader,acknowledgedTasks,previousSource};
 }
 
+test('RISK cloud source recovery: readable device work stays visible read-only during pending and timed-out cloud checks',async t=>{
+ const app=await divergentCloudSourceApp187(t,{timeoutMs:150}),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+ const originalLocal=JSON.stringify(ctx.state),originalCloud=JSON.stringify([...backend.docs]);
+ const originalRaw=await store.readRawExportSnapshot(),originalPending=await store.getPendingUpload('owner');
+ let release,started=false;const gate=new Promise(resolve=>release=resolve);
+ app.faults.serverRead=async()=>{started=true;await gate;};
+ const reviewing=ctx.onAction('review-cloud-source-recovery',{});
+ t.after(async()=>{delete app.faults.serverRead;release();await reviewing;});
+ for(let n=0;n<100&&!started;n++)await flush();
+ assert.equal(started,true,'the actual source-review server read must be pending');
+ let modal=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(modal,/data-cloud-source-readonly/,'already readable device work must not disappear behind cloud discovery');
+ assert.match(modal,/Board open on this device/);assert.match(modal,/Device source only/);assert.match(modal,/preview only/i);
+ assert.doesNotMatch(modal,/data-act="(?:choose-cloud-recovery-source|apply-cloud-source-recovery)"/,'a preliminary device view cannot grant recovery consent');
+ assert.equal(await reviewing,false,'the genuine SDK-boundary read must reach the shipped deadline');
+ modal=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(modal,/Cloud request timed out/);assert.match(modal,/Cloud sources are not verified/);
+ assert.match(modal,/data-cloud-source-readonly/);assert.match(modal,/Device source only/);
+ assert.match(modal,/Read sources again/);assert.match(modal,/Cancel/);
+ assert.doesNotMatch(modal,/data-act="(?:choose-cloud-recovery-source|apply-cloud-source-recovery)"/);
+ assert.equal(JSON.stringify(ctx.state),originalLocal);assert.equal(JSON.stringify([...backend.docs]),originalCloud);
+ assert.deepEqual(await store.readRawExportSnapshot(),originalRaw,'pending and failed inspection never changes original raw device sources');
+ assert.deepEqual(await store.getPendingUpload('owner'),originalPending);
+ delete app.faults.serverRead;release();
+ assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true,'a fresh verified read still reaches the existing complete-source preview');
+ modal=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(modal,/data-act="choose-cloud-recovery-source"/);
+ assert.doesNotMatch(modal,/data-act="choose-cloud-recovery-source"[^>]*aria-pressed="true"/);
+ assert.match(modal,/data-act="apply-cloud-source-recovery"[^>]*disabled/);
+ assert.equal(JSON.stringify([...backend.docs]),originalCloud);assert.deepEqual(await store.getPendingUpload('owner'),originalPending);
+ ctx.openHelp();
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/A read-only device preview stays visible during cloud checks or timeouts/,'extended Help must explain the available local preview and its limits');
+ assert.match(html,/Cloud recovery keeps the open device board visible while cloud source checks are pending or time out/,'release notes must describe the actual available preview');
+});
+
+test('RISK cloud source recovery: read-only inspection does not expose unreadable placeholders or foreign identity work',async t=>{
+ await t.test('unreadable startup',async sub=>{
+  const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),raw='{"tasks":[ unreadable original';
+  const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName:'readonly-unreadable-'+Math.random(),seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}}),{ctx,shim}=app;
+  sub.after(()=>closeLegacyApp173(app));
+  const backend=await loadCloudBackendV2({runtimeWindow:ctx.window,failures:{authPending:true},timeoutMs:150});sub.after(()=>backend.CS.suspend());
+  backend.emitAuth({uid:'owner',email:'e@example.com'});
+  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),false);
+  const modal=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(modal,/Cloud sources are not verified/);assert.match(modal,/A readable device board for this account is not available/);
+  assert.doesNotMatch(modal,/data-cloud-source-readonly|0 tasks|choose-cloud-recovery-source|apply-cloud-source-recovery/);
+  assert.equal(shim.localStorage.getItem(SYNC_STORE_KEY),raw);assert.equal(shim.localStorage.getItem(LOCAL_HEAD_KEY),raw);
+ });
+ await t.test('same email different identity',async sub=>{
+  const app=await divergentCloudSourceApp187(sub,{timeoutMs:150}),{ctx,shim,backend}=app;
+  const original=[...backend.docs].filter(([key])=>key==='users/owner'||key.startsWith('users/owner/')).map(([key,value])=>[key,JSON.stringify(value)]);
+  backend.emitAuth({uid:'other-owner',email:'e@example.com'});
+  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),false,'a known UID mismatch must stop before recovery candidates are created');
+  assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/Device source only|Acknowledged before source damage|Second acknowledged source/,'the old UID cannot become a read-only source for another UID sharing its email');
+  for(const [key,raw] of original)assert.equal(JSON.stringify(backend.docs.get(key)),raw,'inspection in another identity preserves the original namespace');
+  ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/A different account ID keeps sources unavailable even when the email matches/);
+ });
+});
+
 test('RISK resilient sync recovery: an exact acknowledged copy recovers missing cloud chunks and publishes subsequent local work',async t=>{
  const app=await damagedAcknowledgedApp187(t),{ctx,shim,backend,originalRoot,originalHeader,acknowledgedTasks}=app;
  shim.document.getElementById('addInput').value='Local work after source damage';
