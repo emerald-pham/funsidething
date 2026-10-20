@@ -1811,3 +1811,29 @@ The complete recovery suite also retains the released pre-hydration older-tab ba
 - `RISK rapid action guidance: mounted Help distinguishes later accepted work from real device and cloud failures` — the shared extended FAQ explains rapid input, retained failures and the separate cloud acknowledgement boundary; current changelog names the repaired behavior.
 
 Earlier controls covered individual saves and a third edit during one overlap, but did not sustain ten distinct native actions across four successful snapshot acknowledgements. The new regression reaches the exact false retry-exhaustion warning while separately proving complete durable retention. The storage refusal control was added after repair as a preservation guard, not claimed as the original RED. Cant/Return previously lacked a stale pre-hold cloud chain replay after the hold ended; the new same/peer and legacy/current-pass cases retain later deliberate selection as a positive control.
+
+## iOS report-shaped source overlap
+
+- RISK iOS source replay: a fresh native review offers a validated previous board after timed-out headers settle late
+
+This synthetic native review drives held generation headers, late current zero-row and previous eight-row reads, a fresh overlapping request, and an independently validated complete previous board. It asserts explicit choice, unchanged device originals and zero cloud writes. It is not evidence that the private phone payload is valid or that its account recovered.
+
+## One-minute recovery reads and exact-copy resumption (#187)
+
+- RISK iOS source replay: an exact acknowledged board repairs missing current chunks after a cold reopen without a new edit
+- RISK iOS source replay: a modal opened during exact-copy inspection defers repair and closing resumes without an edit
+- RISK recovery read minute: native source review accepts headers arriving at twenty-six seconds within one minute
+- RISK recovery read minute: the second native verification shares the original sixty-second budget
+- RISK recovery read minute: native Cancel releases the read immediately and a late old header cannot replace a fresh preview
+- RISK recovery read minute: stalled server stages expire once and retain protected sources after late replies
+- RISK recovery read minute: changed account revision or drafts revoke a delayed source preview
+- RISK recovery read minute guidance: pending native review offers Cancel and explains the whole bounded read
+
+The real app consumers use synthetic independently verified generations and external SDK/time boundaries. They cover one shared minute, immediate native Cancel, stale replies, changed authority, cold-open exact repair and dialog-close resumption. These checks do not validate the private affected source or prove physical iOS recovery. Existing mismatched/older-source consent, preserved originals and complete-generation publication checks remain required.
+- RISK recovery read minute: an ordinary native save still expires at its existing twenty-second write limit
+
+- RISK recovery read minute: elapsed validation and final verification cannot grant choices before a delayed timer fires
+- RISK recovery read minute: native recovery entry survives an ordinary timeout after cancelling a verified source preview
+- RISK recovery read minute: known-damage entry clears on healthy reads and identity change without broadening ordinary timeouts
+
+An ordinary timeout does not clear a previously verified damage finding. The native menu still reaches fresh guarded source review, without selecting or publishing anything. A healthy source or account change clears that finding; an obsolete account read and a never-damaged timeout cannot create it. Accepted board, device head, pending evidence and cloud bytes remain exact throughout.
