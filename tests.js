@@ -39221,6 +39221,9 @@ test('RISK support diagnostics: second complete source aggregate identifies its 
  await fixtureDeadline((async()=>{while(rootReads<3)await flush();})(),'the second complete source aggregate did not reach its held SDK root read');
  ctx.onAction('view-support-diagnostics',{});
  assert.equal(await reviewing,false,'the second aggregate reaches its ordinary source deadline');
+ // The shared attempt can settle before its SDK rejection reaches the
+ // aggregate observer. Require that actual event within the existing bound.
+ await fixtureDeadline((async()=>{while(!ctx.buildSupportDiagnosticsReport().sourceOperations.some(operation=>operation.events.some(event=>event.stage==='aggregate'&&event.role==='second'&&event.status==='timed-out')))await flush();})(),'the held second aggregate must record its real SDK timeout');
  const operations=ctx.buildSupportDiagnosticsReport().sourceOperations;
  const review=operations.find(operation=>operation.events.some(event=>event.stage==='aggregate'&&event.role==='first'));
  assert.ok(review,'the complete source consumer records a first aggregate');
