@@ -736,6 +736,51 @@ test('RISK recovery read minute: elapsed validation and final verification canno
  });
 });
 
+test('RISK recovery read minute: native recovery entry survives an ordinary timeout after cancelling a verified source preview',async t=>{
+ const clock=recoveryReadClock187(),app=await divergentCloudSourceApp187(t,{timeoutMs:20000,recoveryTimeoutMs:null,timerProvider:clock.provider}),{ctx,shim,backend}=app;
+ ctx.onAction('sync',{});assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="review-cloud-source-recovery"/);
+ assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);await ctx.onAction('close-modal',{});
+ const gate=deferredSyncFixture();let entered=false,pull;
+ app.faults.serverRead=async path=>{if(/^users\/owner\/generations\/[^/]+$/.test(path)){entered=true;await gate.promise;}};
+ t.after(async()=>{gate.resolve();delete app.faults.serverRead;clock.stop();await pull;});
+ const before=JSON.stringify(ctx.state),cloud=JSON.stringify([...backend.docs]),head=await ctx.window.ScannerDeviceStore.readHead(),pending=await ctx.window.ScannerDeviceStore.getPendingUpload('owner');clock.activate(app);
+ pull=ctx.cloudPull();await fixtureDeadline((async()=>{while(!entered)await flush();})(),'ordinary cloud pull enters the held generation header');
+ await clock.advance(20000);await pull;assert.equal(backend.CS.errorCode,'deadline-exceeded','ordinary cloud reads retain their existing twenty-second limit');
+ assert.equal(JSON.stringify(ctx.state),before);assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal((await ctx.window.ScannerDeviceStore.readHead()).hash,head.hash);assert.deepEqual(await ctx.window.ScannerDeviceStore.getPendingUpload('owner'),pending);
+ ctx.onAction('sync',{});const menu=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(menu,/data-act="review-cloud-source-recovery"/,'the real needs-attention menu must retain the minute-long recovery path for an unresolved known damaged source after an ordinary timeout');
+ const fresh=ctx.onAction('review-cloud-source-recovery',{});gate.resolve();assert.equal(await fixtureDeadline(fresh,'fresh native minute recovery remains reachable'),true);
+ assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="choose-cloud-recovery-source"[^>]*aria-pressed="true"/);
+ assert.equal(JSON.stringify(ctx.state),before);assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal((await ctx.window.ScannerDeviceStore.readHead()).hash,head.hash);assert.deepEqual(await ctx.window.ScannerDeviceStore.getPendingUpload('owner'),pending);
+ ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/The recovery entry stays available after timeouts for a cloud copy already found damaged/);
+ assert.match(html,/Timeouts keep recovery reachable for cloud copies already found damaged/);
+});
+
+test('RISK recovery read minute: known-damage entry clears on healthy reads and identity change without broadening ordinary timeouts',async t=>{
+ for(const outcome of ['healthy source','same-email other UID','late old-account read','never damaged'])await t.test(outcome,async sub=>{
+  let app;const clock=recoveryReadClock187();
+  if(outcome==='never damaged'){const fixture=heldDecisionFixture188(),faults={};fixture.local=structuredClone(fixture.remote);app={...await heldDecisionApp188(sub,{fixture,failures:faults,timeoutMs:20000,recoveryTimeoutMs:null,timerProvider:clock.provider}),faults};}
+  else app=await divergentCloudSourceApp187(sub,{timeoutMs:20000,recoveryTimeoutMs:null,timerProvider:clock.provider});
+  const {ctx,shim,backend}=app;
+  if(outcome==='healthy source'){
+   const current='users/owner/generations/'+app.originalRoot.activeGeneration,encoded=await ctx.window.ChainStorageV2.encodeSnapshot(ctx.state.decisionBase.payload);
+   assert.equal(encoded.hash,app.originalHeader.hash);backend.docs.set(current,app.originalHeader);for(const chunk of encoded.chunks)backend.docs.set(current+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
+   assert.equal((await backend.CS.pull()).payload,ctx.state.decisionBase.payload,'a real validated healthy source clears the earlier finding');
+  }else if(outcome==='same-email other UID')backend.emitAuth({uid:'other-owner',email:'e@example.com'});
+  else{
+   const gate=deferredSyncFixture();let entered=false,pull;const faults=app.faults||{};
+   if(!app.faults)throw Error('fixture must expose its existing external SDK fault boundary');
+   faults.serverRead=async()=>{entered=true;await gate.promise;};sub.after(async()=>{gate.resolve();delete faults.serverRead;clock.stop();await pull;});clock.activate(app);
+   pull=backend.CS.pull();await fixtureDeadline((async()=>{while(!entered)await flush();})(),'real ordinary SDK read enters');
+   if(outcome==='late old-account read'){backend.emitAuth({uid:'other-owner',email:'e@example.com'});gate.resolve();assert.equal((await pull).cancelled,true,'an obsolete old UID read cannot restore its finding');}
+   else{await clock.advance(20000);assert.equal((await pull).error,true);assert.equal(backend.CS.errorCode,'deadline-exceeded');}
+  }
+  backend.CS.reportError('reconcile','revision-conflict');ctx.onAction('sync',{});
+  assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="review-cloud-source-recovery"/,'only unresolved positively observed damage can retain this entry');
+  assert.equal(backend.CS.knownDamagedSource,false);
+ });
+});
+
 test('RISK recovery read minute: an ordinary native save still expires at its existing twenty-second write limit',async t=>{
  const fixture=heldDecisionFixture188();fixture.local=structuredClone(fixture.remote);
  const clock=recoveryReadClock187(),faults={},app=await heldDecisionApp188(t,{fixture,failures:faults,timeoutMs:20000,recoveryTimeoutMs:null,timerProvider:clock.provider}),{ctx,shim,backend}=app;

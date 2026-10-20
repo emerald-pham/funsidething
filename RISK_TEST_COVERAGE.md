@@ -1833,3 +1833,7 @@ The real app consumers use synthetic independently verified generations and exte
 - RISK recovery read minute: an ordinary native save still expires at its existing twenty-second write limit
 
 - RISK recovery read minute: elapsed validation and final verification cannot grant choices before a delayed timer fires
+- RISK recovery read minute: native recovery entry survives an ordinary timeout after cancelling a verified source preview
+- RISK recovery read minute: known-damage entry clears on healthy reads and identity change without broadening ordinary timeouts
+
+An ordinary timeout does not clear a previously verified damage finding. The native menu still reaches fresh guarded source review, without selecting or publishing anything. A healthy source or account change clears that finding; an obsolete account read and a never-damaged timeout cannot create it. Accepted board, device head, pending evidence and cloud bytes remain exact throughout.

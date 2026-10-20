@@ -1,6 +1,41 @@
 [
   {
     "baseCommit": "f38c02dd7a29b41515fb3abbf234582845a6ccde",
+    "testChangesSha256": "aa57e9f3840e191e9a7da03fff21982b161b550f9a0d8fb9653994b6725853a7",
+    "reason": "Retain native access to a fresh guarded source review when an ordinary timeout follows positively observed damage, and preserve all cumulative one-minute review and exact-copy repair regressions.",
+    "previousBehavior": "The latest ordinary deadline-exceeded error displaced the corrupt-generation error. Despite unchanged accepted board, durable head, pending evidence, cloud root and account, the real needs-attention menu no longer offered recovery. Removing the earlier preview and Cancel still reproduced the omission, ruling out Cancel as its cause.",
+    "intendedBehavior": "Remember only unresolved positively observed cloud damage for the current backend identity. A later transient failure retains the review entry. A real validated healthy read or UID change clears the finding; a stale old-account read and an ordinary never-damaged timeout cannot set it. The flag grants menu access only; every preview, source choice, preservation and publication guard remains mandatory.",
+    "replacementTests": [
+      "RISK iOS source replay: an exact acknowledged board repairs missing current chunks after a cold reopen without a new edit",
+      "RISK iOS source replay: a modal opened during exact-copy inspection defers repair and closing resumes without an edit",
+      "RISK recovery read minute: native source review accepts headers arriving at twenty-six seconds within one minute",
+      "RISK recovery read minute: the second native verification shares the original sixty-second budget",
+      "RISK recovery read minute: native Cancel releases the read immediately and a late old header cannot replace a fresh preview",
+      "RISK recovery read minute: stalled server stages expire once and retain protected sources after late replies",
+      "RISK recovery read minute: changed account revision or drafts revoke a delayed source preview",
+      "RISK recovery read minute: an ordinary native save still expires at its existing twenty-second write limit",
+      "RISK recovery read minute guidance: pending native review offers Cancel and explains the whole bounded read",
+      "RISK iOS source replay: a fresh native review offers a validated previous board after timed-out headers settle late",
+      "RISK recovery read minute: elapsed validation and final verification cannot grant choices before a delayed timer fires",
+      "RISK recovery read minute: native recovery entry survives an ordinary timeout after cancelling a verified source preview",
+      "RISK recovery read minute: known-damage entry clears on healthy reads and identity change without broadening ordinary timeouts"
+    ],
+    "preservedCoverage": [
+      "All existing runtime and data-safety assertions remain intact. The only existing test expectation migration changes invalid recovery timeout configuration fallback from20000 to60000 under explicit user policy; ordinary configured save/pull timeouts retain their old fallback.",
+      "The existing held-stage diagnostics test still requires the real SDK deadline-exceeded error, correct timed-out stage and late observation; it now waits for the SDK wrapper rejection after the whole-attempt deadline can win first. The170/172 cohort failure is retained. No assertion was removed or relaxed.",
+      "Cold-reopen8chunk exact ACK repair, real durable readback and isolated receiver are positive coverage; valid previous8chunk timeout/fresh overlap is positive coverage. First overlap RED changed only rotating latest-backup ID at an unquiesced fixture; first cold receiver RED was an object prototype comparison. Both corrected fixture records remain, and neither counts as incident RED.",
+      "Existing matching/nonmatching ACK, divergent pending authority, all exact source protections, old saved data, consent, account/UID/revision changes, storage failures, native installed delivery, compatibility and finite passive diagnostics remain required. Actual private affected-account payload matching and physical iOS recovery remain unverified.",
+      "Specialist788 changes-required report and elapsed60001RED are preserved. The owner permanent native case advances only external performance time after actual real codec success or actual final-root SDK result; both fail on788 before runtime repair, then pass. No private payload used. Obsolete788 full was intentionally interrupted because this material source change required a new candidate; it is not called a full/native pass.",
+      "All578 preceding rationale entries remain byte-for-byte intact. The new native regression checks exact state/head/pending/cloud preservation before asserting menu access, then reaches a fresh unselected verified preview with no mutation. Healthy real-codec source, same-email different UID, late obsolete account SDK result and never-damaged timeout controls pass. FAQ guidance retains the existing130-word cap and unrelated copy.",
+      "The extra rendered Cancel/fresh-menu rehearsal had an unknown sign-in screenshot and missing status metadata; it is not claimed as the causal RED. The separate controlled native reproduction and minimization establish the actual menu defect. No private report payload or affected-account recovery is inferred."
+    ],
+    "redEvidence": {
+      "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- Node22 --test --test-name-pattern=\"^RISK recovery read minute: native recovery entry survives\" tests.js; original and preservation-first outputs recovery-entry-ordinary-timeout-red.output.txt and recovery-entry-preserved-red.output.txt under /Users/emeraldpham/.codex/task-artifacts/p0-ios-diagnostics-20261020. External controlled minimization retained as recovery-entry-minimized-red.output.txt. Separate copy RED/control output recovery-entry-guidance-red-and-controls.output.txt.",
+      "failure": "The real needs-attention menu omitted data-act=\"review-cloud-source-recovery\" after the unchanged ordinary20000ms SDK deadline despite exact preserved board/head/pending/cloud. Both original and prior-preview-removed minimization failed that intended assertion. Runtime fix passes; before the FAQ edit the guidance assertion alone failed with the four lifecycle controls passing. Final focused7/7 passes zero failures/skips."
+    }
+  },
+  {
+    "baseCommit": "f38c02dd7a29b41515fb3abbf234582845a6ccde",
     "testChangesSha256": "648e378e7d1b503856ee23e02c21d14a46e4c0bc94f0222df695f5e077bfde80",
     "reason": "Close independent specialistP2 on78818c2: the shared minute must expire based on elapsed work even when validation and final server verification finish before a queued timeout callback. Retain the complete earlier one-minute/ACK-resume behavior and evidence.",
     "previousBehavior": "Source SDK reads expired at the ordinary20-second deadline. Independent verification calls could each restart that budget. Cancelling a pending review retained its busy slot until its deadline. A modal opened during exact ACK inspection blocked safe repair but left neither deferredCloudPull nor a retry; safe close alone did not resume. The original exact cold-open repair and valid previous-choice overlap already pass and are not claimed incident REDs. The78818c2 native consumer could return true with selectable source choices at monotonic60001ms after successful real-codec validation; the timer callback had not yet executed.",
