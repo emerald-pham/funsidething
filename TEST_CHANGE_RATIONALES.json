@@ -1,5 +1,26 @@
 [
   {
+    "testChangesSha256": "f165f3d3aacb93697b7bf8351df3b00d6ba89bc757b1cb20f81e1b4437e51972",
+    "reason": "Complete the read-only recovery preview with independent-review privacy and bounded-rendering repairs, preserving the original preview and known-UID protections.",
+    "previousBehavior": "The new pending/error preview rendered every task immediately and remained visible after an Auth UID transition until the unresolved server read settled; the original source-review screen also hid available local work during timeouts.",
+    "intendedBehavior": "Keep the accepted local board inspectable without source authority, render at most50 titles with the total and clear limit, promptly redact a pending/error preview on account transition and prevent late read completion from restoring it. Preserve drafts, head, pending evidence and original namespace.",
+    "replacementTests": [
+      "RISK cloud source recovery: readable device work stays visible read-only during pending and timed-out cloud checks",
+      "RISK cloud source recovery: read-only inspection does not expose unreadable placeholders or foreign identity work",
+      "RISK cloud source recovery: preliminary device inspection revokes account changes during pending and failed reads",
+      "RISK cloud source recovery: preliminary inspection bounds large device task lists without changing saved work"
+    ],
+    "preservedCoverage": [
+      "All pre-existing passing test assertions remain unchanged; the first preview/UID permanent regressions and their original RED evidence remain intact. Existing complete-source choice, publication, exact ACK, raw source, account/pending races, native, rules and compatibility gates remain required.",
+      "The review-repair-red run observed both pending and failed actual-consumer UID changes leaving earlier titles visible before repair. The separate review-budget-red run observed the eager DOM-row budget failure before the slice(0,50) edit. The first large-fixture run failed an incidental count expectation after normal reconciliation restored four original tasks; it is retained and not used as the DOM defect RED.",
+      "The repair FAQ assertion failed before copy; focused8/8 then passed the actual new runtime controls. No claim that local tests recover missing cloud bytes or establish the physical iOS timeout cause."
+    ],
+    "redEvidence": {
+      "command": "record-run preimplementation-red node --test --test-name-pattern=\"preliminary device inspection revokes|preliminary inspection bounds\" tests.js (review-repair-red); corrected DOM-budget-only review-budget-red; readable-device FAQ review-repair-faq-red, all under /Users/emeraldpham/.codex/task-artifacts/p0-pull-recurrence-20261020/.",
+      "failure": "Observed pending and timed-out source modal still exposing Device source only after emitAuth other-owner with same email; later independent budget RED failed pending inspection must not eagerly create a DOM row for every accepted task. Both preceded their runtime edits. FAQ RED failed Large device boards show at most50 task titles assertion before copy. Original preview RED and UID guard RED remain in the prior rationale and immutable records."
+    }
+  },
+  {
     "testChangesSha256": "d1df2531438d9c42442663c4a0069c1f372849615c71c3c189dfc3b0e07ee8ee",
     "reason": "Keep available device work inspectable during repeated cloud-source discovery timeouts, and reject known account-ID mismatches before full recovery candidates are exposed.",
     "previousBehavior": "Source review showed only a loading message or deadline error until two aggregate cloud reads completed. A same-email different-UID transition could also create a full preview from the prior UID device board before ordinary account reconciliation settled.",

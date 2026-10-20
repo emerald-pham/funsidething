@@ -606,6 +606,8 @@ test('RISK cloud source recovery: readable device work stays visible read-only d
  assert.equal(JSON.stringify([...backend.docs]),originalCloud);assert.deepEqual(await store.getPendingUpload('owner'),originalPending);
  ctx.openHelp();
  assert.match(shim.document.getElementById('modalRoot').innerHTML,/A read-only device preview stays visible during cloud checks or timeouts/,'extended Help must explain the available local preview and its limits');
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/Large device boards show at most 50 task titles in this preliminary preview/);
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/Changing accounts hides this preview immediately/);
  assert.match(html,/Cloud recovery keeps the open device board visible while cloud source checks are pending or time out/,'release notes must describe the actual available preview');
 });
 
@@ -631,6 +633,48 @@ test('RISK cloud source recovery: read-only inspection does not expose unreadabl
   for(const [key,raw] of original)assert.equal(JSON.stringify(backend.docs.get(key)),raw,'inspection in another identity preserves the original namespace');
   ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/A different account ID keeps sources unavailable even when the email matches/);
  });
+});
+
+test('RISK cloud source recovery: preliminary device inspection revokes account changes during pending and failed reads',async t=>{
+ for(const phase of ['pending','failed'])await t.test(phase,async sub=>{
+  const app=await divergentCloudSourceApp187(sub,{timeoutMs:150}),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+  const originalHead=await store.readHead(),originalPending=await store.getPendingUpload('owner');
+  const originalCloud=[...backend.docs].filter(([key])=>key==='users/owner'||key.startsWith('users/owner/')).map(([key,value])=>[key,JSON.stringify(value)]);
+  shim.document.getElementById('addInput').value='Unsubmitted device draft';
+  let release,started=false;const gate=new Promise(resolve=>release=resolve);
+  app.faults.serverRead=async()=>{started=true;await gate;};
+  const reviewing=ctx.onAction('review-cloud-source-recovery',{});
+  sub.after(async()=>{delete app.faults.serverRead;release();await reviewing;});
+  for(let n=0;n<100&&!started;n++)await flush();
+  assert.equal(started,true);assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-cloud-source-readonly/);
+  if(phase==='failed'){assert.equal(await reviewing,false);assert.match(shim.document.getElementById('modalRoot').innerHTML,/Cloud request timed out/);}
+  backend.emitAuth({uid:'other-owner',email:'e@example.com'});
+  for(let n=0;n<5;n++)await flush();
+  let modal=shim.document.getElementById('modalRoot').innerHTML;
+  assert.doesNotMatch(modal,/data-cloud-source-readonly|Device source only/,'the previous UID titles must disappear immediately, including while the server read hangs');
+  assert.match(modal,/signed-in account changed/);assert.match(modal,/Cancel/);
+  assert.doesNotMatch(modal,/choose-cloud-recovery-source|apply-cloud-source-recovery/);
+  delete app.faults.serverRead;release();await reviewing;await flush();
+  modal=shim.document.getElementById('modalRoot').innerHTML;
+  assert.doesNotMatch(modal,/data-cloud-source-readonly|Device source only/,'late completion cannot restore an invalidated account preview');
+  assert.equal(shim.document.getElementById('addInput').value,'Unsubmitted device draft');
+  assert.deepEqual(await store.readHead(),originalHead);assert.deepEqual(await store.getPendingUpload('owner'),originalPending);
+  for(const [key,raw] of originalCloud)assert.equal(JSON.stringify(backend.docs.get(key)),raw);
+ });
+});
+
+test('RISK cloud source recovery: preliminary inspection bounds large device task lists without changing saved work',async t=>{
+ const app=await divergentCloudSourceApp187(t,{timeoutMs:150}),{ctx,shim}=app;
+ ctx.state.tasks=Array.from({length:10000},(_,n)=>({...ctx.state.tasks[0],id:'preview-budget-'+n,title:'Device task '+n}));
+ assert.equal(await ctx.persist(),true);const original=JSON.stringify(ctx.state),raw=await ctx.window.ScannerDeviceStore.readRawExportSnapshot();
+ let release;const gate=new Promise(resolve=>release=resolve);app.faults.serverRead=()=>gate;
+ const reviewing=ctx.onAction('review-cloud-source-recovery',{});
+ t.after(async()=>{delete app.faults.serverRead;release();await reviewing;});
+ const modal=shim.document.getElementById('modalRoot').innerHTML;
+ assert.ok((modal.match(/<li>/g)||[]).length<=50,'pending inspection must not eagerly create a DOM row for every accepted task');
+ assert.ok(modal.includes(ctx.state.tasks.length+' tasks'));assert.match(modal,/Device task 0/);
+ assert.ok(modal.includes('Showing the first 50 of '+ctx.state.tasks.length+' tasks'));assert.doesNotMatch(modal,/Device task 9999/);
+ assert.equal(JSON.stringify(ctx.state),original);assert.deepEqual(await ctx.window.ScannerDeviceStore.readRawExportSnapshot(),raw);
 });
 
 test('RISK resilient sync recovery: an exact acknowledged copy recovers missing cloud chunks and publishes subsequent local work',async t=>{

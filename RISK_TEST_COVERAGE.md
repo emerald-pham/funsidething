@@ -1764,3 +1764,6 @@ The complete recovery suite also retains the released pre-hydration older-tab ba
 - RISK optional oldest start: an unseeded descending pass clears first skips at the ordinary day boundary
 - RISK legacy completion released Start: normally acknowledged expired return is preserved or explicitly held before rewrite
 - RISK resilient sync recovery: automatic rebuilding preserves peer pending intent across staging
+
+- `RISK cloud source recovery: preliminary device inspection revokes account changes during pending and failed reads` — promptly hide prior-account titles, reject late callbacks, retain draft, device head, pending upload and original namespace.
+- `RISK cloud source recovery: preliminary inspection bounds large device task lists without changing saved work` — render at most 50 task titles with the honest total and omitted-list notice; preserve accepted board and raw sources.
