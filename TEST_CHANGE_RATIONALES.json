@@ -15314,4 +15314,105 @@
     "failure": "Before the current integration repair, RISK FAQ redundant changelog question failed its actual mounted Help assertion that summary is immediately followed by release notes. The source was present and the assertion was preserved. After moving only the new reopen paragraph after notes, run3f973fff passed10 cases. No new feature RED is claimed from the unexpectedly passing prior run or missing fixture module."
   }
 }
+,
+{
+    "baseCommit": "f38c02dd7a29b41515fb3abbf234582845a6ccde",
+    "testChangesSha256": "60e55a72a59f41377bff04cb8d2d7455f293575195998048c612d382adaeae0e",
+    "reason": "Consolidate the board-data download entry while retaining ordinary current-board JSON, complete recovery archives, copy/view, accepted unsaved edits, and exact source preservation.",
+    "previousBehavior": "Settings exposed separate current-board and recovery-archive download buttons plus another current-board download in the copy view.",
+    "intendedBehavior": "Settings presents one Download backup action with an explicit current-board or recovery-archive format selection. Both existing consumers remain distinct and read-only; the current-board view/copy path remains available and the separate Support diagnostics and lower app-backup controls stay distinct.",
+    "replacementTests": [
+      "RISK current-board export: Settings and save directions retain board recovery actions",
+      "RISK MANUAL JSON EXPORT: the actual Settings actions download current board and recovery archive"
+    ],
+    "preservedCoverage": [
+      "The actual Settings action still downloads ordinary current-board JSON with accepted unsaved edits and excludes unsubmitted DOM drafts.",
+      "The recovery archive retains exact named localStorage sources and the read-only meta, snapshots, backups, and opaque IndexedDB snapshot with completeness and consistency checks.",
+      "The archive remains distinct from ordinary board import; unsafe, changed, unavailable, or unsupported sources stop without a partial file.",
+      "Neither export writes browser/device storage, saves, syncs, or replays pending work; current-board view/select/copy and separate Support diagnostics remain present."
+    ],
+    "redEvidence": {
+      "records": [
+        "/Users/emeraldpham/.codex/task-artifacts/next-stable-backup-consolidation-20261020/backup216-implementation/phase1-download/red-green-runs/2026-10-20T16-04-38-876Z-dea2f708-468a-470a-9af9-b0d8fdfe3744.json",
+        "/Users/emeraldpham/.codex/task-artifacts/next-stable-backup-consolidation-20261020/backup216-implementation/phase1-download/red-green-runs/2026-10-20T16-05-04-731Z-ba7ef70a-6894-47ce-b6df-b2838e9d9cff.json"
+      ],
+      "command": "TZ=UTC node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"RISK MANUAL JSON EXPORT: the actual Settings actions download current board and recovery archive|RISK current-board export: Settings and save directions retain board recovery actions\" tests.js",
+      "failure": "The actual Settings export consumer failed at its new single-action assertion because the base still exposed separate export buttons; the surface consumer failed because the board-data area still used the old current-board view/copy/download heading. Both are assertion failures captured before product edits."
+    },
+    "setupFailureEvidence": {
+      "record": "/Users/emeraldpham/.codex/task-artifacts/next-stable-backup-consolidation-20261020/backup216-implementation/phase1-download/red-green-runs/2026-10-20T16-04-25-365Z-a164e3f4-130b-444b-b40d-ec47ec2b7290.json",
+      "classification": "test-harness syntax error, not behavioral RED",
+      "failure": "The first recorded test launch found a duplicate local binding in the newly edited test. The binding was renamed; the corrected recorded runs then reached the expected assertion failures. No product file was changed."
+    }
+  },
+{
+    "baseCommit": "f38c02dd7a29b41515fb3abbf234582845a6ccde",
+    "testChangesSha256": "165abf62575d601f95bab4323d2b45e1f4d8178e8350ee49e4dd1643e94cb6e8",
+    "reason": "Consolidate the board-data backup and Restore entry points while retaining every supported format, visible view/copy, accepted unsaved edits, and the existing protected-source and durable-restore contracts.",
+    "previousBehavior": "Settings had separate current-board and full-recovery-archive download buttons, a second current-board download beside view/copy, and separate file and paste restore buttons. The unreadable-startup empty state also opened a second Paste route outside Settings.",
+    "intendedBehavior": "Settings has one Download backup action with current-board JSON and full recovery archive choices when a board is accepted, or source-only raw device evidence when it is not. One Restore action selects native File or Paste and delegates to the existing guarded preview/confirmation consumers. The unreadable-startup empty state routes through that same Settings chooser.",
+    "replacementTests": [
+      "RISK backup and Restore consolidation: Settings keeps one guarded action with all formats"
+    ],
+    "preservedCoverage": [
+      "The actual Settings download consumer exercises both formats through the single action: current-board JSON keeps accepted unsaved board edits and excludes DOM-only drafts; the full archive retains exact app-owned recovery sources and stops on incomplete or unsupported reads. Separate source-only export remains available when no accepted board exists and cannot be imported as an empty board.",
+      "Actual file and paste consumers use the shared Restore route and retain exact selected bytes, existing device/current-board preservation, explicit preview and confirmation, cancel/close behavior, account and revision checks, CAS, ACK, drafts, unknown fields, held/pending sources, and durable reopen. Raw arrays remain supported inputs and are not replayed.",
+      "Current-board View / copy remains available and distinct from downloads. Support diagnostics continues to use the existing #223/#224 report and unchanged collector/privacy/timeout/progress contracts; no new diagnostics exporter, source read, storage scan, private hash, or identifier was added.",
+      "The unreadable-startup view points to Settings and the same Restore selector; its raw source download is routed through the one Download backup action. Existing exact opaque, pending, unknown, and protected source assertions remain.",
+      "The changed index.html hunks do not alter bottom local/app-backup management controls or app-update controls. They remain outside the consolidation and retain their prior actions and behavior."
+    ],
+    "redEvidence": {
+      "command": "The linked record-run evidence contains the exact TZ=UTC node --test consumer commands, each captured before its corresponding implementation slice.",
+      "failure": "Observed assertion REDs: Settings still exposed separate download actions (backup216-implementation/phase1-download/red-green-runs/2026-10-20T16-04-38-876Z-dea2f708-468a-470a-9af9-b0d8fdfe3744.json); old view/copy/download heading remained (2026-10-20T16-05-04-731Z-ba7ef70a-6894-47ce-b6df-b2838e9d9cff.json); the single Restore action was absent (phase2-restore/red-green-runs/2026-10-20T16-07-46-705Z-7e1e1a2e-f130-4535-b682-6c52085b81f1.json); actual file and paste consumers lacked the shared route (2026-10-20T16-08-49-184Z-b04607ef-66ad-42ba-8eb7-eeb78f542e50.json and 2026-10-20T16-08-52-615Z-c7a2ea88-eb00-4440-a85b-cab925f940ae.json); FAQ/changelog copy assertions exposed the old wording (phase3-copy/red-green-runs/2026-10-20T16-11-05-910Z-3f8b782b-32b9-4353-af42-f5fa6b899434.json); and all six actual unreadable-startup cases exposed the duplicate direct Paste route (phase4-empty-state/red-green-runs/2026-10-20T16-16-38-935Z-9f255400-c8c2-4fb1-ba85-8c5f8057bf7e.json). The separate initial test syntax error is retained in the earlier phase-one rationale and was not counted as a behavioral RED."
+    },
+    "greenEvidence": {
+      "phase1": "backup216-implementation/phase1-download/red-green-runs/2026-10-20T16-07-03-806Z-c4da8285-38bc-4a9b-a208-398226d9f091.json: 5/5 actual consumer tests passed for current-board/archive export, unreadable source-only export, accepted unsaved edits, and diagnostics separation.",
+      "phase2": "backup216-implementation/phase2-restore/red-green-runs/2026-10-20T16-09-18-519Z-bfe33e45-774e-477c-92a4-d079b0108118.json: 6/6 actual Settings surface/file/paste outcomes passed; the same phase also records full file-restore, pasted-recovery, unreadable-device, and diagnostics cohorts.",
+      "phase3": "backup216-implementation/phase3-copy/red-green-runs/2026-10-20T16-13-17-180Z-db08b77f-ba18-4c8c-9545-bfcfe7853b25.json: 6/6 FAQ/changelog copy outcomes passed.",
+      "phase4": "backup216-implementation/phase4-empty-state/red-green-runs/2026-10-20T16-16-44-873Z-fc31c804-0c0b-4bb7-a2fc-0038b931367a.json: 6 raw-startup scenarios, 7/7 TAP outcomes passed.",
+      "finalFocused": "backup216-implementation/final-focused/red-green-runs/2026-10-20T16-17-41-118Z-5b33c0ec-17f7-4afb-a8ce-020dd02ee1d0.json: 112/112 focused TAP outcomes passed across the consolidated surface, manual exports, file/paste restoration, unreadable-source preservation, Support diagnostics, backup FAQ, and motion-consent safety."
+    },
+    "validationHistory": "The first final-focused run (backup216-implementation/final-focused/red-green-runs/2026-10-20T16-17-08-391Z-e10b16c8-4351-45da-a2e8-ea8392bdffc2.json) had 111 passes and one stale FAQ assertion expecting “stops before adoption”; the concise FAQ already said “stops adoption.” Updated the assertion to the rendered copy, then reran the full focused cohort to 112/112. No product behavior failed in that run.",
+    "releaseLimits": "Focused local Node/VM tests only. Full suite, native installed-client, browser/rendered typography and focus, CI, Beta acceptance, deployment, actual affected-device recovery, and exact Stable-artifact approval remain outstanding and are owned by the root integration/release task."
+  },
+{
+  "baseCommit": "4e3bcb7e317ae251c8e8a030291802a52ffdefa0",
+  "testChangesSha256": "1cb8aeeb7250552285f61a08832d6a50825698ab644523a627eb36df33cb0c97",
+  "reason": "Reconcile the preserved #216 backup and Restore consumer work onto the published b50 Beta and current P0 Stable baseline, retaining original source-present test-first evidence and every unrelated protection.",
+  "previousBehavior": "The current Beta and Stable expose separate board-data download and Restore entry points; prepared #216 work was authored against f38 before the latest P0 and apology delivery.",
+  "intendedBehavior": "The actual Settings file, paste, current-board, archive and raw-source consumers share the consolidated entry points while retaining protected previews, source bytes, diagnostics and separate bottom app-backup controls.",
+  "replacementTests": [
+    "RISK backup and Restore consolidation: Settings keeps one guarded action with all formats"
+  ],
+  "preservedCoverage": [
+    "All previous P0 source-review timing, cancellation, current-account, draft, unreadable-source and exact recovery-copy assertions remain unchanged.",
+    "All b50 exact apology text, Auth UID and channel dismissal, seven-day timing, metadata refresh, interaction deferral and manual reopen assertions remain unchanged.",
+    "Worker evidence retains the actual source-present REDs and later repairs; the integration-only 198-pass cohort is supplemental GREEN, not new test authorship or a recreated RED."
+  ],
+  "redEvidence": {
+    "command": "Original #216 recorded consumer commands and raw run paths remain in the two preceding imported rationale records; the owner reconciliation command is recorded in integration216/focused-combined.output.txt.",
+    "failure": "Before the original corresponding implementation, actual Settings download, file/paste Restore, FAQ and unreadable-startup consumers failed their new consolidation assertions. The original failed setup and stale-copy attempts retain their distinct classifications; no failure is invented for this reconciliation."
+  },
+  "evidenceClassification": "preserved-original-test-first-evidence-with-current-198-pass-integration"
+},
+{
+  "baseCommit": "b50ac1694502090a51503fdaa79d97d19d13d43e",
+  "testChangesSha256": "ff155537fa71dc3a041f3982836787f9aa5ff29c13a4e0e23cf765e771280bd4",
+  "reason": "Reconcile the preserved #216 backup and Restore consumer work onto the published b50 Beta and current P0 Stable baseline, retaining original source-present test-first evidence and every unrelated protection.",
+  "previousBehavior": "The current Beta and Stable expose separate board-data download and Restore entry points; prepared #216 work was authored against f38 before the latest P0 and apology delivery.",
+  "intendedBehavior": "The actual Settings file, paste, current-board, archive and raw-source consumers share the consolidated entry points while retaining protected previews, source bytes, diagnostics and separate bottom app-backup controls.",
+  "replacementTests": [
+    "RISK backup and Restore consolidation: Settings keeps one guarded action with all formats"
+  ],
+  "preservedCoverage": [
+    "All previous P0 source-review timing, cancellation, current-account, draft, unreadable-source and exact recovery-copy assertions remain unchanged.",
+    "All b50 exact apology text, Auth UID and channel dismissal, seven-day timing, metadata refresh, interaction deferral and manual reopen assertions remain unchanged.",
+    "Worker evidence retains the actual source-present REDs and later repairs; the integration-only 198-pass cohort is supplemental GREEN, not new test authorship or a recreated RED."
+  ],
+  "redEvidence": {
+    "command": "Original #216 recorded consumer commands and raw run paths remain in the two preceding imported rationale records; the owner reconciliation command is recorded in integration216/focused-combined.output.txt.",
+    "failure": "Before the original corresponding implementation, actual Settings download, file/paste Restore, FAQ and unreadable-startup consumers failed their new consolidation assertions. The original failed setup and stale-copy attempts retain their distinct classifications; no failure is invented for this reconciliation."
+  },
+  "evidenceClassification": "preserved-original-test-first-evidence-with-current-198-pass-integration"
+}
 ]
