@@ -15661,6 +15661,54 @@
   {
     "baseCommit": "4e3bcb7e317ae251c8e8a030291802a52ffdefa0",
     "testChangesSha256": "b02e4ae746f22735fe92aabd05bf635670e18759d5edbc04951dd15a8b93c6b1",
+    "reason": "Correct the final integration rationale test-title metadata after preflight rejected unregistered names; all original records are preserved.",
+    "previousBehavior": "Candidate53d had a lossy JSON head-metadata exemption and unnecessarily shortened existing backup lifecycle guidance; full validation and an independent specialist exposed the defects.",
+    "intendedBehavior": "Only finite committedAt-only changes with all other structured-clone head facts losslessly equal may permit one fresh pair in the original minute. Unknown facts remain binding. The published backup/Restore FAQ and original lexical assertions are restored; all new format/route and protected-choice guidance remains.",
+    "replacementTests": [
+      "RISK cloud source fresh check: structured-clone head facts cannot be erased by the metadata exception",
+      "RISK cloud source fresh check: changed head ownership and unknown record facts cannot count as harmless metadata"
+    ],
+    "preservedCoverage": [
+      "All612 prior raw rationale objects remain byte-exact, including the two failed metadata preparations. Corrected records precede same-fingerprint malformed preparations solely because validator uses first match; no source, test, fingerprint or acceptance has changed.",
+      "All610 preceding raw rationale objects remain byte-exact. All609 prior records also verified by worker. Original old feature assertions restored where #216 unnecessarily migrated unchanged lexical contracts; none removed or weakened.",
+      "Actual IDB/head/readback review consumer covers NaN/null, missing/own undefined, -0/0 and named array properties; positive unchanged typed facts preserve safe committedAt-only retry. Existing full comparison and accepted state/draft/head hash+payload/owner/sourceFingerprint/unknown-field/browser/pending/holds/account/UID/auth epoch protections remain.",
+      "Cancel, original monotonic deadline/controller/serial, late-result retirement, no default selection/adoption/write, terminal copy, bounded safe report projection, native lifecycle, earlier backup and notice/CLI acceptance remain unchanged.",
+      "Original53d failed full2FAQ, initial FAQ repair stale-literal failure, typed fixture cross-realm setup failure, and all earlier failed repairs retained with their honest classification."
+    ],
+    "redEvidence": {
+      "command": "Retained actual run records: final-53d9c98 full recorder d225aded; typed-head-repair/runs afc4699d; prior feature REDs remain in original immutable records and HANDOFF files.",
+      "failure": "Before functional repair, all four actual structured-clone metadata transitions returned verified true instead of held false. Before copy repair the full suite failed two unchanged original FAQ contracts. Cross-realm fixture infrastructure failure is separately retained, not a feature RED."
+    },
+    "greenEvidence": "Worker164/164 recovery/identity/report,27/27 focused,3/3 hygiene and committed preflight passed; owner FAQ repair5/5 and independent Code pass. Final exact full/native/rules/compatibility/rendered/review/CI/public evidence remains required.",
+    "evidenceClassification": "metadata-only-correction-after-preflight-no-functional-change"
+  },
+  {
+    "baseCommit": "b50ac1694502090a51503fdaa79d97d19d13d43e",
+    "testChangesSha256": "8091e6bb5126fb411f085e378b56577e7687422070f378f19575d4883bc1e3a9",
+    "reason": "Correct the final integration rationale test-title metadata after preflight rejected unregistered names; all original records are preserved.",
+    "previousBehavior": "Candidate53d had a lossy JSON head-metadata exemption and unnecessarily shortened existing backup lifecycle guidance; full validation and an independent specialist exposed the defects.",
+    "intendedBehavior": "Only finite committedAt-only changes with all other structured-clone head facts losslessly equal may permit one fresh pair in the original minute. Unknown facts remain binding. The published backup/Restore FAQ and original lexical assertions are restored; all new format/route and protected-choice guidance remains.",
+    "replacementTests": [
+      "RISK cloud source fresh check: structured-clone head facts cannot be erased by the metadata exception",
+      "RISK cloud source fresh check: changed head ownership and unknown record facts cannot count as harmless metadata"
+    ],
+    "preservedCoverage": [
+      "All612 prior raw rationale objects remain byte-exact, including the two failed metadata preparations. Corrected records precede same-fingerprint malformed preparations solely because validator uses first match; no source, test, fingerprint or acceptance has changed.",
+      "All610 preceding raw rationale objects remain byte-exact. All609 prior records also verified by worker. Original old feature assertions restored where #216 unnecessarily migrated unchanged lexical contracts; none removed or weakened.",
+      "Actual IDB/head/readback review consumer covers NaN/null, missing/own undefined, -0/0 and named array properties; positive unchanged typed facts preserve safe committedAt-only retry. Existing full comparison and accepted state/draft/head hash+payload/owner/sourceFingerprint/unknown-field/browser/pending/holds/account/UID/auth epoch protections remain.",
+      "Cancel, original monotonic deadline/controller/serial, late-result retirement, no default selection/adoption/write, terminal copy, bounded safe report projection, native lifecycle, earlier backup and notice/CLI acceptance remain unchanged.",
+      "Original53d failed full2FAQ, initial FAQ repair stale-literal failure, typed fixture cross-realm setup failure, and all earlier failed repairs retained with their honest classification."
+    ],
+    "redEvidence": {
+      "command": "Retained actual run records: final-53d9c98 full recorder d225aded; typed-head-repair/runs afc4699d; prior feature REDs remain in original immutable records and HANDOFF files.",
+      "failure": "Before functional repair, all four actual structured-clone metadata transitions returned verified true instead of held false. Before copy repair the full suite failed two unchanged original FAQ contracts. Cross-realm fixture infrastructure failure is separately retained, not a feature RED."
+    },
+    "greenEvidence": "Worker164/164 recovery/identity/report,27/27 focused,3/3 hygiene and committed preflight passed; owner FAQ repair5/5 and independent Code pass. Final exact full/native/rules/compatibility/rendered/review/CI/public evidence remains required.",
+    "evidenceClassification": "metadata-only-correction-after-preflight-no-functional-change"
+  },
+  {
+    "baseCommit": "4e3bcb7e317ae251c8e8a030291802a52ffdefa0",
+    "testChangesSha256": "b02e4ae746f22735fe92aabd05bf635670e18759d5edbc04951dd15a8b93c6b1",
     "reason": "Bind the coherent backup/Restore, notice continuation and bounded P0 verification candidate after genuine independent-review and full-suite repairs; preserve all original rationale records and feature assertions.",
     "previousBehavior": "Candidate53d had a lossy JSON head-metadata exemption and unnecessarily shortened existing backup lifecycle guidance; full validation and an independent specialist exposed the defects.",
     "intendedBehavior": "Only finite committedAt-only changes with all other structured-clone head facts losslessly equal may permit one fresh pair in the original minute. Unknown facts remain binding. The published backup/Restore FAQ and original lexical assertions are restored; all new format/route and protected-choice guidance remains.",
