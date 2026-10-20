@@ -1859,3 +1859,17 @@ The real app consumers use synthetic independently verified generations and exte
 - RISK recovery read minute: known-damage entry clears on healthy reads and identity change without broadening ordinary timeouts
 
 An ordinary timeout does not clear a previously verified damage finding. The native menu still reaches fresh guarded source review, without selecting or publishing anything. A healthy source or account change clears that finding; an obsolete account read and a never-damaged timeout cannot create it. Accepted board, device head, pending evidence and cloud bytes remain exact throughout.
+
+## One fresh guarded source verification (#187)
+
+- RISK cloud source fresh check: one between-capture cloud change verifies again within the same review
+- RISK cloud source fresh check: head metadata alone permits one fresh pair and visible cancellable progress
+- RISK cloud source fresh check: changed head ownership and unknown record facts cannot count as harmless metadata
+- RISK cloud source fresh check: continuing peer churn stops after four complete captures without choosing
+- RISK cloud source fresh check: the restart shares the original minute and late replies remain powerless
+- RISK cloud source fresh check: Cancel and reopen revoke a stalled fresh pair and its late callback
+- RISK cloud source fresh check: changed local authority and unsupported or failed reads never restart
+- RISK cloud source fresh check: a draft changed as fresh progress opens cannot become the new baseline
+- RISK cloud source fresh check guidance: mounted Help explains one fresh check without choosing
+
+One transient between-capture cloud snapshot or finite committedAt-only head metadata change can restart both complete captures once within the original monotonic minute. No source is selected or published. Accepted work, drafts, UID/epoch, head ownership and unknown fields, pending/browser/hold/prepared sources stay binding; churn, cancellation, unsupported sources and refused storage remain held. Synthetic SDK/time/DOM/IDB consumers preserve exact sources and ordinary pull/write deadlines; actual affected-iOS source validity and recovery remain unverified.

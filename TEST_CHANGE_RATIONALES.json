@@ -15529,5 +15529,35 @@
     "failure": "The actual full-app network consumer returned verified for array original source rather than unavailable. The source-present assertion failed before string guards were added; subsequent full apology cohort passed. Earlier original feature and Help REDs remain in preceding records."
   },
   "greenEvidence": "integration216/notice-type-green.output.txt: all apology/identity consumer cases pass after the type guard; supplemental malformed cases retain their actual classification."
+},
+{
+  "baseCommit": "d2b85004a2c430b519e2b61d1f810ee1e790005e",
+  "testChangesSha256": "71f1e55e1021c3ca78a9d1e2f2cc619e6232038661f2c8137ac93f319f6a9f85",
+  "reason": "Implement the explicitly authorized one fresh whole-source verification for a confirmed transient cross-capture mismatch, retaining every prior assertion and all original source/publication safeguards.",
+  "previousBehavior": "One changed cloud revision between otherwise individually stable complete reads immediately returned a terminal source-changed message. The same real consumer verified on a fresh manual call after the transient stopped. There was no automatic fresh pair within the original read budget.",
+  "intendedBehavior": "At most one fresh pair follows only a typed cross-capture mismatch while the complete original local/identity/authority baseline remains safe. Only cloud snapshot and confirmed finite committedAt-only head differences are eligible. The same monotonic minute/controller/serial, all validation, cancellation and explicit consent remain mandatory; ordinary pull/write and publication behavior do not change.",
+  "replacementTests": [
+    "RISK cloud source fresh check: one between-capture cloud change verifies again within the same review",
+    "RISK cloud source fresh check: head metadata alone permits one fresh pair and visible cancellable progress",
+    "RISK cloud source fresh check: changed head ownership and unknown record facts cannot count as harmless metadata",
+    "RISK cloud source fresh check: continuing peer churn stops after four complete captures without choosing",
+    "RISK cloud source fresh check: the restart shares the original minute and late replies remain powerless",
+    "RISK cloud source fresh check: Cancel and reopen revoke a stalled fresh pair and its late callback",
+    "RISK cloud source fresh check: changed local authority and unsupported or failed reads never restart",
+    "RISK cloud source fresh check: a draft changed as fresh progress opens cannot become the new baseline",
+    "RISK cloud source fresh check guidance: mounted Help explains one fresh check without choosing"
+  ],
+  "preservedCoverage": [
+    "All605 prior rationale raw objects and every preexisting runtime assertion remain unchanged. Only new full-app tests and a fixture wrapper are added; no old expectation is weakened or relabelled.",
+    "Exact accepted state, head payload/hash and ownership/unknown metadata, browser raw, pending, device holds, prepared choices, UID/auth epoch and drafts remain binding. No cloud writes, source choice or prepared publication occur during verification.",
+    "The first permanent peer-change actual consumer failed false-versus-true before the first runtime edit, then passed. Later head account/sourceFingerprint/unknown-authority controls exposed an overly broad metadata allowance through a new true-versus-false consumer RED before the committedAt-only repair.",
+    "The first guidance attempt had a new-test regex syntax infrastructure failure, retained as nonqualifying. After repairing only test syntax the mounted Help assertion failed for absent copy; only then were FAQ and current changelog updated.",
+    "Head committedAt, bounded churn, same total minute, Cancel/reopen/late callback, local/identity/source refusal and fresh-progress draft controls were authored after initial implementation and are supplemental GREEN controls, not fabricated preimplementation RED. Existing one-minute/ordinary20second and finite passive diagnostics contracts remain required.",
+    "No generic SDK/network failure, storage refusal, unsupported evidence, account/local edit or source-choice/publication phase enters automatic retry. No source byte/identity/revision/CAS/ACK proof is weakened. Full/native/rendered/emulator/CI/live and actual private affected-device recovery remain outside this worker handoff."
+  ],
+  "redEvidence": {
+    "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- Node22 --test --test-name-pattern=\"^RISK cloud source fresh check: one between-capture cloud change\" tests.js; exact raw records under integration216/p0-fresh-source-retry/runs and peer-change-red.output.txt. Separate head-authority-red.output.txt and guidance-consumer-red.output.txt precede their repairs.",
+    "failure": "Actual same-attempt peer-change assertion failed false !== true on exactd2b8500 before implementation. Subsequent actual head owner/sourceFingerprint/unknown-field control failed true !== false before restricting metadata to finite committedAt. Mounted Help failed the fresh-check sentence assertion before copy; earlier syntax-only record0211f05a remains infrastructure failure and is not behavioral RED."
+  }
 }
 ]
