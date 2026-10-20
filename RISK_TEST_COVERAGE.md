@@ -12,6 +12,9 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 ## Task state, eligibility, and scanner controls
 
+- RISK backup format safety: raw-source qualification remains outside the native selector
+- RISK backup format browser: enlarged unreadable Settings keeps native selectors and safety text readable
+
 - RISK resilient sync recovery: identity changes after durable source capture cannot bind an old response to a new account
 
 - RISK resilient sync recovery: rebuilding retains an interrupted pending generation and its exact readable chunks

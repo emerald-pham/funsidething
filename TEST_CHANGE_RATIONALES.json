@@ -15755,5 +15755,77 @@
     },
     "greenEvidence": "Worker164/164 recovery/identity/report,27/27 focused,3/3 hygiene and committed preflight passed; owner FAQ repair5/5 and independent Code pass. Final exact full/native/rules/compatibility/rendered/review/CI/public evidence remains required.",
     "evidenceClassification": "actual-consumer-red-green-with-cumulative-owner-integration"
+  },
+  {
+    "baseCommit": "d0ecd5f3ce6e810036063f7df1e0027f5c1a2293",
+    "testChangesSha256": "36ffadc29d15db114200bbeb161840ca21b0a470c5477703af0d949a3a2cb5db",
+    "reason": "Repair independently observed enlarged unreadable Settings overflow through the existing mounted and native browser consumers, preserving every original assertion and raw rationale object.",
+    "previousBehavior": "At390px and22.5px native selector text, the raw-only option was379px wide/right420 beyond its308px Settings row and clipped the not-a-board qualification and native arrow.",
+    "intendedBehavior": "Only the two new backup/Restore selectors reuse the existing bounded native-select rule. Raw device sources keeps its unchanged value and source-only archive semantics, with the full wrapping not-a-board qualification outside the native select and linked by aria-describedby. FAQ/current changelog explain readable narrow/enlarged controls.",
+    "replacementTests": [
+      "RISK backup format safety: raw-source qualification remains outside the native selector",
+      "RISK backup format browser: enlarged unreadable Settings keeps native selectors and safety text readable"
+    ],
+    "preservedCoverage": [
+      "All614 preceding raw rationale objects remain byte-exact. No passing existing assertion, native format/download/file/paste/Cancel/source-protection guard or release/source identity contract is removed or weakened.",
+      "Actual native dark/light Settings tests use the established LANDSCAPE_BROWSER_URL/Playwright route and named browser consumer, at390x844 withselect22.5px andhelper20.25px diagnostic font sizes. They verify row bounds, actual same-font native intrinsic label/arrow reference, accessible visible qualification, native source selection and raw-source equality. They do not claim physical device/native zoom or full typography coverage.",
+      "The added browser case is environment-gated like the existing browser cohorts; it was actually executed withzero skips in RED/GREEN and final full rendered matrix remains mandatory. The added mounted consumer is unconditional in ordinary CI.",
+      "Original meaningful browser overflow RED and mounted missing-qualification RED precede app edits. First failed GREEN exposed an uncalibrated24px arrow heuristic; original/failed/repaired records remain. The probe now compares actual same-font/padding/native-appearance intrinsic width rather than weakening row containment.",
+      "Existing colors/fonts/padding/borders/actions are unchanged; only newcontrol IDs receive min-width0/max-width100. Unrelated selectors, storage/cloud/auth, all current P0 identity/budget/consent and bounded diagnostics remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "Actual recorder bc6cc8aa-d672-4f33-be06-5894444cb781: node --test --test-name-pattern=^RISK backup format tests.js with established localhost browser URL/module and isolated malformed source, exact d0 app before runtime edit.",
+      "failure": "Mounted Settings had no visible not-a-board qualification outside select; native dark and light fields exceeded their real Settings row.4of4 actual outcomes failed assertions,0skip, before CSS/label/helper repair. Independent rendered finding raw-select.json independently records379px/right420."
+    },
+    "greenEvidence": "Corrected probe7of7 pass6558bf3a; final narrowly scoped CSS recheck7of7 passb0201f82. Initial failed GREEN9cc15355 retained as probe-assumption failure, not feature RED. New exact full/native/rules/compatibility/rendered/reviews/CI/live acceptance still required.",
+    "evidenceClassification": "contemporaneous-mounted-and-native-consumer-red-green"
+  },
+  {
+    "baseCommit": "4e3bcb7e317ae251c8e8a030291802a52ffdefa0",
+    "testChangesSha256": "7fc44af8c8bf7c257660df1770216ef44b13f1667779b2b20ce9fcb77274e346",
+    "reason": "Repair independently observed enlarged unreadable Settings overflow through the existing mounted and native browser consumers, preserving every original assertion and raw rationale object.",
+    "previousBehavior": "At390px and22.5px native selector text, the raw-only option was379px wide/right420 beyond its308px Settings row and clipped the not-a-board qualification and native arrow.",
+    "intendedBehavior": "Only the two new backup/Restore selectors reuse the existing bounded native-select rule. Raw device sources keeps its unchanged value and source-only archive semantics, with the full wrapping not-a-board qualification outside the native select and linked by aria-describedby. FAQ/current changelog explain readable narrow/enlarged controls.",
+    "replacementTests": [
+      "RISK backup format safety: raw-source qualification remains outside the native selector",
+      "RISK backup format browser: enlarged unreadable Settings keeps native selectors and safety text readable"
+    ],
+    "preservedCoverage": [
+      "All614 preceding raw rationale objects remain byte-exact. No passing existing assertion, native format/download/file/paste/Cancel/source-protection guard or release/source identity contract is removed or weakened.",
+      "Actual native dark/light Settings tests use the established LANDSCAPE_BROWSER_URL/Playwright route and named browser consumer, at390x844 withselect22.5px andhelper20.25px diagnostic font sizes. They verify row bounds, actual same-font native intrinsic label/arrow reference, accessible visible qualification, native source selection and raw-source equality. They do not claim physical device/native zoom or full typography coverage.",
+      "The added browser case is environment-gated like the existing browser cohorts; it was actually executed withzero skips in RED/GREEN and final full rendered matrix remains mandatory. The added mounted consumer is unconditional in ordinary CI.",
+      "Original meaningful browser overflow RED and mounted missing-qualification RED precede app edits. First failed GREEN exposed an uncalibrated24px arrow heuristic; original/failed/repaired records remain. The probe now compares actual same-font/padding/native-appearance intrinsic width rather than weakening row containment.",
+      "Existing colors/fonts/padding/borders/actions are unchanged; only newcontrol IDs receive min-width0/max-width100. Unrelated selectors, storage/cloud/auth, all current P0 identity/budget/consent and bounded diagnostics remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "Actual recorder bc6cc8aa-d672-4f33-be06-5894444cb781: node --test --test-name-pattern=^RISK backup format tests.js with established localhost browser URL/module and isolated malformed source, exact d0 app before runtime edit.",
+      "failure": "Mounted Settings had no visible not-a-board qualification outside select; native dark and light fields exceeded their real Settings row.4of4 actual outcomes failed assertions,0skip, before CSS/label/helper repair. Independent rendered finding raw-select.json independently records379px/right420."
+    },
+    "greenEvidence": "Corrected probe7of7 pass6558bf3a; final narrowly scoped CSS recheck7of7 passb0201f82. Initial failed GREEN9cc15355 retained as probe-assumption failure, not feature RED. New exact full/native/rules/compatibility/rendered/reviews/CI/live acceptance still required.",
+    "evidenceClassification": "contemporaneous-mounted-and-native-consumer-red-green"
+  },
+  {
+    "baseCommit": "b50ac1694502090a51503fdaa79d97d19d13d43e",
+    "testChangesSha256": "7baa985629d1fd579e4f6fd68780999e9601f345e6f0aeea1464dfe627868e20",
+    "reason": "Repair independently observed enlarged unreadable Settings overflow through the existing mounted and native browser consumers, preserving every original assertion and raw rationale object.",
+    "previousBehavior": "At390px and22.5px native selector text, the raw-only option was379px wide/right420 beyond its308px Settings row and clipped the not-a-board qualification and native arrow.",
+    "intendedBehavior": "Only the two new backup/Restore selectors reuse the existing bounded native-select rule. Raw device sources keeps its unchanged value and source-only archive semantics, with the full wrapping not-a-board qualification outside the native select and linked by aria-describedby. FAQ/current changelog explain readable narrow/enlarged controls.",
+    "replacementTests": [
+      "RISK backup format safety: raw-source qualification remains outside the native selector",
+      "RISK backup format browser: enlarged unreadable Settings keeps native selectors and safety text readable"
+    ],
+    "preservedCoverage": [
+      "All614 preceding raw rationale objects remain byte-exact. No passing existing assertion, native format/download/file/paste/Cancel/source-protection guard or release/source identity contract is removed or weakened.",
+      "Actual native dark/light Settings tests use the established LANDSCAPE_BROWSER_URL/Playwright route and named browser consumer, at390x844 withselect22.5px andhelper20.25px diagnostic font sizes. They verify row bounds, actual same-font native intrinsic label/arrow reference, accessible visible qualification, native source selection and raw-source equality. They do not claim physical device/native zoom or full typography coverage.",
+      "The added browser case is environment-gated like the existing browser cohorts; it was actually executed withzero skips in RED/GREEN and final full rendered matrix remains mandatory. The added mounted consumer is unconditional in ordinary CI.",
+      "Original meaningful browser overflow RED and mounted missing-qualification RED precede app edits. First failed GREEN exposed an uncalibrated24px arrow heuristic; original/failed/repaired records remain. The probe now compares actual same-font/padding/native-appearance intrinsic width rather than weakening row containment.",
+      "Existing colors/fonts/padding/borders/actions are unchanged; only newcontrol IDs receive min-width0/max-width100. Unrelated selectors, storage/cloud/auth, all current P0 identity/budget/consent and bounded diagnostics remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "Actual recorder bc6cc8aa-d672-4f33-be06-5894444cb781: node --test --test-name-pattern=^RISK backup format tests.js with established localhost browser URL/module and isolated malformed source, exact d0 app before runtime edit.",
+      "failure": "Mounted Settings had no visible not-a-board qualification outside select; native dark and light fields exceeded their real Settings row.4of4 actual outcomes failed assertions,0skip, before CSS/label/helper repair. Independent rendered finding raw-select.json independently records379px/right420."
+    },
+    "greenEvidence": "Corrected probe7of7 pass6558bf3a; final narrowly scoped CSS recheck7of7 passb0201f82. Initial failed GREEN9cc15355 retained as probe-assumption failure, not feature RED. New exact full/native/rules/compatibility/rendered/reviews/CI/live acceptance still required.",
+    "evidenceClassification": "contemporaneous-mounted-and-native-consumer-red-green"
   }
 ]

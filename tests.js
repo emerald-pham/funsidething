@@ -7580,6 +7580,45 @@ test("RISK backup and Restore consolidation: Settings keeps one guarded action w
   assert.doesNotMatch(html, /Current board recovery/);
 });
 
+test('RISK backup format safety: raw-source qualification remains outside the native selector',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),original='{unreadable original backup source';
+ const app=await loadApp({indexedDBProvider:new IDBFactory(),deviceDbName:'raw-format-safety-'+Math.random(),seedStorage:{[SYNC_STORE_KEY]:original,[LOCAL_HEAD_KEY]:'different protected original'}}),{ctx,shim}=app;
+ t.after(()=>closeLegacyApp173(app));const before=await ctx.window.ScannerDeviceStore.readRawExportSnapshot();
+ ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
+ const format=settings.match(/<select\b[^>]*id="backupDownloadFormat"[^>]*>[\s\S]*?<\/select>/)?.[0];assert.ok(format);
+ assert.match(settings.replace(/<select\b[^>]*>[\s\S]*?<\/select>/g,''),/Raw device sources are not a board and cannot be restored as one\./,'the safety qualification is readable text outside the potentially truncated native option');
+ const describedBy=format.match(/aria-describedby="([^"]+)"/)?.[1];assert.ok(describedBy,'the native format control names its visible safety explanation');assert.ok(settings.includes('id="'+describedBy+'"'));
+ assert.deepEqual(await ctx.window.ScannerDeviceStore.readRawExportSnapshot(),before);assert.equal(shim.localStorage.getItem(SYNC_STORE_KEY),original);
+});
+
+test('RISK backup format browser: enlarged unreadable Settings keeps native selectors and safety text readable',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT),{resolveExpectedFirstRunHelp}=await import('./scripts/browser-fixture-setup.mjs');
+ const origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin,browser=await chromium.launch({headless:true});
+ const evidence=process.env.BACKUP_CONTROL_EVIDENCE_DIR;if(evidence)fs.mkdirSync(evidence,{recursive:true});
+ try{for(const theme of ['dark','light'])await t.test(theme,async()=>{
+  const context=await browser.newContext({viewport:{width:390,height:844},colorScheme:theme,reducedMotion:'reduce',serviceWorkers:'block'});
+  try{
+   await context.addInitScript(()=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:null,writable:false,configurable:false});localStorage.setItem('fvp:chain-scanner:v1','{unreadable original source');localStorage.setItem('fvp:chain-scanner:protected:v1','different protected original');localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced');});
+   await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+   const page=await context.newPage(),response=await page.goto(process.env.LANDSCAPE_BROWSER_URL);assert.equal(await response.text(),html,'native geometry consumer serves this exact app shell');
+   await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&window.ScannerDeviceStore);
+   const motion=page.locator('#motionDialog [data-landscape-motion="reduced"]');if(await motion.isVisible())await motion.click();await resolveExpectedFirstRunHelp(page);
+   assert.equal(await page.evaluate(()=>liveBoardAccepted),false);
+   await page.locator('[data-act="settings"]').first().click();const section=page.locator('#modalRoot details').filter({has:page.locator('#backupDownloadFormat')});if(!await section.evaluate(e=>e.open))await section.locator(':scope > summary').click();
+   const before=await page.evaluate(()=>ScannerDeviceStore.readRawExportSnapshot());
+   await page.addStyleTag({content:'#backupDownloadFormat,#backupRestoreSource,#stDateFormat{font-size:22.5px!important} #modalRoot .modal .kv{font-size:20.25px!important}'});
+   await page.evaluate(()=>document.fonts.ready);await page.locator('#backupDownloadFormat').scrollIntoViewIfNeeded();
+   assert.deepEqual(await page.locator('#backupDownloadFormat option').evaluateAll(es=>es.map(e=>e.value)),['raw-device-sources']);
+   const geometry=await page.locator('#backupDownloadFormat,#backupRestoreSource').evaluateAll(es=>es.map(e=>{const r=e.getBoundingClientRect(),p=e.parentElement.getBoundingClientRect(),s=getComputedStyle(e),probe=document.createElement('select'),option=document.createElement('option');option.textContent=e.selectedOptions[0].textContent;probe.appendChild(option);probe.style.cssText='position:fixed;visibility:hidden;width:max-content;max-width:none;min-width:0;';probe.style.font=s.font;probe.style.padding=s.padding;probe.style.border=s.border;probe.style.appearance=s.appearance;document.body.appendChild(probe);const nativeIntrinsicWidth=probe.getBoundingClientRect().width;probe.remove();return{id:e.id,left:r.left,right:r.right,width:r.width,parentLeft:p.left,parentRight:p.right,fontSize:s.fontSize,text:e.selectedOptions[0].textContent,nativeIntrinsicWidth,appearance:s.appearance};}));
+   if(evidence)await page.screenshot({path:path.join(evidence,theme+'-raw-format.png')});t.diagnostic(JSON.stringify({theme,geometry}));
+   for(const r of geometry){assert.equal(r.fontSize,'22.5px');assert.ok(r.left>=r.parentLeft-1&&r.right<=r.parentRight+1,r.id+' must remain inside its real Settings row');assert.ok(r.nativeIntrinsicWidth<=r.width+1,r.id+' leaves room for its complete label and native arrow compared with an unconstrained native reference');assert.notEqual(r.appearance,'none');}
+   const help=page.getByText('Raw device sources are not a board and cannot be restored as one.',{exact:true});assert.equal(await help.isVisible(),true);assert.equal(await page.locator('#backupDownloadFormat').getAttribute('aria-describedby'),await help.getAttribute('id'));
+   assert.equal(await help.evaluate(e=>e.scrollWidth<=e.clientWidth+1),true);
+   await page.locator('#backupRestoreSource').selectOption('paste');assert.equal(await page.locator('#backupRestoreSource').inputValue(),'paste');assert.deepEqual(await page.evaluate(()=>ScannerDeviceStore.readRawExportSnapshot()),before);assert.equal(await page.evaluate(()=>liveBoardAccepted),false);
+  }finally{await context.close();}
+ });}finally{await browser.close();}
+});
+
 test("median: odd, even, and empty arrays", () => {
   const E = loadEngine();
   assert.equal(E.median([3, 1, 2]), 2);
