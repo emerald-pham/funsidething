@@ -6293,6 +6293,11 @@ test('RISK apology release identity: malformed continuation fails closed at the 
   ['wrong path',notice=>{notice.continuation.basePath='/funsidething/';}],
   ['wrong notice',notice=>{notice.continuation.noticeId='another-notice';}],
   ['bad product',notice=>{notice.continuation.originalProduct.tree='bad';}],
+  ['array original source',notice=>{notice.continuation.originalProduct.sourceRevision=[notice.continuation.originalProduct.sourceRevision];}],
+  ['array original tree',notice=>{notice.continuation.originalProduct.tree=[notice.continuation.originalProduct.tree];}],
+  ['array original fingerprint',notice=>{notice.continuation.originalProduct.appFingerprint=[notice.continuation.originalProduct.appFingerprint];}],
+  ['array current source',(_notice,envelope)=>{envelope.product.sourceRevision=[envelope.product.sourceRevision];}],
+  ['array current tree',(_notice,envelope)=>{envelope.product.tree=[envelope.product.tree];}],
   ['extra product field',notice=>{notice.continuation.originalProduct.extra=true;}],
   ['missing evidence',notice=>{delete notice.continuation.evidence.publicationSha256;}],
   ['bad evidence hash',notice=>{notice.continuation.evidence.artifactSha256='bad';}],
@@ -6304,7 +6309,7 @@ test('RISK apology release identity: malformed continuation fails closed at the 
   ['malformed proof with otherwise valid legacy order',notice=>{notice.startsAt=deployedAt;notice.continuation=null;}],
  ];
  for(const [label,mutate] of cases){
-  const envelope=channelReleaseEnvelope('beta',startsAt,deployedAt);envelope.notices[APOLOGY_NOTICE_ID].continuation=publishedBetaContinuation();mutate(envelope.notices[APOLOGY_NOTICE_ID]);
+  const envelope=channelReleaseEnvelope('beta',startsAt,deployedAt);envelope.notices[APOLOGY_NOTICE_ID].continuation=publishedBetaContinuation();mutate(envelope.notices[APOLOGY_NOTICE_ID],envelope);
   const app=await loadAppAtTime(at,{locationHref:'https://chain-scanner.web.app/',
    fetchProvider:async url=>({ok:true,redirected:false,type:'basic',url:String(url),json:async()=>envelope}),
    cloudSyncFactory:()=>({ready:false,user:null,status:'idle',configured:true,recoveryIdentity:()=> 'invalid-continuation-uid'}),

@@ -15489,5 +15489,45 @@
   },
   "greenEvidence": "Reader GREEN b63f0a58-6052-424c-b180-6882e9c3b3d6; focused apology/help preservation cohort integration216/notice-help-green.output.txt:14 pass,0 fail,0 skip.",
   "evidenceClassification": "current-source-consumer-red-green-with-honest-supplemental-preservation"
+},
+{
+  "baseCommit": "4e3bcb7e317ae251c8e8a030291802a52ffdefa0",
+  "testChangesSha256": "395263ee9a1c793d32e0cb71b48f18713cef3775f7db2ea71ad90b59346960f1",
+  "reason": "Repair independent review P2 by rejecting array-valued hexadecimal product identifiers instead of JavaScript regex coercion, retaining the original consumer test-first history and all216 protection coverage.",
+  "previousBehavior": "A JSON array containing a single valid source, tree or fingerprint string could pass regex validation and enter the immutable original-publication provenance; current source/tree identifiers had the same coercion gap.",
+  "intendedBehavior": "The existing metadata network consumer requires real strings before validating current and original product identifiers. Malformed arrays fail closed without changing board or notice storage.",
+  "replacementTests": [
+    "RISK apology release identity: malformed continuation fails closed at the network consumer"
+  ],
+  "preservedCoverage": [
+    "All603 prior rationale objects and all original passing tests are retained unchanged except additive malformed-type cases and their shared test mutation input.",
+    "Existing valid continuation, missing-proof legacy ordering, exact apology, expiry, dismissed UID, manual reopening, independent Stable, source/data/restore protection and named216 original RED/GREEN records remain intact.",
+    "Independent Code and Specialist separately identified the same P2 in pinned ddcf349; owner permanent consumer RED4c9f65dc preceded the two reader type checks."
+  ],
+  "redEvidence": {
+    "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK apology release identity: malformed continuation fails closed at the network consumer$\" tests.js; integration216/notice-reader-runs/2026-10-20T20-14-10-865Z-4c9f65dc-aa72-4979-94cb-43594ee3eb59.json.",
+    "failure": "The actual full-app network consumer returned verified for array original source rather than unavailable. The source-present assertion failed before string guards were added; subsequent full apology cohort passed. Earlier original feature and Help REDs remain in preceding records."
+  },
+  "greenEvidence": "integration216/notice-type-green.output.txt: all apology/identity consumer cases pass after the type guard; supplemental malformed cases retain their actual classification."
+},
+{
+  "baseCommit": "b50ac1694502090a51503fdaa79d97d19d13d43e",
+  "testChangesSha256": "75c32c02f76c6f3cd58877b0892296ba6962a000b0629867645dff3dbe9067de",
+  "reason": "Repair independent review P2 by rejecting array-valued hexadecimal product identifiers instead of JavaScript regex coercion, retaining the original consumer test-first history and all216 protection coverage.",
+  "previousBehavior": "A JSON array containing a single valid source, tree or fingerprint string could pass regex validation and enter the immutable original-publication provenance; current source/tree identifiers had the same coercion gap.",
+  "intendedBehavior": "The existing metadata network consumer requires real strings before validating current and original product identifiers. Malformed arrays fail closed without changing board or notice storage.",
+  "replacementTests": [
+    "RISK apology release identity: malformed continuation fails closed at the network consumer"
+  ],
+  "preservedCoverage": [
+    "All603 prior rationale objects and all original passing tests are retained unchanged except additive malformed-type cases and their shared test mutation input.",
+    "Existing valid continuation, missing-proof legacy ordering, exact apology, expiry, dismissed UID, manual reopening, independent Stable, source/data/restore protection and named216 original RED/GREEN records remain intact.",
+    "Independent Code and Specialist separately identified the same P2 in pinned ddcf349; owner permanent consumer RED4c9f65dc preceded the two reader type checks."
+  ],
+  "redEvidence": {
+    "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK apology release identity: malformed continuation fails closed at the network consumer$\" tests.js; integration216/notice-reader-runs/2026-10-20T20-14-10-865Z-4c9f65dc-aa72-4979-94cb-43594ee3eb59.json.",
+    "failure": "The actual full-app network consumer returned verified for array original source rather than unavailable. The source-present assertion failed before string guards were added; subsequent full apology cohort passed. Earlier original feature and Help REDs remain in preceding records."
+  },
+  "greenEvidence": "integration216/notice-type-green.output.txt: all apology/identity consumer cases pass after the type guard; supplemental malformed cases retain their actual classification."
 }
 ]

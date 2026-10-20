@@ -47,6 +47,7 @@
        value.origin!==DESTINATIONS.beta.origin||value.basePath!==DESTINATIONS.beta.basePath||value.noticeId!==NOTICE_ID)return null;
     const product=value.originalProduct,evidence=value.evidence;
     if(!exactKeys(product,["sourceRevision","tree","appFingerprint"])||
+       typeof product.sourceRevision!=="string"||typeof product.tree!=="string"||typeof product.appFingerprint!=="string"||
        !/^[a-f0-9]{40}$/.test(product.sourceRevision||"")||!/^[a-f0-9]{40}$/.test(product.tree||"")||
        !/^[a-f0-9]{64}$/.test(product.appFingerprint||"")||
        !exactKeys(evidence,["artifactSha256","publicationSha256","publicVerificationSha256"])||
@@ -67,7 +68,8 @@
     const destination=DESTINATIONS[value.channel];
     if(!destination||value.origin!==destination.origin||value.basePath!==destination.basePath||!validPage(value.channel))return null;
     const product=value.product,notice=value.notices?.[NOTICE_ID],fingerprint=templateFingerprint();
-    if(!product||typeof product!=="object"||
+    if(!product||typeof product!=="object"||Array.isArray(product)||
+       typeof product.sourceRevision!=="string"||typeof product.tree!=="string"||typeof product.appFingerprint!=="string"||
        !/^[a-f0-9]{40}$/.test(product.sourceRevision||"")||
        !/^[a-f0-9]{40}$/.test(product.tree||"")||
        !/^[a-f0-9]{64}$/.test(product.appFingerprint||"")||
