@@ -105,6 +105,7 @@ try {
   files['channel-release.json'] = { sha256: hash(metadata), bytes: metadata.length };
   const config = { hosting: { site: 'chain-scanner', public: 'public', ignore: ['**/.*'], headers: [
     { source: '/channel-release.json', headers: [{ key: 'Cache-Control', value: 'no-store, max-age=0' }] },
+    { source: '/', headers: [{ key: 'Cache-Control', value: 'no-cache' }] },
     { source: '/sw.js', headers: [{ key: 'Cache-Control', value: 'no-cache' }] },
     { source: '/index.html', headers: [{ key: 'Cache-Control', value: 'no-cache' }] },
   ] } };

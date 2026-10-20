@@ -154,6 +154,25 @@ test('Beta packaging labels preview nonpublishable and stages Hosting-only confi
   assert.match(result.stderr, /UNREVIEWED.*NOT FOR PUBLICATION/);
 });
 
+test('Beta packaging revalidates root and named document and worker routes for reviewed and preview artifacts', async t => {
+  for (const preview of [true, false]) await t.test(preview ? 'preview' : 'reviewed', t => {
+    const f = preview ? fixture(t) : reviewedFixture(t);
+    const result = prepare(f, [], preview);
+    assert.equal(result.status, 0, result.stderr);
+    const config = JSON.parse(fs.readFileSync(path.join(f.output, 'firebase.json')));
+    for (const source of ['/', '/index.html', '/sw.js']) {
+      const headers = config.hosting.headers.find(h => h.source === source)?.headers;
+      assert.deepEqual(headers, [{ key: 'Cache-Control', value: 'no-cache' }],
+        source + ' must revalidate at its initial request URL, including the root entry URL');
+    }
+    assert.deepEqual(config.hosting.headers.find(h => h.source === '/channel-release.json').headers,
+      [{ key: 'Cache-Control', value: 'no-store, max-age=0' }], 'metadata keeps its stricter freshness policy');
+    assert.deepEqual(fs.readFileSync(path.join(f.output, 'public/index.html')),
+      execFileSync('git', ['show', f.source + ':index.html'], { cwd: f.repository || repo }),
+      'delivery headers do not alter the exact reviewed product bytes');
+  });
+});
+
 test('Beta packaging rejects stale product fingerprint before staging changed committed product bytes', t => {
   const f = editableFixture(t, root => fs.appendFileSync(path.join(root, 'index.html'), '\n<!-- changed without refreshed product identity -->\n'));
   const result = prepare(f);
