@@ -6250,6 +6250,107 @@ test('RISK apology notice: an eligible Beta login shows the exact original apolo
  assert.equal(app.ctx.window.ChainRelease?.current?.channel,'beta');
 });
 
+function publishedBetaContinuation(){
+ const startsAt='2026-10-20T19:42:33.722Z';
+ return {schemaVersion:1,channel:'beta',origin:'https://chain-scanner.web.app',basePath:'/',noticeId:APOLOGY_NOTICE_ID,
+  originalProduct:{sourceRevision:'b50ac1694502090a51503fdaa79d97d19d13d43e',tree:'d0a89f3232179b5fe6368744b9a69a82b533f547',appFingerprint:'cc008c890dc3f5de3ce1e5fb35c8a3dede880d3aec5d6881e4c563fce722ec48'},
+  originalDeployedAt:startsAt,originalStartsAt:startsAt,
+  evidence:{artifactSha256:'c3f68dab62ed156e413e88d78c0901c761f9f013edb97528a5fadb8e29ae880e',publicationSha256:'1'.repeat(64),publicVerificationSha256:'2'.repeat(64)}};
+}
+
+test('RISK apology release identity: a later Beta product retains the published notice window',async()=>{
+ const startsAt='2026-10-20T19:42:33.722Z',deployedAt='2026-10-22T12:00:00.000Z',at=Date.parse('2026-10-23T12:00:00.000Z');
+ const envelope=channelReleaseEnvelope('beta',startsAt,deployedAt),continuation=publishedBetaContinuation();
+ envelope.notices[APOLOGY_NOTICE_ID].continuation=continuation;
+ const app=await loadAppAtTime(at,{
+  locationHref:'https://chain-scanner.web.app/',
+  fetchProvider:async url=>({ok:true,redirected:false,type:'basic',url:String(url),json:async()=>envelope}),
+  cloudSyncFactory:()=>({ready:false,user:null,status:'idle',configured:true,recoveryIdentity:()=> 'continued-beta-uid'}),
+  beforeStateReady:(_ctx,shim)=>{shim.document.getElementById('appChangelogCurrent').innerHTML=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];},
+ });
+ assert.equal(app.ctx.window.ChainRelease?.status,'verified','the actual metadata consumer accepts explicit original-publication provenance for a later product');
+ const release=app.ctx.window.ChainRelease.current;
+ assert.equal(release.deployedAt,deployedAt,'the product keeps its own later publication time');
+ assert.equal(release.notices[APOLOGY_NOTICE_ID].startsAt,startsAt,'the campaign keeps its original start');
+ assert.equal(JSON.stringify(release.notices[APOLOGY_NOTICE_ID].continuation),JSON.stringify(continuation),'the validated provenance remains inspectable');
+ assert.equal(Object.isFrozen(release.notices[APOLOGY_NOTICE_ID].continuation.evidence),true,'nested public provenance is immutable');
+ const before=JSON.stringify(app.ctx.state);
+ app.ctx.closeModal();const cloud=app.ctx.window.CloudSync;cloud.ready=true;cloud.user='continued@example.invalid';
+ app.ctx.window.dispatchEvent(new app.ctx.CustomEvent('cloudsync'));
+ assert.match(app.shim.document.getElementById('modalRoot').innerHTML,/data-apology-notice="sync-stability-2026-10"/,'the signed-in consumer remains eligible within the original window');
+ assert.equal(JSON.stringify(app.ctx.state),before,'release metadata and display do not alter the board');
+});
+
+test('RISK apology release identity: malformed continuation fails closed at the network consumer',async()=>{
+ const startsAt='2026-10-20T19:42:33.722Z',deployedAt='2026-10-22T12:00:00.000Z',at=Date.parse('2026-10-23T12:00:00.000Z');
+ const cases=[
+  ['null',notice=>{notice.continuation=null;}],
+  ['array',notice=>{notice.continuation=[];}],
+  ['unknown field',notice=>{notice.continuation.path='/private/evidence';}],
+  ['wrong schema',notice=>{notice.continuation.schemaVersion=2;}],
+  ['wrong channel',notice=>{notice.continuation.channel='stable';}],
+  ['wrong origin',notice=>{notice.continuation.origin='https://unverified.example';}],
+  ['wrong path',notice=>{notice.continuation.basePath='/funsidething/';}],
+  ['wrong notice',notice=>{notice.continuation.noticeId='another-notice';}],
+  ['bad product',notice=>{notice.continuation.originalProduct.tree='bad';}],
+  ['extra product field',notice=>{notice.continuation.originalProduct.extra=true;}],
+  ['missing evidence',notice=>{delete notice.continuation.evidence.publicationSha256;}],
+  ['bad evidence hash',notice=>{notice.continuation.evidence.artifactSha256='bad';}],
+  ['extra evidence field',notice=>{notice.continuation.evidence.path='/private';}],
+  ['noncanonical time',notice=>{notice.continuation.originalDeployedAt='2026-10-20T19:42:33Z';}],
+  ['original starts before publication',notice=>{notice.continuation.originalDeployedAt='2026-10-21T00:00:00.000Z';}],
+  ['original publication after current',notice=>{notice.startsAt='2026-10-24T12:00:00.000Z';notice.continuation.originalStartsAt=notice.startsAt;notice.continuation.originalDeployedAt=notice.startsAt;}],
+  ['renewed start',notice=>{notice.startsAt=deployedAt;}],
+  ['malformed proof with otherwise valid legacy order',notice=>{notice.startsAt=deployedAt;notice.continuation=null;}],
+ ];
+ for(const [label,mutate] of cases){
+  const envelope=channelReleaseEnvelope('beta',startsAt,deployedAt);envelope.notices[APOLOGY_NOTICE_ID].continuation=publishedBetaContinuation();mutate(envelope.notices[APOLOGY_NOTICE_ID]);
+  const app=await loadAppAtTime(at,{locationHref:'https://chain-scanner.web.app/',
+   fetchProvider:async url=>({ok:true,redirected:false,type:'basic',url:String(url),json:async()=>envelope}),
+   cloudSyncFactory:()=>({ready:false,user:null,status:'idle',configured:true,recoveryIdentity:()=> 'invalid-continuation-uid'}),
+   beforeStateReady:(_ctx,shim)=>{shim.document.getElementById('appChangelogCurrent').innerHTML=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];},
+  });
+  assert.equal(app.ctx.window.ChainRelease?.status,'unavailable',label);
+  const before=JSON.stringify(app.ctx.state);app.ctx.closeModal();const cloud=app.ctx.window.CloudSync;cloud.ready=true;cloud.user='invalid@example.invalid';app.ctx.window.dispatchEvent(new app.ctx.CustomEvent('cloudsync'));
+  assert.doesNotMatch(app.shim.document.getElementById('modalRoot').innerHTML,/data-apology-notice=/,label+': no automatic notice');
+  assert.equal(JSON.stringify(app.ctx.state),before,label+': board retained');
+  assert.equal(app.shim.localStorage.getItem('fvp:chain-scanner:release-notice:v1:sync-stability-2026-10:beta:invalid-continuation-uid'),null,label+': no notice marker');
+ }
+});
+
+test('RISK apology notice: continuation preserves expiry dismissal manual reopen and separate Stable',async()=>{
+ const startsAt=Date.parse('2026-10-20T19:42:33.722Z'),day=86400000,values=new Map();
+ const storage={getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,String(value)),removeItem:key=>values.delete(key)};
+ const setup=async(channel,at,uid)=>{
+  const envelope=channelReleaseEnvelope(channel,channel==='beta'?startsAt:at-day/24,channel==='beta'?startsAt+day:at-day/24);
+  if(channel==='beta')envelope.notices[APOLOGY_NOTICE_ID].continuation=publishedBetaContinuation();
+  const app=await loadAppAtTime(at,{locationHref:channel==='beta'?'https://chain-scanner.web.app/':'https://emerald-pham.github.io/funsidething/',sharedStorage:storage,
+   fetchProvider:async url=>({ok:true,redirected:false,type:'basic',url:String(url),json:async()=>envelope}),
+   cloudSyncFactory:()=>({ready:false,user:null,status:'idle',configured:true,recoveryIdentity:()=>uid}),
+   beforeStateReady:(_ctx,shim)=>{shim.document.getElementById('appChangelogCurrent').innerHTML=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];},
+  });
+  assert.equal(app.ctx.window.ChainRelease.status,'verified');app.ctx.closeModal();const cloud=app.ctx.window.CloudSync;cloud.ready=true;cloud.user=uid+'@example.invalid';app.ctx.window.dispatchEvent(new app.ctx.CustomEvent('cloudsync'));return app;
+ };
+ const first=await setup('beta',startsAt+2*day,'continued-dismissed');
+ assert.match(first.shim.document.getElementById('modalRoot').innerHTML,/data-apology-notice=/);first.ctx.closeModal();
+ const key='fvp:chain-scanner:release-notice:v1:sync-stability-2026-10:beta:continued-dismissed';assert.equal(storage.getItem(key),'dismissed');
+ const returning=await setup('beta',startsAt+3*day,'continued-dismissed');
+ assert.doesNotMatch(returning.shim.document.getElementById('modalRoot').innerHTML,/data-apology-notice=/,'a later product does not clear the account dismissal');
+ const expired=await setup('beta',startsAt+7*day,'continued-unshown');
+ assert.doesNotMatch(expired.shim.document.getElementById('modalRoot').innerHTML,/data-apology-notice=/,'the original expiry applies even though this product is newer');
+ assert.equal(storage.getItem(key.replace('continued-dismissed','continued-unshown')),null,'expiry does not consume a new marker');
+ expired.ctx.openHelp();const before=[...values];expired.ctx.onAction('reopen-apology',{});
+ assert.ok(expired.shim.document.getElementById('modalRoot').innerHTML.includes(ORIGINAL_APOLOGY.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n\n/g,'<br><br>')),'manual reopen retains the exact original copy after expiry');
+ assert.deepEqual([...values],before,'manual reopen does not renew the window or change saved facts');
+ const stable=await setup('stable',startsAt+8*day,'continued-dismissed');
+ assert.match(stable.shim.document.getElementById('modalRoot').innerHTML,/data-apology-notice=/,'Stable retains a separate fresh ordinary window for that account');
+});
+
+test('RISK apology notice: Help explains that later Beta builds retain the window',async()=>{
+ const app=await loadApp({seed:207216});app.ctx.closeModal();app.ctx.openHelp();
+ assert.match(app.shim.document.getElementById('modalRoot').innerHTML,/Beta and Stable windows are separate; later Beta updates keep the same window/,'the actual Help consumer explains the retained campaign window');
+});
+
 test('RISK apology notice: refreshing an unchanged release keeps the open message',async()=>{
  const at=Date.parse('2026-10-24T12:00:00.000Z'),startsAt=at-60*60*1000,envelope=channelReleaseEnvelope('beta',startsAt,startsAt);
  let requests=0;

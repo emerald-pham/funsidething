@@ -37,6 +37,30 @@
     return page.origin===destination.origin&&
       (page.pathname===destination.basePath||page.pathname===destination.basePath+"index.html");
   }
+  function exactKeys(value,keys){
+    return value&&typeof value==="object"&&!Array.isArray(value)&&
+      Object.keys(value).length===keys.length&&keys.every(key=>Object.prototype.hasOwnProperty.call(value,key));
+  }
+  function noticeContinuation(value,channel,deployedAt,startsAt){
+    if(!exactKeys(value,["schemaVersion","channel","origin","basePath","noticeId","originalProduct","originalDeployedAt","originalStartsAt","evidence"])||
+       value.schemaVersion!==1||channel!=="beta"||value.channel!==channel||
+       value.origin!==DESTINATIONS.beta.origin||value.basePath!==DESTINATIONS.beta.basePath||value.noticeId!==NOTICE_ID)return null;
+    const product=value.originalProduct,evidence=value.evidence;
+    if(!exactKeys(product,["sourceRevision","tree","appFingerprint"])||
+       !/^[a-f0-9]{40}$/.test(product.sourceRevision||"")||!/^[a-f0-9]{40}$/.test(product.tree||"")||
+       !/^[a-f0-9]{64}$/.test(product.appFingerprint||"")||
+       !exactKeys(evidence,["artifactSha256","publicationSha256","publicVerificationSha256"])||
+       !Object.values(evidence).every(hash=>typeof hash==="string"&&/^[a-f0-9]{64}$/.test(hash)))return null;
+    const originalDeployedAt=isoMillis(value.originalDeployedAt),originalStartsAt=isoMillis(value.originalStartsAt);
+    if(originalDeployedAt===null||originalStartsAt===null||originalDeployedAt>originalStartsAt||
+       originalDeployedAt>deployedAt||originalStartsAt!==startsAt)return null;
+    // These references make the publisher's reviewed original evidence auditable;
+    // they are not an additional authority or a request to another service.
+    return {schemaVersion:1,channel,origin:value.origin,basePath:value.basePath,noticeId:NOTICE_ID,
+      originalProduct:{sourceRevision:product.sourceRevision,tree:product.tree,appFingerprint:product.appFingerprint},
+      originalDeployedAt:value.originalDeployedAt,originalStartsAt:value.originalStartsAt,
+      evidence:{artifactSha256:evidence.artifactSha256,publicationSha256:evidence.publicationSha256,publicVerificationSha256:evidence.publicVerificationSha256}};
+  }
   function validateEnvelope(value,requestUrl,nonce,pageIdentity){
     if(!value||typeof value!=="object"||Array.isArray(value)||value.schemaVersion!==1||
        !["beta","stable"].includes(value.channel))return null;
@@ -50,7 +74,13 @@
        !fingerprint||product.appFingerprint!==fingerprint||
        !notice||typeof notice!=="object")return null;
     const deployedAt=isoMillis(value.deployedAt),startsAt=isoMillis(notice.startsAt),now=Date.now();
-    if(deployedAt===null||startsAt===null||deployedAt>now+300000||startsAt<deployedAt)return null;
+    if(deployedAt===null||startsAt===null||deployedAt>now+300000)return null;
+    let continuation=null;
+    if(Object.prototype.hasOwnProperty.call(notice,"continuation")){
+      continuation=noticeContinuation(notice.continuation,value.channel,deployedAt,startsAt);
+      if(!continuation)return null;
+    }
+    if(startsAt<deployedAt&&!continuation)return null;
     const responseUrl=new URL(requestUrl.href);
     if(!pageIdentity()||pageIdentity()!==pageIdentityAtLoad)return null;
     return freeze({
@@ -60,7 +90,7 @@
       basePath:destination.basePath,
       product:{sourceRevision:product.sourceRevision,tree:product.tree,appFingerprint:product.appFingerprint},
       deployedAt:value.deployedAt,
-      notices:{[NOTICE_ID]:{startsAt:notice.startsAt}},
+      notices:{[NOTICE_ID]:{startsAt:notice.startsAt,...(continuation?{continuation}:{})}},
       _response:{origin:responseUrl.origin,path:responseUrl.pathname,search:responseUrl.search,nonce},
     });
   }

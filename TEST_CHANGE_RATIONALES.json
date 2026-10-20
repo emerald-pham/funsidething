@@ -15414,5 +15414,80 @@
     "failure": "Before the original corresponding implementation, actual Settings download, file/paste Restore, FAQ and unreadable-startup consumers failed their new consolidation assertions. The original failed setup and stale-copy attempts retain their distinct classifications; no failure is invented for this reconciliation."
   },
   "evidenceClassification": "preserved-original-test-first-evidence-with-current-198-pass-integration"
+},
+{
+  "baseCommit": "4e3bcb7e317ae251c8e8a030291802a52ffdefa0",
+  "testChangesSha256": "e21dbae4074bc9be8ee0eaae283162b9cc9c3c9fa687bc4dcfd668fb19111984",
+  "reason": "Preserve the published Beta apology campaign when a later product has a new truthful publication time, with explicit original-publication provenance at the existing metadata-network consumer and packaging command.",
+  "previousBehavior": "The metadata reader rejects any notice start before product deployment. Reusing that rule for a later Beta product would either reject the existing campaign or require an unauthorized renewal or false product timestamp.",
+  "intendedBehavior": "An explicitly scoped validated Beta continuation retains the original notice start and its evidence references. Missing or malformed provenance fails closed; ordinary envelopes keep their previous ordering rule and Stable keeps its independent window.",
+  "replacementTests": [
+    "RISK apology release identity: a later Beta product retains the published notice window",
+    "RISK apology release identity: malformed continuation fails closed at the network consumer",
+    "RISK apology notice: continuation preserves expiry dismissal manual reopen and separate Stable",
+    "RISK apology notice: Help explains that later Beta builds retain the window"
+  ],
+  "preservedCoverage": [
+    "All previous executable assertions and all earlier rationale objects remain intact; current #216 consolidation changes retain their imported original consumer REDs and subsequent GREEN evidence.",
+    "The unchanged invalid start-before-deployment network case and actual packaging command legacy refusal/positive controls retain their assertions.",
+    "Metadata remains network-only, credential-free, scoped to the current page fingerprint and fixed origin, and fails closed. The app adds no board/auth/cloud reads or storage writes.",
+    "Supplemental malformed-provenance and expiry/dismissal/manual reopen/Stable cases passed after the initial reader repair; they are preservation evidence and are not claimed as additional preimplementation REDs."
+  ],
+  "redEvidence": {
+    "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=<exact new consumer name> tests.js; raw records integration216/notice-reader-runs/2026-10-20T20-07-08-636Z-4d9d5f1a-cb4e-4b7a-969f-9006e631cef8.json and 2026-10-20T20-09-02-502Z-c410736c-88fd-48a0-ba86-95dcd60374d7.json.",
+    "failure": "Before app-release.js changed, the source-present actual network consumer rejected valid retained provenance with status unavailable instead of verified. Its subsequent GREEN passed. Before Help copy changed, the actual mounted Help assertion failed because the retained-window explanation was absent. The original #216 REDs and reconciliation classification remain in the preceding records."
+  },
+  "greenEvidence": "Reader GREEN b63f0a58-6052-424c-b180-6882e9c3b3d6; focused apology/help preservation cohort integration216/notice-help-green.output.txt:14 pass,0 fail,0 skip.",
+  "evidenceClassification": "current-source-consumer-red-green-with-honest-supplemental-preservation"
+},
+{
+  "baseCommit": "b50ac1694502090a51503fdaa79d97d19d13d43e",
+  "testChangesSha256": "775e1f84c08276b741b062853e73c3e471ebbe4aef7bf1246fee033b0aa12843",
+  "reason": "Preserve the published Beta apology campaign when a later product has a new truthful publication time, with explicit original-publication provenance at the existing metadata-network consumer and packaging command.",
+  "previousBehavior": "The metadata reader rejects any notice start before product deployment. Reusing that rule for a later Beta product would either reject the existing campaign or require an unauthorized renewal or false product timestamp.",
+  "intendedBehavior": "An explicitly scoped validated Beta continuation retains the original notice start and its evidence references. Missing or malformed provenance fails closed; ordinary envelopes keep their previous ordering rule and Stable keeps its independent window.",
+  "replacementTests": [
+    "RISK apology release identity: a later Beta product retains the published notice window",
+    "RISK apology release identity: malformed continuation fails closed at the network consumer",
+    "RISK apology notice: continuation preserves expiry dismissal manual reopen and separate Stable",
+    "RISK apology notice: Help explains that later Beta builds retain the window"
+  ],
+  "preservedCoverage": [
+    "All previous executable assertions and all earlier rationale objects remain intact; current #216 consolidation changes retain their imported original consumer REDs and subsequent GREEN evidence.",
+    "The unchanged invalid start-before-deployment network case and actual packaging command legacy refusal/positive controls retain their assertions.",
+    "Metadata remains network-only, credential-free, scoped to the current page fingerprint and fixed origin, and fails closed. The app adds no board/auth/cloud reads or storage writes.",
+    "Supplemental malformed-provenance and expiry/dismissal/manual reopen/Stable cases passed after the initial reader repair; they are preservation evidence and are not claimed as additional preimplementation REDs."
+  ],
+  "redEvidence": {
+    "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=<exact new consumer name> tests.js; raw records integration216/notice-reader-runs/2026-10-20T20-07-08-636Z-4d9d5f1a-cb4e-4b7a-969f-9006e631cef8.json and 2026-10-20T20-09-02-502Z-c410736c-88fd-48a0-ba86-95dcd60374d7.json.",
+    "failure": "Before app-release.js changed, the source-present actual network consumer rejected valid retained provenance with status unavailable instead of verified. Its subsequent GREEN passed. Before Help copy changed, the actual mounted Help assertion failed because the retained-window explanation was absent. The original #216 REDs and reconciliation classification remain in the preceding records."
+  },
+  "greenEvidence": "Reader GREEN b63f0a58-6052-424c-b180-6882e9c3b3d6; focused apology/help preservation cohort integration216/notice-help-green.output.txt:14 pass,0 fail,0 skip.",
+  "evidenceClassification": "current-source-consumer-red-green-with-honest-supplemental-preservation"
+},
+{
+  "baseCommit": "05d0c3756dc92cfb8179513bb63b72a21aa2b62a",
+  "testChangesSha256": "3342d97c85b07de172505a2535c56849ca3e686a974053226eb525b83444a412",
+  "reason": "Preserve the published Beta apology campaign when a later product has a new truthful publication time, with explicit original-publication provenance at the existing metadata-network consumer and packaging command.",
+  "previousBehavior": "The metadata reader rejects any notice start before product deployment. Reusing that rule for a later Beta product would either reject the existing campaign or require an unauthorized renewal or false product timestamp.",
+  "intendedBehavior": "An explicitly scoped validated Beta continuation retains the original notice start and its evidence references. Missing or malformed provenance fails closed; ordinary envelopes keep their previous ordering rule and Stable keeps its independent window.",
+  "replacementTests": [
+    "RISK apology release identity: a later Beta product retains the published notice window",
+    "RISK apology release identity: malformed continuation fails closed at the network consumer",
+    "RISK apology notice: continuation preserves expiry dismissal manual reopen and separate Stable",
+    "RISK apology notice: Help explains that later Beta builds retain the window"
+  ],
+  "preservedCoverage": [
+    "All previous executable assertions and all earlier rationale objects remain intact; current #216 consolidation changes retain their imported original consumer REDs and subsequent GREEN evidence.",
+    "The unchanged invalid start-before-deployment network case and actual packaging command legacy refusal/positive controls retain their assertions.",
+    "Metadata remains network-only, credential-free, scoped to the current page fingerprint and fixed origin, and fails closed. The app adds no board/auth/cloud reads or storage writes.",
+    "Supplemental malformed-provenance and expiry/dismissal/manual reopen/Stable cases passed after the initial reader repair; they are preservation evidence and are not claimed as additional preimplementation REDs."
+  ],
+  "redEvidence": {
+    "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=<exact new consumer name> tests.js; raw records integration216/notice-reader-runs/2026-10-20T20-07-08-636Z-4d9d5f1a-cb4e-4b7a-969f-9006e631cef8.json and 2026-10-20T20-09-02-502Z-c410736c-88fd-48a0-ba86-95dcd60374d7.json.",
+    "failure": "Before app-release.js changed, the source-present actual network consumer rejected valid retained provenance with status unavailable instead of verified. Its subsequent GREEN passed. Before Help copy changed, the actual mounted Help assertion failed because the retained-window explanation was absent. The original #216 REDs and reconciliation classification remain in the preceding records."
+  },
+  "greenEvidence": "Reader GREEN b63f0a58-6052-424c-b180-6882e9c3b3d6; focused apology/help preservation cohort integration216/notice-help-green.output.txt:14 pass,0 fail,0 skip.",
+  "evidenceClassification": "current-source-consumer-red-green-with-honest-supplemental-preservation"
 }
 ]

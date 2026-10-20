@@ -1823,6 +1823,10 @@ Earlier controls covered individual saves and a third edit during one overlap, b
 - RISK apology notice: an eligible Beta login shows the exact original apology
 - RISK apology notice: refreshing an unchanged release keeps the open message
 - RISK apology release identity: invalid metadata stays silent without touching the board
+- RISK apology release identity: a later Beta product retains the published notice window
+- RISK apology release identity: malformed continuation fails closed at the network consumer
+- RISK apology notice: continuation preserves expiry dismissal manual reopen and separate Stable
+- RISK apology notice: Help explains that later Beta builds retain the window
 - RISK apology notice: account dismissal and Stable window stay independent
 - RISK apology notice: automatic display waits for a modal and unfinished Add draft
 - RISK apology notice: a context-only Add draft waits before consuming its window

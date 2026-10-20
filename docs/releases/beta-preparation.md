@@ -36,6 +36,37 @@ publication window and verifies it against publication evidence. There is no
 Stable command or Stable timestamp transition here. Beta preview cannot start,
 consume or approve the later Stable notice window.
 
+For a later Beta product in the same apology campaign, preserve the original
+notice start while giving the new product its actual publication time. Add
+`--continue-notice <absolute-canonical-bundle.json>` with these exact fields:
+
+```json
+{
+  "artifactDirectory": "/absolute/original-reviewed-artifact",
+  "publicationPath": "/absolute/original-product-provider-record.json",
+  "publicVerificationPath": "/absolute/original-final-public-byte-report.json"
+}
+```
+
+Use the original reviewed, published ordinary envelope, never a preview or a
+chain of continuation artifacts. The command checks its committed product bytes,
+receipt, artifact and config digests, provider publication identity/time, and
+complete successful public byte report before reserving output. The supplied
+notice start must equal that original start; the new product time cannot precede
+the original publication. Without this explicit evidence the existing rule
+still rejects a notice start before product deployment. A supplied malformed
+continuation is always rejected. Previewing with valid original evidence still
+produces a nonpublishable preview.
+
+The optional public `notice.continuation` preserves the original Beta product,
+publication and notice timestamps plus evidence hashes, with fixed channel,
+origin, path and notice identity. Local evidence paths stay private. These
+references support the existing publisher/output review; they are not a new
+signature or authority. The client makes no extra request and accepts only the
+recognized Beta form. Older clients can fail closed to unavailable metadata;
+board and cloud formats do not change. Later Beta updates do not renew this
+notice's seven-day window or account dismissal. Stable keeps its separate window.
+
 ## Output contract
 
 - `public/` contains the committed worker shell inventory plus `sw.js`, extracted
