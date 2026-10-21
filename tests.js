@@ -1499,7 +1499,7 @@ test('RISK recovery read minute guidance: pending native review offers Cancel an
 });
 
 test('RISK iOS source replay: a fresh native review offers a validated previous board after timed-out headers settle late',async t=>{
- const app=await divergentCloudSourceApp187(t,{timeoutMs:1000,sourcePadding:2000000}),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ const clock=recoveryReadClock187(),app=await divergentCloudSourceApp187(t,{timeoutMs:1000,sourcePadding:2000000,timerProvider:clock.provider}),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
  await fixtureDeadline((async()=>{while(true){const save=ctx.buildSupportDiagnosticsReport().save;if(save.debouncePending.value===false&&save.activePersistCalls.value===0)return;await flush();}})(),'ordinary fixture saves finish before source-inspection preservation is measured');
  const currentPath='users/owner/generations/'+originalRoot.activeGeneration,previousPath='users/owner/generations/'+originalRoot.previousGeneration;
  const previousHeader=backend.docs.get(previousPath),previousChunks=[...backend.docs].filter(([key])=>key.startsWith(previousPath+'/chunks/')).map(([,row])=>row).sort((a,b)=>a.index-b.index);
@@ -1508,24 +1508,24 @@ test('RISK iOS source replay: a fresh native review offers a validated previous 
  const decoded=await ctx.window.ChainStorageV2.decodeSnapshot(previousHeader,previousChunks);
  assert.equal(JSON.parse(decoded).futureIOSReportFixture.opaque.length,2000000,'the synthetic previous payload is independently complete and hash-validated, unlike an unverified diagnostic row count');
  const local=JSON.stringify(ctx.state),head=await store.readHead(),pending=await store.getPendingUpload('owner'),raw=await store.readRawExportSnapshot(),cloud=JSON.stringify([...backend.docs]);
- let releaseHeaders,releasePrevious,oldPreviousHeld=false,currentQuery=false,first,fresh;
+ let releaseHeaders,releasePrevious,oldPreviousHeld=false,obsoleteCurrentQueries=0,first,fresh;
  const headersGate=new Promise(resolve=>releaseHeaders=resolve),previousGate=new Promise(resolve=>releasePrevious=resolve),headerReads=new Map();let previousQueries=0;
  app.faults.serverRead=async path=>{
-  if(path===currentPath||path===previousPath){const count=(headerReads.get(path)||0)+1;headerReads.set(path,count);if(count===1)await headersGate;}
-  if(path===currentPath+'/chunks')currentQuery=true;
+  if(path===currentPath||path===previousPath){const count=(headerReads.get(path)||0)+1;headerReads.set(path,count);if(path===currentPath&&count===1)await headersGate;}
+  if(path===currentPath+'/chunks'&&headerReads.get(currentPath)===1)obsoleteCurrentQueries++;
   if(path===previousPath+'/chunks'&&++previousQueries===1){oldPreviousHeld=true;await previousGate;}
  };
- t.after(async()=>{releaseHeaders();releasePrevious();delete app.faults.serverRead;await Promise.allSettled([first,fresh].filter(Boolean));});
- first=ctx.onAction('review-cloud-source-recovery',{});
- await fixtureDeadline((async()=>{while(headerReads.size<2)await flush();})(),'both native generation headers must enter the held SDK boundary');
- assert.equal(await first,false,'the native review reaches its ordinary SDK deadline');
+ t.after(async()=>{releaseHeaders();releasePrevious();delete app.faults.serverRead;await Promise.allSettled([first,fresh].filter(Boolean));clock.stop();});
+ clock.activate(app);first=ctx.onAction('review-cloud-source-recovery',{});
+ await fixtureDeadline((async()=>{while(headerReads.size<2||!oldPreviousHeld)await flush();})(),'both native headers enter and the previous chunk request is already issued before timeout');
+ await clock.advance(1001);assert.equal(await first,false,'the native review reaches its unchanged configured SDK deadline');
  assert.match(shim.document.getElementById('modalRoot').innerHTML,/Cloud request timed out/);
  releaseHeaders();
- await fixtureDeadline((async()=>{while(!oldPreviousHeld||!currentQuery)await flush();})(),'late first-read queries reach current zero rows and held previous rows');
+ await flush();assert.equal(oldPreviousHeld,true,'the old previous chunk request remains issued and held');assert.equal(obsoleteCurrentQueries,0,'a timed-out late header must not start new dependent chunk requests');
  fresh=ctx.onAction('review-cloud-source-recovery',{});
  await fixtureDeadline((async()=>{while((headerReads.get(currentPath)||0)<2||(headerReads.get(previousPath)||0)<2)await flush();})(),'fresh native review overlaps the old unfinished previous-source query');
  releasePrevious();
- assert.equal(await fresh,true,'a fresh complete read must finish the actual guarded preview after an earlier timeout');
+ assert.equal(await fresh,true,'a fresh complete read must finish the actual guarded preview after an earlier timeout');assert.equal(obsoleteCurrentQueries,0,'the retired current header never schedules chunks even after all late replies settle');
  const modal=shim.document.getElementById('modalRoot').innerHTML;
  const button=modal.match(new RegExp('<button[^>]*data-act="choose-cloud-recovery-source"[^>]*data-value="generation:'+originalRoot.previousGeneration+'"[^>]*>'))?.[0];
  assert.ok(button,'the independently valid previous source remains a visible deliberate choice');

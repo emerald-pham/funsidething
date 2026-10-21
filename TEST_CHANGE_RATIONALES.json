@@ -16063,4 +16063,62 @@
     "scopeAcceptance": "https://github.com/emerald-pham/funsidething/issues/226#issuecomment-6307191547",
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021/runs"
   }
+,
+  {
+    "baseCommit": "883c6170f6bf7525dba2b0b987e38b0ed79536a4",
+    "implementationBase": "c8da315511d998b9dc1e82d1903b4bd098cfadf2",
+    "testChangesSha256": "3817205e4f4673f4784a1f307afc33d33b072801baebb8e5949201a634fa4375",
+    "reason": "Migrate the existing eight-chunk delayed-header replay to the explicitly accepted no-dependent-work-after-retirement contract, retaining its guarded fresh-preview and exact source preservation positive rather than expecting obsolete chunks to be scheduled.",
+    "previousBehavior": "The legacy replay held both headers until after timeout, then required their obsolete chunk queries to start. Exact c8da full qualification observed that fixture wait fail because the approved outcome4 guard correctly stops dependent SDK work from retired captures.",
+    "intendedBehavior": "Issue and hold the previous-source chunks before timeout while the current header remains held. Cross the unchanged1000ms configured deadline with the already established recovery fixture clock; the late current header must start zero chunk queries. A fresh native app/backend review overlaps the already-issued old previous request and still offers its independently validated eight-chunk board without selecting or changing anything.",
+    "replacementTests": [
+      "RISK cloud source read retry: unavailable chunks verify a fresh pair without another click",
+      "RISK cloud source read retry: repeated and mixed failures share one restart",
+      "RISK cloud source read retry: only explicit retryable server reads may restart",
+      "RISK cloud source read retry: unavailable cannot rebind original authority or accepted work",
+      "RISK cloud source read retry: fresh nested reads retain the original minute and Cancel authority",
+      "RISK cloud source cancellation: obsolete sibling headers cannot schedule chunks after failure or Cancel",
+      "RISK cloud source inspection: a complete independent source stays readable when its sibling fails",
+      "RISK cloud source inspection: an earlier complete copy remains inspectable after a failed fresh read",
+      "RISK cloud source inspection: current previous and pending copies require supported complete decoding",
+      "RISK cloud source inspection: strict ACK and confirmed Apply consumers reject failed sibling sources",
+      "RISK cloud source cancellation: a failed header retires dependent work before inspection settles",
+      "RISK cloud source inspection: failed sibling counts remain independently unknown",
+      "RISK cloud source authority: confirmed Apply refuses changed typed head and hold facts",
+      "RISK cloud source authority: transaction-time typed changes prevent stale publication",
+      "RISK cloud source authority: durable hold clearing compares full typed facts",
+      "RISK cloud source authority: post-ACK hold change preserves its committed outcome and refuses clearing",
+      "RISK cloud source authority: post-ACK same-hash head change refuses stale local adoption",
+      "RISK cloud source authority: unchanged typed originals remain exactly archived after confirmed restore",
+      "RISK cloud source authority: a cached adapter without exact recovery capabilities refuses before publication",
+      "RISK cloud source authority: a delayed header cannot schedule chunks after original authority changes",
+      "RISK cloud source inspection: native asynchronous updates retain focus disclosure scroll and current source roles",
+      "RISK cloud source states: retry and terminal explanations never substitute raw SDK details",
+      "RISK cloud source lifecycle guidance: mounted Help explains inspection and bounded read failure",
+      "RISK cloud source fresh check: a transient root change inside the first capture verifies automatically",
+      "RISK cloud source fresh check: inner and between-capture changes share one restart",
+      "RISK cloud source fresh check: partial cloud reads cannot rebind changed local or account authority",
+      "RISK cloud source fresh check: a partial-read restart preserves the original deadline and Cancel authority",
+      "RISK cloud source fresh check: late typed head changes cannot be hidden inside the fresh pair",
+      "RISK cloud source fresh check: partial captures retain typed pending and hold evidence",
+      "RISK cloud source partial-read guidance: mounted Help explains the same bounded recheck",
+      "RISK recovery read minute: changed accounts or drafts revoke a delayed source preview",
+      "RISK recovery read minute: a delayed cloud change discards the original capture for one fresh pair"
+    ],
+    "preservedCoverage": [
+      "All622 previously committed raw rationale objects remain byte-exact. Only this test fixture and additive rationale change; c8da app, service worker, styles, FAQ/changelog, storage adapter and every product asset remain byte-identical. Source-clear Code/Spec assessments retain their original scope, with final exact-candidate gates still required.",
+      "Original current-declared8/received0 and independently hash-decoded previous8chunks/2MB payload assertions remain. The fresh review still overlaps an actually issued unfinished old previous chunk query, displays an enabled previous choice, makes no automatic selection, refuses Apply without consent, and preserves exact live state/head/pending/raw source snapshot/cloud bytes. No physical transport-abort claim is introduced.",
+      "Both old headers remain observed. The previous header can complete before timeout so its chunk query is already issued and held; the current header remains late. New zero-obsolete-current-query assertions run before and after the fresh guarded positive. A requirement to schedule forbidden obsolete work is deliberately replaced by the stricter accepted behavior, not removed to hide a product failure.",
+      "The existing recoveryReadClock187 seam advances1001ms against the unchanged1000ms configured timeout, proving actual app/backend timeout without host scheduling dependence. The fresh capture gets its own same1000ms virtual budget; it is not widened. Actual SDK/codec/IDB consumers remain. Separate elapsed-validation and ordinary20second deadline cases remain unchanged; nativebrowser real clocks remain required.",
+      "The first migrated real-clock attempt retained33pass/1fail: fresh2MB preview returnedfalse within its artificial1000ms test budget. It is preserved rather than called productRED or a pass. The final clock-controlled migration plus cancellation/retry/minute cohort passed with zero skips. No product timer/deadline or implementation changed to make this test pass.",
+      "c8da full was intentionally interrupted after the actual legacy fixture failed with late first-read queries reach current zero rows and held previous rows. Its rules13/13 and compatibility15/15 are completed historical gates, while full/native and the first failed WebKit operator are not qualification. The test-only successor must run its own required exact gates and actual rendered reviews before parent release-hold review."
+    ],
+    "redEvidence": {
+      "command": "Exact c8da full record validation-c8da315/full-records/2026-10-21T04-37-43-368Z-71edf301-2a47-42be-a311-791df520341b.json, actual tests.js legacyiOS consumer. Earlier contemporaneous product cancellation/deferred-header REDs remain in620/621/622 and are not reclassified.",
+      "failure": "The legacy replay actually timed out awaiting late first-read queries reach current zero rows and held previous rows, because retired headers no longer schedule chunks. This is an intentionally migrated old expectation under the published stronger cancellation outcome, not a new product defect or missing-module RED."
+    },
+    "greenEvidence": "late-header-contract-clock-green.log: actual legacy eight-chunk positive plus cancellation/read-retry/minute guards passed, zero skips. Final successor full/native/rules/compat/render and independent reviews separately required.",
+    "evidenceClassification": "deliberate protected-test migration for approved stricter scheduling; no functional product change",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021"
+  }
 ]
