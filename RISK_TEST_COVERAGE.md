@@ -1938,5 +1938,6 @@ The existing native inspection consumer now proves truthful promoted/demoted gen
 - RISK cloud source authority: post-ACK same-hash head change refuses stale local adoption
 - RISK cloud source authority: a cached adapter without exact recovery capabilities refuses before publication
 - RISK cloud source inspection: native asynchronous updates retain focus disclosure scroll and current source roles
+- RISK cloud source inspection: narrow native progress updates preserve exact visible text
 
 The final pre-adoption guard reads head, pending/hold and exact protected copies atomically after awaited prerequisites; no await separates this check from live adoption. The opt-in source-fixture setup clock advances only its declared350ms save and awaits real IndexedDB persistence; every runtime/recovery watchdog and native-browser real clock stays unchanged. A measured non-CPU Node pause and all failed setup runs remain separate from product RED/GREEN. Final focused authority32/32 and lifecycle218/218 passed before separately committed qualification.
