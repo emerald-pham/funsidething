@@ -232,3 +232,18 @@ test('effective npm file and environment controls are rejected without exposing 
     if(value.includes('secret-fixture'))assert.ok(!(result.stdout+result.stderr).includes(value),'unsupported setting values stay out of output');
   });
 });
+
+test('concealed index states cannot qualify working tests that differ from the captured committed tests',async t=>{
+  for(const flag of ['--assume-unchanged','--skip-worktree'])await t.test(flag,t=>{
+    const f=fixture(t);useActualNpmTests(f);
+    const ordinary=spawnSync(process.execPath,[npmCli,'test'],{cwd:f.repo,env:f.env,encoding:'utf8'});
+    assert.notEqual(ordinary.status,0);assert.match(ordinary.stdout,/required full-cohort regression executed/);
+    git(f.repo,'update-index',flag,'tests.js');
+    writeFileSync(path.join(f.repo,'tests.js'),`import test from 'node:test';\ntest('${nativeTitle}',()=>{});\n`);
+    assert.equal(git(f.repo,'status','--porcelain','--untracked-files=all'),'','Git hides the modified test under this index flag');
+    assert.notEqual(git(f.repo,'hash-object','tests.js'),git(f.repo,'rev-parse','HEAD:tests.js'),'working source actually differs from the captured revision');
+    const result=invoke(f);assert.notEqual(result.status,0,'concealed source cannot qualify the failing committed revision');absent(f);
+    assert.match(result.stderr,/assume-unchanged|skip-worktree/i);
+    assert.equal(git(f.repo,'status','--porcelain','--untracked-files=all'),'','qualification must not mutate index flag semantics');
+  });
+});
