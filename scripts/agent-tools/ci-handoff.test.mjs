@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, chmodSync, rmSync, readdirSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, chmodSync, rmSync, readdirSync, existsSync, realpathSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,6 +8,7 @@ import test from 'node:test';
 
 const source = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const cli = path.join(source, 'scripts/agent-tools/ci-handoff.mjs');
+const npmCli=realpathSync(process.env.npm_execpath??process.env.PATH.split(path.delimiter).map(directory=>path.join(directory,'npm')).find(candidate=>existsSync(candidate)));
 const git = (cwd, ...args) => {
   const r = spawnSync('git', args, { cwd, encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr); return r.stdout.trim();
@@ -189,4 +190,24 @@ test('a remote configuration redirect during validation cannot publish into anot
   const result=invoke(f);assert.notEqual(result.status,0,'changing the remote must invalidate qualification');
   const target=spawnSync('git',['--git-dir',other,'show-ref','--verify','refs/heads/ci/fixture'],{encoding:'utf8'});
   assert.notEqual(target.status,0);
+});
+
+
+function useActualNpmTests(f) {
+  delete f.env.NODE_TEST_CONTEXT;
+  mkdirSync(path.join(f.repo,'scripts/agent-tools'),{recursive:true});
+  writeFileSync(path.join(f.repo,'scripts/agent-tools/fixture.test.mjs'),"import test from 'node:test'; test('agent fixture',()=>{});\n");
+  writeFileSync(path.join(f.repo,'tests.js'),`import test from 'node:test';\ntest('${nativeTitle}',()=>{});\ntest('required full-cohort regression',()=>{throw Error('required full-cohort regression executed');});\n`);
+  git(f.repo,'add','.');git(f.repo,'commit','-m','failing required full-cohort fixture');
+  replaceBoundary(f,"const rules=args[1]",`if(args[0]==='test'||args[0]==='config'||args[0]==='prefix'){const {spawnSync}=await import('node:child_process');const result=spawnSync(process.execPath,[${JSON.stringify(npmCli)},...args],{encoding:'utf8',env:process.env});process.stdout.write(result.stdout??'');process.stderr.write(result.stderr??'');process.exit(result.status??1);}\nconst rules=args[1]`);
+}
+
+test('npm lifecycle Node overrides cannot narrow the required actual npm test cohort and publish',t=>{
+  const f=fixture(t);useActualNpmTests(f);
+  const ordinary=spawnSync(process.execPath,[npmCli,'test'],{cwd:f.repo,env:f.env,encoding:'utf8'});
+  assert.notEqual(ordinary.status,0);assert.match(ordinary.stdout,/required full-cohort regression executed/);
+  console.log('Actual ordinary fixture npm test fails its required full-cohort regression.');
+  f.env.npm_config_node_options='--test-name-pattern=^RISK';
+  const result=invoke(f);
+  assert.notEqual(result.status,0,'npm lifecycle overrides must not narrow the applicable cohort into qualification');absent(f);
 });
