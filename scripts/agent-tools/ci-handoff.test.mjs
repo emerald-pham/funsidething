@@ -12,7 +12,7 @@ const git = (cwd, ...args) => {
   const r = spawnSync('git', args, { cwd, encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr); return r.stdout.trim();
 };
-const nativeTitle = 'RISK installed-client regression: required native cases complete without omission skip duplication or failure';
+const nativeTitle = 'RISK repository process: required installed-client native outcomes and artifacts execute exactly once';
 function fixture(t) {
   const root = mkdtempSync(path.join(os.tmpdir(), 'chain-corrected-handoff-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
@@ -28,7 +28,7 @@ function fixture(t) {
   writeFileSync(path.join(repo, 'tests.js'), `import test from 'node:test';\ntest('${nativeTitle}',()=>{});\n`);
   writeFileSync(path.join(repo, 'scripts/test-first-gate.mjs'), "import fs from 'node:fs'; fs.appendFileSync(process.env.CALLS, JSON.stringify(['diff-gate',process.argv[2]])+'\\n'); console.log('Test-first diff gate passed.');\n");
   git(repo, 'add', '.'); git(repo, 'commit', '-m', 'fixture');
-  const sha = git(repo, 'rev-parse', 'HEAD'); git(repo, 'remote', 'add', 'origin', remote);
+  const sha = git(repo, 'rev-parse', 'HEAD'); git(repo, 'remote', 'add', 'origin', remote); git(root, '--git-dir', remote, 'fetch', repo, 'HEAD:refs/heads/main');
   const hook = path.join(repo, '.git/hooks/pre-push');
   writeFileSync(hook, '#!/bin/sh\n# codex-release-gate-managed-v1 simulated external release receipt approval\nprintf "hook accepted\\n" >> "$HOOK_CALLS"\nexit 0\n'); chmodSync(hook, 0o755);
   const boundary = `#!/usr/bin/env node
