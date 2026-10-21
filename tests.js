@@ -675,6 +675,25 @@ async function freshSourceCheckFixture187(t,options={}){
  return app;
 }
 
+test('RISK cloud source read retry: unavailable chunks verify a fresh pair without another click',async t=>{
+ const app=await freshSourceCheckFixture187(t),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+ shim.document.getElementById('addInput').value='Keep this unfinished read-retry draft';
+ const before=JSON.stringify(ctx.state),head=await store.readHead(),pending=await store.getPendingUpload('owner'),raw=await store.readRawExportSnapshot(),cloud=JSON.stringify([...backend.docs]),writes=backend.writes.length;
+ let roots=0,chunks=0;app.faults.serverRead=async path=>{
+  if(path==='users/owner')roots++;
+  if(path.endsWith('/chunks')&&++chunks<=2)throw Object.assign(Error('Synthetic unavailable read; private details stay excluded'),{code:'unavailable'});
+ };
+ t.after(()=>{delete app.faults.serverRead;});
+ assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true,'a transient unavailable recovery read must verify again in the same action');
+ assert.equal(roots,5,'discard one incomplete capture and require two entirely fresh successful captures');assert.equal(chunks,6);
+ const modal=shim.document.getElementById('modalRoot').innerHTML;assert.match(modal,/data-act="choose-cloud-recovery-source"/);assert.doesNotMatch(modal,/data-act="choose-cloud-recovery-source"[^>]*aria-pressed="true"/);assert.match(modal,/data-act="apply-cloud-source-recovery"[^>]*disabled/);
+ let download=null,blob=null;const link=makeFakeElement();link.remove=()=>{};link.click=()=>{download=blob;};shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();ctx.Blob=class{constructor(parts){blob=parts.join('');}};ctx.URL={createObjectURL(){return 'blob:read-retry-diagnostics';},revokeObjectURL(){}};
+ ctx.onAction('view-support-diagnostics',{});await ctx.onAction('download-support-diagnostics',{});const report=JSON.parse(download);
+ assert.ok(report.sourceOperations.some(op=>op.status==='failed'&&op.events.some(event=>event.stage==='chunks'&&event.status==='failed'&&event.code.value==='unavailable')),'the downloaded consumer keeps the original failed read');
+ assert.ok(report.sourceOperations.some(op=>op.status==='completed'),'fresh verification is a separately completed operation');assert.ok(Buffer.byteLength(download)<=24*1024);assert.doesNotMatch(download,/private details|owner|generationId|Keep this unfinished/);
+ assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(await store.readHead(),head);assert.deepEqual(await store.getPendingUpload('owner'),pending);assert.deepEqual(await store.readRawExportSnapshot(),raw);assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal(backend.writes.length,writes);assert.equal(shim.document.getElementById('addInput').value,'Keep this unfinished read-retry draft');
+});
+
 test('RISK cloud source fresh check: a transient root change inside the first capture verifies automatically',async t=>{
  const app=await freshSourceCheckFixture187(t),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
  shim.document.getElementById('addInput').value='Unfinished draft stays here';

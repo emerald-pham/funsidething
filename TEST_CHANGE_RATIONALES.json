@@ -15862,5 +15862,31 @@
   "greenEvidence": "First permanent transient-root test passed after minimal typed/root/baseline repair. Original fresh cohort28/28 then expanded focused53/53 passed. Corrected physical prepared-source typed controls7/7 passed, including unchanged originals; broader focused/current exact-candidate native/rules/compat/reviews remain pending. Earlier failed GREEN expectation/fixture cases and prepackaging stale identity/FAQ word-limit failures remain retained honestly. Exactec83 fullrun retained as obsolete-contractfailure; focused migrated delayed-read+unchangedauthority cohort passes5of5 without app edits (repair-delayed-contract-migration.log). Exact final candidate qualification follows.",
   "evidenceClassification": "contemporaneous-permanent-consumer-red-green plus explicitly labeled later isolated guard sensitivity and safety coverage",
   "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-source-changed-report3-20261020/repair-runs"
+},
+{
+  "baseCommit": "883c6170f6bf7525dba2b0b987e38b0ed79536a4",
+  "implementationBase": "0b43bc04bb73bb4a496c6edfb3f5566f46ba4645",
+  "testChangesSha256": "f017fbf100302d8c9e48dda11d1d8a5000446e8bf33cb8c6c7ec55c58b3bd5a6",
+  "reason": "Checkpoint the first explicitly authorized unavailable recovery-source READ vertical slice after a permanent actual-consumer RED. Preserve prior typed-root work and all raw rationale objects; this checkpoint is incomplete and held pending the parent reconciled wider recovery acceptance.",
+  "previousBehavior": "On clean0b43 with only the new permanent test dirty, a typed unavailable error in original SDK chunk reads returnedfalse without a fresh pair, despite otherwise healthy sources. Earlier external probes remain diagnosis, not this permanent RED.",
+  "intendedBehavior": "Only an interactive recovery SDK root/header/chunks/final-root read throwing exact unavailable while its original readAttempt/account remains current is marked recovery-source-unavailable. It may consume the same original single restart only after original authority revalidates; two fresh captures, no selection/application/publication and exact originals remain required.",
+  "replacementTests": [
+    "RISK cloud source read retry: unavailable chunks verify a fresh pair without another click"
+  ],
+  "preservedCoverage": [
+    "All618 prior raw rationale objects are byte-exact, including the previously approved typed-root repair and scoped delayed-read contract migration; no established assertion is removed, changed, skipped or weakened.",
+    "The new permanent actual recovery action uses synthetic external Firestore/IDB only, two unavailable chunk failures followed by healthy data. Five root reads/six chunk reads prove one discarded partial capture plus two complete fresh aggregates, with choices unselected and Apply disabled.",
+    "The actual downloaded support report keeps original unavailable failure and separately completed fresh operation within24KiB and excludes arbitrary error, task/draft and account/generation data. State/head/pending/raw/cloud facts and unfinished draft are exact; no writes occur.",
+    "This is an incomplete local checkpoint. Existing original timer/controller, typed-root case and authority guards are reused; repeated/mixed errors, unsupported/generic/auth/permission controls, elapsed deadline/Cancel/late-overlap/authority regression expansion, truthful progress/FAQ, packaging and final exact full/native/rules/compat/render/independent reviews remain pending.",
+    "Parent sent a new explicit broader five-risk scope after the first atomic GREEN. Work is deliberately checkpointed before any additional functional slice until the reconciled existing187/226 ticket handoff arrives. No public/tracker writes, push/CI/PR/merge/release/status/deployment or live update is allowed.",
+    "No original private diagnostic metadata or payload is committed or used in public fixtures; synthetic observations do not establish backend cause, source validity, ACK match or affected-device recovery."
+  ],
+  "redEvidence": {
+    "command": "Recorder preimplementation-red Node22 --test --test-reporter=spec --test-name-pattern=RISK cloud source read retry: unavailable chunks tests.js on0b43, firstpermanenttestonly beforeappedit.",
+    "failure": "2026-10-21T02:08:17.213Z recordb6f16f78-0b8f-4429-be85-1bd669de672f: actualfalse expectedtrue at review-cloud-source-recovery action. One discriminating assertion failure, no infrastructure/import error."
+  },
+  "greenEvidence": "2026-10-21T02:08:50.890Z record56d09d2b-fd8d-41f3-8416-a0cbc539bdf6:1passed0failed0skip after minimal typed SDK-read mark and existing restart admission. No broader qualification claimed.",
+  "evidenceClassification": "contemporaneous-permanent-consumer-red-green; incomplete localcheckpoint",
+  "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021/runs"
 }
 ]

@@ -3583,7 +3583,7 @@ const SUPPORT_DIAGNOSTICS_ERROR_CODES=new Set([
 const SUPPORT_DIAGNOSTICS_ERROR_ALIASES=Object.freeze({
   "permission-denied":"permission-denied","firestore/permission-denied":"permission-denied",
   "unauthenticated":"unauthenticated","auth/unauthenticated":"unauthenticated",
-  "unavailable":"unavailable","firestore/unavailable":"unavailable",
+  "unavailable":"unavailable","firestore/unavailable":"unavailable","recovery-source-unavailable":"unavailable",
   "deadline-exceeded":"deadline-exceeded","firestore/deadline-exceeded":"deadline-exceeded",
   "resource-exhausted":"resource-exhausted","firestore/resource-exhausted":"resource-exhausted",
   "aborted":"aborted","firestore/aborted":"aborted",
@@ -10352,7 +10352,7 @@ async function reviewCloudSourceRecovery(message=""){
     readAttempt.checkBudget();
     cloudSourceRecoveryPreview=p;renderCloudSourceRecovery(message);return true;
     }catch(error){
-      if(restart!==0||error?.code!=="recovery-source-changed"||!baseline)throw error;
+      if(restart!==0||!["recovery-source-changed","recovery-source-unavailable"].includes(error?.code)||!baseline)throw error;
       // A failed SDK capture has no usable cloud snapshot. Recheck every local
       // source before spending the same single fresh-pair restart on it.
       const checked=changedSources??await cloudSourceRecoveryDeviceSources(readAttempt);
@@ -12844,6 +12844,10 @@ if(configured){
           const at=safeNow(),code=errorCode(error);observe(stage,timedOut?"late":code==="deadline-exceeded"?"timed-out":"failed",role,operation,
             duration(started,at),null,null,null,null,null,null,null,code);
           activeStages.delete(activeStage);
+          // Only an interactive recovery's explicit server-read failure can
+          // spend its original fresh-pair restart. Other errors stay terminal.
+          if(readAttempt&&current()&&error?.code==="unavailable"&&["root","header","chunks","final-root"].includes(stage))
+            throw Object.assign(Error("Cloud source is temporarily unavailable."),{code:"recovery-source-unavailable"});
           throw error;
         }
       };

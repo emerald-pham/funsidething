@@ -1892,3 +1892,9 @@ The recovered review's actual downloaded support report retains the original cro
 The committedAt-only exemption compares complete head records losslessly. Actual durable readback retains NaN/null, missing/undefined, negative-zero/zero and named-array-property distinctions; any such changed unknown authority stays held. Unchanged typed facts still permit the one bounded metadata-only fresh pair without selecting or writing.
 
 A failed partial capture retains its original local/account/UID/epoch/serial/head/browser/pending/hold/prepared-source binding before any fresh pair. SDK and between-capture changes share one restart. Lossless typed comparisons apply through final readback; changed unknown head facts stop inside their original capture, before a second capture. Typed pending and recovery-hold facts remain exact; valid physical prepared-source records retain their payloadHash and raw metadata. Identical typed evidence remains a positive control. No generic error, unsupported source or changed authority is blindly retried.
+
+## Unavailable recovery-read checkpoint (#226)
+
+- RISK cloud source read retry: unavailable chunks verify a fresh pair without another click
+
+An explicitly typed unavailable SDK recovery read can spend the same existing guarded restart. The initial permanent consumer covers an incomplete chunk capture followed by two complete fresh captures, an unselected preview with disabled Apply, bounded downloaded failed/fresh diagnostics, preserved draft and exact device/head/pending/raw/cloud sources with zero writes. This is an incomplete local checkpoint: broader retry/deadline/authority/late-request controls, truthful retry copy, FAQ, packaging and exact-candidate review remain pending the reconciled parent acceptance handoff. It does not establish the private source's validity or actual affected-device recovery.
