@@ -1851,7 +1851,8 @@ This synthetic native review drives held generation headers, late current zero-r
 - RISK recovery read minute: the second native verification shares the original sixty-second budget
 - RISK recovery read minute: native Cancel releases the read immediately and a late old header cannot replace a fresh preview
 - RISK recovery read minute: stalled server stages expire once and retain protected sources after late replies
-- RISK recovery read minute: changed account revision or drafts revoke a delayed source preview
+- RISK recovery read minute: changed accounts or drafts revoke a delayed source preview
+- RISK recovery read minute: a delayed cloud change discards the original capture for one fresh pair
 - RISK recovery read minute guidance: pending native review offers Cancel and explains the whole bounded read
 
 The real app consumers use synthetic independently verified generations and external SDK/time boundaries. They cover one shared minute, immediate native Cancel, stale replies, changed authority, cold-open exact repair and dialog-close resumption. These checks do not validate the private affected source or prove physical iOS recovery. Existing mismatched/older-source consent, preserved originals and complete-generation publication checks remain required.

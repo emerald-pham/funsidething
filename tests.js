@@ -1048,21 +1048,46 @@ test('RISK recovery read minute: stalled server stages expire once and retain pr
  });
 });
 
-test('RISK recovery read minute: changed account revision or drafts revoke a delayed source preview',async t=>{
- for(const change of ['account','cloud revision','draft','local edit'])await t.test(change,async sub=>{
+test('RISK recovery read minute: changed accounts or drafts revoke a delayed source preview',async t=>{
+ for(const change of ['account','draft','local edit'])await t.test(change,async sub=>{
   const clock=recoveryReadClock187(),app=await divergentCloudSourceApp187(sub,{timeoutMs:20000,timerProvider:clock.provider,recoveryTimeoutMs:null}),{ctx,shim,backend,originalRoot}=app;
   const gate=deferredSyncFixture();let entered=false,review;
   app.faults.serverRead=async path=>{if(/^users\/owner\/generations\/[^/]+$/.test(path)){entered=true;await gate.promise;}};
   sub.after(async()=>{gate.resolve();delete app.faults.serverRead;clock.stop();await review;});clock.activate(app);
   review=ctx.onAction('review-cloud-source-recovery',{});await fixtureDeadline((async()=>{while(!entered)await flush();})(),'real headers enter');await clock.advance(26000);
   if(change==='account')backend.emitAuth({uid:'other-owner',email:'e@example.com'});
-  if(change==='cloud revision')backend.docs.set('users/owner',{...originalRoot,rev:originalRoot.rev+1});
   if(change==='draft')shim.document.getElementById('addInput').value='Retain this unfinished draft';
   if(change==='local edit'){shim.document.getElementById('addInput').value='Accepted during the delayed read';await ctx.onAction('add',{});await ctx.persist();}
   const local=JSON.stringify(ctx.state),cloud=JSON.stringify([...backend.docs]);gate.resolve();assert.equal(await fixtureDeadline(review,'changed-source native review finishes'),false);
   assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="choose-cloud-recovery-source"/);assert.equal(JSON.stringify(ctx.state),local);assert.equal(JSON.stringify([...backend.docs]),cloud);
   if(change==='draft')assert.equal(shim.document.getElementById('addInput').value,'Retain this unfinished draft');
  });
+});
+
+test('RISK recovery read minute: a delayed cloud change discards the original capture for one fresh pair',async t=>{
+ const clock=recoveryReadClock187(),app=await divergentCloudSourceApp187(t,{timeoutMs:20000,timerProvider:clock.provider,recoveryTimeoutMs:null}),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ const gate=deferredSyncFixture();let entered=false,review,remainingAtFresh=null;const revisions=[];
+ app.faults.serverRead=async path=>{
+  if(path==='users/owner'){
+   revisions.push(backend.docs.get(path).rev);
+   if(revisions.length===3){
+    remainingAtFresh=60000-clock.elapsed;
+    assert.ok([...clock.timers.values()].some(timer=>timer.at===60000),'the original deadline still binds the fresh pair');
+    assert.ok([...clock.timers.values()].every(timer=>timer.at<=60000),'no replacement timer extends the original minute');
+   }
+  }
+  if(/^users\/owner\/generations\/[^/]+$/.test(path)){entered=true;await gate.promise;}
+ };
+ t.after(async()=>{gate.resolve();delete app.faults.serverRead;clock.stop();await review;});
+ const local=JSON.stringify(ctx.state),head=await store.readHead(),pending=await store.getPendingUpload('owner'),raw=await store.readRawExportSnapshot(),writes=backend.writes.length;
+ clock.activate(app);review=ctx.onAction('review-cloud-source-recovery',{});
+ await fixtureDeadline((async()=>{while(!entered)await flush();})(),'real delayed headers enter');await clock.advance(26000);
+ backend.docs.set('users/owner',{...originalRoot,rev:originalRoot.rev+1});const cloud=JSON.stringify([...backend.docs]);
+ gate.resolve();assert.equal(await fixtureDeadline(review,'fresh pair completes inside the original minute'),true);
+ assert.deepEqual(revisions,[originalRoot.rev,...Array(5).fill(originalRoot.rev+1)],'discard the partial capture, then read two complete fresh captures at the new revision');assert.equal(remainingAtFresh,34000);
+ const modal=shim.document.getElementById('modalRoot').innerHTML;assert.match(modal,new RegExp('Current cloud revision '+(originalRoot.rev+1)));
+ assert.match(modal,/data-act="choose-cloud-recovery-source"/);assert.doesNotMatch(modal,/data-act="choose-cloud-recovery-source"[^>]*aria-pressed="true"/);assert.match(modal,/data-act="apply-cloud-source-recovery"[^>]*disabled/);
+ assert.equal(JSON.stringify(ctx.state),local);assert.deepEqual(await store.readHead(),head);assert.deepEqual(await store.getPendingUpload('owner'),pending);assert.deepEqual(await store.readRawExportSnapshot(),raw);assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal(backend.writes.length,writes);
 });
 
 test('RISK recovery read minute: elapsed validation and final verification cannot grant choices before a delayed timer fires',async t=>{
