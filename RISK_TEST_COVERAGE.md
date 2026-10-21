@@ -1865,6 +1865,14 @@ An ordinary timeout does not clear a previously verified damage finding. The nat
 
 ## One fresh guarded source verification (#187)
 
+- RISK cloud source fresh check: a transient root change inside the first capture verifies automatically
+- RISK cloud source fresh check: inner and between-capture changes share one restart
+- RISK cloud source fresh check: partial cloud reads cannot rebind changed local or account authority
+- RISK cloud source fresh check: a partial-read restart preserves the original deadline and Cancel authority
+- RISK cloud source fresh check: late typed head changes cannot be hidden inside the fresh pair
+- RISK cloud source fresh check: partial captures retain typed pending and hold evidence
+- RISK cloud source partial-read guidance: mounted Help explains the same bounded recheck
+
 - RISK cloud source fresh check: one between-capture cloud change verifies again within the same review
 - RISK cloud source fresh check: head metadata alone permits one fresh pair and visible cancellable progress
 - RISK cloud source fresh check: changed head ownership and unknown record facts cannot count as harmless metadata
@@ -1876,8 +1884,10 @@ An ordinary timeout does not clear a previously verified damage finding. The nat
 - RISK cloud source fresh check: a draft changed as fresh progress opens cannot become the new baseline
 - RISK cloud source fresh check guidance: mounted Help explains one fresh check without choosing
 
-One transient between-capture cloud snapshot or finite committedAt-only head metadata change can restart both complete captures once within the original monotonic minute. No source is selected or published. Accepted work, drafts, UID/epoch, head ownership and unknown fields, pending/browser/hold/prepared sources stay binding; churn, cancellation, unsupported sources and refused storage remain held. Synthetic SDK/time/DOM/IDB consumers preserve exact sources and ordinary pull/write deadlines; actual affected-iOS source validity and recovery remain unverified.
+One transient cloud-root revision change during a capture, between-capture cloud snapshot change or finite committedAt-only head metadata change can restart both complete captures once within the original monotonic minute. No source is selected or published. Accepted work, drafts, UID/epoch, head ownership and unknown fields, pending/browser/hold/prepared sources stay binding; churn, cancellation, unsupported sources and refused storage remain held. Synthetic SDK/time/DOM/IDB consumers preserve exact sources and ordinary pull/write deadlines; actual affected-iOS source validity and recovery remain unverified.
 
 The recovered review's actual downloaded support report retains the original cross-capture refusal and separate fresh verification, with redaction, truncation accounting and unchanged byte/event/operation caps. Report-only compaction preserves source start/terminal facts, generation summaries and publication events. Pending progress and terminal refusal now have distinct wording: stopped checks never ask the user to keep waiting. The same tests retain exact board/head/pending/raw/cloud sources and no writes.
 
 The committedAt-only exemption compares complete head records losslessly. Actual durable readback retains NaN/null, missing/undefined, negative-zero/zero and named-array-property distinctions; any such changed unknown authority stays held. Unchanged typed facts still permit the one bounded metadata-only fresh pair without selecting or writing.
+
+A failed partial capture retains its original local/account/UID/epoch/serial/head/browser/pending/hold/prepared-source binding before any fresh pair. SDK and between-capture changes share one restart. Lossless typed comparisons apply through final readback; changed unknown head facts stop inside their original capture, before a second capture. Typed pending and recovery-hold facts remain exact; valid physical prepared-source records retain their payloadHash and raw metadata. Identical typed evidence remains a positive control. No generic error, unsupported source or changed authority is blindly retried.

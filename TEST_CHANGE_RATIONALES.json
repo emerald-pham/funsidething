@@ -15827,5 +15827,37 @@
     },
     "greenEvidence": "Corrected probe7of7 pass6558bf3a; final narrowly scoped CSS recheck7of7 passb0201f82. Initial failed GREEN9cc15355 retained as probe-assumption failure, not feature RED. New exact full/native/rules/compatibility/rendered/reviews/CI/live acceptance still required.",
     "evidenceClassification": "contemporaneous-mounted-and-native-consumer-red-green"
-  }
+  },
+{
+  "baseCommit": "883c6170f6bf7525dba2b0b987e38b0ed79536a4",
+  "testChangesSha256": "32e06aedadcfbf813ed134dffe873031c4ce1a72ad9a0bd2a1c8ad286a687bfe",
+  "reason": "Close the confirmed single-SDK-capture transient-root-change retry gap at the existing full-app review consumer, preserving the original authority and single bounded restart. Add original-state, cancellation/deadline, lossless typed-source and mounted FAQ regressions without weakening existing source or application protections.",
+  "previousBehavior": "A root revision change inside one SDK read stopped after2root reads with an untyped error; only two completed captures could enter the one fresh verification. During repair, concrete REDs also showed that JSON comparison could accept changed typed head/pending/hold authority, so the original source binding needed lossless checks through final readback.",
+  "intendedBehavior": "Only a typed cloud-root inconsistency may discard an incomplete capture after original device/account/epoch/backend/serial/head/browser/pending/hold/draft/prepared facts are revalidated. One shared restart and original monotonic60second/controller apply across both inner and completed-pair inconsistencies. A fresh complete verified pair leaves all sources unselected and never writes or applies them.",
+  "replacementTests": [
+    "RISK cloud source fresh check: a transient root change inside the first capture verifies automatically",
+    "RISK cloud source fresh check: inner and between-capture changes share one restart",
+    "RISK cloud source fresh check: partial cloud reads cannot rebind changed local or account authority",
+    "RISK cloud source fresh check: a partial-read restart preserves the original deadline and Cancel authority",
+    "RISK cloud source fresh check: late typed head changes cannot be hidden inside the fresh pair",
+    "RISK cloud source fresh check: partial captures retain typed pending and hold evidence",
+    "RISK cloud source partial-read guidance: mounted Help explains the same bounded recheck"
+  ],
+  "preservedCoverage": [
+    "All617 prior rationale objects remain byte-exact; all passing behavior assertions remain, except the existing typed-head negative count is tightened from4root reads to2 because changed authority now stops inside its original capture. The unchanged typed-head/committedAt-only positive still requires8reads and one fresh pair.",
+    "Actual review-cloud-source-recovery, real app/SDK/IDB and controlled external Firestore/time remain the agreed consumer seams. Source/draft/accepted-edit/account/epoch/backend/pending/browser/device-hold/prepared-choice mutations cannot establish a fresh authority baseline.",
+    "Two complete fresh captures and no default source selection remain mandatory. Inner/outer churn share one restart; Cancel/reopen, elapsed original minute and late callbacks cannot choose, write or replace a newer review. Original current/head/pending/raw/cloud bytes remain exact except intentional external fixture mutations.",
+    "Bounded downloaded support diagnostics retains original concurrent-change failure and separate completed fresh operation without source IDs, account data, task/draft contents or expanded event/operation/byte/age caps. Ordinary error/unsupported/account paths do not acquire blanket retries.",
+    "The one initial prepared-copy typed fixture accidentally used an interpreted row without physical payloadHash; its failed RED/GREEN cases are retained as fixture-invalid, not feature RED. The corrected fixture mutates the actual physical raw record, proves it stays readable and covers both changed and identical typed metadata. Valid pending/device-hold REDs preceded the lossless guard repair.",
+    "No affected-user incident or private report is committed. This generic reproduced gap is not claimed as the affected phone cause. This step is local-only: no push/merge/release/publication or live Stable/Beta update.",
+    "FAQ wording is129words after the observed preflight130word-limit failure; all existing literal one-minute/Cancel/ordinary-wait/50-title protections are retained. Prepackaging cache/fingerprint failures were expected stale packaging identities, not behavioralRED."
+  ],
+  "redEvidence": {
+    "command": "Recorder preimplementation-red node --test --test-reporter=spec --test-name-pattern=RISK cloud source fresh check: a transient root change inside the first capture tests.js on clean released883app with new permanent test; then separate recorded typed-head, typed-pending/device-hold and mounted FAQ REDs before their app/copy repairs.",
+    "failure": "2026-10-21T01:01:29.585Z record6a3a743b-f9d6-4bce-9409-b63ab7b5ded5: actualfalse expectedtrue at real review action, no import/infrastructure failure. Later typed-head RED true!=false in4variants; typed pending/device hold RED true!=false in2valid variants; mounted FAQ missing explicit within-read sentence. Prepared-row invalid fixture case is excluded as described."
+  },
+  "greenEvidence": "First permanent transient-root test passed after minimal typed/root/baseline repair. Original fresh cohort28/28 then expanded focused53/53 passed. Corrected physical prepared-source typed controls7/7 passed, including unchanged originals; broader focused/current exact-candidate native/rules/compat/reviews remain pending. Earlier failed GREEN expectation/fixture cases and prepackaging stale identity/FAQ word-limit failures remain retained honestly.",
+  "evidenceClassification": "contemporaneous-permanent-consumer-red-green plus explicitly labeled later isolated guard sensitivity and safety coverage",
+  "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-source-changed-report3-20261020/repair-runs"
+}
 ]
