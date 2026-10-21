@@ -157,7 +157,7 @@ function main() {
     record.state='qualified';save();unchanged();
     if(remoteTip(repo,plan.remote,plan.destination)!==before||remoteTip(repo,plan.remote,'refs/heads/main')!==mainTip)reject('Remote destination or comparison base changed during validation.');
     record.state='publishing';record.publication.state='attempting';save();
-    const result=run('git',['-C',repo,'push','--porcelain',plan.remote,`${candidate.commit}:${plan.destination}`]),output=(result.stdout??'')+(result.stderr??'');
+    const result=run('git',['-C',repo,'push','--porcelain','--no-follow-tags','--recurse-submodules=no',plan.remote,`${candidate.commit}:${plan.destination}`]),output=(result.stdout??'')+(result.stderr??'');
     fs.writeFileSync(path.join(directory,'push.log'),output,{mode:0o600});
     record.publication={state:result.status===0?'published':'failed-or-uncertain',exitCode:result.status,signal:result.signal,log:'push.log',outputSha256:hash(output)};
     record.state=result.status===0?'published':'publication-unresolved';save();

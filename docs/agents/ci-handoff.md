@@ -3,7 +3,9 @@
 Use `npm run agent:ci-handoff --` when a clean committed topic revision should
 complete local CI and then advance that exact revision to an explicit remote
 topic branch. The command makes one ordinary non-force Git push after a complete
-qualifying cohort. Existing pre-push hooks and release receipts still apply;
+qualifying cohort. This push disables automatic annotated-tag following and
+submodule pushes with command flags, preserving local Git preferences. Existing
+pre-push hooks and release receipts still apply;
 prepare the exact outgoing revision's required reviews and receipt first.
 
 Before invoking it, allocate the native/browser and emulator resources under
