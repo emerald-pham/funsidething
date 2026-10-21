@@ -1946,3 +1946,11 @@ The final pre-adoption guard reads head, pending/hold and exact protected copies
 - RISK cloud source inspection: refreshed roles update before a demoted read finishes
 
 The held-demotion native boundary requires one Current and one Previous heading before the demoted generation finishes reading. All retained rows follow the latest observed capture; older callbacks cannot roll roles back. Inspection stays read-only with no source eligibility.
+
+## Populated-board responsiveness and damaged-source work
+
+- RISK sync responsiveness guidance: mounted Help explains large boards and bounded damaged-source recovery
+- RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations
+- RISK populated task responsiveness: three rapid Yes actions retain history and reopen within the interaction budget
+- RISK populated completion responsiveness: rapid Done and Undo preserve earlier completions without full-pool stalls
+- RISK corrupt cloud work budget: a failed exact-source read does not permanently hold a later repair

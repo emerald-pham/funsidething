@@ -1868,6 +1868,65 @@ test('RISK rapid action guidance: mounted Help distinguishes later accepted work
  assert.match(html,/Rapid valid actions keep saving without a false repeated-change warning/);
 });
 
+test('RISK sync responsiveness guidance: mounted Help explains large boards and bounded damaged-source recovery',async()=>{
+ const {ctx,shim}=await loadApp();
+ for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ const rapid=help.split('<dt>Can I make several changes quickly?</dt><dd>')[1]?.split('</dd>')[0];assert.ok(rapid);
+ assert.match(rapid,/Large boards keep the same ranking, History and Undo rules/);
+ const failed=help.split('<dt>Can I keep working with a damaged cloud save?</dt><dd>')[1]?.split('</dd>')[0];assert.ok(failed,'damaged cloud saving has its own brief actionable answer');
+ assert.match(failed,/do not download that same source for every edit/);assert.match(failed,/newer cloud update/);assert.match(failed,/different saved source still needs your choice/);
+ assert.match(help,/Large saved boards respond faster/);assert.match(help,/Corrupted cloud sources stop repeated downloads/);
+});
+
+test('RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations',{timeout:20000},async t=>{
+ const app=await damagedAcknowledgedApp187(t,{sourcePadding:2000000}),{ctx,shim,backend,originalRoot}=app;
+ const headerPath='users/owner/generations/'+originalRoot.activeGeneration;
+ const different=JSON.parse(ctx.state.decisionBase.payload);different.futureDifferent={keep:'a different accepted cloud source'};
+ const encoded=await ctx.window.ChainStorageV2.encodeSnapshot(JSON.stringify(different));
+ backend.docs.set(headerPath,{...backend.docs.get(headerPath),hash:encoded.hash,byteLength:encoded.byteLength,chunkCount:encoded.chunkCount});
+ assert.equal(encoded.chunkCount,8,'the supported damaged source represents a populated eight-chunk board');
+ let reads=0;app.faults.serverRead=async()=>{reads++;};t.after(()=>{delete app.faults.serverRead;});
+ await ctx.cloudPull();assert.equal(backend.CS.errorCode,'corrupt-generation');assert.equal(backend.CS.knownDamagedSource,true);assert.ok(reads>0);
+ const originalCloud=JSON.stringify([...backend.docs]),writes=backend.writes.length,attemptReads=reads,byAction=[];
+ ctx.window.CLOUD_PUSH_DELAY_MS=0;
+ const settle=async()=>{
+  assert.equal(await ctx.persist(),true);
+  await fixtureDeadline((async()=>{for(;;){await syncSettle(5);if(!vm.runInContext('pulling||cloudPushInFlight||cloudTimer!==null',ctx))break;}})(),'ordinary accepted action saves and releases its cloud slot');
+  assert.equal((await ctx.window.ScannerDeviceStore.readHead()).payload,JSON.stringify(ctx.state));byAction.push(reads-attemptReads);
+ };
+ shim.document.getElementById('addInput').value='Local work while the cloud source needs a choice';await ctx.onAction('add',{});await settle();
+ ctx.onAction('start-scan',{dataset:{mode:'descending'}});await settle();
+ const candidate=ctx.state.candidateId,benchmark=ctx.state.chain.at(-1);assert.ok(candidate&&benchmark);
+ ctx.onAction('no',{dataset:{candidate,benchmark}});await settle();assert.equal(ctx.state.considered[candidate],'no');
+ const done=ctx.state.chain.at(-1);ctx.onAction('bench-done',{dataset:{benchmark:done}});await settle();assert.equal(ctx.state.tasks.find(row=>row.id===done).done,true);
+ assert.equal(JSON.stringify([...backend.docs]),originalCloud,'held edits cannot rewrite any damaged or complete original cloud source');assert.equal(backend.writes.length,writes);
+ assert.equal(ctx.state.syncDirty,true,'device durability is still not a cloud acknowledgement');
+ t.diagnostic('Additional unchanged-source SDK reads after Add, Start, No, Done: '+JSON.stringify(byAction));
+ assert.equal(reads,attemptReads,'a terminal unchanged corrupt source must not trigger another complete recovery download for every ordinary task action');
+ await ctx.onAction('sync-retry',{});assert.ok(reads>attemptReads,'the explicit Retry control still makes a fresh guarded attempt');
+ const healthyPayload=ctx.cloudPayload(),healthy=await ctx.window.ChainStorageV2.encodeSnapshot(healthyPayload),newId='healthy-peer-after-corruption';
+ backend.docs.set('users/owner/generations/'+newId,{...healthy,state:'published',baseRev:originalRoot.rev});
+ for(const chunk of healthy.chunks)backend.docs.set('users/owner/generations/'+newId+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
+ backend.docs.set('users/owner',{...originalRoot,rev:originalRoot.rev+1,activeGeneration:newId,previousGeneration:originalRoot.activeGeneration});
+ shim.window.dispatchEvent(new ctx.CustomEvent('cloudboardchange',{detail:{user:backend.CS.user,rev:originalRoot.rev+1}}));
+ await fixtureDeadline((async()=>{while(ctx.state.syncRev<originalRoot.rev+1||ctx.state.syncDirty)await syncSettle(10);})(),'a new server revision escapes the held-source gate');
+ assert.ok(ctx.state.tasks.some(row=>row.title==='Local work while the cloud source needs a choice'));assert.equal(ctx.state.tasks.find(row=>row.id===done).done,true);
+ assert.equal(backend.CS.knownDamagedSource,false);assert.equal(JSON.stringify(backend.docs.get(headerPath)),JSON.stringify(JSON.parse(originalCloud).find(([key])=>key===headerPath)[1]));
+});
+
+test('RISK corrupt cloud work budget: a failed exact-source read does not permanently hold a later repair',async t=>{
+ const app=await damagedAcknowledgedApp187(t),{ctx,shim,backend,originalRoot}=app;let roots=0,failed=false;
+ app.faults.serverRead=async path=>{if(path==='users/owner'&&++roots===3){failed=true;throw Object.assign(Error('Synthetic transient exact-source read'),{code:'unavailable'});}};
+ await ctx.cloudPull();assert.equal(failed,true,'the ordinary corrupt pull reached its separate exact-copy read');assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev);
+ delete app.faults.serverRead;
+ shim.document.getElementById('addInput').value='Accepted after a transient exact-source read';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);await ctx.sendPush();
+ await fixtureDeadline((async()=>{while(vm.runInContext('pulling||cloudPushInFlight',ctx))await syncSettle(5);})(),'the edit-triggered app operation settles before the external verification read');
+ const {remote}=await settleRecovery188(app);
+ assert.ok(remote.rev>originalRoot.rev,'a transient failed check cannot be treated as proof that the exact acknowledged copy is unrepairable');
+ assert.ok(JSON.parse(remote.payload).tasks.some(row=>row.title==='Accepted after a transient exact-source read'));
+});
+
 test('RISK resilient sync recovery: an exact acknowledged copy recovers missing cloud chunks and publishes subsequent local work',async t=>{
  const app=await damagedAcknowledgedApp187(t),{ctx,shim,backend,originalRoot,originalHeader,acknowledgedTasks}=app;
  shim.document.getElementById('addInput').value='Local work after source damage';
@@ -38937,6 +38996,70 @@ test('RISK BACKUP FILE RESTORE: fixture readiness waits for signed-in durable re
  assert.match(preview,/data-act="confirm-file-restore"/,shim.document.getElementById('toast').textContent);
  assert.equal(finishedBeforeAck,false,'fixture readiness must not return while the real reconciliation commit acknowledgement is held');
  assert.doesNotMatch(preview.match(/<button\b[^>]*data-act="confirm-file-restore"[^>]*>/)?.[0]||'',/\sdisabled(?:\s|>|=)/,'a healthy fixture reaches enabled consent only after actual durable cloud acknowledgement');
+});
+
+test('RISK populated task responsiveness: three rapid Yes actions retain history and reopen within the interaction budget',{timeout:30000},async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),at=Date.parse('2026-10-20T15:00:00Z');
+ const initial=syncState({tasks:Array.from({length:434},(_,i)=>({...syncTask('responsive-task-'+i,'Synthetic task '+i),futureTask:{keep:i}})),syncDirty:false,futureBoard:{keep:'opaque'}});
+ const rawInitial=JSON.stringify(initial),source=await loadAppAtTime(at,{seed:2191,seedStorage:{[SYNC_STORE_KEY]:rawInitial,[LOCAL_HEAD_KEY]:rawInitial}});
+ source.ctx.onAction('start-scan',{dataset:{mode:'squared'}});
+ const board=JSON.parse(JSON.stringify(source.ctx.state)),startFacts=board.decisionEvents;
+ assert.equal(startFacts.length,2,'the actual Start supplies the supported draw and chain evidence');
+ const archived=Array.from({length:40},(_,i)=>startFacts.map(event=>({...event,id:'responsive-archive-'+i+'-'+event.target.property,actionId:'responsive-start-'+i,target:{...event.target,id:'responsive-pass-'+i}}))).flat();
+ const oldBaseline=board.decisionBaseline;delete board.decisionBase;
+ board.decisionBaseline=source.ctx.baselineFromSource(board,{account:null,baseId:null});
+ board.decisionBaseline.replacement=[{v:1,reason:'explicit-restore',account:null,actionId:'responsive-recovery',at:at+100,baseline:oldBaseline,
+  facts:archived.map(event=>({id:event.id,witness:source.ctx.LZString.compressToUTF16(source.ctx.canonicalDecisionFact(event))}))}];
+ board.decisionEvents=[];for(let i=1;i<=40;i++)board.tasks[i].lastDoneAt=at-50000+i;
+ assert.equal(source.ctx.decisionEvidenceIssue(board,null),null,'the synthetic historical source is supported before timing starts');
+ const raw=JSON.stringify(board),originalFacts=archived.map(event=>source.ctx.canonicalDecisionFact(event));await source.dispose();
+ const deviceDbName='populated-responsive-'+Math.random(),app=await loadAppAtTime(at,{seed:2192,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw,[LOCAL_BACKUPS_KEY]:'[]'},indexedDBProvider:indexedDB,deviceDbName}),{ctx,shim}=app;
+ t.after(()=>app.dispose());assert.equal(await ctx.persist(),true);
+ ctx.onAction('start-scan',{dataset:{mode:'squared'}});
+ const priorIds=new Set(ctx.state.decisionEvents.map(event=>event.id)),chosen=[],actionMs=[];
+ for(let i=0;i<3;i++){
+  const candidate=ctx.state.candidateId,benchmark=ctx.state.chain.at(-1);assert.ok(candidate&&benchmark);
+  const started=performance.now();ctx.onAction('yes',{dataset:{candidate,benchmark}});actionMs.push(performance.now()-started);
+  assert.equal(ctx.state.chain.at(-1),candidate,'each distinct Yes reaches its intended task');chosen.push(candidate);
+ }
+ assert.equal(new Set(chosen).size,3,'rapid accepted actions must not retarget or collapse');
+ const accepted=ctx.state.decisionEvents.filter(event=>!priorIds.has(event.id));assert.equal(accepted.length,3);
+ assert.equal(await ctx.persist(),true,'the real device store acknowledges all accepted work');
+ const head=await ctx.window.ScannerDeviceStore.readHead();assert.equal(head.payload,JSON.stringify(ctx.state));
+ const retained=ctx.retainedDecisionFacts(JSON.parse(head.payload));
+ for(const fact of originalFacts)assert.ok(retained.some(event=>ctx.canonicalDecisionFact(event)===fact),'every archived decision remains exact');
+ await app.dispose();
+ const beforeShares=ctx.chanceDisplayStats(),cold=await loadAppAtTime(at+10000,{sharedStorage:shim.localStorage,indexedDBProvider:indexedDB,deviceDbName});t.after(()=>cold.dispose());
+ const coldShares=cold.ctx.chanceDisplayStats();for(const [id,row] of beforeShares){assert.ok(Math.abs(row.probability-coldShares.get(id).probability)<1e-12,'freshly reopened probabilities match the incremental view');assert.equal(row.fallback,coldShares.get(id).fallback);}
+ for(const event of accepted)assert.ok(cold.ctx.state.decisionEvents.some(row=>cold.ctx.canonicalDecisionFact(row)===ctx.canonicalDecisionFact(event)),'cold reopen retains each accepted decision exactly');
+ assert.deepEqual([...cold.ctx.state.chain], [...ctx.state.chain]);assert.equal(cold.ctx.state.tasks.length,434);
+ assert.deepEqual(JSON.parse(JSON.stringify(cold.ctx.state.futureBoard)),{keep:'opaque'});
+ t.diagnostic('Three populated-board task actions: '+JSON.stringify(actionMs.map(ms=>Math.round(ms)))+'ms; source '+Buffer.byteLength(raw)+' bytes');
+ assert.ok(actionMs.reduce((sum,ms)=>sum+ms,0)<1000,'three ordinary task controls must not monopolize the main thread for a full second; observed '+Math.round(actionMs.reduce((sum,ms)=>sum+ms,0))+'ms');
+});
+
+test('RISK populated completion responsiveness: rapid Done and Undo preserve earlier completions without full-pool stalls',{timeout:20000},async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),at=Date.parse('2026-10-20T15:00:00Z');
+ const tasks=Array.from({length:434},(_,i)=>({...syncTask('responsive-done-'+i,'Synthetic completion '+i),futureTask:{keep:i}}));
+ const board=syncState({tasks,mode:'work',chain:tasks.slice(0,4).map(row=>row.id),syncDirty:false,futureBoard:{keep:['original']}}),raw=JSON.stringify(board),deviceDbName='responsive-done-'+Math.random();
+ const app=await loadAppAtTime(at,{seed:2901,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},indexedDBProvider:indexedDB,deviceDbName}),{ctx,shim}=app;t.after(()=>app.dispose());
+ assert.equal(await ctx.persist(),true);const completed=[],times=[];
+ for(let i=0;i<3;i++){
+  const id=ctx.state.chain.at(-1),started=performance.now();ctx.onAction('bench-done',{dataset:{benchmark:id}});times.push(performance.now()-started);
+  assert.equal(ctx.state.tasks.find(task=>task.id===id).done,true);completed.push(id);
+ }
+ assert.equal(new Set(completed).size,3);assert.equal(ctx.state.decisionEvents.filter(event=>event.kind==='completion').length,3);
+ ctx.onAction('undo',{});
+ assert.equal(ctx.state.tasks.find(task=>task.id===completed[2]).done,false,'Undo reverses only the last completion');
+ for(const id of completed.slice(0,2))assert.equal(ctx.state.tasks.find(task=>task.id===id).done,true,'earlier accepted completions survive Undo');
+ assert.equal(await ctx.persist(),true);const head=await ctx.window.ScannerDeviceStore.readHead();assert.equal(head.payload,JSON.stringify(ctx.state));await app.dispose();
+ const beforeShares=ctx.chanceDisplayStats(),cold=await loadAppAtTime(at+10000,{sharedStorage:shim.localStorage,indexedDBProvider:indexedDB,deviceDbName});t.after(()=>cold.dispose());
+ const coldShares=cold.ctx.chanceDisplayStats();for(const [id,row] of beforeShares){assert.ok(Math.abs(row.probability-coldShares.get(id).probability)<1e-12,'completion and Undo retain the fresh full-pool probabilities');assert.equal(row.fallback,coldShares.get(id).fallback);}
+ for(const id of completed.slice(0,2))assert.equal(cold.ctx.state.tasks.find(task=>task.id===id).done,true);
+ assert.equal(cold.ctx.state.tasks.find(task=>task.id===completed[2]).done,false);assert.equal(cold.ctx.state.tasks[433].futureTask.keep,433);
+ assert.deepEqual(JSON.parse(JSON.stringify(cold.ctx.state.futureBoard)),{keep:['original']});
+ t.diagnostic('Three populated-board Done controls: '+JSON.stringify(times.map(ms=>Math.round(ms)))+'ms');
+ assert.ok(times.reduce((sum,ms)=>sum+ms,0)<1000,'three Done controls must share the same one-second interaction budget; observed '+Math.round(times.reduce((sum,ms)=>sum+ms,0))+'ms');
 });
 
 test('RISK saved-board startup: a large legacy completion board opens and saves responsively while retaining exact facts',{timeout:15000},async t=>{

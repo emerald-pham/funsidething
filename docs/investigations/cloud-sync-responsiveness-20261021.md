@@ -1,0 +1,65 @@
+# Populated-board responsiveness and repeated damaged-source reads
+
+The agreed target is iPhone 16 Pro on current iOS Safari, including a session
+with little memory headroom. The reported full app restarts remain a separate
+acceptance: a Node timing improvement does not establish their cause or a phone
+fix. All fixtures below are independently constructed synthetic boards.
+
+Baseline: `c677724ded14b4c4519975c57a81f028283b08ff`.
+
+## Reproduced causes
+
+1. Ordinary task actions repeatedly calculated all task-pair probabilities for
+   History and display. A 434-task board with 80 archived Start facts and 40
+   retained completion boundaries blocked three real Yes controls for 3,764 ms.
+   The source and all three accepted decisions survived actual device-store
+   readback and reopening. The existing three-second startup test never exercised
+   this repeated-action workload. A CPU profile identified probability calculation
+   and rating normalization as the largest costs, ahead of serialization.
+2. Done also computed every saved-pass probability when there was no saved draw,
+   even though its saved-pass fallback result was necessarily false. Three real
+   Done controls initially blocked for 2,957 ms. Completion and Undo preserved
+   their intended effects; the missing acceptance was responsiveness.
+3. A corrupt eight-chunk generation whose hash differs from the device's last
+   acknowledged copy cannot be reconstructed automatically from that copy. Each
+   subsequent Add, Start, No and Done nevertheless triggered ten more SDK reads
+   of the unchanged current and previous sources. Four local actions caused 40
+   extra reads, without advancing the cloud revision or repairing it. The normal
+   save-to-push path bypassed the existing finite network retry policy.
+
+## Repairs and preservation
+
+A bounded numeric cache updates only probabilities affected by a few changed,
+added or completed tasks. It retains no boards, History or task-pair table. Full
+calculation remains the fallback; numerical tails use direct calculation. Saved
+scan draws, ranking rules, decision facts and cloud formats remain unchanged.
+A source with no frozen draw no longer computes unused saved-pass weights.
+
+After a complete, current check proves that the acknowledged copy differs from
+the corrupt generation, ordinary local edits remain pending without downloading
+both generations again. An unavailable inspection does not establish that
+negative result and still permits later exact-copy repair. Explicit Retry,
+foreground recovery and a newer server revision still perform fresh guarded
+reads. An exact acknowledged-copy repair still uses the existing validated,
+source-preserving conditional publication. Other sources require an explicit
+choice. No older source is silently adopted and no original source is erased.
+
+Permanent consumer regressions in `tests.js` cover the three-action interaction
+budget, History, completion/Undo, actual device readback and cold reopening,
+freshly recomputed probability agreement, bounded damaged-source reads, explicit
+Retry and a healthy newer server revision. The existing exact-copy recovery,
+source-refusal, account, pending-upload and acknowledgement cases stay protected.
+A transient exact-source-read positive control initially interfered with the
+app-owned pull by polling the backend too early. The corrected test waits for
+that operation; the earlier failure is not claimed as preimplementation RED.
+The independently observed unchanged-source read-budget RED remains valid.
+
+## Evidence and limits
+
+Contemporaneous REDs were recorded before each repair. The local candidate cut
+three Yes controls to about 0.88 seconds and three Done controls to about 0.85
+seconds, and cut the four unchanged-source action batches to zero additional
+SDK reads. These are local Node measurements, not calibrated iPhone budgets,
+peak WebKit heap measurements, authenticated affected-account recovery or proof
+that iOS no longer terminates the app. Exact candidate/native/review/release
+results belong to the release evidence rather than this historical snapshot.

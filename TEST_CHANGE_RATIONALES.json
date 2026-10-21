@@ -16546,5 +16546,31 @@
     },
     "greenEvidence": "held-role-first-green.log recorder8e74cc17: all3 actualnative inspection cases pass with0skips, including held-demotion and all original immediate geometry/focus/scroll assertions. Exact committed full/native/rules/compatibility/render/reviews/CI remain required.",
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021/linux-scroll-repair-20261021"
+  },
+  {
+    "baseCommit": "c677724ded14b4c4519975c57a81f028283b08ff",
+    "testChangesSha256": "a35006429128e788db3739e7a52635afb8ec3cec541b0895916ed11dfc540dd7",
+    "reason": "User-directed takeover verifies cloud corruption, repeated task stalls and conservative iPhone Safari pressure through the agreed actual controls. Add five consumer regressions without weakening existing protections.",
+    "previousBehavior": "Three Yes controls on a populated witnessed board blocked for3764ms; three Done controls for2957ms. After a verified unrepairable current-generation ACK mismatch, Add/Start/No/Done caused40 extra SDK reads against unchanged originals. Existing startup and small-board action checks missed these workloads.",
+    "intendedBehavior": "The three native app controls share a1000ms local synchronous-work budget, retain decisions, History, Undo, opaque fields and actual durable cold reopen. Freshly reopened probabilities agree within1e-12. Held corrupt sources spend no extra downloads on ordinary edits; explicit Retry and a new server revision remain live. FAQ and current Settings changelog describe those outcomes without claiming physical-iPhone recovery.",
+    "replacementTests": [
+      "RISK sync responsiveness guidance: mounted Help explains large boards and bounded damaged-source recovery",
+      "RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations",
+      "RISK populated task responsiveness: three rapid Yes actions retain history and reopen within the interaction budget",
+      "RISK populated completion responsiveness: rapid Done and Undo preserve earlier completions without full-pool stalls",
+      "RISK corrupt cloud work budget: a failed exact-source read does not permanently hold a later repair"
+    ],
+    "preservedCoverage": [
+      "No removed, skipped or weakened existing passing assertions. Existing startup budgets and supported-client floor remain. New timing bounds address ordinary interactions rather than raising a failing startup budget.",
+      "Retain source/account/revision/CAS and real cloud ACK gates; no automatic older-copy choice or actual-account mutation. Original private data never enters fixtures or this record.",
+      "Capture actual chronology and intermediate repair/metadata failures. Later cold-recompute preservation assertions are GREEN coverage, not fabricated preimplementation RED.",
+      "The existing130-word help-answer gate rejected the initial combined wording. Keep its assertions unchanged, retain the original answer, and use a separate brief damaged-cloud question; observed mounted-question and brevity RED is21-02-18-371Z-b0767838-5dd6-4880-921d-18a1ce828c45.",
+      "The transient-read positive control initially polled the external backend before the app-owned pull settled, superseding that pull. Corrected it to await the app operation. Correction record2026-10-21T21-13-27-846Z-98be6e34-ae01-47cc-ad1f-4b109bf40d94 retains chronology: the earlier failure is not independent preimplementation RED for the transient refinement. The original unchanged-source50-versus10 read-budget RED remains valid."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK populated task responsiveness:\" tests.js; corresponding Done, corrupt-cloud and mounted-guidance runs in evidenceDirectory/test-runs.",
+      "failure": "Observed consumer AssertionErrors: Yes3764ms exceeds1000ms (2026-10-21T20-50-06-720Z-1b05764d-e404-431f-937a-6b4967aadcc6); Done2957ms exceeds1000ms (20-53-29-207Z-7fb0f112-834b-4e8f-a77f-39e5ed4e44c3); cloud reads50 instead of10 (20-56-56-624Z-31f04103-8616-45f3-8622-0a4aacd744ca); actual mounted FAQ lacks new guidance (20-58-27-846Z-44818be2-d93e-433d-b6a7-ad229e4f08f3)."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/cloud-sync-root-causes-20261021"
   }
 ]

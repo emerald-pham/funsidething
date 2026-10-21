@@ -41,3 +41,18 @@ _Avoid_: Upload time, last save time
 The reversal of the action being undone while preserving unrelated decisions,
 including those made on another device.
 _Avoid_: Restoring the whole earlier board
+
+**Recovery source**:
+A retained copy of a board or its saved decisions that may help recover work.
+Keeping a source does not establish that it is complete or safe to apply.
+_Avoid_: Recovered board
+
+**Lossless recovery**:
+Recovery that retains every accepted board decision and newer edit. Choosing
+between conflicting sources is a separate decision by the person.
+_Avoid_: Loading any readable backup
+
+**Cloud acknowledgement**:
+Confirmation that the person's saved board reached their cloud account.
+A board saved on one device or read from the cloud is not that confirmation.
+_Avoid_: Synced badge
