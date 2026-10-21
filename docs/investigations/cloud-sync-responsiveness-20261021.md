@@ -32,6 +32,12 @@ Baseline: `c677724ded14b4c4519975c57a81f028283b08ff`.
    early acknowledgement requirement still refused automatic reconstruction.
    A fresh consumer pair reproduced both gaps after the first candidate passed
    its full suite; independent specialist review identified the missing branch.
+5. Even with an exact repair copy, unrepresented or JSON-lossy pending intent
+   must refuse rebuilding. Those completed refusals still downloaded 12 SDK
+   reads for each ordinary edit. Four actions added 48 reads for each of four
+   independently constructed pending shapes, including BigInt and cycles.
+   The missing acceptance was finite work after a safe refusal, not permission
+   to discard the pending evidence.
 
 ## Repairs and preservation
 
@@ -51,7 +57,11 @@ reads. An exact acknowledged-copy repair still uses the existing validated,
 source-preserving conditional publication. A supported current board with the
 same published UTF-8 length and hash now uses those same protection, identity,
 pending-intent and publication guards even without a historical acknowledgement.
-A different hash never grants repair authority. Other sources require an explicit
+A different hash never grants repair authority. Completed pending and immutable
+source-validation refusals now hold the same repeated work. Pending holds retain
+only bounded pointer scalars and recheck local storage: a new pointer, newly
+lossless representation or matching current candidate releases to a fresh guarded
+read. Failed local reads remain pending. Other sources require an explicit
 choice. No older source is silently adopted and no original source is erased.
 
 Permanent consumer regressions in `tests.js` cover the three-action interaction
@@ -79,3 +89,10 @@ SDK reads. These are local Node measurements, not calibrated iPhone budgets,
 peak WebKit heap measurements, authenticated affected-account recovery or proof
 that iOS no longer terminates the app. Exact candidate/native/review/release
 results belong to the release evidence rather than this historical snapshot.
+
+The pending hold positive control first used the normal pending writer, which
+intentionally normalizes unknown fields; this made that simulated pointer
+lossless earlier than intended. The corrected fixture uses raw IDB for the
+unknown-preserving peer transition and the normal writer for the later supported
+transition. Its original physical pending value remains retained under a separate
+fixture row. No application change was needed for that fixture correction.

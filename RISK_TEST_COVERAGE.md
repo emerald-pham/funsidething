@@ -1957,3 +1957,5 @@ The held-demotion native boundary requires one Current and one Previous heading 
 
 - `RISK corrupt cloud work budget: cold-opened sources without an ACK keep newer edits without repeated downloads`: actual supported export cold-open, accepted tasks, durable head, finite same-source reads, manual Retry and newer-root acknowledgement.
 - `RISK lossless cloud recovery: an exact current board repairs missing chunks without a historical ACK`: independently hashed current bytes, source-preserving conditional rebuild, actual cloud ACK, subsequent accepted task and durable cold reopen.
+
+- `RISK corrupt cloud work budget: completed pending-source refusals do not restart downloads on ordinary edits`: unrepresented, JSON-lossy, BigInt and cyclic pending originals; zero repeated SDK reads after Add/Start/No/Done; failed local inspection, changed pointer and same-pointer losslessness transitions; deliberate Retry and exact original physical retention.

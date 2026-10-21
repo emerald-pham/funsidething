@@ -1966,6 +1966,38 @@ test('RISK lossless cloud recovery: an exact current board repairs missing chunk
  const finalHead=final.head.payload;await closeLegacyApp173(app);backend.CS.suspend();const cold=await loadAppAtTime(1792323000000,{sharedStorage:shim.localStorage,indexedDBProvider:indexedDB,deviceDbName,cloudSyncFactory:()=>({configured:false,ready:false,user:null,status:'off'})});t.after(()=>cold.dispose());assert.equal(JSON.stringify(cold.ctx.state),finalHead);assert.equal((await cold.ctx.window.ScannerDeviceStore.readHead()).payload,finalHead,'real cold reopen retains the repaired ACK and subsequent accepted task');
 });
 
+test('RISK corrupt cloud work budget: completed pending-source refusals do not restart downloads on ordinary edits',{timeout:30000},async t=>{
+ for(const control of ['unrepresented pending','JSON-lossy pending','BigInt pending','cyclic pending'])await t.test(control,async sub=>{
+  const app=await damagedAcknowledgedApp187(sub),{ctx,shim,backend,originalRoot,originalHeader}=app,store=ctx.window.ScannerDeviceStore;
+  if(control==='unrepresented pending'){
+   app.faults.transactionRead=async(path,docs)=>{if(path.startsWith('users/owner/generations/')&&!path.includes('/chunks/')&&docs.get(path)?.state==='staging'&&[...docs.keys()].some(key=>key.startsWith(path+'/chunks/')))throw Object.assign(Error('isolated original pending upload'),{code:'unavailable'});};
+   assert.equal((await backend.CS.push(JSON.stringify({v:2,tasks:[{id:'pending-only-budget',title:'Pending-only work',ctx:[]}],futurePending:{keep:'exact original'}}),1792322999999,originalRoot.rev)).error,true);delete app.faults.transactionRead;
+  }else{
+   let future;if(control==='JSON-lossy pending'){future=new Array(1);future.future='sole pending field outside JSON';}else if(control==='BigInt pending')future=9n;else{future={keep:'cyclic original'};future.self=future;}
+   await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>tx.objectStore('meta').put({generationId:'budget-lossy-pending',payloadHash:originalHeader.hash,baseRev:originalRoot.rev,updatedAt:1,account:'owner',futurePending:future},'pending:owner'));
+  }
+  const pending=await store.getPendingUpload('owner'),originalCloud=JSON.stringify([...backend.docs]),writes=backend.writes.length;let reads=0;app.faults.serverRead=async()=>{reads++;};sub.after(()=>{delete app.faults.serverRead;});
+  await ctx.cloudPull();assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev);const initialReads=reads,byAction=[];assert.ok(initialReads>0);ctx.window.CLOUD_PUSH_DELAY_MS=0;
+  const settle=async()=>{assert.equal(await ctx.persist(),true);await fixtureDeadline((async()=>{for(;;){await syncSettle(5);if(!vm.runInContext('pulling||cloudPushInFlight||cloudTimer!==null',ctx))break;}})(),'pending-held ordinary action saves durably');assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state));byAction.push(reads-initialReads);};
+  shim.document.getElementById('addInput').value='Accepted while pending recovery needs a choice';await ctx.onAction('add',{});await settle();ctx.onAction('start-scan',{dataset:{mode:'descending'}});await settle();
+  const candidate=ctx.state.candidateId,benchmark=ctx.state.chain.at(-1);assert.ok(candidate&&benchmark);ctx.onAction('no',{dataset:{candidate,benchmark}});await settle();assert.equal(ctx.state.considered[candidate],'no');const done=ctx.state.chain.at(-1);ctx.onAction('bench-done',{dataset:{benchmark:done}});await settle();assert.equal(ctx.state.tasks.find(row=>row.id===done).done,true);
+  assert.equal(JSON.stringify([...backend.docs]),originalCloud);assert.equal(backend.writes.length,writes);assert.deepEqual(await store.getPendingUpload('owner'),pending,'even JSON-lossy unknown physical fields remain exact');assert.equal(ctx.state.syncDirty,true);
+  sub.diagnostic(control+' additional SDK reads: '+JSON.stringify(byAction));assert.equal(reads,initialReads,'a completed pending-source refusal cannot reset the corrupt-source download budget for every edit');
+  const readPending=store.getPendingUpload;store.getPendingUpload=async()=>{throw Object.assign(Error('isolated unavailable local pending read'),{name:'AbortError'});};try{await ctx.sendPush();assert.equal(reads,initialReads,'an unavailable local pending read cannot authorize another cloud download');}finally{store.getPendingUpload=readPending;}await ctx.sendPush();assert.equal(reads,initialReads,'a later available local read keeps the unchanged refusal bounded');
+
+  await ctx.onAction('sync-retry',{});assert.ok(reads>initialReads,'explicit Retry remains live for a pending-source hold');assert.equal(JSON.stringify([...backend.docs]),originalCloud);assert.deepEqual(await store.getPendingUpload('owner'),pending);
+  // An independent compatible peer may replace the local pointer. Retain the
+  // original physical value (including non-JSON data) before simulating it.
+  await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>tx.objectStore('meta').put(pending,'fixture-original-pending-budget'));
+  const replacement={...pending,updatedAt:pending.updatedAt+1};await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>tx.objectStore('meta').put(replacement,'pending:owner'));const beforePeer=reads;await ctx.sendPush();await settle();assert.ok(reads>beforePeer,'changed local pending evidence releases only to a fresh source check');assert.equal(JSON.stringify([...backend.docs]),originalCloud);assert.deepEqual(await store.getPendingUpload('owner'),replacement);
+  if(control!=='unrepresented pending'){
+   const compatible={...replacement};delete compatible.futurePending;await store.setPendingUpload('owner',compatible);await ctx.sendPush();await fixtureDeadline((async()=>{while(vm.runInContext('pulling||cloudPushInFlight',ctx))await syncSettle(5);})(),'a same-pointer losslessness change permits a fresh guarded repair');const final=await settleRecovery188(app);assert.ok(final.remote.rev>originalRoot.rev);assert.equal(ctx.state.tasks.find(row=>row.id===done).done,true);assert.ok(JSON.parse(final.remote.payload).tasks.some(row=>row.title==='Accepted while pending recovery needs a choice'));
+  }
+  const graph=await store.readRawExportSnapshot(),meta=graph.stores.meta;assert.deepEqual(meta.values[meta.keys.indexOf('fixture-original-pending-budget')],pending,'the compatible-peer fixture retains every exact original non-JSON value');
+
+ });
+});
+
 test('RISK corrupt cloud work budget: a failed exact-source read does not permanently hold a later repair',async t=>{
  const app=await damagedAcknowledgedApp187(t),{ctx,shim,backend,originalRoot}=app;let roots=0,failed=false;
  app.faults.serverRead=async path=>{if(path==='users/owner'&&++roots===3){failed=true;throw Object.assign(Error('Synthetic transient exact-source read'),{code:'unavailable'});}};
