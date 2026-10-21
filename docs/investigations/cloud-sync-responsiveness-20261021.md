@@ -115,3 +115,42 @@ fallback still refresh through their existing owner. Sample count, probability
 formula, History and timing assertions remain unchanged. Exact successor evidence
 is required; the failed a93 run and both successful installed cases remain
 separate intermediate evidence.
+
+## Slower-runner follow-up
+
+The c3 candidate passed its exact local full run but failed both push and PR
+CI. Three Yes controls took 1,127 / 1,345 ms and three Done controls took
+1,081 / 1,353 ms against the unchanged 1,000 ms budgets. The push run also
+failed the initial no-ACK recovery acknowledgement. Local approval did not
+establish a releasable candidate; both failed CI logs remain retained.
+
+The remaining sampling loop repeatedly resolved Gaussian/Math globals. It now
+uses the same Box–Muller operations and random order with per-invocation Math
+references and a local spare returned to the shared stream. Cold probability
+display reuses its already normalized unique rows, preserving the directed
+formula and opponent addition order. Its normal CDF receives the current Math
+reference instead of resolving it again for each pair. Replacement calculators,
+pair functions and Gaussian callers keep their ordinary fallback. Sample counts,
+Float64 scores, Float32 distributions, sort order and stopping rules stay intact.
+Exact released golden distributions, subsequent Gaussian/random draws and
+null/zero/odd/even spare controls were captured before these numeric edits. The
+first characterization failure was a nested VM-array comparison in the fixture;
+host-normalizing those entries passed on unchanged c3. It is not behavioral RED.
+The first numeric repair still exceeded Done's budget (1,077 ms); the source-bound
+profile justified the CDF refinement. The refined local focused totals were
+about 520 ms for Yes and 310 ms for Done. Final full and CI evidence remains
+separate from these intermediate timings.
+
+The recovery failure was isolated without changing application authority or
+acceptance deadlines. The 2 MB cold fixture accidentally used the fake backend's
+25 ms fault-test deadline, unlike its seed's explicit 5,000 ms positive settings.
+A controlled 40 ms transaction interleave reproduced the failure on CI's Node 22.
+The verifier then called the status-mutating fake backend while the app waited
+for its safe retry, replacing the transient error and suppressing that retry.
+Waiting for the actual owner/retry before verifying passed under the original
+25 ms limit with the same interleave, within the unchanged five-second ACK/head
+window. The fixture now has explicit existing positive backend settings and a
+passive owner wait; all original exact source, cloud ACK, durable-head and reopen
+assertions remain. Production automatic paths enter the app-owned pull, rather
+than this verifier-only direct-pull loop. This was a fixture correction, not
+permission to relax recovery evidence or change production deadlines.

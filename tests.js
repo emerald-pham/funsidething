@@ -1925,7 +1925,7 @@ async function coldDamagedSourceWithoutAck214(t,{newerLocalWork=false}={}){
  const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='cold-no-ack-214-'+Math.random();
  const app=await loadAppAtTime(1792323000000,{seed:214,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},indexedDBProvider:indexedDB,deviceDbName});
  const faults={authPending:true},counts={reads:0};faults.serverRead=async()=>{counts.reads++;};
- const backend=await loadCloudBackendV2({rootData:originalRoot,failures:faults,recordSyncError:app.ctx.recordSyncError,runtimeWindow:app.ctx.window});
+ const backend=await loadCloudBackendV2({rootData:originalRoot,timeoutMs:5000,recoveryTimeoutMs:5000,failures:faults,recordSyncError:app.ctx.recordSyncError,runtimeWindow:app.ctx.window});
  for(const [key,value] of provider)backend.docs.set(key,value);
  app.ctx.window.CLOUD_PUSH_DELAY_MS=60000;
  t.after(async()=>{backend.CS.suspend();vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);await app.ctx.window.ScannerDeviceStore?.close?.();await app.dispose();});
@@ -38482,7 +38482,11 @@ async function heldDecisionApp188(t,{fixture=heldDecisionFixture188(),failures={
 }
 async function settleRecovery188(app){
  const end=Date.now()+5000;
- while(Date.now()<end){const remote=await app.backend.CS.pull(),head=app.ctx.window.ScannerDeviceStore?await app.ctx.window.ScannerDeviceStore.readHead():{payload:app.shim.localStorage.getItem(LOCAL_HEAD_KEY)};
+ while(Date.now()<end){
+  // A verifier read mutates the fake backend's shared status. Let the real
+  // owner finish, including a scheduled retry, before verifying its ACK.
+  if(app.ctx.state.syncDirty||vm.runInContext('pulling||cloudPushInFlight||cloudRetryTimer!==null',app.ctx)){await new Promise(resolve=>setTimeout(resolve,5));continue;}
+  const remote=await app.backend.CS.pull(),head=app.ctx.window.ScannerDeviceStore?await app.ctx.window.ScannerDeviceStore.readHead():{payload:app.shim.localStorage.getItem(LOCAL_HEAD_KEY)};
   if(!app.ctx.state.syncDirty&&remote?.payload===app.ctx.cloudPayload()&&remote.rev===app.ctx.state.syncRev&&head.payload===JSON.stringify(app.ctx.state))return {remote,head};
   await new Promise(resolve=>setTimeout(resolve,5));
  }
@@ -40851,4 +40855,29 @@ test('RISK support diagnostics: download bytes, selectable copy fallback, and Re
  assert.match(root.innerHTML,/<h2>Settings<\/h2>/);
  assert.equal(control.value,'37','Return restores the actual unsaved Settings control value');
  assert.equal(ctx.state.settings.workedHours,16,'restoring the draft does not silently save it');
+});
+
+
+test('RISK numeric responsiveness: optimized sampling and cold display preserve released distributions and random streams',async t=>{
+ const golden=[{"spare":null,"rows":[{"id":"a","hist":[0.1428571492433548,0.1428571492433548,0.1428571492433548,0.2857142984867096,0.2857142984867096],"cdf":[0.1428571492433548,0.2857142984867096,0.4285714626312256,0.7142857313156128,1],"topK":5,"n":5},{"id":"b","hist":[0.2857142984867096,0,0.7142857313156128,0,0],"cdf":[0.2857142984867096,0.2857142984867096,1,1,1],"topK":3,"n":5},{"id":"c","hist":[0.2857142984867096,0,0,0.1428571492433548,0.5714285969734192],"cdf":[0.2857142984867096,0.2857142984867096,0.2857142984867096,0.4285714626312256,1],"topK":5,"n":5},{"id":"d","hist":[0.1428571492433548,0.1428571492433548,0,0.5714285969734192,0.1428571492433548],"cdf":[0.1428571492433548,0.2857142984867096,0.2857142984867096,0.8571429252624512,1],"topK":4,"n":5},{"id":"e","hist":[0.1428571492433548,0.7142857313156128,0.1428571492433548,0,0],"cdf":[0.1428571492433548,0.8571428656578064,1,1,1],"topK":2,"n":5}],"savedSpare":-1.4005921983302108,"nextGaussian":-1.4005921983302108,"nextRandom":0.125,"draws":37},{"spare":1.25,"rows":[{"id":"a","hist":[0.2857142984867096,0.1428571492433548,0.1428571492433548,0.2857142984867096,0.1428571492433548],"cdf":[0.2857142984867096,0.4285714626312256,0.5714285969734192,0.8571429252624512,1],"topK":4,"n":5},{"id":"b","hist":[0.2857142984867096,0,0.5714285969734192,0.1428571492433548,0],"cdf":[0.2857142984867096,0.2857142984867096,0.8571429252624512,1,1],"topK":3,"n":5},{"id":"c","hist":[0.1428571492433548,0,0,0.1428571492433548,0.7142857313156128],"cdf":[0.1428571492433548,0.1428571492433548,0.1428571492433548,0.2857142984867096,1],"topK":5,"n":5},{"id":"d","hist":[0.1428571492433548,0.2857142984867096,0,0.4285714328289032,0.1428571492433548],"cdf":[0.1428571492433548,0.4285714626312256,0.4285714626312256,0.8571428656578064,1],"topK":4,"n":5},{"id":"e","hist":[0.1428571492433548,0.5714285969734192,0.2857142984867096,0,0],"cdf":[0.1428571492433548,0.7142857313156128,1,1,1],"topK":2,"n":5}],"savedSpare":null,"nextGaussian":-2.5728461288937713e-16,"nextRandom":0.125,"draws":37}];
+ for(const expected of golden){
+  const app=await loadApp({seed:314});t.after(()=>app.dispose());const {ctx}=app;
+  vm.runInContext('globalThis.goldenDraws=0;globalThis.goldenSequence=[.125,.625,.25,.875,.375,.75];Math.random=function(){if(this!==Math)throw Error("random receiver changed");return goldenSequence[goldenDraws++%goldenSequence.length];};_spare='+JSON.stringify(expected.spare),ctx);
+  const rows=[...ctx.rankStats([{id:'a',mu:25,sigma:8},{id:'b',mu:24,sigma:3},{id:'c',mu:19,sigma:9},{id:'d',mu:NaN,sigma:0},{id:'e',mu:26,sigma:2}],7)].map(([id,row])=>({id,hist:[...row.hist],cdf:[...row.cdf],topK:row.topK,n:row.n}));
+  assert.deepEqual(rows,expected.rows,'released Float32 distributions and stopping estimates remain exact');
+  assert.equal(vm.runInContext('_spare',ctx),expected.savedSpare);assert.equal(ctx.gauss(),expected.nextGaussian);assert.equal(vm.runInContext('Math.random()',ctx),expected.nextRandom);assert.equal(vm.runInContext('goldenDraws',ctx),expected.draws);
+ }
+ for(const [count,samples,spare] of [[0,0,-0],[1,7,0],[4,3,-0],[5,2,null],[5,3,1.25],[4,0,null]]){
+  const apps=await Promise.all([loadApp({seed:315}),loadApp({seed:315})]);t.after(()=>Promise.all(apps.map(app=>app.dispose())));
+  for(const {ctx} of apps)vm.runInContext('globalThis.streamDraws=0;globalThis.streamSequence=[0,.125,0,.625,.25,.875,.375,.75];Math.random=function(){if(this!==Math)throw Error("random receiver changed");return streamSequence[streamDraws++%streamSequence.length];};_spare='+(Object.is(spare,-0)?'-0':JSON.stringify(spare)),ctx);
+  const items=Array.from({length:count},(_,i)=>({id:'stream-'+i,mu:25+i,sigma:3+i}));apps[0].ctx.rankStats(items,samples);
+  for(let i=0;i<count*(samples||250);i++)apps[1].ctx.gauss();
+  assert.ok(Object.is(vm.runInContext('_spare',apps[0].ctx),vm.runInContext('_spare',apps[1].ctx)),'odd/even pools retain the shared Gaussian spare exactly');
+  for(let i=0;i<3;i++)assert.equal(apps[0].ctx.gauss(),apps[1].ctx.gauss(),'later standalone sampling sees the unchanged stream');
+  assert.equal(vm.runInContext('streamDraws',apps[0].ctx),vm.runInContext('streamDraws',apps[1].ctx),'zero uniforms are rejected without extra or missing draws');
+ }
+ const app=await loadApp({seed:316});t.after(()=>app.dispose());const {ctx}=app;
+ const cases=[[],[{id:'sole',mu:NaN,sigma:0}],[{id:'a',mu:-1e5,sigma:-1},{id:'b',mu:1e5,sigma:1e5},{id:'c',mu:25,sigma:8}],[{id:'same',mu:1,sigma:3},{id:'same',mu:2,sigma:4},{id:'other',mu:3,sigma:5}]];
+ for(const tasks of cases){vm.runInContext('chanceDisplayWeightCache=null',ctx);const actual=ctx.chanceDisplayWeights(tasks),expected=new Map(tasks.map(task=>[task.id,ctx.chanceWeight(task,tasks)]));for(const [id,weight] of expected)assert.equal(actual.get(id),weight,'cold normalized weights preserve ID exclusion, bounds and tails exactly');}
+ const tasks=[{id:'a',mu:25,sigma:8},{id:'b',mu:26,sigma:7}];ctx.chanceWeight=task=>task.id==='a'?.25:.75;assert.deepEqual([...ctx.chanceDisplayWeights(tasks)].map(([id,weight])=>[id,weight]),[['a',.25],['b',.75]],'a replacement calculator retains its existing fallback');
 });
