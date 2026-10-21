@@ -1941,3 +1941,7 @@ The existing native inspection consumer now proves truthful promoted/demoted gen
 - RISK cloud source inspection: narrow native progress updates preserve exact visible text
 
 The final pre-adoption guard reads head, pending/hold and exact protected copies atomically after awaited prerequisites; no await separates this check from live adoption. The opt-in source-fixture setup clock advances only its declared350ms save and awaits real IndexedDB persistence; every runtime/recovery watchdog and native-browser real clock stays unchanged. A measured non-CPU Node pause and all failed setup runs remain separate from product RED/GREEN. Final focused authority32/32 and lifecycle218/218 passed before separately committed qualification.
+
+- RISK cloud source inspection: refreshed roles update before a demoted read finishes
+
+The held-demotion native boundary requires one Current and one Previous heading before the demoted generation finishes reading. All retained rows follow the latest observed capture; older callbacks cannot roll roles back. Inspection stays read-only with no source eligibility.

@@ -16399,5 +16399,89 @@
     "greenEvidence": "immediate-valid-green.log recordf4a1e3ac: original390+new360 pass2/2,0skip with original immediate assertions then bounded2frames. focused-cohort.log246/246 passed before final timing strengthening. Final exact full/native/rules/compatibility/rendered/reviews/CI separately required.",
     "evidenceClassification": "Contemporaneous behavioral visible-text RED then minimum product repair and GREEN; original strict scalar contract preserved",
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021/linux-scroll-repair-20261021"
+  },
+  {
+    "baseCommit": "5919574c63f3d345c47536bb8ea9858def11a24a",
+    "testChangesSha256": "0fcc062277970c75a0a75e345b570ce7b5bc103d6d5e6255b8cd9aae8c0a6d1e",
+    "reason": "Close the actual independent rendered held-demotion finding inside the existing226 truthful source-role contract. Add one actual native consumer boundary before the demoted chunk read resolves; preserve all prior635 rationale objects, all original18 immediate assertions,390/360 geometry and all prior behavioral coverage.",
+    "previousBehavior": "Exact591 full/native/rules/compatibility passed, but both exact rendered cases showed two Current labels while the demoted generation fresh read stayed held. The old native consumer asserted roles only after both callbacks, so this intermediate state was missed. Its final approval was withheld/withdrawn; earlier successful gates remain historical.",
+    "intendedBehavior": "All retained inspection rows use the same latest observed manifest, with capture ordering preventing older callbacks from rolling roles back. A demoted retained row shows Previous before its held chunks finish; a retained copy outside current/previous/pending is Earlier received. Read-only preview never grants source choices. The mounted progress height repair and exact original focus/disclosure/scroll/text invariants remain.",
+    "replacementTests": [
+      "RISK cloud source inspection: refreshed roles update before a demoted read finishes"
+    ],
+    "preservedCoverage": [
+      "The shared helper adds a held-demotion branch only for the new case; original390 and360 consumers keep their old timing and every original assertion in order. New case releases its owned gate in cleanup even on assertion failure. No timeout, tolerance, font, skip or eligibility relaxation.",
+      "All635 existing raw rationale objects remain byte-for-byte. Existing earlier real preimplementation visible-text RED and Linux geometry diagnosis remain preserved; the present actual held-role RED occurred before its runtime repair. No claim is made that historical591 approvals cover this successor.",
+      "No read scheduling, one-minute shared budget, authentication, original-source authority, protected storage, CAS/ACK, source selection or restore changes. Separate229 notice removal and230 iOS ticket remain human handoff work. Passing exact CI then park/handoff; no merge/deploy."
+    ],
+    "redEvidence": {
+      "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"RISK cloud source inspection: refreshed roles update\" tests.js; held-role-runs/2026-10-21T11-54-07-585Z-a7341b2f-cf81-4564-bbaa-988fe2ad13e0.json",
+      "failure": "Actual native source-review transition fails strictEqual before demoted chunks are released: expected Previous cloud source, actual Current cloud source. Exactly1 test,1 behavioral failure,0skips; runtime index remained exact591. Parent Code actual Chrome/WebKit role captures independently showed the same duplicateCurrent state."
+    },
+    "greenEvidence": "held-role-first-green.log recorder8e74cc17: all3 actualnative inspection cases pass with0skips, including held-demotion and all original immediate geometry/focus/scroll assertions. Exact committed full/native/rules/compatibility/render/reviews/CI remain required.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021/linux-scroll-repair-20261021"
+  },
+  {
+    "baseCommit": "b5c7af226c0b30884208cadedd542c377f85524e",
+    "testChangesSha256": "2bb40457efd687e2e7666efef96fddf868fdd999aa8d4cc662d64c2b979d567d",
+    "reason": "Close the actual independent rendered held-demotion finding inside the existing226 truthful source-role contract. Add one actual native consumer boundary before the demoted chunk read resolves; preserve all prior635 rationale objects, all original18 immediate assertions,390/360 geometry and all prior behavioral coverage.",
+    "previousBehavior": "Exact591 full/native/rules/compatibility passed, but both exact rendered cases showed two Current labels while the demoted generation fresh read stayed held. The old native consumer asserted roles only after both callbacks, so this intermediate state was missed. Its final approval was withheld/withdrawn; earlier successful gates remain historical.",
+    "intendedBehavior": "All retained inspection rows use the same latest observed manifest, with capture ordering preventing older callbacks from rolling roles back. A demoted retained row shows Previous before its held chunks finish; a retained copy outside current/previous/pending is Earlier received. Read-only preview never grants source choices. The mounted progress height repair and exact original focus/disclosure/scroll/text invariants remain.",
+    "replacementTests": [
+      "RISK cloud source inspection: refreshed roles update before a demoted read finishes"
+    ],
+    "preservedCoverage": [
+      "The shared helper adds a held-demotion branch only for the new case; original390 and360 consumers keep their old timing and every original assertion in order. New case releases its owned gate in cleanup even on assertion failure. No timeout, tolerance, font, skip or eligibility relaxation.",
+      "All635 existing raw rationale objects remain byte-for-byte. Existing earlier real preimplementation visible-text RED and Linux geometry diagnosis remain preserved; the present actual held-role RED occurred before its runtime repair. No claim is made that historical591 approvals cover this successor.",
+      "No read scheduling, one-minute shared budget, authentication, original-source authority, protected storage, CAS/ACK, source selection or restore changes. Separate229 notice removal and230 iOS ticket remain human handoff work. Passing exact CI then park/handoff; no merge/deploy."
+    ],
+    "redEvidence": {
+      "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"RISK cloud source inspection: refreshed roles update\" tests.js; held-role-runs/2026-10-21T11-54-07-585Z-a7341b2f-cf81-4564-bbaa-988fe2ad13e0.json",
+      "failure": "Actual native source-review transition fails strictEqual before demoted chunks are released: expected Previous cloud source, actual Current cloud source. Exactly1 test,1 behavioral failure,0skips; runtime index remained exact591. Parent Code actual Chrome/WebKit role captures independently showed the same duplicateCurrent state."
+    },
+    "greenEvidence": "held-role-first-green.log recorder8e74cc17: all3 actualnative inspection cases pass with0skips, including held-demotion and all original immediate geometry/focus/scroll assertions. Exact committed full/native/rules/compatibility/render/reviews/CI remain required.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021/linux-scroll-repair-20261021"
+  },
+  {
+    "baseCommit": "3b120ae12cd374a5a9685e34495f237d1f5c5604",
+    "testChangesSha256": "2b7f4c4ce5f8438bee3be593edd1f5e09e79ddf031266a49bf182628804345bb",
+    "reason": "Close the actual independent rendered held-demotion finding inside the existing226 truthful source-role contract. Add one actual native consumer boundary before the demoted chunk read resolves; preserve all prior635 rationale objects, all original18 immediate assertions,390/360 geometry and all prior behavioral coverage.",
+    "previousBehavior": "Exact591 full/native/rules/compatibility passed, but both exact rendered cases showed two Current labels while the demoted generation fresh read stayed held. The old native consumer asserted roles only after both callbacks, so this intermediate state was missed. Its final approval was withheld/withdrawn; earlier successful gates remain historical.",
+    "intendedBehavior": "All retained inspection rows use the same latest observed manifest, with capture ordering preventing older callbacks from rolling roles back. A demoted retained row shows Previous before its held chunks finish; a retained copy outside current/previous/pending is Earlier received. Read-only preview never grants source choices. The mounted progress height repair and exact original focus/disclosure/scroll/text invariants remain.",
+    "replacementTests": [
+      "RISK cloud source inspection: refreshed roles update before a demoted read finishes"
+    ],
+    "preservedCoverage": [
+      "The shared helper adds a held-demotion branch only for the new case; original390 and360 consumers keep their old timing and every original assertion in order. New case releases its owned gate in cleanup even on assertion failure. No timeout, tolerance, font, skip or eligibility relaxation.",
+      "All635 existing raw rationale objects remain byte-for-byte. Existing earlier real preimplementation visible-text RED and Linux geometry diagnosis remain preserved; the present actual held-role RED occurred before its runtime repair. No claim is made that historical591 approvals cover this successor.",
+      "No read scheduling, one-minute shared budget, authentication, original-source authority, protected storage, CAS/ACK, source selection or restore changes. Separate229 notice removal and230 iOS ticket remain human handoff work. Passing exact CI then park/handoff; no merge/deploy."
+    ],
+    "redEvidence": {
+      "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"RISK cloud source inspection: refreshed roles update\" tests.js; held-role-runs/2026-10-21T11-54-07-585Z-a7341b2f-cf81-4564-bbaa-988fe2ad13e0.json",
+      "failure": "Actual native source-review transition fails strictEqual before demoted chunks are released: expected Previous cloud source, actual Current cloud source. Exactly1 test,1 behavioral failure,0skips; runtime index remained exact591. Parent Code actual Chrome/WebKit role captures independently showed the same duplicateCurrent state."
+    },
+    "greenEvidence": "held-role-first-green.log recorder8e74cc17: all3 actualnative inspection cases pass with0skips, including held-demotion and all original immediate geometry/focus/scroll assertions. Exact committed full/native/rules/compatibility/render/reviews/CI remain required.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021/linux-scroll-repair-20261021"
+  },
+  {
+    "baseCommit": "883c6170f6bf7525dba2b0b987e38b0ed79536a4",
+    "testChangesSha256": "f908ae7e933cb0c5e3d74b705cbd502a1f2e394ef9da65d1216f92a1e242e482",
+    "reason": "Close the actual independent rendered held-demotion finding inside the existing226 truthful source-role contract. Add one actual native consumer boundary before the demoted chunk read resolves; preserve all prior635 rationale objects, all original18 immediate assertions,390/360 geometry and all prior behavioral coverage.",
+    "previousBehavior": "Exact591 full/native/rules/compatibility passed, but both exact rendered cases showed two Current labels while the demoted generation fresh read stayed held. The old native consumer asserted roles only after both callbacks, so this intermediate state was missed. Its final approval was withheld/withdrawn; earlier successful gates remain historical.",
+    "intendedBehavior": "All retained inspection rows use the same latest observed manifest, with capture ordering preventing older callbacks from rolling roles back. A demoted retained row shows Previous before its held chunks finish; a retained copy outside current/previous/pending is Earlier received. Read-only preview never grants source choices. The mounted progress height repair and exact original focus/disclosure/scroll/text invariants remain.",
+    "replacementTests": [
+      "RISK cloud source inspection: refreshed roles update before a demoted read finishes"
+    ],
+    "preservedCoverage": [
+      "The shared helper adds a held-demotion branch only for the new case; original390 and360 consumers keep their old timing and every original assertion in order. New case releases its owned gate in cleanup even on assertion failure. No timeout, tolerance, font, skip or eligibility relaxation.",
+      "All635 existing raw rationale objects remain byte-for-byte. Existing earlier real preimplementation visible-text RED and Linux geometry diagnosis remain preserved; the present actual held-role RED occurred before its runtime repair. No claim is made that historical591 approvals cover this successor.",
+      "No read scheduling, one-minute shared budget, authentication, original-source authority, protected storage, CAS/ACK, source selection or restore changes. Separate229 notice removal and230 iOS ticket remain human handoff work. Passing exact CI then park/handoff; no merge/deploy."
+    ],
+    "redEvidence": {
+      "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"RISK cloud source inspection: refreshed roles update\" tests.js; held-role-runs/2026-10-21T11-54-07-585Z-a7341b2f-cf81-4564-bbaa-988fe2ad13e0.json",
+      "failure": "Actual native source-review transition fails strictEqual before demoted chunks are released: expected Previous cloud source, actual Current cloud source. Exactly1 test,1 behavioral failure,0skips; runtime index remained exact591. Parent Code actual Chrome/WebKit role captures independently showed the same duplicateCurrent state."
+    },
+    "greenEvidence": "held-role-first-green.log recorder8e74cc17: all3 actualnative inspection cases pass with0skips, including held-demotion and all original immediate geometry/focus/scroll assertions. Exact committed full/native/rules/compatibility/render/reviews/CI remain required.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021/linux-scroll-repair-20261021"
   }
 ]
