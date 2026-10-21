@@ -10,6 +10,7 @@ procedure, output and limits; package script names are the command entry points.
 | Inspect or manage the shared host ledger and parked work | `npm run agent:host-coordination --` | [Host coordination](host-coordination.md) |
 | Run focused copy and rationale checks | `npm run agent:preflight --` | [Preflight](preflight.md) |
 | Run an isolated browser audit and preserve partial results | `npm run agent:browser-audit --` | [Browser audits](browser-audits.md) |
+| Validate a committed topic revision and hand it to remote CI | `npm run agent:ci-handoff --` | [Local CI handoff](ci-handoff.md) |
 | Follow one exact CI run and commit | `npm run agent:ci-monitor --` | [CI monitor](ci-monitor.md) |
 | Update an authorized PR body from UTF-8 text | `npm run agent:pr-body-update --` | [PR body update](pr-body-update.md) |
 
