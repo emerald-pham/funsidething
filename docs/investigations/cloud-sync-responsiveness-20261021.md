@@ -96,3 +96,22 @@ lossless earlier than intended. The corrected fixture uses raw IDB for the
 unknown-preserving peer transition and the normal writer for the later supported
 transition. Its original physical pending value remains retained under a separate
 fixture row. No application change was needed for that fixture correction.
+
+## Final full-suite follow-up
+
+The a93 exact full run retained 2,781 passes, 50 explicit environment skips and
+three counted failures (two top-level blockers). The strict ACK/sibling-source
+consumer still called the old internal helper name; retaining that name fixes
+the contract without editing its existing assertions. The three-Yes consumer
+also exceeded its unchanged 1,000 ms budget at 1,001 ms. This is a failed gate,
+not a pass rounded down.
+
+A source-bound CPU profile and independent call-graph inspection found that
+ordinary Yes and Done each sampled and sorted every rank twice: once at the end
+of projection, then immediately again before History capture. The first numeric
+distribution was discarded. Those action owners now defer the projection refresh
+and retain the final refresh. Standalone projection and refused-projection
+fallback still refresh through their existing owner. Sample count, probability
+formula, History and timing assertions remain unchanged. Exact successor evidence
+is required; the failed a93 run and both successful installed cases remain
+separate intermediate evidence.
