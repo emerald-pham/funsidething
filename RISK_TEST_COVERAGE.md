@@ -1851,7 +1851,8 @@ This synthetic native review drives held generation headers, late current zero-r
 - RISK recovery read minute: the second native verification shares the original sixty-second budget
 - RISK recovery read minute: native Cancel releases the read immediately and a late old header cannot replace a fresh preview
 - RISK recovery read minute: stalled server stages expire once and retain protected sources after late replies
-- RISK recovery read minute: changed account revision or drafts revoke a delayed source preview
+- RISK recovery read minute: changed accounts or drafts revoke a delayed source preview
+- RISK recovery read minute: a delayed cloud change discards the original capture for one fresh pair
 - RISK recovery read minute guidance: pending native review offers Cancel and explains the whole bounded read
 
 The real app consumers use synthetic independently verified generations and external SDK/time boundaries. They cover one shared minute, immediate native Cancel, stale replies, changed authority, cold-open exact repair and dialog-close resumption. These checks do not validate the private affected source or prove physical iOS recovery. Existing mismatched/older-source consent, preserved originals and complete-generation publication checks remain required.
@@ -1865,6 +1866,14 @@ An ordinary timeout does not clear a previously verified damage finding. The nat
 
 ## One fresh guarded source verification (#187)
 
+- RISK cloud source fresh check: a transient root change inside the first capture verifies automatically
+- RISK cloud source fresh check: inner and between-capture changes share one restart
+- RISK cloud source fresh check: partial cloud reads cannot rebind changed local or account authority
+- RISK cloud source fresh check: a partial-read restart preserves the original deadline and Cancel authority
+- RISK cloud source fresh check: late typed head changes cannot be hidden inside the fresh pair
+- RISK cloud source fresh check: partial captures retain typed pending and hold evidence
+- RISK cloud source partial-read guidance: mounted Help explains the same bounded recheck
+
 - RISK cloud source fresh check: one between-capture cloud change verifies again within the same review
 - RISK cloud source fresh check: head metadata alone permits one fresh pair and visible cancellable progress
 - RISK cloud source fresh check: changed head ownership and unknown record facts cannot count as harmless metadata
@@ -1876,8 +1885,63 @@ An ordinary timeout does not clear a previously verified damage finding. The nat
 - RISK cloud source fresh check: a draft changed as fresh progress opens cannot become the new baseline
 - RISK cloud source fresh check guidance: mounted Help explains one fresh check without choosing
 
-One transient between-capture cloud snapshot or finite committedAt-only head metadata change can restart both complete captures once within the original monotonic minute. No source is selected or published. Accepted work, drafts, UID/epoch, head ownership and unknown fields, pending/browser/hold/prepared sources stay binding; churn, cancellation, unsupported sources and refused storage remain held. Synthetic SDK/time/DOM/IDB consumers preserve exact sources and ordinary pull/write deadlines; actual affected-iOS source validity and recovery remain unverified.
+One transient cloud-root revision change during a capture, between-capture cloud snapshot change or finite committedAt-only head metadata change can restart both complete captures once within the original monotonic minute. No source is selected or published. Accepted work, drafts, UID/epoch, head ownership and unknown fields, pending/browser/hold/prepared sources stay binding; churn, cancellation, unsupported sources and refused storage remain held. Synthetic SDK/time/DOM/IDB consumers preserve exact sources and ordinary pull/write deadlines; actual affected-iOS source validity and recovery remain unverified.
 
 The recovered review's actual downloaded support report retains the original cross-capture refusal and separate fresh verification, with redaction, truncation accounting and unchanged byte/event/operation caps. Report-only compaction preserves source start/terminal facts, generation summaries and publication events. Pending progress and terminal refusal now have distinct wording: stopped checks never ask the user to keep waiting. The same tests retain exact board/head/pending/raw/cloud sources and no writes.
 
 The committedAt-only exemption compares complete head records losslessly. Actual durable readback retains NaN/null, missing/undefined, negative-zero/zero and named-array-property distinctions; any such changed unknown authority stays held. Unchanged typed facts still permit the one bounded metadata-only fresh pair without selecting or writing.
+
+A failed partial capture retains its original local/account/UID/epoch/serial/head/browser/pending/hold/prepared-source binding before any fresh pair. SDK and between-capture changes share one restart. Lossless typed comparisons apply through final readback; changed unknown head facts stop inside their original capture, before a second capture. Typed pending and recovery-hold facts remain exact; valid physical prepared-source records retain their payloadHash and raw metadata. Identical typed evidence remains a positive control. No generic error, unsupported source or changed authority is blindly retried.
+
+## Unavailable recovery-read checkpoint (#226)
+
+- RISK cloud source read retry: unavailable chunks verify a fresh pair without another click
+
+An explicitly typed unavailable SDK recovery read can spend the same existing guarded restart. The initial permanent consumer covers an incomplete chunk capture followed by two complete fresh captures, an unselected preview with disabled Apply, bounded downloaded failed/fresh diagnostics, preserved draft and exact device/head/pending/raw/cloud sources with zero writes. This is an incomplete local checkpoint: broader retry/deadline/authority/late-request controls, truthful retry copy, FAQ, packaging and exact-candidate review remain pending the reconciled parent acceptance handoff. It does not establish the private source's validity or actual affected-device recovery.
+
+## Recovery read lifecycle five-risk amendment (#226)
+
+- RISK cloud source read retry: repeated and mixed failures share one restart
+- RISK cloud source read retry: only explicit retryable server reads may restart
+- RISK cloud source read retry: unavailable cannot rebind original authority or accepted work
+- RISK cloud source read retry: fresh nested reads retain the original minute and Cancel authority
+- RISK cloud source cancellation: obsolete sibling headers cannot schedule chunks after failure or Cancel
+- RISK cloud source inspection: a complete independent source stays readable when its sibling fails
+- RISK cloud source inspection: an earlier complete copy remains inspectable after a failed fresh read
+- RISK cloud source inspection: current previous and pending copies require supported complete decoding
+- RISK cloud source inspection: strict ACK and confirmed Apply consumers reject failed sibling sources
+- RISK cloud source cancellation: a failed header retires dependent work before inspection settles
+- RISK cloud source inspection: failed sibling counts remain independently unknown
+- RISK cloud source states: retry and terminal explanations never substitute raw SDK details
+- RISK cloud source lifecycle guidance: mounted Help explains inspection and bounded read failure
+
+The published amendment supersedes the incomplete checkpoint above. Root change and explicitly typed unavailable server reads share one original restart/controller/minute. Independently complete supported copies can be inspected without choice or publication authority; later failed reads keep unknown counts while an earlier received copy remains labeled read-only. Required-source failure still blocks choices and strict ACK/Apply. Original authority and exact sources remain binding; retired sibling requests cannot schedule dependent work. Safe state guidance, failed/late/retry diagnostics, unchanged ordinary deadlines and zero review writes are covered. Synthetic coverage does not establish actual-account recovery, physical-device behavior or shipment.
+
+## Independent recovery review follow-up (#226)
+
+- RISK cloud source authority: confirmed Apply refuses changed typed head and hold facts
+- RISK cloud source authority: a delayed header cannot schedule chunks after original authority changes
+- RISK cloud source inspection: native asynchronous updates retain focus disclosure and scroll
+
+Native asynchronous inspection retains mounted keyboard focus, open device and received-copy disclosures and scroll. Deferred header reads recheck original authority before nested work, including physical browser/pending/head/hold changes, with coalesced in-flight checks for concurrent siblings. Earlier typed-head refusals preserve exact sources before fewer root requests. Confirmed Apply and final publication compare complete typed head/hold facts losslessly. Durable hold completion uses the exact comparator; unchanged supported originals remain protected through the existing tagged archive codec. A cached adapter without the capability refuses before publication; a late post-ACK change retains the hold and reports the committed cloud outcome. Final exact qualification and reviews remain separate.
+
+- RISK cloud source authority: transaction-time typed changes prevent stale publication
+- RISK cloud source authority: durable hold clearing compares full typed facts
+- RISK cloud source authority: post-ACK hold change preserves its committed outcome and refuses clearing
+- RISK cloud source authority: unchanged typed originals remain exactly archived after confirmed restore
+- RISK cloud source authority: a cached adapter without exact hold clearing refuses before publication
+
+## Final independent recovery boundary repairs (#226)
+
+The existing native inspection consumer now proves truthful promoted/demoted generation headings while retaining mounted keyboard focus, disclosures and scroll. Confirmed restore compares complete typed original head metadata in the local write transaction, carries its authored full postcommit head through verification and completion, and clears a recovery hold only under the exact head and hold. A late change retains actual committed outcomes and protected originals; it never grants stale adoption. Permanent actual-consumer REDs precede each correction.
+
+- RISK cloud source authority: post-ACK same-hash head change refuses stale local adoption
+- RISK cloud source authority: a cached adapter without exact recovery capabilities refuses before publication
+- RISK cloud source inspection: native asynchronous updates retain focus disclosure scroll and current source roles
+- RISK cloud source inspection: narrow native progress updates preserve exact visible text
+
+The final pre-adoption guard reads head, pending/hold and exact protected copies atomically after awaited prerequisites; no await separates this check from live adoption. The opt-in source-fixture setup clock advances only its declared350ms save and awaits real IndexedDB persistence; every runtime/recovery watchdog and native-browser real clock stays unchanged. A measured non-CPU Node pause and all failed setup runs remain separate from product RED/GREEN. Final focused authority32/32 and lifecycle218/218 passed before separately committed qualification.
+
+- RISK cloud source inspection: refreshed roles update before a demoted read finishes
+
+The held-demotion native boundary requires one Current and one Previous heading before the demoted generation finishes reading. All retained rows follow the latest observed capture; older callbacks cannot roll roles back. Inspection stays read-only with no source eligibility.

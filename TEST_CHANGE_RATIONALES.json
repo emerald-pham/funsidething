@@ -15827,5 +15827,661 @@
     },
     "greenEvidence": "Corrected probe7of7 pass6558bf3a; final narrowly scoped CSS recheck7of7 passb0201f82. Initial failed GREEN9cc15355 retained as probe-assumption failure, not feature RED. New exact full/native/rules/compatibility/rendered/reviews/CI/live acceptance still required.",
     "evidenceClassification": "contemporaneous-mounted-and-native-consumer-red-green"
+  },
+{
+  "baseCommit": "883c6170f6bf7525dba2b0b987e38b0ed79536a4",
+  "testChangesSha256": "faa9de3bd297bfe75d61ec95ba466ec03be0e6e31ebe9d2c45039b80cf7164aa",
+  "reason": "Close the confirmed single-SDK-capture transient-root-change retry gap at the existing full-app review consumer, preserving the original authority and single bounded restart. Add original-state, cancellation/deadline, lossless typed-source and mounted FAQ regressions without weakening existing source or application protections. Migrate the prior cloud-only delayed-read refusal to the explicitly authorized bounded fresh-pair outcome; retain every account/draft/local-edit refusal.",
+  "previousBehavior": "A root revision change inside one SDK read stopped after2root reads with an untyped error; only two completed captures could enter the one fresh verification. During repair, concrete REDs also showed that JSON comparison could accept changed typed head/pending/hold authority, so the original source binding needed lossless checks through final readback.",
+  "intendedBehavior": "Only a typed cloud-root inconsistency may discard an incomplete capture after original device/account/epoch/backend/serial/head/browser/pending/hold/draft/prepared facts are revalidated. One shared restart and original monotonic60second/controller apply across both inner and completed-pair inconsistencies. A fresh complete verified pair leaves all sources unselected and never writes or applies them.",
+  "replacementTests": [
+    "RISK cloud source fresh check: a transient root change inside the first capture verifies automatically",
+    "RISK cloud source fresh check: inner and between-capture changes share one restart",
+    "RISK cloud source fresh check: partial cloud reads cannot rebind changed local or account authority",
+    "RISK cloud source fresh check: a partial-read restart preserves the original deadline and Cancel authority",
+    "RISK cloud source fresh check: late typed head changes cannot be hidden inside the fresh pair",
+    "RISK cloud source fresh check: partial captures retain typed pending and hold evidence",
+    "RISK cloud source partial-read guidance: mounted Help explains the same bounded recheck",
+    "RISK recovery read minute: changed accounts or drafts revoke a delayed source preview",
+    "RISK recovery read minute: a delayed cloud change discards the original capture for one fresh pair"
+  ],
+  "preservedCoverage": [
+    "All617 prior rationale objects remain byte-exact. The existing typed-head negative count is tightened4to2 for earlier refusal; unchanged typed-head/committedAt-only positive still requires8reads. The original cloud-revision-only delayed-header branch formerly expectedfalse/nochoices, which conflicts with the explicit #226 requirement to refresh this exact inner-capture change. Its separate replacement now requires6rootreads at old/new/new/new/new/new revisions, original26seconds elapsed and34seconds remaining, no timer past original60000ms, latest revision, unselected choices, disabledApply and zero writes with exact local/head/pending/raw/cloud preservation. Account/draft/local-edit refusal variants keep their originalfalse/nochoices/preservation assertions. No production code changes follow the contract migration.",
+    "Actual review-cloud-source-recovery, real app/SDK/IDB and controlled external Firestore/time remain the agreed consumer seams. Source/draft/accepted-edit/account/epoch/backend/pending/browser/device-hold/prepared-choice mutations cannot establish a fresh authority baseline.",
+    "Two complete fresh captures and no default source selection remain mandatory. Inner/outer churn share one restart; Cancel/reopen, elapsed original minute and late callbacks cannot choose, write or replace a newer review. Original current/head/pending/raw/cloud bytes remain exact except intentional external fixture mutations.",
+    "Bounded downloaded support diagnostics retains original concurrent-change failure and separate completed fresh operation without source IDs, account data, task/draft contents or expanded event/operation/byte/age caps. Ordinary error/unsupported/account paths do not acquire blanket retries.",
+    "The one initial prepared-copy typed fixture accidentally used an interpreted row without physical payloadHash; its failed RED/GREEN cases are retained as fixture-invalid, not feature RED. The corrected fixture mutates the actual physical raw record, proves it stays readable and covers both changed and identical typed metadata. Valid pending/device-hold REDs preceded the lossless guard repair.",
+    "No affected-user incident or private report is committed. This generic reproduced gap is not claimed as the affected phone cause. This step is local-only: no push/merge/release/publication or live Stable/Beta update.",
+    "FAQ wording is129words after the observed preflight130word-limit failure; all existing literal one-minute/Cancel/ordinary-wait/50-title protections are retained. Prepackaging cache/fingerprint failures were expected stale packaging identities, not behavioralRED.",
+    "The exactec83 fullrun failed only the obsolete cloud-only branch (2 failures including its parent;2681pass/2733total,50optional skips); both mandatory native cases passed. Failure record8230e327-d002-4425-adf6-1c507461a9ed is retained. Independent Code and sync/data reviewers separately confirmed scoped migration against the existing authorization. This is not a new preimplementationRED; original permanent RED still precedes implementation. New exactcandidate full/native/rules/compat/reviews remain required."
+  ],
+  "redEvidence": {
+    "command": "Recorder preimplementation-red node --test --test-reporter=spec --test-name-pattern=RISK cloud source fresh check: a transient root change inside the first capture tests.js on clean released883app with new permanent test; then separate recorded typed-head, typed-pending/device-hold and mounted FAQ REDs before their app/copy repairs.",
+    "failure": "2026-10-21T01:01:29.585Z record6a3a743b-f9d6-4bce-9409-b63ab7b5ded5: actualfalse expectedtrue at real review action, no import/infrastructure failure. Later typed-head RED true!=false in4variants; typed pending/device hold RED true!=false in2valid variants; mounted FAQ missing explicit within-read sentence. Prepared-row invalid fixture case is excluded as described."
+  },
+  "greenEvidence": "First permanent transient-root test passed after minimal typed/root/baseline repair. Original fresh cohort28/28 then expanded focused53/53 passed. Corrected physical prepared-source typed controls7/7 passed, including unchanged originals; broader focused/current exact-candidate native/rules/compat/reviews remain pending. Earlier failed GREEN expectation/fixture cases and prepackaging stale identity/FAQ word-limit failures remain retained honestly. Exactec83 fullrun retained as obsolete-contractfailure; focused migrated delayed-read+unchangedauthority cohort passes5of5 without app edits (repair-delayed-contract-migration.log). Exact final candidate qualification follows.",
+  "evidenceClassification": "contemporaneous-permanent-consumer-red-green plus explicitly labeled later isolated guard sensitivity and safety coverage",
+  "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-source-changed-report3-20261020/repair-runs"
+},
+{
+  "baseCommit": "883c6170f6bf7525dba2b0b987e38b0ed79536a4",
+  "implementationBase": "0b43bc04bb73bb4a496c6edfb3f5566f46ba4645",
+  "testChangesSha256": "f017fbf100302d8c9e48dda11d1d8a5000446e8bf33cb8c6c7ec55c58b3bd5a6",
+  "reason": "Checkpoint the first explicitly authorized unavailable recovery-source READ vertical slice after a permanent actual-consumer RED. Preserve prior typed-root work and all raw rationale objects; this checkpoint is incomplete and held pending the parent reconciled wider recovery acceptance.",
+  "previousBehavior": "On clean0b43 with only the new permanent test dirty, a typed unavailable error in original SDK chunk reads returnedfalse without a fresh pair, despite otherwise healthy sources. Earlier external probes remain diagnosis, not this permanent RED.",
+  "intendedBehavior": "Only an interactive recovery SDK root/header/chunks/final-root read throwing exact unavailable while its original readAttempt/account remains current is marked recovery-source-unavailable. It may consume the same original single restart only after original authority revalidates; two fresh captures, no selection/application/publication and exact originals remain required.",
+  "replacementTests": [
+    "RISK cloud source read retry: unavailable chunks verify a fresh pair without another click"
+  ],
+  "preservedCoverage": [
+    "All618 prior raw rationale objects are byte-exact, including the previously approved typed-root repair and scoped delayed-read contract migration; no established assertion is removed, changed, skipped or weakened.",
+    "The new permanent actual recovery action uses synthetic external Firestore/IDB only, two unavailable chunk failures followed by healthy data. Five root reads/six chunk reads prove one discarded partial capture plus two complete fresh aggregates, with choices unselected and Apply disabled.",
+    "The actual downloaded support report keeps original unavailable failure and separately completed fresh operation within24KiB and excludes arbitrary error, task/draft and account/generation data. State/head/pending/raw/cloud facts and unfinished draft are exact; no writes occur.",
+    "This is an incomplete local checkpoint. Existing original timer/controller, typed-root case and authority guards are reused; repeated/mixed errors, unsupported/generic/auth/permission controls, elapsed deadline/Cancel/late-overlap/authority regression expansion, truthful progress/FAQ, packaging and final exact full/native/rules/compat/render/independent reviews remain pending.",
+    "Parent sent a new explicit broader five-risk scope after the first atomic GREEN. Work is deliberately checkpointed before any additional functional slice until the reconciled existing187/226 ticket handoff arrives. No public/tracker writes, push/CI/PR/merge/release/status/deployment or live update is allowed.",
+    "No original private diagnostic metadata or payload is committed or used in public fixtures; synthetic observations do not establish backend cause, source validity, ACK match or affected-device recovery."
+  ],
+  "redEvidence": {
+    "command": "Recorder preimplementation-red Node22 --test --test-reporter=spec --test-name-pattern=RISK cloud source read retry: unavailable chunks tests.js on0b43, firstpermanenttestonly beforeappedit.",
+    "failure": "2026-10-21T02:08:17.213Z recordb6f16f78-0b8f-4429-be85-1bd669de672f: actualfalse expectedtrue at review-cloud-source-recovery action. One discriminating assertion failure, no infrastructure/import error."
+  },
+  "greenEvidence": "2026-10-21T02:08:50.890Z record56d09d2b-fd8d-41f3-8416-a0cbc539bdf6:1passed0failed0skip after minimal typed SDK-read mark and existing restart admission. No broader qualification claimed.",
+  "evidenceClassification": "contemporaneous-permanent-consumer-red-green; incomplete localcheckpoint",
+  "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021/runs"
+},
+  {
+    "baseCommit": "883c6170f6bf7525dba2b0b987e38b0ed79536a4",
+    "implementationBase": "fa7735200d5bb697da1715ba7d11a98fe5b870c2",
+    "testChangesSha256": "834bb5304d94f45ba5472dcdc550d33fb765fc798c0863a4f521f0e8e199e47c",
+    "reason": "Implement the published five-risk #187/#226 technical amendment with permanent actual-consumer REDs. Retain all619 prior raw rationale objects and all existing data/ACK/CAS protections; independent complete source inspection remains separate from choice eligibility.",
+    "previousBehavior": "Typed unavailable recovery reads had the first checkpoint retry but no truthful retry guidance or independent cloud inspection. Obsolete deferred sibling headers could schedule chunks after failure/Cancel, asynchronous failure handling could schedule a dependent read, and a later failed fresh read erased an earlier complete inspection copy.",
+    "intendedBehavior": "Only typed unavailable server recovery READs share the original one restart and monotonic minute with root changes. Complete supported independent copies remain clearly read-only; failed counts remain unknown. Choices, confirmed Apply, exact ACK and publication retain full original-source validation/protection and authority checks. Retired reads cannot schedule dependent calls; terminal guidance is bounded and omits raw SDK detail.",
+    "replacementTests": [
+      "RISK cloud source read retry: unavailable chunks verify a fresh pair without another click",
+      "RISK cloud source read retry: repeated and mixed failures share one restart",
+      "RISK cloud source read retry: only explicit retryable server reads may restart",
+      "RISK cloud source read retry: unavailable cannot rebind original authority or accepted work",
+      "RISK cloud source read retry: fresh nested reads retain the original minute and Cancel authority",
+      "RISK cloud source cancellation: obsolete sibling headers cannot schedule chunks after failure or Cancel",
+      "RISK cloud source inspection: a complete independent source stays readable when its sibling fails",
+      "RISK cloud source inspection: an earlier complete copy remains inspectable after a failed fresh read",
+      "RISK cloud source inspection: current previous and pending copies require supported complete decoding",
+      "RISK cloud source inspection: strict ACK and confirmed Apply consumers reject failed sibling sources",
+      "RISK cloud source cancellation: a failed header retires dependent work before inspection settles",
+      "RISK cloud source inspection: failed sibling counts remain independently unknown",
+      "RISK cloud source states: retry and terminal explanations never substitute raw SDK details",
+      "RISK cloud source lifecycle guidance: mounted Help explains inspection and bounded read failure",
+      "RISK cloud source fresh check: a transient root change inside the first capture verifies automatically",
+      "RISK cloud source fresh check: inner and between-capture changes share one restart",
+      "RISK cloud source fresh check: partial cloud reads cannot rebind changed local or account authority",
+      "RISK cloud source fresh check: a partial-read restart preserves the original deadline and Cancel authority",
+      "RISK cloud source fresh check: late typed head changes cannot be hidden inside the fresh pair",
+      "RISK cloud source fresh check: partial captures retain typed pending and hold evidence",
+      "RISK cloud source partial-read guidance: mounted Help explains the same bounded recheck",
+      "RISK recovery read minute: changed accounts or drafts revoke a delayed source preview",
+      "RISK recovery read minute: a delayed cloud change discards the original capture for one fresh pair"
+    ],
+    "preservedCoverage": [
+      "All619 historical rationale objects remain byte-exact. Prior root-change regressions, actual consumer source choice, original backup/CAS/ACK, exact acknowledged-copy automatic repair and strict SDK return shape remain protected; no partial payload reaches ACK or Apply.",
+      "Existing unsafe-head authority read-count expectations tighten from4to2 because additional inspection device readbacks detect the same changed authority in the original capture; all refusal/preservation assertions remain. The validation-expiry count tightens from2to1 because elapsed independent decoding now refuses before the original final-root request. This is earlier safe refusal, not a deadline extension or assertion removal.",
+      "Positive and negative source consumers cover current/previous/pending supported complete decoding, damaged chunks/unsupported boards,62tasks with50title inspection bound, failed counts unknown, later-failure retained earlier copy, original deadline/Cancel/reopen, mixed/repeated failures, backend/UID/epoch/draft/accepted-edit/head/browser/pending/hold/prepared authority and strict ACK/confirmed Apply negatives. All review operations preserve exact originals and zero cloud writes.",
+      "First inspection probe was interrupted because a Promise.race polling fixture leaked; it is not a completed RED. The bounded permanent inspection assertion subsequently failed before app changes. Initial retry-control failures were fixture baseline-write/physical-hold assumptions, corrected in tests without claiming app repair.",
+      "Containment RED observed actual16vs15/17vs15 obsolete calls; early-retirement RED observed1obsolete chunk; its first attempted GREEN still failed due to sibling cancellation winning the race. Original-first failure retention repaired that gap and the9case cohort passed. Actual SDK overlap peaks2/3 were measured, with no physical-abort claim.",
+      "States/guidance seven assertions failed before app/copy edits, then7passed. Inspection-retention RED observed missing earlier complete copy after failed fresh read, followed by6/6 inspection GREEN. Role/decode controls6/6 and expanded lifecycle179/179 passed; final coherent full/native/rules/compatibility/rendered/independent evidence is recorded separately after commit.",
+      "No private original payload/incident details enter fixtures or Git. Local synthetic facts do not establish private-source validity, affected-account ACK/recovery, physical iOS behavior or random-refresh cause. Existing release hold prohibits push/PR/CI publication/merge/release/status/deploy/live update; parent remains sole tracker writer."
+    ],
+    "redEvidence": {
+      "command": "Recorded Node22 actual tests.js consumer slices, purpose preimplementation-red, logs/runs under /Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021; each permanent discriminating RED before its corresponding app edit.",
+      "failure": "first-red false!=true; late-sibling-red16!=15/17!=15; inspection-red-bounded missing data-cloud-source-inspection; early-retirement-red1!=0; independent-failures-red missing Current status; states-guidance-red7 actual mounted assertion failures; inspection-retention-red missing earlier complete received copy after failed fresh read. No infrastructure failure counted as behavior RED."
+    },
+    "evidenceClassification": "contemporaneous-permanent-consumer-red-green with preserved failed fixtures/interrupted attempt and stronger existing refusal counts",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021/runs"
+  },
+  {
+    "baseCommit": "883c6170f6bf7525dba2b0b987e38b0ed79536a4",
+    "implementationBase": "855bf6dec9c92c4bb1ab109d4baa645a59106fd8",
+    "testChangesSha256": "ccaa8f5088b44a728ab63943da8affbb5e3d25b5f89f62910cb647b54420f9f9",
+    "reason": "Complete the independently reviewed five-risk recovery follow-up and published outcome5 typed-authority reconciliation in existing187/226. Retain all620 committed raw rationale objects, meaningful consumer REDs, unchanged supported typed positives, actual late-commit truth and the original source/consent/ACK guards.",
+    "previousBehavior": "855 async inspection detached focused Cancel; delayed headers could schedule chunks after changed local authority. Existing confirmed Apply and final publication/hold-clear JSON comparisons collapsed changed typed head/hold facts. A legacy JSON-only opaque view also lost unchanged typed originals and could not serialize BigInt, despite the existing lossless source codec supporting them.",
+    "intendedBehavior": "Update mounted inspection facts without replacing controls/disclosures/scroll. Recheck original authority before SDK scheduling, sharing only in-flight sibling readbacks and retaining fresh later-stage checks/original deadline. Compare full typed head/hold snapshots at Apply, final publication and durable hold completion; preserve exact supported originals with the existing tagged codec inside the opaque archive. Missing cached exact-clear capability refuses before mutation; legacy clear callers stay strict. After actual cloud ACK, refuse a late changed hold/live adoption while honestly reporting the committed outcome.",
+    "replacementTests": [
+      "RISK cloud source read retry: unavailable chunks verify a fresh pair without another click",
+      "RISK cloud source read retry: repeated and mixed failures share one restart",
+      "RISK cloud source read retry: only explicit retryable server reads may restart",
+      "RISK cloud source read retry: unavailable cannot rebind original authority or accepted work",
+      "RISK cloud source read retry: fresh nested reads retain the original minute and Cancel authority",
+      "RISK cloud source cancellation: obsolete sibling headers cannot schedule chunks after failure or Cancel",
+      "RISK cloud source inspection: a complete independent source stays readable when its sibling fails",
+      "RISK cloud source inspection: an earlier complete copy remains inspectable after a failed fresh read",
+      "RISK cloud source inspection: current previous and pending copies require supported complete decoding",
+      "RISK cloud source inspection: strict ACK and confirmed Apply consumers reject failed sibling sources",
+      "RISK cloud source cancellation: a failed header retires dependent work before inspection settles",
+      "RISK cloud source inspection: failed sibling counts remain independently unknown",
+      "RISK cloud source authority: confirmed Apply refuses changed typed head and hold facts",
+      "RISK cloud source authority: transaction-time typed changes prevent stale publication",
+      "RISK cloud source authority: durable hold clearing compares full typed facts",
+      "RISK cloud source authority: post-ACK hold change preserves its committed outcome and refuses clearing",
+      "RISK cloud source authority: unchanged typed originals remain exactly archived after confirmed restore",
+      "RISK cloud source authority: a cached adapter without exact hold clearing refuses before publication",
+      "RISK cloud source authority: a delayed header cannot schedule chunks after original authority changes",
+      "RISK cloud source inspection: native asynchronous updates retain focus disclosure and scroll",
+      "RISK cloud source states: retry and terminal explanations never substitute raw SDK details",
+      "RISK cloud source lifecycle guidance: mounted Help explains inspection and bounded read failure",
+      "RISK cloud source fresh check: a transient root change inside the first capture verifies automatically",
+      "RISK cloud source fresh check: inner and between-capture changes share one restart",
+      "RISK cloud source fresh check: partial cloud reads cannot rebind changed local or account authority",
+      "RISK cloud source fresh check: a partial-read restart preserves the original deadline and Cancel authority",
+      "RISK cloud source fresh check: late typed head changes cannot be hidden inside the fresh pair",
+      "RISK cloud source fresh check: partial captures retain typed pending and hold evidence",
+      "RISK cloud source partial-read guidance: mounted Help explains the same bounded recheck",
+      "RISK recovery read minute: changed accounts or drafts revoke a delayed source preview",
+      "RISK recovery read minute: a delayed cloud change discards the original capture for one fresh pair"
+    ],
+    "preservedCoverage": [
+      "All620 committed prior raw rationale objects remain byte-exact. The superseded uncommitted621st checkpoint record/map are preserved outsideGit as historical artifacts; this finalized621st record replaces only that uncommitted text. Existing typed-root/unavailable/retry/source/ACK/CAS/identity/ordinary-deadline assertions remain protected.",
+      "Native SDK Chromium focus RED5060affa observed the focused Cancel node detached. Wrong startup-status and an unsupported-summary secondary fixture were setup failures, not behavior REDs; actual hydrated accepted state corrected the source fixture. Native GREEN preserves Cancel plus device disclosure/scroll and a focused open received-copy summary across another result.",
+      "Authority RED164130e7 observed6typedhead/hold Apply acceptances and2obsolete-chunk reads. Published reconciliation226comment6307191547 SHAe2fe83ecf54637a98ccc98bee576d7bcc6219a275b8caf4c67885b614f87d3d0 authorized the adapter scope. Lossless Apply recheck7/7 and transaction+recheck10/10 passed. Transaction RED observed root revision7instead of6 before fixing final publication comparison.",
+      "Durable hold/originals RED observed changed typed hold clearing, postACK stale clearing, lossy missing exact original metadata and missing cached capability allowing publication. Actual authority cohort23/23 passed after the guarded adapter/opaque source repair. A separate BigInt original RED observed false restore refusal before safe legacy projection;23/23 then passed with BigInt retained exactly in the tagged original. The same existing opaque source slot/version and manual value codec are used; no storage schema/data migration or cloud protocol change.",
+      "The existing JSON metadata view is retained where representable and is null for an unsupported ordinaryJSON projection. deviceAuthorityExact retains the complete typed original; it is never replaced by that view or adopted as a board. Ordinary payload/head strings, original cloud generations and legacy archive fields remain. Cached adapters lacking clearRecoveryCloudHoldIfCurrent refuse before publication; old clear callers default to strict pendingJSON rather than lossy equality.",
+      "Existing unsafe-head root counts tighten4to2 in620th record and2to1 here; late typed-head refusal tightens6to5. Expired validation tightens2to1 as previously recorded. Fewer requests follow earlier original-authority refusal; all no-choice, exact typed/raw source, pending/state and zero-write assertions remain. Independent final reviewers must judge these deliberate migrations.",
+      "Accepted-action fault injection explicitly awaits its actual local persist before final state comparison; a faster read refusal no longer races the fixture expected-value assignment. Pending inspection waits for that specific source label. The10000task case retains every50title/state/raw-source assertion and uses the established quiescent helper before changing its board.",
+      "Independent snapshot-limited fixture diagnosis traced the surviving native350ms save timer. Opt-in setup now drains that actual local consumer before cloud controls with the same5000ms budget, and disposes each owned fixture after its subcase. Polling is explicitly bounded, so a timeout cannot leave an infinite Promise.race loop. No timer reset, skipped assertion, timeout increase, cloudACK-as-local-proof or app change is used to hide setup failures. All failed/interrupted infrastructure attempts remain recorded. Successor lifecycle210/210 then passed; exact committed final qualification remains separately recorded.",
+      "855 full run and the obsolete unbounded-fixture focused run were intentionally interrupted after material review repair/fixture correction. Their incomplete records are not full GREEN or product RED. No full rerun was triggered merely for the separate burst investigation. Rules/compat/native/full/render/reviews must bind the coherent successor.",
+      "Native WebKit burst evidence on released883 retained20/20 settled completions and the exact pending pointer after normal reopen; prior1/20 sample closed before local debounce settled and is not a proved loss. No navigation/crash/worker change was reproduced. Actual affected-account/source validity/iOS crash cause/recovery remain unestablished. No private payload/tracker/status/push/PR/CI/merge/deploy/live-update publication is authorized until the parent reviews successor qualification. Latest speed exception permits fast only for uncleared ChainP0/reviewers; no selector or toggle claimed."
+    ],
+    "redEvidence": {
+      "command": "Recorder Node22 actual tests.js consumers under task-artifacts/p0-unavailable-read-226-20261021/runs: authority164130e7; nativefocus5060affa; typed-transaction-red; typed-hold-originals-red; typed-bigint-original-red; typed-authority-guidance-red. Each permanent discriminating assertion was observed before its corresponding runtime/copy correction.",
+      "failure": "164130e7: six typed Apply actualtrue expectedfalse plus two stale header1chunk expected0.5060affa: mounted native Cancel focus false!=true. Transaction actualrev7 expected6 proved stale cloud publication. Hold/originals had5fail1pass, including stale postACK clear, missing exact typed archive and cached-adapter publication. BigInt unchanged restore actualfalse expectedtrue. Mounted FAQ lacked the newly required late-ACK/fresh-choice guidance. Infrastructure startup/unsupported fixture/interrupted attempts are not behavioral RED."
+    },
+    "greenEvidence": "typed-authority-bigint-green23/23; typed-transaction-green10/10; native-focus-disclosure-corrected-fixture1/1; typed-authority-guidance-green copy/brevity; successor-lifecycle-owned-fixtures210/210 before the separately green BigInt projection slice. Exact final full/native/rules/compatibility/render/reviews recorded after commit.",
+    "evidenceClassification": "contemporaneous-permanent-consumer-red-green; explicit stronger-refusal/test-fixture migrations; final exact qualification separately required",
+    "scopeAcceptance": "https://github.com/emerald-pham/funsidething/issues/226#issuecomment-6307191547",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021/runs"
+  }
+,
+  {
+    "baseCommit": "883c6170f6bf7525dba2b0b987e38b0ed79536a4",
+    "implementationBase": "4576b57ec11082a0ec5ef14081ae891bb1730920",
+    "testChangesSha256": "80574a6015c0e651e1f6985c38661fe87a832b86fc0eeeb4352da5e18ee7648b",
+    "reason": "Repair the two consolidated exact4576 review findings within approved187/226 outcomes4/5: truthful mounted generation roles and complete typed head authority after acknowledged publication. Preserve all621 committed rationale records byte-exact and every original guard/positive.",
+    "previousBehavior": "Mounted inspection updated source facts but retained an obsolete Current/Previous h4 after a manifest role change. A same-hash physical typed head change at local commit, after transaction completion or just before hold clear could pass hash/payload-only checks and permit stale local adoption or clearing.",
+    "intendedBehavior": "Update only the mounted heading text so promoted/demoted received copies have truthful roles without replacing focused controls/details/scroll. Confirmed restore requires an exact-capable adapter, compares the full reviewed head metadata atomically with the local write, retains the complete authored postcommit head from inside that transaction, compares it losslessly through readback/completion and conditions hold clearing on both exact head and hold facts. Actual cloud/local commits remain truthful and preserved after a later change; stale live adoption/hold clear stops and asks for a fresh review. Revalidate a final atomic protected-source snapshot after every awaited prerequisite and immediately before synchronous live adoption; use the tx-authored head as the authority, never a mutated readback baseline.",
+    "replacementTests": [
+      "RISK cloud source read retry: unavailable chunks verify a fresh pair without another click",
+      "RISK cloud source read retry: repeated and mixed failures share one restart",
+      "RISK cloud source read retry: only explicit retryable server reads may restart",
+      "RISK cloud source read retry: unavailable cannot rebind original authority or accepted work",
+      "RISK cloud source read retry: fresh nested reads retain the original minute and Cancel authority",
+      "RISK cloud source cancellation: obsolete sibling headers cannot schedule chunks after failure or Cancel",
+      "RISK cloud source inspection: a complete independent source stays readable when its sibling fails",
+      "RISK cloud source inspection: an earlier complete copy remains inspectable after a failed fresh read",
+      "RISK cloud source inspection: current previous and pending copies require supported complete decoding",
+      "RISK cloud source inspection: strict ACK and confirmed Apply consumers reject failed sibling sources",
+      "RISK cloud source cancellation: a failed header retires dependent work before inspection settles",
+      "RISK cloud source inspection: failed sibling counts remain independently unknown",
+      "RISK cloud source authority: confirmed Apply refuses changed typed head and hold facts",
+      "RISK cloud source authority: transaction-time typed changes prevent stale publication",
+      "RISK cloud source authority: durable hold clearing compares full typed facts",
+      "RISK cloud source authority: post-ACK hold change preserves its committed outcome and refuses clearing",
+      "RISK cloud source authority: post-ACK same-hash head change refuses stale local adoption",
+      "RISK cloud source authority: unchanged typed originals remain exactly archived after confirmed restore",
+      "RISK cloud source authority: a cached adapter without exact recovery capabilities refuses before publication",
+      "RISK cloud source authority: a delayed header cannot schedule chunks after original authority changes",
+      "RISK cloud source inspection: native asynchronous updates retain focus disclosure scroll and current source roles",
+      "RISK cloud source states: retry and terminal explanations never substitute raw SDK details",
+      "RISK cloud source lifecycle guidance: mounted Help explains inspection and bounded read failure",
+      "RISK cloud source fresh check: a transient root change inside the first capture verifies automatically",
+      "RISK cloud source fresh check: inner and between-capture changes share one restart",
+      "RISK cloud source fresh check: partial cloud reads cannot rebind changed local or account authority",
+      "RISK cloud source fresh check: a partial-read restart preserves the original deadline and Cancel authority",
+      "RISK cloud source fresh check: late typed head changes cannot be hidden inside the fresh pair",
+      "RISK cloud source fresh check: partial captures retain typed pending and hold evidence",
+      "RISK cloud source partial-read guidance: mounted Help explains the same bounded recheck",
+      "RISK recovery read minute: changed accounts or drafts revoke a delayed source preview",
+      "RISK recovery read minute: a delayed cloud change discards the original capture for one fresh pair"
+    ],
+    "preservedCoverage": [
+      "All621 committed raw rationale objects remain byte-exact. The prior620 retention and full earlier RED/GREEN chronology remain unchanged; this622nd record adds the final review repair. Every earlier identity/UID/epoch/serial/pending/head/browser/draft/CAS/ACK/ordinary-deadline contract remains protected.",
+      "Mounted-role RED2c8c5bd1 used the existing actual Chromium SDK consumer: a previous generation promoted to current after a root-change restart still displayed Previous. The same test retains every prior Cancel and received-summary keyboard-focus, disclosure-open, scroll and no-choice assertion, and now also proves promoted/demoted labels. Its source request gates are externally controlled fixture boundaries, not product patches.",
+      "PostACK precommit RED834902b8 observed Applytrue expectedfalse after a physical typedhead -0to0 change with identical payloadhash. After the atomic precommit repair, REDf721e3b8 separately proved trueinsteadfalse for real IndexedDB afterHeadCommit and before-hold-clear changes. The source/transaction state is checked through the actual app recovery and adapter; no alternative model replaces the consumer.",
+      "Existing cached exact-clear negative becomes two named subcases for missing clear or atomic-head capability. Both refuse before any publication, preserving exact head/hold/source/state and rootrevision. Unchanged supported typed originals including NaN/undefined/negativezero/BigInt/namedarrays still restore positively and are exactly retained in the existing tagged opaque original.",
+      "Adapter optional parameters preserve ordinary hash-CAS callers and their result shape. Recovery supplies the established lossless manual codec; legacy default encoding remains strict JSON-safe. The new capability alias does not change schema, stored data or cloud protocol. The full postcommit snapshot is authored inside the transaction, not accepted from a possibly changed later read.",
+      "After actual cloud ACK, changed authority preserves the committed outcome and newer metadata, leaves the live board/hold protected and reports Cloud saved the selected source. At hold completion the message now identifies head or hold change; its actual missing-guidance assertion was RED before copy correction. No rollback/no-write claim or blind mutation retry is made.",
+      "The first combined review-authority-roles attempt had28pass and one fixture setup timeout before the after-local-commit case began. Its existing5000ms bounded startupquiescence failed; no product assertion ran there. The failed recorder remains. A no-edit isolated recheck then passed4/4; no timeout increase, reset, skip or fixture weakening was used. Broad successor lifecycle and exact final full/native/rules/compatibility/render/reviews are recorded separately.",
+      "4576 full qualification was deliberately interrupted bySIGINT after the material independent review findings required a new source. Its completed rules13/13 remains historical evidence, not successor approval. No fullrerun was triggered by the separate synthetic burst no-repro. Private/affected-account/iOS recovery and deployment remain unclaimed; parent release hold still applies.",
+      "The older acceptededit fault set its expected local snapshot only after awaiting an injected persist, while a sibling stale/SDK timeout could already return the source review. It now records the accepted action immediately and waits for that owned callback/persist before exact state and durable-head assertions. All no-choice, refused restart, pending, zero-write, exact state and saved accepted-task assertions remain. A timed-out SDK read does not imply that the actual accepted local edit has finished saving. Repeated setup failures and the snapshot-limited independent diagnostic remain explicit; no final full qualification follows merely from this fixture repair.",
+      "Independent snapshot-limited diagnosis9e501061 measured a7334ms timer interval with7231ms event-loop delay and3.224msprocessCPU, after the explicitpersist/commit had completed. Cause remains unclassified; neither productauthority nor IDBinitialdelay was established. Failed setupquiescence/scheduledpersist/startup records remain failed, not productRED or qualification. A temporary bounded idle-sleep assertion did not eliminate pauses; the final passingcohort used caffeinate-is on AC, without persistent power/security/permission changes. One pass does not prove the pause cause fixed.",
+      "Only opt-in freshSourceCheck fixture setup now uses its established ctx.setTimeout/clearTimeout clock seam for the final ordinary350ms save. It asserts exactlyone uncancelled350ms job, advances that setup clock350ms, invokes the actual appcallback and awaits its realpersist/IndexedDB promise under the unchanged5000ms watchdog, then verifies full diagnosticdurability/quiescence. Other timers remainnative; original clocks are restored before cloud/recovery controls. It does not mock storage, alter appdeclared350ms/deadlines, drop/reset a save or infer localdurability from cloudACK. Nativebrowser installed/rendered tests keep actualrealtime clocks.",
+      "Grouped late-await RED2e47416f observed stale live-state adoption during finalcopyverification and afterholdrefresh, even though completionreturnedfalse. After all awaited prerequisites, the appnow takes one final atomic rawsource snapshot, compares the full tx-authoredhead, exact copies/opaque/pending/hold and currentlocaldraft/browser/backend facts, then synchronously adopts with nointerveningawait. The actual cloud/localcommit and anyholdclear that preceded a laterchange remain truthful/preserved. Focused32/32 and wider lifecycle218/218 then passed; zero skips."
+    ],
+    "redEvidence": {
+      "command": "Node22 scripts/agent-tools/record-run.mjs with actual tests.js --test-name-pattern native asynchronous updates or post-ACK same-hash head change; immutable runs in p0-unavailable-read-226-20261021/runs. Permanent behavior records834902b8,2c8c5bd1,f721e3b8 and postack-head-guidance-red.log were observed before their corresponding runtime/copy corrections. Grouped final-before-adoption permanent RED2e47416f uses the same actual consumer; current fixture failures remain separately classified infrastructure.",
+      "failure": "834902b8 actual Applytrue expectedfalse after confirmedACK/precommit typedhead mutation.2c8c5bd1 actual Previous cloud source expected Current after realmanifest restart. f721e3b8 actual Applytrue expectedfalse after realheadcommit and beforeholdclear. Guidance actual hold-only message did not match head or recovery hold changed. Failed setup timeout and intentionally interrupted full records do not establish behavior RED or final GREEN.2e47416f: both later-boundarycases returnedfalse only after the selectedboard had already replaced live state; exactoriginalstate assertion failed before adding the final snapshot guard."
+    },
+    "greenEvidence": "final-authority-connected-run32/32; successor-final-lifecycle-awake218/218 zero skips on final runtime app. Exact committed full/native/rules/compatibility/render/reviews separately required.",
+    "evidenceClassification": "contemporaneous-permanent-consumer-red-green; original guarded positives and ordinary adapter interface preserved",
+    "scopeAcceptance": "https://github.com/emerald-pham/funsidething/issues/226#issuecomment-6307191547",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021/runs"
+  }
+,
+  {
+    "baseCommit": "883c6170f6bf7525dba2b0b987e38b0ed79536a4",
+    "implementationBase": "c8da315511d998b9dc1e82d1903b4bd098cfadf2",
+    "testChangesSha256": "3817205e4f4673f4784a1f307afc33d33b072801baebb8e5949201a634fa4375",
+    "reason": "Migrate the existing eight-chunk delayed-header replay to the explicitly accepted no-dependent-work-after-retirement contract, retaining its guarded fresh-preview and exact source preservation positive rather than expecting obsolete chunks to be scheduled.",
+    "previousBehavior": "The legacy replay held both headers until after timeout, then required their obsolete chunk queries to start. Exact c8da full qualification observed that fixture wait fail because the approved outcome4 guard correctly stops dependent SDK work from retired captures.",
+    "intendedBehavior": "Issue and hold the previous-source chunks before timeout while the current header remains held. Cross the unchanged1000ms configured deadline with the already established recovery fixture clock; the late current header must start zero chunk queries. A fresh native app/backend review overlaps the already-issued old previous request and still offers its independently validated eight-chunk board without selecting or changing anything.",
+    "replacementTests": [
+      "RISK cloud source read retry: unavailable chunks verify a fresh pair without another click",
+      "RISK cloud source read retry: repeated and mixed failures share one restart",
+      "RISK cloud source read retry: only explicit retryable server reads may restart",
+      "RISK cloud source read retry: unavailable cannot rebind original authority or accepted work",
+      "RISK cloud source read retry: fresh nested reads retain the original minute and Cancel authority",
+      "RISK cloud source cancellation: obsolete sibling headers cannot schedule chunks after failure or Cancel",
+      "RISK cloud source inspection: a complete independent source stays readable when its sibling fails",
+      "RISK cloud source inspection: an earlier complete copy remains inspectable after a failed fresh read",
+      "RISK cloud source inspection: current previous and pending copies require supported complete decoding",
+      "RISK cloud source inspection: strict ACK and confirmed Apply consumers reject failed sibling sources",
+      "RISK cloud source cancellation: a failed header retires dependent work before inspection settles",
+      "RISK cloud source inspection: failed sibling counts remain independently unknown",
+      "RISK cloud source authority: confirmed Apply refuses changed typed head and hold facts",
+      "RISK cloud source authority: transaction-time typed changes prevent stale publication",
+      "RISK cloud source authority: durable hold clearing compares full typed facts",
+      "RISK cloud source authority: post-ACK hold change preserves its committed outcome and refuses clearing",
+      "RISK cloud source authority: post-ACK same-hash head change refuses stale local adoption",
+      "RISK cloud source authority: unchanged typed originals remain exactly archived after confirmed restore",
+      "RISK cloud source authority: a cached adapter without exact recovery capabilities refuses before publication",
+      "RISK cloud source authority: a delayed header cannot schedule chunks after original authority changes",
+      "RISK cloud source inspection: native asynchronous updates retain focus disclosure scroll and current source roles",
+      "RISK cloud source states: retry and terminal explanations never substitute raw SDK details",
+      "RISK cloud source lifecycle guidance: mounted Help explains inspection and bounded read failure",
+      "RISK cloud source fresh check: a transient root change inside the first capture verifies automatically",
+      "RISK cloud source fresh check: inner and between-capture changes share one restart",
+      "RISK cloud source fresh check: partial cloud reads cannot rebind changed local or account authority",
+      "RISK cloud source fresh check: a partial-read restart preserves the original deadline and Cancel authority",
+      "RISK cloud source fresh check: late typed head changes cannot be hidden inside the fresh pair",
+      "RISK cloud source fresh check: partial captures retain typed pending and hold evidence",
+      "RISK cloud source partial-read guidance: mounted Help explains the same bounded recheck",
+      "RISK recovery read minute: changed accounts or drafts revoke a delayed source preview",
+      "RISK recovery read minute: a delayed cloud change discards the original capture for one fresh pair"
+    ],
+    "preservedCoverage": [
+      "All622 previously committed raw rationale objects remain byte-exact. Only this test fixture and additive rationale change; c8da app, service worker, styles, FAQ/changelog, storage adapter and every product asset remain byte-identical. Source-clear Code/Spec assessments retain their original scope, with final exact-candidate gates still required.",
+      "Original current-declared8/received0 and independently hash-decoded previous8chunks/2MB payload assertions remain. The fresh review still overlaps an actually issued unfinished old previous chunk query, displays an enabled previous choice, makes no automatic selection, refuses Apply without consent, and preserves exact live state/head/pending/raw source snapshot/cloud bytes. No physical transport-abort claim is introduced.",
+      "Both old headers remain observed. The previous header can complete before timeout so its chunk query is already issued and held; the current header remains late. New zero-obsolete-current-query assertions run before and after the fresh guarded positive. A requirement to schedule forbidden obsolete work is deliberately replaced by the stricter accepted behavior, not removed to hide a product failure.",
+      "The existing recoveryReadClock187 seam advances1001ms against the unchanged1000ms configured timeout, proving actual app/backend timeout without host scheduling dependence. The fresh capture gets its own same1000ms virtual budget; it is not widened. Actual SDK/codec/IDB consumers remain. Separate elapsed-validation and ordinary20second deadline cases remain unchanged; nativebrowser real clocks remain required.",
+      "The first migrated real-clock attempt retained33pass/1fail: fresh2MB preview returnedfalse within its artificial1000ms test budget. It is preserved rather than called productRED or a pass. The final clock-controlled migration plus cancellation/retry/minute cohort passed with zero skips. No product timer/deadline or implementation changed to make this test pass.",
+      "c8da full was intentionally interrupted after the actual legacy fixture failed with late first-read queries reach current zero rows and held previous rows. Its rules13/13 and compatibility15/15 are completed historical gates, while full/native and the first failed WebKit operator are not qualification. The test-only successor must run its own required exact gates and actual rendered reviews before parent release-hold review."
+    ],
+    "redEvidence": {
+      "command": "Exact c8da full record validation-c8da315/full-records/2026-10-21T04-37-43-368Z-71edf301-2a47-42be-a311-791df520341b.json, actual tests.js legacyiOS consumer. Earlier contemporaneous product cancellation/deferred-header REDs remain in620/621/622 and are not reclassified.",
+      "failure": "The legacy replay actually timed out awaiting late first-read queries reach current zero rows and held previous rows, because retired headers no longer schedule chunks. This is an intentionally migrated old expectation under the published stronger cancellation outcome, not a new product defect or missing-module RED."
+    },
+    "greenEvidence": "late-header-contract-clock-green.log: actual legacy eight-chunk positive plus cancellation/read-retry/minute guards passed, zero skips. Final successor full/native/rules/compat/render and independent reviews separately required.",
+    "evidenceClassification": "deliberate protected-test migration for approved stricter scheduling; no functional product change",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021"
+  },
+  {
+    "baseCommit": "3b120ae12cd374a5a9685e34495f237d1f5c5604",
+    "testChangesSha256": "fe8aff61b55c1f69f984bfc783d2d17985148dbe97f927ffe3bd5bd166cfe7f6",
+    "reason": "Add bounded temporary passive geometry measurement to the already failing native Linux inspection consumer, with every original assertion and product/workflow byte preserved. This isolated diagnostic publication is authorized by the trusted human continuation fix the loop, not a release approval or contract migration.",
+    "previousBehavior": "Two uninstrumented Ubuntu CI runs fail the original final scrollTop equality at379 versus400; the exact Mac focused run passes. Neither log measures visible unchanged text, so no reader-jump cause or contract change is substantiated.",
+    "intendedBehavior": "Preserve all original assertions and trigger order, and record eight actual visible fixture text ranges, viewport/content coordinates, native scroll extents, progress/font/heading geometry, old li and summary identity, mutation/resize observations and next-two-frame samples even after the original assertion fails. Product implementation and CI workflow remain unchanged.",
+    "replacementTests": [
+      "RISK cloud source inspection: native asynchronous updates retain focus disclosure scroll and current source roles"
+    ],
+    "preservedCoverage": [
+      "All original source-role, focus, disclosure, raw-scroll, no-source-choice and data-safety assertions remain in place. No tolerance, skip, early return, font substitution or anchoring override is introduced.",
+      "All623 prior raw rationale objects remain byte-exact. Earlier two actual unobserved CI failures remain immutable; instrumentation may force layout and is explicitly a later measurement with observer effects.",
+      "A non-main diagnostic receipt and focused Mac pass do not clear the known Linux failure or authorize shipment. Exact successor full/native/rules/compatibility/rendered/FAQ/review/CI/Stable/Beta/live gates still apply."
+    ],
+    "redEvidence": {
+      "command": "Existing exact3b pushCI39549918410 and PRCI39549927659: npm test, actual native inspection consumer. Immutable rawlogs retained under release-3b120ae/ci-push and ci-pr.",
+      "failure": "Both actual uninstrumented Linux runs fail refreshed.scroll 379 != receivedBefore400 after role refresh. This is existing CI RED prompting diagnostic measurement only, not claimed RED for a new product fix. Mac later sensitivity passes1/1; visible-jump RED remains unestablished."
+    },
+    "greenEvidence": "linux-scroll-repair-20261021/macos-trace.log: Node22.23.2 Chromium151 native focused1pass0fail0skip; validates instrumented plumbing and preserved behavior on Mac only. No Linux or shipping green claim.",
+    "evidenceClassification": "temporary diagnostic measurement only; unchanged product and workflow; known required CI failure retained",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021/linux-scroll-repair-20261021"
+  },
+  {
+    "baseCommit": "883c6170f6bf7525dba2b0b987e38b0ed79536a4",
+    "testChangesSha256": "7e60d3cb4c71faed6845888c91e2ef7f2e314f809aac303fcda377c2b97e61e0",
+    "reason": "Add bounded temporary passive geometry measurement to the already failing native Linux inspection consumer, with every original assertion and product/workflow byte preserved. This isolated diagnostic publication is authorized by the trusted human continuation fix the loop, not a release approval or contract migration.",
+    "previousBehavior": "Two uninstrumented Ubuntu CI runs fail the original final scrollTop equality at379 versus400; the exact Mac focused run passes. Neither log measures visible unchanged text, so no reader-jump cause or contract change is substantiated.",
+    "intendedBehavior": "Preserve all original assertions and trigger order, and record eight actual visible fixture text ranges, viewport/content coordinates, native scroll extents, progress/font/heading geometry, old li and summary identity, mutation/resize observations and next-two-frame samples even after the original assertion fails. Product implementation and CI workflow remain unchanged.",
+    "replacementTests": [
+      "RISK cloud source inspection: native asynchronous updates retain focus disclosure scroll and current source roles"
+    ],
+    "preservedCoverage": [
+      "All original source-role, focus, disclosure, raw-scroll, no-source-choice and data-safety assertions remain in place. No tolerance, skip, early return, font substitution or anchoring override is introduced.",
+      "All623 prior raw rationale objects remain byte-exact. Earlier two actual unobserved CI failures remain immutable; instrumentation may force layout and is explicitly a later measurement with observer effects.",
+      "A non-main diagnostic receipt and focused Mac pass do not clear the known Linux failure or authorize shipment. Exact successor full/native/rules/compatibility/rendered/FAQ/review/CI/Stable/Beta/live gates still apply."
+    ],
+    "redEvidence": {
+      "command": "Existing exact3b pushCI39549918410 and PRCI39549927659: npm test, actual native inspection consumer. Immutable rawlogs retained under release-3b120ae/ci-push and ci-pr.",
+      "failure": "Both actual uninstrumented Linux runs fail refreshed.scroll 379 != receivedBefore400 after role refresh. This is existing CI RED prompting diagnostic measurement only, not claimed RED for a new product fix. Mac later sensitivity passes1/1; visible-jump RED remains unestablished."
+    },
+    "greenEvidence": "linux-scroll-repair-20261021/macos-trace.log: Node22.23.2 Chromium151 native focused1pass0fail0skip; validates instrumented plumbing and preserved behavior on Mac only. No Linux or shipping green claim.",
+    "evidenceClassification": "temporary diagnostic measurement only; unchanged product and workflow; known required CI failure retained",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021/linux-scroll-repair-20261021"
+  },
+  {
+    "baseCommit": "3b120ae12cd374a5a9685e34495f237d1f5c5604",
+    "testChangesSha256": "2e7060b9bc3342ed677d9815efdf3b7420e1e13fd8adf2431894910d66fabe0a",
+    "reason": "Add bounded temporary passive geometry measurement to the already failing native Linux inspection consumer, with every original assertion and product/workflow byte preserved. This isolated diagnostic publication is authorized by the trusted human continuation fix the loop, not a release approval or contract migration. Complete independent measurement-review details: reserve decisive samples, reacquire logical fixture text separately from detached nodes, track passive scroll/font status, and bound frame collection with explicit diagnostic-invalid output.",
+    "previousBehavior": "Two uninstrumented Ubuntu CI runs fail the original final scrollTop equality at379 versus400; the exact Mac focused run passes. Neither log measures visible unchanged text, so no reader-jump cause or contract change is substantiated.",
+    "intendedBehavior": "Preserve all original assertions and trigger order, and record eight actual visible fixture text ranges, viewport/content coordinates, native scroll extents, progress/font/heading geometry, old li and summary identity, mutation/resize observations and next-two-frame samples even after the original assertion fails. Product implementation and CI workflow remain unchanged.",
+    "replacementTests": [
+      "RISK cloud source inspection: native asynchronous updates retain focus disclosure scroll and current source roles"
+    ],
+    "preservedCoverage": [
+      "All original source-role, focus, disclosure, raw-scroll, no-source-choice and data-safety assertions remain in place. No tolerance, skip, early return, font substitution or anchoring override is introduced.",
+      "All625 previously committed raw rationale objects remain byte-exact, including first temporary diagnostic chronology. Original two unobserved CI failures remain immutable; reads can force layout and are labelled later measurement. Observer snapshots stop at16 so all decisive samples fit within24. Eight fully visible fixture lines are retained and logical identity is reacquired if detached.",
+      "A non-main diagnostic receipt and focused Mac pass do not clear the known Linux failure or authorize shipment. Exact successor full/native/rules/compatibility/rendered/FAQ/review/CI/Stable/Beta/live gates still apply."
+    ],
+    "redEvidence": {
+      "command": "Existing exact3b pushCI39549918410 and PRCI39549927659: npm test, actual native inspection consumer. Immutable rawlogs retained under release-3b120ae/ci-push and ci-pr.",
+      "failure": "Both actual uninstrumented Linux runs fail refreshed.scroll 379 != receivedBefore400 after role refresh. This is existing CI RED prompting diagnostic measurement only, not claimed RED for a new product fix. Mac later sensitivity passes1/1; visible-jump RED remains unestablished."
+    },
+    "greenEvidence": "macos-trace-v2.log: Node22.23.2 Chromium151 native focused1pass0fail0skip, eight fully visible lines and all decisive frame samples. Validates diagnostic plumbing only; no Linux or shipping green claim.",
+    "evidenceClassification": "temporary diagnostic measurement only; unchanged product and workflow; known required CI failure retained",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021/linux-scroll-repair-20261021"
+  },
+  {
+    "baseCommit": "883c6170f6bf7525dba2b0b987e38b0ed79536a4",
+    "testChangesSha256": "ba2518baa319b0cf14920a9482a631cb5c929625eff6837ca60bad699b2d5701",
+    "reason": "Add bounded temporary passive geometry measurement to the already failing native Linux inspection consumer, with every original assertion and product/workflow byte preserved. This isolated diagnostic publication is authorized by the trusted human continuation fix the loop, not a release approval or contract migration. Complete independent measurement-review details: reserve decisive samples, reacquire logical fixture text separately from detached nodes, track passive scroll/font status, and bound frame collection with explicit diagnostic-invalid output.",
+    "previousBehavior": "Two uninstrumented Ubuntu CI runs fail the original final scrollTop equality at379 versus400; the exact Mac focused run passes. Neither log measures visible unchanged text, so no reader-jump cause or contract change is substantiated.",
+    "intendedBehavior": "Preserve all original assertions and trigger order, and record eight actual visible fixture text ranges, viewport/content coordinates, native scroll extents, progress/font/heading geometry, old li and summary identity, mutation/resize observations and next-two-frame samples even after the original assertion fails. Product implementation and CI workflow remain unchanged.",
+    "replacementTests": [
+      "RISK cloud source inspection: native asynchronous updates retain focus disclosure scroll and current source roles"
+    ],
+    "preservedCoverage": [
+      "All original source-role, focus, disclosure, raw-scroll, no-source-choice and data-safety assertions remain in place. No tolerance, skip, early return, font substitution or anchoring override is introduced.",
+      "All625 previously committed raw rationale objects remain byte-exact, including first temporary diagnostic chronology. Original two unobserved CI failures remain immutable; reads can force layout and are labelled later measurement. Observer snapshots stop at16 so all decisive samples fit within24. Eight fully visible fixture lines are retained and logical identity is reacquired if detached.",
+      "A non-main diagnostic receipt and focused Mac pass do not clear the known Linux failure or authorize shipment. Exact successor full/native/rules/compatibility/rendered/FAQ/review/CI/Stable/Beta/live gates still apply."
+    ],
+    "redEvidence": {
+      "command": "Existing exact3b pushCI39549918410 and PRCI39549927659: npm test, actual native inspection consumer. Immutable rawlogs retained under release-3b120ae/ci-push and ci-pr.",
+      "failure": "Both actual uninstrumented Linux runs fail refreshed.scroll 379 != receivedBefore400 after role refresh. This is existing CI RED prompting diagnostic measurement only, not claimed RED for a new product fix. Mac later sensitivity passes1/1; visible-jump RED remains unestablished."
+    },
+    "greenEvidence": "macos-trace-v2.log: Node22.23.2 Chromium151 native focused1pass0fail0skip, eight fully visible lines and all decisive frame samples. Validates diagnostic plumbing only; no Linux or shipping green claim.",
+    "evidenceClassification": "temporary diagnostic measurement only; unchanged product and workflow; known required CI failure retained",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021/linux-scroll-repair-20261021"
+  },
+  {
+    "baseCommit": "3b120ae12cd374a5a9685e34495f237d1f5c5604",
+    "testChangesSha256": "1f07717119e29eec3bb6cc3b799cfc76047caf4b2dd09f7f22b523f78b7939ce",
+    "reason": "Add bounded temporary passive geometry measurement to the already failing native Linux inspection consumer, with every original assertion and product/workflow byte preserved. This isolated diagnostic publication is authorized by the trusted human continuation fix the loop, not a release approval or contract migration. Complete independent measurement-review details: reserve decisive samples, reacquire logical fixture text separately from detached nodes, track passive scroll/font status, and bound frame collection with explicit diagnostic-invalid output. The actual updated test declaration is included in the diff for the exact test-name rationale guard; no test is renamed or assertion changed.",
+    "previousBehavior": "Two uninstrumented Ubuntu CI runs fail the original final scrollTop equality at379 versus400; the exact Mac focused run passes. Neither log measures visible unchanged text, so no reader-jump cause or contract change is substantiated.",
+    "intendedBehavior": "Preserve all original assertions and trigger order, and record eight actual visible fixture text ranges, viewport/content coordinates, native scroll extents, progress/font/heading geometry, old li and summary identity, mutation/resize observations and next-two-frame samples even after the original assertion fails. Product implementation and CI workflow remain unchanged.",
+    "replacementTests": [
+      "RISK cloud source inspection: native asynchronous updates retain focus disclosure scroll and current source roles"
+    ],
+    "preservedCoverage": [
+      "All original source-role, focus, disclosure, raw-scroll, no-source-choice and data-safety assertions remain in place. No tolerance, skip, early return, font substitution or anchoring override is introduced.",
+      "All627 previously committed raw rationale objects remain byte-exact, including first temporary diagnostic chronology. Original two unobserved CI failures remain immutable; reads can force layout and are labelled later measurement. Observer snapshots stop at16 so all decisive samples fit within24. Eight fully visible fixture lines are retained and logical identity is reacquired if detached.",
+      "A non-main diagnostic receipt and focused Mac pass do not clear the known Linux failure or authorize shipment. Exact successor full/native/rules/compatibility/rendered/FAQ/review/CI/Stable/Beta/live gates still apply."
+    ],
+    "redEvidence": {
+      "command": "Existing exact3b pushCI39549918410 and PRCI39549927659: npm test, actual native inspection consumer. Immutable rawlogs retained under release-3b120ae/ci-push and ci-pr.",
+      "failure": "Both actual uninstrumented Linux runs fail refreshed.scroll 379 != receivedBefore400 after role refresh. This is existing CI RED prompting diagnostic measurement only, not claimed RED for a new product fix. Mac later sensitivity passes1/1; visible-jump RED remains unestablished."
+    },
+    "greenEvidence": "macos-trace-v2.log: Node22.23.2 Chromium151 native focused1pass0fail0skip, eight fully visible lines and all decisive frame samples. Validates diagnostic plumbing only; no Linux or shipping green claim.",
+    "evidenceClassification": "temporary diagnostic measurement only; unchanged product and workflow; known required CI failure retained",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021/linux-scroll-repair-20261021"
+  },
+  {
+    "baseCommit": "883c6170f6bf7525dba2b0b987e38b0ed79536a4",
+    "testChangesSha256": "fdff55c227cd0efa6dad33dcbc4e83aef58d6687c449bd03dcff42028fb8adcc",
+    "reason": "Add bounded temporary passive geometry measurement to the already failing native Linux inspection consumer, with every original assertion and product/workflow byte preserved. This isolated diagnostic publication is authorized by the trusted human continuation fix the loop, not a release approval or contract migration. Complete independent measurement-review details: reserve decisive samples, reacquire logical fixture text separately from detached nodes, track passive scroll/font status, and bound frame collection with explicit diagnostic-invalid output. The actual updated test declaration is included in the diff for the exact test-name rationale guard; no test is renamed or assertion changed.",
+    "previousBehavior": "Two uninstrumented Ubuntu CI runs fail the original final scrollTop equality at379 versus400; the exact Mac focused run passes. Neither log measures visible unchanged text, so no reader-jump cause or contract change is substantiated.",
+    "intendedBehavior": "Preserve all original assertions and trigger order, and record eight actual visible fixture text ranges, viewport/content coordinates, native scroll extents, progress/font/heading geometry, old li and summary identity, mutation/resize observations and next-two-frame samples even after the original assertion fails. Product implementation and CI workflow remain unchanged.",
+    "replacementTests": [
+      "RISK cloud source inspection: native asynchronous updates retain focus disclosure scroll and current source roles"
+    ],
+    "preservedCoverage": [
+      "All original source-role, focus, disclosure, raw-scroll, no-source-choice and data-safety assertions remain in place. No tolerance, skip, early return, font substitution or anchoring override is introduced.",
+      "All627 previously committed raw rationale objects remain byte-exact, including first temporary diagnostic chronology. Original two unobserved CI failures remain immutable; reads can force layout and are labelled later measurement. Observer snapshots stop at16 so all decisive samples fit within24. Eight fully visible fixture lines are retained and logical identity is reacquired if detached.",
+      "A non-main diagnostic receipt and focused Mac pass do not clear the known Linux failure or authorize shipment. Exact successor full/native/rules/compatibility/rendered/FAQ/review/CI/Stable/Beta/live gates still apply."
+    ],
+    "redEvidence": {
+      "command": "Existing exact3b pushCI39549918410 and PRCI39549927659: npm test, actual native inspection consumer. Immutable rawlogs retained under release-3b120ae/ci-push and ci-pr.",
+      "failure": "Both actual uninstrumented Linux runs fail refreshed.scroll 379 != receivedBefore400 after role refresh. This is existing CI RED prompting diagnostic measurement only, not claimed RED for a new product fix. Mac later sensitivity passes1/1; visible-jump RED remains unestablished."
+    },
+    "greenEvidence": "macos-trace-v2.log: Node22.23.2 Chromium151 native focused1pass0fail0skip, eight fully visible lines and all decisive frame samples. Validates diagnostic plumbing only; no Linux or shipping green claim.",
+    "evidenceClassification": "temporary diagnostic measurement only; unchanged product and workflow; known required CI failure retained",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021/linux-scroll-repair-20261021"
+  },
+  {
+    "baseCommit": "b5c7af226c0b30884208cadedd542c377f85524e",
+    "testChangesSha256": "926ee986380df89eac11c91228a7adedd4fec7fb0c37d08bb0476b0916392fc8",
+    "reason": "Add an exact actual-visible-text native regression for the substantiated mounted progress contraction and preserve every original strict assertion. Extract the existing consumer once for390 and360viewports; remove explicitly temporary diagnostic instrumentation after its Linux measurement, retaining all raw traces and original failures outside Git.",
+    "previousBehavior": "Actual Ubuntu390 and one-variable Mac360 traces both show the status paragraph shrink65.25→43.5px, native scroll400→379, and eight unchanged fully visible device task lines move-0.75px. Both original uninstrumented Linux failures and fixed b5 instrumented Linux failure remain preserved. Existing Mac390 scalar passes, so it alone missed wrapping-dependent movement.",
+    "intendedBehavior": "Shorter progress text retains the largest already-rendered paragraph area for the mounted review, allowing growth and a fresh element on reopening. Both original390consumer and new360consumer keep exact viewport text coordinates/text/connection, all original raw-scroll equality, focused control/summary identity, disclosure, source-role and no-choice assertions. No tolerance, font substitution, overflow-anchor or scrollTop override.",
+    "replacementTests": [
+      "RISK cloud source inspection: native asynchronous updates retain focus disclosure scroll and current source roles",
+      "RISK cloud source inspection: narrow native progress updates preserve exact visible text"
+    ],
+    "preservedCoverage": [
+      "All18 original assertion calls remain in order in the shared native consumer, with additional nonvacuous fully-visible-text assertions before the original final scalar. No existing assertion is weakened, skipped or deleted. All629 previously committed raw rationale objects remain byte-exact.",
+      "Product repair is driven by a new actual-consumer visible-text RED before any runtime edit, not a scalar-contract migration or a hardcoded expected geometry. Existing source/authority/data/CAS/ACK/storage regressions remain untouched.",
+      "Temporary DEBUG-pr228 measurement is removed from the successor as planned; original committed b5/remote CI39588590977, two uninstrumented Linux CI failures, all observer-effect-labelled traces and Mac sensitivities remain immutable.",
+      "Latest user endpoint is exact reviews and passing CI then park/handoff, no merge/deploy. Unapproved apology removal is a separately tracked ticket; its partial test is preserved in its separate worktree and not integrated here."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir .../linux-scroll-repair-20261021/visible-text-runs --purpose preimplementation-red -- node --test --test-name-pattern=\"RISK cloud source inspection: narrow native\" tests.js; record1fd3f93a-e295-40b0-bd83-c18ad243c2a9",
+      "failure": "Actual native test fails deepStrictEqual: mounted progress updates must preserve exact viewport positions of unchanged visible text. All8 task lines top/bottom shift-0.75px; e.g first top59.5625 versus60.3125. Runtime index/adapter/worker remained baselineb5 at this RED. No missing-module/syntax/infrastructure or selected-zero-test result is used."
+    },
+    "greenEvidence": "visible-text-first-green.log: both390original and360new actual native consumers pass2/2,0fail,0skip after the minimum mounted-progress-height repair. Exact final full/native/rules/compatibility/rendered/review/CI evidence remains separately required.",
+    "evidenceClassification": "Contemporaneous behavioral visible-text RED then minimum product repair and GREEN; original strict scalar contract preserved",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021/linux-scroll-repair-20261021"
+  },
+  {
+    "baseCommit": "3b120ae12cd374a5a9685e34495f237d1f5c5604",
+    "testChangesSha256": "c6d98323795bd487c4362a2ffd6073e825b764fc6ac565d43fb491bd9f8f4739",
+    "reason": "Add an exact actual-visible-text native regression for the substantiated mounted progress contraction and preserve every original strict assertion. Extract the existing consumer once for390 and360viewports; remove explicitly temporary diagnostic instrumentation after its Linux measurement, retaining all raw traces and original failures outside Git.",
+    "previousBehavior": "Actual Ubuntu390 and one-variable Mac360 traces both show the status paragraph shrink65.25→43.5px, native scroll400→379, and eight unchanged fully visible device task lines move-0.75px. Both original uninstrumented Linux failures and fixed b5 instrumented Linux failure remain preserved. Existing Mac390 scalar passes, so it alone missed wrapping-dependent movement.",
+    "intendedBehavior": "Shorter progress text retains the largest already-rendered paragraph area for the mounted review, allowing growth and a fresh element on reopening. Both original390consumer and new360consumer keep exact viewport text coordinates/text/connection, all original raw-scroll equality, focused control/summary identity, disclosure, source-role and no-choice assertions. No tolerance, font substitution, overflow-anchor or scrollTop override.",
+    "replacementTests": [
+      "RISK cloud source inspection: native asynchronous updates retain focus disclosure scroll and current source roles",
+      "RISK cloud source inspection: narrow native progress updates preserve exact visible text"
+    ],
+    "preservedCoverage": [
+      "All18 original assertion calls remain in order in the shared native consumer, with additional nonvacuous fully-visible-text assertions before the original final scalar. No existing assertion is weakened, skipped or deleted. All629 previously committed raw rationale objects remain byte-exact.",
+      "Product repair is driven by a new actual-consumer visible-text RED before any runtime edit, not a scalar-contract migration or a hardcoded expected geometry. Existing source/authority/data/CAS/ACK/storage regressions remain untouched.",
+      "Temporary DEBUG-pr228 measurement is removed from the successor as planned; original committed b5/remote CI39588590977, two uninstrumented Linux CI failures, all observer-effect-labelled traces and Mac sensitivities remain immutable.",
+      "Latest user endpoint is exact reviews and passing CI then park/handoff, no merge/deploy. Unapproved apology removal is a separately tracked ticket; its partial test is preserved in its separate worktree and not integrated here."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir .../linux-scroll-repair-20261021/visible-text-runs --purpose preimplementation-red -- node --test --test-name-pattern=\"RISK cloud source inspection: narrow native\" tests.js; record1fd3f93a-e295-40b0-bd83-c18ad243c2a9",
+      "failure": "Actual native test fails deepStrictEqual: mounted progress updates must preserve exact viewport positions of unchanged visible text. All8 task lines top/bottom shift-0.75px; e.g first top59.5625 versus60.3125. Runtime index/adapter/worker remained baselineb5 at this RED. No missing-module/syntax/infrastructure or selected-zero-test result is used."
+    },
+    "greenEvidence": "visible-text-first-green.log: both390original and360new actual native consumers pass2/2,0fail,0skip after the minimum mounted-progress-height repair. Exact final full/native/rules/compatibility/rendered/review/CI evidence remains separately required.",
+    "evidenceClassification": "Contemporaneous behavioral visible-text RED then minimum product repair and GREEN; original strict scalar contract preserved",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021/linux-scroll-repair-20261021"
+  },
+  {
+    "baseCommit": "883c6170f6bf7525dba2b0b987e38b0ed79536a4",
+    "testChangesSha256": "7ae2e1f10b9148ffcd2665c02c7d4c6f8e87f9da162dda51b223b6ebc3fbfa47",
+    "reason": "Add an exact actual-visible-text native regression for the substantiated mounted progress contraction and preserve every original strict assertion. Extract the existing consumer once for390 and360viewports; remove explicitly temporary diagnostic instrumentation after its Linux measurement, retaining all raw traces and original failures outside Git.",
+    "previousBehavior": "Actual Ubuntu390 and one-variable Mac360 traces both show the status paragraph shrink65.25→43.5px, native scroll400→379, and eight unchanged fully visible device task lines move-0.75px. Both original uninstrumented Linux failures and fixed b5 instrumented Linux failure remain preserved. Existing Mac390 scalar passes, so it alone missed wrapping-dependent movement.",
+    "intendedBehavior": "Shorter progress text retains the largest already-rendered paragraph area for the mounted review, allowing growth and a fresh element on reopening. Both original390consumer and new360consumer keep exact viewport text coordinates/text/connection, all original raw-scroll equality, focused control/summary identity, disclosure, source-role and no-choice assertions. No tolerance, font substitution, overflow-anchor or scrollTop override.",
+    "replacementTests": [
+      "RISK cloud source inspection: native asynchronous updates retain focus disclosure scroll and current source roles",
+      "RISK cloud source inspection: narrow native progress updates preserve exact visible text"
+    ],
+    "preservedCoverage": [
+      "All18 original assertion calls remain in order in the shared native consumer, with additional nonvacuous fully-visible-text assertions before the original final scalar. No existing assertion is weakened, skipped or deleted. All629 previously committed raw rationale objects remain byte-exact.",
+      "Product repair is driven by a new actual-consumer visible-text RED before any runtime edit, not a scalar-contract migration or a hardcoded expected geometry. Existing source/authority/data/CAS/ACK/storage regressions remain untouched.",
+      "Temporary DEBUG-pr228 measurement is removed from the successor as planned; original committed b5/remote CI39588590977, two uninstrumented Linux CI failures, all observer-effect-labelled traces and Mac sensitivities remain immutable.",
+      "Latest user endpoint is exact reviews and passing CI then park/handoff, no merge/deploy. Unapproved apology removal is a separately tracked ticket; its partial test is preserved in its separate worktree and not integrated here."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir .../linux-scroll-repair-20261021/visible-text-runs --purpose preimplementation-red -- node --test --test-name-pattern=\"RISK cloud source inspection: narrow native\" tests.js; record1fd3f93a-e295-40b0-bd83-c18ad243c2a9",
+      "failure": "Actual native test fails deepStrictEqual: mounted progress updates must preserve exact viewport positions of unchanged visible text. All8 task lines top/bottom shift-0.75px; e.g first top59.5625 versus60.3125. Runtime index/adapter/worker remained baselineb5 at this RED. No missing-module/syntax/infrastructure or selected-zero-test result is used."
+    },
+    "greenEvidence": "visible-text-first-green.log: both390original and360new actual native consumers pass2/2,0fail,0skip after the minimum mounted-progress-height repair. Exact final full/native/rules/compatibility/rendered/review/CI evidence remains separately required.",
+    "evidenceClassification": "Contemporaneous behavioral visible-text RED then minimum product repair and GREEN; original strict scalar contract preserved",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021/linux-scroll-repair-20261021"
+  },
+  {
+    "baseCommit": "b5c7af226c0b30884208cadedd542c377f85524e",
+    "testChangesSha256": "e37b72eeca8d1f576df9ec19292f0945c710d6698c4f0601ab97e471a3ac682a",
+    "reason": "Add an exact actual-visible-text native regression for the substantiated mounted progress contraction and preserve every original strict assertion. Extract the existing consumer once for390 and360viewports; remove explicitly temporary diagnostic instrumentation after its Linux measurement, retaining all raw traces and original failures outside Git. Preserve the original immediate same/open/scroll snapshot timing: new exact geometry is asserted there, before the original scalar; additional bounded two-frame geometry follows all original assertions. Prior draft timing-shift finding is repaired.",
+    "previousBehavior": "Actual Ubuntu390 and one-variable Mac360 traces both show the status paragraph shrink65.25→43.5px, native scroll400→379, and eight unchanged fully visible device task lines move-0.75px. Both original uninstrumented Linux failures and fixed b5 instrumented Linux failure remain preserved. Existing Mac390 scalar passes, so it alone missed wrapping-dependent movement.",
+    "intendedBehavior": "Shorter progress text retains the largest already-rendered paragraph area for the mounted review, allowing growth and a fresh element on reopening. Both original390consumer and new360consumer keep exact viewport text coordinates/text/connection, all original raw-scroll equality, focused control/summary identity, disclosure, source-role and no-choice assertions. No tolerance, font substitution, overflow-anchor or scrollTop override.",
+    "replacementTests": [
+      "RISK cloud source inspection: native asynchronous updates retain focus disclosure scroll and current source roles",
+      "RISK cloud source inspection: narrow native progress updates preserve exact visible text"
+    ],
+    "preservedCoverage": [
+      "All18 original assertion calls remain in order in the shared native consumer, with additional nonvacuous fully-visible-text assertions before the original final scalar. No existing assertion is weakened, skipped or deleted. All629 previously committed raw rationale objects remain byte-exact.",
+      "Product repair is driven by a new actual-consumer visible-text RED before any runtime edit, not a scalar-contract migration or a hardcoded expected geometry. Existing source/authority/data/CAS/ACK/storage regressions remain untouched.",
+      "Temporary DEBUG-pr228 measurement is removed from the successor as planned; original committed b5/remote CI39588590977, two uninstrumented Linux CI failures, all observer-effect-labelled traces and Mac sensitivities remain immutable.",
+      "Latest user endpoint is exact reviews and passing CI then park/handoff, no merge/deploy. Unapproved apology removal is a separately tracked ticket; its partial test is preserved in its separate worktree and not integrated here.",
+      "All632 existing raw rationale objects are retained. The original pre-app-edit visibleRED remains meaningful for persistent displacement; later immediate baseline sensitivity b8d94903 independently fails the same geometry after temporarily restoring baseline render lines. Fixed index bytes were restored in finally. Setup-only failed attempts ran fixed product and are not RED. One original fresh-root3second readiness failure is preserved; no readiness timeout or assertion was widened."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir .../linux-scroll-repair-20261021/visible-text-runs --purpose preimplementation-red -- node --test --test-name-pattern=\"RISK cloud source inspection: narrow native\" tests.js; record1fd3f93a-e295-40b0-bd83-c18ad243c2a9",
+      "failure": "Actual native test fails deepStrictEqual: mounted progress updates must preserve exact viewport positions of unchanged visible text. All8 task lines top/bottom shift-0.75px; e.g first top59.5625 versus60.3125. Runtime index/adapter/worker remained baselineb5 at this RED. No missing-module/syntax/infrastructure or selected-zero-test result is used."
+    },
+    "greenEvidence": "immediate-valid-green.log recordf4a1e3ac: original390+new360 pass2/2,0skip with original immediate assertions then bounded2frames. focused-cohort.log246/246 passed before final timing strengthening. Final exact full/native/rules/compatibility/rendered/reviews/CI separately required.",
+    "evidenceClassification": "Contemporaneous behavioral visible-text RED then minimum product repair and GREEN; original strict scalar contract preserved",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021/linux-scroll-repair-20261021"
+  },
+  {
+    "baseCommit": "3b120ae12cd374a5a9685e34495f237d1f5c5604",
+    "testChangesSha256": "9580a0aacd5ddb5503a901595d214167f7014a22241bb029d5bf5ff9827686fa",
+    "reason": "Add an exact actual-visible-text native regression for the substantiated mounted progress contraction and preserve every original strict assertion. Extract the existing consumer once for390 and360viewports; remove explicitly temporary diagnostic instrumentation after its Linux measurement, retaining all raw traces and original failures outside Git. Preserve the original immediate same/open/scroll snapshot timing: new exact geometry is asserted there, before the original scalar; additional bounded two-frame geometry follows all original assertions. Prior draft timing-shift finding is repaired.",
+    "previousBehavior": "Actual Ubuntu390 and one-variable Mac360 traces both show the status paragraph shrink65.25→43.5px, native scroll400→379, and eight unchanged fully visible device task lines move-0.75px. Both original uninstrumented Linux failures and fixed b5 instrumented Linux failure remain preserved. Existing Mac390 scalar passes, so it alone missed wrapping-dependent movement.",
+    "intendedBehavior": "Shorter progress text retains the largest already-rendered paragraph area for the mounted review, allowing growth and a fresh element on reopening. Both original390consumer and new360consumer keep exact viewport text coordinates/text/connection, all original raw-scroll equality, focused control/summary identity, disclosure, source-role and no-choice assertions. No tolerance, font substitution, overflow-anchor or scrollTop override.",
+    "replacementTests": [
+      "RISK cloud source inspection: native asynchronous updates retain focus disclosure scroll and current source roles",
+      "RISK cloud source inspection: narrow native progress updates preserve exact visible text"
+    ],
+    "preservedCoverage": [
+      "All18 original assertion calls remain in order in the shared native consumer, with additional nonvacuous fully-visible-text assertions before the original final scalar. No existing assertion is weakened, skipped or deleted. All629 previously committed raw rationale objects remain byte-exact.",
+      "Product repair is driven by a new actual-consumer visible-text RED before any runtime edit, not a scalar-contract migration or a hardcoded expected geometry. Existing source/authority/data/CAS/ACK/storage regressions remain untouched.",
+      "Temporary DEBUG-pr228 measurement is removed from the successor as planned; original committed b5/remote CI39588590977, two uninstrumented Linux CI failures, all observer-effect-labelled traces and Mac sensitivities remain immutable.",
+      "Latest user endpoint is exact reviews and passing CI then park/handoff, no merge/deploy. Unapproved apology removal is a separately tracked ticket; its partial test is preserved in its separate worktree and not integrated here.",
+      "All632 existing raw rationale objects are retained. The original pre-app-edit visibleRED remains meaningful for persistent displacement; later immediate baseline sensitivity b8d94903 independently fails the same geometry after temporarily restoring baseline render lines. Fixed index bytes were restored in finally. Setup-only failed attempts ran fixed product and are not RED. One original fresh-root3second readiness failure is preserved; no readiness timeout or assertion was widened."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir .../linux-scroll-repair-20261021/visible-text-runs --purpose preimplementation-red -- node --test --test-name-pattern=\"RISK cloud source inspection: narrow native\" tests.js; record1fd3f93a-e295-40b0-bd83-c18ad243c2a9",
+      "failure": "Actual native test fails deepStrictEqual: mounted progress updates must preserve exact viewport positions of unchanged visible text. All8 task lines top/bottom shift-0.75px; e.g first top59.5625 versus60.3125. Runtime index/adapter/worker remained baselineb5 at this RED. No missing-module/syntax/infrastructure or selected-zero-test result is used."
+    },
+    "greenEvidence": "immediate-valid-green.log recordf4a1e3ac: original390+new360 pass2/2,0skip with original immediate assertions then bounded2frames. focused-cohort.log246/246 passed before final timing strengthening. Final exact full/native/rules/compatibility/rendered/reviews/CI separately required.",
+    "evidenceClassification": "Contemporaneous behavioral visible-text RED then minimum product repair and GREEN; original strict scalar contract preserved",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021/linux-scroll-repair-20261021"
+  },
+  {
+    "baseCommit": "883c6170f6bf7525dba2b0b987e38b0ed79536a4",
+    "testChangesSha256": "6cefa36494bb5cf5dcb3630440c36c16e0cb2f0d77105fe9347abdf28933f06d",
+    "reason": "Add an exact actual-visible-text native regression for the substantiated mounted progress contraction and preserve every original strict assertion. Extract the existing consumer once for390 and360viewports; remove explicitly temporary diagnostic instrumentation after its Linux measurement, retaining all raw traces and original failures outside Git. Preserve the original immediate same/open/scroll snapshot timing: new exact geometry is asserted there, before the original scalar; additional bounded two-frame geometry follows all original assertions. Prior draft timing-shift finding is repaired.",
+    "previousBehavior": "Actual Ubuntu390 and one-variable Mac360 traces both show the status paragraph shrink65.25→43.5px, native scroll400→379, and eight unchanged fully visible device task lines move-0.75px. Both original uninstrumented Linux failures and fixed b5 instrumented Linux failure remain preserved. Existing Mac390 scalar passes, so it alone missed wrapping-dependent movement.",
+    "intendedBehavior": "Shorter progress text retains the largest already-rendered paragraph area for the mounted review, allowing growth and a fresh element on reopening. Both original390consumer and new360consumer keep exact viewport text coordinates/text/connection, all original raw-scroll equality, focused control/summary identity, disclosure, source-role and no-choice assertions. No tolerance, font substitution, overflow-anchor or scrollTop override.",
+    "replacementTests": [
+      "RISK cloud source inspection: native asynchronous updates retain focus disclosure scroll and current source roles",
+      "RISK cloud source inspection: narrow native progress updates preserve exact visible text"
+    ],
+    "preservedCoverage": [
+      "All18 original assertion calls remain in order in the shared native consumer, with additional nonvacuous fully-visible-text assertions before the original final scalar. No existing assertion is weakened, skipped or deleted. All629 previously committed raw rationale objects remain byte-exact.",
+      "Product repair is driven by a new actual-consumer visible-text RED before any runtime edit, not a scalar-contract migration or a hardcoded expected geometry. Existing source/authority/data/CAS/ACK/storage regressions remain untouched.",
+      "Temporary DEBUG-pr228 measurement is removed from the successor as planned; original committed b5/remote CI39588590977, two uninstrumented Linux CI failures, all observer-effect-labelled traces and Mac sensitivities remain immutable.",
+      "Latest user endpoint is exact reviews and passing CI then park/handoff, no merge/deploy. Unapproved apology removal is a separately tracked ticket; its partial test is preserved in its separate worktree and not integrated here.",
+      "All632 existing raw rationale objects are retained. The original pre-app-edit visibleRED remains meaningful for persistent displacement; later immediate baseline sensitivity b8d94903 independently fails the same geometry after temporarily restoring baseline render lines. Fixed index bytes were restored in finally. Setup-only failed attempts ran fixed product and are not RED. One original fresh-root3second readiness failure is preserved; no readiness timeout or assertion was widened."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir .../linux-scroll-repair-20261021/visible-text-runs --purpose preimplementation-red -- node --test --test-name-pattern=\"RISK cloud source inspection: narrow native\" tests.js; record1fd3f93a-e295-40b0-bd83-c18ad243c2a9",
+      "failure": "Actual native test fails deepStrictEqual: mounted progress updates must preserve exact viewport positions of unchanged visible text. All8 task lines top/bottom shift-0.75px; e.g first top59.5625 versus60.3125. Runtime index/adapter/worker remained baselineb5 at this RED. No missing-module/syntax/infrastructure or selected-zero-test result is used."
+    },
+    "greenEvidence": "immediate-valid-green.log recordf4a1e3ac: original390+new360 pass2/2,0skip with original immediate assertions then bounded2frames. focused-cohort.log246/246 passed before final timing strengthening. Final exact full/native/rules/compatibility/rendered/reviews/CI separately required.",
+    "evidenceClassification": "Contemporaneous behavioral visible-text RED then minimum product repair and GREEN; original strict scalar contract preserved",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021/linux-scroll-repair-20261021"
+  },
+  {
+    "baseCommit": "5919574c63f3d345c47536bb8ea9858def11a24a",
+    "testChangesSha256": "0fcc062277970c75a0a75e345b570ce7b5bc103d6d5e6255b8cd9aae8c0a6d1e",
+    "reason": "Close the actual independent rendered held-demotion finding inside the existing226 truthful source-role contract. Add one actual native consumer boundary before the demoted chunk read resolves; preserve all prior635 rationale objects, all original18 immediate assertions,390/360 geometry and all prior behavioral coverage.",
+    "previousBehavior": "Exact591 full/native/rules/compatibility passed, but both exact rendered cases showed two Current labels while the demoted generation fresh read stayed held. The old native consumer asserted roles only after both callbacks, so this intermediate state was missed. Its final approval was withheld/withdrawn; earlier successful gates remain historical.",
+    "intendedBehavior": "All retained inspection rows use the same latest observed manifest, with capture ordering preventing older callbacks from rolling roles back. A demoted retained row shows Previous before its held chunks finish; a retained copy outside current/previous/pending is Earlier received. Read-only preview never grants source choices. The mounted progress height repair and exact original focus/disclosure/scroll/text invariants remain.",
+    "replacementTests": [
+      "RISK cloud source inspection: refreshed roles update before a demoted read finishes"
+    ],
+    "preservedCoverage": [
+      "The shared helper adds a held-demotion branch only for the new case; original390 and360 consumers keep their old timing and every original assertion in order. New case releases its owned gate in cleanup even on assertion failure. No timeout, tolerance, font, skip or eligibility relaxation.",
+      "All635 existing raw rationale objects remain byte-for-byte. Existing earlier real preimplementation visible-text RED and Linux geometry diagnosis remain preserved; the present actual held-role RED occurred before its runtime repair. No claim is made that historical591 approvals cover this successor.",
+      "No read scheduling, one-minute shared budget, authentication, original-source authority, protected storage, CAS/ACK, source selection or restore changes. Separate229 notice removal and230 iOS ticket remain human handoff work. Passing exact CI then park/handoff; no merge/deploy."
+    ],
+    "redEvidence": {
+      "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"RISK cloud source inspection: refreshed roles update\" tests.js; held-role-runs/2026-10-21T11-54-07-585Z-a7341b2f-cf81-4564-bbaa-988fe2ad13e0.json",
+      "failure": "Actual native source-review transition fails strictEqual before demoted chunks are released: expected Previous cloud source, actual Current cloud source. Exactly1 test,1 behavioral failure,0skips; runtime index remained exact591. Parent Code actual Chrome/WebKit role captures independently showed the same duplicateCurrent state."
+    },
+    "greenEvidence": "held-role-first-green.log recorder8e74cc17: all3 actualnative inspection cases pass with0skips, including held-demotion and all original immediate geometry/focus/scroll assertions. Exact committed full/native/rules/compatibility/render/reviews/CI remain required.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021/linux-scroll-repair-20261021"
+  },
+  {
+    "baseCommit": "b5c7af226c0b30884208cadedd542c377f85524e",
+    "testChangesSha256": "2bb40457efd687e2e7666efef96fddf868fdd999aa8d4cc662d64c2b979d567d",
+    "reason": "Close the actual independent rendered held-demotion finding inside the existing226 truthful source-role contract. Add one actual native consumer boundary before the demoted chunk read resolves; preserve all prior635 rationale objects, all original18 immediate assertions,390/360 geometry and all prior behavioral coverage.",
+    "previousBehavior": "Exact591 full/native/rules/compatibility passed, but both exact rendered cases showed two Current labels while the demoted generation fresh read stayed held. The old native consumer asserted roles only after both callbacks, so this intermediate state was missed. Its final approval was withheld/withdrawn; earlier successful gates remain historical.",
+    "intendedBehavior": "All retained inspection rows use the same latest observed manifest, with capture ordering preventing older callbacks from rolling roles back. A demoted retained row shows Previous before its held chunks finish; a retained copy outside current/previous/pending is Earlier received. Read-only preview never grants source choices. The mounted progress height repair and exact original focus/disclosure/scroll/text invariants remain.",
+    "replacementTests": [
+      "RISK cloud source inspection: refreshed roles update before a demoted read finishes"
+    ],
+    "preservedCoverage": [
+      "The shared helper adds a held-demotion branch only for the new case; original390 and360 consumers keep their old timing and every original assertion in order. New case releases its owned gate in cleanup even on assertion failure. No timeout, tolerance, font, skip or eligibility relaxation.",
+      "All635 existing raw rationale objects remain byte-for-byte. Existing earlier real preimplementation visible-text RED and Linux geometry diagnosis remain preserved; the present actual held-role RED occurred before its runtime repair. No claim is made that historical591 approvals cover this successor.",
+      "No read scheduling, one-minute shared budget, authentication, original-source authority, protected storage, CAS/ACK, source selection or restore changes. Separate229 notice removal and230 iOS ticket remain human handoff work. Passing exact CI then park/handoff; no merge/deploy."
+    ],
+    "redEvidence": {
+      "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"RISK cloud source inspection: refreshed roles update\" tests.js; held-role-runs/2026-10-21T11-54-07-585Z-a7341b2f-cf81-4564-bbaa-988fe2ad13e0.json",
+      "failure": "Actual native source-review transition fails strictEqual before demoted chunks are released: expected Previous cloud source, actual Current cloud source. Exactly1 test,1 behavioral failure,0skips; runtime index remained exact591. Parent Code actual Chrome/WebKit role captures independently showed the same duplicateCurrent state."
+    },
+    "greenEvidence": "held-role-first-green.log recorder8e74cc17: all3 actualnative inspection cases pass with0skips, including held-demotion and all original immediate geometry/focus/scroll assertions. Exact committed full/native/rules/compatibility/render/reviews/CI remain required.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021/linux-scroll-repair-20261021"
+  },
+  {
+    "baseCommit": "3b120ae12cd374a5a9685e34495f237d1f5c5604",
+    "testChangesSha256": "2b7f4c4ce5f8438bee3be593edd1f5e09e79ddf031266a49bf182628804345bb",
+    "reason": "Close the actual independent rendered held-demotion finding inside the existing226 truthful source-role contract. Add one actual native consumer boundary before the demoted chunk read resolves; preserve all prior635 rationale objects, all original18 immediate assertions,390/360 geometry and all prior behavioral coverage.",
+    "previousBehavior": "Exact591 full/native/rules/compatibility passed, but both exact rendered cases showed two Current labels while the demoted generation fresh read stayed held. The old native consumer asserted roles only after both callbacks, so this intermediate state was missed. Its final approval was withheld/withdrawn; earlier successful gates remain historical.",
+    "intendedBehavior": "All retained inspection rows use the same latest observed manifest, with capture ordering preventing older callbacks from rolling roles back. A demoted retained row shows Previous before its held chunks finish; a retained copy outside current/previous/pending is Earlier received. Read-only preview never grants source choices. The mounted progress height repair and exact original focus/disclosure/scroll/text invariants remain.",
+    "replacementTests": [
+      "RISK cloud source inspection: refreshed roles update before a demoted read finishes"
+    ],
+    "preservedCoverage": [
+      "The shared helper adds a held-demotion branch only for the new case; original390 and360 consumers keep their old timing and every original assertion in order. New case releases its owned gate in cleanup even on assertion failure. No timeout, tolerance, font, skip or eligibility relaxation.",
+      "All635 existing raw rationale objects remain byte-for-byte. Existing earlier real preimplementation visible-text RED and Linux geometry diagnosis remain preserved; the present actual held-role RED occurred before its runtime repair. No claim is made that historical591 approvals cover this successor.",
+      "No read scheduling, one-minute shared budget, authentication, original-source authority, protected storage, CAS/ACK, source selection or restore changes. Separate229 notice removal and230 iOS ticket remain human handoff work. Passing exact CI then park/handoff; no merge/deploy."
+    ],
+    "redEvidence": {
+      "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"RISK cloud source inspection: refreshed roles update\" tests.js; held-role-runs/2026-10-21T11-54-07-585Z-a7341b2f-cf81-4564-bbaa-988fe2ad13e0.json",
+      "failure": "Actual native source-review transition fails strictEqual before demoted chunks are released: expected Previous cloud source, actual Current cloud source. Exactly1 test,1 behavioral failure,0skips; runtime index remained exact591. Parent Code actual Chrome/WebKit role captures independently showed the same duplicateCurrent state."
+    },
+    "greenEvidence": "held-role-first-green.log recorder8e74cc17: all3 actualnative inspection cases pass with0skips, including held-demotion and all original immediate geometry/focus/scroll assertions. Exact committed full/native/rules/compatibility/render/reviews/CI remain required.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021/linux-scroll-repair-20261021"
+  },
+  {
+    "baseCommit": "883c6170f6bf7525dba2b0b987e38b0ed79536a4",
+    "testChangesSha256": "f908ae7e933cb0c5e3d74b705cbd502a1f2e394ef9da65d1216f92a1e242e482",
+    "reason": "Close the actual independent rendered held-demotion finding inside the existing226 truthful source-role contract. Add one actual native consumer boundary before the demoted chunk read resolves; preserve all prior635 rationale objects, all original18 immediate assertions,390/360 geometry and all prior behavioral coverage.",
+    "previousBehavior": "Exact591 full/native/rules/compatibility passed, but both exact rendered cases showed two Current labels while the demoted generation fresh read stayed held. The old native consumer asserted roles only after both callbacks, so this intermediate state was missed. Its final approval was withheld/withdrawn; earlier successful gates remain historical.",
+    "intendedBehavior": "All retained inspection rows use the same latest observed manifest, with capture ordering preventing older callbacks from rolling roles back. A demoted retained row shows Previous before its held chunks finish; a retained copy outside current/previous/pending is Earlier received. Read-only preview never grants source choices. The mounted progress height repair and exact original focus/disclosure/scroll/text invariants remain.",
+    "replacementTests": [
+      "RISK cloud source inspection: refreshed roles update before a demoted read finishes"
+    ],
+    "preservedCoverage": [
+      "The shared helper adds a held-demotion branch only for the new case; original390 and360 consumers keep their old timing and every original assertion in order. New case releases its owned gate in cleanup even on assertion failure. No timeout, tolerance, font, skip or eligibility relaxation.",
+      "All635 existing raw rationale objects remain byte-for-byte. Existing earlier real preimplementation visible-text RED and Linux geometry diagnosis remain preserved; the present actual held-role RED occurred before its runtime repair. No claim is made that historical591 approvals cover this successor.",
+      "No read scheduling, one-minute shared budget, authentication, original-source authority, protected storage, CAS/ACK, source selection or restore changes. Separate229 notice removal and230 iOS ticket remain human handoff work. Passing exact CI then park/handoff; no merge/deploy."
+    ],
+    "redEvidence": {
+      "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"RISK cloud source inspection: refreshed roles update\" tests.js; held-role-runs/2026-10-21T11-54-07-585Z-a7341b2f-cf81-4564-bbaa-988fe2ad13e0.json",
+      "failure": "Actual native source-review transition fails strictEqual before demoted chunks are released: expected Previous cloud source, actual Current cloud source. Exactly1 test,1 behavioral failure,0skips; runtime index remained exact591. Parent Code actual Chrome/WebKit role captures independently showed the same duplicateCurrent state."
+    },
+    "greenEvidence": "held-role-first-green.log recorder8e74cc17: all3 actualnative inspection cases pass with0skips, including held-demotion and all original immediate geometry/focus/scroll assertions. Exact committed full/native/rules/compatibility/render/reviews/CI remain required.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021/linux-scroll-repair-20261021"
   }
 ]
