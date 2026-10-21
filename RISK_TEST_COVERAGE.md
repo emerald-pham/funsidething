@@ -1930,3 +1930,13 @@ Native asynchronous inspection retains mounted keyboard focus, open device and r
 - RISK cloud source authority: post-ACK hold change preserves its committed outcome and refuses clearing
 - RISK cloud source authority: unchanged typed originals remain exactly archived after confirmed restore
 - RISK cloud source authority: a cached adapter without exact hold clearing refuses before publication
+
+## Final independent recovery boundary repairs (#226)
+
+The existing native inspection consumer now proves truthful promoted/demoted generation headings while retaining mounted keyboard focus, disclosures and scroll. Confirmed restore compares complete typed original head metadata in the local write transaction, carries its authored full postcommit head through verification and completion, and clears a recovery hold only under the exact head and hold. A late change retains actual committed outcomes and protected originals; it never grants stale adoption. Permanent actual-consumer REDs precede each correction.
+
+- RISK cloud source authority: post-ACK same-hash head change refuses stale local adoption
+- RISK cloud source authority: a cached adapter without exact recovery capabilities refuses before publication
+- RISK cloud source inspection: native asynchronous updates retain focus disclosure scroll and current source roles
+
+The final pre-adoption guard reads head, pending/hold and exact protected copies atomically after awaited prerequisites; no await separates this check from live adoption. The opt-in source-fixture setup clock advances only its declared350ms save and awaits real IndexedDB persistence; every runtime/recovery watchdog and native-browser real clock stays unchanged. A measured non-CPU Node pause and all failed setup runs remain separate from product RED/GREEN. Final focused authority32/32 and lifecycle218/218 passed before separately committed qualification.

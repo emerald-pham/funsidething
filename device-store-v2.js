@@ -270,7 +270,7 @@
       ensureOpen();const tx=db.transaction("meta","readonly"),done=transactionDone(tx);
       const hold=await requestResult(tx.objectStore("meta").get("recoveryCloudHold"));await done;return hold??null;
     }
-    async function clearRecoveryCloudHold({expectedHeadHash,expectedHold,encodeHold=pendingJSON}={}){
+    async function clearRecoveryCloudHold({expectedHeadHash,expectedHead,encodeHead=pendingJSON,expectedHold,encodeHold=pendingJSON}={}){
       ensureOpen();if(typeof expectedHeadHash!=="string"||!expectedHold)return false;
       const tx=db.transaction("meta","readwrite"),done=transactionDone(tx),store=tx.objectStore("meta");
       const [head,hold]=await Promise.all([requestResult(store.get("head")),requestResult(store.get("recoveryCloudHold"))]);
@@ -278,7 +278,9 @@
       // stay strict: JSON-lossy unknown facts cannot authorize deleting a hold.
       let same=false;
       try{const expected=encodeHold(expectedHold),current=encodeHold(hold);same=typeof expected==="string"&&typeof current==="string"&&expected===current;}catch{}
-      if(head?.hash!==expectedHeadHash||!same){
+      let sameHead=expectedHead===undefined;
+      if(!sameHead)try{const expected=encodeHead(expectedHead),current=encodeHead(head??null);sameHead=typeof expected==="string"&&typeof current==="string"&&expected===current;}catch{}
+      if(head?.hash!==expectedHeadHash||!same||!sameHead){
         tx.abort();try{await done;}catch{}return false;
       }
       store.delete("recoveryCloudHold");await done;return true;
@@ -316,7 +318,7 @@
       return {ok:true,verified:head?.payload===legacy.headPayload&&head?.hash===headHash&&exactBackups&&exactOpaque,hash:headHash};
     }
 
-    async function commitHead({expectedHash,payload,account=null,backup=null,backups=[],removeBackupIds=[]}={}){
+    async function commitHead({expectedHash,expectedHead,encodeHead=pendingJSON,payload,account=null,backup=null,backups=[],removeBackupIds=[]}={}){
       ensureOpen();
       if(typeof payload!=="string") return {error:true,code:"invalid-payload"};
       const nextHash=await sha(payload);
@@ -332,7 +334,11 @@
         requestResult(metaStore.get("head")),requestResult(backupStore.getAll()),requestResult(snapshotStore.getAllKeys()),requestResult(metaStore.get("recoveryCloudHold")),
         requestResult(backupStore.getAllKeys()),
       ]);
-      if((current?.hash??null)!==(expectedHash??null)){
+      // A reviewed recovery head grants more authority than its payload hash.
+      // Compare all original metadata inside the same transaction as the write.
+      let sameHead=expectedHead===undefined;
+      if(!sameHead)try{const expected=encodeHead(expectedHead),actual=encodeHead(current??null);sameHead=typeof expected==="string"&&typeof actual==="string"&&expected===actual;}catch{}
+      if((current?.hash??null)!==(expectedHash??null)||!sameHead){
         tx.abort();try{await transactionDone(tx);}catch(e){}
         return {conflict:true,hash:current?.hash??null};
       }
@@ -350,7 +356,8 @@
         const {payload:ignored,...saved}=prepared;backupStore.put(saved,saved.id);
       }
       snapshotStore.put({hash:nextHash,payload},nextHash);
-      metaStore.put({...current,hash:nextHash,account,schemaVersion:SCHEMA_VERSION,committedAt:Date.now()},"head");
+      const committedHead={...current,hash:nextHash,account,schemaVersion:SCHEMA_VERSION,committedAt:Date.now()};
+      metaStore.put(committedHead,"head");
       // Snapshot payloads are immutable and shared by the live head and any
       // number of recovery references. Retire only blobs that will have no
       // reference after this transaction; interrupted commits keep the old
@@ -376,7 +383,7 @@
         return {ok:true,superseded:true,committedHash:nextHash,head:verified};
       }
       if(verified.payload!==payload) throw new Error("Device head verification failed");
-      return {ok:true,hash:nextHash};
+      return {ok:true,hash:nextHash,...(expectedHead===undefined?{}:{committedHead:{...committedHead,payload}})};
     }
 
     async function putBackup({expectedHash,backup}={}){
@@ -495,7 +502,7 @@
     }
 
     async function close(){if(db){db.close();db=null;}}
-    const api={open,close,readRawExportSnapshot,readHead,withCurrentHead,listBackups,listOpaqueArchives,protectRecoverySource,writeRecoveredSource,getRecoveryCloudHold,clearRecoveryCloudHold,clearRecoveryCloudHoldIfCurrent:clearRecoveryCloudHold,migrateLegacy,commitHead,putBackup,
+    const api={open,close,readRawExportSnapshot,readHead,withCurrentHead,listBackups,listOpaqueArchives,protectRecoverySource,writeRecoveredSource,getRecoveryCloudHold,clearRecoveryCloudHold,clearRecoveryCloudHoldIfCurrent:clearRecoveryCloudHold,migrateLegacy,commitHead,commitHeadIfCurrent:commitHead,putBackup,
       updateBackupKind,deleteBackup,getPendingUpload,setPendingUpload,setPendingUploadIfCurrent,clearPendingUpload,setLegacyFingerprint};
     return api;
   }

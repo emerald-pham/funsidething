@@ -901,6 +901,24 @@ test('RISK cloud source authority: post-ACK hold change preserves its committed 
  assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),false,'an acknowledged cloud result does not authorize clearing a changed hold');assert.equal(changed,true);assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev+1);assert.equal(JSON.stringify(ctx.state),local,'the later changed authority prevents stale live-board adoption');assert.equal(Object.is((await store.getRecoveryCloudHold()).futureAuthority,0),true);assert.match(shim.document.getElementById('modalRoot').innerHTML,/Cloud saved the selected source/);assert.match(shim.document.getElementById('modalRoot').innerHTML,/hold changed/);assert.ok(ctx.buildSupportDiagnosticsReport().sourceOperations.some(op=>op.events.some(event=>event.status==='acknowledged')));
 });
 
+test('RISK cloud source authority: post-ACK same-hash head change refuses stale local adoption',async t=>{
+ for(const timing of ['before local commit','after local commit','before hold clearing','during final copy verification','after hold refresh'])await t.test(timing,async sub=>{
+ const app=await freshSourceCheckFixture187(sub),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore,{payload,...head}=await store.readHead(),hold=timing==='during final copy verification'?null:{account:'e@example.com',identity:'owner',futureAuthority:-0};
+ await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>{tx.objectStore('meta').put({...head,futureAuthority:-0},'head');if(hold)tx.objectStore('meta').put(hold,'recoveryCloudHold');});assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);assert.equal(await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'generation:'+originalRoot.previousGeneration}}),true);
+ const local=JSON.stringify(ctx.state),commit=store.commitHead,clear=store.clearRecoveryCloudHold;let changed=false,committedPayload=null,physicalWrite=null;
+ const changeHead=async()=>{assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev+1,'the actual acknowledged cloud publication precedes this physical head change');const {payload:currentPayload,...current}=await store.readHead();changed=true;await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>tx.objectStore('meta').put({...current,futureAuthority:0},'head'));};
+ const lateCommit=async options=>{if(timing==='before local commit')await changeHead();const result=await commit(options);if(result.ok)committedPayload=options.payload;return result;};store.commitHead=lateCommit;store.commitHeadIfCurrent=lateCommit;
+ if(timing==='after local commit'){
+  const db=await new Promise((resolve,reject)=>{const request=app.indexedDB.open(app.deviceDbName,1);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});sub.after(async()=>{delete app.idbFault.afterHeadCommit;await physicalWrite;db.close();});
+  app.idbFault.afterHeadCommit=()=>{if(changed)return;changed=true;assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev+1);physicalWrite=new Promise((resolve,reject)=>{const tx=db.transaction('meta','readwrite'),meta=tx.objectStore('meta'),request=meta.get('head');request.onsuccess=()=>meta.put({...request.result,futureAuthority:0},'head');tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);});};
+ }
+ if(timing==='before hold clearing'){const lateClear=async options=>{await changeHead();return clear(options);};store.clearRecoveryCloudHold=lateClear;store.clearRecoveryCloudHoldIfCurrent=lateClear;}
+ if(timing==='during final copy verification'){const list=store.listOpaqueArchives;store.listOpaqueArchives=async()=>{const rows=await list();if(committedPayload&&!changed)await changeHead();return rows;};}
+ if(timing==='after hold refresh'){const refresh=ctx.window.refreshScannerDeviceRecoveryHold;ctx.window.refreshScannerDeviceRecoveryHold=async()=>{const result=await refresh();await changeHead();return result;};}
+ assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),false,'a same-hash typed head change after ACK must refuse stale local adoption');await physicalWrite;assert.equal(changed,true);assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev+1);assert.equal(JSON.stringify(ctx.state),local);const saved=await store.readHead();assert.equal(saved.payload,committedPayload??payload,'retain the actual durable outcome without claiming rollback');assert.equal(Object.is(saved.futureAuthority,0),true);assert.deepEqual(await store.getRecoveryCloudHold(),timing==='after hold refresh'?null:hold,'preserve the actual hold-clear outcome at the time of the later head change');if(timing==='before hold clearing')assert.match(shim.document.getElementById('modalRoot').innerHTML,/head or recovery hold changed/);assert.match(shim.document.getElementById('modalRoot').innerHTML,/Cloud saved the selected source/);assert.ok((await store.listOpaqueArchives()).some(row=>row.key.startsWith('cloud-generation-recovery:')));
+ });
+});
+
 test('RISK cloud source authority: unchanged typed originals remain exactly archived after confirmed restore',async t=>{
  const app=await freshSourceCheckFixture187(t),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore,{payload,...head}=await store.readHead(),hold={account:'e@example.com',identity:'owner',futureAuthority:NaN,zero:-0,bigint:7n,named:Object.assign(['same'],{sole:'original'}),unknown:undefined};
  await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>{tx.objectStore('meta').put({...head,futureAuthority:NaN,bigint:19n,named:Object.assign(['head'],{sole:'head original'})},'head');tx.objectStore('meta').put(hold,'recoveryCloudHold');});
@@ -909,10 +927,12 @@ test('RISK cloud source authority: unchanged typed originals remain exactly arch
  const archive=(await store.listOpaqueArchives()).map(row=>{try{return JSON.parse(row.raw);}catch{return null;}}).find(row=>row?.format==='chain-scanner.cloud-recovery-source');assert.ok(archive);assert.equal(JSON.stringify(archive.deviceAuthorityExact),exact,'the exact protected original must retain typed facts erased by ordinary JSON fields');assert.equal(archive.deviceHead,payload);
 });
 
-test('RISK cloud source authority: a cached adapter without exact hold clearing refuses before publication',async t=>{
- const app=await freshSourceCheckFixture187(t),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
- await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>tx.objectStore('meta').put({account:'e@example.com',identity:'owner'},'recoveryCloudHold'));assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);assert.equal(await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'generation:'+originalRoot.previousGeneration}}),true);delete store.clearRecoveryCloudHoldIfCurrent;
+test('RISK cloud source authority: a cached adapter without exact recovery capabilities refuses before publication',async t=>{
+ for(const capability of ['clearRecoveryCloudHoldIfCurrent','commitHeadIfCurrent'])await t.test(capability,async sub=>{
+ const app=await freshSourceCheckFixture187(sub),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>tx.objectStore('meta').put({account:'e@example.com',identity:'owner'},'recoveryCloudHold'));assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);assert.equal(await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'generation:'+originalRoot.previousGeneration}}),true);delete store[capability];
  const local=JSON.stringify(ctx.state),head=await store.readHead(),hold=await store.getRecoveryCloudHold(),writes=backend.writes.length;assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),false);assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev);assert.equal(backend.writes.length,writes);assert.equal(JSON.stringify(ctx.state),local);assert.deepEqual(await store.readHead(),head);assert.deepEqual(await store.getRecoveryCloudHold(),hold);
+ });
 });
 
 test('RISK cloud source authority: a delayed header cannot schedule chunks after original authority changes',async t=>{
@@ -928,12 +948,12 @@ test('RISK cloud source authority: a delayed header cannot schedule chunks after
  });
 });
 
-test('RISK cloud source inspection: native asynchronous updates retain focus disclosure and scroll',async t=>{
+test('RISK cloud source inspection: native asynchronous updates retain focus disclosure scroll and current source roles',async t=>{
  const {chromium}=await import('playwright'),sdk=await import('./scripts/installed-client-fixture.mjs'),browser=await chromium.launch({headless:true}),context=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'block',reducedMotion:'reduce'}),page=await context.newPage();
- const current=deferredSyncFixture(),previous=deferredSyncFixture(),finalRoot=deferredSyncFixture(),raw=JSON.stringify(sdk.fixture('reconcile-held')),encoded=await loadStorageV2().encodeSnapshot(raw),{chunks,...header}=encoded,remote=new Map([['users/owner',{schemaVersion:2,rev:4,activeGeneration:'held-current',previousGeneration:'received-previous'}],['users/owner/generations/held-current',{...header,hash:'f'.repeat(64),state:'published',baseRev:3}],['users/owner/generations/received-previous',{...header,state:'published',baseRev:2}],...chunks.map(c=>['users/owner/generations/received-previous/chunks/'+String(c.index).padStart(8,'0'),c])]);
- const origin='https://recovery-inspection.invalid',prefix='/synthetic-sdk/';let armed=false,previousEntered=false,roots=0;
- t.after(async()=>{try{await page.evaluate(()=>closeModal());}catch{}current.resolve();previous.resolve();finalRoot.resolve();await context.close();await browser.close();});
- await context.exposeBinding('__installedRPC',async(_,kind,args)=>{const key=args?.[0];if(armed&&kind==='get'&&key==='users/owner'&&++roots>1)await finalRoot.promise;if(armed&&kind==='list'&&key.endsWith('/held-current/chunks'))await current.promise;if(armed&&kind==='list'&&key.endsWith('/received-previous/chunks')){previousEntered=true;await previous.promise;}if(kind==='get')return structuredClone(remote.get(key)??null);if(kind==='list')return [...remote].filter(([id])=>id.startsWith(key+'/'));if(kind==='apply')throw Error('Unexpected recovery inspection write');throw Error('Unexpected fixture RPC');});
+ const current=deferredSyncFixture(),previous=deferredSyncFixture(),finalRoot=deferredSyncFixture(),freshFinalRoot=deferredSyncFixture(),raw=JSON.stringify(sdk.fixture('reconcile-held')),encoded=await loadStorageV2().encodeSnapshot(raw),{chunks,...header}=encoded,remote=new Map([['users/owner',{schemaVersion:2,rev:4,activeGeneration:'held-current',previousGeneration:'received-previous'}],['users/owner/generations/held-current',{...header,hash:'f'.repeat(64),state:'published',baseRev:3}],['users/owner/generations/received-previous',{...header,state:'published',baseRev:2}],...chunks.map(c=>['users/owner/generations/received-previous/chunks/'+String(c.index).padStart(8,'0'),c])]);
+ const origin='https://recovery-inspection.invalid',prefix='/synthetic-sdk/';let armed=false,previousEntered=false,freshFinalEntered=false,roots=0;
+ t.after(async()=>{try{await page.evaluate(()=>closeModal());}catch{}current.resolve();previous.resolve();finalRoot.resolve();freshFinalRoot.resolve();await context.close();await browser.close();});
+ await context.exposeBinding('__installedRPC',async(_,kind,args)=>{const key=args?.[0];if(armed&&kind==='get'&&key==='users/owner'&&++roots>1){await finalRoot.promise;if(roots===4){freshFinalEntered=true;await freshFinalRoot.promise;}}if(armed&&kind==='list'&&key.endsWith('/held-current/chunks'))await current.promise;if(armed&&kind==='list'&&key.endsWith('/received-previous/chunks')){previousEntered=true;await previous.promise;}if(kind==='get')return structuredClone(remote.get(key)??null);if(kind==='list')return [...remote].filter(([id])=>id.startsWith(key+'/'));if(kind==='apply')throw Error('Unexpected recovery inspection write');throw Error('Unexpected fixture RPC');});
  await context.addInitScript(sdk.browserInit,{dbName:'native-inspection-'+Math.random(),authMode:'reconcile-held',sdkBase:origin+prefix});
  await context.addInitScript(raw=>{localStorage.setItem('fvp:chain-scanner:v1',raw);localStorage.setItem('fvp:chain-scanner:protected:v1',raw);localStorage.setItem('fvp:chain-scanner:daily-backups:v1','[]');},raw);
  await context.route('**/*',async route=>{const url=new URL(route.request().url()),file=url.pathname;if(url.origin!==origin)return route.abort();const module=file===prefix+'firebase-app.js'?sdk.appModule:file===prefix+'firebase-auth.js'?sdk.authModule:file===prefix+'firebase-firestore.js'?sdk.firestoreModule:null;if(module!==null)return route.fulfill({contentType:'application/javascript',body:module});const relative=file==='/'?'index.html':file.slice(1);if(relative.includes('..')||!fs.existsSync(path.join(__dirname,relative)))return route.fulfill({status:404,body:''});return route.fulfill({body:fs.readFileSync(path.join(__dirname,relative)),contentType:relative.endsWith('.html')?'text/html':relative.endsWith('.js')?'application/javascript':relative.endsWith('.css')?'text/css':undefined});});
@@ -949,6 +969,9 @@ test('RISK cloud source inspection: native asynchronous updates retain focus dis
  assert.equal(after.sameControl,true,'an asynchronously received source must preserve the mounted keyboard-focused Cancel control');assert.equal(after.open,true,'receiving a cloud source must not close an opened device-source disclosure');assert.equal(after.scroll,before.scroll,'inspection updates must retain the reader’s scroll position');assert.equal(await page.locator('[data-act="choose-cloud-recovery-source"]').count(),0);
  const summary=page.locator('[data-cloud-source-inspection] summary').first();await summary.click();await summary.focus();const receivedBefore=await page.evaluate(()=>{const modal=document.querySelector('#modalRoot .modal');modal.scrollTop=400;window.__receivedSummary=document.activeElement;return modal.scrollTop;});current.resolve();await page.locator('[data-cloud-source-inspection] h4').filter({hasText:'Current cloud source'}).waitFor();
  const receivedAfter=await page.evaluate(()=>({same:document.activeElement===window.__receivedSummary,open:window.__receivedSummary.closest('details').open,scroll:document.querySelector('#modalRoot .modal').scrollTop}));assert.equal(receivedAfter.same,true,'a second source result preserves the already mounted focused received-copy summary');assert.equal(receivedAfter.open,true);assert.equal(receivedAfter.scroll,receivedBefore);
+ remote.set('users/owner',{schemaVersion:2,rev:5,activeGeneration:'received-previous',previousGeneration:'held-current'});finalRoot.resolve();const freshBy=Date.now()+3000;while(Date.now()<freshBy&&!freshFinalEntered)await flush();assert.equal(freshFinalEntered,true,'the changed manifest reaches its fresh capture with independently received copies');
+ assert.equal(await page.locator('[data-cloud-source-inspection-id="received-previous"] h4').textContent(),'Current cloud source','a promoted received generation must show its current manifest role');assert.equal(await page.locator('[data-cloud-source-inspection-id="held-current"] h4').textContent(),'Previous cloud source','a demoted received generation must not retain a second Current heading');
+ const refreshed=await page.evaluate(()=>({same:document.activeElement===window.__receivedSummary,open:window.__receivedSummary.closest('details').open,scroll:document.querySelector('#modalRoot .modal').scrollTop}));assert.equal(refreshed.same,true);assert.equal(refreshed.open,true);assert.equal(refreshed.scroll,receivedBefore);assert.equal(await page.locator('[data-act="choose-cloud-recovery-source"]').count(),0);
 });
 
 test('RISK cloud source states: retry and terminal explanations never substitute raw SDK details',async t=>{
@@ -1229,12 +1252,12 @@ test('RISK cloud source fresh check: Cancel and reopen revoke a stalled fresh pa
 test('RISK cloud source fresh check: changed local authority and unsupported or failed reads never restart',async t=>{
  for(const change of ['same-email other UID','auth epoch','draft','accepted edit','pending','browser raw','device hold','storage failure','unsupported cloud'])await t.test(change,async sub=>{
   const app=await freshSourceCheckFixture187(sub),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore,readHead=store.readHead.bind(store);
-  const before=JSON.stringify(ctx.state),head=await readHead(),writes=backend.writes.length;let roots=0,expectedLocal=before,expectedPending=await store.getPendingUpload('owner');
+  const before=JSON.stringify(ctx.state),head=await readHead(),writes=backend.writes.length;let roots=0,expectedLocal=before,expectedPending=await store.getPendingUpload('owner'),acceptedSave=null;const editComplete=deferredSyncFixture();
   app.faults.serverRead=async path=>{if(path==='users/owner'&&++roots===3){
    if(change==='same-email other UID')backend.emitAuth({uid:'another-owner',email:'e@example.com'});
    if(change==='auth epoch'){backend.emitAuth(null);backend.emitAuth({uid:'owner',email:'e@example.com'});}
    if(change==='draft')shim.document.getElementById('addInput').value='Preserve this draft';
-   if(change==='accepted edit'){shim.document.getElementById('addInput').value='Accepted while sources change';await ctx.onAction('add',{});await ctx.persist();expectedLocal=JSON.stringify(ctx.state);}
+   if(change==='accepted edit'){shim.document.getElementById('addInput').value='Accepted while sources change';await ctx.onAction('add',{});expectedLocal=JSON.stringify(ctx.state);acceptedSave=ctx.persist();await acceptedSave;editComplete.resolve();}
    if(change==='pending'){expectedPending={account:'owner',generationId:'new-protected-pending',payloadHash:'a'.repeat(64),baseRev:4,updatedAt:1};await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>tx.objectStore('meta').put(expectedPending,'pending:owner'));}
    if(change==='browser raw')shim.localStorage.setItem(LOCAL_HEAD_KEY,'sole changed browser source');
    if(change==='device hold')await store.setRecoveryCloudHold({account:'e@example.com',identity:'owner',futureHold:'retain'});
@@ -1242,7 +1265,7 @@ test('RISK cloud source fresh check: changed local authority and unsupported or 
    if(change==='unsupported cloud')backend.docs.set(path,{...backend.docs.get(path),schemaVersion:99});
   }};
   sub.after(()=>{store.readHead=readHead;delete app.faults.serverRead;});
-  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),false);assert.ok(roots<=4,'unsafe changes cannot start the fresh third capture');
+  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),false);if(change==='accepted edit'){await fixtureDeadline(editComplete.promise,'the injected accepted edit finishes before exact state and durable readback');assert.equal(await acceptedSave,true);}assert.ok(roots<=4,'unsafe changes cannot start the fresh third capture');
   assert.match(shim.document.getElementById('modalRoot').innerHTML,change==='same-email other UID'||change==='auth epoch'?/The signed-in account changed/:/Checks have stopped/);assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/until the checks finish|Keep this app open while the sources are checked/);
   assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="choose-cloud-recovery-source"/);assert.equal(JSON.stringify(ctx.state),expectedLocal);assert.deepEqual(await store.getPendingUpload('owner'),expectedPending);assert.equal(backend.writes.length,writes);
   if(change==='accepted edit')assert.ok(JSON.parse((await readHead()).payload).tasks.some(row=>row.title==='Accepted while sources change'));
@@ -39540,8 +39563,23 @@ async function divergentCloudSourceApp187(t,options){
  backend.docs.set(path,{...backend.docs.get(path),hash:'f'.repeat(64)});
  if(options?.settleDeviceBeforeCloud)ctx.window.CLOUD_PUSH_DELAY_MS=60000;
  shim.document.getElementById('addInput').value='Device source only';
- await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
- if(options?.settleDeviceBeforeCloud)await settleSourceFixtureSave187(app,'fixture final native save settles before cloud controls',true);
+ const schedule=ctx.setTimeout,cancel=ctx.clearTimeout,saveClock={elapsed:0,jobs:[]};
+ if(options?.settleDeviceBeforeCloud){
+  ctx.setTimeout=(fn,ms,...args)=>{
+   if(ms!==350)return schedule(fn,ms,...args);
+   const token={sourceFixtureClock:true},job={token,fn,args,at:saveClock.elapsed+ms,delay:ms,cancelled:false};saveClock.jobs.push(job);return token;
+  };
+  ctx.clearTimeout=token=>{const job=saveClock.jobs.find(row=>row.token===token);if(job)job.cancelled=true;else cancel(token);};
+ }
+ try{
+  await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+  if(options?.settleDeviceBeforeCloud){
+   assert.equal(saveClock.jobs.length,1,'the final native Add schedules exactly one ordinary save');const job=saveClock.jobs[0];assert.equal(job.delay,350);assert.equal(job.cancelled,false);
+   saveClock.elapsed+=350;assert.equal(job.at,saveClock.elapsed,'advance only the setup save clock to its declared deadline');
+   const saved=job.fn(...job.args);assert.equal(typeof saved?.then,'function','the actual scheduled callback must run its real persistence consumer');assert.equal(await fixtureDeadline(saved,'fixture final scheduled persist finishes before cloud controls'),true);
+   await settleSourceFixtureSave187(app,'fixture final native save settles before cloud controls',true);
+  }
+ }finally{ctx.setTimeout=schedule;ctx.clearTimeout=cancel;}
  await ctx.cloudPull();await ctx.sendPush();await settleRecoveryOperations188(ctx);
  assert.equal((await backend.CS.pull()).code,'corrupt-generation');
  return app;
