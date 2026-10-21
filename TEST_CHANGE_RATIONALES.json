@@ -16208,5 +16208,49 @@
     "greenEvidence": "macos-trace-v2.log: Node22.23.2 Chromium151 native focused1pass0fail0skip, eight fully visible lines and all decisive frame samples. Validates diagnostic plumbing only; no Linux or shipping green claim.",
     "evidenceClassification": "temporary diagnostic measurement only; unchanged product and workflow; known required CI failure retained",
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021/linux-scroll-repair-20261021"
+  },
+  {
+    "baseCommit": "3b120ae12cd374a5a9685e34495f237d1f5c5604",
+    "testChangesSha256": "1f07717119e29eec3bb6cc3b799cfc76047caf4b2dd09f7f22b523f78b7939ce",
+    "reason": "Add bounded temporary passive geometry measurement to the already failing native Linux inspection consumer, with every original assertion and product/workflow byte preserved. This isolated diagnostic publication is authorized by the trusted human continuation fix the loop, not a release approval or contract migration. Complete independent measurement-review details: reserve decisive samples, reacquire logical fixture text separately from detached nodes, track passive scroll/font status, and bound frame collection with explicit diagnostic-invalid output. The actual updated test declaration is included in the diff for the exact test-name rationale guard; no test is renamed or assertion changed.",
+    "previousBehavior": "Two uninstrumented Ubuntu CI runs fail the original final scrollTop equality at379 versus400; the exact Mac focused run passes. Neither log measures visible unchanged text, so no reader-jump cause or contract change is substantiated.",
+    "intendedBehavior": "Preserve all original assertions and trigger order, and record eight actual visible fixture text ranges, viewport/content coordinates, native scroll extents, progress/font/heading geometry, old li and summary identity, mutation/resize observations and next-two-frame samples even after the original assertion fails. Product implementation and CI workflow remain unchanged.",
+    "replacementTests": [
+      "RISK cloud source inspection: native asynchronous updates retain focus disclosure scroll and current source roles"
+    ],
+    "preservedCoverage": [
+      "All original source-role, focus, disclosure, raw-scroll, no-source-choice and data-safety assertions remain in place. No tolerance, skip, early return, font substitution or anchoring override is introduced.",
+      "All627 previously committed raw rationale objects remain byte-exact, including first temporary diagnostic chronology. Original two unobserved CI failures remain immutable; reads can force layout and are labelled later measurement. Observer snapshots stop at16 so all decisive samples fit within24. Eight fully visible fixture lines are retained and logical identity is reacquired if detached.",
+      "A non-main diagnostic receipt and focused Mac pass do not clear the known Linux failure or authorize shipment. Exact successor full/native/rules/compatibility/rendered/FAQ/review/CI/Stable/Beta/live gates still apply."
+    ],
+    "redEvidence": {
+      "command": "Existing exact3b pushCI39549918410 and PRCI39549927659: npm test, actual native inspection consumer. Immutable rawlogs retained under release-3b120ae/ci-push and ci-pr.",
+      "failure": "Both actual uninstrumented Linux runs fail refreshed.scroll 379 != receivedBefore400 after role refresh. This is existing CI RED prompting diagnostic measurement only, not claimed RED for a new product fix. Mac later sensitivity passes1/1; visible-jump RED remains unestablished."
+    },
+    "greenEvidence": "macos-trace-v2.log: Node22.23.2 Chromium151 native focused1pass0fail0skip, eight fully visible lines and all decisive frame samples. Validates diagnostic plumbing only; no Linux or shipping green claim.",
+    "evidenceClassification": "temporary diagnostic measurement only; unchanged product and workflow; known required CI failure retained",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021/linux-scroll-repair-20261021"
+  },
+  {
+    "baseCommit": "883c6170f6bf7525dba2b0b987e38b0ed79536a4",
+    "testChangesSha256": "fdff55c227cd0efa6dad33dcbc4e83aef58d6687c449bd03dcff42028fb8adcc",
+    "reason": "Add bounded temporary passive geometry measurement to the already failing native Linux inspection consumer, with every original assertion and product/workflow byte preserved. This isolated diagnostic publication is authorized by the trusted human continuation fix the loop, not a release approval or contract migration. Complete independent measurement-review details: reserve decisive samples, reacquire logical fixture text separately from detached nodes, track passive scroll/font status, and bound frame collection with explicit diagnostic-invalid output. The actual updated test declaration is included in the diff for the exact test-name rationale guard; no test is renamed or assertion changed.",
+    "previousBehavior": "Two uninstrumented Ubuntu CI runs fail the original final scrollTop equality at379 versus400; the exact Mac focused run passes. Neither log measures visible unchanged text, so no reader-jump cause or contract change is substantiated.",
+    "intendedBehavior": "Preserve all original assertions and trigger order, and record eight actual visible fixture text ranges, viewport/content coordinates, native scroll extents, progress/font/heading geometry, old li and summary identity, mutation/resize observations and next-two-frame samples even after the original assertion fails. Product implementation and CI workflow remain unchanged.",
+    "replacementTests": [
+      "RISK cloud source inspection: native asynchronous updates retain focus disclosure scroll and current source roles"
+    ],
+    "preservedCoverage": [
+      "All original source-role, focus, disclosure, raw-scroll, no-source-choice and data-safety assertions remain in place. No tolerance, skip, early return, font substitution or anchoring override is introduced.",
+      "All627 previously committed raw rationale objects remain byte-exact, including first temporary diagnostic chronology. Original two unobserved CI failures remain immutable; reads can force layout and are labelled later measurement. Observer snapshots stop at16 so all decisive samples fit within24. Eight fully visible fixture lines are retained and logical identity is reacquired if detached.",
+      "A non-main diagnostic receipt and focused Mac pass do not clear the known Linux failure or authorize shipment. Exact successor full/native/rules/compatibility/rendered/FAQ/review/CI/Stable/Beta/live gates still apply."
+    ],
+    "redEvidence": {
+      "command": "Existing exact3b pushCI39549918410 and PRCI39549927659: npm test, actual native inspection consumer. Immutable rawlogs retained under release-3b120ae/ci-push and ci-pr.",
+      "failure": "Both actual uninstrumented Linux runs fail refreshed.scroll 379 != receivedBefore400 after role refresh. This is existing CI RED prompting diagnostic measurement only, not claimed RED for a new product fix. Mac later sensitivity passes1/1; visible-jump RED remains unestablished."
+    },
+    "greenEvidence": "macos-trace-v2.log: Node22.23.2 Chromium151 native focused1pass0fail0skip, eight fully visible lines and all decisive frame samples. Validates diagnostic plumbing only; no Linux or shipping green claim.",
+    "evidenceClassification": "temporary diagnostic measurement only; unchanged product and workflow; known required CI failure retained",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021/linux-scroll-repair-20261021"
   }
 ]

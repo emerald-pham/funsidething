@@ -948,7 +948,7 @@ test('RISK cloud source authority: a delayed header cannot schedule chunks after
  });
 });
 
-test('RISK cloud source inspection: native asynchronous updates retain focus disclosure scroll and current source roles',async t=>{
+test('RISK cloud source inspection: native asynchronous updates retain focus disclosure scroll and current source roles', async t=>{
  const {chromium}=await import('playwright'),sdk=await import('./scripts/installed-client-fixture.mjs'),browser=await chromium.launch({headless:true}),context=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'block',reducedMotion:'reduce'}),page=await context.newPage();
  const current=deferredSyncFixture(),previous=deferredSyncFixture(),finalRoot=deferredSyncFixture(),freshFinalRoot=deferredSyncFixture(),raw=JSON.stringify(sdk.fixture('reconcile-held')),encoded=await loadStorageV2().encodeSnapshot(raw),{chunks,...header}=encoded,remote=new Map([['users/owner',{schemaVersion:2,rev:4,activeGeneration:'held-current',previousGeneration:'received-previous'}],['users/owner/generations/held-current',{...header,hash:'f'.repeat(64),state:'published',baseRev:3}],['users/owner/generations/received-previous',{...header,state:'published',baseRev:2}],...chunks.map(c=>['users/owner/generations/received-previous/chunks/'+String(c.index).padStart(8,'0'),c])]);
  const origin='https://recovery-inspection.invalid',prefix='/synthetic-sdk/';let armed=false,previousEntered=false,freshFinalEntered=false,roots=0;
