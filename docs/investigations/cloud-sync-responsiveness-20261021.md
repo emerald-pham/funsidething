@@ -154,3 +154,27 @@ passive owner wait; all original exact source, cloud ACK, durable-head and reope
 assertions remain. Production automatic paths enter the app-owned pull, rather
 than this verifier-only direct-pull loop. This was a fixture correction, not
 permission to relax recovery evidence or change production deadlines.
+
+## Remaining slow-runner headroom
+
+The exact296 PR CI passed all2,835 tests (2,785 passes/50 environment skips),
+rules13/13 and compatibility15/15; threeYes793ms andDone391ms met the original
+budgets. Its matching push CI failed only threeYes at1,184ms. This is insufficient
+headroom, not permission to retry until a favorable machine passes. The candidate
+remains unreleased and both complete logs are retained.
+
+A fresh source-bound profile isolated actual Yes-owner work from expensive
+fixture setup:348 self samples included60 in rankStats (34 in its CDF loop) and57
+in chanceHash. The CDF resolves Math.min for every matrix cell; History fingerprints
+resolve Math.imul for each UTF-16 code unit. These methods are now bound to the
+current Math object once per invocation, after sampling for the CDF. The same
+score comparator is reused across samples. No sorting, formulas, Float32 writes,
+random draws, hash constants, input units, overflow behavior or output IDs change.
+
+A new preservation control passed before those edits: exact released hashes for
+empty, short, surrogate/Unicode and long History inputs, stable-tie CDFs/TopK and
+receiver-sensitive Math replacements between invocations. This positive is not
+behavioral RED; the unchanged CI1,184ms failure is the symptom evidence. The first
+focused successor measured threeYes365ms andDone232ms, with both numeric controls
+passing. Final candidate-focused, native, independent review and full exact CI
+remain separate release gates. Earlier full runs keep their original identities.

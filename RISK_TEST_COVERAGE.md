@@ -1954,6 +1954,7 @@ The held-demotion native boundary requires one Current and one Previous heading 
 - RISK populated task responsiveness: three rapid Yes actions retain history and reopen within the interaction budget
 - RISK populated completion responsiveness: rapid Done and Undo preserve earlier completions without full-pool stalls
 - RISK numeric responsiveness: optimized sampling and cold display preserve released distributions and random streams
+- RISK numeric caller preservation: stable CDFs and long history fingerprints survive current Math replacements
 - RISK corrupt cloud work budget: a failed exact-source read does not permanently hold a later repair
 
 - `RISK corrupt cloud work budget: cold-opened sources without an ACK keep newer edits without repeated downloads`: actual supported export cold-open, accepted tasks, durable head, finite same-source reads, manual Retry and newer-root acknowledgement.

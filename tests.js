@@ -40881,3 +40881,17 @@ test('RISK numeric responsiveness: optimized sampling and cold display preserve 
  for(const tasks of cases){vm.runInContext('chanceDisplayWeightCache=null',ctx);const actual=ctx.chanceDisplayWeights(tasks),expected=new Map(tasks.map(task=>[task.id,ctx.chanceWeight(task,tasks)]));for(const [id,weight] of expected)assert.equal(actual.get(id),weight,'cold normalized weights preserve ID exclusion, bounds and tails exactly');}
  const tasks=[{id:'a',mu:25,sigma:8},{id:'b',mu:26,sigma:7}];ctx.chanceWeight=task=>task.id==='a'?.25:.75;assert.deepEqual([...ctx.chanceDisplayWeights(tasks)].map(([id,weight])=>[id,weight]),[['a',.25],['b',.75]],'a replacement calculator retains its existing fallback');
 });
+
+test('RISK numeric caller preservation: stable CDFs and long history fingerprints survive current Math replacements',async t=>{
+ const app=await loadApp({seed:317});t.after(()=>app.dispose());const {ctx}=app;
+ const texts=['','a','history:[["task-a",25,8,true],250]','\u0000😀café\ud800','history:'+('task-25,8,true;'.repeat(4096))];
+ const hashes=[1947474976,1817065451,1459420189,3793510592,4294361956];
+ vm.runInContext('globalThis.originalMin=Math.min;globalThis.originalImul=Math.imul;globalThis.mathReceivers=[];gauss=()=>0',ctx);
+ for(const phase of ['first','second']){
+  vm.runInContext('Math.min=function(a,b){if(this!==Math)throw Error("min receiver changed");mathReceivers.push("'+phase+'-min");return originalMin(a,b);};Math.imul=function(a,b){if(this!==Math)throw Error("imul receiver changed");mathReceivers.push("'+phase+'-imul");return originalImul(a,b);}',ctx);
+  const rows=[...ctx.rankStats([{id:'a',mu:25,sigma:8},{id:'b',mu:25,sigma:8},{id:'c',mu:25,sigma:8}],7)].map(([id,row])=>({id,hist:[...row.hist],cdf:[...row.cdf],topK:row.topK,n:row.n}));
+  assert.deepEqual(rows,[{id:'a',hist:[1,0,0],cdf:[1,1,1],topK:2,n:3},{id:'b',hist:[0,1,0],cdf:[0,1,1],topK:2,n:3},{id:'c',hist:[0,0,1],cdf:[0,0,1],topK:3,n:3}],'stable equal-score order and exact stored CDFs remain released behavior');
+  for(let i=0;i<texts.length;i++)assert.equal(ctx.chanceHash(texts[i]),hashes[i],'released unsigned fingerprints retain every UTF-16 code unit, prefix and overflow');
+  const seen=JSON.parse(vm.runInContext('JSON.stringify(mathReceivers)',ctx));assert.ok(seen.includes(phase+'-min')&&seen.includes(phase+'-imul'),'each call uses the current receiver-sensitive math methods');
+ }
+});
