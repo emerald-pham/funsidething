@@ -1916,3 +1916,17 @@ An explicitly typed unavailable SDK recovery read can spend the same existing gu
 - RISK cloud source lifecycle guidance: mounted Help explains inspection and bounded read failure
 
 The published amendment supersedes the incomplete checkpoint above. Root change and explicitly typed unavailable server reads share one original restart/controller/minute. Independently complete supported copies can be inspected without choice or publication authority; later failed reads keep unknown counts while an earlier received copy remains labeled read-only. Required-source failure still blocks choices and strict ACK/Apply. Original authority and exact sources remain binding; retired sibling requests cannot schedule dependent work. Safe state guidance, failed/late/retry diagnostics, unchanged ordinary deadlines and zero review writes are covered. Synthetic coverage does not establish actual-account recovery, physical-device behavior or shipment.
+
+## Independent recovery review follow-up (#226)
+
+- RISK cloud source authority: confirmed Apply refuses changed typed head and hold facts
+- RISK cloud source authority: a delayed header cannot schedule chunks after original authority changes
+- RISK cloud source inspection: native asynchronous updates retain focus disclosure and scroll
+
+Native asynchronous inspection retains mounted keyboard focus, open device and received-copy disclosures and scroll. Deferred header reads recheck original authority before nested work, including physical browser/pending/head/hold changes, with coalesced in-flight checks for concurrent siblings. Earlier typed-head refusals preserve exact sources before fewer root requests. Confirmed Apply and final publication compare complete typed head/hold facts losslessly. Durable hold completion uses the exact comparator; unchanged supported originals remain protected through the existing tagged archive codec. A cached adapter without the capability refuses before publication; a late post-ACK change retains the hold and reports the committed cloud outcome. Final exact qualification and reviews remain separate.
+
+- RISK cloud source authority: transaction-time typed changes prevent stale publication
+- RISK cloud source authority: durable hold clearing compares full typed facts
+- RISK cloud source authority: post-ACK hold change preserves its committed outcome and refuses clearing
+- RISK cloud source authority: unchanged typed originals remain exactly archived after confirmed restore
+- RISK cloud source authority: a cached adapter without exact hold clearing refuses before publication

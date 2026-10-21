@@ -270,11 +270,15 @@
       ensureOpen();const tx=db.transaction("meta","readonly"),done=transactionDone(tx);
       const hold=await requestResult(tx.objectStore("meta").get("recoveryCloudHold"));await done;return hold??null;
     }
-    async function clearRecoveryCloudHold({expectedHeadHash,expectedHold}={}){
+    async function clearRecoveryCloudHold({expectedHeadHash,expectedHold,encodeHold=pendingJSON}={}){
       ensureOpen();if(typeof expectedHeadHash!=="string"||!expectedHold)return false;
       const tx=db.transaction("meta","readwrite"),done=transactionDone(tx),store=tx.objectStore("meta");
       const [head,hold]=await Promise.all([requestResult(store.get("head")),requestResult(store.get("recoveryCloudHold"))]);
-      if(head?.hash!==expectedHeadHash||JSON.stringify(hold)!==JSON.stringify(expectedHold)){
+      // Recovery supplies its existing lossless source encoder. Legacy callers
+      // stay strict: JSON-lossy unknown facts cannot authorize deleting a hold.
+      let same=false;
+      try{const expected=encodeHold(expectedHold),current=encodeHold(hold);same=typeof expected==="string"&&typeof current==="string"&&expected===current;}catch{}
+      if(head?.hash!==expectedHeadHash||!same){
         tx.abort();try{await done;}catch{}return false;
       }
       store.delete("recoveryCloudHold");await done;return true;
@@ -491,7 +495,7 @@
     }
 
     async function close(){if(db){db.close();db=null;}}
-    const api={open,close,readRawExportSnapshot,readHead,withCurrentHead,listBackups,listOpaqueArchives,protectRecoverySource,writeRecoveredSource,getRecoveryCloudHold,clearRecoveryCloudHold,migrateLegacy,commitHead,putBackup,
+    const api={open,close,readRawExportSnapshot,readHead,withCurrentHead,listBackups,listOpaqueArchives,protectRecoverySource,writeRecoveredSource,getRecoveryCloudHold,clearRecoveryCloudHold,clearRecoveryCloudHoldIfCurrent:clearRecoveryCloudHold,migrateLegacy,commitHead,putBackup,
       updateBackupKind,deleteBackup,getPendingUpload,setPendingUpload,setPendingUploadIfCurrent,clearPendingUpload,setLegacyFingerprint};
     return api;
   }
