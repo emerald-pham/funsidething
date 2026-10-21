@@ -40,11 +40,33 @@ function remoteTip(repo, remote, ref) {
   if (lines.length > 1) reject('Ambiguous remote destination.');
   return lines[0]?.split(/\s+/)[0] ?? null;
 }
+// Query only lifecycle/dependency controls. Never collect npm's complete config:
+// registry credentials and auth tokens do not belong in validation evidence.
+function npmPolicy(repo) {
+  const expected={'node-options':'null','script-shell':'null','ignore-scripts':'false','if-present':'false',
+    workspaces:'null',workspace:'','include-workspace-root':'false',global:'false','dry-run':'false',
+    omit:'',include:'',production:'null',only:'null'};
+  const result=run('npm',['config','get',...Object.keys(expected)],{cwd:repo});
+  if(result.status!==0||result.error||result.signal)reject('Could not establish effective npm lifecycle configuration.');
+  const settings={};
+  for(const line of result.stdout.trimEnd().split(/\r?\n/)) {
+    const at=line.indexOf('=');
+    if(at<0||!Object.hasOwn(expected,line.slice(0,at)))reject('Unrecognized npm lifecycle configuration output.');
+    const key=line.slice(0,at),value=line.slice(at+1);
+    if(Object.hasOwn(settings,key)||value!==expected[key])reject(`Unsupported effective npm lifecycle setting: ${key}.`);
+    settings[key]=value;
+  }
+  if(Object.keys(settings).length!==Object.keys(expected).length)reject('Incomplete npm lifecycle configuration.');
+  const prefix=run('npm',['prefix'],{cwd:repo});
+  if(prefix.status!==0||prefix.error||prefix.signal||fs.realpathSync(prefix.stdout.trim())!==repo)reject('Effective npm project root differs from the captured checkout.');
+  return settings;
+}
 function policy(repo, o, candidate) {
   if (process.versions.node.split('.')[0] !== '22' || !['darwin','linux'].includes(process.platform)) reject('Local handoff supports Node 22 on macOS/Linux; remote Ubuntu remains independently required.');
   const childNode=run('node',['--version']);
   if(childNode.status!==0||childNode.stdout.trim()!==process.version)reject('Child Node executable must match the supported Node 22 parent toolchain.');
   if (process.env.NODE_OPTIONS || process.env.CHAIN_INSTALLED_NATIVE_CHILD || process.env.FIRESTORE_EMULATOR_HOST) reject('Remove inherited test-runner overrides/emulator identity before the owned cohort.');
+  const npmSettings=npmPolicy(repo);
   const workflow = fs.readFileSync(path.join(repo,'.github/workflows/data-safety.yml'));
   if (hash(workflow) !== workflowDigest) reject('Workflow policy changed; review the local cohort before handoff.');
   const packageBytes = fs.readFileSync(path.join(repo,'package.json')), scripts = JSON.parse(packageBytes).scripts;
@@ -65,7 +87,7 @@ function policy(repo, o, candidate) {
   if(fetchUrls.length!==1||pushUrls.length!==1||fetchUrls[0]!==pushUrls[0])reject('Use one matching fetch/push destination for exact CI handoff.');
   const commands = [['npm',['ci']],['npx',['--no-install','playwright','install',...(process.platform==='linux'?['--with-deps']:[]),'chromium']],
     [process.execPath,['scripts/test-first-gate.mjs',o['--base']]],['npm',['test']],['npm',['run','test:rules']],['npm',['run','test:compatibility']]];
-  return {candidate,base:o['--base'],remote:o['--remote'],destination:`refs/heads/${o['--branch']}`,commands,
+  return {candidate,npmSettings,base:o['--base'],remote:o['--remote'],destination:`refs/heads/${o['--branch']}`,commands,
     gitConfigurationSha256:hash(git(repo,'config','--null','--list')),workflowSha256:hash(workflow),packageSha256:hash(packageBytes),lockSha256:hash(fs.readFileSync(path.join(repo,'package-lock.json'))),
     runnerSha256:hash(fs.readFileSync(fileURLToPath(import.meta.url))),hook:{path:hook,sha256:hash(hookBytes)},
     node:process.version,platform:process.platform,java:(java.stderr+java.stdout).trim(),nativePort:o['--native-port'],

@@ -35,6 +35,7 @@ function fixture(t) {
   const boundary = `#!/usr/bin/env node
 import fs from 'node:fs';
 const args=process.argv.slice(2),name=process.argv[1].split('/').at(-1);
+if(name==='npm'&&(args[0]==='config'||args[0]==='prefix')){const {spawnSync}=await import('node:child_process');const result=spawnSync(process.execPath,[${JSON.stringify(npmCli)},...args],{encoding:'utf8',env:process.env});process.stdout.write(result.stdout??'');process.stderr.write(result.stderr??'');process.exit(result.status??1);}
 fs.appendFileSync(process.env.CALLS,JSON.stringify([name,...args])+'\\n');
 if(name==='java'){console.error('openjdk version "21.0.1"');process.exit(0);}
 if(name==='npx'||args[0]==='ci'){console.log('fixture preparation completed');process.exit(0);}
@@ -210,4 +211,24 @@ test('npm lifecycle Node overrides cannot narrow the required actual npm test co
   f.env.npm_config_node_options='--test-name-pattern=^RISK';
   const result=invoke(f);
   assert.notEqual(result.status,0,'npm lifecycle overrides must not narrow the applicable cohort into qualification');absent(f);
+});
+
+test('effective npm file and environment controls are rejected without exposing configuration values',async t=>{
+  for(const [kind,key,value] of [
+    ['project-file','node-options','--test-name-pattern=^RISK'],
+    ['environment','NPM_CONFIG_NODE_OPTIONS','--test-name-pattern=^RISK'],
+    ['environment','npm_config_script_shell','/private/secret-fixture-shell'],
+    ['environment','npm_config_ignore_scripts','true'],
+    ['environment','npm_config_if_present','true'],
+    ['environment','npm_config_workspaces','true'],
+    ['environment','npm_config_dry_run','true'],
+    ['environment','npm_config_omit','dev'],
+    ['environment','npm_config_global','true'],
+  ])await t.test(key,t=>{
+    const f=fixture(t);
+    if(kind==='project-file'){writeFileSync(path.join(f.repo,'.npmrc'),`${key}=${value}\n`);git(f.repo,'add','.npmrc');git(f.repo,'commit','-m','local npm lifecycle override');}
+    else f.env[key]=value;
+    const result=invoke(f);assert.notEqual(result.status,0);absent(f);
+    if(value.includes('secret-fixture'))assert.ok(!(result.stdout+result.stderr).includes(value),'unsupported setting values stay out of output');
+  });
 });

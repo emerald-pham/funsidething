@@ -35,6 +35,10 @@ fails closed until this command's mapping is reviewed and updated.
 Each attempt writes a private `summary.json` and one output log per command,
 binding the captured commit/tree, comparison base, complete command plan,
 configuration and runner fingerprints, toolchain/platform and native identity.
+Effective npm lifecycle/dependency controls and project root must retain their
+ordinary defaults; environment, user/global or project npm configuration cannot
+narrow or replace the cohort. Only the approved nonsecret setting keys/values
+are recorded; registry/authentication configuration is never dumped.
 Only explicitly source-declared, currently non-applicable environment cases can
 be skipped in the main test command. The existing required native process
 contract must complete exactly once; its own validator retains both case and
