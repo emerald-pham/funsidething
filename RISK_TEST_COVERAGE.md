@@ -1898,3 +1898,21 @@ A failed partial capture retains its original local/account/UID/epoch/serial/hea
 - RISK cloud source read retry: unavailable chunks verify a fresh pair without another click
 
 An explicitly typed unavailable SDK recovery read can spend the same existing guarded restart. The initial permanent consumer covers an incomplete chunk capture followed by two complete fresh captures, an unselected preview with disabled Apply, bounded downloaded failed/fresh diagnostics, preserved draft and exact device/head/pending/raw/cloud sources with zero writes. This is an incomplete local checkpoint: broader retry/deadline/authority/late-request controls, truthful retry copy, FAQ, packaging and exact-candidate review remain pending the reconciled parent acceptance handoff. It does not establish the private source's validity or actual affected-device recovery.
+
+## Recovery read lifecycle five-risk amendment (#226)
+
+- RISK cloud source read retry: repeated and mixed failures share one restart
+- RISK cloud source read retry: only explicit retryable server reads may restart
+- RISK cloud source read retry: unavailable cannot rebind original authority or accepted work
+- RISK cloud source read retry: fresh nested reads retain the original minute and Cancel authority
+- RISK cloud source cancellation: obsolete sibling headers cannot schedule chunks after failure or Cancel
+- RISK cloud source inspection: a complete independent source stays readable when its sibling fails
+- RISK cloud source inspection: an earlier complete copy remains inspectable after a failed fresh read
+- RISK cloud source inspection: current previous and pending copies require supported complete decoding
+- RISK cloud source inspection: strict ACK and confirmed Apply consumers reject failed sibling sources
+- RISK cloud source cancellation: a failed header retires dependent work before inspection settles
+- RISK cloud source inspection: failed sibling counts remain independently unknown
+- RISK cloud source states: retry and terminal explanations never substitute raw SDK details
+- RISK cloud source lifecycle guidance: mounted Help explains inspection and bounded read failure
+
+The published amendment supersedes the incomplete checkpoint above. Root change and explicitly typed unavailable server reads share one original restart/controller/minute. Independently complete supported copies can be inspected without choice or publication authority; later failed reads keep unknown counts while an earlier received copy remains labeled read-only. Required-source failure still blocks choices and strict ACK/Apply. Original authority and exact sources remain binding; retired sibling requests cannot schedule dependent work. Safe state guidance, failed/late/retry diagnostics, unchanged ordinary deadlines and zero review writes are covered. Synthetic coverage does not establish actual-account recovery, physical-device behavior or shipment.

@@ -15888,5 +15888,53 @@
   "greenEvidence": "2026-10-21T02:08:50.890Z record56d09d2b-fd8d-41f3-8416-a0cbc539bdf6:1passed0failed0skip after minimal typed SDK-read mark and existing restart admission. No broader qualification claimed.",
   "evidenceClassification": "contemporaneous-permanent-consumer-red-green; incomplete localcheckpoint",
   "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021/runs"
-}
+},
+  {
+    "baseCommit": "883c6170f6bf7525dba2b0b987e38b0ed79536a4",
+    "implementationBase": "fa7735200d5bb697da1715ba7d11a98fe5b870c2",
+    "testChangesSha256": "834bb5304d94f45ba5472dcdc550d33fb765fc798c0863a4f521f0e8e199e47c",
+    "reason": "Implement the published five-risk #187/#226 technical amendment with permanent actual-consumer REDs. Retain all619 prior raw rationale objects and all existing data/ACK/CAS protections; independent complete source inspection remains separate from choice eligibility.",
+    "previousBehavior": "Typed unavailable recovery reads had the first checkpoint retry but no truthful retry guidance or independent cloud inspection. Obsolete deferred sibling headers could schedule chunks after failure/Cancel, asynchronous failure handling could schedule a dependent read, and a later failed fresh read erased an earlier complete inspection copy.",
+    "intendedBehavior": "Only typed unavailable server recovery READs share the original one restart and monotonic minute with root changes. Complete supported independent copies remain clearly read-only; failed counts remain unknown. Choices, confirmed Apply, exact ACK and publication retain full original-source validation/protection and authority checks. Retired reads cannot schedule dependent calls; terminal guidance is bounded and omits raw SDK detail.",
+    "replacementTests": [
+      "RISK cloud source read retry: unavailable chunks verify a fresh pair without another click",
+      "RISK cloud source read retry: repeated and mixed failures share one restart",
+      "RISK cloud source read retry: only explicit retryable server reads may restart",
+      "RISK cloud source read retry: unavailable cannot rebind original authority or accepted work",
+      "RISK cloud source read retry: fresh nested reads retain the original minute and Cancel authority",
+      "RISK cloud source cancellation: obsolete sibling headers cannot schedule chunks after failure or Cancel",
+      "RISK cloud source inspection: a complete independent source stays readable when its sibling fails",
+      "RISK cloud source inspection: an earlier complete copy remains inspectable after a failed fresh read",
+      "RISK cloud source inspection: current previous and pending copies require supported complete decoding",
+      "RISK cloud source inspection: strict ACK and confirmed Apply consumers reject failed sibling sources",
+      "RISK cloud source cancellation: a failed header retires dependent work before inspection settles",
+      "RISK cloud source inspection: failed sibling counts remain independently unknown",
+      "RISK cloud source states: retry and terminal explanations never substitute raw SDK details",
+      "RISK cloud source lifecycle guidance: mounted Help explains inspection and bounded read failure",
+      "RISK cloud source fresh check: a transient root change inside the first capture verifies automatically",
+      "RISK cloud source fresh check: inner and between-capture changes share one restart",
+      "RISK cloud source fresh check: partial cloud reads cannot rebind changed local or account authority",
+      "RISK cloud source fresh check: a partial-read restart preserves the original deadline and Cancel authority",
+      "RISK cloud source fresh check: late typed head changes cannot be hidden inside the fresh pair",
+      "RISK cloud source fresh check: partial captures retain typed pending and hold evidence",
+      "RISK cloud source partial-read guidance: mounted Help explains the same bounded recheck",
+      "RISK recovery read minute: changed accounts or drafts revoke a delayed source preview",
+      "RISK recovery read minute: a delayed cloud change discards the original capture for one fresh pair"
+    ],
+    "preservedCoverage": [
+      "All619 historical rationale objects remain byte-exact. Prior root-change regressions, actual consumer source choice, original backup/CAS/ACK, exact acknowledged-copy automatic repair and strict SDK return shape remain protected; no partial payload reaches ACK or Apply.",
+      "Existing unsafe-head authority read-count expectations tighten from4to2 because additional inspection device readbacks detect the same changed authority in the original capture; all refusal/preservation assertions remain. The validation-expiry count tightens from2to1 because elapsed independent decoding now refuses before the original final-root request. This is earlier safe refusal, not a deadline extension or assertion removal.",
+      "Positive and negative source consumers cover current/previous/pending supported complete decoding, damaged chunks/unsupported boards,62tasks with50title inspection bound, failed counts unknown, later-failure retained earlier copy, original deadline/Cancel/reopen, mixed/repeated failures, backend/UID/epoch/draft/accepted-edit/head/browser/pending/hold/prepared authority and strict ACK/confirmed Apply negatives. All review operations preserve exact originals and zero cloud writes.",
+      "First inspection probe was interrupted because a Promise.race polling fixture leaked; it is not a completed RED. The bounded permanent inspection assertion subsequently failed before app changes. Initial retry-control failures were fixture baseline-write/physical-hold assumptions, corrected in tests without claiming app repair.",
+      "Containment RED observed actual16vs15/17vs15 obsolete calls; early-retirement RED observed1obsolete chunk; its first attempted GREEN still failed due to sibling cancellation winning the race. Original-first failure retention repaired that gap and the9case cohort passed. Actual SDK overlap peaks2/3 were measured, with no physical-abort claim.",
+      "States/guidance seven assertions failed before app/copy edits, then7passed. Inspection-retention RED observed missing earlier complete copy after failed fresh read, followed by6/6 inspection GREEN. Role/decode controls6/6 and expanded lifecycle179/179 passed; final coherent full/native/rules/compatibility/rendered/independent evidence is recorded separately after commit.",
+      "No private original payload/incident details enter fixtures or Git. Local synthetic facts do not establish private-source validity, affected-account ACK/recovery, physical iOS behavior or random-refresh cause. Existing release hold prohibits push/PR/CI publication/merge/release/status/deploy/live update; parent remains sole tracker writer."
+    ],
+    "redEvidence": {
+      "command": "Recorded Node22 actual tests.js consumer slices, purpose preimplementation-red, logs/runs under /Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021; each permanent discriminating RED before its corresponding app edit.",
+      "failure": "first-red false!=true; late-sibling-red16!=15/17!=15; inspection-red-bounded missing data-cloud-source-inspection; early-retirement-red1!=0; independent-failures-red missing Current status; states-guidance-red7 actual mounted assertion failures; inspection-retention-red missing earlier complete received copy after failed fresh read. No infrastructure failure counted as behavior RED."
+    },
+    "evidenceClassification": "contemporaneous-permanent-consumer-red-green with preserved failed fixtures/interrupted attempt and stronger existing refusal counts",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021/runs"
+  }
 ]

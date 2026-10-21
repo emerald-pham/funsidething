@@ -694,6 +694,181 @@ test('RISK cloud source read retry: unavailable chunks verify a fresh pair witho
  assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(await store.readHead(),head);assert.deepEqual(await store.getPendingUpload('owner'),pending);assert.deepEqual(await store.readRawExportSnapshot(),raw);assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal(backend.writes.length,writes);assert.equal(shim.document.getElementById('addInput').value,'Keep this unfinished read-retry draft');
 });
 
+test('RISK cloud source read retry: repeated and mixed failures share one restart',async t=>{
+ for(const [name,unavailableAt,changedAt,expectedRoots] of [
+  ['repeated unavailable',[1,3],[],2],['unavailable then root',[1],[3],3],['root then unavailable',[3],[2],3]
+ ])await t.test(name,async sub=>{
+  const app=await freshSourceCheckFixture187(sub),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+  const local=JSON.stringify(ctx.state),head=await store.readHead(),pending=await store.getPendingUpload('owner'),raw=await store.readRawExportSnapshot(),writes=backend.writes.length;let roots=0,chunks=0;
+  app.faults.serverRead=async path=>{if(path==='users/owner'&&changedAt.includes(++roots))backend.docs.set(path,{...backend.docs.get(path),rev:backend.docs.get(path).rev+1});if(path.endsWith('/chunks')&&unavailableAt.includes(++chunks))throw Object.assign(Error('Synthetic unavailable read'),{code:'unavailable'});};
+  sub.after(()=>{delete app.faults.serverRead;});
+  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),false);assert.equal(roots,expectedRoots,'both failure categories spend the same restart');assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="choose-cloud-recovery-source"/);assert.match(shim.document.getElementById('modalRoot').innerHTML,/Checks have stopped/);
+  assert.equal(JSON.stringify(ctx.state),local);assert.deepEqual(await store.readHead(),head);assert.deepEqual(await store.getPendingUpload('owner'),pending);assert.deepEqual(await store.readRawExportSnapshot(),raw);assert.equal(backend.writes.length,writes);
+ });
+});
+
+test('RISK cloud source read retry: only explicit retryable server reads may restart',async t=>{
+ for(const code of ['permission-denied','unauthenticated','failed-precondition','resource-exhausted',null])await t.test(code||'generic failure',async sub=>{
+  const app=await freshSourceCheckFixture187(sub),{ctx,shim,backend}=app;let roots=0,chunks=0;
+  const local=JSON.stringify(ctx.state),cloud=JSON.stringify([...backend.docs]),writes=backend.writes.length;
+  app.faults.serverRead=async path=>{if(path==='users/owner')roots++;if(path.endsWith('/chunks')&&++chunks===1)throw Object.assign(Error('Arbitrary SDK detail is not recovery authority'),code?{code}:{});};sub.after(()=>{delete app.faults.serverRead;});
+  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),false);assert.equal(roots,1);assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="choose-cloud-recovery-source"/);assert.equal(JSON.stringify(ctx.state),local);assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal(backend.writes.length,writes);
+ });
+ for(const stage of ['root','header','chunks','final-root'])await t.test(stage+' unavailable',async sub=>{
+  const app=await freshSourceCheckFixture187(sub),{ctx,backend}=app;let roots=0,failed=false;const writes=backend.writes.length;
+  app.faults.serverRead=async path=>{if(path==='users/owner')roots++;const match=stage==='root'?path==='users/owner'&&roots===1:stage==='final-root'?path==='users/owner'&&roots===2:stage==='header'?/^users\/owner\/generations\/[^/]+$/.test(path):path.endsWith('/chunks');if(match&&!failed){failed=true;throw Object.assign(Error('Synthetic unavailable read'),{code:'unavailable'});}};sub.after(()=>{delete app.faults.serverRead;});assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);assert.equal(failed,true);assert.equal(roots,stage==='final-root'?6:5);assert.equal(backend.writes.length,writes);
+ });
+});
+
+test('RISK cloud source read retry: unavailable cannot rebind original authority or accepted work',async t=>{
+ for(const change of ['UID','epoch','backend','draft','accepted edit','pending','browser','hold','prepared','head'])await t.test(change,async sub=>{
+  const app=await freshSourceCheckFixture187(sub),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;let roots=0,failed=false;
+  const before=JSON.stringify(ctx.state),head=await store.readHead(),writes=backend.writes.length;let expected=before;
+  app.faults.serverRead=async path=>{if(path==='users/owner')roots++;if(path.endsWith('/chunks')&&!failed){failed=true;
+   if(change==='UID')backend.emitAuth({uid:'different-owner',email:'e@example.com'});
+   if(change==='epoch'){backend.emitAuth(null);backend.emitAuth({uid:'owner',email:'e@example.com'});}
+   if(change==='backend')ctx.window.CloudSync={...backend.CS};
+   if(change==='draft')shim.document.getElementById('addInput').value='Newer unfinished read draft';
+   if(change==='accepted edit'){shim.document.getElementById('addInput').value='Accepted while unavailable';await ctx.onAction('add',{});await ctx.persist();expected=JSON.stringify(ctx.state);}
+   if(change==='pending')await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>tx.objectStore('meta').put({account:'owner',generationId:'new-protected-pending',payloadHash:'a'.repeat(64),baseRev:4,updatedAt:1},'pending:owner'));
+   if(change==='browser')shim.localStorage.setItem(LOCAL_HEAD_KEY,'New sole browser original');
+   if(change==='hold')await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>tx.objectStore('meta').put({account:'e@example.com',identity:'owner',futureAuthority:'new protected hold'},'recoveryCloudHold'));
+   if(change==='prepared')await ctx.saveDurableBackup('decision-recovery-choice',JSON.stringify({...ctx.state,recoveryChoice:{kind:'cloud-source',identity:'owner',choiceId:'new-read-choice',source:'device'}}));
+   if(change==='head'){const {payload,...meta}=await store.readHead();await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>tx.objectStore('meta').put({...meta,futureAuthority:'new head authority'},'head'));}
+   throw Object.assign(Error('Synthetic unavailable read'),{code:'unavailable'});
+  }};sub.after(()=>{delete app.faults.serverRead;});
+  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),false);assert.equal(roots,1);assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="choose-cloud-recovery-source"/);assert.equal(JSON.stringify(ctx.state),expected);assert.equal(backend.writes.length,writes);
+  if(change==='accepted edit')assert.ok(JSON.parse((await store.readHead()).payload).tasks.some(task=>task.title==='Accepted while unavailable'));else assert.equal((await store.readHead()).payload,head.payload);
+  if(change==='draft')assert.equal(shim.document.getElementById('addInput').value,'Newer unfinished read draft');
+  if(change==='browser')assert.equal(shim.localStorage.getItem(LOCAL_HEAD_KEY),'New sole browser original');
+  if(change==='pending')assert.equal((await store.getPendingUpload('owner')).generationId,'new-protected-pending');
+  if(change==='hold')assert.equal((await store.getRecoveryCloudHold()).futureAuthority,'new protected hold');
+  if(change==='prepared')assert.ok(ctx.readLocalBackups().some(row=>row.kind==='decision-recovery-choice'&&JSON.parse(row.payload).recoveryChoice.choiceId==='new-read-choice'));
+ });
+});
+
+test('RISK cloud source read retry: fresh nested reads retain the original minute and Cancel authority',async t=>{
+ for(const mode of ['deadline','Cancel and reopen'])await t.test(mode,async sub=>{
+  const clock=recoveryReadClock187(),app=await freshSourceCheckFixture187(sub,{timeoutMs:20000,recoveryTimeoutMs:null,timerProvider:clock.provider}),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+  const unavailable=deferredSyncFixture(),fresh=deferredSyncFixture();let chunks=0,roots=0,entered=0,review,settled=false;
+  app.faults.serverRead=async path=>{if(path==='users/owner'){roots++;if(roots===4)await fresh.promise;}if(path.endsWith('/chunks')&&++chunks<=2){entered++;await unavailable.promise;throw Object.assign(Error('Synthetic unavailable read'),{code:'unavailable'});}};
+  sub.after(async()=>{unavailable.resolve();fresh.resolve();delete app.faults.serverRead;clock.stop();await review;});const before=JSON.stringify(ctx.state),head=await store.readHead(),raw=await store.readRawExportSnapshot(),cloud=JSON.stringify([...backend.docs]),writes=backend.writes.length;clock.activate(app);
+  review=ctx.onAction('review-cloud-source-recovery',{}).finally(()=>{settled=true;});await fixtureDeadline((async()=>{while(entered<2)await flush();})(),'both unavailable reads enter');await clock.advance(22000);unavailable.resolve();await fixtureDeadline((async()=>{while(roots<4)await flush();})(),'second fresh capture enters');await clock.advance(30000);assert.equal(clock.elapsed,52000);assert.ok([...clock.timers.values()].every(timer=>timer.at<=60000));
+  let terminal;if(mode==='deadline'){await clock.advance(7999);assert.equal(settled,false);await clock.advance(1);assert.equal(await review,false);terminal=shim.document.getElementById('modalRoot').innerHTML;assert.match(terminal,/Cloud request timed out/);}
+  else{await ctx.onAction('close-modal',{});await flush();assert.equal(await review,false);delete app.faults.serverRead;assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);terminal=shim.document.getElementById('modalRoot').innerHTML;}
+  fresh.resolve();for(let i=0;i<20;i++)await flush();assert.equal(shim.document.getElementById('modalRoot').innerHTML,terminal);assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(await store.readHead(),head);assert.deepEqual(await store.readRawExportSnapshot(),raw);assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal(backend.writes.length,writes);
+ });
+});
+
+test('RISK cloud source cancellation: obsolete sibling headers cannot schedule chunks after failure or Cancel',async t=>{
+ for(const mode of ['failed capture','Cancel and reopen'])await t.test(mode,async sub=>{
+  const app=await freshSourceCheckFixture187(sub),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+  const current='users/owner/generations/'+app.originalRoot.activeGeneration,previous='users/owner/generations/'+app.originalRoot.previousGeneration,gate=deferredSyncFixture();let currentHeaders=0,previousHeaders=0,entered=0,active=0,peak=0,review;const requests=[];
+  const before=JSON.stringify(ctx.state),head=await store.readHead(),raw=await store.readRawExportSnapshot(),cloud=JSON.stringify([...backend.docs]),writes=backend.writes.length;
+  app.faults.serverRead=async path=>{requests.push(path);active++;peak=Math.max(peak,active);try{
+   if(path===current&&++currentHeaders===1){if(mode==='failed capture')throw Object.assign(Error('Synthetic unavailable header'),{code:'unavailable'});entered++;await gate.promise;}
+   if(path===previous&&++previousHeaders===1){entered++;await gate.promise;}
+  }finally{active--;}};
+  sub.after(async()=>{gate.resolve();delete app.faults.serverRead;await review;});review=ctx.onAction('review-cloud-source-recovery',{});
+  await fixtureDeadline((async()=>{while(entered<(mode==='failed capture'?1:2))await flush();})(),'uncancellable original sibling enters');
+  if(mode==='failed capture')assert.equal(await review,true);else{await ctx.onAction('close-modal',{});assert.equal(await review,false);assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);}
+  const visible=shim.document.getElementById('modalRoot').innerHTML,count=requests.length;gate.resolve();for(let n=0;n<20;n++)await flush();
+  assert.equal(requests.length,count,'a retired SDK capture cannot schedule chunks after its uncancellable header finally returns');assert.equal(shim.document.getElementById('modalRoot').innerHTML,visible);assert.ok(peak<=4,'overlap is measured and bounded, rather than claimed as transport cancellation');assert.equal(active,0);
+  assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(await store.readHead(),head);assert.deepEqual(await store.readRawExportSnapshot(),raw);assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal(backend.writes.length,writes);sub.diagnostic(JSON.stringify({mode,peakSDKCalls:peak,alreadyIssuedRequestsCanSettleLate:true,physicalAbortClaimed:false,dependentReadsAfterRetirement:requests.length-count}));
+ });
+});
+
+test('RISK cloud source inspection: a complete independent source stays readable when its sibling fails',async t=>{
+ const app=await freshSourceCheckFixture187(t),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ const gate=deferredSyncFixture(),current='users/owner/generations/'+originalRoot.activeGeneration+'/chunks',previous='users/owner/generations/'+originalRoot.previousGeneration+'/chunks';let previousEntered=false,review;
+ const local=JSON.stringify(ctx.state),head=await store.readHead(),pending=await store.getPendingUpload('owner'),raw=await store.readRawExportSnapshot(),cloud=JSON.stringify([...backend.docs]),writes=backend.writes.length;
+ app.faults.serverRead=async path=>{if(path===previous)previousEntered=true;if(path===current){await gate.promise;throw Object.assign(Error('Synthetic unavailable current source'),{code:'unavailable'});}};
+ t.after(async()=>{gate.resolve();delete app.faults.serverRead;await review;});review=ctx.onAction('review-cloud-source-recovery',{});await fixtureDeadline((async()=>{while(!previousEntered)await flush();})(),'independent previous source arrives');
+ const inspectBy=Date.now()+1000;while(Date.now()<inspectBy&&!shim.document.getElementById('modalRoot').innerHTML.includes('data-cloud-source-inspection'))await flush();
+ const reading=shim.document.getElementById('modalRoot').innerHTML;assert.match(reading,/data-cloud-source-inspection/,'independently complete cloud data must be inspectable before every sibling request finishes');assert.match(reading,/Previous cloud source/);assert.match(reading,/Read-only inspection/);assert.doesNotMatch(reading,/data-act="choose-cloud-recovery-source"/);
+ gate.resolve();assert.equal(await review,false,'a failed required original prevents any choice-capable preview');const stopped=shim.document.getElementById('modalRoot').innerHTML;assert.match(stopped,/data-cloud-source-inspection/);assert.match(stopped,/Previous cloud source/);assert.match(stopped,/Unknown/);assert.match(stopped,/Checks have stopped/);assert.doesNotMatch(stopped,/data-act="choose-cloud-recovery-source"/);
+ assert.equal(await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'generation:'+originalRoot.previousGeneration}}),false);assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),false);
+ assert.equal(JSON.stringify(ctx.state),local);assert.deepEqual(await store.readHead(),head);assert.deepEqual(await store.getPendingUpload('owner'),pending);assert.deepEqual(await store.readRawExportSnapshot(),raw);assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal(backend.writes.length,writes);
+});
+
+test('RISK cloud source inspection: an earlier complete copy remains inspectable after a failed fresh read',async t=>{
+ const app=await freshSourceCheckFixture187(t),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ const gate=deferredSyncFixture(),current='users/owner/generations/'+originalRoot.activeGeneration+'/chunks',previous='users/owner/generations/'+originalRoot.previousGeneration+'/chunks';let roots=0,review;
+ const local=JSON.stringify(ctx.state),head=await store.readHead(),raw=await store.readRawExportSnapshot(),cloud=JSON.stringify([...backend.docs]),writes=backend.writes.length;
+ app.faults.serverRead=async path=>{if(path==='users/owner')roots++;if(path===current){if(roots===1)await gate.promise;throw Object.assign(Error('Synthetic current read unavailable'),{code:'unavailable'});}if(path===previous&&roots>1)throw Object.assign(Error('Synthetic later previous read unavailable'),{code:'unavailable'});};
+ t.after(async()=>{gate.resolve();delete app.faults.serverRead;await review;});review=ctx.onAction('review-cloud-source-recovery',{});
+ const inspectBy=Date.now()+1000;while(Date.now()<inspectBy&&!shim.document.getElementById('modalRoot').innerHTML.includes('Tasks in this received copy'))await flush();
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/Tasks in this received copy/,'the first complete independent copy was actually received and mounted');
+ gate.resolve();assert.equal(await review,false);const stopped=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(stopped,/Tasks in this received copy/,'a later failed read must not erase an earlier independently complete read-only copy');
+ assert.match(stopped,/earlier received copy/i);assert.match(stopped,/failed read remain unknown/i);assert.doesNotMatch(stopped,/data-act="choose-cloud-recovery-source"/);
+ assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),false);assert.equal(JSON.stringify(ctx.state),local);assert.deepEqual(await store.readHead(),head);assert.deepEqual(await store.readRawExportSnapshot(),raw);assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal(backend.writes.length,writes);
+});
+
+test('RISK cloud source inspection: current previous and pending copies require supported complete decoding',async t=>{
+ for(const shape of ['current','previous','pending','damaged chunks','unsupported board'])await t.test(shape,async sub=>{
+  const app=await freshSourceCheckFixture187(sub),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore,gate=deferredSyncFixture();let review;
+  const board=JSON.parse(ctx.cloudPayload());board.tasks=Array.from({length:62},(_,i)=>syncTask('inspection-task-'+i,'Inspectable fixture task '+i));board.futureInspection={keep:['unknown',17]};if(shape==='unsupported board')board.v=99;
+  const encoded=await ctx.window.ChainStorageV2.encodeSnapshot(JSON.stringify(board)),id=shape==='current'?originalRoot.activeGeneration:shape==='pending'?'independent-pending-copy':originalRoot.previousGeneration;
+  backend.docs.set('users/owner/generations/'+id,{...encoded,chunks:undefined,state:shape==='pending'?'staging':'published',baseRev:originalRoot.rev,createdAt:1});for(const key of [...backend.docs.keys()])if(key.startsWith('users/owner/generations/'+id+'/chunks/'))backend.docs.delete(key);
+  for(const chunk of encoded.chunks)if(shape!=='damaged chunks')backend.docs.set('users/owner/generations/'+id+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
+  if(shape==='pending')assert.equal((await store.setPendingUpload('owner',{generationId:id,payloadHash:encoded.hash,baseRev:originalRoot.rev,updatedAt:1})).ok,true);
+  const failed=shape==='current'?originalRoot.previousGeneration:originalRoot.activeGeneration,local=JSON.stringify(ctx.state),head=await store.readHead(),pending=await store.getPendingUpload('owner'),raw=await store.readRawExportSnapshot(),cloud=JSON.stringify([...backend.docs]),writes=backend.writes.length;
+  app.faults.serverRead=async path=>{if(path==='users/owner/generations/'+failed+'/chunks'){await gate.promise;throw Object.assign(Error('Synthetic sibling unavailable'),{code:'unavailable'});}};
+  sub.after(async()=>{gate.resolve();delete app.faults.serverRead;await review;});review=ctx.onAction('review-cloud-source-recovery',{});
+  const inspectBy=Date.now()+1000;while(Date.now()<inspectBy&&!shim.document.getElementById('modalRoot').innerHTML.includes('data-cloud-source-inspection'))await flush();
+  const reading=shim.document.getElementById('modalRoot').innerHTML;assert.match(reading,/data-cloud-source-inspection/);assert.match(reading,new RegExp(shape==='current'?'Current cloud source':shape==='pending'?'Pending cloud upload':'Previous cloud source'));
+  if(shape==='damaged chunks'||shape==='unsupported board'){assert.match(reading,/Unknown/);assert.doesNotMatch(reading,/Inspectable fixture task/);}else{assert.match(reading,/62 tasks/);assert.match(reading,/Inspectable fixture task 49/);assert.doesNotMatch(reading,/Inspectable fixture task 50/);assert.match(reading,/first 50 task titles/);}
+  assert.doesNotMatch(reading,/data-act="choose-cloud-recovery-source"/);gate.resolve();assert.equal(await review,false);assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),false);
+  assert.equal(JSON.stringify(ctx.state),local);assert.deepEqual(await store.readHead(),head);assert.deepEqual(await store.getPendingUpload('owner'),pending);assert.deepEqual(await store.readRawExportSnapshot(),raw);assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal(backend.writes.length,writes);
+ });
+});
+
+test('RISK cloud source inspection: strict ACK and confirmed Apply consumers reject failed sibling sources',async t=>{
+ for(const consumer of ['strict SDK and ACK','confirmed Apply'])await t.test(consumer,async sub=>{
+  const app=await freshSourceCheckFixture187(sub),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+  if(consumer==='confirmed Apply'){assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);assert.equal(await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'generation:'+originalRoot.previousGeneration}}),true);}
+  const local=JSON.stringify(ctx.state),head=await store.readHead(),pending=await store.getPendingUpload('owner'),raw=await store.readRawExportSnapshot(),cloud=JSON.stringify([...backend.docs]),writes=backend.writes.length;let inspections=0;
+  app.faults.serverRead=async path=>{if(path==='users/owner/generations/'+originalRoot.activeGeneration+'/chunks')throw Object.assign(Error('Synthetic strict-consumer unavailable'),{code:'unavailable'});};sub.after(()=>{delete app.faults.serverRead;});
+  if(consumer==='strict SDK and ACK'){
+   await assert.rejects(backend.CS.readRecoverySource({onInspection(){inspections++;}}),error=>error.code==='unavailable');assert.equal(inspections,0,'a callback without an interactive readAttempt never enables partial inspection in authority consumers');assert.equal(await ctx.exactAcknowledgedCloudSource({code:'corrupt-generation',generationId:originalRoot.activeGeneration},'e@example.com'),null);
+  }else assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),false);
+  assert.equal(JSON.stringify(ctx.state),local);assert.deepEqual(await store.readHead(),head);assert.deepEqual(await store.getPendingUpload('owner'),pending);assert.deepEqual(await store.readRawExportSnapshot(),raw);assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal(backend.writes.length,writes);
+ });
+});
+
+test('RISK cloud source cancellation: a failed header retires dependent work before inspection settles',async t=>{
+ const app=await freshSourceCheckFixture187(t),{ctx,backend,originalRoot}=app,gate=deferredSyncFixture();let roots=0,previousHeaders=0,obsoleteChunks=0,review;
+ const current='users/owner/generations/'+originalRoot.activeGeneration,previous='users/owner/generations/'+originalRoot.previousGeneration;
+ app.faults.serverRead=async path=>{if(path==='users/owner')roots++;if(path===current&&roots===1)throw Object.assign(Error('Synthetic unavailable header'),{code:'unavailable'});if(path===previous&&++previousHeaders===1)await gate.promise;if(path===previous+'/chunks'&&roots===1)obsoleteChunks++;};
+ t.after(async()=>{gate.resolve();delete app.faults.serverRead;await review;});review=ctx.onAction('review-cloud-source-recovery',{});
+ await fixtureDeadline((async()=>{while(!ctx.buildSupportDiagnosticsReport().sourceOperations.some(op=>op.events.some(event=>event.stage==='header'&&event.status==='failed'&&event.code.value==='unavailable')))await flush();})(),'original header failure observed');
+ gate.resolve();assert.equal(await review,true);assert.equal(obsoleteChunks,0,'failure retirement precedes asynchronous inspection handling, so a sibling cannot start obsolete chunks');
+});
+
+test('RISK cloud source inspection: failed sibling counts remain independently unknown',async t=>{
+ const app=await freshSourceCheckFixture187(t),{ctx,shim,backend}=app;
+ app.faults.serverRead=async path=>{if(path.endsWith('/chunks'))throw Object.assign(Error('Synthetic unavailable source'),{code:'unavailable'});};t.after(()=>{delete app.faults.serverRead;});assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),false);
+ const modal=shim.document.getElementById('modalRoot').innerHTML;assert.match(modal,/Current cloud source/);assert.match(modal,/Previous cloud source/);assert.match(modal,/Unknown/);assert.doesNotMatch(modal,/data-act="choose-cloud-recovery-source"/);
+ const report=ctx.buildSupportDiagnosticsReport(),failed=report.sourceOperations.filter(op=>op.events.some(event=>event.stage==='chunks'&&event.code.value==='unavailable'));
+ assert.equal(failed.length,2);for(const op of failed)for(const role of ['current','previous']){const row=op.generations.find(row=>row.role===role);assert.equal(row.receivedChunks.value,null);assert.equal(row.receivedChunks.status,'unavailable');assert.notEqual(row.validation.value,'verified');assert.notEqual(row.completeness.value,'complete');}
+});
+
+test('RISK cloud source states: retry and terminal explanations never substitute raw SDK details',async t=>{
+ for(const mode of ['retry progress','repeated unavailable','permission-denied','generic','unsupported'])await t.test(mode,async sub=>{
+  const app=await freshSourceCheckFixture187(sub),{ctx,shim,backend}=app,gate=deferredSyncFixture();let roots=0,chunks=0,review;
+  app.faults.serverRead=async path=>{if(path==='users/owner'){roots++;if(mode==='retry progress'&&roots===2)await gate.promise;if(mode==='unsupported')backend.docs.set(path,{...backend.docs.get(path),schemaVersion:99});}if(path.endsWith('/chunks')&&(mode!=='retry progress'||++chunks<=2))throw Object.assign(Error('PRIVATE SDK request detail must never be UI guidance'),mode==='generic'?{}:{code:mode==='permission-denied'?'permission-denied':'unavailable'});};
+  sub.after(async()=>{gate.resolve();delete app.faults.serverRead;await review;});review=ctx.onAction('review-cloud-source-recovery',{});
+  if(mode==='retry progress'){await fixtureDeadline((async()=>{while(roots<2)await flush();})(),'actual bounded recheck progress');const modal=shim.document.getElementById('modalRoot').innerHTML;assert.match(modal,/could not be read/);assert.match(modal,/Checking fresh sources within the same one-minute limit/);assert.doesNotMatch(modal,/The sources changed/);gate.resolve();assert.equal(await review,true);}
+  else{assert.equal(await review,false);const modal=shim.document.getElementById('modalRoot').innerHTML;assert.doesNotMatch(modal,/PRIVATE SDK|request detail/);assert.match(modal,/Checks have stopped/);if(mode==='repeated unavailable')assert.match(modal,/automatic recheck has stopped/);if(mode==='permission-denied')assert.match(modal,/Access to these cloud sources was denied/);if(mode==='generic')assert.match(modal,/could not be verified/);if(mode==='unsupported')assert.match(modal,/compatible/);assert.doesNotMatch(modal,/data-act="choose-cloud-recovery-source"/);}
+ });
+});
+
+test('RISK cloud source lifecycle guidance: mounted Help explains inspection and bounded read failure',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(help,/Can I inspect one cloud copy when another cannot be read/);assert.match(help,/A readable copy does not make it eligible to replace your board/);assert.match(help,/Why does a recovery check retry or stop/);assert.match(help,/Both share the original one-minute limit/);assert.match(html,/Recovery can recheck an unavailable cloud read once/);
+});
+
 test('RISK cloud source fresh check: a transient root change inside the first capture verifies automatically',async t=>{
  const app=await freshSourceCheckFixture187(t),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
  shim.document.getElementById('addInput').value='Unfinished draft stays here';
@@ -881,7 +1056,7 @@ test('RISK cloud source fresh check: changed head ownership and unknown record f
   store.readHead=async()=>{const value=await readHead();return ++heads>=3?{...value,[field]:'different protected head fact'}:value;};
   app.faults.serverRead=async path=>{if(path==='users/owner')roots++;};sub.after(()=>{store.readHead=readHead;delete app.faults.serverRead;});
   assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),false,'a changed head owner, source identity or unknown authority cannot be rebound by a fresh check');
-  assert.equal(roots,4,'unsafe head facts cannot start another complete capture');assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="choose-cloud-recovery-source"/);
+  assert.equal(roots,2,'inspection readback detects unsafe head facts within the original capture, before another complete capture');assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="choose-cloud-recovery-source"/);
   assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(await readHead(),head);assert.deepEqual(await store.getPendingUpload('owner'),pending);assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal(backend.writes.length,writes);
  });
 });
@@ -1122,7 +1297,7 @@ test('RISK recovery read minute: elapsed validation and final verification canno
   assert.ok(validated>0,'the actual complete-source codec executes before elapsed time advances');
   assert.equal(result,false,'elapsed work cannot grant a source choice merely because its timeout callback is not delivered yet');
   assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="choose-cloud-recovery-source"/);assert.match(shim.document.getElementById('modalRoot').innerHTML,/Cloud request timed out/);
-  if(phase==='validation')assert.equal(roots,2,'an expired first validation must not start a second server read');else assert.equal(roots,4,'the independent final verification also checks elapsed expiry');
+  if(phase==='validation')assert.equal(roots,1,'expired inspection validation cannot start the original final-root read');else assert.equal(roots,4,'the independent final verification also checks elapsed expiry');
   assert.equal(JSON.stringify(ctx.state),before);assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal((await ctx.window.ScannerDeviceStore.readHead()).hash,head.hash);assert.deepEqual(await ctx.window.ScannerDeviceStore.getPendingUpload('owner'),pending);
  });
 });
