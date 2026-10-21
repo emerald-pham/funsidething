@@ -1915,6 +1915,57 @@ test('RISK corrupt cloud work budget: ordinary actions stay durable without rere
  assert.equal(backend.CS.knownDamagedSource,false);assert.equal(JSON.stringify(backend.docs.get(headerPath)),JSON.stringify(JSON.parse(originalCloud).find(([key])=>key===headerPath)[1]));
 });
 
+async function coldDamagedSourceWithoutAck214(t,{newerLocalWork=false}={}){
+ const seed=await damagedAcknowledgedApp187(t,{sourcePadding:2000000});
+ if(newerLocalWork){seed.shim.document.getElementById('addInput').value='Newer local task without an ACK export';await seed.ctx.onAction('add',{});assert.equal(await seed.ctx.persist(),true);}
+ const raw=seed.ctx.cloudPayload(),originalRoot={...seed.originalRoot},originalHeader={...seed.originalHeader},provider=[...seed.backend.docs];
+ assert.equal(Object.hasOwn(JSON.parse(raw),'decisionBase'),false,'the supported export does not carry the private ACK payload');
+ assert.equal(createHash('sha256').update(raw).digest('hex')===originalHeader.hash,!newerLocalWork,'control whether retained current bytes can reconstruct the published missing payload');
+ await closeLegacyApp173(seed);seed.backend.CS.suspend();
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='cold-no-ack-214-'+Math.random();
+ const app=await loadAppAtTime(1792323000000,{seed:214,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},indexedDBProvider:indexedDB,deviceDbName});
+ const faults={authPending:true},counts={reads:0};faults.serverRead=async()=>{counts.reads++;};
+ const backend=await loadCloudBackendV2({rootData:originalRoot,failures:faults,recordSyncError:app.ctx.recordSyncError,runtimeWindow:app.ctx.window});
+ for(const [key,value] of provider)backend.docs.set(key,value);
+ app.ctx.window.CLOUD_PUSH_DELAY_MS=60000;
+ t.after(async()=>{backend.CS.suspend();vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);await app.ctx.window.ScannerDeviceStore?.close?.();await app.dispose();});
+ assert.equal(app.ctx.state.decisionBase==null,true,'the actual cold-opened app has no historical acknowledged copy');
+ backend.emitAuth({uid:'owner',email:'e@example.com'});await app.ctx.cloudPull();
+ await fixtureDeadline((async()=>{while(vm.runInContext('pulling||cloudPushInFlight',app.ctx))await syncSettle(5);})(),'the first no-ACK pull settles before inspecting its outcome');
+ return {...app,backend,faults,counts,originalRoot,originalHeader,raw,indexedDB,deviceDbName};
+}
+
+test('RISK corrupt cloud work budget: cold-opened sources without an ACK keep newer edits without repeated downloads',{timeout:20000},async t=>{
+ const app=await coldDamagedSourceWithoutAck214(t,{newerLocalWork:true}),{ctx,shim,backend,counts,originalRoot}=app;
+ assert.equal(backend.CS.errorCode,'corrupt-generation');assert.equal(backend.CS.knownDamagedSource,true);
+ const initialReads=counts.reads,originalCloud=JSON.stringify([...backend.docs]),writes=backend.writes.length,byAction=[];
+ assert.ok(initialReads>0);ctx.window.CLOUD_PUSH_DELAY_MS=0;
+ const settle=async()=>{assert.equal(await ctx.persist(),true);await fixtureDeadline((async()=>{for(;;){await syncSettle(5);if(!vm.runInContext('pulling||cloudPushInFlight||cloudTimer!==null',ctx))break;}})(),'no-ACK accepted action is durably saved');assert.equal((await ctx.window.ScannerDeviceStore.readHead()).payload,JSON.stringify(ctx.state));byAction.push(counts.reads-initialReads);};
+ shim.document.getElementById('addInput').value='Another local task after a held no-ACK pull';await ctx.onAction('add',{});await settle();
+ ctx.onAction('start-scan',{dataset:{mode:'descending'}});await settle();
+ const candidate=ctx.state.candidateId,benchmark=ctx.state.chain.at(-1);assert.ok(candidate&&benchmark);ctx.onAction('no',{dataset:{candidate,benchmark}});await settle();assert.equal(ctx.state.considered[candidate],'no');
+ const done=ctx.state.chain.at(-1);ctx.onAction('bench-done',{dataset:{benchmark:done}});await settle();assert.equal(ctx.state.tasks.find(row=>row.id===done).done,true);
+ assert.equal(JSON.stringify([...backend.docs]),originalCloud);assert.equal(backend.writes.length,writes);assert.equal(ctx.state.syncDirty,true);assert.ok(ctx.state.tasks.some(row=>row.title==='Newer local task without an ACK export'));
+ t.diagnostic('No-ACK additional unchanged-source SDK reads: '+JSON.stringify(byAction));
+ assert.equal(counts.reads,initialReads,'absence of an exact ACK cannot restart the same corrupt-source read for each accepted local edit');
+ await ctx.onAction('sync-retry',{});assert.ok(counts.reads>initialReads,'explicit Retry remains live without an ACK');
+ const healthyPayload=ctx.cloudPayload(),healthy=await ctx.window.ChainStorageV2.encodeSnapshot(healthyPayload),newId='healthy-peer-after-no-ack-hold';
+ backend.docs.set('users/owner/generations/'+newId,{...healthy,state:'published',baseRev:originalRoot.rev});for(const chunk of healthy.chunks)backend.docs.set('users/owner/generations/'+newId+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
+ backend.docs.set('users/owner',{...originalRoot,rev:originalRoot.rev+1,activeGeneration:newId,previousGeneration:originalRoot.activeGeneration});shim.window.dispatchEvent(new ctx.CustomEvent('cloudboardchange',{detail:{user:backend.CS.user,rev:originalRoot.rev+1}}));
+ await fixtureDeadline((async()=>{while(ctx.state.syncRev<originalRoot.rev+1||ctx.state.syncDirty)await syncSettle(10);})(),'new server revision resumes a no-ACK source hold');assert.equal(ctx.state.tasks.find(row=>row.id===done).done,true);assert.ok(ctx.state.tasks.some(row=>row.title==='Another local task after a held no-ACK pull'));
+});
+
+test('RISK lossless cloud recovery: an exact current board repairs missing chunks without a historical ACK',{timeout:20000},async t=>{
+ const app=await coldDamagedSourceWithoutAck214(t),{ctx,shim,backend,originalRoot,originalHeader,raw,indexedDB,deviceDbName}=app;
+ const recovered=await settleRecovery188(app);assert.ok(recovered.remote.rev>originalRoot.rev,'independently matching current bytes permit automatic exact-source reconstruction');
+ const original=JSON.parse(raw),saved=JSON.parse(recovered.remote.payload);assert.deepEqual(saved.tasks,original.tasks);assert.deepEqual(saved.futureIOSReportFixture,original.futureIOSReportFixture);assert.deepEqual(ctx.retainedDecisionFacts(saved),ctx.retainedDecisionFacts(original));
+ assert.equal(JSON.stringify(backend.docs.get('users/owner/generations/'+originalRoot.activeGeneration)),JSON.stringify(originalHeader),'the damaged generation header remains available as an exact original');
+ assert.equal([...backend.docs.keys()].some(key=>key.startsWith('users/owner/generations/'+originalRoot.activeGeneration+'/chunks/')),false,'repair publishes a new complete generation rather than rewriting the original');
+ const graph=await ctx.window.ScannerDeviceStore.readRawExportSnapshot(),containsOriginal=value=>value===raw||value&&typeof value==='object'&&Object.values(value).some(containsOriginal);assert.ok(containsOriginal(graph)||[SYNC_STORE_KEY,LOCAL_HEAD_KEY].some(key=>shim.localStorage.getItem(key)===raw),'the exact original remains retained locally');
+ shim.document.getElementById('addInput').value='New work after exact no-ACK repair';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);await ctx.sendPush();await fixtureDeadline((async()=>{while(vm.runInContext('pulling||cloudPushInFlight',ctx))await syncSettle(5);})(),'post-repair native edit settles before ACK verification');const final=await settleRecovery188(app);assert.ok(JSON.parse(final.remote.payload).tasks.some(row=>row.title==='New work after exact no-ACK repair'));
+ const finalHead=final.head.payload;await closeLegacyApp173(app);backend.CS.suspend();const cold=await loadAppAtTime(1792323000000,{sharedStorage:shim.localStorage,indexedDBProvider:indexedDB,deviceDbName,cloudSyncFactory:()=>({configured:false,ready:false,user:null,status:'off'})});t.after(()=>cold.dispose());assert.equal(JSON.stringify(cold.ctx.state),finalHead);assert.equal((await cold.ctx.window.ScannerDeviceStore.readHead()).payload,finalHead,'real cold reopen retains the repaired ACK and subsequent accepted task');
+});
+
 test('RISK corrupt cloud work budget: a failed exact-source read does not permanently hold a later repair',async t=>{
  const app=await damagedAcknowledgedApp187(t),{ctx,shim,backend,originalRoot}=app;let roots=0,failed=false;
  app.faults.serverRead=async path=>{if(path==='users/owner'&&++roots===3){failed=true;throw Object.assign(Error('Synthetic transient exact-source read'),{code:'unavailable'});}};

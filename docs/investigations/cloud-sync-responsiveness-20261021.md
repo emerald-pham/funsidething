@@ -26,6 +26,12 @@ Baseline: `c677724ded14b4c4519975c57a81f028283b08ff`.
    of the unchanged current and previous sources. Four local actions caused 40
    extra reads, without advancing the cloud revision or repairing it. The normal
    save-to-push path bypassed the existing finite network retry policy.
+4. A supported cold-opened export has no private acknowledgement payload. That
+   branch also repeated four SDK reads per edit, even when no exact copy could
+   repair the source. When its current bytes did match the published hash, the
+   early acknowledgement requirement still refused automatic reconstruction.
+   A fresh consumer pair reproduced both gaps after the first candidate passed
+   its full suite; independent specialist review identified the missing branch.
 
 ## Repairs and preservation
 
@@ -35,13 +41,17 @@ calculation remains the fallback; numerical tails use direct calculation. Saved
 scan draws, ranking rules, decision facts and cloud formats remain unchanged.
 A source with no frozen draw no longer computes unused saved-pass weights.
 
-After a complete, current check proves that the acknowledged copy differs from
-the corrupt generation, ordinary local edits remain pending without downloading
-both generations again. An unavailable inspection does not establish that
+After a complete, current check finds no exact acknowledged or current-board
+copy of the corrupt generation, ordinary local edits remain pending without
+downloading both generations again. A local byte/hash check can recognize a
+newly exact current candidate without repeating network work. An unavailable inspection does not establish that
 negative result and still permits later exact-copy repair. Explicit Retry,
 foreground recovery and a newer server revision still perform fresh guarded
 reads. An exact acknowledged-copy repair still uses the existing validated,
-source-preserving conditional publication. Other sources require an explicit
+source-preserving conditional publication. A supported current board with the
+same published UTF-8 length and hash now uses those same protection, identity,
+pending-intent and publication guards even without a historical acknowledgement.
+A different hash never grants repair authority. Other sources require an explicit
 choice. No older source is silently adopted and no original source is erased.
 
 Permanent consumer regressions in `tests.js` cover the three-action interaction
@@ -56,7 +66,13 @@ The independently observed unchanged-source read-budget RED remains valid.
 
 ## Evidence and limits
 
-Contemporaneous REDs were recorded before each repair. The local candidate cut
+Contemporaneous REDs were recorded before each repair. The no-acknowledgement
+consumer pair first failed to clone synthetic SDK timestamp functions; that
+fixture failure was corrected before runtime edits. Its real RED observed
+20 reads versus 4 and failure to reach a repaired cloud acknowledgement. The
+first repaired positive passed reconstruction but used the wrong clock for
+its final cold reopen; the corrected fixture retains full-state assertions at
+the same test time. These intermediate failures remain in external evidence. The local candidate cut
 three Yes controls to about 0.88 seconds and three Done controls to about 0.85
 seconds, and cut the four unchanged-source action batches to zero additional
 SDK reads. These are local Node measurements, not calibrated iPhone budgets,
