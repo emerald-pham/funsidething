@@ -247,3 +247,29 @@ test('concealed index states cannot qualify working tests that differ from the c
     assert.equal(git(f.repo,'status','--porcelain','--untracked-files=all'),'','qualification must not mutate index flag semantics');
   });
 });
+
+test('topic handoff does not follow annotated tags even when the local push configuration enables it',t=>{
+  const f=fixture(t);git(f.repo,'tag','-a','unrequested-release','-m','local-only release annotation',f.sha);
+  git(f.repo,'commit','--allow-empty','-m','topic candidate');git(f.repo,'config','push.followTags','true');
+  const result=invoke(f);assert.equal(result.status,0,result.stderr);
+  assert.equal(git(f.root,'--git-dir',f.remote,'for-each-ref','--format=%(refname)','refs/tags'),'','the ordinary topic push must not publish a release tag');
+  assert.equal(git(f.repo,'config','--get','push.followTags'),'true','task push flags preserve local Git preferences');
+  assert.equal(readFileSync(f.hookCalls,'utf8'),'hook accepted\n','normal pre-push gate still executes');
+});
+
+test('topic handoff does not automatically push changed submodule refs',t=>{
+  const f=fixture(t),seed=path.join(f.root,'sub-seed'),subRemote=path.join(f.root,'sub-remote.git');
+  mkdirSync(seed);git(seed,'init','-b','main');git(seed,'config','user.email','fixture@example.invalid');git(seed,'config','user.name','Fixture');
+  writeFileSync(path.join(seed,'source'),'initial');git(seed,'add','.');git(seed,'commit','-m','submodule baseline');
+  const initial=git(seed,'rev-parse','HEAD');git(f.root,'clone','--bare',seed,subRemote);
+  git(f.repo,'-c','protocol.file.allow=always','submodule','add',subRemote,'deps/fixture');
+  const sub=path.join(f.repo,'deps/fixture');git(sub,'config','user.email','fixture@example.invalid');git(sub,'config','user.name','Fixture');
+  writeFileSync(path.join(sub,'source'),'local child revision');git(sub,'add','.');git(sub,'commit','-m','local-only child revision');
+  git(f.repo,'add','.gitmodules','deps/fixture');git(f.repo,'commit','-m','topic candidate references local submodule');
+  git(f.repo,'config','push.recurseSubmodules','on-demand');
+  const result=invoke(f);
+  if(result.status!==0){const attempt=readdirSync(f.evidence)[0];console.log(readFileSync(path.join(f.evidence,attempt,'push.log'),'utf8'));}
+  assert.equal(result.status,0,result.stderr);
+  assert.equal(git(f.root,'--git-dir',subRemote,'rev-parse','refs/heads/main'),initial,'only the explicit topic ref may be published');
+  assert.equal(git(f.repo,'config','--get','push.recurseSubmodules'),'on-demand');
+});
