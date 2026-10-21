@@ -952,7 +952,18 @@ test('RISK cloud source inspection: native asynchronous updates retain focus dis
  const {chromium}=await import('playwright'),sdk=await import('./scripts/installed-client-fixture.mjs'),browser=await chromium.launch({headless:true}),context=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'block',reducedMotion:'reduce'}),page=await context.newPage();
  const current=deferredSyncFixture(),previous=deferredSyncFixture(),finalRoot=deferredSyncFixture(),freshFinalRoot=deferredSyncFixture(),raw=JSON.stringify(sdk.fixture('reconcile-held')),encoded=await loadStorageV2().encodeSnapshot(raw),{chunks,...header}=encoded,remote=new Map([['users/owner',{schemaVersion:2,rev:4,activeGeneration:'held-current',previousGeneration:'received-previous'}],['users/owner/generations/held-current',{...header,hash:'f'.repeat(64),state:'published',baseRev:3}],['users/owner/generations/received-previous',{...header,state:'published',baseRev:2}],...chunks.map(c=>['users/owner/generations/received-previous/chunks/'+String(c.index).padStart(8,'0'),c])]);
  const origin='https://recovery-inspection.invalid',prefix='/synthetic-sdk/';let armed=false,previousEntered=false,freshFinalEntered=false,roots=0;
- t.after(async()=>{try{await page.evaluate(()=>closeModal());}catch{}current.resolve();previous.resolve();finalRoot.resolve();freshFinalRoot.resolve();await context.close();await browser.close();});
+ t.after(async()=>{
+  try{
+   const trace=await page.evaluate(async()=>{
+    const trace=window.__pr228ScrollTrace;if(!trace)return null;
+    trace.sample('teardown-immediate');
+    await new Promise(resolve=>requestAnimationFrame(()=>{trace.sample('teardown-frame-1');requestAnimationFrame(()=>{trace.sample('teardown-frame-2');resolve();});}));
+    trace.mutations.disconnect();trace.resize.disconnect();
+    return {snapshots:trace.snapshots,events:trace.events,observerEffect:'Geometry reads can force layout; original two uninstrumented Linux failures are preserved separately.'};
+   });
+   if(trace){const report={platform:process.platform,node:process.version,browser:browser.version(),...trace};console.log('[DEBUG-pr228-scroll] '+JSON.stringify(report));if(process.env.CHAIN_NATIVE_OUTPUT){fs.mkdirSync(process.env.CHAIN_NATIVE_OUTPUT,{recursive:true});fs.writeFileSync(path.join(process.env.CHAIN_NATIVE_OUTPUT,'pr228-scroll-trace.json'),JSON.stringify(report,null,2)+'\n');}}
+  }finally{try{await page.evaluate(()=>closeModal());}catch{}current.resolve();previous.resolve();finalRoot.resolve();freshFinalRoot.resolve();await context.close();await browser.close();}
+ });
  await context.exposeBinding('__installedRPC',async(_,kind,args)=>{const key=args?.[0];if(armed&&kind==='get'&&key==='users/owner'&&++roots>1){await finalRoot.promise;if(roots===4){freshFinalEntered=true;await freshFinalRoot.promise;}}if(armed&&kind==='list'&&key.endsWith('/held-current/chunks'))await current.promise;if(armed&&kind==='list'&&key.endsWith('/received-previous/chunks')){previousEntered=true;await previous.promise;}if(kind==='get')return structuredClone(remote.get(key)??null);if(kind==='list')return [...remote].filter(([id])=>id.startsWith(key+'/'));if(kind==='apply')throw Error('Unexpected recovery inspection write');throw Error('Unexpected fixture RPC');});
  await context.addInitScript(sdk.browserInit,{dbName:'native-inspection-'+Math.random(),authMode:'reconcile-held',sdkBase:origin+prefix});
  await context.addInitScript(raw=>{localStorage.setItem('fvp:chain-scanner:v1',raw);localStorage.setItem('fvp:chain-scanner:protected:v1',raw);localStorage.setItem('fvp:chain-scanner:daily-backups:v1','[]');},raw);
@@ -969,9 +980,40 @@ test('RISK cloud source inspection: native asynchronous updates retain focus dis
  assert.equal(after.sameControl,true,'an asynchronously received source must preserve the mounted keyboard-focused Cancel control');assert.equal(after.open,true,'receiving a cloud source must not close an opened device-source disclosure');assert.equal(after.scroll,before.scroll,'inspection updates must retain the reader’s scroll position');assert.equal(await page.locator('[data-act="choose-cloud-recovery-source"]').count(),0);
  const summary=page.locator('[data-cloud-source-inspection] summary').first();await summary.click();await summary.focus();const receivedBefore=await page.evaluate(()=>{const modal=document.querySelector('#modalRoot .modal');modal.scrollTop=400;window.__receivedSummary=document.activeElement;return modal.scrollTop;});current.resolve();await page.locator('[data-cloud-source-inspection] h4').filter({hasText:'Current cloud source'}).waitFor();
  const receivedAfter=await page.evaluate(()=>({same:document.activeElement===window.__receivedSummary,open:window.__receivedSummary.closest('details').open,scroll:document.querySelector('#modalRoot .modal').scrollTop}));assert.equal(receivedAfter.same,true,'a second source result preserves the already mounted focused received-copy summary');assert.equal(receivedAfter.open,true);assert.equal(receivedAfter.scroll,receivedBefore);
+ await page.evaluate(()=>{
+  const modal=document.querySelector('#modalRoot .modal'),progress=modal.querySelector('[data-cloud-source-progress]'),inspection=modal.querySelector('[data-cloud-source-inspection]'),device=modal.querySelector('[data-cloud-source-readonly]'),summary=window.__receivedSummary;
+  const box=node=>{const r=node.getBoundingClientRect();return {top:r.top,bottom:r.bottom,left:r.left,right:r.right,height:r.height,contentTop:r.top-modal.getBoundingClientRect().top+modal.scrollTop};};
+  const initialModal=box(modal),anchors=[];
+  const walker=document.createTreeWalker(modal,NodeFilter.SHOW_TEXT);
+  while(walker.nextNode()&&anchors.length<8){
+   const node=walker.currentNode;if(!node.textContent.trim()||!node.parentElement.closest('[data-cloud-source-readonly], [data-cloud-source-inspection]'))continue;
+   const range=document.createRange();range.selectNodeContents(node);const rect=range.getBoundingClientRect();
+   if(rect.bottom>initialModal.top+8&&rect.top<initialModal.bottom-8&&rect.height>0)anchors.push({node,range,text:node.textContent,initialParent:node.parentElement,group:node.parentElement.closest('[data-cloud-source-readonly], [data-cloud-source-inspection-id]')});
+  }
+  const oldItems=[...modal.querySelectorAll('[data-cloud-source-readonly] li, [data-cloud-source-inspection] li')];
+  const trace=window.__pr228ScrollTrace={snapshots:[],events:[]};
+  trace.sample=label=>{
+   if(trace.snapshots.length>=24||(['mutation','resize'].includes(label)&&trace.snapshots.length>=16))return;
+   const style=getComputedStyle(progress);
+   trace.snapshots.push({label,time:performance.now(),scrollTop:modal.scrollTop,scrollHeight:modal.scrollHeight,clientHeight:modal.clientHeight,maxScroll:modal.scrollHeight-modal.clientHeight,modal:box(modal),progress:{text:progress.textContent,box:box(progress),fontFamily:style.fontFamily,fontSize:style.fontSize,lineHeight:style.lineHeight},device:box(device),inspection:box(inspection),summary:{connected:summary.isConnected,same:summary===document.activeElement,open:summary.closest('details')?.open,box:box(summary)},headings:[...inspection.querySelectorAll('h4')].map(n=>({text:n.textContent,box:box(n)})),oldItems:{total:oldItems.length,connected:oldItems.filter(n=>n.isConnected).length,receivedConnected:oldItems.filter(n=>n.isConnected&&n.closest('[data-cloud-source-inspection]')).length},anchors:anchors.map(({node,range,text,initialParent,group})=>{
+    const walker=document.createTreeWalker(group,NodeFilter.SHOW_TEXT);let logical=null;
+    while(walker.nextNode())if(walker.currentNode.textContent===text){logical=walker.currentNode;break;}
+    const logicalRange=document.createRange();if(logical)logicalRange.selectNodeContents(logical);
+    return {text:text.slice(0,80),group:group.dataset.cloudSourceInspectionId||'device',unchanged:node.textContent===text,connected:node.isConnected,sameParent:node.parentElement===initialParent,box:node.isConnected?box(range):null,logicalFound:!!logical,logicalSameNode:logical===node,logicalBox:logical?box(logicalRange):null};
+   })});
+  };
+  trace.sample('before-final-root');
+  trace.mutations=new MutationObserver(records=>{
+   if(trace.events.length<24)trace.events.push({type:'mutation',time:performance.now(),changes:records.slice(0,12).map(r=>({type:r.type,target:r.target.nodeType===Node.TEXT_NODE?'text':r.target.tagName,added:r.addedNodes.length,removed:r.removedNodes.length}))});
+   trace.sample('mutation');
+  });
+  trace.mutations.observe(modal,{subtree:true,childList:true,characterData:true});
+  trace.resize=new ResizeObserver(entries=>{if(trace.events.length<24)trace.events.push({type:'resize',time:performance.now(),targets:entries.map(e=>e.target===modal?'modal':e.target===progress?'progress':e.target===device?'device':'inspection')});trace.sample('resize');});
+  for(const node of [modal,progress,device,inspection])trace.resize.observe(node);
+ });
  remote.set('users/owner',{schemaVersion:2,rev:5,activeGeneration:'received-previous',previousGeneration:'held-current'});finalRoot.resolve();const freshBy=Date.now()+3000;while(Date.now()<freshBy&&!freshFinalEntered)await flush();assert.equal(freshFinalEntered,true,'the changed manifest reaches its fresh capture with independently received copies');
  assert.equal(await page.locator('[data-cloud-source-inspection-id="received-previous"] h4').textContent(),'Current cloud source','a promoted received generation must show its current manifest role');assert.equal(await page.locator('[data-cloud-source-inspection-id="held-current"] h4').textContent(),'Previous cloud source','a demoted received generation must not retain a second Current heading');
- const refreshed=await page.evaluate(()=>({same:document.activeElement===window.__receivedSummary,open:window.__receivedSummary.closest('details').open,scroll:document.querySelector('#modalRoot .modal').scrollTop}));assert.equal(refreshed.same,true);assert.equal(refreshed.open,true);assert.equal(refreshed.scroll,receivedBefore);assert.equal(await page.locator('[data-act="choose-cloud-recovery-source"]').count(),0);
+ const refreshed=await page.evaluate(()=>({same:(window.__pr228ScrollTrace.sample('after-role-heading-waits'),document.activeElement===window.__receivedSummary),open:window.__receivedSummary.closest('details').open,scroll:document.querySelector('#modalRoot .modal').scrollTop}));assert.equal(refreshed.same,true);assert.equal(refreshed.open,true);assert.equal(refreshed.scroll,receivedBefore);assert.equal(await page.locator('[data-act="choose-cloud-recovery-source"]').count(),0);
 });
 
 test('RISK cloud source states: retry and terminal explanations never substitute raw SDK details',async t=>{
