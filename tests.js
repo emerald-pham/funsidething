@@ -957,12 +957,13 @@ test('RISK cloud source inspection: native asynchronous updates retain focus dis
    const trace=await page.evaluate(async()=>{
     const trace=window.__pr228ScrollTrace;if(!trace)return null;
     trace.sample('teardown-immediate');
-    await new Promise(resolve=>requestAnimationFrame(()=>{trace.sample('teardown-frame-1');requestAnimationFrame(()=>{trace.sample('teardown-frame-2');resolve();});}));
-    trace.mutations.disconnect();trace.resize.disconnect();
+    let frameTimer;
+    try{await Promise.race([new Promise(resolve=>requestAnimationFrame(()=>{trace.sample('teardown-frame-1');requestAnimationFrame(()=>{trace.sample('teardown-frame-2');resolve();});})),new Promise((_,reject)=>{frameTimer=setTimeout(()=>reject(Error('Diagnostic frame limit exceeded')),1000);})]);}
+    finally{clearTimeout(frameTimer);trace.mutations.disconnect();trace.resize.disconnect();trace.modal.removeEventListener('scroll',trace.scroll);}
     return {snapshots:trace.snapshots,events:trace.events,observerEffect:'Geometry reads can force layout; original two uninstrumented Linux failures are preserved separately.'};
    });
    if(trace){const report={platform:process.platform,node:process.version,browser:browser.version(),...trace};console.log('[DEBUG-pr228-scroll] '+JSON.stringify(report));if(process.env.CHAIN_NATIVE_OUTPUT){fs.mkdirSync(process.env.CHAIN_NATIVE_OUTPUT,{recursive:true});fs.writeFileSync(path.join(process.env.CHAIN_NATIVE_OUTPUT,'pr228-scroll-trace.json'),JSON.stringify(report,null,2)+'\n');}}
-  }finally{try{await page.evaluate(()=>closeModal());}catch{}current.resolve();previous.resolve();finalRoot.resolve();freshFinalRoot.resolve();await context.close();await browser.close();}
+  }catch(error){console.log('[DEBUG-pr228-scroll] '+JSON.stringify({diagnosticInvalid:true,error:String(error.message).slice(0,300)}));}finally{try{await page.evaluate(()=>closeModal());}catch{}current.resolve();previous.resolve();finalRoot.resolve();freshFinalRoot.resolve();await context.close();await browser.close();}
  });
  await context.exposeBinding('__installedRPC',async(_,kind,args)=>{const key=args?.[0];if(armed&&kind==='get'&&key==='users/owner'&&++roots>1){await finalRoot.promise;if(roots===4){freshFinalEntered=true;await freshFinalRoot.promise;}}if(armed&&kind==='list'&&key.endsWith('/held-current/chunks'))await current.promise;if(armed&&kind==='list'&&key.endsWith('/received-previous/chunks')){previousEntered=true;await previous.promise;}if(kind==='get')return structuredClone(remote.get(key)??null);if(kind==='list')return [...remote].filter(([id])=>id.startsWith(key+'/'));if(kind==='apply')throw Error('Unexpected recovery inspection write');throw Error('Unexpected fixture RPC');});
  await context.addInitScript(sdk.browserInit,{dbName:'native-inspection-'+Math.random(),authMode:'reconcile-held',sdkBase:origin+prefix});
@@ -988,14 +989,14 @@ test('RISK cloud source inspection: native asynchronous updates retain focus dis
   while(walker.nextNode()&&anchors.length<8){
    const node=walker.currentNode;if(!node.textContent.trim()||!node.parentElement.closest('[data-cloud-source-readonly], [data-cloud-source-inspection]'))continue;
    const range=document.createRange();range.selectNodeContents(node);const rect=range.getBoundingClientRect();
-   if(rect.bottom>initialModal.top+8&&rect.top<initialModal.bottom-8&&rect.height>0)anchors.push({node,range,text:node.textContent,initialParent:node.parentElement,group:node.parentElement.closest('[data-cloud-source-readonly], [data-cloud-source-inspection-id]')});
+   if(rect.top>=initialModal.top+8&&rect.bottom<=initialModal.bottom-8&&rect.height>0)anchors.push({node,range,text:node.textContent,initialParent:node.parentElement,group:node.parentElement.closest('[data-cloud-source-readonly], [data-cloud-source-inspection-id]')});
   }
   const oldItems=[...modal.querySelectorAll('[data-cloud-source-readonly] li, [data-cloud-source-inspection] li')];
-  const trace=window.__pr228ScrollTrace={snapshots:[],events:[]};
+  const trace=window.__pr228ScrollTrace={snapshots:[],events:[],modal};
   trace.sample=label=>{
    if(trace.snapshots.length>=24||(['mutation','resize'].includes(label)&&trace.snapshots.length>=16))return;
    const style=getComputedStyle(progress);
-   trace.snapshots.push({label,time:performance.now(),scrollTop:modal.scrollTop,scrollHeight:modal.scrollHeight,clientHeight:modal.clientHeight,maxScroll:modal.scrollHeight-modal.clientHeight,modal:box(modal),progress:{text:progress.textContent,box:box(progress),fontFamily:style.fontFamily,fontSize:style.fontSize,lineHeight:style.lineHeight},device:box(device),inspection:box(inspection),summary:{connected:summary.isConnected,same:summary===document.activeElement,open:summary.closest('details')?.open,box:box(summary)},headings:[...inspection.querySelectorAll('h4')].map(n=>({text:n.textContent,box:box(n)})),oldItems:{total:oldItems.length,connected:oldItems.filter(n=>n.isConnected).length,receivedConnected:oldItems.filter(n=>n.isConnected&&n.closest('[data-cloud-source-inspection]')).length},anchors:anchors.map(({node,range,text,initialParent,group})=>{
+   trace.snapshots.push({label,time:performance.now(),fonts:{status:document.fonts.status,faces:[...document.fonts].slice(0,8).map(font=>({family:font.family,status:font.status}))},scrollTop:modal.scrollTop,scrollHeight:modal.scrollHeight,clientHeight:modal.clientHeight,maxScroll:modal.scrollHeight-modal.clientHeight,modal:box(modal),progress:{text:progress.textContent,box:box(progress),fontFamily:style.fontFamily,fontSize:style.fontSize,lineHeight:style.lineHeight},device:box(device),inspection:box(inspection),summary:{connected:summary.isConnected,same:summary===document.activeElement,open:summary.closest('details')?.open,box:box(summary)},headings:[...inspection.querySelectorAll('h4')].map(n=>({text:n.textContent,box:box(n)})),oldItems:{total:oldItems.length,connected:oldItems.filter(n=>n.isConnected).length,receivedConnected:oldItems.filter(n=>n.isConnected&&n.closest('[data-cloud-source-inspection]')).length},anchors:anchors.map(({node,range,text,initialParent,group})=>{
     const walker=document.createTreeWalker(group,NodeFilter.SHOW_TEXT);let logical=null;
     while(walker.nextNode())if(walker.currentNode.textContent===text){logical=walker.currentNode;break;}
     const logicalRange=document.createRange();if(logical)logicalRange.selectNodeContents(logical);
@@ -1003,6 +1004,8 @@ test('RISK cloud source inspection: native asynchronous updates retain focus dis
    })});
   };
   trace.sample('before-final-root');
+  trace.scroll=()=>{if(trace.events.length<24)trace.events.push({type:'scroll',time:performance.now(),scrollTop:modal.scrollTop});};
+  modal.addEventListener('scroll',trace.scroll,{passive:true});
   trace.mutations=new MutationObserver(records=>{
    if(trace.events.length<24)trace.events.push({type:'mutation',time:performance.now(),changes:records.slice(0,12).map(r=>({type:r.type,target:r.target.nodeType===Node.TEXT_NODE?'text':r.target.tagName,added:r.addedNodes.length,removed:r.removedNodes.length}))});
    trace.sample('mutation');
