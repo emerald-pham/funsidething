@@ -31,6 +31,7 @@ function options(args) {
 function sourceIdentity(repo) {
   const branch = git(repo,'symbolic-ref','--quiet','HEAD');
   if (['refs/heads/main','refs/heads/master'].includes(branch)) reject('Use an attached topic checkout.');
+  if(git(repo,'ls-files','-v','-z').split('\0').some(entry=>/^[a-zS] /.test(entry)))reject('Qualification requires no assume-unchanged or skip-worktree index flags.');
   if (git(repo,'status','--porcelain','--untracked-files=all')) reject('Candidate worktree must be clean.');
   return { branch, commit: git(repo,'rev-parse','HEAD'), tree: git(repo,'rev-parse','HEAD^{tree}') };
 }

@@ -43,7 +43,8 @@ Only explicitly source-declared, currently non-applicable environment cases can
 be skipped in the main test command. The existing required native process
 contract must complete exactly once; its own validator retains both case and
 artifact checks. Required rules and compatibility outcomes remain mandatory.
-Dirty state, revision/configuration changes, incomplete/nonzero/cancelled output,
+Assume-unchanged and skip-worktree index flags reject qualification without
+changing the index. Dirty state, revision/configuration changes, incomplete/nonzero/cancelled output,
 missing required results and GitHub skip-CI messages reject qualification.
 
 A published revision is not remote CI success. `remoteCi` remains `unobserved`;
