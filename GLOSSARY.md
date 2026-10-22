@@ -60,3 +60,11 @@ _Avoid_: Synced badge
 
 **History basis memo**:
 One exact serialized numeric-input/result pair reused between matching History observations. Inputs are rebuilt before every lookup; their combined retained strings stay within256Ki UTF-16 units. It retains no task, board or validation graph and grants no cloud authority.
+
+**Saved-draw fingerprint reuse**:
+A bounded mapping from exact primitive input strings to results of the original
+hash calculator. Squared scores and display read current weights and other
+inputs each time. Retention is at most 2,048 keys and 256 Ki UTF-16 input units;
+changed calculators, Math or string methods, accessors, nonprimitive and
+oversized inputs use the ordinary calculation. It retains no saved object or
+source-validation result.

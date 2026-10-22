@@ -9601,7 +9601,7 @@ test("passStartedAt: resuming a paused scan does NOT re-stamp the pass", async (
   ctx.addTask("A", false);
   ctx.addTask("B", false);
   ctx.addTask("C", false);
-  const t0 = realNow(ctx);
+  const t0 = localAt(30, 12, 0);
   setFakeTime(ctx, t0);
   ctx.startScan('descending');                                  // begins the pass, stamps t0
   assert.equal(ctx.state.passStartedAt, t0);
@@ -40989,4 +40989,65 @@ test('RISK saved chance shape preservation: opponent key order enumerability and
  for(const opponent of [Object.assign(Object.create({id:'a',mu:25}),{'id,mu':0,sigma:8}),Object.assign(Object.create({id:'a',mu:25,sigma:8}),{'id,mu,sigma':0})])assert.equal(supported(opponent),true,'released comma-joined legacy key boundaries remain supported');
  for(const opponent of [null,[],{id:'a',mu:25},{id:'a',mu:25,sigma:8,future:true},{id:'a',mu:Infinity,sigma:8},{id:'a',mu:25,sigma:0},{id:'a',mu:25,sigma:NaN},{id:'__proto__',mu:25,sigma:8}])assert.equal(supported(opponent),false,'partial future or invalid evidence stays unsupported');
  assert.equal(ctx.currentChoiceChanceSnapshotSupported({at:1,seed:'saved-draw',weights:{a:.5},opponents:[{id:'a',mu:25,sigma:8},{id:'a',mu:26,sigma:7}]}),false,'duplicate opponents still refuse the saved source');
+});
+
+test('RISK saved-draw work budget: repeated squared scores and display reuse exact fingerprints without changing current calculations',async t=>{
+ const prefix='"use strict";globalThis.drawHashWork=0;globalThis.drawOriginalImul=Math.imul;Math.imul=function(...args){drawHashWork++;return drawOriginalImul.apply(this,args);};globalThis.drawBootImul=Math.imul;\n';
+ const app=await loadApp({appSource:prefix+appSrc,seed:320});t.after(()=>app.dispose());const {ctx}=app;
+ const a=ctx.addTask('Repeated draw first'),b=ctx.addTask('Repeated draw second');ctx.resetChance();
+ ctx.state.chance.seed='work-budget-fresh-draw';const scale=ctx.squaredScale(ctx.state.chance);
+ const expected=ctx.squaredScore(a,scale);ctx.state.chance.seed+='-unseen';
+ vm.runInContext('drawHashWork=0',ctx);const first=ctx.squaredScore(a,scale),work=vm.runInContext('drawHashWork',ctx);
+ assert.ok(work>0,'a new seed and task fingerprint uses the existing hash algorithm');
+ assert.equal(ctx.squaredScore(a,scale),first);
+ assert.equal(vm.runInContext('drawHashWork',ctx),work,'an unchanged saved-draw fingerprint must not be hashed again for each score');
+ const stats=ctx.chanceDisplayStats('squared'),displayWork=vm.runInContext('drawHashWork',ctx);
+ assert.deepEqual(JSON.parse(JSON.stringify([...ctx.chanceDisplayStats('squared')])),JSON.parse(JSON.stringify([...stats])));
+ assert.equal(vm.runInContext('drawHashWork',ctx),displayWork,'displaying the same saved draw reuses its exact numeric fingerprints');
+ assert.ok(Number.isFinite(expected)&&Number.isFinite(first));assert.notEqual(a.id,b.id);
+});
+
+test('RISK saved-draw fingerprint preservation: bounded reuse follows exact inputs and current hash math and string methods',async t=>{
+ const prefix='"use strict";globalThis.drawHashWork=0;globalThis.drawOriginalImul=Math.imul;Math.imul=function(...args){drawHashWork++;return drawOriginalImul.apply(this,args);};globalThis.drawBootImul=Math.imul;\n';
+ const app=await loadApp({appSource:prefix+appSrc,seed:321});t.after(()=>app.dispose());const {ctx}=app;
+ const compute=text=>ctx.displayDrawHash(text),oracle=text=>ctx.chanceHash(text),work=()=>vm.runInContext('drawHashWork',ctx);
+ for(const text of ['', 'a', 'draw:task', '\u0000😀café\ud800', 'seed:with:colons:task'])assert.equal(compute(text),oracle(text),'exact UTF-16 inputs retain the original unsigned hash');
+ const task=ctx.addTask('Fresh draw weight');ctx.resetChance();ctx.state.chance.seed='preserved-draw';
+ const expected=scale=>-Math.log((oracle(ctx.state.chance.seed+':'+task.id)+.5)/4294967296)/((ctx.state.chance.weights[task.id]/scale)**2);
+ for(const [seed,id,weight,scale]of [['preserved-draw',task.id,.5,1],['changed-draw',task.id,.25,1],['changed-draw',task.id+'-new',.75,2]]){
+  ctx.state.chance.seed=seed;task.id=id;ctx.state.chance.weights[id]=weight;assert.equal(ctx.squaredScore(task,scale),expected(scale),'seed, task, weight and scale remain fresh score inputs');
+ }
+ const key='current-calculator';compute(key);
+ vm.runInContext('globalThis.drawSavedHash=chanceHash;globalThis.drawCustomCalls=0;chanceHash=()=>{drawCustomCalls++;return 31;}',ctx);
+ assert.equal(compute(key),31);assert.equal(compute(key),31);assert.equal(vm.runInContext('drawCustomCalls',ctx),2,'replacement hashes run for every call');
+ vm.runInContext('chanceHash=drawSavedHash;Math.imul=function(...args){return drawBootImul.apply(this,args);}',ctx);
+ for(let i=0;i<2;i++){const value=oracle(key),before=work();assert.equal(compute(key),value);assert.ok(work()>before,'changed Math methods bypass retained values');}
+ vm.runInContext('Math.imul=drawBootImul;globalThis.drawBootMath=Math;Math=Object.create(Math)',ctx);
+ for(let i=0;i<2;i++){const value=oracle(key),before=work();assert.equal(compute(key),value);assert.ok(work()>before,'changed Math namespaces bypass retained values');}
+ vm.runInContext('Math=drawBootMath;globalThis.drawBootCodeUnit=String.prototype.charCodeAt;String.prototype.charCodeAt=function(index){return drawBootCodeUnit.call(this,index)^1;}',ctx);
+ for(let i=0;i<2;i++){const value=oracle(key),before=work();assert.equal(compute(key),value);assert.ok(work()>before,'changed string methods bypass retained values');}
+ vm.runInContext('String.prototype.charCodeAt=drawBootCodeUnit',ctx);
+ let codes=0;const object={length:3,charCodeAt(i){codes++;return 65+i;}};const objectExpected=oracle(object);codes=0;
+ assert.equal(compute(object),objectExpected);assert.equal(compute(object),objectExpected);assert.equal(codes,6,'nonprimitive inputs keep their ordinary per-call behavior');
+ vm.runInContext('globalThis.drawImulDescriptor=Object.getOwnPropertyDescriptor(Math,"imul");globalThis.drawImulGets=0;Object.defineProperty(Math,"imul",{configurable:true,get(){return drawImulGets++===0?drawBootImul:function(...args){return drawBootImul.apply(this,args)^1;};}})',ctx);
+ try{
+  for(let i=0;i<2;i++){vm.runInContext('drawImulGets=0',ctx);const value=oracle(key);vm.runInContext('drawImulGets=0',ctx);assert.equal(compute(key),value,'a getter returning the default method once cannot authorize cached math');}
+ }finally{vm.runInContext('Object.defineProperty(Math,"imul",drawImulDescriptor)',ctx);}
+ vm.runInContext('globalThis.drawCodeDescriptor=Object.getOwnPropertyDescriptor(String.prototype,"charCodeAt");globalThis.drawCodeGets=0;Object.defineProperty(String.prototype,"charCodeAt",{configurable:true,get(){return drawCodeGets++===0?drawBootCodeUnit:function(index){return drawBootCodeUnit.call(this,index)^1;};}})',ctx);
+ try{
+  for(let i=0;i<2;i++){vm.runInContext('drawCodeGets=0',ctx);const value=oracle(key);vm.runInContext('drawCodeGets=0',ctx);assert.equal(compute(key),value,'a getter returning the default string method once cannot authorize cached text');}
+ }finally{vm.runInContext('Object.defineProperty(String.prototype,"charCodeAt",drawCodeDescriptor)',ctx);}
+ const clear=()=>vm.runInContext('displayHashCache.clear();displayHashUnits=0',ctx);
+ clear();for(let i=0;i<2050;i++)assert.equal(compute('bounded-draw-'+i),oracle('bounded-draw-'+i));
+ assert.ok(vm.runInContext('displayHashCache.size<=2048',ctx),'retention has a fixed entry cap');
+ const beforeEvicted=work();compute('bounded-draw-0');assert.ok(work()>beforeEvicted,'evicted keys recompute through the existing hash');
+ for(const size of [256*1024,256*1024+1]){
+  clear();const text='😀'.repeat(Math.floor(size/2))+(size%2?'x':'');assert.equal(text.length,size);
+  const value=oracle(text);assert.equal(compute(text),value);const before=work();assert.equal(compute(text),value);
+  if(size===256*1024)assert.equal(work(),before,'the exact UTF-16 cap can reuse a result');else assert.ok(work()>before,'oversized inputs stay uncached');
+  assert.ok(vm.runInContext('displayHashUnits<=256*1024',ctx));
+ }
+ clear();compute('a'.repeat(130*1024));compute('b'.repeat(130*1024));
+ assert.equal(vm.runInContext('displayHashUnits',ctx),130*1024,'eviction counts all retained input units');
+ assert.equal(vm.runInContext('[...displayHashCache.keys()].reduce((n,key)=>n+key.length,0)',ctx),vm.runInContext('displayHashUnits',ctx));
 });

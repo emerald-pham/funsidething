@@ -226,3 +226,46 @@ Independent diagnosis and immutable main CI logs remain in the task evidence.
 This test-only successor has identical public product bytes to7b89ced. Its
 reviews, exact candidate CI and main release gates must pass before publication;
 earlier runtime evidence retains its original source identity and limits.
+
+## Main 754 performance and clock follow-up
+
+Both 1fb87ce candidate runs passed all 2,840 tests (2,790 passes and 50 explicit
+environment skips), rules 13/13, compatibility 15/15 and both required native
+installed-client cases. Three Yes controls took 649/568 ms and Done 393/347 ms.
+After PR #236 merged, main run 39708059186 failed the unchanged three-Yes limit
+at 1,032 ms [345,341,346] and an older paused-resume assertion. Pages did not
+deploy. The candidate passes do not override either main failure.
+
+The resume fixture began at real UTC 01:58:33.735 and resumed two minutes later,
+crossing the app's local 02:00 date marker. An independent exact-source UTC
+control reproduced the precise expected/actual timestamps; the same instant
+under New York stayed on the same pass. Fixed local noon preserves the original
+assertion, actions and offsets, while both adjacent true-rollover controls pass.
+This corrects a nondeterministic fixture, not the production date-reset rule.
+
+A new source-bound CPU profile of actual Yes owners found repeated saved-draw
+fingerprints across before/after observations, squared ordering and rendering.
+Packed-array and stable-merge sorting experiments in external copies gave no
+useful improvement; the production rank sampler and its sorting remain unchanged.
+The permanent work-counter RED through squaredScore observes 138 rather than
+69 hash multiplications for two identical inputs (record 02-19-19-045Z-192e326e).
+
+Squared scoring and display now reuse original chanceHash results only for exact
+primitive input strings, with at most 2,048 entries and 256 Ki UTF-16 input units.
+Every caller still reads its current draw seed, task ID, weight, scale and
+eligibility. Hash, Math namespace and data-descriptor method identities guard
+reuse; altered methods, accessors, objects and oversized inputs stay uncached.
+No draw, task, board, source validation or publication authority is retained.
+All nine pinned function source slices, sample counts and 1,000 ms budgets remain.
+
+The first implementation's adjacent helper placement failed the byte-exact hash
+slice guard; moving the helper after an unprotected function restores the old
+slice without changing the algorithm. A later accessor sensitivity control
+observed 2384096672 instead of 3761576854 before data-descriptor guards; that
+finding is repaired and retained separately from the original RED. The expanded
+14-case focused green includes the source guard, numeric/stream preservation,
+fresh caller/eviction/cap/accessor controls and original resume/day controls.
+Three Yes controls took 359 ms and Done 244 ms locally. These timings do not
+establish CI, deployment, physical iPhone or affected-account acceptance. Fresh
+exact candidate full/native/rendered checks, independent review and required
+candidate/main CI and live verification remain release gates.

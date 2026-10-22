@@ -16744,5 +16744,30 @@
     },
     "greenEvidence": "First two-case green record2026-10-22T01-28-45-773Z-cca5584b-5c7f-4011-a6f0-ed66de11485a passes both original and new cases with all original assertions and zero skips; committed focused/review/CI evidence remains separate.",
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/cloud-sync-root-causes-20261021"
+  },
+  {
+    "baseCommit": "754afce7bf79f5eac184f6d4e23dc4aa2faefb42",
+    "testChangesSha256": "f10a6f9a8fd5ba295a4ee53a5cf71a1c2882e19f21d16deab8fdb068c08f99d6",
+    "reason": "Retain the unchanged1000ms action gate after main754 actually failed1032ms, while reducing proved repeated pure fingerprint work and repairing the independently reproduced local02:00 clock collision in the existing resume fixture.",
+    "previousBehavior": "Main39708059186 failed threeYes1032ms despite candidate runs649/568ms. An ordinary identical squared score hashes twice (138vs69 multiplications). The resume test used real01:58:33.735 then+120000 across the correct02:00 rollover, invalidating its same-day premise.",
+    "intendedBehavior": "Reuse only exact original hash results under fixed entry/input-unit caps and unchanged calculator/data-method identities; current caller inputs and all authority remain fresh. Make only the paused-resume fixture clock fixed local noon, preserving its original assertion/actions and adjacent true rollover controls.",
+    "replacementTests": [
+      "RISK saved-draw work budget: repeated squared scores and display reuse exact fingerprints without changing current calculations",
+      "RISK saved-draw fingerprint preservation: bounded reuse follows exact inputs and current hash math and string methods"
+    ],
+    "preservedCoverage": [
+      "All nine pinned selection/rating function source slices, Monte Carlo sampling/sorting, exact Float32 distributions/random stream and original1000ms Yes/Done caps remain unchanged.",
+      "Original resume timestamp assertion, +60s/+120s actions and both adjacent true02:00 rollover/chain controls remain; only the unrelated real clock assumption is fixed.",
+      "Current seed/ID/weight/scale and hash/Math/string replacements, accessor sensitivity, nonprimitive inputs,2048entry/256KiUTF16 caps, exact cap, overflow and eviction are exercised without caching boards or validation.",
+      "Cloud revision/account/CAS/pending/source protection, actual ACK/durable head/reopen, installed delivery, compatibility and all prior recovery contracts remain required."
+    ],
+    "redEvidence": {
+      "command": "Main Data safety39708059186 npm test at exact754; node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern='^RISK saved-draw work budget:' tests.js",
+      "failure": "Actual CI threeYes1032ms exceeds unchanged1000ms. New preimplementation record2026-10-22T02-19-19-045Z-192e326e-d32f-4ef4-801b-dfc5825167e8 observes138!=69 before reuse. Independent controlled UTC date fixture reproduces exact main1792634433735!=1792634313735; fixed noon and adjacent controls3/3 pass. No unchanged-main retry was triggered."
+    },
+    "additionalEvidence": {
+      "chronology": "External packed/stable-merge sort experiments were not adopted. First fingerprint green5 passes Yes357ms/Done244ms. Added protected source guard records helper-placement failuredd75; relocation restores all9unchanged slices. Later getter sensitivitybd83 actual2384096672!=3761576854 led to data-descriptor guards. Expanded final WIP14case green98c9 passes all original assertions, numeric stream/source guards and bounded-cache/accessor cases; Yes359ms/Done244ms. Fresh committed/full/native/render/review/CI/live evidence remains separate."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/cloud-sync-root-causes-20261021"
   }
 ]

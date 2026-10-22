@@ -1970,3 +1970,13 @@ Numeric preservation keeps exact released Float32 histograms, CDFs, Top K and Ga
 - RISK saved chance shape preservation: opponent key order enumerability and unknown fields keep the same support boundary
 
 The History basis fast path recomputes the complete serialized numeric inputs, compares them exactly, and retains one input/result pair totaling at most256Ki UTF-16 units. Changed eligibility, ratings, IDs, open membership, samples, callable/Math replacements, exact cap and overflow stay explicit. Frozen-opponent validation preserves ordinary key permutations and the released comma-joined hidden/inherited edge through its original fallback. The pinned selection-function source fingerprints remain unchanged.
+
+- RISK saved-draw work budget: repeated squared scores and display reuse exact fingerprints without changing current calculations
+- RISK saved-draw fingerprint preservation: bounded reuse follows exact inputs and current hash math and string methods
+
+Saved-draw reuse preserves exact UTF-16 hashes, fresh seed/ID/weight/scale
+inputs and replacement-calculator behavior. Math and string accessors cannot
+authorize cached values. Entry and total input-unit caps, eviction, exact cap,
+overflow and nonprimitive calls remain explicit. No source validation or board
+graph is cached. The paused-resume fixture uses fixed local noon; its original
+assertion and adjacent actual 02:00 rollover controls remain intact.
