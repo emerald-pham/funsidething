@@ -226,3 +226,112 @@ Independent diagnosis and immutable main CI logs remain in the task evidence.
 This test-only successor has identical public product bytes to7b89ced. Its
 reviews, exact candidate CI and main release gates must pass before publication;
 earlier runtime evidence retains its original source identity and limits.
+
+## Main 754 performance and clock follow-up
+
+Both 1fb87ce candidate runs passed all 2,840 tests (2,790 passes and 50 explicit
+environment skips), rules 13/13, compatibility 15/15 and both required native
+installed-client cases. Three Yes controls took 649/568 ms and Done 393/347 ms.
+After PR #236 merged, main run 39708059186 failed the unchanged three-Yes limit
+at 1,032 ms [345,341,346] and an older paused-resume assertion. Pages did not
+deploy. The candidate passes do not override either main failure.
+
+The resume fixture began at real UTC 01:58:33.735 and resumed two minutes later,
+crossing the app's local 02:00 date marker. An independent exact-source UTC
+control reproduced the precise expected/actual timestamps; the same instant
+under New York stayed on the same pass. Fixed local noon preserves the original
+assertion, actions and offsets, while both adjacent true-rollover controls pass.
+This corrects a nondeterministic fixture, not the production date-reset rule.
+
+A new source-bound CPU profile of actual Yes owners found repeated saved-draw
+fingerprints across before/after observations, squared ordering and rendering.
+Packed-array and stable-merge sorting experiments in external copies gave no
+useful improvement; the production rank sampler and its sorting remain unchanged.
+The permanent work-counter RED through squaredScore observes 138 rather than
+69 hash multiplications for two identical inputs (record 02-19-19-045Z-192e326e).
+
+Squared scoring and display now reuse original chanceHash results only for exact
+primitive input strings, with at most 2,048 entries and 256 Ki UTF-16 input units.
+Every caller still reads its current draw seed, task ID, weight, scale and
+eligibility. Hash, Math namespace and data-descriptor method identities guard
+reuse; altered methods, accessors, objects and oversized inputs stay uncached.
+No draw, task, board, source validation or publication authority is retained.
+All nine pinned function source slices, sample counts and 1,000 ms budgets remain.
+
+The first implementation's adjacent helper placement failed the byte-exact hash
+slice guard; moving the helper after an unprotected function restores the old
+slice without changing the algorithm. A later accessor sensitivity control
+observed 2384096672 instead of 3761576854 before data-descriptor guards; that
+finding is repaired and retained separately from the original RED. The expanded
+14-case focused green includes the source guard, numeric/stream preservation,
+fresh caller/eviction/cap/accessor controls and original resume/day controls.
+Three Yes controls took 359 ms and Done 244 ms locally. These timings do not
+establish CI, deployment, physical iPhone or affected-account acceptance. Fresh
+exact candidate full/native/rendered checks, independent review and required
+candidate/main CI and live verification remain release gates.
+
+
+## Diagnostic success-clock correction after 498
+
+Exact 498 PR run 39712795260 passed all 2,842 tests (2,792 passes, 50 explicit
+environment skips), rules 13/13, compatibility 15/15 and both installed cases.
+Three Yes controls took 566 ms and Done 375 ms. The matching push run
+39712765969 passed both action budgets at 981/586 ms and both installed cases,
+but failed the 150 ms source-diagnostic success subcase (nested and parent count
+as two failures). It was not merged or deployed; the unchanged run was not retried.
+
+That fixture gave the entire real source review a 150 ms wall-clock budget while
+asserting successful completion. An independent exact-source causal pair pauses
+the first real root read for 200 ms. The ordinary clock reproduces false instead
+of true; production correctly reports timeout while diagnostics still records
+150 ms. Activating the existing fixture clock at the real review boundary keeps
+all three original 150/999999/1 inputs, expected 150/60000/60000 limits and every
+original assertion. It passes with the same scheduler pause. This proves a
+sufficient clock-premise mechanism; the exact uninstrumented CI stop stage was
+not traced and remains inferred.
+
+The permanent 150 ms subcase now includes that bounded pause before the clock
+repair's original success assertion. Its owner preimplementation record
+2026-10-22T03-13-32-676Z-159c8dda observes the same false/true failure; the corrected
+four-case green retains all original assertions. Cleanup disposes the fixture
+before stopping its logical clock. Actual expiry, cancellation and production
+SDK limits remain unchanged. No application, CSS/font, worker or public product
+byte changes accompany this correction. Prior source identities and failed CI
+remain retained; fresh exact-candidate reviews and remote release gates are
+still required.
+
+
+The 6f push gate stopped before tests: its incremental comparison used the
+previous branch head 498, while the recorded rationale covered the full PR
+comparison against 754. The owner reproduced the missing-fingerprint refusal
+and appended the same fixture correction's exact 498-based rationale without
+changing product or test source. Both earlier failed runs retain their results.
+The metadata successor must validate the PR base, previous published head and
+immediate parent locally before another push. This is an evidence correction,
+not a relaxed test gate or a new application defect.
+
+## Follow-up: confirmed revision lost during an older device save
+
+Candidate `18a5e1e` push CI `39717363172` passed all 2,792 active cases, 13 rules cases, 15 compatibility cases and both native installed-client modes. Its PR run `39717369491` failed one original editor/deferred-adoption consumer; responsiveness still passed at 750 ms for three Yes actions and 504 ms for three Done actions, under the unchanged 1,000 ms limits. No merge, unchanged retry or deployment followed the failure.
+
+A controlled actual-commit replay reproduced the exact local revision 5 / remote revision 6 / dirty / equal shared-payload state. An accepted cloud ACK6 was followed by an older native Save's CAS repair that adopted device revision5 while the ACK waited for its durable pin-release return. The ACK's final persist then saved revision5. Since the shared payload already equalled `lastPushed`, another ordinary push did not heal the bookkeeping. The failed helper's `durableMatches:false` field was initially unobserved because its preceding conditions blocked the disk read; the causal trace separately proves the successful revision5 commit. This is a product race, not an eight-second test timing premise.
+
+Permanent preimplementation RED `1c90989c-fce1-49a1-9541-e88e61731c7b` reaches the original editor, native Save, real IndexedDB CAS, held pointer, saved view and cold-reopen consumer, adding only an external commit-return gate. A separate RED `04a4720c-299a-4067-b128-5c3d599b6d36` proves that a delayed `sendPush` preflight could clear another caller's actual pending provider-write slot. The owner repairs both: exact currently confirmed revision/base metadata survives older device CAS merges, and a post-preflight slot check leaves the active writer in control. Membership merged into a device head remains dirty until its own confirmation.
+
+Independent diagnosis identified that prior `lastKnownCloud` globals alone outlive sign-out/relogin and do not bind a replacement backend. Additional actual-CAS authority REDs therefore precede the final guard: a small process-local backend/account/UID/revision binding and current reconciliation authority are required. No board or payload cache is added. Six authority controls preserve later edits, original recovery bytes, same-email UID separation, fresh-session/backend requirements, equal peer metadata and higher peer revisions. The first reviewed implementation cohort passed 11/11 with zero skips; exact committed candidate, final copy, broader regression, independent review, CI and live delivery remain separate gates.
+
+Private retained evidence is under `evidence/completion-18a-diagnosis/`, `completion-ack-owner-red.log`, `preflight-ownership-owner-red.log`, `completion-ack-authority-expanded-review-red.log`, `completion-ack-owner-reviewed-green.log` and `completion-ack-guidance-red.log` in the existing task evidence directory. The independent diagnosis is explicitly diagnosis, not release approval. Prior candidate/main failures and their exact identities remain unchanged. Physical latest-iOS termination, peak heap and affected-account recovery remain unproven. Future FAQ editorial work stays in issue #234.
+
+### Independent review: response context before witness binding
+
+Both independent reviewers requested a correction to unpublished `f633262`: an old provider's held reply could be classified stale for diagnostics yet still update state and bind its metadata proof to the replacement backend. Permanent RED `pending-backend-ack-expanded-review-red.log` reaches three real provider-ordering cases: replacement backend, same-email UID change and observed same-account relogin. The repair captures backend/account/UID/current owner binding before asynchronous work, checks the same authority before publication and before consuming its reply, and leaves stale results pending for a fresh read. The focused real-consumer cohort passed 16/16 with no skips. The f633 full run was deliberately interrupted after that review finding and retains its interrupted recorder outcome; it is not a full pass. The earlier f633 private source control completed and keeps its actual identity and limits.
+
+The optional f633 WebKit touch probe failed a harness expectation after five reported actions: its pre-locator state snapshot expected task1, but the sixth actual delegated native click targeted task169 and the exact corresponding comparison was accepted. Its retained event trace proves the accepted sixth click; no crash, page error or unrequested navigation occurred. A device save had updated the candidate between the earlier JavaScript snapshot and locator action. The final owned probe must bind expectations to the actual delegated click's captured candidate/benchmark, retaining all20 actual accepted gestures, exact facts, durable head and reopen assertions and the unchanged two-second effect bound. This instrumentation correction is separate from the product repair and does not reclassify the failed probe as passed.
+
+### Full regression correction: obsolete replies cannot drive a successor
+
+The exact `2243d0a` local full run completed 2,855 cases: 2,803 passed, two failed, 50 explicit environment skips and zero cancellations. Both failures came from its new automatic stale-reply follow-up: an old account response unconditionally restored `pendingPush`, causing a forbidden second publication in the next account, and an automatic replacement read cleared the expected stale diagnostic. The permanent original account-transition count and diagnostics assertions remain unchanged. No CI retry, merge or deployment followed this failed local candidate.
+
+Owner RED `2815a441-175d-476b-9d9b-32422f6ca058` repeats those two original failures plus three new held-provider cases asserting that an obsolete response cannot start a replacement read. The repair invalidates only its still-current captured owner proof/read authority and preserves existing accepted dirty work; it neither creates successor publication intent nor starts successor reads. An explicit current-owner read remains usable. The risk-selected local regression completed 256/256 with zero failures, cancellations or skips, covering diagnostics, decision recovery, account/identity transitions, cloud acknowledgements, completion boundaries/convergence, rapid actions, cloud backups/lifecycle, source retry/cancellation and saved-draw/day behavior. Exact final candidate CI full suites and exact-main deployment full checks remain mandatory; the failed2243 full run is never reused as a pass.
+
+Final independent review found that `5db1e01` guarded proof-object clearing but did not apply the same equality guard before clearing reconciliation authority. A held-provider boundary RED (`e8bb1f36-f708-4113-986e-ec003c981b90`) installs a newer accepted owner from an actual provider read and observes the obsolete return clear its account authority to null. Requiring the captured proof object to remain current before either invalidation closes that mismatch; the unchanged new regression passes. The test models the accepted-owner installation seam explicitly and does not claim ordinary serialized cloudPull can run concurrently. Prior 256-case, private preservation, native touch and rendered outcomes retain their exact older source identities; the successor requires fresh qualification and remote gates.

@@ -16744,5 +16744,312 @@
     },
     "greenEvidence": "First two-case green record2026-10-22T01-28-45-773Z-cca5584b-5c7f-4011-a6f0-ed66de11485a passes both original and new cases with all original assertions and zero skips; committed focused/review/CI evidence remains separate.",
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/cloud-sync-root-causes-20261021"
+  },
+  {
+    "baseCommit": "754afce7bf79f5eac184f6d4e23dc4aa2faefb42",
+    "testChangesSha256": "f10a6f9a8fd5ba295a4ee53a5cf71a1c2882e19f21d16deab8fdb068c08f99d6",
+    "reason": "Retain the unchanged1000ms action gate after main754 actually failed1032ms, while reducing proved repeated pure fingerprint work and repairing the independently reproduced local02:00 clock collision in the existing resume fixture.",
+    "previousBehavior": "Main39708059186 failed threeYes1032ms despite candidate runs649/568ms. An ordinary identical squared score hashes twice (138vs69 multiplications). The resume test used real01:58:33.735 then+120000 across the correct02:00 rollover, invalidating its same-day premise.",
+    "intendedBehavior": "Reuse only exact original hash results under fixed entry/input-unit caps and unchanged calculator/data-method identities; current caller inputs and all authority remain fresh. Make only the paused-resume fixture clock fixed local noon, preserving its original assertion/actions and adjacent true rollover controls.",
+    "replacementTests": [
+      "RISK saved-draw work budget: repeated squared scores and display reuse exact fingerprints without changing current calculations",
+      "RISK saved-draw fingerprint preservation: bounded reuse follows exact inputs and current hash math and string methods"
+    ],
+    "preservedCoverage": [
+      "All nine pinned selection/rating function source slices, Monte Carlo sampling/sorting, exact Float32 distributions/random stream and original1000ms Yes/Done caps remain unchanged.",
+      "Original resume timestamp assertion, +60s/+120s actions and both adjacent true02:00 rollover/chain controls remain; only the unrelated real clock assumption is fixed.",
+      "Current seed/ID/weight/scale and hash/Math/string replacements, accessor sensitivity, nonprimitive inputs,2048entry/256KiUTF16 caps, exact cap, overflow and eviction are exercised without caching boards or validation.",
+      "Cloud revision/account/CAS/pending/source protection, actual ACK/durable head/reopen, installed delivery, compatibility and all prior recovery contracts remain required."
+    ],
+    "redEvidence": {
+      "command": "Main Data safety39708059186 npm test at exact754; node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern='^RISK saved-draw work budget:' tests.js",
+      "failure": "Actual CI threeYes1032ms exceeds unchanged1000ms. New preimplementation record2026-10-22T02-19-19-045Z-192e326e-d32f-4ef4-801b-dfc5825167e8 observes138!=69 before reuse. Independent controlled UTC date fixture reproduces exact main1792634433735!=1792634313735; fixed noon and adjacent controls3/3 pass. No unchanged-main retry was triggered."
+    },
+    "additionalEvidence": {
+      "chronology": "External packed/stable-merge sort experiments were not adopted. First fingerprint green5 passes Yes357ms/Done244ms. Added protected source guard records helper-placement failuredd75; relocation restores all9unchanged slices. Later getter sensitivitybd83 actual2384096672!=3761576854 led to data-descriptor guards. Expanded final WIP14case green98c9 passes all original assertions, numeric stream/source guards and bounded-cache/accessor cases; Yes359ms/Done244ms. Fresh committed/full/native/render/review/CI/live evidence remains separate."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/cloud-sync-root-causes-20261021"
+  },
+  {
+    "baseCommit": "754afce7bf79f5eac184f6d4e23dc4aa2faefb42",
+    "testChangesSha256": "0018e7484695ccfff2f00dc810bf9b1d144b4ad58c5073140b69d938e24686b1",
+    "reason": "Preserve the exact bounded saved-draw and fixed-noon coverage while repairing a proved diagnostic fixture wall-clock success premise; no product deadlines, budgets or original assertions change.",
+    "previousBehavior": "Exact498 PR CI passed all2792/rules13/compat15; push39712765969 failed only the150ms source-diagnostic success subcase while all action budgets and installed outcomes passed. A200ms first-root scheduler pause independently reproduces false!=true with correctly observed150ms.",
+    "intendedBehavior": "The existing real source consumer and all150/999999/1 configurations must report original150/60000/60000 effective limits. Controlled recovery fixture time separates that diagnostic success premise from host scheduling; permanent200ms pause and separate unchanged real-expiry controls keep both boundaries explicit.",
+    "replacementTests": [
+      "RISK support diagnostics: source operations report the effective bounded SDK deadline",
+      "RISK saved-draw work budget: repeated squared scores and display reuse exact fingerprints without changing current calculations",
+      "RISK saved-draw fingerprint preservation: bounded reuse follows exact inputs and current hash math and string methods"
+    ],
+    "preservedCoverage": [
+      "All three original configured/expected diagnostic pairs, actual native source-review success assertion and every observed deadline/status/timestamp assertion remain unchanged.",
+      "Only fixture setup receives the existing recovery clock, activated immediately before the real consumer; cleanup disposes the fixture before stopping the clock. A bounded200ms scheduler pause reaches the actual first tight-budget root read.",
+      "Production whole-review and SDK limits, normalization, Cancel, deadline-expiry, source/account/CAS/ACK authority, pending protection and actual durable source checks remain unchanged.",
+      "All nine protected source slices, rankStats, numerical/random stream controls, samples and original1000ms Yes/Done budgets remain unchanged. Earlier650 rationale objects and all public product bytes stay exact."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK support diagnostics: source operations report the effective bounded SDK deadline$\" tests.js",
+      "failure": "Owner record2026-10-22T03-13-32-676Z-159c8dda-dac3-4616-a678-a5a70ac4d614 preserves the added200ms stimulus before clock correction;150 subcase fails false!==true while999999/1 pass. Independent exact-source705e7d7d/db14764e causal pair agrees; precise uninstrumented CI stopping stage remains inferred."
+    },
+    "greenEvidence": "Owner record2026-10-22T03-13-43-824Z-25d2df5c-b47d-4d8a-9ebd-d365c42d2ef6 passes4/4 with zero skips after existing clock wiring. Exact committed cohort, new reviews and required remote candidate/main CI/live gates remain separate.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/cloud-sync-root-causes-20261021"
+  },
+  {
+    "baseCommit": "49822fdc7a9a5fbdfc5be364dfbdf5eca5c74c54",
+    "testChangesSha256": "f1670977bc24eeed64cf3041357989483e91c714190d808c6b477f5d7658aa57",
+    "reason": "Record the same proved diagnostic fixture correction against the previous published branch head as well as the PR main base. The release push gate uses498 while the PR gate uses754; both comparisons require exact evidence.",
+    "previousBehavior": "Candidate6f push39716343570 stopped before test execution because only the full754-based testdiff0018e748 rationale was present. The actual incremental498-based diagnostic testdiff lacked its own fingerprint; no product/test assertion failure was observed by that stopped run.",
+    "intendedBehavior": "Retain the already validated fixture and every original assertion unchanged, append its exact498-based rationale, and validate754,498 and6f comparisons before publishing a new metadata-only candidate.",
+    "replacementTests": [
+      "RISK support diagnostics: source operations report the effective bounded SDK deadline"
+    ],
+    "preservedCoverage": [
+      "All original150/999999/1 configurations and150/60000/60000 observed-limit expectations plus actual native source-review success, status and observedAt assertions remain unchanged.",
+      "Permanent bounded200ms first-root scheduler stimulus, existing recovery clock activation and fixture-dispose/clock-stop cleanup remain exactly as committed6f; prior clean129/129 zero-skip run keeps that identity.",
+      "No product or test source, protected source fingerprint,1000ms action budget, production deadline, saved data or publication authority changes in this metadata correction. Prior651 rationale objects/raw prefix remain exact."
+    ],
+    "redEvidence": {
+      "command": "GitHub push39716343570 exact6f: node scripts/test-first-gate.mjs 49822fdc7a9a5fbdfc5be364dfbdf5eca5c74c54; owner diagnostic-stimulus record159c8dda remains the behavioral fixtureRED.",
+      "failure": "The push exact-diff gate reports Existing tests were changed or removed without an exact-diff rationale. Owner independently reproduced the same gate error before adding this record. It is a release metadata failure, not a new product defect or rerun of the failed candidate."
+    },
+    "greenEvidence": "Fresh candidate gates must validate fullPR754, previous published498 and new parent6f comparisons. The exact6f129/129 cohort and36-file product equality retain original identities; new exact remoteCI/main/live gates remain mandatory.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/cloud-sync-root-causes-20261021"
+  },
+  {
+    "baseCommit": "754afce7bf79f5eac184f6d4e23dc4aa2faefb42",
+    "testChangesSha256": "5b10624ac9bc4287ef847b7b6deeb1101db6e4da64bb36da154a0f10a8e5c8fb",
+    "reason": "Close the actual older-native-save versus accepted cloud ACK race and the asynchronous push-preflight owner gap exposed by exact18a PR CI, preserving every original completion/editor/gesture assertion. Bind any higher revision carry to fresh process-local backend/account/UID authority; retain pending membership edits.",
+    "previousBehavior": "The exact18a PR run failed the original editor-deferred consumer with local revision5, remote revision6 and equal shared payload after ACK6. A controlled real pin-release commit return reproduces that failure. Separately an earlier awaited preflight can clear another caller’s pending provider-write slot; prior lastKnown globals alone also survive sign-out/relogin and backend replacement.",
+    "intendedBehavior": "Retain only a higher currently confirmed revision and exact decision base during actual device CAS repair. Keep later merged task work dirty, reject expired sessions, changed identity/backend and unconfirmed metadata, preserve equal/higher durable peer metadata, and recheck the active push owner after awaited preflight.",
+    "replacementTests": [
+      "RISK cloud acknowledgement durability: an older native editor CAS repair cannot rewind a confirmed revision",
+      "RISK cloud acknowledgement authority: CAS repair requires current identity and read authority while newer work stays pending",
+      "RISK cloud write ownership: a delayed preflight cannot release another caller before its actual acknowledgement"
+    ],
+    "preservedCoverage": [
+      "Original native Done/theme/editor Save, held scanner pointer/click, exact immutable facts, field/prerequisite/view preservation, actual IndexedDB writes and cold reopen remain intact. The new third mode gates only the return of an actual durable metadata commit and adds no state or response replacement.",
+      "Real provider write and acknowledgement remain held independently of the earlier preflight caller. Original device safety-before-cloud, account/revision guards, failed-save/refusal and recovery-source preservation assertions remain unchanged.",
+      "Six real CAS controls preserve later accepted edits and exact original recovery bytes, expired same-account sessions, same-email UID separation, backend replacement, equal metadata and higher peer revisions. No action limit, production deadline, protected source hash, sample count or skip rule changes.",
+      "Earlier full-PR test corrections retain their original RED evidence and assertions: local-noon resume time, original numeric/display cache equivalence, bounded diagnostic scheduler pause and all150/999999/1 source deadlines. This record covers the final aggregate or incremental comparison rather than relabeling old executions."
+    ],
+    "redEvidence": {
+      "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test tests.js with patterns ^RISK cloud acknowledgement durability: an older native editor CAS (record1c90989c); ^RISK cloud write ownership: a delayed preflight (04a4720c); ^RISK cloud acknowledgement authority: CAS repair (8383e01e and expanded review RED); ^RISK sync responsiveness guidance: (copy RED). Exact commands and source identities are in the private task records.",
+      "failure": "Before product repair, real ACK6→older native CAS produces exact CI local5/remote6/dirty/equal-payload failure; separate provider-pending owner assertion is false instead of true. Before review repair, expired same-account and changed backend acquire stale revision6 and membership-only CAS loses dirty intent. Before copy repair, mounted FAQ lacks the new confirmation sentence. No syntax, missing dependency or credential error counts as RED."
+    },
+    "greenEvidence": "Working final12/12 zero-skip consumer cohort passed, including six authority controls and mounted FAQ. Final coherent committed regression, native delivery, independent review, compatibility, exact candidate/main CI and live proof remain required and keep actual identities.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/cloud-sync-root-causes-20261021"
+  },
+  {
+    "baseCommit": "18a5e1e62c796dfda49d2875709269e0ce4eb1b7",
+    "testChangesSha256": "87ba512c0b3b8fecd09ef237119bcd9a0c3d91ac5b359c94e951eaabacf4e344",
+    "reason": "Close the actual older-native-save versus accepted cloud ACK race and the asynchronous push-preflight owner gap exposed by exact18a PR CI, preserving every original completion/editor/gesture assertion. Bind any higher revision carry to fresh process-local backend/account/UID authority; retain pending membership edits.",
+    "previousBehavior": "The exact18a PR run failed the original editor-deferred consumer with local revision5, remote revision6 and equal shared payload after ACK6. A controlled real pin-release commit return reproduces that failure. Separately an earlier awaited preflight can clear another caller’s pending provider-write slot; prior lastKnown globals alone also survive sign-out/relogin and backend replacement.",
+    "intendedBehavior": "Retain only a higher currently confirmed revision and exact decision base during actual device CAS repair. Keep later merged task work dirty, reject expired sessions, changed identity/backend and unconfirmed metadata, preserve equal/higher durable peer metadata, and recheck the active push owner after awaited preflight.",
+    "replacementTests": [
+      "RISK cloud acknowledgement durability: an older native editor CAS repair cannot rewind a confirmed revision",
+      "RISK cloud acknowledgement authority: CAS repair requires current identity and read authority while newer work stays pending",
+      "RISK cloud write ownership: a delayed preflight cannot release another caller before its actual acknowledgement"
+    ],
+    "preservedCoverage": [
+      "Original native Done/theme/editor Save, held scanner pointer/click, exact immutable facts, field/prerequisite/view preservation, actual IndexedDB writes and cold reopen remain intact. The new third mode gates only the return of an actual durable metadata commit and adds no state or response replacement.",
+      "Real provider write and acknowledgement remain held independently of the earlier preflight caller. Original device safety-before-cloud, account/revision guards, failed-save/refusal and recovery-source preservation assertions remain unchanged.",
+      "Six real CAS controls preserve later accepted edits and exact original recovery bytes, expired same-account sessions, same-email UID separation, backend replacement, equal metadata and higher peer revisions. No action limit, production deadline, protected source hash, sample count or skip rule changes.",
+      "Earlier full-PR test corrections retain their original RED evidence and assertions: local-noon resume time, original numeric/display cache equivalence, bounded diagnostic scheduler pause and all150/999999/1 source deadlines. This record covers the final aggregate or incremental comparison rather than relabeling old executions."
+    ],
+    "redEvidence": {
+      "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test tests.js with patterns ^RISK cloud acknowledgement durability: an older native editor CAS (record1c90989c); ^RISK cloud write ownership: a delayed preflight (04a4720c); ^RISK cloud acknowledgement authority: CAS repair (8383e01e and expanded review RED); ^RISK sync responsiveness guidance: (copy RED). Exact commands and source identities are in the private task records.",
+      "failure": "Before product repair, real ACK6→older native CAS produces exact CI local5/remote6/dirty/equal-payload failure; separate provider-pending owner assertion is false instead of true. Before review repair, expired same-account and changed backend acquire stale revision6 and membership-only CAS loses dirty intent. Before copy repair, mounted FAQ lacks the new confirmation sentence. No syntax, missing dependency or credential error counts as RED."
+    },
+    "greenEvidence": "Working final12/12 zero-skip consumer cohort passed, including six authority controls and mounted FAQ. Final coherent committed regression, native delivery, independent review, compatibility, exact candidate/main CI and live proof remain required and keep actual identities.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/cloud-sync-root-causes-20261021"
+  },
+  {
+    "baseCommit": "754afce7bf79f5eac184f6d4e23dc4aa2faefb42",
+    "testChangesSha256": "21eb1eeeea10b07a3cf85b226aa42ac4589701838619e037a64bdf8d0530478b",
+    "reason": "Close independent review finding F633-ACK-CONTEXT with an actual held-provider response consumer; preserve the prior actual CAS and preflight RED/GREEN protections in aggregate and incremental comparisons.",
+    "previousBehavior": "An old backend response could be labeled stale but still advance local revision and bind confirmation proof to the current replacement backend. Same-email UID changes or sign-out/relogin also left the old reply accepted by the account-string-only response check.",
+    "intendedBehavior": "Capture backend/account/UID/current confirmation-owner binding for the pending write. Require the unchanged reconciliation lifetime before publication and before reply acceptance. Obsolete replies preserve accepted durable work as pending and trigger a fresh current-source read.",
+    "replacementTests": [
+      "RISK cloud acknowledgement identity: a replaced backend cannot inherit an in-flight response as fresh proof"
+    ],
+    "preservedCoverage": [
+      "Three actual held-provider controls cover backend replacement, same-email changed UID and observed same-account relogin; a fresh current-source read stays held while local revision, dirty intent, exact accepted task and durable primary are inspected. No stale response may mint proof and no replacement write is permitted.",
+      "All original editor Done/theme/Save, held pointer, exact facts, saved view, recovery bytes, cold reopen, six CAS authority controls and active write-slot ownership assertions remain intact; all earlier654 rationale objects remain exact.",
+      "No action budgets, sample counts, protected source contracts, recovery deadlines, required cases or skip rules change. Existing exact full/main/compatibility/native/independent FAQ and actual-render gates remain required."
+    ],
+    "redEvidence": {
+      "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=^RISK cloud acknowledgement identity: tests.js; exact initial and expanded commands/identities in pending-backend-ack-review-red.log and pending-backend-ack-expanded-review-red.log.",
+      "failure": "Before response-context correction, the actual old provider committed while its reply was held, connection authority changed, and delivering that old reply incorrectly changed local revision4 to5. Three held-provider variants reach this authority mismatch; the initial12-case CAS/ownership cohort did not cover replacement before ACK delivery."
+    },
+    "greenEvidence": "Working16/16 real-consumer cases pass with zero skips after the captured-context correction, including all original12 plus the pending-provider parent and three identity cases. Final exact committed full/native/rendered/review/CI/live gates remain separate and are not inferred from the interrupted f633 full run.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/cloud-sync-root-causes-20261021"
+  },
+  {
+    "baseCommit": "18a5e1e62c796dfda49d2875709269e0ce4eb1b7",
+    "testChangesSha256": "136466335736786716f0fae68d06f92dc1ace99e735bead934ef4fb65981f1b1",
+    "reason": "Close independent review finding F633-ACK-CONTEXT with an actual held-provider response consumer; preserve the prior actual CAS and preflight RED/GREEN protections in aggregate and incremental comparisons.",
+    "previousBehavior": "An old backend response could be labeled stale but still advance local revision and bind confirmation proof to the current replacement backend. Same-email UID changes or sign-out/relogin also left the old reply accepted by the account-string-only response check.",
+    "intendedBehavior": "Capture backend/account/UID/current confirmation-owner binding for the pending write. Require the unchanged reconciliation lifetime before publication and before reply acceptance. Obsolete replies preserve accepted durable work as pending and trigger a fresh current-source read.",
+    "replacementTests": [
+      "RISK cloud acknowledgement identity: a replaced backend cannot inherit an in-flight response as fresh proof"
+    ],
+    "preservedCoverage": [
+      "Three actual held-provider controls cover backend replacement, same-email changed UID and observed same-account relogin; a fresh current-source read stays held while local revision, dirty intent, exact accepted task and durable primary are inspected. No stale response may mint proof and no replacement write is permitted.",
+      "All original editor Done/theme/Save, held pointer, exact facts, saved view, recovery bytes, cold reopen, six CAS authority controls and active write-slot ownership assertions remain intact; all earlier654 rationale objects remain exact.",
+      "No action budgets, sample counts, protected source contracts, recovery deadlines, required cases or skip rules change. Existing exact full/main/compatibility/native/independent FAQ and actual-render gates remain required."
+    ],
+    "redEvidence": {
+      "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=^RISK cloud acknowledgement identity: tests.js; exact initial and expanded commands/identities in pending-backend-ack-review-red.log and pending-backend-ack-expanded-review-red.log.",
+      "failure": "Before response-context correction, the actual old provider committed while its reply was held, connection authority changed, and delivering that old reply incorrectly changed local revision4 to5. Three held-provider variants reach this authority mismatch; the initial12-case CAS/ownership cohort did not cover replacement before ACK delivery."
+    },
+    "greenEvidence": "Working16/16 real-consumer cases pass with zero skips after the captured-context correction, including all original12 plus the pending-provider parent and three identity cases. Final exact committed full/native/rendered/review/CI/live gates remain separate and are not inferred from the interrupted f633 full run.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/cloud-sync-root-causes-20261021"
+  },
+  {
+    "baseCommit": "f633262b9537db16e19f1e419292c89704ce8eb9",
+    "testChangesSha256": "a32b4fb3bb6307162a2eef8141f19e10edad7634aaa775ff71e75602b8ec0147",
+    "reason": "Close independent review finding F633-ACK-CONTEXT with an actual held-provider response consumer; preserve the prior actual CAS and preflight RED/GREEN protections in aggregate and incremental comparisons.",
+    "previousBehavior": "An old backend response could be labeled stale but still advance local revision and bind confirmation proof to the current replacement backend. Same-email UID changes or sign-out/relogin also left the old reply accepted by the account-string-only response check.",
+    "intendedBehavior": "Capture backend/account/UID/current confirmation-owner binding for the pending write. Require the unchanged reconciliation lifetime before publication and before reply acceptance. Obsolete replies preserve accepted durable work as pending and trigger a fresh current-source read.",
+    "replacementTests": [
+      "RISK cloud acknowledgement identity: a replaced backend cannot inherit an in-flight response as fresh proof"
+    ],
+    "preservedCoverage": [
+      "Three actual held-provider controls cover backend replacement, same-email changed UID and observed same-account relogin; a fresh current-source read stays held while local revision, dirty intent, exact accepted task and durable primary are inspected. No stale response may mint proof and no replacement write is permitted.",
+      "All original editor Done/theme/Save, held pointer, exact facts, saved view, recovery bytes, cold reopen, six CAS authority controls and active write-slot ownership assertions remain intact; all earlier654 rationale objects remain exact.",
+      "No action budgets, sample counts, protected source contracts, recovery deadlines, required cases or skip rules change. Existing exact full/main/compatibility/native/independent FAQ and actual-render gates remain required."
+    ],
+    "redEvidence": {
+      "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=^RISK cloud acknowledgement identity: tests.js; exact initial and expanded commands/identities in pending-backend-ack-review-red.log and pending-backend-ack-expanded-review-red.log.",
+      "failure": "Before response-context correction, the actual old provider committed while its reply was held, connection authority changed, and delivering that old reply incorrectly changed local revision4 to5. Three held-provider variants reach this authority mismatch; the initial12-case CAS/ownership cohort did not cover replacement before ACK delivery."
+    },
+    "greenEvidence": "Working16/16 real-consumer cases pass with zero skips after the captured-context correction, including all original12 plus the pending-provider parent and three identity cases. Final exact committed full/native/rendered/review/CI/live gates remain separate and are not inferred from the interrupted f633 full run.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/cloud-sync-root-causes-20261021"
+  },
+  {
+    "baseCommit": "754afce7bf79f5eac184f6d4e23dc4aa2faefb42",
+    "testChangesSha256": "f15d449751214d93987654e4afcb08f3f268e63228248cf37756ff05af600409",
+    "reason": "Repair the two exact2243 full-suite regressions without changing their original expectations. Strengthen the new held-provider identity consumer so obsolete responses cannot start successor work, while a current-owner explicit read remains usable.",
+    "previousBehavior": "The exact2243 full run failed original account-transition publication count2!=1 and replaced-backend diagnostics unobserved!=stale. Its deferChangedPush unconditionally restored pendingPush and initiated a successor read; old response work therefore crossed the intended owner boundary.",
+    "intendedBehavior": "Discard obsolete response authority without manufacturing pendingPush or deferredCloudPull intent for a successor. Invalidate only the still-captured same-owner read/proof, preserve accepted dirty local work and newer-owner authority, and require a current-owner lifecycle/retry/read to establish fresh proof.",
+    "replacementTests": [
+      "RISK cloud acknowledgement identity: obsolete replies cannot start replacement work or create fresh proof"
+    ],
+    "preservedCoverage": [
+      "All original account-transition exact prior recovery, empty new account, revision0 and only-one-old-publication assertions are unchanged. All original support diagnostics per-request generation, latest ACK coverage and stale-backend assertions are unchanged.",
+      "The renamed unreleased held-provider RISK retains all backend/UID/relogin pending response, revision, dirty, durable accepted task and zero replacement-write assertions; adds zero unsolicited replacement reads followed by exactly one explicit current-owner read. No earlier assertion is removed.",
+      "Prior657 rationale objects remain exact. Original CAS repair, source/hash/account/UID guards, equal/higher durable peer metadata,20fact native touch acceptance, required native modes, budgets and skip rules remain protected."
+    ],
+    "redEvidence": {
+      "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=^RISK decision recovery account transition: pending No acknowledgement|^RISK support diagnostics: held cloud acknowledgements|^RISK cloud acknowledgement identity: tests.js; actual complete arguments in record2815a441 and obsolete-ack-side-effects-red.log.",
+      "failure": "The unchanged2243 product fails both original account-transition count2!=1 and stale diagnostic unobserved!=stale. Each of three held-provider identity cases also observes an unsolicited replacement read1 instead of0, for6counted failures including parent. Zero syntax/dependency/credential errors and zero cancellations."
+    },
+    "greenEvidence": "The final affected local cohort passed256/256, zero failure/cancel/skip, covering both original failures, three strengthened provider cases and all affected cloud/identity/completion/backup/diagnostic controls. Required final exact candidate CI full suites and exact-main full/deployment checks remain separate; failed2243 full2855cases remains failed evidence.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/cloud-sync-root-causes-20261021"
+  },
+  {
+    "baseCommit": "18a5e1e62c796dfda49d2875709269e0ce4eb1b7",
+    "testChangesSha256": "460a9a2f9e3784652e569d4a972b84610439d6ed5e329a070d74cbacd067e203",
+    "reason": "Repair the two exact2243 full-suite regressions without changing their original expectations. Strengthen the new held-provider identity consumer so obsolete responses cannot start successor work, while a current-owner explicit read remains usable.",
+    "previousBehavior": "The exact2243 full run failed original account-transition publication count2!=1 and replaced-backend diagnostics unobserved!=stale. Its deferChangedPush unconditionally restored pendingPush and initiated a successor read; old response work therefore crossed the intended owner boundary.",
+    "intendedBehavior": "Discard obsolete response authority without manufacturing pendingPush or deferredCloudPull intent for a successor. Invalidate only the still-captured same-owner read/proof, preserve accepted dirty local work and newer-owner authority, and require a current-owner lifecycle/retry/read to establish fresh proof.",
+    "replacementTests": [
+      "RISK cloud acknowledgement identity: obsolete replies cannot start replacement work or create fresh proof"
+    ],
+    "preservedCoverage": [
+      "All original account-transition exact prior recovery, empty new account, revision0 and only-one-old-publication assertions are unchanged. All original support diagnostics per-request generation, latest ACK coverage and stale-backend assertions are unchanged.",
+      "The renamed unreleased held-provider RISK retains all backend/UID/relogin pending response, revision, dirty, durable accepted task and zero replacement-write assertions; adds zero unsolicited replacement reads followed by exactly one explicit current-owner read. No earlier assertion is removed.",
+      "Prior657 rationale objects remain exact. Original CAS repair, source/hash/account/UID guards, equal/higher durable peer metadata,20fact native touch acceptance, required native modes, budgets and skip rules remain protected."
+    ],
+    "redEvidence": {
+      "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=^RISK decision recovery account transition: pending No acknowledgement|^RISK support diagnostics: held cloud acknowledgements|^RISK cloud acknowledgement identity: tests.js; actual complete arguments in record2815a441 and obsolete-ack-side-effects-red.log.",
+      "failure": "The unchanged2243 product fails both original account-transition count2!=1 and stale diagnostic unobserved!=stale. Each of three held-provider identity cases also observes an unsolicited replacement read1 instead of0, for6counted failures including parent. Zero syntax/dependency/credential errors and zero cancellations."
+    },
+    "greenEvidence": "The final affected local cohort passed256/256, zero failure/cancel/skip, covering both original failures, three strengthened provider cases and all affected cloud/identity/completion/backup/diagnostic controls. Required final exact candidate CI full suites and exact-main full/deployment checks remain separate; failed2243 full2855cases remains failed evidence.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/cloud-sync-root-causes-20261021"
+  },
+  {
+    "baseCommit": "2243d0a9b4e9bd7a46c019448319bc7ec9141b95",
+    "testChangesSha256": "545c49cd1deff0d0b4b62cc02a6f9484dfb57c3a6dabee7fd60a0b1aa1cf147a",
+    "reason": "Repair the two exact2243 full-suite regressions without changing their original expectations. Strengthen the new held-provider identity consumer so obsolete responses cannot start successor work, while a current-owner explicit read remains usable.",
+    "previousBehavior": "The exact2243 full run failed original account-transition publication count2!=1 and replaced-backend diagnostics unobserved!=stale. Its deferChangedPush unconditionally restored pendingPush and initiated a successor read; old response work therefore crossed the intended owner boundary.",
+    "intendedBehavior": "Discard obsolete response authority without manufacturing pendingPush or deferredCloudPull intent for a successor. Invalidate only the still-captured same-owner read/proof, preserve accepted dirty local work and newer-owner authority, and require a current-owner lifecycle/retry/read to establish fresh proof.",
+    "replacementTests": [
+      "RISK cloud acknowledgement identity: obsolete replies cannot start replacement work or create fresh proof"
+    ],
+    "preservedCoverage": [
+      "All original account-transition exact prior recovery, empty new account, revision0 and only-one-old-publication assertions are unchanged. All original support diagnostics per-request generation, latest ACK coverage and stale-backend assertions are unchanged.",
+      "The renamed unreleased held-provider RISK retains all backend/UID/relogin pending response, revision, dirty, durable accepted task and zero replacement-write assertions; adds zero unsolicited replacement reads followed by exactly one explicit current-owner read. No earlier assertion is removed.",
+      "Prior657 rationale objects remain exact. Original CAS repair, source/hash/account/UID guards, equal/higher durable peer metadata,20fact native touch acceptance, required native modes, budgets and skip rules remain protected."
+    ],
+    "redEvidence": {
+      "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=^RISK decision recovery account transition: pending No acknowledgement|^RISK support diagnostics: held cloud acknowledgements|^RISK cloud acknowledgement identity: tests.js; actual complete arguments in record2815a441 and obsolete-ack-side-effects-red.log.",
+      "failure": "The unchanged2243 product fails both original account-transition count2!=1 and stale diagnostic unobserved!=stale. Each of three held-provider identity cases also observes an unsolicited replacement read1 instead of0, for6counted failures including parent. Zero syntax/dependency/credential errors and zero cancellations."
+    },
+    "greenEvidence": "The final affected local cohort passed256/256, zero failure/cancel/skip, covering both original failures, three strengthened provider cases and all affected cloud/identity/completion/backup/diagnostic controls. Required final exact candidate CI full suites and exact-main full/deployment checks remain separate; failed2243 full2855cases remains failed evidence.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/cloud-sync-root-causes-20261021"
+  },
+  {
+    "baseCommit": "754afce7bf79f5eac184f6d4e23dc4aa2faefb42",
+    "testChangesSha256": "7de82b6b197418e36dbc6e9b92e85cc8d2fdb9b9cf08ce68d72dacc76a92da26",
+    "reason": "Close the final independent captured-owner invalidation finding with a discriminating held-provider boundary regression, preserving every preceding regression and acceptance limit.",
+    "previousBehavior": "The5db stale reply checked the captured proof before clearing the proof object but could still clear a newer same-account accepted reconciliation authority. The preimplementation RED observes null instead of the newly accepted account.",
+    "intendedBehavior": "An obsolete provider return may invalidate only its captured current owner. A newer accepted exact proof, reconciliation authority, clean revision, durable accepted source and existing publication intent survive unchanged.",
+    "replacementTests": [
+      "RISK cloud response ownership: a stale provider return cannot revoke a newer confirmed owner"
+    ],
+    "preservedCoverage": [
+      "All660 preceding rationale objects remain exact. All original account-transition counts, stale diagnostics, held-provider identity, actual editor CAS, cold reopen, recovery originals and active write-slot controls remain unchanged.",
+      "The new consumer holds a successful actual provider response and uses a fresh actual provider read, real binding and persistence; accepted-owner installation is explicitly modeled at the module boundary. It does not claim ordinary serialized cloudPull bypasses its write slot.",
+      "No performance budget, deadline, sample count, native touch assertion, required installed mode, CI/full gate, source consent or skip rule is relaxed. All final exact candidate and main full CI, rules, compatibility, independent reviews and live verification remain mandatory."
+    ],
+    "redEvidence": {
+      "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=^RISK cloud response ownership: tests.js; immutable recorde8bb1f36 and newer-response-owner-review-red.log contain exact arguments.",
+      "failure": "On unchanged5db product the held old reply clears the newer accepted reconciled account to null instead of e@example.com. Exactly1 assertion failure, zero cancellations/skips or infrastructure failures."
+    },
+    "greenEvidence": "The identical new consumer passes after adding only captured-proof equality to the reconciliation invalidation guard. Broader exact successor qualification and mandatory candidate/main full CI are separate gates.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/cloud-sync-root-causes-20261021"
+  },
+  {
+    "baseCommit": "18a5e1e62c796dfda49d2875709269e0ce4eb1b7",
+    "testChangesSha256": "8b47345f131a26e08c6a49a0f1fb13b751b46447f2aa515d37393eb0d744c1dd",
+    "reason": "Close the final independent captured-owner invalidation finding with a discriminating held-provider boundary regression, preserving every preceding regression and acceptance limit.",
+    "previousBehavior": "The5db stale reply checked the captured proof before clearing the proof object but could still clear a newer same-account accepted reconciliation authority. The preimplementation RED observes null instead of the newly accepted account.",
+    "intendedBehavior": "An obsolete provider return may invalidate only its captured current owner. A newer accepted exact proof, reconciliation authority, clean revision, durable accepted source and existing publication intent survive unchanged.",
+    "replacementTests": [
+      "RISK cloud response ownership: a stale provider return cannot revoke a newer confirmed owner"
+    ],
+    "preservedCoverage": [
+      "All660 preceding rationale objects remain exact. All original account-transition counts, stale diagnostics, held-provider identity, actual editor CAS, cold reopen, recovery originals and active write-slot controls remain unchanged.",
+      "The new consumer holds a successful actual provider response and uses a fresh actual provider read, real binding and persistence; accepted-owner installation is explicitly modeled at the module boundary. It does not claim ordinary serialized cloudPull bypasses its write slot.",
+      "No performance budget, deadline, sample count, native touch assertion, required installed mode, CI/full gate, source consent or skip rule is relaxed. All final exact candidate and main full CI, rules, compatibility, independent reviews and live verification remain mandatory."
+    ],
+    "redEvidence": {
+      "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=^RISK cloud response ownership: tests.js; immutable recorde8bb1f36 and newer-response-owner-review-red.log contain exact arguments.",
+      "failure": "On unchanged5db product the held old reply clears the newer accepted reconciled account to null instead of e@example.com. Exactly1 assertion failure, zero cancellations/skips or infrastructure failures."
+    },
+    "greenEvidence": "The identical new consumer passes after adding only captured-proof equality to the reconciliation invalidation guard. Broader exact successor qualification and mandatory candidate/main full CI are separate gates.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/cloud-sync-root-causes-20261021"
+  },
+  {
+    "baseCommit": "5db1e01367b3315dd9430fe096a820a844fd0f46",
+    "testChangesSha256": "e6c91f8eb766e5530c142e09b834192cf5d39b2202dbb6a8eeea5becb9af61d4",
+    "reason": "Close the final independent captured-owner invalidation finding with a discriminating held-provider boundary regression, preserving every preceding regression and acceptance limit.",
+    "previousBehavior": "The5db stale reply checked the captured proof before clearing the proof object but could still clear a newer same-account accepted reconciliation authority. The preimplementation RED observes null instead of the newly accepted account.",
+    "intendedBehavior": "An obsolete provider return may invalidate only its captured current owner. A newer accepted exact proof, reconciliation authority, clean revision, durable accepted source and existing publication intent survive unchanged.",
+    "replacementTests": [
+      "RISK cloud response ownership: a stale provider return cannot revoke a newer confirmed owner"
+    ],
+    "preservedCoverage": [
+      "All660 preceding rationale objects remain exact. All original account-transition counts, stale diagnostics, held-provider identity, actual editor CAS, cold reopen, recovery originals and active write-slot controls remain unchanged.",
+      "The new consumer holds a successful actual provider response and uses a fresh actual provider read, real binding and persistence; accepted-owner installation is explicitly modeled at the module boundary. It does not claim ordinary serialized cloudPull bypasses its write slot.",
+      "No performance budget, deadline, sample count, native touch assertion, required installed mode, CI/full gate, source consent or skip rule is relaxed. All final exact candidate and main full CI, rules, compatibility, independent reviews and live verification remain mandatory."
+    ],
+    "redEvidence": {
+      "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=^RISK cloud response ownership: tests.js; immutable recorde8bb1f36 and newer-response-owner-review-red.log contain exact arguments.",
+      "failure": "On unchanged5db product the held old reply clears the newer accepted reconciled account to null instead of e@example.com. Exactly1 assertion failure, zero cancellations/skips or infrastructure failures."
+    },
+    "greenEvidence": "The identical new consumer passes after adding only captured-proof equality to the reconciliation invalidation guard. Broader exact successor qualification and mandatory candidate/main full CI are separate gates.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/cloud-sync-root-causes-20261021"
   }
 ]

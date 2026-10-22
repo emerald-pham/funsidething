@@ -1874,6 +1874,8 @@ test('RISK sync responsiveness guidance: mounted Help explains large boards and 
  ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  const rapid=help.split('<dt>Can I make several changes quickly?</dt><dd>')[1]?.split('</dd>')[0];assert.ok(rapid);
  assert.match(rapid,/Large boards keep the same ranking, History and Undo rules/);
+ assert.match(rapid,/A completed cloud confirmation is kept when an earlier device save finishes/);
+ assert.match(help,/Cloud saves keep their confirmation when earlier saves finish/);
  const failed=help.split('<dt>Can I keep working with a damaged cloud save?</dt><dd>')[1]?.split('</dd>')[0];assert.ok(failed,'damaged cloud saving has its own brief actionable answer');
  assert.match(failed,/do not download that same source for every edit/);assert.match(failed,/newer cloud update/);assert.match(failed,/different saved source still needs your choice/);
  assert.match(help,/Large saved boards respond faster/);assert.match(help,/Corrupted cloud sources stop repeated downloads/);
@@ -9601,7 +9603,7 @@ test("passStartedAt: resuming a paused scan does NOT re-stamp the pass", async (
   ctx.addTask("A", false);
   ctx.addTask("B", false);
   ctx.addTask("C", false);
-  const t0 = realNow(ctx);
+  const t0 = localAt(30, 12, 0);
   setFakeTime(ctx, t0);
   ctx.startScan('descending');                                  // begins the pass, stamps t0
   assert.equal(ctx.state.passStartedAt, t0);
@@ -30390,7 +30392,7 @@ test('RISK completion boundaries: a pending account-A acknowledgement and its le
  assert.ok(pushCount>=1,'only the captured account-A write was pending through the transition');
 });
 
-async function exerciseCompletionEditorBoundaries(t,nativeOnly=false){
+async function exerciseCompletionEditorBoundaries(t,nativeOnly=false,holdAcknowledgedPins=false){
  const observerWatchdog=setTimeout(()=>{},15000);t.after(()=>clearTimeout(observerWatchdog));
  const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),at=Date.parse('2026-10-17T15:00:00Z'),
   doneId='boundary-editor-done',peerId='boundary-editor-peer',gateId='boundary-editor-gate',dependentId='boundary-editor-dependent',
@@ -30413,7 +30415,7 @@ async function exerciseCompletionEditorBoundaries(t,nativeOnly=false){
  const readStarted=new Promise(resolve=>{readStartedResolve=resolve;}),readGate=new Promise(resolve=>{releaseRead=resolve;});
  const closed=new WeakSet(),closeFixture=async fixture=>{if(!fixture||closed.has(fixture))return;closed.add(fixture);try{fixture.shim.window.CloudSync&&(fixture.shim.window.CloudSync.user=null);fixture.ctx.suspendCloudSync?.();vm.runInContext('clearTimeout(saveTimer);saveTimer=null;clearTimeout(cloudTimer);cloudTimer=null;clearCloudRetry();',fixture.ctx);}catch{}try{await fixture.shim.window.ScannerDeviceStore?.close?.();}catch{}};
  t.after(()=>closeFixture(app));
- const nativeSaves=observeQueuedNativeSaves(ctx,t),oldEntered=deferredSyncFixture(),oldRelease=deferredSyncFixture();let heldOld=false,nativeSource=null;
+ const nativeSaves=observeQueuedNativeSaves(ctx,t),oldEntered=deferredSyncFixture(),oldRelease=deferredSyncFixture(),nativeSave=deferredSyncFixture();let heldOld=false,nativeSource=null,heldPinRelease=false;
  t.after(()=>oldRelease.resolve());
  await ctx.__dataReady;await ctx.cloudPull();CS.ready=false;
  hydrateUnchangedEditorDraft(app,doneId);ctx.onAction('done-task',{dataset:{id:doneId}});
@@ -30433,6 +30435,14 @@ async function exerciseCompletionEditorBoundaries(t,nativeOnly=false){
   // so the regression retains the observed slow-storage producer overlap.
   if(phase==='editor-save-and-deferred-adoption')await syncSettle(400);
   const result=await commit(options);
+  if(holdAcknowledgedPins&&!heldPinRelease&&result?.ok&&ctx.state.syncRev===6&&JSON.parse(options.payload).syncRev===5&&
+     !Object.hasOwn(options,'backups')&&!Object.hasOwn(options,'backup')){
+   // The real cloud ACK has arrived and this real metadata commit is durable.
+   // Deliver its return after the older native Save's CAS repair finishes.
+   // No state, payload, revision, production timer or assertion is replaced.
+   heldPinRelease=true;
+   await fixtureDeadline(nativeSave.promise,'the older native Save must finish while the acknowledged pin-release return is held');
+  }
   if(nativeOnly&&nativeSaves.active()&&phase==='completion-adoption'&&result?.ok&&!heldOld){heldOld=true;nativeSource=options.payload;oldEntered.resolve();await oldRelease.promise;}
   if(result?.ok)durable.push({phase,chain:JSON.parse(options.payload).chain,events:JSON.parse(options.payload).decisionEvents||[]});return result;
  };
@@ -30454,7 +30464,7 @@ async function exerciseCompletionEditorBoundaries(t,nativeOnly=false){
  if(nativeOnly){await oldEntered.promise;const pendingHead=await store.readHead();assert.equal(pendingHead.payload,nativeSource,'the held real native save already protects the original Done and theme before editor Save');}
  shim.document.querySelector=()=>null;
  phase='editor-save-and-deferred-adoption';
- const nativeSave=deferredSyncFixture(),schedule=ctx.setTimeout;
+ const schedule=ctx.setTimeout;
  // Observe the real Save callback and its persistence result. Let the native
  // editor/deferred producers finish before adding a redundant fixture save.
  ctx.setTimeout=(fn,ms,...args)=>{
@@ -30469,6 +30479,7 @@ async function exerciseCompletionEditorBoundaries(t,nativeOnly=false){
   // deferred persistence. Native-only coverage below adds no such barrier.
   await nativeSaves.settle('editor native and deferred producers before the extra fixture push');ctx.cloudPushNow();
  }
+ if(holdAcknowledgedPins)assert.equal(heldPinRelease,true,'the actual acknowledged pin-release commit delivered after the older native save');
  await settleSavedViewPublication(app,h,'editor-deferred completion adoption');
  if(!nativeOnly)assert.equal(await ctx.persist(),true,'the redundant fixture save succeeds after native editor publication is durably acknowledged');phase='settled';
  if(nativeOnly){const backups=await store.listBackups();assert.ok(backups.some(row=>{const board=JSON.parse(row.payload);return board.tasks?.some(task=>task.id===peerId&&task.title==='Editor draft during delayed recovery')&&board.decisionEvents?.some(event=>event.id===completion.id)&&board.decisionEvents?.some(event=>event.id===themeFact.id);}), 'automatic convergence retains a verified recovery copy of the native editor fields and original facts');}
@@ -30547,6 +30558,108 @@ async function exerciseCompletionEditorBoundaries(t,nativeOnly=false){
 
 test("RISK completion boundaries: a live editor and pressed scanner control defer stale adoption while the saved view and fields survive cold reopen",{timeout:15000},async t=>exerciseCompletionEditorBoundaries(t));
 test('RISK completion convergence: native Done theme and editor Save finish after a conflicted recovery copy without an added trigger',{timeout:15000},async t=>exerciseCompletionEditorBoundaries(t,true));
+test('RISK cloud acknowledgement durability: an older native editor CAS repair cannot rewind a confirmed revision',{timeout:15000},async t=>exerciseCompletionEditorBoundaries(t,false,true));
+
+test('RISK cloud acknowledgement authority: CAS repair requires current identity and read authority while newer work stays pending',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb');
+ for(const mode of ['later local edit','expired same-account session','same email different UID','changed backend','equal durable revision','newer durable peer'])await t.test(mode,async()=>{
+  const initial=syncState({tasks:[syncTask('ack-authority','Acknowledged authority task')],syncRev:6,syncAccount:'e@example.com',syncIdentity:'owner-a',syncDirty:false,seenQuickStart:true,futureAcknowledgementField:{opaque:['retained',17]}}),
+   h=makeSyncHarness({remote:initial,rev:6,delayMs:1}),indexedDB=new IDBFactory(),name='ack-authority-'+Math.random();let identity='owner-a';
+  const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},indexedDBProvider:indexedDB,deviceDbName:name,cloudSyncFactory:()=>({...h.factory(),recoveryIdentity:()=>identity})}),{ctx,shim}=app,CS=shim.window.CloudSync,store=shim.window.ScannerDeviceStore;
+  await ctx.__dataReady;await ctx.cloudPull();ctx.observeCloudIdentity();assert.equal(await ctx.persist(),true);
+  assert.equal(ctx.state.syncRev,6);assert.equal(vm.runInContext('lastKnownCloudRevision',ctx),6);
+  const acknowledged=await store.readHead(),peer=JSON.parse(acknowledged.payload);peer.syncRev=mode==='newer durable peer'?8:mode==='equal durable revision'?6:5;peer.lastCloudServerAt=123;
+  const injected=await store.commitHead({expectedHash:acknowledged.hash,payload:JSON.stringify(peer),account:'e@example.com',backup:{id:'original-ack-'+mode,kind:'manual',at:1,day:'2026-10-17',payload:acknowledged.payload}});assert.equal(injected.ok,true);
+  ctx.addTask('Later accepted edit '+mode);
+  if(mode==='expired same-account session'){CS.user=null;ctx.observeCloudIdentity();CS.user='e@example.com';ctx.observeCloudIdentity();}
+  if(mode==='same email different UID'){identity='owner-b';ctx.observeCloudIdentity();}
+  if(mode==='changed backend'){shim.window.CloudSync={...CS};ctx.observeCloudIdentity();}
+  const pushes=h.calls.filter(call=>call==='push').length;
+  assert.equal(await ctx.persist(),true,'the real CAS repair keeps a durable board and the accepted edit');
+  const expected=['later local edit','equal durable revision'].includes(mode)?6:mode==='newer durable peer'?8:5,head=JSON.parse((await store.readHead()).payload);
+  assert.equal(ctx.state.syncRev,expected,mode+' cannot acquire a revision from expired or lower authority');assert.equal(head.syncRev,expected);
+  if(['equal durable revision','newer durable peer'].includes(mode))assert.equal(head.lastCloudServerAt,123,'an equal or newer durable peer keeps its own metadata');
+  assert.equal(ctx.state.syncDirty,true,'a later accepted edit is not confirmed by an earlier cloud payload');assert.equal(head.syncDirty,true);
+  assert.equal(head.tasks.some(row=>row.title==='Later accepted edit '+mode),true);assert.deepEqual(head.futureAcknowledgementField,{opaque:['retained',17]});
+  assert.equal(h.calls.filter(call=>call==='push').length,pushes,'device CAS repair does not publish its pending edit');
+  assert.ok((await store.listBackups()).some(row=>row.payload===acknowledged.payload),'the original confirmed source remains exact in recovery');
+  ctx.suspendCloudSync();const reopened=await loadApp({sharedStorage:shim.localStorage,indexedDBProvider:indexedDB,deviceDbName:name});await reopened.ctx.__dataReady;
+  assert.equal(reopened.ctx.state.syncRev,expected);assert.equal(reopened.ctx.state.tasks.some(row=>row.title==='Later accepted edit '+mode),true);
+ });
+});
+
+test('RISK cloud acknowledgement identity: obsolete replies cannot start replacement work or create fresh proof',{timeout:10000},async t=>{
+ const {IDBFactory}=await import('fake-indexeddb');
+ for(const mode of ['backend replacement','same-email UID change','same-account relogin'])await t.test(mode,async sub=>{
+ let identity='same-owner';const initial=syncState({tasks:[syncTask('stale-ack-owner','Stale acknowledgement task')],syncRev:4,syncAccount:'e@example.com',syncIdentity:'same-owner',syncDirty:false,seenQuickStart:true}),h=makeSyncHarness({remote:initial,rev:4,delayMs:1}),
+  app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},indexedDBProvider:new IDBFactory(),deviceDbName:'ack-backend-replacement-'+Math.random(),cloudSyncFactory:()=>({...h.factory(),recoveryIdentity:()=>identity})}),{ctx,shim}=app,original=shim.window.CloudSync;
+ await ctx.__dataReady;await ctx.cloudPull();original.ready=false;ctx.addTask('Accepted before connection replacement');assert.equal(await ctx.persist(),true);original.ready=true;
+ const entered=deferredSyncFixture(),release=deferredSyncFixture(),push=original.push.bind(original);sub.after(()=>release.resolve());
+ original.push=async(...args)=>{const result=await push(...args);entered.resolve(result);await release.promise;return result;};
+ const sending=ctx.sendPush(),reply=await fixtureDeadline(entered.promise,'the original provider has committed but its reply is held');assert.equal(reply.ok,true);assert.equal(ctx.state.syncRev,4);
+ let replacementWrites=0,freshReads=0;const freshRead=deferredSyncFixture(),freshEntered=deferredSyncFixture(),replacement=mode==='backend replacement'?{...original}:original;
+ replacement.pull=async()=>{freshReads++;freshEntered.resolve();await freshRead.promise;return {error:true};};replacement.push=async()=>{replacementWrites++;return {error:true};};
+ sub.after(()=>freshRead.resolve());
+ if(mode==='same-email UID change')identity='new-owner';
+ if(mode==='same-account relogin'){original.user=null;ctx.observeCloudIdentity();original.user='e@example.com';}
+ shim.window.CloudSync=replacement;ctx.observeCloudIdentity();
+ release.resolve();await sending;
+ assert.equal(freshReads,0,'an obsolete response cannot start work in the replacement connection');
+ assert.equal(ctx.state.syncRev,4,'the old connection reply cannot confirm a revision for a replacement backend');
+ assert.equal(ctx.state.syncDirty,true,'the accepted work stays pending until the replacement has fresh authority');
+ assert.equal(vm.runInContext('confirmedCloudDeviceOwner?.backend===window.CloudSync&&confirmedCloudDeviceOwner?.identity===cloudAccountIdentity()&&confirmedCloudDeviceOwner?.account===window.CloudSync.user',ctx),false,'a stale reply cannot mint a fresh process-local proof for the replacement');
+ assert.equal(ctx.state.tasks.some(row=>row.title==='Accepted before connection replacement'),true);assert.equal(replacementWrites,0);
+ assert.equal(await ctx.persist(),true);const head=JSON.parse((await shim.window.ScannerDeviceStore.readHead()).payload);assert.equal(head.syncRev,4);assert.equal(head.syncDirty,true);assert.equal(head.tasks.some(row=>row.title==='Accepted before connection replacement'),true);
+ const fresh=ctx.cloudPull();await fixtureDeadline(freshEntered.promise,'an explicit current-owner read still reaches the replacement connection');assert.equal(freshReads,1);
+ freshRead.resolve();await fresh;ctx.suspendCloudSync();
+ });
+});
+
+test('RISK cloud response ownership: a stale provider return cannot revoke a newer confirmed owner',async()=>{
+ const initial=syncState({tasks:[syncTask('newer-response-owner','Newer response owner task')],syncRev:4,syncAccount:'e@example.com',syncDirty:false,seenQuickStart:true}),h=makeSyncHarness({remote:initial,rev:4,delayMs:1}),app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial)},cloudSyncFactory:h.factory}),{ctx,shim}=app,CS=shim.window.CloudSync;
+ await ctx.cloudPull();CS.ready=false;ctx.addTask('Accepted before the old response');assert.equal(await ctx.persist(),true);CS.ready=true;
+ const entered=deferredSyncFixture(),release=deferredSyncFixture(),push=CS.push.bind(CS);let sending;
+ try{
+  CS.push=async(...args)=>{const result=await push(...args);entered.resolve();await release.promise;return result;};
+  sending=ctx.sendPush();await fixtureDeadline(entered.promise,'the old provider response is held after its real commit');
+  // Model another accepted publication owner's installation at the module
+  // boundary using a fresh actual provider read. Ordinary cloudPull itself
+  // is serialized by the slot; this is not a claim it bypasses that guard.
+  h.writeBehindBack(h.remoteState());const accepted=await CS.pull();assert.equal(accepted.rev,6);
+  ctx.state.syncRev=accepted.rev;ctx.state.syncDirty=false;ctx.bindDecisionBase(CS.user,accepted.rev,accepted.payload);
+  ctx.__newOwnerSource=accepted;vm.runInContext('lastKnownCloudPayload=__newOwnerSource.payload;lastKnownCloudAccount=window.CloudSync.user;lastKnownCloudRevision=__newOwnerSource.rev;reconciledAs=window.CloudSync.user;cloudAdoptionHeld=false;pendingPush=false;',ctx);delete ctx.__newOwnerSource;
+  ctx.bindConfirmedDeviceCloudOwner();const newer=vm.runInContext('confirmedCloudDeviceOwner',ctx);assert.equal(await ctx.persist(),true);
+  release.resolve();await sending;
+  assert.equal(vm.runInContext('reconciledAs',ctx),'e@example.com','the obsolete callback cannot revoke the newer accepted read authority');
+  assert.equal(vm.runInContext('cloudAdoptionHeld',ctx),false);assert.equal(vm.runInContext('confirmedCloudDeviceOwner',ctx),newer);
+  assert.equal(ctx.state.syncRev,6);assert.equal(ctx.state.syncDirty,false);assert.equal(vm.runInContext('pendingPush',ctx),false);
+  assert.equal(JSON.parse(shim.localStorage.getItem(SYNC_STORE_KEY)).syncRev,6);assert.equal(h.calls.filter(call=>call==='push').length,1);
+ }finally{release.resolve();if(sending)await sending;ctx.suspendCloudSync();}
+});
+
+test('RISK cloud write ownership: a delayed preflight cannot release another caller before its actual acknowledgement',{timeout:15000},async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),initial=syncState({tasks:[syncTask('preflight-owner','Preflight ownership task')],syncRev:4,syncAccount:'e@example.com',syncDirty:false,seenQuickStart:true}),
+  h=makeSyncHarness({remote:initial,rev:4,delayMs:1}),app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},indexedDBProvider:new IDBFactory(),deviceDbName:'push-preflight-owner-'+Math.random(),cloudSyncFactory:h.factory}),{ctx,shim}=app,CS=shim.window.CloudSync;
+ await ctx.__dataReady;await ctx.cloudPull();CS.ready=false;
+ ctx.addTask('Accepted while the earlier cloud preflight waits');assert.equal(await ctx.persist(),true);CS.ready=true;
+ const preflightEntered=deferredSyncFixture(),releasePreflight=deferredSyncFixture(),pushEntered=deferredSyncFixture(),releasePush=deferredSyncFixture(),reconcile=ctx.reconcileDeviceLegacyCopy,push=CS.push.bind(CS);
+ let first=true;
+ t.after(()=>{releasePreflight.resolve();releasePush.resolve();ctx.reconcileDeviceLegacyCopy=reconcile;});
+ ctx.reconcileDeviceLegacyCopy=async(...args)=>{const result=await reconcile(...args);if(first){first=false;preflightEntered.resolve();await releasePreflight.promise;}return result;};
+ CS.push=async(...args)=>{pushEntered.resolve();await releasePush.promise;return push(...args);};
+ const earlier=ctx.sendPush();await fixtureDeadline(preflightEntered.promise,'the first real caller enters its device preflight');
+ const current=ctx.sendPush();await fixtureDeadline(pushEntered.promise,'the second real caller reaches its pending provider write');
+ releasePreflight.resolve();await fixtureDeadline(earlier,'the delayed preflight caller finishes without taking the current write slot');
+ assert.equal(vm.runInContext('cloudPushInFlight',ctx),true,'the actual provider write keeps its owned slot until its acknowledgement arrives');
+ assert.equal(vm.runInContext('pendingPush',ctx),true,'the delayed caller leaves follow-up intent with the current owner');
+ assert.equal(h.calls.filter(call=>call==='push').length,0,'the provider ACK is still held at the real write boundary');
+ releasePush.resolve();await current;await settleSavedViewPublication(app,h,'single-owner cloud preflight acknowledgement');
+ assert.equal(h.remoteState().tasks.some(row=>row.title==='Accepted while the earlier cloud preflight waits'),true);
+ const reopened=await loadApp({sharedStorage:shim.localStorage,indexedDBProvider:shim.window.indexedDB,deviceDbName:shim.window.CHAIN_STORAGE_DB_NAME});
+ await reopened.ctx.__dataReady;assert.equal(reopened.ctx.state.syncRev,h.doc.rev);assert.equal(reopened.ctx.state.syncDirty,false);
+ assert.equal(reopened.ctx.state.tasks.some(row=>row.title==='Accepted while the earlier cloud preflight waits'),true);
+});
+
 
 test('RISK completion convergence: failed saves backup failures account changes suspension and drafts guard recovery wakeups',{timeout:15000},async t=>{
  const {IDBFactory}=await import('fake-indexeddb');
@@ -40412,10 +40525,18 @@ test('RISK support diagnostics: accepted acknowledgements expire with their acco
  });
 });
 
-test('RISK support diagnostics: source operations report the effective bounded SDK deadline',async t=>{
+test('RISK support diagnostics: source operations report the effective bounded SDK deadline',
+async t=>{
  for(const [configured,expected] of [[150,150],[999999,60000],[1,60000]])await t.test(String(configured),async sub=>{
-  const app=await divergentCloudSourceApp187(sub,{timeoutMs:configured}),{ctx}=app;
+  const clock=recoveryReadClock187(),app=await divergentCloudSourceApp187(sub,{timeoutMs:configured,timerProvider:clock.provider}),{ctx}=app;
+  let paused=false;
+  if(configured===150)app.faults.serverRead=path=>{
+   if(path==='users/owner'&&!paused){paused=true;Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,200);}
+  };
+  sub.after(async()=>{delete app.faults.serverRead;await app.dispose();clock.stop();});
+  clock.activate(app);
   assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true,'the actual source consumer completes normally');
+  assert.equal(paused,configured===150,'the bounded scheduler pause reaches the actual tight-budget source read');
   ctx.onAction('view-support-diagnostics',{});const operations=ctx.buildSupportDiagnosticsReport().sourceOperations;
   assert.ok(operations.length>0);
   for(const operation of operations){
@@ -40989,4 +41110,65 @@ test('RISK saved chance shape preservation: opponent key order enumerability and
  for(const opponent of [Object.assign(Object.create({id:'a',mu:25}),{'id,mu':0,sigma:8}),Object.assign(Object.create({id:'a',mu:25,sigma:8}),{'id,mu,sigma':0})])assert.equal(supported(opponent),true,'released comma-joined legacy key boundaries remain supported');
  for(const opponent of [null,[],{id:'a',mu:25},{id:'a',mu:25,sigma:8,future:true},{id:'a',mu:Infinity,sigma:8},{id:'a',mu:25,sigma:0},{id:'a',mu:25,sigma:NaN},{id:'__proto__',mu:25,sigma:8}])assert.equal(supported(opponent),false,'partial future or invalid evidence stays unsupported');
  assert.equal(ctx.currentChoiceChanceSnapshotSupported({at:1,seed:'saved-draw',weights:{a:.5},opponents:[{id:'a',mu:25,sigma:8},{id:'a',mu:26,sigma:7}]}),false,'duplicate opponents still refuse the saved source');
+});
+
+test('RISK saved-draw work budget: repeated squared scores and display reuse exact fingerprints without changing current calculations',async t=>{
+ const prefix='"use strict";globalThis.drawHashWork=0;globalThis.drawOriginalImul=Math.imul;Math.imul=function(...args){drawHashWork++;return drawOriginalImul.apply(this,args);};globalThis.drawBootImul=Math.imul;\n';
+ const app=await loadApp({appSource:prefix+appSrc,seed:320});t.after(()=>app.dispose());const {ctx}=app;
+ const a=ctx.addTask('Repeated draw first'),b=ctx.addTask('Repeated draw second');ctx.resetChance();
+ ctx.state.chance.seed='work-budget-fresh-draw';const scale=ctx.squaredScale(ctx.state.chance);
+ const expected=ctx.squaredScore(a,scale);ctx.state.chance.seed+='-unseen';
+ vm.runInContext('drawHashWork=0',ctx);const first=ctx.squaredScore(a,scale),work=vm.runInContext('drawHashWork',ctx);
+ assert.ok(work>0,'a new seed and task fingerprint uses the existing hash algorithm');
+ assert.equal(ctx.squaredScore(a,scale),first);
+ assert.equal(vm.runInContext('drawHashWork',ctx),work,'an unchanged saved-draw fingerprint must not be hashed again for each score');
+ const stats=ctx.chanceDisplayStats('squared'),displayWork=vm.runInContext('drawHashWork',ctx);
+ assert.deepEqual(JSON.parse(JSON.stringify([...ctx.chanceDisplayStats('squared')])),JSON.parse(JSON.stringify([...stats])));
+ assert.equal(vm.runInContext('drawHashWork',ctx),displayWork,'displaying the same saved draw reuses its exact numeric fingerprints');
+ assert.ok(Number.isFinite(expected)&&Number.isFinite(first));assert.notEqual(a.id,b.id);
+});
+
+test('RISK saved-draw fingerprint preservation: bounded reuse follows exact inputs and current hash math and string methods',async t=>{
+ const prefix='"use strict";globalThis.drawHashWork=0;globalThis.drawOriginalImul=Math.imul;Math.imul=function(...args){drawHashWork++;return drawOriginalImul.apply(this,args);};globalThis.drawBootImul=Math.imul;\n';
+ const app=await loadApp({appSource:prefix+appSrc,seed:321});t.after(()=>app.dispose());const {ctx}=app;
+ const compute=text=>ctx.displayDrawHash(text),oracle=text=>ctx.chanceHash(text),work=()=>vm.runInContext('drawHashWork',ctx);
+ for(const text of ['', 'a', 'draw:task', '\u0000😀café\ud800', 'seed:with:colons:task'])assert.equal(compute(text),oracle(text),'exact UTF-16 inputs retain the original unsigned hash');
+ const task=ctx.addTask('Fresh draw weight');ctx.resetChance();ctx.state.chance.seed='preserved-draw';
+ const expected=scale=>-Math.log((oracle(ctx.state.chance.seed+':'+task.id)+.5)/4294967296)/((ctx.state.chance.weights[task.id]/scale)**2);
+ for(const [seed,id,weight,scale]of [['preserved-draw',task.id,.5,1],['changed-draw',task.id,.25,1],['changed-draw',task.id+'-new',.75,2]]){
+  ctx.state.chance.seed=seed;task.id=id;ctx.state.chance.weights[id]=weight;assert.equal(ctx.squaredScore(task,scale),expected(scale),'seed, task, weight and scale remain fresh score inputs');
+ }
+ const key='current-calculator';compute(key);
+ vm.runInContext('globalThis.drawSavedHash=chanceHash;globalThis.drawCustomCalls=0;chanceHash=()=>{drawCustomCalls++;return 31;}',ctx);
+ assert.equal(compute(key),31);assert.equal(compute(key),31);assert.equal(vm.runInContext('drawCustomCalls',ctx),2,'replacement hashes run for every call');
+ vm.runInContext('chanceHash=drawSavedHash;Math.imul=function(...args){return drawBootImul.apply(this,args);}',ctx);
+ for(let i=0;i<2;i++){const value=oracle(key),before=work();assert.equal(compute(key),value);assert.ok(work()>before,'changed Math methods bypass retained values');}
+ vm.runInContext('Math.imul=drawBootImul;globalThis.drawBootMath=Math;Math=Object.create(Math)',ctx);
+ for(let i=0;i<2;i++){const value=oracle(key),before=work();assert.equal(compute(key),value);assert.ok(work()>before,'changed Math namespaces bypass retained values');}
+ vm.runInContext('Math=drawBootMath;globalThis.drawBootCodeUnit=String.prototype.charCodeAt;String.prototype.charCodeAt=function(index){return drawBootCodeUnit.call(this,index)^1;}',ctx);
+ for(let i=0;i<2;i++){const value=oracle(key),before=work();assert.equal(compute(key),value);assert.ok(work()>before,'changed string methods bypass retained values');}
+ vm.runInContext('String.prototype.charCodeAt=drawBootCodeUnit',ctx);
+ let codes=0;const object={length:3,charCodeAt(i){codes++;return 65+i;}};const objectExpected=oracle(object);codes=0;
+ assert.equal(compute(object),objectExpected);assert.equal(compute(object),objectExpected);assert.equal(codes,6,'nonprimitive inputs keep their ordinary per-call behavior');
+ vm.runInContext('globalThis.drawImulDescriptor=Object.getOwnPropertyDescriptor(Math,"imul");globalThis.drawImulGets=0;Object.defineProperty(Math,"imul",{configurable:true,get(){return drawImulGets++===0?drawBootImul:function(...args){return drawBootImul.apply(this,args)^1;};}})',ctx);
+ try{
+  for(let i=0;i<2;i++){vm.runInContext('drawImulGets=0',ctx);const value=oracle(key);vm.runInContext('drawImulGets=0',ctx);assert.equal(compute(key),value,'a getter returning the default method once cannot authorize cached math');}
+ }finally{vm.runInContext('Object.defineProperty(Math,"imul",drawImulDescriptor)',ctx);}
+ vm.runInContext('globalThis.drawCodeDescriptor=Object.getOwnPropertyDescriptor(String.prototype,"charCodeAt");globalThis.drawCodeGets=0;Object.defineProperty(String.prototype,"charCodeAt",{configurable:true,get(){return drawCodeGets++===0?drawBootCodeUnit:function(index){return drawBootCodeUnit.call(this,index)^1;};}})',ctx);
+ try{
+  for(let i=0;i<2;i++){vm.runInContext('drawCodeGets=0',ctx);const value=oracle(key);vm.runInContext('drawCodeGets=0',ctx);assert.equal(compute(key),value,'a getter returning the default string method once cannot authorize cached text');}
+ }finally{vm.runInContext('Object.defineProperty(String.prototype,"charCodeAt",drawCodeDescriptor)',ctx);}
+ const clear=()=>vm.runInContext('displayHashCache.clear();displayHashUnits=0',ctx);
+ clear();for(let i=0;i<2050;i++)assert.equal(compute('bounded-draw-'+i),oracle('bounded-draw-'+i));
+ assert.ok(vm.runInContext('displayHashCache.size<=2048',ctx),'retention has a fixed entry cap');
+ const beforeEvicted=work();compute('bounded-draw-0');assert.ok(work()>beforeEvicted,'evicted keys recompute through the existing hash');
+ for(const size of [256*1024,256*1024+1]){
+  clear();const text='😀'.repeat(Math.floor(size/2))+(size%2?'x':'');assert.equal(text.length,size);
+  const value=oracle(text);assert.equal(compute(text),value);const before=work();assert.equal(compute(text),value);
+  if(size===256*1024)assert.equal(work(),before,'the exact UTF-16 cap can reuse a result');else assert.ok(work()>before,'oversized inputs stay uncached');
+  assert.ok(vm.runInContext('displayHashUnits<=256*1024',ctx));
+ }
+ clear();compute('a'.repeat(130*1024));compute('b'.repeat(130*1024));
+ assert.equal(vm.runInContext('displayHashUnits',ctx),130*1024,'eviction counts all retained input units');
+ assert.equal(vm.runInContext('[...displayHashCache.keys()].reduce((n,key)=>n+key.length,0)',ctx),vm.runInContext('displayHashUnits',ctx));
 });

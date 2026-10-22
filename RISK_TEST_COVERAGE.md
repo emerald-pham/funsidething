@@ -1970,3 +1970,37 @@ Numeric preservation keeps exact released Float32 histograms, CDFs, Top K and Ga
 - RISK saved chance shape preservation: opponent key order enumerability and unknown fields keep the same support boundary
 
 The History basis fast path recomputes the complete serialized numeric inputs, compares them exactly, and retains one input/result pair totaling at most256Ki UTF-16 units. Changed eligibility, ratings, IDs, open membership, samples, callable/Math replacements, exact cap and overflow stay explicit. Frozen-opponent validation preserves ordinary key permutations and the released comma-joined hidden/inherited edge through its original fallback. The pinned selection-function source fingerprints remain unchanged.
+
+- RISK saved-draw work budget: repeated squared scores and display reuse exact fingerprints without changing current calculations
+- RISK saved-draw fingerprint preservation: bounded reuse follows exact inputs and current hash math and string methods
+
+Saved-draw reuse preserves exact UTF-16 hashes, fresh seed/ID/weight/scale
+inputs and replacement-calculator behavior. Math and string accessors cannot
+authorize cached values. Entry and total input-unit caps, eviction, exact cap,
+overflow and nonprimitive calls remain explicit. No source validation or board
+graph is cached. The paused-resume fixture uses fixed local noon; its original
+assertion and adjacent actual 02:00 rollover controls remain intact.
+
+The effective-SDK-deadline diagnostic consumer uses the existing controlled
+recovery-read clock. Its configured 150/999999/1 inputs still require observed
+150/60000/60000 ms limits and successful real source review. A bounded 200 ms
+scheduler pause at the first tight-budget root read is permanent stimulus;
+logical deadline-expiry and Cancel controls remain separate and unchanged.
+
+### Confirmed cloud bookkeeping during device CAS repair
+
+- RISK cloud acknowledgement durability: an older native editor CAS repair cannot rewind a confirmed revision
+- RISK cloud acknowledgement authority: CAS repair requires current identity and read authority while newer work stays pending
+- RISK cloud write ownership: a delayed preflight cannot release another caller before its actual acknowledgement
+
+The first retains the original editor/deferred-adoption, held-pointer, exact facts, saved view and cold-reopen assertions and gates the return of an actual durable pin-release commit until the older native Save finishes. The authority consumer uses real IndexedDB conflict repair: later edits remain dirty; expired same-account sessions, changed UID/backend, equal revisions and higher durable peer revisions cannot inherit stale proof. Exact original sources remain recoverable. The ownership consumer holds the actual provider write while the earlier preflight returns; its slot remains owned until the received acknowledgement and durable reopen. No deadline or action budget is widened.
+
+- RISK cloud acknowledgement identity: obsolete replies cannot start replacement work or create fresh proof
+
+This actual held-provider consumer covers backend replacement, a changed UID sharing an email and observed same-account relogin before the old reply is delivered. The old write may have committed, but its response cannot bind fresh current proof or replace local revision/dirty bookkeeping. The accepted edit remains durable and pending while a fresh replacement read is held.
+
+The obsolete-reply identity consumer also requires zero replacement reads caused by the stale reply, then proves an explicit current-owner read reaches that connection once. Existing foreign-account publication-count and held-acknowledgement diagnostics consumers retain their original expectations.
+
+- RISK cloud response ownership: a stale provider return cannot revoke a newer confirmed owner
+
+This boundary control holds a successful real provider reply, installs a later accepted publication owner from a fresh actual provider read, then releases the old reply. The newer exact proof object, reconciliation authority, clean revision, durable source and publication intent must survive. The accepted-owner installation is explicitly modeled at the module boundary; ordinary cloudPull remains serialized and this test does not claim a concurrent read bypass.
