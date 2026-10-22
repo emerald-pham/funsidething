@@ -3,7 +3,7 @@
    same-origin additions to fill the cache as they are requested. */
 // The shell key is a fingerprint of every local asset in the addAll list.
 // Update it with any shell change so installed workers cannot serve stale UI.
-const CACHE_NAME = "chain-scanner-shell-bfa3c2e35f12491b6ff5a029e105c776c750151ef81a78d46012e58cc47e8faa";
+const CACHE_NAME = "chain-scanner-shell-63041518b3186780863a79ba72a0d3473b94da97be4a74fb66ec8ecaaa8b44c0";
 
 self.addEventListener("message", event => {
   if(event?.data?.type!=="chain-scanner-support-diagnostics-v1") return;

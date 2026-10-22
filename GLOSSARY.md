@@ -47,6 +47,12 @@ A retained copy of a board or its saved decisions that may help recover work.
 Keeping a source does not establish that it is complete or safe to apply.
 _Avoid_: Recovered board
 
+**Cloud recovery review**:
+A read-only comparison of separately retained device and cloud sources before
+a person chooses whether to recover from one. Opening or reading the review
+is not consent to replace a board.
+_Avoid_: Automatic restore
+
 **Lossless recovery**:
 Recovery that retains every accepted board decision and newer edit. Choosing
 between conflicting sources is a separate decision by the person.
