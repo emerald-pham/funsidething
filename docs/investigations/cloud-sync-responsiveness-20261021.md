@@ -299,3 +299,13 @@ SDK limits remain unchanged. No application, CSS/font, worker or public product
 byte changes accompany this correction. Prior source identities and failed CI
 remain retained; fresh exact-candidate reviews and remote release gates are
 still required.
+
+
+The 6f push gate stopped before tests: its incremental comparison used the
+previous branch head 498, while the recorded rationale covered the full PR
+comparison against 754. The owner reproduced the missing-fingerprint refusal
+and appended the same fixture correction's exact 498-based rationale without
+changing product or test source. Both earlier failed runs retain their results.
+The metadata successor must validate the PR base, previous published head and
+immediate parent locally before another push. This is an evidence correction,
+not a relaxed test gate or a new application defect.

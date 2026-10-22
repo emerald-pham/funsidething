@@ -16793,5 +16793,26 @@
     },
     "greenEvidence": "Owner record2026-10-22T03-13-43-824Z-25d2df5c-b47d-4d8a-9ebd-d365c42d2ef6 passes4/4 with zero skips after existing clock wiring. Exact committed cohort, new reviews and required remote candidate/main CI/live gates remain separate.",
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/cloud-sync-root-causes-20261021"
+  },
+  {
+    "baseCommit": "49822fdc7a9a5fbdfc5be364dfbdf5eca5c74c54",
+    "testChangesSha256": "f1670977bc24eeed64cf3041357989483e91c714190d808c6b477f5d7658aa57",
+    "reason": "Record the same proved diagnostic fixture correction against the previous published branch head as well as the PR main base. The release push gate uses498 while the PR gate uses754; both comparisons require exact evidence.",
+    "previousBehavior": "Candidate6f push39716343570 stopped before test execution because only the full754-based testdiff0018e748 rationale was present. The actual incremental498-based diagnostic testdiff lacked its own fingerprint; no product/test assertion failure was observed by that stopped run.",
+    "intendedBehavior": "Retain the already validated fixture and every original assertion unchanged, append its exact498-based rationale, and validate754,498 and6f comparisons before publishing a new metadata-only candidate.",
+    "replacementTests": [
+      "RISK support diagnostics: source operations report the effective bounded SDK deadline"
+    ],
+    "preservedCoverage": [
+      "All original150/999999/1 configurations and150/60000/60000 observed-limit expectations plus actual native source-review success, status and observedAt assertions remain unchanged.",
+      "Permanent bounded200ms first-root scheduler stimulus, existing recovery clock activation and fixture-dispose/clock-stop cleanup remain exactly as committed6f; prior clean129/129 zero-skip run keeps that identity.",
+      "No product or test source, protected source fingerprint,1000ms action budget, production deadline, saved data or publication authority changes in this metadata correction. Prior651 rationale objects/raw prefix remain exact."
+    ],
+    "redEvidence": {
+      "command": "GitHub push39716343570 exact6f: node scripts/test-first-gate.mjs 49822fdc7a9a5fbdfc5be364dfbdf5eca5c74c54; owner diagnostic-stimulus record159c8dda remains the behavioral fixtureRED.",
+      "failure": "The push exact-diff gate reports Existing tests were changed or removed without an exact-diff rationale. Owner independently reproduced the same gate error before adding this record. It is a release metadata failure, not a new product defect or rerun of the failed candidate."
+    },
+    "greenEvidence": "Fresh candidate gates must validate fullPR754, previous published498 and new parent6f comparisons. The exact6f129/129 cohort and36-file product equality retain original identities; new exact remoteCI/main/live gates remain mandatory.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/cloud-sync-root-causes-20261021"
   }
 ]
