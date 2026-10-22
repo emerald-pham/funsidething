@@ -2019,3 +2019,7 @@ This boundary control holds a successful real provider reply, installs a later a
 - RISK debug log: unavailable diagnostic storage never blocks edits or claims persistence
 - RISK debug log: document and event limits expire without retaining injected private fields
 - RISK debug log: app reload reasons and lifecycle observations survive without private error text
+
+## Shared unresolved recovery evidence
+
+- RISK shared recovery source protection: supported old peer rotations and ordinary collection retain exact unresolved cloud evidence
