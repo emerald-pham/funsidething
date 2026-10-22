@@ -13143,9 +13143,12 @@ if(configured){
     };
     const rootRef=uid=>F.doc(db,"users",uid);
     const generationRef=(uid,id)=>F.doc(db,"users",uid,"generations",id);
+    const protectionRef=(uid,id)=>F.doc(db,"users",uid,"recoveryProtections",id);
     const chunksRef=(uid,id)=>F.collection(db,"users",uid,"generations",id,"chunks");
     const chunkRef=(uid,id,index)=>F.doc(db,"users",uid,"generations",id,"chunks",String(index).padStart(8,"0"));
     const snapshotData=snapshot=>snapshot?.exists?.()?snapshot.data():null;
+    const validProtection=row=>row?.v===1&&Number.isSafeInteger(row.rootRevision)&&row.rootRevision>0&&row.createdAt!=null;
+    const sameRecoveryValue=(left,right)=>JSON.stringify(left)===JSON.stringify(right);
     async function verifiedGeneration(tx,uid,id,expected,current){
       if(!expected||!Number.isSafeInteger(expected.chunkCount)||expected.chunkCount<1||
          !current||["schemaVersion","encoding","chunkCount","byteLength","hash","baseRev"].some(key=>current[key]!==expected[key]))return false;
@@ -13218,10 +13221,30 @@ if(configured){
         const result=await F.getDocsFromServer(F.collection(db,"users",uid,"generations"));
         return result.docs.map(snapshot=>({id:snapshot.id,...snapshot.data()}));
       },
+      async protectGenerations(uid,source,revision,current){
+        return F.runTransaction(db,async tx=>{
+          const root=snapshotData(await tx.get(rootRef(uid)));
+          if(!current())return {cancelled:true};
+          if(root?.schemaVersion!==2||root.rev!==revision)return {conflict:true,rev:root?.rev};
+          const rows=await Promise.all(source.generations.map(async generation=>({generation,
+            header:snapshotData(await tx.get(generationRef(uid,generation.id))),
+            protection:snapshotData(await tx.get(protectionRef(uid,generation.id)))})));
+          if(!current())return {cancelled:true};
+          for(const row of rows){
+            if(!row.header||!["staging","sealed","published"].includes(row.header.state))return {error:true,code:"recovery-source-unavailable"};
+            if(!sameRecoveryValue(row.header,row.generation.header))return {conflict:true,code:"recovery-source-changed",rev:revision};
+            if(row.protection&&!validProtection(row.protection))return {error:true,code:"recovery-protection-unsupported"};
+          }
+          for(const row of rows)if(!row.protection)tx.set(protectionRef(uid,row.generation.id),{v:1,rootRevision:revision,createdAt:F.serverTimestamp()});
+          return {ok:true};
+        });
+      },
+      async readProtection(uid,id){return snapshotData(await F.getDocFromServer(protectionRef(uid,id)));},
       async markDeleting(uid,id,protectedIds=[]){
         return F.runTransaction(db,async tx=>{
           const root=snapshotData(await tx.get(rootRef(uid))),ref=generationRef(uid,id),generation=snapshotData(await tx.get(ref));
           if(!generation||root?.activeGeneration===id||root?.previousGeneration===id||protectedIds.includes(id))return false;
+          if(snapshotData(await tx.get(protectionRef(uid,id))))return false;
           // Interrupted cleanup already owns this tombstone. Rewriting its
           // timestamp is forbidden by the immutable state-transition rules;
           // that rejection used to stop every later collector at the same row
@@ -13253,6 +13276,43 @@ if(configured){
       try{window.__chainSupportDiagnosticsRecovery?.("pendingSource","available",!!pending,
         typeof window.ScannerDeviceStore?.getPendingUpload==="function"?"observed":"unavailable",CS);}catch{}
       return {identity:user.uid,epoch,pending};
+    };
+    CS.protectRecoverySources=async({source,expectedRevision=source?.manifest?.rev,stillCurrent,readAttempt}={})=>{
+      const uid=auth.currentUser?.uid,epoch=recoveryAuthEpoch;
+      const current=()=>!!uid&&!suspended&&auth.currentUser?.uid===uid&&recoveryAuthEpoch===epoch&&
+        source?.identity===uid&&source?.epoch===epoch&&!readAttempt?.signal?.aborted&&
+        readAttempt?.isCurrent?.()!==false&&(typeof stillCurrent!=="function"||stillCurrent());
+      if(!current())return {cancelled:true};
+      if(!validRevision(expectedRevision)||expectedRevision<1||!Array.isArray(source.generations)||!source.generations.length||
+        source.generations.some(row=>!row||typeof row.id!=="string"||!row.id||row.id.includes("/")||!row.header||!Array.isArray(row.chunks))||
+        new Set(source.generations.map(row=>row.id)).size!==source.generations.length)
+        return {error:true,code:"recovery-source-unavailable"};
+      // Every phase spends the same operation budget. An uncertain write is
+      // read back at its deterministic paths, never blindly issued again.
+      const until=Date.now()+(readAttempt?Math.min(CLOUD_RECOVERY_READ_TIMEOUT_MS,readAttempt.remainingMs()):CLOUD_SYNC_TIMEOUT_MS);
+      const bounded=async work=>{
+        readAttempt?.checkBudget();if(!current())throw Object.assign(Error("Recovery stopped"),{code:"cancelled"});
+        const remaining=Math.min(until-Date.now(),readAttempt?readAttempt.remainingMs():Infinity);
+        if(remaining<=0)throw Object.assign(Error("Recovery timed out"),{code:"deadline-exceeded"});
+        const result=await cloudDeadline(Promise.resolve().then(work),remaining,readAttempt?.signal);
+        readAttempt?.checkBudget();if(!current())throw Object.assign(Error("Recovery stopped"),{code:"cancelled"});return result;
+      };
+      try{
+        let mutation;
+        try{mutation=await bounded(()=>cloudAdapter.protectGenerations(uid,source,expectedRevision,current));}
+        catch(error){if(!current())return {cancelled:true};mutation={error:true,code:error?.code||"recovery-protection-unavailable"};}
+        if(mutation?.cancelled||mutation?.conflict)return mutation;
+        for(const generation of source.generations){
+          const [protection,header,chunks]=await bounded(()=>Promise.all([cloudAdapter.readProtection(uid,generation.id),
+            cloudAdapter.readGeneration(uid,generation.id),cloudAdapter.readChunks(uid,generation.id)]));
+          if(!validProtection(protection))return {error:true,code:"recovery-protection-unavailable"};
+          if(!sameRecoveryValue(header,generation.header)||!sameRecoveryValue(chunks,generation.chunks))
+            return {conflict:true,code:"recovery-source-changed",rev:expectedRevision};
+        }
+        const latest=await bounded(()=>cloudAdapter.readRoot(uid));
+        if(latest?.schemaVersion!==2||latest.rev!==expectedRevision)return {conflict:true,rev:latest?.rev};
+        return {ok:true,identity:uid,epoch,revision:expectedRevision,generationIds:source.generations.map(row=>row.id)};
+      }catch(error){return current()?{error:true,code:error?.code||"recovery-protection-unavailable"}:{cancelled:true};}
     };
     CS.readRecoverySource=async({pendingGenerationId,diagnosticOperation,readAttempt=null,onInspection=null}={})=>{
       readAttempt?.checkBudget();

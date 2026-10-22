@@ -41395,44 +41395,54 @@ test('RISK saved-draw fingerprint preservation: bounded reuse follows exact inpu
  assert.equal(vm.runInContext('[...displayHashCache.keys()].reduce((n,key)=>n+key.length,0)',ctx),vm.runInContext('displayHashUnits',ctx));
 });
 
-test('RISK shared recovery source protection: supported old peer rotations and ordinary collection retain exact unresolved cloud evidence',async t=>{
+test('RISK shared recovery source protection: supported old peer rotations and ordinary collection retain exact unresolved cloud evidence (Firestore rules: shared retention)',{skip:!process.env.FIRESTORE_EMULATOR_HOST},async t=>{
  const {IDBFactory}=await import('fake-indexeddb'),{SUPPORTED_RELEASE,readReleasedClient}=await import('./scripts/backward-compatibility.mjs');
+ const {initializeTestEnvironment}=await import('@firebase/rules-unit-testing'),F=await import('firebase/firestore');
+ const env=await initializeTestEnvironment({projectId:'demo-shared-retention-253',firestore:{rules:fs.readFileSync(path.join(__dirname,'firestore.rules'),'utf8')}});
+ t.after(()=>env.cleanup());await env.clearFirestore();const provider=retentionSDK253(F,env.authenticatedContext('owner').firestore());
  const indexedDB=new IDBFactory(),deviceDbName='shared-recovery-253-'+Math.random();
  const original=syncState({tasks:[syncTask('unresolved-original','Exact original before recovery '+('preserved 😀 '.repeat(50000)))],syncAccount:'e@example.com',syncRev:0,syncDirty:true});
  const raw=JSON.stringify(original),app=await loadApp({indexedDBProvider:indexedDB,deviceDbName,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}}),store=app.ctx.window.ScannerDeviceStore;
- const source=await loadCloudBackendV2({runtimeWindow:app.ctx.window,failures:{authPending:true},timeoutMs:5000});
+ const source=await loadCloudBackendV2({runtimeWindow:app.ctx.window,failures:{authPending:true},timeoutMs:15000,firebaseSDK:provider.sdk});
  t.after(async()=>{source.CS.suspend();await app.dispose();});
  assert.equal((await source.CS.push(raw,1,0)).ok,true,'the original is a real acknowledged multi-chunk publication');
- for(let n=0;n<25;n++)await flush();
+ await provider.drain();
  const capture=await source.CS.readRecoverySource(),originalId=capture.manifest.activeGeneration;
  assert.ok(capture.generations[0].chunks.length>1,'do not substitute an ID for exact readable original bytes');
  const archiveRaw=JSON.stringify({format:'chain-scanner.cloud-recovery-source',version:1,identity:capture.identity,manifest:capture.manifest,generations:capture.generations});
  const archiveKey='cloud-generation-recovery:'+encodeURIComponent(capture.identity)+':'+capture.manifest.rev+':'+originalId+':'+await app.ctx.ChainStorageV2.hashPayload(archiveRaw);
  const head=await store.readHead();
  assert.equal(await store.protectRecoverySource({expectedHash:head.hash,key:archiveKey,raw:archiveRaw}),true,'existing durable local protection succeeds before any rotation');
+ await source.CS.protectRecoverySources?.({source:capture});
  const working=JSON.parse(raw);working.tasks[0].title='Validated working board while original evidence is unresolved';
  assert.equal((await source.CS.push(JSON.stringify(working),2,1)).ok,true);
- for(let n=0;n<25;n++)await flush();
- const released=readReleasedClient(__dirname,SUPPORTED_RELEASE),peer=await loadCloudBackendV2({artifacts:released,timeoutMs:5000});
- t.after(()=>peer.CS.suspend());
- // Sequential transport of the shared server snapshot gives this independently
- // instantiated released client the acknowledged provider state, never the
- // first device's IndexedDB archives or collector's pendingGenerationIds.
- for(const [key,value] of source.docs)peer.docs.set(key,value);
+ await provider.drain();
+ const released=readReleasedClient(__dirname,SUPPORTED_RELEASE),peer=await loadCloudBackendV2({artifacts:released,timeoutMs:15000,firebaseSDK:provider.sdk});
+ t.after(()=>peer.CS.suspend?.());
  const oldApp=await loadApp({appSource:extractAppScript(released.html)});t.after(()=>oldApp.dispose());
  for(let revision=2;revision<=3;revision++){
   const board=JSON.parse((await peer.CS.pull()).payload);Object.assign(oldApp.ctx.state,board);
   oldApp.ctx.addTask('Independent supported peer edit '+revision);
   const payload=oldApp.ctx.cloudPayload();
   assert.equal((await peer.CS.push(payload,revision+1,revision)).ok,true,'old client uses its ordinary conditional publication');
-  for(let n=0;n<40;n++)await flush();
+  await provider.drain();
  }
- const latest=peer.docs.get('users/owner');
+ const latest=(await F.getDocFromServer(F.doc(provider.db,'users','owner'))).data();
  assert.notEqual(latest.activeGeneration,originalId);assert.notEqual(latest.previousGeneration,originalId);
  assert.ok((await store.listOpaqueArchives()).some(row=>row.key===archiveKey&&row.raw===archiveRaw),'the first device still has its exact receipt; that cannot protect a peer collector');
- const reopened=await loadCloudBackendV2({timeoutMs:5000});t.after(()=>reopened.CS.suspend());
- for(const [key,value] of peer.docs)reopened.docs.set(key,value);
+ const reopened=await loadCloudBackendV2({timeoutMs:15000,firebaseSDK:provider.sdk});t.after(()=>reopened.CS.suspend());
  const received=await reopened.CS.readRecoverySource({pendingGenerationId:originalId});
  const retained=received.generations.find(row=>row.id===originalId),expected=JSON.parse(archiveRaw).generations.find(row=>row.id===originalId);
  assert.deepEqual(JSON.parse(JSON.stringify(retained)),expected,'a fresh client must still recover the exact unresolved header and chunks after the other supported client collected generations outside both root slots');
 });
+
+function retentionSDK253(F,db,{afterTransaction=null}={}){
+ const pending=new Set();
+ const host=value=>Array.isArray(value)?Array.from(value,host):value?.constructor?.name==='Object'?Object.fromEntries(Object.entries(value).map(([key,item])=>[key,host(item)])):value;
+ const track=promise=>{pending.add(promise);promise.then(()=>pending.delete(promise),()=>pending.delete(promise));return promise;};
+ const writer=object=>({get:ref=>object.get(ref),set:(ref,value)=>object.set(ref,host(value)),update:(ref,value)=>object.update(ref,host(value)),delete:ref=>object.delete(ref)});
+ const sdk={...F,getFirestore:()=>db,runTransaction:(database,callback)=>track(F.runTransaction(database,tx=>callback(writer(tx))).then(async result=>{await afterTransaction?.();return result;})),
+  writeBatch(database){const batch=F.writeBatch(database);return {...writer(batch),commit:()=>track(batch.commit())};}};
+ for(const key of ['getDoc','getDocs','getDocFromServer','getDocsFromServer'])sdk[key]=(...args)=>track(F[key](...args));
+ return {sdk,db,async drain(){for(let idle=0;idle<30;){if(pending.size){idle=0;await Promise.allSettled([...pending]);}else idle++;await new Promise(resolve=>setImmediate(resolve));}}};
+}

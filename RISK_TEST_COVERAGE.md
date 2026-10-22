@@ -2022,4 +2022,4 @@ This boundary control holds a successful real provider reply, installs a later a
 
 ## Shared unresolved recovery evidence
 
-- RISK shared recovery source protection: supported old peer rotations and ordinary collection retain exact unresolved cloud evidence
+- RISK shared recovery source protection: supported old peer rotations and ordinary collection retain exact unresolved cloud evidence (Firestore rules: shared retention)

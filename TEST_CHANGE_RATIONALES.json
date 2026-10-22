@@ -17217,5 +17217,24 @@
       "command": "2026-10-22T23:33Z at unchanged runtime 4f1d6bd: node --test --test-name-pattern='^RISK shared recovery source protection:' tests.js; retained /Users/emeraldpham/Documents/Codex/2026-10-22/issue-187/evidence/253/shared-source-red.log",
       "failure": "Observed final exact-source assertion failure after real native three-chunk original publication, durable local protection, current rotation, two supported old-peer rotations/ordinary collection and fresh receiving-source read. Actual original header=null and chunks=[]; expected original published header and three exact chunks. All setup and local archive readback assertions passed."
     }
+  },
+  {
+    "baseCommit": "5e465e8a654e0a1814be25ccfaa1306bec10da3c",
+    "testChangesSha256": "66e2717900f10bd8637a92435d96a9ca2d1e08ea63502beb15aa397575397e41",
+    "reason": "Upgrade the observed #253 cross-device outcome to the actual SDK/emulator so unchanged supported old collectors encounter real server rules, then implement approved immutable scoped retention through the native source contract.",
+    "previousBehavior": "Both original fixture and stronger SDK preimplementation RED lose the entire three-chunk unresolved original after old peer publication/collection; the capturing device receipt alone survives.",
+    "intendedBehavior": "Native protection creates immutable account-scoped server markers under the current revision and exact source guards; the same old-peer rotations and ordinary collection leave the exact original readable to a cold receiver.",
+    "replacementTests": [
+      "RISK shared recovery source protection: supported old peer rotations and ordinary collection retain exact unresolved cloud evidence (Firestore rules: shared retention)"
+    ],
+    "preservedCoverage": [
+      "Original outcome assertions remain: actual current publication, durable local archive, three chunks, two old-peer edits/publications/collectors, original outside root slots, exact local receipt and fresh exact source readback. Server transport uses the actual SDK instead of copying fixture maps.",
+      "The existing required npm run test:rules pattern Firestore rules: now executes this exact RISK outcome; npm test environment skip is explicit. No workflow, compatibility baseline or existing test assertion was weakened.",
+      "SDK fixture setup repairs clear the isolated project between runs and use optional cleanup for the historical backend without suspend. These are not functional REDs. Protection optional call preserves baseline final-outcome sensitivity before that method exists."
+    ],
+    "redEvidence": {
+      "command": "Original shared-source-red.log; stronger before-runtime SDK run: FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 node --test --test-name-pattern='^RISK shared recovery source protection:' tests.js, retained shared-source-sdk-red.log at runtime 4f1d6bd. GREEN shared-source-sdk-green.log after implementation.",
+      "failure": "Both original and stronger contemporaneous final outcome fail with original header=null and chunks=[] after all publication/archival setup checks. Stronger GREEN receives all exact original fields/chunks through actual SDK/new server rules and old collector permission denial; board publication acknowledgements remain separate."
+    }
   }
 ]
