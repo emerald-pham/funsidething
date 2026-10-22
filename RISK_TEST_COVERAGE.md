@@ -2007,6 +2007,8 @@ This boundary control holds a successful real provider reply, installs a later a
 
 ## Unified restart and sync debug log
 
+- RISK debug log: accepted cloud recovery protects originals after diagnostic capacity cleanup
+- RISK debug log: conditional pending quota exposes only its fixed retry cause and preserves the pointer
 - RISK debug log: FAQ distinguishes an idle preview from accepted recovery verification
 - RISK debug log: shared storage capacity belongs to accepted board saves before diagnostics
 - RISK debug log: shared device capacity preserves mandatory backups before restart metadata

@@ -40476,7 +40476,7 @@ test('RISK debug log: shared storage capacity belongs to accepted board saves be
 });
 
 test('RISK debug log: shared device capacity preserves mandatory backups before restart metadata',async t=>{
- for(const kind of ['backup','head'])await t.test(kind,async sub=>{
+ for(const kind of ['backup','head','restore'])await t.test(kind,async sub=>{
  const {IDBFactory}=await import('fake-indexeddb'),factory=new IDBFactory(),storage=sharedScannerStorage(),key='fvp:chain-scanner:restart-diagnostics:v1';let refusing=false;
  const indexedDBProvider={open(...args){const request=factory.open(...args);return new Proxy(request,{get(target,property){
   if(property==='result'){const db=target.result;return new Proxy(db,{get(database,name){
@@ -40486,13 +40486,19 @@ test('RISK debug log: shared device capacity preserves mandatory backups before 
   const value=target[property];return typeof value==='function'?value.bind(target):value;},set(target,property,value){target[property]=value;return true;}});}};
  const app=await loadApp({sharedStorage:storage,indexedDBProvider,deviceDbName:'debug-capacity-'+Math.random()}),{ctx,shim}=app;sub.after(()=>app.dispose());
  assert.equal(await ctx.persist(),true);const store=ctx.window.ScannerDeviceStore,head=await store.readHead();assert.ok(storage.getItem(key));
- refusing=true;
- if(kind==='head'){
-  shim.document.getElementById('addInput').value='Accepted device-capacity edit';
+ if(kind==='restore'){
+  const {File}=await import('node:buffer');ctx.addTask('Current protected task',false);assert.equal(await ctx.persist(),true);
+  const source=JSON.parse(ctx.currentBoardExportPayload());source.tasks[0].title='Selected recovery task';ctx.openSettings();
+  const input=makeFakeElement();input.id='restoreBackupFile';input.files=[new File([JSON.stringify(source)],'selected.json',{type:'application/json'})];
+  assert.equal(await ctx.handleRestoreBackupFileChange(input),true);refusing=true;
+  assert.equal(await ctx.onAction('confirm-file-restore',{}),true,'actual File Restore reclaims expendable diagnostic space on the captured port');
+  assert.equal(ctx.state.tasks[0].title,'Selected recovery task');
+ }else if(kind==='head'){
+  refusing=true;shim.document.getElementById('addInput').value='Accepted device-capacity edit';
   assert.equal(await ctx.onAction('add',{}),true,'the actual Add retries its guarded device write after releasing diagnostic space');
   assert.ok(JSON.parse((await store.readHead()).payload).tasks.some(row=>row.title==='Accepted device-capacity edit'));
  }else{
- const backup=await ctx.saveDurableBackup('before-account-switch',head.payload);
+ refusing=true;const backup=await ctx.saveDurableBackup('before-account-switch',head.payload);
  assert.ok(backup?.id,'required recovery storage must reclaim diagnostic capacity before failing');
  assert.equal((await store.listBackups()).find(row=>row.id===backup.id).payload,head.payload);
  assert.equal((await store.readHead()).payload,head.payload,'capacity cleanup cannot replace the accepted head');
@@ -40500,6 +40506,29 @@ test('RISK debug log: shared device capacity preserves mandatory backups before 
  await ctx.onAction('help',{});
  assert.equal(storage.getItem(key),null);assert.equal(ctx.buildSupportDiagnosticsReport().restartDiagnostics.storageStatus,'unavailable');
  });
+});
+
+test('RISK debug log: accepted cloud recovery protects originals after diagnostic capacity cleanup',async t=>{
+ const app=await divergentCloudSourceApp187(t),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore,key='fvp:chain-scanner:restart-diagnostics:v1';
+ const original=await store.readHead();
+ await ctx.onAction('review-cloud-source-recovery',{});assert.equal(await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'device'}}),true);
+ const protect=store.protectRecoverySource.bind(store);let refused=0;
+ store.protectRecoverySource=async options=>{if(shim.localStorage.getItem(key)!==null){refused++;throw Object.assign(Error('shared source protection quota'),{name:'QuotaExceededError'});}return protect(options);};
+ assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),true,'the deliberately chosen source must protect its exact originals after releasing only diagnostic capacity');
+ assert.equal(refused,1,'capacity cleanup and retry are bounded');assert.equal(shim.localStorage.getItem(key),null);
+ assert.ok((await store.listOpaqueArchives()).some(row=>{try{const source=JSON.parse(row.raw);return source.format==='chain-scanner.cloud-recovery-source'&&source.deviceHead===original.payload;}catch{return false;}}),'the exact original device head remains in its protected recovery archive');
+ assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state));
+});
+
+test('RISK debug log: conditional pending quota exposes only its fixed retry cause and preserves the pointer',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),factory=new IDBFactory();let refusing=false;
+ const indexedDB={open(...args){const request=factory.open(...args);request.addEventListener('success',()=>{const db=request.result,transaction=db.transaction.bind(db);db.transaction=(...params)=>{const tx=transaction(...params);if(refusing&&params[1]==='readwrite'){const objectStore=tx.objectStore.bind(tx);tx.objectStore=name=>{const store=objectStore(name);store.put=()=>{throw Object.assign(Error('PRIVATE native quota'),{name:'QuotaExceededError'});};return store;};}return tx;};});return request;}};
+ const store=loadStorageV2({indexedDB}).createDeviceStore({indexedDB,crypto:webcrypto,dbName:'pending-debug-capacity-'+Math.random()});await store.open();t.after(()=>store.close());
+ const prior={generationId:'prior',payloadHash:'a'.repeat(64),baseRev:1,updatedAt:1};assert.equal((await store.setPendingUpload('owner',prior)).ok,true);
+ const expected=await store.getPendingUpload('owner');refusing=true;
+ const result=await store.setPendingUploadIfCurrent('owner',{...prior,generationId:'next'},expected);
+ assert.equal(result.code,'pending-upload-write-failed');assert.equal(result.causeCode,'quota-exhausted','capacity retry needs a fixed native quota signal, never a generic failure or error text');
+ assert.deepEqual(await store.getPendingUpload('owner'),expected);assert.doesNotMatch(JSON.stringify(result),/PRIVATE/);
 });
 
 test('RISK debug log: ordinary actions survive reopening as metadata without changing saved work',async t=>{

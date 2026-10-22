@@ -199,3 +199,20 @@ The external run records retain each source snapshot and actual chronology:
 `device-capacity-red.log`, `device-capacity-green.log`,
 `read-only-controls-red.log`, `read-only-controls-green.log`,
 `capacity-cohort.log` and `capacity-cohort-corrected.log`.
+
+
+A successor source review found remaining captured File Restore and protected
+cloud-source writes outside the first cleanup adapter. Permanent actual File
+selection/confirmation and cloud Apply consumers reproduced those failures
+before their repair (`recovery-capacity-red.log`). The adapter now covers the
+remaining growth-write owners, retaining each captured port, arguments and
+source guards. Conditional pending-write failure keeps its existing public
+failure code and exposes only a fixed quota cause for the bounded retry; a
+separate native-storage consumer observed that signal missing before the edit.
+Generic failure, conflict and refusal results do not trigger a retry.
+
+The early Node22 candidate full runs were stopped when later copy/source review
+found material changes still required. Their interrupted records and reason
+notes remain external evidence. Final qualification must use the reconciled
+candidate. A first browser render also caught a cached prior candidate; its
+fingerprint was rejected, rather than calling its screenshots final evidence.

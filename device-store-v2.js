@@ -486,7 +486,8 @@
     // An explicit capability keeps cached stores from silently ignoring a new
     // optional argument. Null means physical absence; an unknown row is present.
     async function setPendingUploadIfCurrent(account,record,expected){
-      try{return await writePendingUpload(account,record,true,expected);}catch{return {error:true,code:"pending-upload-write-failed"};}
+      try{return await writePendingUpload(account,record,true,expected);}
+      catch(error){return {error:true,code:"pending-upload-write-failed",...(error?.name==="QuotaExceededError"?{causeCode:"quota-exhausted"}:{})};}
     }
     async function clearPendingUpload(account,generationId){
       ensureOpen();if(typeof account!=="string"||!account)return false;
