@@ -651,6 +651,7 @@ The Settings board-data area exposes one Download backup action with current-boa
 - RISK evergreen scan reconciliation: cooldown expiry day reset and explicit return preserve eligible and unrelated chain membership
 - RISK evergreen scan reconciliation: offline cold reload clears legacy resting dots and Undo retains completion history
 - RISK evergreen scan reconciliation: a delayed stale read and later revision converge without restoring completed membership
+- RISK evergreen read ownership: an occupied peer read cannot strand the delayed stale-source regression
 
 Completion authority ends only after a deliberate return event observes every outstanding completion. A validated real new-pass root can provide that causal return after eligibility resumes; unaware roots, Dot/No comparison clocks, cloud revision order and local day maintenance cannot. The consumer matrices retain both opposite learning observations, exact original Done/return facts, independent title/theme choices, every reconciled scan paint and the production IndexedDB head through stale retry and reopen. This extends issue #169's recovery foundation without creating an ordinary Done, day reset, Resume or Rescan shortcut.
 

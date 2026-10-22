@@ -191,3 +191,38 @@ The actual counter RED observes624 rather than312 hash operations on a repeated 
 The profile also identified repeated three-key sorts/joins in frozen-opponent validation. Ordinary exact keys use a membership fast path while all other key counts retain the released sort/join expression. Review found that separator-containing keys plus hidden/inherited values could pass the old expression; an observed later sensitivity failure and the original fallback preserve that edge instead of tightening the accepted boundary. No validation result is cached.
 
 Broad local regression, fresh exact installed/native/private/rendered checks, renewed independent review, full candidate CI and main deployment/live acceptance remain required separately. This diagnosis does not establish physical iPhone OS termination cause, peak heap or authenticated affected-account recovery.
+
+## Main release fixture ownership correction
+
+The reviewed7b89ced candidate passed both full push and PR CI, including the
+unchanged action budgets, rules, compatibility and both installed-client cases.
+After PR #232 merged asce18245, main run39703012911 cancelled the existing
+delayed evergreen stale-read case: its promise remained pending after the event
+loop emptied. There was no assertion failure, and Pages did not deploy.
+
+The case assumed that100ms meant the prior completion had published and its
+peer read had finished. A duplicate app-owned pull correctly returns while
+another read owns the source. Arming a one-shot hook and waiting for that
+duplicate to enter it can therefore wait forever. The exact main interleave
+was not traced; an isolated real40ms incumbent read reproduced the same
+cancellation. Waiting for that actual owner was the sole positive-control
+difference and preserved every original completion/title/session assertion.
+
+The permanent fixture now waits for actual idle, clean, matching cloud revision,
+payload and durable local bytes before taking the completed source. It awaits
+the deliberately occupied owner before installing the stale-read hook, bounds
+hook-entry/response waits, then requires durable publication after the newer
+revision. The original stale-response/newer-notification ordering and all four
+assertions for both clients remain. A new occupied-read case failed by actual
+cancellation before this correction, then passed with the original case. Missing
+hook entry now fails with a specific bounded error instead of cancelling the
+remaining suite. No production read guard, timing budget, protocol, sample,
+fingerprint, source-protection or publication authority changes.
+
+The invalid initial recorder purpose was a command error, not behavioral RED.
+The valid preimplementation record is2026-10-22T01-28-11-866Z-c59cddb6-80bb-47ea-bfc2-62ee21390986;
+the first two-case green is2026-10-22T01-28-45-773Z-cca5584b-5c7f-4011-a6f0-ed66de11485a.
+Independent diagnosis and immutable main CI logs remain in the task evidence.
+This test-only successor has identical public product bytes to7b89ced. Its
+reviews, exact candidate CI and main release gates must pass before publication;
+earlier runtime evidence retains its original source identity and limits.

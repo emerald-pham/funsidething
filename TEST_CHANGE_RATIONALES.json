@@ -16723,5 +16723,26 @@
       "comparisonBase": "00acffe6582ffb9bffabac96c946579c448f8b49",
       "chronology": "Protected-hash-red-forecast-positive records original source-guard assertion plus passing new receiver goldens before the forecast edit. Restored-hash-min-only-focused passes source guard and Yes435/Done257ms. Initial History oracle fixture ctx.openTasks TypeError is not RED; corrected fixture observes624!=312. First memo/forecast focused passes16 tests, Yes418/Done245ms. Pre-edit saved-shape positive passes; reviewer separator collision sensitivity fails before original fallback repair. All source-bound logs remain external; broad/full/native/review/CI/live gates retain separate identities."
     }
+  },
+  {
+    "baseCommit": "ce18245fa6e634fea92075c4203720a0e0cef106",
+    "testChangesSha256": "5093bdd33ed73448c63af81b1e75ac8259f6cc66299412b607ff9c36cfcb4d39",
+    "reason": "Repair the proved asynchronous test-owner race that cancelled main CI after the reviewed application repair, without changing any product bytes or weakening a release gate.",
+    "previousBehavior": "A fixed100ms wait could leave the peer pull occupied; the next cloudPull correctly returned early and never entered the one-shot hook, whose unbounded promise cancelled the remaining Node suite.",
+    "intendedBehavior": "Wait for durable publication and the actual incumbent owner, retain delayed stale response followed by newer revision, bound hook waits and require exact completion/title/session preservation on both clients.",
+    "replacementTests": [
+      "RISK evergreen read ownership: an occupied peer read cannot strand the delayed stale-source regression"
+    ],
+    "preservedCoverage": [
+      "The original delayed stale-read test and all four assertions for each client remain: resting membership stays absent, exact completion time survives, newest independent title arrives, and exactly one completion session remains.",
+      "Every product source, protected algorithm fingerprint, Monte Carlo sample count, original1000ms Yes/Done budget, cloud authority, installed delivery and compatibility requirement remains unchanged.",
+      "Readiness requires idle and clean state, matching cloud payload/revision and exact durable local bytes; a bounded missing-hook error replaces process cancellation without extending any existing acceptance timeout."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern='^RISK evergreen read ownership:' tests.js",
+      "failure": "Valid record2026-10-22T01-28-11-866Z-c59cddb6-80bb-47ea-bfc2-62ee21390986 exits1, cancelled1: Promise resolution is still pending but the event loop has already resolved. This reproduces the first main39703012911 cancellation with a real occupied peer read. The earlier invalid-purpose wrapper exit2 is not behavioral RED."
+    },
+    "greenEvidence": "First two-case green record2026-10-22T01-28-45-773Z-cca5584b-5c7f-4011-a6f0-ed66de11485a passes both original and new cases with all original assertions and zero skips; committed focused/review/CI evidence remains separate.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/cloud-sync-root-causes-20261021"
   }
 ]
