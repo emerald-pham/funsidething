@@ -8272,7 +8272,7 @@ test("RISK backup and Restore consolidation: Settings keeps one guarded action w
   ctx.openSettings();
   const panel = shim.document.getElementById("modalRoot").innerHTML;
   assert.match(panel, /<h3>Current-board view and copy<\/h3>/);
-  assert.match(panel, /<h3>Support diagnostics<\/h3>/);
+  assert.match(panel, /<h3>Debug log<\/h3>/);
   assert.match(panel, /data-act="view-current-board"/);
   assert.equal((panel.match(/data-act="download-backup"/g) || []).length, 1, "the board-data area has one Download backup action");
   assert.equal((panel.match(/data-act="restore-backup"/g) || []).length, 1, "the board-data area has one guarded Restore action");
@@ -34057,7 +34057,7 @@ test('RISK repository process: FAQ coverage needs a distinct exact-candidate rev
 test('RISK FAQ sections: mounted Quick start matches Settings groups and covers WOOP lifecycle and dependency filter',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  for(const section of ['Scene and appearance','Scanning and recurrence','Contexts','Data and backups','Changelog'])assert.match(help,new RegExp('<h3>'+section+'</h3>'));
- for(const text of ['Last task WOOP','Filter dependencies','two recorded','Delete WOOP plan','Turning it off','Support diagnostics'])assert.ok(help.includes(text),text);
+ for(const text of ['Last task WOOP','Filter dependencies','two recorded','Delete WOOP plan','Turning it off','Debug log'])assert.ok(help.includes(text),text);
  assert.doesNotMatch(help,/In all three modes/);
 });
 
@@ -40424,15 +40424,111 @@ test('RISK support diagnostics: Settings names the existing board export for its
  assert.match(settings,/data-act="view-current-board"/,'the existing board view/copy action remains available');
  assert.match(settings,/data-act="download-backup"/,'the one consolidated board download action remains available');
  app.ctx.openHelp();const help=app.shim.document.getElementById('modalRoot').innerHTML;
- const faq=help.match(/<dt>What does Support diagnostics contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
+ const faq=help.match(/<dt>What does the debug log contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
  assert.ok(faq,'the extended FAQ describes the separate report');
  assert.match(faq,/local metadata report/i);assert.match(faq,/never includes task or recovery-source contents, account IDs, paths, cached app bodies, or arbitrary error text/i);
  assert.match(faq,/does not start a cloud read or change saved data/i);assert.match(faq,/clears an unverified source-review preview/i);
  assert.match(faq,/During an accepted source save, you can view, select, copy, or download the report inside the existing recovery preview/i);
  assert.match(faq,/never cancels that publication/i);assert.match(faq,/never uploaded/i);assert.match(faq,/does not create a board backup/i);
- const measures=help.match(/<dt>What does the support report measure\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
+ const measures=help.match(/<dt>What does the debug log measure\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
  assert.match(measures,/effective cloud-read deadline/i);assert.match(measures,/Recovery-copy availability and matching reflect existing checks only/i);
  assert.match(measures,/Account changes clear current acknowledgement observations/i);
+});
+
+test('RISK debug log: ordinary actions survive reopening as metadata without changing saved work',async t=>{
+ const app=await loadApp(),{ctx,shim}=app;t.after(()=>app.dispose());
+ shim.document.getElementById('addInput').value='PRIVATE debug-log task 61c59';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ const saved=JSON.stringify(ctx.state),original=shim.localStorage.getItem(SYNC_STORE_KEY);
+ const reopened=await loadApp({sharedStorage:shim.localStorage});t.after(()=>reopened.dispose());
+ const report=reopened.ctx.buildSupportDiagnosticsReport(),journal=report.restartDiagnostics;
+ assert.ok(journal,'the unified report must retain restart observations after a new document opens');
+ assert.equal(journal.storageStatus,'observed');assert.equal(journal.attribution,'recent-documents-may-include-other-tabs');
+ const prior=journal.documents.find(row=>row.document!==journal.currentDocument&&row.lastAction?.detail==='add');
+ assert.ok(prior,'the previous document retains the actual Add command without its task values');
+ assert.ok(journal.documents.some(row=>row.document===journal.currentDocument),'the new document is separately identified');
+ assert.equal(JSON.stringify(reopened.ctx.state),saved);assert.equal(shim.localStorage.getItem(SYNC_STORE_KEY),original);
+ assert.doesNotMatch(reopened.ctx.supportDiagnosticsText(),/PRIVATE debug-log task 61c59/);
+});
+
+test('RISK debug log: an interrupted actual cloud review retains its stage in a new document',async t=>{
+ const app=await divergentCloudSourceApp187(t),{ctx,shim}=app,gate=deferredSyncFixture();let entered=false,review;
+ t.after(async()=>{gate.resolve();delete app.faults.serverRead;await review;});
+ app.faults.serverRead=async()=>{entered=true;await gate.promise;};
+ await ctx.onAction('sync',{});review=ctx.onAction('review-cloud-source-recovery',{});
+ await fixtureDeadline((async()=>{while(!entered)await flush();})(),'the actual recovery read reaches the external server boundary');
+ const key='fvp:chain-scanner:restart-diagnostics:v1',image={[key]:shim.localStorage.getItem(key),[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY),[LOCAL_HEAD_KEY]:shim.localStorage.getItem(LOCAL_HEAD_KEY)};
+ const cold=await loadApp({appSource:'Date.now=()=>'+realNow(ctx)+';\n'+appSrc,seedStorage:image,indexedDBProvider:app.indexedDB,deviceDbName:app.deviceDbName});t.after(()=>cold.dispose());
+ const journal=cold.ctx.buildSupportDiagnosticsReport().restartDiagnostics,prior=journal.documents.find(row=>row.document!==journal.currentDocument&&row.lastAction?.detail==='review-cloud-source-recovery');
+ assert.equal(prior?.review?.stage,'review-start','a new document must retain the interrupted review rather than silently resetting its stage');
+ assert.ok(prior.events.some(row=>row.stage==='root'&&row.status==='started'),'the persisted trail distinguishes an outstanding source read');
+ gate.resolve();delete app.faults.serverRead;assert.equal(await review,true);
+ await fixtureDeadline((async()=>{while(!ctx.buildSupportDiagnosticsReport().restartDiagnostics.documents.some(row=>row.review?.stage==='review-finished'))await flush();})(),'the rendered review records its actual animation frame');
+ const completed=ctx.buildSupportDiagnosticsReport().restartDiagnostics.documents.find(row=>row.document!==journal.currentDocument&&row.lastAction?.detail==='review-cloud-source-recovery');
+ assert.equal(completed?.review?.stage,'review-finished');assert.ok(completed.events.some(row=>row.stage==='review-rendered'));
+ assert.equal(cold.ctx.cloudPayload(),ctx.cloudPayload(),'reopening diagnostic metadata does not replace or publish the board');
+});
+
+test('RISK debug log: the replacement screen copies a unified log without a download',async t=>{
+ let copied=null;const app=await loadApp({navigatorProvider:{clipboard:{async writeText(text){copied=text;}}}}),{ctx,shim}=app;t.after(()=>app.dispose());
+ ctx.openSettings();let modal=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(modal,/<h3>Debug log<\/h3>/,'Settings replaces the old debugger with the unified log');
+ assert.doesNotMatch(modal,/<h3>Support diagnostics<\/h3>/);assert.match(modal,/Copy debug log/);
+ assert.equal(await ctx.onAction('view-support-diagnostics',{}),true);modal=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(modal,/<h2>Debug log<\/h2>/);assert.match(modal,/readonly aria-label="Debug log"/,'manual copy remains available without a clipboard API');
+ assert.equal(await ctx.onAction('copy-support-diagnostics',{}),true);assert.ok(JSON.parse(copied).restartDiagnostics);
+ assert.equal(JSON.parse(copied).boardDataIncluded,false);assert.match(modal,/not a board backup/);
+ const fallback=await loadApp();t.after(()=>fallback.dispose());assert.equal(await fallback.ctx.onAction('copy-support-diagnostics',{}),false);
+ assert.match(fallback.shim.document.getElementById('modalRoot').innerHTML,/<h2>Debug log<\/h2>/);assert.equal(typeof fallback.shim.document.getElementById('supportDiagnosticsData').value,'string');
+});
+
+test('RISK debug log: unavailable diagnostic storage never blocks edits or claims persistence',async t=>{
+ const values=new Map(),key='fvp:chain-scanner:restart-diagnostics:v1';let denied=true;
+ const storage={getItem:k=>values.get(k)??null,setItem(k,v){if(k===key&&denied)throw Object.assign(Error('PRIVATE storage error'),{name:'QuotaExceededError'});values.set(k,String(v));},removeItem:k=>values.delete(k)};
+ const app=await loadApp({sharedStorage:storage}),{ctx,shim}=app;t.after(()=>app.dispose());
+ shim.document.getElementById('addInput').value='PRIVATE retained task';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ assert.equal(ctx.buildSupportDiagnosticsReport().restartDiagnostics.storageStatus,'unavailable','a readable empty store does not prove that a failed diagnostic write persisted');
+ assert.ok(ctx.state.tasks.some(row=>row.title==='PRIVATE retained task'));
+ denied=false;await ctx.onAction('PRIVATE unknown command',{});
+ const report=ctx.buildSupportDiagnosticsReport();assert.equal(report.restartDiagnostics.storageStatus,'observed');
+ assert.doesNotMatch(ctx.supportDiagnosticsText(),/PRIVATE/,'private values, thrown messages and unknown command strings stay out of the log');
+ assert.equal(report.restartDiagnostics.documents.find(row=>row.document===report.restartDiagnostics.currentDocument).lastAction.detail,'other');
+});
+
+test('RISK debug log: document and event limits expire without retaining injected private fields',async t=>{
+ const first=await loadApp();t.after(()=>first.dispose());let latest=first;const key='fvp:chain-scanner:restart-diagnostics:v1';
+ for(let doc=0;doc<6;doc++){
+  latest=await loadApp({sharedStorage:first.shim.localStorage});t.after(()=>latest.dispose());
+  for(let event=0;event<14;event++)await latest.ctx.onAction('PRIVATE unrecognized action',{});
+ }
+ let report=latest.ctx.buildSupportDiagnosticsReport();assert.equal(report.restartDiagnostics.documents.length,4);
+ assert.ok(report.restartDiagnostics.documents.every(row=>row.events.length<=8));assert.ok(Buffer.byteLength(first.shim.localStorage.getItem(key),'utf8')<=8192);
+ assert.doesNotMatch(latest.ctx.supportDiagnosticsText(),/PRIVATE/);
+ const stored=JSON.parse(first.shim.localStorage.getItem(key));stored.documents[0].private='PRIVATE injected account';stored.documents[0].events[0].private='PRIVATE source';
+ first.shim.localStorage.setItem(key,JSON.stringify(stored));assert.doesNotMatch(latest.ctx.supportDiagnosticsText(),/PRIVATE/,'stored metadata is reconstructed rather than echoed');
+ setFakeTime(latest.ctx,Date.now()+60*60*1000+1000);report=latest.ctx.buildSupportDiagnosticsReport();
+ assert.equal(report.restartDiagnostics.documents.length,0);assert.equal(first.shim.localStorage.getItem(key),null,'expired diagnostics are removed on the next access');
+ first.shim.localStorage.setItem(key,'PRIVATE malformed data');assert.equal(latest.ctx.buildSupportDiagnosticsReport().restartDiagnostics.storageStatus,'unavailable');
+ assert.doesNotMatch(latest.ctx.supportDiagnosticsText(),/PRIVATE/);
+});
+
+test('RISK debug log: app reload reasons and lifecycle observations survive without private error text',async t=>{
+ for(const kind of ['manual','update'])await t.test(kind,async sub=>{
+  const app=await loadApp(),{ctx,shim}=app;sub.after(()=>app.dispose());let reloads=0;shim.window.location={reload(){reloads++;}};
+  if(kind==='manual')await ctx.onAction('sync-reload',{});
+  else{
+   const handlers={};ctx.navigator={serviceWorker:{controller:{},addEventListener:(name,fn)=>handlers[name]=fn,register:async()=>({update:async()=>{}})}};
+   shim.document.readyState='complete';ctx.registerServiceWorker();await flush();await handlers.controllerchange();
+  }
+  assert.equal(reloads,1);let report=ctx.buildSupportDiagnosticsReport(),current=report.restartDiagnostics.documents.find(row=>row.document===report.restartDiagnostics.currentDocument);
+  assert.equal(current?.reload?.detail,kind==='manual'?'manual-recovery':'downloaded-update','the real reload site must retain its explicit reason before replacing the page');
+  shim.window.dispatchEvent({type:'error',message:'PRIVATE task failure'});shim.window.dispatchEvent({type:'unhandledrejection',reason:'PRIVATE rejected task'});
+  shim.window.dispatchEvent({type:'pagehide'});shim.window.dispatchEvent({type:'pageshow',persisted:true});
+  report=ctx.buildSupportDiagnosticsReport();current=report.restartDiagnostics.documents.find(row=>row.document===report.restartDiagnostics.currentDocument);
+  for(const stage of ['error','unhandled-rejection','pagehide','pageshow'])assert.ok(current.events.some(row=>row.stage===stage),stage+' is retained as metadata');
+  assert.doesNotMatch(ctx.supportDiagnosticsText(),/PRIVATE/);
+  const cold=await loadApp({sharedStorage:shim.localStorage});sub.after(()=>cold.dispose());
+  assert.ok(cold.ctx.buildSupportDiagnosticsReport().restartDiagnostics.documents.some(row=>row.document!==cold.ctx.buildSupportDiagnosticsReport().restartDiagnostics.currentDocument&&row.reload?.detail===(kind==='manual'?'manual-recovery':'downloaded-update')));
+ });
 });
 
 test('RISK support diagnostics: local report stays redacted, bounded, and separate from board recovery',async t=>{
@@ -40445,7 +40541,7 @@ test('RISK support diagnostics: local report stays redacted, bounded, and separa
   async readRecoverySource(){throw Error('diagnostics must not read recovery sources');},signIn(){throw Error('diagnostics must not sign in');}};
  const beforeState=JSON.stringify(app.ctx.state),beforeStorage=[SYNC_STORE_KEY,LOCAL_HEAD_KEY,'fvp:chain-scanner:sync-error-log:v1'].map(key=>app.shim.localStorage.getItem(key));
  app.ctx.openSettings();const settings=app.shim.document.getElementById('modalRoot').innerHTML;
- assert.match(settings,/Support diagnostics/i,'Settings offers a separate support report');
+ assert.match(settings,/Debug log/i,'Settings offers a separate support report');
  assert.match(settings,/data-act="view-support-diagnostics"/);assert.match(settings,/data-act="copy-support-diagnostics"/);assert.match(settings,/data-act="download-support-diagnostics"/);
  assert.match(settings,/metadata report.*not a board backup/i,'the local report cannot be mistaken for restorable board data');
  app.ctx.onAction('view-support-diagnostics',{});
@@ -40690,18 +40786,18 @@ test('RISK support diagnostics: opening the report supersedes a timed-out source
  assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-cloud-source-readonly/,'the source review was the visible dialog before diagnostics opened');
  ctx.onAction('view-support-diagnostics',{});
  let modal=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(modal,/<h2>Support diagnostics<\/h2>/,'the report replaces the in-progress source review');
+ assert.match(modal,/<h2>Debug log<\/h2>/,'the report replaces the in-progress source review');
  assert.match(modal,/supportDiagnosticsData/,'the local report is visible and selectable');
  assert.doesNotMatch(modal,/data-act="(?:choose-cloud-recovery-source|apply-cloud-source-recovery)"/,'opening diagnostics grants no source choice');
  assert.equal(vm.runInContext('cloudSourceRecoveryBusy',ctx),true,'opening a report does not pretend the timed source read has settled');
  assert.equal(await reviewing,false,'the old source review reaches its real deadline');
  assert.equal(vm.runInContext('cloudSourceRecoveryBusy',ctx),false,'the ordinary read lifecycle releases its busy guard at the deadline');
  modal=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(modal,/<h2>Support diagnostics<\/h2>/,'the timed-out callback cannot replace the current report dialog');
+ assert.match(modal,/<h2>Debug log<\/h2>/,'the timed-out callback cannot replace the current report dialog');
  assert.doesNotMatch(modal,/data-act="(?:choose-cloud-recovery-source|apply-cloud-source-recovery)"/);
  delete app.faults.serverRead;release();for(let n=0;n<20;n++)await flush();
  modal=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(modal,/<h2>Support diagnostics<\/h2>/,'a late source completion cannot replace the report after timeout');
+ assert.match(modal,/<h2>Debug log<\/h2>/,'a late source completion cannot replace the report after timeout');
  const currentReport=ctx.buildSupportDiagnosticsReport();
  const lateOperation=currentReport.sourceOperations.find(operation=>operation.events.some(event=>event.status==='late'));
  assert.ok(lateOperation,'the report retains an explicit late stage when the SDK read completes after the deadline');
@@ -40737,7 +40833,7 @@ test('RISK support diagnostics: report navigation cannot cancel an accepted sour
   ctx.navigator={clipboard:{async writeText(){throw Error('clipboard unavailable');}}};
   assert.equal(await ctx.onAction('select-support-diagnostics',{}),true,'the inline report remains selectable');
   assert.equal(await ctx.onAction('download-support-diagnostics',{}),true,'the inline report can be downloaded while the push is held');
-  assert.equal(download.name,'chain-scanner-support-diagnostics.json');assert.equal(download.blob.type,'application/json');
+  assert.equal(download.name,'chain-scanner-debug-log.json');assert.equal(download.blob.type,'application/json');
   assert.equal(JSON.parse(download.blob.text).schema,'funsidething.support-diagnostics','the real download contains the local report bytes');
   const downloadedReport=JSON.parse(download.blob.text);
   assert.equal(downloadedReport.save.serverAcknowledgement.value,'pending','the actual downloaded report preserves the held publication status');
@@ -40815,9 +40911,9 @@ test('RISK support diagnostics: second complete source aggregate identifies its 
  assert.ok(aggregates.some(event=>event.role==='first'&&event.status==='completed'),'the first complete source read succeeds before the second stalls');
  assert.ok(aggregates.some(event=>event.role==='second'&&event.status==='timed-out'),'the second complete source read carries the held result');
  assert.ok(review.events.some(event=>event.stage==='root'&&event.status==='timed-out'),'the report joins the second aggregate to its actual held root SDK stage');
- assert.match(shim.document.getElementById('modalRoot').innerHTML,/<h2>Support diagnostics<\/h2>/,'the timed-out second read cannot reclaim the report dialog');
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/<h2>Debug log<\/h2>/,'the timed-out second read cannot reclaim the report dialog');
  release();delete app.faults.serverRead;for(let n=0;n<20;n++)await flush();
- assert.match(shim.document.getElementById('modalRoot').innerHTML,/<h2>Support diagnostics<\/h2>/,'a late second-root completion keeps the report current');
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/<h2>Debug log<\/h2>/,'a late second-root completion keeps the report current');
 });
 
 test('RISK support diagnostics: an actual empty chunk query is observed as zero and incomplete',async t=>{
@@ -40883,7 +40979,7 @@ test('RISK support diagnostics: root, chunk, and final-root SDK stalls retain th
   sub.after(async()=>{release();delete app.faults.serverRead;await reviewing;});
   await fixtureDeadline((async()=>{while(!held)await flush();})(),target+' SDK read did not enter the held native call');
   ctx.onAction('view-support-diagnostics',{});
-  assert.match(shim.document.getElementById('modalRoot').innerHTML,/<h2>Support diagnostics<\/h2>/,'the report owns the visible dialog while its source operation is pending');
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/<h2>Debug log<\/h2>/,'the report owns the visible dialog while its source operation is pending');
   const observed=()=>{
    const report=ctx.buildSupportDiagnosticsReport();
    assert.ok(Array.isArray(report.sourceOperations),'bounded source report must retain its stage observations: '+JSON.stringify({keys:Object.keys(report),retention:report.retention,bytes:Buffer.byteLength(JSON.stringify(report))}));
@@ -40902,11 +40998,11 @@ test('RISK support diagnostics: root, chunk, and final-root SDK stalls retain th
    const generation=(timedOutOperation?.generations||[]).find(row=>row.role==='current');
    assert.equal(generation?.receivedChunks.status,'unavailable','a held query is not reported as an observed zero-length result: '+JSON.stringify(timedOutOperation));
   }
-  assert.match(shim.document.getElementById('modalRoot').innerHTML,/<h2>Support diagnostics<\/h2>/,'a stage timeout cannot replace the current report with the old source-review dialog');
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/<h2>Debug log<\/h2>/,'a stage timeout cannot replace the current report with the old source-review dialog');
   release();delete app.faults.serverRead;
   for(let n=0;n<20;n++)await flush();
   assert.ok(observed().some(event=>event.stage===target&&event.status==='late'),target+' late SDK completion remains distinct from its timeout');
-  assert.match(shim.document.getElementById('modalRoot').innerHTML,/<h2>Support diagnostics<\/h2>/,'a late stage completion keeps the report current');
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/<h2>Debug log<\/h2>/,'a late stage completion keeps the report current');
  });
 });
 
@@ -40984,7 +41080,7 @@ test('RISK support diagnostics: download bytes, selectable copy fallback, and Re
   getRegistration(){return new Promise(resolve=>setTimeout(()=>resolve({active:null,waiting:null,installing:null}),140));}}};
  ctx.onAction('view-support-diagnostics',{});
  await ctx.onAction('download-support-diagnostics',{});
- assert.equal(download.name,'chain-scanner-support-diagnostics.json');assert.equal(download.href,'blob:support-diagnostics');
+ assert.equal(download.name,'chain-scanner-debug-log.json');assert.equal(download.href,'blob:support-diagnostics');
  assert.equal(download.blob.type,'application/json');
  const downloaded=JSON.parse(download.blob.text);
  assert.equal(downloaded.schema,'funsidething.support-diagnostics');assert.equal(downloaded.metadataOnly,true);
@@ -40992,7 +41088,7 @@ test('RISK support diagnostics: download bytes, selectable copy fallback, and Re
  assert.equal(await ctx.onAction('copy-support-diagnostics',{}),false,'clipboard failure remains recoverable by selecting the local report');
  assert.equal(selection.focused,true);assert.equal(selection.selected,true);
  await new Promise(resolve=>setTimeout(resolve,170));await flush();
- assert.match(root.innerHTML,/<h2>Support diagnostics<\/h2>/,'a slow worker observer cannot replace the current diagnostics dialog');
+ assert.match(root.innerHTML,/<h2>Debug log<\/h2>/,'a slow worker observer cannot replace the current diagnostics dialog');
  assert.match(root.innerHTML,/supportDiagnosticsData/);
  const beforeFailedDownload=JSON.stringify(ctx.state);
  ctx.URL.createObjectURL=()=>{throw Error('isolated download unavailable');};

@@ -17051,5 +17051,29 @@
     },
     "greenEvidence": "The identical new consumer passes after adding only captured-proof equality to the reconciliation invalidation guard. Broader exact successor qualification and mandatory candidate/main full CI are separate gates.",
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/cloud-sync-root-causes-20261021"
+  },
+  {
+    "baseCommit": "831b0de128fabb6e5abe5665bee5745e45e26a4e",
+    "testChangesSha256": "ff5348ea1fb070da1d24d78ca0d253210cbb14f9d68e45410451c3d36f475c82",
+    "reason": "User approved local restart diagnostics, expanded to normal-use reloads, replacement of the old in-app debugger and copy/paste without downloads. Existing label and download-name assertions follow that explicit UI change; all authority and preservation assertions remain.",
+    "previousBehavior": "Support diagnostics lost source and action observations when a document restarted. The app did not retain its explicit reload reason, and the old report screen lacked the unified persistent restart trail.",
+    "intendedBehavior": "A bounded local metadata log survives reopening, records attempted fixed-name actions, recovery phases and explicit app reload reasons, expires safely, excludes private values, and supports direct clipboard or selectable text without board/source changes.",
+    "replacementTests": [
+      "RISK debug log: ordinary actions survive reopening as metadata without changing saved work",
+      "RISK debug log: an interrupted actual cloud review retains its stage in a new document",
+      "RISK debug log: the replacement screen copies a unified log without a download",
+      "RISK debug log: unavailable diagnostic storage never blocks edits or claims persistence",
+      "RISK debug log: document and event limits expire without retaining injected private fields",
+      "RISK debug log: app reload reasons and lifecycle observations survive without private error text"
+    ],
+    "preservedCoverage": [
+      "All existing source-consent, SDK cancellation, stored-source, pending-upload, revision, identity, acknowledgement, durability and worker update assertions remain. Existing report labels and optional download filenames alone change to the user-requested Debug log.",
+      "Existing schema/version, source-stage byte limits, clipboard fallback, accepted publication ownership and unsaved Settings draft assertions remain. New controls use the existing report actions and textarea.",
+      "The first recovery-stage cold fixture used real time against an older fixed warm clock and expired correctly; its corrected pass is not claimed as a new preimplementation RED. The first ordinary-action persistence RED is meaningful and precedes all observer runtime code."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo $PWD --evidence-dir /Users/emeraldpham/.codex/task-artifacts/cloud-review-reload-20261022/runs --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK debug log:\" tests.js; separate actual slice commands and source snapshots are retained in timestamped records 10-11-35-211Z,10-18-17-511Z,10-19-59-402Z,10-21-06-726Z,10-22-16-341Z.",
+      "failure": "Observed assertions: unified restart report missing after actual Add and cold reopen; Settings old debugger instead of Debug log; failed diagnostic write falsely reported observed; expired stored journal remained; both actual manual and worker reload calls lacked retained reason. Each repair has its subsequent GREEN. Native crash reproduction attempts passed and are not defect REDs."
+    }
   }
 ]

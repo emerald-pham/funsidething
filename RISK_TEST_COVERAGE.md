@@ -2004,3 +2004,12 @@ The obsolete-reply identity consumer also requires zero replacement reads caused
 - RISK cloud response ownership: a stale provider return cannot revoke a newer confirmed owner
 
 This boundary control holds a successful real provider reply, installs a later accepted publication owner from a fresh actual provider read, then releases the old reply. The newer exact proof object, reconciliation authority, clean revision, durable source and publication intent must survive. The accepted-owner installation is explicitly modeled at the module boundary; ordinary cloudPull remains serialized and this test does not claim a concurrent read bypass.
+
+## Unified restart and sync debug log
+
+- RISK debug log: ordinary actions survive reopening as metadata without changing saved work
+- RISK debug log: an interrupted actual cloud review retains its stage in a new document
+- RISK debug log: the replacement screen copies a unified log without a download
+- RISK debug log: unavailable diagnostic storage never blocks edits or claims persistence
+- RISK debug log: document and event limits expire without retaining injected private fields
+- RISK debug log: app reload reasons and lifecycle observations survive without private error text
