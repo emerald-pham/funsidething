@@ -1994,3 +1994,7 @@ logical deadline-expiry and Cancel controls remain separate and unchanged.
 - RISK cloud write ownership: a delayed preflight cannot release another caller before its actual acknowledgement
 
 The first retains the original editor/deferred-adoption, held-pointer, exact facts, saved view and cold-reopen assertions and gates the return of an actual durable pin-release commit until the older native Save finishes. The authority consumer uses real IndexedDB conflict repair: later edits remain dirty; expired same-account sessions, changed UID/backend, equal revisions and higher durable peer revisions cannot inherit stale proof. Exact original sources remain recoverable. The ownership consumer holds the actual provider write while the earlier preflight returns; its slot remains owned until the received acknowledgement and durable reopen. No deadline or action budget is widened.
+
+- RISK cloud acknowledgement identity: a replaced backend cannot inherit an in-flight response as fresh proof
+
+This actual held-provider consumer covers backend replacement, a changed UID sharing an email and observed same-account relogin before the old reply is delivered. The old write may have committed, but its response cannot bind fresh current proof or replace local revision/dirty bookkeeping. The accepted edit remains durable and pending while a fresh replacement read is held.
