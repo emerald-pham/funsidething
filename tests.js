@@ -1868,6 +1868,148 @@ test('RISK rapid action guidance: mounted Help distinguishes later accepted work
  assert.match(html,/Rapid valid actions keep saving without a false repeated-change warning/);
 });
 
+test('RISK sync responsiveness guidance: mounted Help explains large boards and bounded damaged-source recovery',async()=>{
+ const {ctx,shim}=await loadApp();
+ for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ const rapid=help.split('<dt>Can I make several changes quickly?</dt><dd>')[1]?.split('</dd>')[0];assert.ok(rapid);
+ assert.match(rapid,/Large boards keep the same ranking, History and Undo rules/);
+ const failed=help.split('<dt>Can I keep working with a damaged cloud save?</dt><dd>')[1]?.split('</dd>')[0];assert.ok(failed,'damaged cloud saving has its own brief actionable answer');
+ assert.match(failed,/do not download that same source for every edit/);assert.match(failed,/newer cloud update/);assert.match(failed,/different saved source still needs your choice/);
+ assert.match(help,/Large saved boards respond faster/);assert.match(help,/Corrupted cloud sources stop repeated downloads/);
+});
+
+test('RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations',{timeout:20000},async t=>{
+ const app=await damagedAcknowledgedApp187(t,{sourcePadding:2000000}),{ctx,shim,backend,originalRoot}=app;
+ const headerPath='users/owner/generations/'+originalRoot.activeGeneration;
+ const different=JSON.parse(ctx.state.decisionBase.payload);different.futureDifferent={keep:'a different accepted cloud source'};
+ const encoded=await ctx.window.ChainStorageV2.encodeSnapshot(JSON.stringify(different));
+ backend.docs.set(headerPath,{...backend.docs.get(headerPath),hash:encoded.hash,byteLength:encoded.byteLength,chunkCount:encoded.chunkCount});
+ assert.equal(encoded.chunkCount,8,'the supported damaged source represents a populated eight-chunk board');
+ let reads=0;app.faults.serverRead=async()=>{reads++;};t.after(()=>{delete app.faults.serverRead;});
+ await ctx.cloudPull();assert.equal(backend.CS.errorCode,'corrupt-generation');assert.equal(backend.CS.knownDamagedSource,true);assert.ok(reads>0);
+ const originalCloud=JSON.stringify([...backend.docs]),writes=backend.writes.length,attemptReads=reads,byAction=[];
+ ctx.window.CLOUD_PUSH_DELAY_MS=0;
+ const settle=async()=>{
+  assert.equal(await ctx.persist(),true);
+  await fixtureDeadline((async()=>{for(;;){await syncSettle(5);if(!vm.runInContext('pulling||cloudPushInFlight||cloudTimer!==null',ctx))break;}})(),'ordinary accepted action saves and releases its cloud slot');
+  assert.equal((await ctx.window.ScannerDeviceStore.readHead()).payload,JSON.stringify(ctx.state));byAction.push(reads-attemptReads);
+ };
+ shim.document.getElementById('addInput').value='Local work while the cloud source needs a choice';await ctx.onAction('add',{});await settle();
+ ctx.onAction('start-scan',{dataset:{mode:'descending'}});await settle();
+ const candidate=ctx.state.candidateId,benchmark=ctx.state.chain.at(-1);assert.ok(candidate&&benchmark);
+ ctx.onAction('no',{dataset:{candidate,benchmark}});await settle();assert.equal(ctx.state.considered[candidate],'no');
+ const done=ctx.state.chain.at(-1);ctx.onAction('bench-done',{dataset:{benchmark:done}});await settle();assert.equal(ctx.state.tasks.find(row=>row.id===done).done,true);
+ assert.equal(JSON.stringify([...backend.docs]),originalCloud,'held edits cannot rewrite any damaged or complete original cloud source');assert.equal(backend.writes.length,writes);
+ assert.equal(ctx.state.syncDirty,true,'device durability is still not a cloud acknowledgement');
+ t.diagnostic('Additional unchanged-source SDK reads after Add, Start, No, Done: '+JSON.stringify(byAction));
+ assert.equal(reads,attemptReads,'a terminal unchanged corrupt source must not trigger another complete recovery download for every ordinary task action');
+ await ctx.onAction('sync-retry',{});assert.ok(reads>attemptReads,'the explicit Retry control still makes a fresh guarded attempt');
+ const healthyPayload=ctx.cloudPayload(),healthy=await ctx.window.ChainStorageV2.encodeSnapshot(healthyPayload),newId='healthy-peer-after-corruption';
+ backend.docs.set('users/owner/generations/'+newId,{...healthy,state:'published',baseRev:originalRoot.rev});
+ for(const chunk of healthy.chunks)backend.docs.set('users/owner/generations/'+newId+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
+ backend.docs.set('users/owner',{...originalRoot,rev:originalRoot.rev+1,activeGeneration:newId,previousGeneration:originalRoot.activeGeneration});
+ shim.window.dispatchEvent(new ctx.CustomEvent('cloudboardchange',{detail:{user:backend.CS.user,rev:originalRoot.rev+1}}));
+ await fixtureDeadline((async()=>{while(ctx.state.syncRev<originalRoot.rev+1||ctx.state.syncDirty)await syncSettle(10);})(),'a new server revision escapes the held-source gate');
+ assert.ok(ctx.state.tasks.some(row=>row.title==='Local work while the cloud source needs a choice'));assert.equal(ctx.state.tasks.find(row=>row.id===done).done,true);
+ assert.equal(backend.CS.knownDamagedSource,false);assert.equal(JSON.stringify(backend.docs.get(headerPath)),JSON.stringify(JSON.parse(originalCloud).find(([key])=>key===headerPath)[1]));
+});
+
+async function coldDamagedSourceWithoutAck214(t,{newerLocalWork=false}={}){
+ const seed=await damagedAcknowledgedApp187(t,{sourcePadding:2000000});
+ if(newerLocalWork){seed.shim.document.getElementById('addInput').value='Newer local task without an ACK export';await seed.ctx.onAction('add',{});assert.equal(await seed.ctx.persist(),true);}
+ const raw=seed.ctx.cloudPayload(),originalRoot={...seed.originalRoot},originalHeader={...seed.originalHeader},provider=[...seed.backend.docs];
+ assert.equal(Object.hasOwn(JSON.parse(raw),'decisionBase'),false,'the supported export does not carry the private ACK payload');
+ assert.equal(createHash('sha256').update(raw).digest('hex')===originalHeader.hash,!newerLocalWork,'control whether retained current bytes can reconstruct the published missing payload');
+ await closeLegacyApp173(seed);seed.backend.CS.suspend();
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='cold-no-ack-214-'+Math.random();
+ const app=await loadAppAtTime(1792323000000,{seed:214,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},indexedDBProvider:indexedDB,deviceDbName});
+ const faults={authPending:true},counts={reads:0};faults.serverRead=async()=>{counts.reads++;};
+ const backend=await loadCloudBackendV2({rootData:originalRoot,timeoutMs:5000,recoveryTimeoutMs:5000,failures:faults,recordSyncError:app.ctx.recordSyncError,runtimeWindow:app.ctx.window});
+ for(const [key,value] of provider)backend.docs.set(key,value);
+ app.ctx.window.CLOUD_PUSH_DELAY_MS=60000;
+ t.after(async()=>{backend.CS.suspend();vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);await app.ctx.window.ScannerDeviceStore?.close?.();await app.dispose();});
+ assert.equal(app.ctx.state.decisionBase==null,true,'the actual cold-opened app has no historical acknowledged copy');
+ backend.emitAuth({uid:'owner',email:'e@example.com'});await app.ctx.cloudPull();
+ await fixtureDeadline((async()=>{while(vm.runInContext('pulling||cloudPushInFlight',app.ctx))await syncSettle(5);})(),'the first no-ACK pull settles before inspecting its outcome');
+ return {...app,backend,faults,counts,originalRoot,originalHeader,raw,indexedDB,deviceDbName};
+}
+
+test('RISK corrupt cloud work budget: cold-opened sources without an ACK keep newer edits without repeated downloads',{timeout:20000},async t=>{
+ const app=await coldDamagedSourceWithoutAck214(t,{newerLocalWork:true}),{ctx,shim,backend,counts,originalRoot}=app;
+ assert.equal(backend.CS.errorCode,'corrupt-generation');assert.equal(backend.CS.knownDamagedSource,true);
+ const initialReads=counts.reads,originalCloud=JSON.stringify([...backend.docs]),writes=backend.writes.length,byAction=[];
+ assert.ok(initialReads>0);ctx.window.CLOUD_PUSH_DELAY_MS=0;
+ const settle=async()=>{assert.equal(await ctx.persist(),true);await fixtureDeadline((async()=>{for(;;){await syncSettle(5);if(!vm.runInContext('pulling||cloudPushInFlight||cloudTimer!==null',ctx))break;}})(),'no-ACK accepted action is durably saved');assert.equal((await ctx.window.ScannerDeviceStore.readHead()).payload,JSON.stringify(ctx.state));byAction.push(counts.reads-initialReads);};
+ shim.document.getElementById('addInput').value='Another local task after a held no-ACK pull';await ctx.onAction('add',{});await settle();
+ ctx.onAction('start-scan',{dataset:{mode:'descending'}});await settle();
+ const candidate=ctx.state.candidateId,benchmark=ctx.state.chain.at(-1);assert.ok(candidate&&benchmark);ctx.onAction('no',{dataset:{candidate,benchmark}});await settle();assert.equal(ctx.state.considered[candidate],'no');
+ const done=ctx.state.chain.at(-1);ctx.onAction('bench-done',{dataset:{benchmark:done}});await settle();assert.equal(ctx.state.tasks.find(row=>row.id===done).done,true);
+ assert.equal(JSON.stringify([...backend.docs]),originalCloud);assert.equal(backend.writes.length,writes);assert.equal(ctx.state.syncDirty,true);assert.ok(ctx.state.tasks.some(row=>row.title==='Newer local task without an ACK export'));
+ t.diagnostic('No-ACK additional unchanged-source SDK reads: '+JSON.stringify(byAction));
+ assert.equal(counts.reads,initialReads,'absence of an exact ACK cannot restart the same corrupt-source read for each accepted local edit');
+ await ctx.onAction('sync-retry',{});assert.ok(counts.reads>initialReads,'explicit Retry remains live without an ACK');
+ const healthyPayload=ctx.cloudPayload(),healthy=await ctx.window.ChainStorageV2.encodeSnapshot(healthyPayload),newId='healthy-peer-after-no-ack-hold';
+ backend.docs.set('users/owner/generations/'+newId,{...healthy,state:'published',baseRev:originalRoot.rev});for(const chunk of healthy.chunks)backend.docs.set('users/owner/generations/'+newId+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
+ backend.docs.set('users/owner',{...originalRoot,rev:originalRoot.rev+1,activeGeneration:newId,previousGeneration:originalRoot.activeGeneration});shim.window.dispatchEvent(new ctx.CustomEvent('cloudboardchange',{detail:{user:backend.CS.user,rev:originalRoot.rev+1}}));
+ await fixtureDeadline((async()=>{while(ctx.state.syncRev<originalRoot.rev+1||ctx.state.syncDirty)await syncSettle(10);})(),'new server revision resumes a no-ACK source hold');assert.equal(ctx.state.tasks.find(row=>row.id===done).done,true);assert.ok(ctx.state.tasks.some(row=>row.title==='Another local task after a held no-ACK pull'));
+});
+
+test('RISK lossless cloud recovery: an exact current board repairs missing chunks without a historical ACK',{timeout:20000},async t=>{
+ const app=await coldDamagedSourceWithoutAck214(t),{ctx,shim,backend,originalRoot,originalHeader,raw,indexedDB,deviceDbName}=app;
+ const recovered=await settleRecovery188(app);assert.ok(recovered.remote.rev>originalRoot.rev,'independently matching current bytes permit automatic exact-source reconstruction');
+ const original=JSON.parse(raw),saved=JSON.parse(recovered.remote.payload);assert.deepEqual(saved.tasks,original.tasks);assert.deepEqual(saved.futureIOSReportFixture,original.futureIOSReportFixture);assert.deepEqual(ctx.retainedDecisionFacts(saved),ctx.retainedDecisionFacts(original));
+ assert.equal(JSON.stringify(backend.docs.get('users/owner/generations/'+originalRoot.activeGeneration)),JSON.stringify(originalHeader),'the damaged generation header remains available as an exact original');
+ assert.equal([...backend.docs.keys()].some(key=>key.startsWith('users/owner/generations/'+originalRoot.activeGeneration+'/chunks/')),false,'repair publishes a new complete generation rather than rewriting the original');
+ const graph=await ctx.window.ScannerDeviceStore.readRawExportSnapshot(),containsOriginal=value=>value===raw||value&&typeof value==='object'&&Object.values(value).some(containsOriginal);assert.ok(containsOriginal(graph)||[SYNC_STORE_KEY,LOCAL_HEAD_KEY].some(key=>shim.localStorage.getItem(key)===raw),'the exact original remains retained locally');
+ shim.document.getElementById('addInput').value='New work after exact no-ACK repair';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);await ctx.sendPush();await fixtureDeadline((async()=>{while(vm.runInContext('pulling||cloudPushInFlight',ctx))await syncSettle(5);})(),'post-repair native edit settles before ACK verification');const final=await settleRecovery188(app);assert.ok(JSON.parse(final.remote.payload).tasks.some(row=>row.title==='New work after exact no-ACK repair'));
+ const finalHead=final.head.payload;await closeLegacyApp173(app);backend.CS.suspend();const cold=await loadAppAtTime(1792323000000,{sharedStorage:shim.localStorage,indexedDBProvider:indexedDB,deviceDbName,cloudSyncFactory:()=>({configured:false,ready:false,user:null,status:'off'})});t.after(()=>cold.dispose());assert.equal(JSON.stringify(cold.ctx.state),finalHead);assert.equal((await cold.ctx.window.ScannerDeviceStore.readHead()).payload,finalHead,'real cold reopen retains the repaired ACK and subsequent accepted task');
+});
+
+test('RISK corrupt cloud work budget: completed pending-source refusals do not restart downloads on ordinary edits',{timeout:30000},async t=>{
+ for(const control of ['unrepresented pending','JSON-lossy pending','BigInt pending','cyclic pending'])await t.test(control,async sub=>{
+  const app=await damagedAcknowledgedApp187(sub),{ctx,shim,backend,originalRoot,originalHeader}=app,store=ctx.window.ScannerDeviceStore;
+  if(control==='unrepresented pending'){
+   app.faults.transactionRead=async(path,docs)=>{if(path.startsWith('users/owner/generations/')&&!path.includes('/chunks/')&&docs.get(path)?.state==='staging'&&[...docs.keys()].some(key=>key.startsWith(path+'/chunks/')))throw Object.assign(Error('isolated original pending upload'),{code:'unavailable'});};
+   assert.equal((await backend.CS.push(JSON.stringify({v:2,tasks:[{id:'pending-only-budget',title:'Pending-only work',ctx:[]}],futurePending:{keep:'exact original'}}),1792322999999,originalRoot.rev)).error,true);delete app.faults.transactionRead;
+  }else{
+   let future;if(control==='JSON-lossy pending'){future=new Array(1);future.future='sole pending field outside JSON';}else if(control==='BigInt pending')future=9n;else{future={keep:'cyclic original'};future.self=future;}
+   await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>tx.objectStore('meta').put({generationId:'budget-lossy-pending',payloadHash:originalHeader.hash,baseRev:originalRoot.rev,updatedAt:1,account:'owner',futurePending:future},'pending:owner'));
+  }
+  const pending=await store.getPendingUpload('owner'),originalCloud=JSON.stringify([...backend.docs]),writes=backend.writes.length;let reads=0;app.faults.serverRead=async()=>{reads++;};sub.after(()=>{delete app.faults.serverRead;});
+  await ctx.cloudPull();assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev);const initialReads=reads,byAction=[];assert.ok(initialReads>0);ctx.window.CLOUD_PUSH_DELAY_MS=0;
+  const settle=async()=>{assert.equal(await ctx.persist(),true);await fixtureDeadline((async()=>{for(;;){await syncSettle(5);if(!vm.runInContext('pulling||cloudPushInFlight||cloudTimer!==null',ctx))break;}})(),'pending-held ordinary action saves durably');assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state));byAction.push(reads-initialReads);};
+  shim.document.getElementById('addInput').value='Accepted while pending recovery needs a choice';await ctx.onAction('add',{});await settle();ctx.onAction('start-scan',{dataset:{mode:'descending'}});await settle();
+  const candidate=ctx.state.candidateId,benchmark=ctx.state.chain.at(-1);assert.ok(candidate&&benchmark);ctx.onAction('no',{dataset:{candidate,benchmark}});await settle();assert.equal(ctx.state.considered[candidate],'no');const done=ctx.state.chain.at(-1);ctx.onAction('bench-done',{dataset:{benchmark:done}});await settle();assert.equal(ctx.state.tasks.find(row=>row.id===done).done,true);
+  assert.equal(JSON.stringify([...backend.docs]),originalCloud);assert.equal(backend.writes.length,writes);assert.deepEqual(await store.getPendingUpload('owner'),pending,'even JSON-lossy unknown physical fields remain exact');assert.equal(ctx.state.syncDirty,true);
+  sub.diagnostic(control+' additional SDK reads: '+JSON.stringify(byAction));assert.equal(reads,initialReads,'a completed pending-source refusal cannot reset the corrupt-source download budget for every edit');
+  const readPending=store.getPendingUpload;store.getPendingUpload=async()=>{throw Object.assign(Error('isolated unavailable local pending read'),{name:'AbortError'});};try{await ctx.sendPush();assert.equal(reads,initialReads,'an unavailable local pending read cannot authorize another cloud download');}finally{store.getPendingUpload=readPending;}await ctx.sendPush();assert.equal(reads,initialReads,'a later available local read keeps the unchanged refusal bounded');
+
+  await ctx.onAction('sync-retry',{});assert.ok(reads>initialReads,'explicit Retry remains live for a pending-source hold');assert.equal(JSON.stringify([...backend.docs]),originalCloud);assert.deepEqual(await store.getPendingUpload('owner'),pending);
+  // An independent compatible peer may replace the local pointer. Retain the
+  // original physical value (including non-JSON data) before simulating it.
+  await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>tx.objectStore('meta').put(pending,'fixture-original-pending-budget'));
+  const replacement={...pending,updatedAt:pending.updatedAt+1};await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>tx.objectStore('meta').put(replacement,'pending:owner'));const beforePeer=reads;await ctx.sendPush();await settle();assert.ok(reads>beforePeer,'changed local pending evidence releases only to a fresh source check');assert.equal(JSON.stringify([...backend.docs]),originalCloud);assert.deepEqual(await store.getPendingUpload('owner'),replacement);
+  if(control!=='unrepresented pending'){
+   const compatible={...replacement};delete compatible.futurePending;await store.setPendingUpload('owner',compatible);await ctx.sendPush();await fixtureDeadline((async()=>{while(vm.runInContext('pulling||cloudPushInFlight',ctx))await syncSettle(5);})(),'a same-pointer losslessness change permits a fresh guarded repair');const final=await settleRecovery188(app);assert.ok(final.remote.rev>originalRoot.rev);assert.equal(ctx.state.tasks.find(row=>row.id===done).done,true);assert.ok(JSON.parse(final.remote.payload).tasks.some(row=>row.title==='Accepted while pending recovery needs a choice'));
+  }
+  const graph=await store.readRawExportSnapshot(),meta=graph.stores.meta;assert.deepEqual(meta.values[meta.keys.indexOf('fixture-original-pending-budget')],pending,'the compatible-peer fixture retains every exact original non-JSON value');
+
+ });
+});
+
+test('RISK corrupt cloud work budget: a failed exact-source read does not permanently hold a later repair',async t=>{
+ const app=await damagedAcknowledgedApp187(t),{ctx,shim,backend,originalRoot}=app;let roots=0,failed=false;
+ app.faults.serverRead=async path=>{if(path==='users/owner'&&++roots===3){failed=true;throw Object.assign(Error('Synthetic transient exact-source read'),{code:'unavailable'});}};
+ await ctx.cloudPull();assert.equal(failed,true,'the ordinary corrupt pull reached its separate exact-copy read');assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev);
+ delete app.faults.serverRead;
+ shim.document.getElementById('addInput').value='Accepted after a transient exact-source read';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);await ctx.sendPush();
+ await fixtureDeadline((async()=>{while(vm.runInContext('pulling||cloudPushInFlight',ctx))await syncSettle(5);})(),'the edit-triggered app operation settles before the external verification read');
+ const {remote}=await settleRecovery188(app);
+ assert.ok(remote.rev>originalRoot.rev,'a transient failed check cannot be treated as proof that the exact acknowledged copy is unrepairable');
+ assert.ok(JSON.parse(remote.payload).tasks.some(row=>row.title==='Accepted after a transient exact-source read'));
+});
+
 test('RISK resilient sync recovery: an exact acknowledged copy recovers missing cloud chunks and publishes subsequent local work',async t=>{
  const app=await damagedAcknowledgedApp187(t),{ctx,shim,backend,originalRoot,originalHeader,acknowledgedTasks}=app;
  shim.document.getElementById('addInput').value='Local work after source damage';
@@ -38340,7 +38482,11 @@ async function heldDecisionApp188(t,{fixture=heldDecisionFixture188(),failures={
 }
 async function settleRecovery188(app){
  const end=Date.now()+5000;
- while(Date.now()<end){const remote=await app.backend.CS.pull(),head=app.ctx.window.ScannerDeviceStore?await app.ctx.window.ScannerDeviceStore.readHead():{payload:app.shim.localStorage.getItem(LOCAL_HEAD_KEY)};
+ while(Date.now()<end){
+  // A verifier read mutates the fake backend's shared status. Let the real
+  // owner finish, including a scheduled retry, before verifying its ACK.
+  if(app.ctx.state.syncDirty||vm.runInContext('pulling||cloudPushInFlight||cloudRetryTimer!==null',app.ctx)){await new Promise(resolve=>setTimeout(resolve,5));continue;}
+  const remote=await app.backend.CS.pull(),head=app.ctx.window.ScannerDeviceStore?await app.ctx.window.ScannerDeviceStore.readHead():{payload:app.shim.localStorage.getItem(LOCAL_HEAD_KEY)};
   if(!app.ctx.state.syncDirty&&remote?.payload===app.ctx.cloudPayload()&&remote.rev===app.ctx.state.syncRev&&head.payload===JSON.stringify(app.ctx.state))return {remote,head};
   await new Promise(resolve=>setTimeout(resolve,5));
  }
@@ -38937,6 +39083,70 @@ test('RISK BACKUP FILE RESTORE: fixture readiness waits for signed-in durable re
  assert.match(preview,/data-act="confirm-file-restore"/,shim.document.getElementById('toast').textContent);
  assert.equal(finishedBeforeAck,false,'fixture readiness must not return while the real reconciliation commit acknowledgement is held');
  assert.doesNotMatch(preview.match(/<button\b[^>]*data-act="confirm-file-restore"[^>]*>/)?.[0]||'',/\sdisabled(?:\s|>|=)/,'a healthy fixture reaches enabled consent only after actual durable cloud acknowledgement');
+});
+
+test('RISK populated task responsiveness: three rapid Yes actions retain history and reopen within the interaction budget',{timeout:30000},async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),at=Date.parse('2026-10-20T15:00:00Z');
+ const initial=syncState({tasks:Array.from({length:434},(_,i)=>({...syncTask('responsive-task-'+i,'Synthetic task '+i),futureTask:{keep:i}})),syncDirty:false,futureBoard:{keep:'opaque'}});
+ const rawInitial=JSON.stringify(initial),source=await loadAppAtTime(at,{seed:2191,seedStorage:{[SYNC_STORE_KEY]:rawInitial,[LOCAL_HEAD_KEY]:rawInitial}});
+ source.ctx.onAction('start-scan',{dataset:{mode:'squared'}});
+ const board=JSON.parse(JSON.stringify(source.ctx.state)),startFacts=board.decisionEvents;
+ assert.equal(startFacts.length,2,'the actual Start supplies the supported draw and chain evidence');
+ const archived=Array.from({length:40},(_,i)=>startFacts.map(event=>({...event,id:'responsive-archive-'+i+'-'+event.target.property,actionId:'responsive-start-'+i,target:{...event.target,id:'responsive-pass-'+i}}))).flat();
+ const oldBaseline=board.decisionBaseline;delete board.decisionBase;
+ board.decisionBaseline=source.ctx.baselineFromSource(board,{account:null,baseId:null});
+ board.decisionBaseline.replacement=[{v:1,reason:'explicit-restore',account:null,actionId:'responsive-recovery',at:at+100,baseline:oldBaseline,
+  facts:archived.map(event=>({id:event.id,witness:source.ctx.LZString.compressToUTF16(source.ctx.canonicalDecisionFact(event))}))}];
+ board.decisionEvents=[];for(let i=1;i<=40;i++)board.tasks[i].lastDoneAt=at-50000+i;
+ assert.equal(source.ctx.decisionEvidenceIssue(board,null),null,'the synthetic historical source is supported before timing starts');
+ const raw=JSON.stringify(board),originalFacts=archived.map(event=>source.ctx.canonicalDecisionFact(event));await source.dispose();
+ const deviceDbName='populated-responsive-'+Math.random(),app=await loadAppAtTime(at,{seed:2192,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw,[LOCAL_BACKUPS_KEY]:'[]'},indexedDBProvider:indexedDB,deviceDbName}),{ctx,shim}=app;
+ t.after(()=>app.dispose());assert.equal(await ctx.persist(),true);
+ ctx.onAction('start-scan',{dataset:{mode:'squared'}});
+ const priorIds=new Set(ctx.state.decisionEvents.map(event=>event.id)),chosen=[],actionMs=[];
+ for(let i=0;i<3;i++){
+  const candidate=ctx.state.candidateId,benchmark=ctx.state.chain.at(-1);assert.ok(candidate&&benchmark);
+  const started=performance.now();ctx.onAction('yes',{dataset:{candidate,benchmark}});actionMs.push(performance.now()-started);
+  assert.equal(ctx.state.chain.at(-1),candidate,'each distinct Yes reaches its intended task');chosen.push(candidate);
+ }
+ assert.equal(new Set(chosen).size,3,'rapid accepted actions must not retarget or collapse');
+ const accepted=ctx.state.decisionEvents.filter(event=>!priorIds.has(event.id));assert.equal(accepted.length,3);
+ assert.equal(await ctx.persist(),true,'the real device store acknowledges all accepted work');
+ const head=await ctx.window.ScannerDeviceStore.readHead();assert.equal(head.payload,JSON.stringify(ctx.state));
+ const retained=ctx.retainedDecisionFacts(JSON.parse(head.payload));
+ for(const fact of originalFacts)assert.ok(retained.some(event=>ctx.canonicalDecisionFact(event)===fact),'every archived decision remains exact');
+ await app.dispose();
+ const beforeShares=ctx.chanceDisplayStats(),cold=await loadAppAtTime(at+10000,{sharedStorage:shim.localStorage,indexedDBProvider:indexedDB,deviceDbName});t.after(()=>cold.dispose());
+ const coldShares=cold.ctx.chanceDisplayStats();for(const [id,row] of beforeShares){assert.ok(Math.abs(row.probability-coldShares.get(id).probability)<1e-12,'freshly reopened probabilities match the incremental view');assert.equal(row.fallback,coldShares.get(id).fallback);}
+ for(const event of accepted)assert.ok(cold.ctx.state.decisionEvents.some(row=>cold.ctx.canonicalDecisionFact(row)===ctx.canonicalDecisionFact(event)),'cold reopen retains each accepted decision exactly');
+ assert.deepEqual([...cold.ctx.state.chain], [...ctx.state.chain]);assert.equal(cold.ctx.state.tasks.length,434);
+ assert.deepEqual(JSON.parse(JSON.stringify(cold.ctx.state.futureBoard)),{keep:'opaque'});
+ t.diagnostic('Three populated-board task actions: '+JSON.stringify(actionMs.map(ms=>Math.round(ms)))+'ms; source '+Buffer.byteLength(raw)+' bytes');
+ assert.ok(actionMs.reduce((sum,ms)=>sum+ms,0)<1000,'three ordinary task controls must not monopolize the main thread for a full second; observed '+Math.round(actionMs.reduce((sum,ms)=>sum+ms,0))+'ms');
+});
+
+test('RISK populated completion responsiveness: rapid Done and Undo preserve earlier completions without full-pool stalls',{timeout:20000},async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),at=Date.parse('2026-10-20T15:00:00Z');
+ const tasks=Array.from({length:434},(_,i)=>({...syncTask('responsive-done-'+i,'Synthetic completion '+i),futureTask:{keep:i}}));
+ const board=syncState({tasks,mode:'work',chain:tasks.slice(0,4).map(row=>row.id),syncDirty:false,futureBoard:{keep:['original']}}),raw=JSON.stringify(board),deviceDbName='responsive-done-'+Math.random();
+ const app=await loadAppAtTime(at,{seed:2901,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},indexedDBProvider:indexedDB,deviceDbName}),{ctx,shim}=app;t.after(()=>app.dispose());
+ assert.equal(await ctx.persist(),true);const completed=[],times=[];
+ for(let i=0;i<3;i++){
+  const id=ctx.state.chain.at(-1),started=performance.now();ctx.onAction('bench-done',{dataset:{benchmark:id}});times.push(performance.now()-started);
+  assert.equal(ctx.state.tasks.find(task=>task.id===id).done,true);completed.push(id);
+ }
+ assert.equal(new Set(completed).size,3);assert.equal(ctx.state.decisionEvents.filter(event=>event.kind==='completion').length,3);
+ ctx.onAction('undo',{});
+ assert.equal(ctx.state.tasks.find(task=>task.id===completed[2]).done,false,'Undo reverses only the last completion');
+ for(const id of completed.slice(0,2))assert.equal(ctx.state.tasks.find(task=>task.id===id).done,true,'earlier accepted completions survive Undo');
+ assert.equal(await ctx.persist(),true);const head=await ctx.window.ScannerDeviceStore.readHead();assert.equal(head.payload,JSON.stringify(ctx.state));await app.dispose();
+ const beforeShares=ctx.chanceDisplayStats(),cold=await loadAppAtTime(at+10000,{sharedStorage:shim.localStorage,indexedDBProvider:indexedDB,deviceDbName});t.after(()=>cold.dispose());
+ const coldShares=cold.ctx.chanceDisplayStats();for(const [id,row] of beforeShares){assert.ok(Math.abs(row.probability-coldShares.get(id).probability)<1e-12,'completion and Undo retain the fresh full-pool probabilities');assert.equal(row.fallback,coldShares.get(id).fallback);}
+ for(const id of completed.slice(0,2))assert.equal(cold.ctx.state.tasks.find(task=>task.id===id).done,true);
+ assert.equal(cold.ctx.state.tasks.find(task=>task.id===completed[2]).done,false);assert.equal(cold.ctx.state.tasks[433].futureTask.keep,433);
+ assert.deepEqual(JSON.parse(JSON.stringify(cold.ctx.state.futureBoard)),{keep:['original']});
+ t.diagnostic('Three populated-board Done controls: '+JSON.stringify(times.map(ms=>Math.round(ms)))+'ms');
+ assert.ok(times.reduce((sum,ms)=>sum+ms,0)<1000,'three Done controls must share the same one-second interaction budget; observed '+Math.round(times.reduce((sum,ms)=>sum+ms,0))+'ms');
 });
 
 test('RISK saved-board startup: a large legacy completion board opens and saves responsively while retaining exact facts',{timeout:15000},async t=>{
@@ -40645,4 +40855,111 @@ test('RISK support diagnostics: download bytes, selectable copy fallback, and Re
  assert.match(root.innerHTML,/<h2>Settings<\/h2>/);
  assert.equal(control.value,'37','Return restores the actual unsaved Settings control value');
  assert.equal(ctx.state.settings.workedHours,16,'restoring the draft does not silently save it');
+});
+
+
+test('RISK numeric responsiveness: optimized sampling and cold display preserve released distributions and random streams',async t=>{
+ const golden=[{"spare":null,"rows":[{"id":"a","hist":[0.1428571492433548,0.1428571492433548,0.1428571492433548,0.2857142984867096,0.2857142984867096],"cdf":[0.1428571492433548,0.2857142984867096,0.4285714626312256,0.7142857313156128,1],"topK":5,"n":5},{"id":"b","hist":[0.2857142984867096,0,0.7142857313156128,0,0],"cdf":[0.2857142984867096,0.2857142984867096,1,1,1],"topK":3,"n":5},{"id":"c","hist":[0.2857142984867096,0,0,0.1428571492433548,0.5714285969734192],"cdf":[0.2857142984867096,0.2857142984867096,0.2857142984867096,0.4285714626312256,1],"topK":5,"n":5},{"id":"d","hist":[0.1428571492433548,0.1428571492433548,0,0.5714285969734192,0.1428571492433548],"cdf":[0.1428571492433548,0.2857142984867096,0.2857142984867096,0.8571429252624512,1],"topK":4,"n":5},{"id":"e","hist":[0.1428571492433548,0.7142857313156128,0.1428571492433548,0,0],"cdf":[0.1428571492433548,0.8571428656578064,1,1,1],"topK":2,"n":5}],"savedSpare":-1.4005921983302108,"nextGaussian":-1.4005921983302108,"nextRandom":0.125,"draws":37},{"spare":1.25,"rows":[{"id":"a","hist":[0.2857142984867096,0.1428571492433548,0.1428571492433548,0.2857142984867096,0.1428571492433548],"cdf":[0.2857142984867096,0.4285714626312256,0.5714285969734192,0.8571429252624512,1],"topK":4,"n":5},{"id":"b","hist":[0.2857142984867096,0,0.5714285969734192,0.1428571492433548,0],"cdf":[0.2857142984867096,0.2857142984867096,0.8571429252624512,1,1],"topK":3,"n":5},{"id":"c","hist":[0.1428571492433548,0,0,0.1428571492433548,0.7142857313156128],"cdf":[0.1428571492433548,0.1428571492433548,0.1428571492433548,0.2857142984867096,1],"topK":5,"n":5},{"id":"d","hist":[0.1428571492433548,0.2857142984867096,0,0.4285714328289032,0.1428571492433548],"cdf":[0.1428571492433548,0.4285714626312256,0.4285714626312256,0.8571428656578064,1],"topK":4,"n":5},{"id":"e","hist":[0.1428571492433548,0.5714285969734192,0.2857142984867096,0,0],"cdf":[0.1428571492433548,0.7142857313156128,1,1,1],"topK":2,"n":5}],"savedSpare":null,"nextGaussian":-2.5728461288937713e-16,"nextRandom":0.125,"draws":37}];
+ for(const expected of golden){
+  const app=await loadApp({seed:314});t.after(()=>app.dispose());const {ctx}=app;
+  vm.runInContext('globalThis.goldenDraws=0;globalThis.goldenSequence=[.125,.625,.25,.875,.375,.75];Math.random=function(){if(this!==Math)throw Error("random receiver changed");return goldenSequence[goldenDraws++%goldenSequence.length];};_spare='+JSON.stringify(expected.spare),ctx);
+  const rows=[...ctx.rankStats([{id:'a',mu:25,sigma:8},{id:'b',mu:24,sigma:3},{id:'c',mu:19,sigma:9},{id:'d',mu:NaN,sigma:0},{id:'e',mu:26,sigma:2}],7)].map(([id,row])=>({id,hist:[...row.hist],cdf:[...row.cdf],topK:row.topK,n:row.n}));
+  assert.deepEqual(rows,expected.rows,'released Float32 distributions and stopping estimates remain exact');
+  assert.equal(vm.runInContext('_spare',ctx),expected.savedSpare);assert.equal(ctx.gauss(),expected.nextGaussian);assert.equal(vm.runInContext('Math.random()',ctx),expected.nextRandom);assert.equal(vm.runInContext('goldenDraws',ctx),expected.draws);
+ }
+ for(const [count,samples,spare] of [[0,0,-0],[1,7,0],[4,3,-0],[5,2,null],[5,3,1.25],[4,0,null]]){
+  const apps=await Promise.all([loadApp({seed:315}),loadApp({seed:315})]);t.after(()=>Promise.all(apps.map(app=>app.dispose())));
+  for(const {ctx} of apps)vm.runInContext('globalThis.streamDraws=0;globalThis.streamSequence=[0,.125,0,.625,.25,.875,.375,.75];Math.random=function(){if(this!==Math)throw Error("random receiver changed");return streamSequence[streamDraws++%streamSequence.length];};_spare='+(Object.is(spare,-0)?'-0':JSON.stringify(spare)),ctx);
+  const items=Array.from({length:count},(_,i)=>({id:'stream-'+i,mu:25+i,sigma:3+i}));apps[0].ctx.rankStats(items,samples);
+  for(let i=0;i<count*(samples||250);i++)apps[1].ctx.gauss();
+  assert.ok(Object.is(vm.runInContext('_spare',apps[0].ctx),vm.runInContext('_spare',apps[1].ctx)),'odd/even pools retain the shared Gaussian spare exactly');
+  for(let i=0;i<3;i++)assert.equal(apps[0].ctx.gauss(),apps[1].ctx.gauss(),'later standalone sampling sees the unchanged stream');
+  assert.equal(vm.runInContext('streamDraws',apps[0].ctx),vm.runInContext('streamDraws',apps[1].ctx),'zero uniforms are rejected without extra or missing draws');
+ }
+ const app=await loadApp({seed:316});t.after(()=>app.dispose());const {ctx}=app;
+ const cases=[[],[{id:'sole',mu:NaN,sigma:0}],[{id:'a',mu:-1e5,sigma:-1},{id:'b',mu:1e5,sigma:1e5},{id:'c',mu:25,sigma:8}],[{id:'same',mu:1,sigma:3},{id:'same',mu:2,sigma:4},{id:'other',mu:3,sigma:5}]];
+ for(const tasks of cases){vm.runInContext('chanceDisplayWeightCache=null',ctx);const actual=ctx.chanceDisplayWeights(tasks),expected=new Map(tasks.map(task=>[task.id,ctx.chanceWeight(task,tasks)]));for(const [id,weight] of expected)assert.equal(actual.get(id),weight,'cold normalized weights preserve ID exclusion, bounds and tails exactly');}
+ const tasks=[{id:'a',mu:25,sigma:8},{id:'b',mu:26,sigma:7}];ctx.chanceWeight=task=>task.id==='a'?.25:.75;assert.deepEqual([...ctx.chanceDisplayWeights(tasks)].map(([id,weight])=>[id,weight]),[['a',.25],['b',.75]],'a replacement calculator retains its existing fallback');
+});
+
+test('RISK numeric caller preservation: stable CDFs and long history fingerprints survive current Math replacements',async t=>{
+ const app=await loadApp({seed:317});t.after(()=>app.dispose());const {ctx}=app;
+ const texts=['','a','history:[["task-a",25,8,true],250]','\u0000😀café\ud800','history:'+('task-25,8,true;'.repeat(4096))];
+ const hashes=[1947474976,1817065451,1459420189,3793510592,4294361956];
+ vm.runInContext('globalThis.originalMin=Math.min;globalThis.originalImul=Math.imul;globalThis.mathReceivers=[];gauss=()=>0',ctx);
+ for(const phase of ['first','second']){
+  vm.runInContext('Math.min=function(a,b){if(this!==Math)throw Error("min receiver changed");mathReceivers.push("'+phase+'-min");return originalMin(a,b);};Math.imul=function(a,b){if(this!==Math)throw Error("imul receiver changed");mathReceivers.push("'+phase+'-imul");return originalImul(a,b);}',ctx);
+  const rows=[...ctx.rankStats([{id:'a',mu:25,sigma:8},{id:'b',mu:25,sigma:8},{id:'c',mu:25,sigma:8}],7)].map(([id,row])=>({id,hist:[...row.hist],cdf:[...row.cdf],topK:row.topK,n:row.n}));
+  assert.deepEqual(rows,[{id:'a',hist:[1,0,0],cdf:[1,1,1],topK:2,n:3},{id:'b',hist:[0,1,0],cdf:[0,1,1],topK:2,n:3},{id:'c',hist:[0,0,1],cdf:[0,0,1],topK:3,n:3}],'stable equal-score order and exact stored CDFs remain released behavior');
+  for(let i=0;i<texts.length;i++)assert.equal(ctx.chanceHash(texts[i]),hashes[i],'released unsigned fingerprints retain every UTF-16 code unit, prefix and overflow');
+  const seen=JSON.parse(vm.runInContext('JSON.stringify(mathReceivers)',ctx));assert.ok(seen.includes(phase+'-min')&&seen.includes(phase+'-imul'),'each call uses the current receiver-sensitive math methods');
+ }
+});
+
+
+test('RISK forecast caller preservation: current Math receivers preserve exact released shared-draw integration',()=>{
+ const ctx=loadEngine();
+ const cases=[
+  [{mu:25,sigma:8},[],2,0],
+  [{mu:25,sigma:5},[{mu:40,sigma:2}],1,0.9698833719924885],
+  [{mu:25,sigma:25/3},Array.from({length:5},()=>({mu:25,sigma:.8})),5,0.6934877240558331],
+  [{mu:-50,sigma:1000},[{mu:-100,sigma:.8},{mu:-55,sigma:.8}],2,0.4980053321763004],
+  [{mu:0,sigma:10000},[{mu:-5000,sigma:.8},{mu:5000,sigma:.8}],2,0.6914624301491861],
+  [{mu:25,sigma:5},[{mu:20,sigma:2},{mu:40,sigma:2},{mu:25,sigma:3}],2.4,0.9699701244493156]
+ ];
+ vm.runInContext('globalThis.forecastOriginals=Object.fromEntries(["max","min","round","sqrt","abs","exp"].map(key=>[key,Math[key]]));globalThis.forecastReceivers=[]',ctx);
+ for(const phase of ['first','second']){
+  vm.runInContext('for(const [key,fn]of Object.entries(forecastOriginals))Math[key]=function(...args){if(this!==Math)throw Error("forecast Math receiver changed");forecastReceivers.push("'+phase+'-"+key);return fn.apply(this,args);}',ctx);
+  for(const [bench,pool,perMin,expected]of cases){const before=JSON.stringify([bench,pool]);assert.equal(ctx.chanceBetterSoon(bench,pool,perMin),expected,'the same breakpoints, reductions and quadrature retain the exact released result');assert.equal(JSON.stringify([bench,pool]),before,'forecasting does not mutate caller ratings or queue');}
+  const seen=JSON.parse(vm.runInContext('JSON.stringify(forecastReceivers)',ctx));for(const key of ['max','min','round','sqrt','abs','exp'])assert.ok(seen.includes(phase+'-'+key),'each invocation uses the current receiver-sensitive '+key);
+ }
+});
+
+
+test('RISK History basis work budget: identical exact inputs avoid repeated hashing while changed or custom evidence stays fresh',async t=>{
+ const prefix='"use strict";globalThis.basisHashWork=0;globalThis.basisDefaultImul=Math.imul;Math.imul=function(...args){basisHashWork++;return basisDefaultImul.apply(this,args);};globalThis.basisBootImul=Math.imul;\n';
+ const app=await loadApp({appSource:prefix+appSrc,seed:318});t.after(()=>app.dispose());const {ctx}=app;
+ ctx.addTask('Basis first');ctx.addTask('Basis second');ctx.state.tasks[0].mu+=.125;
+ const stats=()=>ctx.chanceDisplayStats('chance');
+ const basisInputs=current=>JSON.stringify([ctx.state.tasks.filter(task=>!task.done).map(task=>[task.id,task.mu,task.sigma,!!current.get(task.id)?.available]).sort(([a],[b])=>a<b?-1:a>b?1:0),ctx.state.settings.samples]);
+ const oracle=current=>{const inputs=basisInputs(current);return ctx.chanceHash('history:'+inputs).toString(16)+':'+ctx.chanceHash('basis:'+inputs).toString(16)+':'+inputs.length;};
+ const firstStats=stats(),expected=oracle(firstStats),before=JSON.stringify(ctx.state);vm.runInContext('basisHashWork=0',ctx);
+ assert.equal(ctx.ratingObservationBasis(firstStats),expected);const firstWork=vm.runInContext('basisHashWork',ctx);assert.ok(firstWork>0,'new exact inputs hash through the existing algorithm');
+ assert.equal(ctx.ratingObservationBasis(stats()),expected);assert.equal(vm.runInContext('basisHashWork',ctx),firstWork,'repeated exact History basis must not rehash the same serialized inputs');
+ assert.equal(JSON.stringify(ctx.state),before,'deriving a basis never mutates the accepted board');
+ for(const change of [()=>{ctx.state.tasks[0].sigma+=.25;},()=>{ctx.state.settings.samples+=1;},()=>{ctx.state.tasks[0].startsAt=ctx.todayISO(10);},()=>{ctx.state.tasks[1].id+='-replaced';},()=>{ctx.state.tasks[1].done=true;}]){change();const current=stats(),value=oracle(current),count=vm.runInContext('basisHashWork',ctx);assert.equal(ctx.ratingObservationBasis(current),value);assert.ok(vm.runInContext('basisHashWork',ctx)>count,'changed ratings, samples and membership are freshly hashed');}
+ const reorderStats=stats(),reorderExpected=oracle(reorderStats);ctx.state.tasks.reverse();const reorderCount=vm.runInContext('basisHashWork',ctx);assert.equal(ctx.ratingObservationBasis(stats()),reorderExpected);assert.equal(vm.runInContext('basisHashWork',ctx),reorderCount,'order-only changes preserve the language-independent exact basis');
+ const savedTasks=ctx.state.tasks;ctx.state.tasks=[];const emptyStats=stats(),emptyExpected=oracle(emptyStats);assert.equal(ctx.ratingObservationBasis(emptyStats),emptyExpected);const emptyCount=vm.runInContext('basisHashWork',ctx);assert.equal(ctx.ratingObservationBasis(stats()),emptyExpected);assert.equal(vm.runInContext('basisHashWork',ctx),emptyCount,'empty exact inputs are stable');ctx.state.tasks=savedTasks;
+ const current=stats();vm.runInContext('globalThis.basisSavedHash=chanceHash;globalThis.customBasisCalls=0;chanceHash=text=>{customBasisCalls++;return text.startsWith("history:")?19:23;}',ctx);
+ for(let i=0;i<2;i++)assert.match(ctx.ratingObservationBasis(current),/^13:17:/);assert.equal(vm.runInContext('customBasisCalls',ctx),4,'replacement calculators are called for every basis');
+ vm.runInContext('chanceHash=basisSavedHash;globalThis.basisOldImul=Math.imul;Math.imul=function(...args){return basisOldImul.apply(this,args);}',ctx);
+ for(let i=0;i<2;i++){const value=oracle(current),count=vm.runInContext('basisHashWork',ctx);assert.equal(ctx.ratingObservationBasis(current),value);assert.ok(vm.runInContext('basisHashWork',ctx)>count,'changed Math methods cannot reuse an older basis');}
+ vm.runInContext('Math.imul=basisBootImul;globalThis.basisBootMath=Math;Math=Object.create(Math)',ctx);
+ for(let i=0;i<2;i++){const value=oracle(current),count=vm.runInContext('basisHashWork',ctx);assert.equal(ctx.ratingObservationBasis(current),value);assert.ok(vm.runInContext('basisHashWork',ctx)>count,'a replacement Math object cannot reuse a default basis');}
+ vm.runInContext('Math=basisBootMath',ctx);
+ const capTask=ctx.state.tasks.find(task=>!task.done);
+ for(const target of [256*1024,256*1024+1]){
+  let units=target-100,current,value,found=false;
+  for(let attempt=0;attempt<16;attempt++){capTask.id=String.fromCharCode(97+attempt)+'x'.repeat(units-1);current=stats();value=oracle(current);const size=basisInputs(current).length+value.length;if(size===target){found=true;break;}units+=target-size;}
+  assert.equal(found,true,'construct exact input-plus-result retention boundary');
+  const count=vm.runInContext('basisHashWork',ctx);assert.equal(ctx.ratingObservationBasis(current),value);const computed=vm.runInContext('basisHashWork',ctx);assert.ok(computed>count);
+  assert.equal(ctx.ratingObservationBasis(stats()),value);const repeated=vm.runInContext('basisHashWork',ctx);if(target===256*1024)assert.equal(repeated,computed,'the exact UTF-16 cap can reuse its result');else assert.ok(repeated>computed,'one unit above the cap must stay uncached');
+ }
+ // An oversized valid string remains supported, but is not retained by the fast path.
+ ctx.state.tasks.find(task=>!task.done).id='basis-large-'+('x'.repeat(256*1024));const large=stats(),largeExpected=oracle(large);
+ for(let i=0;i<2;i++){const count=vm.runInContext('basisHashWork',ctx);assert.equal(ctx.ratingObservationBasis(large),largeExpected);assert.ok(vm.runInContext('basisHashWork',ctx)>count,'oversized inputs use the ordinary uncached result');}
+});
+
+
+test('RISK saved chance shape preservation: opponent key order enumerability and unknown fields keep the same support boundary',async t=>{
+ const app=await loadApp({seed:319});t.after(()=>app.dispose());const {ctx}=app;
+ const supported=opponent=>ctx.currentChoiceChanceSnapshotSupported({at:1,seed:'saved-draw',weights:{a:.5},opponents:[opponent]});
+ for(const keys of [['id','mu','sigma'],['id','sigma','mu'],['mu','id','sigma'],['mu','sigma','id'],['sigma','id','mu'],['sigma','mu','id']])assert.equal(supported(Object.fromEntries(keys.map(key=>[key,{id:'a',mu:25,sigma:8}[key]]))),true,'saved opponent key order does not grant or remove support');
+ const hiddenExtra={id:'a',mu:25,sigma:8};Object.defineProperty(hiddenExtra,'hidden',{value:1});assert.equal(supported(hiddenExtra),true,'the released boundary considers enumerable own keys');
+ const symbolExtra={id:'a',mu:25,sigma:8,[Symbol('retained')]:1};assert.equal(supported(symbolExtra),true);
+ const hiddenRequired={id:'a',mu:25};Object.defineProperty(hiddenRequired,'sigma',{value:8});assert.equal(supported(hiddenRequired),false);
+ const inherited=Object.assign(Object.create({sigma:8}),{id:'a',mu:25});assert.equal(supported(inherited),false);
+ for(const opponent of [Object.assign(Object.create({id:'a',mu:25}),{'id,mu':0,sigma:8}),Object.assign(Object.create({id:'a',mu:25,sigma:8}),{'id,mu,sigma':0})])assert.equal(supported(opponent),true,'released comma-joined legacy key boundaries remain supported');
+ for(const opponent of [null,[],{id:'a',mu:25},{id:'a',mu:25,sigma:8,future:true},{id:'a',mu:Infinity,sigma:8},{id:'a',mu:25,sigma:0},{id:'a',mu:25,sigma:NaN},{id:'__proto__',mu:25,sigma:8}])assert.equal(supported(opponent),false,'partial future or invalid evidence stays unsupported');
+ assert.equal(ctx.currentChoiceChanceSnapshotSupported({at:1,seed:'saved-draw',weights:{a:.5},opponents:[{id:'a',mu:25,sigma:8},{id:'a',mu:26,sigma:7}]}),false,'duplicate opponents still refuse the saved source');
 });

@@ -1946,3 +1946,26 @@ The final pre-adoption guard reads head, pending/hold and exact protected copies
 - RISK cloud source inspection: refreshed roles update before a demoted read finishes
 
 The held-demotion native boundary requires one Current and one Previous heading before the demoted generation finishes reading. All retained rows follow the latest observed capture; older callbacks cannot roll roles back. Inspection stays read-only with no source eligibility.
+
+## Populated-board responsiveness and damaged-source work
+
+- RISK sync responsiveness guidance: mounted Help explains large boards and bounded damaged-source recovery
+- RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations
+- RISK populated task responsiveness: three rapid Yes actions retain history and reopen within the interaction budget
+- RISK populated completion responsiveness: rapid Done and Undo preserve earlier completions without full-pool stalls
+- RISK numeric responsiveness: optimized sampling and cold display preserve released distributions and random streams
+- RISK numeric caller preservation: stable CDFs and long history fingerprints survive current Math replacements
+- RISK corrupt cloud work budget: a failed exact-source read does not permanently hold a later repair
+
+- `RISK corrupt cloud work budget: cold-opened sources without an ACK keep newer edits without repeated downloads`: actual supported export cold-open, accepted tasks, durable head, finite same-source reads, manual Retry and newer-root acknowledgement.
+- `RISK lossless cloud recovery: an exact current board repairs missing chunks without a historical ACK`: independently hashed current bytes, source-preserving conditional rebuild, actual cloud ACK, subsequent accepted task and durable cold reopen.
+
+- `RISK corrupt cloud work budget: completed pending-source refusals do not restart downloads on ordinary edits`: unrepresented, JSON-lossy, BigInt and cyclic pending originals; zero repeated SDK reads after Add/Start/No/Done; failed local inspection, changed pointer and same-pointer losslessness transitions; deliberate Retry and exact original physical retention.
+
+Numeric preservation keeps exact released Float32 histograms, CDFs, Top K and Gaussian stream/spare, including zero-uniform rejection and odd/even/default sample boundaries. Cold display retains exact directed probabilities, rating normalization, duplicate-ID exclusions and replacement-calculator fallback. The recovery verifier waits for the actual app owner and retry before reading the status-mutating fake backend; all original five-second ACK, exact durable-head, source and reopen assertions remain.
+
+- RISK forecast caller preservation: current Math receivers preserve exact released shared-draw integration
+- RISK History basis work budget: identical exact inputs avoid repeated hashing while changed or custom evidence stays fresh
+- RISK saved chance shape preservation: opponent key order enumerability and unknown fields keep the same support boundary
+
+The History basis fast path recomputes the complete serialized numeric inputs, compares them exactly, and retains one input/result pair totaling at most256Ki UTF-16 units. Changed eligibility, ratings, IDs, open membership, samples, callable/Math replacements, exact cap and overflow stay explicit. Frozen-opponent validation preserves ordinary key permutations and the released comma-joined hidden/inherited edge through its original fallback. The pinned selection-function source fingerprints remain unchanged.

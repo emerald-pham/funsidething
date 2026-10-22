@@ -16546,5 +16546,182 @@
     },
     "greenEvidence": "held-role-first-green.log recorder8e74cc17: all3 actualnative inspection cases pass with0skips, including held-demotion and all original immediate geometry/focus/scroll assertions. Exact committed full/native/rules/compatibility/render/reviews/CI remain required.",
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/p0-unavailable-read-226-20261021/linux-scroll-repair-20261021"
+  },
+  {
+    "baseCommit": "c677724ded14b4c4519975c57a81f028283b08ff",
+    "testChangesSha256": "fb933c2d4338b4a671a67e618432302236b9cb0ffd460c99732c8937e7f208ae",
+    "reason": "User-directed takeover verifies cloud corruption, repeated task stalls and conservative iPhone Safari pressure through the agreed actual controls. Add nine consumer and numeric-preservation regressions without weakening existing protections.",
+    "previousBehavior": "Three Yes controls on a populated witnessed board blocked for3764ms; three Done controls for2957ms. Four accepted local actions added40SDKreads after an ACK mismatch,16reads after a no-ACK cold reopen, and48reads for each of four completed pending refusals. Even independently matching current bytes could not repair missing cloud chunks without a private ACK. Existing startup and one-attempt recovery checks missed repeated native actions.",
+    "intendedBehavior": "Three actual Yes or Done controls share a1000ms local synchronous-work budget while retaining decisions,History,Undo,unknown fields and actual durable cold reopen; cold-recomputed probabilities agree within1e-12. Exact supported current bytes may reconstruct the same published cloud source without a historical ACK, under source/account/UID/pending/CAS/verifiedACK guards. Completed unsafe repair checks keep ordinary edits local and pending without repeated SDK reads. Local candidate/pending checks,Retry,foreground and new server revisions can release only to a fresh guarded check. No physical-iPhone or live-account recovery claim.",
+    "replacementTests": [
+      "RISK sync responsiveness guidance: mounted Help explains large boards and bounded damaged-source recovery",
+      "RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations",
+      "RISK populated task responsiveness: three rapid Yes actions retain history and reopen within the interaction budget",
+      "RISK populated completion responsiveness: rapid Done and Undo preserve earlier completions without full-pool stalls",
+      "RISK corrupt cloud work budget: a failed exact-source read does not permanently hold a later repair",
+      "RISK corrupt cloud work budget: cold-opened sources without an ACK keep newer edits without repeated downloads",
+      "RISK lossless cloud recovery: an exact current board repairs missing chunks without a historical ACK",
+      "RISK corrupt cloud work budget: completed pending-source refusals do not restart downloads on ordinary edits",
+      "RISK numeric responsiveness: optimized sampling and cold display preserve released distributions and random streams"
+    ],
+    "preservedCoverage": [
+      "No removed, skipped or weakened existing passing assertions. Existing startup budgets and supported-client floor remain. New timing bounds address ordinary interactions rather than raising a failing startup budget.",
+      "Retain source/account/revision/CAS and real cloud ACK gates; no automatic older-copy choice or actual-account mutation. Original private data never enters fixtures or this record.",
+      "Capture actual chronology and intermediate repair/metadata failures. Later cold-recompute preservation assertions are GREEN coverage, not fabricated preimplementation RED.",
+      "The existing130-word help-answer gate rejected the initial combined wording. Keep its assertions unchanged, retain the original answer, and use a separate brief damaged-cloud question; observed mounted-question and brevity RED is21-02-18-371Z-b0767838-5dd6-4880-921d-18a1ce828c45.",
+      "The transient-read positive control initially polled the external backend before the app-owned pull settled, superseding that pull. Corrected it to await the app operation. Correction record2026-10-21T21-13-27-846Z-98be6e34-ae01-47cc-ad1f-4b109bf40d94 retains chronology: the earlier failure is not independent preimplementation RED for the transient refinement. The original unchanged-source50-versus10 read-budget RED remains valid.",
+      "Independent specialist review found the no-ACK branch missing after e7 full2777pass/0fail; that precursor is not final-candidate proof. First no-ACK fixture failed cloning synthetic timestamp functions before reaching the consumer; corrected before runtime edits. First repaired positive reached actual recovery but its final reopen used real time against a frozen source and triggered normal day/pass expiry; corrected only the fixture clock, retaining full-state/head checks. Records21-29-28,21-29-55,21-30-52 and21-31-31 preserve this chronology.",
+      "Pending budget REDs retain original cloud/pending data and accepted native effects. The first GREEN held downloads correctly but its peer-transition fixture used setPendingUpload, which intentionally normalized unknown fields and enabled repair earlier than expected; corrected that unknown-preserving transition to raw IDB, retaining the original physical value separately. The later supported transition uses the normal writer. 21-41-55 failure and21-42-21 GREEN remain; no application change for this fixture correction. Failed local pending reads and changed/same-pointer losslessness transitions are positive GREEN coverage.",
+      "Exact a93 full regression failed before the final repair: existing strict ACK consumer reached a TypeError after the internal helper rename, and three actual Yes actions took1001ms against the unchanged1000ms budget. Retain the old helper name and remove only the discarded projection rank refresh in ordinary Yes/Done; standalone/early-refused projection behavior and the final pre-History refresh remain. CPU profile and call graph confirm duplicate Gaussian sampling/sorts. No passing assertion or budget changed; both original failures remain in full-a93b0ad.log and run record21-47-47-989Z-3bc77e55-f29b-43e6-971b-53dd96fb5413.",
+      "Exact c3 local full2784pass/0fail did not survive both slower CI gates39685121171/39685150774. Yes1127/1345ms andDone1081/1353ms exceed the unchanged1000ms budget. Capture source-bound profiling and reduce repeated Gaussian/Math lookups and cold normalized-pair allocations while preserving exact RNG/distribution controls. First numeric WIP Done1077ms failed; refined Math-reference path passed focused Yes520ms/Done310ms. All failed logs remain.",
+      "Numeric golden/RNG characterization was captured on immutable c3 before runtime edits. First new fixture failed only a nested VM-array deep comparison; host-normalizing nested entries passed unchanged c3 in record22-41-22-610Z-1dec9117-6c35-4362-b766-61b019c8bb05. That correction and the later equivalence positives are not fabricated RED; actual CI timing failures justify numeric repair.",
+      "The push CI initial no-ACK ACK/head failure was causally isolated on Node22: accidental25ms fault-test SDK deadlines plus a40ms transaction interleave set a transient error, then direct verifier pulls superseded app retry status. Waiting for owner/retry alone passed under25ms within unchanged5000ms acceptance (aeca173d); explicit existing5000ms positive backend settings also passed (ef325e64). Fixture now waits passively and sets the same positive settings as its seed; all original remote ACK, exact head/source and reopen assertions remain. No production timeout/authority change. See evidence/no-ack-ci-diagnosis."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK populated task responsiveness:\" tests.js; corresponding Done, corrupt-cloud and mounted-guidance runs in evidenceDirectory/test-runs.",
+      "failure": "Observed preimplementation consumer AssertionErrors: Yes3764ms>1000ms (2026-10-21T20-50-06-720Z-1b05764d-e404-431f-937a-6b4967aadcc6); Done2957ms>1000ms (20-53-29-207Z-7fb0f112-834b-4e8f-a77f-39e5ed4e44c3); ACKmismatch50reads vs10 (20-56-56-624Z-31f04103-8616-45f3-8622-0a4aacd744ca); missing mountedFAQguidance (20-58-27-846Z-44818be2-d93e-433d-b6a7-ad229e4f08f3); noACK20reads vs4 and missing actualrepairACK (21-29-55-052Z-a9180732-b5e0-488b-95df-fb886ea321db); unrepresented/JSON-lossy/BigInt/cyclic pending each60reads vs12 (21-40-56-050Z-5839acee-3978-40ee-8839-fcc4edc3f118). Final exact-candidate full a93 regression also observed ctx.exactAcknowledgedCloudSource is not a function in the existing strict ACK/sibling consumer and the unchanged1000ms three-Yes budget failed at1001ms before the duplicate-rank repair; original full log and21-47-47-989Z-3bc77e55-f29b-43e6-971b-53dd96fb5413 retain those failures. Exact c3 CI39685121171 and39685150774 failed the same unchanged three-action budgets (Yes1127/1345ms,Done1081/1353ms); push also failed initial no-ACK ACK/head due to independently reproduced verifier interference. Full logs and causal25ms/40ms controls are retained."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/cloud-sync-root-causes-20261021"
+  },
+  {
+    "baseCommit": "c3d60783bb861d2f2ed458a3fa8a74058cc55d5f",
+    "testChangesSha256": "45c2b0ce627810f63ca89c6def95f79d144752a5593de72909fe15953045f06d",
+    "reason": "Repair both independently failed slower CI timing gates without changing their1000ms budget, plus causally proved passive-verifier fixture interference. Add exact released numeric/stream preservation coverage before runtime numeric edits.",
+    "previousBehavior": "Exact c3 local full passed but both CI gates exceeded three-action1000ms budgets; push initial no-ACK recovery also failed because the fake backend verifier replaced a transient status before its automatic retry.",
+    "intendedBehavior": "Reduce hot numeric lookups and cold pair normalization while keeping exact model, samples, Float32 distributions, Gaussian stream/spare and directed probability formula. Verify recovery only after its real owner/retry, retaining original5000ms ACK/head window and every source/reopen assertion.",
+    "replacementTests": [
+      "RISK numeric responsiveness: optimized sampling and cold display preserve released distributions and random streams"
+    ],
+    "preservedCoverage": [
+      "Exact c3 local full2784pass/0fail did not survive both slower CI gates39685121171/39685150774. Yes1127/1345ms andDone1081/1353ms exceed the unchanged1000ms budget. Capture source-bound profiling and reduce repeated Gaussian/Math lookups and cold normalized-pair allocations while preserving exact RNG/distribution controls. First numeric WIP Done1077ms failed; refined Math-reference path passed focused Yes520ms/Done310ms. All failed logs remain.",
+      "Numeric golden/RNG characterization was captured on immutable c3 before runtime edits. First new fixture failed only a nested VM-array deep comparison; host-normalizing nested entries passed unchanged c3 in record22-41-22-610Z-1dec9117-6c35-4362-b766-61b019c8bb05. That correction and the later equivalence positives are not fabricated RED; actual CI timing failures justify numeric repair.",
+      "The push CI initial no-ACK ACK/head failure was causally isolated on Node22: accidental25ms fault-test SDK deadlines plus a40ms transaction interleave set a transient error, then direct verifier pulls superseded app retry status. Waiting for owner/retry alone passed under25ms within unchanged5000ms acceptance (aeca173d); explicit existing5000ms positive backend settings also passed (ef325e64). Fixture now waits passively and sets the same positive settings as its seed; all original remote ACK, exact head/source and reopen assertions remain. No production timeout/authority change. See evidence/no-ack-ci-diagnosis.",
+      "Push091 CI39690292464 rejected this rationale because it listed existing test titles whose title lines were not added in the C3-to-091 diff. Only the genuinely added numeric RISK title belongs in replacementTests for this comparison. Keep the existing recovery/timing tests and every assertion unchanged; they remain covered in preservedCoverage and the full base rationale. Owner missed the second upstream failure in the local preflight output; this correction is metadata-only, with no app or test byte change."
+    ],
+    "redEvidence": {
+      "command": "Exact c3 CI push39685121171 and PR39685150774 npm test; source-bound local numeric profile and isolated no-ACK Node22 controls in evidenceDirectory.",
+      "failure": "Three Yes1127/1345ms andDone1081/1353ms exceed unchanged1000ms budget; push initial actual ACK/head failed. First numeric WIP Done1077ms still failed before Math-reference refinement. No expectation/skip/timeout/tolerance/sample relaxation."
+    },
+    "greenEvidence": "ci-repair-cohort.log:93passes/0fail/0skips; exact final full/native/rules/compatibility/render/reviews/CI still required.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/cloud-sync-root-causes-20261021"
+  },
+  {
+    "baseCommit": "c677724ded14b4c4519975c57a81f028283b08ff",
+    "testChangesSha256": "b1c090413a67ea51420913b466b2b1290b3ea8ec64aad39c557ad88f1f112034",
+    "reason": "User-directed takeover verifies cloud corruption, repeated task stalls and conservative iPhone Safari pressure through the agreed actual controls. Add nine consumer and numeric-preservation regressions without weakening existing protections. Add the subsequent current-Math CDF/hash preservation control after exact296 push CI again exceeded the unchanged budget.",
+    "previousBehavior": "Three Yes controls on a populated witnessed board blocked for3764ms; three Done controls for2957ms. Four accepted local actions added40SDKreads after an ACK mismatch,16reads after a no-ACK cold reopen, and48reads for each of four completed pending refusals. Even independently matching current bytes could not repair missing cloud chunks without a private ACK. Existing startup and one-attempt recovery checks missed repeated native actions.",
+    "intendedBehavior": "Three actual Yes or Done controls share a1000ms local synchronous-work budget while retaining decisions,History,Undo,unknown fields and actual durable cold reopen; cold-recomputed probabilities agree within1e-12. Exact supported current bytes may reconstruct the same published cloud source without a historical ACK, under source/account/UID/pending/CAS/verifiedACK guards. Completed unsafe repair checks keep ordinary edits local and pending without repeated SDK reads. Local candidate/pending checks,Retry,foreground and new server revisions can release only to a fresh guarded check. No physical-iPhone or live-account recovery claim.",
+    "replacementTests": [
+      "RISK sync responsiveness guidance: mounted Help explains large boards and bounded damaged-source recovery",
+      "RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations",
+      "RISK populated task responsiveness: three rapid Yes actions retain history and reopen within the interaction budget",
+      "RISK populated completion responsiveness: rapid Done and Undo preserve earlier completions without full-pool stalls",
+      "RISK corrupt cloud work budget: a failed exact-source read does not permanently hold a later repair",
+      "RISK corrupt cloud work budget: cold-opened sources without an ACK keep newer edits without repeated downloads",
+      "RISK lossless cloud recovery: an exact current board repairs missing chunks without a historical ACK",
+      "RISK corrupt cloud work budget: completed pending-source refusals do not restart downloads on ordinary edits",
+      "RISK numeric responsiveness: optimized sampling and cold display preserve released distributions and random streams",
+      "RISK numeric caller preservation: stable CDFs and long history fingerprints survive current Math replacements"
+    ],
+    "preservedCoverage": [
+      "No removed, skipped or weakened existing passing assertions. Existing startup budgets and supported-client floor remain. New timing bounds address ordinary interactions rather than raising a failing startup budget.",
+      "Retain source/account/revision/CAS and real cloud ACK gates; no automatic older-copy choice or actual-account mutation. Original private data never enters fixtures or this record.",
+      "Capture actual chronology and intermediate repair/metadata failures. Later cold-recompute preservation assertions are GREEN coverage, not fabricated preimplementation RED.",
+      "The existing130-word help-answer gate rejected the initial combined wording. Keep its assertions unchanged, retain the original answer, and use a separate brief damaged-cloud question; observed mounted-question and brevity RED is21-02-18-371Z-b0767838-5dd6-4880-921d-18a1ce828c45.",
+      "The transient-read positive control initially polled the external backend before the app-owned pull settled, superseding that pull. Corrected it to await the app operation. Correction record2026-10-21T21-13-27-846Z-98be6e34-ae01-47cc-ad1f-4b109bf40d94 retains chronology: the earlier failure is not independent preimplementation RED for the transient refinement. The original unchanged-source50-versus10 read-budget RED remains valid.",
+      "Independent specialist review found the no-ACK branch missing after e7 full2777pass/0fail; that precursor is not final-candidate proof. First no-ACK fixture failed cloning synthetic timestamp functions before reaching the consumer; corrected before runtime edits. First repaired positive reached actual recovery but its final reopen used real time against a frozen source and triggered normal day/pass expiry; corrected only the fixture clock, retaining full-state/head checks. Records21-29-28,21-29-55,21-30-52 and21-31-31 preserve this chronology.",
+      "Pending budget REDs retain original cloud/pending data and accepted native effects. The first GREEN held downloads correctly but its peer-transition fixture used setPendingUpload, which intentionally normalized unknown fields and enabled repair earlier than expected; corrected that unknown-preserving transition to raw IDB, retaining the original physical value separately. The later supported transition uses the normal writer. 21-41-55 failure and21-42-21 GREEN remain; no application change for this fixture correction. Failed local pending reads and changed/same-pointer losslessness transitions are positive GREEN coverage.",
+      "Exact a93 full regression failed before the final repair: existing strict ACK consumer reached a TypeError after the internal helper rename, and three actual Yes actions took1001ms against the unchanged1000ms budget. Retain the old helper name and remove only the discarded projection rank refresh in ordinary Yes/Done; standalone/early-refused projection behavior and the final pre-History refresh remain. CPU profile and call graph confirm duplicate Gaussian sampling/sorts. No passing assertion or budget changed; both original failures remain in full-a93b0ad.log and run record21-47-47-989Z-3bc77e55-f29b-43e6-971b-53dd96fb5413.",
+      "Exact c3 local full2784pass/0fail did not survive both slower CI gates39685121171/39685150774. Yes1127/1345ms andDone1081/1353ms exceed the unchanged1000ms budget. Capture source-bound profiling and reduce repeated Gaussian/Math lookups and cold normalized-pair allocations while preserving exact RNG/distribution controls. First numeric WIP Done1077ms failed; refined Math-reference path passed focused Yes520ms/Done310ms. All failed logs remain.",
+      "Numeric golden/RNG characterization was captured on immutable c3 before runtime edits. First new fixture failed only a nested VM-array deep comparison; host-normalizing nested entries passed unchanged c3 in record22-41-22-610Z-1dec9117-6c35-4362-b766-61b019c8bb05. That correction and the later equivalence positives are not fabricated RED; actual CI timing failures justify numeric repair.",
+      "The push CI initial no-ACK ACK/head failure was causally isolated on Node22: accidental25ms fault-test SDK deadlines plus a40ms transaction interleave set a transient error, then direct verifier pulls superseded app retry status. Waiting for owner/retry alone passed under25ms within unchanged5000ms acceptance (aeca173d); explicit existing5000ms positive backend settings also passed (ef325e64). Fixture now waits passively and sets the same positive settings as its seed; all original remote ACK, exact head/source and reopen assertions remain. No production timeout/authority change. See evidence/no-ack-ci-diagnosis.",
+      "Keep every passing assertion and the unchanged1000ms Yes/Done budgets; existing golden/stream tests and actual History/Undo/device-readback/reopen consumers remain. No skips, tolerance, sample or timeout increase.",
+      "New exact stable-tie/CDF/TopK and uint32 hash controls passed on unchanged296 before runtime edits (math-callers-before record23-27-56-836Z-8d415256). They are preservation positives, not fabricated RED. Actual CI1184ms is retained behavioral failure.",
+      "Only numeric method references/comparator allocation change. Source/projection/recovery/pending/UID/CAS/ACK/Undo/save authority and mathematical operators/constants/order remain. Prior local/CI results retain their exact commit identities."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK populated task responsiveness:\" tests.js; corresponding Done, corrupt-cloud and mounted-guidance runs in evidenceDirectory/test-runs.",
+      "failure": "Observed preimplementation consumer AssertionErrors: Yes3764ms>1000ms (2026-10-21T20-50-06-720Z-1b05764d-e404-431f-937a-6b4967aadcc6); Done2957ms>1000ms (20-53-29-207Z-7fb0f112-834b-4e8f-a77f-39e5ed4e44c3); ACKmismatch50reads vs10 (20-56-56-624Z-31f04103-8616-45f3-8622-0a4aacd744ca); missing mountedFAQguidance (20-58-27-846Z-44818be2-d93e-433d-b6a7-ad229e4f08f3); noACK20reads vs4 and missing actualrepairACK (21-29-55-052Z-a9180732-b5e0-488b-95df-fb886ea321db); unrepresented/JSON-lossy/BigInt/cyclic pending each60reads vs12 (21-40-56-050Z-5839acee-3978-40ee-8839-fcc4edc3f118). Final exact-candidate full a93 regression also observed ctx.exactAcknowledgedCloudSource is not a function in the existing strict ACK/sibling consumer and the unchanged1000ms three-Yes budget failed at1001ms before the duplicate-rank repair; original full log and21-47-47-989Z-3bc77e55-f29b-43e6-971b-53dd96fb5413 retain those failures. Exact c3 CI39685121171 and39685150774 failed the same unchanged three-action budgets (Yes1127/1345ms,Done1081/1353ms); push also failed initial no-ACK ACK/head due to independently reproduced verifier interference. Full logs and causal25ms/40ms controls are retained. Subsequent296 push CI39691175046 threeYes1184ms failed whilePRCI793ms passed; exact rawlogs and actual-action profile retain this chronology. Bind only proved repeated Math references, preserving numeric/hash outputs."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/cloud-sync-root-causes-20261021"
+  },
+  {
+    "baseCommit": "296192d69980f03627307ddcbd27d352c37d473b",
+    "testChangesSha256": "ece96ec71a18e3af1cabe8a1f64e50288eccb3f6d3d4a5599cf09c902935d476",
+    "reason": "Reduce additional proved numeric lookup costs after the exact296 push CI failed the unchanged1000ms threeYes budget, while preserving all outputs and existing assertions. Add one before-edit preservation control for current Math callers and released CDF/hash behavior.",
+    "previousBehavior": "Exact296 PR CI passed793ms threeYes but matching push CI failed1184ms [402,384,397]. Actual Yes-only profile shows34CDF selfsamples and57chanceHash samples from repeated global Math references; the same runtime lacks slow-runner headroom.",
+    "intendedBehavior": "Bind current Math.min immediatelybeforeCDF and Math.imul once per fingerprint call; reuse the same score comparator across samples. Retain exact Float32 distribution/order, random stream, UTF16 units, overflow and saved IDs. No cache, authority, protocol or budget changes.",
+    "replacementTests": [
+      "RISK numeric caller preservation: stable CDFs and long history fingerprints survive current Math replacements"
+    ],
+    "preservedCoverage": [
+      "Keep every passing assertion and the unchanged1000ms Yes/Done budgets; existing golden/stream tests and actual History/Undo/device-readback/reopen consumers remain. No skips, tolerance, sample or timeout increase.",
+      "New exact stable-tie/CDF/TopK and uint32 hash controls passed on unchanged296 before runtime edits (math-callers-before record23-27-56-836Z-8d415256). They are preservation positives, not fabricated RED. Actual CI1184ms is retained behavioral failure.",
+      "Only numeric method references/comparator allocation change. Source/projection/recovery/pending/UID/CAS/ACK/Undo/save authority and mathematical operators/constants/order remain. Prior local/CI results retain their exact commit identities."
+    ],
+    "redEvidence": {
+      "command": "Exact296 push CI39691175046 npm test, logs at evidenceDirectory/ci/push-296192d/run-39691175046-296192d69980-1792624602831-f99af17d/logs.txt; follow-up source-bound actualYes CPU profile at profile-296192d.",
+      "failure": "Three actual Yes actions1184ms [402,384,397] exceed unchanged1000ms. Same source PRCI passes793ms; release remains held. Profile isolates actual action348selfsamples with34CDF and57chanceHash lookups."
+    },
+    "greenEvidence": "First focused math-capture-focused.log: actualYes365ms,Done232ms, both numeric controls pass. Required committed-focused/native/review/fullCI evidence remains separate.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/cloud-sync-root-causes-20261021"
+  },
+  {
+    "testChangesSha256": "a4c310bceb3b40d349ea76fb2bc52778b87bd5f626859520bc4eed507e30b485",
+    "reason": "Preserve every existing source fingerprint, sample, timing budget and data-safety assertion while repairing populated-board stalls and exact-copy cloud recovery. Exact00 CI met timing but rejected the chanceHash source edit; restore that protected implementation unchanged and reduce repeated pure History-basis hashing instead, with exact numeric/shape preservation controls. New fixture-only oracle errors remain distinguished from behavioral RED.",
+    "previousBehavior": "Damaged cloud sources redownloaded after ordinary edits; current exact bytes without a private ACK could not repair. Large boards repeated ranking work. The00 numerical increment passed timing but violated an existing byte-exact chanceHash source contract. Before the new memo, the same exact History basis performed624 rather than312 Math.imul calls.",
+    "intendedBehavior": "Keep all nine protected selection/rating function fingerprints unchanged. Hash freshly rebuilt History inputs once per exact repeated default context, with one combined input/result pair capped at256Ki UTF-16 units, and ordinary uncached behavior for changes or replacements. Preserve exact shared-draw forecast outputs and every prior saved-source shape, including comma-joined hidden/inherited edge cases. Complete all original action, recovery, protection, ACK/head, reopen and compatibility assertions.",
+    "replacementTests": [
+      "RISK sync responsiveness guidance: mounted Help explains large boards and bounded damaged-source recovery",
+      "RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations",
+      "RISK corrupt cloud work budget: cold-opened sources without an ACK keep newer edits without repeated downloads",
+      "RISK lossless cloud recovery: an exact current board repairs missing chunks without a historical ACK",
+      "RISK corrupt cloud work budget: completed pending-source refusals do not restart downloads on ordinary edits",
+      "RISK corrupt cloud work budget: a failed exact-source read does not permanently hold a later repair",
+      "RISK populated task responsiveness: three rapid Yes actions retain history and reopen within the interaction budget",
+      "RISK populated completion responsiveness: rapid Done and Undo preserve earlier completions without full-pool stalls",
+      "RISK numeric responsiveness: optimized sampling and cold display preserve released distributions and random streams",
+      "RISK numeric caller preservation: stable CDFs and long history fingerprints survive current Math replacements",
+      "RISK forecast caller preservation: current Math receivers preserve exact released shared-draw integration",
+      "RISK History basis work budget: identical exact inputs avoid repeated hashing while changed or custom evidence stays fresh",
+      "RISK saved chance shape preservation: opponent key order enumerability and unknown fields keep the same support boundary"
+    ],
+    "preservedCoverage": [
+      "Every existing protected function hash, Monte-Carlo sample count, original1000ms action budget, integration tolerance, Float32CDF and random stream remains unchanged.",
+      "Cloud identity/revision/CAS, protected raw originals, pending-source losslessness and actual verified ACK/durable head acceptance remain required.",
+      "Original mounted FAQ content, unsupported/future source refusal, Undo/History facts and installed-client delivery/offline requirements remain intact."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern='^RISK History basis work budget:' tests.js",
+      "failure": "Actual source-bound2026-10-22T00-06-53-162Z-6c39a841-b1f0-4b6f-8aaf-7e0a55c2f936 fails repeated exact History basis work624!=312 before the memo. Source guard failure was observed in both00 CI runs39695073979/39695079699 and locally before restoration. Original cloud/action REDs and all prior candidate failures remain in earlier exact records; current forecast/shape goldens are pre-edit preservation positives, not fabricated symptom REDs."
+    },
+    "additionalEvidence": {
+      "comparisonBase": "c677724ded14b4c4519975c57a81f028283b08ff",
+      "chronology": "Protected-hash-red-forecast-positive records original source-guard assertion plus passing new receiver goldens before the forecast edit. Restored-hash-min-only-focused passes source guard and Yes435/Done257ms. Initial History oracle fixture ctx.openTasks TypeError is not RED; corrected fixture observes624!=312. First memo/forecast focused passes16 tests, Yes418/Done245ms. Pre-edit saved-shape positive passes; reviewer separator collision sensitivity fails before original fallback repair. All source-bound logs remain external; broad/full/native/review/CI/live gates retain separate identities."
+    }
+  },
+  {
+    "testChangesSha256": "70c7943334e93b9714b2880e566501843bc4d2db49d6d547e1b67c1be813db90",
+    "reason": "Preserve every existing source fingerprint, sample, timing budget and data-safety assertion while repairing populated-board stalls and exact-copy cloud recovery. Exact00 CI met timing but rejected the chanceHash source edit; restore that protected implementation unchanged and reduce repeated pure History-basis hashing instead, with exact numeric/shape preservation controls. New fixture-only oracle errors remain distinguished from behavioral RED.",
+    "previousBehavior": "Damaged cloud sources redownloaded after ordinary edits; current exact bytes without a private ACK could not repair. Large boards repeated ranking work. The00 numerical increment passed timing but violated an existing byte-exact chanceHash source contract. Before the new memo, the same exact History basis performed624 rather than312 Math.imul calls.",
+    "intendedBehavior": "Keep all nine protected selection/rating function fingerprints unchanged. Hash freshly rebuilt History inputs once per exact repeated default context, with one combined input/result pair capped at256Ki UTF-16 units, and ordinary uncached behavior for changes or replacements. Preserve exact shared-draw forecast outputs and every prior saved-source shape, including comma-joined hidden/inherited edge cases. Complete all original action, recovery, protection, ACK/head, reopen and compatibility assertions.",
+    "replacementTests": [
+      "RISK forecast caller preservation: current Math receivers preserve exact released shared-draw integration",
+      "RISK History basis work budget: identical exact inputs avoid repeated hashing while changed or custom evidence stays fresh",
+      "RISK saved chance shape preservation: opponent key order enumerability and unknown fields keep the same support boundary"
+    ],
+    "preservedCoverage": [
+      "Every existing protected function hash, Monte-Carlo sample count, original1000ms action budget, integration tolerance, Float32CDF and random stream remains unchanged.",
+      "Cloud identity/revision/CAS, protected raw originals, pending-source losslessness and actual verified ACK/durable head acceptance remain required.",
+      "Original mounted FAQ content, unsupported/future source refusal, Undo/History facts and installed-client delivery/offline requirements remain intact."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern='^RISK History basis work budget:' tests.js",
+      "failure": "Actual source-bound2026-10-22T00-06-53-162Z-6c39a841-b1f0-4b6f-8aaf-7e0a55c2f936 fails repeated exact History basis work624!=312 before the memo. Source guard failure was observed in both00 CI runs39695073979/39695079699 and locally before restoration. Original cloud/action REDs and all prior candidate failures remain in earlier exact records; current forecast/shape goldens are pre-edit preservation positives, not fabricated symptom REDs."
+    },
+    "additionalEvidence": {
+      "comparisonBase": "00acffe6582ffb9bffabac96c946579c448f8b49",
+      "chronology": "Protected-hash-red-forecast-positive records original source-guard assertion plus passing new receiver goldens before the forecast edit. Restored-hash-min-only-focused passes source guard and Yes435/Done257ms. Initial History oracle fixture ctx.openTasks TypeError is not RED; corrected fixture observes624!=312. First memo/forecast focused passes16 tests, Yes418/Done245ms. Pre-edit saved-shape positive passes; reviewer separator collision sensitivity fails before original fallback repair. All source-bound logs remain external; broad/full/native/review/CI/live gates retain separate identities."
+    }
   }
 ]
