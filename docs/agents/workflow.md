@@ -27,6 +27,16 @@ external services or activate accounts does not grant authorization for it.
 Use the current task brief as the spec when it supplies the agreed requirements;
 carry genuinely missing product decisions back to the parent/user.
 
+## Subagent lifecycle
+
+For each distinct repository-improvement task, start a fresh subagent unless
+that task genuinely requires the previous worker's context. Before spawning,
+preserve needed context and close finished or unused subagents owned by the
+current task through supported close operations. Preserve active user-owned
+workers and transcripts. If closing is unsupported, report the limitation.
+Retain the model restrictions in [AGENTS.md](../../AGENTS.md) and existing
+ownership and shared-resource coordination.
+
 ## Strict TDD at agreed seams
 
 Before tests, record the public seams, what each catches and misses, and the
