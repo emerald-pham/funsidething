@@ -28716,6 +28716,8 @@ test('RISK SCALABLE QUOTA: optional IndexedDB history cannot block a primary boa
  const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-idb-quota-'+Date.now()+'-'+Math.random();
  const initial=syncState({tasks:[syncTask('base','Base')]});
  const raw=JSON.stringify(initial),storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw});
+ // This legacy quota fallback has no expendable diagnostic allocation; the separate debug-log RISK covers the one permitted cleanup retry.
+ const storageWrite=storage.setItem;storage.setItem=(key,value)=>{if(key==='fvp:chain-scanner:restart-diagnostics:v1')throw Object.assign(Error('diagnostics unavailable'),{name:'QuotaExceededError'});return storageWrite(key,value);};
  const {ctx,shim}=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName:dbName});
  ctx.addTask('First durable edit');assert.equal(await ctx.persist(),true);
  const manual=await ctx.saveDurableBackup('manual',JSON.stringify(ctx.state));assert.ok(manual?.id);
@@ -30668,7 +30670,10 @@ test('RISK completion convergence: failed saves backup failures account changes 
  for(const control of ['failed-save','quota-after-conflict','unavailable-after-conflict','quota-without-conflict','account','suspended','draft'])await t.test(control,async t=>{
   const initial=syncState({tasks:[syncTask('wake-base','Saved task')],syncRev:4,syncAccount:'e@example.com',syncDirty:false,seenQuickStart:true}),remote=structuredClone(initial);
   for(const key of ['syncRev','syncAccount','syncDirty'])delete remote[key];
-  const h=makeSyncHarness({remote,rev:4,delayMs:1}),raw=JSON.stringify(initial),app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},indexedDBProvider:new IDBFactory(),deviceDbName:'native-recovery-guard-'+control+'-'+Math.random(),cloudSyncFactory:h.factory}),{ctx,shim}=app,backend=shim.window.CloudSync,store=shim.window.ScannerDeviceStore,
+  const h=makeSyncHarness({remote,rev:4,delayMs:1}),raw=JSON.stringify(initial),storage=sharedScannerStorage({[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw});
+  // Count later recovery wakeups after irreducible quota, with no diagnostic bytes available to reclaim.
+  const storageWrite=storage.setItem;storage.setItem=(key,value)=>{if(key==='fvp:chain-scanner:restart-diagnostics:v1')throw Object.assign(Error('diagnostics unavailable'),{name:'QuotaExceededError'});return storageWrite(key,value);};
+  const app=await loadApp({sharedStorage:storage,indexedDBProvider:new IDBFactory(),deviceDbName:'native-recovery-guard-'+control+'-'+Math.random(),cloudSyncFactory:h.factory}),{ctx,shim}=app,backend=shim.window.CloudSync,store=shim.window.ScannerDeviceStore,
    saves=observeQueuedNativeSaves(ctx,t),commit=store.commitHead.bind(store),put=store.putBackup.bind(store),entered=deferredSyncFixture(),release=deferredSyncFixture(),failedBackup=deferredSyncFixture(),watchdog=setTimeout(()=>{},12000);
   let held=false,backupAttempts=0,conflicts=0;
   t.after(async()=>{release.resolve();clearTimeout(watchdog);ctx.suspendCloudSync();vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearTimeout(liveCloudTimer);clearTimeout(deviceCloudBackupTimer);deviceCloudBackupTimer=null;pendingDeviceCloudBackup=null;clearCloudRetry()',ctx);await store.close();});
@@ -40529,6 +40534,30 @@ test('RISK debug log: conditional pending quota exposes only its fixed retry cau
  const result=await store.setPendingUploadIfCurrent('owner',{...prior,generationId:'next'},expected);
  assert.equal(result.code,'pending-upload-write-failed');assert.equal(result.causeCode,'quota-exhausted','capacity retry needs a fixed native quota signal, never a generic failure or error text');
  assert.deepEqual(await store.getPendingUpload('owner'),expected);assert.doesNotMatch(JSON.stringify(result),/PRIVATE/);
+});
+
+test('RISK debug log: quota refusal permits one diagnostic cleanup attempt and cannot reschedule it after a later save',async t=>{
+ for(const diagnosticsAvailable of [true,false])await t.test(String(diagnosticsAvailable),async sub=>{
+  const {IDBFactory}=await import('fake-indexeddb'),key='fvp:chain-scanner:restart-diagnostics:v1',initial=syncState({syncAccount:'e@example.com',syncDirty:false,seenQuickStart:true}),raw=JSON.stringify(initial),remote=structuredClone(initial);
+  for(const name of ['syncAccount','syncDirty','syncRev'])delete remote[name];
+  const h=makeSyncHarness({remote,rev:4,delayMs:1}),storage=sharedScannerStorage({[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}),write=storage.setItem;
+  storage.setItem=(name,value)=>{if(name===key&&!diagnosticsAvailable)throw Object.assign(Error('diagnostics unavailable'),{name:'QuotaExceededError'});return write(name,value);};
+  const app=await loadApp({sharedStorage:storage,indexedDBProvider:new IDBFactory(),deviceDbName:'diagnostic-refusal-'+Math.random(),cloudSyncFactory:h.factory}),{ctx}=app;sub.after(()=>app.dispose());
+  ctx.window.CloudSync.ready=false;
+  assert.equal(await ctx.persist(),true);const store=ctx.window.ScannerDeviceStore,head=await store.readHead(),calls=[];
+  assert.equal(storage.getItem(key)!==null,diagnosticsAvailable);
+  store.putBackup=async options=>{calls.push(options);return {error:true,code:'quota-exhausted'};};
+  assert.equal(await ctx.saveDurableBackup('before-cloud-local-edit',head.payload),null);
+  assert.equal(calls.length,diagnosticsAvailable?2:1,'only an existing expendable record authorizes one extra guarded attempt');
+  if(diagnosticsAvailable)assert.equal(calls[0],calls[1],'the exact original options and expected head are reused');
+  assert.deepEqual(await store.readHead(),head,'a refused required backup cannot change the saved board');
+  assert.equal(storage.getItem(key),null);assert.equal(ctx.buildSupportDiagnosticsReport().restartDiagnostics.storageStatus,'unavailable');
+  const attempts=calls.length,pulls=h.calls.filter(call=>call==='pull').length;ctx.window.CloudSync.ready=true;
+  assert.equal(await ctx.persist(),true);await syncSettle(0);await flush();
+  assert.equal(calls.length,attempts,'a later successful save cannot restart this refused backup');
+  assert.equal(h.calls.filter(call=>call==='pull').length,pulls,'cloud readiness cannot turn a refused backup into a recovery read');
+  assert.equal(vm.runInContext('pendingDeviceCloudBackup===null',ctx),true,'a settled quota refusal leaves no marker for a later save');
+ });
 });
 
 test('RISK debug log: ordinary actions survive reopening as metadata without changing saved work',async t=>{

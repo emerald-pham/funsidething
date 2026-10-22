@@ -216,3 +216,29 @@ found material changes still required. Their interrupted records and reason
 notes remain external evidence. Final qualification must use the reconciled
 candidate. A first browser render also caught a cached prior candidate; its
 fingerprint was rejected, rather than calling its screenshots final evidence.
+
+
+## Full-suite quota fixture reconciliation
+
+The first completed Node22 final full run recorded2818passes and four failed
+nodes (three assertions plus their parent), with50 environmental skips. The
+failures were physical write-attempt counts in two existing quota fixtures,
+not failed board/source/account/ACK assertions. Before this diagnostic feature
+there were no journal bytes to reclaim. With a journal present, its approved
+single same-operation cleanup attempt legitimately adds one physical call;
+a failed-backup entry signal can also arrive before that attempt settles.
+
+The two legacy irreducible-quota fixtures now deny only the restart key at the
+external storage boundary, retaining every original assertion and all original
+board/SDK fault behavior. A companion RISK explicitly covers the ordinary
+journal-present case and the denied case: exactly one additional attempt only
+with disposable bytes present, identical captured arguments/expected head,
+exact unchanged durable head on refusal, awaited failure settlement, and no
+new backup attempt after a later successful save. No runtime or visual code
+changed for this reconciliation. Its positive control passes the existing
+implementation; it is not represented as a new runtime preimplementation RED.
+The failed full record and focused corrected cohort remain external evidence.
+
+The first new companion fixture lacked the ordinary backend required by its cloud-backup kind and failed during setup. This is retained as a fixture error, not a runtime defect RED. Supplying the existing sync/account harness produced 28 passing focused nodes in `quota-fixture-cohort-repair.log`, with every legacy assertion and runtime byte unchanged.
+
+Independent code review found the new companion left SDK readiness false during its later-save probe. The final test restores readiness, settles the actual reconciliation turn, and retains the no-new-backup assertion while adding no-new-pull and no-pending-marker checks. All28focusednodes pass in `quota-fixture-sensitive.log`. The in-progress8c full run was stopped before editing and is recorded as interrupted; it is not a pass. Runtime, UI and worker bytes remain unchanged.
