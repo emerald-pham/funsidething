@@ -30588,7 +30588,7 @@ test('RISK cloud acknowledgement authority: CAS repair requires current identity
  });
 });
 
-test('RISK cloud acknowledgement identity: a replaced backend cannot inherit an in-flight response as fresh proof',{timeout:10000},async t=>{
+test('RISK cloud acknowledgement identity: obsolete replies cannot start replacement work or create fresh proof',{timeout:10000},async t=>{
  const {IDBFactory}=await import('fake-indexeddb');
  for(const mode of ['backend replacement','same-email UID change','same-account relogin'])await t.test(mode,async sub=>{
  let identity='same-owner';const initial=syncState({tasks:[syncTask('stale-ack-owner','Stale acknowledgement task')],syncRev:4,syncAccount:'e@example.com',syncIdentity:'same-owner',syncDirty:false,seenQuickStart:true}),h=makeSyncHarness({remote:initial,rev:4,delayMs:1}),
@@ -30597,19 +30597,21 @@ test('RISK cloud acknowledgement identity: a replaced backend cannot inherit an 
  const entered=deferredSyncFixture(),release=deferredSyncFixture(),push=original.push.bind(original);sub.after(()=>release.resolve());
  original.push=async(...args)=>{const result=await push(...args);entered.resolve(result);await release.promise;return result;};
  const sending=ctx.sendPush(),reply=await fixtureDeadline(entered.promise,'the original provider has committed but its reply is held');assert.equal(reply.ok,true);assert.equal(ctx.state.syncRev,4);
- let replacementWrites=0;const freshRead=deferredSyncFixture(),replacement=mode==='backend replacement'?{...original}:original;
- replacement.pull=async()=>{await freshRead.promise;return {error:true};};replacement.push=async()=>{replacementWrites++;return {error:true};};
+ let replacementWrites=0,freshReads=0;const freshRead=deferredSyncFixture(),freshEntered=deferredSyncFixture(),replacement=mode==='backend replacement'?{...original}:original;
+ replacement.pull=async()=>{freshReads++;freshEntered.resolve();await freshRead.promise;return {error:true};};replacement.push=async()=>{replacementWrites++;return {error:true};};
  sub.after(()=>freshRead.resolve());
  if(mode==='same-email UID change')identity='new-owner';
  if(mode==='same-account relogin'){original.user=null;ctx.observeCloudIdentity();original.user='e@example.com';}
  shim.window.CloudSync=replacement;ctx.observeCloudIdentity();
  release.resolve();await sending;
+ assert.equal(freshReads,0,'an obsolete response cannot start work in the replacement connection');
  assert.equal(ctx.state.syncRev,4,'the old connection reply cannot confirm a revision for a replacement backend');
  assert.equal(ctx.state.syncDirty,true,'the accepted work stays pending until the replacement has fresh authority');
  assert.equal(vm.runInContext('confirmedCloudDeviceOwner?.backend===window.CloudSync&&confirmedCloudDeviceOwner?.identity===cloudAccountIdentity()&&confirmedCloudDeviceOwner?.account===window.CloudSync.user',ctx),false,'a stale reply cannot mint a fresh process-local proof for the replacement');
  assert.equal(ctx.state.tasks.some(row=>row.title==='Accepted before connection replacement'),true);assert.equal(replacementWrites,0);
  assert.equal(await ctx.persist(),true);const head=JSON.parse((await shim.window.ScannerDeviceStore.readHead()).payload);assert.equal(head.syncRev,4);assert.equal(head.syncDirty,true);assert.equal(head.tasks.some(row=>row.title==='Accepted before connection replacement'),true);
- ctx.suspendCloudSync();freshRead.resolve();
+ const fresh=ctx.cloudPull();await fixtureDeadline(freshEntered.promise,'an explicit current-owner read still reaches the replacement connection');assert.equal(freshReads,1);
+ freshRead.resolve();await fresh;ctx.suspendCloudSync();
  });
 });
 
