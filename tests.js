@@ -40895,3 +40895,71 @@ test('RISK numeric caller preservation: stable CDFs and long history fingerprint
   const seen=JSON.parse(vm.runInContext('JSON.stringify(mathReceivers)',ctx));assert.ok(seen.includes(phase+'-min')&&seen.includes(phase+'-imul'),'each call uses the current receiver-sensitive math methods');
  }
 });
+
+
+test('RISK forecast caller preservation: current Math receivers preserve exact released shared-draw integration',()=>{
+ const ctx=loadEngine();
+ const cases=[
+  [{mu:25,sigma:8},[],2,0],
+  [{mu:25,sigma:5},[{mu:40,sigma:2}],1,0.9698833719924885],
+  [{mu:25,sigma:25/3},Array.from({length:5},()=>({mu:25,sigma:.8})),5,0.6934877240558331],
+  [{mu:-50,sigma:1000},[{mu:-100,sigma:.8},{mu:-55,sigma:.8}],2,0.4980053321763004],
+  [{mu:0,sigma:10000},[{mu:-5000,sigma:.8},{mu:5000,sigma:.8}],2,0.6914624301491861],
+  [{mu:25,sigma:5},[{mu:20,sigma:2},{mu:40,sigma:2},{mu:25,sigma:3}],2.4,0.9699701244493156]
+ ];
+ vm.runInContext('globalThis.forecastOriginals=Object.fromEntries(["max","min","round","sqrt","abs","exp"].map(key=>[key,Math[key]]));globalThis.forecastReceivers=[]',ctx);
+ for(const phase of ['first','second']){
+  vm.runInContext('for(const [key,fn]of Object.entries(forecastOriginals))Math[key]=function(...args){if(this!==Math)throw Error("forecast Math receiver changed");forecastReceivers.push("'+phase+'-"+key);return fn.apply(this,args);}',ctx);
+  for(const [bench,pool,perMin,expected]of cases){const before=JSON.stringify([bench,pool]);assert.equal(ctx.chanceBetterSoon(bench,pool,perMin),expected,'the same breakpoints, reductions and quadrature retain the exact released result');assert.equal(JSON.stringify([bench,pool]),before,'forecasting does not mutate caller ratings or queue');}
+  const seen=JSON.parse(vm.runInContext('JSON.stringify(forecastReceivers)',ctx));for(const key of ['max','min','round','sqrt','abs','exp'])assert.ok(seen.includes(phase+'-'+key),'each invocation uses the current receiver-sensitive '+key);
+ }
+});
+
+
+test('RISK History basis work budget: identical exact inputs avoid repeated hashing while changed or custom evidence stays fresh',async t=>{
+ const prefix='"use strict";globalThis.basisHashWork=0;globalThis.basisDefaultImul=Math.imul;Math.imul=function(...args){basisHashWork++;return basisDefaultImul.apply(this,args);};globalThis.basisBootImul=Math.imul;\n';
+ const app=await loadApp({appSource:prefix+appSrc,seed:318});t.after(()=>app.dispose());const {ctx}=app;
+ ctx.addTask('Basis first');ctx.addTask('Basis second');ctx.state.tasks[0].mu+=.125;
+ const stats=()=>ctx.chanceDisplayStats('chance');
+ const basisInputs=current=>JSON.stringify([ctx.state.tasks.filter(task=>!task.done).map(task=>[task.id,task.mu,task.sigma,!!current.get(task.id)?.available]).sort(([a],[b])=>a<b?-1:a>b?1:0),ctx.state.settings.samples]);
+ const oracle=current=>{const inputs=basisInputs(current);return ctx.chanceHash('history:'+inputs).toString(16)+':'+ctx.chanceHash('basis:'+inputs).toString(16)+':'+inputs.length;};
+ const firstStats=stats(),expected=oracle(firstStats),before=JSON.stringify(ctx.state);vm.runInContext('basisHashWork=0',ctx);
+ assert.equal(ctx.ratingObservationBasis(firstStats),expected);const firstWork=vm.runInContext('basisHashWork',ctx);assert.ok(firstWork>0,'new exact inputs hash through the existing algorithm');
+ assert.equal(ctx.ratingObservationBasis(stats()),expected);assert.equal(vm.runInContext('basisHashWork',ctx),firstWork,'repeated exact History basis must not rehash the same serialized inputs');
+ assert.equal(JSON.stringify(ctx.state),before,'deriving a basis never mutates the accepted board');
+ for(const change of [()=>{ctx.state.tasks[0].sigma+=.25;},()=>{ctx.state.settings.samples+=1;},()=>{ctx.state.tasks[0].startsAt=ctx.todayISO(10);},()=>{ctx.state.tasks[1].id+='-replaced';},()=>{ctx.state.tasks[1].done=true;}]){change();const current=stats(),value=oracle(current),count=vm.runInContext('basisHashWork',ctx);assert.equal(ctx.ratingObservationBasis(current),value);assert.ok(vm.runInContext('basisHashWork',ctx)>count,'changed ratings, samples and membership are freshly hashed');}
+ const reorderStats=stats(),reorderExpected=oracle(reorderStats);ctx.state.tasks.reverse();const reorderCount=vm.runInContext('basisHashWork',ctx);assert.equal(ctx.ratingObservationBasis(stats()),reorderExpected);assert.equal(vm.runInContext('basisHashWork',ctx),reorderCount,'order-only changes preserve the language-independent exact basis');
+ const savedTasks=ctx.state.tasks;ctx.state.tasks=[];const emptyStats=stats(),emptyExpected=oracle(emptyStats);assert.equal(ctx.ratingObservationBasis(emptyStats),emptyExpected);const emptyCount=vm.runInContext('basisHashWork',ctx);assert.equal(ctx.ratingObservationBasis(stats()),emptyExpected);assert.equal(vm.runInContext('basisHashWork',ctx),emptyCount,'empty exact inputs are stable');ctx.state.tasks=savedTasks;
+ const current=stats();vm.runInContext('globalThis.basisSavedHash=chanceHash;globalThis.customBasisCalls=0;chanceHash=text=>{customBasisCalls++;return text.startsWith("history:")?19:23;}',ctx);
+ for(let i=0;i<2;i++)assert.match(ctx.ratingObservationBasis(current),/^13:17:/);assert.equal(vm.runInContext('customBasisCalls',ctx),4,'replacement calculators are called for every basis');
+ vm.runInContext('chanceHash=basisSavedHash;globalThis.basisOldImul=Math.imul;Math.imul=function(...args){return basisOldImul.apply(this,args);}',ctx);
+ for(let i=0;i<2;i++){const value=oracle(current),count=vm.runInContext('basisHashWork',ctx);assert.equal(ctx.ratingObservationBasis(current),value);assert.ok(vm.runInContext('basisHashWork',ctx)>count,'changed Math methods cannot reuse an older basis');}
+ vm.runInContext('Math.imul=basisBootImul;globalThis.basisBootMath=Math;Math=Object.create(Math)',ctx);
+ for(let i=0;i<2;i++){const value=oracle(current),count=vm.runInContext('basisHashWork',ctx);assert.equal(ctx.ratingObservationBasis(current),value);assert.ok(vm.runInContext('basisHashWork',ctx)>count,'a replacement Math object cannot reuse a default basis');}
+ vm.runInContext('Math=basisBootMath',ctx);
+ const capTask=ctx.state.tasks.find(task=>!task.done);
+ for(const target of [256*1024,256*1024+1]){
+  let units=target-100,current,value,found=false;
+  for(let attempt=0;attempt<16;attempt++){capTask.id=String.fromCharCode(97+attempt)+'x'.repeat(units-1);current=stats();value=oracle(current);const size=basisInputs(current).length+value.length;if(size===target){found=true;break;}units+=target-size;}
+  assert.equal(found,true,'construct exact input-plus-result retention boundary');
+  const count=vm.runInContext('basisHashWork',ctx);assert.equal(ctx.ratingObservationBasis(current),value);const computed=vm.runInContext('basisHashWork',ctx);assert.ok(computed>count);
+  assert.equal(ctx.ratingObservationBasis(stats()),value);const repeated=vm.runInContext('basisHashWork',ctx);if(target===256*1024)assert.equal(repeated,computed,'the exact UTF-16 cap can reuse its result');else assert.ok(repeated>computed,'one unit above the cap must stay uncached');
+ }
+ // An oversized valid string remains supported, but is not retained by the fast path.
+ ctx.state.tasks.find(task=>!task.done).id='basis-large-'+('x'.repeat(256*1024));const large=stats(),largeExpected=oracle(large);
+ for(let i=0;i<2;i++){const count=vm.runInContext('basisHashWork',ctx);assert.equal(ctx.ratingObservationBasis(large),largeExpected);assert.ok(vm.runInContext('basisHashWork',ctx)>count,'oversized inputs use the ordinary uncached result');}
+});
+
+
+test('RISK saved chance shape preservation: opponent key order enumerability and unknown fields keep the same support boundary',async t=>{
+ const app=await loadApp({seed:319});t.after(()=>app.dispose());const {ctx}=app;
+ const supported=opponent=>ctx.currentChoiceChanceSnapshotSupported({at:1,seed:'saved-draw',weights:{a:.5},opponents:[opponent]});
+ for(const keys of [['id','mu','sigma'],['id','sigma','mu'],['mu','id','sigma'],['mu','sigma','id'],['sigma','id','mu'],['sigma','mu','id']])assert.equal(supported(Object.fromEntries(keys.map(key=>[key,{id:'a',mu:25,sigma:8}[key]]))),true,'saved opponent key order does not grant or remove support');
+ const hiddenExtra={id:'a',mu:25,sigma:8};Object.defineProperty(hiddenExtra,'hidden',{value:1});assert.equal(supported(hiddenExtra),true,'the released boundary considers enumerable own keys');
+ const symbolExtra={id:'a',mu:25,sigma:8,[Symbol('retained')]:1};assert.equal(supported(symbolExtra),true);
+ const hiddenRequired={id:'a',mu:25};Object.defineProperty(hiddenRequired,'sigma',{value:8});assert.equal(supported(hiddenRequired),false);
+ const inherited=Object.assign(Object.create({sigma:8}),{id:'a',mu:25});assert.equal(supported(inherited),false);
+ for(const opponent of [Object.assign(Object.create({id:'a',mu:25}),{'id,mu':0,sigma:8}),Object.assign(Object.create({id:'a',mu:25,sigma:8}),{'id,mu,sigma':0})])assert.equal(supported(opponent),true,'released comma-joined legacy key boundaries remain supported');
+ for(const opponent of [null,[],{id:'a',mu:25},{id:'a',mu:25,sigma:8,future:true},{id:'a',mu:Infinity,sigma:8},{id:'a',mu:25,sigma:0},{id:'a',mu:25,sigma:NaN},{id:'__proto__',mu:25,sigma:8}])assert.equal(supported(opponent),false,'partial future or invalid evidence stays unsupported');
+ assert.equal(ctx.currentChoiceChanceSnapshotSupported({at:1,seed:'saved-draw',weights:{a:.5},opponents:[{id:'a',mu:25,sigma:8},{id:'a',mu:26,sigma:7}]}),false,'duplicate opponents still refuse the saved source');
+});

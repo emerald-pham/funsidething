@@ -1963,3 +1963,9 @@ The held-demotion native boundary requires one Current and one Previous heading 
 - `RISK corrupt cloud work budget: completed pending-source refusals do not restart downloads on ordinary edits`: unrepresented, JSON-lossy, BigInt and cyclic pending originals; zero repeated SDK reads after Add/Start/No/Done; failed local inspection, changed pointer and same-pointer losslessness transitions; deliberate Retry and exact original physical retention.
 
 Numeric preservation keeps exact released Float32 histograms, CDFs, Top K and Gaussian stream/spare, including zero-uniform rejection and odd/even/default sample boundaries. Cold display retains exact directed probabilities, rating normalization, duplicate-ID exclusions and replacement-calculator fallback. The recovery verifier waits for the actual app owner and retry before reading the status-mutating fake backend; all original five-second ACK, exact durable-head, source and reopen assertions remain.
+
+- RISK forecast caller preservation: current Math receivers preserve exact released shared-draw integration
+- RISK History basis work budget: identical exact inputs avoid repeated hashing while changed or custom evidence stays fresh
+- RISK saved chance shape preservation: opponent key order enumerability and unknown fields keep the same support boundary
+
+The History basis fast path recomputes the complete serialized numeric inputs, compares them exactly, and retains one input/result pair totaling at most256Ki UTF-16 units. Changed eligibility, ratings, IDs, open membership, samples, callable/Math replacements, exact cap and overflow stay explicit. Frozen-opponent validation preserves ordinary key permutations and the released comma-joined hidden/inherited edge through its original fallback. The pinned selection-function source fingerprints remain unchanged.

@@ -178,3 +178,16 @@ behavioral RED; the unchanged CI1,184ms failure is the symptom evidence. The fir
 focused successor measured threeYes365ms andDone232ms, with both numeric controls
 passing. Final candidate-focused, native, independent review and full exact CI
 remain separate release gates. Earlier full runs keep their original identities.
+
+
+## Protected source restoration after00acffe
+
+Both00acffe CI runs met the unchanged action budgets (pushYes872ms/Done555ms; PRYes842ms/Done535ms), but failed the existing overall-Chance source fingerprint for chanceHash. The focused cohort had omitted that guard; the candidate was not merged or deployed. Both complete failed runs and earlier approvals remain historical evidence. The protected algorithm is restored byte-for-byte from296; its old expected digest and every assertion remain unchanged.
+
+To retain useful headroom without editing that algorithm, History now reuses one exact basis only when freshly rebuilt serialized inputs match. The key still contains all open IDs/raw ratings/current availability and sample count in the original language-independent order. The combined retained input/result strings are limited to256Ki UTF-16 units. Original hash/Math/imul identities guard every hit; replacements and oversized inputs take the ordinary uncached calculation. No task, board, stats or validation graph is retained, and the memo grants no source or publication authority.
+
+The actual counter RED observes624 rather than312 hash operations on a repeated exact input before the memo. Earlier fixture errors called a lexical helper as an exposed function; those are preserved as nonbehavioral setup failures. Controls cover changed ratings/eligibility/IDs/membership/samples, reorder and empty inputs, replacement/restored calculators and Math objects/methods, and exact input-plus-result cap/overflow. Exact forecast goldens and current-receiver controls passed before passing this invocation's Math object through the existing Phi/phi interface. Every integration node, reduction, operation, tolerance and depth remains unchanged.
+
+The profile also identified repeated three-key sorts/joins in frozen-opponent validation. Ordinary exact keys use a membership fast path while all other key counts retain the released sort/join expression. Review found that separator-containing keys plus hidden/inherited values could pass the old expression; an observed later sensitivity failure and the original fallback preserve that edge instead of tightening the accepted boundary. No validation result is cached.
+
+Broad local regression, fresh exact installed/native/private/rendered checks, renewed independent review, full candidate CI and main deployment/live acceptance remain required separately. This diagnosis does not establish physical iPhone OS termination cause, peak heap or authenticated affected-account recovery.

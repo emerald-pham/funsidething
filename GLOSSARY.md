@@ -56,3 +56,7 @@ _Avoid_: Loading any readable backup
 Confirmation that the person's saved board reached their cloud account.
 A board saved on one device or read from the cloud is not that confirmation.
 _Avoid_: Synced badge
+
+
+**History basis memo**:
+One exact serialized numeric-input/result pair reused between matching History observations. Inputs are rebuilt before every lookup; their combined retained strings stay within256Ki UTF-16 units. It retains no task, board or validation graph and grants no cloud authority.

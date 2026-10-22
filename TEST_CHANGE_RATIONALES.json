@@ -16665,5 +16665,63 @@
     },
     "greenEvidence": "First focused math-capture-focused.log: actualYes365ms,Done232ms, both numeric controls pass. Required committed-focused/native/review/fullCI evidence remains separate.",
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/cloud-sync-root-causes-20261021"
+  },
+  {
+    "testChangesSha256": "a4c310bceb3b40d349ea76fb2bc52778b87bd5f626859520bc4eed507e30b485",
+    "reason": "Preserve every existing source fingerprint, sample, timing budget and data-safety assertion while repairing populated-board stalls and exact-copy cloud recovery. Exact00 CI met timing but rejected the chanceHash source edit; restore that protected implementation unchanged and reduce repeated pure History-basis hashing instead, with exact numeric/shape preservation controls. New fixture-only oracle errors remain distinguished from behavioral RED.",
+    "previousBehavior": "Damaged cloud sources redownloaded after ordinary edits; current exact bytes without a private ACK could not repair. Large boards repeated ranking work. The00 numerical increment passed timing but violated an existing byte-exact chanceHash source contract. Before the new memo, the same exact History basis performed624 rather than312 Math.imul calls.",
+    "intendedBehavior": "Keep all nine protected selection/rating function fingerprints unchanged. Hash freshly rebuilt History inputs once per exact repeated default context, with one combined input/result pair capped at256Ki UTF-16 units, and ordinary uncached behavior for changes or replacements. Preserve exact shared-draw forecast outputs and every prior saved-source shape, including comma-joined hidden/inherited edge cases. Complete all original action, recovery, protection, ACK/head, reopen and compatibility assertions.",
+    "replacementTests": [
+      "RISK sync responsiveness guidance: mounted Help explains large boards and bounded damaged-source recovery",
+      "RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations",
+      "RISK corrupt cloud work budget: cold-opened sources without an ACK keep newer edits without repeated downloads",
+      "RISK lossless cloud recovery: an exact current board repairs missing chunks without a historical ACK",
+      "RISK corrupt cloud work budget: completed pending-source refusals do not restart downloads on ordinary edits",
+      "RISK corrupt cloud work budget: a failed exact-source read does not permanently hold a later repair",
+      "RISK populated task responsiveness: three rapid Yes actions retain history and reopen within the interaction budget",
+      "RISK populated completion responsiveness: rapid Done and Undo preserve earlier completions without full-pool stalls",
+      "RISK numeric responsiveness: optimized sampling and cold display preserve released distributions and random streams",
+      "RISK numeric caller preservation: stable CDFs and long history fingerprints survive current Math replacements",
+      "RISK forecast caller preservation: current Math receivers preserve exact released shared-draw integration",
+      "RISK History basis work budget: identical exact inputs avoid repeated hashing while changed or custom evidence stays fresh",
+      "RISK saved chance shape preservation: opponent key order enumerability and unknown fields keep the same support boundary"
+    ],
+    "preservedCoverage": [
+      "Every existing protected function hash, Monte-Carlo sample count, original1000ms action budget, integration tolerance, Float32CDF and random stream remains unchanged.",
+      "Cloud identity/revision/CAS, protected raw originals, pending-source losslessness and actual verified ACK/durable head acceptance remain required.",
+      "Original mounted FAQ content, unsupported/future source refusal, Undo/History facts and installed-client delivery/offline requirements remain intact."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern='^RISK History basis work budget:' tests.js",
+      "failure": "Actual source-bound2026-10-22T00-06-53-162Z-6c39a841-b1f0-4b6f-8aaf-7e0a55c2f936 fails repeated exact History basis work624!=312 before the memo. Source guard failure was observed in both00 CI runs39695073979/39695079699 and locally before restoration. Original cloud/action REDs and all prior candidate failures remain in earlier exact records; current forecast/shape goldens are pre-edit preservation positives, not fabricated symptom REDs."
+    },
+    "additionalEvidence": {
+      "comparisonBase": "c677724ded14b4c4519975c57a81f028283b08ff",
+      "chronology": "Protected-hash-red-forecast-positive records original source-guard assertion plus passing new receiver goldens before the forecast edit. Restored-hash-min-only-focused passes source guard and Yes435/Done257ms. Initial History oracle fixture ctx.openTasks TypeError is not RED; corrected fixture observes624!=312. First memo/forecast focused passes16 tests, Yes418/Done245ms. Pre-edit saved-shape positive passes; reviewer separator collision sensitivity fails before original fallback repair. All source-bound logs remain external; broad/full/native/review/CI/live gates retain separate identities."
+    }
+  },
+  {
+    "testChangesSha256": "70c7943334e93b9714b2880e566501843bc4d2db49d6d547e1b67c1be813db90",
+    "reason": "Preserve every existing source fingerprint, sample, timing budget and data-safety assertion while repairing populated-board stalls and exact-copy cloud recovery. Exact00 CI met timing but rejected the chanceHash source edit; restore that protected implementation unchanged and reduce repeated pure History-basis hashing instead, with exact numeric/shape preservation controls. New fixture-only oracle errors remain distinguished from behavioral RED.",
+    "previousBehavior": "Damaged cloud sources redownloaded after ordinary edits; current exact bytes without a private ACK could not repair. Large boards repeated ranking work. The00 numerical increment passed timing but violated an existing byte-exact chanceHash source contract. Before the new memo, the same exact History basis performed624 rather than312 Math.imul calls.",
+    "intendedBehavior": "Keep all nine protected selection/rating function fingerprints unchanged. Hash freshly rebuilt History inputs once per exact repeated default context, with one combined input/result pair capped at256Ki UTF-16 units, and ordinary uncached behavior for changes or replacements. Preserve exact shared-draw forecast outputs and every prior saved-source shape, including comma-joined hidden/inherited edge cases. Complete all original action, recovery, protection, ACK/head, reopen and compatibility assertions.",
+    "replacementTests": [
+      "RISK forecast caller preservation: current Math receivers preserve exact released shared-draw integration",
+      "RISK History basis work budget: identical exact inputs avoid repeated hashing while changed or custom evidence stays fresh",
+      "RISK saved chance shape preservation: opponent key order enumerability and unknown fields keep the same support boundary"
+    ],
+    "preservedCoverage": [
+      "Every existing protected function hash, Monte-Carlo sample count, original1000ms action budget, integration tolerance, Float32CDF and random stream remains unchanged.",
+      "Cloud identity/revision/CAS, protected raw originals, pending-source losslessness and actual verified ACK/durable head acceptance remain required.",
+      "Original mounted FAQ content, unsupported/future source refusal, Undo/History facts and installed-client delivery/offline requirements remain intact."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern='^RISK History basis work budget:' tests.js",
+      "failure": "Actual source-bound2026-10-22T00-06-53-162Z-6c39a841-b1f0-4b6f-8aaf-7e0a55c2f936 fails repeated exact History basis work624!=312 before the memo. Source guard failure was observed in both00 CI runs39695073979/39695079699 and locally before restoration. Original cloud/action REDs and all prior candidate failures remain in earlier exact records; current forecast/shape goldens are pre-edit preservation positives, not fabricated symptom REDs."
+    },
+    "additionalEvidence": {
+      "comparisonBase": "00acffe6582ffb9bffabac96c946579c448f8b49",
+      "chronology": "Protected-hash-red-forecast-positive records original source-guard assertion plus passing new receiver goldens before the forecast edit. Restored-hash-min-only-focused passes source guard and Yes435/Done257ms. Initial History oracle fixture ctx.openTasks TypeError is not RED; corrected fixture observes624!=312. First memo/forecast focused passes16 tests, Yes418/Done245ms. Pre-edit saved-shape positive passes; reviewer separator collision sensitivity fails before original fallback repair. All source-bound logs remain external; broad/full/native/review/CI/live gates retain separate identities."
+    }
   }
 ]
