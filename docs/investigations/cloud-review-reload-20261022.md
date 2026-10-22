@@ -156,3 +156,46 @@ Rendered, independent code/specialist/FAQ/typography, compatibility, installed
 client, CI and deployed results must be bound to the final candidate separately.
 The approved diagnostic release does not assert that the original physical
 phone reload, affected account or missing cloud chunks have been repaired.
+
+
+## Review repairs and storage priority
+
+Independent specialist review found that a successful small diagnostic write
+could consume the remaining aggregate site capacity and prevent an otherwise
+fitting accepted edit. A new actual Add consumer reproduced this failure,
+proved that the identical edit fits after removing only diagnostic bytes, and
+then passed after automatic diagnostic eviction. Separate actual IndexedDB
+backup and Add consumers verify that guarded device writes retry after the
+same cleanup. The retry retains the same port and captured options, including
+head/account/source guards; it never reselects authority. Further diagnostic
+writes are suppressed in that document, with unavailable persistence reported.
+Only the dedicated restart metadata key is expendable; board and recovery
+sources retain their existing protection.
+
+The broader storage cohort exposed two older irreducible-capacity fixtures
+whose budgets counted the newly expendable diagnostic bytes as required data.
+Their negative cases now subtract exactly that key and its value from the
+budget. Every original failed-save, exact head, protected-backup and later
+missing-safety assertion remains. This preserves an actually irreducible quota
+condition after diagnostic cleanup rather than denying a save that now fits.
+
+The first full candidate run also caught diagnostic writes from unrecognized
+read-only export and notice commands. The original assertions remain intact;
+the action observer now records only its fixed recognized ordinary commands.
+The focused read-only controls failed before that repair and then passed.
+Privacy and event-limit cases exercise recognized actions; unknown/private
+command strings remain absent from the report. The same full attempt used
+Node 24 and encountered four nested-run reporter mismatches; final full
+qualification uses Node 22, matching repository CI. That earlier attempt is
+retained as failed evidence, not final approval.
+
+Independent FAQ review requested a more precise distinction between an idle
+unverified preview and verification of an already accepted recovery action.
+The mounted help consumer failed on the earlier copy and passed with the
+clarification. The inline accepted-save explanation remains unchanged.
+
+The external run records retain each source snapshot and actual chronology:
+`review-repairs-red.log`, `review-repairs-green.log`,
+`device-capacity-red.log`, `device-capacity-green.log`,
+`read-only-controls-red.log`, `read-only-controls-green.log`,
+`capacity-cohort.log` and `capacity-cohort-corrected.log`.

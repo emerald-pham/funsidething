@@ -17075,5 +17075,34 @@
       "command": "node scripts/agent-tools/record-run.mjs --repo $PWD --evidence-dir /Users/emeraldpham/.codex/task-artifacts/cloud-review-reload-20261022/runs --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK debug log:\" tests.js; separate actual slice commands and source snapshots are retained in timestamped records 10-11-35-211Z,10-18-17-511Z,10-19-59-402Z,10-21-06-726Z,10-22-16-341Z.",
       "failure": "Observed assertions: unified restart report missing after actual Add and cold reopen; Settings old debugger instead of Debug log; failed diagnostic write falsely reported observed; expired stored journal remained; both actual manual and worker reload calls lacked retained reason. Each repair has its subsequent GREEN. Native crash reproduction attempts passed and are not defect REDs."
     }
+  },
+  {
+    "baseCommit": "831b0de128fabb6e5abe5665bee5745e45e26a4e",
+    "testChangesSha256": "6754a83e6370f0b98140974b4da920b5643abae3dc440863c19f98e04a147934",
+    "reason": "User approved local restart diagnostics, expanded to normal-use reloads, replacement of the old in-app debugger and copy/paste without downloads. Existing label and download-name assertions follow that explicit UI change; all authority and preservation assertions remain. Independent review additionally requires automatic diagnostic eviction before shared-capacity board/recovery failures, precise accepted-verification FAQ copy, and preservation of read-only commands.",
+    "previousBehavior": "Support diagnostics lost source and action observations when a document restarted. The app did not retain its explicit reload reason, and the old report screen lacked the unified persistent restart trail.",
+    "intendedBehavior": "A bounded local metadata log survives reopening, records attempted fixed-name actions, recovery phases and explicit app reload reasons, expires safely, excludes private values, and supports direct clipboard or selectable text without board/source changes.",
+    "replacementTests": [
+      "RISK debug log: ordinary actions survive reopening as metadata without changing saved work",
+      "RISK debug log: an interrupted actual cloud review retains its stage in a new document",
+      "RISK debug log: the replacement screen copies a unified log without a download",
+      "RISK debug log: unavailable diagnostic storage never blocks edits or claims persistence",
+      "RISK debug log: document and event limits expire without retaining injected private fields",
+      "RISK debug log: app reload reasons and lifecycle observations survive without private error text",
+      "RISK debug log: FAQ distinguishes an idle preview from accepted recovery verification",
+      "RISK debug log: shared storage capacity belongs to accepted board saves before diagnostics",
+      "RISK debug log: shared device capacity preserves mandatory backups before restart metadata"
+    ],
+    "preservedCoverage": [
+      "All existing source-consent, SDK cancellation, stored-source, pending-upload, revision, identity, acknowledgement, durability and worker update assertions remain. Existing report labels and optional download filenames alone change to the user-requested Debug log.",
+      "Existing schema/version, source-stage byte limits, clipboard fallback, accepted publication ownership and unsaved Settings draft assertions remain. New controls use the existing report actions and textarea.",
+      "The first recovery-stage cold fixture used real time against an older fixed warm clock and expired correctly; its corrected pass is not claimed as a new preimplementation RED. The first ordinary-action persistence RED is meaningful and precedes all observer runtime code.",
+      "Every existing export/no-storage-write, notice exact-store, Undo, Restore, failed-save, two-head equality and protected-source assertion remains. Two aggregate negative fixtures subtract only the expendable journal key/value so their original irreducible-quota and safety-hold assumptions remain true after cleanup.",
+      "Recognized action logging excludes unrecognized read-only export and notice commands. New privacy/event-limit fixtures use actual recognized commands, retain unknown/private exclusion, and keep the declared retention assertions."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo $PWD --evidence-dir /Users/emeraldpham/.codex/task-artifacts/cloud-review-reload-20261022/runs --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK debug log:\" tests.js; separate actual slice commands and source snapshots are retained in timestamped records 10-11-35-211Z,10-18-17-511Z,10-19-59-402Z,10-21-06-726Z,10-22-16-341Z. Review repair actual commands and immutable snapshots are in review-repairs-red.log (10:38), device-capacity-red.log (10:41) and read-only-controls-red.log (10:40), with specialist aggregate-quota reproduction preserved independently.",
+      "failure": "Observed assertions: unified restart report missing after actual Add and cold reopen; Settings old debugger instead of Debug log; failed diagnostic write falsely reported observed; expired stored journal remained; both actual manual and worker reload calls lacked retained reason. Each repair has its subsequent GREEN. Native crash reproduction attempts passed and are not defect REDs. The new aggregate Add fails although identical payload persists after removing only diagnostic bytes; mandatory device backup returns no ID until diagnostic space yields; mounted FAQ omits accepted-verification exception. Existing export and notice tests observed unintended diagnostic writes. The first broad storage repair run exposed budgets that included expendable journal bytes; stricter irreducible fixtures then passed with all safety assertions unchanged."
+    }
   }
 ]

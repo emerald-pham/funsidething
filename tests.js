@@ -16472,7 +16472,8 @@ test('RISK LOCAL BACKUPS: single-device Undo frees old automatic history for its
  const protectedOnlyPlain=JSON.stringify(retained.filter(row=>row.kind==='manual'||row.id==='pinned-recovery'));
  const protectedOnly=ctx.packBackupIndex(protectedOnlyPlain);
  storage.setItem(LOCAL_BACKUPS_KEY,protectedOnly);
- quota=used();
+ const debugKey='fvp:chain-scanner:restart-diagnostics:v1',debugRaw=storage.getItem(debugKey);
+ quota=used()-(debugRaw===null?0:debugKey.length+debugRaw.length); // irreducible even after expendable diagnostics yield
  const beforeHead=storage.getItem(LOCAL_HEAD_KEY),beforeBoard=storage.getItem(SYNC_STORE_KEY);
  reopened.ctx.state.tasks.find(row=>row.id===task.id).title+=' New change';
  assert.equal(await reopened.ctx.persist(),false,'an irreducible aggregate quota still holds the unsaved edit');
@@ -16588,7 +16589,8 @@ test('RISK LOCAL BACKUPS: quota during Restore keeps the immediate pre-restore b
      const primaryGrowth=2*(latest.payload.length-storage.getItem(LOCAL_HEAD_KEY).length);
      // The index write fits, but removing only replaceable latest still leaves
      // the complete two-key restored board one code unit over site quota.
-     quota=used()-released+primaryGrowth-1;
+     const debugKey='fvp:chain-scanner:restart-diagnostics:v1',debugRaw=storage.getItem(debugKey);
+     quota=used()-released+primaryGrowth-1-(debugRaw===null?0:debugKey.length+debugRaw.length);
      quotaArmed=true;
     }
    }
@@ -40427,12 +40429,77 @@ test('RISK support diagnostics: Settings names the existing board export for its
  const faq=help.match(/<dt>What does the debug log contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
  assert.ok(faq,'the extended FAQ describes the separate report');
  assert.match(faq,/local metadata report/i);assert.match(faq,/never includes task or recovery-source contents, account IDs, paths, cached app bodies, or arbitrary error text/i);
- assert.match(faq,/does not start a cloud read or change saved data/i);assert.match(faq,/clears an unverified source-review preview/i);
+ assert.match(faq,/does not start a cloud read or change saved data/i);assert.match(faq,/clears an idle, unverified source-review preview/i);
  assert.match(faq,/During an accepted source save, you can view, select, copy, or download the report inside the existing recovery preview/i);
  assert.match(faq,/never cancels that publication/i);assert.match(faq,/never uploaded/i);assert.match(faq,/does not create a board backup/i);
  const measures=help.match(/<dt>What does the debug log measure\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
  assert.match(measures,/effective cloud-read deadline/i);assert.match(measures,/Recovery-copy availability and matching reflect existing checks only/i);
  assert.match(measures,/Account changes clear current acknowledgement observations/i);
+});
+
+test('RISK debug log: FAQ distinguishes an idle preview from accepted recovery verification',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();
+ const faq=app.shim.document.getElementById('modalRoot').innerHTML.match(/<dt>What does the debug log contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
+ assert.match(faq,/clears an idle, unverified source-review preview/i);
+ assert.match(faq,/accepted recovery action is being verified.*log also opens inline.*leaves that work running/i);
+ assert.match(faq,/During an accepted source save, you can view, select, copy, or download the report inside the existing recovery preview/i);
+});
+
+test('RISK debug log: shared storage capacity belongs to accepted board saves before diagnostics',async t=>{
+ const values=new Map(),key='fvp:chain-scanner:restart-diagnostics:v1';let quota=Infinity,armed=false;
+ const used=()=>[...values].reduce((sum,[name,text])=>sum+name.length+text.length,0);
+ const storage={getItem:name=>values.get(name)??null,removeItem:name=>values.delete(name),setItem(name,text){
+  text=String(text);
+  if(armed&&name===LOCAL_HEAD_KEY){
+   armed=false;
+   const other=[...values].filter(([name])=>![key,LOCAL_HEAD_KEY,SYNC_STORE_KEY,LOCAL_BACKUPS_KEY].includes(name)).reduce((sum,[name,text])=>sum+name.length+text.length,0);
+   quota=other+LOCAL_HEAD_KEY.length+SYNC_STORE_KEY.length+2*text.length+1100;
+  }
+  const prior=values.get(name),next=used()-(prior===undefined?0:name.length+prior.length)+name.length+text.length;
+  if(next>quota)throw Object.assign(Error('aggregate capacity fixture'),{name:'QuotaExceededError'});
+  values.set(name,text);
+ }};
+ const app=await loadApp({sharedStorage:storage}),{ctx,shim}=app;t.after(()=>app.dispose());
+ assert.equal(await ctx.persist(),true);vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry()',ctx);
+ armed=true;shim.document.getElementById('addInput').value='A retained edit '+ 'X'.repeat(800);
+ const accepted=await ctx.onAction('add',{});vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry()',ctx);
+ if(!accepted){
+  storage.removeItem(key);vm.runInContext('restartDiagnosticsRecord=()=>false',ctx);
+  assert.equal(await ctx.persist(),true,'the identical accepted edit fits when only diagnostic storage is removed');
+ }
+ assert.equal(accepted,true,'best-effort diagnostics must yield shared capacity before an otherwise fitting board save fails');
+ assert.ok(JSON.parse(storage.getItem(SYNC_STORE_KEY)).tasks.some(row=>row.title.startsWith('A retained edit ')));
+ assert.equal(storage.getItem(key),null,'later save observations must not recreate the evicted log in this document');
+ assert.equal(ctx.buildSupportDiagnosticsReport().restartDiagnostics.storageStatus,'unavailable');
+ const cold=await loadApp({sharedStorage:storage});t.after(()=>cold.dispose());
+ assert.ok(cold.ctx.state.tasks.some(row=>row.title.startsWith('A retained edit ')),'the accepted edit survives reopening');
+});
+
+test('RISK debug log: shared device capacity preserves mandatory backups before restart metadata',async t=>{
+ for(const kind of ['backup','head'])await t.test(kind,async sub=>{
+ const {IDBFactory}=await import('fake-indexeddb'),factory=new IDBFactory(),storage=sharedScannerStorage(),key='fvp:chain-scanner:restart-diagnostics:v1';let refusing=false;
+ const indexedDBProvider={open(...args){const request=factory.open(...args);return new Proxy(request,{get(target,property){
+  if(property==='result'){const db=target.result;return new Proxy(db,{get(database,name){
+   if(name==='transaction')return(...params)=>{const tx=database.transaction(...params);if(!refusing||params[1]!=='readwrite'||storage.getItem(key)===null)return tx;
+    return new Proxy(tx,{get(transaction,field){if(field==='objectStore')return storeName=>{const store=transaction.objectStore(storeName);return new Proxy(store,{get(object,member){if(member==='put'||member==='add')return()=>{throw Object.assign(Error('shared device quota'),{name:'QuotaExceededError'});};const value=object[member];return typeof value==='function'?value.bind(object):value;}});};const value=transaction[field];return typeof value==='function'?value.bind(transaction):value;},set(transaction,field,value){transaction[field]=value;return true;}});};
+   const value=database[name];return typeof value==='function'?value.bind(database):value;}});}
+  const value=target[property];return typeof value==='function'?value.bind(target):value;},set(target,property,value){target[property]=value;return true;}});}};
+ const app=await loadApp({sharedStorage:storage,indexedDBProvider,deviceDbName:'debug-capacity-'+Math.random()}),{ctx,shim}=app;sub.after(()=>app.dispose());
+ assert.equal(await ctx.persist(),true);const store=ctx.window.ScannerDeviceStore,head=await store.readHead();assert.ok(storage.getItem(key));
+ refusing=true;
+ if(kind==='head'){
+  shim.document.getElementById('addInput').value='Accepted device-capacity edit';
+  assert.equal(await ctx.onAction('add',{}),true,'the actual Add retries its guarded device write after releasing diagnostic space');
+  assert.ok(JSON.parse((await store.readHead()).payload).tasks.some(row=>row.title==='Accepted device-capacity edit'));
+ }else{
+ const backup=await ctx.saveDurableBackup('before-account-switch',head.payload);
+ assert.ok(backup?.id,'required recovery storage must reclaim diagnostic capacity before failing');
+ assert.equal((await store.listBackups()).find(row=>row.id===backup.id).payload,head.payload);
+ assert.equal((await store.readHead()).payload,head.payload,'capacity cleanup cannot replace the accepted head');
+ }
+ await ctx.onAction('help',{});
+ assert.equal(storage.getItem(key),null);assert.equal(ctx.buildSupportDiagnosticsReport().restartDiagnostics.storageStatus,'unavailable');
+ });
 });
 
 test('RISK debug log: ordinary actions survive reopening as metadata without changing saved work',async t=>{
@@ -40489,16 +40556,17 @@ test('RISK debug log: unavailable diagnostic storage never blocks edits or claim
  assert.equal(ctx.buildSupportDiagnosticsReport().restartDiagnostics.storageStatus,'unavailable','a readable empty store does not prove that a failed diagnostic write persisted');
  assert.ok(ctx.state.tasks.some(row=>row.title==='PRIVATE retained task'));
  denied=false;await ctx.onAction('PRIVATE unknown command',{});
+ await ctx.onAction('toggle-add',{});
  const report=ctx.buildSupportDiagnosticsReport();assert.equal(report.restartDiagnostics.storageStatus,'observed');
  assert.doesNotMatch(ctx.supportDiagnosticsText(),/PRIVATE/,'private values, thrown messages and unknown command strings stay out of the log');
- assert.equal(report.restartDiagnostics.documents.find(row=>row.document===report.restartDiagnostics.currentDocument).lastAction.detail,'other');
+ assert.equal(report.restartDiagnostics.documents.find(row=>row.document===report.restartDiagnostics.currentDocument).lastAction.detail,'toggle-add');
 });
 
 test('RISK debug log: document and event limits expire without retaining injected private fields',async t=>{
  const first=await loadApp();t.after(()=>first.dispose());let latest=first;const key='fvp:chain-scanner:restart-diagnostics:v1';
  for(let doc=0;doc<6;doc++){
   latest=await loadApp({sharedStorage:first.shim.localStorage});t.after(()=>latest.dispose());
-  for(let event=0;event<14;event++)await latest.ctx.onAction('PRIVATE unrecognized action',{});
+  for(let event=0;event<14;event++)await latest.ctx.onAction('help',{});
  }
  let report=latest.ctx.buildSupportDiagnosticsReport();assert.equal(report.restartDiagnostics.documents.length,4);
  assert.ok(report.restartDiagnostics.documents.every(row=>row.events.length<=8));assert.ok(Buffer.byteLength(first.shim.localStorage.getItem(key),'utf8')<=8192);

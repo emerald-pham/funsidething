@@ -2007,6 +2007,9 @@ This boundary control holds a successful real provider reply, installs a later a
 
 ## Unified restart and sync debug log
 
+- RISK debug log: FAQ distinguishes an idle preview from accepted recovery verification
+- RISK debug log: shared storage capacity belongs to accepted board saves before diagnostics
+- RISK debug log: shared device capacity preserves mandatory backups before restart metadata
 - RISK debug log: ordinary actions survive reopening as metadata without changing saved work
 - RISK debug log: an interrupted actual cloud review retains its stage in a new document
 - RISK debug log: the replacement screen copies a unified log without a download
