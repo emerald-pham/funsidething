@@ -1874,6 +1874,8 @@ test('RISK sync responsiveness guidance: mounted Help explains large boards and 
  ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  const rapid=help.split('<dt>Can I make several changes quickly?</dt><dd>')[1]?.split('</dd>')[0];assert.ok(rapid);
  assert.match(rapid,/Large boards keep the same ranking, History and Undo rules/);
+ assert.match(rapid,/A completed cloud confirmation is kept when an earlier device save finishes/);
+ assert.match(help,/Cloud saves keep their confirmation when earlier saves finish/);
  const failed=help.split('<dt>Can I keep working with a damaged cloud save?</dt><dd>')[1]?.split('</dd>')[0];assert.ok(failed,'damaged cloud saving has its own brief actionable answer');
  assert.match(failed,/do not download that same source for every edit/);assert.match(failed,/newer cloud update/);assert.match(failed,/different saved source still needs your choice/);
  assert.match(help,/Large saved boards respond faster/);assert.match(help,/Corrupted cloud sources stop repeated downloads/);
@@ -30390,7 +30392,7 @@ test('RISK completion boundaries: a pending account-A acknowledgement and its le
  assert.ok(pushCount>=1,'only the captured account-A write was pending through the transition');
 });
 
-async function exerciseCompletionEditorBoundaries(t,nativeOnly=false){
+async function exerciseCompletionEditorBoundaries(t,nativeOnly=false,holdAcknowledgedPins=false){
  const observerWatchdog=setTimeout(()=>{},15000);t.after(()=>clearTimeout(observerWatchdog));
  const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),at=Date.parse('2026-10-17T15:00:00Z'),
   doneId='boundary-editor-done',peerId='boundary-editor-peer',gateId='boundary-editor-gate',dependentId='boundary-editor-dependent',
@@ -30413,7 +30415,7 @@ async function exerciseCompletionEditorBoundaries(t,nativeOnly=false){
  const readStarted=new Promise(resolve=>{readStartedResolve=resolve;}),readGate=new Promise(resolve=>{releaseRead=resolve;});
  const closed=new WeakSet(),closeFixture=async fixture=>{if(!fixture||closed.has(fixture))return;closed.add(fixture);try{fixture.shim.window.CloudSync&&(fixture.shim.window.CloudSync.user=null);fixture.ctx.suspendCloudSync?.();vm.runInContext('clearTimeout(saveTimer);saveTimer=null;clearTimeout(cloudTimer);cloudTimer=null;clearCloudRetry();',fixture.ctx);}catch{}try{await fixture.shim.window.ScannerDeviceStore?.close?.();}catch{}};
  t.after(()=>closeFixture(app));
- const nativeSaves=observeQueuedNativeSaves(ctx,t),oldEntered=deferredSyncFixture(),oldRelease=deferredSyncFixture();let heldOld=false,nativeSource=null;
+ const nativeSaves=observeQueuedNativeSaves(ctx,t),oldEntered=deferredSyncFixture(),oldRelease=deferredSyncFixture(),nativeSave=deferredSyncFixture();let heldOld=false,nativeSource=null,heldPinRelease=false;
  t.after(()=>oldRelease.resolve());
  await ctx.__dataReady;await ctx.cloudPull();CS.ready=false;
  hydrateUnchangedEditorDraft(app,doneId);ctx.onAction('done-task',{dataset:{id:doneId}});
@@ -30433,6 +30435,14 @@ async function exerciseCompletionEditorBoundaries(t,nativeOnly=false){
   // so the regression retains the observed slow-storage producer overlap.
   if(phase==='editor-save-and-deferred-adoption')await syncSettle(400);
   const result=await commit(options);
+  if(holdAcknowledgedPins&&!heldPinRelease&&result?.ok&&ctx.state.syncRev===6&&JSON.parse(options.payload).syncRev===5&&
+     !Object.hasOwn(options,'backups')&&!Object.hasOwn(options,'backup')){
+   // The real cloud ACK has arrived and this real metadata commit is durable.
+   // Deliver its return after the older native Save's CAS repair finishes.
+   // No state, payload, revision, production timer or assertion is replaced.
+   heldPinRelease=true;
+   await fixtureDeadline(nativeSave.promise,'the older native Save must finish while the acknowledged pin-release return is held');
+  }
   if(nativeOnly&&nativeSaves.active()&&phase==='completion-adoption'&&result?.ok&&!heldOld){heldOld=true;nativeSource=options.payload;oldEntered.resolve();await oldRelease.promise;}
   if(result?.ok)durable.push({phase,chain:JSON.parse(options.payload).chain,events:JSON.parse(options.payload).decisionEvents||[]});return result;
  };
@@ -30454,7 +30464,7 @@ async function exerciseCompletionEditorBoundaries(t,nativeOnly=false){
  if(nativeOnly){await oldEntered.promise;const pendingHead=await store.readHead();assert.equal(pendingHead.payload,nativeSource,'the held real native save already protects the original Done and theme before editor Save');}
  shim.document.querySelector=()=>null;
  phase='editor-save-and-deferred-adoption';
- const nativeSave=deferredSyncFixture(),schedule=ctx.setTimeout;
+ const schedule=ctx.setTimeout;
  // Observe the real Save callback and its persistence result. Let the native
  // editor/deferred producers finish before adding a redundant fixture save.
  ctx.setTimeout=(fn,ms,...args)=>{
@@ -30469,6 +30479,7 @@ async function exerciseCompletionEditorBoundaries(t,nativeOnly=false){
   // deferred persistence. Native-only coverage below adds no such barrier.
   await nativeSaves.settle('editor native and deferred producers before the extra fixture push');ctx.cloudPushNow();
  }
+ if(holdAcknowledgedPins)assert.equal(heldPinRelease,true,'the actual acknowledged pin-release commit delivered after the older native save');
  await settleSavedViewPublication(app,h,'editor-deferred completion adoption');
  if(!nativeOnly)assert.equal(await ctx.persist(),true,'the redundant fixture save succeeds after native editor publication is durably acknowledged');phase='settled';
  if(nativeOnly){const backups=await store.listBackups();assert.ok(backups.some(row=>{const board=JSON.parse(row.payload);return board.tasks?.some(task=>task.id===peerId&&task.title==='Editor draft during delayed recovery')&&board.decisionEvents?.some(event=>event.id===completion.id)&&board.decisionEvents?.some(event=>event.id===themeFact.id);}), 'automatic convergence retains a verified recovery copy of the native editor fields and original facts');}
@@ -30547,6 +30558,59 @@ async function exerciseCompletionEditorBoundaries(t,nativeOnly=false){
 
 test("RISK completion boundaries: a live editor and pressed scanner control defer stale adoption while the saved view and fields survive cold reopen",{timeout:15000},async t=>exerciseCompletionEditorBoundaries(t));
 test('RISK completion convergence: native Done theme and editor Save finish after a conflicted recovery copy without an added trigger',{timeout:15000},async t=>exerciseCompletionEditorBoundaries(t,true));
+test('RISK cloud acknowledgement durability: an older native editor CAS repair cannot rewind a confirmed revision',{timeout:15000},async t=>exerciseCompletionEditorBoundaries(t,false,true));
+
+test('RISK cloud acknowledgement authority: CAS repair requires current identity and read authority while newer work stays pending',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb');
+ for(const mode of ['later local edit','expired same-account session','same email different UID','changed backend','equal durable revision','newer durable peer'])await t.test(mode,async()=>{
+  const initial=syncState({tasks:[syncTask('ack-authority','Acknowledged authority task')],syncRev:6,syncAccount:'e@example.com',syncIdentity:'owner-a',syncDirty:false,seenQuickStart:true,futureAcknowledgementField:{opaque:['retained',17]}}),
+   h=makeSyncHarness({remote:initial,rev:6,delayMs:1}),indexedDB=new IDBFactory(),name='ack-authority-'+Math.random();let identity='owner-a';
+  const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},indexedDBProvider:indexedDB,deviceDbName:name,cloudSyncFactory:()=>({...h.factory(),recoveryIdentity:()=>identity})}),{ctx,shim}=app,CS=shim.window.CloudSync,store=shim.window.ScannerDeviceStore;
+  await ctx.__dataReady;await ctx.cloudPull();ctx.observeCloudIdentity();assert.equal(await ctx.persist(),true);
+  assert.equal(ctx.state.syncRev,6);assert.equal(vm.runInContext('lastKnownCloudRevision',ctx),6);
+  const acknowledged=await store.readHead(),peer=JSON.parse(acknowledged.payload);peer.syncRev=mode==='newer durable peer'?8:mode==='equal durable revision'?6:5;peer.lastCloudServerAt=123;
+  const injected=await store.commitHead({expectedHash:acknowledged.hash,payload:JSON.stringify(peer),account:'e@example.com',backup:{id:'original-ack-'+mode,kind:'manual',at:1,day:'2026-10-17',payload:acknowledged.payload}});assert.equal(injected.ok,true);
+  ctx.addTask('Later accepted edit '+mode);
+  if(mode==='expired same-account session'){CS.user=null;ctx.observeCloudIdentity();CS.user='e@example.com';ctx.observeCloudIdentity();}
+  if(mode==='same email different UID'){identity='owner-b';ctx.observeCloudIdentity();}
+  if(mode==='changed backend'){shim.window.CloudSync={...CS};ctx.observeCloudIdentity();}
+  const pushes=h.calls.filter(call=>call==='push').length;
+  assert.equal(await ctx.persist(),true,'the real CAS repair keeps a durable board and the accepted edit');
+  const expected=['later local edit','equal durable revision'].includes(mode)?6:mode==='newer durable peer'?8:5,head=JSON.parse((await store.readHead()).payload);
+  assert.equal(ctx.state.syncRev,expected,mode+' cannot acquire a revision from expired or lower authority');assert.equal(head.syncRev,expected);
+  if(['equal durable revision','newer durable peer'].includes(mode))assert.equal(head.lastCloudServerAt,123,'an equal or newer durable peer keeps its own metadata');
+  assert.equal(ctx.state.syncDirty,true,'a later accepted edit is not confirmed by an earlier cloud payload');assert.equal(head.syncDirty,true);
+  assert.equal(head.tasks.some(row=>row.title==='Later accepted edit '+mode),true);assert.deepEqual(head.futureAcknowledgementField,{opaque:['retained',17]});
+  assert.equal(h.calls.filter(call=>call==='push').length,pushes,'device CAS repair does not publish its pending edit');
+  assert.ok((await store.listBackups()).some(row=>row.payload===acknowledged.payload),'the original confirmed source remains exact in recovery');
+  ctx.suspendCloudSync();const reopened=await loadApp({sharedStorage:shim.localStorage,indexedDBProvider:indexedDB,deviceDbName:name});await reopened.ctx.__dataReady;
+  assert.equal(reopened.ctx.state.syncRev,expected);assert.equal(reopened.ctx.state.tasks.some(row=>row.title==='Later accepted edit '+mode),true);
+ });
+});
+
+test('RISK cloud write ownership: a delayed preflight cannot release another caller before its actual acknowledgement',{timeout:15000},async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),initial=syncState({tasks:[syncTask('preflight-owner','Preflight ownership task')],syncRev:4,syncAccount:'e@example.com',syncDirty:false,seenQuickStart:true}),
+  h=makeSyncHarness({remote:initial,rev:4,delayMs:1}),app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},indexedDBProvider:new IDBFactory(),deviceDbName:'push-preflight-owner-'+Math.random(),cloudSyncFactory:h.factory}),{ctx,shim}=app,CS=shim.window.CloudSync;
+ await ctx.__dataReady;await ctx.cloudPull();CS.ready=false;
+ ctx.addTask('Accepted while the earlier cloud preflight waits');assert.equal(await ctx.persist(),true);CS.ready=true;
+ const preflightEntered=deferredSyncFixture(),releasePreflight=deferredSyncFixture(),pushEntered=deferredSyncFixture(),releasePush=deferredSyncFixture(),reconcile=ctx.reconcileDeviceLegacyCopy,push=CS.push.bind(CS);
+ let first=true;
+ t.after(()=>{releasePreflight.resolve();releasePush.resolve();ctx.reconcileDeviceLegacyCopy=reconcile;});
+ ctx.reconcileDeviceLegacyCopy=async(...args)=>{const result=await reconcile(...args);if(first){first=false;preflightEntered.resolve();await releasePreflight.promise;}return result;};
+ CS.push=async(...args)=>{pushEntered.resolve();await releasePush.promise;return push(...args);};
+ const earlier=ctx.sendPush();await fixtureDeadline(preflightEntered.promise,'the first real caller enters its device preflight');
+ const current=ctx.sendPush();await fixtureDeadline(pushEntered.promise,'the second real caller reaches its pending provider write');
+ releasePreflight.resolve();await fixtureDeadline(earlier,'the delayed preflight caller finishes without taking the current write slot');
+ assert.equal(vm.runInContext('cloudPushInFlight',ctx),true,'the actual provider write keeps its owned slot until its acknowledgement arrives');
+ assert.equal(vm.runInContext('pendingPush',ctx),true,'the delayed caller leaves follow-up intent with the current owner');
+ assert.equal(h.calls.filter(call=>call==='push').length,0,'the provider ACK is still held at the real write boundary');
+ releasePush.resolve();await current;await settleSavedViewPublication(app,h,'single-owner cloud preflight acknowledgement');
+ assert.equal(h.remoteState().tasks.some(row=>row.title==='Accepted while the earlier cloud preflight waits'),true);
+ const reopened=await loadApp({sharedStorage:shim.localStorage,indexedDBProvider:shim.window.indexedDB,deviceDbName:shim.window.CHAIN_STORAGE_DB_NAME});
+ await reopened.ctx.__dataReady;assert.equal(reopened.ctx.state.syncRev,h.doc.rev);assert.equal(reopened.ctx.state.syncDirty,false);
+ assert.equal(reopened.ctx.state.tasks.some(row=>row.title==='Accepted while the earlier cloud preflight waits'),true);
+});
+
 
 test('RISK completion convergence: failed saves backup failures account changes suspension and drafts guard recovery wakeups',{timeout:15000},async t=>{
  const {IDBFactory}=await import('fake-indexeddb');

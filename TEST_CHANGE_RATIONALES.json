@@ -16814,5 +16814,53 @@
     },
     "greenEvidence": "Fresh candidate gates must validate fullPR754, previous published498 and new parent6f comparisons. The exact6f129/129 cohort and36-file product equality retain original identities; new exact remoteCI/main/live gates remain mandatory.",
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/cloud-sync-root-causes-20261021"
+  },
+  {
+    "baseCommit": "754afce7bf79f5eac184f6d4e23dc4aa2faefb42",
+    "testChangesSha256": "5b10624ac9bc4287ef847b7b6deeb1101db6e4da64bb36da154a0f10a8e5c8fb",
+    "reason": "Close the actual older-native-save versus accepted cloud ACK race and the asynchronous push-preflight owner gap exposed by exact18a PR CI, preserving every original completion/editor/gesture assertion. Bind any higher revision carry to fresh process-local backend/account/UID authority; retain pending membership edits.",
+    "previousBehavior": "The exact18a PR run failed the original editor-deferred consumer with local revision5, remote revision6 and equal shared payload after ACK6. A controlled real pin-release commit return reproduces that failure. Separately an earlier awaited preflight can clear another caller’s pending provider-write slot; prior lastKnown globals alone also survive sign-out/relogin and backend replacement.",
+    "intendedBehavior": "Retain only a higher currently confirmed revision and exact decision base during actual device CAS repair. Keep later merged task work dirty, reject expired sessions, changed identity/backend and unconfirmed metadata, preserve equal/higher durable peer metadata, and recheck the active push owner after awaited preflight.",
+    "replacementTests": [
+      "RISK cloud acknowledgement durability: an older native editor CAS repair cannot rewind a confirmed revision",
+      "RISK cloud acknowledgement authority: CAS repair requires current identity and read authority while newer work stays pending",
+      "RISK cloud write ownership: a delayed preflight cannot release another caller before its actual acknowledgement"
+    ],
+    "preservedCoverage": [
+      "Original native Done/theme/editor Save, held scanner pointer/click, exact immutable facts, field/prerequisite/view preservation, actual IndexedDB writes and cold reopen remain intact. The new third mode gates only the return of an actual durable metadata commit and adds no state or response replacement.",
+      "Real provider write and acknowledgement remain held independently of the earlier preflight caller. Original device safety-before-cloud, account/revision guards, failed-save/refusal and recovery-source preservation assertions remain unchanged.",
+      "Six real CAS controls preserve later accepted edits and exact original recovery bytes, expired same-account sessions, same-email UID separation, backend replacement, equal metadata and higher peer revisions. No action limit, production deadline, protected source hash, sample count or skip rule changes.",
+      "Earlier full-PR test corrections retain their original RED evidence and assertions: local-noon resume time, original numeric/display cache equivalence, bounded diagnostic scheduler pause and all150/999999/1 source deadlines. This record covers the final aggregate or incremental comparison rather than relabeling old executions."
+    ],
+    "redEvidence": {
+      "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test tests.js with patterns ^RISK cloud acknowledgement durability: an older native editor CAS (record1c90989c); ^RISK cloud write ownership: a delayed preflight (04a4720c); ^RISK cloud acknowledgement authority: CAS repair (8383e01e and expanded review RED); ^RISK sync responsiveness guidance: (copy RED). Exact commands and source identities are in the private task records.",
+      "failure": "Before product repair, real ACK6→older native CAS produces exact CI local5/remote6/dirty/equal-payload failure; separate provider-pending owner assertion is false instead of true. Before review repair, expired same-account and changed backend acquire stale revision6 and membership-only CAS loses dirty intent. Before copy repair, mounted FAQ lacks the new confirmation sentence. No syntax, missing dependency or credential error counts as RED."
+    },
+    "greenEvidence": "Working final12/12 zero-skip consumer cohort passed, including six authority controls and mounted FAQ. Final coherent committed regression, native delivery, independent review, compatibility, exact candidate/main CI and live proof remain required and keep actual identities.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/cloud-sync-root-causes-20261021"
+  },
+  {
+    "baseCommit": "18a5e1e62c796dfda49d2875709269e0ce4eb1b7",
+    "testChangesSha256": "87ba512c0b3b8fecd09ef237119bcd9a0c3d91ac5b359c94e951eaabacf4e344",
+    "reason": "Close the actual older-native-save versus accepted cloud ACK race and the asynchronous push-preflight owner gap exposed by exact18a PR CI, preserving every original completion/editor/gesture assertion. Bind any higher revision carry to fresh process-local backend/account/UID authority; retain pending membership edits.",
+    "previousBehavior": "The exact18a PR run failed the original editor-deferred consumer with local revision5, remote revision6 and equal shared payload after ACK6. A controlled real pin-release commit return reproduces that failure. Separately an earlier awaited preflight can clear another caller’s pending provider-write slot; prior lastKnown globals alone also survive sign-out/relogin and backend replacement.",
+    "intendedBehavior": "Retain only a higher currently confirmed revision and exact decision base during actual device CAS repair. Keep later merged task work dirty, reject expired sessions, changed identity/backend and unconfirmed metadata, preserve equal/higher durable peer metadata, and recheck the active push owner after awaited preflight.",
+    "replacementTests": [
+      "RISK cloud acknowledgement durability: an older native editor CAS repair cannot rewind a confirmed revision",
+      "RISK cloud acknowledgement authority: CAS repair requires current identity and read authority while newer work stays pending",
+      "RISK cloud write ownership: a delayed preflight cannot release another caller before its actual acknowledgement"
+    ],
+    "preservedCoverage": [
+      "Original native Done/theme/editor Save, held scanner pointer/click, exact immutable facts, field/prerequisite/view preservation, actual IndexedDB writes and cold reopen remain intact. The new third mode gates only the return of an actual durable metadata commit and adds no state or response replacement.",
+      "Real provider write and acknowledgement remain held independently of the earlier preflight caller. Original device safety-before-cloud, account/revision guards, failed-save/refusal and recovery-source preservation assertions remain unchanged.",
+      "Six real CAS controls preserve later accepted edits and exact original recovery bytes, expired same-account sessions, same-email UID separation, backend replacement, equal metadata and higher peer revisions. No action limit, production deadline, protected source hash, sample count or skip rule changes.",
+      "Earlier full-PR test corrections retain their original RED evidence and assertions: local-noon resume time, original numeric/display cache equivalence, bounded diagnostic scheduler pause and all150/999999/1 source deadlines. This record covers the final aggregate or incremental comparison rather than relabeling old executions."
+    ],
+    "redEvidence": {
+      "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test tests.js with patterns ^RISK cloud acknowledgement durability: an older native editor CAS (record1c90989c); ^RISK cloud write ownership: a delayed preflight (04a4720c); ^RISK cloud acknowledgement authority: CAS repair (8383e01e and expanded review RED); ^RISK sync responsiveness guidance: (copy RED). Exact commands and source identities are in the private task records.",
+      "failure": "Before product repair, real ACK6→older native CAS produces exact CI local5/remote6/dirty/equal-payload failure; separate provider-pending owner assertion is false instead of true. Before review repair, expired same-account and changed backend acquire stale revision6 and membership-only CAS loses dirty intent. Before copy repair, mounted FAQ lacks the new confirmation sentence. No syntax, missing dependency or credential error counts as RED."
+    },
+    "greenEvidence": "Working final12/12 zero-skip consumer cohort passed, including six authority controls and mounted FAQ. Final coherent committed regression, native delivery, independent review, compatibility, exact candidate/main CI and live proof remain required and keep actual identities.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/cloud-sync-root-causes-20261021"
   }
 ]

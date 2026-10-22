@@ -1986,3 +1986,11 @@ recovery-read clock. Its configured 150/999999/1 inputs still require observed
 150/60000/60000 ms limits and successful real source review. A bounded 200 ms
 scheduler pause at the first tight-budget root read is permanent stimulus;
 logical deadline-expiry and Cancel controls remain separate and unchanged.
+
+### Confirmed cloud bookkeeping during device CAS repair
+
+- RISK cloud acknowledgement durability: an older native editor CAS repair cannot rewind a confirmed revision
+- RISK cloud acknowledgement authority: CAS repair requires current identity and read authority while newer work stays pending
+- RISK cloud write ownership: a delayed preflight cannot release another caller before its actual acknowledgement
+
+The first retains the original editor/deferred-adoption, held-pointer, exact facts, saved view and cold-reopen assertions and gates the return of an actual durable pin-release commit until the older native Save finishes. The authority consumer uses real IndexedDB conflict repair: later edits remain dirty; expired same-account sessions, changed UID/backend, equal revisions and higher durable peer revisions cannot inherit stale proof. Exact original sources remain recoverable. The ownership consumer holds the actual provider write while the earlier preflight returns; its slot remains owned until the received acknowledgement and durable reopen. No deadline or action budget is widened.
