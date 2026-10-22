@@ -30615,6 +30615,28 @@ test('RISK cloud acknowledgement identity: obsolete replies cannot start replace
  });
 });
 
+test('RISK cloud response ownership: a stale provider return cannot revoke a newer confirmed owner',async()=>{
+ const initial=syncState({tasks:[syncTask('newer-response-owner','Newer response owner task')],syncRev:4,syncAccount:'e@example.com',syncDirty:false,seenQuickStart:true}),h=makeSyncHarness({remote:initial,rev:4,delayMs:1}),app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial)},cloudSyncFactory:h.factory}),{ctx,shim}=app,CS=shim.window.CloudSync;
+ await ctx.cloudPull();CS.ready=false;ctx.addTask('Accepted before the old response');assert.equal(await ctx.persist(),true);CS.ready=true;
+ const entered=deferredSyncFixture(),release=deferredSyncFixture(),push=CS.push.bind(CS);let sending;
+ try{
+  CS.push=async(...args)=>{const result=await push(...args);entered.resolve();await release.promise;return result;};
+  sending=ctx.sendPush();await fixtureDeadline(entered.promise,'the old provider response is held after its real commit');
+  // Model another accepted publication owner's installation at the module
+  // boundary using a fresh actual provider read. Ordinary cloudPull itself
+  // is serialized by the slot; this is not a claim it bypasses that guard.
+  h.writeBehindBack(h.remoteState());const accepted=await CS.pull();assert.equal(accepted.rev,6);
+  ctx.state.syncRev=accepted.rev;ctx.state.syncDirty=false;ctx.bindDecisionBase(CS.user,accepted.rev,accepted.payload);
+  ctx.__newOwnerSource=accepted;vm.runInContext('lastKnownCloudPayload=__newOwnerSource.payload;lastKnownCloudAccount=window.CloudSync.user;lastKnownCloudRevision=__newOwnerSource.rev;reconciledAs=window.CloudSync.user;cloudAdoptionHeld=false;pendingPush=false;',ctx);delete ctx.__newOwnerSource;
+  ctx.bindConfirmedDeviceCloudOwner();const newer=vm.runInContext('confirmedCloudDeviceOwner',ctx);assert.equal(await ctx.persist(),true);
+  release.resolve();await sending;
+  assert.equal(vm.runInContext('reconciledAs',ctx),'e@example.com','the obsolete callback cannot revoke the newer accepted read authority');
+  assert.equal(vm.runInContext('cloudAdoptionHeld',ctx),false);assert.equal(vm.runInContext('confirmedCloudDeviceOwner',ctx),newer);
+  assert.equal(ctx.state.syncRev,6);assert.equal(ctx.state.syncDirty,false);assert.equal(vm.runInContext('pendingPush',ctx),false);
+  assert.equal(JSON.parse(shim.localStorage.getItem(SYNC_STORE_KEY)).syncRev,6);assert.equal(h.calls.filter(call=>call==='push').length,1);
+ }finally{release.resolve();if(sending)await sending;ctx.suspendCloudSync();}
+});
+
 test('RISK cloud write ownership: a delayed preflight cannot release another caller before its actual acknowledgement',{timeout:15000},async t=>{
  const {IDBFactory}=await import('fake-indexeddb'),initial=syncState({tasks:[syncTask('preflight-owner','Preflight ownership task')],syncRev:4,syncAccount:'e@example.com',syncDirty:false,seenQuickStart:true}),
   h=makeSyncHarness({remote:initial,rev:4,delayMs:1}),app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},indexedDBProvider:new IDBFactory(),deviceDbName:'push-preflight-owner-'+Math.random(),cloudSyncFactory:h.factory}),{ctx,shim}=app,CS=shim.window.CloudSync;

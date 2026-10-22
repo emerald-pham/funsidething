@@ -16988,5 +16988,68 @@
     },
     "greenEvidence": "The final affected local cohort passed256/256, zero failure/cancel/skip, covering both original failures, three strengthened provider cases and all affected cloud/identity/completion/backup/diagnostic controls. Required final exact candidate CI full suites and exact-main full/deployment checks remain separate; failed2243 full2855cases remains failed evidence.",
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/cloud-sync-root-causes-20261021"
+  },
+  {
+    "baseCommit": "754afce7bf79f5eac184f6d4e23dc4aa2faefb42",
+    "testChangesSha256": "7de82b6b197418e36dbc6e9b92e85cc8d2fdb9b9cf08ce68d72dacc76a92da26",
+    "reason": "Close the final independent captured-owner invalidation finding with a discriminating held-provider boundary regression, preserving every preceding regression and acceptance limit.",
+    "previousBehavior": "The5db stale reply checked the captured proof before clearing the proof object but could still clear a newer same-account accepted reconciliation authority. The preimplementation RED observes null instead of the newly accepted account.",
+    "intendedBehavior": "An obsolete provider return may invalidate only its captured current owner. A newer accepted exact proof, reconciliation authority, clean revision, durable accepted source and existing publication intent survive unchanged.",
+    "replacementTests": [
+      "RISK cloud response ownership: a stale provider return cannot revoke a newer confirmed owner"
+    ],
+    "preservedCoverage": [
+      "All660 preceding rationale objects remain exact. All original account-transition counts, stale diagnostics, held-provider identity, actual editor CAS, cold reopen, recovery originals and active write-slot controls remain unchanged.",
+      "The new consumer holds a successful actual provider response and uses a fresh actual provider read, real binding and persistence; accepted-owner installation is explicitly modeled at the module boundary. It does not claim ordinary serialized cloudPull bypasses its write slot.",
+      "No performance budget, deadline, sample count, native touch assertion, required installed mode, CI/full gate, source consent or skip rule is relaxed. All final exact candidate and main full CI, rules, compatibility, independent reviews and live verification remain mandatory."
+    ],
+    "redEvidence": {
+      "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=^RISK cloud response ownership: tests.js; immutable recorde8bb1f36 and newer-response-owner-review-red.log contain exact arguments.",
+      "failure": "On unchanged5db product the held old reply clears the newer accepted reconciled account to null instead of e@example.com. Exactly1 assertion failure, zero cancellations/skips or infrastructure failures."
+    },
+    "greenEvidence": "The identical new consumer passes after adding only captured-proof equality to the reconciliation invalidation guard. Broader exact successor qualification and mandatory candidate/main full CI are separate gates.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/cloud-sync-root-causes-20261021"
+  },
+  {
+    "baseCommit": "18a5e1e62c796dfda49d2875709269e0ce4eb1b7",
+    "testChangesSha256": "8b47345f131a26e08c6a49a0f1fb13b751b46447f2aa515d37393eb0d744c1dd",
+    "reason": "Close the final independent captured-owner invalidation finding with a discriminating held-provider boundary regression, preserving every preceding regression and acceptance limit.",
+    "previousBehavior": "The5db stale reply checked the captured proof before clearing the proof object but could still clear a newer same-account accepted reconciliation authority. The preimplementation RED observes null instead of the newly accepted account.",
+    "intendedBehavior": "An obsolete provider return may invalidate only its captured current owner. A newer accepted exact proof, reconciliation authority, clean revision, durable accepted source and existing publication intent survive unchanged.",
+    "replacementTests": [
+      "RISK cloud response ownership: a stale provider return cannot revoke a newer confirmed owner"
+    ],
+    "preservedCoverage": [
+      "All660 preceding rationale objects remain exact. All original account-transition counts, stale diagnostics, held-provider identity, actual editor CAS, cold reopen, recovery originals and active write-slot controls remain unchanged.",
+      "The new consumer holds a successful actual provider response and uses a fresh actual provider read, real binding and persistence; accepted-owner installation is explicitly modeled at the module boundary. It does not claim ordinary serialized cloudPull bypasses its write slot.",
+      "No performance budget, deadline, sample count, native touch assertion, required installed mode, CI/full gate, source consent or skip rule is relaxed. All final exact candidate and main full CI, rules, compatibility, independent reviews and live verification remain mandatory."
+    ],
+    "redEvidence": {
+      "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=^RISK cloud response ownership: tests.js; immutable recorde8bb1f36 and newer-response-owner-review-red.log contain exact arguments.",
+      "failure": "On unchanged5db product the held old reply clears the newer accepted reconciled account to null instead of e@example.com. Exactly1 assertion failure, zero cancellations/skips or infrastructure failures."
+    },
+    "greenEvidence": "The identical new consumer passes after adding only captured-proof equality to the reconciliation invalidation guard. Broader exact successor qualification and mandatory candidate/main full CI are separate gates.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/cloud-sync-root-causes-20261021"
+  },
+  {
+    "baseCommit": "5db1e01367b3315dd9430fe096a820a844fd0f46",
+    "testChangesSha256": "e6c91f8eb766e5530c142e09b834192cf5d39b2202dbb6a8eeea5becb9af61d4",
+    "reason": "Close the final independent captured-owner invalidation finding with a discriminating held-provider boundary regression, preserving every preceding regression and acceptance limit.",
+    "previousBehavior": "The5db stale reply checked the captured proof before clearing the proof object but could still clear a newer same-account accepted reconciliation authority. The preimplementation RED observes null instead of the newly accepted account.",
+    "intendedBehavior": "An obsolete provider return may invalidate only its captured current owner. A newer accepted exact proof, reconciliation authority, clean revision, durable accepted source and existing publication intent survive unchanged.",
+    "replacementTests": [
+      "RISK cloud response ownership: a stale provider return cannot revoke a newer confirmed owner"
+    ],
+    "preservedCoverage": [
+      "All660 preceding rationale objects remain exact. All original account-transition counts, stale diagnostics, held-provider identity, actual editor CAS, cold reopen, recovery originals and active write-slot controls remain unchanged.",
+      "The new consumer holds a successful actual provider response and uses a fresh actual provider read, real binding and persistence; accepted-owner installation is explicitly modeled at the module boundary. It does not claim ordinary serialized cloudPull bypasses its write slot.",
+      "No performance budget, deadline, sample count, native touch assertion, required installed mode, CI/full gate, source consent or skip rule is relaxed. All final exact candidate and main full CI, rules, compatibility, independent reviews and live verification remain mandatory."
+    ],
+    "redEvidence": {
+      "command": "Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=^RISK cloud response ownership: tests.js; immutable recorde8bb1f36 and newer-response-owner-review-red.log contain exact arguments.",
+      "failure": "On unchanged5db product the held old reply clears the newer accepted reconciled account to null instead of e@example.com. Exactly1 assertion failure, zero cancellations/skips or infrastructure failures."
+    },
+    "greenEvidence": "The identical new consumer passes after adding only captured-proof equality to the reconciliation invalidation guard. Broader exact successor qualification and mandatory candidate/main full CI are separate gates.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/cloud-sync-root-causes-20261021"
   }
 ]

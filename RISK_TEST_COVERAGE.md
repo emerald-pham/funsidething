@@ -2000,3 +2000,7 @@ The first retains the original editor/deferred-adoption, held-pointer, exact fac
 This actual held-provider consumer covers backend replacement, a changed UID sharing an email and observed same-account relogin before the old reply is delivered. The old write may have committed, but its response cannot bind fresh current proof or replace local revision/dirty bookkeeping. The accepted edit remains durable and pending while a fresh replacement read is held.
 
 The obsolete-reply identity consumer also requires zero replacement reads caused by the stale reply, then proves an explicit current-owner read reaches that connection once. Existing foreign-account publication-count and held-acknowledgement diagnostics consumers retain their original expectations.
+
+- RISK cloud response ownership: a stale provider return cannot revoke a newer confirmed owner
+
+This boundary control holds a successful real provider reply, installs a later accepted publication owner from a fresh actual provider read, then releases the old reply. The newer exact proof object, reconciliation authority, clean revision, durable source and publication intent must survive. The accepted-owner installation is explicitly modeled at the module boundary; ordinary cloudPull remains serialized and this test does not claim a concurrent read bypass.
