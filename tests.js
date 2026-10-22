@@ -31123,22 +31123,49 @@ test('RISK evergreen scan reconciliation: offline cold reload clears legacy rest
 });
 
 test('RISK evergreen scan reconciliation: a delayed stale read and later revision converge without restoring completed membership',async()=>{
+ await delayedEvergreenReadFixture();
+});
+
+async function delayedEvergreenReadFixture({incumbentRead=false}={}){
  const {a,b,h,notify,candidateId,benchId,nextId}=await liveScanSyncClients({evergreen:true});
  const stale=h.remoteState();stale.chain=[benchId,candidateId];stale.candidateId=nextId;
- a.ctx.onAction('cand-done',{dataset:{candidate:candidateId,benchmark:benchId}});await syncSettle(100);
+ a.ctx.onAction('cand-done',{dataset:{candidate:candidateId,benchmark:benchId}});
+ await settleSavedViewPublication(a,h,'Completion sender before the delayed stale read');
+ await settleSavedViewPublication(b,h,'Completion peer before the delayed stale read');
  const completed=h.remoteState(),doneAt=completed.tasks.find(t=>t.id===candidateId).lastDoneAt;
+ if(incumbentRead){
+  const CS=b.shim.window.CloudSync,pull=CS.pull,entered=deferredSyncFixture();
+  CS.pull=async(...args)=>{CS.pull=pull;const reply=await pull(...args);entered.resolve();await syncSettle(40);return reply;};
+  const incumbent=b.ctx.cloudPull();
+  await fixtureDeadline(entered.promise,'The occupied-read control did not enter its real read owner');
+  assert.equal(vm.runInContext('pulling',b.ctx),true,'the control actually holds an incumbent read');
+  await fixtureDeadline(incumbent,'The incumbent read did not finish before the delayed-read hook');
+ }
  const CS=b.shim.window.CloudSync,ordinaryPull=CS.pull;let release,started;
  const reading=new Promise(resolve=>{started=resolve;});
  CS.pull=async()=>{CS.pull=ordinaryPull;const reply={...h.doc};started();return new Promise(resolve=>{release=()=>resolve(reply);});};
- h.writeBehindBack(stale);const delayed=b.ctx.cloudPull();await reading;
- completed.chain=[benchId,candidateId];completed.candidateId=nextId;completed.tasks.find(t=>t.id===nextId).title='Newest independent edit';
- h.writeBehindBack(completed);notify();release();await delayed;await syncSettle(180);
- for(const client of [a,b]){
-  assert.deepEqual([...client.ctx.state.chain],[benchId],'neither delayed nor latest shared chain can override completion evidence');
-  assert.equal(client.ctx.state.tasks.find(t=>t.id===candidateId).lastDoneAt,doneAt);
-  assert.equal(client.ctx.state.tasks.find(t=>t.id===nextId).title,'Newest independent edit');
-  assert.equal(client.ctx.state.workLog.filter(e=>e.taskId===candidateId).length,1);
+ try{
+  h.writeBehindBack(stale);const delayed=b.ctx.cloudPull();
+  await fixtureDeadline(reading,'The intended stale-source read never entered its one-shot hook');
+  completed.chain=[benchId,candidateId];completed.candidateId=nextId;completed.tasks.find(t=>t.id===nextId).title='Newest independent edit';
+  h.writeBehindBack(completed);notify();release();
+  await fixtureDeadline(delayed,'The delayed stale-source read did not finish after release');
+  await settleSavedViewPublication(a,h,'Sender after the newer revision');
+  await settleSavedViewPublication(b,h,'Peer after the newer revision');
+  for(const client of [a,b]){
+   assert.deepEqual([...client.ctx.state.chain],[benchId],'neither delayed nor latest shared chain can override completion evidence');
+   assert.equal(client.ctx.state.tasks.find(t=>t.id===candidateId).lastDoneAt,doneAt);
+   assert.equal(client.ctx.state.tasks.find(t=>t.id===nextId).title,'Newest independent edit');
+   assert.equal(client.ctx.state.workLog.filter(e=>e.taskId===candidateId).length,1);
+  }
+ }finally{
+  release?.();CS.pull=ordinaryPull;
+  a.ctx.suspendCloudSync();b.ctx.suspendCloudSync();
  }
+}
+
+test('RISK evergreen read ownership: an occupied peer read cannot strand the delayed stale-source regression',async()=>{
+ await delayedEvergreenReadFixture({incumbentRead:true});
 });
 
 function liveDoneDeliverySnapshot(app,id){
