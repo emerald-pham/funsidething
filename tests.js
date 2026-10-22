@@ -40412,10 +40412,18 @@ test('RISK support diagnostics: accepted acknowledgements expire with their acco
  });
 });
 
-test('RISK support diagnostics: source operations report the effective bounded SDK deadline',async t=>{
+test('RISK support diagnostics: source operations report the effective bounded SDK deadline',
+async t=>{
  for(const [configured,expected] of [[150,150],[999999,60000],[1,60000]])await t.test(String(configured),async sub=>{
-  const app=await divergentCloudSourceApp187(sub,{timeoutMs:configured}),{ctx}=app;
+  const clock=recoveryReadClock187(),app=await divergentCloudSourceApp187(sub,{timeoutMs:configured,timerProvider:clock.provider}),{ctx}=app;
+  let paused=false;
+  if(configured===150)app.faults.serverRead=path=>{
+   if(path==='users/owner'&&!paused){paused=true;Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,200);}
+  };
+  sub.after(async()=>{delete app.faults.serverRead;await app.dispose();clock.stop();});
+  clock.activate(app);
   assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true,'the actual source consumer completes normally');
+  assert.equal(paused,configured===150,'the bounded scheduler pause reaches the actual tight-budget source read');
   ctx.onAction('view-support-diagnostics',{});const operations=ctx.buildSupportDiagnosticsReport().sourceOperations;
   assert.ok(operations.length>0);
   for(const operation of operations){

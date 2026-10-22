@@ -16769,5 +16769,29 @@
       "chronology": "External packed/stable-merge sort experiments were not adopted. First fingerprint green5 passes Yes357ms/Done244ms. Added protected source guard records helper-placement failuredd75; relocation restores all9unchanged slices. Later getter sensitivitybd83 actual2384096672!=3761576854 led to data-descriptor guards. Expanded final WIP14case green98c9 passes all original assertions, numeric stream/source guards and bounded-cache/accessor cases; Yes359ms/Done244ms. Fresh committed/full/native/render/review/CI/live evidence remains separate."
     },
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/cloud-sync-root-causes-20261021"
+  },
+  {
+    "baseCommit": "754afce7bf79f5eac184f6d4e23dc4aa2faefb42",
+    "testChangesSha256": "0018e7484695ccfff2f00dc810bf9b1d144b4ad58c5073140b69d938e24686b1",
+    "reason": "Preserve the exact bounded saved-draw and fixed-noon coverage while repairing a proved diagnostic fixture wall-clock success premise; no product deadlines, budgets or original assertions change.",
+    "previousBehavior": "Exact498 PR CI passed all2792/rules13/compat15; push39712765969 failed only the150ms source-diagnostic success subcase while all action budgets and installed outcomes passed. A200ms first-root scheduler pause independently reproduces false!=true with correctly observed150ms.",
+    "intendedBehavior": "The existing real source consumer and all150/999999/1 configurations must report original150/60000/60000 effective limits. Controlled recovery fixture time separates that diagnostic success premise from host scheduling; permanent200ms pause and separate unchanged real-expiry controls keep both boundaries explicit.",
+    "replacementTests": [
+      "RISK support diagnostics: source operations report the effective bounded SDK deadline",
+      "RISK saved-draw work budget: repeated squared scores and display reuse exact fingerprints without changing current calculations",
+      "RISK saved-draw fingerprint preservation: bounded reuse follows exact inputs and current hash math and string methods"
+    ],
+    "preservedCoverage": [
+      "All three original configured/expected diagnostic pairs, actual native source-review success assertion and every observed deadline/status/timestamp assertion remain unchanged.",
+      "Only fixture setup receives the existing recovery clock, activated immediately before the real consumer; cleanup disposes the fixture before stopping the clock. A bounded200ms scheduler pause reaches the actual first tight-budget root read.",
+      "Production whole-review and SDK limits, normalization, Cancel, deadline-expiry, source/account/CAS/ACK authority, pending protection and actual durable source checks remain unchanged.",
+      "All nine protected source slices, rankStats, numerical/random stream controls, samples and original1000ms Yes/Done budgets remain unchanged. Earlier650 rationale objects and all public product bytes stay exact."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK support diagnostics: source operations report the effective bounded SDK deadline$\" tests.js",
+      "failure": "Owner record2026-10-22T03-13-32-676Z-159c8dda-dac3-4616-a678-a5a70ac4d614 preserves the added200ms stimulus before clock correction;150 subcase fails false!==true while999999/1 pass. Independent exact-source705e7d7d/db14764e causal pair agrees; precise uninstrumented CI stopping stage remains inferred."
+    },
+    "greenEvidence": "Owner record2026-10-22T03-13-43-824Z-25d2df5c-b47d-4d8a-9ebd-d365c42d2ef6 passes4/4 with zero skips after existing clock wiring. Exact committed cohort, new reviews and required remote candidate/main CI/live gates remain separate.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/cloud-sync-root-causes-20261021"
   }
 ]

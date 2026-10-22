@@ -269,3 +269,33 @@ Three Yes controls took 359 ms and Done 244 ms locally. These timings do not
 establish CI, deployment, physical iPhone or affected-account acceptance. Fresh
 exact candidate full/native/rendered checks, independent review and required
 candidate/main CI and live verification remain release gates.
+
+
+## Diagnostic success-clock correction after 498
+
+Exact 498 PR run 39712795260 passed all 2,842 tests (2,792 passes, 50 explicit
+environment skips), rules 13/13, compatibility 15/15 and both installed cases.
+Three Yes controls took 566 ms and Done 375 ms. The matching push run
+39712765969 passed both action budgets at 981/586 ms and both installed cases,
+but failed the 150 ms source-diagnostic success subcase (nested and parent count
+as two failures). It was not merged or deployed; the unchanged run was not retried.
+
+That fixture gave the entire real source review a 150 ms wall-clock budget while
+asserting successful completion. An independent exact-source causal pair pauses
+the first real root read for 200 ms. The ordinary clock reproduces false instead
+of true; production correctly reports timeout while diagnostics still records
+150 ms. Activating the existing fixture clock at the real review boundary keeps
+all three original 150/999999/1 inputs, expected 150/60000/60000 limits and every
+original assertion. It passes with the same scheduler pause. This proves a
+sufficient clock-premise mechanism; the exact uninstrumented CI stop stage was
+not traced and remains inferred.
+
+The permanent 150 ms subcase now includes that bounded pause before the clock
+repair's original success assertion. Its owner preimplementation record
+2026-10-22T03-13-32-676Z-159c8dda observes the same false/true failure; the corrected
+four-case green retains all original assertions. Cleanup disposes the fixture
+before stopping its logical clock. Actual expiry, cancellation and production
+SDK limits remain unchanged. No application, CSS/font, worker or public product
+byte changes accompany this correction. Prior source identities and failed CI
+remain retained; fresh exact-candidate reviews and remote release gates are
+still required.

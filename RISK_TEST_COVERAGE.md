@@ -1980,3 +1980,9 @@ authorize cached values. Entry and total input-unit caps, eviction, exact cap,
 overflow and nonprimitive calls remain explicit. No source validation or board
 graph is cached. The paused-resume fixture uses fixed local noon; its original
 assertion and adjacent actual 02:00 rollover controls remain intact.
+
+The effective-SDK-deadline diagnostic consumer uses the existing controlled
+recovery-read clock. Its configured 150/999999/1 inputs still require observed
+150/60000/60000 ms limits and successful real source review. A bounded 200 ms
+scheduler pause at the first tight-budget root read is permanent stimulus;
+logical deadline-expiry and Cancel controls remain separate and unchanged.
