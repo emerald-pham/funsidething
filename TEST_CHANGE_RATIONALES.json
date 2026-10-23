@@ -17199,6 +17199,112 @@
       "command": "node scripts/agent-tools/record-run.mjs --repo $PWD --evidence-dir /Users/emeraldpham/.codex/task-artifacts/cloud-review-reload-20261022/runs --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK debug log:\" tests.js; separate actual slice commands and source snapshots are retained in timestamped records 10-11-35-211Z,10-18-17-511Z,10-19-59-402Z,10-21-06-726Z,10-22-16-341Z. Review repair actual commands and immutable snapshots are in review-repairs-red.log (10:38), device-capacity-red.log (10:41) and read-only-controls-red.log (10:40), with specialist aggregate-quota reproduction preserved independently. Additional actual preimplementation records are recovery-capacity-red.log and pending-cause-red.log, both before remaining owner/port edits. The completed exact f3f328b full command is in full-release-candidate.log and its recorder (green purpose, actual assertion-failure), before fixture changes; no runtime was edited for this repair.",
       "failure": "Observed assertions: unified restart report missing after actual Add and cold reopen; Settings old debugger instead of Debug log; failed diagnostic write falsely reported observed; expired stored journal remained; both actual manual and worker reload calls lacked retained reason. Each repair has its subsequent GREEN. Native crash reproduction attempts passed and are not defect REDs. The new aggregate Add fails although identical payload persists after removing only diagnostic bytes; mandatory device backup returns no ID until diagnostic space yields; mounted FAQ omits accepted-verification exception. Existing export and notice tests observed unintended diagnostic writes. The first broad storage repair run exposed budgets that included expendable journal bytes; stricter irreducible fixtures then passed with all safety assertions unchanged. Actual File Restore and cloud Apply return false with expendable metadata still present; conditional native pending write lacks the fixed quota cause. First GREEN attempt exposed an incorrectly assumed archive key prefix in the new assertion; it now verifies the actual versioned recovery archive and exact pre-apply device head, without changing implementation. Completed full Node22:2818pass,4failednodes,50environmentalskips. Quota-history physical failure count2vs1 and convergence quota-attempt counts3vs2/2vs1 reflect the approved immediate diagnostic-only retry, not a lost source or unauthorized wakeup. Independent reviewer inspected this interpretation and exact successor fixtures. The first companion setup lacked a backend and failed before its assertions; quota-fixture-cohort.log retains that fixture error. quota-fixture-cohort-repair.log passes all 28 nodes after supplying the established account/SDK harness, with no runtime edit. Code review found the later-save companion disabled cloud readiness; its corrected cloud-ready probe passes all28focusednodes in quota-fixture-sensitive.log. The8c full attempt was explicitly interrupted for that test refinement and is not claimed passed."
     }
+  },
+  {
+    "baseCommit": "4f1d6bdc9ff6ca8a2a2294e34022ad01118a3d5f",
+    "testChangesSha256": "f83714dd24198ff50f959bca683a30e11dc784a23eeabffabf81c293ba70962a",
+    "reason": "Add the ticket #253 outcome regression before any functional implementation: a durable local recovery receipt cannot protect exact cloud source bytes from an independently acting supported old collector.",
+    "previousBehavior": "Current native publication only passes the first device opaque-archive generation IDs to its own collector. The supported old native client has no such local receipt and deletes the exact original after it leaves active and previous root slots.",
+    "intendedBehavior": "Exact readable unresolved header and chunk evidence must remain available to a fresh same-account receiver after two acknowledged old-peer publications and ordinary collection, with the original no longer active or previous. A compatible shared mechanism must be agreed before runtime implementation.",
+    "replacementTests": [
+      "RISK shared recovery source protection: supported old peer rotations and ordinary collection retain exact unresolved cloud evidence"
+    ],
+    "preservedCoverage": [
+      "All preceding tests and assertions remain unchanged. The new test crosses existing native publication, recovery read, durable device archival and supported released-client collection consumers with synthetic data only.",
+      "The external SDK boundary is the existing in-memory fixture. This RED is not emulator/rules compatibility, production data, affected-account recovery or a product GREEN. No functionality has been changed; the test intentionally remains RED pending an agreed mechanism."
+    ],
+    "redEvidence": {
+      "command": "2026-10-22T23:33Z at unchanged runtime 4f1d6bd: node --test --test-name-pattern='^RISK shared recovery source protection:' tests.js; retained /Users/emeraldpham/Documents/Codex/2026-10-22/issue-187/evidence/253/shared-source-red.log",
+      "failure": "Observed final exact-source assertion failure after real native three-chunk original publication, durable local protection, current rotation, two supported old-peer rotations/ordinary collection and fresh receiving-source read. Actual original header=null and chunks=[]; expected original published header and three exact chunks. All setup and local archive readback assertions passed."
+    }
+  },
+  {
+    "baseCommit": "5e465e8a654e0a1814be25ccfaa1306bec10da3c",
+    "testChangesSha256": "66e2717900f10bd8637a92435d96a9ca2d1e08ea63502beb15aa397575397e41",
+    "reason": "Upgrade the observed #253 cross-device outcome to the actual SDK/emulator so unchanged supported old collectors encounter real server rules, then implement approved immutable scoped retention through the native source contract.",
+    "previousBehavior": "Both original fixture and stronger SDK preimplementation RED lose the entire three-chunk unresolved original after old peer publication/collection; the capturing device receipt alone survives.",
+    "intendedBehavior": "Native protection creates immutable account-scoped server markers under the current revision and exact source guards; the same old-peer rotations and ordinary collection leave the exact original readable to a cold receiver.",
+    "replacementTests": [
+      "RISK shared recovery source protection: supported old peer rotations and ordinary collection retain exact unresolved cloud evidence (Firestore rules: shared retention)"
+    ],
+    "preservedCoverage": [
+      "Original outcome assertions remain: actual current publication, durable local archive, three chunks, two old-peer edits/publications/collectors, original outside root slots, exact local receipt and fresh exact source readback. Server transport uses the actual SDK instead of copying fixture maps.",
+      "The existing required npm run test:rules pattern Firestore rules: now executes this exact RISK outcome; npm test environment skip is explicit. No workflow, compatibility baseline or existing test assertion was weakened.",
+      "SDK fixture setup repairs clear the isolated project between runs and use optional cleanup for the historical backend without suspend. These are not functional REDs. Protection optional call preserves baseline final-outcome sensitivity before that method exists."
+    ],
+    "redEvidence": {
+      "command": "Original shared-source-red.log; stronger before-runtime SDK run: FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 node --test --test-name-pattern='^RISK shared recovery source protection:' tests.js, retained shared-source-sdk-red.log at runtime 4f1d6bd. GREEN shared-source-sdk-green.log after implementation.",
+      "failure": "Both original and stronger contemporaneous final outcome fail with original header=null and chunks=[] after all publication/archival setup checks. Stronger GREEN receives all exact original fields/chunks through actual SDK/new server rules and old collector permission denial; board publication acknowledgements remain separate."
+    }
+  },
+  {
+    "baseCommit": "ad9a5ac66ba2b3ab65af8c80c5e16a8abe7ae58f",
+    "testChangesSha256": "d4c0cf748e48640ec3fd892ddb6c3e0dc53d06e0ace867903355c376b7d0d1e1",
+    "reason": "Complete the approved shared-retention behavior with guarded ordinary publication, strict marker validation, atomic resulting-state rules, safe refreshed-source archival/reuse and bounded real-consumer proof of refusal, uncertainty, cleanup and recovery budget propagation.",
+    "previousBehavior": "Initial retention GREEN protected the main old-peer outcome, but consumer REDs exposed malformed marker acceptance, ordinary publication omitting shared protection, same-batch marker plus retiring source acceptance, frozen legitimate upload-state evolution, duplicate refreshed archives, repeated protected-source downloads, deleting-source refusal misread as uncertainty, and unsupported archive versions accepted.",
+    "intendedBehavior": "All readable originals remain protected before a writer retires root references; unsupported/absent/deleting/stale/cancelled sources safely hold publication, while independent local edits survive. Evolved legitimate sources are archived distinctly and reused, immutable markers permit later normal saves without downloading originals again, and all server deletion paths enforce permanent incident retention.",
+    "replacementTests": [
+      "RISK shared recovery source protection: supported old peer rotations and ordinary collection retain exact unresolved cloud evidence (Firestore rules: shared retention)",
+      "RISK shared protection authority: malformed server receipts cannot authorize recovery publication (Firestore rules: retention authority)",
+      "RISK shared protection publication: ordinary saved edits protect archived originals before root rotation (Firestore rules: retention publication)",
+      "RISK shared protection atomicity: marker creation cannot share a commit with source retirement (Firestore rules: retention atomicity)",
+      "RISK shared protection evolution: ordinary saves retain old captures and refresh legitimate upload state changes (Firestore rules: retention evolution)",
+      "RISK shared protection destructive paths: existing markers stop old transitions and already-deleting byte removal (Firestore rules: retention deletion)",
+      "RISK shared protection uncertain outcomes: lost acknowledgement is read back without another mutation and stale authority stays held (Firestore rules: retention uncertainty)",
+      "RISK shared protection old rules: refused retention keeps independent durable device edits and the published root intact (Firestore rules: retention compatibility)",
+      "RISK shared protection races: old retirement winning the commit prevents a false protection receipt (Firestore rules: retention race)",
+      "RISK shared protection budget: source readback spends the original recovery budget and cancellation cannot become board acknowledgement (Firestore rules: retention budget)"
+    ],
+    "preservedCoverage": [
+      "All original tests and original final exact-source assertion are unchanged except deliberate real-SDK qualification already recorded. The new current-collector continuation assertion proves unprotected debris still retires after protected rows. No support-floor change, workflow edit, live data or new framework.",
+      "Every new server consumer test contains Firestore rules: and therefore runs in the existing required rules cohort without skips. The SDK adapter normalizes only external write containers and exposes SDK read/commit fault controls; production algorithms and old clients remain actual source.",
+      "Rules/account isolation, immutable marker denial, already-deleting byte/header deletes, missing-source refusal, old-rule local durability, uncertain commit verification without another mutation, stale epoch/revision/cancel, real SDK retry after source retirement and final missing-byte control are direct native/SDK outcomes.",
+      "Known fixture setup error from a missing initial device head is retained separately in ordinary-protection-setup-error.log, then corrected before meaningful RED. Passing coverage additions are identified as qualification, never fabricated RED."
+    ],
+    "redEvidence": {
+      "command": "Recorded before each correction: marker-shape-red.log; ordinary-protection-red.log; atomicity-red.log; evolution-red.log; evolution-reuse-red.log; deleting-authority-red.log; unsupported-archive-red.log; retained-source-read-budget-red.log. Each uses FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 node --test --test-name-pattern with its named RISK family. Subsequent matching *green.log files and all-retention-focused-green.log retain observed GREEN, under issue-187/evidence/253.",
+      "failure": "Observed consumer assertions respectively: malformed receipt result.error undefined; no marker after ordinary acknowledged edit; forbidden same-commit protection/retirement succeeded; evolved-source next save lacked ok; repeated edit grew archive 3 vs 2; deleting-source result.error undefined; version2 archive allowed later publication; protected-source query count 9 vs 6 after another ordinary edit. All occurred before their respective minimal corrections. Earlier original and stronger-SDK outcome RED chronology remains retained."
+    }
+  },
+  {
+    "baseCommit": "ad9a5ac66ba2b3ab65af8c80c5e16a8abe7ae58f",
+    "testChangesSha256": "6f6356b79daff6bb7b7ae65f11e61e982cdb6bef8a2ebaac2683186804986c46",
+    "reason": "Complete approved immutable scoped retention with real SDK destructive-path controls and native historical-source authority controls, preserving the original outcome RED chronology and exact archived originals.",
+    "previousBehavior": "Initial retention passed the old-peer outcome but later consumer REDs exposed permanent holds after completed historical recovery or healthy ordinary sync beside already-absent historical bytes, cancellation issuing dependent reads, absent-root orphan refusal, Firestore map ordering falsely changing exact captures, and deliberate current recovery blocked by older differing same-ID archives.",
+    "intendedBehavior": "Retain available incident originals before unsafe retirement while preserving exact old archives and independently safe healthy ordinary synchronization. Exact completed receipts are recognized narrowly; absent historical bytes remain unresolved. Current deliberate recovery requires an actual server-matching preserved capture regardless of archive order, current consent, strict source/revision/epoch checks and unchanged existing CAS.",
+    "replacementTests": [
+      "RISK shared protection changed originals: deliberate current recovery selects exact server capture independently of archive order"
+    ],
+    "preservedCoverage": [
+      "All prior assertions remain, including original old-peer exact header/chunks outcome, verified empty/explicit ACK regression, current source changes after preview refusing publication, UID isolation, old-rules refusal, cleanup continuation and irreversible marker guards. No supported client, existing cohort, workflow, test budget or baseline was dropped.",
+      "Optional existing fixture artifact forwarding loads actual historical app/storage/backend sources. New real-SDK tests qualify immutable paths, atomic resulting state, uncertain acknowledgement readback and original read budgets. Existing historical consumers generate actual old manual or automatic recovery receipts before cold upgrade; tests do not invent completion markers.",
+      "New native controls preserve exact raw historical archives and distinguish successful current publication from unresolved historical data. Root-named, live pending, orphan-chunk, binding-hold, invalid decision-base, account/epoch and cancellation controls keep safety refusal. Empty source capture grants no payload authority; source hash changes are not treated as benign upload evolution.",
+      "Firestore map fields compare canonical serialized values while preserving every key/value and array order. The same real orphan state-evolution consumer exposed server field reordering before correction; all exact raw archive assertions remain."
+    ],
+    "redEvidence": {
+      "command": "Pre-correction evidence under /Users/emeraldpham/Documents/Codex/2026-10-22/issue-187/evidence/253: original shared-source-red.log and stronger SDK shared-source-sdk-red.log; marker-shape, ordinary-protection, atomicity, evolution, evolution-reuse, deleting-authority, unsupported-archive and retained-source-read-budget *red.log; historical-manual-red.log, historical-automatic-red.log, historical-cancellation-red.log, transaction-cancellation-red.log, empty-root-regression-red.log, empty-authority-sdk-red.log, empty-evolution-red.log and probe4, affected-recovery-regression.log and changed-original-order-red.log. Actual commands use named node test patterns and real SDK through allocated demo emulator when applicable.",
+      "failure": "Observed original header/chunks deletion; malformed receipt acceptance; no ordinary-publication protection; atomic marker/retirement allowed; evolved saves held or duplicate archives; deleting source false success; unsupported version bypass; repeated chunk queries; actual old completed/automatic recovery native Add held; cancellation made dependent marker request; absent-root source refused; legal SDK map field reordering falsely differed; explicit source ACK failed with older hash while current-first allowed ACK but falsely omitted unresolved flag. Each is followed by named GREEN. Fixture errors, emulator reused-project failures, wrapper occupied-port startup and overly strict race-outcome expectation are explicitly qualification/setup issues, not functional RED."
+    }
+  },
+  {
+    "baseCommit": "4f1d6bdc9ff6ca8a2a2294e34022ad01118a3d5f",
+    "testChangesSha256": "36c12d013c0b3e39e7535e7e6ec72522b71e7f8efb03894367a9f04923c70f5e",
+    "reason": "Complete approved immutable scoped retention with real SDK destructive-path controls and native historical-source authority controls, preserving the original outcome RED chronology and exact archived originals.",
+    "previousBehavior": "Initial retention passed the old-peer outcome but later consumer REDs exposed permanent holds after completed historical recovery or healthy ordinary sync beside already-absent historical bytes, cancellation issuing dependent reads, absent-root orphan refusal, Firestore map ordering falsely changing exact captures, and deliberate current recovery blocked by older differing same-ID archives.",
+    "intendedBehavior": "Retain available incident originals before unsafe retirement while preserving exact old archives and independently safe healthy ordinary synchronization. Exact completed receipts are recognized narrowly; absent historical bytes remain unresolved. Current deliberate recovery requires an actual server-matching preserved capture regardless of archive order, current consent, strict source/revision/epoch checks and unchanged existing CAS.",
+    "replacementTests": [
+      "RISK shared protection changed originals: deliberate current recovery selects exact server capture independently of archive order"
+    ],
+    "preservedCoverage": [
+      "All prior assertions remain, including original old-peer exact header/chunks outcome, verified empty/explicit ACK regression, current source changes after preview refusing publication, UID isolation, old-rules refusal, cleanup continuation and irreversible marker guards. No supported client, existing cohort, workflow, test budget or baseline was dropped.",
+      "Optional existing fixture artifact forwarding loads actual historical app/storage/backend sources. New real-SDK tests qualify immutable paths, atomic resulting state, uncertain acknowledgement readback and original read budgets. Existing historical consumers generate actual old manual or automatic recovery receipts before cold upgrade; tests do not invent completion markers.",
+      "New native controls preserve exact raw historical archives and distinguish successful current publication from unresolved historical data. Root-named, live pending, orphan-chunk, binding-hold, invalid decision-base, account/epoch and cancellation controls keep safety refusal. Empty source capture grants no payload authority; source hash changes are not treated as benign upload evolution.",
+      "Firestore map fields compare canonical serialized values while preserving every key/value and array order. The same real orphan state-evolution consumer exposed server field reordering before correction; all exact raw archive assertions remain."
+    ],
+    "redEvidence": {
+      "command": "Pre-correction evidence under /Users/emeraldpham/Documents/Codex/2026-10-22/issue-187/evidence/253: original shared-source-red.log and stronger SDK shared-source-sdk-red.log; marker-shape, ordinary-protection, atomicity, evolution, evolution-reuse, deleting-authority, unsupported-archive and retained-source-read-budget *red.log; historical-manual-red.log, historical-automatic-red.log, historical-cancellation-red.log, transaction-cancellation-red.log, empty-root-regression-red.log, empty-authority-sdk-red.log, empty-evolution-red.log and probe4, affected-recovery-regression.log and changed-original-order-red.log. Actual commands use named node test patterns and real SDK through allocated demo emulator when applicable.",
+      "failure": "Observed original header/chunks deletion; malformed receipt acceptance; no ordinary-publication protection; atomic marker/retirement allowed; evolved saves held or duplicate archives; deleting source false success; unsupported version bypass; repeated chunk queries; actual old completed/automatic recovery native Add held; cancellation made dependent marker request; absent-root source refused; legal SDK map field reordering falsely differed; explicit source ACK failed with older hash while current-first allowed ACK but falsely omitted unresolved flag. Each is followed by named GREEN. Fixture errors, emulator reused-project failures, wrapper occupied-port startup and overly strict race-outcome expectation are explicitly qualification/setup issues, not functional RED."
+    }
   }
 ,
   {

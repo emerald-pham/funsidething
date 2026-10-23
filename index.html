@@ -4895,6 +4895,21 @@ function cloudPayloadFor(board){
   return JSON.stringify(out);
 }
 function cloudPayload(){ return cloudPayloadFor(state); }
+// This grants no recovery authority. It only recognizes an independently
+// healthy ordinary writer beside an already absent historical cloud source.
+window.__chainHealthyOrdinaryPublication=(backend,identity,revision,payload)=>{
+  const account=backend?.user,proof=confirmedCloudDeviceOwner;
+  if(window.CloudSync!==backend||!cloudReady()||!liveBoardAccepted||cloudSuspended||cloudResumePending||cloudAdoptionHeld||
+    deviceRecoveryCloudHold||automaticCloudRecovery||cloudSourceRecoveryPreview||cloudSourceRecoveryBusy||decisionRecoveryBusy||
+    decisionRecoveryHolds(account).length||!proof||proof.backend!==backend||proof.account!==account||proof.identity!==identity||
+    proof.revision!==revision||cloudAccountIdentity()!==identity||state?.syncIdentity!==identity||state?.syncAccount!==account||
+    state.syncRev!==revision||reconciledAs!==account||lastKnownCloudAccount!==account||lastKnownCloudRevision!==revision||
+    lastKnownCloudPayload!==payload||!validDecisionBase(state.decisionBase,account,revision)||state.decisionBase.payload!==payload)return false;
+  try{
+    const board=JSON.parse(payload);assertCompleteSavedCollections(board);dropRemovedFields(board);hydrateState(board);
+    return !currentChoiceSourceIssue(board)&&!decisionEvidenceIssue(board,account);
+  }catch{return false;}
+};
 const decisionBaseIdentityCache=[];
 function decisionBaseIdentity(account,revision,payload){
   const cached=decisionBaseIdentityCache.find(row=>row.account===account&&row.revision===revision&&row.payload===payload);
@@ -13226,7 +13241,7 @@ registerServiceWorker();
 const CFG = window.FIREBASE_CONFIG || {};
 const configured = !!(CFG.apiKey && CFG.apiKey.indexOf("PASTE") !== 0);
 const CS = window.CloudSync = {
-  configured, ready:false, user:null, status: configured ? "syncing" : "off", errorStage:null, errorCode:null,knownDamagedSource:false,
+  configured, ready:false, user:null, status: configured ? "syncing" : "off", errorStage:null, errorCode:null,knownDamagedSource:false,recoveryRetentionPending:false,
   signIn(){}, signOut(){}, async pull(){ return { error:true }; }, async push(){ return { error:true }; }
 };
 const ping = ()=> window.dispatchEvent(new CustomEvent("cloudsync"));
@@ -13321,9 +13336,20 @@ if(configured){
     };
     const rootRef=uid=>F.doc(db,"users",uid);
     const generationRef=(uid,id)=>F.doc(db,"users",uid,"generations",id);
+    const protectionRef=(uid,id)=>F.doc(db,"users",uid,"recoveryProtections",id);
     const chunksRef=(uid,id)=>F.collection(db,"users",uid,"generations",id,"chunks");
     const chunkRef=(uid,id,index)=>F.doc(db,"users",uid,"generations",id,"chunks",String(index).padStart(8,"0"));
     const snapshotData=snapshot=>snapshot?.exists?.()?snapshot.data():null;
+    const validProtection=row=>row?.v===1&&Object.keys(row).length===3&&Number.isSafeInteger(row.rootRevision)&&row.rootRevision>=0&&
+      typeof row.createdAt?.toMillis==="function"&&Number.isFinite(row.createdAt.toMillis());
+    const sameRecoveryValue=(left,right)=>{
+      // Firestore map field order can change after a legal state update.
+      // Compare serialized values canonically; arrays and every field remain exact.
+      const ordered=value=>Array.isArray(value)?value.map(ordered):value&&typeof value==="object"
+        ?Object.fromEntries(Object.keys(value).sort().map(key=>[key,ordered(value[key])])):value;
+      const canonical=value=>{const raw=JSON.stringify(value);return raw===undefined?raw:JSON.stringify(ordered(JSON.parse(raw)));};
+      return canonical(left)===canonical(right);
+    };
     async function verifiedGeneration(tx,uid,id,expected,current){
       if(!expected||!Number.isSafeInteger(expected.chunkCount)||expected.chunkCount<1||
          !current||["schemaVersion","encoding","chunkCount","byteLength","hash","baseRev"].some(key=>current[key]!==expected[key]))return false;
@@ -13396,10 +13422,31 @@ if(configured){
         const result=await F.getDocsFromServer(F.collection(db,"users",uid,"generations"));
         return result.docs.map(snapshot=>({id:snapshot.id,...snapshot.data()}));
       },
+      async protectGenerations(uid,source,revision,current){
+        return F.runTransaction(db,async tx=>{
+          const root=snapshotData(await tx.get(rootRef(uid)));
+          if(!current())return {cancelled:true};
+          if(revision===0?root!==null:root?.schemaVersion!==2||root.rev!==revision)return {conflict:true,rev:root?.rev};
+          const rows=await Promise.all(source.generations.map(async generation=>{
+            const [header,protection]=await Promise.all([tx.get(generationRef(uid,generation.id)),tx.get(protectionRef(uid,generation.id))]);
+            return {generation,header:snapshotData(header),protection:snapshotData(protection)};
+          }));
+          if(!current())return {cancelled:true};
+          for(const row of rows){
+            if(!row.header||!["staging","sealed","published"].includes(row.header.state))return {error:true,code:"recovery-source-unavailable"};
+            if(!sameRecoveryValue(row.header,row.generation.header))return {conflict:true,code:"recovery-source-changed",rev:revision};
+            if(row.protection&&!validProtection(row.protection))return {error:true,code:"recovery-protection-unsupported"};
+          }
+          for(const row of rows)if(!row.protection)tx.set(protectionRef(uid,row.generation.id),{v:1,rootRevision:revision,createdAt:F.serverTimestamp()});
+          return {ok:true};
+        });
+      },
+      async readProtection(uid,id){return snapshotData(await F.getDocFromServer(protectionRef(uid,id)));},
       async markDeleting(uid,id,protectedIds=[]){
         return F.runTransaction(db,async tx=>{
           const root=snapshotData(await tx.get(rootRef(uid))),ref=generationRef(uid,id),generation=snapshotData(await tx.get(ref));
           if(!generation||root?.activeGeneration===id||root?.previousGeneration===id||protectedIds.includes(id))return false;
+          if(snapshotData(await tx.get(protectionRef(uid,id))))return false;
           // Interrupted cleanup already owns this tombstone. Rewriting its
           // timestamp is forbidden by the immutable state-transition rules;
           // that rejection used to stop every later collector at the same row
@@ -13431,6 +13478,43 @@ if(configured){
       try{window.__chainSupportDiagnosticsRecovery?.("pendingSource","available",!!pending,
         typeof window.ScannerDeviceStore?.getPendingUpload==="function"?"observed":"unavailable",CS);}catch{}
       return {identity:user.uid,epoch,pending};
+    };
+    CS.protectRecoverySources=async({source,expectedRevision=source?.manifest?.rev,stillCurrent,readAttempt}={})=>{
+      const uid=auth.currentUser?.uid,epoch=recoveryAuthEpoch;
+      const current=()=>!!uid&&!suspended&&auth.currentUser?.uid===uid&&recoveryAuthEpoch===epoch&&
+        source?.identity===uid&&source?.epoch===epoch&&!readAttempt?.signal?.aborted&&
+        readAttempt?.isCurrent?.()!==false&&(typeof stillCurrent!=="function"||stillCurrent());
+      if(!current())return {cancelled:true};
+      if(!validRevision(expectedRevision)||!Array.isArray(source.generations)||!source.generations.length&&source.manifest!==null||
+        source.generations.some(row=>!row||typeof row.id!=="string"||!row.id||row.id.includes("/")||!row.header||!Array.isArray(row.chunks))||
+        new Set(source.generations.map(row=>row.id)).size!==source.generations.length)
+        return {error:true,code:"recovery-source-unavailable"};
+      // Every phase spends the same operation budget. An uncertain write is
+      // read back at its deterministic paths, never blindly issued again.
+      const until=Date.now()+(readAttempt?Math.min(CLOUD_RECOVERY_READ_TIMEOUT_MS,readAttempt.remainingMs()):CLOUD_SYNC_TIMEOUT_MS);
+      const bounded=async work=>{
+        readAttempt?.checkBudget();if(!current())throw Object.assign(Error("Recovery stopped"),{code:"cancelled"});
+        const remaining=Math.min(until-Date.now(),readAttempt?readAttempt.remainingMs():Infinity);
+        if(remaining<=0)throw Object.assign(Error("Recovery timed out"),{code:"deadline-exceeded"});
+        const result=await cloudDeadline(Promise.resolve().then(work),remaining,readAttempt?.signal);
+        readAttempt?.checkBudget();if(!current())throw Object.assign(Error("Recovery stopped"),{code:"cancelled"});return result;
+      };
+      try{
+        let mutation,uncertain=false;
+        try{mutation=await bounded(()=>cloudAdapter.protectGenerations(uid,source,expectedRevision,current));}
+        catch(error){if(!current())return {cancelled:true};uncertain=true;mutation={error:true,code:error?.code||"recovery-protection-unavailable"};}
+        if(mutation?.cancelled||mutation?.conflict||mutation?.error&&!uncertain)return mutation;
+        for(const generation of source.generations){
+          const [protection,header,chunks]=await bounded(()=>Promise.all([cloudAdapter.readProtection(uid,generation.id),
+            cloudAdapter.readGeneration(uid,generation.id),cloudAdapter.readChunks(uid,generation.id)]));
+          if(!validProtection(protection))return mutation?.error?mutation:{error:true,code:"recovery-protection-unavailable"};
+          if(!sameRecoveryValue(header,generation.header)||!sameRecoveryValue(chunks,generation.chunks))
+            return {conflict:true,code:"recovery-source-changed",rev:expectedRevision};
+        }
+        const latest=await bounded(()=>cloudAdapter.readRoot(uid));
+        if(expectedRevision===0?latest!==null:latest?.schemaVersion!==2||latest.rev!==expectedRevision)return {conflict:true,rev:latest?.rev};
+        return {ok:true,identity:uid,epoch,revision:expectedRevision,generationIds:source.generations.map(row=>row.id)};
+      }catch(error){return current()?{error:true,code:error?.code||"recovery-protection-unavailable"}:{cancelled:true};}
     };
     CS.readRecoverySource=async({pendingGenerationId,diagnosticOperation,readAttempt=null,onInspection=null}={})=>{
       readAttempt?.checkBudget();
@@ -13593,6 +13677,7 @@ if(configured){
       if(!validRevision(baseRev)){cloudFailure("push",{code:"invalid-revision"});return {error:true};}
       const operation=++pushOperation;
       const stillCurrent=()=>auth.currentUser?.uid===pushUid&&operation===pushOperation&&recoveryStillCurrent();
+      let recoveryRetentionPending=false;
 
       clearCloudError();CS.status = "syncing"; ping();
       try{
@@ -13601,6 +13686,131 @@ if(configured){
         if(!stillCurrent())return {cancelled:true};
         const pendingStore=window.ScannerDeviceStore;
         const existing=await pendingStore?.getPendingUpload?.(pushUid);
+        if(!stillCurrent())return {cancelled:true};
+        // A local receipt alone cannot stop a supported peer's collector.
+        // Establish server retention before this writer can rotate root slots.
+        const recoveryArchives=await pendingStore?.listOpaqueArchives?.()??[];
+        let confirmedRecoveryChoices;
+        for(const row of recoveryArchives){
+          if(!row?.key?.startsWith("cloud-generation-recovery:"+encodeURIComponent(pushUid)+":"))continue;
+          const archived=JSON.parse(row.raw);
+          if(archived.format!=="chain-scanner.cloud-recovery-source"||archived.version!==1||archived.identity!==pushUid)
+            throw Object.assign(Error("Recovery protection unavailable"),{code:"recovery-protection-unavailable"});
+          confirmedRecoveryChoices??=await pendingStore?.listBackups?.()??[];
+          if(!stillCurrent())return {cancelled:true};
+          const completed=confirmedRecoveryChoices.some(copy=>{
+            if(copy?.kind!=="decision-recovery-confirmed")return false;
+            const board=JSON.parse(copy.payload),choice=board.recoveryChoice,source=choice?.cloudSource;
+            return choice?.kind==="cloud-source"&&choice.identity===pushUid&&choice.account===CS.user&&board.syncAccount===CS.user&&
+              choice.revision===archived.manifest?.rev&&source?.identity===pushUid&&
+              sameRecoveryValue(source.manifest,archived.manifest)&&sameRecoveryValue(source.generations,archived.generations)&&
+              sameRecoveryValue(choice.pending,archived.pending);
+          });
+          // This exact durable classification is earned only after the old
+          // native recovery verified cloud ACK and local adoption. Preserve
+          // its originals without reopening a completed historical incident.
+          if(completed)continue;
+          const contentHeader=header=>{const out={...header};for(const key of ["state","sealedAt","publishedAt"])delete out[key];return out;};
+          let retained=Array.isArray(archived.generations)&&archived.generations.length>0;
+          for(const generation of retained?archived.generations:[]){
+            if(typeof generation?.id!=="string"||!generation.id||generation.id.includes("/")){retained=false;break;}
+            let protection;try{protection=await cloudDeadline(cloudAdapter.readProtection(pushUid,generation.id));}catch{retained=false;break;}
+            if(!validProtection(protection)){retained=false;break;}
+            const header=await cloudDeadline(cloudAdapter.readGeneration(pushUid,generation.id));
+            if(!stillCurrent())return {cancelled:true};
+            if(!header||!["staging","sealed","published"].includes(header.state)){retained=false;break;}
+            if(!sameRecoveryValue(contentHeader(header),contentHeader(generation.header))){
+              recoveryRetentionPending=true;
+              if(recoveryContext){retained=false;break;}
+            }
+          }
+          // These permanent server records deny every destructive source
+          // path, including older collectors. Subsequent normal edits need
+          // their retention proof, not another full original download. A
+          // recovery adoption still uses the strict source readback method.
+          if(retained)continue;
+          let protectedSource=await CS.protectRecoverySources({source:{...archived,epoch:recoveryAuthEpoch},expectedRevision:baseRev,stillCurrent});
+          if(protectedSource.cancelled||!stillCurrent())return {cancelled:true};
+          if(!protectedSource.ok&&!recoveryContext&&typeof window.__chainHealthyOrdinaryPublication==="function"&&Array.isArray(archived.generations)&&archived.generations.length){
+            // Retroactive locks cannot recreate bytes already lost by an old
+            // peer. An ordinary healthy save retires no reference to IDs that
+            // are absent from both root slots and have no remaining bytes.
+            // Keep their exact local originals and the unresolved outcome.
+            const root=await cloudDeadline(cloudAdapter.readRoot(pushUid));
+            let absent=root?.schemaVersion===2&&root.rev===baseRev;
+            for(const generation of absent?archived.generations:[]){
+              if(typeof generation?.id!=="string"||!generation.id||generation.id.includes("/")||
+                root.activeGeneration===generation.id||root.previousGeneration===generation.id||existing?.generationId===generation.id){absent=false;break;}
+              const [header,chunks]=await cloudDeadline(Promise.all([cloudAdapter.readGeneration(pushUid,generation.id),cloudAdapter.readChunks(pushUid,generation.id)]));
+              if(header!==null||chunks.length!==0){absent=false;break;}
+              if(!stillCurrent())return {cancelled:true};
+            }
+            if(absent){
+              const healthy=await cloudDeadline(generationStore.pull(pushUid,{stillCurrent}));
+              if(!stillCurrent())return {cancelled:true};
+              if(healthy?.rev===baseRev&&typeof healthy.payload==="string"&&window.__chainHealthyOrdinaryPublication(CS,pushUid,baseRev,healthy.payload)){
+                recoveryRetentionPending=true;continue;
+              }
+            }
+          }
+          if(protectedSource.conflict&&protectedSource.code==="recovery-source-changed"&&recoveryContext&&
+            typeof recoveryContext.validateBeforePublish==="function"){
+            // Deliberate recovery may have captured a damaged source after an
+            // earlier incident. Only a fresh archive matching actual server
+            // bytes can protect that current source; archive order is irrelevant.
+            const root=await cloudDeadline(cloudAdapter.readRoot(pushUid));
+            for(const candidate of recoveryArchives){
+              if(!candidate?.key?.startsWith("cloud-generation-recovery:"+encodeURIComponent(pushUid)+":"))continue;
+              const fresh=JSON.parse(candidate.raw);
+              if(fresh.format!=="chain-scanner.cloud-recovery-source"||fresh.version!==1||fresh.identity!==pushUid||
+                !sameRecoveryValue(fresh.manifest,root)||!Array.isArray(fresh.generations)||
+                !archived.generations.every(old=>fresh.generations.some(row=>row.id===old.id)))continue;
+              const proof=await CS.protectRecoverySources({source:{...fresh,epoch:recoveryAuthEpoch},expectedRevision:baseRev,stillCurrent});
+              if(proof.cancelled||!stillCurrent())return {cancelled:true};
+              if(proof.ok){protectedSource=proof;recoveryRetentionPending=true;break;}
+            }
+          }
+          if(protectedSource.conflict&&protectedSource.code==="recovery-source-changed"){
+            // Uploads can legitimately finish after their staging capture.
+            // Preserve that original, then archive a separately verified fresh
+            // capture. Never relabel an evolved header as the earlier source.
+            const latest=await cloudDeadline(cloudAdapter.readRoot(pushUid));
+            if(!stillCurrent())return {cancelled:true};
+            if(baseRev===0?latest!==null:latest?.schemaVersion!==2||latest.rev!==baseRev)return {conflict:true,rev:latest?.rev};
+            const generations=[];
+            const order={staging:0,sealed:1,published:2};
+            for(const generation of archived.generations){
+              const [header,chunks]=await cloudDeadline(Promise.all([cloudAdapter.readGeneration(pushUid,generation.id),cloudAdapter.readChunks(pushUid,generation.id)]));
+              if(!stillCurrent())return {cancelled:true};
+              if(!header||!Object.hasOwn(order,header.state)||!Object.hasOwn(order,generation.header?.state)||order[header.state]<order[generation.header.state]||
+                !sameRecoveryValue(contentHeader(header),contentHeader(generation.header))||
+                !generation.chunks.every(chunk=>chunks.some(current=>sameRecoveryValue(chunk,current))))return protectedSource;
+              generations.push({id:generation.id,header,chunks});
+            }
+            let refreshed;
+            for(const prior of recoveryArchives){
+              if(!prior?.key?.startsWith("cloud-generation-recovery:"+encodeURIComponent(pushUid)+":"))continue;
+              const saved=JSON.parse(prior.raw);
+              if(saved.identity===pushUid&&saved.version===1&&saved.format==="chain-scanner.cloud-recovery-source"&&sameRecoveryValue(saved.generations,generations)){refreshed=saved;break;}
+            }
+            if(!refreshed){
+              refreshed={...archived,manifest:latest,generations,refreshedFrom:row.key};
+              const raw=JSON.stringify(refreshed),key="cloud-generation-recovery:"+encodeURIComponent(pushUid)+":"+baseRev+":"+(latest?.activeGeneration||"empty")+":"+await window.ChainStorageV2.hashPayload(raw);
+              const head=await pendingStore.readHead?.();
+              if(!stillCurrent())return {cancelled:true};
+              if(!head||!await pendingStore.protectRecoverySource?.({expectedHash:head.hash,key,raw}))
+                throw Object.assign(Error("Refreshed recovery source could not be preserved"),{code:"recovery-protection-unavailable"});
+              recoveryArchives.push({key,raw});
+            }
+            if(!stillCurrent())return {cancelled:true};
+            protectedSource=await CS.protectRecoverySources({source:{...refreshed,epoch:recoveryAuthEpoch},expectedRevision:baseRev,stillCurrent});
+          }
+          if(!protectedSource.ok){
+            if(protectedSource.cancelled)return protectedSource;
+            if(protectedSource.conflict)return protectedSource;
+            throw Object.assign(Error("Recovery source is not protected"),{code:protectedSource.code||"recovery-protection-unavailable"});
+          }
+        }
         if(!stillCurrent())return {cancelled:true};
         if(recoveryContext&&(typeof pendingStore?.setPendingUploadIfCurrent!=="function"||
           !Object.prototype.hasOwnProperty.call(recoveryContext,"recoveryPending")))
@@ -13645,6 +13855,7 @@ if(configured){
         if(res.ok||res.conflict)await pendingStore?.clearPendingUpload?.(pushUid,generationId);
         if(!stillCurrent()) return {cancelled:true};
         if(res.ok){
+          res.recoveryRetentionPending=recoveryRetentionPending;CS.recoveryRetentionPending=recoveryRetentionPending;
           // The publication already confirmed this revision. Timestamp metadata
           // may enrich that receipt, but cannot hold a saved board in syncing
           // for another full network timeout. A later pull also supplies it.
@@ -13687,7 +13898,7 @@ if(configured){
     A.onAuthStateChanged(auth, u=>{
       stopRootSubscription();
       const nextUid=u?.uid || null;
-      if(nextUid!==backendAuthUid){backendAuthUid=nextUid;recoveryAuthEpoch++;pullOperation++;pushOperation++;CS.knownDamagedSource=false;}
+      if(nextUid!==backendAuthUid){backendAuthUid=nextUid;recoveryAuthEpoch++;pullOperation++;pushOperation++;CS.knownDamagedSource=false;CS.recoveryRetentionPending=false;}
       CS.user   = u ? (u.email || u.uid) : null;
       try{window.__chainSupportDiagnosticsIdentity?.(CS,CS.user,nextUid,recoveryAuthEpoch);}catch{}
       if(authStorageFailure) cloudFailure("auth-storage",authStorageFailure);

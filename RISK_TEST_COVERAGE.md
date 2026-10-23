@@ -2028,3 +2028,22 @@ This boundary control holds a successful real provider reply, installs a later a
 - RISK debug log: unavailable diagnostic storage never blocks edits or claims persistence
 - RISK debug log: document and event limits expire without retaining injected private fields
 - RISK debug log: app reload reasons and lifecycle observations survive without private error text
+
+## Shared unresolved recovery evidence
+
+- RISK shared recovery source protection: supported old peer rotations and ordinary collection retain exact unresolved cloud evidence (Firestore rules: shared retention)
+
+- RISK shared protection authority: malformed server receipts cannot authorize recovery publication (Firestore rules: retention authority)
+- RISK shared protection publication: ordinary saved edits protect archived originals before root rotation (Firestore rules: retention publication)
+- RISK shared protection atomicity: marker creation cannot share a commit with source retirement (Firestore rules: retention atomicity)
+- RISK shared protection evolution: ordinary saves retain old captures and refresh legitimate upload state changes (Firestore rules: retention evolution)
+- RISK shared protection destructive paths: existing markers stop old transitions and already-deleting byte removal (Firestore rules: retention deletion)
+- RISK shared protection uncertain outcomes: lost acknowledgement is read back without another mutation and stale authority stays held (Firestore rules: retention uncertainty)
+- RISK shared protection old rules: refused retention keeps independent durable device edits and the published root intact (Firestore rules: retention compatibility)
+- RISK shared protection races: old retirement winning the commit prevents a false protection receipt (Firestore rules: retention race)
+- RISK shared protection budget: source readback spends the original recovery budget and cancellation cannot become board acknowledgement (Firestore rules: retention budget)
+- RISK shared protection history: an exact completed legacy source choice does not reblock healthy new edits
+- RISK shared protection historical absence: healthy ordinary saves keep lost legacy evidence flagged without claiming its recovery
+- RISK shared protection cancellation: a stopped transaction cannot start dependent source-marker reads
+- RISK shared protection absent-root authority: retained orphan sources lock only under verified unchanged root absence (Firestore rules: retention empty root)
+- RISK shared protection changed originals: deliberate current recovery selects exact server capture independently of archive order
