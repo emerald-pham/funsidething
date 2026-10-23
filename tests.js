@@ -560,11 +560,11 @@ test('RISK cloud source recovery pending capture: native recovery cannot discard
 });
 
 
-async function damagedAcknowledgedApp187(t,{timeoutMs=5000,sourcePadding=0,timerProvider=null,recoveryTimeoutMs=timeoutMs}={}){
+async function damagedAcknowledgedApp187(t,{timeoutMs=5000,sourcePadding=0,timerProvider=null,recoveryTimeoutMs=timeoutMs,artifacts=null}={}){
  const fixture=heldDecisionFixture188();
  if(sourcePadding)fixture.remote.futureIOSReportFixture={opaque:'q'.repeat(sourcePadding)};
  fixture.local=structuredClone(fixture.remote);
- const faults={},app=await heldDecisionApp188(t,{fixture,failures:faults,timeoutMs,timerProvider,recoveryTimeoutMs}),{ctx,shim,backend}=app;
+ const faults={},app=await heldDecisionApp188(t,{fixture,failures:faults,timeoutMs,timerProvider,recoveryTimeoutMs,artifacts}),{ctx,shim,backend}=app;
  ctx.window.CLOUD_PUSH_DELAY_MS=60000;
  shim.document.getElementById('addInput').value='Acknowledged before source damage';
  await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
@@ -38590,7 +38590,7 @@ test('RISK CLOUD CONFORMANCE: controlled crypto delivery executes original adapt
 // Isolated original mixed-release replay: current typed light choice, then the
 // released pre-decision client saved dark while retaining that exact choice.
 function heldDecisionFixture188(){return {"local":{"v":2,"tasks":[{"id":"a","title":"Fixture A","url":null,"due":null,"evergreen":false,"ctx":[],"mu":25,"sigma":8.333333333333334,"done":false,"createdAt":1,"completedAt":null,"lastDoneAt":null,"startsAt":null,"prerequisiteRevision":0,"prerequisiteIds":[],"prerequisiteId":null,"prerequisiteMirror":null,"prerequisiteOps":{},"evergreenHours":18,"evergreenResetAtDay":true}],"contexts":[],"chain":[],"considered":{},"cantAt":{},"workedAt":{},"candidateId":null,"workLog":[],"interventionActive":false,"interventionP":0,"snooze":0,"mode":"scan","decisionsMs":[],"presentedAt":0,"passStartedAt":1792321140000,"listOpen":false,"ctxOpen":true,"histOpen":false,"seenQuickStart":true,"updatedAt":1792321201000,"settings":{"horizonMin":60,"thresholdPct":25,"samples":250,"cantMin":30,"workedHours":16,"postponeHours":1,"evergreenHours":18,"evergreenResetAtDay":true,"scanMode":"squared","squaredDefaultVersion":1,"listMetric":"rank","excludeNoContext":false,"lastTaskWoop":false,"floatingHeader":false,"patternedIndicators":false,"showPostpone":true,"theme":"dark","dateFormat":"system","hourlyQuotes":{},"scene":{"time":null,"season":null,"location":null},"skipOldestFirstDot":false},"passId":"mixed-rollout","scanMode":"descending","syncAccount":"e@example.com","syncRev":4,"syncDirty":true,"deletionLog":[],"deletedTaskIds":{},"clearedHistoryIds":{},"restoredTaskIds":{},"restoredHistoryIds":{},"restoredTaskOps":{},"restoredHistoryOps":{},"deletedAfterRestoreOps":{},"clearedAfterRestoreOps":{},"chance":null,"addOpen":true,"decisionBase":{"v":1,"id":"db1:ef0eff3a10121ebe968caa55bd33d2bb","account":"e@example.com","revision":4,"payload":"{\"v\":2,\"tasks\":[{\"id\":\"a\",\"title\":\"Fixture A\",\"url\":null,\"due\":null,\"evergreen\":false,\"ctx\":[],\"mu\":25,\"sigma\":8.333333333333334,\"done\":false,\"createdAt\":1,\"completedAt\":null,\"lastDoneAt\":null,\"startsAt\":null,\"prerequisiteRevision\":0,\"prerequisiteIds\":[],\"prerequisiteId\":null,\"prerequisiteMirror\":null,\"prerequisiteOps\":{},\"evergreenHours\":18,\"evergreenResetAtDay\":true}],\"contexts\":[],\"chain\":[],\"considered\":{},\"cantAt\":{},\"workedAt\":{},\"candidateId\":null,\"workLog\":[],\"interventionActive\":false,\"interventionP\":0,\"snooze\":0,\"mode\":\"scan\",\"decisionsMs\":[],\"presentedAt\":0,\"passStartedAt\":1792321140000,\"listOpen\":false,\"ctxOpen\":true,\"histOpen\":false,\"seenQuickStart\":true,\"updatedAt\":0,\"settings\":{\"horizonMin\":60,\"thresholdPct\":25,\"samples\":250,\"cantMin\":30,\"workedHours\":16,\"postponeHours\":1,\"evergreenHours\":18,\"evergreenResetAtDay\":true,\"scanMode\":\"squared\",\"squaredDefaultVersion\":1,\"listMetric\":\"rank\",\"excludeNoContext\":false,\"lastTaskWoop\":false,\"skipOldestFirstDot\":false,\"floatingHeader\":false,\"patternedIndicators\":false,\"showPostpone\":true,\"theme\":\"system\",\"dateFormat\":\"system\",\"hourlyQuotes\":{},\"scene\":{\"time\":null,\"season\":null,\"location\":null}},\"passId\":\"mixed-rollout\",\"scanMode\":\"descending\",\"deletionLog\":[],\"deletedTaskIds\":{},\"clearedHistoryIds\":{},\"restoredTaskIds\":{},\"restoredHistoryIds\":{},\"restoredTaskOps\":{},\"restoredHistoryOps\":{},\"deletedAfterRestoreOps\":{},\"clearedAfterRestoreOps\":{},\"chance\":null,\"addOpen\":true}"},"decisionBaseline":{"v":1,"account":"e@example.com","sourceBaseId":"db1:ef0eff3a10121ebe968caa55bd33d2bb","sourceRevision":4,"includedActionIds":[],"ratings":[{"taskId":"a","mu":25,"sigma":8.333333333333334}],"chainIds":[],"passId":"mixed-rollout","passAt":1792321140000,"considered":{},"cantAt":{},"workedAt":{},"observedRatingHistoryIds":[],"id":"dlb2:6b9e4e304cf1e2aa3f14f7dfde0b3097"},"decisionEvents":[{"v":1,"id":"te9703fc8-b286-48a2-ac2b-b42b9c803f19","at":1792321200000,"account":"e@example.com","baseId":"db1:ef0eff3a10121ebe968caa55bd33d2bb","kind":"current-choice","actionId":"tfa255a29-fb5d-40f6-ab66-73248fed8170","target":{"type":"setting","id":"board","property":"theme"},"value":"light","after":{"present":true},"before":{"present":true,"value":"system"},"passId":"mixed-rollout","passAt":1792321140000,"scanMode":"descending","chainIds":[],"observedActionIds":[]}]},"remote":{"v":1,"tasks":[{"id":"a","title":"Fixture A","url":null,"due":null,"evergreen":false,"ctx":[],"mu":25,"sigma":8.333333333333334,"done":false,"createdAt":1,"completedAt":null,"lastDoneAt":null}],"contexts":[],"chain":[],"considered":{},"cantAt":{},"workedAt":{},"candidateId":null,"workLog":[],"interventionActive":false,"interventionP":0,"snooze":0,"mode":"idle","decisionsMs":[],"presentedAt":0,"passStartedAt":1792321140000,"listOpen":false,"ctxOpen":true,"histOpen":false,"seenQuickStart":true,"updatedAt":0,"settings":{"horizonMin":60,"thresholdPct":25,"samples":250,"cantMin":30,"workedHours":8,"theme":"system"},"passId":"mixed-rollout","scanMode":"descending","syncAccount":"e@example.com","syncRev":4,"syncDirty":false},"rev":4,"producer":{"current":"52d4b25","old":"69a9fed","actions":["current cycle-theme system to light","old cycle-theme light to dark"]}};}
-async function heldDecisionApp188(t,{fixture=heldDecisionFixture188(),failures={},storageBackend="indexedDB",timeoutMs=5000,timerProvider=null,recoveryTimeoutMs=timeoutMs}={}){
+async function heldDecisionApp188(t,{fixture=heldDecisionFixture188(),failures={},storageBackend="indexedDB",timeoutMs=5000,timerProvider=null,recoveryTimeoutMs=timeoutMs,artifacts=null}={}){
  const {IDBFactory}=await import('fake-indexeddb'),factory=new IDBFactory(),deviceDbName='held-choice-188-'+Math.random(),idbFault={};
  const indexedDB={open(...args){const request=factory.open(...args);return new Proxy(request,{
   get(target,key){
@@ -38618,10 +38618,10 @@ async function heldDecisionApp188(t,{fixture=heldDecisionFixture188(),failures={
   },set(target,key,value){return Reflect.set(target,key,value,target);}
  });}};
  const localRaw=JSON.stringify(fixture.local),cloudRaw=fixture.remote===null?null:JSON.stringify(fixture.remote);
- const app=await loadAppAtTime(1792323000000,{seed:188,seedStorage:{[SYNC_STORE_KEY]:localRaw,[LOCAL_HEAD_KEY]:localRaw},...(storageBackend==='indexedDB'?{indexedDBProvider:indexedDB,deviceDbName}:{})});
+ const app=await loadAppAtTime(1792323000000,{...(artifacts?{artifacts,appSource:extractAppScript(artifacts.html)}:{}),seed:188,seedStorage:{[SYNC_STORE_KEY]:localRaw,[LOCAL_HEAD_KEY]:localRaw},...(storageBackend==='indexedDB'?{indexedDBProvider:indexedDB,deviceDbName}:{})});
  if(!app.ctx.window.ChainStorageV2){vm.runInContext(fs.readFileSync(path.join(__dirname,'device-store-v2.js'),'utf8'),app.ctx,{filename:'device-store-v2.js'});app.ctx.window.ChainStorageV2=app.ctx.ChainStorageV2;}
  failures.authPending=true;
- const backend=await loadCloudBackendV2({rootData:cloudRaw===null?null:{payload:cloudRaw,updatedAt:fixture.remote.updatedAt,rev:fixture.rev,serverUpdatedAt:1},failures,timeoutMs,timerProvider,recoveryTimeoutMs,recordSyncError:app.ctx.recordSyncError,runtimeWindow:app.ctx.window});
+ const backend=await loadCloudBackendV2({artifacts,rootData:cloudRaw===null?null:{payload:cloudRaw,updatedAt:fixture.remote.updatedAt,rev:fixture.rev,serverUpdatedAt:1},failures,timeoutMs,timerProvider,recoveryTimeoutMs,recordSyncError:app.ctx.recordSyncError,runtimeWindow:app.ctx.window});
  backend.emitAuth({uid:'owner',email:'e@example.com'});app.ctx.window.CLOUD_PUSH_DELAY_MS=0;
  t.after(async()=>{backend.CS.suspend();vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);await app.ctx.window.ScannerDeviceStore?.close?.();});
  await app.ctx.cloudPull();
@@ -41417,6 +41417,7 @@ test('RISK shared recovery source protection: supported old peer rotations and o
  const working=JSON.parse(raw);working.tasks[0].title='Validated working board while original evidence is unresolved';
  assert.equal((await source.CS.push(JSON.stringify(working),2,1)).ok,true);
  await provider.drain();
+ const obsoleteId=(await F.getDocFromServer(F.doc(provider.db,'users','owner'))).data().activeGeneration;
  const released=readReleasedClient(__dirname,SUPPORTED_RELEASE),peer=await loadCloudBackendV2({artifacts:released,timeoutMs:15000,firebaseSDK:provider.sdk});
  t.after(()=>peer.CS.suspend?.());
  const oldApp=await loadApp({appSource:extractAppScript(released.html)});t.after(()=>oldApp.dispose());
@@ -41434,15 +41435,291 @@ test('RISK shared recovery source protection: supported old peer rotations and o
  const received=await reopened.CS.readRecoverySource({pendingGenerationId:originalId});
  const retained=received.generations.find(row=>row.id===originalId),expected=JSON.parse(archiveRaw).generations.find(row=>row.id===originalId);
  assert.deepEqual(JSON.parse(JSON.stringify(retained)),expected,'a fresh client must still recover the exact unresolved header and chunks after the other supported client collected generations outside both root slots');
+ assert.equal((await reopened.CS.push((await reopened.CS.pull()).payload,5,4)).ok,true);await provider.drain();
+ assert.equal((await F.getDocFromServer(F.doc(provider.db,'users','owner','generations',obsoleteId))).exists(),false,'a new collector skips permanent protection and continues collecting ordinary unprotected debris');
+ assert.equal((await F.getDocFromServer(F.doc(provider.db,'users','owner','generations',originalId))).exists(),true);
 });
 
-function retentionSDK253(F,db,{afterTransaction=null}={}){
- const pending=new Set();
+function retentionSDK253(F,db,{afterTransaction=null,beforeProtectionCommit=null}={}){
+ const pending=new Set(),stats={reads:[]};
  const host=value=>Array.isArray(value)?Array.from(value,host):value?.constructor?.name==='Object'?Object.fromEntries(Object.entries(value).map(([key,item])=>[key,host(item)])):value;
  const track=promise=>{pending.add(promise);promise.then(()=>pending.delete(promise),()=>pending.delete(promise));return promise;};
  const writer=object=>({get:ref=>object.get(ref),set:(ref,value)=>object.set(ref,host(value)),update:(ref,value)=>object.update(ref,host(value)),delete:ref=>object.delete(ref)});
- const sdk={...F,getFirestore:()=>db,runTransaction:(database,callback)=>track(F.runTransaction(database,tx=>callback(writer(tx))).then(async result=>{await afterTransaction?.();return result;})),
+ const sdk={...F,getFirestore:()=>db,runTransaction:(database,callback)=>track(F.runTransaction(database,async tx=>{const port=writer(tx),set=port.set;let protecting=false;port.set=(ref,value)=>{if(ref.path.includes('/recoveryProtections/'))protecting=true;return set(ref,value);};const result=await callback(port);if(protecting)await beforeProtectionCommit?.();return result;}).then(async result=>{await afterTransaction?.();return result;})),
   writeBatch(database){const batch=F.writeBatch(database);return {...writer(batch),commit:()=>track(batch.commit())};}};
- for(const key of ['getDoc','getDocs','getDocFromServer','getDocsFromServer'])sdk[key]=(...args)=>track(F[key](...args));
- return {sdk,db,async drain(){for(let idle=0;idle<30;){if(pending.size){idle=0;await Promise.allSettled([...pending]);}else idle++;await new Promise(resolve=>setImmediate(resolve));}}};
+ for(const key of ['getDoc','getDocs','getDocFromServer','getDocsFromServer'])sdk[key]=(...args)=>{stats.reads.push(args[0].path);return track(F[key](...args));};
+ return {sdk,db,stats,async drain(){for(let idle=0;idle<30;){if(pending.size){idle=0;await Promise.allSettled([...pending]);}else idle++;await new Promise(resolve=>setImmediate(resolve));}}};
 }
+
+test('RISK shared protection authority: malformed server receipts cannot authorize recovery publication (Firestore rules: retention authority)',{skip:!process.env.FIRESTORE_EMULATOR_HOST},async t=>{
+ const {initializeTestEnvironment}=await import('@firebase/rules-unit-testing'),F=await import('firebase/firestore');
+ const env=await initializeTestEnvironment({projectId:'demo-retention-authority-253',firestore:{rules:fs.readFileSync(path.join(__dirname,'firestore.rules'),'utf8')}});t.after(()=>env.cleanup());await env.clearFirestore();
+ const provider=retentionSDK253(F,env.authenticatedContext('owner').firestore()),backend=await loadCloudBackendV2({timeoutMs:15000,firebaseSDK:provider.sdk});t.after(()=>backend.CS.suspend());
+ assert.equal((await backend.CS.push('{"tasks":[]}',1,0)).ok,true);await provider.drain();
+ const source=await backend.CS.readRecoverySource(),id=source.manifest.activeGeneration;
+ await env.withSecurityRulesDisabled(context=>F.setDoc(F.doc(context.firestore(),'users','owner','recoveryProtections',id),{v:1,rootRevision:1,createdAt:'not a server timestamp',unexpected:'unrecognized marker'}));
+ const result=await backend.CS.protectRecoverySources({source});
+ assert.equal(result.error,true,'an unknown marker shape is retention evidence only, not validated publication authority');
+ assert.equal((await backend.CS.pull()).rev,1,'protection never acknowledges a board write');
+});
+
+test('RISK shared protection publication: ordinary saved edits protect archived originals before root rotation (Firestore rules: retention publication)',{skip:!process.env.FIRESTORE_EMULATOR_HOST},async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),{initializeTestEnvironment}=await import('@firebase/rules-unit-testing'),F=await import('firebase/firestore');
+ const env=await initializeTestEnvironment({projectId:'demo-retention-publication-253',firestore:{rules:fs.readFileSync(path.join(__dirname,'firestore.rules'),'utf8')}});t.after(()=>env.cleanup());await env.clearFirestore();
+ const indexedDB=new IDBFactory(),deviceDbName='retention-publication-'+Math.random(),app=await loadApp({indexedDBProvider:indexedDB,deviceDbName}),store=app.ctx.window.ScannerDeviceStore;
+ const provider=retentionSDK253(F,env.authenticatedContext('owner').firestore()),backend=await loadCloudBackendV2({runtimeWindow:app.ctx.window,failures:{authPending:true},timeoutMs:15000,firebaseSDK:provider.sdk});t.after(async()=>{backend.CS.suspend();await app.dispose();});
+ assert.equal((await backend.CS.push('{"tasks":[]}',1,0)).ok,true);await provider.drain();
+ assert.equal(await app.ctx.persist(),true);
+ const source=await backend.CS.readRecoverySource(),id=source.manifest.activeGeneration,raw=JSON.stringify({format:'chain-scanner.cloud-recovery-source',version:1,identity:source.identity,manifest:source.manifest,generations:source.generations});
+ const head=await store.readHead();assert.equal(await store.protectRecoverySource({expectedHash:head.hash,key:'cloud-generation-recovery:owner:synthetic-original',raw}),true);
+ assert.equal((await backend.CS.push('{"tasks":[{"id":"new-local-work"}]}',2,1)).ok,true);await provider.drain();
+ assert.equal((await F.getDocFromServer(F.doc(provider.db,'users','owner','recoveryProtections',id))).exists(),true,'ordinary publication must establish shared retention, rather than merely passing this device archive IDs to its own collector');
+ const unsupported=JSON.stringify({...JSON.parse(raw),version:2});
+ assert.equal(await store.protectRecoverySource({expectedHash:(await store.readHead()).hash,key:'cloud-generation-recovery:owner:unsupported-new-version',raw:unsupported}),true);
+ assert.equal((await backend.CS.push('{"tasks":[{"id":"held-until-understood"}]}',3,2)).error,true,'an unknown recovery archive version cannot omit unrecognized protection requirements');
+ assert.equal((await backend.CS.pull()).rev,2);assert.ok((await store.listOpaqueArchives()).some(row=>row.raw===unsupported));
+});
+
+test('RISK shared protection atomicity: marker creation cannot share a commit with source retirement (Firestore rules: retention atomicity)',{skip:!process.env.FIRESTORE_EMULATOR_HOST},async t=>{
+ const {initializeTestEnvironment,assertFails}=await import('@firebase/rules-unit-testing'),F=await import('firebase/firestore');
+ const env=await initializeTestEnvironment({projectId:'demo-retention-atomicity-253',firestore:{rules:fs.readFileSync(path.join(__dirname,'firestore.rules'),'utf8')}});t.after(()=>env.cleanup());await env.clearFirestore();
+ await env.withSecurityRulesDisabled(async context=>{const db=context.firestore();await F.setDoc(F.doc(db,'users','owner'),{schemaVersion:2,rev:3,activeGeneration:'current',previousGeneration:'previous',updatedAt:1});await F.setDoc(F.doc(db,'users','owner','generations','original'),{state:'published'});});
+ const db=env.authenticatedContext('owner').firestore(),batch=F.writeBatch(db);
+ batch.set(F.doc(db,'users','owner','recoveryProtections','original'),{v:1,rootRevision:3,createdAt:F.serverTimestamp()});
+ batch.update(F.doc(db,'users','owner','generations','original'),{state:'deleting',deletingAt:F.serverTimestamp()});
+ await assertFails(batch.commit());
+ assert.equal((await F.getDocFromServer(F.doc(db,'users','owner','generations','original'))).data().state,'published');
+});
+
+test('RISK shared protection evolution: ordinary saves retain old captures and refresh legitimate upload state changes (Firestore rules: retention evolution)',{skip:!process.env.FIRESTORE_EMULATOR_HOST},async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),{initializeTestEnvironment}=await import('@firebase/rules-unit-testing'),F=await import('firebase/firestore');
+ const env=await initializeTestEnvironment({projectId:'demo-retention-evolution-253',firestore:{rules:fs.readFileSync(path.join(__dirname,'firestore.rules'),'utf8')}});t.after(()=>env.cleanup());await env.clearFirestore();
+ const app=await loadApp({indexedDBProvider:new IDBFactory(),deviceDbName:'retention-evolution-'+Math.random()}),store=app.ctx.window.ScannerDeviceStore;
+ assert.equal(await app.ctx.persist(),true);const provider=retentionSDK253(F,env.authenticatedContext('owner').firestore()),backend=await loadCloudBackendV2({runtimeWindow:app.ctx.window,failures:{authPending:true},timeoutMs:15000,firebaseSDK:provider.sdk});t.after(async()=>{backend.CS.suspend();await app.dispose();});
+ assert.equal((await backend.CS.push('{"tasks":[]}',1,0)).ok,true);await provider.drain();
+ const pendingPayload='{"tasks":[{"id":"peer-pending","title":"Peer upload"}]}',encoded=await app.ctx.ChainStorageV2.encodeSnapshot(pendingPayload),id='pending-upload';
+ const {chunks,...header}=encoded;
+ await F.setDoc(F.doc(provider.db,'users','owner','generations',id),{...header,state:'staging',baseRev:1,createdAt:F.serverTimestamp()});
+ for(const chunk of chunks)await F.setDoc(F.doc(provider.db,'users','owner','generations',id,'chunks',String(chunk.index).padStart(8,'0')),{...chunk});
+ const capture=await backend.CS.readRecoverySource({pendingGenerationId:id}),raw=JSON.stringify({format:'chain-scanner.cloud-recovery-source',version:1,identity:capture.identity,manifest:capture.manifest,generations:capture.generations});
+ assert.equal(await store.protectRecoverySource({expectedHash:(await store.readHead()).hash,key:'cloud-generation-recovery:owner:evolving-original',raw}),true);
+ const peer=await loadCloudBackendV2({timeoutMs:15000,firebaseSDK:provider.sdk});t.after(()=>peer.CS.suspend());peer.pending.set('owner',{generationId:id,payloadHash:encoded.hash,baseRev:1,updatedAt:2});
+ assert.equal((await peer.CS.push(pendingPayload,2,1)).ok,true);await provider.drain();
+ assert.equal((await F.getDocFromServer(F.doc(provider.db,'users','owner','generations',id))).data().state,'published');
+ const result=await backend.CS.push('{"tasks":[{"id":"peer-pending","title":"Peer upload"},{"id":"local-next","title":"New durable work"}]}',3,2);
+ assert.equal(result.ok,true,'legitimate staging to published evolution refreshes retained evidence rather than freezing every later save');
+ const archives=await store.listOpaqueArchives();assert.ok(archives.some(row=>row.raw===raw),'the earlier exact capture remains immutable');
+ assert.ok(archives.some(row=>row.raw!==raw&&JSON.parse(row.raw).generations?.some(generation=>generation.id===id&&generation.header.state==='published')),'the refreshed exact capture is durably preserved separately');
+ const sourceChunkPath='users/owner/generations/'+id+'/chunks',readsBefore=provider.stats.reads.filter(path=>path===sourceChunkPath).length;
+ assert.equal((await backend.CS.push('{"tasks":[{"id":"peer-pending"},{"id":"another-local-edit"}]}',4,3)).ok,true);
+ assert.equal((await store.listOpaqueArchives()).length,archives.length,'later root rotations reuse the exact refreshed source instead of archiving it again for every edit');
+ assert.equal(provider.stats.reads.filter(path=>path===sourceChunkPath).length,readsBefore,'ordinary later edits verify immutable protection without redownloading the same protected original');
+});
+
+test('RISK shared protection destructive paths: existing markers stop old transitions and already-deleting byte removal (Firestore rules: retention deletion)',{skip:!process.env.FIRESTORE_EMULATOR_HOST},async t=>{
+ const {initializeTestEnvironment,assertFails}=await import('@firebase/rules-unit-testing'),F=await import('firebase/firestore');
+ const env=await initializeTestEnvironment({projectId:'demo-retention-deletion-253',firestore:{rules:fs.readFileSync(path.join(__dirname,'firestore.rules'),'utf8')}});t.after(()=>env.cleanup());await env.clearFirestore();
+ await env.withSecurityRulesDisabled(async context=>{const db=context.firestore();await F.setDoc(F.doc(db,'users','owner'),{schemaVersion:2,rev:3,activeGeneration:'current',previousGeneration:'previous',updatedAt:1});await F.setDoc(F.doc(db,'users','owner','generations','original'),{state:'published'});});
+ const db=env.authenticatedContext('owner').firestore(),header=F.doc(db,'users','owner','generations','original'),marker=F.doc(db,'users','owner','recoveryProtections','original'),chunk=F.doc(db,'users','owner','generations','original','chunks','00000000');
+ await F.setDoc(marker,{v:1,rootRevision:3,createdAt:F.serverTimestamp()});
+ await assertFails(F.updateDoc(header,{state:'deleting',deletingAt:F.serverTimestamp()}));
+ await env.withSecurityRulesDisabled(async context=>{const admin=context.firestore();await F.updateDoc(F.doc(admin,header.path),{state:'deleting',deletingAt:1});await F.setDoc(F.doc(admin,chunk.path),{index:0,text:'exact retained bytes'});});
+ await assertFails(F.deleteDoc(chunk));await assertFails(F.deleteDoc(header));
+ await assertFails(F.deleteDoc(marker));await assertFails(F.updateDoc(marker,{rootRevision:4}));
+ await assertFails(F.getDocFromServer(F.doc(env.authenticatedContext('stranger').firestore(),marker.path)));
+ await assertFails(F.getDocFromServer(F.doc(env.unauthenticatedContext().firestore(),marker.path)));
+ await assertFails(F.setDoc(F.doc(db,'users','owner','recoveryProtections','missing'),{v:1,rootRevision:3,createdAt:F.serverTimestamp()}));
+ assert.equal((await F.getDocFromServer(chunk)).data().text,'exact retained bytes');
+ const backend=await loadCloudBackendV2({timeoutMs:15000,firebaseSDK:retentionSDK253(F,db).sdk});t.after(()=>backend.CS.suspend());
+ const capture=await backend.CS.readRecoverySource({pendingGenerationId:'original'}),source={...capture,generations:capture.generations.filter(row=>row.id==='original')};
+ assert.equal((await backend.CS.protectRecoverySources({source})).error,true,'a definite deleting-source refusal cannot be reinterpreted as an uncertain successful mutation');
+});
+
+test('RISK shared protection uncertain outcomes: lost acknowledgement is read back without another mutation and stale authority stays held (Firestore rules: retention uncertainty)',{skip:!process.env.FIRESTORE_EMULATOR_HOST},async t=>{
+ const {initializeTestEnvironment}=await import('@firebase/rules-unit-testing'),F=await import('firebase/firestore');
+ const env=await initializeTestEnvironment({projectId:'demo-retention-uncertainty-253',firestore:{rules:fs.readFileSync(path.join(__dirname,'firestore.rules'),'utf8')}});t.after(()=>env.cleanup());await env.clearFirestore();
+ let loseAck=false,lost=0;const provider=retentionSDK253(F,env.authenticatedContext('owner').firestore(),{afterTransaction(){if(loseAck){lost++;throw Object.assign(Error('lost response'),{code:'unavailable'});}}});
+ const backend=await loadCloudBackendV2({timeoutMs:15000,firebaseSDK:provider.sdk});t.after(()=>backend.CS.suspend());
+ assert.equal((await backend.CS.push('{"tasks":[]}',1,0)).ok,true);await provider.drain();
+ const source=await backend.CS.readRecoverySource();loseAck=true;
+ const result=await backend.CS.protectRecoverySources({source});
+ assert.equal(result.ok,true,'server readback verifies the already committed immutable protection after a lost transaction response');assert.equal(lost,1,'there is no blind second mutation');loseAck=false;
+ assert.equal((await backend.CS.pull()).rev,1,'a protection receipt is not a new board acknowledgement');
+ assert.equal((await backend.CS.protectRecoverySources({source,expectedRevision:2})).conflict,true);
+ assert.equal((await backend.CS.protectRecoverySources({source:{...source,epoch:source.epoch+1}})).cancelled,true);
+ const stopped=new AbortController();stopped.abort();
+ assert.equal((await backend.CS.protectRecoverySources({source,readAttempt:{signal:stopped.signal,remainingMs:()=>60000,checkBudget(){},isCurrent:()=>true}})).cancelled,true);
+});
+
+test('RISK shared protection old rules: refused retention keeps independent durable device edits and the published root intact (Firestore rules: retention compatibility)',{skip:!process.env.FIRESTORE_EMULATOR_HOST},async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),{initializeTestEnvironment}=await import('@firebase/rules-unit-testing'),{SUPPORTED_RELEASE,readReleasedClient}=await import('./scripts/backward-compatibility.mjs'),F=await import('firebase/firestore');
+ const old=readReleasedClient(__dirname,SUPPORTED_RELEASE),env=await initializeTestEnvironment({projectId:'demo-retention-old-rules-253',firestore:{rules:old.rules}});t.after(()=>env.cleanup());await env.clearFirestore();
+ const app=await loadApp({indexedDBProvider:new IDBFactory(),deviceDbName:'old-rule-local-'+Math.random()}),store=app.ctx.window.ScannerDeviceStore;assert.equal(await app.ctx.persist(),true);
+ const provider=retentionSDK253(F,env.authenticatedContext('owner').firestore()),backend=await loadCloudBackendV2({runtimeWindow:app.ctx.window,failures:{authPending:true},timeoutMs:15000,firebaseSDK:provider.sdk});t.after(async()=>{backend.CS.suspend();await app.dispose();});
+ assert.equal((await backend.CS.push('{"tasks":[]}',1,0)).ok,true);await provider.drain();
+ const source=await backend.CS.readRecoverySource(),raw=JSON.stringify({format:'chain-scanner.cloud-recovery-source',version:1,identity:source.identity,manifest:source.manifest,generations:source.generations});
+ assert.equal(await store.protectRecoverySource({expectedHash:(await store.readHead()).hash,key:'cloud-generation-recovery:owner:old-rule-source',raw}),true);
+ app.ctx.addTask('Locally durable work while shared preservation is unavailable');assert.equal(await app.ctx.persist(),true);const local=await store.readHead();
+ assert.equal((await backend.CS.protectRecoverySources({source})).error,true);
+ assert.equal((await backend.CS.push(app.ctx.cloudPayload(),2,1)).error,true,'old rules cannot be bypassed by an ordinary edit publication');
+ assert.equal((await backend.CS.pull()).rev,1);assert.equal((await store.readHead()).payload,local.payload);assert.ok(local.payload.includes('Locally durable work while shared preservation is unavailable'));
+ assert.ok((await store.listOpaqueArchives()).some(row=>row.raw===raw));
+});
+
+test('RISK shared protection races: old retirement winning the commit prevents a false protection receipt (Firestore rules: retention race)',{skip:!process.env.FIRESTORE_EMULATOR_HOST},async t=>{
+ const {initializeTestEnvironment,assertFails}=await import('@firebase/rules-unit-testing'),F=await import('firebase/firestore');
+ const env=await initializeTestEnvironment({projectId:'demo-retention-race-253',firestore:{rules:fs.readFileSync(path.join(__dirname,'firestore.rules'),'utf8')}});t.after(()=>env.cleanup());await env.clearFirestore();
+ const db=env.authenticatedContext('owner').firestore();let target=null,injected=false;
+ const provider=retentionSDK253(F,db,{beforeProtectionCommit:async()=>{if(!injected){injected=true;await F.updateDoc(target,{state:'deleting',deletingAt:F.serverTimestamp()});}}}),backend=await loadCloudBackendV2({timeoutMs:15000,firebaseSDK:provider.sdk});t.after(()=>backend.CS.suspend());
+ assert.equal((await backend.CS.push('{"tasks":[{"id":"original"}]}',1,0)).ok,true);await provider.drain();
+ const source=await backend.CS.readRecoverySource(),id=source.manifest.activeGeneration;target=F.doc(db,'users','owner','generations',id);
+ await env.withSecurityRulesDisabled(async context=>{const admin=context.firestore();await F.updateDoc(F.doc(admin,'users','owner'),{rev:3,activeGeneration:'current',previousGeneration:'previous'});});
+ const refused=await backend.CS.protectRecoverySources({source,expectedRevision:3});
+ assert.equal(injected,true);assert.equal(refused.error,true);assert.equal((await F.getDocFromServer(F.doc(db,'users','owner','recoveryProtections',id))).exists(),false);
+ await env.withSecurityRulesDisabled(context=>F.updateDoc(F.doc(context.firestore(),target.path),{state:'published'}));
+ const fresh=await backend.CS.readRecoverySource({pendingGenerationId:id}),onlyOriginal={...fresh,generations:fresh.generations.filter(row=>row.id===id)};
+ assert.equal((await backend.CS.protectRecoverySources({source:onlyOriginal})).ok,true,'a fresh current-source check can acquire protection when retirement has not already won');
+ await assertFails(F.updateDoc(target,{state:'deleting',deletingAt:F.serverTimestamp()}));
+ await env.withSecurityRulesDisabled(context=>F.deleteDoc(F.doc(context.firestore(),target.path,'chunks','00000000')));
+ assert.equal((await backend.CS.protectRecoverySources({source:onlyOriginal})).conflict,true,'a marker cannot recreate bytes missing before final readback');
+});
+
+test('RISK shared protection budget: source readback spends the original recovery budget and cancellation cannot become board acknowledgement (Firestore rules: retention budget)',{skip:!process.env.FIRESTORE_EMULATOR_HOST},async t=>{
+ const {initializeTestEnvironment}=await import('@firebase/rules-unit-testing'),F=await import('firebase/firestore');
+ const env=await initializeTestEnvironment({projectId:'demo-retention-budget-253',firestore:{rules:fs.readFileSync(path.join(__dirname,'firestore.rules'),'utf8')}});t.after(()=>env.cleanup());await env.clearFirestore();
+ const provider=retentionSDK253(F,env.authenticatedContext('owner').firestore());let blocked=false,release;const gate=new Promise(resolve=>release=resolve),read=provider.sdk.getDocFromServer;
+ provider.sdk.getDocFromServer=async reference=>{if(blocked&&reference.path.includes('/recoveryProtections/'))await gate;return read(reference);};
+ const backend=await loadCloudBackendV2({timeoutMs:15000,firebaseSDK:provider.sdk});t.after(async()=>{release();backend.CS.suspend();await provider.drain();});
+ assert.equal((await backend.CS.push('{"tasks":[]}',1,0)).ok,true);await provider.drain();const source=await backend.CS.readRecoverySource();
+ const started=Date.now(),controller=new AbortController(),attempt={signal:controller.signal,remainingMs:()=>Math.max(0,50-(Date.now()-started)),checkBudget(){if(this.remainingMs()<=0)throw Object.assign(Error('original recovery budget exhausted'),{code:'deadline-exceeded'});},isCurrent:()=>true};blocked=true;
+ const result=await backend.CS.protectRecoverySources({source,readAttempt:attempt});
+ assert.equal(result.error,true);assert.equal(result.code,'deadline-exceeded');assert.ok(Date.now()-started<1000,'source verification cannot inherit a fresh ordinary network deadline');
+ controller.abort();assert.equal((await backend.CS.protectRecoverySources({source,readAttempt:attempt})).cancelled,true);release();await provider.drain();
+ assert.equal((await backend.CS.pull()).rev,1,'even a late immutable protection commit cannot acknowledge or publish a board');
+});
+
+test('RISK shared protection history: an exact completed legacy source choice does not reblock healthy new edits',async t=>{
+ const {readReleasedClient}=await import('./scripts/backward-compatibility.mjs'),artifacts=readReleasedClient(__dirname,'4f1d6bdc9ff6ca8a2a2294e34022ad01118a3d5f');
+ const app=await divergentCloudSourceApp187(t,{artifacts}),{ctx,backend}=app,store=ctx.window.ScannerDeviceStore;
+ assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);assert.equal(await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'device'}}),true);assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),true);
+ const archives=await store.listOpaqueArchives(),confirmed=(await store.listBackups()).filter(row=>row.kind==='decision-recovery-confirmed');assert.ok(archives.length);assert.equal(confirmed.length,1,'the actual historical native recovery completed its exact durable confirmation receipt');
+ const peer=await loadCloudBackendV2({artifacts,timeoutMs:5000});t.after(()=>peer.CS.suspend());for(const [key,value]of backend.docs)peer.docs.set(key,value);
+ for(let i=0;i<2;i++){const remote=await peer.CS.pull();assert.equal((await peer.CS.push(remote.payload,100+i,remote.rev)).ok,true);for(let n=0;n<40;n++)await flush();}
+ const oldIds=JSON.parse(archives[0].raw).generations.map(row=>row.id);assert.ok(oldIds.every(id=>!peer.docs.has('users/owner/generations/'+id)),'the independent legacy collector really removed the old shared generations before this feature');
+ await app.dispose();backend.CS.suspend();
+ const cold=await loadAppAtTime(1792323000000,{sharedStorage:app.shim.localStorage,indexedDBProvider:app.indexedDB,deviceDbName:app.deviceDbName});t.after(()=>cold.dispose());
+ const current=await loadCloudBackendV2({runtimeWindow:cold.ctx.window,failures:{authPending:true},timeoutMs:5000});t.after(()=>current.CS.suspend());for(const [key,value]of peer.docs)current.docs.set(key,value);
+ current.emitAuth({uid:'owner',email:'e@example.com'});await cold.ctx.cloudPull();await settleRecoveryOperations188(cold.ctx);const prior=current.docs.get('users/owner').rev;
+ cold.shim.document.getElementById('addInput').value='Healthy new work after completed legacy recovery';await cold.ctx.onAction('add',{});assert.equal(await cold.ctx.persist(),true);await cold.ctx.sendPush();await syncSettle(40);
+ assert.ok(current.docs.get('users/owner').rev>prior,'an exact completed legacy choice cannot make every healthy future ordinary save pending again');
+ const saved=await cold.ctx.window.ScannerDeviceStore.listOpaqueArchives();for(const archive of archives)assert.ok(saved.some(row=>row.key===archive.key&&row.raw===archive.raw),'completed historical originals stay exact locally');
+});
+
+test('RISK shared protection historical absence: healthy ordinary saves keep lost legacy evidence flagged without claiming its recovery',async t=>{
+ const {readReleasedClient}=await import('./scripts/backward-compatibility.mjs'),artifacts=readReleasedClient(__dirname,'4f1d6bdc9ff6ca8a2a2294e34022ad01118a3d5f');
+ const app=await damagedAcknowledgedApp187(t,{artifacts}),{backend,ctx}=app;await ctx.cloudPull();await ctx.sendPush();await settleRecovery188(app);
+ const store=ctx.window.ScannerDeviceStore,archives=await store.listOpaqueArchives();assert.ok(archives.length);assert.equal((await store.listBackups()).filter(row=>row.kind==='decision-recovery-confirmed').length,0,'automatic legacy repair provides no deliberate-choice completion receipt');
+ const peer=await loadCloudBackendV2({artifacts,timeoutMs:5000});t.after(()=>peer.CS.suspend());for(const [key,value]of backend.docs)peer.docs.set(key,value);
+ for(let i=0;i<2;i++){const remote=await peer.CS.pull();assert.equal((await peer.CS.push(remote.payload,200+i,remote.rev)).ok,true);for(let n=0;n<40;n++)await flush();}
+ const oldIds=JSON.parse(archives[0].raw).generations.map(row=>row.id),provider=peer.docs;
+ assert.ok(oldIds.every(id=>!provider.has('users/owner/generations/'+id)&&![...provider.keys()].some(key=>key.startsWith('users/owner/generations/'+id+'/chunks/'))),'both old headers and chunks were already absent before the upgraded ordinary save');
+ await app.dispose();backend.CS.suspend();
+ const cold=await loadAppAtTime(1792323000000,{sharedStorage:app.shim.localStorage,indexedDBProvider:app.indexedDB,deviceDbName:app.deviceDbName});t.after(()=>cold.dispose());
+ const currentFaults={authPending:true},current=await loadCloudBackendV2({runtimeWindow:cold.ctx.window,failures:currentFaults,timeoutMs:5000});t.after(()=>current.CS.suspend());for(const [key,value]of provider)current.docs.set(key,value);
+ current.emitAuth({uid:'owner',email:'e@example.com'});await cold.ctx.cloudPull();await settleRecoveryOperations188(cold.ctx);const prior=current.docs.get('users/owner').rev;
+ assert.equal(cold.ctx.state.decisionBase.revision,prior,'the current healthy complete board has actual accepted read authority');
+ cold.shim.document.getElementById('addInput').value='Independent safe work beside absent historical evidence';await cold.ctx.onAction('add',{});assert.equal(await cold.ctx.persist(),true);await cold.ctx.sendPush();await syncSettle(40);
+ assert.ok(current.docs.get('users/owner').rev>prior,'this ordinary write retires no last shared reference to any already absent historical source');
+ assert.equal(current.CS.recoveryRetentionPending,true,'the successful new-board acknowledgement does not declare absent historical data recovered');
+ const saved=await cold.ctx.window.ScannerDeviceStore.listOpaqueArchives();for(const archive of archives)assert.ok(saved.some(row=>row.key===archive.key&&row.raw===archive.raw));
+ const capture=JSON.parse(archives[0].raw);assert.equal((await current.CS.protectRecoverySources({source:{...capture,epoch:(await current.CS.recoveryEvidence()).epoch},expectedRevision:current.docs.get('users/owner').rev})).error,true,'required recovery-source protection remains fail-closed for absent data');
+ const root=current.docs.get('users/owner'),localStore=cold.ctx.window.ScannerDeviceStore,oldId=oldIds[0],oldPath='users/owner/generations/'+oldId;
+ const ordinary=()=>current.CS.push(cold.ctx.cloudPayload(),300,root.rev);
+ const livePending={generationId:oldId,payloadHash:'a'.repeat(64),baseRev:root.rev,updatedAt:1};
+ await localStore.setPendingUpload('owner',livePending);assert.equal((await ordinary()).error,true,'a currently live pending generation cannot use historical absence');assert.equal((await localStore.getPendingUpload('owner')).generationId,oldId);await localStore.clearPendingUpload('owner',oldId);
+ current.docs.set('users/owner',{...root,previousGeneration:oldId});assert.equal((await ordinary()).error,true,'a missing generation still named by a root slot is required evidence');current.docs.set('users/owner',root);
+ current.docs.set(oldPath+'/chunks/00000000',{index:0,text:'remaining readable historical bytes'});assert.equal((await ordinary()).error,true,'header absence alone cannot hide surviving original chunks');current.docs.delete(oldPath+'/chunks/00000000');
+ const decisionBase=cold.ctx.state.decisionBase;cold.ctx.state.decisionBase={...decisionBase,payload:'unvalidated source'};assert.equal((await ordinary()).error,true,'a healthy-looking root is insufficient without the exact current accepted decision base');cold.ctx.state.decisionBase=decisionBase;
+ await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>tx.objectStore('meta').put({identity:'owner',account:'e@example.com',headHash:'protected'},'recoveryCloudHold'));await cold.ctx.window.refreshScannerDeviceRecoveryHold();
+ assert.equal((await ordinary()).error,true,'a still-binding device recovery hold cannot use the ordinary-save capability');
+ assert.equal(current.docs.get('users/owner').rev,root.rev,'every missing-current, pending, remaining-byte and authority control stays before publication');
+ let revoked=false,readsAfterRevocation=0;currentFaults.serverRead=async path=>{if(revoked)readsAfterRevocation++;if(path.includes('/recoveryProtections/')){revoked=true;current.CS.suspend();}};
+ assert.equal((await ordinary()).cancelled,true);delete currentFaults.serverRead;
+ assert.equal(readsAfterRevocation,0,'revoked protection authority cannot start dependent historical-source checks');
+
+});
+
+test('RISK shared protection cancellation: a stopped transaction cannot start dependent source-marker reads',async t=>{
+ const faults={},backend=await loadCloudBackendV2({timeoutMs:5000,failures:faults});t.after(()=>backend.CS.suspend());assert.equal((await backend.CS.push('{"tasks":[]}',1,0)).ok,true);for(let n=0;n<25;n++)await flush();
+ const source=await backend.CS.readRecoverySource();let entered=false,revoked=false,afterRevocation=0,release;const gate=new Promise(resolve=>release=resolve);
+ faults.transactionRead=async path=>{if(revoked)afterRevocation++;if(path.includes('/generations/')){entered=true;await gate;}};
+ const protecting=backend.CS.protectRecoverySources({source});await fixtureDeadline((async()=>{while(!entered)await flush();})(),'native protection transaction reaches its actual external header read');
+ revoked=true;backend.CS.suspend();release();assert.equal((await protecting).cancelled,true);for(let n=0;n<10;n++)await flush();
+ assert.equal(afterRevocation,0,'headers and markers must share their original read phase; cancellation forbids a dependent marker request');
+});
+
+test('RISK shared protection absent-root authority: retained orphan sources lock only under verified unchanged root absence (Firestore rules: retention empty root)',{skip:!process.env.FIRESTORE_EMULATOR_HOST},async t=>{
+ const {initializeTestEnvironment,assertFails}=await import('@firebase/rules-unit-testing'),F=await import('firebase/firestore');
+ const env=await initializeTestEnvironment({projectId:'demo-retention-empty-root-253',firestore:{rules:fs.readFileSync(path.join(__dirname,'firestore.rules'),'utf8')}});t.after(()=>env.cleanup());await env.clearFirestore();
+ const provider=retentionSDK253(F,env.authenticatedContext('owner').firestore()),backend=await loadCloudBackendV2({timeoutMs:15000,firebaseSDK:provider.sdk});t.after(()=>backend.CS.suspend());
+ const encoded=await loadStorageV2().encodeSnapshot('{"tasks":[]}'),{chunks,...header}=encoded;
+ for(const id of ['orphan','batch-orphan','stale-orphan']){
+  await F.setDoc(F.doc(provider.db,'users','owner','generations',id),{...header,state:'staging',baseRev:0,createdAt:F.serverTimestamp()});
+  for(const chunk of chunks)await F.setDoc(F.doc(provider.db,'users','owner','generations',id,'chunks',String(chunk.index).padStart(8,'0')),{...chunk});
+ }
+ const source=await backend.CS.readRecoverySource({pendingGenerationId:'orphan'});
+ assert.equal((await backend.CS.protectRecoverySources({source,expectedRevision:0})).ok,true,'positive root absence may protect existing orphan bytes without seeding a board');
+ assert.equal((await F.getDocFromServer(F.doc(provider.db,'users','owner'))).exists(),false);
+ assert.equal((await F.getDocFromServer(F.doc(provider.db,'users','owner','recoveryProtections','orphan'))).data().rootRevision,0);
+ const empty=await backend.CS.readRecoverySource();assert.equal((await backend.CS.protectRecoverySources({source:empty,expectedRevision:0})).ok,true);
+ const batch=F.writeBatch(provider.db);batch.set(F.doc(provider.db,'users','owner','recoveryProtections','batch-orphan'),{v:1,rootRevision:0,createdAt:F.serverTimestamp()});batch.set(F.doc(provider.db,'users','owner'),{payload:'{"tasks":[]}',updatedAt:1,rev:1,serverUpdatedAt:F.serverTimestamp()});await assertFails(batch.commit());
+ const stale=await backend.CS.readRecoverySource({pendingGenerationId:'stale-orphan'});
+ await F.setDoc(F.doc(provider.db,'users','owner'),{payload:'{"tasks":[{"id":"peer"}]}',updatedAt:1,rev:1,serverUpdatedAt:F.serverTimestamp()});
+ assert.equal((await backend.CS.protectRecoverySources({source:stale,expectedRevision:0})).conflict,true,'a newly present legacy root is distinct from the old empty authority');
+ assert.equal((await F.getDocFromServer(F.doc(provider.db,'users','owner','recoveryProtections','stale-orphan'))).exists(),false);
+ await env.withSecurityRulesDisabled(context=>F.deleteDoc(F.doc(context.firestore(),'users','owner')));
+ let createdDuringProtection=false;const racingProvider=retentionSDK253(F,provider.db,{beforeProtectionCommit:async()=>{if(!createdDuringProtection){createdDuringProtection=true;await F.setDoc(F.doc(provider.db,'users','owner'),{payload:'{"tasks":[]}',updatedAt:1,rev:1,serverUpdatedAt:F.serverTimestamp()});}}});
+ const racingBackend=await loadCloudBackendV2({timeoutMs:15000,firebaseSDK:racingProvider.sdk});t.after(()=>racingBackend.CS.suspend());
+ const racingSource=await racingBackend.CS.readRecoverySource({pendingGenerationId:'stale-orphan'});
+ const raced=await racingBackend.CS.protectRecoverySources({source:racingSource,expectedRevision:0});assert.ok(raced.conflict||raced.error,'the actual SDK/rules must reject a root created after its empty read, whether conflict or commit-time permission denial wins');
+ assert.equal(createdDuringProtection,true);assert.equal((await F.getDocFromServer(F.doc(provider.db,'users','owner','recoveryProtections','stale-orphan'))).exists(),false);
+ const {SUPPORTED_RELEASE,readReleasedClient}=await import('./scripts/backward-compatibility.mjs'),old=readReleasedClient(__dirname,SUPPORTED_RELEASE),oldEnv=await initializeTestEnvironment({projectId:'demo-retention-empty-old-rules-253',firestore:{rules:old.rules}});t.after(()=>oldEnv.cleanup());await oldEnv.clearFirestore();
+ const oldDb=oldEnv.authenticatedContext('owner').firestore();await F.setDoc(F.doc(oldDb,'users','owner','generations','old-orphan'),{...header,state:'staging',baseRev:0,createdAt:F.serverTimestamp()});
+ for(const chunk of chunks)await F.setDoc(F.doc(oldDb,'users','owner','generations','old-orphan','chunks',String(chunk.index).padStart(8,'0')),{...chunk});
+ const refusedBackend=await loadCloudBackendV2({timeoutMs:15000,firebaseSDK:retentionSDK253(F,oldDb).sdk});t.after(()=>refusedBackend.CS.suspend());
+ const oldSource=await refusedBackend.CS.readRecoverySource({pendingGenerationId:'old-orphan'});assert.equal((await refusedBackend.CS.protectRecoverySources({source:oldSource,expectedRevision:0})).error,true,'old rules cannot acknowledge retention of existing orphan bytes');
+ assert.equal((await F.getDocFromServer(F.doc(oldDb,'users','owner'))).exists(),false);
+ await env.withSecurityRulesDisabled(context=>F.deleteDoc(F.doc(context.firestore(),'users','owner')));
+ const {IDBFactory}=await import('fake-indexeddb'),app=await loadApp({indexedDBProvider:new IDBFactory(),deviceDbName:'empty-state-evolution-'+Math.random()});t.after(()=>app.dispose());assert.equal(await app.ctx.persist(),true);
+ const publishing=await loadCloudBackendV2({runtimeWindow:app.ctx.window,failures:{authPending:true},timeoutMs:15000,firebaseSDK:provider.sdk});t.after(()=>publishing.CS.suspend());
+ const beforeSeal=await publishing.CS.readRecoverySource({pendingGenerationId:'batch-orphan'}),raw=JSON.stringify({format:'chain-scanner.cloud-recovery-source',version:1,identity:beforeSeal.identity,manifest:beforeSeal.manifest,generations:beforeSeal.generations}),store=app.ctx.window.ScannerDeviceStore;
+ assert.equal(await store.protectRecoverySource({expectedHash:(await store.readHead()).hash,key:'cloud-generation-recovery:owner:empty-state-original',raw}),true);
+ await F.updateDoc(F.doc(provider.db,'users','owner','generations','batch-orphan'),{state:'sealed',sealedAt:F.serverTimestamp()});
+ assert.equal((await publishing.CS.push('{"tasks":[]}',1,0)).ok,true,'a legitimate orphan upload state change can refresh and protect its sources before the later ordinary absent-root CAS');
+ assert.ok((await store.listOpaqueArchives()).some(row=>row.raw===raw));
+
+
+});
+
+test('RISK shared protection changed originals: deliberate current recovery selects exact server capture independently of archive order',async t=>{
+ for(const order of ['old-first','current-first','changed-after-preview'])await t.test(order,async sub=>{
+  const app=await damagedAcknowledgedApp187(sub),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+  app.faults.push=Object.assign(Error('offline rebuild'),{code:'unavailable'});await ctx.cloudPull();await settleRecoveryOperations188(ctx);delete app.faults.push;
+  const before=await store.listOpaqueArchives(),originals=before.filter(row=>row.key.startsWith('cloud-generation-recovery:'));
+  assert.ok(originals.length);const sourcePath='users/owner/generations/'+originalRoot.activeGeneration;
+  backend.docs.set(sourcePath,{...backend.docs.get(sourcePath),hash:'f'.repeat(64)});await ctx.cloudPull();
+  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'device'}});
+  const list=store.listOpaqueArchives.bind(store);store.listOpaqueArchives=async()=>{const rows=await list();return order==='current-first'?rows.reverse():rows;};
+  if(order==='changed-after-preview')backend.docs.set(sourcePath,{...backend.docs.get(sourcePath),hash:'e'.repeat(64)});
+  const revision=backend.docs.get('users/owner').rev,result=await ctx.onAction('apply-cloud-source-recovery',{});
+  if(order==='changed-after-preview'){
+   assert.equal(result,false,'a source change after current consent still revokes publication');assert.equal(backend.docs.get('users/owner').rev,revision);
+  }else{
+   assert.equal(result,true,'a verified current capture can preserve the changed source before the deliberate publication regardless of archive ordering');
+   assert.equal(backend.CS.recoveryRetentionPending,true,'retaining current bytes does not resolve the older differing original');
+   assert.ok(backend.docs.has('users/owner/recoveryProtections/'+originalRoot.activeGeneration));
+   const rows=await list();assert.ok(rows.some(row=>row.key.startsWith('cloud-generation-recovery:')&&JSON.parse(row.raw).generations.some(generation=>generation.id===originalRoot.activeGeneration&&generation.header.hash==='f'.repeat(64))));
+  }
+  const after=await list();for(const row of originals)assert.ok(after.some(saved=>saved.key===row.key&&saved.raw===row.raw),'every historical raw archive stays exact');
+ });
+});

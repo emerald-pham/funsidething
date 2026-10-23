@@ -77,12 +77,17 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly(['v', 'rootRevision', 'createdAt'])
           && request.resource.data.v == 1
           && request.resource.data.rootRevision is int
-          && request.resource.data.rootRevision > 0
+          && request.resource.data.rootRevision >= 0
           && request.resource.data.createdAt == request.time
-          && exists(userPath()) && get(userPath()).data.schemaVersion == 2
-          && get(userPath()).data.rev == request.resource.data.rootRevision
+          && (request.resource.data.rootRevision == 0
+            ? !exists(userPath()) && !existsAfter(userPath())
+            : exists(userPath()) && get(userPath()).data.schemaVersion == 2
+              && get(userPath()).data.rev == request.resource.data.rootRevision)
           && exists(generationPath(generationId))
-          && get(generationPath(generationId)).data.state in ['staging', 'sealed', 'published'];
+          && get(generationPath(generationId)).data.state in ['staging', 'sealed', 'published']
+          // A batch cannot acquire a marker using the old header while
+          // retiring that same source in the resulting atomic state.
+          && getAfter(generationPath(generationId)).data.state in ['staging', 'sealed', 'published'];
         allow update, delete: if false;
       }
 
