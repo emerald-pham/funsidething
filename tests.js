@@ -2147,15 +2147,41 @@ async function inspectCompleteSource230(t,{page,remote,receivedRaw,browser,engin
   t.diagnostic('Native complete-source consumer: '+engine+' '+browser.version()+', '+width+'x844, '+Buffer.byteLength(receivedRaw)+' source bytes, '+(shortValues?'byte-matched short values':'long scalar')+'. No physical-device or production-account proof.');
 }
 
+async function waitForNativeHistoryAck226(page,owner){
+ const completion=item=>{
+  const read=item.read,fail=reason=>({ok:false,reason,serial:read.serial,deadline:item.deadline});
+  if(window.CloudSync!==read.backend||read.backend.user!==read.account||cloudAccountIdentity()!==read.identity)return fail('identity-changed');
+  if(cloudSourceRecoverySerial!==read.serial)return fail('superseded');
+  if(item.controller!==read.controller||read.controller.signal.aborted||performance.now()>=item.deadline)return fail(read.controller.signal.reason?.code||'original-deadline');
+  const acknowledged=automaticCloudSourceResumeStatus.state==='acknowledged';
+  if(automaticCloudSourceResumeStatus.state==='stopped')return fail('stopped:'+automaticCloudSourceResumeStatus.reason);
+  if(acknowledged&&!cloudSourceRecoveryBusy&&!pulling&&
+    (cloudSourceRecoveryRead===read||cloudSourceRecoveryRead===null))return {ok:true,serial:read.serial,deadline:item.deadline,completedAt:performance.now(),cleanedUp:cloudSourceRecoveryRead===null};
+  if(cloudSourceRecoveryRead!==read&&!(cloudSourceRecoveryRead===null&&acknowledged))return fail('owner-ended-before-ack');
+  return false;
+ };
+ // Completed/stale owners are terminal observations even after their old deadline.
+ const immediate=await page.evaluate(completion,owner);if(immediate)return immediate;
+ const remaining=await page.evaluate(item=>item.deadline-performance.now(),owner);
+ if(remaining<=0)return {ok:false,reason:'original-deadline'};
+ const result=await page.waitForFunction(completion,owner,{timeout:Math.max(1,Math.floor(remaining))});
+ try{return await result.jsonValue();}finally{await result.dispose();}
+}
+
 async function runNativeRecoveryInspection226(t,width=390,holdDemoted=false,completeSource=null,automaticView=null){
  const playwright=await import('playwright'),engine=(completeSource||automaticView)?(process.env.CHAIN_RECOVERY_TEST_ENGINE||'chromium'):'chromium';assert.ok(['chromium','webkit'].includes(engine),'the native source consumer uses an existing supported engine');
  const sdk=await import('./scripts/installed-client-fixture.mjs'),browser=await playwright[engine].launch({headless:true}),context=await browser.newContext({viewport:{width,height:844},serviceWorkers:'block',reducedMotion:'reduce'}),page=await context.newPage();
  const current=deferredSyncFixture(),previous=deferredSyncFixture(),finalRoot=deferredSyncFixture(),freshFinalRoot=deferredSyncFixture(),demoted=deferredSyncFixture(),raw=JSON.stringify({...sdk.fixture('reconcile-held'),...(automaticView?{settings:{...sdk.fixture('reconcile-held').settings,theme:automaticView.theme}}:{})}),encoded=await loadStorageV2().encodeSnapshot(raw),{chunks,...header}=encoded,remote=new Map([['users/owner',{schemaVersion:2,rev:4,activeGeneration:'held-current',previousGeneration:'received-previous'}],['users/owner/generations/held-current',{...header,hash:'f'.repeat(64),state:'published',baseRev:3}],['users/owner/generations/received-previous',{...header,state:'published',baseRev:2}],...chunks.map(c=>['users/owner/generations/received-previous/chunks/'+String(c.index).padStart(8,'0'),c])]);
  if(automaticView){remote.set('users/owner/generations/held-current',{...header,state:'published',baseRev:3});for(const chunk of chunks)remote.set('users/owner/generations/held-current/chunks/'+chunk.index,chunk);}
  let publicationAllowed=false,historyArmed=false,historyEntered=false;const historyGate=deferredSyncFixture();
+ const boundedAck={armed:false,enteredAt:null,deliveredAt:null,observation:null},boundedAckDelivered=deferredSyncFixture();let boundedAckTimer=null,boundedAckOwner=null;const nativeHistoryOwners=[];
  const origin='https://recovery-inspection.invalid',prefix='/synthetic-sdk/';let armed=false,previousEntered=false,freshFinalEntered=false,demotedEntered=false,roots=0;
- t.after(async()=>{try{await page.evaluate(()=>{closeModal();window.__releaseNativeRetry?.();});}catch{}current.resolve();previous.resolve();finalRoot.resolve();freshFinalRoot.resolve();demoted.resolve();historyGate.resolve();await context.close();await browser.close();});
- await context.exposeBinding('__installedRPC',async(_,kind,args)=>{const key=args?.[0];if(historyArmed&&kind==='get'&&key==='users/owner/generations/held-current'){historyEntered=true;await historyGate.promise;}if(armed&&kind==='get'&&key==='users/owner'&&++roots>1){await finalRoot.promise;if(roots===4){freshFinalEntered=true;await freshFinalRoot.promise;}}if(armed&&kind==='list'&&key.endsWith('/held-current/chunks')){await current.promise;if(holdDemoted&&roots>=3){demotedEntered=true;await demoted.promise;}}if(armed&&kind==='list'&&key.endsWith('/received-previous/chunks')){previousEntered=true;await previous.promise;}if(kind==='get')return structuredClone(remote.get(key)??null);if(kind==='list')return [...remote].filter(([id])=>id.startsWith(key+'/'));if(kind==='apply'){if(!automaticView)throw Error('Unexpected recovery inspection write');if(!publicationAllowed)return {fixtureFailure:'permission-denied'};for(const [op,id,value]of args[0]){if(op==='delete')remote.delete(id);else remote.set(id,op==='update'?{...remote.get(id),...structuredClone(value)}:structuredClone(value));}return true;}throw Error('Unexpected fixture RPC');});
+ t.after(async()=>{if(boundedAckTimer)await boundedAckDelivered.promise;if(boundedAckOwner)await boundedAckOwner.dispose();for(const owner of nativeHistoryOwners)await owner.dispose();if(automaticView?.boundedAck&&process.env.CHAIN_RECOVERY_UI_OUTPUT){fs.mkdirSync(process.env.CHAIN_RECOVERY_UI_OUTPUT,{recursive:true});fs.writeFileSync(path.join(process.env.CHAIN_RECOVERY_UI_OUTPUT,automaticView.theme+'-'+width+'-bounded-ack.json'),JSON.stringify(boundedAck,null,2));}try{await page.evaluate(()=>{closeModal();window.__releaseNativeRetry?.();});}catch{}current.resolve();previous.resolve();finalRoot.resolve();freshFinalRoot.resolve();demoted.resolve();historyGate.resolve();await context.close();await browser.close();});
+ await context.exposeBinding('__installedRPC',async(_,kind,args)=>{const key=args?.[0];if(boundedAck.armed&&kind==='get'&&key==='users/owner/generations/held-current'){
+  boundedAck.armed=false;boundedAck.enteredAt=Date.now();boundedAckOwner=await page.evaluateHandle(()=>window.__nativeHistoryBudget());
+  boundedAckTimer=setTimeout(async()=>{try{boundedAck.observation=await page.evaluate(owner=>({sameRead:cloudSourceRecoveryRead===owner.read,sameController:cloudSourceRecoveryRead?.controller===owner.controller,serial:cloudSourceRecoveryRead?.serial,originalSerial:owner.read.serial,deadline:owner.deadline,deadlineUnchanged:window.__nativeHistoryBudget()===owner,remaining:owner.deadline-performance.now(),state:automaticCloudSourceResumeStatus.state,aborted:owner.controller.signal.aborted}),boundedAckOwner);boundedAck.deliveredAt=Date.now();}catch(error){boundedAck.error=String(error);}finally{boundedAckTimer=null;boundedAckDelivered.resolve();}},16000);
+  await boundedAckDelivered.promise;
+ }if(historyArmed&&kind==='get'&&key==='users/owner/generations/held-current'){historyEntered=true;await historyGate.promise;}if(armed&&kind==='get'&&key==='users/owner'&&++roots>1){await finalRoot.promise;if(roots===4){freshFinalEntered=true;await freshFinalRoot.promise;}}if(armed&&kind==='list'&&key.endsWith('/held-current/chunks')){await current.promise;if(holdDemoted&&roots>=3){demotedEntered=true;await demoted.promise;}}if(armed&&kind==='list'&&key.endsWith('/received-previous/chunks')){previousEntered=true;await previous.promise;}if(kind==='get')return structuredClone(remote.get(key)??null);if(kind==='list')return [...remote].filter(([id])=>id.startsWith(key+'/'));if(kind==='apply'){if(!automaticView)throw Error('Unexpected recovery inspection write');if(!publicationAllowed)return {fixtureFailure:'permission-denied'};for(const [op,id,value]of args[0]){if(op==='delete')remote.delete(id);else remote.set(id,op==='update'?{...remote.get(id),...structuredClone(value)}:structuredClone(value));}return true;}throw Error('Unexpected fixture RPC');});
  await context.addInitScript(sdk.browserInit,{dbName:'native-inspection-'+Math.random(),authMode:'reconcile-held',sdkBase:origin+prefix});
  if(automaticView?.history)await context.addInitScript(()=>{
   const schedule=window.setTimeout.bind(window),cancel=window.clearTimeout.bind(window);let overall=null,held=null,used=false;
@@ -2169,6 +2195,7 @@ async function runNativeRecoveryInspection226(t,width=390,holdDemoted=false,comp
    return schedule(callback,delay,...args);
   };
   window.clearTimeout=token=>{if(held?.token===token)held.cancelled=true;return cancel(token);};
+  window.__nativeHistoryBudget=()=>overall;
   window.__nativeRetryReady=()=>!!held?.ready;
   window.__releaseNativeRetry=()=>{
    const item=held;if(!item)return null;held=null;cancel(item.token);
@@ -2216,16 +2243,28 @@ async function runNativeRecoveryInspection226(t,width=390,holdDemoted=false,comp
    await capture('checking',/Checking an earlier saved cloud source/);
    const ownedRead=await page.evaluateHandle(()=>cloudSourceRecoveryRead);try{await page.locator('[data-act="help"]').first().click();await page.locator('#modalRoot [data-act="close-modal"]').first().click();assert.equal(await page.evaluate(read=>cloudSourceRecoveryRead===read&&!read.controller.signal.aborted,ownedRead),true,'closing ordinary Help preserves the same bounded automatic source read');}finally{await ownedRead.dispose();}
    remote.set('users/owner/generations/held-current',{...currentHeader,schemaVersion:99});historyArmed=false;historyGate.resolve();
-   await page.waitForFunction(()=>automaticCloudSourceResumeStatus.state==='stopped'&&!cloudSourceRecoveryBusy,{},{timeout:10000});await capture('stopped',/earlier cloud source remains unresolved and protected/i);
+   await page.waitForFunction(()=>automaticCloudSourceResumeStatus.state==='stopped'&&!cloudSourceRecoveryBusy,{},{timeout:10000});
+   const stoppedOwner=await page.evaluateHandle(()=>window.__nativeHistoryBudget());nativeHistoryOwners.push(stoppedOwner);
+   const stoppedCompletion=await waitForNativeHistoryAck226(page,stoppedOwner);assert.equal(stoppedCompletion.ok,false);assert.match(stoppedCompletion.reason,/^stopped:/,'an actual unsupported source cannot be waited into confirmation');
+   await capture('stopped',/earlier cloud source remains unresolved and protected/i);
    remote.set('users/owner/generations/held-current',currentHeader);for(const chunk of laterChunks)remote.set('users/owner/generations/held-current/chunks/'+chunk.index,chunk);
+   const previousSerial=await page.evaluate(()=>window.__nativeHistoryBudget().read.serial);
+   boundedAck.armed=automaticView.boundedAck===true;
    await page.evaluate(()=>window.dispatchEvent(new Event('online')));
-   await page.waitForFunction(()=>automaticCloudSourceResumeStatus.state==='acknowledged'&&!cloudSourceRecoveryBusy&&!pulling,{},{timeout:15000});await capture('acknowledged',/The current board is confirmed by cloud/);
+   // Keep the original responsiveness bound for entering a new actual owner.
+   await page.waitForFunction(serial=>window.__nativeHistoryBudget()?.read.serial>serial,previousSerial,{timeout:15000});
+   const ackOwner=await page.evaluateHandle(()=>window.__nativeHistoryBudget());nativeHistoryOwners.push(ackOwner);
+   const ackCompletion=await waitForNativeHistoryAck226(page,ackOwner);assert.equal(ackCompletion.ok,true,'only the same current owner may finish within its original budget: '+JSON.stringify(ackCompletion));
+   const staleCompletion=await waitForNativeHistoryAck226(page,stoppedOwner);assert.equal(staleCompletion.ok,false);assert.equal(staleCompletion.reason,'superseded','a stopped older owner cannot borrow the later ACK');
+   if(automaticView.boundedAck){assert.equal(boundedAck.error,undefined,'the actual bounded SDK delivery must finish: '+boundedAck.error);assert.ok(boundedAck.deliveredAt>=boundedAck.enteredAt+16000,'the actual entered SDK reply spends real time beyond the former ACK observation limit');assert.equal(boundedAck.observation.sameRead,true);assert.equal(boundedAck.observation.sameController,true);assert.equal(boundedAck.observation.deadlineUnchanged,true);assert.equal(boundedAck.observation.aborted,false);assert.ok(boundedAck.observation.remaining>0);assert.notEqual(boundedAck.observation.state,'acknowledged','the held earlier source cannot be called confirmed before its reply');}
+   await capture('acknowledged',/The current board is confirmed by cloud/);
    assert.equal(await page.evaluate(()=>state.tasks.some(row=>row.id==='native-later-254')),true,'actual lifecycle resumption adopts the independently complete later source');
    const finalArchives=await page.evaluate(async()=>ScannerDeviceStore.listOpaqueArchives());for(const row of originalArchives)assert.ok(finalArchives.some(next=>next.key===row.key&&next.raw===row.raw),'native later-source resumption retains original archive bytes');
    await page.evaluate(()=>window.dispatchEvent(new Event('pagehide')));await page.locator('#addInput').fill('Native edit after background ACK');await page.locator('#addButton').click();await page.waitForFunction(async()=>JSON.parse((await ScannerDeviceStore.readHead()).payload).tasks.some(row=>row.title==='Native edit after background ACK'));
    await page.locator('#addInput').fill('Native unfinished status draft');await capture('later-edit',/not been confirmed by cloud/);assert.equal(await page.locator('#addInput').inputValue(),'Native unfinished status draft');await page.locator('#addInput').fill('');
    await page.locator('#syncBtn').click();await page.waitForFunction(()=>window.CloudSync.user===null);await capture('signed-out',/different signed-in account/);
-   if(output)fs.writeFileSync(path.join(output,automaticView.theme+'-'+width+'-history.json'),JSON.stringify({source:process.env.CHAIN_NATIVE_CANDIDATE_SHA||'working-tree',indexSha256:createHash('sha256').update(fs.readFileSync(path.join(__dirname,'index.html'))).digest('hex'),engine,browser:browser.version(),captures,timerDelivery,limits:['actual native browser with isolated synthetic SDK','no production account or physical-device proof']},null,2));return;
+   const signedOutCompletion=await waitForNativeHistoryAck226(page,ackOwner);assert.equal(signedOutCompletion.ok,false);assert.equal(signedOutCompletion.reason,'identity-changed','a prior completed owner cannot confirm after actual signout');
+   if(output)fs.writeFileSync(path.join(output,automaticView.theme+'-'+width+'-history.json'),JSON.stringify({source:process.env.CHAIN_NATIVE_CANDIDATE_SHA||'working-tree',indexSha256:createHash('sha256').update(fs.readFileSync(path.join(__dirname,'index.html'))).digest('hex'),engine,browser:browser.version(),captures,timerDelivery,boundedAck,ackCompletion,stoppedCompletion,staleCompletion,signedOutCompletion,limits:['actual native browser with isolated synthetic SDK','no production account or physical-device proof']},null,2));return;
   }
 
   await page.reload();await page.locator('html[data-app-ready="true"]').waitFor();
@@ -2314,8 +2353,9 @@ async function runNativeRecoveryInspection226(t,width=390,holdDemoted=false,comp
  assert.deepEqual(settledReader,readerBefore,'unchanged visible text must also stay in place through the next two frames');
 }
 
-test('RISK automatic source status native: historical retry checking stop and confirmation remain current',async t=>{
- for(const [theme,width]of [['light',390],['dark',390],['light',1280],['dark',1280]])await t.test(theme+' '+width,sub=>runNativeRecoveryInspection226(sub,width,false,null,{theme,history:true}));
+test('RISK automatic source status native: historical retry checking stop and confirmation remain current',
+async t=>{
+ for(const [theme,width]of [['light',390],['dark',390],['light',1280],['dark',1280]])await t.test(theme+' '+width,sub=>runNativeRecoveryInspection226(sub,width,false,null,{theme,history:true,boundedAck:theme==='dark'&&width===390}));
 });
 
 test('RISK integrated automatic recovery native: persisted startup status and neighboring controls remain usable',async t=>{
