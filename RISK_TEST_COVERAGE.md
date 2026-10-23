@@ -2105,3 +2105,7 @@ This boundary control holds a successful real provider reply, installs a later a
 - Acknowledged damaged-source fixture inputs finish both real native seed Add saves before later recovery/consent: `RISK recovery fixture ownership: acknowledged damage inputs finish both native seed saves before recovery`.
 
 - The native historical status consumer retains15s new-owner entry, then only that read/controller/serial's original remaining60s budget; an entered16s SDK reply, true stopped/superseded/signout refusals and normal ACK cleanup are exercised in `RISK automatic source status native: historical retry checking stop and confirmation remain current`.
+
+- Failed source observations retain their original rejection while their own polling timers terminate and the real consumer exits: `RISK recovery fixture shutdown: a failed real source observation stops its own polling and exits`.
+
+- All four ordinary actions share one absolute 20s durability/read bound, including an actually held device-commit refusal: `RISK corrupt work budget fixture: one shared action deadline rejects an actually held device commit`.

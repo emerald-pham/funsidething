@@ -793,8 +793,8 @@ test('RISK cloud startup: auth waits for raw boot capture and replays one read a
  assert.equal(await store.getRecoveryCloudHold(),null,'a pending capture never grants an adoption hold');
  assert.deepEqual(await store.readRawExportSnapshot(),before,'the raw store stays byte-for-byte unchanged while capture is pending');
  captureGate.resolve();
- await fixtureDeadline((async()=>{while(!vm.runInContext('automaticCloudFallbackBootBaseline',app.ctx))await flush();})(),'boot capture establishes its exact raw baseline');
- await fixtureDeadline((async()=>{while(pulls===0||vm.runInContext('pulling',app.ctx))await flush();})(),'the deferred auth read replays after capture settles');
+ await fixtureDeadline(async wait=>{while(!vm.runInContext('automaticCloudFallbackBootBaseline',app.ctx))await wait();},'boot capture establishes its exact raw baseline');
+ await fixtureDeadline(async wait=>{while(pulls===0||vm.runInContext('pulling',app.ctx))await wait();},'the deferred auth read replays after capture settles');
  assert.equal(pulls,1,'the existing boot replay drains the deferred auth request exactly once');
  assert.equal(await store.readHead(),null,'a malformed cloud response cannot turn the temporary shell into a saved head');
  assert.equal(await store.getRecoveryCloudHold(),null,'an invalid cloud response cannot create a recovery hold');
@@ -821,7 +821,7 @@ test('RISK iOS source replay: an exact acknowledged board repairs missing curren
  for(const [key,raw]of app.previousSource)assert.equal(JSON.stringify(reader.docs.get(key)),raw,'the older original stays exact');
  const peer=await loadAppAtTime(1792323000000,{indexedDBProvider:indexedDB,deviceDbName:deviceDbName+'-independent-receiver'});t.after(()=>closeLegacyApp173(peer));
  const receiving=await loadCloudBackendV2({runtimeWindow:peer.ctx.window,failures:{authPending:true},timeoutMs:5000});t.after(()=>receiving.CS.suspend());for(const [key,value]of reader.docs)receiving.docs.set(key,value);
- receiving.emitAuth({uid:'owner',email:'e@example.com'});await fixtureDeadline((async()=>{while(vm.runInContext('automaticCloudFallbackBootCapturePending||!state',peer.ctx))await flush();})(),'receiver boot raw authority completes before reconciliation');peer.ctx.closeModal();await peer.ctx.cloudPull();await settleRecoveryOperations188(peer.ctx);
+ receiving.emitAuth({uid:'owner',email:'e@example.com'});await fixtureDeadline(async wait=>{while(vm.runInContext('automaticCloudFallbackBootCapturePending||!state',peer.ctx))await wait();},'receiver boot raw authority completes before reconciliation');peer.ctx.closeModal();await peer.ctx.cloudPull();await settleRecoveryOperations188(peer.ctx);
  assert.deepEqual(JSON.parse(JSON.stringify(peer.ctx.state.tasks)),app.acknowledgedTasks,'an isolated ordinary receiving client accepts every serialized field of the repaired board');
  assert.equal(peer.ctx.state.futureIOSReportFixture.opaque.length,2000000);
 });
@@ -834,7 +834,7 @@ test('RISK cloud source recovery automatic fallback: one complete older source o
  await closeLegacyApp173(damaged);backend.CS.suspend();
  const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='safe-fallback-249-'+Math.random();
  const cold=await loadAppAtTime(1792323000000,{indexedDBProvider:indexedDB,deviceDbName});t.after(()=>closeLegacyApp173(cold));
- await fixtureDeadline((async()=>{while(!vm.runInContext('automaticCloudFallbackBootBaseline',cold.ctx))await flush();})(),'verified empty startup capture completes before cloud auth');
+ await fixtureDeadline(async wait=>{while(!vm.runInContext('automaticCloudFallbackBootBaseline',cold.ctx))await wait();},'verified empty startup capture completes before cloud auth');
  const firstPublicationFault={authPending:true};refuseNextRecoveryTransaction255(firstPublicationFault);const reader=await loadCloudBackendV2({runtimeWindow:cold.ctx.window,failures:firstPublicationFault,timeoutMs:5000});t.after(()=>reader.CS.suspend());
  for(const [key,value]of backend.docs)reader.docs.set(key,value);
  reader.emitAuth({uid:'owner',email:'e@example.com'});
@@ -903,7 +903,7 @@ async function automaticSourceLifecycle254(t,afterAcknowledged=null){
  await closeLegacyApp173(damaged);backend.CS.suspend();
  const {IDBFactory}=await import('fake-indexeddb'),recoveryDb=new IDBFactory(),recoveryName='background-resume-254-'+Math.random();
  const cold=await loadAppAtTime(1792323000000,{indexedDBProvider:recoveryDb,deviceDbName:recoveryName});t.after(()=>closeLegacyApp173(cold));
- await fixtureDeadline((async()=>{while(!vm.runInContext('automaticCloudFallbackBootBaseline',cold.ctx))await flush();})(),'verified empty startup capture completes before fallback recovery');
+ await fixtureDeadline(async wait=>{while(!vm.runInContext('automaticCloudFallbackBootBaseline',cold.ctx))await wait();},'verified empty startup capture completes before fallback recovery');
  const firstPublicationFault={authPending:true};refuseNextRecoveryTransaction255(firstPublicationFault);const reader=await loadCloudBackendV2({runtimeWindow:cold.ctx.window,failures:firstPublicationFault,timeoutMs:5000,recoveryTimeoutMs:5000});t.after(()=>reader.CS.suspend());
  for(const [key,value]of backend.docs)reader.docs.set(key,value);
  reader.emitAuth({uid:'owner',email:'e@example.test'});cold.ctx.closeModal();await cold.ctx.cloudPull();
@@ -1030,7 +1030,7 @@ async function automaticSourceLifecycle254(t,afterAcknowledged=null){
  const receiver=await loadAppAtTime(1792323000000,{indexedDBProvider:recoveryDb,deviceDbName:recoveryName+'-receiver'});t.after(()=>closeLegacyApp173(receiver));
  const receiving=await loadCloudBackendV2({runtimeWindow:receiver.ctx.window,sharedDocs:resumed.docs,failures:{authPending:true},timeoutMs:5000});
  t.after(()=>receiving.CS.suspend());receiving.emitAuth({uid:'owner',email:'e@example.test'});receiver.ctx.closeModal();
- await fixtureDeadline((async()=>{while(vm.runInContext('automaticCloudFallbackBootCapturePending||!state',receiver.ctx))await flush();})(),
+ await fixtureDeadline(async wait=>{while(vm.runInContext('automaticCloudFallbackBootCapturePending||!state',receiver.ctx))await wait();},
   'the independent receiver completes its own durable-source startup capture before cloud reconciliation');
  await receiver.ctx.cloudPull();await settleRecoveryOperations188(receiver.ctx);
  assert.equal(vm.runInContext('reconciledAs',receiver.ctx),receiving.CS.user,'the independent receiver finishes account-bound cloud reconciliation');
@@ -1064,10 +1064,10 @@ test('RISK automatic source status: completed confirmation follows current edits
 test('RISK integrated automatic recovery: no-input fallback continues through exact cloud confirmation',async t=>{
  const damaged=await damagedAcknowledgedApp187(t),{backend,activeSource}=damaged;await closeLegacyApp173(damaged);backend.CS.suspend();
  const {IDBFactory}=await import('fake-indexeddb'),cold=await loadAppAtTime(1792323000000,{indexedDBProvider:new IDBFactory(),deviceDbName:'no-input-255-'+Math.random()});t.after(()=>closeLegacyApp173(cold));
- await fixtureDeadline((async()=>{while(!vm.runInContext('automaticCloudFallbackBootBaseline',cold.ctx))await flush();})(),'fresh startup authority is captured');
+ await fixtureDeadline(async wait=>{while(!vm.runInContext('automaticCloudFallbackBootBaseline',cold.ctx))await wait();},'fresh startup authority is captured');
  const reader=await loadCloudBackendV2({runtimeWindow:cold.ctx.window,sharedDocs:backend.docs,failures:{authPending:true},timeoutMs:5000});t.after(()=>reader.CS.suspend());
  reader.emitAuth({uid:'owner',email:'e@example.test'});cold.ctx.closeModal();const running=cold.ctx.cloudPull();
- await fixtureDeadline((async()=>{while(!(await cold.ctx.window.ScannerDeviceStore.listOpaqueArchives()).some(row=>row.key.startsWith('automatic-recovery-ack:')))await flush();})(),'no-input initial fallback reaches its actual current-board ACK');
+ await fixtureDeadline(async wait=>{while(!(await cold.ctx.window.ScannerDeviceStore.listOpaqueArchives()).some(row=>row.key.startsWith('automatic-recovery-ack:')))await wait();},'no-input initial fallback reaches its actual current-board ACK');
  assert.equal(cold.ctx.state.tasks.some(row=>row.title==='Second acknowledged source'),false,'missing newer bytes remain unknown after the first ACK');
  for(const chunk of activeSource.chunks)reader.docs.set('users/owner/generations/'+activeSource.id+'/chunks/'+chunk.index,structuredClone(chunk));
  await fixtureDeadline(running,'the same bounded automatic continuation settles after external source bytes return',8000);
@@ -1082,7 +1082,7 @@ test('RISK integrated automatic recovery: a failed current read cannot hide the 
  const expected=await seed.ctx.window.ChainStorageV2.decodeSnapshot(backend.docs.get(previousPath),[...backend.docs].filter(([key])=>key.startsWith(previousPath+'/chunks/')).map(([,row])=>row).sort((a,b)=>a.index-b.index));
  await closeLegacyApp173(seed);backend.CS.suspend();
  const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='independent-source-255-'+Math.random(),cold=await loadAppAtTime(1792323000000,{indexedDBProvider:indexedDB,deviceDbName});t.after(()=>closeLegacyApp173(cold));
- await fixtureDeadline((async()=>{while(!vm.runInContext('automaticCloudFallbackBootBaseline',cold.ctx))await flush();})(),'fresh raw source capture settles before selective SDK failure');
+ await fixtureDeadline(async wait=>{while(!vm.runInContext('automaticCloudFallbackBootBaseline',cold.ctx))await wait();},'fresh raw source capture settles before selective SDK failure');
  const faults={authPending:true},reader=await loadCloudBackendV2({runtimeWindow:cold.ctx.window,sharedDocs:backend.docs,failures:faults,timeoutMs:5000,recoveryTimeoutMs:5000});t.after(()=>reader.CS.suspend());
  let currentReads=0;faults.serverRead=async path=>{if(path==='users/owner/generations/'+originalRoot.activeGeneration+'/chunks'&&++currentReads>1)throw Object.assign(Error('Selective current source unavailable'),{code:'unavailable'});};
  reader.emitAuth({uid:'owner',email:'e@example.com'});cold.ctx.closeModal();await fixtureDeadline(cold.ctx.cloudPull(),'selective source attempt retains its original bounded deadline',7000);await settleRecoveryOperations188(cold.ctx);
@@ -1096,7 +1096,7 @@ test('RISK integrated automatic recovery: a failed current read cannot hide the 
  await closeLegacyApp173(cold);reader.CS.suspend();delete faults.serverRead;
  for(const chunk of seed.activeSource.chunks)reader.docs.set('users/owner/generations/'+seed.activeSource.id+'/chunks/'+chunk.index,structuredClone(chunk));
  const reopened=await loadAppAtTime(1792323000000,{indexedDBProvider:indexedDB,deviceDbName,sharedStorage:cold.shim.localStorage});t.after(()=>closeLegacyApp173(reopened));await reopened.ctx.__dataReady;
- const resumed=await loadCloudBackendV2({runtimeWindow:reopened.ctx.window,sharedDocs:reader.docs,failures:{authPending:true},timeoutMs:5000,recoveryTimeoutMs:5000});t.after(()=>resumed.CS.suspend());resumed.emitAuth({uid:'owner',email:'e@example.com'});reopened.ctx.closeModal();await reopened.ctx.cloudPull();await fixtureDeadline((async()=>{while(vm.runInContext('automaticCloudFallbackBootCapturePending||cloudPullPending||cloudSourceRecoveryBusy||cloudPushInFlight',reopened.ctx))await flush();})(),'ordinary boot replay and publisher finish before final acceptance');await settleRecoveryOperations188(reopened.ctx);
+ const resumed=await loadCloudBackendV2({runtimeWindow:reopened.ctx.window,sharedDocs:reader.docs,failures:{authPending:true},timeoutMs:5000,recoveryTimeoutMs:5000});t.after(()=>resumed.CS.suspend());resumed.emitAuth({uid:'owner',email:'e@example.com'});reopened.ctx.closeModal();await reopened.ctx.cloudPull();await fixtureDeadline(async wait=>{while(vm.runInContext('automaticCloudFallbackBootCapturePending||cloudPullPending||cloudSourceRecoveryBusy||cloudPushInFlight',reopened.ctx))await wait();},'ordinary boot replay and publisher finish before final acceptance');await settleRecoveryOperations188(reopened.ctx);
  assert.equal(await reopened.ctx.window.ScannerDeviceStore.getRecoveryCloudHold(),null,'a later complete read resumes the automatic hold without reinterpreting its unknown original capture');
  const confirmed=await resumed.CS.pull();assert.equal(confirmed.payload,reopened.ctx.cloudPayload());assert.ok(JSON.parse(confirmed.payload).tasks.some(row=>row.title==='Second acknowledged source'));assert.ok(JSON.parse(confirmed.payload).tasks.some(row=>row.title==='Accepted after selective fallback'));
  const laterCopies=await reopened.ctx.window.ScannerDeviceStore.listOpaqueArchives(),fresh=laterCopies.map(row=>{try{return JSON.parse(row.raw);}catch{return null;}}).find(row=>row?.sourceCapture&&row.refreshedFrom===envelope.sourceArchiveKeys[0]);assert.ok(fresh,'the later complete observation is separately captured with original-source provenance');assert.equal(await reopened.ctx.window.ChainStorageV2.decodeSnapshot(fresh.sourceCapture.generations.find(row=>row.id===seed.activeSource.id).header,fresh.sourceCapture.generations.find(row=>row.id===seed.activeSource.id).chunks),await seed.ctx.window.ChainStorageV2.decodeSnapshot(seed.activeSource.header,seed.activeSource.chunks),'newly observed original bytes are independently exact');
@@ -1379,7 +1379,7 @@ test('RISK automatic recovery defaults: an unaccepted device uses stable source 
  const browserRaw=JSON.stringify(browser),cloudRaw=JSON.stringify(cloud);
  const app=await loadAppAtTime(1792323000000,{indexedDBProvider:indexedDB,deviceDbName,seedStorage:{'fvp:chain-scanner:device-store-v2':'1',[SYNC_STORE_KEY]:browserRaw}}),{ctx,shim}=app;t.after(()=>closeLegacyApp173(app));
  assert.equal(vm.runInContext('liveBoardAccepted',ctx),false,'the readable browser alternative cannot become accepted while the selected durable head is unreadable');
- await fixtureDeadline((async()=>{while(vm.runInContext('automaticCloudFallbackBootCapturePending',ctx))await flush();})(),'malformed raw boot capture completes');
+ await fixtureDeadline(async wait=>{while(vm.runInContext('automaticCloudFallbackBootCapturePending',ctx))await wait();},'malformed raw boot capture completes');
  const publicationFaults={authPending:true},backend=await loadCloudBackendV2({runtimeWindow:ctx.window,failures:publicationFaults,timeoutMs:5000});t.after(()=>backend.CS.suspend());
  backend.emitAuth({uid:'owner',email:'e@example.com'});assert.equal((await backend.CS.push(cloudRaw,1,0)).ok,true);
  refuseNextRecoveryTransaction255(publicationFaults);ctx.closeModal();await flush();await ctx.cloudPull();
@@ -1476,7 +1476,7 @@ test('RISK automatic recovery convergence: two accepted defaults adopt acknowled
  for(const row of bOriginals)assert.ok((await b.ctx.window.ScannerDeviceStore.listOpaqueArchives()).some(saved=>saved.key===row.key&&saved.raw===row.raw));
  const cold=await loadAppAtTime(1792323000000,{indexedDBProvider:indexedDB,deviceDbName,sharedStorage:b.shim.localStorage});t.after(()=>closeLegacyApp173(cold));assert.equal(cold.ctx.cloudPayload(),first.payload);
  const coldA=await loadAppAtTime(1792323000000,{indexedDBProvider:a.indexedDB,deviceDbName:a.deviceDbName,sharedStorage:a.shim.localStorage});t.after(()=>closeLegacyApp173(coldA));assert.equal(coldA.ctx.cloudPayload(),first.payload);
- const third=await loadAppAtTime(1792323000000,{});t.after(()=>closeLegacyApp173(third));const thirdBackend=await loadCloudBackendV2({sharedDocs:backend.docs,runtimeWindow:third.ctx.window,failures:{authPending:true},timeoutMs:5000});t.after(()=>thirdBackend.CS.suspend());thirdBackend.emitAuth({uid:'owner',email:'e@example.com'});third.ctx.closeModal();await fixtureDeadline((async()=>{while(vm.runInContext('automaticCloudFallbackBootCapturePending||!state',third.ctx))await flush();})(),'third client boot capture completes before cloud reconciliation');await third.ctx.cloudPull();await settleRecoveryOperations188(third.ctx);assert.equal(third.ctx.cloudPayload(),first.payload);
+ const third=await loadAppAtTime(1792323000000,{});t.after(()=>closeLegacyApp173(third));const thirdBackend=await loadCloudBackendV2({sharedDocs:backend.docs,runtimeWindow:third.ctx.window,failures:{authPending:true},timeoutMs:5000});t.after(()=>thirdBackend.CS.suspend());thirdBackend.emitAuth({uid:'owner',email:'e@example.com'});third.ctx.closeModal();await fixtureDeadline(async wait=>{while(vm.runInContext('automaticCloudFallbackBootCapturePending||!state',third.ctx))await wait();},'third client boot capture completes before cloud reconciliation');await third.ctx.cloudPull();await settleRecoveryOperations188(third.ctx);assert.equal(third.ctx.cloudPayload(),first.payload);
 });
 
 test('RISK automatic recovery publication guards: changed exact authority storage drafts pending and identity cannot publish',async t=>{
@@ -1573,12 +1573,19 @@ test('RISK automatic recovery guidance: mounted FAQ explains reversible defaults
 
 test('RISK automatic recovery comparisons: compatible independent observations replay once instead of becoming rating defaults',async t=>{
  const app=await divergentCloudSourceApp187(t,{phase:'automatic-inputs',holdCloudPush:true}),{ctx,backend,originalRoot}=app;
+ const nativeSaves=observeQueuedNativeSaves(ctx,t);
  ctx.window.CloudSync.ready=false;ctx.openSettings();const box=app.shim.document.getElementById('stSkipOldestFirstDot');Object.assign(box,{id:'stSkipOldestFirstDot',checked:true,matches:()=>false});app.shim.document.dispatchEvent({type:'change',target:box});ctx.closeModal();
  ctx.onAction('start-scan',{dataset:{mode:'descending'}});ctx.decide('yes');assert.equal(await ctx.persist(),true);
- const shared=JSON.stringify(ctx.state),peer=await loadAppAtTime(1792323000000,{seedStorage:{[SYNC_STORE_KEY]:shared,[LOCAL_HEAD_KEY]:shared}});t.after(()=>closeLegacyApp173(peer));
+ assert.ok((await nativeSaves.settle('shared comparison setup')).results.every(result=>result===true));
+ const shared=JSON.stringify(ctx.state),peer=await loadAppAtTime(1792323000000,{seedStorage:{[SYNC_STORE_KEY]:shared,[LOCAL_HEAD_KEY]:shared}});t.after(()=>closeLegacyApp173(peer));const peerSaves=observeQueuedNativeSaves(peer.ctx,t);
  assert.equal(peer.ctx.state.candidateId,ctx.state.candidateId);assert.ok(ctx.state.candidateId);
  setFakeTime(ctx,1792323000100);ctx.decide('yes');assert.equal(await ctx.persist(),true);
  setFakeTime(peer.ctx,1792323000200);peer.ctx.decide('no');assert.equal(await peer.ctx.persist(),true);
+ const localSaved=await nativeSaves.settle('local comparison input'),peerSaved=await peerSaves.settle('peer comparison input');
+ assert.ok(localSaved.completed>=2&&localSaved.results.every(result=>result===true));
+ assert.ok(peerSaved.completed>=1&&peerSaved.results.every(result=>result===true));
+ assert.equal((await ctx.window.ScannerDeviceStore.readHead()).payload,JSON.stringify(ctx.state));
+ assert.equal(peer.shim.localStorage.getItem(LOCAL_HEAD_KEY),JSON.stringify(peer.ctx.state));
  const localObservation=JSON.parse(JSON.stringify(ctx.state.decisionEvents.find(row=>row.kind==='comparison'&&row.action==='yes'))),peerObservation=JSON.parse(JSON.stringify(peer.ctx.state.decisionEvents.find(row=>row.kind==='no')));
  assert.ok(localObservation?.id&&peerObservation?.id);assert.notEqual(localObservation.id,peerObservation.id);
  assert.equal(localObservation.ratingApplied,true);assert.equal(peerObservation.ratingApplied,true);
@@ -1587,6 +1594,7 @@ test('RISK automatic recovery comparisons: compatible independent observations r
  const oneObservationSigmas=new Map(ctx.state.tasks.map(task=>[task.id,Math.min(task.sigma,peer.ctx.state.tasks.find(row=>row.id===task.id).sigma)]));
  const incoming=peer.ctx.cloudPayload(),path='users/owner/generations/'+originalRoot.previousGeneration,header=backend.docs.get(path),encoded=await ctx.window.ChainStorageV2.encodeSnapshot(incoming);
  backend.docs.set(path,{...header,...encoded,chunks:undefined});for(const key of [...backend.docs.keys()])if(key.startsWith(path+'/chunks/'))backend.docs.delete(key);for(const chunk of encoded.chunks)backend.docs.set(path+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
+ assert.equal(ctx.buildSupportDiagnosticsReport().save.debouncePending.value,false,'comparison input preparation must finish its actual native save before recovery ACK verification');
  ctx.window.CloudSync.ready=true;ctx.closeModal();await flush();await ctx.cloudPull();
  for(const observation of [localObservation,peerObservation])assert.deepEqual(JSON.parse(JSON.stringify(ctx.state.decisionEvents.find(row=>row.id===observation.id)??null)),observation,'each independent comparison reaches the actual automatic working board unchanged');
  for(const id of [peerObservation.benchmarkId,peerObservation.candidateId])assert.ok(ctx.state.tasks.find(row=>row.id===id).sigma<oneObservationSigmas.get(id),'two distinct valid observations add information beyond either one-observation source');
@@ -1669,14 +1677,14 @@ test('RISK cloud source recovery automatic fallback: an unfinished draft capture
  await closeLegacyApp173(damaged);backend.CS.suspend();
  const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='safe-fallback-draft-249-'+Math.random();
  const cold=await loadAppAtTime(1792323000000,{indexedDBProvider:indexedDB,deviceDbName});t.after(()=>closeLegacyApp173(cold));
- await fixtureDeadline((async()=>{while(!vm.runInContext('automaticCloudFallbackBootBaseline',cold.ctx))await flush();})(),'draft test starts after verified empty startup capture');
+ await fixtureDeadline(async wait=>{while(!vm.runInContext('automaticCloudFallbackBootBaseline',cold.ctx))await wait();},'draft test starts after verified empty startup capture');
  const failures={authPending:true},reader=await loadCloudBackendV2({runtimeWindow:cold.ctx.window,failures,timeoutMs:5000,recoveryTimeoutMs:1000});t.after(()=>reader.CS.suspend());
  for(const [key,value]of backend.docs)reader.docs.set(key,value);
  const previousChunks='users/owner/generations/'+originalRoot.previousGeneration+'/chunks',gate=deferredSyncFixture();let entered=false,pull;
  failures.serverRead=async path=>{if(path===previousChunks){entered=true;await gate.promise;}};
  t.after(async()=>{gate.resolve();cold.ctx.suspendCloudSync();vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry()',cold.ctx);reader.CS.suspend();if(pull)await Promise.race([pull,new Promise(resolve=>setTimeout(resolve,1000))]);delete failures.serverRead;});
  reader.emitAuth({uid:'owner',email:'e@example.com'});cold.ctx.closeModal();await flush();pull=cold.ctx.cloudPull();
- await fixtureDeadline((async()=>{while(!entered)await flush();})(),'automatic fallback reaches the bounded read of its complete previous source');
+ await fixtureDeadline(async wait=>{while(!entered)await wait();},'automatic fallback reaches the bounded read of its complete previous source');
  const store=cold.ctx.window.ScannerDeviceStore,headBefore=await store.readHead(),stateBefore=JSON.stringify(cold.ctx.state),rootBefore=JSON.stringify(reader.docs.get('users/owner'));
  cold.shim.document.getElementById('addInput').value='Unfinished draft during recovery';gate.resolve();await fixtureDeadline(pull,'a stale empty-source capture stops after the draft changes');
  assert.equal(cold.shim.document.getElementById('addInput').value,'Unfinished draft during recovery','the unfinished Add draft remains visible');
@@ -1696,7 +1704,7 @@ test('RISK cloud source recovery automatic fallback: a stopped read survives col
  const reopenCaptureEntered={promise:new Promise((resolve,reject)=>{reopenCaptureEnteredResolve=resolve;reopenCaptureEnteredReject=reject;})};
  t.after(async()=>{gate.resolve();reopenCaptureGate.resolve();for(const app of [cold,reopened].filter(Boolean)){app.ctx.suspendCloudSync();vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry()',app.ctx);}reader?.CS.suspend();readerAfter?.CS.suspend();if(pull)await Promise.race([pull,new Promise(resolve=>setTimeout(resolve,1000))]);});
  cold=await loadAppAtTime(1792323000000,{indexedDBProvider:indexedDB,deviceDbName});
- await fixtureDeadline((async()=>{while(!vm.runInContext('automaticCloudFallbackBootBaseline',cold.ctx))await flush();})(),'timeout test starts after verified empty startup capture');
+ await fixtureDeadline(async wait=>{while(!vm.runInContext('automaticCloudFallbackBootBaseline',cold.ctx))await wait();},'timeout test starts after verified empty startup capture');
  const store=cold.ctx.window.ScannerDeviceStore,initialRaw=await store.readRawExportSnapshot();
  assert.ok(Object.values(initialRaw.stores).every(source=>source.keys.length===0&&source.values.length===0),'startup proves raw metadata, snapshots, backups and opaque archives are absent');
  assert.ok([SYNC_STORE_KEY,LOCAL_HEAD_KEY,LOCAL_BACKUPS_KEY,'fvp:chain-scanner:device-store-v2'].every(key=>cold.shim.localStorage.getItem(key)===null),'browser boards, backups and the device-authority marker are absent');
@@ -1706,7 +1714,7 @@ test('RISK cloud source recovery automatic fallback: a stopped read survives col
  failures.serverRead=async path=>{if(path===previousChunks){entered=true;await gate.promise;}};
  reader.emitAuth({uid:'owner',email:'e@example.com'});cold.ctx.closeModal();await flush();
  const firstPull=cold.ctx.cloudPull();pull=firstPull;
- await fixtureDeadline((async()=>{while(!entered)await flush();})(),'first automatic fallback reaches its bounded previous-source read');
+ await fixtureDeadline(async wait=>{while(!entered)await wait();},'first automatic fallback reaches its bounded previous-source read');
  await fixtureDeadline(firstPull,'the configured recovery-read deadline stops the first attempt');gate.resolve();await firstPull;delete failures.serverRead;
  assert.equal(await store.getRecoveryCloudHold(),null,'a timed-out source read does not create an adoption hold');
  assert.equal(JSON.stringify(await store.readRawExportSnapshot()),JSON.stringify(initialRaw),'a failed attempt preserves every empty raw device store byte for byte');
@@ -1744,11 +1752,11 @@ test('RISK cloud source recovery automatic fallback: a stopped read survives col
  assert.equal(await reopenedStore.getRecoveryCloudHold(),null,'pending reopened capture cannot create an adoption hold');
  assert.deepEqual(await reopenedRawRead.call(reopenedStore),rawWhileCapturePending,'auth cannot mutate the raw source while reopened capture is unresolved');
  reopenCaptureGate.resolve();
- await fixtureDeadline((async()=>{while(!(await reopenedStore.getRecoveryCloudHold()))await flush();})(),'the existing post-capture replay completes automatic recovery after reopening');
+ await fixtureDeadline(async wait=>{while(!(await reopenedStore.getRecoveryCloudHold()))await wait();},'the existing post-capture replay completes automatic recovery after reopening');
  assert.equal(vm.runInContext('automaticCloudFallbackBootCapturePending',reopened.ctx),false,'automatic recovery settles only after the boot raw capture finishes');
  assert.equal(vm.runInContext('cloudPullPending',reopened.ctx),false,'the existing boot replay drains the deferred auth read');
  assert.equal(reopenedRecoveryEntries,1,'the deferred auth/read requests produce exactly one automatic recovery attempt');
- await fixtureDeadline((async()=>{while(vm.runInContext('pulling',reopened.ctx))await flush();})(),'guarded adoption completes before the recovery read returns');
+ await fixtureDeadline(async wait=>{while(vm.runInContext('pulling',reopened.ctx))await wait();},'guarded adoption completes before the recovery read returns');
  assert.equal(vm.runInContext('pulling',reopened.ctx),false,'the recovery read settles before adoption is checked');
  const recoveredHold=await reopened.ctx.window.ScannerDeviceStore.getRecoveryCloudHold();
  const reopenedState=vm.runInContext('JSON.stringify({error:unrepairableCloudSource?.code??null,cloud:window.CloudSync?.errorCode,cloudReady:window.CloudSync?.ready,status:window.CloudSync?.status,pulling,cloudPullPending,bootCapturePending:automaticCloudFallbackBootCapturePending,baselineMode:automaticCloudFallbackBootBaseline?.mode,freshClient,verifiedEmptyDeviceStore,deviceStorageRequired,deviceStorageAuthority})',reopened.ctx);
@@ -1790,7 +1798,7 @@ test('RISK iOS source replay: a modal opened during exact-copy inspection defers
  const currentPath='users/owner/generations/'+originalRoot.activeGeneration,previousPath='users/owner/generations/'+originalRoot.previousGeneration,gate=deferredSyncFixture();let reads=0,entered=false,pull;
  app.faults.serverRead=async path=>{if(path===currentPath&&++reads>=2||path===previousPath){entered=true;await gate.promise;}};
  t.after(async()=>{gate.resolve();delete app.faults.serverRead;await pull;});
- pull=ctx.cloudPull();await fixtureDeadline((async()=>{while(!entered)await flush();})(),'automatic exact-copy source inspection enters after the ordinary corrupt-generation read');
+ pull=ctx.cloudPull();await fixtureDeadline(async wait=>{while(!entered)await wait();},'automatic exact-copy source inspection enters after the ordinary corrupt-generation read');
  ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/Quick start/);gate.resolve();await pull;
  assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev,'opening a modal cannot authorize a source swap');
  assert.equal(ctx.buildSupportDiagnosticsReport().recoverySources.exactAcknowledgedCopy.matchesCurrentGeneration.status,'unobserved','an interrupted eligibility check is not a negative match');
@@ -1816,7 +1824,7 @@ function recoveryReadClock187(){
 
 test('RISK cloud source fresh check: one between-capture cloud change verifies again within the same review',async t=>{
  const app=await divergentCloudSourceApp187(t),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
- await fixtureDeadline((async()=>{while(true){const save=ctx.buildSupportDiagnosticsReport().save;if(!save.debouncePending.value&&!save.activePersistCalls.value)return;await flush();}})(),'fixture saves finish before measuring source preservation');
+ await fixtureDeadline(async wait=>{while(true){const save=ctx.buildSupportDiagnosticsReport().save;if(!save.debouncePending.value&&!save.activePersistCalls.value)return;await wait();}},'fixture saves finish before measuring source preservation');
  const before=JSON.stringify(ctx.state),head=await store.readHead(),pending=await store.getPendingUpload('owner'),raw=await store.readRawExportSnapshot(),writes=backend.writes.length;
  let roots=0,expectedCloud=JSON.stringify([...backend.docs]);
  app.faults.serverRead=async path=>{if(path==='users/owner'&&++roots===3){backend.docs.set(path,{...backend.docs.get(path),rev:app.originalRoot.rev+1});expectedCloud=JSON.stringify([...backend.docs]);}};
@@ -1935,7 +1943,7 @@ test('RISK cloud source read retry: fresh nested reads retain the original minut
   const unavailable=deferredSyncFixture(),fresh=deferredSyncFixture();let chunks=0,roots=0,entered=0,review,settled=false;
   app.faults.serverRead=async path=>{if(path==='users/owner'){roots++;if(roots===4)await fresh.promise;}if(path.endsWith('/chunks')&&++chunks<=2){entered++;await unavailable.promise;throw Object.assign(Error('Synthetic unavailable read'),{code:'unavailable'});}};
   sub.after(async()=>{unavailable.resolve();fresh.resolve();delete app.faults.serverRead;clock.stop();await review;});const before=JSON.stringify(ctx.state),head=await store.readHead(),raw=await store.readRawExportSnapshot(),cloud=JSON.stringify([...backend.docs]),writes=backend.writes.length;clock.activate(app);
-  review=ctx.onAction('review-cloud-source-recovery',{}).finally(()=>{settled=true;});await fixtureDeadline((async()=>{while(entered<2)await flush();})(),'both unavailable reads enter');await clock.advance(22000);unavailable.resolve();await fixtureDeadline((async()=>{while(roots<4)await flush();})(),'second fresh capture enters');await clock.advance(30000);assert.equal(clock.elapsed,52000);assert.ok([...clock.timers.values()].every(timer=>timer.at<=60000));
+  review=ctx.onAction('review-cloud-source-recovery',{}).finally(()=>{settled=true;});await fixtureDeadline(async wait=>{while(entered<2)await wait();},'both unavailable reads enter');await clock.advance(22000);unavailable.resolve();await fixtureDeadline(async wait=>{while(roots<4)await wait();},'second fresh capture enters');await clock.advance(30000);assert.equal(clock.elapsed,52000);assert.ok([...clock.timers.values()].every(timer=>timer.at<=60000));
   let terminal;if(mode==='deadline'){await clock.advance(7999);assert.equal(settled,false);await clock.advance(1);assert.equal(await review,false);terminal=shim.document.getElementById('modalRoot').innerHTML;assert.match(terminal,/Cloud request timed out/);}
   else{await ctx.onAction('close-modal',{});await flush();assert.equal(await review,false);delete app.faults.serverRead;assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);terminal=shim.document.getElementById('modalRoot').innerHTML;}
   fresh.resolve();for(let i=0;i<20;i++)await flush();assert.equal(shim.document.getElementById('modalRoot').innerHTML,terminal);assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(await store.readHead(),head);assert.deepEqual(await store.readRawExportSnapshot(),raw);assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal(backend.writes.length,writes);
@@ -1952,7 +1960,7 @@ test('RISK cloud source cancellation: obsolete sibling headers cannot schedule c
    if(path===previous&&++previousHeaders===1){entered++;await gate.promise;}
   }finally{active--;}};
   sub.after(async()=>{gate.resolve();delete app.faults.serverRead;await review;});review=ctx.onAction('review-cloud-source-recovery',{});
-  await fixtureDeadline((async()=>{while(entered<(mode==='failed capture'?1:2))await flush();})(),'uncancellable original sibling enters');
+  await fixtureDeadline(async wait=>{while(entered<(mode==='failed capture'?1:2))await wait();},'uncancellable original sibling enters');
   if(mode==='failed capture')assert.equal(await review,true);else{await ctx.onAction('close-modal',{});assert.equal(await review,false);assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);}
   const visible=shim.document.getElementById('modalRoot').innerHTML,count=requests.length;gate.resolve();for(let n=0;n<20;n++)await flush();
   assert.equal(requests.length,count,'a retired SDK capture cannot schedule chunks after its uncancellable header finally returns');assert.equal(shim.document.getElementById('modalRoot').innerHTML,visible);assert.ok(peak<=4,'overlap is measured and bounded, rather than claimed as transport cancellation');assert.equal(active,0);
@@ -1965,7 +1973,7 @@ test('RISK cloud source inspection: a complete independent source stays readable
  const gate=deferredSyncFixture(),current='users/owner/generations/'+originalRoot.activeGeneration+'/chunks',previous='users/owner/generations/'+originalRoot.previousGeneration+'/chunks';let previousEntered=false,review;
  const local=JSON.stringify(ctx.state),head=await store.readHead(),pending=await store.getPendingUpload('owner'),raw=await store.readRawExportSnapshot(),cloud=JSON.stringify([...backend.docs]),writes=backend.writes.length;
  app.faults.serverRead=async path=>{if(path===previous)previousEntered=true;if(path===current){await gate.promise;throw Object.assign(Error('Synthetic unavailable current source'),{code:'unavailable'});}};
- t.after(async()=>{gate.resolve();delete app.faults.serverRead;await review;});review=ctx.onAction('review-cloud-source-recovery',{});await fixtureDeadline((async()=>{while(!previousEntered)await flush();})(),'independent previous source arrives');
+ t.after(async()=>{gate.resolve();delete app.faults.serverRead;await review;});review=ctx.onAction('review-cloud-source-recovery',{});await fixtureDeadline(async wait=>{while(!previousEntered)await wait();},'independent previous source arrives');
  const inspectBy=Date.now()+1000;while(Date.now()<inspectBy&&!shim.document.getElementById('modalRoot').innerHTML.includes('data-cloud-source-inspection'))await flush();
  const reading=shim.document.getElementById('modalRoot').innerHTML;assert.match(reading,/data-cloud-source-inspection/,'independently complete cloud data must be inspectable before every sibling request finishes');assert.match(reading,/Previous cloud source/);assert.match(reading,/Read-only inspection/);assert.doesNotMatch(reading,/data-act="choose-cloud-recovery-source"/);
  gate.resolve();assert.equal(await review,false,'a failed required original prevents any choice-capable preview');const stopped=shim.document.getElementById('modalRoot').innerHTML;assert.match(stopped,/data-cloud-source-inspection/);assert.match(stopped,/Previous cloud source/);assert.match(stopped,/Unknown/);assert.match(stopped,/Checks have stopped/);assert.doesNotMatch(stopped,/data-act="choose-cloud-recovery-source"/);
@@ -2024,7 +2032,7 @@ test('RISK cloud source cancellation: a failed header retires dependent work bef
  const current='users/owner/generations/'+originalRoot.activeGeneration,previous='users/owner/generations/'+originalRoot.previousGeneration;
  app.faults.serverRead=async path=>{if(path==='users/owner')roots++;if(path===current&&roots===1)throw Object.assign(Error('Synthetic unavailable header'),{code:'unavailable'});if(path===previous&&++previousHeaders===1)await gate.promise;if(path===previous+'/chunks'&&roots===1)obsoleteChunks++;};
  t.after(async()=>{gate.resolve();delete app.faults.serverRead;await review;});review=ctx.onAction('review-cloud-source-recovery',{});
- await fixtureDeadline((async()=>{while(!ctx.buildSupportDiagnosticsReport().sourceOperations.some(op=>op.events.some(event=>event.stage==='header'&&event.status==='failed'&&event.code.value==='unavailable')))await flush();})(),'original header failure observed');
+ await fixtureDeadline(async wait=>{while(!ctx.buildSupportDiagnosticsReport().sourceOperations.some(op=>op.events.some(event=>event.stage==='header'&&event.status==='failed'&&event.code.value==='unavailable')))await wait();},'original header failure observed');
  gate.resolve();assert.equal(await review,true);assert.equal(obsoleteChunks,0,'failure retirement precedes asynchronous inspection handling, so a sibling cannot start obsolete chunks');
 });
 
@@ -2115,7 +2123,7 @@ test('RISK cloud source authority: a cached adapter without exact recovery capab
 test('RISK cloud source authority: a delayed header cannot schedule chunks after original authority changes',async t=>{
  for(const mode of ['draft','accepted action','browser','pending','head','hold'])await t.test(mode,async sub=>{
   const app=await freshSourceCheckFixture187(sub),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore,gate=deferredSyncFixture(),path='users/owner/generations/'+originalRoot.activeGeneration;let entered=false,chunks=0,review;
-  app.faults.serverRead=async key=>{if(key===path){entered=true;await gate.promise;}if(key===path+'/chunks')chunks++;};sub.after(async()=>{gate.resolve();delete app.faults.serverRead;await review;});review=ctx.onAction('review-cloud-source-recovery',{});await fixtureDeadline((async()=>{while(!entered)await flush();})(),'original header held before changed local authority');
+  app.faults.serverRead=async key=>{if(key===path){entered=true;await gate.promise;}if(key===path+'/chunks')chunks++;};sub.after(async()=>{gate.resolve();delete app.faults.serverRead;await review;});review=ctx.onAction('review-cloud-source-recovery',{});await fixtureDeadline(async wait=>{while(!entered)await wait();},'original header held before changed local authority');
   if(mode==='draft'||mode==='accepted action')shim.document.getElementById('addInput').value='Newer work during held header';if(mode==='accepted action'){await ctx.onAction('add',{});await ctx.persist();}
   if(mode==='browser')shim.localStorage.setItem(LOCAL_HEAD_KEY,'A newer sole browser source');
   if(mode==='pending')await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>tx.objectStore('meta').put({account:'owner',generationId:'newer-held-pending',payloadHash:'a'.repeat(64),baseRev:4,updatedAt:1},'pending:owner'));
@@ -2239,7 +2247,7 @@ async function runNativeRecoveryInspection226(t,width=390,holdDemoted=false,comp
    await capture('retrying',/temporarily unavailable.*retry/i);
    await page.waitForFunction(()=>window.__nativeRetryReady(),{},{timeout:5000});const timerDelivery=await page.evaluate(()=>window.__releaseNativeRetry());assert.equal(timerDelivery.valid,true);assert.equal(timerDelivery.sameRead,true);assert.equal(timerDelivery.sameController,true);assert.ok(timerDelivery.releasedAt>=timerDelivery.earnedAt+2000&&timerDelivery.releasedAt<timerDelivery.deadline);
    await page.waitForFunction(()=>automaticCloudSourceResumeStatus.state==='checking',{},{timeout:10000});
-   await fixtureDeadline((async()=>{while(!historyEntered)await flush();})(),'native historical source reaches the controlled external header read');
+   await fixtureDeadline(async wait=>{while(!historyEntered)await wait();},'native historical source reaches the controlled external header read');
    await capture('checking',/Checking an earlier saved cloud source/);
    const ownedRead=await page.evaluateHandle(()=>cloudSourceRecoveryRead);try{await page.locator('[data-act="help"]').first().click();await page.locator('#modalRoot [data-act="close-modal"]').first().click();assert.equal(await page.evaluate(read=>cloudSourceRecoveryRead===read&&!read.controller.signal.aborted,ownedRead),true,'closing ordinary Help preserves the same bounded automatic source read');}finally{await ownedRead.dispose();}
    remote.set('users/owner/generations/held-current',{...currentHeader,schemaVersion:99});historyArmed=false;historyGate.resolve();
@@ -2377,7 +2385,7 @@ test('RISK cloud source states: retry and terminal explanations never substitute
   const app=await freshSourceCheckFixture187(sub),{ctx,shim,backend}=app,gate=deferredSyncFixture();let roots=0,chunks=0,review;
   app.faults.serverRead=async path=>{if(path==='users/owner'){roots++;if(mode==='retry progress'&&roots===2)await gate.promise;if(mode==='unsupported')backend.docs.set(path,{...backend.docs.get(path),schemaVersion:99});}if(path.endsWith('/chunks')&&(mode!=='retry progress'||++chunks<=2))throw Object.assign(Error('PRIVATE SDK request detail must never be UI guidance'),mode==='generic'?{}:{code:mode==='permission-denied'?'permission-denied':'unavailable'});};
   sub.after(async()=>{gate.resolve();delete app.faults.serverRead;await review;});review=ctx.onAction('review-cloud-source-recovery',{});
-  if(mode==='retry progress'){await fixtureDeadline((async()=>{while(roots<2)await flush();})(),'actual bounded recheck progress');const modal=shim.document.getElementById('modalRoot').innerHTML;assert.match(modal,/could not be read/);assert.match(modal,/Checking fresh sources within the same one-minute limit/);assert.doesNotMatch(modal,/The sources changed/);gate.resolve();assert.equal(await review,true);}
+  if(mode==='retry progress'){await fixtureDeadline(async wait=>{while(roots<2)await wait();},'actual bounded recheck progress');const modal=shim.document.getElementById('modalRoot').innerHTML;assert.match(modal,/could not be read/);assert.match(modal,/Checking fresh sources within the same one-minute limit/);assert.doesNotMatch(modal,/The sources changed/);gate.resolve();assert.equal(await review,true);}
   else{assert.equal(await review,false);const modal=shim.document.getElementById('modalRoot').innerHTML;assert.doesNotMatch(modal,/PRIVATE SDK|request detail/);assert.match(modal,/Checks have stopped/);if(mode==='repeated unavailable')assert.match(modal,/automatic recheck has stopped/);if(mode==='permission-denied')assert.match(modal,/Access to these cloud sources was denied/);if(mode==='generic')assert.match(modal,/could not be verified/);if(mode==='unsupported')assert.match(modal,/compatible/);assert.doesNotMatch(modal,/data-act="choose-cloud-recovery-source"/);}
  });
 });
@@ -2472,9 +2480,9 @@ test('RISK cloud source fresh check: a partial-read restart preserves the origin
   sub.after(async()=>{first.resolve();changed.resolve();fresh.resolve();delete app.faults.serverRead;clock.stop();await review;});
   const before=JSON.stringify(ctx.state),head=await ctx.window.ScannerDeviceStore.readHead(),pending=await ctx.window.ScannerDeviceStore.getPendingUpload('owner'),raw=await ctx.window.ScannerDeviceStore.readRawExportSnapshot(),writes=backend.writes.length;clock.activate(app);
   review=ctx.onAction('review-cloud-source-recovery',{}).finally(()=>{settled=true;});
-  await fixtureDeadline((async()=>{while(roots<1)await flush();})(),'first partial source enters');await clock.advance(26000);first.resolve();
-  await fixtureDeadline((async()=>{while(roots<2)await flush();})(),'changed final root enters');await clock.advance(24000);changed.resolve();
-  await fixtureDeadline((async()=>{while(roots<3)await flush();})(),'fresh pair enters with ten seconds left');
+  await fixtureDeadline(async wait=>{while(roots<1)await wait();},'first partial source enters');await clock.advance(26000);first.resolve();
+  await fixtureDeadline(async wait=>{while(roots<2)await wait();},'changed final root enters');await clock.advance(24000);changed.resolve();
+  await fixtureDeadline(async wait=>{while(roots<3)await wait();},'fresh pair enters with ten seconds left');
   assert.match(shim.document.getElementById('modalRoot').innerHTML,/Checking fresh sources within the same one-minute limit/);
   let terminal;
   if(mode==='original deadline'){
@@ -2561,7 +2569,7 @@ test('RISK cloud source fresh check: head metadata alone permits one fresh pair 
  app.faults.serverRead=async path=>{if(path==='users/owner'&&++roots===5)await gate.promise;};
  t.after(async()=>{gate.resolve();store.readHead=readHead;delete app.faults.serverRead;await review;});
  review=ctx.onAction('review-cloud-source-recovery',{});
- await fixtureDeadline((async()=>{while(roots<5)await flush();})(),'the entirely fresh pair enters its real SDK root read');
+ await fixtureDeadline(async wait=>{while(roots<5)await wait();},'the entirely fresh pair enters its real SDK root read');
  const progress=shim.document.getElementById('modalRoot').innerHTML;
  assert.match(progress,/Checking fresh sources within the same one-minute limit/);assert.match(progress,/data-act="close-modal">Cancel/);assert.match(progress,/data-cloud-source-readonly/);assert.match(progress,/until the checks finish/,'the fresh check is actually running');
  gate.resolve();assert.equal(await review,true);assert.equal(roots,8);
@@ -2628,9 +2636,9 @@ test('RISK cloud source fresh check: the restart shares the original minute and 
  app.faults.serverRead=async path=>{if(path==='users/owner'){roots++;if(roots===1)await first.promise;if(roots===3){backend.docs.set(path,{...backend.docs.get(path),rev:app.originalRoot.rev+1});await second.promise;}if(roots===5)await fresh.promise;}};
  t.after(async()=>{first.resolve();second.resolve();fresh.resolve();delete app.faults.serverRead;clock.stop();await review;});
  const before=JSON.stringify(ctx.state),head=await ctx.window.ScannerDeviceStore.readHead(),pending=await ctx.window.ScannerDeviceStore.getPendingUpload('owner'),writes=backend.writes.length;clock.activate(app);
- review=ctx.onAction('review-cloud-source-recovery',{}).finally(()=>{settled=true;});await fixtureDeadline((async()=>{while(roots<1)await flush();})(),'first SDK root enters');
- await clock.advance(26000);first.resolve();await fixtureDeadline((async()=>{while(roots<3)await flush();})(),'second complete capture enters');await clock.advance(24000);second.resolve();
- await fixtureDeadline((async()=>{while(roots<5)await flush();})(),'fresh restart enters with only ten seconds remaining');
+ review=ctx.onAction('review-cloud-source-recovery',{}).finally(()=>{settled=true;});await fixtureDeadline(async wait=>{while(roots<1)await wait();},'first SDK root enters');
+ await clock.advance(26000);first.resolve();await fixtureDeadline(async wait=>{while(roots<3)await wait();},'second complete capture enters');await clock.advance(24000);second.resolve();
+ await fixtureDeadline(async wait=>{while(roots<5)await wait();},'fresh restart enters with only ten seconds remaining');
  assert.match(shim.document.getElementById('modalRoot').innerHTML,/Checking fresh sources/);await clock.advance(9999);assert.equal(settled,false);await clock.advance(1);assert.equal(settled,true);assert.equal(await review,false);
  const failed=shim.document.getElementById('modalRoot').innerHTML;assert.match(failed,/Cloud request timed out/);assert.match(failed,/Checks have stopped/);assert.doesNotMatch(failed,/until the checks finish/);fresh.resolve();for(let n=0;n<20;n++)await flush();assert.equal(shim.document.getElementById('modalRoot').innerHTML,failed);
  assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(await ctx.window.ScannerDeviceStore.readHead(),head);assert.deepEqual(await ctx.window.ScannerDeviceStore.getPendingUpload('owner'),pending);assert.equal(backend.writes.length,writes);
@@ -2641,7 +2649,7 @@ test('RISK cloud source fresh check: Cancel and reopen revoke a stalled fresh pa
  app.faults.serverRead=async path=>{if(path==='users/owner'){roots++;if(roots===3)backend.docs.set(path,{...backend.docs.get(path),rev:app.originalRoot.rev+1});if(roots===5)await gate.promise;}};
  t.after(async()=>{gate.resolve();delete app.faults.serverRead;await review;});
  const before=JSON.stringify(ctx.state),head=await ctx.window.ScannerDeviceStore.readHead(),pending=await ctx.window.ScannerDeviceStore.getPendingUpload('owner'),writes=backend.writes.length;
- review=ctx.onAction('review-cloud-source-recovery',{}).finally(()=>{settled=true;});await fixtureDeadline((async()=>{while(roots<5)await flush();})(),'fresh pair is held');
+ review=ctx.onAction('review-cloud-source-recovery',{}).finally(()=>{settled=true;});await fixtureDeadline(async wait=>{while(roots<5)await wait();},'fresh pair is held');
  await ctx.onAction('close-modal',{});await flush();await flush();assert.equal(settled,true);assert.equal(await review,false);
  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);const current=shim.document.getElementById('modalRoot').innerHTML;gate.resolve();for(let n=0;n<20;n++)await flush();assert.equal(shim.document.getElementById('modalRoot').innerHTML,current);
  assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(await ctx.window.ScannerDeviceStore.readHead(),head);assert.deepEqual(await ctx.window.ScannerDeviceStore.getPendingUpload('owner'),pending);assert.equal(backend.writes.length,writes);
@@ -2695,13 +2703,13 @@ test('RISK cloud source fresh check guidance: mounted Help explains one fresh ch
 
 test('RISK recovery read minute: native source review accepts headers arriving at twenty-six seconds within one minute',async t=>{
  const clock=recoveryReadClock187(),app=await divergentCloudSourceApp187(t,{timeoutMs:20000,timerProvider:clock.provider,recoveryTimeoutMs:null}),{ctx,shim,backend,originalRoot}=app;
- await fixtureDeadline((async()=>{while(true){const save=ctx.buildSupportDiagnosticsReport().save;if(!save.debouncePending.value&&!save.activePersistCalls.value)return;await flush();}})(),'fixture saves are quiescent');
+ await fixtureDeadline(async wait=>{while(true){const save=ctx.buildSupportDiagnosticsReport().save;if(!save.debouncePending.value&&!save.activePersistCalls.value)return;await wait();}},'fixture saves are quiescent');
  const raw=await ctx.window.ScannerDeviceStore.readRawExportSnapshot(),cloud=JSON.stringify([...backend.docs]),before=JSON.stringify(ctx.state);
  const gate=deferredSyncFixture();let headers=0,settled=false,review;
  app.faults.serverRead=async path=>{if(/^users\/owner\/generations\/[^/]+$/.test(path)){headers++;if(headers<=2)await gate.promise;}};
  t.after(async()=>{gate.resolve();delete app.faults.serverRead;clock.stop();await review;});clock.activate(app);
  review=ctx.onAction('review-cloud-source-recovery',{}).finally(()=>{settled=true;});
- await fixtureDeadline((async()=>{while(headers<2)await flush();})(),'both real SDK header reads enter');
+ await fixtureDeadline(async wait=>{while(headers<2)await wait();},'both real SDK header reads enter');
  await clock.advance(26000);
  assert.equal(settled,false,'a twenty-six-second header read is still pending within the user-requested minute');
  const pending=shim.document.getElementById('modalRoot').innerHTML;assert.match(pending,/Reading/);assert.match(pending,/data-cloud-source-readonly/);assert.match(pending,/data-act="close-modal"/);
@@ -2720,8 +2728,8 @@ test('RISK recovery read minute: the second native verification shares the origi
  t.after(async()=>{first.resolve();second.resolve();delete app.faults.serverRead;clock.stop();await review;});
  const before=JSON.stringify(ctx.state),cloud=JSON.stringify([...backend.docs]);clock.activate(app);
  review=ctx.onAction('review-cloud-source-recovery',{}).finally(()=>{settled=true;});
- await fixtureDeadline((async()=>{while(headers<2)await flush();})(),'first headers enter');await clock.advance(26000);first.resolve();
- await fixtureDeadline((async()=>{while(headers<4)await flush();})(),'second headers enter after complete first read and validation');
+ await fixtureDeadline(async wait=>{while(headers<2)await wait();},'first headers enter');await clock.advance(26000);first.resolve();
+ await fixtureDeadline(async wait=>{while(headers<4)await wait();},'second headers enter after complete first read and validation');
  await clock.advance(33999);assert.equal(settled,false,'the attempt may use the remainder of its original minute');
  await clock.advance(1);assert.equal(settled,true,'the second verification cannot reset one minute into two');assert.equal(await review,false);
  assert.match(shim.document.getElementById('modalRoot').innerHTML,/Cloud request timed out/);assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-cloud-source-readonly/);
@@ -2737,7 +2745,7 @@ test('RISK recovery read minute: native Cancel releases the read immediately and
  t.after(async()=>{old.resolve();delete app.faults.serverRead;clock.stop();await review;});
  const before=JSON.stringify(ctx.state),cloud=JSON.stringify([...backend.docs]);clock.activate(app);
  review=ctx.onAction('review-cloud-source-recovery',{}).finally(()=>{settled=true;});
- await fixtureDeadline((async()=>{while(headers<2)await flush();})(),'old headers enter');await clock.advance(26000);
+ await fixtureDeadline(async wait=>{while(headers<2)await wait();},'old headers enter');await clock.advance(26000);
  await ctx.onAction('close-modal',{});await flush();await flush();
  assert.equal(settled,true,'Cancel releases the actual pending SDK read immediately rather than locking all fresh recovery behind the remaining minute');assert.equal(await review,false);
  assert.equal(await fixtureDeadline(ctx.onAction('review-cloud-source-recovery',{}),'a fresh native read is admitted after Cancel'),true);
@@ -2754,7 +2762,7 @@ test('RISK recovery read minute: stalled server stages expire once and retain pr
   app.faults.serverRead=async path=>{if(path==='users/owner')roots++;const match=stage==='root'?path==='users/owner'&&roots===1:stage==='final-root'?path==='users/owner'&&roots===2:stage==='header'?path===currentPath:path===currentPath+'/chunks';if(match){entered=true;await gate.promise;}};
   sub.after(async()=>{gate.resolve();delete app.faults.serverRead;clock.stop();await review;});
   const before=JSON.stringify(ctx.state),cloud=JSON.stringify([...backend.docs]),head=await ctx.window.ScannerDeviceStore.readHead(),pending=await ctx.window.ScannerDeviceStore.getPendingUpload('owner');clock.activate(app);
-  review=ctx.onAction('review-cloud-source-recovery',{}).finally(()=>{settled=true;});await fixtureDeadline((async()=>{while(!entered)await flush();})(),stage+' real server stage enters');
+  review=ctx.onAction('review-cloud-source-recovery',{}).finally(()=>{settled=true;});await fixtureDeadline(async wait=>{while(!entered)await wait();},stage+' real server stage enters');
   await clock.advance(59999);assert.equal(settled,false);await clock.advance(1);assert.equal(settled,true);assert.equal(await review,false);
   const timeout=shim.document.getElementById('modalRoot').innerHTML;assert.match(timeout,/Cloud request timed out/);assert.match(timeout,/Read sources again/);
   gate.resolve();for(let n=0;n<20;n++)await flush();assert.equal(shim.document.getElementById('modalRoot').innerHTML,timeout);
@@ -2768,7 +2776,7 @@ test('RISK recovery read minute: changed accounts or drafts revoke a delayed sou
   const gate=deferredSyncFixture();let entered=false,review;
   app.faults.serverRead=async path=>{if(/^users\/owner\/generations\/[^/]+$/.test(path)){entered=true;await gate.promise;}};
   sub.after(async()=>{gate.resolve();delete app.faults.serverRead;clock.stop();await review;});clock.activate(app);
-  review=ctx.onAction('review-cloud-source-recovery',{});await fixtureDeadline((async()=>{while(!entered)await flush();})(),'real headers enter');await clock.advance(26000);
+  review=ctx.onAction('review-cloud-source-recovery',{});await fixtureDeadline(async wait=>{while(!entered)await wait();},'real headers enter');await clock.advance(26000);
   if(change==='account')backend.emitAuth({uid:'other-owner',email:'e@example.com'});
   if(change==='draft')shim.document.getElementById('addInput').value='Retain this unfinished draft';
   if(change==='local edit'){shim.document.getElementById('addInput').value='Accepted during the delayed read';await ctx.onAction('add',{});await ctx.persist();}
@@ -2795,7 +2803,7 @@ test('RISK recovery read minute: a delayed cloud change discards the original ca
  t.after(async()=>{gate.resolve();delete app.faults.serverRead;clock.stop();await review;});
  const local=JSON.stringify(ctx.state),head=await store.readHead(),pending=await store.getPendingUpload('owner'),raw=await store.readRawExportSnapshot(),writes=backend.writes.length;
  clock.activate(app);review=ctx.onAction('review-cloud-source-recovery',{});
- await fixtureDeadline((async()=>{while(!entered)await flush();})(),'real delayed headers enter');await clock.advance(26000);
+ await fixtureDeadline(async wait=>{while(!entered)await wait();},'real delayed headers enter');await clock.advance(26000);
  backend.docs.set('users/owner',{...originalRoot,rev:originalRoot.rev+1});const cloud=JSON.stringify([...backend.docs]);
  gate.resolve();assert.equal(await fixtureDeadline(review,'fresh pair completes inside the original minute'),true);
  assert.deepEqual(revisions,[originalRoot.rev,...Array(5).fill(originalRoot.rev+1)],'discard the partial capture, then read two complete fresh captures at the new revision');assert.equal(remainingAtFresh,34000);
@@ -2830,7 +2838,7 @@ test('RISK recovery read minute: native recovery entry survives an ordinary time
  app.faults.serverRead=async path=>{if(/^users\/owner\/generations\/[^/]+$/.test(path)){entered=true;await gate.promise;}};
  t.after(async()=>{gate.resolve();delete app.faults.serverRead;clock.stop();await pull;});
  const before=JSON.stringify(ctx.state),cloud=JSON.stringify([...backend.docs]),head=await ctx.window.ScannerDeviceStore.readHead(),pending=await ctx.window.ScannerDeviceStore.getPendingUpload('owner');clock.activate(app);
- pull=ctx.cloudPull();await fixtureDeadline((async()=>{while(!entered)await flush();})(),'ordinary cloud pull enters the held generation header');
+ pull=ctx.cloudPull();await fixtureDeadline(async wait=>{while(!entered)await wait();},'ordinary cloud pull enters the held generation header');
  await clock.advance(20000);await pull;assert.equal(backend.CS.errorCode,'deadline-exceeded','ordinary cloud reads retain their existing twenty-second limit');
  assert.equal(JSON.stringify(ctx.state),before);assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal((await ctx.window.ScannerDeviceStore.readHead()).hash,head.hash);assert.deepEqual(await ctx.window.ScannerDeviceStore.getPendingUpload('owner'),pending);
  ctx.onAction('sync',{});const menu=shim.document.getElementById('modalRoot').innerHTML;
@@ -2857,7 +2865,7 @@ test('RISK recovery read minute: known-damage entry clears on healthy reads and 
    const gate=deferredSyncFixture();let entered=false,pull;const faults=app.faults||{};
    if(!app.faults)throw Error('fixture must expose its existing external SDK fault boundary');
    faults.serverRead=async()=>{entered=true;await gate.promise;};sub.after(async()=>{gate.resolve();delete faults.serverRead;clock.stop();await pull;});clock.activate(app);
-   pull=backend.CS.pull();await fixtureDeadline((async()=>{while(!entered)await flush();})(),'real ordinary SDK read enters');
+   pull=backend.CS.pull();await fixtureDeadline(async wait=>{while(!entered)await wait();},'real ordinary SDK read enters');
    if(outcome==='late old-account read'){backend.emitAuth({uid:'other-owner',email:'e@example.com'});gate.resolve();assert.equal((await pull).cancelled,true,'an obsolete old UID read cannot restore its finding');}
    else{await clock.advance(20000);assert.equal((await pull).error,true);assert.equal(backend.CS.errorCode,'deadline-exceeded');}
   }
@@ -2875,7 +2883,7 @@ test('RISK recovery read minute: an ordinary native save still expires at its ex
  t.after(async()=>{gate.resolve();delete faults.pushPending;clock.stop();await push;});
  shim.document.getElementById('addInput').value='Accepted task retained after ordinary write timeout';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
  push=ctx.sendPush().finally(()=>{settled=true;});
- await fixtureDeadline((async()=>{while(!clock.scheduled.includes(20000))await flush();})(),'ordinary native save enters the unchanged SDK deadline');
+ await fixtureDeadline(async wait=>{while(!clock.scheduled.includes(20000))await wait();},'ordinary native save enters the unchanged SDK deadline');
  await clock.advance(19999);assert.equal(settled,false);await clock.advance(1);assert.equal(settled,true);await push;
  assert.equal(backend.CS.errorCode,'deadline-exceeded');assert.equal(JSON.stringify([...backend.docs]),before);
  const head=await ctx.window.ScannerDeviceStore.readHead();assert.ok(JSON.parse(head.payload).tasks.some(row=>row.title==='Accepted task retained after ordinary write timeout'));
@@ -2886,7 +2894,7 @@ test('RISK recovery read minute guidance: pending native review offers Cancel an
  const app=await divergentCloudSourceApp187(t,{timeoutMs:150}),{ctx,shim}=app,gate=deferredSyncFixture();let started=false,review;
  app.faults.serverRead=async()=>{started=true;await gate.promise;};
  t.after(async()=>{gate.resolve();delete app.faults.serverRead;await review;});
- review=ctx.onAction('review-cloud-source-recovery',{});await fixtureDeadline((async()=>{while(!started)await flush();})(),'native recovery SDK read enters');
+ review=ctx.onAction('review-cloud-source-recovery',{});await fixtureDeadline(async wait=>{while(!started)await wait();},'native recovery SDK read enters');
  const pending=shim.document.getElementById('modalRoot').innerHTML;
  assert.match(pending,/This review can take up to one minute/,'the visible wait describes the bounded whole attempt');
  assert.match(pending,/data-act="close-modal">Cancel<\/button>/,'Cancel is visible while discovery is pending');
@@ -2898,7 +2906,7 @@ test('RISK recovery read minute guidance: pending native review offers Cancel an
 
 test('RISK iOS source replay: a fresh native review offers a validated previous board after timed-out headers settle late',async t=>{
  const clock=recoveryReadClock187(),app=await divergentCloudSourceApp187(t,{timeoutMs:1000,sourcePadding:2000000,timerProvider:clock.provider}),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
- await fixtureDeadline((async()=>{while(true){const save=ctx.buildSupportDiagnosticsReport().save;if(save.debouncePending.value===false&&save.activePersistCalls.value===0)return;await flush();}})(),'ordinary fixture saves finish before source-inspection preservation is measured');
+ await fixtureDeadline(async wait=>{while(true){const save=ctx.buildSupportDiagnosticsReport().save;if(save.debouncePending.value===false&&save.activePersistCalls.value===0)return;await wait();}},'ordinary fixture saves finish before source-inspection preservation is measured');
  const currentPath='users/owner/generations/'+originalRoot.activeGeneration,previousPath='users/owner/generations/'+originalRoot.previousGeneration;
  const previousHeader=backend.docs.get(previousPath),previousChunks=[...backend.docs].filter(([key])=>key.startsWith(previousPath+'/chunks/')).map(([,row])=>row).sort((a,b)=>a.index-b.index);
  assert.equal(backend.docs.get(currentPath).chunkCount,8,'synthetic current source has the report-shaped declared chunk count');
@@ -2915,13 +2923,13 @@ test('RISK iOS source replay: a fresh native review offers a validated previous 
  };
  t.after(async()=>{releaseHeaders();releasePrevious();delete app.faults.serverRead;await Promise.allSettled([first,fresh].filter(Boolean));clock.stop();});
  clock.activate(app);first=ctx.onAction('review-cloud-source-recovery',{});
- await fixtureDeadline((async()=>{while(headerReads.size<2||!oldPreviousHeld)await flush();})(),'both native headers enter and the previous chunk request is already issued before timeout');
+ await fixtureDeadline(async wait=>{while(headerReads.size<2||!oldPreviousHeld)await wait();},'both native headers enter and the previous chunk request is already issued before timeout');
  await clock.advance(1001);assert.equal(await first,false,'the native review reaches its unchanged configured SDK deadline');
  assert.match(shim.document.getElementById('modalRoot').innerHTML,/Cloud request timed out/);
  releaseHeaders();
  await flush();assert.equal(oldPreviousHeld,true,'the old previous chunk request remains issued and held');assert.equal(obsoleteCurrentQueries,0,'a timed-out late header must not start new dependent chunk requests');
  fresh=ctx.onAction('review-cloud-source-recovery',{});
- await fixtureDeadline((async()=>{while((headerReads.get(currentPath)||0)<2||(headerReads.get(previousPath)||0)<2)await flush();})(),'fresh native review overlaps the old unfinished previous-source query');
+ await fixtureDeadline(async wait=>{while((headerReads.get(currentPath)||0)<2||(headerReads.get(previousPath)||0)<2)await wait();},'fresh native review overlaps the old unfinished previous-source query');
  releasePrevious();
  assert.equal(await fresh,true,'a fresh complete read must finish the actual guarded preview after an earlier timeout');assert.equal(obsoleteCurrentQueries,0,'the retired current header never schedules chunks even after all late replies settle');
  const modal=shim.document.getElementById('modalRoot').innerHTML;
@@ -3223,7 +3231,10 @@ test('RISK sync responsiveness guidance: mounted Help explains large boards and 
  assert.match(help,/Large saved boards respond faster/);assert.match(help,/Corrupted cloud sources stop repeated downloads/);
 });
 
-test('RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations',{timeout:20000},async t=>{
+test('RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations',{timeout:20000+9*5000},async t=>{
+ // Finite envelope: startup/auth, two native saves and two ACKs, initial
+ // recovery, Retry and healthy-revision observation retain their 5s bounds.
+ // The four actual ordinary actions share one separate absolute 20s bound.
  const app=await damagedAcknowledgedApp187(t,{sourcePadding:2000000}),{ctx,shim,backend,originalRoot}=app;
  const headerPath='users/owner/generations/'+originalRoot.activeGeneration;
  const different=JSON.parse(ctx.state.decisionBase.payload);different.futureDifferent={keep:'a different accepted cloud source'};
@@ -3234,27 +3245,31 @@ test('RISK corrupt cloud work budget: ordinary actions stay durable without rere
  await ctx.cloudPull();assert.equal(backend.CS.errorCode,'corrupt-generation');assert.equal(backend.CS.knownDamagedSource,true);assert.ok(reads>0);
  const originalCloud=JSON.stringify([...backend.docs]),writes=backend.writes.length,attemptReads=reads,byAction=[];
  ctx.window.CLOUD_PUSH_DELAY_MS=0;
+ let done;const actionStarted=performance.now();
+ try{await fixtureDeadline(async wait=>{
  const settle=async()=>{
-  assert.equal(await ctx.persist(),true);
-  await fixtureDeadline((async()=>{for(;;){await syncSettle(5);if(!vm.runInContext('pulling||cloudPushInFlight||cloudTimer!==null',ctx))break;}})(),'ordinary accepted action saves and releases its cloud slot');
+  assert.equal(await ctx.persist(),true);await wait();
+  await fixtureDeadline(async wait=>{for(;;){await wait(5);if(!vm.runInContext('pulling||cloudPushInFlight||cloudTimer!==null',ctx))break;}},'ordinary accepted action saves and releases its cloud slot');
   assert.equal((await ctx.window.ScannerDeviceStore.readHead()).payload,JSON.stringify(ctx.state));byAction.push(reads-attemptReads);
  };
  shim.document.getElementById('addInput').value='Local work while the cloud source needs a choice';await ctx.onAction('add',{});await settle();
  ctx.onAction('start-scan',{dataset:{mode:'descending'}});await settle();
  const candidate=ctx.state.candidateId,benchmark=ctx.state.chain.at(-1);assert.ok(candidate&&benchmark);
  ctx.onAction('no',{dataset:{candidate,benchmark}});await settle();assert.equal(ctx.state.considered[candidate],'no');
- const done=ctx.state.chain.at(-1);ctx.onAction('bench-done',{dataset:{benchmark:done}});await settle();assert.equal(ctx.state.tasks.find(row=>row.id===done).done,true);
+ done=ctx.state.chain.at(-1);ctx.onAction('bench-done',{dataset:{benchmark:done}});await settle();assert.equal(ctx.state.tasks.find(row=>row.id===done).done,true);
  assert.equal(JSON.stringify([...backend.docs]),originalCloud,'held edits cannot rewrite any damaged or complete original cloud source');assert.equal(backend.writes.length,writes);
  assert.equal(ctx.state.syncDirty,true,'device durability is still not a cloud acknowledgement');
  t.diagnostic('Additional unchanged-source SDK reads after Add, Start, No, Done: '+JSON.stringify(byAction));
  assert.equal(reads,attemptReads,'a terminal unchanged corrupt source must not trigger another complete recovery download for every ordinary task action');
+ },'four ordinary actions exceed their shared 20000ms durability/read budget',20000);}
+ finally{t.diagnostic('Ordinary-action shared 20000ms observation: '+Math.round(performance.now()-actionStarted)+'ms');}
  await ctx.onAction('sync-retry',{});assert.ok(reads>attemptReads,'the explicit Retry control still makes a fresh guarded attempt');
  const healthyPayload=ctx.cloudPayload(),healthy=await ctx.window.ChainStorageV2.encodeSnapshot(healthyPayload),newId='healthy-peer-after-corruption';
  backend.docs.set('users/owner/generations/'+newId,{...healthy,state:'published',baseRev:originalRoot.rev});
  for(const chunk of healthy.chunks)backend.docs.set('users/owner/generations/'+newId+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
  backend.docs.set('users/owner',{...originalRoot,rev:originalRoot.rev+1,activeGeneration:newId,previousGeneration:originalRoot.activeGeneration});
  shim.window.dispatchEvent(new ctx.CustomEvent('cloudboardchange',{detail:{user:backend.CS.user,rev:originalRoot.rev+1}}));
- await fixtureDeadline((async()=>{while(ctx.state.syncRev<originalRoot.rev+1||ctx.state.syncDirty)await syncSettle(10);})(),'a new server revision escapes the held-source gate');
+ await fixtureDeadline(async wait=>{while(ctx.state.syncRev<originalRoot.rev+1||ctx.state.syncDirty)await wait(10);},'a new server revision escapes the held-source gate');
  assert.ok(ctx.state.tasks.some(row=>row.title==='Local work while the cloud source needs a choice'));assert.equal(ctx.state.tasks.find(row=>row.id===done).done,true);
  assert.equal(backend.CS.knownDamagedSource,false);assert.equal(JSON.stringify(backend.docs.get(headerPath)),JSON.stringify(JSON.parse(originalCloud).find(([key])=>key===headerPath)[1]));
 });
@@ -3275,7 +3290,7 @@ async function coldDamagedSourceWithoutAck214(t,{newerLocalWork=false}={}){
  t.after(async()=>{backend.CS.suspend();vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);await app.ctx.window.ScannerDeviceStore?.close?.();await app.dispose();});
  assert.equal(app.ctx.state.decisionBase==null,true,'the actual cold-opened app has no historical acknowledged copy');
  backend.emitAuth({uid:'owner',email:'e@example.com'});await app.ctx.cloudPull();
- await fixtureDeadline((async()=>{while(vm.runInContext('pulling||cloudPushInFlight',app.ctx))await syncSettle(5);})(),'the first no-ACK pull settles before inspecting its outcome');
+ await fixtureDeadline(async wait=>{while(vm.runInContext('pulling||cloudPushInFlight',app.ctx))await wait(5);},'the first no-ACK pull settles before inspecting its outcome');
  return {...app,backend,faults,counts,originalRoot,originalHeader,raw,indexedDB,deviceDbName};
 }
 
@@ -3284,7 +3299,7 @@ test('RISK corrupt cloud work budget: cold-opened sources without an ACK keep ne
  assert.equal(backend.CS.errorCode,'corrupt-generation');assert.equal(backend.CS.knownDamagedSource,true);
  const initialReads=counts.reads,originalCloud=JSON.stringify([...backend.docs]),writes=backend.writes.length,byAction=[];
  assert.ok(initialReads>0);ctx.window.CLOUD_PUSH_DELAY_MS=0;
- const settle=async()=>{assert.equal(await ctx.persist(),true);await fixtureDeadline((async()=>{for(;;){await syncSettle(5);if(!vm.runInContext('pulling||cloudPushInFlight||cloudTimer!==null',ctx))break;}})(),'no-ACK accepted action is durably saved');assert.equal((await ctx.window.ScannerDeviceStore.readHead()).payload,JSON.stringify(ctx.state));byAction.push(counts.reads-initialReads);};
+ const settle=async()=>{assert.equal(await ctx.persist(),true);await fixtureDeadline(async wait=>{for(;;){await wait(5);if(!vm.runInContext('pulling||cloudPushInFlight||cloudTimer!==null',ctx))break;}},'no-ACK accepted action is durably saved');assert.equal((await ctx.window.ScannerDeviceStore.readHead()).payload,JSON.stringify(ctx.state));byAction.push(counts.reads-initialReads);};
  shim.document.getElementById('addInput').value='Another local task after a held no-ACK pull';await ctx.onAction('add',{});await settle();
  ctx.onAction('start-scan',{dataset:{mode:'descending'}});await settle();
  const candidate=ctx.state.candidateId,benchmark=ctx.state.chain.at(-1);assert.ok(candidate&&benchmark);ctx.onAction('no',{dataset:{candidate,benchmark}});await settle();assert.equal(ctx.state.considered[candidate],'no');
@@ -3296,7 +3311,7 @@ test('RISK corrupt cloud work budget: cold-opened sources without an ACK keep ne
  const healthyPayload=ctx.cloudPayload(),healthy=await ctx.window.ChainStorageV2.encodeSnapshot(healthyPayload),newId='healthy-peer-after-no-ack-hold';
  backend.docs.set('users/owner/generations/'+newId,{...healthy,state:'published',baseRev:originalRoot.rev});for(const chunk of healthy.chunks)backend.docs.set('users/owner/generations/'+newId+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
  backend.docs.set('users/owner',{...originalRoot,rev:originalRoot.rev+1,activeGeneration:newId,previousGeneration:originalRoot.activeGeneration});shim.window.dispatchEvent(new ctx.CustomEvent('cloudboardchange',{detail:{user:backend.CS.user,rev:originalRoot.rev+1}}));
- await fixtureDeadline((async()=>{while(ctx.state.syncRev<originalRoot.rev+1||ctx.state.syncDirty)await syncSettle(10);})(),'new server revision resumes a no-ACK source hold');assert.equal(ctx.state.tasks.find(row=>row.id===done).done,true);assert.ok(ctx.state.tasks.some(row=>row.title==='Another local task after a held no-ACK pull'));
+ await fixtureDeadline(async wait=>{while(ctx.state.syncRev<originalRoot.rev+1||ctx.state.syncDirty)await wait(10);},'new server revision resumes a no-ACK source hold');assert.equal(ctx.state.tasks.find(row=>row.id===done).done,true);assert.ok(ctx.state.tasks.some(row=>row.title==='Another local task after a held no-ACK pull'));
 });
 
 test('RISK lossless cloud recovery: an exact current board repairs missing chunks without a historical ACK',{timeout:20000},async t=>{
@@ -3306,7 +3321,7 @@ test('RISK lossless cloud recovery: an exact current board repairs missing chunk
  assert.equal(JSON.stringify(backend.docs.get('users/owner/generations/'+originalRoot.activeGeneration)),JSON.stringify(originalHeader),'the damaged generation header remains available as an exact original');
  assert.equal([...backend.docs.keys()].some(key=>key.startsWith('users/owner/generations/'+originalRoot.activeGeneration+'/chunks/')),false,'repair publishes a new complete generation rather than rewriting the original');
  const graph=await ctx.window.ScannerDeviceStore.readRawExportSnapshot(),containsOriginal=value=>value===raw||value&&typeof value==='object'&&Object.values(value).some(containsOriginal);assert.ok(containsOriginal(graph)||[SYNC_STORE_KEY,LOCAL_HEAD_KEY].some(key=>shim.localStorage.getItem(key)===raw),'the exact original remains retained locally');
- shim.document.getElementById('addInput').value='New work after exact no-ACK repair';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);await ctx.sendPush();await fixtureDeadline((async()=>{while(vm.runInContext('pulling||cloudPushInFlight',ctx))await syncSettle(5);})(),'post-repair native edit settles before ACK verification');const final=await settleRecovery188(app);assert.ok(JSON.parse(final.remote.payload).tasks.some(row=>row.title==='New work after exact no-ACK repair'));
+ shim.document.getElementById('addInput').value='New work after exact no-ACK repair';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);await ctx.sendPush();await fixtureDeadline(async wait=>{while(vm.runInContext('pulling||cloudPushInFlight',ctx))await wait(5);},'post-repair native edit settles before ACK verification');const final=await settleRecovery188(app);assert.ok(JSON.parse(final.remote.payload).tasks.some(row=>row.title==='New work after exact no-ACK repair'));
  const finalHead=final.head.payload;await closeLegacyApp173(app);backend.CS.suspend();const cold=await loadAppAtTime(1792323000000,{sharedStorage:shim.localStorage,indexedDBProvider:indexedDB,deviceDbName,cloudSyncFactory:()=>({configured:false,ready:false,user:null,status:'off'})});t.after(()=>cold.dispose());assert.equal(JSON.stringify(cold.ctx.state),finalHead);assert.equal((await cold.ctx.window.ScannerDeviceStore.readHead()).payload,finalHead,'real cold reopen retains the repaired ACK and subsequent accepted task');
 });
 
@@ -3324,7 +3339,7 @@ test('RISK corrupt cloud work budget: completed pending-source refusals do not r
   }
   const pending=await store.getPendingUpload('owner');const originalCloud=JSON.stringify([...backend.docs]),writes=backend.writes.length;let reads=0;app.faults.serverRead=async()=>{reads++;};sub.after(()=>{delete app.faults.serverRead;});
   await fixtureDeadline(ctx.cloudPull(),'pending source check settles within its original bounded attempt',7000);assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev);const initialReads=reads,byAction=[];assert.ok(initialReads>0);ctx.window.CLOUD_PUSH_DELAY_MS=0;
-  const settle=async()=>{assert.equal(await ctx.persist(),true);await fixtureDeadline((async()=>{for(;;){await syncSettle(5);if(!vm.runInContext('pulling||cloudPushInFlight||cloudTimer!==null',ctx))break;}})(),'pending-held ordinary action saves durably');assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state));byAction.push(reads-initialReads);};
+  const settle=async()=>{assert.equal(await ctx.persist(),true);await fixtureDeadline(async wait=>{for(;;){await wait(5);if(!vm.runInContext('pulling||cloudPushInFlight||cloudTimer!==null',ctx))break;}},'pending-held ordinary action saves durably');assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state));byAction.push(reads-initialReads);};
   shim.document.getElementById('addInput').value='Accepted while pending recovery needs a choice';await ctx.onAction('add',{});await settle();ctx.onAction('start-scan',{dataset:{mode:'descending'}});await settle();
   const candidate=ctx.state.candidateId,benchmark=ctx.state.chain.at(-1);assert.ok(candidate&&benchmark);ctx.onAction('no',{dataset:{candidate,benchmark}});await settle();assert.equal(ctx.state.considered[candidate],'no');const done=ctx.state.chain.at(-1);ctx.onAction('bench-done',{dataset:{benchmark:done}});await settle();assert.equal(ctx.state.tasks.find(row=>row.id===done).done,true);
   assert.equal(JSON.stringify([...backend.docs]),originalCloud);assert.equal(backend.writes.length,writes);assert.deepEqual(await store.getPendingUpload('owner'),pending,'even JSON-lossy unknown physical fields remain exact');assert.equal(ctx.state.syncDirty,true);
@@ -3337,7 +3352,7 @@ test('RISK corrupt cloud work budget: completed pending-source refusals do not r
   await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>tx.objectStore('meta').put(pending,'fixture-original-pending-budget'));
   const replacement={...pending,updatedAt:pending.updatedAt+1};await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>tx.objectStore('meta').put(replacement,'pending:owner'));const beforePeer=reads;await ctx.sendPush();await settle();assert.ok(reads>beforePeer,'changed local pending evidence releases only to a fresh source check');assert.equal(JSON.stringify([...backend.docs]),originalCloud);assert.deepEqual(await store.getPendingUpload('owner'),replacement);
   if(control!=='unrepresented pending with typed authority'){
-   const compatible={...replacement};delete compatible.futurePending;await store.setPendingUpload('owner',compatible);await ctx.sendPush();await fixtureDeadline((async()=>{while(vm.runInContext('pulling||cloudPushInFlight',ctx))await syncSettle(5);})(),'a same-pointer losslessness change permits a fresh guarded repair');const final=await settleRecovery188(app);assert.ok(final.remote.rev>originalRoot.rev);assert.equal(ctx.state.tasks.find(row=>row.id===done).done,true);assert.ok(JSON.parse(final.remote.payload).tasks.some(row=>row.title==='Accepted while pending recovery needs a choice'));
+   const compatible={...replacement};delete compatible.futurePending;await store.setPendingUpload('owner',compatible);await ctx.sendPush();await fixtureDeadline(async wait=>{while(vm.runInContext('pulling||cloudPushInFlight',ctx))await wait(5);},'a same-pointer losslessness change permits a fresh guarded repair');const final=await settleRecovery188(app);assert.ok(final.remote.rev>originalRoot.rev);assert.equal(ctx.state.tasks.find(row=>row.id===done).done,true);assert.ok(JSON.parse(final.remote.payload).tasks.some(row=>row.title==='Accepted while pending recovery needs a choice'));
   }
   const graph=await store.readRawExportSnapshot(),meta=graph.stores.meta;assert.deepEqual(meta.values[meta.keys.indexOf('fixture-original-pending-budget')],pending,'the compatible-peer fixture retains every exact original non-JSON value');
 
@@ -3350,7 +3365,7 @@ test('RISK corrupt cloud work budget: a failed exact-source read does not perman
  refuseNextRecoveryTransaction255(app.faults);await ctx.cloudPull();assert.equal(failed,true,'the ordinary corrupt pull reached its separate exact-copy read');assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev);
  delete app.faults.serverRead;
  shim.document.getElementById('addInput').value='Accepted after a transient exact-source read';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);await ctx.sendPush();
- await fixtureDeadline((async()=>{while(vm.runInContext('pulling||cloudPushInFlight',ctx))await syncSettle(5);})(),'the edit-triggered app operation settles before the external verification read');
+ await fixtureDeadline(async wait=>{while(vm.runInContext('pulling||cloudPushInFlight',ctx))await wait(5);},'the edit-triggered app operation settles before the external verification read');
  const {remote}=await settleRecovery188(app);
  assert.ok(remote.rev>originalRoot.rev,'a transient failed check cannot be treated as proof that the exact acknowledged copy is unrepairable');
  assert.ok(JSON.parse(remote.payload).tasks.some(row=>row.title==='Accepted after a transient exact-source read'));
@@ -8436,6 +8451,52 @@ test("app harness: disposal cancels its real wake and late timers while another 
  assert.equal(stale,false,"closed app callbacks never run after their owning test");
  assert.equal(late,false,"late continuations cannot revive a closed app");
  assert.equal(otherWake._destroyed,false,"another live app retains its own wake");
+});
+
+test('RISK recovery fixture shutdown: a failed real source observation stops its own polling and exits',async t=>{
+ const os=await import('node:os'),root=fs.mkdtempSync(path.join(os.tmpdir(),'scanner-source-failure-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const source=fs.readFileSync(path.join(__dirname,'tests.js'),'utf8'),name='RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations';
+ const start=source.indexOf("test('"+name+"'"),end=source.indexOf('\nasync function coldDamagedSourceWithoutAck214',start);
+ assert.ok(start>=0&&end>start);
+ const anchor=" shim.window.dispatchEvent(new ctx.CustomEvent('cloudboardchange',{detail:{user:backend.CS.user,rev:originalRoot.rev+1}}));";
+ const consumer=source.slice(start,end);assert.equal(consumer.split(anchor).length,2,'the fault attaches to the one actual healthy-revision SDK read');
+ const failed=consumer.replace(anchor,` app.faults.pull=Object.assign(Error('Controlled unavailable next revision'),{code:'unavailable'});
+ t.after(async()=>{await app.dispose();assert.equal(vm.runInContext('scanWakeTimer',ctx)?._destroyed,true);assert.ok(backend.subscriptions.every(row=>!row.active));console.log('FAILED_FIXTURE_OWNED_RESOURCES_CLOSED');});
+`+anchor);
+ const childSource=(source.slice(0,start)+failed+source.slice(end)).replace('const __dirname = path.dirname(fileURLToPath(import.meta.url));','const __dirname = '+JSON.stringify(__dirname)+';');
+ fs.writeFileSync(path.join(root,'failed-consumer.mjs'),childSource);fs.symlinkSync(path.join(__dirname,'node_modules'),path.join(root,'node_modules'),'dir');
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^'+name+'$','failed-consumer.mjs'],{cwd:root,env,encoding:'utf8',timeout:70000,maxBuffer:1024*1024}),output=child.stdout+child.stderr;
+ assert.equal(child.error,undefined,'the real failed consumer must finish before its process cleanup bound: '+output);
+ assert.equal(child.signal,null,'the actual failed consumer must exit without a polling worker: '+output);
+ assert.equal(child.status,1,'the deliberate external refusal remains a real failed consumer');
+ assert.match(output,/a new server revision escapes the held-source gate/);assert.match(output,/FAILED_FIXTURE_OWNED_RESOURCES_CLOSED/);
+ assert.match(output,/# tests 1\b/);assert.match(output,/# fail 1\b/);assert.match(output,/# cancelled 0\b/);
+});
+
+test('RISK corrupt work budget fixture: one shared action deadline rejects an actually held device commit',async t=>{
+ const os=await import('node:os'),root=fs.mkdtempSync(path.join(os.tmpdir(),'scanner-action-overrun-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const source=fs.readFileSync(path.join(__dirname,'tests.js'),'utf8'),name='RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations';
+ const start=source.indexOf("test('"+name+"'"),end=source.indexOf('\nasync function coldDamagedSourceWithoutAck214',start);assert.ok(start>=0&&end>start);
+ const anchor=' ctx.window.CLOUD_PUSH_DELAY_MS=0;',consumer=source.slice(start,end);assert.equal(consumer.split(anchor).length,2);
+ const stalled=consumer.replace(anchor,` const store=ctx.window.ScannerDeviceStore,commit=store.commitHead.bind(store),gate=deferredSyncFixture(),held=[];let delivery=null;
+ store.commitHead=options=>{const call=(async()=>{if(options.payload.includes('Local work while the cloud source needs a choice')){console.log('ACTUAL_ORDINARY_ACTION_COMMIT_ENTERED');if(delivery===null)delivery=setTimeout(()=>gate.resolve(),21000);await gate.promise;}return commit(options);})();held.push(call);return call;};
+ t.after(async()=>{clearTimeout(delivery);gate.resolve();await Promise.all(held);store.commitHead=commit;await app.dispose();});
+`+anchor);
+ fs.writeFileSync(path.join(root,'stalled-consumer.mjs'),(source.slice(0,start)+stalled+source.slice(end)).replace('const __dirname = path.dirname(fileURLToPath(import.meta.url));','const __dirname = '+JSON.stringify(__dirname)+';'));
+ fs.symlinkSync(path.join(__dirname,'node_modules'),path.join(root,'node_modules'),'dir');
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ // Child envelope includes the existing setup/control bounds; it must report
+ // the single 20s action bound, never pass or require process termination.
+ const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^'+name+'$','stalled-consumer.mjs'],{cwd:root,env,encoding:'utf8',timeout:70000,maxBuffer:1024*1024}),output=child.stdout+child.stderr;
+ assert.equal(child.error,undefined,output);assert.equal(child.signal,null,output);assert.equal(child.status,1,output);
+ assert.match(output,/ACTUAL_ORDINARY_ACTION_COMMIT_ENTERED/);
+ assert.match(output,/four ordinary actions exceed their shared 20000ms durability\/read budget/);
+ const elapsed=Number(output.match(/Ordinary-action shared 20000ms observation: (\d+)ms/)?.[1]);assert.ok(elapsed>=20000,'the earned action stall reaches the original single 20s limit: '+output);
+ t.diagnostic('The actual held ordinary-action commit rejected at the single '+elapsed+'ms action deadline and its child exited normally.');
+ assert.match(output,/# tests 1\b/);assert.match(output,/# fail 1\b/);assert.match(output,/# cancelled 0\b/);
 });
 
 // Overrides Date.now() *inside one vm context only*, via in-context code —
@@ -14565,9 +14626,20 @@ test('RISK saved view fallback: corrupt or blocked local presentation storage le
 // They observe real application promises; no loader, production state or timer changes.
 function deferredSyncFixture(){let resolve;const promise=new Promise(done=>{resolve=done;});return{promise,resolve};}
 async function fixtureDeadline(promise,message,ms=5000){
- let timer;
- try{return await Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(message)),ms);})]);}
- finally{clearTimeout(timer);}
+ let timer,finished=false;const waits=new Map();
+ // Polling belongs to this observation, not the product operation it watches.
+ // A raced async loop otherwise keeps scheduling host timers after failure.
+ const wait=(delay=0)=>new Promise((resolve,reject)=>{
+  if(finished){reject(Error(message));return;}
+  const pending=setTimeout(()=>{waits.delete(pending);resolve();},delay);waits.set(pending,reject);
+ });
+ try{return await Promise.race([typeof promise==='function'?promise(wait):promise,
+  new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(message)),ms);})]);}
+ finally{
+  finished=true;clearTimeout(timer);
+  for(const [pending,reject]of waits){clearTimeout(pending);reject(Error(message));}
+  waits.clear();
+ }
 }
 function observeSyncFixtureCalls(ctx,name){
  const original=ctx[name],calls=[];
@@ -41984,14 +42056,14 @@ test('RISK debug log: an interrupted actual cloud review retains its stage in a 
  t.after(async()=>{gate.resolve();delete app.faults.serverRead;await review;});
  app.faults.serverRead=async()=>{entered=true;await gate.promise;};
  await ctx.onAction('sync',{});review=ctx.onAction('review-cloud-source-recovery',{});
- await fixtureDeadline((async()=>{while(!entered)await flush();})(),'the actual recovery read reaches the external server boundary');
+ await fixtureDeadline(async wait=>{while(!entered)await wait();},'the actual recovery read reaches the external server boundary');
  const key='fvp:chain-scanner:restart-diagnostics:v1',image={[key]:shim.localStorage.getItem(key),[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY),[LOCAL_HEAD_KEY]:shim.localStorage.getItem(LOCAL_HEAD_KEY)};
  const cold=await loadApp({appSource:'Date.now=()=>'+realNow(ctx)+';\n'+appSrc,seedStorage:image,indexedDBProvider:app.indexedDB,deviceDbName:app.deviceDbName});t.after(()=>cold.dispose());
  const journal=cold.ctx.buildSupportDiagnosticsReport().restartDiagnostics,prior=journal.documents.find(row=>row.document!==journal.currentDocument&&row.lastAction?.detail==='review-cloud-source-recovery');
  assert.equal(prior?.review?.stage,'review-start','a new document must retain the interrupted review rather than silently resetting its stage');
  assert.ok(prior.events.some(row=>row.stage==='root'&&row.status==='started'),'the persisted trail distinguishes an outstanding source read');
  gate.resolve();delete app.faults.serverRead;assert.equal(await review,true);
- await fixtureDeadline((async()=>{while(!ctx.buildSupportDiagnosticsReport().restartDiagnostics.documents.some(row=>row.review?.stage==='review-finished'))await flush();})(),'the rendered review records its actual animation frame');
+ await fixtureDeadline(async wait=>{while(!ctx.buildSupportDiagnosticsReport().restartDiagnostics.documents.some(row=>row.review?.stage==='review-finished'))await wait();},'the rendered review records its actual animation frame');
  const completed=ctx.buildSupportDiagnosticsReport().restartDiagnostics.documents.find(row=>row.document!==journal.currentDocument&&row.lastAction?.detail==='review-cloud-source-recovery');
  assert.equal(completed?.review?.stage,'review-finished');assert.ok(completed.events.some(row=>row.stage==='review-rendered'));
  assert.equal(cold.ctx.cloudPayload(),ctx.cloudPayload(),'reopening diagnostic metadata does not replace or publish the board');
@@ -42126,7 +42198,7 @@ test('RISK support diagnostics: native debounce reports scheduled, saving, and d
  assert.equal(saving.activePersistCalls.value,1,'the scheduled action has entered its real held device save');
  assert.equal(saving.debouncePending.value,false,'a fired debounce is not a pending timer while storage is held');
  gate.resolve();
- await fixtureDeadline((async()=>{while(ctx.buildSupportDiagnosticsReport().save.activePersistCalls.value)await flush();})(),'the real device save did not drain');
+ await fixtureDeadline(async wait=>{while(ctx.buildSupportDiagnosticsReport().save.activePersistCalls.value)await wait();},'the real device save did not drain');
  const head=await store.readHead(),drained=ctx.buildSupportDiagnosticsReport().save;
  assert.equal(head.payload,JSON.stringify(ctx.state),'the native changes reached an exact durable snapshot');
  assert.equal(commits,1,'the superseded older timer cannot add a second save');
@@ -42426,12 +42498,12 @@ test('RISK support diagnostics: second complete source aggregate identifies its 
  app.faults.serverRead=async path=>{if(path===rootPath&&++rootReads===3)await gate;};
  const reviewing=ctx.onAction('review-cloud-source-recovery',{});
  t.after(async()=>{release();delete app.faults.serverRead;await reviewing;});
- await fixtureDeadline((async()=>{while(rootReads<3)await flush();})(),'the second complete source aggregate did not reach its held SDK root read');
+ await fixtureDeadline(async wait=>{while(rootReads<3)await wait();},'the second complete source aggregate did not reach its held SDK root read');
  ctx.onAction('view-support-diagnostics',{});
  assert.equal(await reviewing,false,'the second aggregate reaches its ordinary source deadline');
  // The shared attempt can settle before its SDK rejection reaches the
  // aggregate observer. Require that actual event within the existing bound.
- await fixtureDeadline((async()=>{while(!ctx.buildSupportDiagnosticsReport().sourceOperations.some(operation=>operation.events.some(event=>event.stage==='aggregate'&&event.role==='second'&&event.status==='timed-out')))await flush();})(),'the held second aggregate must record its real SDK timeout');
+ await fixtureDeadline(async wait=>{while(!ctx.buildSupportDiagnosticsReport().sourceOperations.some(operation=>operation.events.some(event=>event.stage==='aggregate'&&event.role==='second'&&event.status==='timed-out')))await wait();},'the held second aggregate must record its real SDK timeout');
  const operations=ctx.buildSupportDiagnosticsReport().sourceOperations;
  const review=operations.find(operation=>operation.events.some(event=>event.stage==='aggregate'&&event.role==='first'));
  assert.ok(review,'the complete source consumer records a first aggregate');
@@ -42507,7 +42579,7 @@ test('RISK support diagnostics: root, chunk, and final-root SDK stalls retain th
   };
   reviewing=ctx.onAction('review-cloud-source-recovery',{});
   sub.after(async()=>{release();delete app.faults.serverRead;await reviewing;});
-  await fixtureDeadline((async()=>{while(!held)await flush();})(),target+' SDK read did not enter the held native call');
+  await fixtureDeadline(async wait=>{while(!held)await wait();},target+' SDK read did not enter the held native call');
   ctx.onAction('view-support-diagnostics',{});
   assert.match(shim.document.getElementById('modalRoot').innerHTML,/<h2>Debug log<\/h2>/,'the report owns the visible dialog while its source operation is pending');
   const observed=()=>{
@@ -42519,7 +42591,7 @@ test('RISK support diagnostics: root, chunk, and final-root SDK stalls retain th
   assert.equal(await reviewing,false,target+' source review reaches its ordinary SDK deadline');
   // The whole-attempt timer can settle before the SDK's abort rejection has
   // crossed its wrapper. Still require that real error and stage observation.
-  await fixtureDeadline((async()=>{while(!readError)await flush();})(),target+' bounded SDK abort must settle');
+  await fixtureDeadline(async wait=>{while(!readError)await wait();},target+' bounded SDK abort must settle');
   const stageEvents=observed().filter(event=>event.stage===target);
   assert.equal(readError?.code,'deadline-exceeded',target+' control holds the real SDK until its ordinary deadline');
   assert.ok(stageEvents.some(event=>event.status==='timed-out'),target+' timeout is attributed to the held stage; held='+held+' rootReads='+rootReads+' error='+JSON.stringify(readError)+' events='+JSON.stringify(observed().map(event=>({stage:event.stage,status:event.status,role:event.role,operation:event.operation,code:event.code?.value}))));
@@ -43058,7 +43130,7 @@ test('RISK shared protection cancellation: a stopped transaction cannot start de
  const faults={},backend=await loadCloudBackendV2({timeoutMs:5000,failures:faults});t.after(()=>backend.CS.suspend());assert.equal((await backend.CS.push('{"tasks":[]}',1,0)).ok,true);for(let n=0;n<25;n++)await flush();
  const source=await backend.CS.readRecoverySource();let entered=false,revoked=false,afterRevocation=0,release;const gate=new Promise(resolve=>release=resolve);
  faults.transactionRead=async path=>{if(revoked)afterRevocation++;if(path.includes('/generations/')){entered=true;await gate;}};
- const protecting=backend.CS.protectRecoverySources({source});await fixtureDeadline((async()=>{while(!entered)await flush();})(),'native protection transaction reaches its actual external header read');
+ const protecting=backend.CS.protectRecoverySources({source});await fixtureDeadline(async wait=>{while(!entered)await wait();},'native protection transaction reaches its actual external header read');
  revoked=true;backend.CS.suspend();release();assert.equal((await protecting).cancelled,true);for(let n=0;n<10;n++)await flush();
  assert.equal(afterRevocation,0,'headers and markers must share their original read phase; cancellation forbids a dependent marker request');
 });
