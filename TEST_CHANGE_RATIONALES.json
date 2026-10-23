@@ -17454,6 +17454,26 @@
   },
   {
     "baseCommit": "ed8355bfb8de6feae759c8f66fbdfe6c01d2339a",
+    "testChangesSha256": "15f6bd1a18fe98999bdbe328cc09c7b52c10cdfbb199fb09aed93c942f2d2a5d",
+    "reason": "Extend the malformed-readable-head full-app consumer through a real accepted edit and offline cold reopen, while proving every original source remains exact after both transitions.",
+    "previousBehavior": "The malformed-head consumer stopped after initial automatic adoption and exact raw readback. It did not prove that an accepted edit could reach durable storage after activation or survive an offline reopen, and it had no unreadable physical backup row to exercise post-save backup-cache refresh.",
+    "intendedBehavior": "After guarded automatic adoption, a real accepted edit must persist as the exact device head, remain locally held and unpublished, preserve the exact browser copies, malformed snapshots, unknown metadata, unreadable physical backup row, original archive envelope and manual opaque source, then survive a cold reopen without a cloud client.",
+    "replacementTests": [
+      "RISK cloud source recovery malformed readable head: accepted edit and exact sources survive offline cold reopen"
+    ],
+    "preservedCoverage": [
+      "The existing healthy-current malformed-head adoption, accepted-board identity, unsupported-field retention and pending cloud acknowledgement checks remain in the same full-app consumer.",
+      "The exact raw-source envelope, browser copies, malformed snapshots, unknown metadata, physical unreadable backup row and manual opaque source remain verified after adoption, editing and offline cold reopen.",
+      "The teardown now disposes the first app without invoking an implicit persistence operation, so the cold-reopen assertion depends on the accepted editor save itself.",
+      "The inaccessible-store and unsupported-archive refusal assertions, startup capture deferral, #249 fresh-empty controls and #250 supported-union coverage remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK cloud source recovery malformed readable head' tests.js",
+      "failure": "The post-adoption edit extension first failed at saveEditorChoice returning false (false !== true) with device-save:storage/unavailable, despite liveBoardAccepted and deviceStorageAuthority being true and deviceStorageRequired being false. The first terminal invocation was unrecorded; the same pre-correction working-tree state was recorded at evidence/252/2026-10-23T02-29-48-923Z-4887ef5e-cf21-4b9e-8b39-c26420809834.json against integration ed8355bfb8de6feae759c8f66fbdfe6c01d2339a. The subsequent unreadable-backup-row qualification was added after the minimal activation fix and passed without any reader/runtime change at evidence/252/2026-10-23T02-35-50-324Z-4789c9d6-12c2-4133-9069-0240e2d7848e.json."
+    }
+  },
+  {
+    "baseCommit": "ed8355bfb8de6feae759c8f66fbdfe6c01d2339a",
     "testChangesSha256": "90a1b91eb22a1b524dfd2e92cd35004721a87a19207e0f1f74e8989e5b0baa08",
     "reason": "Implement authorized #251 automatic compatible defaults, exact alternatives, guarded publication/current-context ACK and obsolete-baseline convergence through the agreed full-app device and SDK consumers. Preserve original chronological failures rather than invent one combined RED.",
     "previousBehavior": "Supported same-field ambiguity left an unaccepted device stranded. A later automatic hold could never publish. A second device kept an obsolete default held after another device acknowledged its result, a concurrent accepted Add stranded supported cloud work, and an uncertain committed write could not finish after an exact later server read.",
