@@ -1799,7 +1799,7 @@ The full-app cloudPull path unions only independently validated same-account can
 
 ## Readable malformed device head (#252)
 
-- RISK cloud source recovery malformed readable head: a healthy same-account cloud board can reopen
+- RISK cloud source recovery malformed readable head: accepted edit and exact sources survive offline cold reopen
 
 This full-app consumer starts over a readable raw IndexedDB source whose selected head record is malformed, with distinct malformed browser copies and a healthy current cloud generation. Recovery must open a supported local board under a durable cloud hold, preserve the exact original source evidence, and leave the cloud generation unchanged. This remains distinct from a truly empty first-use client and from inaccessible storage; the malformed source is never accepted as an empty board.
 
