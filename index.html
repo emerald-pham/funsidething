@@ -11263,6 +11263,11 @@ function cloudSourceRecoveryBoard(raw,account){
 }
 function automaticRecoveryPlainObject(value){return !!value&&typeof value==="object"&&!Array.isArray(value);}
 function automaticRecoveryClone(value){return JSON.parse(JSON.stringify(value));}
+function automaticRecoveryRecordedRatings(board){
+  const account=board?.syncAccount??null;
+  return supportedDecisionBaseline(board?.decisionBaseline,account)&&
+    !decisionEvidenceIssue(board,account)&&!decisionProjectionIssue(board);
+}
 function automaticRecoverySourceFacts(board){
   const facts=new Map(),causalRoot=new Set([...DEVICE_LOCAL_KEYS,"updatedAt","tasks","contexts","workLog","deletionLog",
     "deletedTaskIds","restoredTaskIds","restoredTaskOps","deletedAfterRestoreOps","clearedHistoryIds","restoredHistoryIds",
@@ -11271,6 +11276,12 @@ function automaticRecoverySourceFacts(board){
     "ratingHistory","ratingHistoryRecovery","ratingHistoryHead","woopPlanOps","woopEvidenceRecovery","woopOpaqueRecovery",
     "postponeOps","postponeRecovery","comparisonOps","comparisonRecovery","prerequisiteIds","prerequisiteId",
     "prerequisiteMirror","prerequisiteOps","prerequisiteRevision","dependencyModes","dependencyModeRecovery"]);
+  // Coherently recorded ratings are derived replay results, not separate
+  // saved-number choices. Legacy/unprojectable numbers remain ordinary facts;
+  // cross-source baseline/identity compatibility is still checked separately.
+  if(automaticRecoveryRecordedRatings(board)){
+    causalTask.add("mu");causalTask.add("sigma");
+  }
   const put=(path,present,value)=>facts.set(JSON.stringify(path),canonicalDecisionFact({present,...(present?{value}:{})}));
   const visit=(value,path)=>{
     if(automaticRecoveryPlainObject(value)){
@@ -11287,12 +11298,15 @@ function automaticRecoverySourceFacts(board){
   return facts;
 }
 function automaticRecoveryChangedFacts(board,base){
-  const current=automaticRecoverySourceFacts(board),ancestor=automaticRecoverySourceFacts(base),changed=new Map();
+  const current=automaticRecoverySourceFacts(board),ancestor=automaticRecoverySourceFacts(base),changed=new Map(),derivedRatings=automaticRecoveryRecordedRatings(board);
   const currentTaskIds=new Set((Array.isArray(board?.tasks)?board.tasks:[]).map(task=>task?.id).filter(id=>typeof id==="string"));
   for(const key of new Set([...current.keys(),...ancestor.keys()])){
     const now=current.get(key),before=ancestor.get(key);
     if(now!==before){
       const path=JSON.parse(key);
+      // An unrecorded ancestor still contains saved numbers; their absence
+      // from the replay-derived current facts is not a field deletion.
+      if(derivedRatings&&path[0]==="tasks"&&["mu","sigma"].includes(path[2]))continue;
       // Task membership is changed only by the explicit task-intent records
       // merged in mergeUndeletedTasks. A partial snapshot cannot delete it.
       if(now===undefined&&path[0]==="tasks"&&!currentTaskIds.has(path[1]))continue;

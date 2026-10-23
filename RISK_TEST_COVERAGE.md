@@ -2084,3 +2084,5 @@ This boundary control holds a successful real provider reply, installs a later a
 - RISK automatic recovery identity safety: contradictory original decision bytes never become a default
 - RISK automatic recovery guidance: mounted FAQ explains reversible defaults and exact cloud confirmation
 - RISK automatic recovery recorded choices: a causal native edit beats the pinned device value despite clock skew
+- RISK automatic recovery comparisons: compatible independent observations replay once instead of becoming rating defaults
+- RISK automatic recovery rating safety: ambiguous legacy saved numbers do not become a compatible default

@@ -1281,6 +1281,42 @@ test('RISK automatic recovery guidance: mounted FAQ explains reversible defaults
  assert.match(html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1],/Recovery resolves compatible disagreements automatically/);
 });
 
+test('RISK automatic recovery comparisons: compatible independent observations replay once instead of becoming rating defaults',async t=>{
+ const app=await divergentCloudSourceApp187(t,{deferInitialRecovery:true,holdCloudPush:true}),{ctx,backend,originalRoot}=app;
+ ctx.window.CloudSync.ready=false;ctx.openSettings();const box=app.shim.document.getElementById('stSkipOldestFirstDot');Object.assign(box,{id:'stSkipOldestFirstDot',checked:true,matches:()=>false});app.shim.document.dispatchEvent({type:'change',target:box});ctx.closeModal();
+ ctx.onAction('start-scan',{dataset:{mode:'descending'}});ctx.decide('yes');assert.equal(await ctx.persist(),true);
+ const shared=JSON.stringify(ctx.state),peer=await loadAppAtTime(1792323000000,{seedStorage:{[SYNC_STORE_KEY]:shared,[LOCAL_HEAD_KEY]:shared}});t.after(()=>closeLegacyApp173(peer));
+ assert.equal(peer.ctx.state.candidateId,ctx.state.candidateId);assert.ok(ctx.state.candidateId);
+ setFakeTime(ctx,1792323000100);ctx.decide('yes');assert.equal(await ctx.persist(),true);
+ setFakeTime(peer.ctx,1792323000200);peer.ctx.decide('no');assert.equal(await peer.ctx.persist(),true);
+ const localObservation=JSON.parse(JSON.stringify(ctx.state.decisionEvents.find(row=>row.kind==='comparison'&&row.action==='yes'))),peerObservation=JSON.parse(JSON.stringify(peer.ctx.state.decisionEvents.find(row=>row.kind==='no')));
+ assert.ok(localObservation?.id&&peerObservation?.id);assert.notEqual(localObservation.id,peerObservation.id);
+ assert.equal(localObservation.ratingApplied,true);assert.equal(peerObservation.ratingApplied,true);
+ assert.equal(ctx.decisionBaselineCoreEqual(ctx.state.decisionBaseline,peer.ctx.state.decisionBaseline),true,'both real native observations share the exact supported rating baseline');
+ assert.equal(ctx.decisionProjectionIssue(ctx.state),null);assert.equal(peer.ctx.decisionProjectionIssue(peer.ctx.state),null);
+ const oneObservationSigmas=new Map(ctx.state.tasks.map(task=>[task.id,Math.min(task.sigma,peer.ctx.state.tasks.find(row=>row.id===task.id).sigma)]));
+ const incoming=peer.ctx.cloudPayload(),path='users/owner/generations/'+originalRoot.previousGeneration,header=backend.docs.get(path),encoded=await ctx.window.ChainStorageV2.encodeSnapshot(incoming);
+ backend.docs.set(path,{...header,...encoded,chunks:undefined});for(const key of [...backend.docs.keys()])if(key.startsWith(path+'/chunks/'))backend.docs.delete(key);for(const chunk of encoded.chunks)backend.docs.set(path+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
+ ctx.window.CloudSync.ready=true;ctx.closeModal();await flush();await ctx.cloudPull();
+ for(const observation of [localObservation,peerObservation])assert.deepEqual(JSON.parse(JSON.stringify(ctx.state.decisionEvents.find(row=>row.id===observation.id)??null)),observation,'each independent comparison reaches the actual automatic working board unchanged');
+ for(const id of [peerObservation.benchmarkId,peerObservation.candidateId])assert.ok(ctx.state.tasks.find(row=>row.id===id).sigma<oneObservationSigmas.get(id),'two distinct valid observations add information beyond either one-observation source');
+ assert.equal((await ctx.window.ScannerDeviceStore.getRecoveryCloudHold())?.automaticRecovery,true);
+ await ctx.sendPush();assert.equal(await ctx.window.ScannerDeviceStore.getRecoveryCloudHold(),null);
+ const acknowledged=ctx.cloudPayload(),revision=backend.docs.get('users/owner').rev;
+ for(let n=0;n<2;n++){await ctx.cloudPull();await ctx.sendPush();assert.equal(ctx.cloudPayload(),acknowledged,'repeated delivery cannot duplicate rating learning');}
+ assert.equal(backend.docs.get('users/owner').rev,revision);
+});
+
+test('RISK automatic recovery rating safety: ambiguous legacy saved numbers do not become a compatible default',async t=>{
+ const app=await divergentCloudSourceApp187(t,{deferInitialRecovery:true,holdCloudPush:true}),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ const before=JSON.stringify(ctx.state),head=await store.readHead(),path='users/owner/generations/'+originalRoot.previousGeneration,header=backend.docs.get(path),chunks=[...backend.docs].filter(([key])=>key.startsWith(path+'/chunks/')).map(([,row])=>row).sort((a,b)=>a.index-b.index);
+ const legacy=JSON.parse(await ctx.window.ChainStorageV2.decodeSnapshot(header,chunks));assert.equal(legacy.decisionBaseline,undefined);legacy.tasks.find(row=>row.id==='a').mu=26;
+ const raw=JSON.stringify(legacy),encoded=await ctx.window.ChainStorageV2.encodeSnapshot(raw);backend.docs.set(path,{...header,...encoded,chunks:undefined});for(const key of [...backend.docs.keys()])if(key.startsWith(path+'/chunks/'))backend.docs.delete(key);for(const chunk of encoded.chunks)backend.docs.set(path+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
+ ctx.closeModal();await flush();await ctx.cloudPull();
+ assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(await store.readHead(),head);assert.equal(await store.getRecoveryCloudHold(),null);
+ assert.equal(await ctx.window.ChainStorageV2.decodeSnapshot(backend.docs.get(path),encoded.chunks),raw);assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev);
+});
+
 test('RISK automatic recovery recorded choices: a causal native edit beats the pinned device value despite clock skew',async t=>{
  const app=await divergentCloudSourceApp187(t,{deferInitialRecovery:true,holdCloudPush:true}),{ctx,backend,originalRoot}=app;
  ctx.window.CloudSync.ready=false;
