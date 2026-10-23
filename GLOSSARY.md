@@ -45,6 +45,8 @@ _Avoid_: Restoring the whole earlier board
 **Recovery source**:
 A retained copy of a board or its saved decisions that may help recover work.
 Keeping a source does not establish that it is complete or safe to apply.
+Shared originals retained by automatic recovery remain protected across devices,
+including after they leave the current cloud slots; this cannot recreate missing bytes.
 _Avoid_: Recovered board
 
 **Cloud recovery review**:
@@ -64,6 +66,8 @@ _Avoid_: Newest snapshot, invented decision
 Recovery that retains every accepted board decision, unfinished draft and
 newer edit. A validated older source can provide a local working board while
 unexamined cloud changes remain protected and cloud confirmation stays pending.
+The verified saved working board and an automatic pending confirmation can resume
+after reopening without another source-selection exercise.
 _Avoid_: Loading any readable backup
 
 **Cloud acknowledgement**:

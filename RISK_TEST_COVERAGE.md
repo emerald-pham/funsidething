@@ -2087,3 +2087,9 @@ This boundary control holds a successful real provider reply, installs a later a
 - RISK automatic recovery recorded choices: a causal native edit beats the pinned device value despite clock skew
 - RISK automatic recovery comparisons: compatible independent observations replay once instead of becoming rating defaults
 - RISK automatic recovery rating safety: ambiguous legacy saved numbers do not become a compatible default
+
+## Integrated automatic recovery qualification
+
+- RISK integrated automatic recovery: persisted multichunk sources retain pending ACK and true Done Undo through restart
+- RISK integrated automatic recovery native: persisted startup status and neighboring controls remain usable
+- RISK integrated automatic recovery: a failed current read cannot hide the healthy previous source
