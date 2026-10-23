@@ -585,13 +585,14 @@ async function damagedAcknowledgedApp187(t,{timeoutMs=5000,sourcePadding=0,timer
  return {...app,faults,originalRoot,originalHeader,acknowledgedTasks,previousSource};
 }
 
-test('RISK cloud source recovery malformed readable head: a healthy same-account cloud board can reopen',async t=>{
+test('RISK cloud source recovery malformed readable head: accepted edit and exact sources survive offline cold reopen',async t=>{
  const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='malformed-readable-head-252-'+Math.random();
  const malformedPayload='{"tasks":[ exact damaged device bytes \ud800',store=loadStorageV2({indexedDB}).createDeviceStore({indexedDB,crypto:webcrypto,dbName:deviceDbName});
  await store.open();assert.equal((await store.commitHead({expectedHash:null,payload:malformedPayload,account:'e@example.com'})).ok,true);
  await editRawDevice187(indexedDB,deviceDbName,tx=>{
   tx.objectStore('meta').put({schemaVersion:99,hash:'truncated-head-hash',futureHeadEvidence:{keep:['every','field']}},'head');
   tx.objectStore('meta').put({futureDeviceMarker:{opaque:'retain exact unknown row'}},'future:unknown');
+  tx.objectStore('backups').put({unknownBackup:99,payloadHash:'missing'},'unreadable-original-252');
   tx.objectStore('opaque').put({key:'manual-252',raw:'exact protected source bytes'},'manual-252');
  });
  const before=await store.readRawExportSnapshot(),browserOriginals={
@@ -600,7 +601,7 @@ test('RISK cloud source recovery malformed readable head: a healthy same-account
   [LOCAL_BACKUPS_KEY]:'[ exact manual backup index bytes',
  };
  const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName,seedStorage:{'fvp:chain-scanner:device-store-v2':'1',...browserOriginals}}),{ctx,shim}=app;
- t.after(()=>app.dispose());
+ t.after(async()=>{await app.dispose();await store.close();});
  const board=syncState({v:2,tasks:[syncTask('healthy-cloud-252','Healthy same-account cloud source')],syncAccount:'e@example.com',syncRev:0,syncDirty:false,
   futureCloudEvidence:{opaque:['preserve',252]}}),cloudRaw=JSON.stringify(board);
  const backend=await loadCloudBackendV2({runtimeWindow:ctx.window,timeoutMs:5000,recoveryTimeoutMs:5000});t.after(()=>backend.CS.suspend());
@@ -645,6 +646,9 @@ test('RISK cloud source recovery malformed readable head: a healthy same-account
  assert.deepEqual([SYNC_STORE_KEY,LOCAL_HEAD_KEY,LOCAL_BACKUPS_KEY].map(key=>shim.localStorage.getItem(key)),
   [browserOriginals[SYNC_STORE_KEY],browserOriginals[LOCAL_HEAD_KEY],browserOriginals[LOCAL_BACKUPS_KEY]],'ordinary accepted editing leaves the exact browser originals intact');
  const editedRaw=await store.readRawExportSnapshot();
+ const unreadableBackupIndex=editedRaw.stores.backups.keys.findIndex(key=>key==='unreadable-original-252');
+ assert.notEqual(unreadableBackupIndex,-1,'the accepted edit keeps the unreadable physical backup row present');
+ assert.deepEqual(editedRaw.stores.backups.values[unreadableBackupIndex],before.stores.backups.values[before.stores.backups.keys.indexOf('unreadable-original-252')],'the accepted edit keeps the unreadable physical backup row exact');
  for(const [index,key]of before.stores.snapshots.keys.entries()){
   const at=editedRaw.stores.snapshots.keys.findIndex(candidate=>JSON.stringify(candidate)===JSON.stringify(key));
   assert.notEqual(at,-1,'the accepted edit keeps every original malformed snapshot present');
@@ -668,6 +672,9 @@ test('RISK cloud source recovery malformed readable head: a healthy same-account
  assert.deepEqual([SYNC_STORE_KEY,LOCAL_HEAD_KEY,LOCAL_BACKUPS_KEY].map(key=>cold.shim.localStorage.getItem(key)),
   [browserOriginals[SYNC_STORE_KEY],browserOriginals[LOCAL_HEAD_KEY],browserOriginals[LOCAL_BACKUPS_KEY]],'offline cold reopen retains the exact browser originals');
  const coldRaw=await coldStore.readRawExportSnapshot();
+ const coldUnreadableBackupIndex=coldRaw.stores.backups.keys.findIndex(key=>key==='unreadable-original-252');
+ assert.notEqual(coldUnreadableBackupIndex,-1,'offline cold reopen keeps the unreadable physical backup row present');
+ assert.deepEqual(coldRaw.stores.backups.values[coldUnreadableBackupIndex],before.stores.backups.values[before.stores.backups.keys.indexOf('unreadable-original-252')],'offline cold reopen keeps the unreadable physical backup row exact');
  for(const [index,key]of before.stores.snapshots.keys.entries()){
   const at=coldRaw.stores.snapshots.keys.findIndex(candidate=>JSON.stringify(candidate)===JSON.stringify(key));
   assert.notEqual(at,-1,'offline cold reopen keeps every original malformed snapshot present');
@@ -704,6 +711,7 @@ test('RISK malformed device recovery capture: inaccessible and unsupported archi
   assert.deepEqual(JSON.parse(vm.runInContext('JSON.stringify(unacceptedDeviceSource.automaticRecoveryCaptureFailure??null)',ctx)),
    {ok:false,mode:'readable-malformed',code},'startup classification retains the refusal without granting source authority');
   assert.equal(vm.runInContext('automaticCloudFallbackBootBaseline',ctx),null,'refused raw capture never creates an automatic recovery baseline');
+  assert.equal(vm.runInContext('storageOK',ctx),false,'a typed capture refusal does not claim durable storage is available for saves');
   assert.equal(vm.runInContext('liveBoardAccepted',ctx),false,'a typed refusal does not make the placeholder authoritative');
   assert.equal(vm.runInContext('unacceptedDeviceSource.reason',ctx),'unreadable-or-unsupported-device-source','the original startup classification remains intact');
  }

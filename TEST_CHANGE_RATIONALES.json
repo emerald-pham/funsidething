@@ -17451,5 +17451,25 @@
       "command": "See the distinct original preimplementation and later-baseline receipts cited in the existing #252 and #250 rationale entries in this file and in /Users/emeraldpham/Documents/Codex/2026-10-22/issue-187/evidence/252 and evidence/250. Aggregate fingerprint is computed by scripts/test-first-gate.mjs for `git diff --unified=0 037145329afbfe950cafa4c541855bfadf3aaba3...1379fdfcc581b727e853ec70337ed2d248d1fe8c -- tests.js`.",
       "failure": "There was no single combined RED. On pristine 037, the #252 malformed-head consumer failed because no durable hold existed; separately, the #250 accepted-device/previous-cloud consumers failed because supported previous-generation work was omitted. The #252 startup-order RED at HEAD 037 included uncommitted helper/index changes and observed one cloud pull instead of zero while raw capture was held. Later #250 ACK/durable-head and writer-intent failures, two original same-byte cold-reopen failures, the false early-pulling assertion and the overstrict foreign-sibling hold expectation are all retained with their own source identity and labels in the component evidence. The eventual 16/16 run preserves the original failures rather than erasing them; the scheduling consumer then waits for the actual capture-gated replay and eventual hold. This exact aggregate record exists only because the protected diff against official 037 combines those two independently documented workstreams."
     }
+  },
+  {
+    "baseCommit": "ed8355bfb8de6feae759c8f66fbdfe6c01d2339a",
+    "testChangesSha256": "15f6bd1a18fe98999bdbe328cc09c7b52c10cdfbb199fb09aed93c942f2d2a5d",
+    "reason": "Extend the malformed-readable-head full-app consumer through a real accepted edit and offline cold reopen, while proving every original source remains exact after both transitions.",
+    "previousBehavior": "The malformed-head consumer stopped after initial automatic adoption and exact raw readback. It did not prove that an accepted edit could reach durable storage after activation or survive an offline reopen, and it had no unreadable physical backup row to exercise post-save backup-cache refresh.",
+    "intendedBehavior": "After guarded automatic adoption, a real accepted edit must persist as the exact device head, remain locally held and unpublished, preserve the exact browser copies, malformed snapshots, unknown metadata, unreadable physical backup row, original archive envelope and manual opaque source, then survive a cold reopen without a cloud client.",
+    "replacementTests": [
+      "RISK cloud source recovery malformed readable head: accepted edit and exact sources survive offline cold reopen"
+    ],
+    "preservedCoverage": [
+      "The existing healthy-current malformed-head adoption, accepted-board identity, unsupported-field retention and pending cloud acknowledgement checks remain in the same full-app consumer.",
+      "The exact raw-source envelope, browser copies, malformed snapshots, unknown metadata, physical unreadable backup row and manual opaque source remain verified after adoption, editing and offline cold reopen.",
+      "The teardown now disposes the first app without invoking an implicit persistence operation, so the cold-reopen assertion depends on the accepted editor save itself.",
+      "The inaccessible-store and unsupported-archive refusal assertions, startup capture deferral, #249 fresh-empty controls and #250 supported-union coverage remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK cloud source recovery malformed readable head' tests.js",
+      "failure": "The post-adoption edit extension first failed at saveEditorChoice returning false (false !== true) with device-save:storage/unavailable, despite liveBoardAccepted and deviceStorageAuthority being true and deviceStorageRequired being false. The first terminal invocation was unrecorded; the same pre-correction working-tree state was recorded at evidence/252/2026-10-23T02-29-48-923Z-4887ef5e-cf21-4b9e-8b39-c26420809834.json against integration ed8355bfb8de6feae759c8f66fbdfe6c01d2339a. The subsequent unreadable-backup-row qualification was added after the minimal activation fix and passed without any reader/runtime change at evidence/252/2026-10-23T02-35-50-324Z-4789c9d6-12c2-4133-9069-0240e2d7848e.json."
+    }
   }
 ]
