@@ -48,11 +48,17 @@ Keeping a source does not establish that it is complete or safe to apply.
 _Avoid_: Recovered board
 
 **Cloud recovery review**:
-A protected check of separately retained device and cloud sources. One complete
-older cloud source may open automatically on a genuinely fresh device when no
-saved board or unfinished draft would be displaced. Other source replacement
-still requires a supported recovery decision; opening a review is not consent.
+A protected check of separately retained device and cloud sources that can
+support automatic compatible reconciliation. Explicit manual File or Paste
+Restore remains a deliberate replacement; opening a review does not approve it.
 _Avoid_: Automatic restore
+
+**Automatic recovery default**:
+A reversible choice between compatible values whose order cannot be established,
+using the accepted device value when available or a fixed source order otherwise.
+The alternatives remain protected, and later acknowledged work becomes the basis
+for subsequent reconciliation.
+_Avoid_: Newest snapshot, invented decision
 
 **Lossless recovery**:
 Recovery that retains every accepted board decision, unfinished draft and
@@ -61,8 +67,9 @@ unexamined cloud changes remain protected and cloud confirmation stays pending.
 _Avoid_: Loading any readable backup
 
 **Cloud acknowledgement**:
-Confirmation that the person's saved board reached their cloud account.
-A board saved on one device or read from the cloud is not that confirmation.
+Confirmation that the current saved board reached the person's cloud account,
+separate from device-local saving or reading a cloud copy. It does not establish
+that unavailable historical changes have been recovered.
 _Avoid_: Synced badge
 
 

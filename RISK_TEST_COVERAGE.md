@@ -1793,7 +1793,7 @@ This path opens one complete, validated previous cloud generation only on a veri
 - RISK cloud source recovery automatic union: disjoint settings and opaque fields survive across accepted device and previous cloud sources
 - RISK cloud source recovery automatic union: explicit deletion and History clear survive an older complete cloud source
 - RISK cloud source recovery automatic union: a repeated comparison observation remains one exact decision
-- RISK cloud source recovery automatic union: an unbased same-path edit is classified and remains held
+- RISK automatic recovery defaults: supported same-path ambiguity keeps the accepted device value and exact alternatives
 
 The full-app cloudPull path unions only independently validated same-account candidates whose supported deltas can be represented without guessing. Candidate sources include the accepted board, a supported durable device head, validated browser copies, active/previous/pending cloud generations and a valid acknowledged decision base; a nonmatching acknowledgement contributes supported work without being misrepresented as the current generation. Explicit foreign UIDs are excluded from sibling candidates while exact raw bytes remain archived. Exact device raw/browser evidence and each cloud generation are archived and read back before the local board is adopted under an automatic-recovery hold. Tests cover accepted, durable-head, browser, previous-cloud and acknowledged additions; disjoint settings and opaque fields; explicit deletion and History-clear evidence; completion identity; idempotent comparison delivery; and a same-path disagreement with no common decision base. The cold-reopen timeout control now pauses the actual raw capture, proves auth stays deferred with no dependent writes, and requires exactly one recovery attempt after the existing boot replay settles. That ambiguity is classified separately from unsupported evidence and causes no dependent write; unsupported source bytes remain protected. Residual conflict defaults belong to #251. Background retry, guarded publication, acknowledgement and multi-device convergence remain with #254.
 
@@ -2073,3 +2073,14 @@ This boundary control holds a successful real provider reply, installs a later a
 - RISK shared protection cancellation: a stopped transaction cannot start dependent source-marker reads
 - RISK shared protection absent-root authority: retained orphan sources lock only under verified unchanged root absence (Firestore rules: retention empty root)
 - RISK shared protection changed originals: deliberate current recovery selects exact server capture independently of archive order
+- RISK automatic recovery defaults: an unaccepted device uses stable source keys and preserves exact alternatives
+- RISK automatic recovery baseline refresh: a concurrent accepted Add gets one fresh capture without losing its draft
+- RISK automatic recovery publication: exact current-context cloud ACK releases only its automatic hold
+- RISK automatic recovery uncertain publication: a lost reply is verified before retry and never duplicates a cloud save
+- RISK automatic recovery convergence: two accepted defaults adopt acknowledged authority without publication loops
+- RISK automatic recovery publication guards: changed exact authority storage drafts pending and identity cannot publish
+- RISK automatic recovery pending CAS: exact conditional clearing preserves changed typed or peer rows
+- RISK automatic recovery revision conflict: a peer publication at the transaction boundary replaces an obsolete default
+- RISK automatic recovery identity safety: contradictory original decision bytes never become a default
+- RISK automatic recovery guidance: mounted FAQ explains reversible defaults and exact cloud confirmation
+- RISK automatic recovery recorded choices: a causal native edit beats the pinned device value despite clock skew
