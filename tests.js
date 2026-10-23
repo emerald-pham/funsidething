@@ -575,6 +575,9 @@ async function damagedAcknowledgedApp187(t,{timeoutMs=5000,sourcePadding=0,timer
  const originalRoot={...backend.docs.get('users/owner')};
  assert.equal(originalRoot.schemaVersion,2,'the setup must produce a real chunk-generation ACK');
  const originalHeader={...backend.docs.get('users/owner/generations/'+originalRoot.activeGeneration)};
+ const activePath='users/owner/generations/'+originalRoot.activeGeneration;
+ const activeChunks=[...backend.docs].filter(([key])=>key.startsWith(activePath+'/chunks/')).map(([,row])=>structuredClone(row)).sort((a,b)=>a.index-b.index);
+ assert.equal(activeChunks.length,originalHeader.chunkCount,'the newer source is complete before the fixture makes its chunks unavailable');
  const acknowledged=ctx.state.decisionBase.payload;
  assert.equal(createHash('sha256').update(acknowledged,'utf8').digest('hex'),originalHeader.hash,'the retained source is independently proved byte exact');
  const acknowledgedTasks=JSON.parse(acknowledged).tasks;
@@ -582,7 +585,7 @@ async function damagedAcknowledgedApp187(t,{timeoutMs=5000,sourcePadding=0,timer
  const previousSource=[...backend.docs].filter(([key])=>key===previousPath||key.startsWith(previousPath+'/')).map(([key,value])=>[key,JSON.stringify(value)]);
  assert.ok(previousSource.length>1,'the damaged root also names a complete previous source');
  for(const key of [...backend.docs.keys()])if(key.startsWith('users/owner/generations/'+originalRoot.activeGeneration+'/chunks/'))backend.docs.delete(key);
- return {...app,faults,originalRoot,originalHeader,acknowledgedTasks,previousSource};
+ return {...app,faults,originalRoot,originalHeader,activeSource:{id:originalRoot.activeGeneration,header:originalHeader,chunks:activeChunks},acknowledgedTasks,previousSource};
 }
 
 test('RISK cloud source recovery malformed readable head: accepted edit and exact sources survive offline cold reopen',async t=>{
@@ -853,6 +856,156 @@ test('RISK cloud source recovery automatic fallback: one complete older source o
  const faq=reopened.shim.document.getElementById('modalRoot').innerHTML;
  assert.match(faq,/opens automatically/i,'the extended FAQ explains the bounded automatic fallback');
  assert.match(faq,/not been confirmed by cloud/i,'the FAQ distinguishes local recovery from acknowledgement');
+});
+
+test('RISK cloud source recovery resume: an offline edit survives reopen and a retired newer source is later acknowledged',async t=>{
+ const damaged=await damagedAcknowledgedApp187(t),{backend,originalRoot,activeSource,indexedDB,deviceDbName}=damaged;
+ const targetPayload=await damaged.ctx.window.ChainStorageV2.decodeSnapshot(activeSource.header,activeSource.chunks);
+ const targetTask=JSON.parse(targetPayload).tasks.find(row=>row.title==='Second acknowledged source');
+ assert.ok(targetTask,'the independently complete newer source contains a distinct accepted task');
+ await closeLegacyApp173(damaged);backend.CS.suspend();
+ const {IDBFactory}=await import('fake-indexeddb'),recoveryDb=new IDBFactory(),recoveryName='background-resume-254-'+Math.random();
+ const cold=await loadAppAtTime(1792323000000,{indexedDBProvider:recoveryDb,deviceDbName:recoveryName});t.after(()=>closeLegacyApp173(cold));
+ await fixtureDeadline((async()=>{while(!vm.runInContext('automaticCloudFallbackBootBaseline',cold.ctx))await flush();})(),'verified empty startup capture completes before fallback recovery');
+ const reader=await loadCloudBackendV2({runtimeWindow:cold.ctx.window,failures:{authPending:true},timeoutMs:5000,recoveryTimeoutMs:5000});t.after(()=>reader.CS.suspend());
+ for(const [key,value]of backend.docs)reader.docs.set(key,value);
+ reader.emitAuth({uid:'owner',email:'e@example.test'});cold.ctx.closeModal();await cold.ctx.cloudPull();
+ const store=cold.ctx.window.ScannerDeviceStore,firstHold=await store.getRecoveryCloudHold();
+ assert.ok(firstHold?.automaticRecovery,'the complete older source opens under the exact automatic fallback authority');
+ const beforeAckArchives=await store.listOpaqueArchives(),originalEnvelope=beforeAckArchives.find(row=>row.key===firstHold.originalKey);
+ assert.ok(originalEnvelope,'the initial fallback commits exact originals before an edit is accepted');
+ const originalEnvelopeRaw=originalEnvelope.raw,envelope=JSON.parse(originalEnvelope.raw);
+ const originalSourceKey=envelope.sourceArchiveKeys[0],originalSourceRow=beforeAckArchives.find(row=>row.key===originalSourceKey);
+ assert.ok(originalSourceRow,'the automatic originals envelope names one exact cloud-source archive');
+ const originalSourceRaw=originalSourceRow.raw,originalSource=JSON.parse(originalSourceRaw);
+ assert.ok(originalSource.generations.some(row=>row.id===activeSource.id&&row.chunks.length===0),
+  'the unavailable newer generation remains an exact unresolved reference in the durable source archive');
+ cold.shim.document.getElementById('addInput').value='Accepted after the older fallback';
+ await cold.ctx.onAction('add',{});assert.equal(await cold.ctx.persist(),true,'the accepted edit is durably saved on the fallback');
+ await cold.ctx.sendPush();
+ const firstAck=await reader.CS.pull();
+ assert.ok(firstAck.rev>originalRoot.rev,'the existing guarded publisher acknowledges the edited fallback');
+ assert.equal(firstAck.payload,cold.ctx.cloudPayload(),'the first ACK is the exact current fallback board');
+ assert.equal(await store.getRecoveryCloudHold(),null,'the first current-board ACK clears only its exact automatic hold');
+ const firstResolution=(await store.listOpaqueArchives()).map(row=>({row,value:row.key.startsWith('automatic-recovery-ack:')?JSON.parse(row.raw):null}))
+  .find(entry=>entry.value?.originalKey===firstHold.originalKey);
+ assert.ok(firstResolution,'the exact ACK durably records which complete source references it resolved');
+ assert.ok(!firstResolution.value.resolvedGenerationIds.includes(activeSource.id),
+  'an incomplete generation is not marked resolved by the fallback board ACK');
+ assert.equal(reader.docs.get('users/owner').previousGeneration,activeSource.id,
+  'the first ACK retains the unresolved newer source in its previous root slot');
+ cold.shim.document.getElementById('addInput').value='Accepted before a second publication';
+ await cold.ctx.onAction('add',{});assert.equal(await cold.ctx.persist(),true,'a second accepted edit remains durable before root rotation');
+ await cold.ctx.sendPush();
+ const rotationAck=await reader.CS.pull();
+ assert.ok(rotationAck.rev>firstAck.rev,'a second ordinary publication rotates the acknowledged root slots');
+ assert.equal(rotationAck.payload,cold.ctx.cloudPayload(),'the second publication is the exact current board');
+ const firstRoot=reader.docs.get('users/owner');
+ assert.ok(![firstRoot.activeGeneration,firstRoot.previousGeneration].includes(activeSource.id),
+  'the unresolved newer source has rotated out of both current root slots');
+ assert.ok(reader.docs.has('users/owner/recoveryProtections/'+activeSource.id),
+  'shared retention protects the old generation even after root-slot rotation');
+ assert.equal((await store.listOpaqueArchives()).find(row=>row.key===firstHold.originalKey)?.raw,
+  originalEnvelopeRaw,'the successful ACK retains the original partial envelope byte-for-byte');
+ assert.equal((await store.listOpaqueArchives()).find(row=>row.key===originalSourceKey)?.raw,
+  originalSourceRaw,'the successful ACK retains the partial source capture byte-for-byte');
+
+ cold.shim.window.dispatchEvent({type:'pagehide'});
+ cold.shim.document.getElementById('addInput').value='Accepted while offline';
+ await cold.ctx.onAction('add',{});assert.equal(await cold.ctx.persist(),true,'the offline edit is durably saved locally');
+ const offlineHead=await store.readHead(),offlineBoard=JSON.parse(offlineHead.payload);
+ assert.ok(offlineBoard.tasks.some(row=>row.title==='Accepted while offline'));
+ await closeLegacyApp173(cold);
+ const offline=await loadAppAtTime(1792323000000,{indexedDBProvider:recoveryDb,deviceDbName:recoveryName,sharedStorage:cold.shim.localStorage});t.after(()=>closeLegacyApp173(offline));
+ assert.equal(offline.ctx.window.CloudSync,undefined,'the second cold open exercises the offline startup path');
+ assert.equal((await offline.ctx.window.ScannerDeviceStore.readHead()).payload,JSON.stringify(offline.ctx.state),
+  'cold reopen accepts the exact locally saved offline edit');
+ assert.ok(offline.ctx.state.tasks.some(row=>row.title==='Accepted while offline'));
+
+ offline.shim.window.CLOUD_RETRY_DELAY_MS=60000;
+ const resumed=await loadCloudBackendV2({runtimeWindow:offline.ctx.window,sharedDocs:reader.docs,failures:{authPending:true},timeoutMs:5000,recoveryTimeoutMs:5000});
+ t.after(()=>resumed.CS.suspend());resumed.emitAuth({uid:'owner',email:'e@example.test'});offline.ctx.closeModal();
+ await offline.ctx.cloudPull();await settleRecoveryOperations188(offline.ctx);
+ const rotated=resumed.docs.get('users/owner');
+ assert.ok(![rotated.activeGeneration,rotated.previousGeneration].includes(activeSource.id),
+  'the unresolved reference remains discoverable outside the current root slots');
+ assert.ok(resumed.docs.has('users/owner/recoveryProtections/'+activeSource.id),
+  'the exact source remains protected while another local edit is reconciled');
+ assert.equal((await offline.ctx.window.ScannerDeviceStore.listOpaqueArchives()).find(row=>row.key===firstHold.originalKey)?.raw,
+  originalEnvelopeRaw,'later publication does not rewrite prior automatic originals');
+ assert.equal((await offline.ctx.window.ScannerDeviceStore.listOpaqueArchives()).find(row=>row.key===originalSourceKey)?.raw,
+  originalSourceRaw,'later publication does not rewrite the original partial source evidence');
+ let retryFire=null;const retryTimerId='automatic-source-retry-254',priorSetTimeout=offline.ctx.setTimeout,priorClearTimeout=offline.ctx.clearTimeout;
+ offline.ctx.setTimeout=(callback,delay,...args)=>{
+  if(delay===60000){retryFire=()=>callback(...args);return retryTimerId;}
+  return priorSetTimeout(callback,delay,...args);
+ };
+ offline.ctx.clearTimeout=id=>{if(id===retryTimerId){retryFire=null;return;}return priorClearTimeout(id);};
+ offline.shim.window.dispatchEvent({type:'online'});
+ const waitUntil=async predicate=>{const until=Date.now()+5000;while(!predicate()&&Date.now()<until)await flush();return predicate();};
+ assert.equal(await waitUntil(()=>!!retryFire),true,
+  'an incomplete durable source reference schedules through the existing bounded retry');
+ assert.equal(vm.runInContext('automaticCloudSourceResumeStatus.state',offline.ctx),'unresolved',
+  'the saved current board remains usable while older source bytes are still incomplete');
+ assert.equal(offline.ctx.state.tasks.some(row=>row.id===targetTask.id),false,
+  'an incomplete capture is not presented as recovered');
+ assert.equal((await offline.ctx.window.ScannerDeviceStore.listOpaqueArchives()).find(row=>row.key===originalSourceKey)?.raw,
+  originalSourceRaw,'a transient retry preserves the exact old partial source capture');
+ for(const chunk of activeSource.chunks)resumed.docs.set('users/owner/generations/'+activeSource.id+'/chunks/'+chunk.index,structuredClone(chunk));
+ assert.equal(resumed.docs.get('users/owner/generations/'+activeSource.id).hash,activeSource.header.hash,
+  'the newly readable source uses its unchanged original header');
+ const retry=retryFire;retryFire=null;retry();
+ assert.equal(await waitUntil(()=>vm.runInContext('automaticCloudSourceResumeStatus.state==="acknowledged"',offline.ctx)),true,
+  'the existing bounded retry rereads the source and completes the guarded automatic resumption');
+ assert.ok(offline.ctx.state.tasks.some(row=>row.id===targetTask.id),
+  'online lifecycle rereads the retired newer source and merges it with the accepted offline edit');
+ assert.ok(offline.ctx.state.tasks.some(row=>row.title==='Accepted while offline'),
+  'automatic source resumption preserves the current accepted device edit');
+ const acknowledged=await resumed.CS.pull();
+ assert.ok(acknowledged.rev>rotated.rev,'the existing current-context publisher acknowledges the later merged board');
+ assert.equal(acknowledged.payload,offline.ctx.cloudPayload(),'the later cloud ACK matches the exact recovered current board');
+ assert.equal(await offline.ctx.window.ScannerDeviceStore.getRecoveryCloudHold(),null,
+  'the publisher clears the new hold only after the later exact current-board ACK');
+ const afterArchives=await offline.ctx.window.ScannerDeviceStore.listOpaqueArchives();
+ assert.equal(afterArchives.find(row=>row.key===firstHold.originalKey)?.raw,originalEnvelopeRaw,'the first original envelope stays exact after later discovery');
+ assert.equal(afterArchives.find(row=>row.key===originalSourceKey)?.raw,originalSourceRaw,'the first partial capture stays exact after later discovery');
+ const latestEnvelope=afterArchives.filter(row=>row.key.startsWith('automatic-device-recovery:')&&row.key!==firstHold.originalKey).at(-1);
+ assert.ok(latestEnvelope,'later source recovery records a distinct fresh guarded publication context');
+ const latestEnvelopeValue=JSON.parse(latestEnvelope.raw),latestSourceKey=latestEnvelopeValue.sourceArchiveKeys[0],latestSourceRow=afterArchives.find(row=>row.key===latestSourceKey);
+ assert.ok(latestSourceRow&&latestSourceKey!==originalSourceKey,'later discovery creates a distinct exact cloud-source capture');
+ const latestSource=JSON.parse(latestSourceRow.raw).generations.find(row=>row.id===activeSource.id);
+ assert.deepEqual(latestSource?.chunks,activeSource.chunks,'the fresh source archive stores the exact newly readable original chunks');
+ assert.ok(latestEnvelopeValue.preservedAutomaticArchiveKeys.includes(firstHold.originalKey)&&
+  latestEnvelopeValue.preservedAutomaticArchiveKeys.includes(originalSourceKey),
+  'later originals reference prior automatic archives without rewriting them');
+ assert.ok(!latestEnvelopeValue.indexedDB.opaque.some(row=>row.key?.type==='string'&&
+  latestEnvelopeValue.preservedAutomaticArchiveKeys.includes(row.key.value)),
+  'later originals do not recursively copy prior automatic archive payloads');
+ const latestResolution=afterArchives.map(row=>row.key.startsWith('automatic-recovery-ack:')?JSON.parse(row.raw):null)
+  .find(value=>value?.originalKey===latestEnvelope.key);
+ assert.ok(latestResolution?.resolvedGenerationIds.includes(activeSource.id),
+  'the new exact current-board ACK records the newly recovered generation as resolved');
+ assert.equal(JSON.stringify(resumed.docs.get('users/owner/generations/'+activeSource.id)),JSON.stringify(activeSource.header),
+  'the original protected generation header remains exact');
+ const restoredChunks=[...resumed.docs].filter(([key])=>key.startsWith('users/owner/generations/'+activeSource.id+'/chunks/'))
+  .map(([,row])=>row).sort((a,b)=>a.index-b.index);
+ assert.deepEqual(restoredChunks,activeSource.chunks,'the original generation bytes remain exact after recovery publication');
+ const receiver=await loadAppAtTime(1792323000000,{indexedDBProvider:recoveryDb,deviceDbName:recoveryName+'-receiver'});t.after(()=>closeLegacyApp173(receiver));
+ const receiving=await loadCloudBackendV2({runtimeWindow:receiver.ctx.window,sharedDocs:resumed.docs,failures:{authPending:true},timeoutMs:5000});
+ t.after(()=>receiving.CS.suspend());receiving.emitAuth({uid:'owner',email:'e@example.test'});receiver.ctx.closeModal();
+ await fixtureDeadline((async()=>{while(vm.runInContext('automaticCloudFallbackBootCapturePending||!state',receiver.ctx))await flush();})(),
+  'the independent receiver completes its own durable-source startup capture before cloud reconciliation');
+ await receiver.ctx.cloudPull();await settleRecoveryOperations188(receiver.ctx);
+ assert.equal(vm.runInContext('reconciledAs',receiver.ctx),receiving.CS.user,'the independent receiver finishes account-bound cloud reconciliation');
+ assert.ok(receiver.ctx.state.tasks.some(row=>row.id===targetTask.id),'an independent client receives the later recovered decision');
+ assert.ok(receiver.ctx.state.tasks.some(row=>row.title==='Accepted while offline'),'the receiver also accepts the offline edit');
+ assert.equal(receiver.ctx.cloudPayload(),acknowledged.payload,'the independent receiver accepts the exact complete acknowledged board');
+ await closeLegacyApp173(offline);
+ const reopened=await loadAppAtTime(1792323000000,{indexedDBProvider:recoveryDb,deviceDbName:recoveryName,sharedStorage:offline.shim.localStorage});
+ t.after(()=>closeLegacyApp173(reopened));
+ assert.equal((await reopened.ctx.window.ScannerDeviceStore.readHead()).payload,JSON.stringify(reopened.ctx.state),
+  'a later cold reopen retains the exact durably acknowledged recovered board');
+ assert.equal(reopened.ctx.cloudPayload(),acknowledged.payload);
 });
 
 test('RISK cloud source recovery automatic union: accepted device and supported previous cloud additions both survive',async t=>{

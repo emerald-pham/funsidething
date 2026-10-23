@@ -1778,6 +1778,7 @@ The native needs-attention action uses real IndexedDB and the production backend
 ## Bounded automatic cloud fallback (#249)
 
 - RISK cloud source recovery automatic fallback: one complete older source opens and stays local until cloud is confirmed
+- RISK cloud source recovery resume: an offline edit survives reopen and a retired newer source is later acknowledged
 - RISK cloud source recovery automatic fallback: an unfinished draft captured before cloud reads prevents replacement
 - RISK cloud source recovery automatic fallback: a stopped read survives cold reopen and later adopts its safe source
 - RISK cloud source recovery automatic fallback: all accepted deletions survive cold reopen without older-source fallback

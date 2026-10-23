@@ -17616,5 +17616,31 @@
     "command": "Final61-name Node consumer/inventory selection through scripts/agent-tools/record-run.mjs, receipt2026-10-23T03-01-07-889Z-9b5cdbfa-c7ee-4267-8d9b-8724e2df7536.json on exact ff64861905e102c56556c907134062682850c939.",
     "failure": "The actual reducer returned board:null and the existing assertion supported field ambiguity now has the spec-authorized accepted-device default failed. After exact physical-number representation comparison, all three affected unchanged consumers pass3/3 in2026-10-23T03-02-35-216Z-f33ac716-aa37-4c6d-8336-9e0ae8a598ea.json."
   }
+},
+{
+  "baseCommit": "906a19c97ffeb370790b7b6dee5d1414dc5a019e",
+  "testChangesSha256": "5880460cfb3528273c82bb35513bebda763feae2190171814e1dbd2487793553",
+  "reason": "Add one full-app lifecycle consumer for automatic source resumption after an offline fallback edit; it checks that exact source evidence survives retries, later publication and reopen.",
+  "previousBehavior": "A current-board ACK cleared the automatic hold without durable resolved-generation provenance, and online lifecycle handling did not schedule an existing bounded retry for an incomplete retired source reference.",
+  "intendedBehavior": "Only exact complete generation references in the publisher-verified ACK are durably resolved. Unresolved automatic references remain discoverable after root-slot rotation; one bounded lifecycle attempt re-reads them, preserves old partial bytes, and reuses the current-context publisher after exact source bytes return.",
+  "replacementTests": [
+    "RISK cloud source recovery resume: an offline edit survives reopen and a retired newer source is later acknowledged"
+  ],
+  "preservedCoverage": [
+    "The new consumer drives actual app startup, accepted actions and persist, cloudPull, online lifecycle, the existing retry timer, cold reopen, external SDK source reads and an independent receiver. Existing manual/legacy restore contracts and all existing risk consumers remain unchanged. It asserts exact old partial capture/envelope bytes, exact fresh chunks, shared protection, current-board ACK, durable local head and receiver agreement."
+  ],
+  "redEvidence": {
+    "command": "node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/Documents/Codex/2026-10-22/issue-187/evidence/254/runs --purpose preimplementation-red -- node --test --test-name-pattern='RISK cloud source recovery resume: an offline edit survives reopen and a retired newer source is later acknowledged' tests.js",
+    "failure": "On exact 906a19c97ffeb370790b7b6dee5d1414dc5a019e, the unchanged actual publisher ACK cleared the exact automatic hold but did not write a durable ACK-resolution archive for complete source references. Recorder receipt 2026-10-23T03-31-02-158Z-83333810-26db-4707-add0-4ec7ece41f1a.json.",
+    "additionalFailure": "The same full-app lifecycle consumer previously reached the assertion that an incomplete durable source reference schedules through the existing bounded retry; it failed there on exact 906a, receipt 2026-10-23T03-27-29-962Z-06d94a09-8f22-46a9-a336-bc2060b25f5f.json. Earlier fixture and setup failures are retained separately and are not acceptance REDs."
+  },
+  "implementationIterations": [
+    "An interim green attempt on the final-base consumer still failed the existing bounded-retry assertion; retain receipt 2026-10-23T03-50-47-229Z-9e41ed5d-fa35-4d6e-be22-ebe3436ec174.json as a repair failure, not a base RED.",
+    "A later green attempt reached the independent receiver but failed because its cold-start source capture was still pending when the fixture began checking cloud reconciliation; receipt 2026-10-23T03-56-18-745Z-c5811311-44b7-4ddd-b4c4-f1cfc7ee5cc7.json. The fixture now waits for the actual startup capture and pull to settle before checking receiver state.",
+    "The final focused full-app lifecycle consumer passes 1/1 at 2026-10-23T03-57-09-667Z-132adedb-3b16-4dea-961a-e34b4741a4dd.json. The existing publisher ACK-envelope lookup was corrected to use its actual opaque archive row key; no receiving-client acceptance assertion was weakened.",
+    "The scoped lifecycle, retry, budget, cancellation, pending-CAS and authority batch at 2026-10-23T03-59-10-293Z-d6cec52d-dace-4913-8ec0-b9ce9e96bd6e.json passed all selected controls except the existing same-hash head-change subcase during final copy verification. A later app-source-only comparison also failed that control with untouched index.html from exact 906a, receipt 2026-10-23T04-03-27-231Z-87578f42-fe48-4b49-b8e4-2b909dcbe2bc.json; root then confirmed the same single subcase on pristine exact 906a runtime and helpers, receipt evidence/254/pristine-906a/2026-10-23T04-04-12-072Z-92b74075-f296-41a6-9c4d-7986371d51d3.json. The test and its expectation remain unchanged; this inherited base failure is not presented as #254 coverage passing.",
+    "A broader selected batch at 2026-10-23T04-04-19-970Z-35d1208d-04c9-447e-8643-08bf7f1a44dc.json passed 77 of 78 outcomes and surfaced the unchanged #251 typed-original archive control as another failure. Root reproduced this with all eight authority parents on pristine exact 906a: 31 outcomes, 28 pass, 3 fail including the same-hash parent/timing subcase and typed-original archive assertion, receipt evidence/254/pristine-906a/2026-10-23T04-06-20-329Z-1c2a5ad7-de9f-4615-b59f-62940b6065e5.json. No assertion was changed; #255 owns the combined-candidate repair.",
+    "The final scoped lifecycle, fallback, retry, cancellation, pending-CAS and passing authority controls, excluding the two pristine-base failures above, pass 77/77 in 2026-10-23T04-06-07-060Z-c77881c2-a201-42b9-9d53-4c5376fbb153.json."
+  ]
 }
 ]
