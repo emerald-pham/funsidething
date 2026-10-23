@@ -722,19 +722,28 @@ test('RISK cloud source recovery automatic fallback: a stopped read survives col
  assert.equal(readerAfter.docs.get('users/owner').rev,originalRoot.rev,'later local fallback still does not publish to cloud');
 });
 
-test('RISK cloud source recovery automatic fallback: an accepted empty board with deletion evidence is never replaced by an older cloud source',async t=>{
+test('RISK cloud source recovery automatic fallback: all accepted deletions survive cold reopen without older-source fallback',async t=>{
  const damaged=await damagedAcknowledgedApp187(t),{ctx,backend,originalRoot,indexedDB,deviceDbName}=damaged;
- const removed=ctx.state.tasks[0];assert.ok(removed,'the setup starts with an actual task to delete');
- ctx.deleteTask(removed.id);assert.equal(await ctx.persist(),true,'the explicit deletion is durably accepted');
- assert.equal(ctx.state.tasks.some(task=>task.id===removed.id),false);
- assert.ok(ctx.state.deletionLog?.length||ctx.state.deletedTaskIds?.[removed.id],'the empty board retains explicit deletion authority');
+ assert.equal(vm.runInContext('pulling||cloudPushInFlight',ctx),false,'the earlier acknowledged setup has no ordinary cloud operation in flight');
+ ctx.suspendCloudSync();
+ const removedIds=ctx.state.tasks.map(task=>task.id);assert.ok(removedIds.length>0,'the setup starts with actual tasks to delete');
+ for(const id of removedIds)ctx.deleteTask(id);
+ assert.deepEqual(ctx.state.tasks,[],'every fixture task is explicitly deleted before the accepted empty board is captured');
+ assert.equal(await ctx.persist(),true,'the explicit deletions are durably accepted');
+ const deletionEvidence=state=>new Set([...(state.deletionLog||[]).map(row=>row?.id),...Object.keys(state.deletedTaskIds||{})]);
+ for(const id of removedIds)assert.ok(deletionEvidence(ctx.state).has(id),'the accepted empty board retains explicit deletion authority for '+id);
  const accepted=JSON.stringify(ctx.state),rootBefore=JSON.stringify(backend.docs.get('users/owner'));
+ assert.equal((await ctx.window.ScannerDeviceStore.readHead()).payload,accepted,'the accepted empty board is the durable device head before closing its writer');
  await closeLegacyApp173(damaged);backend.CS.suspend();
  const cold=await loadAppAtTime(1792323000000,{indexedDBProvider:indexedDB,deviceDbName,sharedStorage:damaged.shim.localStorage});t.after(()=>closeLegacyApp173(cold));
+ assert.equal((await cold.ctx.window.ScannerDeviceStore.readHead()).payload,accepted,'cold startup retains the exact accepted empty-board head before a cloud read');
+ assert.equal(JSON.stringify(cold.ctx.state),accepted,'cold startup opens the accepted empty board before reconciliation begins');
  const reader=await loadCloudBackendV2({runtimeWindow:cold.ctx.window,failures:{authPending:true},timeoutMs:5000});t.after(()=>reader.CS.suspend());
  for(const [key,value]of backend.docs)reader.docs.set(key,value);
  reader.emitAuth({uid:'owner',email:'e@example.com'});await cold.ctx.cloudPull();
- assert.equal(JSON.stringify(cold.ctx.state),accepted,'accepted explicit deletion remains the live board while multiple or older sources need later reconciliation');
+ assert.deepEqual(cold.ctx.state.tasks,[],'cloud reconciliation cannot resurrect a task deleted from the accepted empty board');
+ for(const id of removedIds)assert.ok(deletionEvidence(cold.ctx.state).has(id),'cloud reconciliation retains deletion authority for '+id);
+ assert.equal((await cold.ctx.window.ScannerDeviceStore.readHead()).payload,JSON.stringify(cold.ctx.state),'the post-reconciliation empty board remains the exact durable head');
  assert.equal(await cold.ctx.window.ScannerDeviceStore.getRecoveryCloudHold(),null,'a saved empty board is not reclassified as a disposable fresh-client placeholder');
  assert.equal(JSON.stringify(reader.docs.get('users/owner')),rootBefore,'the unsafe fallback attempt never changes cloud state');
 });

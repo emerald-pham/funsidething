@@ -17329,5 +17329,24 @@
       "command": "node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/Documents/Codex/2026-10-22/issue-187/evidence/249 --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK cloud source recovery automatic fallback:\" tests.js; record 2026-10-22T23-38-16-581Z-37041583-95f6-4bf2-ad91-44d6d2885193.json. Later baseline-sensitivity: same recorder with --purpose later-baseline-sensitivity and test filter for \"a stopped read survives cold reopen and later adopts its safe source\"; record 2026-10-22T23-54-22-031Z-2b2b966e-5260-40af-904e-e143976a7adc.json.",
       "failure": "On unchanged 4f1d6bd the new full app consumer failed at the missing recovery-hold assertion (actual null), while the accepted-empty/deletion control passed. After introducing timeout/cold-reopen sensitivity and before correcting the runtime, the first bounded read timed out but cold reopen failed at later automatic adoption (hold remained null): the attempt had persisted a placeholder and freshClient was false. Both records are actual consumer assertion failures; the second is labeled later-baseline sensitivity, not original RED."
     }
+  },
+  {
+    "baseCommit": "a751a397d189f4cf29d17a7fb8e22af08a258192",
+    "testChangesSha256": "72bc1c2001926e13ea9a972b3db13fba6e65871177e631a96e568927c468b9c6",
+    "reason": "Correct the saved-empty control after merged integration exposed that its setup deleted only one of three tasks and that shutdown could settle an ordinary cloud ACK after its snapshot. Preserve the observed failure and isolate accepted deletion semantics from sync metadata timing.",
+    "previousBehavior": "The control called a one-task deletion an empty board, retained two tasks, captured before closeLegacyApp173's extra persist, and compared all ACK fields across a cloud read. The merged failure changed only syncRev, dirty, and decisionBase metadata; the surviving tasks and deletion evidence were identical.",
+    "intendedBehavior": "Suspend ordinary cloud sync before the control edit, explicitly delete every fixture task, durably accept the truly empty board, and verify all deletion markers through cold reopen and corrupt-source reconciliation. Keep no-fallback/no-cloud-mutation assertions and allow legitimate ACK metadata changes while checking the durable semantic board.",
+    "replacementTests": [
+      "RISK cloud source recovery automatic fallback: all accepted deletions survive cold reopen without older-source fallback"
+    ],
+    "preservedCoverage": [
+      "The original accepted-empty safety control, exact accepted durable head, and pre-cloud cold-open state remain independently asserted; no task-resurrection or deletion-evidence assertion is weakened.",
+      "The corrected setup removes all fixture task IDs and checks each deletion marker after cold reopen and cloud reconciliation, while requiring the local head to match the resulting state and keeping the recovery hold absent.",
+      "The remote root remains byte-identical. The original post-merge failure is retained as fixture/ACK-settlement timing evidence, not reclassified as a functional resurrection RED."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/recovery-249/funsidething --evidence-dir /Users/emeraldpham/Documents/Codex/2026-10-22/issue-187/evidence/249 --purpose green -- node --test --test-name-pattern=\"^RISK cloud source recovery automatic fallback:\" tests.js; merged failure record 2026-10-23T00-13-27-576Z-64f6601f-1239-47c9-b976-ad19b21ca0ae.json.",
+      "failure": "The merged accepted-empty test failed on whole-state equality after reconciliation. Read-only comparison established identical task IDs/titles and deletion evidence, with only ordinary ACK metadata advancing syncRev 6→7, clearing dirty, and updating decisionBase. The failure did not demonstrate resurrection. Corrected all-task deletion control passed at 2026-10-23T00-17-27-264Z-88e93ecc-bf8a-4d13-9d77-dc00fa4542ea.json."
+    }
   }
 ]

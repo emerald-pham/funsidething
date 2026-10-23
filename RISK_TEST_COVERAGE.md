@@ -1779,7 +1779,7 @@ The native needs-attention action uses real IndexedDB and the production backend
 - RISK cloud source recovery automatic fallback: one complete older source opens and stays local until cloud is confirmed
 - RISK cloud source recovery automatic fallback: an unfinished draft captured before cloud reads prevents replacement
 - RISK cloud source recovery automatic fallback: a stopped read survives cold reopen and later adopts its safe source
-- RISK cloud source recovery automatic fallback: an accepted empty board with deletion evidence is never replaced by an older cloud source
+- RISK cloud source recovery automatic fallback: all accepted deletions survive cold reopen without older-source fallback
 
 The only automatic choice is one complete, validated previous cloud generation on a verified fresh client. Exact raw IndexedDB stores (including pending, backup and opaque rows), browser boards and recovery keys, authority marker, account/backend/session, local and draft state, and source captures remain bound through conditional local adoption and readback. A timeout leaves true empty stores empty for a later cold-open retry. Accepted empty boards with explicit deletion evidence and drafts stay authoritative. The recovered board remains local with a visible cloud hold; no cloud replacement is published.
 
