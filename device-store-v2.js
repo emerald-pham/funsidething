@@ -495,6 +495,15 @@
       if(!current||current.generationId!==generationId){tx.abort();try{await done;}catch(e){}return false;}
       store.delete(pendingKey(account));await done;return true;
     }
+    async function clearPendingUploadIfCurrent(account,expected,{guard}={}){
+      ensureOpen();if(typeof account!=="string"||!account||typeof guard!=="function"||!expected)return false;
+      let encoded;try{encoded=pendingJSON(expected);}catch{return false;}
+      const tx=db.transaction("meta","readwrite"),done=transactionDone(tx),store=tx.objectStore("meta");
+      const current=await requestResult(store.get(pendingKey(account)));let same=false;
+      try{same=pendingJSON(current)===encoded&&guard()===true;}catch{}
+      if(!same){tx.abort();try{await done;}catch{}return false;}
+      store.delete(pendingKey(account));await done;return true;
+    }
     async function setLegacyFingerprint(expectedHash,fingerprint){
       ensureOpen();if(typeof fingerprint!=="string"||!fingerprint)return false;
       const tx=db.transaction("meta","readwrite"),done=transactionDone(tx),store=tx.objectStore("meta"),current=await requestResult(store.get("head"));
@@ -504,7 +513,7 @@
 
     async function close(){if(db){db.close();db=null;}}
     const api={open,close,readRawExportSnapshot,readHead,withCurrentHead,listBackups,listOpaqueArchives,protectRecoverySource,writeRecoveredSource,getRecoveryCloudHold,clearRecoveryCloudHold,clearRecoveryCloudHoldIfCurrent:clearRecoveryCloudHold,migrateLegacy,commitHead,commitHeadIfCurrent:commitHead,putBackup,
-      updateBackupKind,deleteBackup,getPendingUpload,setPendingUpload,setPendingUploadIfCurrent,clearPendingUpload,setLegacyFingerprint};
+      updateBackupKind,deleteBackup,getPendingUpload,setPendingUpload,setPendingUploadIfCurrent,clearPendingUpload,clearPendingUploadIfCurrent,setLegacyFingerprint};
     return api;
   }
 

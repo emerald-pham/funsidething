@@ -39,6 +39,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK unreadable device recovery review: the native header reaches SDK sign-in and Settings account correction while sources stay held
 - RISK unreadable device recovery review: preserved partial raw rows permit native cloud choice ACK and cold reopen
 - RISK unreadable device recovery review: receipt collisions never overwrite a raw unknown row at the same physical key
+- RISK malformed device recovery capture: inaccessible and unsupported archives retain typed refusals
 - RISK DEVICE STORAGE V2: conditional pending writes compare complete physical rows and preserve ordinary staging
 - RISK cloud source recovery pending capture: a peer pending pointer arriving between own pending write and read is never consented
 - RISK cloud source recovery pending capture: peer pending intent created after the existing read is never overwritten by recovery staging
@@ -1774,6 +1775,41 @@ The native needs-attention action uses real IndexedDB and the production backend
 - RISK recovery identity consumers: final-task WOOP advances after acknowledged recovery
 - RISK recovery identity consumers: verified cloud adoption rebases independent saved extension fields for the same UID
 
+## Bounded automatic cloud fallback (#249)
+
+- RISK cloud source recovery automatic fallback: one complete older source opens and stays local until cloud is confirmed
+- RISK cloud source recovery resume: an offline edit survives reopen and a retired newer source is later acknowledged
+- RISK cloud source recovery automatic fallback: an unfinished draft captured before cloud reads prevents replacement
+- RISK cloud source recovery automatic fallback: a stopped read survives cold reopen and later adopts its safe source
+- RISK cloud source recovery automatic fallback: all accepted deletions survive cold reopen without older-source fallback
+
+This path opens one complete, validated previous cloud generation only on a verified fresh client. Exact raw IndexedDB stores (including pending, backup and opaque rows), browser boards and recovery keys, authority marker, account/backend/session, local and draft state, and source captures remain bound through conditional local adoption and readback. A timeout leaves true empty stores empty for a later cold-open retry. Accepted empty boards with explicit deletion evidence and drafts stay authoritative. The recovered board remains local with a visible cloud hold; no cloud replacement is published.
+
+## Supported automatic recovery union (#250)
+
+- RISK cloud source recovery automatic union: accepted device and supported previous cloud additions both survive
+- RISK cloud source recovery automatic union: a valid nonmatching acknowledged copy contributes supported work
+- RISK cloud source recovery automatic union: a foreign-UID browser sibling is excluded while safe same-UID work recovers
+- RISK cloud source recovery automatic union: a supported durable device head contributes work absent from accepted live state
+- RISK cloud source recovery automatic union: disjoint settings and opaque fields survive across accepted device and previous cloud sources
+- RISK cloud source recovery automatic union: explicit deletion and History clear survive an older complete cloud source
+- RISK cloud source recovery automatic union: a repeated comparison observation remains one exact decision
+- RISK automatic recovery defaults: supported same-path ambiguity keeps the accepted device value and exact alternatives
+
+The full-app cloudPull path unions only independently validated same-account candidates whose supported deltas can be represented without guessing. Candidate sources include the accepted board, a supported durable device head, validated browser copies, active/previous/pending cloud generations and a valid acknowledged decision base; a nonmatching acknowledgement contributes supported work without being misrepresented as the current generation. Explicit foreign UIDs are excluded from sibling candidates while exact raw bytes remain archived. Exact device raw/browser evidence and each cloud generation are archived and read back before the local board is adopted under an automatic-recovery hold. Tests cover accepted, durable-head, browser, previous-cloud and acknowledged additions; disjoint settings and opaque fields; explicit deletion and History-clear evidence; completion identity; idempotent comparison delivery; and a same-path disagreement with no common decision base. The cold-reopen timeout control now pauses the actual raw capture, proves auth stays deferred with no dependent writes, and requires exactly one recovery attempt after the existing boot replay settles. That ambiguity is classified separately from unsupported evidence and causes no dependent write; unsupported source bytes remain protected. Residual conflict defaults belong to #251. Background retry, guarded publication, acknowledgement and multi-device convergence remain with #254.
+
+## Readable malformed device head (#252)
+
+- RISK cloud source recovery malformed readable head: accepted edit and exact sources survive offline cold reopen
+
+This full-app consumer starts over a readable raw IndexedDB source whose selected head record is malformed, with distinct malformed browser copies and a healthy current cloud generation. Recovery must open a supported local board under a durable cloud hold, preserve the exact original source evidence, and leave the cloud generation unchanged. This remains distinct from a truly empty first-use client and from inaccessible storage; the malformed source is never accepted as an empty board.
+
+## Boot capture ordering (#252)
+
+- RISK cloud startup: auth waits for raw boot capture and replays one read after capture settles
+
+The full-app control pauses the real startup raw-store capture, then lets authentication request a pull. No cloud read, placeholder head or hold may occur before raw evidence capture settles; the existing boot replay must issue one read afterward while preserving the empty raw store. A malformed cloud response keeps this control focused on startup ordering rather than adoption.
+
 ## Incident support diagnostics
 
 - RISK support diagnostics: Settings names the existing board export for its contents
@@ -2019,3 +2055,51 @@ This boundary control holds a successful real provider reply, installs a later a
 - RISK debug log: unavailable diagnostic storage never blocks edits or claims persistence
 - RISK debug log: document and event limits expire without retaining injected private fields
 - RISK debug log: app reload reasons and lifecycle observations survive without private error text
+
+## Shared unresolved recovery evidence
+
+- RISK shared recovery source protection: supported old peer rotations and ordinary collection retain exact unresolved cloud evidence (Firestore rules: shared retention)
+
+- RISK shared protection authority: malformed server receipts cannot authorize recovery publication (Firestore rules: retention authority)
+- RISK shared protection publication: ordinary saved edits protect archived originals before root rotation (Firestore rules: retention publication)
+- RISK shared protection atomicity: marker creation cannot share a commit with source retirement (Firestore rules: retention atomicity)
+- RISK shared protection evolution: ordinary saves retain old captures and refresh legitimate upload state changes (Firestore rules: retention evolution)
+- RISK shared protection destructive paths: existing markers stop old transitions and already-deleting byte removal (Firestore rules: retention deletion)
+- RISK shared protection uncertain outcomes: lost acknowledgement is read back without another mutation and stale authority stays held (Firestore rules: retention uncertainty)
+- RISK shared protection old rules: refused retention keeps independent durable device edits and the published root intact (Firestore rules: retention compatibility)
+- RISK shared protection races: old retirement winning the commit prevents a false protection receipt (Firestore rules: retention race)
+- RISK shared protection budget: source readback spends the original recovery budget and cancellation cannot become board acknowledgement (Firestore rules: retention budget)
+- RISK shared protection history: an exact completed legacy source choice does not reblock healthy new edits
+- RISK shared protection historical absence: healthy ordinary saves keep lost legacy evidence flagged without claiming its recovery
+- RISK shared protection cancellation: a stopped transaction cannot start dependent source-marker reads
+- RISK shared protection absent-root authority: retained orphan sources lock only under verified unchanged root absence (Firestore rules: retention empty root)
+- RISK shared protection changed originals: deliberate current recovery selects exact server capture independently of archive order
+- RISK automatic recovery defaults: an unaccepted device uses stable source keys and preserves exact alternatives
+- RISK automatic recovery baseline refresh: a concurrent accepted Add gets one fresh capture without losing its draft
+- RISK automatic recovery publication: exact current-context cloud ACK releases only its automatic hold
+- RISK automatic recovery uncertain publication: a lost reply is verified before retry and never duplicates a cloud save
+- RISK automatic recovery convergence: two accepted defaults adopt acknowledged authority without publication loops
+- RISK automatic recovery publication guards: changed exact authority storage drafts pending and identity cannot publish
+- RISK automatic recovery pending CAS: exact conditional clearing preserves changed typed or peer rows
+- RISK automatic recovery revision conflict: a peer publication at the transaction boundary replaces an obsolete default
+- RISK automatic recovery identity safety: contradictory original decision bytes never become a default
+- RISK automatic recovery guidance: mounted FAQ explains reversible defaults and exact cloud confirmation
+- RISK automatic recovery recorded choices: a causal native edit beats the pinned device value despite clock skew
+- RISK automatic recovery comparisons: compatible independent observations replay once instead of becoming rating defaults
+- RISK automatic recovery rating safety: ambiguous legacy saved numbers do not become a compatible default
+
+## Integrated automatic recovery qualification
+
+- RISK integrated automatic recovery: persisted multichunk sources retain pending ACK and true Done Undo through restart
+- RISK integrated automatic recovery native: persisted startup status and neighboring controls remain usable
+- RISK integrated automatic recovery: a failed current read cannot hide the healthy previous source
+
+- RISK automatic source status: completed confirmation follows current edits and signed-in identity
+- RISK automatic source status native: historical retry checking stop and confirmation remain current
+- RISK integrated automatic recovery: no-input fallback continues through exact cloud confirmation
+
+- Immutable installed Git assets above one megabyte must retain exact bytes and still refuse a changed checkout before native delivery: `RISK repository process: large immutable installed assets retain exact bytes and reject a changed checkout`.
+
+- Manual recovery fixture ownership must start from the settled exact original before actual Review, without prior automatic adoption: `RISK recovery fixture ownership: deliberate review begins with settled original sources before automatic recovery`.
+
+- Acknowledged damaged-source fixture inputs finish both real native seed Add saves before later recovery/consent: `RISK recovery fixture ownership: acknowledged damage inputs finish both native seed saves before recovery`.

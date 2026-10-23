@@ -11,6 +11,12 @@ service cloud.firestore {
       function generationPath(generationId) {
         return /databases/$(database)/documents/users/$(uid)/generations/$(generationId);
       }
+      function protectionPath(generationId) {
+        return /databases/$(database)/documents/users/$(uid)/recoveryProtections/$(generationId);
+      }
+      function notProtected(generationId) {
+        return !exists(protectionPath(generationId));
+      }
       function datedRevision() {
         return request.resource.data.keys().hasAll(['payload', 'updatedAt', 'rev', 'serverUpdatedAt'])
           && !request.resource.data.keys().hasAny(['schemaVersion'])
@@ -62,6 +68,29 @@ service cloud.firestore {
           && datedRevision() && request.resource.data.rev == resource.data.get('rev', 0) + 1) || v2Update());
       allow delete: if false;
 
+      // Root replacement by a released client cannot erase these independent
+      // incident sources. Retention has no client expiry or unpin operation.
+      match /recoveryProtections/{generationId} {
+        allow read: if owner();
+        allow create: if owner()
+          && request.resource.data.keys().hasAll(['v', 'rootRevision', 'createdAt'])
+          && request.resource.data.keys().hasOnly(['v', 'rootRevision', 'createdAt'])
+          && request.resource.data.v == 1
+          && request.resource.data.rootRevision is int
+          && request.resource.data.rootRevision >= 0
+          && request.resource.data.createdAt == request.time
+          && (request.resource.data.rootRevision == 0
+            ? !exists(userPath()) && !existsAfter(userPath())
+            : exists(userPath()) && get(userPath()).data.schemaVersion == 2
+              && get(userPath()).data.rev == request.resource.data.rootRevision)
+          && exists(generationPath(generationId))
+          && get(generationPath(generationId)).data.state in ['staging', 'sealed', 'published']
+          // A batch cannot acquire a marker using the old header while
+          // retiring that same source in the resulting atomic state.
+          && getAfter(generationPath(generationId)).data.state in ['staging', 'sealed', 'published'];
+        allow update, delete: if false;
+      }
+
       match /generations/{generationId} {
         function validStagingHeader() {
           return request.resource.data.keys().hasAll(['schemaVersion', 'state', 'encoding', 'chunkCount',
@@ -92,12 +121,14 @@ service cloud.firestore {
             && request.resource.data.state == 'deleting'
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['state', 'deletingAt'])
             && request.resource.data.deletingAt == request.time
+            && notProtected(generationId)
             && rootDoesNotReference(generationId);
         }
         allow read: if owner();
         allow create: if owner() && validStagingHeader();
         allow update: if owner() && (sealTransition() || publishTransition() || deletingTransition());
-        allow delete: if owner() && resource.data.state == 'deleting' && rootDoesNotReference(generationId);
+        allow delete: if owner() && resource.data.state == 'deleting'
+          && notProtected(generationId) && rootDoesNotReference(generationId);
 
         match /chunks/{chunkId} {
           function validChunk() {
@@ -115,6 +146,7 @@ service cloud.firestore {
           allow update: if false;
           allow delete: if owner() && exists(generationPath(generationId))
             && get(generationPath(generationId)).data.state == 'deleting'
+            && notProtected(generationId)
             && rootDoesNotReference(generationId);
         }
       }

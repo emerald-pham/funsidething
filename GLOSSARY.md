@@ -45,22 +45,35 @@ _Avoid_: Restoring the whole earlier board
 **Recovery source**:
 A retained copy of a board or its saved decisions that may help recover work.
 Keeping a source does not establish that it is complete or safe to apply.
+Shared originals retained by automatic recovery remain protected across devices,
+including after they leave the current cloud slots; this cannot recreate missing bytes.
 _Avoid_: Recovered board
 
 **Cloud recovery review**:
-A read-only comparison of separately retained device and cloud sources before
-a person chooses whether to recover from one. Opening or reading the review
-is not consent to replace a board.
+A protected check of separately retained device and cloud sources that can
+support automatic compatible reconciliation. Explicit manual File or Paste
+Restore remains a deliberate replacement; opening a review does not approve it.
 _Avoid_: Automatic restore
 
+**Automatic recovery default**:
+A reversible choice between compatible values whose order cannot be established,
+using the accepted device value when available or a fixed source order otherwise.
+The alternatives remain protected, and later acknowledged work becomes the basis
+for subsequent reconciliation.
+_Avoid_: Newest snapshot, invented decision
+
 **Lossless recovery**:
-Recovery that retains every accepted board decision and newer edit. Choosing
-between conflicting sources is a separate decision by the person.
+Recovery that retains every accepted board decision, unfinished draft and
+newer edit. A validated older source can provide a local working board while
+unexamined cloud changes remain protected and cloud confirmation stays pending.
+The verified saved working board and an automatic pending confirmation can resume
+after reopening without another source-selection exercise.
 _Avoid_: Loading any readable backup
 
 **Cloud acknowledgement**:
-Confirmation that the person's saved board reached their cloud account.
-A board saved on one device or read from the cloud is not that confirmation.
+Confirmation that the current saved board reached the person's cloud account,
+separate from device-local saving or reading a cloud copy. It does not establish
+that unavailable historical changes have been recovered.
 _Avoid_: Synced badge
 
 
