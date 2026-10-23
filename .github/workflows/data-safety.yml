@@ -75,14 +75,30 @@ jobs:
       TZ: UTC
     steps:
       - uses: actions/checkout@v4
+        id: diagnostic-checkout
         with:
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@v4
+        id: diagnostic-node
         with:
           node-version: '22.23.3'
+      - name: Preserve setup outcome even when checkout or Node setup fails
+        id: diagnostic-setup-evidence
+        if: always()
+        shell: bash
+        working-directory: ${{ runner.temp }}
+        env:
+          CHECKOUT_OUTCOME: ${{ steps.diagnostic-checkout.outcome }}
+          NODE_OUTCOME: ${{ steps.diagnostic-node.outcome }}
+        run: |
+          for outcome in "$CHECKOUT_OUTCOME" "$NODE_OUTCOME"; do
+            case "$outcome" in success|failure|cancelled|skipped) ;; *) exit 1 ;; esac
+          done
+          mkdir -p "$RUNNER_TEMP/linux-diagnostic-187"
+          printf '{"schemaVersion":1,"checkout":"%s","nodeSetup":"%s","scope":"setup-only; step output remains in Actions log"}\n' "$CHECKOUT_OUTCOME" "$NODE_OUTCOME" > "$RUNNER_TEMP/linux-diagnostic-187/setup.json"
       - name: Record immutable H and J consumers once
-        run: node scripts/agent-tools/linux-diagnostic-187.mjs --repo "$GITHUB_WORKSPACE" --evidence-dir "$RUNNER_TEMP/linux-diagnostic-187" --scratch-parent "$RUNNER_TEMP"
+        run: node scripts/agent-tools/linux-diagnostic-187.mjs --repo "$GITHUB_WORKSPACE" --evidence-dir "$RUNNER_TEMP/linux-diagnostic-187/run" --scratch-parent "$RUNNER_TEMP"
       - name: Preserve diagnostic evidence including failures
         if: always()
         uses: actions/upload-artifact@v4

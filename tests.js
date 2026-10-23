@@ -28428,7 +28428,7 @@ test('RISK repository process: main deployment requires the merged reviewed head
  }finally{cleanupReleaseGateFixture(fixture);}
 });
 
-test('RISK repository process: only the exact live diagnostic push selects the bounded Linux carrier',async()=>{
+test('RISK repository process: the exact diagnostic push retains standard CI authority and setup failure evidence',async()=>{
  const {parse}=await import('yaml');
  const workflow=parse(fs.readFileSync(path.join(__dirname,'.github/workflows/data-safety.yml'),'utf8'));
  const selected=(github)=>Object.entries(workflow.jobs).filter(([,job])=>job.if===undefined||vm.runInNewContext(String(job.if).replace(/^\$\{\{\s*|\s*\}\}$/g,''),{github},{timeout:100})).map(([name])=>name);
@@ -28445,10 +28445,23 @@ test('RISK repository process: only the exact live diagnostic push selects the b
  assert.equal(job.environment,undefined);
  assert.deepEqual(job.env,{TZ:'UTC'});
  assert.equal(job['timeout-minutes'],15);
- assert.deepEqual(job.steps.map(step=>step.uses??null),['actions/checkout@v4','actions/setup-node@v4',null,'actions/upload-artifact@v4']);
+ assert.deepEqual(job.steps.map(step=>step.uses??null),['actions/checkout@v4','actions/setup-node@v4',null,null,'actions/upload-artifact@v4']);
  assert.equal(job.steps[1].with['node-version'],'22.23.3');
- assert.equal(job.steps[2].run,'node scripts/agent-tools/linux-diagnostic-187.mjs --repo "$GITHUB_WORKSPACE" --evidence-dir "$RUNNER_TEMP/linux-diagnostic-187" --scratch-parent "$RUNNER_TEMP"');
+ assert.equal(job.steps[3].run,'node scripts/agent-tools/linux-diagnostic-187.mjs --repo "$GITHUB_WORKSPACE" --evidence-dir "$RUNNER_TEMP/linux-diagnostic-187/run" --scratch-parent "$RUNNER_TEMP"');
+ for(const index of [0,1,3]){assert.equal(job.steps[index].if,undefined,'checkout, setup and probes retain default success gating');assert.equal(job.steps[index]['continue-on-error'],undefined);}
  assert.equal(JSON.stringify(job).includes('secrets.'),false,'the diagnostic job has no secret input');
+ const bootstrap=job.steps.find(step=>step.id==='diagnostic-setup-evidence');
+ assert.ok(bootstrap,'checkout or Node setup failure must retain a setup artifact before the helper can start');
+ assert.equal(bootstrap.if,'always()');
+ assert.equal(bootstrap['working-directory'],'${{ runner.temp }}','setup artifacts do not depend on a checked-out directory');
+ const temporary=fs.mkdtempSync(path.join(process.env.TMPDIR||'/tmp','diagnostic-setup-failure-'));
+ try{
+  for(const [checkout,nodeSetup] of [['failure','skipped'],['success','failure']]){
+   const result=spawnSync('bash',['-c',bootstrap.run],{cwd:temporary,encoding:'utf8',env:{PATH:process.env.PATH,RUNNER_TEMP:temporary,CHECKOUT_OUTCOME:checkout,NODE_OUTCOME:nodeSetup}});
+   assert.equal(result.status,0,result.stderr);
+   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(temporary,'linux-diagnostic-187','setup.json'),'utf8')),{schemaVersion:1,checkout,nodeSetup,scope:'setup-only; step output remains in Actions log'});
+  }
+ }finally{fs.rmSync(temporary,{recursive:true,force:true});}
  assert.equal(job.steps.some(step=>step.if==='always()'&&step.uses==='actions/upload-artifact@v4'&&step.with['if-no-files-found']==='error'),true,'failure evidence must be uploaded');
  const original=parse(releaseGateGit(__dirname,['show','94300cf1b3ca85f00ed4f3c4c8954ac51b460f80:.github/workflows/data-safety.yml']));
  assert.deepEqual(workflow.jobs['scanner-tests'].steps,original.jobs['scanner-tests'].steps);

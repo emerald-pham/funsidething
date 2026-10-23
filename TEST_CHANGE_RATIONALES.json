@@ -18507,5 +18507,78 @@
       "command": "TZ=UTC official Node22.23.3 record-run --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern=^RISK repository process: only the exact live diagnostic push selects the bounded Linux carrier$ tests.js; record171ae0d2-2b4b-4379-a316-a36325276a89 at18:08:50Z in external linux-x64-carrier/implementation/workflow-red.",
       "failure": "Before workflow/runner implementation, the runnable actual workflow selected [scanner-tests] while this exact diagnostic push required [linux-diagnostic-187]. ERR_ASSERTION/deepStrictEqual, exit1, one named failure, zero skip/cancel; this is a process policy RED and makes no causal application/performance claim."
     }
+  },
+  {
+    "baseCommit": "77e1edf3f4474963c01aca05c20bef38b525fc07",
+    "testChangesSha256": "4f251cc257b0b3daf73fdc039dfde0798b759b5f0623e0d92ced6000f907aa0a",
+    "reason": "Close the diagnostic carrier setup-failure artifact boundary discovered in owner self-review. The repaired tip remains diagnostic-only and never becomes scanner or application release qualification.",
+    "previousBehavior": "The first carrier tip has an always-upload step but checkout/setup-node failure occurs before the helper can create artifacts, so no setup outcome manifest is retained. All existing consumer/process/source constraints otherwise remain.",
+    "intendedBehavior": "An always-run finite Bash step in runner.temp writes only allowlisted checkout and Node setup outcomes, independently of checkout/Node availability. The real helper writes a fresh run subdirectory and remains default-success gated; prior setup failures stay failed. Full action step output remains in Actions logs; the finite artifact is setup-only and contains no verified-source claim.",
+    "replacementTests": [
+      "RISK repository process: the exact diagnostic push retains standard CI authority and setup failure evidence"
+    ],
+    "preservedCoverage": [
+      "All723 preexisting raw rationale objects remain byte-for-byte unchanged; tests.js is exactly J plus these three adjacent process RISK cases. Every original application/native assertion and 20s/30s/1000ms budget remains. No product, dependency, FAQ, shell, gate or deployment implementation changes.",
+      "The established deployment-prerequisite RISK remains verbatim. Semantic actual workflow controls preserve ordinary PR/push/main/fork/wrong-ref/deleted-ref selection; scanner steps, release-evidence and Pages jobs are byte-exact to J except the reciprocal scanner job guard.",
+      "The actual runner executes Git and the unchanged recorder through a public external-process boundary. Disposable actual H/J Git checkouts and real recording children test fixed command counts/order, clean exact identities, original first-Add stack vs later/other assertion, zero/duplicate/skipped outcomes, setup/runtime stops, separate artifacts and contained cleanup; they do not run app/performance probes or claim Linux evidence.",
+      "Process timeout/output and marker-refusal checks exercise actual owned children. Later external broken guard/owner-marker variants both fail actual assertions; these are sensitivity, not the initial preimplementation RED. Actual Mac Node22 CLI stops unsupported-runtime with zero consumers.",
+      "Diagnostic job results never replace scanner/release acceptance. All native registration source is unchanged; actual browser/native/full app/rules/compat cohorts are outside this diagnostic-only qualification per canonical parent approval. Root retains exact review/receipt/push authority and all application release holds.",
+      "All725 rationale objects committed in the first carrier tip remain raw-byte exact; this appends three comparison-specific records. The existing protected CI prerequisite and every J native/application assertion, source hash, source-derived first-Add frame and fixed budget remain unchanged.",
+      "The expanded real workflow consumer simulates checkout-failed/Node-skipped and checkout-success/Node-failed shell outcomes, while checking explicit runner.temp working directory, always-run preservation, default-success probes and no continue-on-error. No GitHub Action orchestration is claimed by local shell simulation."
+    ],
+    "redEvidence": {
+      "command": "TZ=UTC official Node22.23.3 recorder --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern=^RISK repository process: the exact diagnostic push retains standard CI authority and setup failure evidence$ tests.js; setup-artifact-red record1fafbab0-1bcc-4c24-84dc-06ba4a9be0fd at18:32:34Z.",
+      "failure": "The actual workflow lacked diagnostic-setup-evidence. One named ERR_ASSERTION failed: checkout or Node setup failure must retain a setup artifact before the helper can start. Exit1, zero skip/cancel, before the setup-preservation step or run-subdirectory repair; no missing module/parser and no application causal claim."
+    }
+  },
+  {
+    "baseCommit": "94300cf1b3ca85f00ed4f3c4c8954ac51b460f80",
+    "testChangesSha256": "563c9a5d18894ad1f613e338fc3c1c3ab5c4a117ded9ee512f2da4cb5ef2b2c2",
+    "reason": "Close the diagnostic carrier setup-failure artifact boundary discovered in owner self-review. The repaired tip remains diagnostic-only and never becomes scanner or application release qualification.",
+    "previousBehavior": "This whole comparison includes the original bounded Linux carrier plus its setup-artifact repair, while preserving all prior H/J application/fixture coverage and failure-only diagnosis. The earlier carrier and setup gap are not application fixes.",
+    "intendedBehavior": "An always-run finite Bash step in runner.temp writes only allowlisted checkout and Node setup outcomes, independently of checkout/Node availability. The real helper writes a fresh run subdirectory and remains default-success gated; prior setup failures stay failed. Full action step output remains in Actions logs; the finite artifact is setup-only and contains no verified-source claim.",
+    "replacementTests": [
+      "RISK repository process: the exact diagnostic push retains standard CI authority and setup failure evidence",
+      "RISK repository process: the Linux carrier verifies immutable sources and records only the fixed bounded consumer plan",
+      "RISK repository process: diagnostic process limits stop owned children and cleanup refuses foreign ownership"
+    ],
+    "preservedCoverage": [
+      "All723 preexisting raw rationale objects remain byte-for-byte unchanged; tests.js is exactly J plus these three adjacent process RISK cases. Every original application/native assertion and 20s/30s/1000ms budget remains. No product, dependency, FAQ, shell, gate or deployment implementation changes.",
+      "The established deployment-prerequisite RISK remains verbatim. Semantic actual workflow controls preserve ordinary PR/push/main/fork/wrong-ref/deleted-ref selection; scanner steps, release-evidence and Pages jobs are byte-exact to J except the reciprocal scanner job guard.",
+      "The actual runner executes Git and the unchanged recorder through a public external-process boundary. Disposable actual H/J Git checkouts and real recording children test fixed command counts/order, clean exact identities, original first-Add stack vs later/other assertion, zero/duplicate/skipped outcomes, setup/runtime stops, separate artifacts and contained cleanup; they do not run app/performance probes or claim Linux evidence.",
+      "Process timeout/output and marker-refusal checks exercise actual owned children. Later external broken guard/owner-marker variants both fail actual assertions; these are sensitivity, not the initial preimplementation RED. Actual Mac Node22 CLI stops unsupported-runtime with zero consumers.",
+      "Diagnostic job results never replace scanner/release acceptance. All native registration source is unchanged; actual browser/native/full app/rules/compat cohorts are outside this diagnostic-only qualification per canonical parent approval. Root retains exact review/receipt/push authority and all application release holds.",
+      "All725 rationale objects committed in the first carrier tip remain raw-byte exact; this appends three comparison-specific records. The existing protected CI prerequisite and every J native/application assertion, source hash, source-derived first-Add frame and fixed budget remain unchanged.",
+      "The expanded real workflow consumer simulates checkout-failed/Node-skipped and checkout-success/Node-failed shell outcomes, while checking explicit runner.temp working directory, always-run preservation, default-success probes and no continue-on-error. No GitHub Action orchestration is claimed by local shell simulation."
+    ],
+    "redEvidence": {
+      "command": "TZ=UTC official Node22.23.3 recorder --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern=^RISK repository process: the exact diagnostic push retains standard CI authority and setup failure evidence$ tests.js; setup-artifact-red record1fafbab0-1bcc-4c24-84dc-06ba4a9be0fd at18:32:34Z.",
+      "failure": "The actual workflow lacked diagnostic-setup-evidence. One named ERR_ASSERTION failed: checkout or Node setup failure must retain a setup artifact before the helper can start. Exit1, zero skip/cancel, before the setup-preservation step or run-subdirectory repair; no missing module/parser and no application causal claim."
+    }
+  },
+  {
+    "baseCommit": "7de2910b79ebb0996b97f1a2abd0776c505b29de",
+    "testChangesSha256": "d6c239a7a5fed6211f2a812da05f70c4431366d792033337238c28ac022886ca",
+    "reason": "Close the diagnostic carrier setup-failure artifact boundary discovered in owner self-review. The repaired tip remains diagnostic-only and never becomes scanner or application release qualification.",
+    "previousBehavior": "This whole comparison includes the original bounded Linux carrier plus its setup-artifact repair, while preserving all prior H/J application/fixture coverage and failure-only diagnosis. The earlier carrier and setup gap are not application fixes.",
+    "intendedBehavior": "An always-run finite Bash step in runner.temp writes only allowlisted checkout and Node setup outcomes, independently of checkout/Node availability. The real helper writes a fresh run subdirectory and remains default-success gated; prior setup failures stay failed. Full action step output remains in Actions logs; the finite artifact is setup-only and contains no verified-source claim.",
+    "replacementTests": [
+      "RISK repository process: the exact diagnostic push retains standard CI authority and setup failure evidence",
+      "RISK repository process: the Linux carrier verifies immutable sources and records only the fixed bounded consumer plan",
+      "RISK repository process: diagnostic process limits stop owned children and cleanup refuses foreign ownership"
+    ],
+    "preservedCoverage": [
+      "All723 preexisting raw rationale objects remain byte-for-byte unchanged; tests.js is exactly J plus these three adjacent process RISK cases. Every original application/native assertion and 20s/30s/1000ms budget remains. No product, dependency, FAQ, shell, gate or deployment implementation changes.",
+      "The established deployment-prerequisite RISK remains verbatim. Semantic actual workflow controls preserve ordinary PR/push/main/fork/wrong-ref/deleted-ref selection; scanner steps, release-evidence and Pages jobs are byte-exact to J except the reciprocal scanner job guard.",
+      "The actual runner executes Git and the unchanged recorder through a public external-process boundary. Disposable actual H/J Git checkouts and real recording children test fixed command counts/order, clean exact identities, original first-Add stack vs later/other assertion, zero/duplicate/skipped outcomes, setup/runtime stops, separate artifacts and contained cleanup; they do not run app/performance probes or claim Linux evidence.",
+      "Process timeout/output and marker-refusal checks exercise actual owned children. Later external broken guard/owner-marker variants both fail actual assertions; these are sensitivity, not the initial preimplementation RED. Actual Mac Node22 CLI stops unsupported-runtime with zero consumers.",
+      "Diagnostic job results never replace scanner/release acceptance. All native registration source is unchanged; actual browser/native/full app/rules/compat cohorts are outside this diagnostic-only qualification per canonical parent approval. Root retains exact review/receipt/push authority and all application release holds.",
+      "All725 rationale objects committed in the first carrier tip remain raw-byte exact; this appends three comparison-specific records. The existing protected CI prerequisite and every J native/application assertion, source hash, source-derived first-Add frame and fixed budget remain unchanged.",
+      "The expanded real workflow consumer simulates checkout-failed/Node-skipped and checkout-success/Node-failed shell outcomes, while checking explicit runner.temp working directory, always-run preservation, default-success probes and no continue-on-error. No GitHub Action orchestration is claimed by local shell simulation."
+    ],
+    "redEvidence": {
+      "command": "TZ=UTC official Node22.23.3 recorder --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern=^RISK repository process: the exact diagnostic push retains standard CI authority and setup failure evidence$ tests.js; setup-artifact-red record1fafbab0-1bcc-4c24-84dc-06ba4a9be0fd at18:32:34Z.",
+      "failure": "The actual workflow lacked diagnostic-setup-evidence. One named ERR_ASSERTION failed: checkout or Node setup failure must retain a setup artifact before the helper can start. Exit1, zero skip/cancel, before the setup-preservation step or run-subdirectory repair; no missing module/parser and no application causal claim."
+    }
   }
 ]
