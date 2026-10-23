@@ -11268,7 +11268,7 @@ function automaticRecoveryRecordedRatings(board){
   return supportedDecisionBaseline(board?.decisionBaseline,account)&&
     !decisionEvidenceIssue(board,account)&&!decisionProjectionIssue(board);
 }
-function automaticRecoverySourceFacts(board){
+function automaticRecoverySourceFacts(board,{includeRecordedRatings=false}={}){
   const facts=new Map(),causalRoot=new Set([...DEVICE_LOCAL_KEYS,"updatedAt","tasks","contexts","workLog","deletionLog",
     "deletedTaskIds","restoredTaskIds","restoredTaskOps","deletedAfterRestoreOps","clearedHistoryIds","restoredHistoryIds",
     "restoredHistoryOps","clearedAfterRestoreOps","decisionEvents","decisionEventsRecovery","decisionBaseline","decisionBaselineRecovery"]);
@@ -11279,7 +11279,7 @@ function automaticRecoverySourceFacts(board){
   // Coherently recorded ratings are derived replay results, not separate
   // saved-number choices. Legacy/unprojectable numbers remain ordinary facts;
   // cross-source baseline/identity compatibility is still checked separately.
-  if(automaticRecoveryRecordedRatings(board)){
+  if(!includeRecordedRatings&&automaticRecoveryRecordedRatings(board)){
     causalTask.add("mu");causalTask.add("sigma");
   }
   const put=(path,present,value)=>facts.set(JSON.stringify(path),canonicalDecisionFact({present,...(present?{value}:{})}));
@@ -11467,8 +11467,14 @@ function reduceAutomaticRecoveryCandidates({acceptedBaseline=null,candidates=[]}
   for(const candidate of compatible){
     const base=automaticRecoverySharedBase(anchor.board,candidate.board,account);
     const expected=base?automaticRecoveryChangedFacts(candidate.board,base):automaticRecoverySourceFacts(candidate.board);
-    if([...expected].some(([path,value])=>resultFacts.get(path)!==value&&!resolvedAmbiguities.some(row=>JSON.stringify(row.path)===path)))
-      unsupported.push({key:candidate.key,sourceRef:candidate.sourceRef,reason:"candidate-delta-not-represented"});
+    // A legacy source still requires its exact saved numbers to survive.
+    // The result may omit those facts only because its own ratings are derived;
+    // compare the actual projected numbers rather than treating omission as loss.
+    const resultIncludingRatings=automaticRecoverySourceFacts(next,{includeRecordedRatings:true});
+    if([...expected].some(([path,value])=>{
+      const parts=JSON.parse(path),actual=parts[0]==="tasks"&&["mu","sigma"].includes(parts[2])?resultIncludingRatings.get(path):resultFacts.get(path);
+      return actual!==value&&!resolvedAmbiguities.some(row=>JSON.stringify(row.path)===path);
+    }))unsupported.push({key:candidate.key,sourceRef:candidate.sourceRef,reason:"candidate-delta-not-represented"});
   }
   if(unsupported.length)return {board:null,alternativesToPreserve,supportedAmbiguities,unsupported};
   next.syncDirty=true;
