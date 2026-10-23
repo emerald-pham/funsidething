@@ -2099,3 +2099,5 @@ This boundary control holds a successful real provider reply, installs a later a
 - RISK integrated automatic recovery: no-input fallback continues through exact cloud confirmation
 
 - Immutable installed Git assets above one megabyte must retain exact bytes and still refuse a changed checkout before native delivery: `RISK repository process: large immutable installed assets retain exact bytes and reject a changed checkout`.
+
+- Manual recovery fixture ownership must start from the settled exact original before actual Review, without prior automatic adoption: `RISK recovery fixture ownership: deliberate review begins with settled original sources before automatic recovery`.

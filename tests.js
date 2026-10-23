@@ -1074,7 +1074,7 @@ test('RISK integrated automatic recovery: a failed current read cannot hide the 
 });
 
 test('RISK integrated automatic recovery: persisted multichunk sources retain pending ACK and true Done Undo through restart',async t=>{
- const app=await divergentCloudSourceApp187(t,{sourcePadding:1100000,deferInitialRecovery:true,holdCloudPush:true}),{ctx,backend,indexedDB,deviceDbName,originalRoot}=app;
+ const app=await divergentCloudSourceApp187(t,{sourcePadding:1100000,phase:'automatic-inputs',holdCloudPush:true}),{ctx,backend,indexedDB,deviceDbName,originalRoot}=app;
  ctx.window.CloudSync.ready=false;
  ctx.onAction('done-task',{dataset:{id:'a'}});assert.equal(await ctx.persist(),true);
  const completion=JSON.parse(JSON.stringify(ctx.state.decisionEvents.find(row=>row.kind==='completion'&&row.taskId==='a')));assert.ok(completion?.id);
@@ -1107,7 +1107,7 @@ test('RISK integrated automatic recovery: persisted multichunk sources retain pe
 });
 
 test('RISK cloud source recovery automatic union: accepted device and supported previous cloud additions both survive',async t=>{
- const app=await divergentCloudSourceApp187(t,{deferInitialRecovery:true,holdCloudPush:true}),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ const app=await divergentCloudSourceApp187(t,{phase:'automatic-inputs',holdCloudPush:true}),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
  const previousPath='users/owner/generations/'+originalRoot.previousGeneration,previousHeader=backend.docs.get(previousPath);
  const previousChunks=[...backend.docs].filter(([key])=>key.startsWith(previousPath+'/chunks/')).map(([,row])=>row).sort((a,b)=>a.index-b.index);
  const previousPayload=await ctx.window.ChainStorageV2.decodeSnapshot(previousHeader,previousChunks),previous=JSON.parse(previousPayload);
@@ -1134,7 +1134,7 @@ test('RISK cloud source recovery automatic union: accepted device and supported 
 });
 
 test('RISK cloud source recovery automatic union: a valid nonmatching acknowledged copy contributes supported work',async t=>{
- const app=await divergentCloudSourceApp187(t,{deferInitialRecovery:true,holdCloudPush:true}),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ const app=await divergentCloudSourceApp187(t,{phase:'automatic-inputs',holdCloudPush:true}),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
  const acknowledged=JSON.parse(JSON.stringify(ctx.state));
  acknowledged.tasks.push(syncTask('acknowledged-only','Acknowledged source only'));
  const acknowledgedPayload=JSON.stringify(acknowledged),account=ctx.state.syncAccount,base=ctx.makeDecisionBase(account,ctx.state.syncRev,acknowledgedPayload);
@@ -1161,7 +1161,7 @@ test('RISK cloud source recovery automatic union: a valid nonmatching acknowledg
 });
 
 test('RISK cloud source recovery automatic union: a foreign-UID browser sibling is excluded while safe same-UID work recovers',async t=>{
- const app=await divergentCloudSourceApp187(t,{deferInitialRecovery:true,holdCloudPush:true}),{ctx,backend}=app,store=ctx.window.ScannerDeviceStore;
+ const app=await divergentCloudSourceApp187(t,{phase:'automatic-inputs',holdCloudPush:true}),{ctx,backend}=app,store=ctx.window.ScannerDeviceStore;
  const accepted=JSON.parse(JSON.stringify(ctx.state)),rootBefore=JSON.stringify(backend.docs.get('users/owner'));
  const eventApp=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(accepted),[LOCAL_HEAD_KEY]:JSON.stringify(accepted)}});
  t.after(()=>closeLegacyApp173(eventApp));
@@ -1214,7 +1214,7 @@ test('RISK cloud source recovery automatic union: a foreign-UID browser sibling 
 });
 
 test('RISK cloud source recovery automatic union: a supported durable device head contributes work absent from accepted live state',async t=>{
- const app=await divergentCloudSourceApp187(t,{deferInitialRecovery:true,holdCloudPush:true}),{ctx,backend}=app,store=ctx.window.ScannerDeviceStore;
+ const app=await divergentCloudSourceApp187(t,{phase:'automatic-inputs',holdCloudPush:true}),{ctx,backend}=app,store=ctx.window.ScannerDeviceStore;
  const source={...JSON.parse(JSON.stringify(ctx.state)),futureDurableHead:{kept:['durable',29]}};
  Object.assign(ctx.state,source);
  assert.equal(await ctx.persist(),true,'the independently validated durable source is produced by the ordinary device save path');
@@ -1235,7 +1235,7 @@ test('RISK cloud source recovery automatic union: a supported durable device hea
 });
 
 test('RISK cloud source recovery automatic union: disjoint settings and opaque fields survive across accepted device and previous cloud sources',async t=>{
- const app=await divergentCloudSourceApp187(t,{deferInitialRecovery:true,holdCloudPush:true}),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ const app=await divergentCloudSourceApp187(t,{phase:'automatic-inputs',holdCloudPush:true}),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
  ctx.window.CLOUD_PUSH_DELAY_MS=60000;
  ctx.state.settings.deviceRecoveryExtension={keep:'accepted device setting'};
  ctx.state.futureDeviceRecovery={keep:['device',17]};
@@ -1265,7 +1265,7 @@ test('RISK cloud source recovery automatic union: disjoint settings and opaque f
 });
 
 test('RISK cloud source recovery automatic union: explicit deletion and History clear survive an older complete cloud source',async t=>{
- const app=await divergentCloudSourceApp187(t,{deferInitialRecovery:true,holdCloudPush:true}),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ const app=await divergentCloudSourceApp187(t,{phase:'automatic-inputs',holdCloudPush:true}),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
  ctx.window.CLOUD_PUSH_DELAY_MS=60000;
  ctx.window.CloudSync.ready=false;
  const historyTask=ctx.state.tasks.find(row=>row.id==='a'),deletedTask=ctx.state.tasks.find(row=>row.id!=='a');
@@ -1313,7 +1313,7 @@ test('RISK cloud source recovery automatic union: explicit deletion and History 
 });
 
 test('RISK cloud source recovery automatic union: a repeated comparison observation remains one exact decision',async t=>{
- const app=await divergentCloudSourceApp187(t,{deferInitialRecovery:true,holdCloudPush:true}),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ const app=await divergentCloudSourceApp187(t,{phase:'automatic-inputs',holdCloudPush:true}),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
  ctx.window.CloudSync.ready=false;
  const task=ctx.state.tasks[0];hydrateUnchangedEditorDraft(app,task.id);
  ctx.onAction('dot-task',{dataset:{id:task.id}});
@@ -1365,7 +1365,7 @@ test('RISK automatic recovery defaults: an unaccepted device uses stable source 
 });
 
 async function automaticDefaultApp251(t,{prepare=null,assertAdopted=true}={}){
- const app=await divergentCloudSourceApp187(t,{deferInitialRecovery:true,holdCloudPush:true}),{ctx,backend,originalRoot}=app;
+ const app=await divergentCloudSourceApp187(t,{phase:'automatic-inputs',holdCloudPush:true}),{ctx,backend,originalRoot}=app;
  const path='users/owner/generations/'+originalRoot.previousGeneration,header=backend.docs.get(path),chunks=[...backend.docs].filter(([key])=>key.startsWith(path+'/chunks/')).map(([,row])=>row).sort((a,b)=>a.index-b.index);
  const previous=JSON.parse(await ctx.window.ChainStorageV2.decodeSnapshot(header,chunks));previous.settings.workedHours=8;previous.tasks.push(syncTask('cloud-default-251','Cloud alternative task'));
  const encoded=await ctx.window.ChainStorageV2.encodeSnapshot(JSON.stringify(previous));backend.docs.set(path,{...header,...encoded,chunks:undefined});for(const key of [...backend.docs.keys()])if(key.startsWith(path+'/chunks/'))backend.docs.delete(key);
@@ -1510,7 +1510,7 @@ test('RISK automatic recovery revision conflict: a peer publication at the trans
 });
 
 test('RISK automatic recovery identity safety: contradictory original decision bytes never become a default',async t=>{
- const app=await divergentCloudSourceApp187(t,{deferInitialRecovery:true,holdCloudPush:true}),{ctx,backend,originalRoot}=app;
+ const app=await divergentCloudSourceApp187(t,{phase:'automatic-inputs',holdCloudPush:true}),{ctx,backend,originalRoot}=app;
  ctx.window.CloudSync.ready=false;assert.equal(await saveEditorChoice(app,'a',1792323000123,{title:'Accepted original identity'}),true);
  const original=JSON.stringify(ctx.state),before=await ctx.window.ScannerDeviceStore.readHead(),incoming=JSON.parse(ctx.cloudPayload()),event=incoming.decisionEvents.find(row=>row.kind==='current-choice'&&row.target?.property==='title');
  assert.ok(event);event.value='Contradictory reused identity';incoming.tasks.find(row=>row.id==='a').title=event.value;
@@ -1540,7 +1540,7 @@ test('RISK automatic recovery guidance: mounted FAQ explains reversible defaults
 });
 
 test('RISK automatic recovery comparisons: compatible independent observations replay once instead of becoming rating defaults',async t=>{
- const app=await divergentCloudSourceApp187(t,{deferInitialRecovery:true,holdCloudPush:true}),{ctx,backend,originalRoot}=app;
+ const app=await divergentCloudSourceApp187(t,{phase:'automatic-inputs',holdCloudPush:true}),{ctx,backend,originalRoot}=app;
  ctx.window.CloudSync.ready=false;ctx.openSettings();const box=app.shim.document.getElementById('stSkipOldestFirstDot');Object.assign(box,{id:'stSkipOldestFirstDot',checked:true,matches:()=>false});app.shim.document.dispatchEvent({type:'change',target:box});ctx.closeModal();
  ctx.onAction('start-scan',{dataset:{mode:'descending'}});ctx.decide('yes');assert.equal(await ctx.persist(),true);
  const shared=JSON.stringify(ctx.state),peer=await loadAppAtTime(1792323000000,{seedStorage:{[SYNC_STORE_KEY]:shared,[LOCAL_HEAD_KEY]:shared}});t.after(()=>closeLegacyApp173(peer));
@@ -1566,7 +1566,7 @@ test('RISK automatic recovery comparisons: compatible independent observations r
 });
 
 test('RISK automatic recovery rating safety: ambiguous legacy saved numbers do not become a compatible default',async t=>{
- const app=await divergentCloudSourceApp187(t,{deferInitialRecovery:true,holdCloudPush:true}),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ const app=await divergentCloudSourceApp187(t,{phase:'automatic-inputs',holdCloudPush:true}),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
  const before=JSON.stringify(ctx.state),head=await store.readHead(),path='users/owner/generations/'+originalRoot.previousGeneration,header=backend.docs.get(path),chunks=[...backend.docs].filter(([key])=>key.startsWith(path+'/chunks/')).map(([,row])=>row).sort((a,b)=>a.index-b.index);
  const legacy=JSON.parse(await ctx.window.ChainStorageV2.decodeSnapshot(header,chunks));assert.equal(legacy.decisionBaseline,undefined);legacy.tasks.find(row=>row.id==='a').mu=26;
  const raw=JSON.stringify(legacy),encoded=await ctx.window.ChainStorageV2.encodeSnapshot(raw);backend.docs.set(path,{...header,...encoded,chunks:undefined});for(const key of [...backend.docs.keys()])if(key.startsWith(path+'/chunks/'))backend.docs.delete(key);for(const chunk of encoded.chunks)backend.docs.set(path+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
@@ -1576,7 +1576,7 @@ test('RISK automatic recovery rating safety: ambiguous legacy saved numbers do n
 });
 
 test('RISK automatic recovery recorded choices: a causal native edit beats the pinned device value despite clock skew',async t=>{
- const app=await divergentCloudSourceApp187(t,{deferInitialRecovery:true,holdCloudPush:true}),{ctx,backend,originalRoot}=app;
+ const app=await divergentCloudSourceApp187(t,{phase:'automatic-inputs',holdCloudPush:true}),{ctx,backend,originalRoot}=app;
  ctx.window.CloudSync.ready=false;
  assert.equal(await saveEditorChoice(app,'a',1792323000500,{title:'Clock-forward earlier title'}),true);
  const earlier=JSON.stringify(ctx.state);
@@ -1599,7 +1599,7 @@ test('RISK automatic recovery recorded choices: a causal native edit beats the p
 });
 
 test('RISK automatic recovery defaults: supported same-path ambiguity keeps the accepted device value and exact alternatives',async t=>{
- const app=await divergentCloudSourceApp187(t,{deferInitialRecovery:true,holdCloudPush:true}),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ const app=await divergentCloudSourceApp187(t,{phase:'automatic-inputs',holdCloudPush:true}),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
  ctx.window.CloudSync.ready=false;
  const task=ctx.state.tasks.find(row=>row.id==='a');hydrateUnchangedEditorDraft(app,task.id);
  app.shim.document.getElementById('etTitle').value='Accepted device title';
@@ -2044,7 +2044,7 @@ test('RISK cloud source authority: post-ACK hold change preserves its committed 
 
 test('RISK cloud source authority: post-ACK same-hash head change refuses stale local adoption',async t=>{
  for(const timing of ['before local commit','after local commit','before hold clearing','during final copy verification','after hold refresh'])await t.test(timing,async sub=>{
- const app=await freshSourceCheckFixture187(sub,{deferInitialRecovery:true}),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore,{payload,...head}=await store.readHead(),hold=timing==='during final copy verification'?null:{account:'e@example.com',identity:'owner',futureAuthority:-0};
+ const app=await freshSourceCheckFixture187(sub),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore,{payload,...head}=await store.readHead(),hold=timing==='during final copy verification'?null:{account:'e@example.com',identity:'owner',futureAuthority:-0};
  assert.equal(await store.getRecoveryCloudHold(),null,'manual authority fixture starts before automatic adoption');
  assert.equal((await store.listOpaqueArchives()).some(row=>row.key.startsWith('automatic-cloud-source:')),false,'no earlier automatic archive can stand in for this manual capture');
  await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>{tx.objectStore('meta').put({...head,futureAuthority:-0},'head');if(hold)tx.objectStore('meta').put(hold,'recoveryCloudHold');});assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);assert.equal(await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'generation:'+originalRoot.previousGeneration}}),true);
@@ -2063,7 +2063,7 @@ test('RISK cloud source authority: post-ACK same-hash head change refuses stale 
 });
 
 test('RISK cloud source authority: unchanged typed originals remain exactly archived after confirmed restore',async t=>{
- const app=await freshSourceCheckFixture187(t,{deferInitialRecovery:true}),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore,{payload,...head}=await store.readHead(),hold={account:'e@example.com',identity:'owner',futureAuthority:NaN,zero:-0,bigint:7n,named:Object.assign(['same'],{sole:'original'}),unknown:undefined};
+ const app=await freshSourceCheckFixture187(t),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore,{payload,...head}=await store.readHead(),hold={account:'e@example.com',identity:'owner',futureAuthority:NaN,zero:-0,bigint:7n,named:Object.assign(['same'],{sole:'original'}),unknown:undefined};
  assert.equal(await store.getRecoveryCloudHold(),null,'manual authority fixture starts before automatic adoption');
  assert.equal((await store.listOpaqueArchives()).some(row=>row.key.startsWith('automatic-cloud-source:')),false,'no earlier automatic archive can stand in for this manual capture');
  await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>{tx.objectStore('meta').put({...head,futureAuthority:NaN,bigint:19n,named:Object.assign(['head'],{sole:'head original'})},'head');tx.objectStore('meta').put(hold,'recoveryCloudHold');});
@@ -2774,7 +2774,7 @@ test('RISK recovery read minute: known-damage entry clears on healthy reads and 
  for(const outcome of ['healthy source','same-email other UID','late old-account read','never damaged'])await t.test(outcome,async sub=>{
   let app;const clock=recoveryReadClock187();
   if(outcome==='never damaged'){const fixture=heldDecisionFixture188(),faults={};fixture.local=structuredClone(fixture.remote);app={...await heldDecisionApp188(sub,{fixture,failures:faults,timeoutMs:20000,recoveryTimeoutMs:null,timerProvider:clock.provider}),faults};}
-  else app=await divergentCloudSourceApp187(sub,{timeoutMs:20000,recoveryTimeoutMs:null,timerProvider:clock.provider,deferInitialRecovery:true});
+  else app=await divergentCloudSourceApp187(sub,{timeoutMs:20000,recoveryTimeoutMs:null,timerProvider:clock.provider});
   const {ctx,shim,backend}=app;
   if(outcome==='healthy source'){
    const current='users/owner/generations/'+app.originalRoot.activeGeneration,encoded=await ctx.window.ChainStorageV2.encodeSnapshot(ctx.state.decisionBase.payload);
@@ -2825,7 +2825,7 @@ test('RISK recovery read minute guidance: pending native review offers Cancel an
 });
 
 test('RISK iOS source replay: a fresh native review offers a validated previous board after timed-out headers settle late',async t=>{
- const clock=recoveryReadClock187(),app=await divergentCloudSourceApp187(t,{timeoutMs:1000,sourcePadding:2000000,timerProvider:clock.provider,deferInitialRecovery:true}),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ const clock=recoveryReadClock187(),app=await divergentCloudSourceApp187(t,{timeoutMs:1000,sourcePadding:2000000,timerProvider:clock.provider}),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
  await fixtureDeadline((async()=>{while(true){const save=ctx.buildSupportDiagnosticsReport().save;if(save.debouncePending.value===false&&save.activePersistCalls.value===0)return;await flush();}})(),'ordinary fixture saves finish before source-inspection preservation is measured');
  const currentPath='users/owner/generations/'+originalRoot.activeGeneration,previousPath='users/owner/generations/'+originalRoot.previousGeneration;
  const previousHeader=backend.docs.get(previousPath),previousChunks=[...backend.docs].filter(([key])=>key.startsWith(previousPath+'/chunks/')).map(([,row])=>row).sort((a,b)=>a.index-b.index);
@@ -41266,16 +41266,36 @@ test('RISK resilient sync recovery: verified empty and explicit ACK transitions 
  });
 });
 
-// Uses only the existing native consumer and real storage/backend. The failed
-// selected hash makes this a deliberate source choice, never an exact repair.
-async function divergentCloudSourceApp187(t,options){
+test('RISK recovery fixture ownership: deliberate review begins with settled original sources before automatic recovery',async t=>{
+ const app=await divergentCloudSourceApp187(t),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ assert.equal(await store.getRecoveryCloudHold(),null,'manual setup must not adopt an automatic board or leave its publisher owning the source');
+ assert.equal(vm.runInContext('cloudSourceRecoveryBusy||cloudPushInFlight||pulling',ctx),false,'manual setup has no automatic read or publisher in flight');
+ const save=ctx.buildSupportDiagnosticsReport().save;
+ assert.equal(save.debouncePending.value,false,'the actual final setup Add debounce finishes before caller source capture');
+ assert.equal(save.activePersistCalls.value,0);assert.equal(save.localDurability.value,'durable');
+ assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state),'the exact accepted original is stable before Review');
+ assert.equal((await store.listOpaqueArchives()).length,0,'setup does not prearchive a different automatic recovery phase');
+ assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev);
+ const before=JSON.stringify(ctx.state);assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);
+ assert.equal(JSON.stringify(ctx.state),before,'actual manual inspection retains the original board without automatic adoption');
+ assert.equal(await store.getRecoveryCloudHold(),null);await ctx.onAction('close-modal',{});
+});
+
+// Manual review owns the default: finish the real setup Add save, then return
+// the unchanged original before any app recovery. Automatic consumers explicitly
+// request input assembly and enter via their own cloudPull/cold bootstrap below;
+// this fixture never starts a second recovery owner on their behalf.
+async function divergentCloudSourceApp187(t,options={}){
+ const phase=options.phase??'manual-review';
+ assert.ok(['manual-review','automatic-inputs'].includes(phase),'explicit recovery fixture phase');
+ options={...options,settleDeviceBeforeCloud:options.settleDeviceBeforeCloud??phase==='manual-review'};
  const app=await damagedAcknowledgedApp187(t,options),{ctx,shim,backend,originalRoot}=app;
  if(options?.settleDeviceBeforeCloud)t.after(()=>app.dispose());
  const path='users/owner/generations/'+originalRoot.activeGeneration;
  backend.docs.set(path,{...backend.docs.get(path),hash:'f'.repeat(64)});
  if(options?.settleDeviceBeforeCloud)ctx.window.CLOUD_PUSH_DELAY_MS=60000;
  if(options?.holdCloudPush)ctx.window.CLOUD_PUSH_DELAY_MS=60000;
- if(options?.holdCloudPush||!options?.deferInitialRecovery)refuseNextRecoveryTransaction255(app.faults);
+ if(options.holdCloudPush)refuseNextRecoveryTransaction255(app.faults);
  shim.document.getElementById('addInput').value='Device source only';
  const schedule=ctx.setTimeout,cancel=ctx.clearTimeout,saveClock={elapsed:0,jobs:[]};
  if(options?.settleDeviceBeforeCloud){
@@ -41294,7 +41314,6 @@ async function divergentCloudSourceApp187(t,options){
    await settleSourceFixtureSave187(app,'fixture final native save settles before cloud controls',true);
   }
  }finally{ctx.setTimeout=schedule;ctx.clearTimeout=cancel;}
- if(!options?.deferInitialRecovery){await ctx.cloudPull();await settleRecoveryOperations188(ctx);}
  assert.equal((await backend.CS.pull()).code,'corrupt-generation');
  return app;
 }
@@ -41400,8 +41419,14 @@ test('RISK cloud source recovery: a late browser pending or peer change cannot b
 });
 
 test('RISK cloud source recovery: chosen prior membership remains deliberate while an unseen peer task and decision history survive',async t=>{
- const app=await divergentCloudSourceApp187(t),{ctx,backend,originalRoot}=app;
+ const app=await divergentCloudSourceApp187(t,{phase:'automatic-inputs',holdCloudPush:true}),{ctx,backend,originalRoot}=app;
+ await ctx.cloudPull();await settleRecoveryOperations188(ctx);
+ assert.equal((await ctx.window.ScannerDeviceStore.getRecoveryCloudHold())?.automaticRecovery,true,'the actual automatic consumer establishes the held prior board before Start and deliberate choice');
+ assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev,'the external first-publication refusal retains original generation authority');
  ctx.onAction('start-scan',{dataset:{mode:'descending'}});await ctx.persist();
+ await settleSourceFixtureSave187(app,'the accepted Start save settles before manual source capture',true);
+ await settleRecoveryOperations188(ctx);
+ assert.equal((await ctx.window.ScannerDeviceStore.getRecoveryCloudHold())?.automaticRecovery,true,'native Start retains the earned automatic hold before the later deliberate source choice');
  const before=JSON.stringify(ctx.state),originalFacts=JSON.parse(before).decisionEvents||[];
  assert.ok(originalFacts.length>0,'the native prior state contains actual recorded decisions');
  await ctx.onAction('review-cloud-source-recovery',{});await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'generation:'+originalRoot.previousGeneration}});
@@ -41547,7 +41572,7 @@ test('RISK cloud source recovery: native Cancel stops delayed source checks and 
 
 test('RISK cloud source recovery: account changes during final hold completion never report the old recovery complete',async t=>{
  // This consumer owns deliberate manual review; automatic boot continuation is tested separately.
- const app=await divergentCloudSourceApp187(t,{deferInitialRecovery:true}),{ctx,backend}=app;
+ const app=await divergentCloudSourceApp187(t),{ctx,backend}=app;
  await ctx.onAction('review-cloud-source-recovery',{});await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'device'}});
  let opaqueReads=0,fired=false;
  app.idbFault.afterReadTransaction=names=>{
@@ -41883,7 +41908,7 @@ test('RISK debug log: ordinary actions survive reopening as metadata without cha
 
 test('RISK debug log: an interrupted actual cloud review retains its stage in a new document',async t=>{
  // This consumer owns deliberate manual review; automatic boot continuation is tested separately.
- const app=await divergentCloudSourceApp187(t,{deferInitialRecovery:true}),{ctx,shim}=app,gate=deferredSyncFixture();let entered=false,review;
+ const app=await divergentCloudSourceApp187(t),{ctx,shim}=app,gate=deferredSyncFixture();let entered=false,review;
  t.after(async()=>{gate.resolve();delete app.faults.serverRead;await review;});
  app.faults.serverRead=async()=>{entered=true;await gate.promise;};
  await ctx.onAction('sync',{});review=ctx.onAction('review-cloud-source-recovery',{});
@@ -42908,7 +42933,7 @@ test('RISK shared protection budget: source readback spends the original recover
 test('RISK shared protection history: an exact completed legacy source choice does not reblock healthy new edits',async t=>{
  // This consumer owns deliberate manual review; automatic boot continuation is tested separately.
  const {readReleasedClient}=await import('./scripts/backward-compatibility.mjs'),artifacts=readReleasedClient(__dirname,'4f1d6bdc9ff6ca8a2a2294e34022ad01118a3d5f');
- const app=await divergentCloudSourceApp187(t,{artifacts,deferInitialRecovery:true}),{ctx,backend}=app,store=ctx.window.ScannerDeviceStore;
+ const app=await divergentCloudSourceApp187(t,{artifacts}),{ctx,backend}=app,store=ctx.window.ScannerDeviceStore;
  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);assert.equal(await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'device'}}),true);assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),true);
  const archives=await store.listOpaqueArchives(),confirmed=(await store.listBackups()).filter(row=>row.kind==='decision-recovery-confirmed');assert.ok(archives.length);assert.equal(confirmed.length,1,'the actual historical native recovery completed its exact durable confirmation receipt');
  const peer=await loadCloudBackendV2({artifacts,timeoutMs:5000});t.after(()=>peer.CS.suspend());for(const [key,value]of backend.docs)peer.docs.set(key,value);
