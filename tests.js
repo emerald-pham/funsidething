@@ -2177,7 +2177,7 @@ async function waitForNativeHistoryAck226(page,owner){
 }
 
 async function runNativeRecoveryInspection226(t,width=390,holdDemoted=false,completeSource=null,automaticView=null){
- const playwright=await import('playwright'),engine=(completeSource||automaticView)?(process.env.CHAIN_RECOVERY_TEST_ENGINE||'chromium'):'chromium';assert.ok(['chromium','webkit'].includes(engine),'the native source consumer uses an existing supported engine');
+ const playwright=await import('playwright'),engine=(completeSource||automaticView)?(automaticView?.engine||process.env.CHAIN_RECOVERY_TEST_ENGINE||'chromium'):'chromium';assert.ok(['chromium','webkit'].includes(engine),'the native source consumer uses an existing supported engine');
  const sdk=await import('./scripts/installed-client-fixture.mjs'),browser=await playwright[engine].launch({headless:true}),context=await browser.newContext({viewport:{width,height:844},serviceWorkers:'block',reducedMotion:'reduce'}),page=await context.newPage();
  const current=deferredSyncFixture(),previous=deferredSyncFixture(),finalRoot=deferredSyncFixture(),freshFinalRoot=deferredSyncFixture(),demoted=deferredSyncFixture(),raw=JSON.stringify({...sdk.fixture('reconcile-held'),...(automaticView?{settings:{...sdk.fixture('reconcile-held').settings,theme:automaticView.theme}}:{})}),encoded=await loadStorageV2().encodeSnapshot(raw),{chunks,...header}=encoded,remote=new Map([['users/owner',{schemaVersion:2,rev:4,activeGeneration:'held-current',previousGeneration:'received-previous'}],['users/owner/generations/held-current',{...header,hash:'f'.repeat(64),state:'published',baseRev:3}],['users/owner/generations/received-previous',{...header,state:'published',baseRev:2}],...chunks.map(c=>['users/owner/generations/received-previous/chunks/'+String(c.index).padStart(8,'0'),c])]);
  if(automaticView){remote.set('users/owner/generations/held-current',{...header,state:'published',baseRev:3});for(const chunk of chunks)remote.set('users/owner/generations/held-current/chunks/'+chunk.index,chunk);}
@@ -2286,7 +2286,8 @@ async function runNativeRecoveryInspection226(t,width=390,holdDemoted=false,comp
   await page.locator('[data-act="settings"]').first().click();
   const warning=page.locator('#modalRoot [role="status"]').filter({hasText:'Cloud recovery is pending'});await warning.waitFor();
   const review=page.locator('#modalRoot [data-act="review-cloud-source-recovery"]'),neighbor=page.locator('#modalRoot [data-act="sync-signout"]');
-  await review.focus();await page.keyboard.press('Tab');await page.keyboard.press('Shift+Tab');assert.equal(await review.evaluate(el=>el===document.activeElement),true,'native focus returns to the actual recovery action');
+  const focusForward=engine==='webkit'&&process.platform==='darwin'?'Alt+Tab':'Tab',focusBackward=engine==='webkit'&&process.platform==='darwin'?'Alt+Shift+Tab':'Shift+Tab';
+  await review.focus();await page.keyboard.press(focusForward);assert.equal(await neighbor.evaluate(el=>el===document.activeElement),true,'native forward focus reaches the actual next recovery control');await page.keyboard.press(focusBackward);assert.equal(await review.evaluate(el=>el===document.activeElement),true,'native focus returns to the actual recovery action');
   const output=process.env.CHAIN_RECOVERY_UI_OUTPUT?path.resolve(process.env.CHAIN_RECOVERY_UI_OUTPUT):null,observations=[];
   if(output)fs.mkdirSync(output,{recursive:true});
   await page.waitForFunction(()=>!document.getElementById('toast')?.classList.contains('show'),{},{timeout:15000});
@@ -2366,8 +2367,8 @@ async t=>{
  for(const [theme,width]of [['light',390],['dark',390],['light',1280],['dark',1280]])await t.test(theme+' '+width,sub=>runNativeRecoveryInspection226(sub,width,false,null,{theme,history:true,boundedAck:theme==='dark'&&width===390}));
 });
 
-test('RISK integrated automatic recovery native: persisted startup status and neighboring controls remain usable',async t=>{
- for(const [theme,width]of [['light',390],['dark',390],['light',1280],['dark',1280]])await t.test(theme+' '+width,sub=>runNativeRecoveryInspection226(sub,width,false,null,{theme}));
+test('RISK integrated automatic recovery native: persisted startup status and neighboring controls remain usable',async t=>{const engine=process.env.CHAIN_RECOVERY_TEST_ENGINE||'chromium';
+ for(const [theme,width]of [['light',390],['dark',390],['light',1280],['dark',1280]])await t.test(theme+' '+width,sub=>runNativeRecoveryInspection226(sub,width,false,null,{theme,engine}));
 });
 
 test('RISK cloud source inspection: native asynchronous updates retain focus disclosure scroll and current source roles',async t=>runNativeRecoveryInspection226(t));
