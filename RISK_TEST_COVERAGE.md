@@ -2109,3 +2109,7 @@ This boundary control holds a successful real provider reply, installs a later a
 - Failed source observations retain their original rejection while their own polling timers terminate and the real consumer exits: `RISK recovery fixture shutdown: a failed real source observation stops its own polling and exits`.
 
 - All four ordinary actions share one absolute 20s durability/read bound, including an actually held device-commit refusal: `RISK corrupt work budget fixture: one shared action deadline rejects an actually held device commit`.
+
+- The first actual Add synchronous prefix consumes the original single20s action budget: `RISK recovery observation budget: the first actual Add prefix belongs to the single action deadline`.
+
+- A successful callback cannot be accepted after its original monotonic deadline even when host timer delivery is blocked: `RISK recovery observation budget: late synchronous success cannot outlive the original deadline`.

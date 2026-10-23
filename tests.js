@@ -8499,6 +8499,39 @@ test('RISK corrupt work budget fixture: one shared action deadline rejects an ac
  assert.match(output,/# tests 1\b/);assert.match(output,/# fail 1\b/);assert.match(output,/# cancelled 0\b/);
 });
 
+test('RISK recovery observation budget: the first actual Add prefix belongs to the single action deadline',async t=>{
+ const os=await import('node:os'),root=fs.mkdtempSync(path.join(os.tmpdir(),'scanner-action-prefix-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const source=fs.readFileSync(path.join(__dirname,'tests.js'),'utf8'),name='RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations';
+ const start=source.indexOf("test('"+name+"'"),end=source.indexOf('\nasync function coldDamagedSourceWithoutAck214',start);assert.ok(start>=0&&end>start);
+ const anchor=' ctx.window.CLOUD_PUSH_DELAY_MS=0;',consumer=source.slice(start,end);assert.equal(consumer.split(anchor).length,2);
+ const delayed=consumer.replace(anchor,` const action=ctx.onAction;let heldFirstAdd=false;
+ ctx.onAction=(name,...args)=>{if(name==='add'&&!heldFirstAdd){heldFirstAdd=true;const started=performance.now();Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,21000);const elapsed=performance.now()-started;assert.ok(elapsed>=20000);const result=action(name,...args);assert.ok(ctx.state.tasks.some(row=>row.title==='Local work while the cloud source needs a choice'));console.log('ACTUAL_FIRST_ADD_PREFIX_MS '+Math.round(elapsed));return result;}return action(name,...args);};
+ t.after(()=>{ctx.onAction=action;});
+`+anchor);
+ fs.writeFileSync(path.join(root,'prefix-consumer.mjs'),(source.slice(0,start)+delayed+source.slice(end)).replace('const __dirname = path.dirname(fileURLToPath(import.meta.url));','const __dirname = '+JSON.stringify(__dirname)+';'));
+ fs.symlinkSync(path.join(__dirname,'node_modules'),path.join(root,'node_modules'),'dir');
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^'+name+'$','prefix-consumer.mjs'],{cwd:root,env,encoding:'utf8',timeout:70000,maxBuffer:1024*1024}),output=child.stdout+child.stderr;
+ assert.equal(child.error,undefined,output);assert.equal(child.signal,null,output);
+ assert.equal(child.status,1,'the first actual Add cannot acquire a fresh20s window after its synchronous entry: '+output);
+ const prefixElapsed=Number(output.match(/ACTUAL_FIRST_ADD_PREFIX_MS (\d+)/)?.[1]);assert.ok(prefixElapsed>=20000,'the first Add really exceeds the original action budget: '+output);
+ assert.match(output,/four ordinary actions exceed their shared 20000ms durability\/read budget/);
+ assert.match(output,/# tests 1\b/);assert.match(output,/# fail 1\b/);assert.match(output,/# cancelled 0\b/);
+ t.diagnostic(output.match(/ACTUAL_FIRST_ADD_PREFIX_MS \d+/)?.[0]+' rejected under the original action deadline; child exited normally.');
+});
+
+test('RISK recovery observation budget: late synchronous success cannot outlive the original deadline',async()=>{
+ assert.equal(await fixtureDeadline(()=>17,'immediate synchronous control'),17);
+ assert.equal(await fixtureDeadline(Promise.resolve(19),'promise-only SDK control'),19);
+ const started=performance.now();
+ await assert.rejects(fixtureDeadline(()=>{
+  assert.equal(Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,30),'timed-out');
+  return 'late synchronous success';
+ },'the original20ms deadline includes synchronous callback completion',20),/original20ms deadline/);
+ assert.ok(performance.now()-started>=20,'late completion really crosses the monotonic deadline before host timeout delivery');
+});
+
 // Overrides Date.now() *inside one vm context only*, via in-context code —
 // never touches the outer process's real Date, so it can't leak across tests.
 function setFakeTime(sandbox, ts) {
@@ -14626,6 +14659,7 @@ test('RISK saved view fallback: corrupt or blocked local presentation storage le
 // They observe real application promises; no loader, production state or timer changes.
 function deferredSyncFixture(){let resolve;const promise=new Promise(done=>{resolve=done;});return{promise,resolve};}
 async function fixtureDeadline(promise,message,ms=5000){
+ const deadline=performance.now()+ms;
  let timer,finished=false;const waits=new Map();
  // Polling belongs to this observation, not the product operation it watches.
  // A raced async loop otherwise keeps scheduling host timers after failure.
@@ -14633,8 +14667,14 @@ async function fixtureDeadline(promise,message,ms=5000){
   if(finished){reject(Error(message));return;}
   const pending=setTimeout(()=>{waits.delete(pending);resolve();},delay);waits.set(pending,reject);
  });
- try{return await Promise.race([typeof promise==='function'?promise(wait):promise,
-  new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(message)),ms);})]);}
+ try{
+  // Arm from the same absolute start before any synchronous callback prefix.
+  const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(message)),Math.max(0,deadline-performance.now()));});
+  const result=await Promise.race([typeof promise==='function'?promise(wait):promise,timeout]);
+  // A blocked host can deliver a successful microtask before its expired timer.
+  if(performance.now()>=deadline)throw Error(message);
+  return result;
+ }
  finally{
   finished=true;clearTimeout(timer);
   for(const [pending,reject]of waits){clearTimeout(pending);reject(Error(message));}
