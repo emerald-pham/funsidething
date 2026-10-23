@@ -39,6 +39,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK unreadable device recovery review: the native header reaches SDK sign-in and Settings account correction while sources stay held
 - RISK unreadable device recovery review: preserved partial raw rows permit native cloud choice ACK and cold reopen
 - RISK unreadable device recovery review: receipt collisions never overwrite a raw unknown row at the same physical key
+- RISK malformed device recovery capture: inaccessible and unsupported archives retain typed refusals
 - RISK DEVICE STORAGE V2: conditional pending writes compare complete physical rows and preserve ordinary staging
 - RISK cloud source recovery pending capture: a peer pending pointer arriving between own pending write and read is never consented
 - RISK cloud source recovery pending capture: peer pending intent created after the existing read is never overwritten by recovery staging
@@ -1782,6 +1783,18 @@ The native needs-attention action uses real IndexedDB and the production backend
 - RISK cloud source recovery automatic fallback: all accepted deletions survive cold reopen without older-source fallback
 
 The only automatic choice is one complete, validated previous cloud generation on a verified fresh client. Exact raw IndexedDB stores (including pending, backup and opaque rows), browser boards and recovery keys, authority marker, account/backend/session, local and draft state, and source captures remain bound through conditional local adoption and readback. A timeout leaves true empty stores empty for a later cold-open retry. Accepted empty boards with explicit deletion evidence and drafts stay authoritative. The recovered board remains local with a visible cloud hold; no cloud replacement is published.
+
+## Readable malformed device head (#252)
+
+- RISK cloud source recovery malformed readable head: a healthy same-account cloud board can reopen
+
+This full-app consumer starts over a readable raw IndexedDB source whose selected head record is malformed, with distinct malformed browser copies and a healthy current cloud generation. Recovery must open a supported local board under a durable cloud hold, preserve the exact original source evidence, and leave the cloud generation unchanged. This remains distinct from a truly empty first-use client and from inaccessible storage; the malformed source is never accepted as an empty board.
+
+## Boot capture ordering (#252)
+
+- RISK cloud startup: auth waits for raw boot capture and replays one read after capture settles
+
+The full-app control pauses the real startup raw-store capture, then lets authentication request a pull. No cloud read, placeholder head or hold may occur before raw evidence capture settles; the existing boot replay must issue one read afterward while preserving the empty raw store. A malformed cloud response keeps this control focused on startup ordering rather than adoption.
 
 ## Incident support diagnostics
 

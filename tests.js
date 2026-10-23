@@ -585,6 +585,128 @@ async function damagedAcknowledgedApp187(t,{timeoutMs=5000,sourcePadding=0,timer
  return {...app,faults,originalRoot,originalHeader,acknowledgedTasks,previousSource};
 }
 
+test('RISK cloud source recovery malformed readable head: a healthy same-account cloud board can reopen',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='malformed-readable-head-252-'+Math.random();
+ const malformedPayload='{"tasks":[ exact damaged device bytes \ud800',store=loadStorageV2({indexedDB}).createDeviceStore({indexedDB,crypto:webcrypto,dbName:deviceDbName});
+ await store.open();assert.equal((await store.commitHead({expectedHash:null,payload:malformedPayload,account:'e@example.com'})).ok,true);
+ await editRawDevice187(indexedDB,deviceDbName,tx=>{
+  tx.objectStore('meta').put({schemaVersion:99,hash:'truncated-head-hash',futureHeadEvidence:{keep:['every','field']}},'head');
+  tx.objectStore('meta').put({futureDeviceMarker:{opaque:'retain exact unknown row'}},'future:unknown');
+  tx.objectStore('opaque').put({key:'manual-252',raw:'exact protected source bytes'},'manual-252');
+ });
+ const before=await store.readRawExportSnapshot(),browserOriginals={
+  [SYNC_STORE_KEY]:'{ exact browser primary bytes',
+  [LOCAL_HEAD_KEY]:'{ distinct browser head bytes',
+  [LOCAL_BACKUPS_KEY]:'[ exact manual backup index bytes',
+ };
+ const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName,seedStorage:{'fvp:chain-scanner:device-store-v2':'1',...browserOriginals}}),{ctx,shim}=app;
+ t.after(()=>closeLegacyApp173(app));t.after(()=>store.close());
+ const board=syncState({v:2,tasks:[syncTask('healthy-cloud-252','Healthy same-account cloud source')],syncAccount:'e@example.com',syncRev:0,syncDirty:false,
+  futureCloudEvidence:{opaque:['preserve',252]}}),cloudRaw=JSON.stringify(board);
+ const backend=await loadCloudBackendV2({runtimeWindow:ctx.window,timeoutMs:5000,recoveryTimeoutMs:5000});t.after(()=>backend.CS.suspend());
+ backend.emitAuth({uid:'owner',email:'e@example.com'});
+ assert.equal((await backend.CS.push(cloudRaw,1792323000000,0)).ok,true,'the isolated account has one complete supported current cloud generation');
+ ctx.closeModal();
+ await ctx.cloudPull();
+ const hold=await store.getRecoveryCloudHold();
+ assert.ok(hold,'a readable malformed device head must not block safe discovery of a healthy current source');
+ const head=await store.readHead();
+ assert.equal(head.payload,JSON.stringify(ctx.state),'the automatically opened working board is the exact durable device head');
+ assert.deepEqual(Array.from(ctx.state.tasks,task=>task.id),['healthy-cloud-252'],'the hydrated empty shell is never treated as an accepted empty board');
+ assert.equal(ctx.state.futureCloudEvidence.opaque[1],252,'the independently validated source retains unknown supported board fields');
+ assert.equal(ctx.state.syncDirty,true,'local recovery remains pending cloud acknowledgement');
+ const after=await store.readRawExportSnapshot(),archives=await store.listOpaqueArchives();
+ const original=archives.find(row=>row.key===hold.originalKey);
+ assert.ok(original,'the selected cloud recovery hold names its exact raw-source archive');
+ assert.ok(original.raw.includes('truncated-head-hash')&&original.raw.includes('futureHeadEvidence'),'the malformed head record is retained byte-for-byte in the recovery archive');
+ assert.ok(original.raw.includes(browserOriginals[SYNC_STORE_KEY])&&original.raw.includes(browserOriginals[LOCAL_HEAD_KEY]),'the archive retains both exact browser copies');
+ assert.ok(archives.some(row=>row.key==='manual-252'&&row.raw==='exact protected source bytes'),'pre-existing protected opaque evidence remains exact');
+ const remote=await backend.CS.pull();assert.equal(remote.rev,1,'opening recovery never publishes or rewrites the cloud generation');
+ assert.equal(remote.payload,cloudRaw,'the healthy source remains byte exact in its original cloud generation');
+ assert.deepEqual([SYNC_STORE_KEY,LOCAL_HEAD_KEY,LOCAL_BACKUPS_KEY].map(key=>shim.localStorage.getItem(key)),
+  [browserOriginals[SYNC_STORE_KEY],browserOriginals[LOCAL_HEAD_KEY],browserOriginals[LOCAL_BACKUPS_KEY]],'both browser copies and the manual index remain exact');
+ for(const [index,key]of before.stores.snapshots.keys.entries()){
+  const at=after.stores.snapshots.keys.findIndex(candidate=>JSON.stringify(candidate)===JSON.stringify(key));
+  assert.notEqual(at,-1,'the original malformed snapshot remains present');
+  assert.deepEqual(after.stores.snapshots.values[at],before.stores.snapshots.values[index],'the original malformed snapshot remains exact');
+ }
+ const unknownAt=after.stores.meta.keys.findIndex(key=>key==='future:unknown');
+ assert.notEqual(unknownAt,-1,'unknown raw metadata remains present');
+ assert.deepEqual(after.stores.meta.values[unknownAt],before.stores.meta.values[before.stores.meta.keys.indexOf('future:unknown')],'unknown raw metadata remains exact');
+});
+
+test('RISK malformed device recovery capture: inaccessible and unsupported archives retain typed refusals',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='malformed-capture-refusal-252-'+Math.random();
+ const store=loadStorageV2({indexedDB}).createDeviceStore({indexedDB,crypto:webcrypto,dbName:deviceDbName});await store.open();
+ assert.equal((await store.commitHead({expectedHash:null,payload:'{malformed selected source',account:'e@example.com'})).ok,true);
+ await editRawDevice187(indexedDB,deviceDbName,tx=>tx.objectStore('meta').put({schemaVersion:99,hash:'retained malformed head'},'head'));
+ const before=await store.readRawExportSnapshot(),app=await loadApp({indexedDBProvider:indexedDB,deviceDbName,
+  seedStorage:{'fvp:chain-scanner:device-store-v2':'1'}}),{ctx}=app;
+ t.after(()=>closeLegacyApp173(app));t.after(()=>store.close());
+ assert.equal(vm.runInContext('liveBoardAccepted',ctx),false,'an unsupported selected device head stays unaccepted');
+ assert.equal(vm.runInContext('deviceStorageRequired',ctx),true,'the malformed source continues to require durable recovery');
+ assert.equal(vm.runInContext('unacceptedDeviceSource.reason',ctx),'unreadable-or-unsupported-device-source');
+ const runtimeStore=ctx.window.ScannerDeviceStore,readRaw=runtimeStore.readRawExportSnapshot,encoder=ctx.encodeManualArchiveSnapshot;
+ for(const [code,inject,restore] of [
+  ['device-store-unavailable',()=>{runtimeStore.readRawExportSnapshot=async()=>{throw Object.assign(Error('synthetic inaccessible raw store'),{code});};},()=>{runtimeStore.readRawExportSnapshot=readRaw;}],
+  ['recovery-archive-unsupported',()=>{ctx.encodeManualArchiveSnapshot=()=>{throw Object.assign(Error('synthetic unsupported raw archive'),{code});};},()=>{ctx.encodeManualArchiveSnapshot=encoder;}],
+ ]){
+  inject();
+  let refusal;
+  try{refusal=await ctx.captureAutomaticCloudFallbackBootBaseline(false);}finally{restore();}
+  assert.deepEqual(JSON.parse(JSON.stringify(refusal??null)),{ok:false,mode:'readable-malformed',code},'capture returns the exact typed '+code+' refusal');
+  assert.deepEqual(JSON.parse(vm.runInContext('JSON.stringify(unacceptedDeviceSource.automaticRecoveryCaptureFailure??null)',ctx)),
+   {ok:false,mode:'readable-malformed',code},'startup classification retains the refusal without granting source authority');
+  assert.equal(vm.runInContext('automaticCloudFallbackBootBaseline',ctx),null,'refused raw capture never creates an automatic recovery baseline');
+  assert.equal(vm.runInContext('liveBoardAccepted',ctx),false,'a typed refusal does not make the placeholder authoritative');
+  assert.equal(vm.runInContext('unacceptedDeviceSource.reason',ctx),'unreadable-or-unsupported-device-source','the original startup classification remains intact');
+ }
+ assert.deepEqual(await store.readRawExportSnapshot(),before,'both refusal paths preserve every original raw row');
+ const retried=await ctx.captureAutomaticCloudFallbackBootBaseline(false);
+ assert.deepEqual(JSON.parse(JSON.stringify(retried)),{ok:true,mode:'readable-malformed'},'a later exact raw capture can establish the baseline');
+});
+
+test('RISK cloud startup: auth waits for raw boot capture and replays one read after capture settles',{timeout:15000},async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='boot-raw-capture-gate-252-'+Math.random();
+ const store=loadStorageV2({indexedDB}).createDeviceStore({indexedDB,crypto:webcrypto,dbName:deviceDbName});await store.open();
+ const before=await store.readRawExportSnapshot(),captureGate=deferredSyncFixture();let enteredResolve,enteredReject;
+ const captureEntered={promise:new Promise((resolve,reject)=>{enteredResolve=resolve;enteredReject=reject;})};
+ let pulls=0,app,backend;
+ app=await loadApp({indexedDBProvider:indexedDB,deviceDbName,beforeStateReady(ctx){
+  const capture=ctx.captureAutomaticCloudFallbackBootBaseline;
+  ctx.captureAutomaticCloudFallbackBootBaseline=async loaded=>{
+   const runtimeStore=vm.runInContext('deviceStore',ctx),read=runtimeStore?.readRawExportSnapshot;let held=false;
+   if(!runtimeStore||typeof read!=='function'){const error=Error('boot capture has no open raw device store');enteredReject(error);throw error;}
+   runtimeStore.readRawExportSnapshot=async(...args)=>{
+    const raw=await read.apply(runtimeStore,args);
+    if(!held){held=true;enteredResolve();await captureGate.promise;}
+    return raw;
+   };
+   try{return await capture(loaded);}catch(error){enteredReject(error);throw error;}finally{runtimeStore.readRawExportSnapshot=read;}
+  };
+ }});
+ t.after(async()=>{captureGate.resolve();backend?.CS.suspend();
+  if(app){app.ctx.suspendCloudSync();vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry()',app.ctx);await app.ctx.window.ScannerDeviceStore?.close?.();}
+  await store.close();
+ });
+ await fixtureDeadline(captureEntered.promise,'real startup raw capture enters and remains unresolved');
+ backend=await loadCloudBackendV2({runtimeWindow:app.ctx.window,failures:{authPending:true},timeoutMs:5000});
+ const pull=backend.CS.pull.bind(backend.CS);backend.CS.pull=async(...args)=>{pulls++;return {unexpectedStartupResponse:true};};
+ backend.emitAuth({uid:'owner',email:'owner@example.test'});await app.ctx.cloudPull();
+ assert.equal(pulls,0,'auth restoration must not read or classify cloud while the boot raw-source capture is unresolved');
+ assert.equal(vm.runInContext('pulling',app.ctx),false,'the auth-triggered consumer returns without opening a competing recovery read');
+ assert.equal(await store.readHead(),null,'a pending capture never creates a placeholder device head');
+ assert.equal(await store.getRecoveryCloudHold(),null,'a pending capture never grants an adoption hold');
+ assert.deepEqual(await store.readRawExportSnapshot(),before,'the raw store stays byte-for-byte unchanged while capture is pending');
+ captureGate.resolve();
+ await fixtureDeadline((async()=>{while(!vm.runInContext('automaticCloudFallbackBootBaseline',app.ctx))await flush();})(),'boot capture establishes its exact raw baseline');
+ await fixtureDeadline((async()=>{while(pulls===0||vm.runInContext('pulling',app.ctx))await flush();})(),'the deferred auth read replays after capture settles');
+ assert.equal(pulls,1,'the existing boot replay drains the deferred auth request exactly once');
+ assert.equal(await store.readHead(),null,'a malformed cloud response cannot turn the temporary shell into a saved head');
+ assert.equal(await store.getRecoveryCloudHold(),null,'an invalid cloud response cannot create a recovery hold');
+ assert.deepEqual(await store.readRawExportSnapshot(),before,'settling the failed read preserves every original raw row');
+});
+
 test('RISK iOS source replay: an exact acknowledged board repairs missing current chunks after a cold reopen without a new edit',async t=>{
  const app=await damagedAcknowledgedApp187(t,{sourcePadding:2000000}),{backend,originalRoot,originalHeader,indexedDB,deviceDbName}=app;
  await closeLegacyApp173(app);backend.CS.suspend();
