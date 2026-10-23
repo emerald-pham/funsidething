@@ -565,18 +565,50 @@ function refuseNextRecoveryTransaction255(faults){
  Object.defineProperty(faults,'push',{configurable:true,get(){queueMicrotask(()=>{delete faults.push;});return refusal;}});
 }
 
+test('RISK recovery fixture ownership: acknowledged damage inputs finish both native seed saves before recovery',async t=>{
+ const app=await damagedAcknowledgedApp187(t),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ const save=ctx.buildSupportDiagnosticsReport().save;
+ assert.equal(save.debouncePending.value,false,'neither acknowledged setup Add may leave its owned save callback for later recovery');
+ assert.equal(save.activePersistCalls.value,0);assert.equal(save.localDurability.value,'durable');
+ assert.equal(save.durableThroughRequest.value,save.acceptedRequests.value);
+ assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state),'the acknowledged seed head is exact before any automatic recovery');
+ assert.equal(ctx.state.syncDirty,false);assert.equal(await store.getRecoveryCloudHold(),null);
+ assert.equal((await store.listOpaqueArchives()).length,0,'damaging only external chunks does not pre-run recovery');
+ assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev);
+ assert.equal((await backend.CS.pull()).code,'corrupt-generation','the real first automatic read still has a damaged generation to recover');
+});
+
 async function damagedAcknowledgedApp187(t,{timeoutMs=5000,sourcePadding=0,timerProvider=null,recoveryTimeoutMs=timeoutMs,artifacts=null}={}){
  const fixture=heldDecisionFixture188();
  if(sourcePadding)fixture.remote.futureIOSReportFixture={opaque:'q'.repeat(sourcePadding)};
  fixture.local=structuredClone(fixture.remote);
  const faults={},app=await heldDecisionApp188(t,{fixture,failures:faults,timeoutMs,timerProvider,recoveryTimeoutMs,artifacts}),{ctx,shim,backend}=app;
  ctx.window.CLOUD_PUSH_DELAY_MS=60000;
+ // Own only the two setup Add callbacks. Their real persistence finishes before
+ // damage/recovery, so neither can later replace a consented recovery head.
+ const schedule=ctx.setTimeout,cancel=ctx.clearTimeout,saveClock={elapsed:0,jobs:[]};
+ ctx.setTimeout=(fn,delay,...args)=>{
+  if(delay!==350)return schedule(fn,delay,...args);
+  const token={acknowledgedSeedSave187:true},job={token,fn,args,delay,at:saveClock.elapsed+delay,cancelled:false};saveClock.jobs.push(job);return token;
+ };
+ ctx.clearTimeout=token=>{const job=saveClock.jobs.find(row=>row.token===token);if(job)job.cancelled=true;else cancel(token);};
+ const finishSeedSave=async()=>{
+  const jobs=saveClock.jobs.filter(job=>!job.cancelled);assert.equal(jobs.length,1,'each native setup Add owns exactly one scheduled save');
+  const job=jobs[0];assert.equal(job.delay,350);saveClock.elapsed+=350;assert.equal(job.at,saveClock.elapsed,'deliver only this earned setup callback at its declared deadline');
+  const saved=job.fn(...job.args);assert.equal(typeof saved?.then,'function','the actual setup callback runs real persistence');
+  assert.equal(await fixtureDeadline(saved,'acknowledged seed scheduled persistence finishes'),true);job.cancelled=true;
+  await settleSourceFixtureSave187(app,'acknowledged seed save settles before source damage',true);
+ };
+ try{
  shim.document.getElementById('addInput').value='Acknowledged before source damage';
  await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ await finishSeedSave();
  await ctx.sendPush();await settleRecovery188(app);
  shim.document.getElementById('addInput').value='Second acknowledged source';
  await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ await finishSeedSave();
  await ctx.sendPush();await settleRecovery188(app);
+ }finally{ctx.setTimeout=schedule;ctx.clearTimeout=cancel;}
  const originalRoot={...backend.docs.get('users/owner')};
  assert.equal(originalRoot.schemaVersion,2,'the setup must produce a real chunk-generation ACK');
  const originalHeader={...backend.docs.get('users/owner/generations/'+originalRoot.activeGeneration)};
