@@ -2093,3 +2093,7 @@ This boundary control holds a successful real provider reply, installs a later a
 - RISK integrated automatic recovery: persisted multichunk sources retain pending ACK and true Done Undo through restart
 - RISK integrated automatic recovery native: persisted startup status and neighboring controls remain usable
 - RISK integrated automatic recovery: a failed current read cannot hide the healthy previous source
+
+- RISK automatic source status: completed confirmation follows current edits and signed-in identity
+- RISK automatic source status native: historical retry checking stop and confirmation remain current
+- RISK integrated automatic recovery: no-input fallback continues through exact cloud confirmation
