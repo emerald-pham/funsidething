@@ -18461,5 +18461,51 @@
       "command": "Original H npm test in Linuxx64 push39964800218 and PR39964810605, retained final-v9 raw logs. Later sensitivity-only external Node22.23.3/TZUTC record2026-10-23T16-35-37-158Z-c2226496-fedf-4f8a-89b7-a648041a8620 under evidence/persist-ownership-repair/diagnostic-J makes actual cold device commitHead reject fixed AbortError/unavailable after helper return; source hash835698e543c5e324ec091b3d5799c84fd3e45d568e78f0db8bb378690e1edddb. It is not a reproduction of original CI cause.",
       "failure": "Both original H Linux CI runs failed sole first-Add assert.equal(await ctx.persist(),true), false!==true, at3303:32/3304:124 in9151.412544ms and9219.02146ms. External actual-storage calibration also fails the unchanged assertion and emits one447-byteASCII JSON report device-store/write-failed with finite counters/booleans; this demonstrates diagnostic sensitivity only. A first launcher attempt lacked its external fixture and is retained as infrastructure failure, not RED. No local causal RED or product fix is claimed."
     }
+  },
+  {
+    "baseCommit": "94300cf1b3ca85f00ed4f3c4c8954ac51b460f80",
+    "testChangesSha256": "43f0a9a0ee7fcfb008cfe106145b58aa787bf0c249a122d0122b812985de7dd7",
+    "reason": "Add a distinct, guarded diagnostic-only Linux x64 carrier to obtain an immutable H/J save-refusal pair and one separate original J CPU profile. This is never scanner qualification, a product fix, or application integration.",
+    "previousBehavior": "The actual current workflow selects scanner-tests for the exact diagnostic push and has no fixed one-shot carrier; original H Linux first-Add refusal and J push three-Yes 1010ms performance failure remain unresolved.",
+    "intendedBehavior": "Only the exact live emerald-pham/funsidething push to refs/heads/diagnose/187-linux-consumers selects a contents-read diagnostic job. All ordinary scanner steps and main release/deployment guards remain exact. Verify pristine immutable H/J source/tree/product/lock, record H then J no-ACK once under permitted original first-Add refusal or success, then one separate J three-Yes profile, stopping unexpected/incomplete outcomes. Preserve bounded artifacts and remove only marker/realpath-owned public scratch.",
+    "replacementTests": [
+      "RISK repository process: only the exact live diagnostic push selects the bounded Linux carrier",
+      "RISK repository process: the Linux carrier verifies immutable sources and records only the fixed bounded consumer plan",
+      "RISK repository process: diagnostic process limits stop owned children and cleanup refuses foreign ownership"
+    ],
+    "preservedCoverage": [
+      "All723 preexisting raw rationale objects remain byte-for-byte unchanged; tests.js is exactly J plus these three adjacent process RISK cases. Every original application/native assertion and 20s/30s/1000ms budget remains. No product, dependency, FAQ, shell, gate or deployment implementation changes.",
+      "The established deployment-prerequisite RISK remains verbatim. Semantic actual workflow controls preserve ordinary PR/push/main/fork/wrong-ref/deleted-ref selection; scanner steps, release-evidence and Pages jobs are byte-exact to J except the reciprocal scanner job guard.",
+      "The actual runner executes Git and the unchanged recorder through a public external-process boundary. Disposable actual H/J Git checkouts and real recording children test fixed command counts/order, clean exact identities, original first-Add stack vs later/other assertion, zero/duplicate/skipped outcomes, setup/runtime stops, separate artifacts and contained cleanup; they do not run app/performance probes or claim Linux evidence.",
+      "Process timeout/output and marker-refusal checks exercise actual owned children. Later external broken guard/owner-marker variants both fail actual assertions; these are sensitivity, not the initial preimplementation RED. Actual Mac Node22 CLI stops unsupported-runtime with zero consumers.",
+      "Diagnostic job results never replace scanner/release acceptance. All native registration source is unchanged; actual browser/native/full app/rules/compat cohorts are outside this diagnostic-only qualification per canonical parent approval. Root retains exact review/receipt/push authority and all application release holds."
+    ],
+    "redEvidence": {
+      "command": "TZ=UTC official Node22.23.3 record-run --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern=^RISK repository process: only the exact live diagnostic push selects the bounded Linux carrier$ tests.js; record171ae0d2-2b4b-4379-a316-a36325276a89 at18:08:50Z in external linux-x64-carrier/implementation/workflow-red.",
+      "failure": "Before workflow/runner implementation, the runnable actual workflow selected [scanner-tests] while this exact diagnostic push required [linux-diagnostic-187]. ERR_ASSERTION/deepStrictEqual, exit1, one named failure, zero skip/cancel; this is a process policy RED and makes no causal application/performance claim."
+    }
+  },
+  {
+    "baseCommit": "7de2910b79ebb0996b97f1a2abd0776c505b29de",
+    "testChangesSha256": "d187c0d817ef4532a272e16b8f13413235c5e5b7aab29f605f1c77a604c0d02f",
+    "reason": "Add a distinct, guarded diagnostic-only Linux x64 carrier to obtain an immutable H/J save-refusal pair and one separate original J CPU profile. This is never scanner qualification, a product fix, or application integration.",
+    "previousBehavior": "The retained integration composes H fixture ownership/deadline corrections and the lazy J failure-only catch, with all original consumer assertions and budgets. This comparison also includes the new bounded process-only carrier; those retained changes are not attributed to this carrier.",
+    "intendedBehavior": "Only the exact live emerald-pham/funsidething push to refs/heads/diagnose/187-linux-consumers selects a contents-read diagnostic job. All ordinary scanner steps and main release/deployment guards remain exact. Verify pristine immutable H/J source/tree/product/lock, record H then J no-ACK once under permitted original first-Add refusal or success, then one separate J three-Yes profile, stopping unexpected/incomplete outcomes. Preserve bounded artifacts and remove only marker/realpath-owned public scratch.",
+    "replacementTests": [
+      "RISK repository process: only the exact live diagnostic push selects the bounded Linux carrier",
+      "RISK repository process: the Linux carrier verifies immutable sources and records only the fixed bounded consumer plan",
+      "RISK repository process: diagnostic process limits stop owned children and cleanup refuses foreign ownership"
+    ],
+    "preservedCoverage": [
+      "All723 preexisting raw rationale objects remain byte-for-byte unchanged; tests.js is exactly J plus these three adjacent process RISK cases. Every original application/native assertion and 20s/30s/1000ms budget remains. No product, dependency, FAQ, shell, gate or deployment implementation changes.",
+      "The established deployment-prerequisite RISK remains verbatim. Semantic actual workflow controls preserve ordinary PR/push/main/fork/wrong-ref/deleted-ref selection; scanner steps, release-evidence and Pages jobs are byte-exact to J except the reciprocal scanner job guard.",
+      "The actual runner executes Git and the unchanged recorder through a public external-process boundary. Disposable actual H/J Git checkouts and real recording children test fixed command counts/order, clean exact identities, original first-Add stack vs later/other assertion, zero/duplicate/skipped outcomes, setup/runtime stops, separate artifacts and contained cleanup; they do not run app/performance probes or claim Linux evidence.",
+      "Process timeout/output and marker-refusal checks exercise actual owned children. Later external broken guard/owner-marker variants both fail actual assertions; these are sensitivity, not the initial preimplementation RED. Actual Mac Node22 CLI stops unsupported-runtime with zero consumers.",
+      "Diagnostic job results never replace scanner/release acceptance. All native registration source is unchanged; actual browser/native/full app/rules/compat cohorts are outside this diagnostic-only qualification per canonical parent approval. Root retains exact review/receipt/push authority and all application release holds."
+    ],
+    "redEvidence": {
+      "command": "TZ=UTC official Node22.23.3 record-run --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern=^RISK repository process: only the exact live diagnostic push selects the bounded Linux carrier$ tests.js; record171ae0d2-2b4b-4379-a316-a36325276a89 at18:08:50Z in external linux-x64-carrier/implementation/workflow-red.",
+      "failure": "Before workflow/runner implementation, the runnable actual workflow selected [scanner-tests] while this exact diagnostic push required [linux-diagnostic-187]. ERR_ASSERTION/deepStrictEqual, exit1, one named failure, zero skip/cancel; this is a process policy RED and makes no causal application/performance claim."
+    }
   }
 ]

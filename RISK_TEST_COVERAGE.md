@@ -2,6 +2,10 @@
 
 This map records the current named RISK contracts in tests.js. It lets reviewers see which costly feature boundaries already have explicit protection before changing nearby behavior. Related non-RISK regression tests remain part of the contract too; the focused companions below call those out where they matter.
 
+- Exact diagnostic push authority preserves ordinary scanner and main deployment gates: `RISK repository process: only the exact live diagnostic push selects the bounded Linux carrier`.
+- Immutable public H/J sources, fixed one-shot command order, outcome classification, separate recorder/profile artifacts and safe scratch cleanup: `RISK repository process: the Linux carrier verifies immutable sources and records only the fixed bounded consumer plan`.
+- Owned process timeout/output bounds and changed-marker cleanup refusal: `RISK repository process: diagnostic process limits stop owned children and cleanup refuses foreign ownership`.
+
 - RISK rooftop gardens: daylight hides paired plants while preserving decks and nighttime lights
 - RISK skyline light cadence: twice as many opportunities keep single-roof samples and visible-window toggles
 - RISK clocktower visit geometry: four staggered visitors stand on both actual roof slopes at every viewport

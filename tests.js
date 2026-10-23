@@ -28428,6 +28428,118 @@ test('RISK repository process: main deployment requires the merged reviewed head
  }finally{cleanupReleaseGateFixture(fixture);}
 });
 
+test('RISK repository process: only the exact live diagnostic push selects the bounded Linux carrier',async()=>{
+ const {parse}=await import('yaml');
+ const workflow=parse(fs.readFileSync(path.join(__dirname,'.github/workflows/data-safety.yml'),'utf8'));
+ const selected=(github)=>Object.entries(workflow.jobs).filter(([,job])=>job.if===undefined||vm.runInNewContext(String(job.if).replace(/^\$\{\{\s*|\s*\}\}$/g,''),{github},{timeout:100})).map(([name])=>name);
+ const diagnostic={repository:'emerald-pham/funsidething',event_name:'push',ref:'refs/heads/diagnose/187-linux-consumers',event:{deleted:false}};
+ assert.deepEqual(selected(diagnostic),['linux-diagnostic-187'],'an exact diagnostic push must execute only the distinct diagnostic job');
+ for(const change of [{event_name:'pull_request'},{ref:'refs/heads/ordinary'},{repository:'someone/funsidething'},{event:{deleted:true}},{ref:'refs/heads/diagnose/187-linux-consumers-extra'}]){
+  assert.deepEqual(selected({...diagnostic,...change}),['scanner-tests'],'ordinary, fork, PR, deleted and neighboring refs retain scanner qualification');
+ }
+ assert.deepEqual(selected({...diagnostic,ref:'refs/heads/main'}),['scanner-tests','release-evidence','deploy-pages']);
+ assert.deepEqual(Object.keys(workflow.on),['push','pull_request']);
+ const job=workflow.jobs['linux-diagnostic-187'];
+ assert.deepEqual(job.permissions,{contents:'read'});
+ assert.equal(job.steps[0].with['persist-credentials'],false);
+ assert.equal(job.environment,undefined);
+ assert.deepEqual(job.env,{TZ:'UTC'});
+ assert.equal(job['timeout-minutes'],15);
+ assert.deepEqual(job.steps.map(step=>step.uses??null),['actions/checkout@v4','actions/setup-node@v4',null,'actions/upload-artifact@v4']);
+ assert.equal(job.steps[1].with['node-version'],'22.23.3');
+ assert.equal(job.steps[2].run,'node scripts/agent-tools/linux-diagnostic-187.mjs --repo "$GITHUB_WORKSPACE" --evidence-dir "$RUNNER_TEMP/linux-diagnostic-187" --scratch-parent "$RUNNER_TEMP"');
+ assert.equal(JSON.stringify(job).includes('secrets.'),false,'the diagnostic job has no secret input');
+ assert.equal(job.steps.some(step=>step.if==='always()'&&step.uses==='actions/upload-artifact@v4'&&step.with['if-no-files-found']==='error'),true,'failure evidence must be uploaded');
+ const original=parse(releaseGateGit(__dirname,['show','94300cf1b3ca85f00ed4f3c4c8954ac51b460f80:.github/workflows/data-safety.yml']));
+ assert.deepEqual(workflow.jobs['scanner-tests'].steps,original.jobs['scanner-tests'].steps);
+ for(const name of ['release-evidence','deploy-pages'])assert.deepEqual(workflow.jobs[name],original.jobs[name]);
+});
+
+test('RISK repository process: the Linux carrier verifies immutable sources and records only the fixed bounded consumer plan',async()=>{
+ const {runDiagnostic,execute,noAck,threeYes}=await import('./scripts/agent-tools/linux-diagnostic-187.mjs');
+ const root=fs.mkdtempSync(path.join(process.env.TMPDIR||'/tmp','linux-carrier-process-'));
+ const recordingChild=path.join(root,'recording-child.cjs');
+ // Real external recording children + the unchanged recorder; no app consumer,
+ // fabricated internal runner or performance result is executed by this case.
+ fs.writeFileSync(recordingChild,String.raw`
+const fs=require('node:fs'),path=require('node:path');
+const [name,mode,label,profiles]=process.argv.slice(2);
+let output='TAP version 13\n# Subtest: '+name+'\n';
+if(mode==='zero')output+='1..0\n# tests 0\n# pass 0\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n';
+else {
+ const failed=['original','other','later'].includes(mode),skip=mode==='skip';
+ output+=(failed?'not ok':'ok')+' 1 - '+name+(skip?' # SKIP':'')+'\n';
+ if(failed){
+  const settle=label==='H'?'3303:32':'3303:36',caller=mode==='later'?'3316:124':mode==='other'?'3290:2':label==='H'?'3304:124':'3315:124';
+  output+="  ---\n  code: 'ERR_ASSERTION'\n  operator: 'strictEqual'\n  actual: false\n  expected: true\n  stack: |-\n    settle (file:///public/tests.js:"+settle+")\n    async file:///public/tests.js:"+caller+"\n  ...\n";
+ }
+ if(mode==='duplicate')output+='ok 2 - '+name+'\n';
+ output+=(mode==='missing-plan'?'':'1..1\n')+'# tests 1\n# pass '+(!failed&&!skip?1:0)+'\n# fail '+(failed?1:0)+'\n# cancelled 0\n# skipped '+(skip?1:0)+'\n# todo 0\n';
+}
+if(profiles&&mode!=='profile-missing'){
+ fs.mkdirSync(profiles,{recursive:true});
+ fs.writeFileSync(path.join(profiles,'CPU.20261023.180000.'+process.pid+'.0.001.cpuprofile'),JSON.stringify({nodes:[{id:1,callFrame:{functionName:'recording child',url:'synthetic'}}],samples:[1],timeDeltas:[1],startTime:0,endTime:1}));
+}
+console.log(output);process.exitCode=['original','other','later'].includes(mode)?1:0;
+`);
+ const scenarios=[['positive',['passed','passed','passed']],['original',['original-first-add-refusal','passed','passed']],['J-original',['passed','original-first-add-refusal','passed']],['missing-plan',['incomplete-or-unexpected']],['profile-missing',['passed','passed','incomplete-or-unexpected']],['later',['other-failure']],['other',['other-failure']],['zero',['incomplete-or-unexpected']],['duplicate',['incomplete-or-unexpected']],['skip',['incomplete-or-unexpected']],['mismatch',[]],['install-failure',[]],['foreign-link',['passed','incomplete-or-unexpected']],['unsupported-runtime',[]]];
+ try{
+  for(const [scenario,expected] of scenarios){
+   const area=path.join(root,scenario);fs.mkdirSync(area);const calls=[];let foreign;
+   const port=async(command,args,options)=>{
+    if(args[0]==='-e'&&args[1].includes('heap_size_limit'))return execute(process.execPath,['-e','console.log('+JSON.stringify(JSON.stringify({platform:'linux',arch:'x64',version:scenario==='unsupported-runtime'?'v22.0.0':'v22.23.3',executable:process.execPath,kernel:'synthetic-recording-boundary',cpus:2,memory:6000000000,heap:2000000000}))+')'],options);
+    if(command==='npm'){
+     calls.push({kind:'install',args});
+     if(scenario==='install-failure')return execute(process.execPath,['-e','console.error("synthetic npm failure");process.exitCode=1'],options);
+     fs.mkdirSync(path.join(options.cwd,'node_modules'));
+     if(scenario==='foreign-link'){foreign=path.join(area,'foreign');fs.mkdirSync(foreign);fs.writeFileSync(path.join(foreign,'keep'),'foreign data');fs.symlinkSync(foreign,path.join(options.cwd,'foreign-link'));}
+     return execute(process.execPath,['-e','console.log("synthetic install boundary")'],options);
+    }
+    if(args[0]?.endsWith('/record-run.mjs')){
+     const separator=args.indexOf('--'),intended=args.slice(separator+2),name=intended.includes('--cpu-prof')?threeYes:noAck,label=path.basename(options.cwd),profileArg=intended.find(a=>a.startsWith('--cpu-prof-dir='));
+     calls.push({kind:'consumer',label,name,intended});
+     if(calls.filter(c=>c.kind==='consumer').length>1){const previous=calls.filter(c=>c.kind==='consumer').length===2?'H-noACK':'J-noACK';assert.equal(fs.existsSync(path.join(area,'evidence',previous,'verdict.json')),true,'prior outcome is durable before the next launch');}
+     const mode=scenario==='J-original'&&label==='J'&&name===noAck?'original':scenario==='profile-missing'&&name===threeYes?'profile-missing':label==='H'&&name===noAck&&!['positive','foreign-link'].includes(scenario)?scenario:'pass';
+     return execute(command,[...args.slice(0,separator+2),recordingChild,name,mode,label,profileArg?.slice('--cpu-prof-dir='.length)||''],options);
+    }
+    const result=await execute(command,args,options);
+    if(scenario==='mismatch'&&command==='git'&&args.includes('worktree')&&args.includes('add')&&args.at(-1).startsWith('db5a30'))fs.appendFileSync(path.join(args.at(-2),'tests.js'),'\n// changed source\n');
+    return result;
+   };
+   const summary=await runDiagnostic({repo:__dirname,evidenceDir:path.join(area,'evidence'),scratchParent:area},port);
+   const records=summary.consumers.map(c=>c.record?JSON.parse(fs.readFileSync(path.join(area,'evidence',c.record),'utf8')):null);
+   assert.deepEqual(summary.consumers.map(c=>c.classification),expected,scenario+' '+JSON.stringify(records));
+   const consumers=calls.filter(c=>c.kind==='consumer');
+   assert.deepEqual(consumers.map(c=>[c.label,c.name]),[['H',noAck],['J',noAck],['J',threeYes]].slice(0,expected.length),scenario+' order/count');
+   for(const call of consumers){assert.equal(call.intended.at(-1),'tests.js');assert.equal(call.intended.includes('--test'),true);assert.equal(call.intended.find(a=>a.startsWith('--test-name-pattern=')),'--test-name-pattern=^'+call.name+'$');assert.equal(call.intended.includes('--cpu-prof'),call.name===threeYes);}
+   if(expected.length===3){assert.equal(summary.consumers[2].profiles.length,scenario==='profile-missing'?0:1);assert.equal(new Set(summary.consumers.map(c=>c.record)).size,3);}
+   if(scenario==='mismatch'){assert.equal(calls.length,0,'a changed immutable source launches neither install nor test');assert.equal(summary.stopReason,'immutable-source-mismatch-H');}
+   if(scenario==='install-failure')assert.equal(summary.stopReason,'install-failed');
+   assert.equal(fs.existsSync(path.join(area,'evidence','before-cleanup.json')),true);
+   assert.equal(fs.existsSync(path.join(area,'evidence','manifest.json')),true);
+   assert.equal(summary.cleanup.status,scenario==='foreign-link'?'refused':scenario==='unsupported-runtime'?'not-created':'removed',scenario);
+   if(scenario==='unsupported-runtime')assert.equal(summary.stopReason,'unsupported-runtime');
+   if(foreign)assert.equal(fs.readFileSync(path.join(foreign,'keep'),'utf8'),'foreign data');
+  }
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+
+test('RISK repository process: diagnostic process limits stop owned children and cleanup refuses foreign ownership',async()=>{
+ const {execute,cleanupScratch}=await import('./scripts/agent-tools/linux-diagnostic-187.mjs');
+ const root=fs.realpathSync(fs.mkdtempSync(path.join(process.env.TMPDIR||'/tmp','linux-carrier-boundary-'))),scratch=path.join(root,'linux-diagnostic-187-owned');
+ try{
+  const timed=await execute(process.execPath,['-e','setInterval(()=>{},1000)'],{cwd:root,env:{PATH:process.env.PATH},timeout:80});
+  assert.equal(timed.reason,'timeout');assert.equal(timed.complete,false);assert.equal(timed.signal,'SIGTERM');
+  assert.throws(()=>process.kill(timed.pid,0),error=>error.code==='ESRCH','the owned recording child actually exited');
+  const loud=await execute(process.execPath,['-e','process.stdout.write("x".repeat(9*1024*1024));setInterval(()=>{},1000)'],{cwd:root,env:{PATH:process.env.PATH},timeout:3000});
+  assert.equal(loud.reason,'output-limit');assert.equal(loud.complete,false);assert.ok(Buffer.byteLength(loud.stdout)<=8*1024*1024);
+  fs.mkdirSync(scratch);fs.writeFileSync(path.join(scratch,'.owner'),'original');fs.writeFileSync(path.join(scratch,'keep'),'owned public fixture');
+  assert.equal((await cleanupScratch(scratch,'changed',root)).status,'refused');assert.equal(fs.existsSync(path.join(scratch,'keep')),true);
+  assert.equal((await cleanupScratch(scratch,'original',root)).status,'removed');
+  assert.equal(fs.existsSync(scratch),false);
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+
 test('RISK repository process: CI makes verified release evidence a deployment prerequisite',()=>{
  const workflow=fs.readFileSync(path.join(__dirname,'.github/workflows/data-safety.yml'),'utf8');
  assert.match(workflow,/release-evidence:/,'CI must have a distinct exact-SHA deployment evidence job');
