@@ -1828,6 +1828,9 @@ async function runNativeRecoveryInspection226(t,width=390,holdDemoted=false,comp
  await context.addInitScript(raw=>{localStorage.setItem('fvp:chain-scanner:v1',raw);localStorage.setItem('fvp:chain-scanner:protected:v1',raw);localStorage.setItem('fvp:chain-scanner:daily-backups:v1','[]');},raw);
  await context.route('**/*',async route=>{const url=new URL(route.request().url()),file=url.pathname;if(url.origin!==origin)return route.abort();const module=file===prefix+'firebase-app.js'?sdk.appModule:file===prefix+'firebase-auth.js'?sdk.authModule:file===prefix+'firebase-firestore.js'?sdk.firestoreModule:null;if(module!==null)return route.fulfill({contentType:'application/javascript',body:module});const relative=file==='/'?'index.html':file.slice(1);if(relative.includes('..')||!fs.existsSync(path.join(__dirname,relative)))return route.fulfill({status:404,body:''});return route.fulfill({body:fs.readFileSync(path.join(__dirname,relative)),contentType:relative.endsWith('.html')?'text/html':relative.endsWith('.js')?'application/javascript':relative.endsWith('.css')?'text/css':undefined});});
  await page.goto(origin+'/');await page.locator('html[data-app-ready="true"]').waitFor();await page.waitForFunction(()=>typeof state!=='undefined'&&state?.tasks.length===64&&CloudSync.ready===true&&CloudSync.errorCode==='corrupt-generation');
+ // The first error arrives before automatic source preservation finishes.
+ // Manual reading begins after that actual read, not during its busy interval.
+ await page.waitForFunction(()=>!pulling&&!cloudSourceRecoveryBusy);
  await page.evaluate(()=>{document.getElementById('motionDialog')?.close();closeModal();state.seenQuickStart=true;state.apologySeen=APOLOGY_NOTICE_ID;render();});
  let receivedRaw=await page.evaluate(()=>JSON.stringify(state));
  if(completeSource?.shortValues){const source=JSON.parse(receivedRaw),padding=source.futurePopulated.opaque,n=8000,budget=padding.length-3*n+1,part=Math.floor(budget/n);source.futurePopulated.opaque=Array.from({length:n},(_,i)=>'p'.repeat(i===n-1?budget-part*(n-1):part));const next=JSON.stringify(source);assert.equal(Buffer.byteLength(next),Buffer.byteLength(receivedRaw),'the short-value control retains the exact source byte budget');receivedRaw=next;}
@@ -40948,7 +40951,7 @@ test('RISK cloud source recovery: a late browser pending or peer change cannot b
 
 test('RISK cloud source recovery: chosen prior membership remains deliberate while an unseen peer task and decision history survive',async t=>{
  const app=await divergentCloudSourceApp187(t),{ctx,backend,originalRoot}=app;
- ctx.onAction('start-scan',{dataset:{mode:'descending'}});await ctx.persist();await ctx.sendPush();
+ ctx.onAction('start-scan',{dataset:{mode:'descending'}});await ctx.persist();
  const before=JSON.stringify(ctx.state),originalFacts=JSON.parse(before).decisionEvents||[];
  assert.ok(originalFacts.length>0,'the native prior state contains actual recorded decisions');
  await ctx.onAction('review-cloud-source-recovery',{});await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'generation:'+originalRoot.previousGeneration}});
