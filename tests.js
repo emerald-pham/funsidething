@@ -754,16 +754,18 @@ test('RISK cloud source recovery automatic fallback: one complete older source o
  assert.equal(cold.ctx.state.syncAccount,'e@example.com');assert.equal(cold.ctx.state.syncIdentity,'owner');
  assert.equal(cold.ctx.state.syncDirty,true,'local durability is not represented as cloud acknowledgement');
  assert.equal(reader.docs.get('users/owner').rev,originalRoot.rev,'automatic local recovery never publishes a replacement');
- const protectedSource=(await store.listOpaqueArchives()).find(row=>row.key===hold.originalKey);
- assert.ok(protectedSource,'the exact source capture is durably archived before local adoption');
- const captured=JSON.parse(protectedSource.raw);
+ const archives=await store.listOpaqueArchives(),rawSource=archives.find(row=>row.key===hold.originalKey);
+ assert.ok(rawSource,'the exact raw source capture is durably archived before local adoption');
+ const rawCapture=JSON.parse(rawSource.raw);
+ assert.equal(rawCapture.format,'chain-scanner.automatic-recovery-originals');
+ assert.equal(rawCapture.mode,'fresh-empty');
+ assert.ok(Object.values(rawCapture.indexedDB).every(rows=>rows.length===0),'the exact raw capture proves the fresh device stores are empty');
+ const captured=JSON.parse(archives.find(row=>row.key===rawCapture.sourceArchiveKeys[0]).raw);
  assert.equal(captured.manifest.activeGeneration,originalRoot.activeGeneration);
  assert.deepEqual(captured.generations.find(row=>row.id===originalRoot.previousGeneration).chunks,previousChunks,'the complete fallback chunks remain exact in the archive');
  assert.equal(captured.deviceAuthorityExact.classification,'verified-empty-fresh-client','the archive records why empty device storage is not treated as a saved board');
- assert.deepEqual(captured.deviceAuthorityExact.startupStores,captured.deviceAuthorityExact.currentStores,'the archived raw store capture matches the exact empty stores at adoption');
- assert.ok(Object.values(captured.deviceAuthorityExact.startupStores).every(source=>source.keys.length===0&&source.values.length===0),'no metadata, snapshots, backups or opaque archive may be present');
- assert.deepEqual(captured.deviceAuthorityExact.startupBrowser,captured.deviceAuthorityExact.currentBrowser,'the archived browser recovery capture matches at adoption');
- assert.ok(captured.deviceAuthorityExact.startupBrowser.every(source=>source.status==='absent'),'no browser board, pending copy, backup or authority marker may be present');
+ assert.equal(captured.automaticRecovery,true,'the source archive is distinguishable from manual Restore evidence');
+ assert.ok(rawCapture.localStorage.every(source=>source.status==='absent'),'the exact raw capture proves no browser board, backup or authority marker existed');
  cold.ctx.openSettings();
  assert.match(cold.shim.document.getElementById('modalRoot').innerHTML,/Cloud recovery is pending/i);
  assert.match(cold.shim.document.getElementById('modalRoot').innerHTML,/has not been confirmed by cloud/i);
@@ -781,6 +783,273 @@ test('RISK cloud source recovery automatic fallback: one complete older source o
  const faq=reopened.shim.document.getElementById('modalRoot').innerHTML;
  assert.match(faq,/opens automatically/i,'the extended FAQ explains the bounded automatic fallback');
  assert.match(faq,/not been confirmed by cloud/i,'the FAQ distinguishes local recovery from acknowledgement');
+});
+
+test('RISK cloud source recovery automatic union: accepted device and supported previous cloud additions both survive',async t=>{
+ const app=await divergentCloudSourceApp187(t,{deferInitialRecovery:true,holdCloudPush:true}),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ const previousPath='users/owner/generations/'+originalRoot.previousGeneration,previousHeader=backend.docs.get(previousPath);
+ const previousChunks=[...backend.docs].filter(([key])=>key.startsWith(previousPath+'/chunks/')).map(([,row])=>row).sort((a,b)=>a.index-b.index);
+ const previousPayload=await ctx.window.ChainStorageV2.decodeSnapshot(previousHeader,previousChunks),previous=JSON.parse(previousPayload);
+ previous.tasks.push(syncTask('cloud-previous-only','Cloud previous source only'));
+ const encoded=await ctx.window.ChainStorageV2.encodeSnapshot(JSON.stringify(previous));
+ backend.docs.set(previousPath,{...previousHeader,...encoded,chunks:undefined});
+ for(const key of [...backend.docs.keys()])if(key.startsWith(previousPath+'/chunks/'))backend.docs.delete(key);
+ for(const chunk of encoded.chunks)backend.docs.set(previousPath+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
+ const acceptedDevice=JSON.stringify(ctx.state),rootBefore=JSON.stringify(backend.docs.get('users/owner'));
+ assert.ok(ctx.state.tasks.some(task=>task.title==='Device source only'),'the setup retains an accepted device-only edit');
+ ctx.closeModal();await flush();await ctx.cloudPull();
+ assert.ok(ctx.state.tasks.some(task=>task.title==='Device source only'),'automatic recovery keeps the accepted device addition');
+ assert.ok(ctx.state.tasks.some(task=>task.title==='Cloud previous source only'),'automatic recovery unions the independently validated previous cloud addition');
+ assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state),'the supported union is the exact durable local head');
+ const hold=await store.getRecoveryCloudHold();assert.ok(hold,'the union stays pending cloud confirmation');
+ const archives=await store.listOpaqueArchives(),archive=archives.find(row=>row.key===hold.originalKey);assert.ok(archive,'all raw device evidence is protected before local adoption');
+ assert.equal(hold.automaticRecovery,true,'the durable hold identifies automatic recovery provenance');
+ const rawCapture=JSON.parse(archive.raw),sourceArchive=archives.find(row=>rawCapture.sourceArchiveKeys.includes(row.key));
+ assert.ok(sourceArchive,'the exact cloud source is separately archived before local adoption');
+ const captured=JSON.parse(sourceArchive.raw),archivedPrevious=captured.generations.find(row=>row.id===originalRoot.previousGeneration);
+ assert.equal(JSON.stringify(archivedPrevious.chunks),JSON.stringify(encoded.chunks),'the exact cloud candidate chunks remain archived');
+ assert.equal(JSON.stringify(backend.docs.get('users/owner')),rootBefore,'local recovery does not claim cloud acknowledgement');
+ assert.equal(captured.acceptedDeviceBoard,acceptedDevice,'the original accepted device board remains byte-exact in the protected source archive');
+});
+
+test('RISK cloud source recovery automatic union: a valid nonmatching acknowledged copy contributes supported work',async t=>{
+ const app=await divergentCloudSourceApp187(t,{deferInitialRecovery:true,holdCloudPush:true}),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ const acknowledged=JSON.parse(JSON.stringify(ctx.state));
+ acknowledged.tasks.push(syncTask('acknowledged-only','Acknowledged source only'));
+ const acknowledgedPayload=JSON.stringify(acknowledged),account=ctx.state.syncAccount,base=ctx.makeDecisionBase(account,ctx.state.syncRev,acknowledgedPayload);
+ assert.ok(base,'the retained acknowledged source has a valid account, revision and byte-bound identity');
+ ctx.state.decisionBase=base;
+ assert.equal(await ctx.persist(),true,'the retained base remains part of the durable accepted board');
+ const acceptedDevice=JSON.stringify(ctx.state),rootBefore=JSON.stringify(backend.docs.get('users/owner'));
+ assert.equal(ctx.validDecisionBase(ctx.state.decisionBase,account,ctx.state.syncRev),true);
+ assert.equal(JSON.parse(ctx.state.decisionBase.payload).tasks.some(task=>task.id==='acknowledged-only'),true);
+ assert.equal((await ctx.window.CloudSync.pull()).code,'corrupt-generation','the acknowledged payload is not an exact reconstruction of the corrupt current generation');
+ ctx.closeModal();await flush();await ctx.cloudPull();
+ assert.ok(ctx.state.tasks.some(task=>task.id==='acknowledged-only'),'the validated acknowledged copy contributes work absent from accepted and readable cloud candidates');
+ assert.ok(ctx.state.tasks.some(task=>task.title==='Device source only'),'the accepted device edit remains present');
+ assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state),'the supported result is the exact durable local head');
+ const hold=await store.getRecoveryCloudHold();assert.equal(hold?.automaticRecovery,true,'the adopted board remains under an automatic recovery hold');
+ const archives=await store.listOpaqueArchives(),raw=archives.find(row=>row.key===hold.originalKey),capture=JSON.parse(raw.raw);
+ const sourceArchive=JSON.parse(archives.find(row=>row.key===capture.sourceArchiveKeys[0]).raw);
+ assert.equal(JSON.parse(sourceArchive.acceptedDeviceBoard).decisionBase.payload,acknowledgedPayload,'the exact retained acknowledged bytes remain protected');
+ assert.ok(sourceArchive.candidateSources.some(row=>row.key==='cloud-acknowledged:'+base.id&&row.sourceRef.kind==='acknowledged-decision-base'),
+  'the archive identifies the stable acknowledged source key and provenance');
+ assert.ok(sourceArchive.alternativesToPreserve.some(row=>row.key==='cloud-acknowledged:'+base.id),
+  'the adopted result keeps the acknowledged source in its protected alternatives');
+ assert.equal(JSON.stringify(backend.docs.get('users/owner')),rootBefore,'local recovery does not claim cloud acknowledgement');
+});
+
+test('RISK cloud source recovery automatic union: a foreign-UID browser sibling is excluded while safe same-UID work recovers',async t=>{
+ const app=await divergentCloudSourceApp187(t,{deferInitialRecovery:true,holdCloudPush:true}),{ctx,backend}=app,store=ctx.window.ScannerDeviceStore;
+ const accepted=JSON.parse(JSON.stringify(ctx.state)),rootBefore=JSON.stringify(backend.docs.get('users/owner'));
+ const eventApp=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(accepted),[LOCAL_HEAD_KEY]:JSON.stringify(accepted)}});
+ t.after(()=>closeLegacyApp173(eventApp));
+ const eventTask=eventApp.ctx.state.tasks[0];hydrateUnchangedEditorDraft(eventApp,eventTask.id);
+ eventApp.ctx.onAction('dot-task',{dataset:{id:eventTask.id}});
+ const foreignEvent=eventApp.ctx.state.decisionEvents?.find(event=>event.kind==='comparison'&&event.action==='dot'&&event.taskId===eventTask.id);
+ assert.ok(foreignEvent,'the foreign source decision is produced through the real Dot action');
+ const foreign={...JSON.parse(JSON.stringify(eventApp.ctx.state)),syncIdentity:'another-owner',futureForeignOnly:{opaque:['foreign',251]}};
+ foreign.tasks.push(syncTask('foreign-uid-only','Foreign identity must stay separate'));
+ const foreignRaw=JSON.stringify(foreign);
+ const safe={...structuredClone(accepted),tasks:[...structuredClone(accepted.tasks),syncTask('trusted-browser-only','Supported same-UID browser source')]};
+ const safeRaw=JSON.stringify(safe);
+ app.shim.localStorage.setItem(SYNC_STORE_KEY,foreignRaw);
+ app.shim.localStorage.setItem(LOCAL_HEAD_KEY,safeRaw);
+ assert.equal(JSON.parse(app.shim.localStorage.getItem(SYNC_STORE_KEY)).syncAccount,ctx.state.syncAccount,
+  'the excluded sibling has the same email/account label but an explicit different UID');
+ assert.equal(JSON.parse(app.shim.localStorage.getItem(LOCAL_HEAD_KEY)).syncIdentity,ctx.state.syncIdentity,
+  'the independently supported sibling belongs to the active UID');
+ assert.equal(ctx.state.syncDirty,true,'local recovery keeps ordinary upload work pending');
+ assert.equal(vm.runInContext('cloudPushInFlight',ctx),false,'no cloud writer owns the pending intent during local recovery');
+ const priorVisibility=app.shim.document.hidden;
+ app.shim.document.hidden=true;await ctx.sendPush();app.shim.document.hidden=priorVisibility;
+ assert.equal(vm.runInContext('pendingPush',ctx),true,'the ordinary save request remains queued while the document is hidden');
+ ctx.closeModal();await flush();await ctx.cloudPull();
+ assert.ok(ctx.state.tasks.some(task=>task.id==='trusted-browser-only'),'a separate supported active-UID browser source can contribute work');
+ assert.ok(ctx.state.tasks.some(task=>task.title==='Device source only'),'accepted same-UID work remains present');
+ assert.equal(ctx.state.tasks.some(task=>task.id==='foreign-uid-only'),false,'a foreign UID task never enters the recovered board');
+ assert.equal(Object.hasOwn(ctx.state,'futureForeignOnly'),false,'a foreign UID board field never enters the recovered board');
+ assert.equal((ctx.state.decisionEvents||[]).some(event=>event.id===foreignEvent.id),false,'a foreign UID comparison never enters the recovered board');
+ assert.deepEqual(ctx.state.decisionEvents||[],accepted.decisionEvents||[],'the foreign sibling cannot replace or add accepted decision evidence');
+ assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state),'the safe active-UID union is durably exact');
+ assert.equal(ctx.state.syncDirty,true,'the local result remains pending cloud confirmation');
+ const archives=await store.listOpaqueArchives(),hold=await store.getRecoveryCloudHold();
+ assert.equal(hold?.automaticRecovery,true,'the safe local recovery remains held for cloud confirmation');
+ const rawArchive=archives.find(row=>row.key===hold.originalKey);
+ assert.ok(rawArchive,'the hold names the exact raw-source archive');
+ const envelope=JSON.parse(rawArchive.raw),sourceArchive=JSON.parse(archives.find(row=>row.key===envelope.sourceArchiveKeys[0]).raw);
+ assert.equal(envelope.format,'chain-scanner.automatic-recovery-originals');
+ assert.equal(envelope.localStorage.find(row=>row.key===SYNC_STORE_KEY)?.raw,foreignRaw,'the raw envelope retains the exact foreign browser bytes');
+ assert.equal(sourceArchive.browserRawSources.find(row=>row.key===SYNC_STORE_KEY)?.raw,foreignRaw,'the decision archive retains the exact foreign browser bytes');
+ assert.equal(sourceArchive.browserRawSources.find(row=>row.key===LOCAL_HEAD_KEY)?.raw,safeRaw,'the decision archive retains the exact safe browser candidate bytes');
+ assert.ok(sourceArchive.candidateSources.some(row=>row.key===LOCAL_HEAD_KEY&&row.sourceRef.kind==='browser'),
+  'the same-UID browser source is identified as a candidate');
+ assert.equal(sourceArchive.candidateSources.some(row=>row.key===SYNC_STORE_KEY),false,'the foreign browser sibling is excluded from candidate reduction');
+ assert.ok(sourceArchive.unsupported?.some(row=>row.key===SYNC_STORE_KEY&&row.reason==='browser-source-identity-mismatch'),
+  'the foreign sibling remains classified as excluded evidence');
+ assert.equal(app.shim.localStorage.getItem(SYNC_STORE_KEY),foreignRaw,'the source remains byte-exact in localStorage');
+ assert.equal(app.shim.localStorage.getItem(LOCAL_HEAD_KEY),safeRaw,'the safe source remains byte-exact in localStorage');
+ assert.equal(JSON.stringify(backend.docs.get('users/owner')),rootBefore,'local recovery does not publish or mutate cloud state');
+});
+
+test('RISK cloud source recovery automatic union: a supported durable device head contributes work absent from accepted live state',async t=>{
+ const app=await divergentCloudSourceApp187(t,{deferInitialRecovery:true,holdCloudPush:true}),{ctx,backend}=app,store=ctx.window.ScannerDeviceStore;
+ const source={...JSON.parse(JSON.stringify(ctx.state)),futureDurableHead:{kept:['durable',29]}};
+ Object.assign(ctx.state,source);
+ assert.equal(await ctx.persist(),true,'the independently validated durable source is produced by the ordinary device save path');
+ const durableHead=await store.readHead();assert.ok(JSON.parse(durableHead.payload).futureDurableHead);
+ delete ctx.state.futureDurableHead;
+ assert.equal(Object.hasOwn(ctx.state,'futureDurableHead'),false,'the accepted live projection remains independently distinct from the durable head');
+ const rootBefore=JSON.stringify(backend.docs.get('users/owner'));
+ ctx.closeModal();await flush();await ctx.cloudPull();
+ assert.deepEqual(ctx.state.futureDurableHead,{kept:['durable',29]},'the supported durable head candidate contributes its nonconflicting field');
+ assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state),'the combined result is durably exact');
+ const hold=await store.getRecoveryCloudHold();assert.equal(hold?.automaticRecovery,true);
+ const archives=await store.listOpaqueArchives(),raw=archives.find(row=>row.key===hold.originalKey),capture=JSON.parse(raw.raw);
+ const sourceArchive=JSON.parse(archives.find(row=>row.key===capture.sourceArchiveKeys[0]).raw);
+ assert.equal(sourceArchive.deviceHead,durableHead.payload,'the exact durable head remains byte-preserved in the source archive');
+ assert.ok(sourceArchive.candidateSources.some(row=>row.key==='device-head:'+durableHead.hash&&row.sourceRef.kind==='durable-device-head'),
+  'the archive identifies the durable head by stable hash and source type');
+ assert.equal(JSON.stringify(backend.docs.get('users/owner')),rootBefore,'local recovery does not claim cloud acknowledgement');
+});
+
+test('RISK cloud source recovery automatic union: disjoint settings and opaque fields survive across accepted device and previous cloud sources',async t=>{
+ const app=await divergentCloudSourceApp187(t,{deferInitialRecovery:true,holdCloudPush:true}),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ ctx.window.CLOUD_PUSH_DELAY_MS=60000;
+ ctx.state.settings.deviceRecoveryExtension={keep:'accepted device setting'};
+ ctx.state.futureDeviceRecovery={keep:['device',17]};
+ assert.equal(await ctx.persist(),true,'the accepted device extension reaches the ordinary durable save consumer');
+ const previousPath='users/owner/generations/'+originalRoot.previousGeneration,previousHeader=backend.docs.get(previousPath);
+ const previousChunks=[...backend.docs].filter(([key])=>key.startsWith(previousPath+'/chunks/')).map(([,row])=>row).sort((a,b)=>a.index-b.index);
+ const previous=JSON.parse(await ctx.window.ChainStorageV2.decodeSnapshot(previousHeader,previousChunks));
+ previous.tasks.push(syncTask('cloud-source-extension','Previous cloud source task'));
+ previous.settings||={};previous.settings.cloudRecoveryExtension={keep:'previous cloud setting'};
+ previous.futureCloudRecovery={keep:['cloud',23]};
+ const encoded=await ctx.window.ChainStorageV2.encodeSnapshot(JSON.stringify(previous));
+ backend.docs.set(previousPath,{...previousHeader,...encoded,chunks:undefined});
+ for(const key of [...backend.docs.keys()])if(key.startsWith(previousPath+'/chunks/'))backend.docs.delete(key);
+ for(const chunk of encoded.chunks)backend.docs.set(previousPath+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
+ const rootBefore=JSON.stringify(backend.docs.get('users/owner'));
+ ctx.closeModal();await flush();await ctx.cloudPull();
+ assert.ok(ctx.state.tasks.some(task=>task.title==='Device source only'),'the accepted device addition remains present');
+ assert.ok(ctx.state.tasks.some(task=>task.title==='Previous cloud source task'),'a supported previous cloud task remains present');
+ assert.deepEqual(ctx.state.settings.deviceRecoveryExtension,{keep:'accepted device setting'});
+ assert.deepEqual(ctx.state.settings.cloudRecoveryExtension,{keep:'previous cloud setting'},'the distinct supported cloud setting joins without replacing the accepted setting');
+ assert.deepEqual(ctx.state.futureDeviceRecovery,{keep:['device',17]});
+ assert.deepEqual(ctx.state.futureCloudRecovery,{keep:['cloud',23]},'an opaque cloud extension joins without snapshot replacement');
+ assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state),'the full-app source union is durably exact');
+ assert.ok(await store.getRecoveryCloudHold(),'the source union remains held for cloud confirmation');
+ assert.match(app.shim.document.getElementById('toast').textContent,/Recovery is open on this device.*Cloud confirmation is still pending/i,
+  'the status describes a supported working board without claiming every candidate was combined or cloud-confirmed');
+ assert.equal(JSON.stringify(backend.docs.get('users/owner')),rootBefore,'the local union does not claim cloud acknowledgement');
+});
+
+test('RISK cloud source recovery automatic union: explicit deletion and History clear survive an older complete cloud source',async t=>{
+ const app=await divergentCloudSourceApp187(t,{deferInitialRecovery:true,holdCloudPush:true}),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ ctx.window.CLOUD_PUSH_DELAY_MS=60000;
+ ctx.window.CloudSync.ready=false;
+ const historyTask=ctx.state.tasks.find(row=>row.id==='a'),deletedTask=ctx.state.tasks.find(row=>row.id!=='a');
+ hydrateUnchangedEditorDraft(app,historyTask.id);
+ app.shim.document.getElementById('etEver').checked=true;
+ ctx.onAction('save-edit',{dataset:{id:historyTask.id}});
+ assert.equal(historyTask.evergreen,true,'the Evergreen choice is made through the actual editor consumer');
+ assert.ok(ctx.state.decisionEvents.some(row=>row.kind==='current-choice'&&row.target?.type==='task'&&row.target.id===historyTask.id&&row.target.property==='evergreen'),
+  'the accepted Evergreen change retains its current-choice provenance');
+ ctx.onAction('done-task',{dataset:{id:historyTask.id}});
+ const originalHistory=JSON.parse(JSON.stringify(ctx.state.workLog.at(-1)));
+ const completion=JSON.parse(JSON.stringify(ctx.state.decisionEvents.find(row=>row.kind==='completion'&&row.taskId===historyTask.id)));
+ assert.ok(originalHistory?.id&&completion?.id,'the actual evergreen completion creates durable History and decision evidence');
+ const previousPath='users/owner/generations/'+originalRoot.previousGeneration,previousHeader=backend.docs.get(previousPath);
+ const encoded=await ctx.window.ChainStorageV2.encodeSnapshot(JSON.stringify(ctx.state));
+ backend.docs.set(previousPath,{...previousHeader,...encoded,chunks:undefined});
+ for(const key of [...backend.docs.keys()])if(key.startsWith(previousPath+'/chunks/'))backend.docs.delete(key);
+ for(const chunk of encoded.chunks)backend.docs.set(previousPath+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
+ const rootBefore=JSON.stringify(backend.docs.get('users/owner'));
+ ctx.deleteTask(deletedTask.id);
+ ctx.onAction('clear-done',{dataset:{}});
+ assert.equal(ctx.state.deletedTaskIds[deletedTask.id],true,'the real delete action leaves explicit task-deletion authority');
+ assert.equal(ctx.state.clearedHistoryIds[originalHistory.id],true,'the real Clear history action leaves exact-row clearing authority');
+ assert.deepEqual(Array.from(ctx.state.workLog),[],'the accepted device has cleared the evergreen History row');
+ assert.ok(ctx.state.tasks.some(row=>row.id===historyTask.id),'clearing History does not delete the evergreen task');
+ const lastDoneAt=ctx.state.tasks.find(row=>row.id===historyTask.id).lastDoneAt;
+ assert.equal(await ctx.persist(),true,'the deletion and History-clear evidence reach the durable accepted board');
+ const acceptedBefore=JSON.stringify(ctx.state);
+ ctx.closeModal();await flush();ctx.window.CloudSync.ready=true;await ctx.cloudPull();
+ assert.equal(JSON.stringify(ctx.state),acceptedBefore,'recovery keeps the accepted causal board while reducing the older source');
+ assert.equal((await store.readHead()).payload,acceptedBefore,'the exact supported result remains the durable head');
+ assert.equal(ctx.state.tasks.some(row=>row.id===deletedTask.id),false,'the older cloud membership does not resurrect the deleted identity');
+ assert.equal(ctx.state.deletedTaskIds[deletedTask.id],true,'the exact deletion token survives recovery');
+ assert.deepEqual(Array.from(ctx.state.workLog),[],'the older cloud History row does not return');
+ assert.equal(ctx.state.clearedHistoryIds[originalHistory.id],true,'the exact History-clear token survives recovery');
+ assert.equal(ctx.state.tasks.find(row=>row.id===historyTask.id).lastDoneAt,lastDoneAt,'History clearing preserves the original evergreen rest time');
+ assert.equal(ctx.state.decisionEvents.filter(row=>row.id===completion.id).length,1,'the original completion event is not duplicated');
+ assert.equal(JSON.stringify(backend.docs.get('users/owner')),rootBefore,'automatic local recovery does not claim cloud acknowledgement');
+ const hold=await store.getRecoveryCloudHold(),archives=await store.listOpaqueArchives();
+ assert.equal(hold?.automaticRecovery,true,'the unresolved result is marked as automatic recovery');
+ const sourceKey=JSON.parse(archives.find(row=>row.key===hold.originalKey).raw).sourceArchiveKeys[0];
+ const source=JSON.parse(archives.find(row=>row.key===sourceKey).raw);
+ assert.equal(source.generations.find(row=>row.id===originalRoot.previousGeneration).chunks[0].hash,encoded.chunks[0].hash,
+  'the exact stale cloud source remains protected alongside its causal result');
+});
+
+test('RISK cloud source recovery automatic union: a repeated comparison observation remains one exact decision',async t=>{
+ const app=await divergentCloudSourceApp187(t,{deferInitialRecovery:true,holdCloudPush:true}),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ ctx.window.CloudSync.ready=false;
+ const task=ctx.state.tasks[0];hydrateUnchangedEditorDraft(app,task.id);
+ ctx.onAction('dot-task',{dataset:{id:task.id}});
+ const observation=JSON.parse(JSON.stringify(ctx.state.decisionEvents.find(row=>row.kind==='comparison'&&row.action==='dot'&&row.taskId===task.id)));
+ assert.ok(observation?.id,'the actual Dot action creates its original comparison observation');
+ assert.equal(await ctx.persist(),true,'the accepted decision reaches the ordinary durable device save');
+ const repeated=JSON.parse(JSON.stringify(ctx.state));repeated.futureCloudRecovery={opaque:['same comparison delivered twice']};
+ const encoded=await ctx.window.ChainStorageV2.encodeSnapshot(JSON.stringify(repeated));
+ const previousPath='users/owner/generations/'+originalRoot.previousGeneration,previousHeader=backend.docs.get(previousPath);
+ backend.docs.set(previousPath,{...previousHeader,...encoded,chunks:undefined});
+ for(const key of [...backend.docs.keys()])if(key.startsWith(previousPath+'/chunks/'))backend.docs.delete(key);
+ for(const chunk of encoded.chunks)backend.docs.set(previousPath+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
+ const rootBefore=JSON.stringify(backend.docs.get('users/owner'));
+ ctx.window.CloudSync.ready=true;ctx.closeModal();await flush();await ctx.cloudPull();
+ const retained=ctx.state.decisionEvents.filter(row=>row.id===observation.id);
+ assert.equal(retained.length,1,'the same immutable comparison delivered by both candidates is applied once');
+ assert.deepEqual(retained[0],observation,'the original comparison identity, time, and meaning remain exact');
+ assert.deepEqual(ctx.state.futureCloudRecovery,{opaque:['same comparison delivered twice']},'the supported source extension still joins the accepted decision');
+ assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state),'the durable union contains the exact idempotent result');
+ assert.ok((await store.getRecoveryCloudHold())?.automaticRecovery,'the result remains pending cloud confirmation');
+ assert.equal(JSON.stringify(backend.docs.get('users/owner')),rootBefore,'the local recovery does not acknowledge or publish the observation');
+});
+
+test('RISK cloud source recovery automatic union: an unbased same-path edit is classified and remains held',async t=>{
+ const app=await divergentCloudSourceApp187(t,{deferInitialRecovery:true,holdCloudPush:true}),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ ctx.window.CloudSync.ready=false;
+ const task=ctx.state.tasks.find(row=>row.id==='a');hydrateUnchangedEditorDraft(app,task.id);
+ app.shim.document.getElementById('etTitle').value='Accepted device title';
+ ctx.onAction('save-edit',{dataset:{id:task.id}});
+ assert.equal(await ctx.persist(),true,'the accepted task edit reaches the ordinary durable device save');
+ const previousPath='users/owner/generations/'+originalRoot.previousGeneration,previousHeader=backend.docs.get(previousPath);
+ const previousChunks=[...backend.docs].filter(([key])=>key.startsWith(previousPath+'/chunks/')).map(([,row])=>row).sort((a,b)=>a.index-b.index);
+ const previous=JSON.parse(await ctx.window.ChainStorageV2.decodeSnapshot(previousHeader,previousChunks));
+ previous.tasks.find(row=>row.id===task.id).title='Older cloud title with no shared decision base';
+ const encoded=await ctx.window.ChainStorageV2.encodeSnapshot(JSON.stringify(previous));
+ backend.docs.set(previousPath,{...previousHeader,...encoded,chunks:undefined});
+ for(const key of [...backend.docs.keys()])if(key.startsWith(previousPath+'/chunks/'))backend.docs.delete(key);
+ for(const chunk of encoded.chunks)backend.docs.set(previousPath+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
+ const acceptedBefore=JSON.stringify(ctx.state),headBefore=await store.readHead(),rawBefore=await store.readRawExportSnapshot();
+ const archivesBefore=await store.listOpaqueArchives(),rootBefore=JSON.stringify(backend.docs.get('users/owner'));
+ const reduce=ctx.reduceAutomaticRecoveryCandidates,commit=ctx.commitAutomaticRecoveryDeviceSource;
+ let reduction=null,commitCalls=0;
+ ctx.reduceAutomaticRecoveryCandidates=input=>{const result=reduce(input);reduction=JSON.parse(JSON.stringify(result));return result;};
+ ctx.commitAutomaticRecoveryDeviceSource=async input=>{commitCalls++;return commit(input);};
+ ctx.window.CloudSync.ready=true;ctx.closeModal();await flush();await ctx.cloudPull();
+ assert.equal(reduction?.board,null,'unbased same-path values are not combined by guessing which full snapshot is newer');
+ assert.ok(reduction?.supportedAmbiguities.some(row=>row.kind==='supported-field-ambiguity'&&JSON.stringify(row.path)===JSON.stringify(['tasks',task.id,'title'])),
+  'the reducer reports the supported same-field disagreement separately from unsupported evidence');
+ assert.deepEqual(reduction?.unsupported,[],'valid competing field values remain supported ambiguity, not malformed evidence');
+ assert.equal(commitCalls,0,'an unresolved supported ambiguity never reaches the conditional raw-source writer');
+ assert.equal(JSON.stringify(ctx.state),acceptedBefore,'the current accepted board stays open without an invented winner');
+ assert.deepEqual(await store.readHead(),headBefore,'a held ambiguity cannot replace the durable accepted head');
+ assert.deepEqual(await store.readRawExportSnapshot(),rawBefore,'source inspection does not mutate raw device storage');
+ assert.deepEqual(await store.listOpaqueArchives(),archivesBefore,'no dependent adoption archive is written before a safe result exists');
+ assert.equal(await store.getRecoveryCloudHold(),null,'no adoption receipt implies an automatic result was accepted');
+ assert.equal(JSON.stringify(backend.docs.get('users/owner')),rootBefore,'an unresolved source disagreement never mutates cloud data');
 });
 
 test('RISK cloud source recovery automatic fallback: an unfinished draft captured before cloud reads prevents replacement',async t=>{
@@ -810,8 +1079,10 @@ test('RISK cloud source recovery automatic fallback: a stopped read survives col
  const damaged=await damagedAcknowledgedApp187(t),{backend,originalRoot}=damaged;
  await closeLegacyApp173(damaged);backend.CS.suspend();
  const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='safe-fallback-timeout-249-'+Math.random();
- let cold,reopened,reader,readerAfter,pull;const gate=deferredSyncFixture(),recoveryTimeoutMs=50;
- t.after(async()=>{gate.resolve();for(const app of [cold,reopened].filter(Boolean)){app.ctx.suspendCloudSync();vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry()',app.ctx);}reader?.CS.suspend();readerAfter?.CS.suspend();if(pull)await Promise.race([pull,new Promise(resolve=>setTimeout(resolve,1000))]);});
+ let cold,reopened,reader,readerAfter,pull;const gate=deferredSyncFixture(),reopenCaptureGate=deferredSyncFixture(),recoveryTimeoutMs=50;
+ let reopenCaptureEnteredResolve,reopenCaptureEnteredReject,reopenedRawRead,reopenedRecoveryEntries=0;
+ const reopenCaptureEntered={promise:new Promise((resolve,reject)=>{reopenCaptureEnteredResolve=resolve;reopenCaptureEnteredReject=reject;})};
+ t.after(async()=>{gate.resolve();reopenCaptureGate.resolve();for(const app of [cold,reopened].filter(Boolean)){app.ctx.suspendCloudSync();vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry()',app.ctx);}reader?.CS.suspend();readerAfter?.CS.suspend();if(pull)await Promise.race([pull,new Promise(resolve=>setTimeout(resolve,1000))]);});
  cold=await loadAppAtTime(1792323000000,{indexedDBProvider:indexedDB,deviceDbName});
  await fixtureDeadline((async()=>{while(!vm.runInContext('automaticCloudFallbackBootBaseline',cold.ctx))await flush();})(),'timeout test starts after verified empty startup capture');
  const store=cold.ctx.window.ScannerDeviceStore,initialRaw=await store.readRawExportSnapshot();
@@ -831,14 +1102,44 @@ test('RISK cloud source recovery automatic fallback: a stopped read survives col
  assert.deepEqual([SYNC_STORE_KEY,LOCAL_HEAD_KEY,LOCAL_BACKUPS_KEY,'fvp:chain-scanner:device-store-v2'].map(key=>cold.shim.localStorage.getItem(key)),[null,null,null,null],'a failed attempt leaves browser boards, backups and authority absent');
  const sharedStorage=cold.shim.localStorage;cold.ctx.suspendCloudSync();reader.CS.suspend();vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry()',cold.ctx);
  await cold.dispose();
- reopened=await loadAppAtTime(1792323000000,{indexedDBProvider:indexedDB,deviceDbName,sharedStorage});
+ reopened=await loadAppAtTime(1792323000000,{indexedDBProvider:indexedDB,deviceDbName,sharedStorage,beforeStateReady(ctx){
+  const capture=ctx.captureAutomaticCloudFallbackBootBaseline;
+  ctx.captureAutomaticCloudFallbackBootBaseline=async loaded=>{
+   const runtimeStore=vm.runInContext('deviceStore',ctx),read=runtimeStore?.readRawExportSnapshot;let held=false;
+   if(!runtimeStore||typeof read!=='function'){const error=Error('reopened boot capture has no open raw device store');reopenCaptureEnteredReject(error);throw error;}
+   reopenedRawRead=read;
+   runtimeStore.readRawExportSnapshot=async(...args)=>{
+    const raw=await read.apply(runtimeStore,args);
+    if(!held){held=true;reopenCaptureEnteredResolve();await reopenCaptureGate.promise;}
+    return raw;
+   };
+   try{return await capture(loaded);}catch(error){reopenCaptureEnteredReject(error);throw error;}finally{runtimeStore.readRawExportSnapshot=read;}
+  };
+  const fallback=ctx.openAutomaticCloudSourceFallback;
+  ctx.openAutomaticCloudSourceFallback=(...args)=>{reopenedRecoveryEntries++;return fallback(...args);};
+ }});
+ await fixtureDeadline(reopenCaptureEntered.promise,'the reopened app pauses inside its actual raw boot capture');
  readerAfter=await loadCloudBackendV2({runtimeWindow:reopened.ctx.window,failures:{authPending:true},timeoutMs:5000,recoveryTimeoutMs});
  for(const [key,value]of backend.docs)readerAfter.docs.set(key,value);
  assert.equal(vm.runInContext('freshClient',reopened.ctx),true,'cold reopen still independently recognizes a fresh empty client');
- readerAfter.emitAuth({uid:'owner',email:'e@example.com'});reopened.ctx.closeModal();await flush();await reopened.ctx.cloudPull();
- await fixtureDeadline((async()=>{while(vm.runInContext('pulling',reopened.ctx))await flush();})(),'later source read finishes after reopening');
+ const reopenedStore=reopened.ctx.window.ScannerDeviceStore,rawWhileCapturePending=await reopenedRawRead.call(reopenedStore);
+ readerAfter.emitAuth({uid:'owner',email:'e@example.com'});reopened.ctx.closeModal();await flush();await reopened.ctx.cloudPull();await flush();
+ assert.equal(vm.runInContext('automaticCloudFallbackBootCapturePending',reopened.ctx),true,'the auth-triggered recovery is still behind the real reopened raw capture');
+ assert.equal(vm.runInContext('cloudPullPending',reopened.ctx),true,'auth and explicit cloudPull requests coalesce in the existing deferred-read latch');
+ assert.equal(reopenedRecoveryEntries,0,'no recovery source read can start before the new exact raw baseline is captured');
+ assert.equal(vm.runInContext('pulling',reopened.ctx),false,'queued auth does not open a competing cloud read');
+ assert.equal(await reopenedStore.readHead(),null,'pending reopened capture never saves a placeholder board');
+ assert.equal(await reopenedStore.getRecoveryCloudHold(),null,'pending reopened capture cannot create an adoption hold');
+ assert.deepEqual(await reopenedRawRead.call(reopenedStore),rawWhileCapturePending,'auth cannot mutate the raw source while reopened capture is unresolved');
+ reopenCaptureGate.resolve();
+ await fixtureDeadline((async()=>{while(!(await reopenedStore.getRecoveryCloudHold()))await flush();})(),'the existing post-capture replay completes automatic recovery after reopening');
+ assert.equal(vm.runInContext('automaticCloudFallbackBootCapturePending',reopened.ctx),false,'automatic recovery settles only after the boot raw capture finishes');
+ assert.equal(vm.runInContext('cloudPullPending',reopened.ctx),false,'the existing boot replay drains the deferred auth read');
+ assert.equal(reopenedRecoveryEntries,1,'the deferred auth/read requests produce exactly one automatic recovery attempt');
+ await fixtureDeadline((async()=>{while(vm.runInContext('pulling',reopened.ctx))await flush();})(),'guarded adoption completes before the recovery read returns');
+ assert.equal(vm.runInContext('pulling',reopened.ctx),false,'the recovery read settles before adoption is checked');
  const recoveredHold=await reopened.ctx.window.ScannerDeviceStore.getRecoveryCloudHold();
- const reopenedState=vm.runInContext('JSON.stringify({error:unrepairableCloudSource?.code??null,cloud:window.CloudSync?.errorCode,pulling,freshClient,verifiedEmptyDeviceStore,deviceStorageRequired,deviceStorageAuthority})',reopened.ctx);
+ const reopenedState=vm.runInContext('JSON.stringify({error:unrepairableCloudSource?.code??null,cloud:window.CloudSync?.errorCode,cloudReady:window.CloudSync?.ready,status:window.CloudSync?.status,pulling,cloudPullPending,bootCapturePending:automaticCloudFallbackBootCapturePending,baselineMode:automaticCloudFallbackBootBaseline?.mode,freshClient,verifiedEmptyDeviceStore,deviceStorageRequired,deviceStorageAuthority})',reopened.ctx);
  assert.ok(recoveredHold,'the unchanged fresh client can retry and automatically adopt the complete source after reopening; app state: '+reopenedState);
  assert.ok(reopened.ctx.state.tasks.some(task=>task.title==='Acknowledged before source damage'));
  assert.equal(readerAfter.docs.get('users/owner').rev,originalRoot.rev,'later local fallback still does not publish to cloud');
@@ -40235,6 +40536,7 @@ async function divergentCloudSourceApp187(t,options){
  const path='users/owner/generations/'+originalRoot.activeGeneration;
  backend.docs.set(path,{...backend.docs.get(path),hash:'f'.repeat(64)});
  if(options?.settleDeviceBeforeCloud)ctx.window.CLOUD_PUSH_DELAY_MS=60000;
+ if(options?.holdCloudPush)ctx.window.CLOUD_PUSH_DELAY_MS=60000;
  shim.document.getElementById('addInput').value='Device source only';
  const schedule=ctx.setTimeout,cancel=ctx.clearTimeout,saveClock={elapsed:0,jobs:[]};
  if(options?.settleDeviceBeforeCloud){
@@ -40253,7 +40555,7 @@ async function divergentCloudSourceApp187(t,options){
    await settleSourceFixtureSave187(app,'fixture final native save settles before cloud controls',true);
   }
  }finally{ctx.setTimeout=schedule;ctx.clearTimeout=cancel;}
- await ctx.cloudPull();await ctx.sendPush();await settleRecoveryOperations188(ctx);
+ if(!options?.deferInitialRecovery){await ctx.cloudPull();await ctx.sendPush();await settleRecoveryOperations188(ctx);}
  assert.equal((await backend.CS.pull()).code,'corrupt-generation');
  return app;
 }
@@ -40435,8 +40737,12 @@ test('RISK cloud source recovery: uncertain ACK stays held through cold open and
 
 test('RISK cloud source recovery guidance: mounted FAQ and changelog explain deliberate sources and unknown missing changes',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(help,/What if a cloud save is damaged/);assert.match(help,/Review cloud recovery sources/);assert.match(help,/missing data is unknown/i);assert.match(help,/Nothing is selected by default/);
- const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];assert.match(current,/complete recovery source/);
+ const damaged=help.split('<dt>What if a cloud save is damaged?</dt><dd>')[1]?.split('</dd>')[0];assert.ok(damaged);
+ assert.match(damaged,/supported, nonconflicting changes.*combined/i);assert.match(damaged,/cannot be combined safely/i);assert.match(damaged,/original sources stay protected/i);
+ assert.ok(damaged.split(/\s+/).filter(Boolean).length<=130,'the automatic recovery guidance stays within the existing FAQ word limit');
+ assert.match(help,/What if a cloud save is damaged/);assert.match(help,/Review cloud recovery sources/);assert.match(help,/missing data stays unknown/i);assert.match(help,/none is selected by default/i);
+ const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];
+ assert.match(current,/nonconflicting changes from saved device and cloud copies combine locally/i);assert.match(current,/Original sources stay protected/);
 });
 
 test('RISK cloud source recovery controls: native Apply stays subdued until a complete source is selected',async t=>{

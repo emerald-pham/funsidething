@@ -1782,7 +1782,20 @@ The native needs-attention action uses real IndexedDB and the production backend
 - RISK cloud source recovery automatic fallback: a stopped read survives cold reopen and later adopts its safe source
 - RISK cloud source recovery automatic fallback: all accepted deletions survive cold reopen without older-source fallback
 
-The only automatic choice is one complete, validated previous cloud generation on a verified fresh client. Exact raw IndexedDB stores (including pending, backup and opaque rows), browser boards and recovery keys, authority marker, account/backend/session, local and draft state, and source captures remain bound through conditional local adoption and readback. A timeout leaves true empty stores empty for a later cold-open retry. Accepted empty boards with explicit deletion evidence and drafts stay authoritative. The recovered board remains local with a visible cloud hold; no cloud replacement is published.
+This path opens one complete, validated previous cloud generation only on a verified fresh client. Exact raw IndexedDB stores (including pending, backup and opaque rows), browser boards and recovery keys, authority marker, account/backend/session, local and draft state, and source captures remain bound through conditional local adoption and readback. A timeout leaves true empty stores empty for a later cold-open retry. Accepted empty boards with explicit deletion evidence and drafts stay authoritative. The recovered board remains local with a visible cloud hold; no cloud replacement is published.
+
+## Supported automatic recovery union (#250)
+
+- RISK cloud source recovery automatic union: accepted device and supported previous cloud additions both survive
+- RISK cloud source recovery automatic union: a valid nonmatching acknowledged copy contributes supported work
+- RISK cloud source recovery automatic union: a foreign-UID browser sibling is excluded while safe same-UID work recovers
+- RISK cloud source recovery automatic union: a supported durable device head contributes work absent from accepted live state
+- RISK cloud source recovery automatic union: disjoint settings and opaque fields survive across accepted device and previous cloud sources
+- RISK cloud source recovery automatic union: explicit deletion and History clear survive an older complete cloud source
+- RISK cloud source recovery automatic union: a repeated comparison observation remains one exact decision
+- RISK cloud source recovery automatic union: an unbased same-path edit is classified and remains held
+
+The full-app cloudPull path unions only independently validated same-account candidates whose supported deltas can be represented without guessing. Candidate sources include the accepted board, a supported durable device head, validated browser copies, active/previous/pending cloud generations and a valid acknowledged decision base; a nonmatching acknowledgement contributes supported work without being misrepresented as the current generation. Explicit foreign UIDs are excluded from sibling candidates while exact raw bytes remain archived. Exact device raw/browser evidence and each cloud generation are archived and read back before the local board is adopted under an automatic-recovery hold. Tests cover accepted, durable-head, browser, previous-cloud and acknowledged additions; disjoint settings and opaque fields; explicit deletion and History-clear evidence; completion identity; idempotent comparison delivery; and a same-path disagreement with no common decision base. The cold-reopen timeout control now pauses the actual raw capture, proves auth stays deferred with no dependent writes, and requires exactly one recovery attempt after the existing boot replay settles. That ambiguity is classified separately from unsupported evidence and causes no dependent write; unsupported source bytes remain protected. Residual conflict defaults belong to #251. Background retry, guarded publication, acknowledgement and multi-device convergence remain with #254.
 
 ## Readable malformed device head (#252)
 
