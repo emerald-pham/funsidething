@@ -1493,6 +1493,8 @@ test('RISK automatic recovery guidance: mounted FAQ explains reversible defaults
  assert.match(help,/Saved working boards reopen automatically/i,'accepted cold reopening is part of the automatic recovery policy');
  assert.match(help,/An automatic recovery waiting for cloud confirmation resumes after reopening/i);
  assert.match(help,/Shared cloud originals remain protected permanently/i);
+ assert.match(help,/<dt>Will recovered work reopen and finish saving automatically\?<\/dt><dd>Saved working boards reopen automatically/i,'reopening guidance has its own concise reachable FAQ topic');
+ assert.match(help,/protection does not recreate missing data/i,'retention is never described as reconstructing an unavailable original');
  assert.match(help,/recorded decision order first/i);assert.match(help,/accepted device value/i);assert.match(help,/fixed source order/i);
  assert.match(help,/other values remain protected/i);assert.match(help,/exact cloud confirmation/i);
  assert.match(help,/File or paste Restore replaces the selected snapshot/,'explicit manual replacement remains distinct');
