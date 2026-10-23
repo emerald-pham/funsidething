@@ -3275,7 +3275,7 @@ test('RISK corrupt cloud work budget: ordinary actions stay durable without rere
  assert.equal(backend.CS.knownDamagedSource,false);assert.equal(JSON.stringify(backend.docs.get(headerPath)),JSON.stringify(JSON.parse(originalCloud).find(([key])=>key===headerPath)[1]));
 });
 
-async function coldDamagedSourceWithoutAck214(t,{newerLocalWork=false,observeColdStore=null}={}){
+async function coldDamagedSourceWithoutAck214(t,{newerLocalWork=false}={}){
  const seed=await damagedAcknowledgedApp187(t,{sourcePadding:2000000});
  if(newerLocalWork){seed.shim.document.getElementById('addInput').value='Newer local task without an ACK export';await seed.ctx.onAction('add',{});assert.equal(await seed.ctx.persist(),true);}
  const raw=seed.ctx.cloudPayload(),originalRoot={...seed.originalRoot},originalHeader={...seed.originalHeader},provider=[...seed.backend.docs];
@@ -3284,7 +3284,6 @@ async function coldDamagedSourceWithoutAck214(t,{newerLocalWork=false,observeCol
  await closeLegacyApp173(seed);seed.backend.CS.suspend();
  const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='cold-no-ack-214-'+Math.random();
  const app=await loadAppAtTime(1792323000000,{seed:214,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},indexedDBProvider:indexedDB,deviceDbName});
- observeColdStore?.(app);
  const faults={authPending:true},counts={reads:0};faults.serverRead=async()=>{counts.reads++;};
  const backend=await loadCloudBackendV2({rootData:originalRoot,timeoutMs:5000,recoveryTimeoutMs:5000,failures:faults,recordSyncError:app.ctx.recordSyncError,runtimeWindow:app.ctx.window});
  for(const [key,value] of provider)backend.docs.set(key,value);
@@ -3296,64 +3295,23 @@ async function coldDamagedSourceWithoutAck214(t,{newerLocalWork=false,observeCol
  return {...app,backend,faults,counts,originalRoot,originalHeader,raw,indexedDB,deviceDbName};
 }
 
-test('RISK corrupt cloud work budget: cold-opened sources without an ACK keep newer edits without repeated downloads',
-{timeout:20000},async t=>{
- // Diagnostic-only owner trace for the two Linux first-Add refusals. Observe
- // existing port promises without changing their identity or outcome. The
- // bounded metadata callbacks add observation overhead, with no extra wait.
- const trace=[],traceLimit=12,traceStarted=performance.now();let dropped=0,sequence=0;
- const codes=new Set(['unaccepted-source','unavailable','recovery-unavailable','ambiguous-legacy-completion','legacy-reconcile-failed','write-failed','account-changed','changed-during-save','quota-exhausted','recovery-failed','invalid-payload','invalid-backup','backup-id-collision','concurrent-change','changed-during-write','storage-denied','deadline-exceeded']);
- const stages=new Set(['device-recovery','storage','completion-upgrade','device-store','primary-write','restore-safety']);
- const errors=new Set(['Error','TypeError','RangeError','SyntaxError','AbortError','QuotaExceededError','InvalidStateError','TransactionInactiveError','DataError','DataCloneError','NotFoundError','ReadOnlyError','UnknownError','ConstraintError','SecurityError']);
- const safeCode=value=>codes.has(value)?value:'other',safeHash=value=>typeof value==='string'&&/^[a-f0-9]{64}$/.test(value)?value:null;
- const bounded=value=>Number.isSafeInteger(value)&&value>=0&&value<=1000000?value:null;
- const observeColdStore=app=>{
-  const {ctx}=app,store=ctx.window.ScannerDeviceStore,owned=[];
-  const counters=()=>vm.runInContext('({accepted:saveRequestGeneration,active:supportDiagnosticsActivePersistCalls,persists:supportDiagnosticsPersistCalls})',ctx);
-  const record=(method,event,call,details={})=>{
-   try{
-    const save=counters(),row={call:bounded(call),method,event,ms:bounded(Math.round(performance.now()-traceStarted)),accepted:bounded(save.accepted),active:bounded(save.active),persists:bounded(save.persists),...details};
-    if(trace.length===traceLimit){trace.shift();dropped++;}trace.push(row);
-   }catch{dropped++;}
-  };
-  const failure=error=>{
-   const frame=/(device-store-v2\.js|cloud-store-v2\.js|index\.html#app):(\d+):(\d+)/.exec(typeof error?.stack==='string'?error.stack:'');
-   return {name:errors.has(error?.name)?error.name:'other',code:safeCode(error?.code),...(frame?{file:frame[1],line:bounded(Number(frame[2])),column:bounded(Number(frame[3]))}:{})};
-  };
-  for(const method of ['commitHead','readHead','close'])assert.equal(Object.getOwnPropertyDescriptor(store,method)?.writable,true,'the diagnostic observes only a writable existing device port');
-  // This callback registers before the helper's close, so observation does
-  // not change which owner closes the store or extend its lifetime.
-  t.after(()=>{for(const {method,original,wrapped}of owned)if(store[method]===wrapped)store[method]=original;});
-  for(const method of ['commitHead','readHead','close']){
-   const original=store[method];
-   const wrapped=function(...args){
-    const call=++sequence;
-    try{record(method,'start',call,method==='commitHead'?{expectedHash:safeHash(args[0]?.expectedHash),ownerMatches:args[0]?.account===(ctx.state.syncAccount??null)}:{});}catch{dropped++;}
-    let result;
-    try{result=Reflect.apply(original,this,args);}
-    catch(error){try{record(method,'throw',call,failure(error));}catch{dropped++;}throw error;}
-    // These native async ports return their original promise. The separate
-    // observation branch handles both outcomes and cannot reject or throw.
-    try{result.then(value=>{try{record(method,'return',call,{ok:value?.ok===true,conflict:value?.conflict===true,superseded:value?.superseded===true,code:safeCode(value?.code),hash:safeHash(value?.hash),headHash:safeHash(value?.head?.hash),present:value!=null,ownerMatches:method==='readHead'&&value!=null?value.account===(ctx.state.syncAccount??null):null});}catch{dropped++;}},error=>{try{record(method,'reject',call,failure(error));}catch{dropped++;}});}catch{dropped++;}
-    return result;
-   };
-   store[method]=wrapped;owned.push({method,original,wrapped});
-  }
- };
- const app=await coldDamagedSourceWithoutAck214(t,{newerLocalWork:true,observeColdStore}),{ctx,shim,backend,counts,originalRoot}=app;
- const reportFailure=()=>{
-  try{
-   const issue=ctx.deviceSaveIssue(),flags=vm.runInContext('({accepted:saveRequestGeneration,active:supportDiagnosticsActivePersistCalls,persists:supportDiagnosticsPersistCalls,retries:supportDiagnosticsRetryAttempts,deviceAuthority:deviceStorageAuthority,deviceRequired:deviceStorageRequired,acceptedBoard:liveBoardAccepted,storageOK,pulling,pushing:cloudPushInFlight,cloudTimer:cloudTimer!==null,saveTimer:saveTimer!==null,recoveryBusy:cloudSourceRecoveryBusy,recoveryHold:!!deviceRecoveryCloudHold,pendingCloudBackup:!!pendingDeviceCloudBackup,storeMatchesWindow:deviceStore===window.ScannerDeviceStore,accountMatches:state.syncAccount===(window.CloudSync?.user??null),dirty:state.syncDirty===true,ackPresent:state.decisionBase!=null})',ctx);
-   for(const key of ['accepted','active','persists','retries'])flags[key]=bounded(flags[key]);
-   const report={v:1,platform:['darwin','linux','win32'].includes(process.platform)?process.platform:'other',arch:['arm64','x64'].includes(process.arch)?process.arch:'other',node:/^\d{1,2}\.\d{1,3}\.\d{1,3}$/.test(process.versions.node)?process.versions.node:'other',issue:issue?{stage:stages.has(issue.stage)?issue.stage:'other',code:safeCode(issue.code)}:null,flags,dropped:bounded(dropped),trace:[...trace]};
-   let text=JSON.stringify(report);while(text.length>8000&&report.trace.length){report.trace.shift();report.dropped=bounded((report.dropped??0)+1);text=JSON.stringify(report);}
-   t.diagnostic('NO_ACK_PERSISTENCE_FAILURE '+(text.length<=8000?text:'{"v":1,"observationUnavailable":true}'));
-  }catch{try{t.diagnostic('NO_ACK_PERSISTENCE_FAILURE {"v":1,"observationUnavailable":true}');}catch{}}
- };
+test('RISK corrupt cloud work budget: cold-opened sources without an ACK keep newer edits without repeated downloads',{timeout:20000},async t=>{
+ const app=await coldDamagedSourceWithoutAck214(t,{newerLocalWork:true}),{ctx,shim,backend,counts,originalRoot}=app;
  assert.equal(backend.CS.errorCode,'corrupt-generation');assert.equal(backend.CS.knownDamagedSource,true);
  const initialReads=counts.reads,originalCloud=JSON.stringify([...backend.docs]),writes=backend.writes.length,byAction=[];
  assert.ok(initialReads>0);ctx.window.CLOUD_PUSH_DELAY_MS=0;
- const settle=async()=>{try{assert.equal(await ctx.persist(),true);}catch(error){reportFailure();throw error;}await fixtureDeadline(async wait=>{for(;;){await wait(5);if(!vm.runInContext('pulling||cloudPushInFlight||cloudTimer!==null',ctx))break;}},'no-ACK accepted action is durably saved');assert.equal((await ctx.window.ScannerDeviceStore.readHead()).payload,JSON.stringify(ctx.state));byAction.push(counts.reads-initialReads);};
+ const settle=async()=>{try{assert.equal(await ctx.persist(),true);}catch(error){
+  // Everything in this handler runs only after the original failed outcome.
+  try{
+   const issue=ctx.deviceSaveIssue(),stages=new Set(['device-recovery','storage','completion-upgrade','device-store','primary-write','restore-safety']),codes=new Set(['unaccepted-source','unavailable','recovery-unavailable','ambiguous-legacy-completion','legacy-reconcile-failed','write-failed','account-changed','changed-during-save','quota-exhausted','recovery-failed','invalid-payload','invalid-backup','backup-id-collision','concurrent-change','changed-during-write','storage-denied','deadline-exceeded']);
+   const flags=vm.runInContext('({accepted:saveRequestGeneration,active:supportDiagnosticsActivePersistCalls,persists:supportDiagnosticsPersistCalls,retries:supportDiagnosticsRetryAttempts,deviceAuthority:deviceStorageAuthority,deviceRequired:deviceStorageRequired,acceptedBoard:liveBoardAccepted,storageOK,pulling,pushing:cloudPushInFlight,cloudTimer:cloudTimer!==null,saveTimer:saveTimer!==null,recoveryBusy:cloudSourceRecoveryBusy,recoveryHold:!!deviceRecoveryCloudHold,pendingCloudBackup:!!pendingDeviceCloudBackup,storeMatchesWindow:deviceStore===window.ScannerDeviceStore,accountMatches:state.syncAccount===(window.CloudSync?.user??null),dirty:state.syncDirty===true,ackPresent:state.decisionBase!=null})',ctx);
+   for(const key of ['accepted','active','persists','retries'])if(!Number.isSafeInteger(flags[key])||flags[key]<0||flags[key]>1000000)flags[key]=null;
+   for(const key of ['deviceAuthority','deviceRequired','acceptedBoard','storageOK','pulling','pushing','cloudTimer','saveTimer','recoveryBusy','recoveryHold','pendingCloudBackup','storeMatchesWindow','accountMatches','dirty','ackPresent'])if(typeof flags[key]!=='boolean')flags[key]=null;
+   const report={v:1,originalAssertion:error?.code==='ERR_ASSERTION',issue:issue?{stage:stages.has(issue.stage)?issue.stage:'other',code:codes.has(issue.code)?issue.code:'other'}:null,flags},text=JSON.stringify(report);
+   t.diagnostic('NO_ACK_MINIMAL_FAILURE '+(text.length<=4000?text:'{"v":1,"observationUnavailable":true}'));
+  }catch{try{t.diagnostic('NO_ACK_MINIMAL_FAILURE {"v":1,"observationUnavailable":true}');}catch{}}
+  throw error;
+ }await fixtureDeadline(async wait=>{for(;;){await wait(5);if(!vm.runInContext('pulling||cloudPushInFlight||cloudTimer!==null',ctx))break;}},'no-ACK accepted action is durably saved');assert.equal((await ctx.window.ScannerDeviceStore.readHead()).payload,JSON.stringify(ctx.state));byAction.push(counts.reads-initialReads);};
  shim.document.getElementById('addInput').value='Another local task after a held no-ACK pull';await ctx.onAction('add',{});await settle();
  ctx.onAction('start-scan',{dataset:{mode:'descending'}});await settle();
  const candidate=ctx.state.candidateId,benchmark=ctx.state.chain.at(-1);assert.ok(candidate&&benchmark);ctx.onAction('no',{dataset:{candidate,benchmark}});await settle();assert.equal(ctx.state.considered[candidate],'no');

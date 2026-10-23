@@ -18361,5 +18361,105 @@
     "command": "npm test in H PR CI39964810605 (actual syntheticQ7002fe0847626a9c2e928b04d8aee3f8e4df5588/treeH) and direct-H push CI39964800218, Node22.23.3/Linux. Original logs are final-v9/ci-pull_request/run-39964810605-db5a30c3a9a5-1792764151579-913307ab/logs.txt and final-v9/ci-push/run-39964800218-db5a30c3a9a5-1792764929501-78c9f983/logs.txt, under /Users/emeraldpham/Documents/Codex/2026-10-22/issue-187/evidence. These failures precede diagnostic edits. Later external calibration record993e620c under persist-ownership-repair is sensitivity only.",
     "failure": "Both real Linux CI runs failed the sole cold no-ACK first-Add persistence assertion at original tests.js3303:32, called3304:124: false!==true; durations9219.02146ms and9151.412544ms. Each whole run2959 tests/2897pass/1fail/61preexisting skips/0cancel; rules and compatibility skipped. This diagnostics-only change preserves that expected behavior and does not claim GREEN on the failing environment or a repaired root cause."
   }
-}
+},
+  {
+    "baseCommit": "7de2910b79ebb0996b97f1a2abd0776c505b29de",
+    "testChangesSha256": "23c48d3828aba91ac68fca377e2198af700e1be0ec650b953c23cd2104f7a44b",
+    "reason": "Replace I pre-outcome port observation with a lazy failure-only diagnostic after original H Linux CI first-Add failures remained unreproduced. This M current main fingerprint is diagnostic-only, not a causal fix or release approval.",
+    "previousBehavior": "H CI39964800218 and39964810605 failed the original first-Add persist assertion, actual false. Both I diagnostic CI runs passed without trace while independent earlier-case/sibling pace differed; observer/runner pace is confounded. Mac controls, six LinuxARM focused controls and the pristine resized LinuxARM128-parent prefix333/333 also pass. Original refusal cause remains unresolved.",
+    "intendedBehavior": "Restore H whole tests.js except the original settle assert.equal(await ctx.persist(),true) enclosed in a lazy catch. Only after its failed outcome, report finite allowlisted existing refusal stage/code, normalized booleans/null and bounded nonnegative counters, with4000ASCII JSON cap and safe fallback, then rethrow the identical original error. Remove every I observer, wrapper, ring, side promise and pre-outcome diagnostic initialization. Do not change product behavior or retry a refusal.",
+    "diagnosticSubjectTests": [
+      "RISK corrupt cloud work budget: cold-opened sources without an ACK keep newer edits without repeated downloads"
+    ],
+    "replacementTests": [
+      "RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations"
+    ],
+    "preservedCoverage": [
+      "All719 existing raw rationale JSON objects remain byte-exact, including original716 and the three I diagnostic records. Removing only the lazy catch reconstructs entire original H tests.js SHA256697aec67fa6421ed18f3aaa916f61ba2fb73c6a68c6127f84e8b5aecd4959484.",
+      "Every original no-ACK Add/Start/No/Done, exact durable head, newer local work, cloud source/no-write/read budget, explicit Retry and healthy-revision/Done assertion remains. Timeout stays20000ms; original persist invocation count, await, return and thrown error are unchanged.",
+      "The complete coldDamagedSourceWithoutAck214 signature/body and both callers restore H exactly. The exact-current no-ACK repair sibling, all native focus controls, absolute deadline/polling contracts and source/account/ACK guards remain. No application, store, rules, FAQ, worker, PWA fingerprint, gate or release helper byte changes.",
+      "Diagnostic sets, VM reads, metadata normalization and serialization execute only inside the failed-assertion catch. No new storage/file/network read, timer, wait, retry, arbitrary string, message, stack, source/task/account/pending payload is emitted. Code layout/JIT may still affect scheduling, so no claim of perfect noninterference or an observer-caused positive follows.",
+      "Existing RISK names and inventory map remain unchanged. H-to-J has no added test header and its optional historical structural gate is expected to report only the unchanged-header replacement-name limitation; root diagnostic-J-H-gate-boundary.md requires exact reconstruction/manual qualification and prohibits cosmetic header/gate changes. Current M/I/B and inventory gates must pass. Whole-candidate/native/rules/compat/actualCI acceptance remain required for a later real repair.",
+      "For M/B whole-candidate comparisons, the directly neighboring ordinary-work case has an actual added/updated header from the retained H shared-deadline fixture changes, so replacementTests names that unchanged integration coverage. The no-ACK body is explicitly the diagnosticSubjectTests seam; its header is unchanged relative to M/B/H. This metadata does not claim that J added or renamed that subject or changed ordinary-work behavior."
+    ],
+    "redEvidence": {
+      "command": "Original H npm test in Linuxx64 push39964800218 and PR39964810605, retained final-v9 raw logs. Later sensitivity-only external Node22.23.3/TZUTC record2026-10-23T16-35-37-158Z-c2226496-fedf-4f8a-89b7-a648041a8620 under evidence/persist-ownership-repair/diagnostic-J makes actual cold device commitHead reject fixed AbortError/unavailable after helper return; source hash835698e543c5e324ec091b3d5799c84fd3e45d568e78f0db8bb378690e1edddb. It is not a reproduction of original CI cause.",
+      "failure": "Both original H Linux CI runs failed sole first-Add assert.equal(await ctx.persist(),true), false!==true, at3303:32/3304:124 in9151.412544ms and9219.02146ms. External actual-storage calibration also fails the unchanged assertion and emits one447-byteASCII JSON report device-store/write-failed with finite counters/booleans; this demonstrates diagnostic sensitivity only. A first launcher attempt lacked its external fixture and is retained as infrastructure failure, not RED. No local causal RED or product fix is claimed."
+    }
+  },
+  {
+    "baseCommit": "4934454e158d6e62f1ad419d0f1b31df27d4e2d1",
+    "testChangesSha256": "ad513ffe3ca19f38da1015bfed5fcf410577e6bee5bc5d1698d020de793fdab6",
+    "reason": "Replace I pre-outcome port observation with a lazy failure-only diagnostic after original H Linux CI first-Add failures remained unreproduced. This I direct and published integration fingerprint is diagnostic-only, not a causal fix or release approval.",
+    "previousBehavior": "H CI39964800218 and39964810605 failed the original first-Add persist assertion, actual false. Both I diagnostic CI runs passed without trace while independent earlier-case/sibling pace differed; observer/runner pace is confounded. Mac controls, six LinuxARM focused controls and the pristine resized LinuxARM128-parent prefix333/333 also pass. Original refusal cause remains unresolved.",
+    "intendedBehavior": "Restore H whole tests.js except the original settle assert.equal(await ctx.persist(),true) enclosed in a lazy catch. Only after its failed outcome, report finite allowlisted existing refusal stage/code, normalized booleans/null and bounded nonnegative counters, with4000ASCII JSON cap and safe fallback, then rethrow the identical original error. Remove every I observer, wrapper, ring, side promise and pre-outcome diagnostic initialization. Do not change product behavior or retry a refusal.",
+    "diagnosticSubjectTests": [
+      "RISK corrupt cloud work budget: cold-opened sources without an ACK keep newer edits without repeated downloads"
+    ],
+    "replacementTests": [
+      "RISK corrupt cloud work budget: cold-opened sources without an ACK keep newer edits without repeated downloads"
+    ],
+    "preservedCoverage": [
+      "All719 existing raw rationale JSON objects remain byte-exact, including original716 and the three I diagnostic records. Removing only the lazy catch reconstructs entire original H tests.js SHA256697aec67fa6421ed18f3aaa916f61ba2fb73c6a68c6127f84e8b5aecd4959484.",
+      "Every original no-ACK Add/Start/No/Done, exact durable head, newer local work, cloud source/no-write/read budget, explicit Retry and healthy-revision/Done assertion remains. Timeout stays20000ms; original persist invocation count, await, return and thrown error are unchanged.",
+      "The complete coldDamagedSourceWithoutAck214 signature/body and both callers restore H exactly. The exact-current no-ACK repair sibling, all native focus controls, absolute deadline/polling contracts and source/account/ACK guards remain. No application, store, rules, FAQ, worker, PWA fingerprint, gate or release helper byte changes.",
+      "Diagnostic sets, VM reads, metadata normalization and serialization execute only inside the failed-assertion catch. No new storage/file/network read, timer, wait, retry, arbitrary string, message, stack, source/task/account/pending payload is emitted. Code layout/JIT may still affect scheduling, so no claim of perfect noninterference or an observer-caused positive follows.",
+      "Existing RISK names and inventory map remain unchanged. H-to-J has no added test header and its optional historical structural gate is expected to report only the unchanged-header replacement-name limitation; root diagnostic-J-H-gate-boundary.md requires exact reconstruction/manual qualification and prohibits cosmetic header/gate changes. Current M/I/B and inventory gates must pass. Whole-candidate/native/rules/compat/actualCI acceptance remain required for a later real repair.",
+      "For M/B whole-candidate comparisons, the directly neighboring ordinary-work case has an actual added/updated header from the retained H shared-deadline fixture changes, so replacementTests names that unchanged integration coverage. The no-ACK body is explicitly the diagnosticSubjectTests seam; its header is unchanged relative to M/B/H. This metadata does not claim that J added or renamed that subject or changed ordinary-work behavior."
+    ],
+    "redEvidence": {
+      "command": "Original H npm test in Linuxx64 push39964800218 and PR39964810605, retained final-v9 raw logs. Later sensitivity-only external Node22.23.3/TZUTC record2026-10-23T16-35-37-158Z-c2226496-fedf-4f8a-89b7-a648041a8620 under evidence/persist-ownership-repair/diagnostic-J makes actual cold device commitHead reject fixed AbortError/unavailable after helper return; source hash835698e543c5e324ec091b3d5799c84fd3e45d568e78f0db8bb378690e1edddb. It is not a reproduction of original CI cause.",
+      "failure": "Both original H Linux CI runs failed sole first-Add assert.equal(await ctx.persist(),true), false!==true, at3303:32/3304:124 in9151.412544ms and9219.02146ms. External actual-storage calibration also fails the unchanged assertion and emits one447-byteASCII JSON report device-store/write-failed with finite counters/booleans; this demonstrates diagnostic sensitivity only. A first launcher attempt lacked its external fixture and is retained as infrastructure failure, not RED. No local causal RED or product fix is claimed."
+    }
+  },
+  {
+    "baseCommit": "db5a30c3a9a545365465a11878c1760b4dd3abc9",
+    "testChangesSha256": "9f8146813e7478da3c705c2bd8803f6701edccf7c74c27e824561dcbadc04e07",
+    "reason": "Replace I pre-outcome port observation with a lazy failure-only diagnostic after original H Linux CI first-Add failures remained unreproduced. This H optional historical comparison with unchanged-header structural limitation fingerprint is diagnostic-only, not a causal fix or release approval.",
+    "previousBehavior": "H CI39964800218 and39964810605 failed the original first-Add persist assertion, actual false. Both I diagnostic CI runs passed without trace while independent earlier-case/sibling pace differed; observer/runner pace is confounded. Mac controls, six LinuxARM focused controls and the pristine resized LinuxARM128-parent prefix333/333 also pass. Original refusal cause remains unresolved.",
+    "intendedBehavior": "Restore H whole tests.js except the original settle assert.equal(await ctx.persist(),true) enclosed in a lazy catch. Only after its failed outcome, report finite allowlisted existing refusal stage/code, normalized booleans/null and bounded nonnegative counters, with4000ASCII JSON cap and safe fallback, then rethrow the identical original error. Remove every I observer, wrapper, ring, side promise and pre-outcome diagnostic initialization. Do not change product behavior or retry a refusal.",
+    "diagnosticSubjectTests": [
+      "RISK corrupt cloud work budget: cold-opened sources without an ACK keep newer edits without repeated downloads"
+    ],
+    "replacementTests": [
+      "RISK corrupt cloud work budget: cold-opened sources without an ACK keep newer edits without repeated downloads"
+    ],
+    "preservedCoverage": [
+      "All719 existing raw rationale JSON objects remain byte-exact, including original716 and the three I diagnostic records. Removing only the lazy catch reconstructs entire original H tests.js SHA256697aec67fa6421ed18f3aaa916f61ba2fb73c6a68c6127f84e8b5aecd4959484.",
+      "Every original no-ACK Add/Start/No/Done, exact durable head, newer local work, cloud source/no-write/read budget, explicit Retry and healthy-revision/Done assertion remains. Timeout stays20000ms; original persist invocation count, await, return and thrown error are unchanged.",
+      "The complete coldDamagedSourceWithoutAck214 signature/body and both callers restore H exactly. The exact-current no-ACK repair sibling, all native focus controls, absolute deadline/polling contracts and source/account/ACK guards remain. No application, store, rules, FAQ, worker, PWA fingerprint, gate or release helper byte changes.",
+      "Diagnostic sets, VM reads, metadata normalization and serialization execute only inside the failed-assertion catch. No new storage/file/network read, timer, wait, retry, arbitrary string, message, stack, source/task/account/pending payload is emitted. Code layout/JIT may still affect scheduling, so no claim of perfect noninterference or an observer-caused positive follows.",
+      "Existing RISK names and inventory map remain unchanged. H-to-J has no added test header and its optional historical structural gate is expected to report only the unchanged-header replacement-name limitation; root diagnostic-J-H-gate-boundary.md requires exact reconstruction/manual qualification and prohibits cosmetic header/gate changes. Current M/I/B and inventory gates must pass. Whole-candidate/native/rules/compat/actualCI acceptance remain required for a later real repair.",
+      "For M/B whole-candidate comparisons, the directly neighboring ordinary-work case has an actual added/updated header from the retained H shared-deadline fixture changes, so replacementTests names that unchanged integration coverage. The no-ACK body is explicitly the diagnosticSubjectTests seam; its header is unchanged relative to M/B/H. This metadata does not claim that J added or renamed that subject or changed ordinary-work behavior."
+    ],
+    "redEvidence": {
+      "command": "Original H npm test in Linuxx64 push39964800218 and PR39964810605, retained final-v9 raw logs. Later sensitivity-only external Node22.23.3/TZUTC record2026-10-23T16-35-37-158Z-c2226496-fedf-4f8a-89b7-a648041a8620 under evidence/persist-ownership-repair/diagnostic-J makes actual cold device commitHead reject fixed AbortError/unavailable after helper return; source hash835698e543c5e324ec091b3d5799c84fd3e45d568e78f0db8bb378690e1edddb. It is not a reproduction of original CI cause.",
+      "failure": "Both original H Linux CI runs failed sole first-Add assert.equal(await ctx.persist(),true), false!==true, at3303:32/3304:124 in9151.412544ms and9219.02146ms. External actual-storage calibration also fails the unchanged assertion and emits one447-byteASCII JSON report device-store/write-failed with finite counters/booleans; this demonstrates diagnostic sensitivity only. A first launcher attempt lacked its external fixture and is retained as infrastructure failure, not RED. No local causal RED or product fix is claimed."
+    }
+  },
+  {
+    "baseCommit": "4f1d6bdc9ff6ca8a2a2294e34022ad01118a3d5f",
+    "testChangesSha256": "a117a61f8c464c8724dbfdecaf733e1b5f23a0537d0d41a3f769119db22d5c65",
+    "reason": "Replace I pre-outcome port observation with a lazy failure-only diagnostic after original H Linux CI first-Add failures remained unreproduced. This B original integration base fingerprint is diagnostic-only, not a causal fix or release approval.",
+    "previousBehavior": "H CI39964800218 and39964810605 failed the original first-Add persist assertion, actual false. Both I diagnostic CI runs passed without trace while independent earlier-case/sibling pace differed; observer/runner pace is confounded. Mac controls, six LinuxARM focused controls and the pristine resized LinuxARM128-parent prefix333/333 also pass. Original refusal cause remains unresolved.",
+    "intendedBehavior": "Restore H whole tests.js except the original settle assert.equal(await ctx.persist(),true) enclosed in a lazy catch. Only after its failed outcome, report finite allowlisted existing refusal stage/code, normalized booleans/null and bounded nonnegative counters, with4000ASCII JSON cap and safe fallback, then rethrow the identical original error. Remove every I observer, wrapper, ring, side promise and pre-outcome diagnostic initialization. Do not change product behavior or retry a refusal.",
+    "diagnosticSubjectTests": [
+      "RISK corrupt cloud work budget: cold-opened sources without an ACK keep newer edits without repeated downloads"
+    ],
+    "replacementTests": [
+      "RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations"
+    ],
+    "preservedCoverage": [
+      "All719 existing raw rationale JSON objects remain byte-exact, including original716 and the three I diagnostic records. Removing only the lazy catch reconstructs entire original H tests.js SHA256697aec67fa6421ed18f3aaa916f61ba2fb73c6a68c6127f84e8b5aecd4959484.",
+      "Every original no-ACK Add/Start/No/Done, exact durable head, newer local work, cloud source/no-write/read budget, explicit Retry and healthy-revision/Done assertion remains. Timeout stays20000ms; original persist invocation count, await, return and thrown error are unchanged.",
+      "The complete coldDamagedSourceWithoutAck214 signature/body and both callers restore H exactly. The exact-current no-ACK repair sibling, all native focus controls, absolute deadline/polling contracts and source/account/ACK guards remain. No application, store, rules, FAQ, worker, PWA fingerprint, gate or release helper byte changes.",
+      "Diagnostic sets, VM reads, metadata normalization and serialization execute only inside the failed-assertion catch. No new storage/file/network read, timer, wait, retry, arbitrary string, message, stack, source/task/account/pending payload is emitted. Code layout/JIT may still affect scheduling, so no claim of perfect noninterference or an observer-caused positive follows.",
+      "Existing RISK names and inventory map remain unchanged. H-to-J has no added test header and its optional historical structural gate is expected to report only the unchanged-header replacement-name limitation; root diagnostic-J-H-gate-boundary.md requires exact reconstruction/manual qualification and prohibits cosmetic header/gate changes. Current M/I/B and inventory gates must pass. Whole-candidate/native/rules/compat/actualCI acceptance remain required for a later real repair.",
+      "For M/B whole-candidate comparisons, the directly neighboring ordinary-work case has an actual added/updated header from the retained H shared-deadline fixture changes, so replacementTests names that unchanged integration coverage. The no-ACK body is explicitly the diagnosticSubjectTests seam; its header is unchanged relative to M/B/H. This metadata does not claim that J added or renamed that subject or changed ordinary-work behavior."
+    ],
+    "redEvidence": {
+      "command": "Original H npm test in Linuxx64 push39964800218 and PR39964810605, retained final-v9 raw logs. Later sensitivity-only external Node22.23.3/TZUTC record2026-10-23T16-35-37-158Z-c2226496-fedf-4f8a-89b7-a648041a8620 under evidence/persist-ownership-repair/diagnostic-J makes actual cold device commitHead reject fixed AbortError/unavailable after helper return; source hash835698e543c5e324ec091b3d5799c84fd3e45d568e78f0db8bb378690e1edddb. It is not a reproduction of original CI cause.",
+      "failure": "Both original H Linux CI runs failed sole first-Add assert.equal(await ctx.persist(),true), false!==true, at3303:32/3304:124 in9151.412544ms and9219.02146ms. External actual-storage calibration also fails the unchanged assertion and emits one447-byteASCII JSON report device-store/write-failed with finite counters/booleans; this demonstrates diagnostic sensitivity only. A first launcher attempt lacked its external fixture and is retained as infrastructure failure, not RED. No local causal RED or product fix is claimed."
+    }
+  }
 ]
