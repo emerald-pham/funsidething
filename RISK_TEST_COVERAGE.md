@@ -1774,6 +1774,15 @@ The native needs-attention action uses real IndexedDB and the production backend
 - RISK recovery identity consumers: final-task WOOP advances after acknowledged recovery
 - RISK recovery identity consumers: verified cloud adoption rebases independent saved extension fields for the same UID
 
+## Bounded automatic cloud fallback (#249)
+
+- RISK cloud source recovery automatic fallback: one complete older source opens and stays local until cloud is confirmed
+- RISK cloud source recovery automatic fallback: an unfinished draft captured before cloud reads prevents replacement
+- RISK cloud source recovery automatic fallback: a stopped read survives cold reopen and later adopts its safe source
+- RISK cloud source recovery automatic fallback: an accepted empty board with deletion evidence is never replaced by an older cloud source
+
+The only automatic choice is one complete, validated previous cloud generation on a verified fresh client. Exact raw IndexedDB stores (including pending, backup and opaque rows), browser boards and recovery keys, authority marker, account/backend/session, local and draft state, and source captures remain bound through conditional local adoption and readback. A timeout leaves true empty stores empty for a later cold-open retry. Accepted empty boards with explicit deletion evidence and drafts stay authoritative. The recovered board remains local with a visible cloud hold; no cloud replacement is published.
+
 ## Incident support diagnostics
 
 - RISK support diagnostics: Settings names the existing board export for its contents

@@ -48,14 +48,16 @@ Keeping a source does not establish that it is complete or safe to apply.
 _Avoid_: Recovered board
 
 **Cloud recovery review**:
-A read-only comparison of separately retained device and cloud sources before
-a person chooses whether to recover from one. Opening or reading the review
-is not consent to replace a board.
+A protected check of separately retained device and cloud sources. One complete
+older cloud source may open automatically on a genuinely fresh device when no
+saved board or unfinished draft would be displaced. Other source replacement
+still requires a supported recovery decision; opening a review is not consent.
 _Avoid_: Automatic restore
 
 **Lossless recovery**:
-Recovery that retains every accepted board decision and newer edit. Choosing
-between conflicting sources is a separate decision by the person.
+Recovery that retains every accepted board decision, unfinished draft and
+newer edit. A validated older source can provide a local working board while
+unexamined cloud changes remain protected and cloud confirmation stays pending.
 _Avoid_: Loading any readable backup
 
 **Cloud acknowledgement**:
