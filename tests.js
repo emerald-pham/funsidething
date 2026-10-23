@@ -39843,7 +39843,7 @@ test('RISK completion lifecycle fixtures: released Start informed Start and loca
  const pattern='^RISK legacy completion released Start: normally|^RISK completion lifecycle Start: an observed new-pass|^RISK completion lifecycle maintenance: the local day';
  for(const zone of ['UTC','America/New_York'])await t.test(zone,()=>{
   const env={...process.env,TZ:zone};delete env.NODE_TEST_CONTEXT;
-  const child=spawnSync(process.execPath,['--test','--test-name-pattern='+pattern,'tests.js'],{cwd:__dirname,env,encoding:'utf8',timeout:30000});
+  const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern='+pattern,'tests.js'],{cwd:__dirname,env,encoding:'utf8',timeout:30000});
   const output=child.stdout+child.stderr;
   assert.equal(child.status,0,zone+' must execute the original Start/maintenance consumers successfully: '+output);
   assert.match(output,/# tests 7\b/,'all three consumers and four released-source subcases actually execute');
@@ -39856,14 +39856,14 @@ test('RISK completion lifecycle fixtures: released Start informed Start and loca
 test('RISK completion delivery fixtures: controlled startup pending and acknowledged boundaries execute all five consumers',()=>{
  const pattern='^RISK comparison replay: deleting an opponent|^RISK completion boundaries: failed read stays pending|^RISK completion boundaries: a pending account-A|^RISK completion boundaries: a live editor and pressed|^RISK live scan sync: evergreen Done Undo propagates';
  const env={...process.env,TZ:'UTC'};delete env.NODE_TEST_CONTEXT;
- const child=spawnSync(process.execPath,['--test','--test-name-pattern='+pattern,'tests.js'],{cwd:__dirname,env,encoding:'utf8',timeout:30000}),output=child.stdout+child.stderr;
+ const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern='+pattern,'tests.js'],{cwd:__dirname,env,encoding:'utf8',timeout:30000}),output=child.stdout+child.stderr;
  assert.equal(child.status,0,'all five real controlled-delivery consumers complete: '+output);
  assert.match(output,/# tests 5\b/);assert.match(output,/# fail 0\b/);assert.match(output,/# skipped 0\b/);
 });
 
 test('RISK CLOUD CONFORMANCE: controlled crypto delivery executes original adapter and diagnostic assertions while true deadlines remain bounded',()=>{
  const pattern='^RISK CLOUD ADAPTER: malformed revisions|^RISK CLOUD DIAGNOSTICS: safe failure',env={...process.env};delete env.NODE_TEST_CONTEXT;
- const child=spawnSync(process.execPath,['--test','--test-name-pattern='+pattern,'tests.js'],{cwd:__dirname,env,encoding:'utf8',timeout:30000}),output=child.stdout+child.stderr;
+ const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern='+pattern,'tests.js'],{cwd:__dirname,env,encoding:'utf8',timeout:30000}),output=child.stdout+child.stderr;
  assert.equal(child.status,0,'both original real-backend consumers complete after controlled native crypto delivery: '+output);
  assert.match(output,/# tests 2\b/);assert.match(output,/# fail 0\b/);assert.match(output,/# skipped 0\b/);
 });
@@ -40339,6 +40339,21 @@ test('RISK held decision recovery: new reviewed consent supersedes prior prepare
  });
 });
 
+
+test('RISK repository process: large immutable installed assets retain exact bytes and reject a changed checkout',async t=>{
+ const {runInstalledClientCase}=await import('./scripts/installed-client-regression.mjs');
+ const git=(...args)=>{const result=spawnSync('git',args,{cwd:__dirname,maxBuffer:16*1024*1024});assert.equal(result.status,0,String(result.stderr));return result.stdout;};
+ const sha=git('rev-parse','HEAD').toString().trim(),tree=git('rev-parse','HEAD^{tree}').toString().trim();
+ const original=git('show',sha+':index.html');assert.ok(original.length>1024*1024,'the real committed candidate exceeds the former default Git buffer');
+ const directory=fs.mkdtempSync(path.join((await import('node:os')).tmpdir(),'installed-asset-boundary-'));
+ t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ // Read-only Git metadata points to this checkout; only the isolated local asset
+ // differs. The actual immutable shell reader must finish before its exact-byte guard.
+ fs.writeFileSync(path.join(directory,'.git'),'gitdir: '+git('rev-parse','--absolute-git-dir').toString().trim()+'\n');
+ fs.writeFileSync(path.join(directory,'index.html'),Buffer.concat([original,Buffer.from('changed checkout')]));
+ await assert.rejects(runInstalledClientCase({mode:'signed-out',repo:directory,oldCommit:'779defa4e8c3465fdf535fe17dbe2227d2b76ea1',candidateCommit:sha,candidateTree:tree,outputDir:path.join(directory,'evidence')}),/checkout app asset differs from explicit candidate: index\.html/,'large immutable Git bytes must reach the existing dirty-asset refusal before browser or server allocation');
+ assert.equal(fs.existsSync(path.join(directory,'evidence')),false,'refused source identity cannot produce a native delivery report');
+});
 
 test('RISK repository process: required installed-client native outcomes and artifacts execute exactly once',t=>{
  const required=['RISK native installed-client delivery: signed-out','RISK native installed-client delivery: reconcile-held'];
@@ -41531,7 +41546,8 @@ test('RISK cloud source recovery: native Cancel stops delayed source checks and 
 });
 
 test('RISK cloud source recovery: account changes during final hold completion never report the old recovery complete',async t=>{
- const app=await divergentCloudSourceApp187(t),{ctx,backend}=app;
+ // This consumer owns deliberate manual review; automatic boot continuation is tested separately.
+ const app=await divergentCloudSourceApp187(t,{deferInitialRecovery:true}),{ctx,backend}=app;
  await ctx.onAction('review-cloud-source-recovery',{});await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'device'}});
  let opaqueReads=0,fired=false;
  app.idbFault.afterReadTransaction=names=>{
@@ -41866,7 +41882,8 @@ test('RISK debug log: ordinary actions survive reopening as metadata without cha
 });
 
 test('RISK debug log: an interrupted actual cloud review retains its stage in a new document',async t=>{
- const app=await divergentCloudSourceApp187(t),{ctx,shim}=app,gate=deferredSyncFixture();let entered=false,review;
+ // This consumer owns deliberate manual review; automatic boot continuation is tested separately.
+ const app=await divergentCloudSourceApp187(t,{deferInitialRecovery:true}),{ctx,shim}=app,gate=deferredSyncFixture();let entered=false,review;
  t.after(async()=>{gate.resolve();delete app.faults.serverRead;await review;});
  app.faults.serverRead=async()=>{entered=true;await gate.promise;};
  await ctx.onAction('sync',{});review=ctx.onAction('review-cloud-source-recovery',{});
@@ -42889,8 +42906,9 @@ test('RISK shared protection budget: source readback spends the original recover
 });
 
 test('RISK shared protection history: an exact completed legacy source choice does not reblock healthy new edits',async t=>{
+ // This consumer owns deliberate manual review; automatic boot continuation is tested separately.
  const {readReleasedClient}=await import('./scripts/backward-compatibility.mjs'),artifacts=readReleasedClient(__dirname,'4f1d6bdc9ff6ca8a2a2294e34022ad01118a3d5f');
- const app=await divergentCloudSourceApp187(t,{artifacts}),{ctx,backend}=app,store=ctx.window.ScannerDeviceStore;
+ const app=await divergentCloudSourceApp187(t,{artifacts,deferInitialRecovery:true}),{ctx,backend}=app,store=ctx.window.ScannerDeviceStore;
  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);assert.equal(await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'device'}}),true);assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),true);
  const archives=await store.listOpaqueArchives(),confirmed=(await store.listBackups()).filter(row=>row.kind==='decision-recovery-confirmed');assert.ok(archives.length);assert.equal(confirmed.length,1,'the actual historical native recovery completed its exact durable confirmation receipt');
  const peer=await loadCloudBackendV2({artifacts,timeoutMs:5000});t.after(()=>peer.CS.suspend());for(const [key,value]of backend.docs)peer.docs.set(key,value);

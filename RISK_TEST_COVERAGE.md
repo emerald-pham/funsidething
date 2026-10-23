@@ -2097,3 +2097,5 @@ This boundary control holds a successful real provider reply, installs a later a
 - RISK automatic source status: completed confirmation follows current edits and signed-in identity
 - RISK automatic source status native: historical retry checking stop and confirmation remain current
 - RISK integrated automatic recovery: no-input fallback continues through exact cloud confirmation
+
+- Immutable installed Git assets above one megabyte must retain exact bytes and still refuse a changed checkout before native delivery: `RISK repository process: large immutable installed assets retain exact bytes and reject a changed checkout`.

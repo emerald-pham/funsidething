@@ -48,7 +48,8 @@ export async function runInstalledClientCase({mode,repo,oldCommit,candidateCommi
   assert.ok(['signed-out','reconcile-held'].includes(mode));
   assert.ok(control===null||['wrong-candidate','stale-byte','unsafe-quiescence','source-loss'].includes(control),'known explicit sensitivity control');
   assert.equal(oldCommit,OLD,'immutable installed source must remain779');
-  const git=(...args)=>execFileSync('git',args,{cwd:repo});
+  // Immutable shell assets can exceed Node's one-megabyte default; keep reads bounded.
+  const git=(...args)=>execFileSync('git',args,{cwd:repo,maxBuffer:16*1024*1024});
   for(const [name,value] of Object.entries({oldCommit,candidateCommit,candidateTree}))assert.match(value||'',/^[a-f0-9]{40}$/,'Explicit full '+name+' required');
   assert.equal(git('rev-parse',candidateCommit+'^{commit}').toString().trim(),candidateCommit);
   assert.equal(git('rev-parse',candidateCommit+'^{tree}').toString().trim(),candidateTree,'explicit candidate tree');
