@@ -18591,5 +18591,68 @@
       "command": "Parent actual full candidate69b35e5 recorder2026-10-24T23-27-43-941Z-3b4f2149-beee-4923-858d-4970a5360d57 (validation-69b35e5/) retained six real preflight parent failures and three real shutdown/action-budget parent failures before owner cancellation; cancellation is distinct from those failures. Own before-edit Node22 recorder2026-10-24T23-37-51-242Z-732920c4-020e-4c30-b546-4f8d86ee4e92 ran --test --test-name-pattern=RISK recovery fixture shutdown|RISK corrupt work budget fixture tests.js and reproduced both outer marker-assertion failures. Source tests.js was still69b35e5 during that run.",
       "failure": "Existing parent assertions expected a new server revision escapes the held-source gate / FAILED_FIXTURE_OWNED_RESOURCES_CLOSED and the held action deadline consumer markers, but actual nested output was ERR_MODULE_NOT_FOUND for the copied fixture async-probe path. Own recorder correctly labels infrastructure-failure because that nested import error is present; this is a demonstrated introduced acceptance regression, not the original258 feature RED. Root full transcript additionally identifies the first-Add-prefix parent failing the same missing-module path."
     }
-  }
+  },
+{
+  "baseCommit": "3b273718df28919586c2cd84ca835de573631fe3",
+  "testChangesSha256": "defac021a5c7227af4c351b6f0cfbb6c013f143616a5b7895b64be9747ea16ba",
+  "reason": "Integrate reviewed PR262 tooling and preserve the four exact historical-planner regression contracts under the user-requested half daytime human spawn rate. Add independent rejected-visit sunset coverage from the bounded review.",
+  "previousBehavior": "Four immutable historical planners received the prior reservation-policy adapter but still admitted every daytime human, so full scene equality failed before the operation-budget assertions. The original new-feature test covered only an admitted sunset party, leaving rejected-party resurrection untested.",
+  "intendedBehavior": "Apply a separately asserted post-admission daytime policy only to five historical reference sites, retaining full scene deep equality, order, complete payloads and unchanged operation budgets. Keep the feature rate baseline at unmodified 3b273718. Independently pin a rejected daylight picnic across sunset and preserve exact source fingerprints for offline delivery.",
+  "replacementTests": [
+    "RISK daytime spawn birth phase: rejected daylight parties stay absent after sunset"
+  ],
+  "preservedCoverage": [
+    "All original full-scene deepEqual assertions remain: nighttime, nonhuman events, complete retained recipes and order, woodland/clouds/rooftops/clocktower/gardens and UTC/cache/reseek reconstruction. No subset-only comparator replaces them.",
+    "Original cold lifetime bounds, rare join duplicate sensitivity, real astronomical providers and1600/2100/+1 solar bounds, and1800000 hash-work bound remain unchanged. The repaired four tests and both restored FAQ contracts passed in actual7/7 recorded execution.",
+    "The original user-facing half-rate test retains its unadapted pinned released baseline, independent summer/twilight/winter/night counts/digests, whole parties, no replacements and complete visits. The newly pinned rejected picnic remains absent before/after sunset while the unthinned reference proves it is alive.",
+    "All PR262 test changes and original rationale objects are preserved on merge. This rationale links actual source-bound follow-up repairs without relabelling prior original/direct RED or interrupted full evidence."
+  ],
+  "redEvidence": {
+    "command": "Recorded unchanged clean dd45841 baseline: node scripts/agent-tools/record-run.mjs --summary --repo <worktree> --evidence-dir <external>/resume262/runs --purpose later-baseline-sensitivity -- node --test --test-reporter=spec --test-name-pattern=\"RISK pedestrian planner (cold work|rare reuse|solar work|hash work)\" tests.js; record671d336f-d428-4527-871a-306656d3ab4e. Original feature pre-edit direct RED at2026-10-24T23:08:57Z remains the original chronology.",
+    "failure": "The four recorded baseline tests each failed ERR_ASSERTION full-scene equality because the historical scenes retained intentionally omitted daytime humans. New sunset control975676f4 passed on the unchanged actual public timeline; isolated current-bucket-sun mutant f32e2aae failed ERR_ASSERTION: a rejected daylight party must not appear again after sunset. This is retrospective sensitivity, not a new original feature RED."
+  },
+  "observedGreen": "Recorde5f848dc-c3fd-4703-a095-a14611b9a02d: seven focused cases passed,0failed/skipped, including four planner controls, original feature and restored FAQ assertions. Rejected-party permanent test ad31b44f passed separately. Existing PWA and changelog fingerprints failed before refresh b2b6dbc2 then passed93ed8710 after refresh; no dated public tuning note added under AGENTS exception."
+},
+{
+  "baseCommit": "0d8fb09bde1d419ea3a655df8f1787ac10535111",
+  "testChangesSha256": "8bc83a8b66f9f29a335957dda2a2b43d5626a91e0f7a2f25c727e129c8f55df1",
+  "reason": "Integrate reviewed PR262 tooling and preserve the four exact historical-planner regression contracts under the user-requested half daytime human spawn rate. Add independent rejected-visit sunset coverage from the bounded review.",
+  "previousBehavior": "Four immutable historical planners received the prior reservation-policy adapter but still admitted every daytime human, so full scene equality failed before the operation-budget assertions. The original new-feature test covered only an admitted sunset party, leaving rejected-party resurrection untested.",
+  "intendedBehavior": "Apply a separately asserted post-admission daytime policy only to five historical reference sites, retaining full scene deep equality, order, complete payloads and unchanged operation budgets. Keep the feature rate baseline at unmodified 3b273718. Independently pin a rejected daylight picnic across sunset and preserve exact source fingerprints for offline delivery.",
+  "replacementTests": [
+    "RISK daytime spawn birth phase: rejected daylight parties stay absent after sunset"
+  ],
+  "preservedCoverage": [
+    "All original full-scene deepEqual assertions remain: nighttime, nonhuman events, complete retained recipes and order, woodland/clouds/rooftops/clocktower/gardens and UTC/cache/reseek reconstruction. No subset-only comparator replaces them.",
+    "Original cold lifetime bounds, rare join duplicate sensitivity, real astronomical providers and1600/2100/+1 solar bounds, and1800000 hash-work bound remain unchanged. The repaired four tests and both restored FAQ contracts passed in actual7/7 recorded execution.",
+    "The original user-facing half-rate test retains its unadapted pinned released baseline, independent summer/twilight/winter/night counts/digests, whole parties, no replacements and complete visits. The newly pinned rejected picnic remains absent before/after sunset while the unthinned reference proves it is alive.",
+    "All PR262 test changes and original rationale objects are preserved on merge. This rationale links actual source-bound follow-up repairs without relabelling prior original/direct RED or interrupted full evidence."
+  ],
+  "redEvidence": {
+    "command": "Recorded unchanged clean dd45841 baseline: node scripts/agent-tools/record-run.mjs --summary --repo <worktree> --evidence-dir <external>/resume262/runs --purpose later-baseline-sensitivity -- node --test --test-reporter=spec --test-name-pattern=\"RISK pedestrian planner (cold work|rare reuse|solar work|hash work)\" tests.js; record671d336f-d428-4527-871a-306656d3ab4e. Original feature pre-edit direct RED at2026-10-24T23:08:57Z remains the original chronology.",
+    "failure": "The four recorded baseline tests each failed ERR_ASSERTION full-scene equality because the historical scenes retained intentionally omitted daytime humans. New sunset control975676f4 passed on the unchanged actual public timeline; isolated current-bucket-sun mutant f32e2aae failed ERR_ASSERTION: a rejected daylight party must not appear again after sunset. This is retrospective sensitivity, not a new original feature RED."
+  },
+  "observedGreen": "Recorde5f848dc-c3fd-4703-a095-a14611b9a02d: seven focused cases passed,0failed/skipped, including four planner controls, original feature and restored FAQ assertions. Rejected-party permanent test ad31b44f passed separately. Existing PWA and changelog fingerprints failed before refresh b2b6dbc2 then passed93ed8710 after refresh; no dated public tuning note added under AGENTS exception."
+},
+{
+  "baseCommit": "dd45841d3996cbd446e8bf0f265f189e9eb5287f",
+  "testChangesSha256": "143cbca325b3462536c7a14e0eed0009de79f476ba88d96f1e669bedbe4aa4e4",
+  "reason": "Integrate reviewed PR262 tooling and preserve the four exact historical-planner regression contracts under the user-requested half daytime human spawn rate. Add independent rejected-visit sunset coverage from the bounded review.",
+  "previousBehavior": "Four immutable historical planners received the prior reservation-policy adapter but still admitted every daytime human, so full scene equality failed before the operation-budget assertions. The original new-feature test covered only an admitted sunset party, leaving rejected-party resurrection untested.",
+  "intendedBehavior": "Apply a separately asserted post-admission daytime policy only to five historical reference sites, retaining full scene deep equality, order, complete payloads and unchanged operation budgets. Keep the feature rate baseline at unmodified 3b273718. Independently pin a rejected daylight picnic across sunset and preserve exact source fingerprints for offline delivery.",
+  "replacementTests": [
+    "RISK daytime spawn birth phase: rejected daylight parties stay absent after sunset"
+  ],
+  "preservedCoverage": [
+    "All original full-scene deepEqual assertions remain: nighttime, nonhuman events, complete retained recipes and order, woodland/clouds/rooftops/clocktower/gardens and UTC/cache/reseek reconstruction. No subset-only comparator replaces them.",
+    "Original cold lifetime bounds, rare join duplicate sensitivity, real astronomical providers and1600/2100/+1 solar bounds, and1800000 hash-work bound remain unchanged. The repaired four tests and both restored FAQ contracts passed in actual7/7 recorded execution.",
+    "The original user-facing half-rate test retains its unadapted pinned released baseline, independent summer/twilight/winter/night counts/digests, whole parties, no replacements and complete visits. The newly pinned rejected picnic remains absent before/after sunset while the unthinned reference proves it is alive.",
+    "All PR262 test changes and original rationale objects are preserved on merge. This rationale links actual source-bound follow-up repairs without relabelling prior original/direct RED or interrupted full evidence."
+  ],
+  "redEvidence": {
+    "command": "Recorded unchanged clean dd45841 baseline: node scripts/agent-tools/record-run.mjs --summary --repo <worktree> --evidence-dir <external>/resume262/runs --purpose later-baseline-sensitivity -- node --test --test-reporter=spec --test-name-pattern=\"RISK pedestrian planner (cold work|rare reuse|solar work|hash work)\" tests.js; record671d336f-d428-4527-871a-306656d3ab4e. Original feature pre-edit direct RED at2026-10-24T23:08:57Z remains the original chronology.",
+    "failure": "The four recorded baseline tests each failed ERR_ASSERTION full-scene equality because the historical scenes retained intentionally omitted daytime humans. New sunset control975676f4 passed on the unchanged actual public timeline; isolated current-bucket-sun mutant f32e2aae failed ERR_ASSERTION: a rejected daylight party must not appear again after sunset. This is retrospective sensitivity, not a new original feature RED."
+  },
+  "observedGreen": "Recorde5f848dc-c3fd-4703-a095-a14611b9a02d: seven focused cases passed,0failed/skipped, including four planner controls, original feature and restored FAQ assertions. Rejected-party permanent test ad31b44f passed separately. Existing PWA and changelog fingerprints failed before refresh b2b6dbc2 then passed93ed8710 after refresh; no dated public tuning note added under AGENTS exception."
+}
 ]

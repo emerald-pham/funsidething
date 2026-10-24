@@ -37423,7 +37423,7 @@ test('RISK pedestrian planner cold work: full capacity skips unnecessary lifetim
  const prior=spawnSync('git',['show','c21ee6f2a1147636f89cc96dae80aa9ba8ba9ea5:landscape-timeline.js'],{cwd:__dirname,encoding:'utf8'});assert.equal(prior.status,0,prior.stderr);
  const epoch=Date.parse('2026-10-06T00:00Z'),day=86400000,snapshot=value=>JSON.parse(JSON.stringify(value));
  for(const season of ['winter','summer'])for(const night of [false,true]){
-  const current=sceneTimeline(),reference=sceneTimeline({'landscape-timeline.js':()=>pedestrianReservationPolicy(prior.stdout)}),create=current.LandscapeGeometry.create;let calls=0;
+  const current=sceneTimeline(),reference=sceneTimeline({'landscape-timeline.js':()=>pedestrianDaytimeSpawnPolicy(pedestrianReservationPolicy(prior.stdout))}),create=current.LandscapeGeometry.create;let calls=0;
   current.LandscapeGeometry.create=(w,h)=>{const geometry=create(w,h);if(w===8192){const lifetime=geometry.walkingLifetime;geometry.walkingLifetime=e=>{calls++;return lifetime(e);};}return geometry;};
   for(const c of[current,reference])assert.equal(c.LandscapeConfig.setSpawnRates('| blimp | 0 |'),true);
   const options={seed:'private-schedule',season,sunAt:()=>({altitude:night?-20:30,azimuth:night?0:90})},actual=current.LandscapeTimeline.create(options),baseline=reference.LandscapeTimeline.create(options),first=epoch+12*3600000;
@@ -37449,12 +37449,12 @@ test('RISK pedestrian planner rare reuse: guard join is unique and complete admi
  const released=spawnSync('git',['show','f8fa176ddfaeedb9b2b7aeaf586b8e71a2e5ce3f:landscape-timeline.js'],{cwd:__dirname,encoding:'utf8'});assert.equal(released.status,0,released.stderr);
  const epoch=Date.parse('2026-10-06T00:00Z'),day=86400000,snapshot=value=>JSON.parse(JSON.stringify(value));
  for(const season of ['summer','winter'])for(const night of [false,true])for(const rareRate of [0,2]){
-  const actual=sceneTimeline(),prior=sceneTimeline({'landscape-timeline.js':()=>pedestrianReservationPolicy(released.stdout)});for(const c of[actual,prior])assert.equal(c.LandscapeConfig.setSpawnRates(`| abduction | ${rareRate} |\n| festival | ${rareRate} |\n| blimp | 0 |`),true);
+  const actual=sceneTimeline(),prior=sceneTimeline({'landscape-timeline.js':()=>pedestrianDaytimeSpawnPolicy(pedestrianReservationPolicy(released.stdout))});for(const c of[actual,prior])assert.equal(c.LandscapeConfig.setSpawnRates(`| abduction | ${rareRate} |\n| festival | ${rareRate} |\n| blimp | 0 |`),true);
   const options={seed:rareRate?'private-schedule':'chain-scanner-scene-v1',season,sunAt:()=>({altitude:night?-20:30,azimuth:night?0:90})},a=actual.LandscapeTimeline.create(options),b=prior.LandscapeTimeline.create(options);
   for(const offset of[12*3600000,-1,0,1,day-1,day,day+1,2*day+1,12*3600000]){const value=a.at(epoch+offset);assert.deepEqual(snapshot(value),snapshot(b.at(epoch+offset)),'raw reuse retains accepted IDs, lifetimes, independent streams and cache/UTC reconstruction');assertPedestrianReservationBound(value);}
  }
  const boundarySlot=epoch/1000/8-75,inject=source=>source.replace('function random(seed,stream,slot=0){',`function random(seed,stream,slot=0){if(seed==='private-rare-boundary'&&stream==='arrival'&&slot===${boundarySlot})return ()=>0;`).replace('const rare=rareRaw.filter','globalThis.rareIds=rareRaw.map(e=>e.id);const rare=rareRaw.filter');
- const a=sceneTimeline({'landscape-timeline.js':inject}),b=sceneTimeline({'landscape-timeline.js':()=>inject(pedestrianReservationPolicy(released.stdout))}),options={seed:'private-rare-boundary',season:'summer',sunAt:()=>({altitude:30,azimuth:90})};
+ const a=sceneTimeline({'landscape-timeline.js':inject}),b=sceneTimeline({'landscape-timeline.js':()=>inject(pedestrianDaytimeSpawnPolicy(pedestrianReservationPolicy(released.stdout)))}),options={seed:'private-rare-boundary',season:'summer',sunAt:()=>({altitude:30,azimuth:90})};
  for(const c of[a,b])assert.equal(c.LandscapeConfig.setSpawnRates('| blimp | 0 |'),true);
  assert.deepEqual(snapshot(a.LandscapeTimeline.create(options).at(epoch+3600000)),snapshot(b.LandscapeTimeline.create(options).at(epoch+3600000)));
  assert.ok(a.rareIds.includes(`arrival:${boundarySlot}`),'fixture puts an actual abduction exactly at the raw/rare guard join');assert.equal(new Set(a.rareIds).size,a.rareIds.length,'inclusive ordinary range endpoints cannot duplicate the join proposal');
@@ -37464,7 +37464,7 @@ test('RISK pedestrian planner rare reuse: guard join is unique and complete admi
 test('RISK pedestrian planner solar work: failed show chance draws do not request unused astronomy and exact scenes remain unchanged',()=>{
  const old=spawnSync('git',['show','f8fa176ddfaeedb9b2b7aeaf586b8e71a2e5ce3f:landscape-timeline.js'],{cwd:__dirname,encoding:'utf8'});assert.equal(old.status,0,old.stderr);
  for(const rate of[0,1]){
-  const current=sceneTimeline(),prior=sceneTimeline({'landscape-timeline.js':()=>pedestrianReservationPolicy(old.stdout)}),location={latitude:28.5383,longitude:-81.3792,timezone:'America/New_York',elevation:20},storage={getItem(){return null;}};let calls=0;
+  const current=sceneTimeline(),prior=sceneTimeline({'landscape-timeline.js':()=>pedestrianDaytimeSpawnPolicy(pedestrianReservationPolicy(old.stdout))}),location={latitude:28.5383,longitude:-81.3792,timezone:'America/New_York',elevation:20},storage={getItem(){return null;}};let calls=0;
   for(const c of[current,prior])assert.equal(c.LandscapeConfig.setSpawnRates(`| fireworks | ${rate} |\n| festival | ${rate} |\n| blimp | 0 |`),true);
   const options=c=>({seed:c.LandscapeTimeline.DEFAULT_SEED,season:'autumn',location,sunAt:at=>{if(c===current)calls++;return c.LivingSky.sunAt(c.LivingSky.sceneDate(new Date(at),storage,location),location);}}),a=current.LandscapeTimeline.create(options(current)),b=prior.LandscapeTimeline.create(options(prior)),at=Date.parse('2026-10-06T12:00Z'),value=a.at(at);
   assert.deepEqual(JSON.parse(JSON.stringify(value)),JSON.parse(JSON.stringify(b.at(at))),'pure chance prechecks preserve the actual astronomy-derived admitted scene');
@@ -37642,7 +37642,7 @@ test('RISK sky observer validation reuse: bounded zone cache never bypasses muta
 test('RISK pedestrian planner hash work: complete cold proposals reuse immutable RNG prefixes while retaining every admitted scene',()=>{
  const prior=spawnSync('git',['show','523d691:landscape-timeline.js'],{cwd:__dirname,encoding:'utf8'});assert.equal(prior.status,0,prior.stderr);
  const instrument=source=>`{const Native=Math;globalThis.hashMultiplies=0;globalThis.Math=Object.create(Math);Math.imul=(...args)=>{hashMultiplies++;return Native.imul(...args);};}\n`+source;
- const a=sceneTimeline({'landscape-timeline.js':instrument}),b=sceneTimeline({'landscape-timeline.js':()=>pedestrianReservationPolicy(prior.stdout)}),options={seed:'chain-scanner-scene-v1',season:'autumn',sunAt:()=>({altitude:30,azimuth:90})},at=Date.parse('2026-10-06T12:00Z');
+ const a=sceneTimeline({'landscape-timeline.js':instrument}),b=sceneTimeline({'landscape-timeline.js':()=>pedestrianDaytimeSpawnPolicy(pedestrianReservationPolicy(prior.stdout))}),options={seed:'chain-scanner-scene-v1',season:'autumn',sunAt:()=>({altitude:30,azimuth:90})},at=Date.parse('2026-10-06T12:00Z');
  for(const c of[a,b])assert.equal(c.LandscapeConfig.setSpawnRates('| blimp | 0 |'),true);
  assert.deepEqual(JSON.parse(JSON.stringify(a.LandscapeTimeline.create(options).at(at))),JSON.parse(JSON.stringify(b.LandscapeTimeline.create(options).at(at))),'all seeded proposals and admitted scene remain exact');
  assert.ok(a.hashMultiplies<=1800000,`full cold proposal consumer repeats immutable hash prefixes: ${a.hashMultiplies} multiplies`);
@@ -38204,6 +38204,16 @@ function pedestrianReservationPolicy(source){
  return source.replace('active.push({end});','active.push({end:e.start+reservationDuration(e)});');
 }
 
+function pedestrianDaytimeSpawnPolicy(source){
+ // Historical planner comparisons isolate scheduling optimizations from the
+ // requested later rate change. Keep whole-scene equality and every budget;
+ // the separate rate test still uses its unmodified, pinned released baseline.
+ const marker='return {events,woodland};';
+ assert.equal(source.split(marker).length,2,'historical planner exposes one final post-admission scene boundary');
+ const people=['cyclist','walker','dogwalker','reader','picnic','couple','kite','skateboarder','rollerskater','hoverboard','scooter','jetski','windsurfer','sailboat','hangglider','snowman','skier','snowangel'];
+ return source.replace(marker,`return {events:events.filter(e=>!${JSON.stringify(people)}.includes(e.type)||sunAt(e.start).altitude<-6||sample(seed,'daytime-human-visit',e.id)<.5),woodland};`);
+}
+
 function assertPedestrianReservationBound(scene){
  const reserving=scene.events.filter(e=>e.age<(e.scheduleDuration||e.activityDuration||e.duration));
  assert.ok(reserving.length<=14,`shared admission has ${reserving.length} reservations`);
@@ -38506,6 +38516,19 @@ test('RISK daytime people: daytime and twilight spawn rate halves while complete
  assert.match(faq,/shared arrival budget/);assert.match(faq,/walking visits can continue after their arrival slots are freed/);assert.match(faq,/A new visit in this visitor budget must finish before midnight UTC/);assert.match(faq,/Underway visits finish normally/);assert.match(faq,/Trains, metro, and woodland animals keep their existing schedules/);
  assert.doesNotMatch(faq,/crash|repair|fix/i,'scenery guidance makes no crash-cause claim');
  assert.ok(summer.actualActors<summer.baselineActors&&twilight.actualActors<twilight.baselineActors,'both visible daylight and twilight cohorts are reduced');
+});
+
+test('RISK daytime spawn birth phase: rejected daylight parties stay absent after sunset',()=>{
+ const released=spawnSync('git',['show','3b273718df28919586c2cd84ca835de573631fe3:landscape-timeline.js'],{cwd:__dirname,encoding:'utf8'});assert.equal(released.status,0,released.stderr);
+ const boundary=Date.parse('2026-10-20T12:00:00.000Z'),options={seed:'daytime-people-20261024',season:'summer',sunAt:instant=>({altitude:instant<boundary?30:-20,azimuth:90})};
+ const reference=sceneTimeline({'landscape-timeline.js':()=>released.stdout}).LandscapeTimeline.create(options),current=sceneTimeline().LandscapeTimeline.create(options);
+ const rejectedId='arrival:224061892',rejected=reference.at(boundary+1000).events.find(e=>e.id===rejectedId);
+ assert.equal(rejected?.type,'picnic','an independently pinned rejected daylight party spans sunset');assert.equal(rejected.duration,2584.709);
+ const end=boundary+1000-Math.round(rejected.age*1000)+rejected.duration*1000;
+ for(const at of [boundary-1000,boundary+1000,end-1000]){
+  assert.ok(reference.at(at).events.some(e=>e.id===rejectedId),'the unthinned reference visit is still underway at every sampled instant');
+  assert.ok(!current.at(at).events.some(e=>e.id===rejectedId),'a rejected daylight party must not appear again after sunset');
+ }
 });
 
 // Replay actual canvas transforms and paint bounds. Tracking-camera ground marks
