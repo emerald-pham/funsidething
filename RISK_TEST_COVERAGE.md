@@ -518,6 +518,7 @@ The Settings board-data area exposes one Download backup action with current-boa
 
 - RISK support diagnostics: native debounce reports scheduled, saving, and drained work accurately
 - RISK support diagnostics: accepted acknowledgements expire with their account and backend context
+- RISK support diagnostics: controlled SDK clock owns seed replies before source review
 - RISK support diagnostics: source operations report the effective bounded SDK deadline
 - RISK support diagnostics: recovery-copy checks are explicit, passive, and preserve unmatched pending work
 - RISK support diagnostics: real device retries count attempts while unexplained churn remains refused

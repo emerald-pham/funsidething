@@ -43,6 +43,23 @@ An additional original-J failed-job control was requested at
 [attempt 2](https://github.com/emerald-pham/funsidething/actions/runs/39991387451/attempts/2);
 its result remains separate release evidence.
 
+That control subsequently failed the `150` SDK-deadline diagnostics case during
+its second acknowledged seed, before source review began. A delayed 200 ms seed
+transaction reproduces the same ACK/head assertion; the matching 100 ms control
+passes. This establishes a fixture timing boundary, not the unrecorded hosted
+transaction timing or an application defect. The controlled SDK clock now owns
+time from construction. App attachment starts fresh entry observations without
+clearing pending timers or resetting elapsed time. A new real-consumer regression
+requires acknowledged, durable seeds after delayed delivery and retains exact
+149/150 ms timeout sensitivity. Existing source diagnostics and ACK/head assertions
+remain intact.
+
+Both exact `fd20528` candidate checks later passed the full suite, rules,
+compatibility and both native modes. They remain contextual positives after the
+new setup failure. The repaired candidate requires fresh exact-source checks and
+reviews; the failed original-J control remains a negative record and is not
+repeated unchanged to obtain a passing result.
+
 The first 128 app-test parents of pristine `db5a30c` also passed 333/333 TAP
 outcomes on Linux x64, with zero skips or cancellations. This finite prefix
 excluded concurrent separate tooling files and used a newer runner image.

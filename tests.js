@@ -1813,11 +1813,15 @@ test('RISK iOS source replay: a modal opened during exact-copy inspection defers
 });
 
 function recoveryReadClock187(){
- let active=false,elapsed=0,next=0,ctx;const start=1792323000000,timers=new Map(),scheduled=[];
+ // The backend receives this clock before setup ACKs. Attaching the app later
+ // must not let host fixture work spend its controlled source-operation time.
+ let active=true,elapsed=0,next=0,ctx;const start=1792323000000,timers=new Map(),scheduled=[];
  const provider={Date:class extends Date{static now(){return active?start+elapsed:Date.now();}},performance:{now:()=>elapsed},
   setTimeout(fn,delay,...args){if(!active)return setTimeout(fn,delay,...args);const id={recoveryClock187:++next};timers.set(id,{fn:()=>fn(...args),at:elapsed+Number(delay),delay:Number(delay)});scheduled.push(Number(delay));return id;},
   clearTimeout(id){if(timers.has(id))timers.delete(id);else clearTimeout(id);}};
- return {provider,timers,scheduled,get elapsed(){return elapsed;},activate(app){ctx=app.ctx;active=true;ctx.setTimeout=provider.setTimeout;ctx.clearTimeout=provider.clearTimeout;ctx.performance=provider.performance;setFakeTime(ctx,start);},
+ // Consumer entry observations belong to the attached app phase; completed
+ // seed calls cannot satisfy a later consumer's wait-for-entry predicate.
+ return {provider,timers,scheduled,get elapsed(){return elapsed;},activate(app){ctx=app.ctx;active=true;scheduled.length=0;ctx.setTimeout=provider.setTimeout;ctx.clearTimeout=provider.clearTimeout;ctx.performance=provider.performance;setFakeTime(ctx,start);},
   async advance(ms){const target=elapsed+ms;while(true){const due=[...timers].filter(([,timer])=>timer.at<=target).sort((a,b)=>a[1].at-b[1].at)[0];if(!due)break;elapsed=due[1].at;setFakeTime(ctx,start+elapsed);timers.delete(due[0]);due[1].fn();await flush();}elapsed=target;setFakeTime(ctx,start+elapsed);await flush();},
   stop(){active=false;timers.clear();}};
 }
@@ -42273,6 +42277,31 @@ test('RISK support diagnostics: accepted acknowledgements expire with their acco
   assert.ok(after.events.some(event=>event.stage==='push'&&event.status==='acknowledged'),'bounded historical events remain available as events');
   assert.equal(JSON.stringify(ctx.state),stateBefore,'diagnostic invalidation does not replace the retained board');
  });
+});
+
+test('RISK support diagnostics: controlled SDK clock owns seed replies before source review',{timeout:10000},async t=>{
+ const clock=recoveryReadClock187(),faults={},held=deferredSyncFixture(),entered=deferredSyncFixture();
+ t.after(()=>clock.stop());
+ const fixture=heldDecisionFixture188();fixture.local=structuredClone(fixture.remote);
+ const app=await heldDecisionApp188(t,{fixture,timeoutMs:150,timerProvider:clock.provider,failures:faults}),{ctx,shim,backend}=app;
+ t.after(async()=>{held.resolve();delete faults.transactionRead;delete faults.serverRead;await app.dispose();});
+ ctx.window.CLOUD_PUSH_DELAY_MS=60000;
+ let delayed=false;
+ for(const [index,title] of ['Acknowledged before source damage','Second acknowledged source'].entries()){
+  shim.document.getElementById('addInput').value=title;await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+  await settleSourceFixtureSave187(app,'the actual seed Add save finishes before its push',true);
+  if(index===1)faults.transactionRead=async path=>{if(path==='users/owner'&&!delayed){delayed=true;await new Promise(resolve=>setTimeout(resolve,200));}};
+  await ctx.sendPush();await settleRecovery188(app);
+ }
+ assert.equal(delayed,true,'the second real seed transaction includes host delivery beyond the later SDK budget');
+ assert.equal(ctx.state.syncDirty,false,'fixture setup still requires a real cloud acknowledgement');
+ delete faults.transactionRead;clock.activate(app);
+ faults.serverRead=async path=>{if(path==='users/owner'){entered.resolve();await held.promise;}};
+ let settled=false;const pull=backend.CS.pull().finally(()=>{settled=true;});
+ await fixtureDeadline(entered.promise,'the actual ordinary source read enters its held SDK reply');
+ await clock.advance(149);assert.equal(settled,false,'the configured SDK deadline cannot expire early');
+ await clock.advance(1);assert.equal(settled,true,'the same SDK deadline still expires at exactly 150 ms after setup');
+ assert.equal((await pull).error,true);assert.equal(backend.CS.errorCode,'deadline-exceeded');
 });
 
 test('RISK support diagnostics: source operations report the effective bounded SDK deadline',
