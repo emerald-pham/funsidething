@@ -405,6 +405,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK repository process: review policy derives code and specialist roles from the exact diff
 - RISK repository process: a generic role guard requires a security specialist
 - RISK repository process: generic state persistence requires a memory specialist
+- RISK repository process: Playwright waitForFunction predicates are synchronous
 - RISK repository process: persisting generic sessions requires both affected specialists
 - RISK repository process: TypeScript tooling directives cannot use comment-only exemption
 - RISK repository process: CSS comment removal cannot join selector tokens under owner-only review
