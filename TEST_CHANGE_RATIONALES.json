@@ -18555,10 +18555,7 @@
     "previousBehavior": "The top-level async-probe import made every tests.js import require scripts/agent-tools/async-probe.mjs, including six preflight fixtures and three actual shutdown/action-budget fixture consumers that deliberately copy only their existing dependency set. Those outer parent assertions failed on missing real-consumer markers because the nested child instead exited ERR_MODULE_NOT_FOUND.",
     "intendedBehavior": "Import the unchanged bounded helper only when each of the two actual native consumers executes. Focused/minimal nonnative fixtures can again reach their real application refusal, cleanup and original single-action-deadline checks without copying an unrelated native helper.",
     "replacementTests": [
-      "RISK repository process: Playwright waitForFunction predicates are synchronous",
-      "RISK recovery fixture shutdown: a failed real source observation stops its own polling and exits",
-      "RISK corrupt work budget fixture: one shared action deadline rejects an actually held device commit",
-      "RISK recovery observation budget: the first actual Add prefix belongs to the single action deadline"
+      "RISK repository process: Playwright waitForFunction predicates are synchronous"
     ],
     "preservedCoverage": [
       "Every prior raw rationale object is retained. Only the top-level helper import moves to two local awaited imports; no existing assertion, test name, budget, fixture dependency list, app behavior or native gate is removed, skipped or relaxed.",
