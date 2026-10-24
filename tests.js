@@ -28558,7 +28558,7 @@ console.log(output);process.exitCode=['original','other','later'].includes(mode)
  }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
 
-test('RISK repository process: the Linux carrier replays the finite immutable H noACK prefix with owned Chromium',async()=>{
+test('RISK repository process: the Linux carrier replays the finite immutable H noACK prefix and validates TAP cardinality',async()=>{
  const {runDiagnostic,execute,noAck,threeYes}=await import('./scripts/agent-tools/linux-diagnostic-187.mjs');
  const hCommit='db5a30c3a9a545365465a11878c1760b4dd3abc9';
  const hSourceResult=spawnSync('git',['-C',__dirname,'show',hCommit+':tests.js'],{encoding:'utf8',maxBuffer:8*1024*1024});
