@@ -7,6 +7,8 @@ procedure, output and limits; package script names are the command entry points.
 | --- | --- | --- |
 | Measure rendered typography, zoom, theme and capture evidence | `npm run agent:rendered-evidence --` | [Rendered evidence](rendered-evidence.md) |
 | Record a command's test and source provenance | `npm run agent:record-test-run --` | [Test-run provenance](test-run-provenance.md) |
+| Validate a compact checkpoint with distinct required gates and follow-ups | `npm run agent:checkpoint --` | [Checkpoints](checkpoints.md) |
+| Check native task actions and durable readback in an isolated profile | `npm run agent:native-task-smoke --` | [Native task smoke](native-task-smoke.md) |
 | Inspect or manage the shared host ledger and parked work | `npm run agent:host-coordination --` | [Host coordination](host-coordination.md) |
 | Run focused copy and rationale checks | `npm run agent:preflight --` | [Preflight](preflight.md) |
 | Run an isolated browser audit and preserve partial results | `npm run agent:browser-audit --` | [Browser audits](browser-audits.md) |
