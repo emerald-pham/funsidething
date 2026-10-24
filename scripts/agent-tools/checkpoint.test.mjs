@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, truncateSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { test } from 'node:test';
 import os from 'node:os';
@@ -83,6 +83,24 @@ function invokeValidate(fixture, recordPath) {
   ], { cwd: fixture.repo, encoding: 'utf8', timeout: 15000 });
 }
 
+function createZeroArtifact(fixture, name, byteLength) {
+  const artifactPath = path.join(fixture.root, name);
+  writeFileSync(artifactPath, Buffer.alloc(0));
+  truncateSync(artifactPath, byteLength);
+  const hash = createHash('sha256');
+  const zeros = Buffer.alloc(64 * 1024);
+  for (let remaining = byteLength; remaining > 0; remaining -= zeros.length) {
+    hash.update(zeros.subarray(0, Math.min(zeros.length, remaining)));
+  }
+  return {
+    id: name,
+    path: artifactPath,
+    sha256: hash.digest('hex'),
+    sourceCommit: fixture.record.source.commit,
+    sourceTree: fixture.record.source.tree,
+  };
+}
+
 test('creates a complete checkpoint while retaining a separately unverified follow-up', (t) => {
   const fixture = createSourceFixture(t);
   const recordPath = path.join(fixture.root, 'checkpoint.json');
@@ -146,6 +164,33 @@ test('rejects an oversized manifest before writing a checkpoint', (t) => {
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /exceeds the 32768-byte limit/);
   assert.equal(existsSync(recordPath), false);
+});
+
+test('accepts a single evidence artifact larger than 2 MiB through the command process', (t) => {
+  const fixture = createSourceFixture(t);
+  const evidence = createZeroArtifact(fixture, 'large-release-log.json', (2 * 1024 * 1024) + 1);
+  fixture.record.requiredGates[0].evidence = [evidence];
+  writeFileSync(fixture.inputPath, `${JSON.stringify(fixture.record, null, 2)}\n`);
+  const recordPath = path.join(fixture.root, 'checkpoint-large-artifact.json');
+
+  const result = invokeCreate(fixture, recordPath);
+  assert.equal(result.status, 0, result.stderr);
+  const saved = JSON.parse(readFileSync(recordPath, 'utf8'));
+  assert.equal(saved.requiredGates[0].evidence[0].sha256, evidence.sha256);
+});
+
+test('accepts aggregate evidence larger than 8 MiB while each file is 2 MiB', (t) => {
+  const fixture = createSourceFixture(t);
+  const evidence = Array.from({ length: 5 }, (_, index) =>
+    createZeroArtifact(fixture, `release-log-${index + 1}.json`, 2 * 1024 * 1024));
+  fixture.record.requiredGates[0].evidence = evidence;
+  writeFileSync(fixture.inputPath, `${JSON.stringify(fixture.record, null, 2)}\n`);
+  const recordPath = path.join(fixture.root, 'checkpoint-large-evidence-set.json');
+
+  const result = invokeCreate(fixture, recordPath);
+  assert.equal(result.status, 0, result.stderr);
+  const saved = JSON.parse(readFileSync(recordPath, 'utf8'));
+  assert.equal(saved.requiredGates[0].evidence.length, 5);
 });
 
 test('resumes into a new revision while preserving the prior checkpoint and its failed evidence', (t) => {
