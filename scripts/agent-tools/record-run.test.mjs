@@ -51,6 +51,57 @@ function summaryFrom(result) {
   return JSON.parse(lines[0]);
 }
 
+test('redacts evidence path metadata while retaining real files and child failure status', async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'record-run-private-path-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(temp);
+  const secret = 'PRIVATE-PATH-SECRET-72aa';
+  const evidence = path.join(temp, secret, 'evidence');
+  const result = invokeRecorder({ repo, evidence, purpose: 'green', command: node,
+    args: ['-e', `process.stdout.write('${secret}\\n'); process.stderr.write('complete failure output\\n'); process.exitCode = 7;`],
+    extraOptions: ['--summary', '--redact-pattern', secret],
+  });
+  assert.equal(result.status, 7, result.stderr);
+  assert.equal(result.stdout.includes(secret), false, 'summary paths must follow configured redaction');
+  const summary = summaryFrom(result);
+  assert.equal(summary.status, 'failed');
+  assert.equal(summary.child.exitCode, 7);
+  assert.equal(summary.evidence.status, 'complete');
+  const files = await readdir(evidence);
+  assert.equal(files.length, 3, 'all three complete evidence files exist at the actual caller-owned directory');
+  const metadataName = files.find(file => file.endsWith('.json'));
+  const serialized = await readFile(path.join(evidence, metadataName), 'utf8');
+  assert.equal(serialized.includes(secret), false, 'persisted path metadata must also follow configured redaction');
+  const record = JSON.parse(serialized);
+  assert.deepEqual(record.evidence, summary.evidence);
+  for (const field of ['metadataPath', 'stdoutPath', 'stderrPath']) {
+    assert.ok(record.evidence[field].includes('[REDACTED]'), field + ' is a sanitized display path');
+    assert.ok(record.redaction.locations['evidence.' + field] > 0, field + ' redaction is accounted for');
+  }
+  assert.equal(record.execution.output.stdout, '[REDACTED]\n');
+  assert.equal(record.execution.output.stderr, 'complete failure output\n');
+  assert.equal(await readFile(path.join(evidence, `${record.id}.stdout.txt`), 'utf8'), record.execution.output.stdout);
+  assert.equal(await readFile(path.join(evidence, `${record.id}.stderr.txt`), 'utf8'), record.execution.output.stderr);
+
+  const blockedEvidence = path.join(temp, secret, 'blocked');
+  await writeFile(blockedEvidence, 'preserve blocking file');
+  const refused = invokeRecorder({ repo, evidence: blockedEvidence, purpose: 'green', command: node,
+    args: ['-e', "process.exitCode = 0"], extraOptions: ['--summary', '--redact-pattern', secret] });
+  assert.equal(refused.status, 74);
+  assert.equal(refused.stdout.includes(secret), false, 'preparation failures also redact displayed evidence paths');
+  assert.equal(summaryFrom(refused).status, 'evidence-failure');
+  assert.equal(await readFile(blockedEvidence, 'utf8'), 'preserve blocking file');
+
+  const ordinaryEvidence = path.join(temp, secret, 'ordinary');
+  const ordinary = invokeRecorder({ repo, evidence: ordinaryEvidence, purpose: 'green', command: node,
+    args: ['-e', "process.stdout.write('ordinary complete output\\n')"], extraOptions: ['--redact-pattern', secret] });
+  assert.equal(ordinary.status, 0);
+  assert.equal(ordinary.stdout, 'ordinary complete output\n', 'default child output remains unchanged');
+  assert.equal(ordinary.stderr.includes(secret), false, 'default evidence path announcements also follow redaction');
+  assert.match(evidencePathFrom(ordinary), /\[REDACTED\]/);
+  assert.equal((await readdir(ordinaryEvidence)).length, 1, 'ordinary evidence still exists in the actual caller-owned directory');
+});
+
 test('summarizes large real child output while preserving complete redacted evidence and source identity', async (t) => {
   const temp = await mkdtemp(path.join(os.tmpdir(), 'record-run-summary-'));
   t.after(() => rm(temp, { recursive: true, force: true }));

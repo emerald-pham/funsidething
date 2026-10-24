@@ -450,6 +450,15 @@ async function main(argv) {
   }
   const git = await gitIdentity(repo, redaction);
   const workingTree = await collectSourceTestState(repo, redaction);
+  // Keep filesystem destinations private to I/O; evidence metadata follows the
+  // same redaction policy as source paths and captured child output.
+  const evidencePaths = {
+    metadataPath: sanitizeText(recordPath, redaction, 'evidence.metadataPath'),
+    ...(options.summary ? {
+      stdoutPath: sanitizeText(stdoutPath, redaction, 'evidence.stdoutPath'),
+      stderrPath: sanitizeText(stderrPath, redaction, 'evidence.stderrPath'),
+    } : {}),
+  };
   const record = {
     schemaVersion: 1,
     id,
@@ -477,7 +486,7 @@ async function main(argv) {
     },
     redaction: { applied: redaction.count > 0, count: redaction.count, locations: { ...redaction.locations } },
     provenanceLimits,
-    ...(options.summary ? { evidence: { status: 'pending', metadataPath: recordPath, stdoutPath, stderrPath } } : {}),
+    ...(options.summary ? { evidence: { status: 'pending', ...evidencePaths } } : {}),
   };
 
   try {
@@ -500,16 +509,14 @@ async function main(argv) {
       workingTree,
       evidence: {
         status: 'failed',
-        metadataPath: recordPath,
-        stdoutPath,
-        stderrPath,
+        ...evidencePaths,
         errors: [{ file: 'metadata', message }],
       },
     });
     process.exitCode = evidenceFailureExitCode;
     return;
   }
-  if (!options.summary) process.stderr.write(`record-run: evidence=${recordPath}\n`);
+  if (!options.summary) process.stderr.write(`record-run: evidence=${evidencePaths.metadataPath}\n`);
 
   const result = await execute(command, commandArgs, repo);
   const signalNumber = { SIGINT: 2, SIGKILL: 9, SIGTERM: 15 }[result.interruption?.signal ?? result.signal];
@@ -560,9 +567,7 @@ async function main(argv) {
     }
     record.evidence = {
       status: evidenceErrors.length ? 'failed' : 'complete',
-      metadataPath: recordPath,
-      stdoutPath,
-      stderrPath,
+      ...evidencePaths,
       ...(evidenceErrors.length ? { errors: evidenceErrors } : {}),
     };
     let finalWrapperExitCode = wrapperExitCode;

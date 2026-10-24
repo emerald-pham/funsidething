@@ -8,7 +8,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-import { waitForTruthyProbe } from "./scripts/agent-tools/async-probe.mjs";
 
 // Every top-level test owns its app fixtures. Nested t.test cases inherit the
 // parent scope so a shared fixture remains live until all its consumers finish.
@@ -2145,6 +2144,7 @@ test('RISK cloud source authority: a delayed header cannot schedule chunks after
 });
 
 async function inspectCompleteSource230(t,{page,remote,receivedRaw,browser,engine,width,shortValues}){
+  const {waitForTruthyProbe}=await import('./scripts/agent-tools/async-probe.mjs');
   t.diagnostic('Native complete-source entry: '+engine+' '+browser.version()+', '+width+'x844, '+Buffer.byteLength(receivedRaw)+' source bytes.');
   await page.locator('[data-act="apply-cloud-source-recovery"]').waitFor();
   // This read-only source review runs after startup migration has produced a
@@ -2194,6 +2194,7 @@ async function waitForNativeHistoryAck226(page,owner){
 }
 
 async function runNativeRecoveryInspection226(t,width=390,holdDemoted=false,completeSource=null,automaticView=null){
+ const {waitForTruthyProbe}=await import('./scripts/agent-tools/async-probe.mjs');
  const playwright=await import('playwright'),engine=(completeSource||automaticView)?(automaticView?.engine||process.env.CHAIN_RECOVERY_TEST_ENGINE||'chromium'):'chromium';assert.ok(['chromium','webkit'].includes(engine),'the native source consumer uses an existing supported engine');
  const sdk=await import('./scripts/installed-client-fixture.mjs'),browser=await playwright[engine].launch({headless:true}),context=await browser.newContext({viewport:{width,height:844},serviceWorkers:'block',reducedMotion:'reduce'}),page=await context.newPage();
  const current=deferredSyncFixture(),previous=deferredSyncFixture(),finalRoot=deferredSyncFixture(),freshFinalRoot=deferredSyncFixture(),demoted=deferredSyncFixture(),raw=JSON.stringify({...sdk.fixture('reconcile-held'),...(automaticView?{settings:{...sdk.fixture('reconcile-held').settings,theme:automaticView.theme}}:{})}),encoded=await loadStorageV2().encodeSnapshot(raw),{chunks,...header}=encoded,remote=new Map([['users/owner',{schemaVersion:2,rev:4,activeGeneration:'held-current',previousGeneration:'received-previous'}],['users/owner/generations/held-current',{...header,hash:'f'.repeat(64),state:'published',baseRev:3}],['users/owner/generations/received-previous',{...header,state:'published',baseRev:2}],...chunks.map(c=>['users/owner/generations/received-previous/chunks/'+String(c.index).padStart(8,'0'),c])]);

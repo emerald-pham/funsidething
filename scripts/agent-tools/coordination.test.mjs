@@ -295,6 +295,86 @@ test('migration rejects an unverifiable lock owner instead of reclaiming it', ()
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
+test('migration preserves unknown target locks that appear while waiting for source ownership', async (t) => {
+  for (const suffix of ['.lock', '.lock.recovery']) await t.test(suffix, async () => {
+    const f = migrationFixture();
+    const source = join(f.root, 'a-source.json');
+    const target = join(f.root, 'z-target.json');
+    renameSync(f.source, source);
+    const args = f.args();
+    args[2] = source;
+    args[4] = target;
+    const sourceLock = `${source}.lock`;
+    const unknownPath = `${target}${suffix}`;
+    const unknown = '{"owner":"unrecognized-active-client","token":"preserve"}\n';
+    writeFileSync(sourceLock, JSON.stringify({ pid: process.pid, token: 'source-holder' }));
+    let settled = false;
+    const pending = commandAsync(args, f.root).then(result => { settled = true; return result; });
+    try {
+      await new Promise(resolveWait => setTimeout(resolveWait, 150));
+      assert.equal(settled, false, 'migration is waiting on the recognized live source lock');
+      if (suffix === '.lock.recovery') {
+        writeFileSync(`${target}.lock`, JSON.stringify({ pid: 2147483647, token: 'recognized-stale' }));
+      }
+      writeFileSync(unknownPath, unknown);
+      rmSync(sourceLock);
+      const result = await pending;
+      assert.notEqual(result.status, 0, 'a lock appearing after preflight must still block migration');
+      assert.match(result.stderr, /lock|ownership/);
+      assert.equal(readFileSync(unknownPath, 'utf8'), unknown, 'unrecognized ownership remains untouched');
+      assert.equal(readFileSync(source, 'utf8'), f.contents, 'source authority remains unchanged');
+      assert.equal(existsSync(target), false, 'target authority is never published');
+      assert.equal(existsSync(f.backup), false, 'no migration phase begins without both safe locks');
+    } finally {
+      rmSync(sourceLock, { force: true });
+      await pending;
+      rmSync(f.root, { recursive: true, force: true });
+    }
+  });
+});
+
+test('migration preserves a same-byte lock replacement during stale-owner recovery', async () => {
+  const f = migrationFixture();
+  const stale = JSON.stringify({ pid: 2147483647, token: 'stale-owner' });
+  mkdirSync(join(f.root, 'persistent'));
+  const lockPath = `${f.target}.lock`;
+  writeFileSync(lockPath, stale);
+  const pending = commandAsync(f.args(), f.root);
+  try {
+    const deadline = Date.now() + 2000;
+    while (!existsSync(`${lockPath}.recovery`) && Date.now() < deadline) {
+      await new Promise(resolveWait => setTimeout(resolveWait, 2));
+    }
+    assert.ok(existsSync(`${lockPath}.recovery`), 'real migration entered stale-lock recovery');
+    await new Promise(resolveWait => setTimeout(resolveWait, 10));
+    writeFileSync(`${lockPath}.replacement`, stale);
+    renameSync(`${lockPath}.replacement`, lockPath);
+    const result = await pending;
+    assert.notEqual(result.status, 0, 'equal lock bytes cannot establish recovery ownership of a replacement');
+    assert.match(result.stderr, /identity|ownership/);
+    assert.equal(readFileSync(lockPath, 'utf8'), stale);
+    assert.equal(readFileSync(f.source, 'utf8'), f.contents);
+    assert.equal(existsSync(f.target), false);
+    assert.equal(existsSync(f.backup), false);
+  } finally {
+    await pending;
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test('ordinary coordination retains legacy unknown-lock reclamation', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'chain-legacy-lock-'));
+  try {
+    const project = createProject(join(fixture, 'project'), 'work/legacy-lock');
+    const ledger = join(fixture, 'ledger.json');
+    writeFileSync(`${ledger}.lock`, '{"owner":"old-unrecognized-format"}\n');
+    const result = command(['begin', '--file', ledger], project);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(JSON.parse(readFileSync(ledger, 'utf8')).entries.length, 1);
+    assert.equal(existsSync(`${ledger}.lock`), false);
+  } finally { rmSync(fixture, { recursive: true, force: true }); }
+});
+
 test('migration rejects a shared-writable ancestor hidden above a private destination parent', () => {
   const f = migrationFixture();
   try {
