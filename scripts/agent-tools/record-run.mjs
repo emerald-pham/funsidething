@@ -8,6 +8,7 @@ import { pathToFileURL } from 'node:url';
 
 const purposes = new Set(['preimplementation-red', 'later-baseline-sensitivity', 'green']);
 const cleanupGraceMs = 750;
+const evidenceFailureExitCode = 74;
 const provenanceLimits = [
   'Generated metadata is not tamper-proof attestation.',
   'The declared purpose does not prove when a test was authored.',
@@ -21,6 +22,10 @@ function parseArguments(argv) {
   for (let index = 0; index < separator; index += 1) {
     const name = argv[index];
     if (!name.startsWith('--')) throw new Error(`Unexpected option: ${name}`);
+    if (name === '--summary') {
+      options.summary = true;
+      continue;
+    }
     const value = argv[index + 1];
     if (value === undefined || value.startsWith('--')) throw new Error(`Missing value for ${name}.`);
     const key = name.slice(2);
@@ -266,6 +271,47 @@ async function writeRecord(filePath, record) {
   await rename(temporaryPath, filePath);
 }
 
+async function writeOutputFile(filePath, output) {
+  const handle = await open(filePath, 'wx', 0o600);
+  try {
+    await handle.writeFile(output, 'utf8');
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
+}
+
+function summaryStatus(result, evidenceStatus) {
+  if (evidenceStatus !== 'complete') return 'evidence-failure';
+  if (result.interruption || result.signal) return 'interrupted';
+  if (result.launchError) return 'launch-failure';
+  if (!Number.isInteger(result.exitCode)) return 'unknown';
+  return result.exitCode === 0 ? 'passed' : 'failed';
+}
+
+function emitSummary({ status, outcome, purpose, child, interruptionSignal = null, wrapperExitCode, git, workingTree, evidence }) {
+  const summary = {
+    status,
+    outcome,
+    purpose,
+    child,
+    interruptionSignal,
+    wrapperExitCode,
+    source: {
+      commit: git?.commit ?? null,
+      identityStatus: workingTree?.identity?.status ?? 'unknown',
+      diffSha256: workingTree?.sourceTestDiffSha256 ?? null,
+    },
+    evidence,
+  };
+  process.stdout.write(`${JSON.stringify(summary)}\n`);
+}
+
+function summarizeEvidenceError(error, redaction, location) {
+  const message = error instanceof Error ? error.message : String(error);
+  return sanitizeText(message, redaction, location).slice(0, 240);
+}
+
 async function execute(command, args, cwd) {
   return new Promise((resolveResult) => {
     const child = spawn(command, args, { cwd, stdio: ['inherit', 'pipe', 'pipe'], detached: process.platform !== 'win32' });
@@ -375,6 +421,8 @@ async function main(argv) {
   const repo = path.resolve(options.repo);
   const evidenceDirectory = path.resolve(options['evidence-dir']);
   const recordPath = path.join(evidenceDirectory, `${id}.json`);
+  const stdoutPath = options.summary ? path.join(evidenceDirectory, `${id}.stdout.txt`) : undefined;
+  const stderrPath = options.summary ? path.join(evidenceDirectory, `${id}.stderr.txt`) : undefined;
   if (Boolean(options['correction-of']) !== Boolean(options['correction-note'])) {
     throw new Error('--correction-of and --correction-note must be supplied together.');
   }
@@ -429,15 +477,39 @@ async function main(argv) {
     },
     redaction: { applied: redaction.count > 0, count: redaction.count, locations: { ...redaction.locations } },
     provenanceLimits,
+    ...(options.summary ? { evidence: { status: 'pending', metadataPath: recordPath, stdoutPath, stderrPath } } : {}),
   };
 
-  await mkdir(evidenceDirectory, { recursive: true, mode: 0o700 });
-  await writeRecord(recordPath, record);
-  record.startedAt = new Date().toISOString();
-  record.state = 'running';
-  record.execution.outcome = 'running';
-  await writeRecord(recordPath, record);
-  process.stderr.write(`record-run: evidence=${recordPath}\n`);
+  try {
+    await mkdir(evidenceDirectory, { recursive: true, mode: 0o700 });
+    await writeRecord(recordPath, record);
+    record.startedAt = new Date().toISOString();
+    record.state = 'running';
+    record.execution.outcome = 'running';
+    await writeRecord(recordPath, record);
+  } catch (error) {
+    if (!options.summary) throw error;
+    const message = summarizeEvidenceError(error, redaction, 'evidence.prepareError');
+    emitSummary({
+      status: 'evidence-failure',
+      outcome: 'not-started',
+      purpose: options.purpose,
+      child: { exitCode: null, signal: null },
+      wrapperExitCode: evidenceFailureExitCode,
+      git,
+      workingTree,
+      evidence: {
+        status: 'failed',
+        metadataPath: recordPath,
+        stdoutPath,
+        stderrPath,
+        errors: [{ file: 'metadata', message }],
+      },
+    });
+    process.exitCode = evidenceFailureExitCode;
+    return;
+  }
+  if (!options.summary) process.stderr.write(`record-run: evidence=${recordPath}\n`);
 
   const result = await execute(command, commandArgs, repo);
   const signalNumber = { SIGINT: 2, SIGKILL: 9, SIGTERM: 15 }[result.interruption?.signal ?? result.signal];
@@ -474,6 +546,52 @@ async function main(argv) {
     outputSha256: sha256(JSON.stringify(output)),
   };
   record.redaction = { applied: redaction.count > 0, count: redaction.count, locations: { ...redaction.locations } };
+  if (options.summary) {
+    const evidenceErrors = [];
+    for (const [file, filePath, contents] of [
+      ['stdout', stdoutPath, output.stdout],
+      ['stderr', stderrPath, output.stderr],
+    ]) {
+      try {
+        await writeOutputFile(filePath, contents);
+      } catch (error) {
+        evidenceErrors.push({ file, message: summarizeEvidenceError(error, redaction, `evidence.${file}Error`) });
+      }
+    }
+    record.evidence = {
+      status: evidenceErrors.length ? 'failed' : 'complete',
+      metadataPath: recordPath,
+      stdoutPath,
+      stderrPath,
+      ...(evidenceErrors.length ? { errors: evidenceErrors } : {}),
+    };
+    let finalWrapperExitCode = wrapperExitCode;
+    if (evidenceErrors.length && finalWrapperExitCode === 0) finalWrapperExitCode = evidenceFailureExitCode;
+    record.execution.wrapperExitCode = finalWrapperExitCode;
+    record.redaction = { applied: redaction.count > 0, count: redaction.count, locations: { ...redaction.locations } };
+    try {
+      await writeRecord(recordPath, record);
+    } catch (error) {
+      evidenceErrors.push({ file: 'metadata', message: summarizeEvidenceError(error, redaction, 'evidence.metadataError') });
+      record.evidence.status = 'failed';
+      record.evidence.errors = evidenceErrors;
+      if (finalWrapperExitCode === 0) finalWrapperExitCode = evidenceFailureExitCode;
+      record.execution.wrapperExitCode = finalWrapperExitCode;
+    }
+    emitSummary({
+      status: summaryStatus(result, record.evidence.status),
+      outcome: record.execution.outcome,
+      purpose: options.purpose,
+      child: { exitCode: result.exitCode, signal: result.signal },
+      interruptionSignal: result.interruption?.signal ?? null,
+      wrapperExitCode: finalWrapperExitCode,
+      git,
+      workingTree,
+      evidence: record.evidence,
+    });
+    process.exitCode = finalWrapperExitCode;
+    return;
+  }
   await writeRecord(recordPath, record);
   process.stdout.write(output.stdout);
   process.stderr.write(output.stderr);
