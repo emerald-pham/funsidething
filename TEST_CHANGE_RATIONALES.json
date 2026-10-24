@@ -18656,5 +18656,23 @@
       "command": "PATH=/Users/emeraldpham/Documents/Codex/2026-10-22/issue-187/evidence/persist-ownership-repair/npm-cache/_npx/d18f28baf1132559/node_modules/node/bin:$PATH TZ=UTC node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/recovery-187-linux/funsidething --evidence-dir /Users/emeraldpham/Documents/Codex/2026-10-22/issue-187/evidence/linux-x64-carrier/prefix-replay/red --purpose preimplementation-red -- /Users/emeraldpham/Documents/Codex/2026-10-22/issue-187/evidence/persist-ownership-repair/npm-cache/_npx/d18f28baf1132559/node_modules/node/bin/node --test --test-reporter=tap --test-name-pattern='^RISK repository process: the Linux carrier replays the finite immutable H noACK prefix with owned Chromium$' tests.js; record /Users/emeraldpham/Documents/Codex/2026-10-22/issue-187/evidence/linux-x64-carrier/prefix-replay/red/2026-10-24T14-35-06-450Z-32930636-87ea-4868-8367-1dc0346d046c.json sha256=6061abb49e46e47c35260606d6d8b157d24d2fadb7c9df840f4666cbc2a3b43b",
       "failure": "Against unmodified carrier R=544a874ce38c8945aaf3237c29f2dc1c2deb6c1f, the preset request produced the old three-consumer plan H-noACK, J-noACK, J-threeYes-profile instead of one H prefix consumer. The new process assertion failed: exit 1, one test failed, zero skipped/cancelled. Synthetic runner-boundary RED only; no Linux application test ran."
     }
+  },
+  {
+    "baseCommit": "159d865b0b4cc7596a7431e323d90106da7f8225",
+    "testChangesSha256": "10df13af44d1f5d1449ba02d5a0ffaedf6a013a96fbf74feb92fa7b3551a454a",
+    "reason": "Require the immutable H prefix TAP footer to account for every emitted nested and top-level outcome.",
+    "previousBehavior": "The prefix classifier validated its 333-test TAP footer and 128 ordered parent outcomes but ignored nested result lines, so an internally inconsistent transcript could be reported complete.",
+    "intendedBehavior": "Before classifying pass or the original H target-negative, require every top-level and nested TAP outcome line to equal the reported test total while preserving the exact parent sequence and failure details.",
+    "replacementTests": [
+      "RISK repository process: the Linux carrier replays the finite immutable H noACK prefix with owned Chromium"
+    ],
+    "preservedCoverage": [
+      "The positive synthetic prefix now contains 205 nested and 128 parent results, matching all 333 outcomes while retaining the original H target-negative and parent-order checks.",
+      "A counterfactual emits 206 nested plus 128 parent results but claims # tests 333; the carrier must label it incomplete, while existing default/profile, earlier-failure, missing-target, and cleanup controls remain covered."
+    ],
+    "redEvidence": {
+      "command": "PATH=/Users/emeraldpham/Documents/Codex/2026-10-22/issue-187/evidence/persist-ownership-repair/npm-cache/_npx/d18f28baf1132559/node_modules/node/bin:$PATH TZ=UTC node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/recovery-187-linux/funsidething --evidence-dir /Users/emeraldpham/Documents/Codex/2026-10-22/issue-187/evidence/linux-x64-carrier/prefix-replay/completeness-repair/red --purpose preimplementation-red -- /Users/emeraldpham/Documents/Codex/2026-10-22/issue-187/evidence/persist-ownership-repair/npm-cache/_npx/d18f28baf1132559/node_modules/node/bin/node --test --test-reporter=tap --test-name-pattern=\"^RISK repository process: the Linux carrier replays the finite immutable H noACK prefix with owned Chromium$\" tests.js",
+      "failure": "Against frozen candidate159d865b0b4cc7596a7431e323d90106da7f8225, the added counterfactual had334 emitted outcomes but # tests333; the helper reported completed instead of incomplete. The focused process test failed with one failure and zero skips/cancellations. Synthetic process evidence only, not an original Linux app RED."
+    }
   }
 ]

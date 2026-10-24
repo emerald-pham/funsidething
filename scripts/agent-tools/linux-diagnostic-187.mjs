@@ -127,7 +127,8 @@ function classifyPrefixRecord(record, source, parents, result) {
   const tests = metric('tests'), pass = metric('pass'), fail = metric('fail');
   const cancelled = metric('cancelled'), skipped = metric('skipped'), todo = metric('todo');
   if (!result.complete || record?.state !== 'complete' || record.execution.signal || record.execution.wrapperExitCode !== result.code || record.git?.commit !== source.commit || source.label !== 'H' || record.workingTree?.identity?.status !== 'complete' || record.workingTree.sourceTestFiles.length !== 0) return 'incomplete-or-unexpected';
-  const commonTap = tests === prefixSpec.tapTests && cancelled === 0 && skipped === 0 && todo === 0;
+  const reportedOutcomes = lines.filter(line => /^\s*(?:not )?ok \d+ - /.test(line));
+  const commonTap = tests === prefixSpec.tapTests && reportedOutcomes.length === tests && cancelled === 0 && skipped === 0 && todo === 0;
   if (!commonTap || outcomes.some(outcome => !outcome) || plan.length !== 1) return 'incomplete-or-unexpected';
   const priorFailure = outcomes.slice(0, prefixSpec.targetOrdinal - 1).some(outcome => outcome.failed);
   if (priorFailure && outcomes.length === prefixSpec.parentCount && outcomes.every((outcome, index) => outcome.ordinal === index + 1 && outcome.name === parents[index]) && result.code === 1 && record.execution.exitCode === 1 && pass === prefixSpec.tapTests - 1 && fail === 1 && plan[0] === '1..' + prefixSpec.parentCount) return 'other-failure';

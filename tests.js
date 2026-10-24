@@ -28586,7 +28586,7 @@ if(mode==='single'){
  for(let index=0;index<entered;index++){
   const parent=names[index],failed=index===failedAt;
   output+='# Subtest: '+parent+'\n';
-  if(index===0){for(let child=1;child<=206;child++)output+='    ok '+child+' - fixture nested '+child+'\n';output+='    1..206\n';}
+  if(index===0){const nestedCount=205+(mode==='extra-nested-outcome'?1:0);for(let child=1;child<=nestedCount;child++)output+='    ok '+child+' - fixture nested '+child+'\n';output+='    1..'+nestedCount+'\n';}
   output+=(failed?'not ok':'ok')+' '+(index+1)+' - '+parent+'\n';
   if(failed){
    if(mode==='original')output+="  ---\n  code: 'ERR_ASSERTION'\n  operator: 'strictEqual'\n  actual: false\n  expected: true\n  stack: |-\n    settle (file:///immutable-H/tests.js:3303:32)\n    async file:///immutable-H/tests.js:3304:124\n  ...\n";
@@ -28606,7 +28606,7 @@ if(['original','earlier-failure','target-not-entered'].includes(mode))process.ex
  assert.match(rejectedPreset.stderr,/invalid paths\/options/);
  assert.equal(fs.existsSync(path.join(root,'invalid-preset-evidence')),false,'invalid preset input creates no evidence or scratch');
  const cases=[
-  ['positive','passed'],['original','original-first-add-refusal'],['earlier-failure','other-failure'],
+  ['positive','passed'],['extra-nested-outcome','incomplete-or-unexpected'],['original','original-first-add-refusal'],['earlier-failure','other-failure'],
   ['target-not-entered','incomplete-or-unexpected'],['incomplete','incomplete-or-unexpected'],
   ['browser-install-failure','setup'],['browser-install-timeout','setup'],['browser-runtime-failure','setup'],['source-changed-after-install','setup'],['prefix-timeout','prefix-timeout'],
  ];
@@ -28705,6 +28705,7 @@ if(['original','earlier-failure','target-not-entered'].includes(mode))process.ex
    assert.equal(summary.cleanup.status,'removed');
    assert.equal(fs.existsSync(browserPath),false,'the owned Chromium download is cleaned with the scratch checkout');
    const record=records[0];
+   if(scenario==='extra-nested-outcome'){const stdout=record.execution.output.stdout;assert.equal(stdout.split('\n').filter(line=>/^\s*(?:not )?ok \d+ - /.test(line)).length,334);assert.match(stdout,/^# tests 333$/m,'the counterfactual reports one fewer test than its emitted TAP outcomes');}
    if(expected!=='incomplete-or-unexpected'){
     const stdout=record.execution.output.stdout;
     assert.match(stdout,/^# tests 333$/m);assert.match(stdout,/^# skipped 0$/m);assert.match(stdout,/^# cancelled 0$/m);
