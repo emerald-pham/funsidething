@@ -22,3 +22,76 @@ Run new `begin` commands at the actual Git worktree root; subdirectory invocatio
 This entry point supports shared lifecycle and ownership plus Chain Scanner completion. Den of Wolves keeps its existing completion client, validation, version and changelog gates. Adoption does not migrate that repository or replace its release contract. Slot allocation and repository-specific validation commands remain with their existing clients on the same ledger.
 
 Tests and examples use an explicit fixture ledger. Never point tests at the live host ledger, and never create a repository-local coordination file for convenience. If the stable copy cannot load or the configured paths conflict, report that state rather than falling back to a second ledger.
+
+## Durable host migration
+
+Use this procedure only for an authorized host location change, after the concrete
+paths, environment configuration and recovery plan receive infrastructure review.
+Discovery deliberately keeps the legacy temporary default until the owner exports
+the persistent `CODEX_COORDINATION_FILE`. Migration does not edit shell profiles,
+install or replace executables, change completion checks, or transfer ownership.
+
+1. Inventory every participating project's clients, shells, background guardians
+   and launchers. Keep foreign owners in control of their own work. Every active
+   entry must be parked or completed by its owner and every live reservation must
+   stop before migration; expired leases, dead entry PIDs and missing worktrees
+   do not waive active ownership. Pause the migration owner's guardian too.
+2. Select one persistent absolute destination and one fresh backup directory
+   outside temporary storage and disposable checkouts. Inspect existing environment
+   settings and shell startup files, retain exact backups/hashes, and resolve any
+   disagreement before proceeding. Keep different installed helpers and unrelated
+   shell settings intact. Use the reviewed repository CLI for the cutover.
+3. Hash the raw source bytes after owners quiesce, then use the same source,
+   destination, backup directory and digest for every phase:
+
+   ```sh
+   node scripts/agent-tools/coordination.mjs migrate \
+     --file "$SOURCE_LEDGER" --to "$PERSISTENT_LEDGER" \
+     --backup-dir "$MIGRATION_BACKUP" --expected-sha256 "$REVIEWED_SHA256" \
+     --phase prepare
+   ```
+
+   `--phase all` (the default) performs prepare, block and publish under both locks.
+   Explicit phases permit inspection or safe recovery at each process boundary:
+
+   | Phase | Authority and completion criterion |
+   | --- | --- |
+   | `prepare` | Source remains writable. Exact `source.json`, staged destination bytes and `migration.json` are durable; destination is absent. |
+   | `block` | Source is atomically replaced with a non-JSON retirement marker. No live ledger is writable until publish; the exact backup and receipt explain recovery. |
+   | `publish` | Complete staged bytes are linked exclusively to the destination. Destination is authoritative; repeat publish can complete an interrupted staging unlink/receipt update. |
+   | `rollback` | Allowed only while destination is absent. Validated original/blocker identity and saved bytes restore source authority; backup and receipt remain. |
+
+   Migration preserves every raw byte, including parked/foreign ownership,
+   reservations, configurations and unknown metadata. It uses the existing token
+   locks for both paths, refuses active ownership and malformed v1 state, and
+   checks file identity as well as SHA-256 at transitions. Existing destinations
+   (even equal bytes), symlinks, unrecognized locks, hardlinks and unsafe ownership
+   fail closed. Destination/backup parents must be literal owned directories, with
+   trusted user/root ancestors (root-owned sticky temporary ancestors are allowed);
+   only the existing macOS system `/var` → `/private/var` source spelling is
+   accepted as an ancestor alias and its physical path is recorded.
+4. Inspect `migration.json`, the exact backup and both paths after each phase.
+   On error or interruption, the receipt may precede the final filesystem change:
+   compare recorded inode/device/owner/mode and digest with actual files before
+   resuming the same phase. A recognized original, retirement marker or known
+   target/staging link has a supported recovery path. Replaced/missing identities
+   require owner investigation; never force overwrite, delete a foreign file, or
+   infer ownership from equal bytes. After destination publication, use that ledger
+   and retain the old marker; rollback is forbidden even before the receipt update.
+5. Publish and validate exact before/after bytes and retained ownership, then
+   configure one small explicit environment file for all participating launchers.
+   `export-env --file "$PERSISTENT_LEDGER"` prints its canonical export without
+   editing settings. If a legacy client needs the older variable, derive
+   `DOW_EMULATOR_COORDINATION_FILE` from the same canonical value. Have each relevant
+   startup file source this file while preserving unrelated bytes; a login-only
+   startup file does not configure noninteractive shells. Existing processes must
+   restart or receive the same environment explicitly before resuming.
+6. From fresh shells in every participating project, verify discovery (and the
+   participating legacy/slot client) selects the identical persistent path, read
+   the retained state, then resume the same parked entries. Verify restart and
+   temporary-directory-loss behavior with disposable fixtures. The old marker is
+   deliberately invalid JSON: older v1 parsers stop instead of normalizing a valid
+   JSON pointer into an empty ledger. Its atomic file replacement avoids the
+   file-to-directory crash gap; symlink/hardlink aliases are unsafe under legacy
+   atomic renames. Temporary-directory removal can remove the marker, so canonical
+   configuration of every participating launcher is a completion requirement.
