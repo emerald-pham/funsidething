@@ -97,8 +97,8 @@ jobs:
           done
           mkdir -p "$RUNNER_TEMP/linux-diagnostic-187"
           printf '{"schemaVersion":1,"checkout":"%s","nodeSetup":"%s","scope":"setup-only; step output remains in Actions log"}\n' "$CHECKOUT_OUTCOME" "$NODE_OUTCOME" > "$RUNNER_TEMP/linux-diagnostic-187/setup.json"
-      - name: Record immutable H and J consumers once
-        run: node scripts/agent-tools/linux-diagnostic-187.mjs --repo "$GITHUB_WORKSPACE" --evidence-dir "$RUNNER_TEMP/linux-diagnostic-187/run" --scratch-parent "$RUNNER_TEMP"
+      - name: Replay the immutable H noACK prefix once
+        run: node scripts/agent-tools/linux-diagnostic-187.mjs --repo "$GITHUB_WORKSPACE" --evidence-dir "$RUNNER_TEMP/linux-diagnostic-187/run" --scratch-parent "$RUNNER_TEMP" --preset noack-prefix-h
       - name: Preserve diagnostic evidence including failures
         if: always()
         uses: actions/upload-artifact@v4

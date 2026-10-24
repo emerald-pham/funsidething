@@ -28447,7 +28447,7 @@ test('RISK repository process: the exact diagnostic push retains standard CI aut
  assert.equal(job['timeout-minutes'],15);
  assert.deepEqual(job.steps.map(step=>step.uses??null),['actions/checkout@v4','actions/setup-node@v4',null,null,'actions/upload-artifact@v4']);
  assert.equal(job.steps[1].with['node-version'],'22.23.3');
- assert.equal(job.steps[3].run,'node scripts/agent-tools/linux-diagnostic-187.mjs --repo "$GITHUB_WORKSPACE" --evidence-dir "$RUNNER_TEMP/linux-diagnostic-187/run" --scratch-parent "$RUNNER_TEMP"');
+ assert.equal(job.steps[3].run,'node scripts/agent-tools/linux-diagnostic-187.mjs --repo "$GITHUB_WORKSPACE" --evidence-dir "$RUNNER_TEMP/linux-diagnostic-187/run" --scratch-parent "$RUNNER_TEMP" --preset noack-prefix-h');
  for(const index of [0,1,3]){assert.equal(job.steps[index].if,undefined,'checkout, setup and probes retain default success gating');assert.equal(job.steps[index]['continue-on-error'],undefined);}
  assert.equal(JSON.stringify(job).includes('secrets.'),false,'the diagnostic job has no secret input');
  const bootstrap=job.steps.find(step=>step.id==='diagnostic-setup-evidence');
@@ -28554,6 +28554,167 @@ console.log(output);process.exitCode=['original','other','later'].includes(mode)
    assert.equal(summary.cleanup.status,scenario==='foreign-link'?'refused':scenario==='unsupported-runtime'?'not-created':'removed',scenario);
    if(scenario==='unsupported-runtime')assert.equal(summary.stopReason,'unsupported-runtime');
    if(foreign)assert.equal(fs.readFileSync(path.join(foreign,'keep'),'utf8'),'foreign data');
+  }
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+
+test('RISK repository process: the Linux carrier replays the finite immutable H noACK prefix with owned Chromium',async()=>{
+ const {runDiagnostic,execute,noAck,threeYes}=await import('./scripts/agent-tools/linux-diagnostic-187.mjs');
+ const hCommit='db5a30c3a9a545365465a11878c1760b4dd3abc9';
+ const hSourceResult=spawnSync('git',['-C',__dirname,'show',hCommit+':tests.js'],{encoding:'utf8',maxBuffer:8*1024*1024});
+ assert.equal(hSourceResult.status,0,hSourceResult.stderr);
+ const hSource=hSourceResult.stdout;
+ const hLockResult=spawnSync('git',['-C',__dirname,'show',hCommit+':package-lock.json'],{encoding:'utf8',maxBuffer:8*1024*1024});
+ assert.equal(hLockResult.status,0,hLockResult.stderr);
+ const lockedPlaywrightVersion=JSON.parse(hLockResult.stdout).packages['node_modules/playwright'].version;
+ const prefixNames=[];
+ for(const line of hSource.split('\n')){const match=line.match(/^test\((['"])(.*?)\1\s*,/);if(match)prefixNames.push(match[2]);}
+ const parents=prefixNames.slice(0,128);
+ assert.equal(parents.length,128);assert.equal(parents.at(-1),noAck);
+ const expectedPattern='^(?:'+parents.map(name=>name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|')+')$';
+ const root=fs.realpathSync(fs.mkdtempSync(path.join(process.env.TMPDIR||'/tmp','linux-prefix-carrier-process-')));
+ const recordingChild=path.join(root,'recording-child.cjs');
+ fs.writeFileSync(recordingChild,String.raw`
+const fs=require('node:fs');
+const [mode,name,namesJson]=process.argv.slice(2),names=JSON.parse(namesJson);
+const failedAt=mode==='original'?127:mode==='earlier-failure'?39:-1;
+const entered=mode==='target-not-entered'?127:names.length;
+let output='TAP version 13\n';
+if(mode==='single'){
+ output+='# Subtest: '+name+'\nok 1 - '+name+'\n1..1\n# tests 1\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n';
+}else{
+ for(let index=0;index<entered;index++){
+  const parent=names[index],failed=index===failedAt;
+  output+='# Subtest: '+parent+'\n';
+  if(index===0){for(let child=1;child<=206;child++)output+='    ok '+child+' - fixture nested '+child+'\n';output+='    1..206\n';}
+  output+=(failed?'not ok':'ok')+' '+(index+1)+' - '+parent+'\n';
+  if(failed){
+   if(mode==='original')output+="  ---\n  code: 'ERR_ASSERTION'\n  operator: 'strictEqual'\n  actual: false\n  expected: true\n  stack: |-\n    settle (file:///immutable-H/tests.js:3303:32)\n    async file:///immutable-H/tests.js:3304:124\n  ...\n";
+   else output+="  ---\n  code: 'ERR_ASSERTION'\n  operator: 'strictEqual'\n  actual: false\n  expected: true\n  stack: |-\n    async file:///immutable-H/tests.js:1000:1\n  ...\n";
+  }
+ }
+ output+='1..'+entered+'\n';
+ const tests=entered===128?333:entered+205,failures=mode==='original'||mode==='earlier-failure'?1:0;
+ output+='# tests '+tests+'\n# pass '+(tests-failures)+'\n# fail '+failures+'\n# cancelled 0\n# skipped 0\n';
+ if(mode!=='incomplete')output+='# todo 0\n';
+}
+process.stdout.write(output);
+if(['original','earlier-failure','target-not-entered'].includes(mode))process.exitCode=1;
+`);
+ const rejectedPreset=spawnSync(process.execPath,[path.join(__dirname,'scripts/agent-tools/linux-diagnostic-187.mjs'),'--repo',__dirname,'--evidence-dir',path.join(root,'invalid-preset-evidence'),'--scratch-parent',root,'--preset','^.*$'],{cwd:__dirname,encoding:'utf8'});
+ assert.equal(rejectedPreset.status,2,'the carrier rejects arbitrary patterns as preset input');
+ assert.match(rejectedPreset.stderr,/invalid paths\/options/);
+ assert.equal(fs.existsSync(path.join(root,'invalid-preset-evidence')),false,'invalid preset input creates no evidence or scratch');
+ const cases=[
+  ['positive','passed'],['original','original-first-add-refusal'],['earlier-failure','other-failure'],
+  ['target-not-entered','incomplete-or-unexpected'],['incomplete','incomplete-or-unexpected'],
+  ['browser-install-failure','setup'],['browser-install-timeout','setup'],['browser-runtime-failure','setup'],['source-changed-after-install','setup'],['prefix-timeout','prefix-timeout'],
+ ];
+ try{
+  for(const [scenario,expected]of cases){
+   const area=path.join(root,scenario);fs.mkdirSync(area);const calls=[];let browserPath;
+   const port=async(command,args,options)=>{
+    if(args[0]==='-e'&&args[1].includes('heap_size_limit'))return execute(process.execPath,['-e','console.log('+JSON.stringify(JSON.stringify({platform:'linux',arch:'x64',version:'v22.23.3',executable:process.execPath,kernel:'synthetic-recording-boundary',cpus:2,memory:6000000000,heap:2000000000}))+')'],options);
+    if(args[0]==='-e'&&args[1].includes('chromium.executablePath')){
+     calls.push({kind:'browser-runtime',env:options.env});
+     if(scenario==='browser-runtime-failure')return execute(process.execPath,['-e','console.error("synthetic browser runtime failure");process.exitCode=1'],options);
+     return execute(process.execPath,['-e','console.log('+JSON.stringify(JSON.stringify({playwrightVersion:lockedPlaywrightVersion,executablePresent:true,executableRelativePath:'chromium-test-fixture/chrome',insideOwnedDirectory:true}))+')'],options);
+    }
+    if(command==='npm'){
+     calls.push({kind:'install',cwd:options.cwd,args,env:options.env});
+     fs.mkdirSync(path.join(options.cwd,'node_modules'));
+     return execute(process.execPath,['-e','console.log("synthetic npm boundary")'],options);
+    }
+    if(command==='npx'){
+     browserPath=options.env.PLAYWRIGHT_BROWSERS_PATH;
+     calls.push({kind:'browser-install',cwd:options.cwd,args,browserPath,env:options.env});
+     if(scenario==='browser-install-failure')return execute(process.execPath,['-e','console.error("synthetic browser install failure");process.exitCode=1'],options);
+     if(scenario==='browser-install-timeout')return {code:null,signal:'SIGTERM',pid:4242,reason:'timeout',error:null,stdout:'',stderr:'',bytes:0,complete:false};
+     fs.mkdirSync(path.join(browserPath,'chromium-test-fixture'),{recursive:true});
+     fs.writeFileSync(path.join(browserPath,'chromium-test-fixture','chrome'),'fixture browser');
+     if(scenario==='source-changed-after-install')fs.appendFileSync(path.join(options.cwd,'tests.js'),'\n// synthetic install mutation\n');
+     return execute(process.execPath,['-e','console.log("synthetic Chromium install")'],options);
+    }
+    if(args[0]?.endsWith('/record-run.mjs')){
+     const separator=args.indexOf('--'),intended=args.slice(separator+2),pattern=intended.find(arg=>arg.startsWith('--test-name-pattern='));
+     const isPrefix=pattern?.includes('|')??false,name=intended.includes('--cpu-prof')?threeYes:noAck;
+     calls.push({kind:'consumer',label:path.basename(options.cwd),name,intended,env:options.env});
+     if(scenario==='prefix-timeout')return {code:null,signal:'SIGTERM',pid:4243,reason:'timeout',error:null,stdout:'',stderr:'',bytes:0,complete:false};
+     const mode=isPrefix?scenario:'single';
+     return execute(command,[...args.slice(0,separator+2),recordingChild,mode,name,JSON.stringify(parents)],options);
+    }
+    return execute(command,args,options);
+   };
+   const summary=await runDiagnostic({repo:__dirname,evidenceDir:path.join(area,'evidence'),scratchParent:area,preset:'noack-prefix-h'},port);
+   const consumers=calls.filter(call=>call.kind==='consumer');
+   const records=summary.consumers.map(item=>item.record?JSON.parse(fs.readFileSync(path.join(area,'evidence',item.record),'utf8')):null);
+   if(expected==='setup'){
+    assert.equal(consumers.length,0,scenario+' never starts the app prefix');
+    assert.equal(summary.status,'incomplete');
+    assert.equal(summary.exitCode,1);
+    assert.ok(['browser-install-failed','browser-runtime-failed','immutable-source-mismatch-H'].includes(summary.stopReason),scenario+' is retained as setup failure');
+    assert.equal(summary.browser.status,scenario.startsWith('browser-install')?'install-failed':scenario==='browser-runtime-failure'?'runtime-failed':'installed');
+    assert.equal(fs.existsSync(path.join(area,'evidence','before-cleanup.json')),true);
+    assert.equal(summary.cleanup.status,'removed');
+    if(browserPath)assert.equal(fs.existsSync(browserPath),false,'owned browser files are removed after setup failure');
+    const installCalls=calls.filter(call=>call.kind==='browser-install');
+    if(scenario.startsWith('browser-install')){
+     assert.equal(installCalls.length,1);
+     assert.deepEqual(installCalls[0].args,['--no-install','playwright','install','--with-deps','chromium']);
+     assert.equal(path.basename(installCalls[0].cwd),'H');
+     assert.equal(installCalls[0].browserPath,path.join(path.dirname(installCalls[0].cwd),'playwright-browsers'));
+     assert.equal(installCalls[0].env.PLAYWRIGHT_BROWSERS_PATH,browserPath,'the browser install receives only its owned download directory');
+    }
+    if(scenario==='browser-install-timeout'){
+     const commandRecords=fs.readdirSync(path.join(area,'evidence')).filter(file=>file.endsWith('browser-install.json'));
+     assert.equal(commandRecords.length,1);
+     assert.equal(JSON.parse(fs.readFileSync(path.join(area,'evidence',commandRecords[0]),'utf8')).result.reason,'timeout');
+    }
+    continue;
+   }
+   if(expected==='prefix-timeout'){
+    assert.deepEqual(consumers.map(call=>[call.label,call.name]),[['H',noAck]]);
+    assert.equal(summary.status,'incomplete');assert.equal(summary.exitCode,1);assert.equal(summary.stopReason,'prefix-timeout');
+    assert.equal(summary.consumers[0].classification,'incomplete-or-unexpected');
+    assert.equal(summary.cleanup.status,'removed');assert.equal(fs.existsSync(browserPath),false,'a timed-out prefix still removes the owned browser download');
+    const commandRecords=fs.readdirSync(path.join(area,'evidence')).filter(file=>file.endsWith('H-noACK-prefix.json'));
+    assert.equal(commandRecords.length,1);assert.equal(JSON.parse(fs.readFileSync(path.join(area,'evidence',commandRecords[0]),'utf8')).result.reason,'timeout');
+    continue;
+   }
+   assert.deepEqual(consumers.map(call=>[call.label,call.name]),[['H',noAck]],scenario+' only the exact H prefix is executed');
+   const expectedStatus=expected==='passed'?'completed':['original-first-add-refusal','other-failure'].includes(expected)?'completed-with-negative-prefix':'incomplete';
+   assert.equal(summary.status,expectedStatus,scenario);
+   assert.equal(summary.exitCode,expected==='passed'?0:1,scenario);
+   assert.deepEqual(summary.consumers.map(item=>item.classification),[expected],scenario+' '+JSON.stringify(records));
+   assert.deepEqual(consumers.map(call=>[call.label,call.name]),[['H',noAck]],scenario+' only the exact H prefix is executed');
+   const prefix=consumers[0],pattern=prefix.intended.find(arg=>arg.startsWith('--test-name-pattern='));
+   assert.equal(pattern,'--test-name-pattern='+expectedPattern,'the selection is exactly the first 128 literal H parents through noACK');
+   assert.equal(prefix.intended.at(-1),'tests.js');
+   assert.equal(prefix.intended.includes('--cpu-prof'),false,'the prefix does not substitute a profiler run');
+   assert.equal(prefix.env.PLAYWRIGHT_BROWSERS_PATH,browserPath,'only the owned browser path is supplied to the test process');
+   const dependencyInstall=calls.find(call=>call.kind==='install');
+   assert.deepEqual(dependencyInstall.args,['ci','--ignore-scripts','--no-audit','--no-fund']);
+   assert.equal(path.basename(dependencyInstall.cwd),'H');
+   assert.equal(dependencyInstall.env.PLAYWRIGHT_BROWSERS_PATH,undefined,'only browser setup and the prefix receive the owned browser path');
+   assert.equal(calls.filter(call=>call.kind==='browser-runtime').length,1);
+   assert.equal(calls.filter(call=>call.kind==='browser-install').length,1);
+   assert.equal(summary.sources.length,1);assert.equal(summary.sources[0].label,'H');
+   assert.equal(summary.prefix.afterInstallSourceCheck,'clean');
+   assert.equal(summary.browser.playwrightVersion,lockedPlaywrightVersion);
+   assert.equal(summary.browser.status,'ready');
+   assert.equal(summary.cleanup.status,'removed');
+   assert.equal(fs.existsSync(browserPath),false,'the owned Chromium download is cleaned with the scratch checkout');
+   const record=records[0];
+   if(expected!=='incomplete-or-unexpected'){
+    const stdout=record.execution.output.stdout;
+    assert.match(stdout,/^# tests 333$/m);assert.match(stdout,/^# skipped 0$/m);assert.match(stdout,/^# cancelled 0$/m);
+   }
+   if(scenario==='original'){
+    const tracePath=path.join(area,'evidence',summary.consumers[0].label,'failure-only.trace.txt');
+    assert.equal(fs.existsSync(tracePath),true,'the target-only trace is retained beside the full TAP record');
+    assert.match(fs.readFileSync(tracePath,'utf8'),/not ok 128 - RISK corrupt cloud work budget:/);
+    assert.match(fs.readFileSync(tracePath,'utf8'),/tests\.js:3304:124/);
+   }
   }
  }finally{fs.rmSync(root,{recursive:true,force:true});}
 });

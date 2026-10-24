@@ -4,6 +4,7 @@ This map records the current named RISK contracts in tests.js. It lets reviewers
 
 - Exact diagnostic push authority preserves ordinary scanner/main gates and bounded setup failure evidence: `RISK repository process: the exact diagnostic push retains standard CI authority and setup failure evidence`.
 - Immutable public H/J sources, fixed one-shot command order and outcome classification; a positive profile identifies `tests.js`, while an unidentifiable profile leaves the diagnostic incomplete and retains raw artifacts and the recorder verdict: `RISK repository process: the Linux carrier verifies sources bounded consumers and identified profile children`.
+- Finite H noACK prefix selection, lockfile-matched Chromium setup, full TAP/target classification, failure trace retention and owned timeout cleanup: `RISK repository process: the Linux carrier replays the finite immutable H noACK prefix with owned Chromium`.
 - Owned process timeout/output bounds and changed-marker cleanup refusal: `RISK repository process: diagnostic process limits stop owned children and cleanup refuses foreign ownership`.
 
 - RISK rooftop gardens: daylight hides paired plants while preserving decks and nighttime lights
