@@ -2,8 +2,8 @@
 
 import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, resolve } from 'node:path';
-import { lstat, mkdir, open, readFile, realpath, rename, stat, unlink, writeFile } from 'node:fs/promises';
-import { randomUUID } from 'node:crypto';
+import { link, lstat, mkdir, open, readFile, realpath, rename, stat, unlink, writeFile } from 'node:fs/promises';
+import { createHash, randomUUID } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { pathToFileURL } from 'node:url';
@@ -14,6 +14,7 @@ const LOCK_RETRY_MS = 50;
 const LOCK_ATTEMPTS = 600;
 const EMPTY_LOCK_GRACE_MS = 1_000;
 const DEFAULT_COORDINATION_LEASE_MS = 90_000;
+const RETIRED_LEDGER_PREFIX = '!CODEX_COORDINATION_RETIRED_V1\n';
 const execFileAsync = promisify(execFile);
 
 function discover(args, environment = process.env) {
@@ -87,7 +88,11 @@ function isoNow(value = new Date()) {
 
 async function readState(filePath, { pruneReservations = true } = {}) {
   try {
-    const state = normalizeState(JSON.parse(await readFile(filePath, 'utf8')));
+    const contents = await readFile(filePath, 'utf8');
+    if (contents.startsWith(RETIRED_LEDGER_PREFIX)) {
+      throw new Error(`This coordination ledger is retired. ${contents.slice(RETIRED_LEDGER_PREFIX.length).trim()}`);
+    }
+    const state = normalizeState(JSON.parse(contents));
     if (pruneReservations) {
       state.reservations = state.reservations.filter((reservation) =>
         processIsAlive(reservation.pid) || processIsAlive(reservation.childPid));
@@ -216,6 +221,333 @@ async function writeState(filePath, state) {
   } finally {
     await unlink(temporaryPath).catch(() => undefined);
   }
+}
+
+function sha256(contents) {
+  return createHash('sha256').update(contents).digest('hex');
+}
+
+function absoluteMigrationPath(value, option) {
+  if (typeof value !== 'string' || !isAbsolute(value) || resolve(value) !== value || value === '/') {
+    throw new Error(`Migration requires a normalized absolute ${option} path.`);
+  }
+  return value;
+}
+
+async function metadataIfPresent(path) {
+  try { return await lstat(path); }
+  catch (error) { if (error?.code !== 'ENOENT') throw error; return undefined; }
+}
+
+function assertOwnedMetadata(metadata, path, type = 'file') {
+  if (typeof process.getuid !== 'function' || metadata.uid !== process.getuid()
+    || metadata.isSymbolicLink() || (type === 'file' ? !metadata.isFile() : !metadata.isDirectory())
+    || (metadata.mode & 0o022) !== 0 || (type === 'file' && metadata.nlink !== 1)) {
+    throw new Error(`Unverifiable ownership or unsafe ${type} at ${path}; migration refuses symlinks, hardlinks and shared-writable paths.`);
+  }
+}
+
+// Resolve existing ancestors before creating anything. Source aliases such as
+// macOS /var are recorded explicitly; destination/backup ancestors must be literal.
+async function migrationParent(path, { allowAlias = false } = {}) {
+  let ancestor = dirname(path);
+  while (!(await metadataIfPresent(ancestor))) {
+    const next = dirname(ancestor);
+    if (next === ancestor) throw new Error(`No existing migration ancestor for ${path}.`);
+    ancestor = next;
+  }
+  const metadata = await lstat(ancestor);
+  assertOwnedMetadata(metadata, ancestor, 'directory');
+  const canonical = await realpath(ancestor);
+  // macOS's system /var alias is the existing default source location. Other
+  // ancestor aliases can disguise another ledger and require an explicit path.
+  const systemVarAlias = allowAlias && (ancestor === '/var' || ancestor.startsWith('/var/'))
+    && canonical === `/private${ancestor}`;
+  if (canonical !== ancestor && !systemVarAlias) throw new Error(`Ambiguous symlink ancestor at ${ancestor}.`);
+  let component = canonical;
+  while (true) {
+    const owner = await lstat(component);
+    const systemTemporary = owner.uid === 0 && (owner.mode & 0o1000) !== 0;
+    if (!owner.isDirectory() || owner.isSymbolicLink() || ![0, process.getuid()].includes(owner.uid)
+      || ((owner.mode & 0o022) !== 0 && !systemTemporary)) {
+      throw new Error(`Unsafe migration ancestor ownership or permissions at ${component}.`);
+    }
+    const parent = dirname(component);
+    if (parent === component) break;
+    component = parent;
+  }
+  return { ancestor, canonical, dev: metadata.dev, ino: metadata.ino };
+}
+
+function validateMigrationState(contents) {
+  let state;
+  try { state = JSON.parse(contents); }
+  catch { throw new Error('Migration requires an intact v1 ledger; the source is not valid JSON.'); }
+  if (state?.version !== 1 || state?.scope !== 'codex-wide'
+    || !['entries', 'reservations', 'configurations'].every((key) => Array.isArray(state[key]))) {
+    throw new Error('Migration requires the explicit v1 codex-wide ledger arrays; normalization is forbidden.');
+  }
+  const ids = new Set();
+  const absoluteWorktree = (item) => typeof item?.worktree === 'string' && isAbsolute(item.worktree);
+  for (const entry of state.entries) {
+    if (!entry || typeof entry.id !== 'string' || !entry.id || ids.has(entry.id) || !absoluteWorktree(entry)
+      || !['active', 'parked', 'complete'].includes(entry.status)
+      || ['claims', 'resources', 'scopes'].some((key) => entry[key] !== undefined
+        && (!Array.isArray(entry[key]) || entry[key].some((value) => typeof value !== 'string')))) {
+      throw new Error('Migration refuses malformed or ambiguous entry ownership.');
+    }
+    ids.add(entry.id);
+    if (entry.status === 'active') throw new Error(`Migration blocked by active coordination entry ${entry.id}; its owner must park or complete it.`);
+    if (entry.status === 'parked' && (typeof entry.branchName !== 'string' || !entry.branchName
+      || !/^[0-9a-f]{40}$/i.test(entry.parked?.checkpointSha ?? '')
+      || (entry.parked?.worktree !== undefined && entry.parked.worktree !== entry.worktree))) {
+      throw new Error(`Migration cannot verify parked ownership for ${entry.id}.`);
+    }
+  }
+  for (const reservation of state.reservations) {
+    if (!absoluteWorktree(reservation) || ![reservation?.pid, reservation?.childPid].some((pid) => Number.isInteger(pid) && pid > 0)) {
+      throw new Error('Migration cannot verify reservation ownership.');
+    }
+    if (processIsAlive(reservation.pid) || processIsAlive(reservation.childPid)) {
+      throw new Error('Migration blocked by a live reservation; its owner must stop it.');
+    }
+  }
+  if (state.configurations.some((configuration) => !absoluteWorktree(configuration))) {
+    throw new Error('Migration cannot verify configuration ownership.');
+  }
+  return state;
+}
+
+async function durableExclusiveFile(path, contents) {
+  const handle = await open(path, 'wx', 0o600);
+  try { await handle.writeFile(contents); await handle.sync(); }
+  finally { await handle.close(); }
+}
+
+async function syncDirectory(path) {
+  const handle = await open(path, 'r');
+  try { await handle.sync(); } finally { await handle.close(); }
+}
+
+function fileIdentity(metadata) {
+  return { dev: metadata.dev, ino: metadata.ino, uid: metadata.uid, mode: metadata.mode };
+}
+
+function sameIdentity(metadata, identity) {
+  return metadata && ['dev', 'ino', 'uid', 'mode'].every((key) => metadata[key] === identity?.[key]);
+}
+
+async function requireMigrationFile(path, identity, digest, { linkedStage } = {}) {
+  const metadata = await lstat(path);
+  // Publication may be interrupted between the exclusive link and staging unlink.
+  // Accept that single known alias only; arbitrary same-byte hardlinks are unsafe.
+  if (linkedStage && metadata.nlink === 2) {
+    const stage = await lstat(linkedStage);
+    if (!sameIdentity(stage, identity)) throw new Error(`Unexpected publication alias at ${path}.`);
+  } else {
+    assertOwnedMetadata(metadata, path);
+  }
+  if (!metadata.isFile() || metadata.isSymbolicLink() || !sameIdentity(metadata, identity)
+    || sha256(await readFile(path)) !== digest || !sameIdentity(await lstat(path), identity)) {
+    throw new Error(`Migration identity or bytes changed at ${path}; refusing to overwrite or infer ownership.`);
+  }
+}
+
+async function assertMigrationAncestor(snapshot) {
+  const metadata = await lstat(snapshot.ancestor);
+  assertOwnedMetadata(metadata, snapshot.ancestor, 'directory');
+  if (metadata.dev !== snapshot.dev || metadata.ino !== snapshot.ino
+    || await realpath(snapshot.ancestor) !== snapshot.canonical) {
+    throw new Error(`Migration ancestor changed at ${snapshot.ancestor}.`);
+  }
+}
+
+async function assertAbsent(path) {
+  if (await metadataIfPresent(path)) throw new Error(`Migration refuses an existing destination or conflicting state at ${path}.`);
+}
+
+function migrationBlocker(receipt) {
+  return `${RETIRED_LEDGER_PREFIX}Canonical ledger: ${receipt.target}\nRecovery receipt: ${receipt.backupDirectory}/migration.json\nUse the shared CODEX_COORDINATION_FILE; this retired path is not a ledger.\n`;
+}
+
+async function updateMigrationReceipt(receipt) {
+  const path = `${receipt.backupDirectory}/migration.json`;
+  assertOwnedMetadata(await lstat(path), path);
+  const temporary = `${path}.${randomUUID()}.tmp`;
+  await durableExclusiveFile(temporary, `${JSON.stringify(receipt, null, 2)}\n`);
+  await rename(temporary, path);
+  await syncDirectory(receipt.backupDirectory);
+}
+
+async function removeMigrationArtifact(path, identity, digest) {
+  if (!(await metadataIfPresent(path))) return;
+  await requireMigrationFile(path, identity, digest);
+  await unlink(path);
+  await syncDirectory(dirname(path));
+}
+
+async function migrate(source, options) {
+  if (!options.file) throw new Error('Migration requires an explicit --file source.');
+  source = absoluteMigrationPath(options.file, '--file');
+  const target = absoluteMigrationPath(options.to, '--to');
+  const backupDirectory = absoluteMigrationPath(options['backup-dir'], '--backup-dir');
+  const expected = options['expected-sha256'];
+  const phase = options.phase ?? 'all';
+  if (!/^[0-9a-f]{64}$/.test(expected ?? '')) throw new Error('Migration requires an exact lowercase --expected-sha256 digest from the reviewed source.');
+  if (!['prepare', 'block', 'publish', 'all', 'rollback'].includes(phase)) throw new Error('Migration --phase must be prepare, block, publish, all or rollback.');
+  if ([source, target].some((path) => backupDirectory === path || backupDirectory.startsWith(`${path}/`))
+    || source.startsWith(`${backupDirectory}/`) || target.startsWith(`${backupDirectory}/`)) {
+    throw new Error('Migration source, destination and backup directory must be separate paths.');
+  }
+  const parents = await Promise.all([
+    migrationParent(source, { allowAlias: true }), migrationParent(target), migrationParent(backupDirectory),
+  ]);
+  const canonicalSource = resolve(parents[0].canonical, source.slice(parents[0].ancestor.length + 1));
+  const canonicalTarget = resolve(parents[1].canonical, target.slice(parents[1].ancestor.length + 1));
+  if (canonicalSource === canonicalTarget || canonicalSource.startsWith(`${canonicalTarget}/`)
+    || canonicalTarget.startsWith(`${canonicalSource}/`)) throw new Error('Migration paths alias or overlap.');
+  for (const path of [source, target]) {
+    for (const suffix of ['.lock', '.lock.recovery']) {
+      const lockPath = `${path}${suffix}`;
+      const lock = await metadataIfPresent(lockPath);
+      if (lock) {
+        assertOwnedMetadata(lock, lockPath);
+        if (!lockOwner(await readFile(lockPath, 'utf8'))) throw new Error(`Migration cannot verify lock ownership at ${lockPath}.`);
+      }
+    }
+  }
+  const locks = [canonicalSource, canonicalTarget].sort();
+  const receiptPath = `${backupDirectory}/migration.json`;
+  return withCoordinationLock(locks[0], () => withCoordinationLock(locks[1], async () => {
+    await Promise.all(parents.map(assertMigrationAncestor));
+    // New parents created by the lock helper must also be literal private paths.
+    await Promise.all([migrationParent(source, { allowAlias: true }), migrationParent(target)]);
+    let receipt;
+    try {
+      if (phase === 'all' || phase === 'prepare') {
+        await assertAbsent(target);
+        await assertAbsent(backupDirectory);
+        const metadata = await lstat(source);
+        assertOwnedMetadata(metadata, source);
+        const contents = await readFile(source);
+        if (sha256(contents) !== expected) throw new Error('Migration source SHA-256 changed since review.');
+        validateMigrationState(contents);
+        const sourceIdentity = fileIdentity(metadata);
+        await requireMigrationFile(source, sourceIdentity, expected);
+        await mkdir(dirname(backupDirectory), { recursive: true, mode: 0o700 });
+        await migrationParent(backupDirectory);
+        await mkdir(backupDirectory, { mode: 0o700 });
+        const id = randomUUID();
+        receipt = {
+          kind: 'codex-coordination-migration-v1', id, source, target, backupDirectory,
+          canonicalSource, canonicalTarget, sha256: expected, sourceIdentity,
+          stagedTarget: `${target}.migration-${id}.staged`,
+          blockerTemporary: `${source}.migration-${id}.blocker`,
+          status: 'preparing', createdAt: new Date().toISOString(),
+          recovery: 'Inspect source/target identities and bytes as well as this receipt: a crash can precede its stage update. Before publication, rollback restores only the verified original or this migration blocker; after publication the target is authoritative.',
+        };
+        await durableExclusiveFile(`${backupDirectory}/source.json`, contents);
+        receipt.backupIdentity = fileIdentity(await lstat(`${backupDirectory}/source.json`));
+        await durableExclusiveFile(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
+        await syncDirectory(backupDirectory);
+        await syncDirectory(dirname(backupDirectory));
+        await durableExclusiveFile(receipt.stagedTarget, contents);
+        receipt.stagedIdentity = fileIdentity(await lstat(receipt.stagedTarget));
+        await syncDirectory(dirname(target));
+        await durableExclusiveFile(receipt.blockerTemporary, migrationBlocker(receipt));
+        receipt.blockerIdentity = fileIdentity(await lstat(receipt.blockerTemporary));
+        await syncDirectory(dirname(source));
+        receipt.status = 'prepared';
+        await updateMigrationReceipt(receipt);
+      } else {
+        assertOwnedMetadata(await lstat(backupDirectory), backupDirectory, 'directory');
+        assertOwnedMetadata(await lstat(receiptPath), receiptPath);
+        receipt = JSON.parse(await readFile(receiptPath, 'utf8'));
+        if (receipt.kind !== 'codex-coordination-migration-v1' || !/^[0-9a-f-]{36}$/.test(receipt.id ?? '')
+          || receipt.source !== source || receipt.target !== target || receipt.backupDirectory !== backupDirectory
+          || receipt.canonicalSource !== canonicalSource || receipt.canonicalTarget !== canonicalTarget || receipt.sha256 !== expected
+          || receipt.stagedTarget !== `${target}.migration-${receipt.id}.staged`
+          || receipt.blockerTemporary !== `${source}.migration-${receipt.id}.blocker`
+          || !['preparing', 'prepared', 'source-blocked', 'migrated', 'rolled-back'].includes(receipt.status)) {
+          throw new Error('Migration receipt does not match the reviewed paths, digest and supported state.');
+        }
+        await requireMigrationFile(`${backupDirectory}/source.json`, receipt.backupIdentity, expected);
+        validateMigrationState(await readFile(`${backupDirectory}/source.json`));
+      }
+      const markerDigest = sha256(migrationBlocker(receipt));
+      if (phase === 'rollback') {
+        await assertAbsent(target); // Never roll back after publication, even identical bytes.
+        if (receipt.status === 'migrated' || receipt.status === 'rolled-back') throw new Error('Migration is already finalized; rollback is unavailable.');
+        // Verify everything rollback would remove before changing the authority.
+        // A substituted staging file belongs to someone else, even with equal bytes.
+        for (const [path, identity, digest] of [
+          [receipt.stagedTarget, receipt.stagedIdentity, expected],
+          [receipt.blockerTemporary, receipt.blockerIdentity, markerDigest],
+        ]) {
+          if (await metadataIfPresent(path)) await requireMigrationFile(path, identity, digest);
+        }
+        const current = await lstat(source);
+        if (sameIdentity(current, receipt.sourceIdentity)) {
+          await requireMigrationFile(source, receipt.sourceIdentity, expected);
+        } else {
+          await requireMigrationFile(source, receipt.blockerIdentity, markerDigest);
+          const restore = `${source}.migration-${receipt.id}.restore`;
+          await durableExclusiveFile(restore, await readFile(`${backupDirectory}/source.json`));
+          await requireMigrationFile(source, receipt.blockerIdentity, markerDigest);
+          await assertAbsent(target);
+          await rename(restore, source);
+          await syncDirectory(dirname(source));
+        }
+        receipt.status = 'rolled-back';
+        receipt.restoredSourceIdentity = fileIdentity(await lstat(source));
+        await updateMigrationReceipt(receipt);
+        await removeMigrationArtifact(receipt.stagedTarget, receipt.stagedIdentity, expected);
+        await removeMigrationArtifact(receipt.blockerTemporary, receipt.blockerIdentity, markerDigest);
+      } else {
+        if (phase === 'all' || phase === 'block') {
+          await assertAbsent(target);
+          if (!['prepared', 'source-blocked'].includes(receipt.status)) throw new Error('Migration must be fully prepared before source blocking.');
+          const current = await lstat(source);
+          if (sameIdentity(current, receipt.blockerIdentity)) {
+            await requireMigrationFile(source, receipt.blockerIdentity, markerDigest);
+          } else {
+            await requireMigrationFile(source, receipt.sourceIdentity, expected);
+            validateMigrationState(await readFile(source));
+            await requireMigrationFile(receipt.stagedTarget, receipt.stagedIdentity, expected);
+            await requireMigrationFile(receipt.blockerTemporary, receipt.blockerIdentity, markerDigest);
+            await rename(receipt.blockerTemporary, source);
+            await syncDirectory(dirname(source));
+          }
+          receipt.status = 'source-blocked';
+          await updateMigrationReceipt(receipt);
+        }
+        if (phase === 'all' || phase === 'publish') {
+          if (!['prepared', 'source-blocked', 'migrated'].includes(receipt.status)) throw new Error('Migration must be prepared and blocked before publication.');
+          await requireMigrationFile(source, receipt.blockerIdentity, markerDigest);
+          if (await metadataIfPresent(target)) {
+            await requireMigrationFile(target, receipt.stagedIdentity, expected, { linkedStage: receipt.stagedTarget });
+          } else {
+            await requireMigrationFile(receipt.stagedTarget, receipt.stagedIdentity, expected);
+            await link(receipt.stagedTarget, target); // Exclusive publication: rename could clobber a concurrent target.
+            await syncDirectory(dirname(target));
+          }
+          // This unlink also completes an interrupted exclusive-link publication.
+          const staged = await metadataIfPresent(receipt.stagedTarget);
+          if (staged) {
+            if (!sameIdentity(staged, receipt.stagedIdentity)) throw new Error('Migration staging identity changed.');
+            await unlink(receipt.stagedTarget);
+            await syncDirectory(dirname(target));
+          }
+          receipt.status = 'migrated';
+          receipt.completedAt = new Date().toISOString();
+          await updateMigrationReceipt(receipt);
+        }
+      }
+      return { status: receipt.status, source, target, sha256: expected, receiptPath };
+    } catch (error) {
+      throw new Error(`${error.message} Migration stopped; inspect ${receiptPath} and retained source/target/backup identities before recovery.`, { cause: error });
+    }
+  }));
 }
 
 function parseList(value) {
@@ -905,6 +1237,14 @@ if (command === 'discover') {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 2;
   }
+} else if (command === 'migrate') {
+  try {
+    const options = parseOptions(args);
+    console.log(JSON.stringify(await migrate(discover(args), options), null, 2));
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 2;
+  }
 } else if (command === 'claim') {
   try {
     const entry = await claim(discover(args), parseOptions(args));
@@ -922,6 +1262,6 @@ if (command === 'discover') {
     process.exitCode = 2;
   }
 } else {
-  console.error('usage: coordination.mjs <discover|export-env|install|status|begin|heartbeat|claim|release-claim|park|resume|finish> [options]');
+  console.error('usage: coordination.mjs <discover|export-env|install|migrate|status|begin|heartbeat|claim|release-claim|park|resume|finish> [options]');
   process.exitCode = 2;
 }
