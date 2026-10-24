@@ -3,7 +3,7 @@
 This map records the current named RISK contracts in tests.js. It lets reviewers see which costly feature boundaries already have explicit protection before changing nearby behavior. Related non-RISK regression tests remain part of the contract too; the focused companions below call those out where they matter.
 
 - Exact diagnostic push authority preserves ordinary scanner/main gates and bounded setup failure evidence: `RISK repository process: the exact diagnostic push retains standard CI authority and setup failure evidence`.
-- Immutable public H/J sources, fixed one-shot command order, outcome classification, separate recorder/profile artifacts and safe scratch cleanup: `RISK repository process: the Linux carrier verifies immutable sources and records only the fixed bounded consumer plan`.
+- Immutable public H/J sources, fixed one-shot command order and outcome classification; a positive profile identifies `tests.js`, while an unidentifiable profile leaves the diagnostic incomplete and retains raw artifacts and the recorder verdict: `RISK repository process: the Linux carrier verifies sources bounded consumers and identified profile children`.
 - Owned process timeout/output bounds and changed-marker cleanup refusal: `RISK repository process: diagnostic process limits stop owned children and cleanup refuses foreign ownership`.
 
 - RISK rooftop gardens: daylight hides paired plants while preserving decks and nighttime lights

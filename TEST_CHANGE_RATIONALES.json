@@ -18580,5 +18580,62 @@
       "command": "TZ=UTC official Node22.23.3 recorder --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern=^RISK repository process: the exact diagnostic push retains standard CI authority and setup failure evidence$ tests.js; setup-artifact-red record1fafbab0-1bcc-4c24-84dc-06ba4a9be0fd at18:32:34Z.",
       "failure": "The actual workflow lacked diagnostic-setup-evidence. One named ERR_ASSERTION failed: checkout or Node setup failure must retain a setup artifact before the helper can start. Exit1, zero skip/cancel, before the setup-preservation step or run-subdirectory repair; no missing module/parser and no application causal claim."
     }
+  },
+    {
+    "baseCommit": "39622e931329afe00c719bf06ec2dd080a22ca47",
+    "testChangesSha256": "15856c1fb43c93551d81774f648c44c8eafd8b7e0fced1fb32b145e08124bed8",
+    "reason": "Require an identified tests.js child profile so a parent-only or unrelated profile cannot complete the diagnostic.",
+    "previousBehavior": "Any nonempty CPU profile list left the profiled consumer passed even when every profile lacked a tests.js frame and testChildProfilePids was empty.",
+    "intendedBehavior": "A missing profile or missing identified test-child profile makes the diagnostic incomplete with exit code 1 while preserving every raw profile and the completed record-run TAP verdict.",
+    "replacementTests": [
+      "RISK repository process: the Linux carrier verifies sources bounded consumers and identified profile children"
+    ],
+    "preservedCoverage": [
+      "All 728 existing rationale objects remain raw-byte exact; the fixed H/J public sources, ordered consumer plan, 20s/30s/1000ms budgets and 434 tasks/40 archive groups/80 facts remain unchanged.",
+      "The positive synthetic profile identifies a tests.js frame; the parent-only synthetic profile remains on disk and its recorder record still reports a complete passing TAP outcome while the diagnostic verdict is incomplete.",
+      "The process fixture exercises only the runner boundary. It does not establish Linux application behavior, cause, repair, the original H first-Add refusal or the J 1010ms responsiveness RED."
+    ],
+    "redEvidence": {
+      "command": "PATH=/Users/emeraldpham/Documents/Codex/2026-10-22/issue-187/evidence/persist-ownership-repair/npm-cache/_npx/d18f28baf1132559/node_modules/node/bin:$PATH TZ=UTC node scripts/agent-tools/record-run.mjs --repo \"/Users/emeraldpham/.codex/worktrees/recovery-187-linux/funsidething\" --evidence-dir /Users/emeraldpham/Documents/Codex/2026-10-22/issue-187/evidence/linux-x64-carrier/profile-identity-repair/red --purpose preimplementation-red -- /Users/emeraldpham/Documents/Codex/2026-10-22/issue-187/evidence/persist-ownership-repair/npm-cache/_npx/d18f28baf1132559/node_modules/node/bin/node --test --test-reporter=tap --test-name-pattern=\"^RISK repository process: the Linux carrier verifies sources bounded consumers and identified profile children$\" tests.js; record /Users/emeraldpham/Documents/Codex/2026-10-22/issue-187/evidence/linux-x64-carrier/profile-identity-repair/red/2026-10-24T13-51-49-006Z-5df33f99-9024-4eca-9dad-9d5f709f8d73.json sha256=aa67afe6eab6cf9673ad9413094d049594d8878051a6b9640edb0e6174334060",
+      "failure": "On candidate C=39622e931329afe00c719bf06ec2dd080a22ca47, the new parent-only profile control had a passing TAP/recorder record but no tests.js frame and an empty testChildProfilePids list. The helper returned passed instead of incomplete-or-unexpected; the named assertion failed with actual [passed, passed, passed] versus expected [passed, passed, incomplete-or-unexpected]. Exit 1, one test failed, zero skipped/cancelled. Synthetic process-control evidence only; not Linux application or causal evidence."
+    }
+  },
+  {
+    "baseCommit": "94300cf1b3ca85f00ed4f3c4c8954ac51b460f80",
+    "testChangesSha256": "20c563cd8aa5b3593ace4356cc2147a11e5dcacdc2883838011eade71f79d19d",
+    "reason": "Require an identified tests.js child profile so a parent-only or unrelated profile cannot complete the diagnostic.",
+    "previousBehavior": "Any nonempty CPU profile list left the profiled consumer passed even when every profile lacked a tests.js frame and testChildProfilePids was empty.",
+    "intendedBehavior": "A missing profile or missing identified test-child profile makes the diagnostic incomplete with exit code 1 while preserving every raw profile and the completed record-run TAP verdict.",
+    "replacementTests": [
+      "RISK repository process: the Linux carrier verifies sources bounded consumers and identified profile children"
+    ],
+    "preservedCoverage": [
+      "All 728 existing rationale objects remain raw-byte exact; the fixed H/J public sources, ordered consumer plan, 20s/30s/1000ms budgets and 434 tasks/40 archive groups/80 facts remain unchanged.",
+      "The positive synthetic profile identifies a tests.js frame; the parent-only synthetic profile remains on disk and its recorder record still reports a complete passing TAP outcome while the diagnostic verdict is incomplete.",
+      "The process fixture exercises only the runner boundary. It does not establish Linux application behavior, cause, repair, the original H first-Add refusal or the J 1010ms responsiveness RED."
+    ],
+    "redEvidence": {
+      "command": "PATH=/Users/emeraldpham/Documents/Codex/2026-10-22/issue-187/evidence/persist-ownership-repair/npm-cache/_npx/d18f28baf1132559/node_modules/node/bin:$PATH TZ=UTC node scripts/agent-tools/record-run.mjs --repo \"/Users/emeraldpham/.codex/worktrees/recovery-187-linux/funsidething\" --evidence-dir /Users/emeraldpham/Documents/Codex/2026-10-22/issue-187/evidence/linux-x64-carrier/profile-identity-repair/red --purpose preimplementation-red -- /Users/emeraldpham/Documents/Codex/2026-10-22/issue-187/evidence/persist-ownership-repair/npm-cache/_npx/d18f28baf1132559/node_modules/node/bin/node --test --test-reporter=tap --test-name-pattern=\"^RISK repository process: the Linux carrier verifies sources bounded consumers and identified profile children$\" tests.js; record /Users/emeraldpham/Documents/Codex/2026-10-22/issue-187/evidence/linux-x64-carrier/profile-identity-repair/red/2026-10-24T13-51-49-006Z-5df33f99-9024-4eca-9dad-9d5f709f8d73.json sha256=aa67afe6eab6cf9673ad9413094d049594d8878051a6b9640edb0e6174334060",
+      "failure": "On candidate C=39622e931329afe00c719bf06ec2dd080a22ca47, the new parent-only profile control had a passing TAP/recorder record but no tests.js frame and an empty testChildProfilePids list. The helper returned passed instead of incomplete-or-unexpected; the named assertion failed with actual [passed, passed, passed] versus expected [passed, passed, incomplete-or-unexpected]. Exit 1, one test failed, zero skipped/cancelled. Synthetic process-control evidence only; not Linux application or causal evidence."
+    }
+  },
+  {
+    "baseCommit": "7de2910b79ebb0996b97f1a2abd0776c505b29de",
+    "testChangesSha256": "43330e45c2903f0ac0bca931b88e51abb7d16cb934a9a67490f3ce434744a54c",
+    "reason": "Require an identified tests.js child profile so a parent-only or unrelated profile cannot complete the diagnostic.",
+    "previousBehavior": "Any nonempty CPU profile list left the profiled consumer passed even when every profile lacked a tests.js frame and testChildProfilePids was empty.",
+    "intendedBehavior": "A missing profile or missing identified test-child profile makes the diagnostic incomplete with exit code 1 while preserving every raw profile and the completed record-run TAP verdict.",
+    "replacementTests": [
+      "RISK repository process: the Linux carrier verifies sources bounded consumers and identified profile children"
+    ],
+    "preservedCoverage": [
+      "All 728 existing rationale objects remain raw-byte exact; the fixed H/J public sources, ordered consumer plan, 20s/30s/1000ms budgets and 434 tasks/40 archive groups/80 facts remain unchanged.",
+      "The positive synthetic profile identifies a tests.js frame; the parent-only synthetic profile remains on disk and its recorder record still reports a complete passing TAP outcome while the diagnostic verdict is incomplete.",
+      "The process fixture exercises only the runner boundary. It does not establish Linux application behavior, cause, repair, the original H first-Add refusal or the J 1010ms responsiveness RED."
+    ],
+    "redEvidence": {
+      "command": "PATH=/Users/emeraldpham/Documents/Codex/2026-10-22/issue-187/evidence/persist-ownership-repair/npm-cache/_npx/d18f28baf1132559/node_modules/node/bin:$PATH TZ=UTC node scripts/agent-tools/record-run.mjs --repo \"/Users/emeraldpham/.codex/worktrees/recovery-187-linux/funsidething\" --evidence-dir /Users/emeraldpham/Documents/Codex/2026-10-22/issue-187/evidence/linux-x64-carrier/profile-identity-repair/red --purpose preimplementation-red -- /Users/emeraldpham/Documents/Codex/2026-10-22/issue-187/evidence/persist-ownership-repair/npm-cache/_npx/d18f28baf1132559/node_modules/node/bin/node --test --test-reporter=tap --test-name-pattern=\"^RISK repository process: the Linux carrier verifies sources bounded consumers and identified profile children$\" tests.js; record /Users/emeraldpham/Documents/Codex/2026-10-22/issue-187/evidence/linux-x64-carrier/profile-identity-repair/red/2026-10-24T13-51-49-006Z-5df33f99-9024-4eca-9dad-9d5f709f8d73.json sha256=aa67afe6eab6cf9673ad9413094d049594d8878051a6b9640edb0e6174334060",
+      "failure": "On candidate C=39622e931329afe00c719bf06ec2dd080a22ca47, the new parent-only profile control had a passing TAP/recorder record but no tests.js frame and an empty testChildProfilePids list. The helper returned passed instead of incomplete-or-unexpected; the named assertion failed with actual [passed, passed, passed] versus expected [passed, passed, incomplete-or-unexpected]. Exit 1, one test failed, zero skipped/cancelled. Synthetic process-control evidence only; not Linux application or causal evidence."
+    }
   }
 ]

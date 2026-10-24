@@ -28468,7 +28468,7 @@ test('RISK repository process: the exact diagnostic push retains standard CI aut
  for(const name of ['release-evidence','deploy-pages'])assert.deepEqual(workflow.jobs[name],original.jobs[name]);
 });
 
-test('RISK repository process: the Linux carrier verifies immutable sources and records only the fixed bounded consumer plan',async()=>{
+test('RISK repository process: the Linux carrier verifies sources bounded consumers and identified profile children',async()=>{
  const {runDiagnostic,execute,noAck,threeYes}=await import('./scripts/agent-tools/linux-diagnostic-187.mjs');
  const root=fs.mkdtempSync(path.join(process.env.TMPDIR||'/tmp','linux-carrier-process-'));
  const recordingChild=path.join(root,'recording-child.cjs');
@@ -28491,11 +28491,12 @@ else {
 }
 if(profiles&&mode!=='profile-missing'){
  fs.mkdirSync(profiles,{recursive:true});
- fs.writeFileSync(path.join(profiles,'CPU.20261023.180000.'+process.pid+'.0.001.cpuprofile'),JSON.stringify({nodes:[{id:1,callFrame:{functionName:'recording child',url:'synthetic'}}],samples:[1],timeDeltas:[1],startTime:0,endTime:1}));
+ const url=mode==='parent-only-profile'?'synthetic':'file:///public/tests.js';
+ fs.writeFileSync(path.join(profiles,'CPU.20261023.180000.'+process.pid+'.0.001.cpuprofile'),JSON.stringify({nodes:[{id:1,callFrame:{functionName:'recording child',url}}],samples:[1],timeDeltas:[1],startTime:0,endTime:1}));
 }
 console.log(output);process.exitCode=['original','other','later'].includes(mode)?1:0;
 `);
- const scenarios=[['positive',['passed','passed','passed']],['original',['original-first-add-refusal','passed','passed']],['J-original',['passed','original-first-add-refusal','passed']],['missing-plan',['incomplete-or-unexpected']],['profile-missing',['passed','passed','incomplete-or-unexpected']],['later',['other-failure']],['other',['other-failure']],['zero',['incomplete-or-unexpected']],['duplicate',['incomplete-or-unexpected']],['skip',['incomplete-or-unexpected']],['mismatch',[]],['install-failure',[]],['foreign-link',['passed','incomplete-or-unexpected']],['unsupported-runtime',[]]];
+ const scenarios=[['positive',['passed','passed','passed']],['original',['original-first-add-refusal','passed','passed']],['J-original',['passed','original-first-add-refusal','passed']],['missing-plan',['incomplete-or-unexpected']],['profile-missing',['passed','passed','incomplete-or-unexpected']],['parent-only-profile',['passed','passed','incomplete-or-unexpected']],['later',['other-failure']],['other',['other-failure']],['zero',['incomplete-or-unexpected']],['duplicate',['incomplete-or-unexpected']],['skip',['incomplete-or-unexpected']],['mismatch',[]],['install-failure',[]],['foreign-link',['passed','incomplete-or-unexpected']],['unsupported-runtime',[]]];
  try{
   for(const [scenario,expected] of scenarios){
    const area=path.join(root,scenario);fs.mkdirSync(area);const calls=[];let foreign;
@@ -28512,7 +28513,7 @@ console.log(output);process.exitCode=['original','other','later'].includes(mode)
      const separator=args.indexOf('--'),intended=args.slice(separator+2),name=intended.includes('--cpu-prof')?threeYes:noAck,label=path.basename(options.cwd),profileArg=intended.find(a=>a.startsWith('--cpu-prof-dir='));
      calls.push({kind:'consumer',label,name,intended});
      if(calls.filter(c=>c.kind==='consumer').length>1){const previous=calls.filter(c=>c.kind==='consumer').length===2?'H-noACK':'J-noACK';assert.equal(fs.existsSync(path.join(area,'evidence',previous,'verdict.json')),true,'prior outcome is durable before the next launch');}
-     const mode=scenario==='J-original'&&label==='J'&&name===noAck?'original':scenario==='profile-missing'&&name===threeYes?'profile-missing':label==='H'&&name===noAck&&!['positive','foreign-link'].includes(scenario)?scenario:'pass';
+     const mode=scenario==='J-original'&&label==='J'&&name===noAck?'original':scenario==='profile-missing'&&name===threeYes?'profile-missing':scenario==='parent-only-profile'&&name===threeYes?'parent-only-profile':label==='H'&&name===noAck&&!['positive','foreign-link'].includes(scenario)?scenario:'pass';
      return execute(command,[...args.slice(0,separator+2),recordingChild,name,mode,label,profileArg?.slice('--cpu-prof-dir='.length)||''],options);
     }
     const result=await execute(command,args,options);
@@ -28525,7 +28526,27 @@ console.log(output);process.exitCode=['original','other','later'].includes(mode)
    const consumers=calls.filter(c=>c.kind==='consumer');
    assert.deepEqual(consumers.map(c=>[c.label,c.name]),[['H',noAck],['J',noAck],['J',threeYes]].slice(0,expected.length),scenario+' order/count');
    for(const call of consumers){assert.equal(call.intended.at(-1),'tests.js');assert.equal(call.intended.includes('--test'),true);assert.equal(call.intended.find(a=>a.startsWith('--test-name-pattern=')),'--test-name-pattern=^'+call.name+'$');assert.equal(call.intended.includes('--cpu-prof'),call.name===threeYes);}
-   if(expected.length===3){assert.equal(summary.consumers[2].profiles.length,scenario==='profile-missing'?0:1);assert.equal(new Set(summary.consumers.map(c=>c.record)).size,3);}
+   if(expected.length===3){
+    const profiled=summary.consumers[2],record=records[2];
+    assert.equal(profiled.profiles.length,scenario==='profile-missing'?0:1);
+    assert.equal(new Set(summary.consumers.map(c=>c.record)).size,3);
+    if(profiled.profiles.length){
+     const profile=profiled.profiles[0],rawPath=path.join(area,'evidence',profiled.label,'profiles',profile.file);
+     assert.equal(profile.hasTestsJsFrame,scenario!=='parent-only-profile');
+     assert.deepEqual(profiled.testChildProfilePids,scenario==='parent-only-profile'?[]:[profile.pid]);
+     assert.equal(fs.existsSync(rawPath),true,'the original CPU profile stays available');
+     assert.equal(JSON.parse(fs.readFileSync(rawPath,'utf8')).nodes.some(node=>node.callFrame?.url==='file:///public/tests.js'),scenario!=='parent-only-profile');
+    }
+    if(scenario==='parent-only-profile'){
+     assert.equal(summary.status,'completed-with-negative-or-incomplete-profile');
+     assert.equal(summary.exitCode,1);
+     assert.equal(profiled.classification,'incomplete-or-unexpected');
+     assert.equal(record.state,'complete');
+     assert.equal(record.execution.outcome,'passed');
+     assert.equal(record.execution.exitCode,0);
+     assert.match(record.execution.output.stdout,/^ok 1 - RISK populated task responsiveness:/m);
+    }
+   }
    if(scenario==='mismatch'){assert.equal(calls.length,0,'a changed immutable source launches neither install nor test');assert.equal(summary.stopReason,'immutable-source-mismatch-H');}
    if(scenario==='install-failure')assert.equal(summary.stopReason,'install-failed');
    assert.equal(fs.existsSync(path.join(area,'evidence','before-cleanup.json')),true);

@@ -223,7 +223,7 @@ export async function runDiagnostic({ repo, evidenceDir, scratchParent }, execut
         }
         item.profileScope = 'PID filenames retained; recorder PID is known. Test child PID is inferred only where profile call frames identify tests.js; no phase attribution is automatic.';
         item.testChildProfilePids = item.profiles.filter(entry => entry.hasTestsJsFrame).map(entry => entry.pid);
-        if (!item.profiles.length) item.classification = 'incomplete-or-unexpected';
+        if (!item.profiles.length || !item.testChildProfilePids.length) item.classification = 'incomplete-or-unexpected';
       }
       summary.consumers.push(item);
       await json(path.join(out, 'verdict.json'), item);
