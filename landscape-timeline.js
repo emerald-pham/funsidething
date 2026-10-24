@@ -6,6 +6,7 @@
   'use strict';
   const S=root.LivingSky,C=root.LandscapeConfig;
   const DEFAULT_SEED='chain-scanner-scene-v1',DAY=86400,MAX_LIFE=300;
+  const DAYTIME_PEOPLE=new Set(['cyclist','walker','dogwalker','reader','picnic','couple','kite','skateboarder','rollerskater','hoverboard','scooter','jetski','windsurfer','sailboat','hangglider','snowman','skier','snowangel']);
   const unit=value=>((value%1)+1)%1;
   function sample(seed,stream,slot=0,salt=0){
     let hash=2166136261;
@@ -191,7 +192,11 @@
         const speed=S.startingSpeed(r());woods.push({id:`woodland:${slot}`,type:C.woodland.types[index],start,duration:C.woodland.duration/speed,speed,seed:r(),lane:r(),reverse:r()>.5});
       }
       const woodland=woods.filter(e=>e.start<to&&e.start+reservationDuration(e)>from&&woods.filter(prior=>prior.start<e.start&&prior.start+prior.duration>e.start).length<C.woodland.maxActive);
-      return {events,woodland};
+      // Thin only after every shared admission decision is complete, so removing
+      // a person cannot free capacity for a replacement. The visit's start-time
+      // solar phase owns the choice for its full, already-admitted lifetime.
+      const visibleEvents=events.filter(e=>!DAYTIME_PEOPLE.has(e.type)||sunAt(e.start).altitude<-6||sample(seed,'daytime-human-visit',e.id)<.5);
+      return {events:visibleEvents,woodland};
     }
     function rareVisit(seconds,stream,interval,duration,chance,rate=1){
       const slot=Math.floor(seconds/interval),start=slot*interval,r=random(seed,stream,slot);

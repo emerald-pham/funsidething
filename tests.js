@@ -38389,6 +38389,111 @@ test('RISK motion safety: export clicks do not renew consent while actual choice
  assert.equal(starts,2,'the two explicit choices each update motion');assert.equal(closes,2,'each explicit choice closes its prompt');
 });
 
+test('RISK daytime people: daytime and twilight spawn rate halves while complete visits and night schedules finish intact',()=>{
+ const baselineSha='3b273718df28919586c2cd84ca835de573631fe3',baselineSource=spawnSync('git',['show',`${baselineSha}:landscape-timeline.js`],{cwd:__dirname,encoding:'utf8'});
+ assert.equal(baselineSource.status,0,`pinned scenery baseline must load: ${baselineSource.stderr}`);
+ const people=new Set(['cyclist','walker','dogwalker','reader','picnic','couple','kite','skateboarder','rollerskater','hoverboard','scooter','jetski','windsurfer','sailboat','hangglider','snowman','skier','snowangel']);
+ const actors=e=>e.type==='cyclist'?e.count||1:['couple','picnic'].includes(e.type)?2:1;
+ const digest=events=>createHash('sha256').update(JSON.stringify(events.map(e=>[e.id,e.type,actors(e),e.duration,e.activityDuration,e.count??null]))).digest('hex');
+ const from=Date.parse('2026-10-20T08:00:00.000Z'),seed='daytime-people-20261024';
+ function timeline(baseline,season,altitude,sunAt){
+  const context=sceneTimeline(baseline?{'landscape-timeline.js':()=>baselineSource.stdout}:{});
+  return context.LandscapeTimeline.create({seed,season,sunAt:sunAt||(()=>({altitude,azimuth:90}))});
+ }
+ function capture(value,fromMs,durationSeconds){
+  const events=new Map();
+  for(let seconds=0;seconds<durationSeconds;seconds+=8){
+   const at=fromMs+seconds*1000;
+   for(const valueEvent of value.at(at).events){
+    const start=at-Math.round(valueEvent.age*1000);
+    if(start<fromMs||start>=fromMs+durationSeconds*1000)continue;
+    const event=JSON.parse(JSON.stringify(valueEvent));delete event.age;
+    const prior=events.get(event.id);
+    if(prior)assert.deepEqual(event,prior.event,`${event.id} keeps one complete immutable visit recipe`);
+    else events.set(event.id,{start,event});
+   }
+  }
+  return [...events.values()].sort((a,b)=>a.event.id.localeCompare(b.event.id));
+ }
+ function checkPopulation(label,season,altitude,durationSeconds,expected,thin){
+  const reference=timeline(true,season,altitude),candidate=timeline(false,season,altitude);
+  const baseline=capture(reference,from,durationSeconds),actual=capture(candidate,from,durationSeconds);
+  const baselinePeople=baseline.filter(row=>people.has(row.event.type)).map(row=>row.event),actualPeople=actual.filter(row=>people.has(row.event.type)).map(row=>row.event);
+  const baselineOthers=baseline.filter(row=>!people.has(row.event.type)).map(row=>row.event),actualOthers=actual.filter(row=>!people.has(row.event.type)).map(row=>row.event);
+  const baselineActors=baselinePeople.reduce((n,e)=>n+actors(e),0),actualActors=actualPeople.reduce((n,e)=>n+actors(e),0);
+  assert.equal(baseline.length,expected.events,`${label} independently pinned baseline event population`);
+  assert.equal(baselinePeople.length,expected.people,`${label} independently pinned baseline human events`);
+  assert.equal(baselineActors,expected.actors,`${label} independently pinned baseline visible human count`);
+  assert.equal(baselineOthers.length,expected.others,`${label} independently pinned baseline nonhuman population`);
+  assert.equal(digest(baselinePeople),expected.peopleDigest,`${label} baseline human IDs and complete recipes stay pinned`);
+  assert.equal(digest(baselineOthers),expected.othersDigest,`${label} baseline nonhuman IDs and complete recipes stay pinned`);
+  if(thin){
+   const baselineById=new Map(baselinePeople.map(e=>[e.id,e]));
+   for(const event of actualPeople){
+    assert.ok(baselineById.has(event.id),`${label} thins the established admission plan without replacing a person`);
+    assert.deepEqual(event,baselineById.get(event.id),`${label} keeps a selected person, whole party, and complete visit unchanged`);
+   }
+   assert.ok(actualPeople.length<baselinePeople.length,`${label} removes newly admitted people from the shared scene`);
+   assert.deepEqual(actualOthers,baselineOthers,`${label} keeps every nonhuman event, identity, and lifetime unchanged`);
+   assert.ok(actualActors>=Math.ceil(baselineActors*.45)&&actualActors<=Math.floor(baselineActors*.55),`${label} sampled human spawn rate should be near half when weighted for visible people (${actualActors}/${baselineActors})`);
+  }else{
+   assert.deepEqual(actual.map(row=>row.event),baseline.map(row=>row.event),`${label} keeps daytime people and all other night events unchanged`);
+   assert.equal(actualActors,baselineActors,`${label} keeps night human count unchanged`);
+  }
+  const probe=from+2*3600_000+1234,expectedScene=JSON.parse(JSON.stringify(candidate.at(probe))),referenceScene=JSON.parse(JSON.stringify(reference.at(probe)));
+  assert.deepEqual(expectedScene.woodland,referenceScene.woodland,`${label} preserves the independent woodland schedule`);
+  assert.deepEqual(expectedScene.clouds,referenceScene.clouds,`${label} preserves shared nonhuman cloud scenery`);
+  assert.deepEqual(expectedScene.clocktower,referenceScene.clocktower,`${label} preserves independent clocktower appearances`);
+  assert.deepEqual(expectedScene.party,referenceScene.party,`${label} preserves independent rooftop visits`);
+  candidate.at(from+(durationSeconds-8)*1000);candidate.at(from+23*3600_000);candidate.at(from+3600_000);
+  assert.deepEqual(JSON.parse(JSON.stringify(candidate.at(probe))),expectedScene,`${label} repeated and reversed seeks preserve the same public scene`);
+  const reopened=timeline(false,season,altitude);reopened.at(from+durationSeconds*1000-8);reopened.at(from-8);
+  assert.deepEqual(JSON.parse(JSON.stringify(reopened.at(probe))),expectedScene,`${label} reload reconstructs the same people without viewport or animation history`);
+  return {baselinePeople,actualPeople,baselineActors,actualActors,baseline};
+ }
+ const summer=checkPopulation('summer day','summer',30,14400,{
+  events:1610,people:699,actors:965,others:911,
+  peopleDigest:'a8ba099171055601c7cc675b71365ea3896756de6f3a96509b12e48be1f51ba2',
+  othersDigest:'f4be4c85adb9c8bdcb3e7d96525ee2d65f7898b37cea99817a4254aac7d49970'
+ },true);
+ const twilight=checkPopulation('summer twilight at the inclusive -6 degree boundary','summer',-6,14400,{
+  events:1588,people:681,actors:940,others:907,
+  peopleDigest:'b07af8751fd1f3c6bdc78c242f945634651f58694d6539668e054b07f2e630d7',
+  othersDigest:'d9e0d200b2f4cfd38f18693520420b3e94faf1ae80ce3c335afb45843fa97300'
+ },true);
+ checkPopulation('winter day','winter',30,14400,{
+  events:1725,people:646,actors:646,others:1079,
+  peopleDigest:'dc0ebdb3d5de51e31373efc57004c4a0436db30715f49d0535399a3a572778e8',
+  othersDigest:'847fe93c334893e9fc875d1bfd5a596d3f7e772f87987b58476722baff3a5111'
+ },true);
+ const nightStart=Date.parse('2026-10-20T00:00:00.000Z'),nightBase=timeline(true,'summer',-20),nightNow=timeline(false,'summer',-20);
+ const nightBaseline=capture(nightBase,nightStart,7200),nightActual=capture(nightNow,nightStart,7200);
+ const nightPeople=nightBaseline.filter(row=>people.has(row.event.type)).map(row=>row.event),nightOthers=nightBaseline.filter(row=>!people.has(row.event.type)).map(row=>row.event);
+ assert.equal(nightBaseline.length,263);assert.equal(nightPeople.length,44);assert.equal(nightPeople.reduce((n,e)=>n+actors(e),0),49);
+ assert.equal(digest(nightPeople),'d0e80624f556b46ec26876b497d39410bacd9492c4153322213aa3c2ba4a9a78');
+ assert.equal(digest(nightOthers),'b604064049737919b5504803afc24bc1fd281aa169748c250190b3214fce9ec8');
+ assert.deepEqual(nightActual.map(row=>row.event),nightBaseline.map(row=>row.event),'the complete nighttime event schedule remains identical');
+ assert.deepEqual(nightBaseline.filter(row=>row.event.type==='festival').map(row=>row.event.id),['festival:29874306'],'the pinned nighttime festival crowd remains present');
+ const nightAt=29874316*60_000,nightScene=nightNow.at(nightAt),nightReferenceScene=nightBase.at(nightAt),clocktower=nightScene.clocktower,clocktowerReference=nightReferenceScene.clocktower;
+ assert.deepEqual(JSON.parse(JSON.stringify(clocktower)),JSON.parse(JSON.stringify(clocktowerReference)),'the pinned rare nighttime clocktower visit remains identical');
+ assert.deepEqual(JSON.parse(JSON.stringify(clocktower)),{age:0,duration:50,seed:0.3774666809476912,direction:1});
+ assert.deepEqual(JSON.parse(JSON.stringify(nightScene.party)),JSON.parse(JSON.stringify(nightReferenceScene.party)),'the independent nighttime rooftop visit remains identical');
+ const boundary=Date.parse('2026-10-20T12:00:00.000Z'),sunAt=instant=>({altitude:instant<boundary?30:-20,azimuth:90});
+ const boundaryBase=timeline(true,'summer',30,sunAt),boundaryCurrent=timeline(false,'summer',30,sunAt),crossingId='arrival:224062192';
+ const before=boundaryCurrent.at(boundary-1000).events.find(e=>e.id===crossingId),after=boundaryCurrent.at(boundary+1000).events.find(e=>e.id===crossingId),afterReference=boundaryBase.at(boundary+1000).events.find(e=>e.id===crossingId);
+ assert.equal(before?.type,'picnic','the pinned daytime couple visit begins before sunset');
+ assert.equal(after?.type,'picnic','an admitted daylight visit remains visible after twilight becomes night');
+ const crossingStart=boundary+1000-Math.round(after.age*1000),crossingEnd=crossingStart+after.duration*1000;
+ assert.deepEqual(JSON.parse(JSON.stringify(after)),JSON.parse(JSON.stringify(afterReference)),'the cross-boundary whole party keeps its original full visit recipe');
+ assert.ok(boundaryCurrent.at(crossingEnd-1000).events.some(e=>e.id===crossingId),'the selected person completes the original lifetime after sunset');
+ assert.ok(!boundaryCurrent.at(crossingEnd+1000).events.some(e=>e.id===crossingId),'the person leaves at the original complete-lifetime boundary');
+ const faq=html.split('<dt>Why can the scene have fewer visitors?</dt>')[1].split('</dd>')[0];
+ assert.match(faq,/daytime and twilight people spawn about half as often/i);assert.match(faq,/already underway finishes its original visit/i);assert.match(faq,/Nighttime visits keep their existing schedule/i);
+ assert.match(faq,/shared arrival budget/);assert.match(faq,/walking visits can continue after their arrival slots are freed/);assert.match(faq,/A new visit in this visitor budget must finish before midnight UTC/);assert.match(faq,/Underway visits finish normally/);assert.match(faq,/Trains, metro, and woodland animals keep their existing schedules/);
+ assert.doesNotMatch(faq,/crash|repair|fix/i,'scenery guidance makes no crash-cause claim');
+ assert.ok(summer.actualActors<summer.baselineActors&&twilight.actualActors<twilight.baselineActors,'both visible daylight and twilight cohorts are reduced');
+});
+
 // Replay actual canvas transforms and paint bounds. Tracking-camera ground marks
 // are diagnostic ink; exclude only their documented gray color, not actor shapes.
 function paintedMotionWorldXs(frame){

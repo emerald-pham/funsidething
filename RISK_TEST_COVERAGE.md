@@ -683,6 +683,7 @@ Completion authority ends only after a deliberate return event observes every ou
 - RISK shared scenery: the same seed and UTC instant select identical events after different open frame and interruption histories
 - RISK shared scenery: normalized clouds and bounded schedules survive midnight viewport season and reduced motion changes
 - RISK shared scenery: deterministic opportunities preserve rail rare-show refractory periods and finite complete lifetimes
+- RISK daytime people: daytime and twilight spawn rate halves while complete visits and night schedules finish intact
 - RISK rain cloud consistency: every drifting cloud uses the shaded rain contour while clear daytime clouds retain their paint
 - RISK shared scene time: numeric locks and selected seasons use the synced sky zone rather than the device zone
 - RISK shared scenery runtime: every scene owner consumes the UTC snapshot without random frame draws or board writes

@@ -18527,5 +18527,29 @@
       "command": "Original npm test in Linuxx64 run39991387451 attempt2/job120979942170 (raw evidence/release-resume-20261024/j-control-attempt2/logs.txt SHA37af0ca18af3cc428d648d76c161398182f6daae62087381d2fcc246c2616b28). Before any clock edit, Node22.23.3/TZUTC recorder external-transaction-delay478adf4c executes original selected SDK-deadline test with one essential second-seed transaction reply at200ms; minimized64c4d454 retains that RED. Paired100ms control223527c1 passes. Exact commands/record hashes are in sdk150-diagnosis/diagnosis.json. Later corrected new-regression baseline record2026-10-24T21-14-53-423Z-dc42d02d-7e0a-43cb-b474-005b9ca5e500 is explicitly sensitivity after first attempted edit, not original chronology.",
       "failure": "Actual CI150 leaf5945.405ms fails recovery must reach an actual remote ACK and an exact durable local head at original tests.js610, second seed; parent propagates failure. Pre-edit200ms calibration fails the same original assertion in full/minimized forms while100ms passes; failure-only read shows exact durable head, dirty work and held cloud schedule. Corrected new regression on restored old clock also fails the same assertion at its second seed after5934.090ms; repaired clock passes5/5, no skips/cancel/failure, and retains exact150ms held-read expiry. The affected clock cohort also failed the existing ordinary save20-second deadline observation (59pass/1fail of60); its original deadline/settled assertions discriminate stale setup-entry observations before the history reset."
     }
-  }
+  },
+{
+  "baseCommit": "3b273718df28919586c2cd84ca835de573631fe3",
+  "testChangesSha256": "93ae941678ee4452000589009b086db5d95edb01da2ea3ae460906207477153a",
+  "reason": "Add an agreed public timeline-consumer regression for the requested daytime and twilight human arrival-rate reduction, preserving complete admitted visits and unrelated scenery schedules after the user clarified the goal as half the spawn rate.",
+  "previousBehavior": "The shared scene admitted its ordinary daytime and twilight people at the existing rate. The pinned baseline cohort had 699 summer-day people (965 weighted visible actors), 681 twilight people (940 weighted actors), and 646 winter-day people, with independent nonhuman streams and complete visit lifetimes.",
+  "intendedBehavior": "After existing admission planning, deterministically retain about half of new daytime and twilight people by stable event identity. Do not backfill removed admissions. Retain complete parties and original lifetimes across sunset, keep nighttime and nonhuman schedules identical, and reconstruct the same result after reload, viewport changes, and repeated or reversed seeks.",
+  "replacementTests": [
+    "RISK daytime people: daytime and twilight spawn rate halves while complete visits and night schedules finish intact"
+  ],
+  "preservedCoverage": [
+    "The test independently pins baseline event counts, weighted actor counts and identity/recipe digests for summer daylight, the inclusive -6 degree twilight boundary, winter daylight, and nighttime before comparing the candidate to a broad 45-55 percent weighted daytime/twilight rate.",
+    "Candidate retained people must be exact baseline events with full party counts and lifetimes; nonhuman event identities and recipes, woodland, clouds, rooftop visits, clocktower appearances, and all nighttime events remain identical.",
+    "A pinned daytime picnic crossing sunset remains visible with its original complete visit and exits only at its original lifetime boundary; deterministic results survive repeated/reversed seeks and reconstructed timelines.",
+    "The new FAQ assertions cover the spawn-rate wording and retain the shared arrival budget, midnight UTC, full-exit, underway-visit and nonhuman schedule guidance."
+  ],
+  "redEvidence": {
+    "command": "Direct, unrecorded original preimplementation RED: node --test --test-name-pattern='RISK daytime people' tests.js; started 2026-10-24T23:08:57Z against baseline 3b273718df28919586c2cd84ca835de573631fe3. Repository record-run was not used for this original RED. Raw output: /Users/emeraldpham/.codex/task-artifacts/ios-page-failure-20261024/daytime-people/red-output.txt (SHA-256 869878a471a607e4967fad91aa061c31a0a67885ee836956a4fe4199fb06e543).",
+    "failure": "Exit 1, one test failed on the unchanged baseline at the summer-day behavioral assertion: AssertionError [ERR_ASSERTION]: summer day removes newly admitted people from the shared scene (tests.js:38436). This is the observed baseline mismatch, not a later sensitivity replay."
+  },
+  "additionalObservedEvidence": [
+    "The intervening direct, unrecorded focused cohort at 2026-10-24T23:11:48Z ran node --test --test-name-pattern='RISK (daytime people|shared scenery|pedestrian|fireworks reservations)' tests.js and returned 54 passed, 6 failed, 1 skipped. Its two failures were FAQ assertions after the earlier copy replacement; they are repaired by restoring the complete old paragraph. Four strict historical planner scene-equality tests still fail because their pre-feature snapshots require daytime people that this requested behavior removes: RISK pedestrian planner cold work, rare reuse, solar work, and hash work. These four failures are intentionally left unchanged and unqualified at the user-requested stopping point; parent owns the next repair decision. Raw output: /Users/emeraldpham/.codex/task-artifacts/ios-page-failure-20261024/daytime-people/focused-landscape-output.txt (SHA-256 876e9bf19dd41dfda7b8fb17f99b271d4ab85dcffec1a4e6d935a95885b868a4).",
+    "Final focused standalone GREEN used the required recorder after the FAQ repair: record id bcae2bf5-208c-4d7b-a759-84267835bfa3, purpose green, outcome passed, one test passed with no skips or failures. Full record: /Users/emeraldpham/.codex/task-artifacts/ios-page-failure-20261024/daytime-people/records/2026-10-24T23-15-28-151Z-bcae2bf5-208c-4d7b-a759-84267835bfa3.json."
+  ]
+}
 ]
