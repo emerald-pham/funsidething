@@ -7,10 +7,9 @@ import { spawnSync } from 'node:child_process';
 import { basename, dirname, resolve } from 'node:path';
 
 const MAX_RECORD_BYTES = 32 * 1024;
-const MAX_POINTER_BYTES = 2 * 1024 * 1024;
-const MAX_POINTER_TOTAL_BYTES = 8 * 1024 * 1024;
 const MAX_POINTERS = 32;
 const MAX_GATES = 32;
+const EVIDENCE_READ_BUFFER_BYTES = 64 * 1024;
 const SHA1 = /^[a-f0-9]{40}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
 const READ_ONLY = constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0);
@@ -107,27 +106,24 @@ async function readJson(filePath, field) {
   }
 }
 
-async function sha256File(filePath, aggregate) {
+async function sha256File(filePath) {
   let handle;
   try {
     handle = await open(filePath, READ_ONLY);
-    const before = await handle.stat();
+    const before = await handle.stat({ bigint: true });
     if (!before.isFile()) fail(`Evidence pointer ${filePath} must name a regular file.`);
-    if (before.size > MAX_POINTER_BYTES) fail(`Evidence pointer ${filePath} exceeds the ${MAX_POINTER_BYTES}-byte limit.`);
-    aggregate.bytes += before.size;
-    if (aggregate.bytes > MAX_POINTER_TOTAL_BYTES) fail(`Evidence pointers exceed the ${MAX_POINTER_TOTAL_BYTES}-byte total limit.`);
     const hash = createHash('sha256');
-    const buffer = Buffer.alloc(64 * 1024);
-    let total = 0;
+    const buffer = Buffer.alloc(EVIDENCE_READ_BUFFER_BYTES);
+    let total = 0n;
     while (true) {
       const { bytesRead } = await handle.read(buffer, 0, buffer.length, null);
       if (bytesRead === 0) break;
-      total += bytesRead;
-      if (total > MAX_POINTER_BYTES) fail(`Evidence pointer ${filePath} exceeds the ${MAX_POINTER_BYTES}-byte limit.`);
+      total += BigInt(bytesRead);
+      if (total > before.size) fail(`Evidence pointer ${filePath} grew while it was being read.`);
       hash.update(buffer.subarray(0, bytesRead));
     }
-    const after = await handle.stat();
-    if (before.size !== after.size || before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs || total !== before.size) {
+    const after = await handle.stat({ bigint: true });
+    if (before.size !== after.size || before.mtimeNs !== after.mtimeNs || before.ctimeNs !== after.ctimeNs || total !== before.size) {
       fail(`Evidence pointer ${filePath} changed while it was being read.`);
     }
     return hash.digest('hex');
@@ -190,7 +186,6 @@ async function validateRecord(repo, record) {
   const pointers = collectPointers(record);
   if (pointers.length > MAX_POINTERS) fail(`checkpoint may contain at most ${MAX_POINTERS} evidence pointers.`);
   const pointerIds = new Set();
-  const aggregate = { bytes: 0 };
   const pointerCurrent = new Map();
   for (const [index, pointer] of pointers.entries()) {
     const field = `checkpoint evidence[${index}]`;
@@ -204,7 +199,7 @@ async function validateRecord(repo, record) {
     const evidenceCommit = exactCommit(repo, pointer.sourceCommit, `${field}.sourceCommit`);
     const evidenceTree = exactSha(pointer.sourceTree, `${field}.sourceTree`);
     if (sourceTree(repo, evidenceCommit, `${field}.sourceCommit`) !== evidenceTree) fail(`${field}.sourceTree does not match its exact evidence commit.`);
-    const actualDigest = await sha256File(evidencePath, aggregate);
+    const actualDigest = await sha256File(evidencePath);
     if (actualDigest !== pointer.sha256) fail(`${field} SHA-256 does not match the immutable artifact bytes.`);
     pointerCurrent.set(id, evidenceCommit === commit && evidenceTree === tree);
   }

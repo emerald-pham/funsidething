@@ -13,7 +13,7 @@ Each version 1 JSON record contains:
 
 Evidence pointers contain a unique `id`, absolute artifact `path`, `sha256`, `sourceCommit`, and `sourceTree`. The command hashes the file and checks its Git source identity. Every passed required gate needs at least one pointer for the record's exact current source commit and tree. Historical failed evidence may point to an earlier source and remains unchanged when a record is resumed.
 
-The checkpoint JSON is limited to 32 KiB, 32 gates and follow-ups each, and 32 evidence pointers total. Each pointed file is limited to 2 MiB and all pointed files together to 8 MiB. Pointers are fingerprints, not embedded reports.
+The checkpoint JSON is limited to 32 KiB, 32 gates and follow-ups each, and 32 evidence pointers total. Evidence files have no byte-size cap: the command hashes each file through a fixed-size buffer, samples its size before reading, rejects growth past that size, and checks the file's size and timestamps again afterward. Pointers are fingerprints, not embedded reports.
 
 ## Create, validate, and resume
 
