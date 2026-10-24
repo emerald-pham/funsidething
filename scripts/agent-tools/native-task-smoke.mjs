@@ -25,7 +25,9 @@ export function classifyOrigin(origin, mode) {
   assert.equal(url.protocol, 'http:', 'Local fixture must use plain loopback HTTP');
   assert.equal(url.hostname, '127.0.0.1', 'Local fixture must use the literal 127.0.0.1 address');
   assert.match(url.port, /^\d+$/, 'Local fixture origin must include an explicit port');
-  assert.ok(Number(url.port) > 0 && Number(url.port) <= 65535, 'Local fixture port must be valid');
+  assert.ok((Number(url.port) > 0 && Number(url.port) <= 65535)
+    || (url.port === '0' && process.env.CI === 'true'),
+  'Local fixture requires an allocated port; only an isolated CI runner may request ephemeral port 0');
   assert.equal(url.username, '', 'Credentials are forbidden in a local fixture origin');
   assert.equal(url.password, '', 'Credentials are forbidden in a local fixture origin');
   assert.equal(url.search, '', 'Query strings are forbidden in a local fixture origin');
@@ -80,8 +82,9 @@ function parseCli(argv) {
 }
 
 async function runNativeSmoke(options) {
-  const { repo, source, tree, origin, output, engine, mode, target } = options;
-  const fixtureOrigin = target.url.origin;
+  const { repo, source, tree, origin: requestedOrigin, output, engine, mode, target } = options;
+  let origin = requestedOrigin;
+  let fixtureOrigin = target.url.origin;
   assert.equal(execFileSync('git', ['rev-parse', source + '^{tree}'], { cwd: repo, encoding: 'utf8' }).trim(), tree,
     'Explicit source commit must resolve to the declared tree');
   const shellFiles = productShell(repo, source);
@@ -97,7 +100,7 @@ async function runNativeSmoke(options) {
     ? await import(pathToFileURL(path.join(repo, 'scripts/installed-client-fixture.mjs')))
     : null;
   const report = {
-    source, tree, origin, engine, mode, proofScope: mode === 'local-fixture' ? 'local-fixture' : 'actual-public-origin',
+    source, tree, requestedOrigin, origin, engine, mode, proofScope: mode === 'local-fixture' ? 'local-fixture' : 'actual-public-origin',
     startedAt: new Date().toISOString(), status: 'running', productAssets: Object.fromEntries([...sourceAssets].map(([file, bytes]) => [file, hash(bytes)])),
     pageErrors: [], crashes: 0, navigations: 0, cloudMutationRequests: [], actions: [],
     limits: mode === 'local-fixture'
@@ -154,7 +157,13 @@ async function runNativeSmoke(options) {
         server.once('error', reject);
         server.listen(Number(target.url.port), '127.0.0.1', resolve);
       });
-      report.fixture = { host: '127.0.0.1', port: server.address().port, auth: 'signed-out', profile: 'fresh ephemeral Chromium context' };
+      fixtureOrigin = `http://127.0.0.1:${server.address().port}`;
+      origin = fixtureOrigin;
+      report.origin = origin;
+      report.fixture = { host: '127.0.0.1', requestedPort: Number(target.url.port), port: server.address().port,
+        allocation: Number(target.url.port) === 0 ? 'isolated CI runner; OS-selected owned listener' : 'explicit host allocation',
+        auth: 'signed-out', profile: 'fresh ephemeral Chromium context' };
+      save();
     }
 
     browser = await ({ chromium, webkit })[engine].launch({ headless: true });
@@ -242,7 +251,9 @@ async function runNativeSmoke(options) {
       const action = index < 10 ? 'yes' : 'bench-done';
       const before = await page.evaluate(() => ({ candidate: state.candidateId, benchmark: benchmark()?.id, clicks: window.__releaseClicks.length }));
       const control = page.locator('[data-act="' + action + '"]').first();
-      if (index === 10) await control.dblclick({ delay: 40 });
+      // Use native default input timing: an artificial held press can span a
+      // normal rerender and detach the delegated target between down and up.
+      if (index === 10) await control.dblclick();
       else await control.click();
       const delivered = await page.evaluate(({ count, action }) => window.__releaseClicks.slice(count).filter(row => row.act === action),
         { count: before.clicks, action });

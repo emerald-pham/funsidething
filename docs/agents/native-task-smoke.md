@@ -24,6 +24,22 @@ synthetic SDK receives a cloud RPC. This local fixture is useful for checking
 the native browser path; it does not establish public deployment or account
 behavior.
 
+The existing `npm test` and `test:agent-tools` cohorts require one actual local
+Chromium driver case. They fail for an omitted, skipped or failed case, absent or
+wrong-source report, and incomplete cleanup. Local runs reuse the explicit
+`CHAIN_NATIVE_CANDIDATE_SHA`, `CHAIN_NATIVE_CANDIDATE_TREE` and durable
+`CHAIN_NATIVE_OUTPUT` directory from installed-client validation. Allocate and
+set `CHAIN_NATIVE_SMOKE_PORT` separately from `CHAIN_NATIVE_PORT`, because the
+two cohorts can run concurrently. Missing source, port, Chromium or output
+configuration fails the case; it never skips it.
+
+Only an isolated runner with `CI=true` may request literal `http://127.0.0.1:0`.
+The fixture binds the OS-selected port itself and retains that listener, avoiding
+a reserve-and-close port race. Its report records the requested origin and the
+actual listener origin/port, and all browser and transport checks use the actual
+origin. Ordinary local execution continues to require the allocated nonzero port.
+CI uses synthetic local fixtures; approved public checks remain postdeployment.
+
 Local mode checks 12 Add actions, ten Yes choices, ten Done completions, and
 Undo. It records trusted browser click events, including one real detail-2
 double-click control that the app must reject after the preceding detail-1

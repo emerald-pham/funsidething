@@ -119,7 +119,30 @@ function lockOwner(content) {
   return Number.isInteger(pid) && pid > 0 ? { pid, token: undefined } : undefined;
 }
 
-async function lockIsStale(lockPath) {
+async function migrationLockSnapshot(lockPath) {
+  const metadata = await metadataIfPresent(lockPath);
+  if (!metadata) return undefined;
+  assertOwnedMetadata(metadata, lockPath);
+  const contents = await readFile(lockPath, 'utf8');
+  const owner = lockOwner(contents);
+  if (!owner) throw new Error(`Migration cannot verify lock ownership at ${lockPath}.`);
+  const identity = fileIdentity(metadata);
+  await requireMigrationFile(lockPath, identity, sha256(contents));
+  return { identity, digest: sha256(contents), owner };
+}
+
+async function requireMigrationLockSnapshot(lockPath, snapshot) {
+  if (!snapshot) return false;
+  if (!(await metadataIfPresent(lockPath))) return false;
+  await requireMigrationFile(lockPath, snapshot.identity, snapshot.digest);
+  return true;
+}
+
+async function lockIsStale(lockPath, migration = false) {
+  if (migration) {
+    const snapshot = await migrationLockSnapshot(lockPath);
+    return !snapshot || !processIsAlive(snapshot.owner.pid);
+  }
   try {
     const [contents, metadata] = await Promise.all([readFile(lockPath, 'utf8'), stat(lockPath)]);
     if (!contents.trim()) return Date.now() - metadata.mtimeMs >= EMPTY_LOCK_GRACE_MS;
@@ -130,8 +153,9 @@ async function lockIsStale(lockPath) {
   }
 }
 
-async function releaseOwnedLock(lockPath, token) {
+async function releaseOwnedLock(lockPath, token, snapshot) {
   try {
+    if (snapshot && !(await requireMigrationLockSnapshot(lockPath, snapshot))) return;
     const owner = lockOwner(await readFile(lockPath, 'utf8'));
     if (owner?.token !== token) return;
     await unlink(lockPath).catch((error) => {
@@ -142,73 +166,105 @@ async function releaseOwnedLock(lockPath, token) {
   }
 }
 
-async function reclaimStaleRecoveryLock(recoveryPath) {
-  if (!(await lockIsStale(recoveryPath))) return false;
+async function reclaimStaleRecoveryLock(recoveryPath, migration = false) {
+  const snapshot = migration ? await migrationLockSnapshot(recoveryPath) : undefined;
+  const stale = () => migration ? snapshot && !processIsAlive(snapshot.owner.pid) : lockIsStale(recoveryPath);
+  if (!(await stale())) return false;
   await delay(LOCK_RETRY_MS);
-  if (!(await lockIsStale(recoveryPath))) return false;
+  if (!(await stale())) return false;
+  if (migration && !(await requireMigrationLockSnapshot(recoveryPath, snapshot))) return false;
   await unlink(recoveryPath).catch((error) => {
     if (error?.code !== 'ENOENT') throw error;
   });
   return true;
 }
 
-async function reclaimStaleLock(lockPath) {
+async function reclaimStaleLock(lockPath, migration = false) {
   const recoveryPath = `${lockPath}.recovery`;
   const recoveryToken = randomUUID();
   let recoveryHandle;
+  let recoverySnapshot;
   try {
+    if (migration) await migrationLockSnapshot(recoveryPath);
     recoveryHandle = await open(recoveryPath, 'wx', 0o600);
-    await recoveryHandle.writeFile(`${JSON.stringify({ pid: process.pid, token: recoveryToken })}\n`, 'utf8');
+    const contents = `${JSON.stringify({ pid: process.pid, token: recoveryToken })}\n`;
+    if (migration) recoverySnapshot = { identity: fileIdentity(await recoveryHandle.stat()), digest: sha256(contents) };
+    await recoveryHandle.writeFile(contents, 'utf8');
+    if (migration) await requireMigrationFile(recoveryPath, recoverySnapshot.identity, recoverySnapshot.digest);
   } catch (error) {
     if (recoveryHandle) await recoveryHandle.close().catch(() => undefined);
     if (error?.code === 'EEXIST') {
-      await reclaimStaleRecoveryLock(recoveryPath);
+      await reclaimStaleRecoveryLock(recoveryPath, migration);
       return false;
     }
     throw error;
   }
   try {
-    if (!(await lockIsStale(lockPath))) return false;
+    const snapshot = migration ? await migrationLockSnapshot(lockPath) : undefined;
+    const stale = () => migration ? snapshot && !processIsAlive(snapshot.owner.pid) : lockIsStale(lockPath);
+    if (!(await stale())) return false;
     await delay(LOCK_RETRY_MS);
-    if (!(await lockIsStale(lockPath))) return false;
+    if (!(await stale())) return false;
+    if (migration) {
+      await requireMigrationFile(recoveryPath, recoverySnapshot.identity, recoverySnapshot.digest);
+      if (!(await requireMigrationLockSnapshot(lockPath, snapshot))) return false;
+    }
     await unlink(lockPath).catch((error) => {
       if (error?.code !== 'ENOENT') throw error;
     });
     return true;
   } finally {
     await recoveryHandle.close();
-    await releaseOwnedLock(recoveryPath, recoveryToken);
+    await releaseOwnedLock(recoveryPath, recoveryToken, recoverySnapshot);
   }
 }
 
-async function withCoordinationLock(filePath, operation) {
+async function withCoordinationLock(filePath, operation, { migration = false } = {}) {
   await mkdir(dirname(filePath), { recursive: true, mode: 0o700 });
   const lockPath = `${filePath}.lock`;
   const lockToken = randomUUID();
   let lockHandle;
+  let lockSnapshot;
   for (let attempt = 0; attempt < LOCK_ATTEMPTS; attempt += 1) {
     let candidateHandle;
+    let candidateSnapshot;
     try {
+      if (migration) {
+        await migrationLockSnapshot(lockPath);
+        if (await migrationLockSnapshot(`${lockPath}.recovery`)) {
+          await reclaimStaleRecoveryLock(`${lockPath}.recovery`, true);
+          await delay(LOCK_RETRY_MS);
+          continue;
+        }
+      }
       candidateHandle = await open(lockPath, 'wx', 0o600);
-      await candidateHandle.writeFile(`${JSON.stringify({ pid: process.pid, token: lockToken })}\n`, 'utf8');
+      const contents = `${JSON.stringify({ pid: process.pid, token: lockToken })}\n`;
+      if (migration) candidateSnapshot = { identity: fileIdentity(await candidateHandle.stat()), digest: sha256(contents) };
+      await candidateHandle.writeFile(contents, 'utf8');
+      if (migration) await requireMigrationFile(lockPath, candidateSnapshot.identity, candidateSnapshot.digest);
+      lockSnapshot = candidateSnapshot;
       lockHandle = candidateHandle;
       break;
     } catch (error) {
       if (candidateHandle) {
         await candidateHandle.close().catch(() => undefined);
-        await releaseOwnedLock(lockPath, lockToken).catch(() => undefined);
+        await releaseOwnedLock(lockPath, lockToken, candidateSnapshot).catch(() => undefined);
       }
       if (error?.code !== 'EEXIST') throw error;
-      if (await lockIsStale(lockPath)) await reclaimStaleLock(lockPath);
+      if (await lockIsStale(lockPath, migration)) await reclaimStaleLock(lockPath, migration);
       else await delay(LOCK_RETRY_MS);
     }
   }
   if (!lockHandle) throw new Error(`Timed out waiting for coordination lock at ${lockPath}.`);
   try {
-    return await operation();
+    return await operation(async () => {
+      if (migration && !(await requireMigrationLockSnapshot(lockPath, lockSnapshot))) {
+        throw new Error(`Migration lost lock ownership at ${lockPath}.`);
+      }
+    });
   } finally {
     await lockHandle.close();
-    await releaseOwnedLock(lockPath, lockToken);
+    await releaseOwnedLock(lockPath, lockToken, lockSnapshot);
   }
 }
 
@@ -418,7 +474,9 @@ async function migrate(source, options) {
   }
   const locks = [canonicalSource, canonicalTarget].sort();
   const receiptPath = `${backupDirectory}/migration.json`;
-  return withCoordinationLock(locks[0], () => withCoordinationLock(locks[1], async () => {
+  return withCoordinationLock(locks[0], (verifyFirstLock) => withCoordinationLock(locks[1], async (verifySecondLock) => {
+    await verifyFirstLock();
+    await verifySecondLock();
     await Promise.all(parents.map(assertMigrationAncestor));
     // New parents created by the lock helper must also be literal private paths.
     await Promise.all([migrationParent(source, { allowAlias: true }), migrationParent(target)]);
@@ -547,7 +605,7 @@ async function migrate(source, options) {
     } catch (error) {
       throw new Error(`${error.message} Migration stopped; inspect ${receiptPath} and retained source/target/backup identities before recovery.`, { cause: error });
     }
-  }));
+  }, { migration: true }), { migration: true });
 }
 
 function parseList(value) {
