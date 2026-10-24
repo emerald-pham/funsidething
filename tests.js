@@ -8,6 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import { waitForTruthyProbe } from "./scripts/agent-tools/async-probe.mjs";
 
 // Every top-level test owns its app fixtures. Nested t.test cases inherit the
 // parent scope so a shared fixture remains live until all its consumers finish.
@@ -24,6 +25,12 @@ function test(...args){
   });}
  });
 }
+
+test('RISK repository process: Playwright waitForFunction predicates are synchronous',()=>{
+ const source=fs.readFileSync(fileURLToPath(import.meta.url),'utf8');
+ const asyncWaitCalls=[...source.matchAll(/\.waitForFunction\s*\(\s*async\b/g)].map(match=>source.slice(0,match.index).split('\n').length);
+ assert.deepEqual(asyncWaitCalls,[],'waitForFunction predicates must be synchronous; await storage reads through a bounded Node probe. Found lines: '+asyncWaitCalls.join(', '));
+});
 
 test('RISK unreadable device recovery: an unsupported saved version cannot be replaced by Quick start or ordinary saving',async t=>{
  const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='unsupported-device-187-'+Math.random();
@@ -2140,8 +2147,14 @@ test('RISK cloud source authority: a delayed header cannot schedule chunks after
 async function inspectCompleteSource230(t,{page,remote,receivedRaw,browser,engine,width,shortValues}){
   t.diagnostic('Native complete-source entry: '+engine+' '+browser.version()+', '+width+'x844, '+Buffer.byteLength(receivedRaw)+' source bytes.');
   await page.locator('[data-act="apply-cloud-source-recovery"]').waitFor();
-  await page.waitForFunction(async()=>{const d=buildSupportDiagnosticsReport().save,h=await ScannerDeviceStore.readHead();return !d.debouncePending.value&&d.activePersistCalls.value===0&&d.localDurability.value==='durable'&&h?.payload===JSON.stringify(state);});
+  // This read-only source review runs after startup migration has produced a
+  // larger in-memory projection; it must not invent a save just to make it
+  // match the durable original. Wait only for actual app saves to quiesce, then
+  // keep the live projection and durable head as separate exact facts below.
+  await waitForTruthyProbe(()=>page.evaluate(()=>{const save=buildSupportDiagnosticsReport().save;return !save.debouncePending.value&&save.activePersistCalls.value===0;}),{timeoutMs:30_000,pollIntervalMs:25});
   const capture=()=>page.evaluate(async()=>({documentId:__installedFixture.documentId,board:JSON.stringify(state),head:await ScannerDeviceStore.readHead(),pending:await ScannerDeviceStore.getPendingUpload('owner'),originals:await ScannerDeviceStore.readRawExportSnapshot()})),beforeSource=await capture(),cloudBefore=JSON.stringify([...remote]);
+  const saveBaseline=await page.evaluate(async()=>{const save=buildSupportDiagnosticsReport().save,head=await ScannerDeviceStore.readHead();return {debounce:save.debouncePending.value,activePersists:save.activePersistCalls.value,localDurability:save.localDurability.value,liveBytes:JSON.stringify(state).length,durableHeadBytes:head?.payload?.length??null};});
+  t.diagnostic('Native complete-source baseline is quiescent; live and durable bytes remain separate read-only facts: '+JSON.stringify(saveBaseline)+'.');
   const source=page.locator('#modalRoot section.settings-section').filter({has:page.getByRole('heading',{name:'Previous cloud source',exact:true})}),disclosure=source.locator('summary').filter({hasText:'Complete supported source, including other saved fields'}),reader=source.locator('pre,textarea');assert.equal(await disclosure.count(),1);assert.equal(await reader.count(),1);
   let ready=false,watchdog;const interaction=(async()=>{await disclosure.click();await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));ready=true;})();
   try{await Promise.race([interaction,new Promise(resolve=>{watchdog=setTimeout(resolve,1000);})]);assert.equal(ready,true,'opening a complete supported source must return native frames within the existing one-second reader bound');}finally{clearTimeout(watchdog);}
@@ -2272,7 +2285,7 @@ async function runNativeRecoveryInspection226(t,width=390,holdDemoted=false,comp
    await capture('acknowledged',/The current board is confirmed by cloud/);
    assert.equal(await page.evaluate(()=>state.tasks.some(row=>row.id==='native-later-254')),true,'actual lifecycle resumption adopts the independently complete later source');
    const finalArchives=await page.evaluate(async()=>ScannerDeviceStore.listOpaqueArchives());for(const row of originalArchives)assert.ok(finalArchives.some(next=>next.key===row.key&&next.raw===row.raw),'native later-source resumption retains original archive bytes');
-   await page.evaluate(()=>window.dispatchEvent(new Event('pagehide')));await page.locator('#addInput').fill('Native edit after background ACK');await page.locator('#addButton').click();await page.waitForFunction(async()=>JSON.parse((await ScannerDeviceStore.readHead()).payload).tasks.some(row=>row.title==='Native edit after background ACK'));
+   await page.evaluate(()=>window.dispatchEvent(new Event('pagehide')));await page.locator('#addInput').fill('Native edit after background ACK');await page.locator('#addButton').click();await waitForTruthyProbe(()=>page.evaluate(async()=>JSON.parse((await ScannerDeviceStore.readHead()).payload).tasks.some(row=>row.title==='Native edit after background ACK')),{timeoutMs:30_000,pollIntervalMs:25});
    await page.locator('#addInput').fill('Native unfinished status draft');await capture('later-edit',/not been confirmed by cloud/);assert.equal(await page.locator('#addInput').inputValue(),'Native unfinished status draft');await page.locator('#addInput').fill('');
    await page.locator('#syncBtn').click();await page.waitForFunction(()=>window.CloudSync.user===null);await capture('signed-out',/different signed-in account/);
    const signedOutCompletion=await waitForNativeHistoryAck226(page,ackOwner);assert.equal(signedOutCompletion.ok,false);assert.equal(signedOutCompletion.reason,'identity-changed','a prior completed owner cannot confirm after actual signout');
