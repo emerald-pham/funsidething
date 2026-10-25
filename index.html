@@ -1013,6 +1013,8 @@ function safeUrl(u){
 }
 
 let state = null;
+let memoryRecoveryWorkspace = false;
+let localDeviceStartupAttempt = null;
 let liveBoardAccepted = false; // false means the shell is still a hydration placeholder or saved state was rejected
 let unacceptedDeviceSource = null;
 let deviceRecoveryCloudHold = null;
@@ -1924,10 +1926,13 @@ function showManualExportCopy(title,raw,explanation,areaId,selectAction){
     +'<p class="kv">'+esc(explanation)+'</p><textarea id="'+esc(areaId)+'" readonly aria-label="'+esc(title)+'" style="width:100%;min-height:12rem">'+esc(raw)+'</textarea>'
     +'<div class="mbtns"><button class="btn subtle" data-act="'+esc(selectAction)+'">Select all</button><button class="btn subtle" data-act="settings">Back to Settings</button></div>');
 }
+function emptyNewWorkWorkspace(){
+  return ["new-work","memory-only"].includes(deviceRecoveryCloudHold?.workspace)&&!state?.tasks?.length;
+}
 function currentBoardExportPayload(){
   // Use the live board so this remains a recovery path when the most recent
   // device save failed. cloudPayload() strips device-only sync bookkeeping.
-  if(!liveBoardAccepted||!state)throw new Error("The accepted board is not ready in this tab.");
+  if(!liveBoardAccepted||!state||emptyNewWorkWorkspace())throw new Error("The accepted board is not ready in this tab.");
   return JSON.stringify(JSON.parse(cloudPayload()),null,2);
 }
 function viewCurrentBoard(){
@@ -1956,7 +1961,7 @@ async function downloadRecoveryArchive({rawSourcesOnly=false}={}){
   let boardRaw,board;
   try{
     if(rawSourcesOnly){
-      if(liveBoardAccepted||!unacceptedDeviceSource)throw Error("Raw-source recovery is not active.");
+      if(!unacceptedDeviceSource||liveBoardAccepted&&!unacceptedDeviceSource.workingWorkspace&&!memoryRecoveryWorkspace)throw Error("Raw-source recovery is not active.");
       boardRaw=JSON.stringify(state);board=null;
     }else{
       boardRaw=currentBoardExportPayload();board=JSON.parse(boardRaw);
@@ -1977,7 +1982,7 @@ async function downloadRecoveryArchive({rawSourcesOnly=false}={}){
     const localAfter=readManualArchiveLocalSources();
     const changedLocal=localBefore.find((row,index)=>JSON.stringify(row)!==JSON.stringify(localAfter[index]));
     if(changedLocal)throw new Error("Recovery source localStorage key "+changedLocal.key+" changed during capture. No file was created; try again.");
-    if(rawSourcesOnly?liveBoardAccepted||JSON.stringify(state)!==boardRaw:!liveBoardAccepted||currentBoardExportPayload()!==boardRaw)
+    if(rawSourcesOnly?(!unacceptedDeviceSource||JSON.stringify(state)!==boardRaw):!liveBoardAccepted||currentBoardExportPayload()!==boardRaw)
       throw new Error("The open board changed during capture. No file was created; try again.");
     const encoded=encodeManualArchiveSnapshot(snapshot),localManifest=Object.fromEntries(localBefore.map(row=>[row.key,{status:row.status==="absent"?"absent":"included"}]));
     const database=window.CHAIN_STORAGE_DB_NAME||"chain-scanner-v2",schemaVersion=window.ChainStorageV2?.SCHEMA_VERSION||2;
@@ -2699,7 +2704,7 @@ async function activateDeviceStorage(payload){
     await refreshDeviceBackupCache();window.ScannerDeviceStore=deviceStore;return true;
   }catch(e){return false;}
 }
-async function repairExactLocalDeviceHead(){
+async function repairExactLocalDeviceHead(bootAttempt=null){
   const store=deviceStore,accepted=state;
   if(typeof store?.repairHeadSnapshot!=="function")return null;
   try{
@@ -2715,7 +2720,7 @@ async function repairExactLocalDeviceHead(){
       assertCompleteSavedCollections(JSON.parse(payload));
       const archive={key:"device-recovery-original:"+uid(),raw:JSON.stringify({format:"chain-scanner.device-recovery-source",formatVersion:1,
         reason:"exact-local-head-repair",localStorage:browser,indexedDB:encodeManualArchiveSnapshot(source).stores})};
-      const guard=()=>deviceStore===store&&state===accepted&&JSON.stringify(readManualArchiveLocalSources())===JSON.stringify(browser);
+      const guard=()=>localDeviceStartupCurrent(bootAttempt)&&deviceStore===store&&state===accepted&&JSON.stringify(readManualArchiveLocalSources())===JSON.stringify(browser);
       const repaired=await deviceWriteBeforeDiagnostics("repairHeadSnapshot",{expectedSource:rawRecoverySourceIdentity(source),
         encodeSource:rawRecoverySourceIdentity,payload,archive,guard},store);
       if(repaired?.ok)return repaired.head;
@@ -2724,7 +2729,213 @@ async function repairExactLocalDeviceHead(){
   }catch{}
   return null;
 }
+async function localWorkingArchivedCandidates(source,add){
+  const field=(value,key)=>value?.type==="object"?value.entries?.find(row=>row?.[0]===key)?.[1]:null,
+    primitive=value=>["string","number","boolean"].includes(value?.type)?value.value:null,
+    key=row=>primitive(row?.key),seen=new Set(),queue=[];
+  const enqueue=(raw,ref,depth=0)=>{if(typeof raw==="string"&&!seen.has(raw)&&queue.length<128){seen.add(raw);queue.push({raw,ref,depth});}};
+  for(const [index,value]of source.stores.opaque.values.entries())enqueue(value?.raw,"archive:"+String(source.stores.opaque.keys[index]));
+  let bytes=0;
+  for(let i=0;i<queue.length;i++){
+    const {raw,ref,depth}=queue[i];if(depth>4||bytes+raw.length>16*1024*1024)continue;bytes+=raw.length;
+    let envelope;try{envelope=JSON.parse(raw);}catch{continue;}
+    let stores=null,browser=[];
+    if(envelope?.format==="chain-scanner.device-recovery-source"&&envelope.formatVersion===1){
+      if(envelope.indexedDBCapture!==undefined&&!await automaticRecoveryReferencedArchiveRows(envelope,automaticRecoveryOpaqueRows(source)))continue;
+      stores=envelope.indexedDB;browser=envelope.localStorage;
+    }
+    else if(envelope?.format==="chain-scanner.automatic-recovery-originals"&&envelope.version===1){
+      if(!await automaticRecoveryReferencedArchiveRows(envelope,automaticRecoveryOpaqueRows(source)))continue;
+      stores=envelope.indexedDB;browser=envelope.localStorage;
+    }else if(envelope?.format==="chain-scanner.recovery-archive"&&envelope.formatVersion===1){
+      stores=envelope.appSources?.indexedDB?.stores;browser=envelope.appSources?.localStorage;
+      if(envelope.currentBoard)await add(JSON.stringify(envelope.currentBoard),ref+":current-board");
+    }else if(envelope?.format==="chain-scanner.cloud-recovery-source"&&envelope.version===1){
+      for(const name of ["acceptedDeviceBoard","deviceHead","deviceBaselineBoard"])await add(envelope[name],ref+":"+name);
+      for(const generation of Array.isArray(envelope.generations)?envelope.generations:[]){
+        try{await add(await ChainStorageV2.decodeSnapshot(generation.header,generation.chunks),ref+":generation:"+generation.id,generation.header?.hash);}catch{}
+      }
+      continue;
+    }else continue;
+    if(stores&&Array.isArray(stores.snapshots)&&Array.isArray(stores.meta)&&Array.isArray(stores.backups)){
+      const head=stores.meta.find(row=>key(row)==="head")?.value,
+        hashes=new Set([primitive(field(head,"hash"))]);
+      for(const row of stores.backups){const id=primitive(field(row.value,"id")),hash=primitive(field(row.value,"payloadHash"));if(id===key(row))hashes.add(hash);}
+      for(const row of stores.snapshots){
+        const hash=primitive(field(row.value,"hash"));
+        if(hashes.has(hash)&&hash===key(row)&&/^[a-f0-9]{64}$/.test(hash||""))
+          await add(primitive(field(row.value,"payload")),ref+":snapshot:"+hash,hash);
+      }
+      for(const row of Array.isArray(stores.opaque)?stores.opaque:[])enqueue(primitive(field(row.value,"raw")),ref+":"+String(key(row)),depth+1);
+    }
+    for(const row of Array.isArray(browser)?browser:[])if([STORE_KEY,LOCAL_HEAD_KEY].includes(row?.key))await add(row.raw,ref+":browser:"+row.key);
+  }
+}
+async function localWorkingRecoveryCapture(source){
+  const indexedDB=encodeManualArchiveSnapshot(source).stores,references=[],physical=automaticRecoveryOpaqueRows(source);
+  for(const row of physical){
+    if(references.length>=256||typeof row.key!=="string"||!row.key.startsWith("device-recovery-original:")||
+      row.value?.key!==row.key||typeof row.value.raw!=="string")continue;
+    let envelope;try{envelope=JSON.parse(row.value.raw);}catch{continue;}
+    if(envelope?.format!=="chain-scanner.device-recovery-source"||envelope.formatVersion!==1||!envelope.indexedDB)continue;
+    references.push({key:row.key,index:row.index,rawHash:await ChainStorageV2.hashPayload(JSON.stringify(row.value)),
+      rowHash:await ChainStorageV2.hashPayload(JSON.stringify(indexedDB.opaque[row.index]))});
+  }
+  const sourceIdentityHash=await ChainStorageV2.hashPayload(JSON.stringify(indexedDB)),excluded=new Set(references.map(row=>row.index));
+  indexedDB.opaque=indexedDB.opaque.filter((row,index)=>!excluded.has(index));
+  return {indexedDB,indexedDBCapture:{format:"chain-scanner.automatic-archive-references",version:1,
+    completeness:references.length?"reference-compressed":"exact",sourceIdentityHash,references},
+    preservedAutomaticArchiveKeys:references.map(row=>row.key)};
+}
+function localWorkingRecoveryIntent(hold){
+  return hold?.v===1&&hold.reason==="device-source-recovery"&&hold.automaticRecovery===true&&
+    hold.phase==="awaiting-cloud-evidence"&&typeof hold.originalKey==="string"&&hold.originalKey.startsWith("device-recovery-original:")&&
+    /^[a-f0-9]{64}$/.test(hold.sourceIdentityHash||"")&&/^[a-f0-9]{64}$/.test(hold.workingBaseHash||"")&&
+    hold.headHash===hold.workingBaseHash&&!Object.hasOwn(hold,"epoch")&&Array.isArray(hold.unresolvedSourceRefs);
+}
+async function verifiedLocalWorkingRecoveryIntent(hold,source,account,identity,{allowUnresolved=false}={}){
+  if(!localWorkingRecoveryIntent(hold)||!allowUnresolved&&hold.unresolvedSourceRefs.length||
+    hold.account!=null&&hold.account!==account||hold.identity!=null&&hold.identity!==identity)return false;
+  const opaque=source.stores.opaque,at=opaque.keys.indexOf(hold.originalKey),row=opaque.values[at];
+  let archive;try{archive=JSON.parse(row?.raw);}catch{return false;}
+  if(row?.key!==hold.originalKey||archive?.format!=="chain-scanner.device-recovery-source"||archive.formatVersion!==1||
+    archive.reason!=="device-source-recovery")return false;
+  if(archive.indexedDBCapture!==undefined){
+    if(archive.indexedDBCapture.sourceIdentityHash!==hold.sourceIdentityHash||
+      !await automaticRecoveryReferencedArchiveRows(archive,automaticRecoveryOpaqueRows(source)))return false;
+  }else if(await ChainStorageV2.hashPayload(JSON.stringify(archive.indexedDB))!==hold.sourceIdentityHash)return false;
+  const snapshots=source.stores.snapshots,snapshot=snapshots.values[snapshots.keys.indexOf(hold.workingBaseHash)];
+  if(snapshot?.hash!==hold.workingBaseHash||typeof snapshot.payload!=="string"||
+    await ChainStorageV2.hashPayload(snapshot.payload)!==hold.workingBaseHash)return false;
+  const checked=cloudSourceRecoveryBoard(snapshot.payload,account);
+  return !!checked.board&&(checked.board.syncIdentity==null||checked.board.syncIdentity===identity)&&
+    !automaticRecoveryBoardIssue(checked.board,account)&&!decisionProjectionIssue(checked.board);
+}
+function automaticRecoveryExpectedHoldCurrent(captured){
+  return captured?.localRecoveryIntent?localWorkingRecoveryIntent(captured.localRecoveryIntent)&&
+    recoverySourceValueEqual(captured.hold,captured.localRecoveryIntent)&&recoverySourceValueEqual(deviceRecoveryCloudHold,captured.localRecoveryIntent):
+    !captured?.hold&&!deviceRecoveryCloudHold;
+}
+async function recoverLocalWorkingDeviceSource({workingBoard=null,expectedMemoryHold=null,bootAttempt=null}={}){
+  const store=deviceStore,accepted=state,acceptedRaw=JSON.stringify(state);
+  const held=()=>expectedMemoryHold?memoryRecoveryWorkspace&&deviceRecoveryCloudHold===expectedMemoryHold:
+    !deviceRecoveryCloudHold;
+  if(typeof store?.writeRecoveredSource!=="function"||!held())return null;
+  try{
+    const source=await store.readRawExportSnapshot(),browser=readManualArchiveLocalSources(),
+      sourceIdentity=rawRecoverySourceIdentity(source),candidates=[],seen=new Set(),hashes=new Map();
+    if(source.stores.meta.keys.includes("recoveryCloudHold"))return null;
+    let bytes=0;
+    const add=async(payload,key,expectedHash=null)=>{
+      if(typeof payload!=="string"||seen.has(payload)||candidates.length>=128)return;
+      if(!hashes.has(payload)){
+        if(hashes.size>=128||bytes+payload.length>8*1024*1024)return;
+        bytes+=payload.length;hashes.set(payload,await ChainStorageV2.hashPayload(payload));
+      }
+      const hash=hashes.get(payload);
+      if(expectedHash!==null&&hash!==expectedHash)return;
+      seen.add(payload);
+      try{
+        const original=JSON.parse(payload);assertCompleteSavedCollections(original);
+        const account=original.syncAccount??original.decisionBaseline?.account??null,validated=cloudSourceRecoveryBoard(original.v===1?JSON.stringify({...original,v:STATE_VERSION}):payload,account);
+        if(!validated.board||automaticRecoveryBoardIssue(validated.board,account)||decisionProjectionIssue(validated.board))return;
+        candidates.push({key,board:validated.board,sourceRef:{kind:"device-local-source",key,hash}});
+      }catch{}
+    };
+    const rawHead=source.stores.meta.values[source.stores.meta.keys.indexOf("head")];
+    // Read linked snapshots independently. A malformed auxiliary row must not
+    // turn a complete sibling into an unavailable source.
+    for(const [index,row]of source.stores.backups.values.entries()){
+      if(typeof row?.id!=="string"||row.id!==source.stores.backups.keys[index]||!/^[a-f0-9]{64}$/.test(row.payloadHash||""))continue;
+      const at=source.stores.snapshots.keys.indexOf(row.payloadHash),snapshot=source.stores.snapshots.values[at];
+      if(snapshot?.hash===row.payloadHash)await add(snapshot.payload,"backup:"+row.id,row.payloadHash);
+    }
+    for(const row of browser){
+      if([STORE_KEY,LOCAL_HEAD_KEY].includes(row.key)&&row.status==="present")await add(row.raw,"browser:"+row.key);
+      if(row.key===LOCAL_BACKUPS_KEY&&row.status==="present"){
+        try{const rows=parseBackupIndex(row.raw);if(Array.isArray(rows))for(const item of rows)if(readableBackupRow(item))await add(item.payload,"browser-backup:"+item.id);}catch{}
+      }
+    }
+    await localWorkingArchivedCandidates(source,add);
+    candidates.sort((a,b)=>a.key<b.key?-1:a.key>b.key?1:0);
+    const anchor=candidates.find(row=>rawHead?.account==null||row.board.syncAccount===rawHead.account);
+    const compatible=anchor?candidates.filter(row=>sameListOwner(anchor.board,row.board)):[],
+      reduced=workingBoard?reduceAutomaticRecoveryCandidates({acceptedBaseline:workingBoard,candidates:candidates.filter(row=>sameListOwner(workingBoard,row.board))}):
+        reduceAutomaticRecoveryCandidates({candidates:compatible});
+    // Conflicting alternatives remain exact in the source archive. One
+    // complete projection can still support new offline work without granting
+    // authority to publish an unresolved replacement.
+    const plan=workingBoard?(reduced.board?reduced:reduceAutomaticRecoveryCandidates({acceptedBaseline:workingBoard})):!anchor?{board:defaultState()}:reduced.board?reduced:reduceAutomaticRecoveryCandidates({candidates:[anchor]});
+    if(!plan.board)return null;
+    const capture=await localWorkingRecoveryCapture(source),payload=JSON.stringify(plan.board),originalKey="device-recovery-original:working:"+uid(),
+      sourceIdentityHash=await ChainStorageV2.hashPayload(sourceIdentity),workingBaseHash=await ChainStorageV2.hashPayload(payload),
+      archive={key:originalKey,raw:JSON.stringify({format:"chain-scanner.device-recovery-source",formatVersion:1,
+        reason:"device-source-recovery",workspace:anchor&&!workingBoard?"supported-source":"new-work",localStorage:browser,...capture,
+        candidates:candidates.map(({key,sourceRef})=>({key,sourceRef})),unsupported:reduced.unsupported})},
+      hold={v:1,reason:"device-source-recovery",automaticRecovery:true,phase:"awaiting-cloud-evidence",originalKey,
+        sourceIdentityHash,workingBaseHash,account:plan.board.syncAccount??null,identity:plan.board.syncIdentity??null,
+        workspace:anchor&&!workingBoard?"supported-source":"new-work",
+        unresolvedOriginalRefs:[{kind:"device-original",key:originalKey,reason:"original-device-source-unreadable"}],
+        unresolvedSourceRefs:!anchor||reduced.board?[]:compatible.map(row=>row.sourceRef)};
+    const current=()=>localDeviceStartupCurrent(bootAttempt)&&deviceStore===store&&state===accepted&&JSON.stringify(state)===acceptedRaw&&held()&&
+      JSON.stringify(readManualArchiveLocalSources())===JSON.stringify(browser);
+    if(!current())return null;
+    const result=await deviceWriteBeforeDiagnostics("writeRecoveredSource",{expectedSource:sourceIdentity,
+      encodeSource:rawRecoverySourceIdentity,archives:[archive],payload,account:hold.account,hold,guard:current},store);
+    if(!result?.ok||!current())return null;
+    const [head,savedHold,raw]=await Promise.all([store.readHead(),store.getRecoveryCloudHold(),store.readRawExportSnapshot()]),
+      at=raw.stores.opaque.keys.indexOf(originalKey);
+    if(head?.hash!==workingBaseHash||head.payload!==payload||
+      !recoverySourceValueEqual(savedHold,{...hold,headHash:workingBaseHash})||at<0||
+      raw.stores.opaque.values[at]?.raw!==archive.raw||
+      !await verifiedLocalWorkingRecoveryIntent(savedHold,raw,hold.account,hold.identity,{allowUnresolved:true})||
+      !current()||!markDeviceStorageAuthority())return null;
+    deviceRecoveryCloudHold=savedHold;deviceLegacySeenSignature=legacyBoardSignature(legacyBoardCopies());
+    return head;
+  }catch{return null;}
+}
+async function resumeMemoryWorkingDeviceStorage(){
+  if(!memoryRecoveryWorkspace||deviceRecoveryCloudHold?.workspace!=="memory-only"||localDeviceStartupAttempt?.pending)return false;
+  const hold=deviceRecoveryCloudHold;
+  try{
+    if(!deviceStore){
+      if(!window.ChainStorageV2||!window.indexedDB||!crypto?.subtle)return false;
+      deviceStore=ChainStorageV2.createDeviceStore({indexedDB:window.indexedDB,crypto,
+        dbName:window.CHAIN_STORAGE_DB_NAME||"chain-scanner-v2",encodeRecoveryValue:encodeManualArchiveValue,
+        openTimeoutMs:window.CHAIN_STORAGE_OPEN_TIMEOUT_MS||5000});
+    }
+    await deviceStore.open();window.ScannerDeviceStore=deviceStore;
+    const head=await recoverLocalWorkingDeviceSource({workingBoard:automaticRecoveryClone(state),expectedMemoryHold:hold});
+    if(!head)return false;
+    state=JSON.parse(head.payload);deviceHeadHash=head.hash;lastPersistedRaw=head.payload;
+    storageOK=true;deviceStorageAuthority=true;deviceStorageRequired=false;memoryRecoveryWorkspace=false;
+    unacceptedDeviceSource={reason:"protected-local-working-source",workingWorkspace:true};
+    await refreshDeviceBackupCache();clearDeviceSaveIssue();render();return true;
+  }catch{return false;}
+}
+function localDeviceStartupCurrent(attempt){
+  if(!attempt)return true;
+  if(attempt!==localDeviceStartupAttempt||attempt.expired)return false;
+  if(performance.now()>=attempt.deadline){attempt.expired=true;return false;}
+  return true;
+}
 async function initializeDeviceStorage(){
+  const configured=Number(window.CHAIN_STORAGE_OPEN_TIMEOUT_MS),timeout=Number.isFinite(configured)&&configured>0?configured:5000,
+    attempt={expired:false,pending:true,deadline:performance.now()+timeout};
+  localDeviceStartupAttempt=attempt;
+  let timer;
+  const work=initializeDeviceStorageWithinBudget(attempt).catch(()=>null).finally(()=>{attempt.pending=false;});
+  const expired=new Promise(resolve=>{timer=setTimeout(()=>{attempt.expired=true;resolve(null);},timeout);});
+  const result=await Promise.race([work,expired]);clearTimeout(timer);
+  if(attempt.expired){
+    deviceStorageAuthority=false;deviceStorageRequired=true;
+    unacceptedDeviceSource={reason:"unavailable-device-storage"};
+    supportDiagnosticsObserve("device-store","timed-out","current",null,timeout,null,null,null,null,null,null,null,"deadline-exceeded");
+    return null;
+  }
+  return result;
+}
+async function initializeDeviceStorageWithinBudget(bootAttempt){
   deviceStorageRequired=hasDeviceStorageAuthorityMarker();
   if(window.storage||!window.ChainStorageV2||!window.indexedDB||!crypto?.subtle) return null;
   let opened=false;
@@ -2734,43 +2945,69 @@ async function initializeDeviceStorage(){
       encodeRecoveryValue:encodeManualArchiveValue,
       onRecovery:({status,code})=>supportDiagnosticsObserve("device-store",status,"current",null,null,null,null,null,null,null,null,null,code),
       openTimeoutMs:window.CHAIN_STORAGE_OPEN_TIMEOUT_MS||5000});
-    await deviceStore.open();opened=true;window.ScannerDeviceStore=deviceStore;
+    await deviceStore.open();if(!localDeviceStartupCurrent(bootAttempt))return null;opened=true;window.ScannerDeviceStore=deviceStore;
     deviceRecoveryCloudHold=await deviceStore.getRecoveryCloudHold();
+    if(!localDeviceStartupCurrent(bootAttempt))return null;
     let head;
     try{head=await deviceStore.readHead();}
-    catch{head=await repairExactLocalDeviceHead();if(!head)head=await deviceStore.readHead();}
+    catch{head=await repairExactLocalDeviceHead(bootAttempt);if(!head)head=await recoverLocalWorkingDeviceSource({bootAttempt});if(!head)head=await deviceStore.readHead();}
+    if(!localDeviceStartupCurrent(bootAttempt))return null;
     const legacyCopies=legacyBoardCopies(),legacy=legacyBoardBytes(),legacySignature=legacyBoardSignature(legacyCopies);
     if(!head){
       const raw=await deviceStore.readRawExportSnapshot();
+      if(!localDeviceStartupCurrent(bootAttempt))return null;
       verifiedEmptyDeviceStore=Object.values(raw.stores).every(source=>source.keys.length===0);
-      if(deviceStorageRequired||!verifiedEmptyDeviceStore){
-        deviceStorageRequired=true;unacceptedDeviceSource={reason:"missing-authoritative-head"};return null;
+      if(deviceStorageRequired||!verifiedEmptyDeviceStore||hasSavedBrowserEvidence()&&!legacy){
+        head=await recoverLocalWorkingDeviceSource({bootAttempt});
+        if(!head){deviceStorageRequired=true;unacceptedDeviceSource={reason:"missing-authoritative-head"};return null;}
       }
     }
     if(!head&&legacy&&!deviceStorageRequired){
       const migration=legacyMigrationBundle(legacy,legacyCopies),sourceFingerprint=await ChainStorageV2.hashPayload(legacySignature);
       const result=await deviceWriteBeforeDiagnostics("migrateLegacy",{headPayload:migration.headPayload,account:JSON.parse(legacy).syncAccount??null,
         sourceFingerprint,backups:migration.rows,opaqueArchives:migration.opaqueArchives});
-      if(!result?.ok||!result.verified) return null;
+      if(!localDeviceStartupCurrent(bootAttempt)||!result?.ok||!result.verified) return null;
       head=await deviceStore.readHead();
     }
-    if(!head){
+    if(!head||!localDeviceStartupCurrent(bootAttempt)){
       return null;
     }
     // A verified byte hash does not establish supported JSON/board authority.
     // Validate a detached copy before hydrating or reconciling legacy sources.
-    const checked=JSON.parse(head.payload);assertCompleteSavedCollections(checked);dropRemovedFields(checked);hydrateState(checked);
-    if(!markDeviceStorageAuthority()) return null;
+    let checked;
+    try{checked=JSON.parse(head.payload);assertCompleteSavedCollections(checked);dropRemovedFields(checked);hydrateState(checked);}
+    catch{head=await recoverLocalWorkingDeviceSource({bootAttempt});if(!head)throw Error("No supported local working source");}
+    deviceRecoveryCloudHold=await deviceStore.getRecoveryCloudHold();
+    if(deviceRecoveryCloudHold?.reason==="device-source-recovery"&&deviceRecoveryCloudHold.automaticRecovery===true){
+      const raw=await deviceStore.readRawExportSnapshot();
+      if(!await verifiedLocalWorkingRecoveryIntent(deviceRecoveryCloudHold,raw,deviceRecoveryCloudHold.account,
+        deviceRecoveryCloudHold.identity,{allowUnresolved:true}))throw Error("The local recovery original could not be verified");
+    }
+    if(!localDeviceStartupCurrent(bootAttempt)||!markDeviceStorageAuthority()) return null;
     deviceStorageAuthority=true;deviceHeadHash=head.hash;
     const legacyFingerprint=legacy?await ChainStorageV2.hashPayload(legacySignature):null;
-    deviceLegacySeenSignature=legacy&&head.sourceFingerprint===legacyFingerprint?legacySignature:null;
+    if(!localDeviceStartupCurrent(bootAttempt))return null;
+    deviceLegacySeenSignature=deviceRecoveryCloudHold?.reason==="device-source-recovery"?legacySignature:
+      legacy&&head.sourceFingerprint===legacyFingerprint?legacySignature:null;
     await refreshDeviceBackupCache();
+    if(!localDeviceStartupCurrent(bootAttempt))return null;
     if(legacy&&!deviceLegacySeenSignature){
       if(!await reconcileDeviceLegacyCopy())return null;
       head=await deviceStore.readHead();
     }
+    if(!localDeviceStartupCurrent(bootAttempt))return null;
+    if(localWorkingRecoveryIntent(deviceRecoveryCloudHold))unacceptedDeviceSource={reason:"protected-local-working-source",workingWorkspace:true};
     return head.payload;
   }catch(e){
+    if(!localDeviceStartupCurrent(bootAttempt))return null;
+    if(opened&&!deviceRecoveryCloudHold){
+      const head=await recoverLocalWorkingDeviceSource({bootAttempt});
+      if(head&&localDeviceStartupCurrent(bootAttempt)){
+        deviceStorageAuthority=true;deviceHeadHash=head.hash;deviceLegacySeenSignature=legacyBoardSignature(legacyBoardCopies());
+        unacceptedDeviceSource={reason:"protected-local-working-source",workingWorkspace:true};
+        await refreshDeviceBackupCache();return localDeviceStartupCurrent(bootAttempt)?head.payload:null;
+      }
+    }
     deviceStorageAuthority=false;
     if(opened){deviceStorageRequired=true;unacceptedDeviceSource={reason:"unreadable-or-unsupported-device-source"};}
     else{deviceStore=null;window.ScannerDeviceStore=null;}
@@ -3263,7 +3500,8 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
       ?"An unreadable backup is protected. Choose a supported recovery source before saving this board."
       :"The saved source is protected. Choose a supported recovery source before saving this board.");
   }
-  if(!storageOK) return reportDeviceSaveFailure("storage","unavailable","Keep this tab open; use View / copy current board in Settings before closing it.");
+  if(memoryRecoveryWorkspace&&await resumeMemoryWorkingDeviceStorage())return true;
+  if(!storageOK) return reportDeviceSaveFailure("storage","unavailable","New work is only in this tab and is not saved. Keep this tab open until storage is available.");
   let completionSourceBackup=null,completionSourcePayload=null,priorCompletionProtection=null,completionProtection=null;
   const failCompletionRecovery=()=>{
     if(completionProtection&&JSON.stringify(state?.protectedBackupIds)===JSON.stringify(completionProtection)){
@@ -5503,7 +5741,13 @@ async function cloudPull(){
     if(!state||automaticCloudFallbackBootCapturePending){cloudPullPending=true;renderSync();return;}
     cloudPullPending=false;
     if(deviceRecoveryCloudHold.automaticRecovery===true){
-      observeCloudIdentity();await publishAutomaticCloudRecovery();
+      observeCloudIdentity();
+      if(localWorkingRecoveryIntent(deviceRecoveryCloudHold)){
+        const backend=window.CloudSync,account=backend?.user,identity=cloudAccountIdentity();
+        await openAutomaticCloudSourceFallback({code:"device-source-recovery"},{backend,account,identity,
+          pullStillCurrent:()=>window.CloudSync===backend&&backend?.user===account&&cloudAccountIdentity()===identity&&
+            !cloudSuspended&&!cloudResumePending});
+      }else await publishAutomaticCloudRecovery();
     }
     renderSync();return;
   }
@@ -10619,7 +10863,7 @@ function automaticRecoveryDeviceAuthorityCurrent(captured){
       captured.backend?.user!==captured.account||captured.backend.recoveryIdentity?.()!==captured.evidence.identity||
       JSON.stringify(state)!==captured.local||cloudSourceRecoveryDraft()!==captured.draft||
       deviceStorageRequired!==authority.deviceStorageRequired||deviceStorageAuthority!==authority.deviceStorageAuthority||
-      deviceHeadHash!==captured.headHash||captured.hold||deviceRecoveryCloudHold||
+      deviceHeadHash!==captured.headHash||!automaticRecoveryExpectedHoldCurrent(captured)||
       JSON.stringify(readManualArchiveLocalSources())!==JSON.stringify(captured.rawBrowserSources))return false;
     if(captured.recoveryMode==="accepted")return liveBoardAccepted&&deviceStorageAuthority;
     if(captured.recoveryMode==="fresh-empty"||captured.recoveryMode==="readable-malformed")
@@ -10795,6 +11039,12 @@ async function automaticCloudSourceHistory(readAttempt=null){
     const unresolved=[],permanent=[],seen=new Set();
     for(const {sourceKey,source} of envelopes){
       readAttempt?.checkBudget();
+      for(const ref of Array.isArray(source.unresolvedLocalSources)?source.unresolvedLocalSources:[]){
+        if(ref?.kind!=="device-original"||typeof ref.key!=="string"||seen.has(ref.key))continue;
+        const original=archives.find(row=>row.key===ref.key);
+        if(typeof original?.raw!=="string")continue;
+        seen.add(ref.key);permanent.push({id:ref.key,sourceArchiveKey:sourceKey,reason:"original-device-source-unreadable"});
+      }
       const issues=new Map((source.unsupported||[]).filter(issue=>issue?.sourceRef?.kind==="cloud-generation")
         .map(issue=>[issue.sourceRef.id,issue.reason]));
       const candidates=new Set((source.candidateSources||[]).filter(row=>row?.sourceRef?.kind==="cloud-generation")
@@ -10848,7 +11098,7 @@ async function maybeResumeAutomaticCloudSources(){
     {account,backend,identity,pullStillCurrent});
 }
 async function cloudSourceRecoveryDeviceSources(readAttempt=null,{allowFreshEmpty=false,allowReadableMalformedHead=false,
-  captureAutomaticDeviceAuthority=false}={}){
+  captureAutomaticDeviceAuthority=false,localRecoveryIntent=null}={}){
   readAttempt?.checkBudget();
   const backend=window.CloudSync,account=backend?.user,local=JSON.stringify(state),draft=cloudSourceRecoveryDraft();
   const baseline=automaticCloudFallbackBootBaseline;
@@ -10909,7 +11159,11 @@ async function cloudSourceRecoveryDeviceSources(readAttempt=null,{allowFreshEmpt
   }
   if(rawSourceIdentity!==baseline?.rawSourceIdentity&&recoveryMode!=="accepted")
     throw Error("The device source changed. Its exact data stays protected; read sources again.");
-  const deviceCandidates=captureRawAuthority?cloudSourceRecoveryDeviceCandidates(account):undefined;
+  if(localRecoveryIntent&&(!captureRawAuthority||recoveryMode!=="accepted"||
+    !recoverySourceValueEqual(hold,localRecoveryIntent)||!recoverySourceValueEqual(deviceRecoveryCloudHold,localRecoveryIntent)||
+    !await verifiedLocalWorkingRecoveryIntent(localRecoveryIntent,raw,account,evidence.identity)))
+    throw Error("The protected local recovery source changed or still has incompatible alternatives.");
+  const deviceCandidates=captureRawAuthority&&!localRecoveryIntent?cloudSourceRecoveryDeviceCandidates(account):undefined;
   let acceptedBaseline=null;
   if(recoveryMode==="accepted"&&captureRawAuthority){
     const validated=cloudSourceRecoveryBoard(local,account);
@@ -10919,7 +11173,7 @@ async function cloudSourceRecoveryDeviceSources(readAttempt=null,{allowFreshEmpt
   readAttempt?.checkBudget();
   const captured={backend,account,local,draft,head:head?.payload??null,headHash,headRecord,browser,
     ...(captureRawAuthority?{rawBrowserSources,rawSourceIdentity,acceptedBaseline,deviceCandidates}:{}),
-    freshEmpty:recoveryMode==="fresh-empty",recoveryMode,hold,evidence,holds};
+    freshEmpty:recoveryMode==="fresh-empty",recoveryMode,hold,evidence,holds,...(localRecoveryIntent?{localRecoveryIntent}:{})};
   if(captureRawAuthority){
     const deviceRawAuthority=Object.freeze({});
     captured.deviceRawAuthority=deviceRawAuthority;
@@ -10929,7 +11183,7 @@ async function cloudSourceRecoveryDeviceSources(readAttempt=null,{allowFreshEmpt
   return captured;
 }
 async function cloudSourceRecoverySources(diagnosticOperation=null,aggregateRole=null,readAttempt=null,onDeviceCapture=null,
-  {allowFreshEmpty=false,allowReadableMalformedHead=false,captureAutomaticDeviceAuthority=false,additionalGenerationIds=[]}={}){
+  {allowFreshEmpty=false,allowReadableMalformedHead=false,captureAutomaticDeviceAuthority=false,additionalGenerationIds=[],localRecoveryIntent=null}={}){
   const operation=diagnosticOperation||supportDiagnosticsSourceOperation(),operationStarted=supportDiagnosticsNow(),aggregateStarted=supportDiagnosticsNow();
   const observe=(stage,status,role="current",started=operationStarted,code="unknown")=>{
     const ended=supportDiagnosticsNow(),duration=Number.isFinite(started)&&Number.isFinite(ended)?Math.max(0,ended-started):null;
@@ -10943,7 +11197,7 @@ async function cloudSourceRecoverySources(diagnosticOperation=null,aggregateRole
   if(aggregateRole==="first"||aggregateRole==="second")supportDiagnosticsObserve("aggregate","started",aggregateRole,operation,null,null,null,null,null,null,null,null,"unknown");
   supportDiagnosticsObserve("source-read","started","current",operation,null,null,null,null,null,null,null,null,"unknown");
   try{
-  const captureOptions={allowFreshEmpty,allowReadableMalformedHead,captureAutomaticDeviceAuthority,additionalGenerationIds};
+  const captureOptions={allowFreshEmpty,allowReadableMalformedHead,captureAutomaticDeviceAuthority,additionalGenerationIds,localRecoveryIntent};
   const captured=await cloudSourceRecoveryDeviceSources(readAttempt,captureOptions);
   const {backend,account,local,draft,headRecord:head,browser,hold,evidence}=captured;
   captured.serial=cloudSourceRecoverySerial;
@@ -11039,7 +11293,7 @@ async function commitAutomaticRecoveryDeviceSource({captured,payload,archives=[]
     try{return guard()===true&&automaticRecoveryDeviceAuthorityCurrent(captured)&&
       window.CloudSync===captured.backend&&captured.backend?.user===captured.account&&
       captured.backend.recoveryIdentity?.()===captured.evidence.identity&&
-      !deviceRecoveryCloudHold&&!cloudPushInFlight;}
+      automaticRecoveryExpectedHoldCurrent(captured)&&!cloudPushInFlight;}
     catch{return false;}
   };
   if(!current())return refuse("stale-source-or-account");
@@ -11092,19 +11346,22 @@ async function commitAutomaticRecoveryDeviceSource({captured,payload,archives=[]
 }
 async function openAutomaticCloudSourceFallback(failed,{account,backend,identity,pullStillCurrent}={}){
   const baseline=automaticCloudFallbackBootBaseline;
+  const localIntent=failed?.code==="device-source-recovery"?deviceRecoveryCloudHold:null,localIntentDraft=localIntent?cloudSourceRecoveryDraft():null;
+  if(localIntent&&!localWorkingRecoveryIntent(localIntent))return false;
   let backgroundResume=failed?.code==="automatic-source-resume";
   let additionalGenerationIds=[];
   const malformed=failed?.code==="readable-malformed-device-head";
   let recoveryMode=malformed?"readable-malformed":baseline?.mode==="fresh-empty"?"fresh-empty":
     liveBoardAccepted&&deviceStorageAuthority?"accepted":null;
-  if((malformed?recoveryMode!=="readable-malformed":backgroundResume?recoveryMode!=="accepted":failed?.code!=="corrupt-generation")||!recoveryMode||
-    cloudSourceRecoveryBusy||cloudSourceRecoveryPreview||fileRestoreBusy||deviceRecoveryCloudHold||!deviceStore||
+  if((malformed?recoveryMode!=="readable-malformed":backgroundResume||localIntent?recoveryMode!=="accepted":failed?.code!=="corrupt-generation")||!recoveryMode||
+    cloudSourceRecoveryBusy||cloudSourceRecoveryPreview||fileRestoreBusy||deviceRecoveryCloudHold&&!localIntent||!deviceStore||
     typeof deviceStore.writeRecoveredSource!=="function"||!deviceStore.readRawExportSnapshot||!useLocal||
     recoveryMode!=="accepted"&&deviceStorageAuthority)return false;
   const bootStillCurrent=()=>{
     const common=window.CloudSync===backend&&backend?.user===account&&cloudAccountIdentity()===identity&&
       pullStillCurrent?.()===true&&!cloudSuspended&&!cloudResumePending&&!document.hidden&&
-      !hasActiveEditor()&&!scannerGestureActive&&!fileRestoreBusy&&!deviceRecoveryCloudHold;
+      !hasActiveEditor()&&!scannerGestureActive&&!fileRestoreBusy&&
+      (localIntent?recoverySourceValueEqual(deviceRecoveryCloudHold,localIntent)&&cloudSourceRecoveryDraft()===localIntentDraft:!deviceRecoveryCloudHold);
     if(!common)return false;
     // The persisted marker requires verified v2 storage; a successfully read
     // accepted head supplies that authority after reopening as well.
@@ -11125,14 +11382,15 @@ async function openAutomaticCloudSourceFallback(failed,{account,backend,identity
       if(!bootStillCurrent())return false;
       const captureOptions={allowFreshEmpty:recoveryMode==="fresh-empty",
         allowReadableMalformedHead:recoveryMode==="readable-malformed",
-        captureAutomaticDeviceAuthority:recoveryMode==="accepted",additionalGenerationIds};
+        captureAutomaticDeviceAuthority:recoveryMode==="accepted",additionalGenerationIds,localRecoveryIntent:localIntent};
       const p=await cloudSourceRecoverySources(diagnosticOperation,"first",readAttempt,
         backgroundResume?captured=>{backgroundSourceBaseline??=captured;}:null,captureOptions);
       if(serial!==cloudSourceRecoverySerial||readAttempt.signal.aborted||!bootStillCurrent())return false;
       p.serial=serial;p.rev=p.source.manifest?.rev??0;
       const manifest=p.source.manifest,activeId=manifest?.activeGeneration,previousId=manifest?.previousGeneration;
       if(p.backend!==backend||p.account!==account||p.evidence.identity!==identity||p.source.identity!==identity||
-        p.evidence.epoch!==p.source.epoch||p.holds.length||p.hold||
+        p.evidence.epoch!==p.source.epoch||p.holds.length||
+        (localIntent?!recoverySourceValueEqual(p.hold,localIntent):!!p.hold)||
         p.recoveryMode!==recoveryMode||!Array.isArray(p.source.generations)||
         recoveryMode==="fresh-empty"&&(!p.freshEmpty||p.rawSourceIdentity!==baseline.rawSourceIdentity||
           p.head!==null||p.headHash!==null||p.headRecord!==null||p.local!==baseline.board||p.draft!==baseline.draft)||
@@ -11141,7 +11399,7 @@ async function openAutomaticCloudSourceFallback(failed,{account,backend,identity
         recoveryMode==="accepted"&&(!p.acceptedBaseline||!p.deviceRawAuthority||p.headHash!==deviceHeadHash)||
         !cloudSourceRecoveryFreshBaseline(p,p)||manifest?.schemaVersion!==2||!Number.isSafeInteger(manifest.rev)||manifest.rev<1)
         return false;
-      if(!backgroundResume&&recoveryMode!=="readable-malformed"&&activeId!==failed.generationId)return false;
+      if(!backgroundResume&&!localIntent&&recoveryMode!=="readable-malformed"&&activeId!==failed.generationId)return false;
       if(recoveryMode==="fresh-empty"&&(typeof previousId!=="string"||previousId===activeId||
         !p.source.generations.some(row=>row.id===activeId)||!p.source.generations.some(row=>row.id===previousId)))return false;
       const namedIds=new Set([activeId,previousId,p.evidence.pending?.generationId,...additionalGenerationIds].filter(id=>typeof id==="string"));
@@ -11239,7 +11497,7 @@ async function openAutomaticCloudSourceFallback(failed,{account,backend,identity
       }
       const latestEvidence=await backend.recoveryEvidence();
       if(!bootStillCurrent()||!recoverySourceValueEqual(p.evidence,latestEvidence))return false;
-      if(!bootStillCurrent()||!recoverySourceValueEqual(await deviceStore.getRecoveryCloudHold?.()??null,null)||
+      if(!bootStillCurrent()||!recoverySourceValueEqual(await deviceStore.getRecoveryCloudHold?.()??null,localIntent)||
         JSON.stringify(decisionRecoveryHolds(account))!==JSON.stringify(p.holds))return false;
       if(backgroundResume){
         const rowsById=new Map(p.source.generations.map(row=>[row.id,row]));
@@ -11282,6 +11540,7 @@ async function openAutomaticCloudSourceFallback(failed,{account,backend,identity
         alternativesToPreserve:reduced.alternativesToPreserve.map(row=>({key:row.key,sourceRef:row.sourceRef})),
         supportedAmbiguities:reduced.supportedAmbiguities,resolvedAmbiguities:reduced.resolvedAmbiguities||[],
         defaultPolicy:"accepted-device-then-stable-source-key-v1",unsupported:sourceIssues,
+        unresolvedLocalSources:localIntent?.unresolvedOriginalRefs??[],
         deviceAuthorityExact:{classification:p.recoveryMode==="fresh-empty"?"verified-empty-fresh-client":
           p.recoveryMode==="readable-malformed"?"readable-malformed-device-source":"accepted-device-board"}});
       const hold={v:1,reason:"cloud-source-recovery",automaticRecovery:true,account,identity,epoch:p.evidence.epoch,originalKey:holdKey};
@@ -12794,7 +13053,7 @@ function openSettings(){
   modalShell(
     '<div class="mtop"><h2>Settings</h2><button class="x" data-act="close-modal" aria-label="Close">✕</button></div>'
     + (!liveBoardAccepted?'<p class="kv warn" role="status"><b>Saved device source needs recovery.</b> It is unreadable, missing or unsupported. Its originals stay untouched. Use Restore below to choose a supported recovery board, then review and confirm it. This recovery view is not a saved empty board.</p>':'')
-    + (deviceRecoveryCloudHold?'<p class="kv warn" role="status"><b>Cloud recovery is pending.</b> Your restored board and later edits save on this device. Unknown cloud changes and earlier sources remain protected. This board has not been confirmed by cloud.</p>'+(cloudReady()&&typeof window.CloudSync?.readRecoverySource==="function"?'<div class="mbtns"><button class="btn subtle" data-act="review-cloud-source-recovery">Review cloud recovery</button></div>':'<p class="kv">Sign in to review the cloud source before resuming sync.</p>'):'')
+    + (deviceRecoveryCloudHold?'<p class="kv warn" role="status"><b>Cloud recovery is pending.</b> '+(memoryRecoveryWorkspace||deviceRecoveryCloudHold.workspace==="memory-only"?'A new workspace is open only in this tab. New work is not saved. Keep this tab open; earlier saved sources remain untouched.':deviceRecoveryCloudHold.workspace==="new-work"?'A new offline workspace is open. Earlier saved data could not be opened. New work saves on this device; the earlier sources remain protected.':'Your working board and later edits save on this device. Unknown cloud changes and earlier sources remain protected.')+' This board has not been confirmed by cloud.</p>'+(cloudReady()&&typeof window.CloudSync?.readRecoverySource==="function"?'<div class="mbtns"><button class="btn subtle" data-act="review-cloud-source-recovery">Review cloud recovery</button></div>':'<p class="kv">Sign in to review the cloud source before resuming sync.</p>'):'')
     + (automaticCloudSourceResumeStatus.state!=="idle"?'<p id="automaticCloudSourceResumeStatus" class="kv" role="status">'+esc(automaticCloudSourceResumeMessage(automaticCloudSourceResumeStatus))+'</p>':'')
     + ((deviceRecoveryCloudHold||!liveBoardAccepted)&&window.CloudSync?.configured
       ? '<p class="kv">Signing in or changing accounts keeps the recovery sources protected. Authentication alone does not choose or upload a board.</p>'
@@ -12851,8 +13110,8 @@ function openSettings(){
         : "Cloud sync configured \u2014 sign in from the header to link this device.")+'</div>'
     + '<div class="mbtns"><button class="btn danger" data-act="wipe">Reset everything</button></div>'
     + '<h3>Download backup</h3><p class="kv">Current-board JSON contains ordinary board data, including accepted edits that may not have saved on this device. A recovery archive also preserves this app\u2019s readable local backup and pending recovery sources; it is not an ordinary board-import file. Downloads do not save, sync, or replay pending work. If a source cannot be captured consistently, no recovery archive is made.</p>'
-    + '<div class="mbtns"><label for="backupDownloadFormat">Backup format</label><select id="backupDownloadFormat" aria-label="Backup format"'+(!liveBoardAccepted?' aria-describedby="rawBackupSourceHelp"':'')+'>'+(liveBoardAccepted?'<option value="current-board">Current board JSON</option><option value="recovery-archive">Full recovery archive</option>':'<option value="raw-device-sources">Raw device sources</option>')+'</select><button class="btn subtle" data-act="download-backup">Download backup</button></div>'
-    + (!liveBoardAccepted?'<p class="kv" id="rawBackupSourceHelp">Raw device sources are not a board and cannot be restored as one.</p>':'')
+    + '<div class="mbtns"><label for="backupDownloadFormat">Backup format</label><select id="backupDownloadFormat" aria-label="Backup format"'+(!liveBoardAccepted||emptyNewWorkWorkspace()?' aria-describedby="rawBackupSourceHelp"':'')+'>'+(liveBoardAccepted&&!emptyNewWorkWorkspace()?'<option value="current-board">Current board JSON</option><option value="recovery-archive">Full recovery archive</option>':'<option value="raw-device-sources">Raw device sources</option>')+'</select><button class="btn subtle" data-act="download-backup">Download backup</button></div>'
+    + (!liveBoardAccepted||emptyNewWorkWorkspace()?'<p class="kv" id="rawBackupSourceHelp">Raw device sources are not a board and cannot be restored as one.</p>':'')
     + '<h3>Restore</h3><p class="kv">Choose a JSON file or paste board data for the same protected preview. Supported inputs include ordinary board JSON, a complete recovery archive, or a raw backup list with a deliberate supported-board choice. The exact selected source and current board are protected before preview; Cancel keeps them unchanged. An archive applies only its current board, and its recovery sources are never replayed.</p>'
     + '<div class="mbtns"><label for="backupRestoreSource">Restore source</label><select id="backupRestoreSource" aria-label="Restore source"><option value="file">Choose a JSON file</option><option value="paste">Paste JSON</option></select><button class="btn subtle" data-act="restore-backup">Restore</button><input id="restoreBackupFile" type="file" accept=".json,application/json" hidden aria-label="Choose a board backup JSON file"/></div>'
     + '<h3>Current-board view and copy</h3><p class="kv">View or copy ordinary board JSON for the board currently open in this tab, including accepted edits that may not have saved on this device.</p>'
@@ -13030,7 +13289,8 @@ async function protectUnacceptedFileRestore(baseline,restoreFile){
   // must not recursively archive already protected receipts and fill storage.
   const original=reuse?prior.original:{key:"device-recovery-original:"+uid(),raw:JSON.stringify({
     format:"chain-scanner.device-recovery-source",formatVersion:1,reason:baseline.unacceptedSource.reason,
-    localStorage:baseline.rawLocalSources,indexedDB:encodeManualArchiveSnapshot(baseline.rawDeviceSnapshot).stores})};
+    localStorage:baseline.rawLocalSources,indexedDB:encodeManualArchiveSnapshot(baseline.rawDeviceSnapshot).stores,
+    ...(baseline.unacceptedSource.workingWorkspace?{currentWorkingBoard:baseline.currentRaw,currentWorkingDrafts:baseline.quickAddDraftRaw}:{})})};
   const fileRaw=JSON.stringify(restoreFile),file=reuse&&prior.archives.find(row=>row.key.startsWith("device-recovery-file:")&&row.raw===fileRaw)
     ||{key:"device-recovery-file:"+uid(),raw:fileRaw};
   const rawRecoveryArchives=[original,file];
@@ -13070,7 +13330,7 @@ function fileRestoreReadinessReason(p){
   return null;
 }
 async function captureFileRestoreBaseline({pasteDraft=null}={}){
-  const unacceptedSource=!liveBoardAccepted&&unacceptedDeviceSource;
+  const unacceptedSource=(!liveBoardAccepted||unacceptedDeviceSource?.workingWorkspace)&&unacceptedDeviceSource;
   if((!liveBoardAccepted&&!unacceptedSource)||!state||!Array.isArray(state.tasks))throw Error("The accepted board is not ready. No file restore was started.");
   if(!unacceptedSource&&deviceStorageRequired&&!deviceStorageAuthority)throw Error("This device's durable board storage is unavailable. The current board stays open.");
   const currentRaw=JSON.stringify(state),backend=window.CloudSync,cloudUser=backend?.user??null;
@@ -13152,7 +13412,7 @@ async function verifyFileRestoreCopies(p){
 function fileRestoreSourcesMatchSync(p){
   if(p.consentGeneration!==fileRestoreConsentGeneration||!pasteDraftIsCurrent(p))return false;
   let identity=null;try{identity=p.backend?.recoveryIdentity?.()??null;}catch(error){return false;}
-  if((p.unacceptedSource?liveBoardAccepted||unacceptedDeviceSource!==p.unacceptedSource:!liveBoardAccepted)||state!==p.stateRef||JSON.stringify(state)!==p.currentRaw||
+  if((p.unacceptedSource?(p.unacceptedSource.workingWorkspace?!liveBoardAccepted:liveBoardAccepted)||unacceptedDeviceSource!==p.unacceptedSource:!liveBoardAccepted)||state!==p.stateRef||JSON.stringify(state)!==p.currentRaw||
      window.CloudSync!==p.backend||(p.backend?.user??null)!==p.cloudUser||identity!==p.cloudIdentity||
      deviceStorageAuthority!==p.deviceStorageAuthority||deviceStorageRequired!==p.deviceStorageRequired||
      deviceStore!==p.deviceStore||deviceHeadHash!==p.deviceHeadHash)return false;
@@ -13173,12 +13433,12 @@ async function fileRestoreSourcesStillCurrent(p){
     try{if(rawRecoverySourceIdentity(await p.deviceStore.readRawExportSnapshot())!==p.rawSourceIdentity||!fileRestoreSourcesMatchSync(p))return false;}
     catch{return false;}
   }
-  if(p.deviceStorageAuthority){
+  if(p.deviceStorageAuthority&&!p.unacceptedSource){
     try{const head=await p.deviceStore.readHead();if(!fileRestoreSourcesMatchSync(p)||!head||head.hash!==p.deviceHead.hash||head.payload!==p.deviceHead.payload)return false;}
     catch(error){return false;}
   }
   if(p.currentCopyId&&p.fileCopyId)try{await verifyFileRestoreCopies(p);if(!fileRestoreSourcesMatchSync(p))return false;}catch(error){return false;}
-  if(p.deviceStorageAuthority){
+  if(p.deviceStorageAuthority&&!p.unacceptedSource){
     try{const head=await p.deviceStore.readHead();if(!fileRestoreSourcesMatchSync(p)||!head||head.hash!==p.deviceHead.hash||head.payload!==p.deviceHead.payload)return false;}
     catch(error){return false;}
   }
@@ -13594,7 +13854,7 @@ function installFileRestoreState(p,payload){
   lastPersistedRaw=payload;persistedChanceSeed=state.chance?.seed??null;clearDeviceSaveIssue();
   if(p.committedHead)deviceHeadHash=p.committedHead.hash;
   if(p.unacceptedSource){
-    unacceptedDeviceSource=null;storageOK=true;deviceStorageAuthority=true;deviceStorageRequired=true;
+    unacceptedDeviceSource=null;memoryRecoveryWorkspace=false;storageOK=true;deviceStorageAuthority=true;deviceStorageRequired=true;
     // Retained browser bytes are raw evidence, not a legacy tab edit to adopt.
     deviceLegacySeenSignature=legacyBoardSignature(legacyBoardCopies());
     cloudAdoptionHeld=true;pendingPush=false;reconciledAs=null;undoStack=[];
@@ -14328,7 +14588,16 @@ function hotkeyDelete(){
     rejectedSavedState = true;
   }
   liveBoardAccepted=!rejectedSavedState&&(!!loaded||freshClient);
-  if(!liveBoardAccepted)unacceptedDeviceSource||={reason:rejectedSavedState?"unsupported-or-partial-board":"unreadable-or-missing-source"};
+  if(!liveBoardAccepted){
+    unacceptedDeviceSource||={reason:rejectedSavedState?"unsupported-or-partial-board":"unreadable-or-missing-source"};
+    unacceptedDeviceSource.workingWorkspace=true;
+    // The original remains unaccepted. A separate live workspace permits new
+    // work when every durable recovery write is refused; it cannot upload or
+    // claim a saved empty original.
+    memoryRecoveryWorkspace=true;liveBoardAccepted=true;storageOK=false;
+    deviceRecoveryCloudHold||={v:1,reason:"device-memory-workspace",workspace:"memory-only"};
+    setDeviceSaveIssue("storage","unavailable");
+  }
   if(!rejectedSavedState&&loaded){
     const upgraded=JSON.parse(JSON.stringify(state));
     if(ambiguousLegacyCompletion(upgraded))pendingLegacyCompletionSource=lastPersistedRaw??JSON.stringify(loaded);

@@ -1,5 +1,37 @@
 [
   {
+    "baseCommit": "f6d1da402787162d17b635b00044c881b97929b7",
+    "testChangesSha256": "4ac582a624fd06be70ac16a7849ff0f30cdd2a82011c5f7641906cd0ed365454",
+    "reason": "Implement the explicitly authorized protected offline working recovery and new-work workspace, keeping the actual app startup, native Add/Done/Undo, cold reopen, raw IndexedDB, and extracted backend consumer seams. Migrate only obsolete unusable-placeholder expectations; original bytes and manual raw-CAS authority remain protected.",
+    "previousBehavior": "Missing or malformed device heads refused every surviving local source without network. No complete source left an unaccepted shell whose edits could not save; the automatic cloud publisher did not recognize a local-only intent. Raw startup reads could stall beyond the original open budget.",
+    "intendedBehavior": "Complete supported same-owner local sources provide a verified durable working head and local intent; unknown originals remain exact. No complete original provides a distinct protected new-work basis, and all storage refused provides honest memory-only work that can later save. Fresh identity/source evidence transitions the exact intent through one full raw CAS into the existing publisher and exact cloud ACK.",
+    "replacementTests": [
+      "RISK offline working recovery: surviving linked backups open useful protected work before any network",
+      "RISK offline working recovery: verified protected archive and browser decisions combine without foreign sources",
+      "RISK offline working reconnect: current offline edits and retained peer work reach exact cloud acknowledgement",
+      "RISK offline new-work recovery: absent complete original opens a distinct durable workspace and preserves unseen cloud tasks",
+      "RISK offline memory recovery: refused durable media still permit new work with an honest unsaved status",
+      "RISK offline memory recovery resume: returning storage saves current new work without replacing the refused original",
+      "RISK offline working authority: a changed original archive cannot activate a claimed recovered working head",
+      "RISK offline working archives: prior exact originals are referenced without recursively copying their bytes",
+      "RISK offline working reconnect guards: changed source hold pending draft and account retain the current workspace",
+      "RISK offline startup budget: stalled open and raw reads expose unsaved work without late adoption",
+      "RISK offline memory restore: a deliberate Paste after storage returns protects accepted unsaved work"
+    ],
+    "preservedCoverage": [
+      "Retain exact original snapshots, corrupt/unknown auxiliary and pending rows, all browser values, immutable archive bytes, manual File/Paste preview/Cancel/full-raw-CAS/typed/account/readback checks and unsupported selected-source rejection. A new working head is not a recovered empty original.",
+      "Old unsupported-source and raw-startup tests now require a separate working workspace plus lossless original archival, rather than refusing every ordinary save. The raw peer fixture now mutates the actual post-recovery head, preserving the same transaction-time race assertion. Partial collections remain exact; browser-only refused durability remains unsaved.",
+      "All changed and added tests are Node-only existing consumers. No browser/emulator/native-process test, private account, CI, push, deployment, FAQ/fingerprint or test-group assignment is performed here. Final independent risk/rendered/FAQ/full/native/compatibility/CI/release acceptance belongs to the parent.",
+      "The reconnect guard cohort initially passed five defenses but failed a changed unfinished draft (record823c97c5, declared green failure). That real failure preceded a narrow local-intent draft lifetime guard. Initial stalled-open observation1c78476e was cancelled due unref timing and is not behavioral RED; the corrected fixtureDeadline consumer produced actual raw-read REDcfcb6bb4.",
+      "The malformed capture regression now exercises exact typed raw-source/encoder refusals through cloudSourceRecoveryDeviceSources and actual cloudPull on the accepted protected workspace, retaining the same complete raw graph. The automatic browser-default test now expects its proven accepted local baseline (16 hours) instead of an unaccepted cloud-key default (8 hours); exact browser/cloud alternatives and cold reopen remain covered.",
+      "A successful explicit File/Paste Restore from a memory-only workspace archives its exact accepted unsaved board and current drafts alongside full raw originals, then retires the memory-only status. It retains the existing complete-source preview, full raw CAS and exact hold/account/readback checks; currentWorkingBoard is protected evidence, not a new automatic source-selection shortcut."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo $PWD --evidence-dir /Users/emeraldpham/.codex/task-artifacts/ios-page-failure-20261024/database/offline-working/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern <explicit Node root pattern> tests.js. Contemporaneous records6307d9f4 (linked source), b3008d48 (archive/browser), a21326e5 (reconnect), 666e1640 (new work), 5994538a (memory), 19c96932 (returning storage), a7a06871 (archive authority), f592ac7b (archive references), 3952aa1c (mislabel sibling), cfcb6bb4 (stalled raw read). Guard regression823c97c5 (declared green failure) and corrected startup budget REDcfcb6bb4 also precede their narrow fixes; source/node-only run89c2aa14 exposed only the two obsolete accepted-baseline assertions. Final memory-only deliberate Paste RED78170154 precedes the guarded manual Restore repair; GREENbdc2cd2b verifies exact accepted unsaved board plus draft preservation and memory-state retirement.",
+      "failure": "Observed assertion mismatches before each corresponding runtime slice: device authority false despite complete backup; archived task absent; local recovery hold never ACKs; distinct new-work/unsaved status absent; returning storage still cannot save; changed original archive activated; prior archive recursively copied; mislabelled sibling hides healthy browser payload; permanently stalled initial raw read keeps state null beyond35ms budget. All failed attempts and corrections remain retained. Later focused GREEN and source-preservation runs are separately recorded."
+    }
+  },
+  {
     "baseCommit": "c531eff5ce57575c69142a1529c37837286b4c50",
     "testChangesSha256": "55b7bfd7c9e8442707929b63b335cb6d22c7d4929164e890fec91630b58ac3fd",
     "reason": "Separate two actual native reading gestures after measured Chromium PageDown smooth scrolling consumed an immediate horizontal wheel despite correct PRE target and no prevention. Keep vertical movement, then observe3unchanged native scrollTop frames within the existing1000ms bound before one horizontal wheel and its unchanged movement assertion.",
