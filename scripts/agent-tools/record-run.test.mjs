@@ -122,7 +122,12 @@ async function assertQualificationSetupRejected(t, fixture, { env = {}, evidence
     env: { ...fixture.env, ...env },
   });
   assert.notEqual(result.status, 0, `${result.stdout}\n${result.stderr}`);
-  assert.match(result.stderr, expectedError, `${result.stdout}\n${result.stderr}`);
+  const summary = summaryFrom(result);
+  assert.equal(result.status, 74);
+  assert.equal(summary.status, 'evidence-failure');
+  assert.equal(summary.outcome, 'not-started');
+  assert.deepEqual(summary.child, { exitCode: null, signal: null });
+  assert.match(summary.evidence.errors[0].message, expectedError, `${result.stdout}\n${result.stderr}`);
   await assert.rejects(readFile(fixture.sentinel, 'utf8'), { code: 'ENOENT' }, 'the expensive child never starts on invalid setup');
 }
 
@@ -155,8 +160,8 @@ test('qualification readiness requires distinct explicit local ports and rejects
 
   const missingSmoke = await createQualificationFixture(t);
   await assertQualificationSetupRejected(t, missingSmoke, {
-    env: { CI: 'true', CHAIN_NATIVE_SMOKE_PORT: '' },
-    expectedError: /CHAIN_NATIVE_SMOKE_PORT/,
+    env: { CI: '', CHAIN_NATIVE_SMOKE_PORT: '' },
+    expectedError: /CHAIN_NATIVE_SMOKE_PORT must be an explicit locally allocated TCP port/,
   });
 
   const same = await createQualificationFixture(t);
@@ -221,6 +226,61 @@ test('qualification readiness rejects dirty candidates and unusable evidence des
     env: { CHAIN_NATIVE_OUTPUT: overlapping.evidence },
     expectedError: /separate, non-overlapping directories/,
   });
+});
+
+test('qualification readiness redacts setup failures in summary and default output without launching the child', async (t) => {
+  for (const failure of ['recorder-evidence', 'native-output', 'missing-ledger']) {
+    for (const summaryMode of [true, false]) {
+      await t.test(`${failure} ${summaryMode ? 'summary' : 'default'}`, async (t) => {
+        const fixture = await createQualificationFixture(t);
+        const secret = 'PRIVATE-READINESS-REVIEW-275';
+        const privatePath = path.join(fixture.root, secret);
+        const blocker = 'preserve blocking file';
+        const env = { ...fixture.env };
+        let evidence = fixture.evidence;
+        if (failure === 'missing-ledger') env.CODEX_COORDINATION_FILE = path.join(privatePath, 'ledger.json');
+        else {
+          await writeFile(privatePath, blocker);
+          if (failure === 'recorder-evidence') evidence = privatePath;
+          else env.CHAIN_NATIVE_OUTPUT = privatePath;
+        }
+        const result = invokeRecorder({
+          repo: fixture.repo,
+          evidence,
+          purpose: 'green',
+          command: node,
+          args: ['-e', "require('node:fs').writeFileSync(process.env.CHAIN_QUALIFICATION_READINESS_SENTINEL, 'launched')"],
+          extraOptions: ['--qualification-readiness', '--redact-pattern', secret, ...(summaryMode ? ['--summary'] : [])],
+          env,
+        });
+
+        assert.equal(`${result.stdout}\n${result.stderr}`.includes(secret), false, 'readiness diagnostics must redact caller-configured private paths');
+        await assert.rejects(readFile(fixture.sentinel, 'utf8'), { code: 'ENOENT' }, 'readiness failure leaves the expensive child unlaunched');
+        if (failure !== 'missing-ledger') assert.equal(await readFile(privatePath, 'utf8'), blocker);
+        if (summaryMode) {
+          assert.equal(result.status, 74);
+          const summary = summaryFrom(result);
+          assert.equal(summary.status, 'evidence-failure');
+          assert.equal(summary.outcome, 'not-started');
+          assert.deepEqual(summary.child, { exitCode: null, signal: null });
+          assert.equal(summary.source.commit, fixture.commit);
+          assert.equal(summary.evidence.status, 'failed');
+          assert.match(summary.evidence.errors[0].message, /\[REDACTED\]/);
+          if (failure === 'recorder-evidence') {
+            for (const field of ['metadataPath', 'stdoutPath', 'stderrPath']) assert.match(summary.evidence[field], /\[REDACTED\]/);
+          }
+        } else {
+          assert.equal(result.status, 2);
+          assert.equal(result.stdout, '');
+          assert.match(result.stderr, /^record-run: .*\[REDACTED\]/);
+        }
+        if (failure !== 'recorder-evidence') {
+          const files = await readdir(evidence).catch((error) => error.code === 'ENOENT' ? [] : Promise.reject(error));
+          assert.deepEqual(files, [], 'a refused qualification leaves no prepared or completed recorder evidence');
+        }
+      });
+    }
+  }
 });
 
 test('redacts evidence path metadata while retaining real files and child failure status', async (t) => {
