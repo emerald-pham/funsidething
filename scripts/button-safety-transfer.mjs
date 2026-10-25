@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import {createHash} from 'node:crypto';
 import {buttonFixture as fixture} from './button-safety-fixture.mjs';
 
 function decode(value){
@@ -62,13 +63,24 @@ export async function runTransferScenarios(h){
   if(expected.copies===16){
    await ui.act('close-modal',()=>!document.getElementById('exportTransferDialog')&&!!document.getElementById('stHorizon'));
    const headBefore=await ui.page.evaluate(async()=>{const head=await ScannerDeviceStore.readHead();return{hash:head.hash,payload:head.payload};});
+   const originals=()=>ui.page.evaluate(async()=>Promise.all((await ScannerDeviceStore.listBackups()).filter(row=>row.id.startsWith('gate-retained-')).map(async row=>({id:row.id,role:JSON.parse(row.payload).futureSourceRole,hash:await ChainStorageV2.hashPayload(row.payload)}))));
+   const originalsBefore=await originals();
    await ui.select('#backupRestoreSource','paste');await ui.act('import-backup',()=>!!document.getElementById('jsonBox'));
-   await ui.fill('#jsonBox',copiedRaw);await ui.act('preview-pasted-recovery',()=>!!document.querySelector('[data-act="confirm-file-restore"]'));
-   await ui.act('cancel-file-restore',()=>!!document.getElementById('jsonBox'));
-   assert.equal(await ui.page.locator('#jsonBox').inputValue(),copiedRaw,'oversized exported archive returns as the exact retained paste draft');
+   await ui.pasteBoundary('#jsonBox',copiedRaw,()=>document.getElementById('jsonBox')?.value===''&&/complete text/i.test(document.getElementById('pasteDraftStatus')?.textContent||''));
+   const expectedSourceHash=createHash('sha256').update(Buffer.from(copiedRaw).toString('base64')).digest('hex');
+   const assertProtectedSource=async()=>{
+    const hashes=await ui.page.evaluate(async()=>Promise.all((await ScannerDeviceStore.listBackups()).filter(row=>row.kind==='restore-file-source'&&typeof row.restoreFile?.bytesBase64==='string').map(row=>ChainStorageV2.hashPayload(row.restoreFile.bytesBase64))));
+    assert.ok(hashes.includes(expectedSourceHash),'the exact complete oversized archive bytes are protected before preview');
+   };
+   await ui.act('preview-pasted-recovery',()=>!!document.querySelector('[data-act="confirm-file-restore"]'));await assertProtectedSource();
+   await ui.act('cancel-file-restore',()=>document.getElementById('jsonBox')?.value===''&&/complete text/i.test(document.getElementById('pasteDraftStatus')?.textContent||''));
+   assert.equal(await ui.page.locator('#jsonBox').inputValue(),'','Cancel restores a bounded editor while retaining the complete large draft');
+   await ui.act('preview-pasted-recovery',()=>!!document.querySelector('[data-act="confirm-file-restore"]'));await assertProtectedSource();
+   await ui.act('cancel-file-restore',()=>document.getElementById('jsonBox')?.value===''&&/complete text/i.test(document.getElementById('pasteDraftStatus')?.textContent||''));
    const headAfter=await ui.page.evaluate(async()=>{const head=await ScannerDeviceStore.readHead();return{hash:head.hash,payload:head.payload};});assert.deepEqual(headAfter,headBefore,'oversized preview and Cancel preserve the exact durable current board');
    const ids=await ui.page.evaluate(async()=>{const rows=await ScannerDeviceStore.listBackups();return rows.filter(row=>row.id.startsWith('gate-retained-')).map(row=>({id:row.id,role:JSON.parse(row.payload).futureSourceRole}));});
    assert.equal(ids.length,16);for(let i=0;i<16;i++)assert.ok(ids.some(row=>row.id==='gate-retained-'+i&&row.role===i),'oversized import preview keeps retained original '+i);
+   assert.deepEqual(await originals(),originalsBefore,'Preview and Cancel preserve the exact bytes of all sixteen original saved sources');
    await ui.act('close-paste-recovery',()=>!!document.getElementById('stHorizon'));
   }
  });
