@@ -2128,6 +2128,14 @@ This boundary control holds a successful real provider reply, installs a later a
 
 - A successful callback cannot be accepted after its original monotonic deadline even when host timer delivery is blocked: `RISK recovery observation budget: late synchronous success cannot outlive the original deadline`.
 
+- Cloud-only repair retains damaged generations with immutable server pins, publishes a fresh independently readable generation, and leaves unavailable-device pending work and drafts unchanged: `RISK independent cloud repair: unavailable device storage repairs retained server sources without acknowledging local work`.
+
+- Server-only capability does not accept arbitrary local payloads or observe pending state; unsupported manifest/header/board evidence and missing candidates cannot replace originals: `RISK independent cloud source safety: unsupported roots headers boards and absent candidates remain protected`; `RISK independent cloud capability: server-only repair ignores injected payloads and never observes local pending state`.
+
+- Cloud-only authority, bounded restart, source pins and readback preserve local pending intent under cancellation, UID/epoch/backend/suspend changes, fresh peer revisions, refused pins, changed chunks, lost write replies and later source discovery: `RISK independent cloud authority: cancellation account epoch backend and suspension changes cannot publish stale repairs`; `RISK independent cloud races: fresh peer roots win during reads and publication while failed pins keep originals`; `RISK independent cloud uncertain reply: deterministic publication reads back a lost reply and never clears pending uploads`; `RISK independent cloud retained discovery: pinned originals survive ordinary rotations and repair another damaged root without local storage`.
+
+- Exact-current hash reconstruction still retains compatible facts from every complete retained server source: `RISK independent cloud exact reconstruction: a matching retained hash cannot discard other complete server facts`.
+
 ## Offline device database recovery
 
 - RISK device database repair guidance: mounted FAQ distinguishes offline exact-copy repair from protected unresolved sources
@@ -2135,6 +2143,14 @@ This boundary control holds a successful real provider reply, installs a later a
 - RISK device connection startup: one internal server failure recovers the authoritative offline board within a bounded attempt
 - RISK device connection recovery: offline accepted work survives a lost handle and durable reopen
 - RISK device connection recovery: a closed local handle still permits exact cloud reconstruction without losing originals
+
+- An actual externally stalled native IndexedDB pending-key read cannot block source-only server repair, alter device rows or consume a local draft: `RISK independent cloud stalled storage: a pending native IDB request cannot block remote-only repair`.
+
+- Source-only repair handles absent storage and preserves in-flight native work, explicit cancellation and uncertain staged/committed replies, with one finite restart and total monotonic budget: `RISK independent cloud absent storage: actual cloudPull repairs remote bytes without a device capability`; `RISK independent cloud live work: accepted Add comparison and unfinished draft survive a held server-only repair`; `RISK independent cloud explicit abort: canceled reads and uncertain committed replies cannot acknowledge local work`; `RISK independent cloud staged reply: retry resumes the same deterministic generation after uncertain creation`; `RISK independent cloud restart budget: repeated fresh root changes stop after one restart without replacement`; `RISK independent cloud total budget: clock skew and late server replies cannot extend the original operation`.
+
+- Permitted writes followed by repeatedly damaged remote bytes cannot report successful repair, and share the same one-restart budget: `RISK independent cloud final readback: repeated damage after permitted publication cannot become verified repair`.
+
+- A server-only acknowledgement cannot display an unchanged local board as synced; protected terminal remote failures remain visible until independently verified recovery: `RISK independent cloud confirmation status: repairing server bytes cannot show an unchanged local board as acknowledged`; `RISK independent cloud failure status: protected terminal errors stay visible until verified server recovery`.
 
 ## Device connection cancellation
 
