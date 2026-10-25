@@ -62,39 +62,86 @@
     transaction.onabort=()=>reject(transaction.error||new Error("IndexedDB transaction aborted"));
   });
 
-  function createDeviceStore({indexedDB=root.indexedDB,crypto=root.crypto,dbName="chain-scanner-v2",openTimeoutMs=5000,encodeRecoveryValue=null}={}){
+  function createDeviceStore({indexedDB=root.indexedDB,crypto=root.crypto,dbName="chain-scanner-v2",openTimeoutMs=5000,encodeRecoveryValue=null,onRecovery=null}={}){
     if(!indexedDB) throw new Error("IndexedDB is unavailable");
     if(!crypto?.subtle) throw new Error("Web Crypto is unavailable");
     if(!Number.isFinite(openTimeoutMs)||openTimeoutMs<1) throw new Error("IndexedDB open timeout is invalid");
-    let db=null;
+    let db=null,opening=null,reconnectAllowed=false;
     const sha=async value=>hex(await crypto.subtle.digest("SHA-256",bytes(value)));
     const storeNames=["meta","snapshots","backups","opaque"];
+    const recoveryNow=()=>typeof root.performance?.now==="function"?root.performance.now():Date.now();
+    const observeRecovery=(status,error=null)=>{
+      const code=error?.name==="QuotaExceededError"?"quota-exhausted":error?.name==="SecurityError"?"storage-denied":
+        error?.name==="TimeoutError"?"deadline-exceeded":error?"unavailable":"unknown";
+      try{if(typeof onRecovery==="function")onRecovery({status,code});}catch{}
+    };
 
-    async function open(){
-      if(db) return api;
-      const request=indexedDB.open(dbName,1);
-      db=await new Promise((resolve,reject)=>{
+    function openOnce(existingOnly,remainingMs){
+      return new Promise((resolve,reject)=>{
+        const request=indexedDB.open(dbName,1);
         let settled=false;
         const finish=(fn,value)=>{if(settled)return;settled=true;clearTimeout(timer);fn(value);};
-        const timer=setTimeout(()=>finish(reject,Object.assign(new Error("IndexedDB open timed out"),{name:"TimeoutError"})),openTimeoutMs);
+        const timer=setTimeout(()=>finish(reject,Object.assign(new Error("IndexedDB open timed out"),{name:"TimeoutError"})),remainingMs);
         request.onupgradeneeded=()=>{
+          // Reconnection never creates an empty replacement for a database
+          // that disappeared. Its former authority and sources stay held.
+          if(existingOnly){try{request.transaction.abort();}catch{}finish(reject,new Error("The existing device database is unavailable"));return;}
           const next=request.result;
           for(const name of storeNames) if(!next.objectStoreNames.contains(name)) next.createObjectStore(name);
         };
         request.onsuccess=()=>{
           if(settled){try{request.result?.close();}catch(e){}return;}
-          finish(resolve,request.result);
+          const connection=request.result;
+          db=connection;reconnectAllowed=true;
+          connection.onclose=()=>{if(db===connection){db=null;observeRecovery("unavailable",new Error("Connection closed"));}};
+          connection.onversionchange=()=>{if(db===connection)db=null;try{connection.close();}catch{}};
+          finish(resolve,api);
         };
         request.onerror=()=>finish(reject,request.error||new Error("IndexedDB open failed"));
         request.onblocked=()=>finish(reject,Object.assign(new Error("IndexedDB open is blocked"),{name:"BlockedError"}));
       });
-      return api;
     }
-    const ensureOpen=()=>{if(!db) throw new Error("Device store is not open");};
+    async function open(){
+      if(db)return api;
+      if(opening)return opening;
+      const existingOnly=reconnectAllowed,deadline=recoveryNow()+openTimeoutMs;
+      const pending=(async()=>{
+        for(let attempt=0;attempt<2;attempt++){
+          observeRecovery("started");
+          try{const result=await openOnce(existingOnly,Math.max(1,deadline-recoveryNow()));observeRecovery("completed");return result;}
+          catch(error){
+            observeRecovery("failed",error);
+            const remaining=deadline-recoveryNow();
+            if(attempt||remaining<=1||!["UnknownError","InvalidStateError"].includes(error?.name))throw error;
+            // Both opens share the original deadline. Quota, permissions,
+            // blocked upgrades and uncertain writes never enter this retry.
+            await new Promise(resolve=>setTimeout(resolve,Math.min(25,remaining/2)));
+          }
+        }
+      })();
+      opening=pending;
+      try{return await pending;}finally{if(opening===pending)opening=null;}
+    }
+    const ensureOpen=()=>{if(!db&&!reconnectAllowed) throw new Error("Device store is not open");};
+    async function beginTransaction(names,mode){
+      ensureOpen();
+      if(!db)await open();
+      const connection=db;
+      try{return connection.transaction(names,mode);}
+      catch(error){
+        // A synchronous creation failure issued no requests or mutation.
+        // Reconnect once; never replay a started transaction's uncertain work.
+        if(!["InvalidStateError","UnknownError"].includes(error?.name))throw error;
+        if(db===connection)db=null;
+        try{connection.close();}catch{}
+        await open();
+        return db.transaction(names,mode);
+      }
+    }
 
     async function readRawExportSnapshot(){
       ensureOpen();
-      const tx=db.transaction(storeNames,"readonly"),done=transactionDone(tx);
+      const tx=await beginTransaction(storeNames,"readonly"),done=transactionDone(tx);
       try{
         const entries=await Promise.all(storeNames.map(async name=>{
           const store=tx.objectStore(name);
@@ -114,7 +161,7 @@
 
     async function readHead(){
       ensureOpen();
-      const tx=db.transaction(["meta","snapshots"],"readonly");
+      const tx=await beginTransaction(["meta","snapshots"],"readonly");
       const done=transactionDone(tx);
       const [meta,snapshots]=await Promise.all([
         requestResult(tx.objectStore("meta").get("head")),
@@ -136,7 +183,7 @@
       // Optional legacy retirement must see the head and recovery references
       // together. Keep peer head/reclassification writes queued until its
       // synchronous decision finishes; this operation never changes IDB data.
-      const tx=db.transaction(["meta","snapshots","backups"],"readwrite"),done=transactionDone(tx);
+      const tx=await beginTransaction(["meta","snapshots","backups"],"readwrite"),done=transactionDone(tx);
       try{
         const [head,snapshot,backups]=await Promise.all([
           requestResult(tx.objectStore("meta").get("head")),
@@ -171,7 +218,7 @@
     }
     async function listBackups(){
       ensureOpen();
-      const tx=db.transaction(["backups","snapshots","opaque"],"readonly"),backupStore=tx.objectStore("backups"),snapshotStore=tx.objectStore("snapshots"),opaqueStore=tx.objectStore("opaque");
+      const tx=await beginTransaction(["backups","snapshots","opaque"],"readonly"),backupStore=tx.objectStore("backups"),snapshotStore=tx.objectStore("snapshots"),opaqueStore=tx.objectStore("opaque");
       const done=transactionDone(tx);
       const [rows,keys,snapshots,snapshotKeys,opaque,opaqueKeys]=await Promise.all([requestResult(backupStore.getAll()),requestResult(backupStore.getAllKeys()),
         requestResult(snapshotStore.getAll()),requestResult(snapshotStore.getAllKeys()),requestResult(opaqueStore.getAll()),requestResult(opaqueStore.getAllKeys())]),result=[];
@@ -194,7 +241,7 @@
 
     async function listOpaqueArchives(){
       ensureOpen();
-      const tx=db.transaction("opaque","readonly"),done=transactionDone(tx),store=tx.objectStore("opaque");
+      const tx=await beginTransaction("opaque","readonly"),done=transactionDone(tx),store=tx.objectStore("opaque");
       const [rows,keys]=await Promise.all([requestResult(store.getAll()),requestResult(store.getAllKeys())]);
       await done;
       const protectedRaw=protectedRawRowReader(keys,rows),readable=rows.filter((row,index)=>{
@@ -209,7 +256,7 @@
     async function protectRecoverySource({expectedHash,key,raw}={}){
       ensureOpen();
       if(typeof expectedHash!=="string"||typeof key!=="string"||!key||typeof raw!=="string")return false;
-      const tx=db.transaction(["meta","opaque"],"readwrite"),done=transactionDone(tx);
+      const tx=await beginTransaction(["meta","opaque"],"readwrite"),done=transactionDone(tx);
       const head=await requestResult(tx.objectStore("meta").get("head"));
       const store=tx.objectStore("opaque"),[existingKey,existing]=await Promise.all([requestResult(store.getKey(key)),requestResult(store.get(key))]);
       // A peer edit or different evidence at this identity invalidates the
@@ -228,6 +275,35 @@
       }));
       return {stores:Object.fromEntries(entries)};
     }
+    async function repairHeadSnapshot({expectedSource,encodeSource,payload,archive,guard=()=>true}={}){
+      ensureOpen();
+      if(typeof expectedSource!=="string"||typeof encodeSource!=="function"||typeof payload!=="string"||
+        typeof guard!=="function"||typeof archive?.key!=="string"||!archive.key||typeof archive.raw!=="string")
+        return {error:true,code:"invalid-recovery-source"};
+      const hash=await sha(payload),tx=await beginTransaction(storeNames,"readwrite"),done=transactionDone(tx);
+      try{
+        const source=await rawTransactionSnapshot(tx),meta=tx.objectStore("meta"),snapshots=tx.objectStore("snapshots"),opaque=tx.objectStore("opaque");
+        const head=source.stores.meta.values[source.stores.meta.keys.indexOf("head")];
+        if(head?.schemaVersion!==SCHEMA_VERSION||head.hash!==hash||encodeSource(source)!==expectedSource||guard()!==true){
+          tx.abort();try{await done;}catch{}return {conflict:true};
+        }
+        const [existingKey,existing]=await Promise.all([requestResult(opaque.getKey(archive.key)),requestResult(opaque.get(archive.key))]);
+        if(existingKey!==undefined&&(existing?.key!==archive.key||existing?.raw!==archive.raw)){
+          tx.abort();try{await done;}catch{}return {error:true,code:"recovery-evidence-collision"};
+        }
+        if(guard()!==true){tx.abort();try{await done;}catch{}return {conflict:true};}
+        // Restore only the bytes named by the existing authority. Metadata,
+        // holds, pending work and every other row retain their exact values.
+        const previous=source.stores.snapshots.values[source.stores.snapshots.keys.indexOf(hash)];
+        if(existingKey===undefined)opaque.put({...archive,order:Date.now()},archive.key);
+        snapshots.put({...((previous&&Object.prototype.toString.call(previous)==="[object Object]")?previous:{}),hash,payload},hash);
+        await done;
+        const [verified,archives]=await Promise.all([readHead(),listOpaqueArchives()]);
+        if(verified?.hash!==hash||verified.payload!==payload||!archives.some(row=>row.key===archive.key&&row.raw===archive.raw))
+          return {conflict:true};
+        return {ok:true,head:verified};
+      }catch(error){try{tx.abort();}catch{}try{await done;}catch{}throw error;}
+    }
     // Recovery compares the entire losslessly encoded raw source, including an
     // absent/malformed head and orphan rows. A hash-only CAS cannot distinguish
     // changes to corrupt bytes or preserve evidence it cannot interpret.
@@ -238,7 +314,7 @@
         return {error:true,code:"invalid-recovery-source"};
       if(payload!==undefined&&typeof payload!=="string")return {error:true,code:"invalid-payload"};
       const nextHash=payload===undefined?null:await sha(payload);
-      const tx=db.transaction(storeNames,"readwrite"),done=transactionDone(tx);
+      const tx=await beginTransaction(storeNames,"readwrite"),done=transactionDone(tx);
       try{
         const source=await rawTransactionSnapshot(tx);
         if(encodeSource(source)!==expectedSource||guard()!==true){tx.abort();try{await done;}catch{}return {conflict:true};}
@@ -267,12 +343,12 @@
       }catch(error){try{tx.abort();}catch{}try{await done;}catch{}throw error;}
     }
     async function getRecoveryCloudHold(){
-      ensureOpen();const tx=db.transaction("meta","readonly"),done=transactionDone(tx);
+      ensureOpen();const tx=await beginTransaction("meta","readonly"),done=transactionDone(tx);
       const hold=await requestResult(tx.objectStore("meta").get("recoveryCloudHold"));await done;return hold??null;
     }
     async function clearRecoveryCloudHold({expectedHeadHash,expectedHead,encodeHead=pendingJSON,expectedHold,encodeHold=pendingJSON}={}){
       ensureOpen();if(typeof expectedHeadHash!=="string"||!expectedHold)return false;
-      const tx=db.transaction("meta","readwrite"),done=transactionDone(tx),store=tx.objectStore("meta");
+      const tx=await beginTransaction("meta","readwrite"),done=transactionDone(tx),store=tx.objectStore("meta");
       const [head,hold]=await Promise.all([requestResult(store.get("head")),requestResult(store.get("recoveryCloudHold"))]);
       // Recovery supplies its existing lossless source encoder. Legacy callers
       // stay strict: JSON-lossy unknown facts cannot authorize deleting a hold.
@@ -294,7 +370,7 @@
         if(!row||typeof row.id!=="string"||typeof row.payload!=="string") return {error:true,code:"invalid-legacy-backup"};
         prepared.push({row:{...row,payloadHash:await sha(row.payload)},payload:row.payload});
       }
-      const tx=db.transaction(storeNames,"readwrite"),metaStore=tx.objectStore("meta"),snapshotStore=tx.objectStore("snapshots"),backupStore=tx.objectStore("backups"),opaqueStore=tx.objectStore("opaque");
+      const tx=await beginTransaction(storeNames,"readwrite"),metaStore=tx.objectStore("meta"),snapshotStore=tx.objectStore("snapshots"),backupStore=tx.objectStore("backups"),opaqueStore=tx.objectStore("opaque");
       const existing=await requestResult(metaStore.get("head"));
       if(existing){
         tx.abort();
@@ -329,7 +405,7 @@
           return {error:true,code:"invalid-backup"};
         ids.add(candidate.id);preparedBackups.push({...candidate,payloadHash:await sha(candidate.payload)});
       }
-      const tx=db.transaction(["meta","snapshots","backups"],"readwrite"),metaStore=tx.objectStore("meta"),snapshotStore=tx.objectStore("snapshots"),backupStore=tx.objectStore("backups");
+      const tx=await beginTransaction(["meta","snapshots","backups"],"readwrite"),metaStore=tx.objectStore("meta"),snapshotStore=tx.objectStore("snapshots"),backupStore=tx.objectStore("backups");
       const [current,backupRows,snapshotKeys,recoveryHold,backupKeys]=await Promise.all([
         requestResult(metaStore.get("head")),requestResult(backupStore.getAll()),requestResult(snapshotStore.getAllKeys()),requestResult(metaStore.get("recoveryCloudHold")),
         requestResult(backupStore.getAllKeys()),
@@ -371,7 +447,13 @@
       referenced.add(nextHash);
       // Unknown recovery rows remain in place while the recovered workspace
       // is awaiting a deliberate cloud choice, including during local edits.
-      if(!recoveryHold)for(const key of snapshotKeys) if(!referenced.has(key)) snapshotStore.delete(key);
+      if(!recoveryHold)for(const key of snapshotKeys)if(!referenced.has(key)&&typeof key==="string"&&/^[a-f0-9]{64}$/.test(key)){
+        const unused=await requestResult(snapshotStore.get(key));
+        // Unknown rows can be sole recovery evidence after a damaged source
+        // reopens. Retire only the two-field snapshots this codec owns.
+        if(unused?.hash===key&&typeof unused.payload==="string"&&Object.keys(unused).length===2)
+          snapshotStore.delete(key);
+      }
       await transactionDone(tx);
       const verified=await readHead();
       if(!verified) throw new Error("Device head verification failed");
@@ -390,7 +472,7 @@
       ensureOpen();
       if(!backup||typeof backup.id!=="string"||typeof backup.payload!=="string") return {error:true,code:"invalid-backup"};
       const payloadHash=await sha(backup.payload);
-      const tx=db.transaction(["meta","snapshots","backups"],"readwrite"),done=transactionDone(tx);
+      const tx=await beginTransaction(["meta","snapshots","backups"],"readwrite"),done=transactionDone(tx);
       const metaStore=tx.objectStore("meta"),snapshotStore=tx.objectStore("snapshots"),backupStore=tx.objectStore("backups");
       const [current,existing,existingKey]=await Promise.all([requestResult(metaStore.get("head")),requestResult(backupStore.get(backup.id)),requestResult(backupStore.getKey(backup.id))]);
       if((current?.hash??null)!==(expectedHash??null)){
@@ -412,7 +494,7 @@
     async function updateBackupKind(id,payload,kind){
       ensureOpen();
       if(typeof id!=="string"||typeof payload!=="string"||typeof kind!=="string") return false;
-      const payloadHash=await sha(payload),tx=db.transaction("backups","readwrite"),done=transactionDone(tx),store=tx.objectStore("backups");
+      const payloadHash=await sha(payload),tx=await beginTransaction("backups","readwrite"),done=transactionDone(tx),store=tx.objectStore("backups");
       const row=await requestResult(store.get(id));
       if(!row||row.payloadHash!==payloadHash){tx.abort();try{await done;}catch(e){}return false;}
       store.put({...row,kind},id);await done;return true;
@@ -421,7 +503,7 @@
     async function deleteBackup(id,{payload,allowedKinds=[],beforeDelete=null}={}){
       ensureOpen();
       const payloadHash=typeof payload==="string"?await sha(payload):null;
-      const tx=db.transaction(["meta","snapshots","backups"],"readwrite"),done=transactionDone(tx),store=tx.objectStore("backups"),snapshotStore=tx.objectStore("snapshots");
+      const tx=await beginTransaction(["meta","snapshots","backups"],"readwrite"),done=transactionDone(tx),store=tx.objectStore("backups"),snapshotStore=tx.objectStore("snapshots");
       try{
         const [row,head,rows]=await Promise.all([
           requestResult(store.get(id)),requestResult(tx.objectStore("meta").get("head")),requestResult(store.getAll()),
@@ -443,7 +525,7 @@
     const pendingKey=account=>"pending:"+account;
     async function getPendingUpload(account){
       ensureOpen();if(typeof account!=="string"||!account)return null;
-      const tx=db.transaction("meta","readonly"),done=transactionDone(tx),value=await requestResult(tx.objectStore("meta").get(pendingKey(account)));
+      const tx=await beginTransaction("meta","readonly"),done=transactionDone(tx),value=await requestResult(tx.objectStore("meta").get(pendingKey(account)));
       await done;return value||null;
     }
     function pendingJSON(value){
@@ -471,7 +553,7 @@
       }
       const value={generationId:record.generationId,payloadHash:record.payloadHash,baseRev:record.baseRev,
         updatedAt:Number.isFinite(record.updatedAt)?record.updatedAt:0,account};
-      const tx=db.transaction("meta","readwrite"),done=transactionDone(tx),store=tx.objectStore("meta");
+      const tx=await beginTransaction("meta","readwrite"),done=transactionDone(tx),store=tx.objectStore("meta");
       try{
         if(conditional){
           const [key,current]=await Promise.all([requestResult(store.getKey(pendingKey(account))),requestResult(store.get(pendingKey(account)))]);
@@ -491,14 +573,14 @@
     }
     async function clearPendingUpload(account,generationId){
       ensureOpen();if(typeof account!=="string"||!account)return false;
-      const tx=db.transaction("meta","readwrite"),done=transactionDone(tx),store=tx.objectStore("meta"),current=await requestResult(store.get(pendingKey(account)));
+      const tx=await beginTransaction("meta","readwrite"),done=transactionDone(tx),store=tx.objectStore("meta"),current=await requestResult(store.get(pendingKey(account)));
       if(!current||current.generationId!==generationId){tx.abort();try{await done;}catch(e){}return false;}
       store.delete(pendingKey(account));await done;return true;
     }
     async function clearPendingUploadIfCurrent(account,expected,{guard}={}){
       ensureOpen();if(typeof account!=="string"||!account||typeof guard!=="function"||!expected)return false;
       let encoded;try{encoded=pendingJSON(expected);}catch{return false;}
-      const tx=db.transaction("meta","readwrite"),done=transactionDone(tx),store=tx.objectStore("meta");
+      const tx=await beginTransaction("meta","readwrite"),done=transactionDone(tx),store=tx.objectStore("meta");
       const current=await requestResult(store.get(pendingKey(account)));let same=false;
       try{same=pendingJSON(current)===encoded&&guard()===true;}catch{}
       if(!same){tx.abort();try{await done;}catch{}return false;}
@@ -506,13 +588,13 @@
     }
     async function setLegacyFingerprint(expectedHash,fingerprint){
       ensureOpen();if(typeof fingerprint!=="string"||!fingerprint)return false;
-      const tx=db.transaction("meta","readwrite"),done=transactionDone(tx),store=tx.objectStore("meta"),current=await requestResult(store.get("head"));
+      const tx=await beginTransaction("meta","readwrite"),done=transactionDone(tx),store=tx.objectStore("meta"),current=await requestResult(store.get("head"));
       if(!current||current.hash!==expectedHash){tx.abort();try{await done;}catch(e){}return false;}
       store.put({...current,sourceFingerprint:fingerprint},"head");await done;return true;
     }
 
-    async function close(){if(db){db.close();db=null;}}
-    const api={open,close,readRawExportSnapshot,readHead,withCurrentHead,listBackups,listOpaqueArchives,protectRecoverySource,writeRecoveredSource,getRecoveryCloudHold,clearRecoveryCloudHold,clearRecoveryCloudHoldIfCurrent:clearRecoveryCloudHold,migrateLegacy,commitHead,commitHeadIfCurrent:commitHead,putBackup,
+    async function close(){reconnectAllowed=false;if(db){db.close();db=null;}}
+    const api={open,close,readRawExportSnapshot,readHead,withCurrentHead,listBackups,listOpaqueArchives,protectRecoverySource,repairHeadSnapshot,writeRecoveredSource,getRecoveryCloudHold,clearRecoveryCloudHold,clearRecoveryCloudHoldIfCurrent:clearRecoveryCloudHold,migrateLegacy,commitHead,commitHeadIfCurrent:commitHead,putBackup,
       updateBackupKind,deleteBackup,getPendingUpload,setPendingUpload,setPendingUploadIfCurrent,clearPendingUpload,clearPendingUploadIfCurrent,setLegacyFingerprint};
     return api;
   }

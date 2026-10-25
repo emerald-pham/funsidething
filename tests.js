@@ -25,6 +25,92 @@ function test(...args){
  });
 }
 
+test('RISK device database repair guidance: mounted FAQ distinguishes offline exact-copy repair from protected unresolved sources',async()=>{
+ const app=await loadApp();app.ctx.openHelp();
+ const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(markup,/reopen its saved board while offline/);
+ assert.match(markup,/temporary problem opening saved data is retried once/);
+ assert.match(markup,/exact matching copy already retained on this device/);
+ assert.match(markup,/damaged originals stay protected/);
+ assert.match(markup,/not an empty recovered board/);
+});
+
+test('RISK offline device recovery: an exact retained local copy repairs damaged current bytes without cloud',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='offline-exact-head-'+Math.random();let networkCalls=0;
+ const offline={navigatorProvider:{onLine:false},fetchProvider:async()=>{networkCalls++;throw Error('fully offline source recovery');}};
+ const original=JSON.stringify(syncState({tasks:[syncTask('offline-original','Exact original offline task')],syncAccount:'owner@example.com',syncIdentity:'owner',syncRev:7,syncDirty:false,futureOffline:{keep:['all',47]}}));
+ const storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:original,[SYNC_STORE_KEY]:original});
+ const first=await loadApp({...offline,indexedDBProvider:indexedDB,deviceDbName,sharedStorage:storage});t.after(()=>first.dispose());
+ assert.equal(await first.ctx.persist(),true);const expected=await first.shim.window.ScannerDeviceStore.readHead();
+ storage.setItem(LOCAL_HEAD_KEY,expected.payload);storage.setItem(SYNC_STORE_KEY,expected.payload);await first.dispose();
+ const damaged='damaged current snapshot original bytes';
+ await editRawDevice187(indexedDB,deviceDbName,tx=>{
+  tx.objectStore('snapshots').put({hash:expected.hash,payload:damaged,futureRaw:{keep:19}},expected.hash);
+  tx.objectStore('snapshots').put({unknownOrphan:['keep',37]},'offline-orphan');
+  tx.objectStore('meta').put({generationId:'offline-pending-original',futurePending:[3,4]},'pending:uninterpreted');
+  tx.objectStore('meta').put({...expected,futureHead:{keep:29}},'head');
+ });
+ const inspector=loadStorageV2({indexedDB}).createDeviceStore({indexedDB,crypto:webcrypto,dbName:deviceDbName});await inspector.open();t.after(()=>inspector.close());
+ const before=await inspector.readRawExportSnapshot();
+ const app=await loadApp({...offline,indexedDBProvider:indexedDB,deviceDbName,sharedStorage:storage}),{ctx}=app;t.after(()=>app.dispose());
+ assert.equal(ctx.deviceStorageActive(),true,'offline startup repairs only a retained complete copy matching the authoritative head hash');
+ const head=await inspector.readHead();assert.equal(head.payload,expected.payload);assert.deepEqual(head.futureHead,{keep:29});
+ assert.ok(ctx.state.tasks.some(row=>row.id==='offline-original'));assert.deepEqual(JSON.parse(JSON.stringify(ctx.state.futureOffline)),{keep:['all',47]});
+ const after=await inspector.readRawExportSnapshot(),value=(source,name,key)=>source.stores[name].values[source.stores[name].keys.indexOf(key)];
+ assert.deepEqual(value(after,'meta','pending:uninterpreted'),value(before,'meta','pending:uninterpreted'));
+ assert.deepEqual(value(after,'snapshots','offline-orphan'),value(before,'snapshots','offline-orphan'));
+ assert.ok((await inspector.listOpaqueArchives()).some(row=>{try{const original=JSON.parse(row.raw);return original.format==='chain-scanner.device-recovery-source'&&JSON.stringify(original.indexedDB)===JSON.stringify(ctx.encodeManualArchiveSnapshot(before).stores);}catch{return false;}}),'the entire exact damaged source is protected before the active bytes are repaired');
+ assert.equal(networkCalls,0);assert.equal(await inspector.getRecoveryCloudHold(),null,'an exact byte repair does not invent a cloud choice or acknowledgement');
+ ctx.addTask('Work after offline repair');assert.equal(await ctx.persist(),true);await app.dispose();
+ const cold=await loadApp({...offline,indexedDBProvider:indexedDB,deviceDbName,sharedStorage:storage});t.after(()=>cold.dispose());
+ assert.ok(cold.ctx.state.tasks.some(row=>row.title==='Work after offline repair'));assert.equal(networkCalls,0);
+});
+
+test('RISK device connection startup: one internal server failure recovers the authoritative offline board within a bounded attempt',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),factory=new IDBFactory();let networkCalls=0,opens=0;
+ const offline={navigatorProvider:{onLine:false},fetchProvider:async()=>{networkCalls++;throw Error('isolated offline startup');}};
+ const original=JSON.stringify(syncState({tasks:[syncTask('startup-original','Retained original')],futureConnection:{original:97}})),storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:original,[SYNC_STORE_KEY]:original}),deviceDbName='startup-reconnect-'+Math.random();
+ const first=await loadApp({...offline,sharedStorage:storage,indexedDBProvider:factory,deviceDbName});t.after(()=>first.dispose());
+ first.ctx.addTask('Only in the authoritative device database');assert.equal(await first.ctx.persist(),true);const expected=await first.shim.window.ScannerDeviceStore.readHead();await first.dispose();
+ const indexedDBProvider={open(...args){opens++;if(opens>1)return factory.open(...args);const request={};setTimeout(()=>{request.error=Object.assign(Error('An internal error was encountered in the Indexed Database server'),{name:'UnknownError'});request.onerror?.();},0);return request;}};
+ const app=await loadApp({...offline,sharedStorage:storage,indexedDBProvider,deviceDbName}),{ctx}=app;t.after(()=>app.dispose());
+ assert.equal(ctx.deviceStorageActive(),true,'the app safely retries a transient internal server error without reviving the stale browser shell');
+ assert.equal((await ctx.window.ScannerDeviceStore.readHead()).payload,expected.payload);
+ assert.ok(ctx.state.tasks.some(row=>row.title==='Only in the authoritative device database'));
+ assert.equal(opens,2,'one transient open failure receives exactly one retry');assert.equal(networkCalls,0);
+ const events=JSON.parse(ctx.supportDiagnosticsText()).events.filter(row=>row.stage==='device-store');
+ assert.ok(events.some(row=>row.status==='failed'&&row.code.value==='unavailable'),'bounded diagnostics retain the original failure');
+ assert.ok(events.some(row=>row.status==='completed'),'the recovered connection is observed separately from board durability');
+});
+
+test('RISK device connection recovery: offline accepted work survives a lost handle and durable reopen',async t=>{
+ for(const mode of ['unexpected-close','closed-before-transaction'])await t.test(mode,async t=>{
+  const {IDBFactory,forceCloseDatabase}=await import('fake-indexeddb'),factory=new IDBFactory(),handles=[];
+  let opens=0,networkCalls=0;
+  const indexedDBProvider={open(...args){opens++;const request=factory.open(...args);request.addEventListener('success',()=>handles.push(request.result));return request;}};
+  const offline={navigatorProvider:{onLine:false},fetchProvider:async()=>{networkCalls++;throw Error('isolated fully offline transport');}};
+  const original=JSON.stringify(syncState({tasks:[syncTask('connection-original','Existing offline work')],futureConnection:{keep:['all',47]}}));
+  const storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:original,[SYNC_STORE_KEY]:original}),deviceDbName='offline-connection-'+mode+'-'+Math.random();
+  const app=await loadApp({...offline,sharedStorage:storage,indexedDBProvider,deviceDbName}),{ctx,shim}=app,store=shim.window.ScannerDeviceStore;t.after(()=>app.dispose());
+  assert.equal(await ctx.persist(),true);const before=await store.readHead();
+  const manual=await ctx.saveDurableBackup('manual',before.payload),manualBefore=(await store.listBackups()).find(row=>row.id===manual.id);
+  await store.setPendingUpload('other-original-owner',{generationId:'original-pending',payloadHash:'c'.repeat(64),baseRev:9,updatedAt:17});
+  const pendingBefore=await store.getPendingUpload('other-original-owner');
+  const connection=handles.at(-1);assert.ok(connection);
+  if(mode==='unexpected-close')forceCloseDatabase(connection);else connection.close();
+  ctx.addTask('Accepted during offline database recovery');shim.document.getElementById('addInput').value='Unfinished independent draft';
+  assert.equal(await ctx.persist(),true,'an accepted offline edit reconnects to the existing database and reaches verified durable storage');
+  assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state));assert.equal(ctx.deviceSaveIssue(),null);
+  assert.equal(shim.document.getElementById('addInput').value,'Unfinished independent draft');
+  assert.deepEqual((await store.listBackups()).find(row=>row.id===manual.id),manualBefore);
+  assert.deepEqual(await store.getPendingUpload('other-original-owner'),pendingBefore);assert.equal(networkCalls,0);
+  assert.equal(opens,2,'one lost connection has one shared reopen');await app.dispose();
+  const cold=await loadApp({...offline,sharedStorage:storage,indexedDBProvider,deviceDbName});t.after(()=>cold.dispose());
+  assert.ok(cold.ctx.state.tasks.some(row=>row.title==='Accepted during offline database recovery'));
+  assert.deepEqual(JSON.parse(JSON.stringify(cold.ctx.state.futureConnection)),{keep:['all',47]});assert.equal(networkCalls,0);
+ });
+});
+
 test('RISK repository process: Playwright waitForFunction predicates are synchronous',()=>{
  const source=fs.readFileSync(fileURLToPath(import.meta.url),'utf8');
  const asyncWaitCalls=[...source.matchAll(/\.waitForFunction\s*\(\s*async\b/g)].map(match=>source.slice(0,match.index).split('\n').length);
@@ -43422,4 +43508,34 @@ test('RISK shared protection changed originals: deliberate current recovery sele
   }
   const after=await list();for(const row of originals)assert.ok(after.some(saved=>saved.key===row.key&&saved.raw===row.raw),'every historical raw archive stays exact');
  });
+});
+
+test('RISK device connection recovery: a closed local handle still permits exact cloud reconstruction without losing originals',async t=>{
+ const {IDBFactory,forceCloseDatabase}=await import('fake-indexeddb'),handles=[],open=IDBFactory.prototype.open;
+ // Observe the external factory only while the established fixture opens its
+ // real connection; restore it before exercising app recovery.
+ IDBFactory.prototype.open=function(...args){const request=open.apply(this,args);request.addEventListener('success',()=>handles.push(request.result));return request;};
+ let app;try{app=await damagedAcknowledgedApp187(t);}finally{IDBFactory.prototype.open=open;}
+ const {ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ const connection=handles.filter(db=>db.name===app.deviceDbName).at(-1);assert.ok(connection);
+ const cloudBefore=JSON.stringify([...backend.docs]),localBefore=JSON.stringify(ctx.state),rawBefore=await store.readRawExportSnapshot();
+ const originals=[...backend.docs].filter(([key])=>key!=='users/owner').map(([key,row])=>[key,JSON.stringify(row)]);
+ assert.equal((await backend.CS.pull()).code,'corrupt-generation','fixture reaches the real missing-chunk decoder failure');
+ forceCloseDatabase(connection);
+ await ctx.cloudPull();await ctx.sendPush();
+ await fixtureDeadline(async wait=>{while(vm.runInContext('pulling||cloudPushInFlight||cloudRetryTimer!==null',ctx))await wait(5);},'closed-connection cloud recovery settles within its finite budget',7000);
+ const remote=await backend.CS.pull();
+ if(remote.code==='corrupt-generation'){
+  assert.equal(JSON.stringify([...backend.docs]),cloudBefore,'unresolved repair preserves remote originals');
+  assert.equal(JSON.stringify(ctx.state),localBefore,'unresolved repair preserves accepted local work');
+  const fresh=ctx.ChainStorageV2.createDeviceStore({indexedDB:app.indexedDB,crypto:ctx.crypto,dbName:app.deviceDbName});await fresh.open();
+  try{assert.deepEqual(await fresh.readRawExportSnapshot(),rawBefore,'unresolved repair preserves every physical local row');}finally{fresh.close();}
+ }
+ assert.equal(remote.payload,ctx.cloudPayload(),'exact acknowledged reconstruction reaches a complete remote save after recovery settles');
+ assert.ok(remote.rev>originalRoot.rev,'repair receives an actual later cloud acknowledgement');
+ assert.notEqual(backend.docs.get('users/owner').activeGeneration,originalRoot.activeGeneration,'repair publishes a fresh immutable generation');
+ assert.deepEqual(JSON.parse(remote.payload).tasks,app.acknowledgedTasks,'all acknowledged task fields remain exact');
+ for(const [key,raw]of originals)assert.equal(JSON.stringify(backend.docs.get(key)),raw,'original generation/header/chunks remain exact');
+ assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state),'the acknowledged app board is durably saved');
+ assert.equal(ctx.state.syncRev,remote.rev);assert.equal(ctx.state.syncDirty,false);
 });

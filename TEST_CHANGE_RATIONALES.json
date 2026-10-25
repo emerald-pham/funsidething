@@ -18654,5 +18654,155 @@
     "failure": "The four recorded baseline tests each failed ERR_ASSERTION full-scene equality because the historical scenes retained intentionally omitted daytime humans. New sunset control975676f4 passed on the unchanged actual public timeline; isolated current-bucket-sun mutant f32e2aae failed ERR_ASSERTION: a rejected daylight party must not appear again after sunset. This is retrospective sensitivity, not a new original feature RED."
   },
   "observedGreen": "Recorde5f848dc-c3fd-4703-a095-a14611b9a02d: seven focused cases passed,0failed/skipped, including four planner controls, original feature and restored FAQ assertions. Rejected-party permanent test ad31b44f passed separately. Existing PWA and changelog fingerprints failed before refresh b2b6dbc2 then passed93ed8710 after refresh; no dated public tuning note added under AGENTS exception."
+},
+{
+  "baseCommit": "9596b9c4b7245955ea775079184039c8f68252fb",
+  "testChangesSha256": "18b505f64a9776861c7bb31cb1b45fb8ec5fef9b698d3475d81401ef95cf7e72",
+  "reason": "Add real app-consumer regressions for offline device connection recovery, bounded transient startup retry and exact retained-copy repair, with protected originals and cloud reconstruction. Retain all earlier daytime-planner and PR262 contracts unchanged.",
+  "previousBehavior": "An unexpected or silently closed IndexedDB handle made accepted ordinary work remain only in memory and blocked otherwise supported cloud exact-ACK reconstruction. One transient internal-server startup error permanently held the device board. Damaged current snapshot bytes could not recover from a complete local copy matching the recorded authoritative hash.",
+  "intendedBehavior": "Reconnect once before a transaction when its creation failed without issuing requests; share concurrent opens and keep one bounded transient-open retry. Restore only the exact hash-matching supported current payload under full raw-source CAS with immutable original capture, preserving metadata, holds and pending work. Never replay a started uncertain mutation or choose an older or foreign board as an exact repair. Keep unrelated orphan snapshots through ordinary cleanup.",
+  "replacementTests": [
+    "RISK device database repair guidance: mounted FAQ distinguishes offline exact-copy repair from protected unresolved sources",
+    "RISK offline device recovery: an exact retained local copy repairs damaged current bytes without cloud",
+    "RISK device connection startup: one internal server failure recovers the authoritative offline board within a bounded attempt",
+    "RISK device connection recovery: offline accepted work survives a lost handle and durable reopen",
+    "RISK device connection recovery: a closed local handle still permits exact cloud reconstruction without losing originals"
+  ],
+  "preservedCoverage": [
+    "No existing executable assertions are removed or weakened in this slice. Released-compatibility, all raw-source refusal/CAS/typed capture, cloud account/revision/ACK and pending-upload safeguards remain intact. New pure Node offline cases require zero transport calls and actual durable reopen.",
+    "Both native external close forms retain accepted Add, unfinished draft, unknown board fields, manual backup and another owner pending record. Cloud reconstruction must independently decode a later acknowledged generation and retain original headers/chunks, while ordinary upload guards remain unchanged.",
+    "All earlier full-scene historical equality and numerical operation budgets, the independent unadapted half-rate baseline, complete human visits and rejected sunset-party assertions remain unchanged; routine density tuning remains absent from public patch notes.",
+    "The immutable raw source archive preserves every damaged value before the active snapshot is repaired. Exact repair keeps head metadata and existing cloud hold untouched; unsupported/mismatched source behavior and final physical-device/release acceptance remain separate."
+  ],
+  "redEvidence": {
+    "command": "Actual recorder preimplementation-red runs: node --test --test-reporter=spec --test-name-pattern=\"^RISK device connection recovery:\" tests.js (644c6e34); startup7fefe6c3; offline exact-copycb1b9b7b; mounted FAQ and fingerprints293c676b. External minimized ordinary/remote controls are linked in database/CHECKPOINT.md and cloud/DIAGNOSIS.md.",
+    "failure": "644c6e34: both offline close variants returned false instead of verified persistence; actual settled cloud decoder returned undefined instead of the complete expected payload. 7fefe6c3: one internal-server failure left authoritative offline storage inactive. cb1b9b7b: damaged current bytes with an exact retained copy left authority false. a5739b3d later exposed unintended orphan retirement after repair; source GC was tightened. FAQ293c676b failed before copy changed. All chronology and failed intermediate attempts are retained."
+  },
+  "observedGreen": "d8317f32: six local/offline/cloud connection and exact-source cases passed; extended preservation cohort8a686a5f passed with zero failures/skips; final FAQ/PWA/inventoryefd799ea passed. This is an unshipped checkpoint: broader forced local working recovery, independent-cloud integration and final release gates remain unfinished."
+},
+{
+  "baseCommit": "0d8fb09bde1d419ea3a655df8f1787ac10535111",
+  "testChangesSha256": "1ae011b35e01be6b15d9b1f22cca602a3c78ad404417a5e63aed0373db725160",
+  "reason": "Add real app-consumer regressions for offline device connection recovery, bounded transient startup retry and exact retained-copy repair, with protected originals and cloud reconstruction. Retain all earlier daytime-planner and PR262 contracts unchanged.",
+  "previousBehavior": "An unexpected or silently closed IndexedDB handle made accepted ordinary work remain only in memory and blocked otherwise supported cloud exact-ACK reconstruction. One transient internal-server startup error permanently held the device board. Damaged current snapshot bytes could not recover from a complete local copy matching the recorded authoritative hash.",
+  "intendedBehavior": "Reconnect once before a transaction when its creation failed without issuing requests; share concurrent opens and keep one bounded transient-open retry. Restore only the exact hash-matching supported current payload under full raw-source CAS with immutable original capture, preserving metadata, holds and pending work. Never replay a started uncertain mutation or choose an older or foreign board as an exact repair. Keep unrelated orphan snapshots through ordinary cleanup.",
+  "replacementTests": [
+    "RISK device database repair guidance: mounted FAQ distinguishes offline exact-copy repair from protected unresolved sources",
+    "RISK offline device recovery: an exact retained local copy repairs damaged current bytes without cloud",
+    "RISK device connection startup: one internal server failure recovers the authoritative offline board within a bounded attempt",
+    "RISK device connection recovery: offline accepted work survives a lost handle and durable reopen",
+    "RISK device connection recovery: a closed local handle still permits exact cloud reconstruction without losing originals"
+  ],
+  "preservedCoverage": [
+    "No existing executable assertions are removed or weakened in this slice. Released-compatibility, all raw-source refusal/CAS/typed capture, cloud account/revision/ACK and pending-upload safeguards remain intact. New pure Node offline cases require zero transport calls and actual durable reopen.",
+    "Both native external close forms retain accepted Add, unfinished draft, unknown board fields, manual backup and another owner pending record. Cloud reconstruction must independently decode a later acknowledged generation and retain original headers/chunks, while ordinary upload guards remain unchanged.",
+    "All earlier full-scene historical equality and numerical operation budgets, the independent unadapted half-rate baseline, complete human visits and rejected sunset-party assertions remain unchanged; routine density tuning remains absent from public patch notes.",
+    "The immutable raw source archive preserves every damaged value before the active snapshot is repaired. Exact repair keeps head metadata and existing cloud hold untouched; unsupported/mismatched source behavior and final physical-device/release acceptance remain separate."
+  ],
+  "redEvidence": {
+    "command": "Actual recorder preimplementation-red runs: node --test --test-reporter=spec --test-name-pattern=\"^RISK device connection recovery:\" tests.js (644c6e34); startup7fefe6c3; offline exact-copycb1b9b7b; mounted FAQ and fingerprints293c676b. External minimized ordinary/remote controls are linked in database/CHECKPOINT.md and cloud/DIAGNOSIS.md.",
+    "failure": "644c6e34: both offline close variants returned false instead of verified persistence; actual settled cloud decoder returned undefined instead of the complete expected payload. 7fefe6c3: one internal-server failure left authoritative offline storage inactive. cb1b9b7b: damaged current bytes with an exact retained copy left authority false. a5739b3d later exposed unintended orphan retirement after repair; source GC was tightened. FAQ293c676b failed before copy changed. All chronology and failed intermediate attempts are retained."
+  },
+  "observedGreen": "d8317f32: six local/offline/cloud connection and exact-source cases passed; extended preservation cohort8a686a5f passed with zero failures/skips; final FAQ/PWA/inventoryefd799ea passed. This is an unshipped checkpoint: broader forced local working recovery, independent-cloud integration and final release gates remain unfinished."
+},
+{
+  "baseCommit": "3b273718df28919586c2cd84ca835de573631fe3",
+  "testChangesSha256": "cd1aee8d4b945cc9bb4ba723c67951bff69cd6a6a07980914896d3a757b5f5b1",
+  "reason": "Add real app-consumer regressions for offline device connection recovery, bounded transient startup retry and exact retained-copy repair, with protected originals and cloud reconstruction. Retain all earlier daytime-planner and PR262 contracts unchanged.",
+  "previousBehavior": "An unexpected or silently closed IndexedDB handle made accepted ordinary work remain only in memory and blocked otherwise supported cloud exact-ACK reconstruction. One transient internal-server startup error permanently held the device board. Damaged current snapshot bytes could not recover from a complete local copy matching the recorded authoritative hash.",
+  "intendedBehavior": "Reconnect once before a transaction when its creation failed without issuing requests; share concurrent opens and keep one bounded transient-open retry. Restore only the exact hash-matching supported current payload under full raw-source CAS with immutable original capture, preserving metadata, holds and pending work. Never replay a started uncertain mutation or choose an older or foreign board as an exact repair. Keep unrelated orphan snapshots through ordinary cleanup.",
+  "replacementTests": [
+    "RISK device database repair guidance: mounted FAQ distinguishes offline exact-copy repair from protected unresolved sources",
+    "RISK offline device recovery: an exact retained local copy repairs damaged current bytes without cloud",
+    "RISK device connection startup: one internal server failure recovers the authoritative offline board within a bounded attempt",
+    "RISK device connection recovery: offline accepted work survives a lost handle and durable reopen",
+    "RISK device connection recovery: a closed local handle still permits exact cloud reconstruction without losing originals"
+  ],
+  "preservedCoverage": [
+    "No existing executable assertions are removed or weakened in this slice. Released-compatibility, all raw-source refusal/CAS/typed capture, cloud account/revision/ACK and pending-upload safeguards remain intact. New pure Node offline cases require zero transport calls and actual durable reopen.",
+    "Both native external close forms retain accepted Add, unfinished draft, unknown board fields, manual backup and another owner pending record. Cloud reconstruction must independently decode a later acknowledged generation and retain original headers/chunks, while ordinary upload guards remain unchanged.",
+    "All earlier full-scene historical equality and numerical operation budgets, the independent unadapted half-rate baseline, complete human visits and rejected sunset-party assertions remain unchanged; routine density tuning remains absent from public patch notes.",
+    "The immutable raw source archive preserves every damaged value before the active snapshot is repaired. Exact repair keeps head metadata and existing cloud hold untouched; unsupported/mismatched source behavior and final physical-device/release acceptance remain separate."
+  ],
+  "redEvidence": {
+    "command": "Actual recorder preimplementation-red runs: node --test --test-reporter=spec --test-name-pattern=\"^RISK device connection recovery:\" tests.js (644c6e34); startup7fefe6c3; offline exact-copycb1b9b7b; mounted FAQ and fingerprints293c676b. External minimized ordinary/remote controls are linked in database/CHECKPOINT.md and cloud/DIAGNOSIS.md.",
+    "failure": "644c6e34: both offline close variants returned false instead of verified persistence; actual settled cloud decoder returned undefined instead of the complete expected payload. 7fefe6c3: one internal-server failure left authoritative offline storage inactive. cb1b9b7b: damaged current bytes with an exact retained copy left authority false. a5739b3d later exposed unintended orphan retirement after repair; source GC was tightened. FAQ293c676b failed before copy changed. All chronology and failed intermediate attempts are retained."
+  },
+  "observedGreen": "d8317f32: six local/offline/cloud connection and exact-source cases passed; extended preservation cohort8a686a5f passed with zero failures/skips; final FAQ/PWA/inventoryefd799ea passed. This is an unshipped checkpoint: broader forced local working recovery, independent-cloud integration and final release gates remain unfinished."
+},
+{
+  "baseCommit": "9596b9c4b7245955ea775079184039c8f68252fb",
+  "testChangesSha256": "dda8b2d6a288bf1fefbc12b4d732b580e6c04a451e27665b66d97ace053e5c3f",
+  "reason": "Add real app-consumer regressions for offline device connection recovery, bounded transient startup retry and exact retained-copy repair, with protected originals and cloud reconstruction. Retain all earlier daytime-planner and PR262 contracts unchanged.",
+  "previousBehavior": "An unexpected or silently closed IndexedDB handle made accepted ordinary work remain only in memory and blocked otherwise supported cloud exact-ACK reconstruction. One transient internal-server startup error permanently held the device board. Damaged current snapshot bytes could not recover from a complete local copy matching the recorded authoritative hash.",
+  "intendedBehavior": "Reconnect once before a transaction when its creation failed without issuing requests; share concurrent opens and keep one bounded transient-open retry. Restore only the exact hash-matching supported current payload under full raw-source CAS with immutable original capture, preserving metadata, holds and pending work. Never replay a started uncertain mutation or choose an older or foreign board as an exact repair. Keep unrelated orphan snapshots through ordinary cleanup.",
+  "replacementTests": [
+    "RISK device database repair guidance: mounted FAQ distinguishes offline exact-copy repair from protected unresolved sources",
+    "RISK offline device recovery: an exact retained local copy repairs damaged current bytes without cloud",
+    "RISK device connection startup: one internal server failure recovers the authoritative offline board within a bounded attempt",
+    "RISK device connection recovery: offline accepted work survives a lost handle and durable reopen",
+    "RISK device connection recovery: a closed local handle still permits exact cloud reconstruction without losing originals"
+  ],
+  "preservedCoverage": [
+    "No existing executable assertions are removed or weakened in this slice. Released-compatibility, all raw-source refusal/CAS/typed capture, cloud account/revision/ACK and pending-upload safeguards remain intact. New pure Node offline cases require zero transport calls and actual durable reopen.",
+    "Both native external close forms retain accepted Add, unfinished draft, unknown board fields, manual backup and another owner pending record. Cloud reconstruction must independently decode a later acknowledged generation and retain original headers/chunks, while ordinary upload guards remain unchanged.",
+    "All earlier full-scene historical equality and numerical operation budgets, the independent unadapted half-rate baseline, complete human visits and rejected sunset-party assertions remain unchanged; routine density tuning remains absent from public patch notes.",
+    "The immutable raw source archive preserves every damaged value before the active snapshot is repaired. Exact repair keeps head metadata and existing cloud hold untouched; unsupported/mismatched source behavior and final physical-device/release acceptance remain separate."
+  ],
+  "redEvidence": {
+    "command": "Actual recorder preimplementation-red runs: node --test --test-reporter=spec --test-name-pattern=\"^RISK device connection recovery:\" tests.js (644c6e34); startup7fefe6c3; offline exact-copycb1b9b7b; mounted FAQ and fingerprints293c676b. External minimized ordinary/remote controls are linked in database/CHECKPOINT.md and cloud/DIAGNOSIS.md.",
+    "failure": "644c6e34: both offline close variants returned false instead of verified persistence; actual settled cloud decoder returned undefined instead of the complete expected payload. 7fefe6c3: one internal-server failure left authoritative offline storage inactive. cb1b9b7b: damaged current bytes with an exact retained copy left authority false. a5739b3d later exposed unintended orphan retirement after repair; source GC was tightened. FAQ293c676b failed before copy changed. All chronology and failed intermediate attempts are retained."
+  },
+  "observedGreen": "d8317f32: six local/offline/cloud connection and exact-source cases passed; extended preservation cohort8a686a5f passed with zero failures/skips; final FAQ/PWA/inventoryefd799ea passed. This is an unshipped checkpoint: broader forced local working recovery, independent-cloud integration and final release gates remain unfinished."
+},
+{
+  "baseCommit": "0d8fb09bde1d419ea3a655df8f1787ac10535111",
+  "testChangesSha256": "360230f0d6bf40b524a0b4f3de9d80dbe32e45a72e53d0f57c175995e61bf269",
+  "reason": "Add real app-consumer regressions for offline device connection recovery, bounded transient startup retry and exact retained-copy repair, with protected originals and cloud reconstruction. Retain all earlier daytime-planner and PR262 contracts unchanged.",
+  "previousBehavior": "An unexpected or silently closed IndexedDB handle made accepted ordinary work remain only in memory and blocked otherwise supported cloud exact-ACK reconstruction. One transient internal-server startup error permanently held the device board. Damaged current snapshot bytes could not recover from a complete local copy matching the recorded authoritative hash.",
+  "intendedBehavior": "Reconnect once before a transaction when its creation failed without issuing requests; share concurrent opens and keep one bounded transient-open retry. Restore only the exact hash-matching supported current payload under full raw-source CAS with immutable original capture, preserving metadata, holds and pending work. Never replay a started uncertain mutation or choose an older or foreign board as an exact repair. Keep unrelated orphan snapshots through ordinary cleanup.",
+  "replacementTests": [
+    "RISK device database repair guidance: mounted FAQ distinguishes offline exact-copy repair from protected unresolved sources",
+    "RISK offline device recovery: an exact retained local copy repairs damaged current bytes without cloud",
+    "RISK device connection startup: one internal server failure recovers the authoritative offline board within a bounded attempt",
+    "RISK device connection recovery: offline accepted work survives a lost handle and durable reopen",
+    "RISK device connection recovery: a closed local handle still permits exact cloud reconstruction without losing originals"
+  ],
+  "preservedCoverage": [
+    "No existing executable assertions are removed or weakened in this slice. Released-compatibility, all raw-source refusal/CAS/typed capture, cloud account/revision/ACK and pending-upload safeguards remain intact. New pure Node offline cases require zero transport calls and actual durable reopen.",
+    "Both native external close forms retain accepted Add, unfinished draft, unknown board fields, manual backup and another owner pending record. Cloud reconstruction must independently decode a later acknowledged generation and retain original headers/chunks, while ordinary upload guards remain unchanged.",
+    "All earlier full-scene historical equality and numerical operation budgets, the independent unadapted half-rate baseline, complete human visits and rejected sunset-party assertions remain unchanged; routine density tuning remains absent from public patch notes.",
+    "The immutable raw source archive preserves every damaged value before the active snapshot is repaired. Exact repair keeps head metadata and existing cloud hold untouched; unsupported/mismatched source behavior and final physical-device/release acceptance remain separate."
+  ],
+  "redEvidence": {
+    "command": "Actual recorder preimplementation-red runs: node --test --test-reporter=spec --test-name-pattern=\"^RISK device connection recovery:\" tests.js (644c6e34); startup7fefe6c3; offline exact-copycb1b9b7b; mounted FAQ and fingerprints293c676b. External minimized ordinary/remote controls are linked in database/CHECKPOINT.md and cloud/DIAGNOSIS.md.",
+    "failure": "644c6e34: both offline close variants returned false instead of verified persistence; actual settled cloud decoder returned undefined instead of the complete expected payload. 7fefe6c3: one internal-server failure left authoritative offline storage inactive. cb1b9b7b: damaged current bytes with an exact retained copy left authority false. a5739b3d later exposed unintended orphan retirement after repair; source GC was tightened. FAQ293c676b failed before copy changed. All chronology and failed intermediate attempts are retained."
+  },
+  "observedGreen": "d8317f32: six local/offline/cloud connection and exact-source cases passed; extended preservation cohort8a686a5f passed with zero failures/skips; final FAQ/PWA/inventoryefd799ea passed. This is an unshipped checkpoint: broader forced local working recovery, independent-cloud integration and final release gates remain unfinished."
+},
+{
+  "baseCommit": "3b273718df28919586c2cd84ca835de573631fe3",
+  "testChangesSha256": "25d0e9ee576228100ab9bb37c9eca395ae6bbb2c271af5c7f665146d627558ae",
+  "reason": "Add real app-consumer regressions for offline device connection recovery, bounded transient startup retry and exact retained-copy repair, with protected originals and cloud reconstruction. Retain all earlier daytime-planner and PR262 contracts unchanged.",
+  "previousBehavior": "An unexpected or silently closed IndexedDB handle made accepted ordinary work remain only in memory and blocked otherwise supported cloud exact-ACK reconstruction. One transient internal-server startup error permanently held the device board. Damaged current snapshot bytes could not recover from a complete local copy matching the recorded authoritative hash.",
+  "intendedBehavior": "Reconnect once before a transaction when its creation failed without issuing requests; share concurrent opens and keep one bounded transient-open retry. Restore only the exact hash-matching supported current payload under full raw-source CAS with immutable original capture, preserving metadata, holds and pending work. Never replay a started uncertain mutation or choose an older or foreign board as an exact repair. Keep unrelated orphan snapshots through ordinary cleanup.",
+  "replacementTests": [
+    "RISK device database repair guidance: mounted FAQ distinguishes offline exact-copy repair from protected unresolved sources",
+    "RISK offline device recovery: an exact retained local copy repairs damaged current bytes without cloud",
+    "RISK device connection startup: one internal server failure recovers the authoritative offline board within a bounded attempt",
+    "RISK device connection recovery: offline accepted work survives a lost handle and durable reopen",
+    "RISK device connection recovery: a closed local handle still permits exact cloud reconstruction without losing originals"
+  ],
+  "preservedCoverage": [
+    "No existing executable assertions are removed or weakened in this slice. Released-compatibility, all raw-source refusal/CAS/typed capture, cloud account/revision/ACK and pending-upload safeguards remain intact. New pure Node offline cases require zero transport calls and actual durable reopen.",
+    "Both native external close forms retain accepted Add, unfinished draft, unknown board fields, manual backup and another owner pending record. Cloud reconstruction must independently decode a later acknowledged generation and retain original headers/chunks, while ordinary upload guards remain unchanged.",
+    "All earlier full-scene historical equality and numerical operation budgets, the independent unadapted half-rate baseline, complete human visits and rejected sunset-party assertions remain unchanged; routine density tuning remains absent from public patch notes.",
+    "The immutable raw source archive preserves every damaged value before the active snapshot is repaired. Exact repair keeps head metadata and existing cloud hold untouched; unsupported/mismatched source behavior and final physical-device/release acceptance remain separate."
+  ],
+  "redEvidence": {
+    "command": "Actual recorder preimplementation-red runs: node --test --test-reporter=spec --test-name-pattern=\"^RISK device connection recovery:\" tests.js (644c6e34); startup7fefe6c3; offline exact-copycb1b9b7b; mounted FAQ and fingerprints293c676b. External minimized ordinary/remote controls are linked in database/CHECKPOINT.md and cloud/DIAGNOSIS.md.",
+    "failure": "644c6e34: both offline close variants returned false instead of verified persistence; actual settled cloud decoder returned undefined instead of the complete expected payload. 7fefe6c3: one internal-server failure left authoritative offline storage inactive. cb1b9b7b: damaged current bytes with an exact retained copy left authority false. a5739b3d later exposed unintended orphan retirement after repair; source GC was tightened. FAQ293c676b failed before copy changed. All chronology and failed intermediate attempts are retained."
+  },
+  "observedGreen": "d8317f32: six local/offline/cloud connection and exact-source cases passed; extended preservation cohort8a686a5f passed with zero failures/skips; final FAQ/PWA/inventoryefd799ea passed. This is an unshipped checkpoint: broader forced local working recovery, independent-cloud integration and final release gates remain unfinished."
 }
 ]

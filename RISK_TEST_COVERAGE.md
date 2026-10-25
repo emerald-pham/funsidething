@@ -2117,3 +2117,11 @@ This boundary control holds a successful real provider reply, installs a later a
 - The first actual Add synchronous prefix consumes the original single20s action budget: `RISK recovery observation budget: the first actual Add prefix belongs to the single action deadline`.
 
 - A successful callback cannot be accepted after its original monotonic deadline even when host timer delivery is blocked: `RISK recovery observation budget: late synchronous success cannot outlive the original deadline`.
+
+## Offline device database recovery
+
+- RISK device database repair guidance: mounted FAQ distinguishes offline exact-copy repair from protected unresolved sources
+- RISK offline device recovery: an exact retained local copy repairs damaged current bytes without cloud
+- RISK device connection startup: one internal server failure recovers the authoritative offline board within a bounded attempt
+- RISK device connection recovery: offline accepted work survives a lost handle and durable reopen
+- RISK device connection recovery: a closed local handle still permits exact cloud reconstruction without losing originals
