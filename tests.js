@@ -27759,7 +27759,7 @@ test('RISK test-first gate: scanner, landscape, time, rules, and offline-shell e
 
 test('RISK test-first gate: changing enforcement code requires process tests and a new risk case',async()=>{
  const {validateTestFirst}=await import('./scripts/test-first-gate.mjs');
- for(const file of ['scripts/test-first-gate.mjs','scripts/release-evidence.mjs','scripts/install-release-hook.mjs','.claude/hooks/test-first-guard.sh','.github/workflows/data-safety.yml']){
+ for(const file of ['scripts/test-first-gate.mjs','scripts/release-evidence.mjs','scripts/install-release-hook.mjs','scripts/test-groups.mjs','.claude/hooks/test-first-guard.sh','.github/workflows/data-safety.yml']){
   assert.match(validateTestFirst([file],[]).join(' '),/tests\.js/,`${file} must be covered by a process test`);
   assert.match(validateTestFirst([file,'tests.js'],['+test("ordinary behavior test",()=>{})']).join(' '),/RISK/,`${file} requires a risk-labeled process test`);
  }
@@ -43386,9 +43386,19 @@ test('RISK shared protection changed originals: deliberate current recovery sele
  });
 });
 
-
 test('RISK repository process: event routing retains exact merge validation before avoiding a duplicate cohort',()=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
  const result=spawnSync(process.execPath,['--test','--test-name-pattern=workflow avoids a second complete cohort',path.join(__dirname,'scripts/agent-tools/ci-routing.test.mjs')],{cwd:__dirname,encoding:'utf8',timeout:30000,env});
  assert.equal(result.status,0,'The public workflow cohort command must preserve exact canonical merge validation: '+result.stdout+'\n'+result.stderr);
+});
+
+test('RISK repository process: grouped runner stays covered at the default npm test boundary',t=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group runner (executes a complete isolated group with bound identity|keeps oversized group selections below the portable argument limit|binds native tests to the actual checkout commit and tree|reconciles a renamed root and preserves baseline case identities)$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
+ const output=[result.stdout,result.stderr].filter(Boolean).join('\n');t.diagnostic(output);
+ assert.equal(result.error,undefined,'The grouped runner process contract must start: '+(result.error?.message||output));
+ assert.equal(result.signal,null,'The focused group runner process contract must finish: '+output);
+ assert.equal(result.status,0,'The default full-suite boundary must keep focused group runner coverage live: '+output);
+ assert.match(result.stdout||'',/^# tests 4$/m,'Isolated group, portable pattern sizing, actual-checkout identity, and captured-baseline reconciliation contracts must run');
+ assert.match(result.stdout||'',/^# skipped 0$/m,'The runner contract cannot pass through a skip');
 });

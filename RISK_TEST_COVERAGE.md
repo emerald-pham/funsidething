@@ -1570,6 +1570,7 @@ The actual intervention Yes records deliberate current-pass Scan intent even whe
 ## Agent evidence command wiring (#152)
 
 - `RISK repository process: npm test fails when an agent-tool cohort assertion fails`
+- `RISK repository process: grouped runner stays covered at the default npm test boundary`
 
 Preflight comparison coverage:
 - `RISK repository process: preflight catches outgoing upstream rationale gaps after the selected base passes`
