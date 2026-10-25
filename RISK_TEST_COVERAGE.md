@@ -2156,3 +2156,7 @@ This boundary control holds a successful real provider reply, installs a later a
 
 - `RISK device connection cancellation: explicit close invalidates a delayed open without resurrecting or replacing sources`
 - `RISK device connection cancellation: closing before first upgrade leaves no replacement database`
+
+## Automatic offline and independent cloud guidance
+
+- `RISK offline repair guidance: help distinguishes a working workspace cloud repair and exact preserved originals`

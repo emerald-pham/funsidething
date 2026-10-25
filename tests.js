@@ -35,6 +35,15 @@ test('RISK device database repair guidance: mounted FAQ distinguishes offline ex
  assert.match(markup,/not an empty recovered board/);
 });
 
+test('RISK offline repair guidance: help distinguishes a working workspace cloud repair and exact preserved originals',async()=>{
+ const app=await loadApp();app.ctx.openHelp();const help=app.shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(help,/new offline workspace/i,'help explains useful new work when no complete original survives');
+ assert.match(help,/original sources remain protected/i,'a new workspace is not described as a recovered empty board');
+ assert.match(help,/repair a damaged cloud board from complete retained cloud copies/i);
+ assert.match(help,/does not confirm edits still waiting on this device/i,'server repair and local edit acknowledgement remain separate');
+ assert.match(help,/one Restore action: choose a JSON file or Paste JSON/i,'automatic repair retains the established deliberate Restore route');
+});
+
 test('RISK offline device recovery: an exact retained local copy repairs damaged current bytes without cloud',async t=>{
  const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='offline-exact-head-'+Math.random();let networkCalls=0;
  const offline={navigatorProvider:{onLine:false},fetchProvider:async()=>{networkCalls++;throw Error('fully offline source recovery');}};
