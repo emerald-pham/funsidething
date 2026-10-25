@@ -18778,7 +18778,6 @@
   "previousBehavior": "The scanner job ran the full suite serially. Its protected workflow assertion required the literal npm test command. Group discovery could omit data-driven new top-level roots, and the old observer could accept a legacy-shaped job list even when a parallel candidate required additional jobs.",
   "intendedBehavior": "Four fixed serial process groups execute independently; scanner-tests succeeds only after complete real case/log/artifact/native reconciliation or four honest references to a freshly reverified completed exact producer. The actual checkout workflow independently determines observer topology. Metadata-only PR edits may reuse an unchanged complete context, while actual head/base/merge changes, main and uncertain observations preserve full validation.",
   "replacementTests": [
-    "Repository CI gate requires changed tests and risk cases with app source diffs",
     "RISK repository process: required parallel scanner aggregation rejects absent group evidence"
   ],
   "preservedCoverage": [
