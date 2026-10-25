@@ -19484,6 +19484,40 @@ test('SETTINGS: manual local backups replace visible JSON import and export cont
   assert.match(html,/title="Settings, contexts, and backups"/);
 });
 
+test('RISK JSON COPY PASTE: large native paste retains full draft without rendering the archive',async t=>{
+  const {IDBFactory}=await import('fake-indexeddb');
+  const app=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'large-paste-'+Date.now()}),{ctx,shim}=app;
+  t.after(()=>app.dispose());ctx.addTask('Original remains until confirmation',false);await prepareBackupFileFixtureSource(app);
+  const original=JSON.stringify(ctx.state),head=await ctx.window.ScannerDeviceStore.readHead();
+  const source=JSON.parse(ctx.currentBoardExportPayload());source.futureLargePaste='retain 🌿\n'.repeat(40000);
+  const raw=JSON.stringify(source,null,2);ctx.openSettings();shim.document.getElementById('backupRestoreSource').value='paste';await ctx.onAction('import-backup',{});
+  const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value='replace this selected draft';box.selectionStart=0;box.selectionEnd=box.value.length;
+  let prevented=false;shim.document.dispatchEvent({type:'paste',target:box,clipboardData:{getData:()=>raw},preventDefault(){prevented=true;}});
+  assert.equal(prevented,true,'large clipboard data bypasses the native multiline editor insertion');
+  assert.ok(box.value.length<1024,'the editor never mounts the entire large archive');
+  assert.match(shim.document.getElementById('pasteDraftStatus').textContent,/complete text/i);
+  assert.equal(await ctx.onAction('preview-pasted-recovery',{}),true,'the complete captured draft reaches protected preview');
+  const rows=await ctx.window.ScannerDeviceStore.listBackups();assert.ok(rows.some(row=>row.kind==='restore-file-source'&&Buffer.from(row.restoreFile?.bytesBase64||'','base64').toString('utf8')===raw),'the exact complete source is protected');
+  assert.equal(JSON.stringify(ctx.state),original);assert.equal((await ctx.window.ScannerDeviceStore.readHead()).hash,head.hash);
+  await ctx.onAction('cancel-file-restore',{});assert.ok(shim.document.getElementById('jsonBox').value.length<1024,'Cancel restores a bounded editor');
+  await ctx.onAction('close-paste-recovery',{});await ctx.onAction('open-paste-recovery',{});
+  assert.match(shim.document.getElementById('pasteDraftStatus').textContent,/complete text/i);
+  assert.equal(await ctx.onAction('preview-pasted-recovery',{}),true,'closing and reopening preserves the complete draft');
+  assert.equal(await ctx.onAction('confirm-file-restore',{}),true);
+  assert.equal(ctx.state.futureLargePaste,source.futureLargePaste,'confirmed import preserves every unknown-field character');
+  assert.equal(JSON.parse((await ctx.window.ScannerDeviceStore.readHead()).payload).futureLargePaste,source.futureLargePaste);
+  assert.ok((await ctx.window.ScannerDeviceStore.listBackups()).some(row=>row.payload===original),'the original board stays protected');
+
+  await ctx.onAction('open-paste-recovery',{});const replacement=shim.document.getElementById('jsonBox');replacement.id='jsonBox';replacement.value='';replacement.selectionStart=0;replacement.selectionEnd=0;
+  shim.document.dispatchEvent({type:'paste',target:replacement,clipboardData:{getData:()=>raw},preventDefault(){}});
+  const small=JSON.stringify({...source,futureLargePaste:'deliberate replacement'});let smallPrevented=false;
+  shim.document.dispatchEvent({type:'paste',target:replacement,clipboardData:{getData:()=>small},preventDefault(){smallPrevented=true;}});
+  assert.equal(smallPrevented,false,'ordinary replacement paste retains native editing');
+  replacement.value=small;shim.document.dispatchEvent({type:'input',target:replacement});
+  assert.equal(await ctx.onAction('preview-pasted-recovery',{}),true);await ctx.onAction('confirm-file-restore',{});
+  assert.equal(ctx.state.futureLargePaste,'deliberate replacement','a new draft replaces the buffered source explicitly');
+});
+
 test('RISK JSON COPY PASTE: stale clipboard completion cannot release a newer export transfer',async t=>{
   for(const outcome of ['resolve','reject'])await t.test(outcome,async t=>{
     const pending=[],{IDBFactory}=await import('fake-indexeddb');
@@ -19592,6 +19626,7 @@ test('RISK JSON COPY PASTE: Quick start explains the copy button, manual fallbac
   assert.match(answer,/If clipboard access is unavailable, use Download/i);
   assert.match(answer,/Import.*Paste JSON.*preview.*confirm/i);
   assert.match(answer,/accepted unsaved edits/i);
+  assert.match(help,/Large pasted archives stay captured without filling the text box/);
   assert.doesNotMatch(answer,/Select all.*manually/i);
 });
 
@@ -42650,7 +42685,7 @@ test('RISK pasted recovery UI: archive and raw backup text use the visible Setti
  const help=source.shim.document.getElementById('modalRoot').innerHTML,faq=help.match(/<dt>How do I paste a saved board\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
  assert.ok(faq,'the extended Data and backups FAQ explains pasted recovery');
  assert.ok(faq.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the pasted-recovery FAQ keeps its word limit');
- assert.match(faq,/Settings → Data and backups → Restore.*choose Paste JSON.*select Restore/,'the FAQ names the consolidated Settings route');
+ assert.match(faq,/Settings → Data and backups → Import.*choose Paste JSON.*select Import/,'the FAQ names the consolidated Settings route');
  assert.match(faq,/separate from Review saved decisions.*combines device and cloud choices/,'the FAQ distinguishes snapshot restore from held-cloud choice merging');
 });
 
