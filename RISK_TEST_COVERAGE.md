@@ -2184,3 +2184,5 @@ This boundary control holds a successful real provider reply, installs a later a
 
 - RISK offline recovery activation: a verified committed workspace activates before optional cache reads can strand later edits
 - RISK offline recovery reentry: settled own recovery writes permit fresh current work while changed holds stay protected
+
+- Independent cloud preflight queues Auth and native wake events until hydration and exact boot capture settle, then still repairs real remote chunks after permanently unavailable native startup reaches its bound; accepted unsaved Add/draft remain pending: `RISK independent cloud boot authority: source-only preflight waits for bounded device startup before repairing remote bytes`.

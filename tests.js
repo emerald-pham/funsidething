@@ -30166,7 +30166,7 @@ async function decisionBackend146(artifacts,db,F,uid='owner',{beforePublication=
  };
  const window={FIREBASE_CONFIG:{apiKey:'emulator-only'},CLOUD_SYNC_TIMEOUT_MS:5000,dispatchEvent:event=>events.push(event)};
  const A={getAuth:()=>auth,setPersistence:async()=>{},browserLocalPersistence:{},onAuthStateChanged:(_,fn)=>fn(auth.currentUser)};
- const context=vm.createContext({window,crypto:webcrypto,TextEncoder,TextDecoder,Uint8Array,structuredClone,console,setTimeout,clearTimeout,CustomEvent:class{},__modules:[{initializeApp:()=>({})},A,sdk]});
+ const context=vm.createContext({window,crypto:webcrypto,TextEncoder,TextDecoder,Uint8Array,structuredClone,console,performance,setTimeout,clearTimeout,CustomEvent:class{},__modules:[{initializeApp:()=>({})},A,sdk]});
  for(const [file,code] of [['device-store-v2.js',artifacts.storage],['cloud-store-v2.js',artifacts.cloud]])vm.runInContext(code,context,{filename:file});
  window.ChainStorageV2=context.ChainStorageV2;window.ChainCloudV2=context.ChainCloudV2;
  const module=artifacts.html.match(/<script type="module">([\s\S]*?)<\/script>/)[1].replace(/const \[appMod, A, F\] = await Promise\.all\(\[[\s\S]*?\]\);/,'const [appMod,A,F]=globalThis.__modules;');
@@ -44475,4 +44475,35 @@ test('RISK independent cloud legacy source: supported released v1 boards upgrade
   }else{assert.equal(remote.code,'corrupt-generation');assert.deepEqual(backend.docs.get('users/owner'),originalRoot,'unknown versions foreign ownership and other lossy fields cannot authorize replacement');}
   assert.equal(JSON.stringify(ctx.state),local);assert.equal(shim.document.getElementById('addInput').value,'Unfinished local draft during legacy cloud repair');for(const [key,value]of originals)assert.equal(JSON.stringify(backend.docs.get(key)),value,'every original published header and chunk remains exact');
  });
+});
+
+test('RISK independent cloud boot authority: source-only preflight waits for bounded device startup before repairing remote bytes',async t=>{
+ const seed=await damagedAcknowledgedApp187(t),failures={authPending:true},entered=deferredSyncFixture(),release=deferredSyncFixture();
+ let ctx,shim,backendPromise,backend,readBeforeReady=false,held=false;
+ const boot=loadAppAtTime(1792323000000,{indexedDBProvider:{open(){return {};}},deviceDbName:'independent-cloud-boot-'+Math.random(),deviceOpenTimeoutMs:180,
+  seedStorage:{[DEVICE_AUTHORITY_KEY]:'1'},beforeStateReady(app,host){
+   ctx=app;shim=host;Object.defineProperty(shim.window,'cloudPull',{get:()=>ctx.cloudPull,configurable:true});
+   failures.serverRead=async()=>{if(vm.runInContext('!state||automaticCloudFallbackBootCapturePending',ctx))readBeforeReady=true;if(!held){held=true;entered.resolve();await release.promise;}};
+   backendPromise=loadCloudBackendV2({runtimeWindow:shim.window,sharedDocs:seed.backend.docs,failures,timeoutMs:5000});
+  }});
+ t.after(async()=>{release.resolve();await boot;backend?.CS.suspend();});
+ backend=await fixtureDeadline(backendPromise,'actual backend starts while native device startup is pending');
+ assert.equal(vm.runInContext('state',ctx),null);backend.emitAuth({uid:'owner',email:'e@example.com'});
+ for(const type of ['pageshow','focus','online'])shim.window.dispatchEvent({type,persisted:false});
+ await new Promise(resolve=>setTimeout(resolve,25));
+ assert.equal(vm.runInContext('state',ctx),null,'the external native open still has not completed or reached its bound');
+ assert.equal(backend.network.length,0,'independent repair cannot read any server source before hydration and exact boot capture settle');
+ assert.equal(backend.writes.length,0);assert.deepEqual(backend.docs.get('users/owner'),seed.originalRoot);
+ const app=await fixtureDeadline(boot,'permanent native open unavailability reaches its bounded usable startup');
+ assert.ok(app.ctx.state);assert.equal(app.ctx.deviceStorageActive(),false);
+ await fixtureDeadline(entered.promise,'queued Auth automatically starts a server source read after bounded unavailable startup');
+ assert.equal(readBeforeReady,false,'all actual server reads occur after hydration and exact boot capture');
+ shim.document.getElementById('addInput').value='Accepted after bounded unavailable boot';await fixtureDeadline(ctx.onAction('add',{}),'unsaved local Add remains usable while remote repair is held');
+ vm.runInContext('clearTimeout(saveTimer);saveTimer=null;clearTimeout(cloudTimer);cloudTimer=null;clearCloudRetry()',ctx);
+ const local=JSON.stringify(ctx.state);shim.document.getElementById('addInput').value='Draft after unavailable boot';
+ release.resolve();
+ for(let i=0;i<100&&backend.docs.get('users/owner').rev===seed.originalRoot.rev;i++)await new Promise(resolve=>setTimeout(resolve,10));
+ const remote=await backend.CS.pull();assert.equal(typeof remote.payload,'string','the real decoder confirms independent cloud repair after bounded unavailable startup');assert.ok(remote.rev>seed.originalRoot.rev);
+ assert.equal(JSON.stringify(ctx.state),local);assert.equal(shim.document.getElementById('addInput').value,'Draft after unavailable boot');assert.equal(ctx.state.syncDirty,true);
+ assert.equal(JSON.parse(remote.payload).tasks.some(row=>row.title==='Accepted after bounded unavailable boot'),false,'server-only repair never uploads unobserved accepted local work');
 });

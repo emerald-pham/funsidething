@@ -5789,6 +5789,9 @@ async function exactAcknowledgedCloudSource(failed,account){
   }catch{return null;}
 }
 async function cloudPull(){
+  // Even source-only repair waits for boot to classify its saved sources.
+  // A bounded unavailable startup still replays this queued request afterward.
+  if(!state||automaticCloudFallbackBootCapturePending){cloudPullPending=true;return;}
   // This read classifies only device availability. Server-only repair cannot
   // consume, clear or acknowledge pending local work that it cannot observe.
   if(cloudReady()&&!cloudSuspended&&!document.hidden&&
@@ -5816,9 +5819,6 @@ async function cloudPull(){
     }
   }
   if(deviceRecoveryCloudHold){
-    // Auth may arrive before boot verifies the saved head. Replay only after
-    // that capture; the publisher then checks the exact automatic provenance.
-    if(!state||automaticCloudFallbackBootCapturePending){cloudPullPending=true;renderSync();return;}
     cloudPullPending=false;
     if(deviceRecoveryCloudHold.automaticRecovery===true){
       observeCloudIdentity();
@@ -5839,12 +5839,6 @@ async function cloudPull(){
   // ancestor; otherwise a later edit looks like it conflicts with our own
   // earlier edit. Failed/conflicting writes still require a fresh read.
   if(cloudPushInFlight){deferredCloudPull=true;return;}
-  // Boot replays Auth and lifecycle reads after it knows whether hydration succeeded.
-  if(!state){ cloudPullPending = true; return; }
-  // Auth can finish after hydration but before the exact raw boot source is
-  // captured. Queue it for init's existing post-capture replay, including a
-  // typed refusal; it cannot authorize a cloud read against an unknown source.
-  if(automaticCloudFallbackBootCapturePending){cloudPullPending=true;return;}
   if(!liveBoardAccepted||deviceStorageRequired&&!deviceStorageAuthority){
     const baseline=automaticCloudFallbackBootBaseline;
     if(baseline?.mode==="readable-malformed"&&automaticCloudFallbackBaselineMatches(baseline)){
