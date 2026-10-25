@@ -37500,7 +37500,7 @@ test('RISK pedestrian ski preparation attachments: hat follows the painted head 
  }
 });
 
-test('RISK pedestrian planner cold work: full capacity skips unnecessary lifetime solving without changing admitted scenes or reseeks',()=>{
+test('RISK pedestrian planner cold work: full capacity skips unnecessary lifetime solving without changing admitted scenes or reseeks', () => {
  const prior=spawnSync('git',['show','c21ee6f2a1147636f89cc96dae80aa9ba8ba9ea5:landscape-timeline.js'],{cwd:__dirname,encoding:'utf8'});assert.equal(prior.status,0,prior.stderr);
  const epoch=Date.parse('2026-10-06T00:00Z'),day=86400000,snapshot=value=>JSON.parse(JSON.stringify(value));
  for(const season of ['winter','summer'])for(const night of [false,true]){
@@ -37508,13 +37508,18 @@ test('RISK pedestrian planner cold work: full capacity skips unnecessary lifetim
   current.LandscapeGeometry.create=(w,h)=>{const geometry=create(w,h);if(w===8192){const lifetime=geometry.walkingLifetime;geometry.walkingLifetime=e=>{calls++;return lifetime(e);};}return geometry;};
   for(const c of[current,reference])assert.equal(c.LandscapeConfig.setSpawnRates('| blimp | 0 |'),true);
   const options={seed:'private-schedule',season,sunAt:()=>({altitude:night?-20:30,azimuth:night?0:90})},actual=current.LandscapeTimeline.create(options),baseline=reference.LandscapeTimeline.create(options),first=epoch+12*3600000;
-  assert.deepEqual(snapshot(actual.at(first)),snapshot(baseline.at(first)),'the actual cold consumer preserves every admitted event, duration and independent scenery stream');
+  let historicalNoonQueries=0;const historicalAt=baseline.at;baseline.at=at=>{if(at===first)historicalNoonQueries++;return historicalAt(at);};
+  // The pinned historical source and all options are fixed within this scenario.
+  // Keep only its repeated noon result; current queries still rebuild after eviction.
+  const firstExpected=JSON.stringify(baseline.at(first));
+  assert.deepEqual(snapshot(actual.at(first)),JSON.parse(firstExpected),'the actual cold consumer preserves every admitted event, duration and independent scenery stream');
   assert.ok(calls<=(night?1300:season==='winter'?1300:1800),`${season} ${night?'night':'day'} cold planning solved ${calls} lifetimes despite full capacity`);
   const coldCalls=calls;actual.at(first+8000);actual.at(first-8000);actual.at(first);assert.ok(calls<=coldCalls+4,'same-day buckets reuse admission and resolve only newly inspected immutable recipes');
   for(const offset of [1,23*3600000+40*60000,day-1,day,day+1,-1,2*day+1,-2*day+1,12*3600000]){
-   const at=epoch+offset,scene=actual.at(at);assert.deepEqual(snapshot(scene),snapshot(baseline.at(at)),'midnight, eviction and backwards reseek preserve exact scheduling');assertPedestrianReservationBound(scene);
+   const at=epoch+offset,scene=actual.at(at);assert.deepEqual(snapshot(scene),at===first?JSON.parse(firstExpected):snapshot(baseline.at(at)),'midnight, eviction and backwards reseek preserve exact scheduling');assertPedestrianReservationBound(scene);
    for(const e of scene.events)if(!['train','metro'].includes(e.type)){const born=at-e.age*1000;assert.ok(born+Math.max(e.duration,e.scheduleDuration||e.activityDuration||e.duration)*1000<=(Math.floor(born/day)+1)*day+.001,'full reservations still fit their admitted UTC day');}
   }
+  assert.equal(historicalNoonQueries,1,'the identical independent historical noon expectation is prepared once per isolated scenario');
  }
 });
 
@@ -37526,13 +37531,17 @@ test('RISK pedestrian planner proposal work: rare admission reuses immutable day
  const before=context.proposalDraws;timeline.at(at+8000);timeline.at(at-8000);assert.equal(context.proposalDraws,before,'the bounded same-day memo remains effective');
 });
 
-test('RISK pedestrian planner rare reuse: guard join is unique and complete admitted scenes match prior across rare rates midnight and eviction',()=>{
+test('RISK pedestrian planner rare reuse: guard join is unique and complete admitted scenes match prior across rare rates midnight and eviction', () => {
  const released=spawnSync('git',['show','f8fa176ddfaeedb9b2b7aeaf586b8e71a2e5ce3f:landscape-timeline.js'],{cwd:__dirname,encoding:'utf8'});assert.equal(released.status,0,released.stderr);
  const epoch=Date.parse('2026-10-06T00:00Z'),day=86400000,snapshot=value=>JSON.parse(JSON.stringify(value));
  for(const season of ['summer','winter'])for(const night of [false,true])for(const rareRate of [0,2]){
   const actual=sceneTimeline(),prior=sceneTimeline({'landscape-timeline.js':()=>pedestrianReservationPolicy(released.stdout)});for(const c of[actual,prior])assert.equal(c.LandscapeConfig.setSpawnRates(`| abduction | ${rareRate} |\n| festival | ${rareRate} |\n| blimp | 0 |`),true);
-  const options={seed:rareRate?'private-schedule':'chain-scanner-scene-v1',season,sunAt:()=>({altitude:night?-20:30,azimuth:night?0:90})},a=actual.LandscapeTimeline.create(options),b=prior.LandscapeTimeline.create(options);
-  for(const offset of[12*3600000,-1,0,1,day-1,day,day+1,2*day+1,12*3600000]){const value=a.at(epoch+offset);assert.deepEqual(snapshot(value),snapshot(b.at(epoch+offset)),'raw reuse retains accepted IDs, lifetimes, independent streams and cache/UTC reconstruction');assertPedestrianReservationBound(value);}
+  const options={seed:rareRate?'private-schedule':'chain-scanner-scene-v1',season,sunAt:()=>({altitude:night?-20:30,azimuth:night?0:90})},a=actual.LandscapeTimeline.create(options),b=prior.LandscapeTimeline.create(options),first=epoch+12*3600000;
+  let historicalNoonQueries=0;const historicalAt=b.at;b.at=at=>{if(at===first)historicalNoonQueries++;return historicalAt(at);};
+  // Serialized data is immutable and belongs only to this source/config/seed scenario.
+  const firstExpected=JSON.stringify(b.at(first));
+  for(const offset of[12*3600000,-1,0,1,day-1,day,day+1,2*day+1,12*3600000]){const value=a.at(epoch+offset);assert.deepEqual(snapshot(value),epoch+offset===first?JSON.parse(firstExpected):snapshot(b.at(epoch+offset)),'raw reuse retains accepted IDs, lifetimes, independent streams and cache/UTC reconstruction');assertPedestrianReservationBound(value);}
+  assert.equal(historicalNoonQueries,1,'rare-rate scenarios prepare their own identical independent historical noon expectation once');
  }
  const boundarySlot=epoch/1000/8-75,inject=source=>source.replace('function random(seed,stream,slot=0){',`function random(seed,stream,slot=0){if(seed==='private-rare-boundary'&&stream==='arrival'&&slot===${boundarySlot})return ()=>0;`).replace('const rare=rareRaw.filter','globalThis.rareIds=rareRaw.map(e=>e.id);const rare=rareRaw.filter');
  const a=sceneTimeline({'landscape-timeline.js':inject}),b=sceneTimeline({'landscape-timeline.js':()=>inject(pedestrianReservationPolicy(released.stdout))}),options={seed:'private-rare-boundary',season:'summer',sunAt:()=>({altitude:30,azimuth:90})};

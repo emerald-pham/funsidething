@@ -18627,5 +18627,26 @@
       "command": "#267: exact final-title Chromium startup matrix with shared Browser withheld, node --test --test-name-pattern=\"integrated automatic recovery native: persisted startup status and neighboring controls remain usable with one browser and isolated contexts\" tests.js. #266: node --test --test-name-pattern=\"RISK immutable scenery fixture preparation\" --test-reporter=spec tests.js.",
       "failure": "#267 ran all four original cases and passed four-distinct-context/page guards, then its process-count assertion observed 5 instead of 1 (19.78s outer wall). #266 actual second consumer observed seven repeated immutable-source compilations where zero were expected. Each is the intended fixture-cost RED with preserved functional assertions."
     }
+  },
+  {
+    "baseCommit": "20b12894edd6c1400f6c7428a109da661d3eac07",
+    "testChangesSha256": "0bede3a6fdcd46a2977d9f70fc2ec7640c23c0fc7523065be19e458eb53af412",
+    "reason": "Prepare the independently pinned historical noon expectation once inside each existing planner scenario, avoiding redundant legacy day-plan reconstruction after historical cache eviction without caching or skipping any current consumer query.",
+    "previousBehavior": "The cold-work and rare-reuse scenarios queried the same immutable historical noon result before and after their full offset sweeps. Both actual historical consumers rebuilt it twice per scenario; the observed behavioral RED saw 2 queries instead of the required 1.",
+    "intendedBehavior": "Capture only that exact historical noon result as a scenario-local const serialized string, parse fresh expected data for each comparison, and still execute every current query and unchanged scene/admission/lifetime assertion after midnight, eviction and backward reseeks. Every other historical offset still executes normally. No cross-source, configuration, options, seed, season or scenario sharing exists.",
+    "replacementTests": [
+      "RISK pedestrian planner cold work: full capacity skips unnecessary lifetime solving without changing admitted scenes or reseeks",
+      "RISK pedestrian planner rare reuse: guard join is unique and complete admitted scenes match prior across rare rates midnight and eviction"
+    ],
+    "preservedCoverage": [
+      "Every existing actor, direction, frame, terrain, viewport, reduced-motion, painter, current scene query, offset order, eviction/backseek, deepEqual, admission, lifetime and guard-join negative-control assertion is retained. The original ten-test cohort and risk identities are unchanged. Accepted samples remain60480 upright,196014 dense corridor and4800 painter.",
+      "Historical expectations are still computed independently from pinned git blobs c21ee6f2a1147636f89cc96dae80aa9ba8ba9ea5 and f8fa176ddfaeedb9b2b7aeaf586b8e71a2e5ce3f through the existing reservation policy. Scope inside each isolated VM/options loop binds all inputs by construction; the string cannot be mutated through returned parsed comparison data.",
+      "Only repeated historical noon preparation is eliminated: 4 cold and8 rare calls. All current .at queries still execute, including final noon after deliberate eviction and reseek; no actual result is memoized or used as its own expected value. No product runtime, source algorithm, saved data, deadline, sample loop or tolerance changes.",
+      "The new observed preparation guard measures the real historical timeline at the approved public scenery consumer; it does not replace any existing result comparison. Numerical focused and comparable10case timing evidence remain distinct from hosted CI or rendered product proof."
+    ],
+    "redEvidence": {
+      "command": "Before functional snapshot capture: node --test --test-name-pattern='RISK pedestrian planner (cold work|rare reuse)' --test-reporter=spec tests.js; source20b12894 plus only query observation/assertions. Raw source, SHA256, red.spec.txt and red.time retained under /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/266-finish/.",
+      "failure": "Both real planner consumers failed their new one-preparation assertions with actual2, expected1 after their original full current/historical offset comparisons. No import, syntax, infrastructure or product behavior failure supplied this RED."
+    }
   }
 ]
