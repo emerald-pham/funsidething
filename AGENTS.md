@@ -9,6 +9,11 @@ commit, push, merge, and release to the existing live deployment after applicabl
 checks pass. Honor narrower task holds. Umbrella and animal designs require
 explicit user approval before shipping; guidance work does not approve them.
 
+Stable is the current release target. Keep Beta mirroring paused until the user
+confirms Stable is good. Passing tests, CI, deployment checks or elapsed time
+do not establish that confirmation. This supersedes earlier automatic
+Stable-to-Beta mirroring guidance.
+
 For every user-facing behavior change, update the corresponding extended FAQ in
 Quick start and Settings changelog, retaining unrelated content and structure.
 Routine animation-frequency tuning stays out of public patch notes/changelog by
