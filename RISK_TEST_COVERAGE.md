@@ -2224,6 +2224,8 @@ Protect actual automatic recovery, manual source review, exact protected copies 
 
 ## Device-read diagnostic distinctions
 
+- RISK recovery device diagnostics: terminal transaction and synchronous request errors survive Review and Copy
+
 - RISK recovery device diagnostics: copied report distinguishes failed reads and replacement connections without private text
 - RISK recovery device diagnostics: FAQ explains read categories without claiming a repair
 - RISK support diagnostics: event retention and malformed observer input stay bounded and redacted

@@ -86,6 +86,42 @@ test('RISK recovery device diagnostics: copied report distinguishes failed reads
  });
 });
 
+test('RISK recovery device diagnostics: terminal transaction and synchronous request errors survive Review and Copy',async t=>{
+ for(const target of ['transaction','pending-upload','recovery-hold','head','head-snapshots'])await t.test(target,async sub=>{
+  const app=await freshSourceCheckFixture187(sub,{nativeDeviceConnection:true}),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+  const raw=await store.readRawExportSnapshot(),local=JSON.stringify(ctx.state),cloud=JSON.stringify([...backend.docs]),writes=backend.writes.length;
+  shim.document.getElementById('addInput').value='PRIVATE unfinished setup-error draft';
+  const {IDBDatabase,IDBObjectStore}=await import('fake-indexeddb');
+  const transaction=IDBDatabase.prototype.transaction,get=IDBObjectStore.prototype.get,getAll=IDBObjectStore.prototype.getAll;
+  let failures=0;
+  const restore=()=>{IDBDatabase.prototype.transaction=transaction;IDBObjectStore.prototype.get=get;IDBObjectStore.prototype.getAll=getAll;};sub.after(restore);
+  IDBDatabase.prototype.transaction=function(names,mode,...args){
+   if(target==='transaction'&&this.name===app.deviceDbName&&mode==='readonly'&&failures<2){
+    failures++;throw Object.assign(Error(failures===1?'The database connection is closing.':'PRIVATE database path'),{name:failures===1?'InvalidStateError':'SecurityError'});
+   }
+   return transaction.call(this,names,mode,...args);
+  };
+  const failRequest=(source,key)=>{
+   const match=target==='head-snapshots'?source.name==='snapshots':source.name==='meta'&&key===({'pending-upload':'pending:owner','recovery-hold':'recoveryCloudHold',head:'head'})[target];
+   if(target!=='transaction'&&!failures&&source.transaction.db.name===app.deviceDbName&&match){failures++;throw Object.assign(Error('The transaction is inactive or finished.'),{name:'TransactionInactiveError'});}
+  };
+  IDBObjectStore.prototype.get=function(key){failRequest(this,key);return get.call(this,key);};
+  IDBObjectStore.prototype.getAll=function(...args){failRequest(this);return getAll.apply(this,args);};
+  ctx.onAction('sync',{});assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),false);
+  assert.equal(failures,target==='transaction'?2:1,'existing retry rules stay bounded');
+  assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="choose-cloud-recovery-source"/);
+  let copied;ctx.navigator={clipboard:{async writeText(value){copied=value;}}};assert.equal(await ctx.onAction('copy-support-diagnostics',{}),true);
+  const operation=target==='head-snapshots'?'head':target,events=JSON.parse(copied).events.filter(e=>e.stage==='device-store'&&e.status==='failed'&&e.metadata.deviceOperation===operation);
+  assert.equal(events.length,failures,'the copied log retains every failed setup attempt, including the terminal replacement connection');
+  assert.equal(events.at(-1).metadata.deviceErrorName,target==='transaction'?'SecurityError':'TransactionInactiveError');
+  assert.equal(events.at(-1).metadata.deviceErrorReason,target==='transaction'?'unknown':'inactive-transaction');
+  if(target==='transaction'){assert.equal(events[0].metadata.deviceErrorName,'InvalidStateError');assert.notEqual(events[0].metadata.deviceConnection,events[1].metadata.deviceConnection);assert.equal(events[1].code.value,'storage-denied');}
+  assert.doesNotMatch(copied,/PRIVATE|pending:owner|e@example/);assert.ok(Buffer.byteLength(copied)<=24*1024);
+  restore();assert.deepEqual(await store.readRawExportSnapshot(),raw);assert.equal(JSON.stringify(ctx.state),local);assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal(backend.writes.length,writes);
+  assert.equal(shim.document.getElementById('addInput').value,'PRIVATE unfinished setup-error draft');
+ });
+});
+
 test('RISK recovery device diagnostics: FAQ explains read categories without claiming a repair',async t=>{
  const app=await loadApp();t.after(()=>app.dispose());
  for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];

@@ -12681,6 +12681,11 @@
       "root": "RISK recovery device diagnostics: FAQ explains read categories without claiming a repair",
       "group": "core",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK recovery device diagnostics: terminal transaction and synchronous request errors survive Review and Copy",
+      "group": "core",
+      "file": "tests.js"
     }
   ],
   "processControls": [

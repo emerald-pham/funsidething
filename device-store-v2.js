@@ -145,6 +145,10 @@
       try{return await pending;}finally{if(opening===pending)opening=null;}
     }
     const ensureOpen=()=>{if(!db&&!reconnectAllowed) throw new Error("Device store is not open");};
+    function readonlyRequest(tx,operation,createRequest){
+      try{return requestResult(createRequest());}
+      catch(error){observeRecovery("failed",error,operation,tx.db);throw error;}
+    }
     async function readonlyResults(tx,requests,operation){
       const done=transactionDone(tx);
       try{
@@ -181,7 +185,9 @@
         if(db===connection)db=null;
         try{connection.close();}catch{}
         await open();
-        return db.transaction(names,mode);
+        const replacement=db;
+        try{return replacement.transaction(names,mode);}
+        catch(error){observeRecovery("failed",error,"transaction",replacement);throw error;}
       }
     }
 
@@ -210,8 +216,8 @@
       ensureOpen();
       const tx=await beginTransaction(["meta","snapshots"],"readonly");
       const [meta,snapshots]=await readonlyResults(tx,[
-        requestResult(tx.objectStore("meta").get("head")),
-        requestResult(tx.objectStore("snapshots").getAll()),
+        readonlyRequest(tx,"head",()=>tx.objectStore("meta").get("head")),
+        readonlyRequest(tx,"head",()=>tx.objectStore("snapshots").getAll()),
       ],"head");
       if(!meta) return null;
       if(typeof meta!=="object"||meta.schemaVersion!==SCHEMA_VERSION||typeof meta.hash!=="string"||!/^[0-9a-f]{64}$/.test(meta.hash))
@@ -389,7 +395,7 @@
     }
     async function getRecoveryCloudHold(){
       ensureOpen();const tx=await beginTransaction("meta","readonly");
-      const [hold]=await readonlyResults(tx,[requestResult(tx.objectStore("meta").get("recoveryCloudHold"))],"recovery-hold");return hold??null;
+      const [hold]=await readonlyResults(tx,[readonlyRequest(tx,"recovery-hold",()=>tx.objectStore("meta").get("recoveryCloudHold"))],"recovery-hold");return hold??null;
     }
     async function clearRecoveryCloudHold({expectedHeadHash,expectedHead,encodeHead=pendingJSON,expectedHold,encodeHold=pendingJSON}={}){
       ensureOpen();if(typeof expectedHeadHash!=="string"||!expectedHold)return false;
@@ -570,7 +576,7 @@
     const pendingKey=account=>"pending:"+account;
     async function getPendingUpload(account){
       ensureOpen();if(typeof account!=="string"||!account)return null;
-      const tx=await beginTransaction("meta","readonly"),[value]=await readonlyResults(tx,[requestResult(tx.objectStore("meta").get(pendingKey(account)))],"pending-upload");
+      const tx=await beginTransaction("meta","readonly"),[value]=await readonlyResults(tx,[readonlyRequest(tx,"pending-upload",()=>tx.objectStore("meta").get(pendingKey(account)))],"pending-upload");
       return value||null;
     }
     function pendingJSON(value){
