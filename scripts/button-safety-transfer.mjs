@@ -105,3 +105,5 @@ export async function runTransferScenarios(h){
   await ui.act('close-paste-recovery',()=>!!document.getElementById('stHorizon')&&!document.getElementById('jsonBox'));
  });
 }
+
+export {rawIdentity,assertArchive};

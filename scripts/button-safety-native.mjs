@@ -78,12 +78,12 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
    });
    const dbName='button-'+randomUUID();
    await context.addInitScript(browserInit,{dbName,authMode:options.authMode||'signed-out',sdkBase:origin+sdk});
-   await context.addInitScript(({board,clipboardFail,geoFail})=>{
+   await context.addInitScript(({board,clipboardFail,clipboardDeferred,geoFail})=>{
     if(!localStorage.getItem('fvp:chain-scanner:device-store-v2')&&localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',JSON.stringify(board));
-    window.__buttonClipboard=[];
-    Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{if(clipboardFail)throw new DOMException('Synthetic clipboard permission refused','NotAllowedError');window.__buttonClipboard.push(text);}}});
+    window.__buttonClipboard=[];window.__buttonClipboardPending=[];
+    Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{if(clipboardFail)throw new DOMException('Synthetic clipboard permission refused','NotAllowedError');window.__buttonClipboard.push(text);if(clipboardDeferred)await new Promise((resolve,reject)=>window.__buttonClipboardPending.push({resolve,reject}));}}});
     Object.defineProperty(navigator,'geolocation',{configurable:true,value:{getCurrentPosition:(success,failure)=>geoFail?failure?.({code:1,message:'Synthetic location refused'}):success({coords:{latitude:40.7,longitude:-74,accuracy:20}})}});
-   },{board,clipboardFail:options.clipboardFail,geoFail:options.geoFail});
+   },{board,clipboardFail:options.clipboardFail,clipboardDeferred:options.clipboardDeferred,geoFail:options.geoFail});
    await context.addInitScript(()=>{
     window.__buttonRefuseWrites=false;window.__buttonRefuseReads=false;
     const tx=IDBDatabase.prototype.transaction;IDBDatabase.prototype.transaction=function(stores,mode,...rest){if(mode==='readonly'&&window.__buttonRefuseReads)throw new DOMException('Synthetic saved source read refused','UnknownError');if(mode==='readwrite'&&window.__buttonRefuseWrites)throw new DOMException('Synthetic saved source write refused','QuotaExceededError');return tx.call(this,stores,mode,...rest);};
@@ -164,7 +164,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
    const burst=async(actionName,expect,{selector,semantics,expectedAccepted=10,reload=false}={})=>{
     assert.ok(typeof semantics==='string'&&semantics.length>=10,'Explicit independent repeated-effect semantics required');
     selector??='[data-act="'+actionName+'"]';if(!selector.startsWith('#')&&await page.locator('#modalRoot '+selector).count())selector='#modalRoot '+selector;
-    await expose(selector);const target=page.locator(selector).first(),originalBox=await target.boundingBox();assert.ok(originalBox,'Rapid target is initially rendered');
+    await expose(selector);const target=page.locator(selector).first();await bounded(target.scrollIntoViewIfNeeded(),'rapid target scroll');const originalBox=await target.boundingBox();assert.ok(originalBox,'Rapid target is initially rendered');
     const action=await target.evaluate(actionFor);assert.ok(action===actionName||action==='act:'+actionName,'Rapid target action must match independent family');
     await page.evaluate(()=>{window.__buttonHeartbeat.maxGapMs=0;window.__buttonHeartbeat.at=performance.now();});const start={presses:report.presses?.length||0,clicks:report.clicks?.length||0};
     const previousDocument=reload?await page.evaluate(()=>window.__installedFixture.documentId):null;if(reload)allowedNavigation={url:page.url(),remaining:1,action};
@@ -173,10 +173,10 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
      let availability={present:false,disabled:false,hit:false},box=originalBox;
      if(await target.count()){
       const next=await target.boundingBox();if(next)box=next;
-      availability=await target.evaluate(el=>{const r=el.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return{present:!!(r.width&&r.height),disabled:el.matches(':disabled'),hit:!!hit&&(el===hit||el.contains(hit))};});
+      availability=await target.evaluate((el,backdrop)=>{const r=el.getBoundingClientRect(),hit=document.elementFromPoint(r.x+(backdrop?5:r.width/2),r.y+(backdrop?5:r.height/2));return{present:!!(r.width&&r.height),disabled:el.matches(':disabled'),hit:!!hit&&(el===hit||el.contains(hit))};},action==='act:mback');
      }
      const before={clicks:report.clicks?.length||0,presses:report.presses?.length||0};
-     if(availability.present&&availability.hit)await bounded(page.mouse.click(box.x+box.width/2,box.y+box.height/2),'rapid native press '+actionName);
+     if(availability.present&&availability.hit)await bounded(page.mouse.click(box.x+(action==='act:mback'?5:box.width/2),box.y+(action==='act:mback'?5:box.height/2)),'rapid native press '+actionName);
      else{
       // The original control has disappeared or is obscured by its result. A
       // real down followed by release outside the viewport cannot activate a
