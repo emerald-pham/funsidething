@@ -18608,24 +18608,6 @@
       "failure": "The real repeated sceneTimeline consumer compiled all seven marked module sources again: the assertion expected zero new immutable-source compilations and observed 7. This is process instrumentation of the existing public fixture boundary, not a private cache-helper test or an infrastructure failure."
     }
   },
-<<<<<<< HEAD
-{
-  "baseCommit": "669840e4c05dfe8cd62be771d67eef2b04e31e33",
-  "testChangesSha256": "a3b8d7446e5ace40bde6585fa56ca75b9296d735b52e3c0c94772be18e6ced49",
-  "reason": "Exercise the accepted public workflow cohort process to prevent source-head-only deduplication and preserve the real synthetic merge and outgoing comparison contexts.",
-  "previousBehavior": "Every push and PR event independently executed npm test even when the complete validation context was already covered by a successful exact PR merge producer.",
-  "intendedBehavior": "A branch consumer avoids only the full cohort covered by a completed exact canonical PR merge producer, retaining its outgoing gates and original producer checkout, run and attempt.",
-  "replacementTests": [
-    "RISK repository process: event routing retains exact merge validation before avoiding a duplicate cohort"
-  ],
-  "preservedCoverage": [
-    "All existing scanner, storage, native installed-client, rules, compatibility and test-first assertions remain unchanged; this adds a process consumer using isolated Git and fake external GitHub/npm boundaries.",
-    "The child test clears inherited NODE_TEST_CONTEXT so it executes its named assertion; the initial vacuous wrapper pass is documented and excluded from feature RED evidence."
-  ],
-  "redEvidence": {
-    "command": "node --test --test-name-pattern='RISK repository process: event routing retains exact merge validation' tests.js > /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/268/canonical-routing-red.log 2>&1",
-    "failure": "Before functional routing implementation, the existing workflow command ran the full cohort twice; the assertion failed with2 !==1 for real outgoing source and distinct synthetic PR merge checkout fixtures."
-=======
   {
     "baseCommit": "d224107e5e56e5455a16e670dad6bdbc951940b5",
     "testChangesSha256": "278c7fd5da8090acbb93864bc04fcbe666c13f670328960c04c77dfee4e3ea04",
@@ -18645,7 +18627,46 @@
       "command": "#267: exact final-title Chromium startup matrix with shared Browser withheld, node --test --test-name-pattern=\"integrated automatic recovery native: persisted startup status and neighboring controls remain usable with one browser and isolated contexts\" tests.js. #266: node --test --test-name-pattern=\"RISK immutable scenery fixture preparation\" --test-reporter=spec tests.js.",
       "failure": "#267 ran all four original cases and passed four-distinct-context/page guards, then its process-count assertion observed 5 instead of 1 (19.78s outer wall). #266 actual second consumer observed seven repeated immutable-source compilations where zero were expected. Each is the intended fixture-cost RED with preserved functional assertions."
     }
->>>>>>> integration/ci-speedup-263
+  },
+{
+  "baseCommit": "669840e4c05dfe8cd62be771d67eef2b04e31e33",
+  "testChangesSha256": "a3b8d7446e5ace40bde6585fa56ca75b9296d735b52e3c0c94772be18e6ced49",
+  "reason": "Exercise the accepted public workflow cohort process to prevent source-head-only deduplication and preserve the real synthetic merge and outgoing comparison contexts.",
+  "previousBehavior": "Every push and PR event independently executed npm test even when the complete validation context was already covered by a successful exact PR merge producer.",
+  "intendedBehavior": "A branch consumer avoids only the full cohort covered by a completed exact canonical PR merge producer, retaining its outgoing gates and original producer checkout, run and attempt.",
+  "replacementTests": [
+    "RISK repository process: event routing retains exact merge validation before avoiding a duplicate cohort"
+  ],
+  "preservedCoverage": [
+    "All existing scanner, storage, native installed-client, rules, compatibility and test-first assertions remain unchanged; this adds a process consumer using isolated Git and fake external GitHub/npm boundaries.",
+    "The child test clears inherited NODE_TEST_CONTEXT so it executes its named assertion; the initial vacuous wrapper pass is documented and excluded from feature RED evidence."
+  ],
+  "redEvidence": {
+    "command": "node --test --test-name-pattern='RISK repository process: event routing retains exact merge validation' tests.js > /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/268/canonical-routing-red.log 2>&1",
+    "failure": "Before functional routing implementation, the existing workflow command ran the full cohort twice; the assertion failed with2 !==1 for real outgoing source and distinct synthetic PR merge checkout fixtures."
+  }
+},
+{
+  "baseCommit": "d224107e5e56e5455a16e670dad6bdbc951940b5",
+  "testChangesSha256": "629306cd844abe04779695f41540e514aaa914f8067904381af1d815fa0a8c3e",
+  "reason": "Reconcile exact integrated protected-test changes for #266 immutable scenery preparation, #267 isolated recovery browser reuse and #268 public event routing without dropping any existing assertions or original evidence.",
+  "previousBehavior": "Each recovery matrix case launched its own browser despite owning an independent context and page. Motion fixture consumers also recompiled unchanged module source for every context, including seven repeat compilations in the discriminating second-consumer RED. Every push and PR event independently executed npm test even when the complete validation context was already covered by a successful exact PR merge producer.",
+  "intendedBehavior": "Each native recovery matrix launches one browser and still creates four independent contexts and pages with fresh case state. Motion fixture consumers reuse compiled vm.Script objects by exact source and filename while executing in each fresh VM context. Both changes remain test-fixture-only. A branch consumer avoids only the full cohort covered by a completed exact canonical PR merge producer, retaining its outgoing gates and original producer checkout, run and attempt.",
+  "replacementTests": [
+    "RISK integrated automatic recovery native: persisted startup status and neighboring controls remain usable with one browser and isolated contexts",
+    "RISK immutable scenery fixture preparation: exact source reuse keeps fresh consumer contexts and known output",
+    "RISK repository process: event routing retains exact merge validation before avoiding a duplicate cohort"
+  ],
+  "preservedCoverage": [
+    "The recovery matrices retain all four theme and viewport cases, fresh contexts/pages, independent account/board/backend/gates/evidence, startup/reopen/ACK/protected-source/newer-edit/draft/Undo assertions, and the historical case real 16-second ACK. The original held-device-commit, first-Add-prefix, late-success, child-exit and 20000ms deadlines remain unchanged.",
+    "The animation fixtures still execute modules in fresh mutable contexts and retain every existing sample, scene, painter, planner, viewport, reduced-motion and source-identity assertion. The cache keys preserve exact source and consumer filename, bounded cache size, and the stale aggregate-hash negative control.",
+    "No product runtime, UI, recovery semantics, persistence, app animation algorithm, public process boundary, test timeout or fake-clock behavior changes. The individual #267 and #266 records above retain their separate profiling and test-first histories.",
+    "All existing scanner, storage, native installed-client, rules, compatibility and test-first assertions remain unchanged; this adds a process consumer using isolated Git and fake external GitHub/npm boundaries.",
+    "The child test clears inherited NODE_TEST_CONTEXT so it executes its named assertion; the initial vacuous wrapper pass is documented and excluded from feature RED evidence."
+  ],
+  "redEvidence": {
+    "command": "#267: exact final-title Chromium startup matrix with shared Browser withheld, node --test --test-name-pattern=\"integrated automatic recovery native: persisted startup status and neighboring controls remain usable with one browser and isolated contexts\" tests.js. #266: node --test --test-name-pattern=\"RISK immutable scenery fixture preparation\" --test-reporter=spec tests.js. node --test --test-name-pattern='RISK repository process: event routing retains exact merge validation' tests.js > /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/268/canonical-routing-red.log 2>&1",
+    "failure": "#267 ran all four original cases and passed four-distinct-context/page guards, then its process-count assertion observed 5 instead of 1 (19.78s outer wall). #266 actual second consumer observed seven repeated immutable-source compilations where zero were expected. Each is the intended fixture-cost RED with preserved functional assertions. Before functional routing implementation, the existing workflow command ran the full cohort twice; the assertion failed with2 !==1 for real outgoing source and distinct synthetic PR merge checkout fixtures."
   }
 }
 ]
