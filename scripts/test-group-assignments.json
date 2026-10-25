@@ -12543,10 +12543,24 @@
       "file": "tests.js"
     },
     {
-      "name": "RISK independent cloud legacy source: supported released v1 boards upgrade only their version during server-only repair",
       "group": "persistence-recovery",
       "file": "tests.js",
-      "note": "One new top-level root; parent owns global test-group map update."
+      "root": "RISK independent cloud legacy source: supported released v1 boards upgrade only their version during server-only repair"
+    },
+    {
+      "root": "RISK offline working ownership: startup binds explicit null and proved browser UID while preserving ambiguous alternatives",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK offline startup resume: fresh storage saves accepted memory work while an expired readonly delivery remains withheld",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK offline startup resume budget: fresh stalled captures stop and uncertain started writes never replay",
+      "group": "persistence-recovery",
+      "file": "tests.js"
     }
   ],
   "processControls": [
