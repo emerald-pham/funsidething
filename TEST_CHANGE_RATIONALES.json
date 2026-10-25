@@ -18587,5 +18587,23 @@
       "command": "Before cache edits, `node --test --test-name-pattern='RISK immutable scenery fixture preparation' --test-reporter=spec tests.js`; output captured at /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/266/profile/red-process-boundary.log.",
       "failure": "The real repeated sceneTimeline consumer compiled all seven marked module sources again: the assertion expected zero new immutable-source compilations and observed 7. This is process instrumentation of the existing public fixture boundary, not a private cache-helper test or an infrastructure failure."
     }
+  },
+{
+  "baseCommit": "669840e4c05dfe8cd62be771d67eef2b04e31e33",
+  "testChangesSha256": "a3b8d7446e5ace40bde6585fa56ca75b9296d735b52e3c0c94772be18e6ced49",
+  "reason": "Exercise the accepted public workflow cohort process to prevent source-head-only deduplication and preserve the real synthetic merge and outgoing comparison contexts.",
+  "previousBehavior": "Every push and PR event independently executed npm test even when the complete validation context was already covered by a successful exact PR merge producer.",
+  "intendedBehavior": "A branch consumer avoids only the full cohort covered by a completed exact canonical PR merge producer, retaining its outgoing gates and original producer checkout, run and attempt.",
+  "replacementTests": [
+    "RISK repository process: event routing retains exact merge validation before avoiding a duplicate cohort"
+  ],
+  "preservedCoverage": [
+    "All existing scanner, storage, native installed-client, rules, compatibility and test-first assertions remain unchanged; this adds a process consumer using isolated Git and fake external GitHub/npm boundaries.",
+    "The child test clears inherited NODE_TEST_CONTEXT so it executes its named assertion; the initial vacuous wrapper pass is documented and excluded from feature RED evidence."
+  ],
+  "redEvidence": {
+    "command": "node --test --test-name-pattern='RISK repository process: event routing retains exact merge validation' tests.js > /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/268/canonical-routing-red.log 2>&1",
+    "failure": "Before functional routing implementation, the existing workflow command ran the full cohort twice; the assertion failed with2 !==1 for real outgoing source and distinct synthetic PR merge checkout fixtures."
   }
+}
 ]

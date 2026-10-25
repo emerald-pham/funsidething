@@ -43,6 +43,26 @@ expected. A skip of `scanner-tests`, a skipped main-push release job, an
 unclassified job, or an unknown workflow policy cannot produce success. Update
 the observer and its focused tests when that workflow policy changes.
 
+For a branch push with one same-repository PR, routing may use that PR's exact
+merge checkout as the complete-cohort producer. The outgoing push still executes
+its own source/before test-first, rules and compatibility checks. Its scanner job
+stays pending while a producer is pending, fails for a known matching producer
+failure or cancellation, and succeeds through reuse only after the exact producer
+aggregate completes successfully. A skipped scanner aggregate remains forbidden.
+The monitor keeps the same exit-code contract for the automatic handoff; it does
+not substitute the producer's run id or source for the requested push run.
+
+`ci-routing/routing.json` and raw public observations bind the outgoing validation
+context separately from the cohort's source, actual merge checkout/tree, PR base,
+event policy and required cohort. A successful producer's original run and attempt
+remain in `coveredBy`; native reports retain that producer's actual candidate SHA.
+Main and PR events execute their own full cohort. Ambiguous, unavailable or changed
+PR/run observations fall back to the actual outgoing checkout's full cohort.
+Routing reads public metadata with existing permissions, caps reads and pending
+waits, and rechecks PR merge/base identity after producer completion. Source-head
+or tree equality alone cannot authorize reuse. The completion marker is emitted
+only after the workflow's full required regression and native-artifact checks.
+
 The GitHub boundary uses `gh run view` for metadata and logs. A local
 `GODEBUG=http2client=0` retry is used only after a TLS handshake timeout; it is
 passed to that `gh` process and does not change global configuration or install

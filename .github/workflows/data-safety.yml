@@ -3,6 +3,7 @@ name: Data safety
 on:
   push:
   pull_request:
+    types: [opened, synchronize, reopened, edited]
 
 jobs:
   scanner-tests:
@@ -47,22 +48,44 @@ jobs:
       - name: Bind exact native candidate tree
         shell: bash
         run: echo "CHAIN_NATIVE_CANDIDATE_TREE=$(git rev-parse "${GITHUB_SHA}^{tree}")" >> "$GITHUB_ENV"
-      - run: npm test
+      - name: Run complete regression cohort
+        id: cohort
+        run: |
+          node scripts/agent-tools/ci-routing.mjs --comparison-base "${{ steps.diff-base.outputs.sha }}" --evidence-dir "${{ runner.temp }}/ci-routing"
+          decision="$(node -p "require('${{ runner.temp }}/ci-routing/routing.json').decision")"
+          if [[ "$decision" == "full" ]]; then
+            npm test
+          elif [[ "$decision" != "reuse" ]]; then
+            echo "Unknown routing decision" >&2
+            exit 1
+          fi
         env:
           CHAIN_NATIVE_CANDIDATE_SHA: ${{ github.sha }}
           CHAIN_NATIVE_OUTPUT: ${{ runner.temp }}/installed-client-regression
       - name: Preserve native regression evidence
-        if: always()
+        if: always() && steps.cohort.outputs.decision == 'full'
         uses: actions/upload-artifact@v4
         with:
           name: installed-client-regression-${{ github.sha }}
           path: ${{ runner.temp }}/installed-client-regression
           if-no-files-found: error
       - run: npm run test:rules
+      - name: Announce regression context ${{ steps.cohort.outputs.context }}
+        run: echo "Exact context bound by ci-routing"
       - name: Backward compatibility
         env:
           COMPATIBILITY_BASE_SHA: ${{ steps.diff-base.outputs.sha }}
         run: npm run test:compatibility
+      - name: Complete regression context ${{ steps.cohort.outputs.context }}
+        if: steps.cohort.outputs.decision == 'full'
+        run: echo "Complete required regression cohort and native artifacts succeeded"
+      - name: Preserve routing observations
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-routing-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ci-routing
+          if-no-files-found: error
 
   release-evidence:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
