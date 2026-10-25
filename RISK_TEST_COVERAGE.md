@@ -2206,3 +2206,10 @@ This boundary control holds a successful real provider reply, installs a later a
 - RISK cloud recovery device read: recovered diagnostics keep the failed attempt without private error text
 - RISK cloud recovery device read: permanent storage errors never enter the automatic recheck
 - RISK cloud recovery device read guidance: mounted FAQ and changelog explain the bounded device recheck
+
+## Populated cloud recovery memory
+
+Protect actual automatic recovery, manual source review, exact protected copies and subsequent durable edits with 32 MiB of retained synthetic data in an isolated 512 MiB Node heap. Finish the actual setup save first and require both automatic source-check aggregates to complete; an early stale-source stop cannot satisfy the test. This is a repeatable regression budget, not a physical iPhone memory claim. Reuse requires a fresh exact source comparison.
+
+- RISK cloud recovery memory: retained saved copies leave automatic checks and manual review usable in a bounded heap
+- RISK cloud recovery memory guidance: mounted FAQ and changelog explain lower memory use and retained originals
