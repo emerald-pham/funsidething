@@ -87,6 +87,13 @@ the process RISK. CI binds each group's exact checkout and installs the pinned P
 package's matching Chromium in the regression jobs. The scanner-tests aggregate
 verifies the native reports and their actual checkout identities. Missing source,
 browser or runtime support is a failure to investigate, not an empty pass.
+For an expensive local full-suite qualification, invoke the recorder with its
+opt-in `--qualification-readiness` flag as shown in
+[test-run provenance](test-run-provenance.md#local-qualification-readiness).
+That gate also requires a distinct explicitly allocated `CHAIN_NATIVE_SMOKE_PORT`
+owned by the same active worktree. It rejects `CI=true` because native smoke
+would switch to ephemeral port 0 and ignore that allocation.
+Focused behavioral RED/GREEN recorder runs omit the flag.
 
 Serve immutable old and candidate Git assets. A dirty runner may exercise an
 explicit committed app only after asset equality checks, recording runner
