@@ -12378,6 +12378,11 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK repository process: nested native fixture output stays isolated at the command boundary",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK device database repair guidance: mounted FAQ distinguishes offline exact-copy repair from protected unresolved sources",
       "group": "core",
       "file": "tests.js"

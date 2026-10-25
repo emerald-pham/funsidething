@@ -44588,6 +44588,20 @@ test('RISK repository process: grouped catalog binds real declarations rather th
  assert.match(result.stdout||'',/^# tests 1$/m);assert.match(result.stdout||'',/^# skipped 0$/m);
 });
 
+test('RISK repository process: nested native fixture output stays isolated at the command boundary',t=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group runner reconciles complete full and grouped fixture cohorts$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
+ const output=[result.stdout,result.stderr].filter(Boolean).join('\n');t.diagnostic(output);
+ assert.equal(result.error,undefined,'The isolated nested fixture cohort must start: '+output);
+ assert.equal(result.signal,null,'The isolated nested fixture cohort must finish: '+output);
+ assert.equal(result.status,0,'A nested fixture with its own native output directory must succeed: '+output);
+ assert.match(result.stdout||'',/^# tests 1$/m,'Exactly one real grouped-fixture contract must run');
+ assert.match(result.stdout||'',/^# pass 1$/m);assert.match(result.stdout||'',/^# fail 0$/m);
+ assert.match(result.stdout||'',/^# skipped 0$/m,'The command-boundary contract cannot pass through a skip');
+ assert.match(result.stdout||'',/^# Nested output negative control:.*ENOENT: no such file or directory, open .*candidate-identity\.json/m,
+  'The unisolated inherited-output child must actually fail before the isolated child proves success');
+});
+
 test('RISK independent cloud stalled storage: a pending native IDB request cannot block remote-only repair',async t=>{
  const {IDBFactory}=await import('fake-indexeddb'),handles=[],open=IDBFactory.prototype.open;
  IDBFactory.prototype.open=function(...args){const request=open.apply(this,args);request.addEventListener('success',()=>handles.push(request.result));return request;};
