@@ -7754,7 +7754,7 @@ test('RISK AUTH HYDRATION: real Auth and native resume wait for the durable boar
  assert.deepEqual(pendingWarnings,[],'Pending successful hydration must not be reported as device-store/unavailable');
 });
 
-test('RISK AUTH HYDRATION: a corrupt device-head read protects exact originals before supported local recovery releases hydration',async()=>{
+test('RISK AUTH HYDRATION: a corrupt device-head read protects exact originals before supported local recovery releases hydration',async t=>{
  const {IDBFactory}=await import('fake-indexeddb'),factory=new IDBFactory(),at=Date.parse('2026-10-18T13:00:00Z');
  async function within(promise,label,ms=4000){let timer;try{return await Promise.race([promise,new Promise((_,reject)=>timer=setTimeout(()=>reject(Error('Corrupt-head control deadline: '+label)),ms))]);}finally{clearTimeout(timer);}}
  const dbName='chain-scanner-auth-corrupt-head-'+Date.now()+'-'+Math.random(),protectedId='protected-corrupt-head-185';
@@ -7776,13 +7776,31 @@ test('RISK AUTH HYDRATION: a corrupt device-head read protects exact originals b
   request.onerror=()=>reject(request.error);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||Error('snapshot corruption fixture aborted'));
  });
  opened.close();assert.equal(snapshotFound,true,'the actual content-addressed head snapshot was found and damaged');
- const damagedInspector=warm.shim.window.ChainStorageV2.createDeviceStore({indexedDB:factory,crypto:warm.ctx.crypto,dbName});await damagedInspector.open();const damagedSource=await damagedInspector.readRawExportSnapshot();await damagedInspector.close();
+ const damagedInspector=warm.shim.window.ChainStorageV2.createDeviceStore({indexedDB:factory,crypto:warm.ctx.crypto,dbName});await damagedInspector.open();const damagedSource=await damagedInspector.readRawExportSnapshot();
  const browserCopies={[SYNC_STORE_KEY]:storage.getItem(SYNC_STORE_KEY),[LOCAL_HEAD_KEY]:storage.getItem(LOCAL_HEAD_KEY)};
- let releaseSuccess,openEntered,ctx,shim,backendPromise,boot,cold,inspector;
+ let releaseSuccess,openEntered,ctx,shim,backendPromise,boot,cold,inspector,backend,firstRead=null,completedSourceWrites=0;
+ const cloudReadEntered=deferredSyncFixture(),cloudReadDelivery=deferredSyncFixture();
+ const failures={authPending:true,async serverRead(path){
+  if(!firstRead){
+   firstRead={path,completedSourceWrites,flags:JSON.parse(vm.runInContext('JSON.stringify({stateReady:state!==null,liveBoardAccepted,deviceStorageAuthority,storageOK,headHash:deviceHeadHash})',ctx)),ids:ctx.state?.tasks.map(row=>row.id)};
+   try{firstRead.head=await damagedInspector.readHead();firstRead.hold=await damagedInspector.getRecoveryCloudHold();firstRead.originals=await damagedInspector.listOpaqueArchives();firstRead.completedSourceWritesAfter=completedSourceWrites;}
+   catch(error){firstRead.problem=error.message;}
+   cloudReadEntered.resolve();
+  }
+  await cloudReadDelivery.promise;
+ }};
  const releaseDelivery=new Promise(resolve=>{releaseSuccess=resolve;});
  const entered=new Promise(resolve=>{openEntered=resolve;}),warnings=[];
  const provider={open(...args){const request=factory.open(...args);return new Proxy(request,{
-  get(target,key){const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;},
+  get(target,key){
+   const value=Reflect.get(target,key,target);
+   if(key==='result'&&value?.transaction)return new Proxy(value,{get(db,key){
+    if(key==='transaction')return(names,mode,...args)=>{const tx=db.transaction(names,mode,...args),stores=typeof names==='string'?[names]:Array.from(names);
+     if(mode==='readwrite'&&stores.some(name=>['snapshots','opaque'].includes(name)))tx.addEventListener('complete',()=>completedSourceWrites++);return tx;};
+    const item=Reflect.get(db,key,db);return typeof item==='function'?item.bind(db):item;
+   }});
+   return typeof value==='function'?value.bind(target):value;
+  },
   set(target,key,value){if(key==='onsuccess'){target.onsuccess=event=>{openEntered();releaseDelivery.then(()=>value.call(target,event));};return true;}return Reflect.set(target,key,value,target);}
  });}};
  try{
@@ -7791,9 +7809,9 @@ test('RISK AUTH HYDRATION: a corrupt device-head read protects exact originals b
    const toast=shim.document.getElementById('toast');let text=toast.textContent;
    Object.defineProperty(toast,'textContent',{configurable:true,get(){return text;},set(value){text=value;if(/device-save:|Durable browser storage is unavailable/.test(String(value)))warnings.push(String(value));}});
    const remote={...board,tasks:[...board.tasks,syncTask('remote-only','Must not be adopted before local head recovery')]};
-   backendPromise=loadCloudBackendV2({rootData:{payload:JSON.stringify(remote),updatedAt:at,rev:5},failures:{authPending:true},timeoutMs:5000,runtimeWindow:shim.window});
+   backendPromise=loadCloudBackendV2({rootData:{payload:JSON.stringify(remote),updatedAt:at,rev:5},failures,timeoutMs:5000,runtimeWindow:shim.window});
   }});
-  const backend=await within(backendPromise,'real module before corrupt-read delivery');
+  backend=await within(backendPromise,'real module before corrupt-read delivery');const remoteOriginal=JSON.stringify([...backend.docs]);
   await within(entered,'actual IndexedDB open success before damaged head read');
   backend.emitAuth({uid:'owner',email:'owner@example.test'});
   for(const type of ['pageshow','focus','online'])shim.window.dispatchEvent({type,persisted:false});
@@ -7804,8 +7822,15 @@ test('RISK AUTH HYDRATION: a corrupt device-head read protects exact originals b
   assert.equal(vm.runInContext('storageOK',ctx),true,'a complete retained local source opens supported work after exact original preservation');
   assert.ok(ctx.state.tasks.some(row=>row.id==='local-only'),'the prior local task is present instead of an empty recovered original');assert.equal(ctx.state.futureSaved.keep,'original');
   for(const [key,value] of Object.entries(browserCopies))assert.equal(storage.getItem(key),value,'old browser recovery bytes stay unchanged after the damaged original is protected and repaired');
-  assert.equal(backend.network.length,0,'no cloud operation starts ahead of supported local recovery and exact original preservation');
-  assert.equal(backend.writes.length,0);assert.equal(backend.docs.get('users/owner').rev,5,'the remote revision stays untouched');
+  const pulling=ctx.cloudPull();await within(cloudReadEntered.promise,'first SDK read after local repair and activation');
+  assert.equal(firstRead.problem,undefined);assert.equal(firstRead.path,'users/owner');
+  assert.ok(firstRead.completedSourceWrites>0,'the actual source repair transaction completes before the first SDK read');assert.equal(firstRead.completedSourceWritesAfter,firstRead.completedSourceWrites,'no later head/archive write can manufacture the ordering proof while the reply is gated');
+  assert.deepEqual(firstRead.flags,{stateReady:true,liveBoardAccepted:true,deviceStorageAuthority:true,storageOK:true,headHash:initialHead.hash},'the actual first SDK read starts only after supported local authority has activated');
+  assert.ok(firstRead.ids.includes('local-only'));assert.equal(firstRead.ids.includes('remote-only'),false,'the remote reply is still held and cannot supply the local ordering proof');
+  assert.equal(firstRead.head.hash,initialHead.hash);assert.equal(firstRead.head.payload,initialHead.payload);assert.equal(firstRead.hold,null);
+  assert.ok(firstRead.originals.some(row=>{try{return JSON.stringify(JSON.parse(row.raw).indexedDB)===JSON.stringify(ctx.encodeManualArchiveSnapshot(damagedSource).stores);}catch{return false;}}),'the entire damaged graph already exists durably at the first SDK read boundary');
+  t.diagnostic('First SDK read observed supported active local authority, the exact repaired head and the exact protected damaged graph before reply delivery.');
+  assert.equal(backend.writes.length,0);assert.equal(JSON.stringify([...backend.docs]),remoteOriginal,'the gated read cannot mutate the remote original');assert.equal(backend.docs.get('users/owner').rev,5);
   inspector=warm.shim.window.ChainStorageV2.createDeviceStore({indexedDB:factory,crypto:warm.ctx.crypto,dbName});
   await inspector.open();const repaired=await inspector.readHead(),hold=await inspector.getRecoveryCloudHold();assert.ok(JSON.parse(repaired.payload).tasks.some(row=>row.id==='local-only'));
   const originals=await inspector.listOpaqueArchives();assert.ok(originals.some(row=>{try{return JSON.stringify(JSON.parse(row.raw).indexedDB)===JSON.stringify(ctx.encodeManualArchiveSnapshot(damagedSource).stores);}catch{return false;}}),'the entire real damaged graph is durably archived before a supported local head activates');
@@ -7814,9 +7839,12 @@ test('RISK AUTH HYDRATION: a corrupt device-head read protects exact originals b
   assert.ok(backups.some(row=>row.id==='manual-corrupt-head-185'&&row.payload===manualPayload),'the distinct manual recovery payload stays exact');
   assert.ok(backups.some(row=>row.id===protectedId&&row.payload===protectedPayload),'the distinct protected recovery payload stays exact');
   await inspector.close();
+  backend.CS.suspend();ctx.suspendCloudSync();cloudReadDelivery.resolve();await within(pulling,'cancelled first read settles');
+  await within((async()=>{while(vm.runInContext('pulling||cloudPushInFlight',ctx))await flush();})(),'actual automatic read consumer stops after cancellation');
+  assert.equal(backend.writes.length,0);assert.equal(JSON.stringify([...backend.docs]),remoteOriginal,'late cancelled reply preserves the complete remote original');
  }finally{
-  releaseSuccess();if(boot&&!cold)try{cold=await within(boot,'corrupt-read cleanup');}catch{}
-  try{await inspector?.close?.();}catch{}
+  backend?.CS.suspend();ctx?.suspendCloudSync?.();cloudReadDelivery.resolve();releaseSuccess();if(boot&&!cold)try{cold=await within(boot,'corrupt-read cleanup');}catch{}
+  try{await inspector?.close?.();await damagedInspector.close();}catch{}
   for(const app of [cold,warm])try{await app?.ctx.window.ScannerDeviceStore?.close?.();}catch{}
  }
 });

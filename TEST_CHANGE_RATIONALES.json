@@ -1,5 +1,24 @@
 [
   {
+    "baseCommit": "e7599f5964e50ac4cbb3388c36ad6fd87547a3e6",
+    "testChangesSha256": "284bbfbeb9be6d8945b8d8214515aada85138aae9fdad5610d4aa5e6314878e9",
+    "reason": "Replace an obsolete postcompletion zero-read timing assertion with actual first-SDK-read ordering proof after parent integrated the cloud hydration guard and local exact repair migration. Reads are allowed once supported local authority and protected originals are complete.",
+    "previousBehavior": "The corrupt AUTH test correctly prohibited network reads while opening but still required backend.network.length0 after exact repaired head and accepted state activated. Actual integrated GREENa18c38b2 failed because one legitimate SDK read had started; earlier separate sensitivity95758043 happened to observe0 and did not prove universal postboot timing.",
+    "intendedBehavior": "Observe and hold the actual first SDK root read. Prove the native source repair write completed before entry, supported accepted state/device authority/storageOK/exact head hash already active, and independently verified original head/hold/archive data already durable without any later source write manufacturing that proof. Preserve all pre-delivery prohibitions, manual/protected/browser originals and complete remote namespace; cancel the held reply safely at teardown.",
+    "replacementTests": [
+      "RISK AUTH HYDRATION: a corrupt device-head read protects exact originals before supported local recovery releases hydration"
+    ],
+    "preservedCoverage": [
+      "All pre-delivery state-null, network0 and writes0 assertions remain unchanged. Exact original initialHead hash/payload, hold=null/no fabricated choice or ACK, full damaged raw graph archive, browser keys and distinct manual/protected payload equality remain explicit. Only obsolete post-activation network0 is replaced; no product guard/runtime/API/budget change.",
+      "Existing external loadCloudBackendV2 failures.serverRead gate and local open proxy observe the actual SDK boundary and native readwrite transaction completion. State flags and completed write count are captured synchronously at entry. Independent native readbacks follow while cloud reply is held, with unchanged source-write count so later work cannot manufacture the ordering proof. Cancelled reply preserves complete remote document bytes and writes0.",
+      "The root name stays unchanged; no global root map, source, FAQ, fingerprint, device-store, cloud, rules or metadata edit. No browser/emulator/full-suite/CI/push. Earlier separate appSource sensitivity remains labeled as such and not exact integrated proof; parent owns final integration and release qualification."
+    ],
+    "redEvidence": {
+      "command": "Parent integrated qualification a18c38b2 is a failed purpose=green discovery (12/13pass), unchanged. Focused clean-e759 preimplementation-red340d5826: node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/offline-working-repair/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/ios-page-failure-20261024/database/offline-working/regression/first-cloud-read/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern '^RISK AUTH HYDRATION: a corrupt device-head' tests.js. New boundary-proof GREEN2a5a17aa passes AUTH3/3.",
+      "failure": "Clean integrated e759 reproduces1instead of0 only at the postboot network-length assertion. The new external-boundary observation finds the first SDK read after completed source transaction, accepted supported local authority, exact repaired original head and full immutable original archive; no ahead-of-authority product defect was observed, so no runtime change is made. Pre-delivery network assertions still enforce0. Full failed GREEN/discovery and focused RED chronology are retained; no sensitivity result is promoted to universal timing proof."
+    }
+  },
+  {
     "baseCommit": "892b5ced1cf42319ab4ca7292dea570d546f29b0",
     "testChangesSha256": "fe343569a905d14d72b6755296c523530feedf53f4f16f8df2de6cca1b542156",
     "reason": "Repair local failures discovered by actual failed C3 full qualification: preserve unreadable-backup cause beside honest unsaved/useful work; provide browser monotonic clock in two manual app VM fixtures; keep Node alive during the original bounded inaccessible-store save; deliberately migrate obsolete unaccepted-placeholder expectations to the authorized protected working workspace/exact repair behavior.",
