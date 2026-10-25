@@ -141,7 +141,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK AUTH RESTORE: configured startup stays syncing until Firebase resolves the actual session
 - RISK AUTH RESTORE: remembered boards show syncing in header and Settings while restoration is pending
 - RISK AUTH HYDRATION: real Auth and native resume wait for the durable board, then reconcile once
-- RISK AUTH HYDRATION: a corrupt device-head read stays visible and keeps cloud adoption held
+- RISK AUTH HYDRATION: a corrupt device-head read protects exact originals before supported local recovery releases hydration
 - RISK AUTH HYDRATION: extended FAQ and current Changelog explain the saved-board wait
 
 - RISK IMPORT RENDERING: restored identifiers cannot inject attributes or break task reveal
@@ -2186,3 +2186,4 @@ This boundary control holds a successful real provider reply, installs a later a
 - RISK offline recovery reentry: settled own recovery writes permit fresh current work while changed holds stay protected
 
 - Independent cloud preflight queues Auth and native wake events until hydration and exact boot capture settle, then still repairs real remote chunks after permanently unavailable native startup reaches its bound; accepted unsaved Add/draft remain pending: `RISK independent cloud boot authority: source-only preflight waits for bounded device startup before repairing remote bytes`.
+- RISK offline unreadable backup status: useful unsaved work names the protected cause without quota or durability claims

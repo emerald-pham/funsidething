@@ -3555,7 +3555,12 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
       :"The saved source is protected. Choose a supported recovery source before saving this board.");
   }
   if(memoryRecoveryWorkspace&&await resumeMemoryWorkingDeviceStorage())return true;
-  if(!storageOK) return reportDeviceSaveFailure("storage","unavailable","New work is only in this tab and is not saved. Keep this tab open until storage is available.");
+  if(!storageOK){
+    const backup=inspectBackupIndex(),unreadableBackup=backup.raw!==null&&backup.rows===null;
+    return reportDeviceSaveFailure("storage","unavailable",unreadableBackup
+      ?"An unreadable backup is protected. New work is only in this tab and is not saved. Keep this tab open; view its raw data in Settings."
+      :"New work is only in this tab and is not saved. Keep this tab open until storage is available.");
+  }
   let completionSourceBackup=null,completionSourcePayload=null,priorCompletionProtection=null,completionProtection=null;
   const failCompletionRecovery=()=>{
     if(completionProtection&&JSON.stringify(state?.protectedBackupIds)===JSON.stringify(completionProtection)){
