@@ -3502,12 +3502,17 @@ test('RISK cloud source recovery: read-only inspection does not expose unreadabl
   const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),raw='{"tasks":[ unreadable original';
   const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName:'readonly-unreadable-'+Math.random(),seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}}),{ctx,shim}=app;
   sub.after(()=>closeLegacyApp173(app));
+  const store=ctx.window.ScannerDeviceStore,hold=await store.getRecoveryCloudHold(),original=(await store.listOpaqueArchives()).find(row=>row.key===hold.originalKey);
+  assert.equal(vm.runInContext('liveBoardAccepted',ctx),true,'the accepted board is a distinct useful workspace, not the unreadable original');assert.equal(hold.workspace,'new-work');
+  ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/new offline workspace/i);ctx.closeModal();
+  shim.document.getElementById('addInput').value='New work beside unreadable original';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);const head=await store.readHead();
   const backend=await loadCloudBackendV2({runtimeWindow:ctx.window,failures:{authPending:true},timeoutMs:150});sub.after(()=>backend.CS.suspend());
   backend.emitAuth({uid:'owner',email:'e@example.com'});
-  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),false);
+  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true,'accepted new work may be inspected without treating the unreadable original as a board');
   const modal=shim.document.getElementById('modalRoot').innerHTML;
-  assert.match(modal,/Cloud sources are not verified/);assert.match(modal,/A readable device board for this account is not available/);
-  assert.doesNotMatch(modal,/data-cloud-source-readonly|0 tasks|choose-cloud-recovery-source|apply-cloud-source-recovery/);
+  assert.match(modal,/New work beside unreadable original/);assert.doesNotMatch(modal,/data-act="choose-cloud-recovery-source"[^>]*aria-pressed="true"/);assert.match(modal,/data-act="apply-cloud-source-recovery"[^>]*disabled/);
+  assert.doesNotMatch(modal,/0 tasks/);assert.equal(modal.includes(ctx.esc(raw)),false,'opaque unreadable bytes never become a supported preview');assert.equal((await store.readHead()).payload,head.payload,'inspection never replaces the current saved new work');
+  assert.equal((await store.listOpaqueArchives()).find(row=>row.key===hold.originalKey).raw,original.raw);assert.ok(JSON.parse(original.raw).localStorage.filter(row=>[SYNC_STORE_KEY,LOCAL_HEAD_KEY].includes(row.key)).every(row=>row.raw===raw));
   assert.equal(shim.localStorage.getItem(SYNC_STORE_KEY),raw);assert.equal(shim.localStorage.getItem(LOCAL_HEAD_KEY),raw);
  });
  await t.test('same email different identity',async sub=>{
@@ -7748,7 +7753,7 @@ test('RISK AUTH HYDRATION: real Auth and native resume wait for the durable boar
  assert.deepEqual(pendingWarnings,[],'Pending successful hydration must not be reported as device-store/unavailable');
 });
 
-test('RISK AUTH HYDRATION: a corrupt device-head read stays visible and keeps cloud adoption held',async()=>{
+test('RISK AUTH HYDRATION: a corrupt device-head read protects exact originals before supported local recovery releases hydration',async()=>{
  const {IDBFactory}=await import('fake-indexeddb'),factory=new IDBFactory(),at=Date.parse('2026-10-18T13:00:00Z');
  async function within(promise,label,ms=4000){let timer;try{return await Promise.race([promise,new Promise((_,reject)=>timer=setTimeout(()=>reject(Error('Corrupt-head control deadline: '+label)),ms))]);}finally{clearTimeout(timer);}}
  const dbName='chain-scanner-auth-corrupt-head-'+Date.now()+'-'+Math.random(),protectedId='protected-corrupt-head-185';
@@ -7770,6 +7775,7 @@ test('RISK AUTH HYDRATION: a corrupt device-head read stays visible and keeps cl
   request.onerror=()=>reject(request.error);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||Error('snapshot corruption fixture aborted'));
  });
  opened.close();assert.equal(snapshotFound,true,'the actual content-addressed head snapshot was found and damaged');
+ const damagedInspector=warm.shim.window.ChainStorageV2.createDeviceStore({indexedDB:factory,crypto:warm.ctx.crypto,dbName});await damagedInspector.open();const damagedSource=await damagedInspector.readRawExportSnapshot();await damagedInspector.close();
  const browserCopies={[SYNC_STORE_KEY]:storage.getItem(SYNC_STORE_KEY),[LOCAL_HEAD_KEY]:storage.getItem(LOCAL_HEAD_KEY)};
  let releaseSuccess,openEntered,ctx,shim,backendPromise,boot,cold,inspector;
  const releaseDelivery=new Promise(resolve=>{releaseSuccess=resolve;});
@@ -7793,14 +7799,16 @@ test('RISK AUTH HYDRATION: a corrupt device-head read stays visible and keeps cl
   await flush();assert.equal(ctx.state,null,'the failed read has not been delivered yet');assert.deepEqual(warnings,[],'pending read delivery is not reported as a known failure');
   assert.equal(backend.network.length,0);assert.equal(backend.writes.length,0);
   releaseSuccess();cold=await within(boot,'corrupt head read failure');
-  assert.equal(vm.runInContext('deviceStorageAuthority',ctx),false);
-  assert.equal(vm.runInContext('storageOK',ctx),false,'a corrupt durable head cannot become a new empty local authority');
-  assert.ok(warnings.length>0,'the genuine durable read failure remains visible after startup resolves');
-  for(const [key,value] of Object.entries(browserCopies))assert.equal(storage.getItem(key),value,'old browser recovery bytes stay unchanged after the failed read');
-  assert.equal(backend.network.length,0,'the corrupt durable head does not authorize reading or adopting cloud data');
+  assert.equal(vm.runInContext('deviceStorageAuthority',ctx),true);
+  assert.equal(vm.runInContext('storageOK',ctx),true,'a complete retained local source opens supported work after exact original preservation');
+  assert.ok(ctx.state.tasks.some(row=>row.id==='local-only'),'the prior local task is present instead of an empty recovered original');assert.equal(ctx.state.futureSaved.keep,'original');
+  for(const [key,value] of Object.entries(browserCopies))assert.equal(storage.getItem(key),value,'old browser recovery bytes stay unchanged after the damaged original is protected and repaired');
+  assert.equal(backend.network.length,0,'no cloud operation starts ahead of supported local recovery and exact original preservation');
   assert.equal(backend.writes.length,0);assert.equal(backend.docs.get('users/owner').rev,5,'the remote revision stays untouched');
   inspector=warm.shim.window.ChainStorageV2.createDeviceStore({indexedDB:factory,crypto:warm.ctx.crypto,dbName});
-  await inspector.open();await assert.rejects(inspector.readHead(),/corrupt|head/i,'the control observes the real snapshot hash failure');
+  await inspector.open();const repaired=await inspector.readHead(),hold=await inspector.getRecoveryCloudHold();assert.ok(JSON.parse(repaired.payload).tasks.some(row=>row.id==='local-only'));
+  const originals=await inspector.listOpaqueArchives();assert.ok(originals.some(row=>{try{return JSON.stringify(JSON.parse(row.raw).indexedDB)===JSON.stringify(ctx.encodeManualArchiveSnapshot(damagedSource).stores);}catch{return false;}}),'the entire real damaged graph is durably archived before a supported local head activates');
+  assert.equal(repaired.hash,initialHead.hash);assert.equal(repaired.payload,initialHead.payload,'the exact original authoritative bytes are repaired rather than choosing a manual alternative');assert.equal(hold,null,'an exact byte repair does not invent a cloud source choice or acknowledgement');
   const backups=await inspector.listBackups();
   assert.ok(backups.some(row=>row.id==='manual-corrupt-head-185'&&row.payload===manualPayload),'the distinct manual recovery payload stays exact');
   assert.ok(backups.some(row=>row.id===protectedId&&row.payload===protectedPayload),'the distinct protected recovery payload stays exact');
@@ -9755,7 +9763,7 @@ test("clearCompleted: removes done tasks when confirm() is accepted, leaves them
     const shim = makeDomShim();
     const sandbox = {
       window: shim.window, document: shim.document, localStorage: shim.localStorage,
-      console, JSON, CustomEvent: class {},
+      console, JSON, performance, CustomEvent: class {},
       setTimeout: (fn, ms, ...a) => { const timer = setTimeout(fn, ms, ...a); timer.unref?.(); return timer; }, clearTimeout,
       requestAnimationFrame: (fn) => setTimeout(fn, 0),
       confirm: () => false, alert: () => {}, prompt: () => null,
@@ -14502,7 +14510,7 @@ test('applyTheme: a host with no documentElement is a safe no-op', async () => {
   delete shim.document.documentElement;
   const sandbox = {
     window: shim.window, document: shim.document, localStorage: shim.localStorage,
-    console, JSON,
+    console, JSON, performance,
     CustomEvent: class CustomEvent { constructor(type, opts) { this.type = type; Object.assign(this, opts || {}); } },
     setTimeout: (fn, ms, ...a) => { const t = setTimeout(fn, ms, ...a); t.unref?.(); return t; },
     clearTimeout, requestAnimationFrame: (fn) => setTimeout(fn, 0),
@@ -17686,6 +17694,16 @@ test('RISK LOCAL BACKUPS: parseable but unrestorable history cannot be retired f
  const raw=JSON.stringify([row]);storage.setItem(LOCAL_BACKUPS_KEY,raw);
  assert.equal(ctx.saveLocalBackup('daily',JSON.stringify(ctx.state)),false);
  assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),raw,'the original unreadable source remains byte-for-byte available');
+});
+
+test('RISK offline unreadable backup status: useful unsaved work names the protected cause without quota or durability claims',async()=>{
+ for(const source of ['unreadable original backup bytes','chain-scanner-backups-lzw9:unsupported-original']){
+  const storage=sharedScannerStorage({[LOCAL_BACKUPS_KEY]:source}),app=await loadApp({sharedStorage:storage}),{ctx,shim}=app;
+  shim.document.getElementById('addInput').value='Accepted beside protected unreadable backup';await ctx.onAction('add',{});assert.ok(ctx.state.tasks.some(row=>row.title==='Accepted beside protected unreadable backup'));
+  assert.equal(vm.runInContext('liveBoardAccepted&&memoryRecoveryWorkspace',ctx),true);assert.equal(await ctx.persist(),false);
+  const message=shim.document.getElementById('toast').textContent;assert.match(message,/unreadable backup/i);assert.match(message,/only in this tab|not saved|unsaved/i);assert.doesNotMatch(message,/storage is full|quota|saved successfully/i);
+  assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),source);assert.equal(storage.getItem(LOCAL_HEAD_KEY),null);assert.equal(storage.getItem(SYNC_STORE_KEY),null);assert.ok(ctx.deviceSaveIssue());
+ }
 });
 
 test('RISK LOCAL BACKUPS: an unreadable index explains the paused save without claiming quota',async()=>{
@@ -30451,7 +30469,7 @@ test('RISK SCALABLE RECOVERY: an inaccessible established IndexedDB authority ne
  const reopened=await loadApp({sharedStorage:storage,indexedDBProvider:blocked,deviceDbName:dbName,cloudSyncFactory});
  assert.equal(vm.runInContext('storageOK',reopened.ctx),false,'the app reports the authoritative store unavailable instead of accepting old localStorage');
  assert.equal(reopened.ctx.state.tasks.some(task=>task.title==='Legacy shell task'),false,'stale legacy bytes are not treated as the current board');
- reopened.ctx.addTask('Must remain in memory');assert.equal(await reopened.ctx.persist(),false);
+ reopened.ctx.addTask('Must remain in memory');assert.equal(await fixtureDeadline(reopened.ctx.persist(),'unavailable established authority save settles within its existing budget',6000),false);
  reopened.ctx.cloudPushNow();await syncSettle(PAST_DEBOUNCE+40);
  assert.equal(pushes.length,0,'an unavailable durable authority cannot upload a default or stale board');
  assert.equal(storage.getItem(SYNC_STORE_KEY),legacyRaw,'the last legacy recovery bytes stay untouched');
