@@ -83,8 +83,9 @@ suite or a set of skipped required cases.
 Local execution needs an explicit full `CHAIN_NATIVE_CANDIDATE_SHA` and
 `CHAIN_NATIVE_CANDIDATE_TREE`, a durable `CHAIN_NATIVE_OUTPUT`, and an allocated
 `CHAIN_NATIVE_PORT`. Use the recorder and shared host allocation before launching
-the process RISK. CI binds its exact checkout and installs the pinned Playwright
-package's matching Chromium in the existing scanner-tests job. Missing source,
+the process RISK. CI binds each group's exact checkout and installs the pinned Playwright
+package's matching Chromium in the regression jobs. The scanner-tests aggregate
+verifies the native reports and their actual checkout identities. Missing source,
 browser or runtime support is a failure to investigate, not an empty pass.
 
 Serve immutable old and candidate Git assets. A dirty runner may exercise an

@@ -2,7 +2,8 @@
 
 import { spawnSync } from 'node:child_process';
 import { appendFile, mkdir, writeFile } from 'node:fs/promises';
-import { randomUUID } from 'node:crypto';
+import { GROUP_IDS } from '../test-groups.mjs';
+import { createHash, randomUUID } from 'node:crypto';
 import { join, resolve } from 'node:path';
 
 function parseArguments(args) {
@@ -108,7 +109,7 @@ async function ghOutput(args, { options, transport, requestsPath, kind, maxBuffe
 async function readRun({ repo, runId, options, transport, requestsPath, deadline }) {
   const result = await ghOutput([
     'run', 'view', runId, '--repo', repo,
-    '--json', 'databaseId,headSha,status,conclusion,event,headBranch,workflowName,jobs',
+    '--json', 'databaseId,headSha,status,conclusion,event,headBranch,workflowName,jobs,attempt',
   ], { options, transport, requestsPath, kind: 'run', maxBuffer: 10 * 1024 * 1024, deadline });
   try {
     return { run: JSON.parse(result.stdout), raw: result.stdout, transportFallbackUsed: result.transportFallbackUsed };
@@ -117,8 +118,8 @@ async function readRun({ repo, runId, options, transport, requestsPath, deadline
   }
 }
 
-async function readLogs({ repo, runId, options, transport, requestsPath, deadline }) {
-  const result = await ghOutput(['run', 'view', runId, '--repo', repo, '--log'], {
+async function readLogs({ repo, runId, attempt, options, transport, requestsPath, deadline }) {
+  const result = await ghOutput(['run', 'view', runId, '--repo', repo, ...(attempt ? ['--attempt',String(attempt)] : []), '--log'], {
     options,
     transport,
     requestsPath,
@@ -129,14 +130,49 @@ async function readLogs({ repo, runId, options, transport, requestsPath, deadlin
   return { logs: result.stdout, transportFallbackUsed: result.transportFallbackUsed };
 }
 
-const currentWorkflowJobs = new Set(['scanner-tests', 'release-evidence', 'deploy-pages']);
+async function bindWorkflowPolicy(run, logs, state) {
+  if(!Number.isInteger(run.attempt)||run.attempt<1)throw new Error('Missing exact run attempt identity.');
+  const checkoutMatches=[...logs.matchAll(/git log -1 --format=%H[^\r\n]*[\r\n]+[^\r\n]*?\b([a-f0-9]{40})\b/g)].map(match=>match[1]);
+  const announced=(run.jobs||[]).flatMap(job=>job.steps||[]).map(step=>step.name).filter(name=>/^Actual checkout [a-f0-9]{40} tree [a-f0-9]{40}$/.test(name));
+  const candidates=[...new Set([...checkoutMatches,...announced.map(name=>name.split(' ')[2])])];
+  if(candidates.length!==1)throw new Error('Actual checkout provenance is missing or ambiguous.');
+  const checkoutSha=candidates[0];
+  if(run.event==='push'&&checkoutSha!==run.headSha)throw new Error('Push actual checkout differs from source.');
+  const api=async endpoint=>{
+    const result=await ghOutput(['api',`repos/${state.options.repo}/${endpoint}`],{...state,kind:'policy',maxBuffer:10*1024*1024});
+    await appendFile(join(state.attemptDirectory,'policy-reads.jsonl'),JSON.stringify({endpoint,response:result.stdout})+'\n',{mode:0o600});
+    return JSON.parse(result.stdout);
+  };
+  const commit=await api('git/commits/'+checkoutSha);
+  if(commit.sha!==checkoutSha||! /^[a-f0-9]{40}$/.test(commit.tree?.sha||''))throw new Error('Actual checkout commit/tree response is not bound.');
+  if(run.event==='pull_request'&&(commit.parents?.length!==2||commit.parents[1].sha!==run.headSha))throw new Error('PR checkout parents do not bind the exact source.');
+  if(announced.some(name=>name.split(' ')[4]!==commit.tree.sha))throw new Error('Announced actual checkout tree mismatch.');
+  const response=await api('contents/.github/workflows/data-safety.yml?ref='+checkoutSha);
+  if(response.encoding!=='base64'||typeof response.content!=='string')throw new Error('Missing actual candidate workflow bytes.');
+  const bytes=Buffer.from(response.content.replace(/\s/g,''),'base64');
+  const blob=createHash('sha1').update(Buffer.concat([Buffer.from('blob '+bytes.length+'\0'),bytes])).digest('hex');
+  if(response.sha!==blob)throw new Error('Actual candidate workflow blob digest mismatch.');
+  const text=bytes.toString('utf8');
+  const ids=[...text.matchAll(/^  ([a-z][a-z0-9-]*):\s*$/gm)].map(match=>match[1]).filter(id=>!['push','pull_request'].includes(id));
+  const legacy=['scanner-tests','release-evidence','deploy-pages'];
+  const parallel=['validation-context','event-gates','cohort-routing','regression',...legacy];
+  let topology,required;
+  if(/^  CHAIN_CI_TOPOLOGY: four-groups-v1$/m.test(text)) {
+    if(JSON.stringify(ids)!==JSON.stringify(parallel)||!text.includes('name: regression-${{ matrix.group }}')||!text.includes('group: ['+GROUP_IDS.join(', ')+']')||!text.includes('needs: [scanner-tests, release-evidence]'))throw new Error('Unknown parallel workflow topology.');
+    topology='four-groups-v1';required=['validation-context','event-gates','cohort-routing',...GROUP_IDS.map(id=>'regression-'+id),'scanner-tests'];
+  } else if(JSON.stringify(ids)===JSON.stringify(legacy)&&!text.includes('CHAIN_CI_TOPOLOGY')) {topology='legacy-serial';required=['scanner-tests'];}
+  else throw new Error('Unknown actual candidate workflow topology.');
+  const binding={topology,checkoutSha,checkoutTree:commit.tree.sha,comparisonBase:run.event==='pull_request'?commit.parents[0].sha:null,workflowBlob:blob,runId:String(run.databaseId),runAttempt:run.attempt,required,known:[...required,'release-evidence','deploy-pages']};
+  await writeFile(join(state.attemptDirectory,'workflow-policy.json'),JSON.stringify(binding,null,2)+'\n',{mode:0o600});
+  return binding;
+}
 
 function expectedSkippedJobs(run) {
   const isMainPush = run.event === 'push' && run.headBranch === 'main';
   return isMainPush ? new Set() : new Set(['release-evidence', 'deploy-pages']);
 }
 
-function classifyRun(run) {
+function classifyRun(run, policy = null) {
   const status = String(run.status ?? '').toLowerCase();
   const conclusion = String(run.conclusion ?? '').toLowerCase();
   const expectedSkipped = expectedSkippedJobs(run);
@@ -159,6 +195,8 @@ function classifyRun(run) {
   if (['failure', 'timed_out', 'action_required', 'stale', 'startup_failure'].includes(conclusion)) return classification('failure', 1);
   if (conclusion !== 'success') return classification('unresolved', 2, `Unknown run conclusion: ${conclusion || 'missing'}.`);
 
+  if(!policy)return classification('unresolved',2,'Actual candidate workflow policy could not be verified.');
+  const currentWorkflowJobs=new Set(policy.known);
   const byName = new Map();
   for (const job of jobs) {
     const name = String(job.name ?? '');
@@ -167,8 +205,8 @@ function classifyRun(run) {
     byName.set(name, job);
   }
   const required = run.event === 'push' && run.headBranch === 'main'
-    ? ['scanner-tests', 'release-evidence', 'deploy-pages']
-    : ['scanner-tests'];
+    ? [...policy.required, 'release-evidence', 'deploy-pages']
+    : policy.required;
   for (const name of required) {
     const job = byName.get(name);
     if (!job) return classification('failure', 1, `Required job ${name} is missing.`);
@@ -192,6 +230,20 @@ function classifyRun(run) {
       return classification('failure', 1, `Job ${name} concluded ${jobConclusion}.`);
     }
     return classification('unresolved', 2, `Job ${name} has no terminal success.`);
+  }
+  if(policy.topology==='four-groups-v1'){
+    const early=(byName.get('validation-context').steps||[]).filter(step=>step.conclusion==='success').map(step=>step.name);
+    const source=early.filter(name=>new RegExp(`^Validation source ${run.headSha} base [a-f0-9]{40}$`).test(name));
+    const context=early.filter(name=>/^Announce regression context [a-f0-9]{64}$/.test(name));
+    if(source.length!==1||context.length!==1||!early.includes(`Actual checkout ${policy.checkoutSha} tree ${policy.checkoutTree}`)||!early.includes(`Workflow blob ${policy.workflowBlob} policy four-groups-v1`))return classification('failure',1,'Required exact workflow/context announcement is missing or ambiguous.');
+    const base=source[0].split(' ').at(-1),digest=context[0].split(' ').at(-1);
+    if(policy.comparisonBase&&base!==policy.comparisonBase)return classification('failure',1,'Announced PR comparison base differs from actual merge parent.');
+    const steps=(byName.get('scanner-tests').steps||[]).filter(step=>step.conclusion==='success').map(step=>step.name);
+    const verified=steps.filter(name=>new RegExp(`^Verified complete cohort ${digest} report [a-f0-9]{64} mode (full|reuse)$`).test(name));
+    if(!steps.includes('Verify complete required cohort')||verified.length!==1)return classification('failure',1,'Required verified aggregate attestation is missing or ambiguous.');
+    const words=verified[0].split(' '),report=words[5],mode=words[7];
+    if(mode==='full'&&steps.filter(name=>name===`Complete regression context ${digest} report ${report}`).length!==1)return classification('failure',1,'Required full producer completion attestation is missing.');
+    policy.comparisonBase=base;policy.contextSha256=digest;policy.reportSha256=report;policy.mode=mode;
   }
   return classification('success', 0);
 }
@@ -285,7 +337,15 @@ async function main() {
       process.exitCode = 1;
       return;
     }
-    const outcome = classifyRun(run);
+    let cachedLogs=null,policy=null,policyError=null,logsReadError=null;
+    if(run.status==='completed'&&run.conclusion==='success'&&run.workflowName==='Data safety'&&['push','pull_request'].includes(run.event)) {
+      try {
+        try{cachedLogs=(await readLogs({repo:options.repo,runId:options['run-id'],attempt:run.attempt,options,transport,requestsPath,deadline})).logs;}catch(error){logsReadError=error.message;throw error;}
+        policy=await bindWorkflowPolicy(run,cachedLogs,{options,transport,requestsPath,deadline,attemptDirectory});
+      } catch(error){policyError=error.message;}
+    }
+    let outcome = classifyRun(run,policy);
+    if(policyError&&outcome.result==='unresolved')outcome={...outcome,reason:policyError};
     const key = snapshotKey(run, outcome);
     const changed = key !== previousKey;
     const nonterminal = ['pending', 'waiting', 'running'].includes(outcome.result);
@@ -313,7 +373,8 @@ async function main() {
       let logsState = 'saved';
       let logsError = null;
       try {
-        const { logs } = await readLogs({ repo: options.repo, runId: options['run-id'], options, transport, requestsPath, deadline });
+        if(logsReadError)throw new Error(logsReadError);
+        const logs=cachedLogs ?? (await readLogs({ repo: options.repo, runId: options['run-id'], attempt:run.attempt, options, transport, requestsPath, deadline })).logs;
         await writeFile(join(attemptDirectory, 'logs.txt'), logs, { mode: 0o600 });
       } catch (error) {
         logsState = 'unavailable';
@@ -322,6 +383,7 @@ async function main() {
       const finalOutcome = outcome.result === 'success' && logsState !== 'saved'
         ? { ...outcome, result: 'unresolved', exitCode: 2, reason: 'Full raw logs could not be persisted.' }
         : outcome;
+      if(policy)await writeFile(join(attemptDirectory,'workflow-policy.json'),JSON.stringify(policy,null,2)+'\n',{mode:0o600});
       await writeSummary(attemptDirectory, {
         repo: options.repo,
         runId: options['run-id'],
@@ -330,6 +392,8 @@ async function main() {
         polls: poll,
         status: run.status,
         conclusion: run.conclusion,
+        runAttempt: run.attempt,
+        workflowPolicy: policy,
         logsState,
         requests: requestsPath,
         progress: progressPath,
@@ -351,7 +415,7 @@ async function main() {
   let logsError = null;
   if (lastRun) {
     try {
-      const { logs } = await readLogs({ repo: options.repo, runId: options['run-id'], options, transport, requestsPath, deadline });
+      const { logs } = await readLogs({ repo: options.repo, runId: options['run-id'], attempt:lastRun.attempt, options, transport, requestsPath, deadline });
       await writeFile(join(attemptDirectory, 'logs.txt'), logs, { mode: 0o600 });
       logsState = 'saved';
     } catch (error) {

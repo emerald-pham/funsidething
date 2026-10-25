@@ -10,6 +10,10 @@ This map records the current named RISK contracts in tests.js. It lets reviewers
 
 The named-contract test in tests.js checks that every top-level test whose title starts with RISK appears in this inventory. Add or rename the inventory entry in the same test-first change. If a future feature adds a new risk area, add a heading and place its concrete test names under it.
 
+- RISK repository process: event routing retains exact merge validation before avoiding a duplicate cohort
+- RISK repository process: required parallel scanner aggregation rejects absent group evidence
+- RISK repository process: grouped catalog binds real declarations rather than quoted fixtures
+
 ## Task state, eligibility, and scanner controls
 
 - RISK backup format safety: raw-source qualification remains outside the native selector
@@ -402,6 +406,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 ## Release memory/cloud/sync and independent code review
 
+- RISK repository process: release recording classifies the tail of a complete large diff
 - RISK repository process: review policy derives code and specialist roles from the exact diff
 - RISK repository process: a generic role guard requires a security specialist
 - RISK repository process: generic state persistence requires a memory specialist
@@ -854,6 +859,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK motion review harness: frozen actual actor painters reconstruct repeatable before-after sequences across direction viewport and reduced motion
 - RISK walking scope guidance: extended FAQ and changelog describe walker winter woodland and held-line improvements
 - RISK motion harness controls: nonfinite actual painter commands are rejected and foreground deer use their real travel anchor
+- RISK immutable scenery fixture preparation: exact source reuse keeps fresh consumer contexts and known output
 
 - RISK snowangel departing shadow: actual winter painter follows the standing person and preserves the fixed imprint
 
@@ -1569,12 +1575,14 @@ The actual intervention Yes records deliberate current-pass Scan intent even whe
 ## Agent evidence command wiring (#152)
 
 - `RISK repository process: npm test fails when an agent-tool cohort assertion fails`
+- `RISK repository process: grouped runner stays covered at the default npm test boundary`
+- `RISK test group runner preserves hash identities and counts only executable controlled registrations`
 
 Preflight comparison coverage:
 - `RISK repository process: preflight catches outgoing upstream rationale gaps after the selected base passes`
   exercises the public command with a real published local Git branch, a passing selected comparison and a missing outgoing rationale. It preserves the existing gate, focused copy checks, refs, HEAD, tracked files and configuration.
 
-The required npm test entry point surfaces a failing isolated agent-tool cohort with a nonzero result and its assertion output.
+The required npm test entry point surfaces a failing isolated agent-tool cohort with a nonzero result and its assertion output. Group-runner identity evidence preserves the independently captured TAP-escaped inventory while reporting canonical runtime titles, and native-child registration checks distinguish executable declarations from quoted fixture text while rejecting missing and duplicate controls.
 
 ## Deletion membership authority after log pruning (#171)
 
@@ -2095,7 +2103,7 @@ This boundary control holds a successful real provider reply, installs a later a
 ## Integrated automatic recovery qualification
 
 - RISK integrated automatic recovery: persisted multichunk sources retain pending ACK and true Done Undo through restart
-- RISK integrated automatic recovery native: persisted startup status and neighboring controls remain usable
+- RISK integrated automatic recovery native: persisted startup status and neighboring controls remain usable with one browser and isolated contexts
 - RISK integrated automatic recovery: a failed current read cannot hide the healthy previous source
 
 - RISK automatic source status: completed confirmation follows current edits and signed-in identity
@@ -2109,6 +2117,8 @@ This boundary control holds a successful real provider reply, installs a later a
 - Acknowledged damaged-source fixture inputs finish both real native seed Add saves before later recovery/consent: `RISK recovery fixture ownership: acknowledged damage inputs finish both native seed saves before recovery`.
 
 - The native historical status consumer retains15s new-owner entry, then only that read/controller/serial's original remaining60s budget; an entered16s SDK reply, true stopped/superseded/signout refusals and normal ACK cleanup are exercised in `RISK automatic source status native: historical retry checking stop and confirmation remain current`.
+
+- The startup matrix identifier `RISK integrated automatic recovery native: persisted startup status and neighboring controls remain usable` was renamed to `RISK integrated automatic recovery native: persisted startup status and neighboring controls remain usable with one browser and isolated contexts`; its four theme/viewport children and recovery assertions remain intact. The renamed startup matrix and historical matrix `RISK automatic source status native: historical retry checking stop and confirmation remain current` each launch one Playwright browser for four cases while preserving four fresh contexts and pages, independent synthetic account/board/backend/gates, per-case evidence, and all startup/reopen/ACK/protected-source/newer-edit/draft/Undo assertions. The historical dark390 case retains its real16s held ACK.
 
 - Failed source observations retain their original rejection while their own polling timers terminate and the real consumer exits: `RISK recovery fixture shutdown: a failed real source observation stops its own polling and exits`.
 
@@ -2125,3 +2135,11 @@ This boundary control holds a successful real provider reply, installs a later a
 - Cloud-only authority, bounded restart, source pins and readback preserve local pending intent under cancellation, UID/epoch/backend/suspend changes, fresh peer revisions, refused pins, changed chunks, lost write replies and later source discovery: `RISK independent cloud authority: cancellation account epoch backend and suspension changes cannot publish stale repairs`; `RISK independent cloud races: fresh peer roots win during reads and publication while failed pins keep originals`; `RISK independent cloud uncertain reply: deterministic publication reads back a lost reply and never clears pending uploads`; `RISK independent cloud retained discovery: pinned originals survive ordinary rotations and repair another damaged root without local storage`.
 
 - Exact-current hash reconstruction still retains compatible facts from every complete retained server source: `RISK independent cloud exact reconstruction: a matching retained hash cannot discard other complete server facts`.
+
+## Offline device database recovery
+
+- RISK device database repair guidance: mounted FAQ distinguishes offline exact-copy repair from protected unresolved sources
+- RISK offline device recovery: an exact retained local copy repairs damaged current bytes without cloud
+- RISK device connection startup: one internal server failure recovers the authoritative offline board within a bounded attempt
+- RISK device connection recovery: offline accepted work survives a lost handle and durable reopen
+- RISK device connection recovery: a closed local handle still permits exact cloud reconstruction without losing originals
