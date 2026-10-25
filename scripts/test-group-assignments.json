@@ -12661,6 +12661,16 @@
       "root": "RISK cloud recovery memory guidance: mounted FAQ and changelog explain lower memory use and retained originals",
       "group": "core",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud recovery device connection: a failed handle is reopened within the same protected review",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud recovery reconnect guidance: mounted help explains reconnecting without replacing saved data",
+      "group": "core",
+      "file": "tests.js"
     }
   ],
   "processControls": [
