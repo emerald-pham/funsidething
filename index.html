@@ -2823,23 +2823,27 @@ async function recoverLocalWorkingDeviceSource({workingBoard=null,expectedMemory
   if(typeof store?.writeRecoveredSource!=="function"||!held())return null;
   try{
     const source=await store.readRawExportSnapshot(),browser=readManualArchiveLocalSources(),
-      sourceIdentity=rawRecoverySourceIdentity(source),candidates=[],seen=new Set(),hashes=new Map();
+      sourceIdentity=rawRecoverySourceIdentity(source),candidates=[],seen=new Map(),hashes=new Map();
     if(source.stores.meta.keys.includes("recoveryCloudHold"))return null;
-    let bytes=0;
+    let bytes=0,browserHead=null;
     const add=async(payload,key,expectedHash=null)=>{
-      if(typeof payload!=="string"||seen.has(payload)||candidates.length>=128)return;
+      if(typeof payload!=="string"||candidates.length>=128)return;
       if(!hashes.has(payload)){
         if(hashes.size>=128||bytes+payload.length>8*1024*1024)return;
         bytes+=payload.length;hashes.set(payload,await ChainStorageV2.hashPayload(payload));
       }
       const hash=hashes.get(payload);
       if(expectedHash!==null&&hash!==expectedHash)return;
-      seen.add(payload);
+      if(seen.has(payload))return seen.get(payload);
+      seen.set(payload,null);
       try{
         const original=JSON.parse(payload);assertCompleteSavedCollections(original);
         const account=original.syncAccount??original.decisionBaseline?.account??null,validated=cloudSourceRecoveryBoard(original.v===1?JSON.stringify({...original,v:STATE_VERSION}):payload,account);
         if(!validated.board||automaticRecoveryBoardIssue(validated.board,account)||decisionProjectionIssue(validated.board))return;
-        candidates.push({key,board:validated.board,sourceRef:{kind:"device-local-source",key,hash}});
+        const ownerProved=Object.hasOwn(original,"syncAccount")&&(original.syncAccount===null?
+          original.syncIdentity==null:typeof original.syncAccount==="string"&&!!original.syncAccount&&typeof original.syncIdentity==="string"&&!!original.syncIdentity),
+          candidate={key,board:validated.board,ownerProved,sourceRef:{kind:"device-local-source",key,hash}};
+        candidates.push(candidate);seen.set(payload,candidate);return candidate;
       }catch{}
     };
     const rawHead=source.stores.meta.values[source.stores.meta.keys.indexOf("head")];
@@ -2851,16 +2855,28 @@ async function recoverLocalWorkingDeviceSource({workingBoard=null,expectedMemory
       if(snapshot?.hash===row.payloadHash)await add(snapshot.payload,"backup:"+row.id,row.payloadHash);
     }
     for(const row of browser){
-      if([STORE_KEY,LOCAL_HEAD_KEY].includes(row.key)&&row.status==="present")await add(row.raw,"browser:"+row.key);
+      if([STORE_KEY,LOCAL_HEAD_KEY].includes(row.key)&&row.status==="present"){
+        const candidate=await add(row.raw,"browser:"+row.key);
+        if(row.key===LOCAL_HEAD_KEY&&candidate?.ownerProved)browserHead=candidate;
+      }
       if(row.key===LOCAL_BACKUPS_KEY&&row.status==="present"){
         try{const rows=parseBackupIndex(row.raw);if(Array.isArray(rows))for(const item of rows)if(readableBackupRow(item))await add(item.payload,"browser-backup:"+item.id);}catch{}
       }
     }
     await localWorkingArchivedCandidates(source,add);
     candidates.sort((a,b)=>a.key<b.key?-1:a.key>b.key?1:0);
-    const anchor=candidates.find(row=>rawHead?.account==null||row.board.syncAccount===rawHead.account);
-    const compatible=anchor?candidates.filter(row=>sameListOwner(anchor.board,row.board)):[],
-      reduced=workingBoard?reduceAutomaticRecoveryCandidates({acceptedBaseline:workingBoard,candidates:candidates.filter(row=>sameListOwner(workingBoard,row.board))}):
+    // A missing account is not an unsigned owner, and an email does not prove
+    // a UID. Only the complete captured browser head or a sole eligible owner
+    // group can establish which retained list supports the working board.
+    const sameOwner=(a,b)=>(a.syncAccount??null)===(b.syncAccount??null)&&(a.syncIdentity??null)===(b.syncIdentity??null),
+      hasAccount=rawHead&&Object.hasOwn(rawHead,"account")&&
+      (rawHead.account===null||typeof rawHead.account==="string"),
+      eligible=candidates.filter(row=>!hasAccount||(rawHead.account===null?
+        row.board.syncAccount==null&&row.board.syncIdentity==null:row.board.syncAccount===rawHead.account)),
+      proved=browserHead&&eligible.includes(browserHead)?browserHead:null,
+      anchor=proved||(eligible.length&&eligible.every(row=>sameOwner(eligible[0].board,row.board))?eligible[0]:null);
+    const compatible=anchor?candidates.filter(row=>sameOwner(anchor.board,row.board)):[],
+      reduced=workingBoard?reduceAutomaticRecoveryCandidates({acceptedBaseline:workingBoard,candidates:candidates.filter(row=>sameOwner(workingBoard,row.board))}):
         reduceAutomaticRecoveryCandidates({candidates:compatible});
     // Conflicting alternatives remain exact in the source archive. One
     // complete projection can still support new offline work without granting
@@ -2876,7 +2892,7 @@ async function recoverLocalWorkingDeviceSource({workingBoard=null,expectedMemory
         sourceIdentityHash,workingBaseHash,account:plan.board.syncAccount??null,identity:plan.board.syncIdentity??null,
         workspace:anchor&&!workingBoard?"supported-source":"new-work",
         unresolvedOriginalRefs:[{kind:"device-original",key:originalKey,reason:"original-device-source-unreadable"}],
-        unresolvedSourceRefs:!anchor||reduced.board?[]:compatible.map(row=>row.sourceRef)};
+        unresolvedSourceRefs:workingBoard||anchor?(reduced.board?[]:compatible.map(row=>row.sourceRef)):candidates.map(row=>row.sourceRef)};
     const current=()=>localDeviceStartupCurrent(bootAttempt)&&deviceStore===store&&state===accepted&&JSON.stringify(state)===acceptedRaw&&held()&&
       JSON.stringify(readManualArchiveLocalSources())===JSON.stringify(browser);
     if(!current())return null;

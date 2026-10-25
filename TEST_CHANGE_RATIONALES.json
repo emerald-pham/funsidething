@@ -1,5 +1,24 @@
 [
   {
+    "baseCommit": "ba826db17076d31be90e2f2375f32f87d792c5b7",
+    "testChangesSha256": "ac8a72f2150cad947890b07338b14f3248891e0171bc660811db04ecd7f5f5bd",
+    "reason": "Repair independently observed P1: lexical source ordering selected a foreign account or UID before ownership qualification during protected offline startup. Add actual startup cases and keep ambiguous alternatives usable and protected.",
+    "previousBehavior": "A malformed explicit-null head, an absent head, or an email-only malformed head could select a-foreign-owner ahead of the retained local board, adopt another UID and record no unresolved source refs.",
+    "intendedBehavior": "Explicit null binds unsigned ownership. A complete captured browser head with explicit owner and UID provenance or a sole eligible owner group supports local recovery. Multiple unproved owner groups open a separate protected new-work workspace retaining all exact alternatives and unresolved refs; native Add, saving, cold reopen and held reconnect stay useful.",
+    "replacementTests": [
+      "RISK offline working ownership: startup binds explicit null and proved browser UID while preserving ambiguous alternatives"
+    ],
+    "preservedCoverage": [
+      "Only additive tests; no preceding assertion, root, fixture, native case, CI assignment, public FAQ or source guard is changed. Complete payload validation, independent hashing, exact raw CAS/readback, original archives, unknown rows and pending rows remain protected.",
+      "Eleven actual loadApp/raw-IDB startup cases cover null ownership, absent provenance, complete browser owner/UID, missing browser owner or UID, same-email different-UID groups, conflicting foreign task IDs, reversed source keys and nonauthoritative browser store values. Separate new work retains accepted Add/save/cold reopen and does not publish over unseen cloud work. Empty-string ownership cannot alias explicit unsigned ownership during compatibility filtering.",
+      "The existing offline local-intent, working-head lifecycle, reconnect ACK, explicit Restore, bounded startup and memory-only recovery contracts stay unchanged. Parent connection epoch handling and earliest independent-cloud preflight are untouched; no native, live, full-suite or CI acceptance is claimed by these Node cases."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/offline-working-repair/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/ios-page-failure-20261024/database/offline-working/ownership/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern '^RISK offline working ownership:' tests.js. Exact C1 original RED52f75f00; additional incomplete browser ownership proof RED43b874f3 occurred after first narrow fix and before its ownerProved guard. Self-review edge RED53f40790 exposed empty-string owner conflation before a local strict nullish owner comparison; final focused GREENa1e138d0 passes all eleven scenarios and root.",
+      "failure": "Original exact-C1 RED: seven of eight scenarios adopted foreign-provenance (true instead of false), while reversed-key positive control passed. The later two new missing-browser-owner/UID cases failed supported-source instead of new-work before the narrow proof guard. Full original raw archive checks passed before ownership assertions. Final focused GREEN1c6dee4a passes all ten scenarios and root, including unresolved reconnect preservation. Self-review RED53f40790: an empty-string owner beside an explicit-null head merged foreign-provenance through the legacy truthy owner comparison; strict local owner equality repairs it without changing the shared owner helper."
+    }
+  },
+  {
     "baseCommit": "f6d1da402787162d17b635b00044c881b97929b7",
     "testChangesSha256": "4ac582a624fd06be70ac16a7849ff0f30cdd2a82011c5f7641906cd0ed365454",
     "reason": "Implement the explicitly authorized protected offline working recovery and new-work workspace, keeping the actual app startup, native Add/Done/Undo, cold reopen, raw IndexedDB, and extracted backend consumer seams. Migrate only obsolete unusable-placeholder expectations; original bytes and manual raw-CAS authority remain protected.",
