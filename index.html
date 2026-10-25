@@ -7182,7 +7182,13 @@ const taskActionOwnerBundle=(()=>{
       :captureRatingObservation(kind,[task.id]);
     observation.at=actionAt;
     pushUndo();
-    if(modeOnStart)state.mode=modeOnStart;
+    if(modeOnStart){
+      const beforeMode=state.mode;
+      state.mode=modeOnStart;
+      // The explicit WOOP dot also pauses scanning. Keep that choice in the
+      // same action so projection and Undo cannot separate it from the dot.
+      recordCurrentScannerMode(choiceGesture,beforeMode);
+    }
     const resting=action==="return"&&task.evergreen&&task.lastDoneAt&&Date.now()<evergreenUntil(task);
     if(draft){
       applyEditorDraft(task,draft);
