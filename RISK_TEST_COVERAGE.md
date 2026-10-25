@@ -2221,3 +2221,13 @@ Protect actual automatic recovery, manual source review, exact protected copies 
 
 - RISK cloud recovery memory: retained saved copies leave automatic checks and manual review usable in a bounded heap
 - RISK cloud recovery memory guidance: mounted FAQ and changelog explain lower memory use and retained originals
+
+## Device-read diagnostic distinctions
+
+- RISK recovery device diagnostics: terminal transaction and synchronous request errors survive Review and Copy
+
+- RISK recovery device diagnostics: copied report distinguishes failed reads and replacement connections without private text
+- RISK recovery device diagnostics: FAQ explains read categories without claiming a repair
+- RISK support diagnostics: event retention and malformed observer input stay bounded and redacted
+
+The real Sync → Review action and Copy debug log consumer distinguish failed pending-upload, recovery-hold and head reads, fixed exception categories and temporary connection aliases. Repeated failures still stop after the existing one recheck. Exact device/cloud originals, unfinished drafts, source-selection guards and the 24 KiB report/512-byte event limits stay intact. Arbitrary error messages, paths, account identifiers, out-of-range aliases, extra fields and changing/throwing getters cannot enter the copied report. The current physical-phone failure remains unreproduced; these diagnostics do not repair data or establish its cause.

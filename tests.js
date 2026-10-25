@@ -25,7 +25,7 @@ function test(...args){
  });
 }
 
-async function injectRecoveryDatabaseFailure187(t,app,{key='pending:owner',failAt=[1],errorName='UnknownError',beforeRequest=false,untilReopened=false,onFailure=()=>{}}={}){
+async function injectRecoveryDatabaseFailure187(t,app,{key='pending:owner',failAt=[1],errorName='UnknownError',errorMessage='An internal error was encountered in the Indexed Database server',beforeRequest=false,untilReopened=false,onFailure=()=>{}}={}){
  const {IDBDatabase}=await import('fake-indexeddb'),originalTransaction=IDBDatabase.prototype.transaction;
  const observed={reads:0,failures:0};let failedConnection=null;
  // Inject a browser database-server abort after a native request succeeds.
@@ -43,7 +43,7 @@ async function injectRecoveryDatabaseFailure187(t,app,{key='pending:owner',failA
       observed.failures++;
       if(untilReopened)failedConnection=connection;
       (trigger??request).addEventListener('success',()=>{
-       Object.defineProperty(tx,'error',{configurable:true,value:Object.assign(Error('An internal error was encountered in the Indexed Database server'),{name:errorName})});
+       Object.defineProperty(tx,'error',{configurable:true,value:Object.assign(Error(errorMessage),{name:errorName})});
        onFailure();
        tx.abort();
       },{once:true});
@@ -58,6 +58,81 @@ async function injectRecoveryDatabaseFailure187(t,app,{key='pending:owner',failA
  t.after(()=>{IDBDatabase.prototype.transaction=originalTransaction;});
  return observed;
 }
+
+test('RISK recovery device diagnostics: copied report distinguishes failed reads and replacement connections without private text',async t=>{
+ const cases=[
+  {key:'pending:owner',operation:'pending-upload',errorName:'UnknownError',errorMessage:'Connection to Indexed Database server lost. Refresh the page to try again.',reason:'connection-lost'},
+  {key:'recoveryCloudHold',operation:'recovery-hold',errorName:'InvalidStateError',errorMessage:'The database connection is closing.',reason:'connection-closing'},
+  {key:'head',operation:'head',errorName:'UnknownError',errorMessage:'An internal error was encountered in the Indexed Database server',reason:'internal-server-error'},
+  {key:'head',operation:'head',errorName:'UnknownError',errorMessage:'PRIVATE database path /account-private/test; board title PRIVATE-BOARD',reason:'unknown'}
+ ];
+ for(const options of cases)await t.test(options.operation+' '+options.reason,async sub=>{
+  const app=await freshSourceCheckFixture187(sub,{nativeDeviceConnection:true}),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+  const raw=await store.readRawExportSnapshot(),local=JSON.stringify(ctx.state),cloud=JSON.stringify([...backend.docs]),writes=backend.writes.length;
+  shim.document.getElementById('addInput').value='PRIVATE unfinished diagnostic draft';
+  const fault=await injectRecoveryDatabaseFailure187(sub,app,{...options,failAt:[1,2],untilReopened:true});
+  ctx.onAction('sync',{});assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),false);
+  assert.equal(fault.failures,2,'the existing single recheck remains bounded after replacement also fails');
+  let copied=null;ctx.navigator={clipboard:{async writeText(value){copied=value;}}};
+  assert.equal(await ctx.onAction('copy-support-diagnostics',{}),true);
+  const report=JSON.parse(copied),failures=report.events.filter(event=>event.stage==='device-store'&&event.status==='unavailable'&&event.metadata.deviceOperation===options.operation);
+  assert.equal(failures.length,2,'the copied report identifies both failed device reads instead of only unavailable');
+  for(const failure of failures){assert.equal(failure.metadata.deviceErrorName,options.errorName);assert.equal(failure.metadata.deviceErrorReason,options.reason);assert.ok(Number.isSafeInteger(failure.metadata.deviceConnection)&&failure.metadata.deviceConnection>0);}
+  assert.notEqual(failures[0].metadata.deviceConnection,failures[1].metadata.deviceConnection,'separate newly opened connections remain distinguishable');
+  assert.doesNotMatch(copied,/PRIVATE|Indexed Database server|database connection is closing|pending:owner|e@example/,'only fixed error categories enter the copied report');
+  assert.ok(Buffer.byteLength(copied)<=24*1024);assert.ok(report.events.every(event=>Buffer.byteLength(JSON.stringify(event))<=512));
+  assert.equal(JSON.stringify(ctx.state),local);assert.equal(shim.document.getElementById('addInput').value,'PRIVATE unfinished diagnostic draft');
+  assert.deepEqual(await store.readRawExportSnapshot(),raw);assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal(backend.writes.length,writes);
+ });
+});
+
+test('RISK recovery device diagnostics: terminal transaction and synchronous request errors survive Review and Copy',async t=>{
+ for(const target of ['transaction','pending-upload','recovery-hold','head','head-snapshots'])await t.test(target,async sub=>{
+  const app=await freshSourceCheckFixture187(sub,{nativeDeviceConnection:true}),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+  const raw=await store.readRawExportSnapshot(),local=JSON.stringify(ctx.state),cloud=JSON.stringify([...backend.docs]),writes=backend.writes.length;
+  shim.document.getElementById('addInput').value='PRIVATE unfinished setup-error draft';
+  const {IDBDatabase,IDBObjectStore}=await import('fake-indexeddb');
+  const transaction=IDBDatabase.prototype.transaction,get=IDBObjectStore.prototype.get,getAll=IDBObjectStore.prototype.getAll;
+  let failures=0;
+  const restore=()=>{IDBDatabase.prototype.transaction=transaction;IDBObjectStore.prototype.get=get;IDBObjectStore.prototype.getAll=getAll;};sub.after(restore);
+  IDBDatabase.prototype.transaction=function(names,mode,...args){
+   if(target==='transaction'&&this.name===app.deviceDbName&&mode==='readonly'&&failures<2){
+    failures++;throw Object.assign(Error(failures===1?'The database connection is closing.':'PRIVATE database path'),{name:failures===1?'InvalidStateError':'SecurityError'});
+   }
+   return transaction.call(this,names,mode,...args);
+  };
+  const failRequest=(source,key)=>{
+   const match=target==='head-snapshots'?source.name==='snapshots':source.name==='meta'&&key===({'pending-upload':'pending:owner','recovery-hold':'recoveryCloudHold',head:'head'})[target];
+   if(target!=='transaction'&&!failures&&source.transaction.db.name===app.deviceDbName&&match){failures++;throw Object.assign(Error('The transaction is inactive or finished.'),{name:'TransactionInactiveError'});}
+  };
+  IDBObjectStore.prototype.get=function(key){failRequest(this,key);return get.call(this,key);};
+  IDBObjectStore.prototype.getAll=function(...args){failRequest(this);return getAll.apply(this,args);};
+  ctx.onAction('sync',{});assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),false);
+  assert.equal(failures,target==='transaction'?2:1,'existing retry rules stay bounded');
+  assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="choose-cloud-recovery-source"/);
+  let copied;ctx.navigator={clipboard:{async writeText(value){copied=value;}}};assert.equal(await ctx.onAction('copy-support-diagnostics',{}),true);
+  const operation=target==='head-snapshots'?'head':target,events=JSON.parse(copied).events.filter(e=>e.stage==='device-store'&&e.status==='failed'&&e.metadata.deviceOperation===operation);
+  assert.equal(events.length,failures,'the copied log retains every failed setup attempt, including the terminal replacement connection');
+  assert.equal(events.at(-1).metadata.deviceErrorName,target==='transaction'?'SecurityError':'TransactionInactiveError');
+  assert.equal(events.at(-1).metadata.deviceErrorReason,target==='transaction'?'unknown':'inactive-transaction');
+  if(target==='transaction'){assert.equal(events[0].metadata.deviceErrorName,'InvalidStateError');assert.notEqual(events[0].metadata.deviceConnection,events[1].metadata.deviceConnection);assert.equal(events[1].code.value,'storage-denied');}
+  assert.doesNotMatch(copied,/PRIVATE|pending:owner|e@example/);assert.ok(Buffer.byteLength(copied)<=24*1024);
+  restore();assert.deepEqual(await store.readRawExportSnapshot(),raw);assert.equal(JSON.stringify(ctx.state),local);assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal(backend.writes.length,writes);
+  assert.equal(shim.document.getElementById('addInput').value,'PRIVATE unfinished setup-error draft');
+ });
+});
+
+test('RISK recovery device diagnostics: FAQ explains read categories without claiming a repair',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ await app.ctx.onAction('help',{});
+ const measures=app.shim.document.getElementById('modalRoot').innerHTML.match(/<dt>What does the debug log measure\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
+ assert.match(measures,/which saved-data read failed/i);
+ assert.match(measures,/fixed error categories.*temporary connection numbers/i);
+ assert.match(measures,/does not repair saved data or confirm that recovery succeeded/i);
+ assert.match(app.shim.document.getElementById('modalRoot').innerHTML,/Debug log now distinguishes saved-data read failures and reconnections without including private error text/i);
+ app.ctx.openSettings();assert.match(app.shim.document.getElementById('modalRoot').innerHTML,/data-act="view-support-diagnostics"/);
+});
 
 test('RISK cloud recovery device connection: a failed handle is reopened within the same protected review',async t=>{
  for(const key of ['pending:owner','recoveryCloudHold','head'])for(const errorName of ['UnknownError','InvalidStateError'])await t.test(key+' '+errorName,async t=>{
@@ -43891,6 +43966,16 @@ test('RISK support diagnostics: event retention and malformed observer input sta
  const circular={};circular.self=circular;
  assert.doesNotThrow(()=>ctx.window.__chainSupportDiagnosticsObserve('root',circular,circular,null,circular,circular,circular,circular,circular,circular,circular,circular,circular),
   'circular and otherwise nonserializable observer metadata is discarded without throwing');
+ for(const details of [
+  {deviceOperation:'private-board',deviceErrorName:'owner@example.test',deviceErrorReason:'private-generation-8fd12',deviceConnection:'account-private-8fd12'},
+  {deviceOperation:'head',deviceErrorName:'UnknownError',deviceErrorReason:'unknown',deviceConnection:1000000,message:'private-board',stack:'owner@example.test'},
+  circular,{get deviceOperation(){throw Error('private-board');}}
+ ])assert.doesNotThrow(()=>ctx.window.__chainSupportDiagnosticsObserve('device-store','failed','current',null,null,null,null,null,null,null,null,null,'unavailable',null,null,null,null,details));
+ let operationReads=0;
+ ctx.window.__chainSupportDiagnosticsObserve('device-store','failed','current',null,null,null,null,null,null,null,null,null,'unavailable',null,null,null,null,
+  {get deviceOperation(){return ++operationReads===1?'head':'private-board';}});
+ ctx.window.__chainSupportDiagnosticsObserve('root','completed','current',null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+  {deviceOperation:'head',deviceErrorName:'UnknownError',deviceErrorReason:'unknown',deviceConnection:1});
  const report=ctx.buildSupportDiagnosticsReport(),text=ctx.supportDiagnosticsText();
  assert.ok(report.events.length<=80,'event retention never exceeds 80 entries');
  assert.ok(report.retention.dropped.value>=16,'the report accounts for events dropped at the finite capacity');
@@ -43898,6 +43983,9 @@ test('RISK support diagnostics: event retention and malformed observer input sta
  assert.ok(Buffer.byteLength(text,'utf8')<=24*1024,'the complete report stays below its byte cap');
  assert.ok(report.events.every(event=>event.stage!=='account-private-8fd12'&&event.status!=='account-private-8fd12'),'observer metadata is mapped through fixed stage and status allowlists');
  assert.doesNotMatch(text,/owner@example\\.test|private-generation-8fd12|private-board|account-private-8fd12/,'malformed observer arguments cannot add private strings');
+ const deviceEvents=report.events.filter(event=>event.stage==='device-store');
+ assert.ok(deviceEvents.length>0);assert.ok(deviceEvents.every(event=>event.metadata.deviceConnection===undefined),'out-of-range and nonnumeric connection numbers are discarded');
+ assert.ok(report.events.filter(event=>event.stage!=='device-store').every(event=>event.metadata.deviceOperation===undefined),'device details cannot enter unrelated stages');
  vm.runInContext('Date.now=()=>1000000+60*60*1000+1',ctx);
  const expired=ctx.buildSupportDiagnosticsReport();assert.equal(expired.events.length,0,'events older than the one-hour retention window are removed');
  vm.runInContext('Date.now=()=>NaN',ctx);

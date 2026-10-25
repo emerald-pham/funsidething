@@ -20082,5 +20082,47 @@
       "command": "Exact-base gate command: node scripts/test-first-gate.mjs daa757649f0d0c2e5bd8e7283987b216d26de638; observed failure is recorded in /Users/emeraldpham/Documents/GitHub/funsidething/.git/agent-test-runs/issue-275/integration-gates/02-test-first-gate.txt. Postimplementation sensitivity command: node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/issue-275-readiness/funsidething --evidence-dir /Users/emeraldpham/Documents/GitHub/funsidething/.git/agent-test-runs/issue-275/readiness277/structural-repair --purpose green --summary -- node --test --test-name-pattern=^RISK repository process: nested native fixture output stays isolated at the command boundary$ tests.js.",
       "failure": "No preimplementation RED is claimed for this process contract because it was added after the #277 implementation in response to the observed structural gate failure. The real nested baseline control fails as expected with ENOENT when it inherits a deliberately absent caller output directory, while the isolated child succeeds; evidence is /Users/emeraldpham/Documents/GitHub/funsidething/.git/agent-test-runs/issue-275/readiness277/structural-repair/2026-10-25T14-25-06-693Z-33303408-c195-49f2-a796-617f06d0fec0.stdout.txt. The earlier #276 preimplementation RED remains preserved in its existing rationale entry."
     }
+  },
+  {
+    "baseCommit": "faa5c33da1f2fa29f183dbb778a7367e2e2fde65",
+    "testChangesSha256": "d755805e4ec3542cf20776dac98968dcb125a48f7b585d3847eb30aa43639da3",
+    "reason": "The current phone report collapses failed recovery device reads into unavailable even after a successful reconnect. Add diagnostic distinctions through the actual Review and Copy debug log consumers; the phone cause remains unresolved.",
+    "previousBehavior": "Copied reports identified neither the device read nor the error category or replacement connection. Arbitrary device observer details were not supported.",
+    "intendedBehavior": "The existing bounded metadata-only log reports fixed device operation/error categories and temporary connection aliases, while preserving every source and the existing single recheck. Unknown private text and malformed details remain excluded. FAQ and changelog explicitly describe an investigation improvement, not a repair.",
+    "replacementTests": [
+      "RISK recovery device diagnostics: copied report distinguishes failed reads and replacement connections without private text",
+      "RISK recovery device diagnostics: FAQ explains read categories without claiming a repair"
+    ],
+    "preservedCoverage": [
+      "All existing recovery connection, deadline, cancel, account/authority, source choice and permanent-error assertions remain. The injection helper adds only an optional error-message argument with its previous default preserved. Real device/cloud originals and unfinished drafts are compared after repeated failure and actual report copying.",
+      "The existing malformed-input test gains fixed device-field and changing-getter cases without removing retention, byte caps, clock, circular-object or private-field assertions. The two new fast roots are assigned to core without moving baseline roots or changing group policy.",
+      "No source selection, write replay, schema, cloud mutation, automatic reload, retry count or timeout is changed. Native WebKit stress and overlapping-read probes passed before implementation and are retained as nonreproductions, never claimed as RED or physical-device repair."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red --summary -- node --test --test-name-pattern \"^RISK recovery device diagnostics\" tests.js; separate fixed observer privacy control used ^RISK support diagnostics: event retention. Immutable records under /Users/emeraldpham/.codex/task-artifacts/recovery-read-followup-20261025/runs: 7c3bc6c6, 0f546b76 and c9ebbf8a.",
+      "failure": "7c3bc6c6 failed before diagnostic runtime edits: copied report had 0 labeled failed device reads instead of 2 in all four real Review/Copy cases. 0f546b76 failed the mounted FAQ category assertion before copy edits. Later development GREENs 9e376a68 and 50165eec exposed a test fixture incorrectly expecting the extended FAQ/changelog directly in Settings; the existing Help template route was restored and 1cf82aa0 passed 94 cases. c9ebbf8a failed private-string exclusion on a changing getter in the draft observer before snapshotting details once. Final focused GREEN f71bba4d passed. None reproduces or claims to fix the remaining phone failure."
+    }
+  },
+  {
+    "baseCommit": "faa5c33da1f2fa29f183dbb778a7367e2e2fde65",
+    "testChangesSha256": "07bc3909700f6b123b73937d6e9f1f5facd5a15f3cfe58d65bda650ea1ec61f2",
+    "reason": "The current phone report collapses failed recovery device reads into unavailable even after a successful reconnect. Add diagnostic distinctions through the actual Review and Copy debug log consumers; the phone cause remains unresolved. Independent specialist review found two further missing diagnostic observations; permanent Review/Copy tests cover terminal transaction creation and synchronous request setup.",
+    "previousBehavior": "Copied reports identified neither the device read nor the error category or replacement connection. Arbitrary device observer details were not supported.",
+    "intendedBehavior": "The existing bounded metadata-only log reports fixed device operation/error categories and temporary connection aliases, while preserving every source and the existing single recheck. Unknown private text and malformed details remain excluded. FAQ and changelog explicitly describe an investigation improvement, not a repair.",
+    "replacementTests": [
+      "RISK recovery device diagnostics: copied report distinguishes failed reads and replacement connections without private text",
+      "RISK recovery device diagnostics: FAQ explains read categories without claiming a repair",
+      "RISK recovery device diagnostics: terminal transaction and synchronous request errors survive Review and Copy"
+    ],
+    "preservedCoverage": [
+      "All existing recovery connection, deadline, cancel, account/authority, source choice and permanent-error assertions remain. The injection helper adds only an optional error-message argument with its previous default preserved. Real device/cloud originals and unfinished drafts are compared after repeated failure and actual report copying.",
+      "The existing malformed-input test gains fixed device-field and changing-getter cases without removing retention, byte caps, clock, circular-object or private-field assertions. The two new fast roots are assigned to core without moving baseline roots or changing group policy.",
+      "No source selection, write replay, schema, cloud mutation, automatic reload, retry count or timeout is changed. Native WebKit stress and overlapping-read probes passed before implementation and are retained as nonreproductions, never claimed as RED or physical-device repair.",
+      "New five-case native-boundary consumer test preserves exact device/cloud sources and unfinished draft, asserts no source choices and existing failure attempt counts. Added runtime catches only observe and rethrow; no new retry, write or connection retirement."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red --summary -- node --test --test-name-pattern \"^RISK recovery device diagnostics\" tests.js; separate fixed observer privacy control used ^RISK support diagnostics: event retention. Immutable records under /Users/emeraldpham/.codex/task-artifacts/recovery-read-followup-20261025/runs: 7c3bc6c6, 0f546b76 and c9ebbf8a.",
+      "failure": "7c3bc6c6 failed before diagnostic runtime edits: copied report had 0 labeled failed device reads instead of 2 in all four real Review/Copy cases. 0f546b76 failed the mounted FAQ category assertion before copy edits. Later development GREENs 9e376a68 and 50165eec exposed a test fixture incorrectly expecting the extended FAQ/changelog directly in Settings; the existing Help template route was restored and 1cf82aa0 passed 94 cases. c9ebbf8a failed private-string exclusion on a changing getter in the draft observer before snapshotting details once. Final focused GREEN f71bba4d passed. None reproduces or claims to fix the remaining phone failure. Specialist finding confirmation4eabe42d failed five actual Review/Copy subcases before repair: terminal transaction observation1 versus2, synchronous pending/hold/head/snapshot setup observations0 versus1. Original specialist external probe5a13f5d0 remains distinct from this permanent consumer RED."
+    }
   }
 ]

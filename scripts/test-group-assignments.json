@@ -12671,6 +12671,21 @@
       "root": "RISK cloud recovery reconnect guidance: mounted help explains reconnecting without replacing saved data",
       "group": "core",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK recovery device diagnostics: copied report distinguishes failed reads and replacement connections without private text",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK recovery device diagnostics: FAQ explains read categories without claiming a repair",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK recovery device diagnostics: terminal transaction and synchronous request errors survive Review and Copy",
+      "group": "core",
+      "file": "tests.js"
     }
   ],
   "processControls": [
