@@ -12686,6 +12686,61 @@
       "root": "RISK recovery device diagnostics: terminal transaction and synchronous request errors survive Review and Copy",
       "group": "core",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK JSON COPY PASTE: the current-board viewer copies its exact displayed JSON without saving",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK JSON COPY PASTE: Quick start explains the copy button, manual fallback and guarded paste",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK DATABASE REPAIR EXPORT: the Settings copy includes exact saved sources and repair metadata without writes",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK DATABASE REPAIR EXPORT: unreadable storage produces a labeled partial package with available board and diagnostics",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK DATABASE REPAIR EXPORT: visible Debug log controls use the combined repair export",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK DATABASE REPAIR EXPORT: readonly capture keeps original diagnostic storage even when old entries expire",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK DATABASE REPAIR EXPORT: available worker and cache identities are captured without diagnostic writes",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK DATABASE REPAIR EXPORT: a cancelled capture cannot replace a newer pasted draft",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK DATABASE REPAIR EXPORT: a damaged saved source is retained without inventing a current board",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK DATABASE REPAIR EXPORT: FAQ explains the included database, diagnostics and partial-report limits",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK DATABASE REPAIR EXPORT: reload help routes users to the combined export after standalone log exporters are removed",
+      "group": "core",
+      "file": "tests.js"
     }
   ],
   "processControls": [

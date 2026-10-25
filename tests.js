@@ -19434,6 +19434,232 @@ test('SETTINGS: manual local backups replace visible JSON import and export cont
   assert.match(html,/title="Settings, contexts, and backups"/);
 });
 
+test('RISK JSON COPY PASTE: the current-board viewer copies its exact displayed JSON without saving',async t=>{
+  const storage=sharedScannerStorage(),app=await loadApp({sharedStorage:storage}),{ctx,shim}=app;
+  t.after(()=>app.dispose());
+  const task=ctx.addTask('Copy <board> & keep 🌿');await ctx.persist();
+  task.futureCopyField={keep:'unknown value'};ctx.state.futureCopyBoardField={retain:true};
+  const before=JSON.stringify(ctx.state),saved=storage.getItem(SYNC_STORE_KEY),writes=[];
+  const set=storage.setItem.bind(storage);storage.setItem=(key,value)=>{writes.push(key);return set(key,value);};
+  ctx.openSettings();await ctx.onAction('view-current-board',{});
+  const markup=shim.document.getElementById('modalRoot').innerHTML;
+  const copy=markup.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>Copy JSON<\/button>/);
+  assert.ok(copy,'the actual current-board viewer offers a clipboard Copy JSON action');
+  const shown=markup.match(/<textarea\b[^>]*id="currentBoardData"[^>]*>([\s\S]*?)<\/textarea>/)?.[1];
+  assert.ok(shown,'the complete readonly JSON remains visible');
+  const raw=shown.replaceAll('&quot;','"').replaceAll('&#39;',"'").replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&amp;','&');
+  shim.document.getElementById('currentBoardData').value=raw;
+  let copied=null;ctx.navigator={clipboard:{async writeText(value){copied=value;}}};
+  assert.equal(await ctx.onAction(copy[1],{}),true);
+  assert.equal(copied,raw,'the copy gesture uses the visible snapshot');
+  const board=JSON.parse(copied);
+  assert.equal(board.tasks.find(row=>row.id===task.id).futureCopyField.keep,'unknown value');
+  assert.equal(board.futureCopyBoardField.retain,true);
+  assert.equal(JSON.stringify(ctx.state),before,'copy leaves accepted unsaved fields untouched');
+  assert.equal(storage.getItem(SYNC_STORE_KEY),saved,'copy does not save accepted unsaved fields');
+  assert.deepEqual(writes,[],'copy does not write browser storage');
+  const area=shim.document.getElementById('currentBoardData');let selected=0;
+  area.select=()=>selected++;
+  for(const clipboard of [undefined,{async writeText(){throw Error('denied');}}]){
+    ctx.navigator={clipboard};
+    assert.equal(await ctx.onAction(copy[1],{}),false,'unavailable clipboard access is recoverable');
+    assert.equal(area.value,raw,'the exact snapshot remains available for manual copying');
+    assert.match(shim.document.getElementById('modalRoot').innerHTML,/currentBoardData/);
+    assert.match(shim.document.getElementById('toast').textContent,/select.*copy/i);
+  }
+  assert.equal(selected,2,'both denied and missing clipboard APIs select the visible JSON');
+  assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(writes,[]);
+  const {IDBFactory}=await import('fake-indexeddb');
+  const destination=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'json-copy-paste-'+Date.now()});
+  t.after(()=>destination.dispose());
+  const target=destination.ctx,dom=destination.shim;
+  target.addTask('Board before pasted restore',false);await prepareBackupFileFixtureSource(destination);
+  const original=JSON.stringify(target.state),originalHead=await target.window.ScannerDeviceStore.readHead();
+  target.openSettings();dom.document.getElementById('backupRestoreSource').value='paste';
+  await target.onAction('restore-backup',{});
+  const pasted=dom.document.getElementById('jsonBox');pasted.id='jsonBox';pasted.value=copied;
+  dom.document.dispatchEvent({type:'input',target:pasted});
+  assert.equal(await target.onAction('preview-pasted-recovery',{}),true,dom.document.getElementById('toast').textContent);
+  assert.match(dom.document.getElementById('modalRoot').innerHTML,/confirm-file-restore/);
+  assert.equal(JSON.stringify(target.state),original,'pasting reaches a preview without replacing the board');
+  assert.equal((await target.window.ScannerDeviceStore.readHead()).hash,originalHead.hash);
+  await target.onAction('cancel-file-restore',{});
+  assert.equal(dom.document.getElementById('jsonBox').value,copied,'Cancel retains the exact copied text');
+  assert.equal(JSON.stringify(target.state),original);
+  assert.equal(await target.onAction('preview-pasted-recovery',{}),true);
+  assert.equal(await target.onAction('confirm-file-restore',{}),true);
+  assert.equal(target.state.tasks.find(row=>row.id===task.id).futureCopyField.keep,'unknown value');
+  const durable=JSON.parse((await target.window.ScannerDeviceStore.readHead()).payload);
+  assert.equal(durable.futureCopyBoardField.retain,true,'confirmed round-trip retains unknown board data durably');
+  assert.ok((await target.window.ScannerDeviceStore.listBackups()).some(row=>row.payload===original),'the displaced board remains protected');
+});
+
+test('RISK JSON COPY PASTE: Quick start explains the copy button, manual fallback and guarded paste',async t=>{
+  const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();
+  const help=app.shim.document.getElementById('modalRoot').innerHTML;
+  const answer=help.match(/<dt>How do I copy and paste JSON\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
+  assert.ok(answer,'Quick start includes the JSON copy and paste workflow');
+  assert.match(answer,/View \/ copy current board.*Copy JSON/);
+  assert.match(answer,/does not copy local backups or recovery sources/i);
+  assert.match(answer,/Select all.*manually/i);
+  assert.match(answer,/Restore.*Paste JSON.*preview.*confirm/i);
+  assert.match(answer,/accepted.*unsaved|may not have saved/i);
+  assert.match(answer,/not.*Debug log/i);
+});
+
+test('RISK DATABASE REPAIR EXPORT: the Settings copy includes exact saved sources and repair metadata without writes',async t=>{
+  const {IDBFactory}=await import('fake-indexeddb');
+  const dbName='database-repair-copy-'+Date.now(),app=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:dbName}),{ctx,shim}=app;
+  t.after(()=>app.dispose());ctx.addTask('Database repair task',false);await prepareBackupFileFixtureSource(app);
+  ctx.state.tasks[0].futureRepairField={keep:'unknown 🌿'};
+  const store=ctx.window.ScannerDeviceStore,account='repair-copy@example.test';
+  await store.setPendingUpload(account,{generationId:'repair-pending-not-replayed',payloadHash:'b'.repeat(64),baseRev:4,updatedAt:1});
+  const head=await store.readHead();await store.putBackup({expectedHash:head.hash,backup:{id:'repair-manual-original',kind:'manual',day:'2026-10-25',at:1,payload:'{"unknownOriginal":"keep exact"}'}});
+  const before=JSON.stringify(await store.readRawExportSnapshot()),boardBefore=JSON.stringify(ctx.state);
+  ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
+  const view=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>View \/ copy database for repair<\/button>/);
+  assert.ok(view,'Settings exposes one combined database and repair export');
+  assert.equal(await ctx.onAction(view[1],{}),true);
+  const markup=shim.document.getElementById('modalRoot').innerHTML;
+  const shown=markup.match(/<textarea\b[^>]*id="databaseRepairData"[^>]*>([\s\S]*?)<\/textarea>/)?.[1];assert.ok(shown);
+  const raw=shown.replaceAll('&quot;','"').replaceAll('&#39;',"'").replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&amp;','&');
+  shim.document.getElementById('databaseRepairData').value=raw;
+  const copy=markup.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>Copy JSON<\/button>/);assert.ok(copy);
+  let copied=null;ctx.navigator={clipboard:{async writeText(value){copied=value;}}};assert.equal(await ctx.onAction(copy[1],{}),true);assert.equal(copied,raw);
+  const exported=JSON.parse(copied);assert.equal(exported.format,'chain-scanner.recovery-archive');assert.equal(exported.formatVersion,1);assert.equal(exported.manifest.status,'complete');
+  assert.equal(exported.currentBoard.tasks[0].futureRepairField.keep,'unknown 🌿');
+  assert.ok(copied.includes('repair-pending-not-replayed')&&copied.includes('repair-manual-original'),'the database sources accompany the open board');
+  assert.equal(exported.appSources.indexedDB.stores.meta.find(row=>decodeManualArchiveTypedValue(row.key)==='head').value.type,'object');
+  const log=exported.repairInfo.debugLog;assert.equal(log.schema,'funsidething.support-diagnostics');assert.equal(log.metadataOnly,true);assert.equal(log.boardDataIncluded,false);
+  assert.match(copied,/appFingerprint|fingerprint|cacheName|build/i,'the package includes available build and worker observations');
+  assert.equal(exported.appSources.indexedDB.database,dbName);assert.equal(exported.manifest.sources.indexedDB.schemaVersion,2);
+  assert.equal(JSON.stringify(await store.readRawExportSnapshot()),before);assert.equal(JSON.stringify(ctx.state),boardBefore,'repair export is read-only');
+  const {ctx:target,shim:dom,...destination}=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'repair-copy-restore-'+Date.now()});
+  t.after(()=>destination.dispose());target.addTask('Before repair-file restore',false);await prepareBackupFileFixtureSource(target);
+  const original=JSON.stringify(target.state);target.openSettings();dom.document.getElementById('backupRestoreSource').value='paste';await target.onAction('restore-backup',{});
+  const box=dom.document.getElementById('jsonBox');box.id='jsonBox';box.value=copied;dom.document.dispatchEvent({type:'input',target:box});
+  assert.equal(await target.onAction('preview-pasted-recovery',{}),true,dom.document.getElementById('toast').textContent);assert.equal(JSON.stringify(target.state),original);
+  assert.equal(await target.onAction('confirm-file-restore',{}),true);assert.equal(target.state.tasks[0].futureRepairField.keep,'unknown 🌿');
+  assert.equal(await target.window.ScannerDeviceStore.getPendingUpload(account),null,'restoring the current board never replays archived pending work');
+  assert.ok((await target.window.ScannerDeviceStore.listBackups()).some(row=>row.kind==='restore-file-source'&&Buffer.from(row.restoreFile?.bytesBase64||'','base64').toString('utf8')===copied),'the exact package remains protected for repair');
+});
+
+test('RISK DATABASE REPAIR EXPORT: unreadable storage produces a labeled partial package with available board and diagnostics',async t=>{
+  const {IDBFactory,IDBDatabase}=await import('fake-indexeddb');
+  for(const failure of ['no device database','database read failure','one local source unreadable'])await t.test(failure,async subtest=>{
+    const storage=sharedScannerStorage(),dbName='partial-repair-'+failure+'-'+Date.now();
+    const app=await loadApp({sharedStorage:storage,...(failure==='no device database'?{}:{indexedDBProvider:new IDBFactory(),deviceDbName:dbName})}),{ctx,shim}=app;
+    subtest.after(()=>app.dispose());ctx.addTask('Available accepted repair board',false);await ctx.persist();
+    const before=JSON.stringify(ctx.state),transaction=IDBDatabase.prototype.transaction,get=storage.getItem;
+    if(failure==='database read failure')IDBDatabase.prototype.transaction=function(names,mode,...args){if(this.name===dbName&&mode==='readonly')throw Object.assign(Error('private-os-error-not-for-export'),{name:'UnknownError'});return transaction.call(this,names,mode,...args);};
+    if(failure==='one local source unreadable')storage.getItem=key=>{if(key==='fvp:chain-scanner:daily-backups:v1')throw Error('private-local-error-not-for-export');return get(key);};
+    try{
+      ctx.openSettings();assert.equal(await ctx.onAction('view-database-repair',{}),true,'the repair export stays usable when a database source cannot be read');
+      const markup=shim.document.getElementById('modalRoot').innerHTML;assert.match(markup,/partial repair export/i);
+      const shown=markup.match(/<textarea\b[^>]*id="databaseRepairData"[^>]*>([\s\S]*?)<\/textarea>/)?.[1];assert.ok(shown);
+      const raw=shown.replaceAll('&quot;','"').replaceAll('&#39;',"'").replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&amp;','&');
+      const report=JSON.parse(raw);assert.equal(report.manifest.status,'partial');assert.ok(report.manifest.failures.length);
+      assert.equal(report.currentBoard.tasks[0].title,'Available accepted repair board');assert.equal(report.repairInfo.debugLog.metadataOnly,true);
+      assert.ok(report.appSources.localStorage.some(row=>row.status==='present'&&typeof row.raw==='string'),'other readable local sources are retained');
+      if(failure==='one local source unreadable')assert.equal(report.manifest.sources.localStorage['fvp:chain-scanner:daily-backups:v1'].status,'unavailable');
+      else{assert.equal(report.manifest.sources.indexedDB.status,'unavailable');assert.equal(report.appSources.indexedDB.stores,null,'unreadable storage is never represented as an empty database');}
+      assert.doesNotMatch(raw,/private-(?:os|local)-error-not-for-export/,'arbitrary exception text is excluded from repair diagnostics');
+      assert.equal(JSON.stringify(ctx.state),before,'an incomplete export cannot replace accepted work');
+      IDBDatabase.prototype.transaction=transaction;storage.getItem=get;
+      shim.document.getElementById('databaseRepairData').value=raw;let copied;ctx.navigator={clipboard:{async writeText(value){copied=value;}}};
+      assert.equal(await ctx.onAction('copy-database-repair',{}),true);assert.equal(copied,raw);
+      ctx.openSettings();shim.document.getElementById('backupRestoreSource').value='paste';await ctx.onAction('restore-backup',{});
+      const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=copied;shim.document.dispatchEvent({type:'input',target:box});
+      assert.equal(await ctx.onAction('preview-pasted-recovery',{}),false,'a partial diagnostic package cannot be restored as a complete backup');
+      assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="confirm-file-restore"/);assert.equal(JSON.stringify(ctx.state),before);
+    }finally{IDBDatabase.prototype.transaction=transaction;storage.getItem=get;}
+  });
+});
+
+test('RISK DATABASE REPAIR EXPORT: visible Debug log controls use the combined repair export',async t=>{
+  const app=await loadApp();t.after(()=>app.dispose());const {ctx,shim}=app;
+  ctx.openSettings();let markup=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(markup,/data-act="view-database-repair"/);
+  assert.doesNotMatch(markup,/data-act="(?:copy|download)-support-diagnostics"/,'Settings has no redundant standalone Debug log exporters');
+  await ctx.onAction('view-support-diagnostics',{});markup=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(markup,/data-act="view-database-repair"/,'quick log inspection links to the same combined exporter');
+  assert.doesNotMatch(markup,/data-act="(?:copy|download)-support-diagnostics"/);
+  assert.match(markup,/data-act="select-support-diagnostics"/,'the log remains manually selectable for quick inspection');
+});
+
+test('RISK DATABASE REPAIR EXPORT: readonly capture keeps original diagnostic storage even when old entries expire',async t=>{
+  const storage=sharedScannerStorage(),app=await loadApp({sharedStorage:storage}),{ctx,shim}=app;t.after(()=>app.dispose());
+  ctx.addTask('Read-only repair capture',false);await ctx.persist();ctx.openSettings();
+  const key='fvp:chain-scanner:restart-diagnostics:v1',original=JSON.stringify({version:1,documents:[{document:'1234567890abcdef',navigationType:'reload',events:[{at:Date.now()-2*60*60*1000,stage:'boot'}]}]});
+  storage.setItem(key,original);const writes=[],set=storage.setItem.bind(storage),remove=storage.removeItem.bind(storage);
+  storage.setItem=(...args)=>{writes.push(['set',args[0]]);return set(...args);};storage.removeItem=(...args)=>{writes.push(['remove',args[0]]);return remove(...args);};
+  assert.equal(await ctx.onAction('view-database-repair',{}),true);
+  assert.equal(storage.getItem(key),original,'diagnostic retention filtering must not rewrite original storage during database export');
+  assert.deepEqual(writes,[],'repair capture performs no browser-storage writes');
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/databaseRepairData/);
+});
+
+test('RISK DATABASE REPAIR EXPORT: available worker and cache identities are captured without diagnostic writes',async t=>{
+  const {MessageChannel}=await import('node:worker_threads'),storage=sharedScannerStorage(),fingerprint='c'.repeat(64),worker={postMessage(message,ports){ports[0].postMessage({type:message.type,cacheName:'chain-scanner-shell-'+fingerprint});}};
+  const app=await loadApp({sharedStorage:storage,navigatorProvider:{serviceWorker:{controller:worker,addEventListener(){},async register(){return {active:worker,addEventListener(){}};},async getRegistration(){return {active:worker};}}}}),{ctx,shim}=app;t.after(()=>app.dispose());
+  ctx.MessageChannel=MessageChannel;ctx.caches={async keys(){return ['chain-scanner-shell-'+fingerprint];}};
+  ctx.openSettings();const writes=[],set=storage.setItem.bind(storage),remove=storage.removeItem.bind(storage);
+  storage.setItem=(...args)=>{writes.push(['set',args[0]]);return set(...args);};storage.removeItem=(...args)=>{writes.push(['remove',args[0]]);return remove(...args);};
+  assert.equal(await ctx.onAction('view-database-repair',{}),true);
+  const shown=shim.document.getElementById('modalRoot').innerHTML.match(/<textarea\b[^>]*id="databaseRepairData"[^>]*>([\s\S]*?)<\/textarea>/)?.[1];assert.ok(shown);
+  const report=JSON.parse(shown.replaceAll('&quot;','"').replaceAll('&#39;',"'").replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&amp;','&'));
+  assert.equal(report.repairInfo.debugLog.serviceWorker.active.value,fingerprint,'the combined export captures available worker identity without first opening Debug log');
+  assert.ok(report.repairInfo.debugLog.serviceWorker.cacheShellKeys.value.includes(fingerprint));
+  assert.deepEqual(writes,[],'repair observations do not append diagnostic events to storage');
+});
+
+test('RISK DATABASE REPAIR EXPORT: a cancelled capture cannot replace a newer pasted draft',async t=>{
+  const {IDBFactory}=await import('fake-indexeddb');
+  const app=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'repair-capture-cancel-'+Date.now()}),{ctx,shim}=app;t.after(()=>app.dispose());
+  ctx.addTask('Retained during repair capture',false);await prepareBackupFileFixtureSource(app);const before=JSON.stringify(ctx.state);
+  ctx.openSettings();const source=makeFakeElement();source.isConnected=true;
+  const operation=ctx.onAction('view-database-repair',source);
+  await ctx.onAction('close-modal',{});source.isConnected=false;ctx.openSettings();await ctx.onAction('open-paste-recovery',{});
+  const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value='newer unfinished pasted JSON';shim.document.dispatchEvent({type:'input',target:box});
+  assert.equal(await operation,false,'leaving the initiating view cancels its late continuation');
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="jsonBox"/);assert.equal(box.value,'newer unfinished pasted JSON');assert.equal(JSON.stringify(ctx.state),before);
+  await ctx.onAction('close-paste-recovery',{});ctx.openSettings();
+  const live=makeFakeElement();live.isConnected=true;
+  const older=ctx.onAction('view-database-repair',live),newer=ctx.onAction('view-database-repair',live);
+  assert.deepEqual(await Promise.all([older,newer]),[false,true],'only the latest overlapping export may install its viewer');
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/databaseRepairData/);assert.equal(JSON.stringify(ctx.state),before);
+});
+
+test('RISK DATABASE REPAIR EXPORT: a damaged saved source is retained without inventing a current board',async t=>{
+  const {IDBFactory}=await import('fake-indexeddb'),original='{"tasks":[{"id":"broken-repair-original"}';
+  const app=await loadApp({indexedDBProvider:new IDBFactory(),deviceDbName:'repair-no-board-'+Date.now(),seedStorage:{[SYNC_STORE_KEY]:original}}),{ctx,shim}=app;t.after(()=>app.dispose());
+  const store=ctx.window.ScannerDeviceStore,before=JSON.stringify(await store.readRawExportSnapshot());ctx.openSettings();
+  assert.equal(await ctx.onAction('view-database-repair',{}),true);
+  const markup=shim.document.getElementById('modalRoot').innerHTML,shown=markup.match(/<textarea\b[^>]*id="databaseRepairData"[^>]*>([\s\S]*?)<\/textarea>/)?.[1];assert.ok(shown);
+  const report=JSON.parse(shown.replaceAll('&quot;','"').replaceAll('&#39;',"'").replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&amp;','&'));
+  assert.equal(report.manifest.status,'partial');assert.equal(report.currentBoard,null);assert.equal(report.manifest.sources.currentBoard.status,'unavailable');
+  assert.ok(report.appSources.localStorage.some(row=>row.raw===original),'the exact damaged original remains available for repair');
+  assert.equal(JSON.stringify(await store.readRawExportSnapshot()),before,'source-only repair export changes no saved database row');
+});
+
+test('RISK DATABASE REPAIR EXPORT: FAQ explains the included database, diagnostics and partial-report limits',async t=>{
+  const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();const help=app.shim.document.getElementById('modalRoot').innerHTML;
+  const answer=help.match(/<dt>What does the database repair export contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.ok(answer);
+  assert.match(answer,/current board.*saved.*sources.*Debug log/i);assert.match(answer,/build.*storage|storage.*build/i);
+  assert.match(answer,/partial.*cannot.*restore/i);assert.match(answer,/only.*current board.*pending.*never replayed/i);
+  assert.match(answer,/read.only|never saves or syncs/i);assert.match(answer,/Select all/);
+  const log=help.match(/<dt>What does the debug log contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
+  assert.doesNotMatch(log,/copy, or download the report/,'the FAQ no longer advertises removed standalone exporters');
+  assert.match(log,/Database repair export/);
+});
+
+test('RISK DATABASE REPAIR EXPORT: reload help routes users to the combined export after standalone log exporters are removed',async t=>{
+  const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();const help=app.shim.document.getElementById('modalRoot').innerHTML;
+  assert.doesNotMatch(help,/Copy debug log|Download debug log/,'no FAQ advertises a removed standalone export control');
+  const reload=help.match(/<dt>Why did the app reload\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.ok(reload);
+  assert.match(reload,/View \/ copy database for repair/);assert.match(reload,/partial|unreadable/i);
+});
+
 test('RISK RECOVERY EXPORT: an unsaved in-memory board remains copyable without device storage',async()=>{
   const storage=sharedScannerStorage();
   const {ctx,shim}=await loadApp({sharedStorage:storage});
@@ -43233,7 +43459,7 @@ test('RISK support diagnostics: Settings names the existing board export for its
  assert.ok(faq,'the extended FAQ describes the separate report');
  assert.match(faq,/local metadata report/i);assert.match(faq,/never includes task or recovery-source contents, account IDs, paths, cached app bodies, or arbitrary error text/i);
  assert.match(faq,/does not start a cloud read or change saved data/i);assert.match(faq,/clears an idle, unverified source-review preview/i);
- assert.match(faq,/During an accepted source save, you can view, select, copy, or download the report inside the existing recovery preview/i);
+ assert.match(faq,/During an accepted source save, you can view and select the report inside the existing recovery preview/i);
  assert.match(faq,/never cancels that publication/i);assert.match(faq,/never uploaded/i);assert.match(faq,/does not create a board backup/i);
  const measures=help.match(/<dt>What does the debug log measure\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
  assert.match(measures,/effective cloud-read deadline/i);assert.match(measures,/Recovery-copy availability and matching reflect existing checks only/i);
@@ -43245,7 +43471,7 @@ test('RISK debug log: FAQ distinguishes an idle preview from accepted recovery v
  const faq=app.shim.document.getElementById('modalRoot').innerHTML.match(/<dt>What does the debug log contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
  assert.match(faq,/clears an idle, unverified source-review preview/i);
  assert.match(faq,/accepted recovery action is being verified.*log also opens inline.*leaves that work running/i);
- assert.match(faq,/During an accepted source save, you can view, select, copy, or download the report inside the existing recovery preview/i);
+ assert.match(faq,/During an accepted source save, you can view and select the report inside the existing recovery preview/i);
 });
 
 test('RISK debug log: shared storage capacity belongs to accepted board saves before diagnostics',async t=>{
@@ -43396,7 +43622,7 @@ test('RISK debug log: the replacement screen copies a unified log without a down
  let copied=null;const app=await loadApp({navigatorProvider:{clipboard:{async writeText(text){copied=text;}}}}),{ctx,shim}=app;t.after(()=>app.dispose());
  ctx.openSettings();let modal=shim.document.getElementById('modalRoot').innerHTML;
  assert.match(modal,/<h3>Debug log<\/h3>/,'Settings replaces the old debugger with the unified log');
- assert.doesNotMatch(modal,/<h3>Support diagnostics<\/h3>/);assert.match(modal,/Copy debug log/);
+ assert.doesNotMatch(modal,/<h3>Support diagnostics<\/h3>/);assert.match(modal,/View \/ copy database for repair/);
  assert.equal(await ctx.onAction('view-support-diagnostics',{}),true);modal=shim.document.getElementById('modalRoot').innerHTML;
  assert.match(modal,/<h2>Debug log<\/h2>/);assert.match(modal,/readonly aria-label="Debug log"/,'manual copy remains available without a clipboard API');
  assert.equal(await ctx.onAction('copy-support-diagnostics',{}),true);assert.ok(JSON.parse(copied).restartDiagnostics);
@@ -43467,7 +43693,7 @@ test('RISK support diagnostics: local report stays redacted, bounded, and separa
  const beforeState=JSON.stringify(app.ctx.state),beforeStorage=[SYNC_STORE_KEY,LOCAL_HEAD_KEY,'fvp:chain-scanner:sync-error-log:v1'].map(key=>app.shim.localStorage.getItem(key));
  app.ctx.openSettings();const settings=app.shim.document.getElementById('modalRoot').innerHTML;
  assert.match(settings,/Debug log/i,'Settings offers a separate support report');
- assert.match(settings,/data-act="view-support-diagnostics"/);assert.match(settings,/data-act="copy-support-diagnostics"/);assert.match(settings,/data-act="download-support-diagnostics"/);
+ assert.match(settings,/data-act="view-support-diagnostics"/);assert.match(settings,/data-act="view-database-repair"/);assert.doesNotMatch(settings,/data-act="copy-support-diagnostics"/);assert.doesNotMatch(settings,/data-act="download-support-diagnostics"/);
  assert.match(settings,/metadata report.*not a board backup/i,'the local report cannot be mistaken for restorable board data');
  app.ctx.onAction('view-support-diagnostics',{});
  let report=app.ctx.buildSupportDiagnosticsReport();
@@ -43775,7 +44001,7 @@ test('RISK support diagnostics: report navigation cannot cancel an accepted sour
   let modal=shim.document.getElementById('modalRoot').innerHTML;
   assert.match(modal,/data-support-diagnostics-inline/,'the report is presented inside the existing recovery dialog');
   assert.match(modal,/supportDiagnosticsData/,'the report text stays locally viewable while the accepted push is held');
-  for(const action of ['select-support-diagnostics','copy-support-diagnostics','download-support-diagnostics','refresh-support-diagnostics'])
+  for(const action of ['select-support-diagnostics','refresh-support-diagnostics'])
    assert.match(modal,new RegExp('data-act="'+action+'"'),'the in-dialog report exposes '+action);
   let download=null,blob=null;const link=makeFakeElement();link.remove=()=>{};link.click=()=>{download={blob,href:link.href,name:link.download};};
   shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();ctx.Blob=class DiagnosticsBlob{constructor(parts,options){blob={text:parts.join(''),type:options.type};}};
