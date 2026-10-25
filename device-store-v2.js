@@ -6,6 +6,9 @@
 
   const SCHEMA_VERSION=2;
   const DEFAULT_TARGET_BYTES=256*1024;
+  // Ephemeral aliases distinguish handles, including replacement store instances.
+  let connectionSequence=0;
+  const connectionNumbers=new WeakMap();
   const textEncoder=new TextEncoder();
   const textDecoder=new TextDecoder("utf-8",{fatal:true});
   const bytes=value=>textEncoder.encode(String(value));
@@ -70,10 +73,23 @@
     const sha=async value=>hex(await crypto.subtle.digest("SHA-256",bytes(value)));
     const storeNames=["meta","snapshots","backups","opaque"];
     const recoveryNow=()=>typeof root.performance?.now==="function"?root.performance.now():Date.now();
-    const observeRecovery=(status,error=null)=>{
-      const code=error?.name==="QuotaExceededError"?"quota-exhausted":error?.name==="SecurityError"?"storage-denied":
-        error?.name==="TimeoutError"?"deadline-exceeded":error?"unavailable":"unknown";
-      try{if(typeof onRecovery==="function")onRecovery({status,code});}catch{}
+    const observeRecovery=(status,error=null,deviceOperation="open",connection=db)=>{
+      let name,message;try{name=error?.name;message=error?.message;}catch{}
+      const code=name==="QuotaExceededError"?"quota-exhausted":name==="SecurityError"?"storage-denied":
+        name==="TimeoutError"?"deadline-exceeded":error?"unavailable":"unknown";
+      // Only fixed categories leave this boundary. Never retain a browser's
+      // raw exception, which can contain database paths or saved values.
+      let deviceErrorName="unknown",deviceErrorReason="unknown";
+      try{
+        if(["UnknownError","InvalidStateError","AbortError","SecurityError","QuotaExceededError","TransactionInactiveError","DataError","DataCloneError","NotFoundError","ConstraintError","ReadOnlyError","TimeoutError","BlockedError","VersionError"].includes(name))deviceErrorName=name;
+        if(message==="Connection to Indexed Database server lost."||message==="Connection to Indexed Database server lost. Refresh the page to try again.")deviceErrorReason="connection-lost";
+        else if(message==="The database connection is closing."||message==="The database connection is closed.")deviceErrorReason="connection-closing";
+        else if(message==="Connection closed")deviceErrorReason="connection-closed";
+        else if(message==="An internal error was encountered in the Indexed Database server")deviceErrorReason="internal-server-error";
+        else if(message==="Attempt to get a record from database without an in-progress transaction"||message==="The transaction is inactive or finished.")deviceErrorReason="inactive-transaction";
+      }catch{}
+      try{if(typeof onRecovery==="function")onRecovery({status,code,deviceOperation,deviceErrorName,deviceErrorReason,
+        deviceConnection:connection?connectionNumbers.get(connection):undefined});}catch{}
     };
 
     const cancelledOpen=()=>Object.assign(new Error("Device store opening was cancelled"),{name:"AbortError"});
@@ -96,8 +112,9 @@
         request.onsuccess=()=>{
           if(settled||epoch!==openEpoch){try{request.result?.close();}catch(e){}if(!settled)finish(reject,cancelledOpen());return;}
           const connection=request.result;
+          if(connectionSequence<999999)connectionNumbers.set(connection,++connectionSequence);
           db=connection;reconnectAllowed=true;
-          connection.onclose=()=>{if(db===connection){db=null;observeRecovery("unavailable",new Error("Connection closed"));}};
+          connection.onclose=()=>{if(db===connection){db=null;observeRecovery("unavailable",new Error("Connection closed"),"connection",connection);}};
           connection.onversionchange=()=>{if(db===connection)db=null;try{connection.close();}catch{}};
           finish(resolve,api);
         };
@@ -128,7 +145,7 @@
       try{return await pending;}finally{if(opening===pending)opening=null;}
     }
     const ensureOpen=()=>{if(!db&&!reconnectAllowed) throw new Error("Device store is not open");};
-    async function readonlyResults(tx,requests){
+    async function readonlyResults(tx,requests,operation){
       const done=transactionDone(tx);
       try{
         // Observe requests and completion together: a server failure can
@@ -142,11 +159,12 @@
         // Retire only this failed handle so the caller's bounded recheck opens
         // the existing database. Never replay a transaction or close a newer
         // connection when an older concurrent read finishes late.
-        if(db===tx.db&&["UnknownError","InvalidStateError"].includes(failure?.name)){
+        const retired=db===tx.db&&["UnknownError","InvalidStateError"].includes(failure?.name);
+        if(retired){
           const connection=db;db=null;
           try{connection.close();}catch{}
-          observeRecovery("unavailable",failure);
         }
+        observeRecovery(retired?"unavailable":"failed",failure,operation,tx.db);
         throw failure;
       }
     }
@@ -156,6 +174,7 @@
       const connection=db;
       try{return connection.transaction(names,mode);}
       catch(error){
+        observeRecovery("failed",error,"transaction",connection);
         // A synchronous creation failure issued no requests or mutation.
         // Reconnect once; never replay a started transaction's uncertain work.
         if(!["InvalidStateError","UnknownError"].includes(error?.name))throw error;
@@ -182,6 +201,7 @@
       }catch(error){
         try{tx.abort();}catch(e){}
         try{await done;}catch(e){}
+        observeRecovery("failed",error,"raw-snapshot",tx.db);
         throw error;
       }
     }
@@ -192,7 +212,7 @@
       const [meta,snapshots]=await readonlyResults(tx,[
         requestResult(tx.objectStore("meta").get("head")),
         requestResult(tx.objectStore("snapshots").getAll()),
-      ]);
+      ],"head");
       if(!meta) return null;
       if(typeof meta!=="object"||meta.schemaVersion!==SCHEMA_VERSION||typeof meta.hash!=="string"||!/^[0-9a-f]{64}$/.test(meta.hash))
         throw new Error("Durable device head format is unsupported");
@@ -369,7 +389,7 @@
     }
     async function getRecoveryCloudHold(){
       ensureOpen();const tx=await beginTransaction("meta","readonly");
-      const [hold]=await readonlyResults(tx,[requestResult(tx.objectStore("meta").get("recoveryCloudHold"))]);return hold??null;
+      const [hold]=await readonlyResults(tx,[requestResult(tx.objectStore("meta").get("recoveryCloudHold"))],"recovery-hold");return hold??null;
     }
     async function clearRecoveryCloudHold({expectedHeadHash,expectedHead,encodeHead=pendingJSON,expectedHold,encodeHold=pendingJSON}={}){
       ensureOpen();if(typeof expectedHeadHash!=="string"||!expectedHold)return false;
@@ -550,7 +570,7 @@
     const pendingKey=account=>"pending:"+account;
     async function getPendingUpload(account){
       ensureOpen();if(typeof account!=="string"||!account)return null;
-      const tx=await beginTransaction("meta","readonly"),[value]=await readonlyResults(tx,[requestResult(tx.objectStore("meta").get(pendingKey(account)))]);
+      const tx=await beginTransaction("meta","readonly"),[value]=await readonlyResults(tx,[requestResult(tx.objectStore("meta").get(pendingKey(account)))],"pending-upload");
       return value||null;
     }
     function pendingJSON(value){
