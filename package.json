@@ -6,6 +6,8 @@
     "test:agent-tools": "node --test scripts/agent-tools/*.test.mjs",
     "agent:rendered-evidence": "node scripts/agent-tools/rendered-evidence.mjs",
     "agent:record-test-run": "node scripts/agent-tools/record-run.mjs",
+    "agent:checkpoint": "node scripts/agent-tools/checkpoint.mjs",
+    "agent:native-task-smoke": "node scripts/agent-tools/native-task-smoke.mjs",
     "agent:host-coordination": "node scripts/agent-tools/coordination.mjs",
     "agent:preflight": "node scripts/agent-tools/preflight.mjs",
     "agent:browser-audit": "node scripts/agent-tools/browser-audit.mjs",

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
-import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -73,6 +73,423 @@ function commandAsync(args, cwd, environment = {}) {
     child.on('close', (status, signal) => resolveResult({ status, signal, stdout, stderr }));
   });
 }
+
+test('migration retains parked ownership across temporary-directory loss and blocks legacy writers', () => {
+  const fixture = realpathSync(mkdtempSync(join(tmpdir(), 'chain-coordination-migration-')));
+  try {
+    const project = createProject(join(fixture, 'project'), 'work/migration');
+    const temporaryDirectory = join(fixture, 'legacy-temporary');
+    mkdirSync(temporaryDirectory);
+    const source = join(temporaryDirectory, 'ledger.json');
+    const target = join(fixture, 'persistent', 'coordination.json');
+    const backup = join(fixture, 'evidence');
+    const began = command(['begin', '--file', source, '--claims', 'foreign:retained'], project);
+    assert.equal(began.status, 0, began.stderr);
+    const entry = JSON.parse(began.stdout);
+    const parked = command(['park', '--file', source, '--id', entry.id,
+      '--checkpoint-sha', git(project, 'rev-parse', 'HEAD'), '--next-action', 'Resume after host restart.'], project);
+    assert.equal(parked.status, 0, parked.stderr);
+    const state = JSON.parse(readFileSync(source, 'utf8'));
+    state.unknownHostMetadata = { preserve: ['all', 'bytes'] };
+    state.reservations.push({ worktree: join(fixture, 'offline-project'), pid: 2147483647, slot: 8, retained: true });
+    state.configurations.push({ worktree: join(fixture, 'offline-project'), slot: 8, retained: true });
+    const original = `${JSON.stringify(state, null, 3)}\n`;
+    writeFileSync(source, original);
+    const digest = createHash('sha256').update(original).digest('hex');
+
+    const migrated = command(['migrate', '--file', source, '--to', target,
+      '--backup-dir', backup, '--expected-sha256', digest], project);
+    assert.equal(migrated.status, 0, `explicit migration must retain the populated ledger: ${migrated.stderr}`);
+    assert.equal(existsSync(target), true, 'migration must publish the populated ledger at the durable path');
+    const report = JSON.parse(migrated.stdout);
+    assert.equal(report.status, 'migrated');
+    assert.equal(report.sha256, digest);
+    assert.equal(readFileSync(target, 'utf8'), original, 'migration must not normalize or prune any saved ownership');
+    assert.equal(readFileSync(join(backup, 'source.json'), 'utf8'), original, 'rollback keeps exact original bytes');
+    assert.equal(JSON.parse(readFileSync(join(backup, 'migration.json'), 'utf8')).status, 'migrated');
+    assert.equal(statSync(source).isFile(), true, 'the retired source remains atomically replaceable');
+    assert.throws(() => JSON.parse(readFileSync(source, 'utf8')), SyntaxError, 'the blocker must fail old v1 JSON parsers');
+
+    // A bounded real v1 writer: read/ENOENT-as-empty, normalize, then atomic rename.
+    // A JSON pointer or symlink would let this client create a second writable ledger.
+    const legacy = spawnSync(process.execPath, ['--input-type=module', '-e', `
+      import { readFile, writeFile, rename } from 'node:fs/promises';
+      const file = process.argv[1];
+      let state;
+      try { state = JSON.parse(await readFile(file, 'utf8')); }
+      catch (error) { if (error.code !== 'ENOENT') throw error; state = {}; }
+      state = { ...state, version: 1, entries: Array.isArray(state.entries) ? state.entries : [] };
+      state.entries.push({ id: 'legacy-split', status: 'active' });
+      await writeFile(file + '.legacy.tmp', JSON.stringify(state));
+      await rename(file + '.legacy.tmp', file);
+    `, source], { encoding: 'utf8' });
+    assert.notEqual(legacy.status, 0, 'legacy writers must stop at the retired source');
+    assert.match(legacy.stderr, /SyntaxError/);
+    assert.equal(readFileSync(target, 'utf8'), original);
+
+    const selected = command(['export-env', '--file', target], project);
+    assert.equal(selected.status, 0, selected.stderr);
+    const environmentFile = join(fixture, 'coordination-env.sh');
+    writeFileSync(environmentFile, selected.stdout);
+    rmSync(temporaryDirectory, { recursive: true });
+    for (const cwd of [project, fixture]) {
+      const fresh = spawnSync('/bin/sh', ['-c', '. "$1"; exec "$2" "$3" discover',
+        'fixture', environmentFile, process.execPath, entrypoint], {
+        cwd, encoding: 'utf8', env: { ...process.env, CODEX_COORDINATION_FILE: '', DOW_EMULATOR_COORDINATION_FILE: '' },
+      });
+      assert.equal(fresh.status, 0, fresh.stderr);
+      assert.equal(fresh.stdout.trim(), target, 'fresh shells in both projects select the same durable path');
+    }
+    const resumed = command(['resume', '--id', entry.id], project, { CODEX_COORDINATION_FILE: target });
+    assert.equal(resumed.status, 0, resumed.stderr);
+    assert.equal(JSON.parse(resumed.stdout).id, entry.id, 'parked ownership survives restart at the new canonical path');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+function migrationFixture() {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'chain-migration-control-')));
+  const source = join(root, 'source.json');
+  const target = join(root, 'persistent', 'coordination.json');
+  const backup = join(root, 'backup');
+  const contents = '{"version":1,"scope":"codex-wide","entries":[],"reservations":[],"configurations":[],"unknown":"retain"}\n';
+  writeFileSync(source, contents);
+  const digest = createHash('sha256').update(contents).digest('hex');
+  return { root, source, target, backup, contents, digest,
+    args: (phase = 'all') => ['migrate', '--file', source, '--to', target,
+      '--backup-dir', backup, '--expected-sha256', digest, '--phase', phase] };
+}
+
+test('migration rejects source ancestor symlinks rather than authorizing a path alias', () => {
+  const f = migrationFixture();
+  try {
+    const nested = join(f.root, 'nested');
+    mkdirSync(nested);
+    const actualSource = join(nested, 'source.json');
+    renameSync(f.source, actualSource);
+    const alias = join(f.root, 'alias');
+    symlinkSync(f.root, alias, 'dir');
+    const args = f.args();
+    args[2] = join(alias, 'nested', 'source.json');
+    const result = command(args, f.root);
+    assert.notEqual(result.status, 0, 'a user-created source ancestor alias must fail closed');
+    assert.match(result.stderr, /alias|symlink|ambiguous/i);
+    assert.equal(readFileSync(actualSource, 'utf8'), f.contents);
+    assert.equal(existsSync(f.target), false);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test('migration phases preserve one authority, permit prepublication rollback, and resume interrupted publication', () => {
+  for (const stopAfter of ['prepare', 'block', 'link']) {
+    const f = migrationFixture();
+    try {
+      const prepared = command(f.args('prepare'), f.root);
+      assert.equal(prepared.status, 0, prepared.stderr);
+      assert.equal(JSON.parse(prepared.stdout).status, 'prepared');
+      assert.equal(readFileSync(f.source, 'utf8'), f.contents, 'prepare leaves the original ledger authoritative');
+      assert.equal(existsSync(f.target), false);
+      const early = command(f.args('publish'), f.root);
+      assert.notEqual(early.status, 0, 'publication requires verified source retirement');
+      if (stopAfter !== 'prepare') {
+        const blocked = command(f.args('block'), f.root);
+        assert.equal(blocked.status, 0, blocked.stderr);
+        const legacyRead = command(['status', '--file', f.source], f.root);
+        assert.notEqual(legacyRead.status, 0);
+        assert.match(legacyRead.stderr, /retired/);
+        assert.match(legacyRead.stderr, /Canonical ledger:/);
+        assert.equal(existsSync(f.target), false, 'the explicit blocked phase retains recoverable backup before publication');
+      }
+      if (stopAfter === 'link') {
+        const receipt = JSON.parse(readFileSync(join(f.backup, 'migration.json'), 'utf8'));
+        // Real filesystem state after an interrupted link but before staging unlink/receipt update.
+        linkSync(receipt.stagedTarget, f.target);
+        const rollback = command(f.args('rollback'), f.root);
+        assert.notEqual(rollback.status, 0, 'target existence forbids rollback even before the receipt update');
+        const published = command(f.args('publish'), f.root);
+        assert.equal(published.status, 0, published.stderr);
+        assert.equal(JSON.parse(published.stdout).status, 'migrated');
+        assert.equal(readFileSync(f.target, 'utf8'), f.contents);
+        assert.equal(statSync(f.target).nlink, 1, 'resumed publication removes only its known staging alias');
+        const repeated = command(f.args('publish'), f.root);
+        assert.equal(repeated.status, 0, repeated.stderr);
+        assert.equal(command(f.args('rollback'), f.root).status, 2);
+      } else {
+        const rollback = command(f.args('rollback'), f.root);
+        assert.equal(rollback.status, 0, rollback.stderr);
+        assert.equal(JSON.parse(rollback.stdout).status, 'rolled-back');
+        assert.equal(readFileSync(f.source, 'utf8'), f.contents);
+        assert.equal(existsSync(f.target), false);
+        assert.equal(readFileSync(join(f.backup, 'source.json'), 'utf8'), f.contents, 'rollback retains recovery evidence');
+        assert.equal(command(f.args('block'), f.root).status, 2, 'a finalized rollback cannot later retire the source');
+      }
+    } finally { rmSync(f.root, { recursive: true, force: true }); }
+  }
+});
+
+test('migration refuses active foreign entries, live reservations and malformed ownership without modifying state', () => {
+  const controls = [
+    { entries: [{ id: 'foreign-active', worktree: '/offline/foreign', status: 'active', pid: 2147483647,
+      heartbeatAt: '2000-01-01T00:00:00.000Z', lease: { expiresAt: '2000-01-01T00:00:00.000Z' } }] },
+    { reservations: [{ worktree: '/foreign/reservation', pid: process.pid, unknownReservation: true }] },
+    { entries: [{ id: 'foreign-unknown', worktree: '/foreign/unknown', status: 'mystery' }] },
+    { entries: [{ id: 'parked-missing-checkpoint', worktree: '/foreign/parked', status: 'parked' }] },
+    { entries: [{ id: 'same', worktree: '/foreign/a', status: 'complete' }, { id: 'same', worktree: '/foreign/b', status: 'complete' }] },
+    { reservations: [{ worktree: '/foreign/unverifiable' }] },
+    { configurations: [{ worktree: 'relative/path' }] },
+    { entries: 'not-an-array' },
+    { version: 2 },
+  ];
+  for (const control of controls) {
+    const f = migrationFixture();
+    try {
+      const contents = JSON.stringify({ version: 1, scope: 'codex-wide', entries: [], reservations: [], configurations: [], ...control });
+      writeFileSync(f.source, contents);
+      const args = f.args();
+      args[8] = createHash('sha256').update(contents).digest('hex');
+      const result = command(args, f.root);
+      assert.notEqual(result.status, 0, `unsafe ownership must block migration: ${contents}`);
+      assert.match(result.stderr, /active|live|ownership|v1|normalization/);
+      assert.equal(readFileSync(f.source, 'utf8'), contents);
+      assert.equal(existsSync(f.target), false);
+      assert.equal(existsSync(f.backup), false, 'unsafe preconditions cannot create misleading migration evidence');
+    } finally { rmSync(f.root, { recursive: true, force: true }); }
+  }
+});
+
+test('migration requires original file identity and refuses same-byte replacements at every transition', () => {
+  for (const replacement of ['source', 'blocker', 'backup', 'stage', 'target']) {
+    const f = migrationFixture();
+    try {
+      assert.equal(command(f.args('prepare'), f.root).status, 0);
+      if (replacement !== 'source') assert.equal(command(f.args('block'), f.root).status, 0);
+      const receipt = JSON.parse(readFileSync(join(f.backup, 'migration.json'), 'utf8'));
+      const path = { source: f.source, blocker: f.source, backup: join(f.backup, 'source.json'),
+        stage: receipt.stagedTarget, target: f.target }[replacement];
+      const original = replacement === 'target' ? f.contents : readFileSync(path);
+      writeFileSync(`${path}.replacement`, original);
+      renameSync(`${path}.replacement`, path);
+      const result = command(f.args(replacement === 'source' ? 'block' : 'publish'), f.root);
+      assert.notEqual(result.status, 0, `same bytes cannot prove ownership of a replaced ${replacement}`);
+      assert.match(result.stderr, /identity|ownership/);
+      assert.deepEqual(readFileSync(path), Buffer.from(original), 'the replacement must be preserved');
+      const beforeRollback = readFileSync(f.source);
+      assert.equal(command(f.args('rollback'), f.root).status, 2,
+        'rollback must verify source and backup and must never run after any target appears');
+      assert.deepEqual(readFileSync(f.source), beforeRollback, 'a refused rollback must preserve the current authority and changed artifacts');
+    } finally { rmSync(f.root, { recursive: true, force: true }); }
+  }
+});
+
+test('migration rejects an unverifiable lock owner instead of reclaiming it', () => {
+  const f = migrationFixture();
+  try {
+    const unknownLock = '{"owner":"unrecognized-active-client","token":"preserve"}\n';
+    writeFileSync(`${f.source}.lock`, unknownLock);
+    const result = command(f.args(), f.root);
+    assert.notEqual(result.status, 0, 'unknown lock ownership must block host migration');
+    assert.match(result.stderr, /lock|ownership/);
+    assert.equal(readFileSync(`${f.source}.lock`, 'utf8'), unknownLock);
+    assert.equal(readFileSync(f.source, 'utf8'), f.contents);
+    assert.equal(existsSync(f.target), false);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test('migration preserves unknown target locks that appear while waiting for source ownership', async (t) => {
+  for (const suffix of ['.lock', '.lock.recovery']) await t.test(suffix, async () => {
+    const f = migrationFixture();
+    const source = join(f.root, 'a-source.json');
+    const target = join(f.root, 'z-target.json');
+    renameSync(f.source, source);
+    const args = f.args();
+    args[2] = source;
+    args[4] = target;
+    const sourceLock = `${source}.lock`;
+    const unknownPath = `${target}${suffix}`;
+    const unknown = '{"owner":"unrecognized-active-client","token":"preserve"}\n';
+    writeFileSync(sourceLock, JSON.stringify({ pid: process.pid, token: 'source-holder' }));
+    let settled = false;
+    const pending = commandAsync(args, f.root).then(result => { settled = true; return result; });
+    try {
+      await new Promise(resolveWait => setTimeout(resolveWait, 150));
+      assert.equal(settled, false, 'migration is waiting on the recognized live source lock');
+      if (suffix === '.lock.recovery') {
+        writeFileSync(`${target}.lock`, JSON.stringify({ pid: 2147483647, token: 'recognized-stale' }));
+      }
+      writeFileSync(unknownPath, unknown);
+      rmSync(sourceLock);
+      const result = await pending;
+      assert.notEqual(result.status, 0, 'a lock appearing after preflight must still block migration');
+      assert.match(result.stderr, /lock|ownership/);
+      assert.equal(readFileSync(unknownPath, 'utf8'), unknown, 'unrecognized ownership remains untouched');
+      assert.equal(readFileSync(source, 'utf8'), f.contents, 'source authority remains unchanged');
+      assert.equal(existsSync(target), false, 'target authority is never published');
+      assert.equal(existsSync(f.backup), false, 'no migration phase begins without both safe locks');
+    } finally {
+      rmSync(sourceLock, { force: true });
+      await pending;
+      rmSync(f.root, { recursive: true, force: true });
+    }
+  });
+});
+
+test('migration preserves a same-byte lock replacement during stale-owner recovery', async () => {
+  const f = migrationFixture();
+  const stale = JSON.stringify({ pid: 2147483647, token: 'stale-owner' });
+  mkdirSync(join(f.root, 'persistent'));
+  const lockPath = `${f.target}.lock`;
+  writeFileSync(lockPath, stale);
+  const pending = commandAsync(f.args(), f.root);
+  try {
+    const deadline = Date.now() + 2000;
+    while (!existsSync(`${lockPath}.recovery`) && Date.now() < deadline) {
+      await new Promise(resolveWait => setTimeout(resolveWait, 2));
+    }
+    assert.ok(existsSync(`${lockPath}.recovery`), 'real migration entered stale-lock recovery');
+    await new Promise(resolveWait => setTimeout(resolveWait, 10));
+    writeFileSync(`${lockPath}.replacement`, stale);
+    renameSync(`${lockPath}.replacement`, lockPath);
+    const result = await pending;
+    assert.notEqual(result.status, 0, 'equal lock bytes cannot establish recovery ownership of a replacement');
+    assert.match(result.stderr, /identity|ownership/);
+    assert.equal(readFileSync(lockPath, 'utf8'), stale);
+    assert.equal(readFileSync(f.source, 'utf8'), f.contents);
+    assert.equal(existsSync(f.target), false);
+    assert.equal(existsSync(f.backup), false);
+  } finally {
+    await pending;
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test('ordinary coordination retains legacy unknown-lock reclamation', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'chain-legacy-lock-'));
+  try {
+    const project = createProject(join(fixture, 'project'), 'work/legacy-lock');
+    const ledger = join(fixture, 'ledger.json');
+    writeFileSync(`${ledger}.lock`, '{"owner":"old-unrecognized-format"}\n');
+    const result = command(['begin', '--file', ledger], project);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(JSON.parse(readFileSync(ledger, 'utf8')).entries.length, 1);
+    assert.equal(existsSync(`${ledger}.lock`), false);
+  } finally { rmSync(fixture, { recursive: true, force: true }); }
+});
+
+test('migration rejects a shared-writable ancestor hidden above a private destination parent', () => {
+  const f = migrationFixture();
+  try {
+    const shared = join(f.root, 'shared');
+    const privateParent = join(shared, 'private');
+    mkdirSync(privateParent, { recursive: true, mode: 0o700 });
+    chmodSync(shared, 0o777);
+    const target = join(privateParent, 'coordination.json');
+    const args = f.args();
+    args[4] = target;
+    const result = command(args, f.root);
+    assert.notEqual(result.status, 0, 'a private final parent cannot establish safe ownership through an unsafe ancestor');
+    assert.match(result.stderr, /ancestor|ownership|unsafe/);
+    assert.equal(readFileSync(f.source, 'utf8'), f.contents);
+    assert.equal(existsSync(target), false);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test('migration refuses symlinks, hardlinks, nonregular destinations and stale reviewed bytes', () => {
+  for (const conflict of ['source-symlink', 'source-hardlink', 'target-symlink', 'target-file', 'target-directory',
+    'target-parent-symlink', 'backup-directory', 'shared-writable-parent', 'changed-bytes', 'lock-symlink']) {
+    const f = migrationFixture();
+    try {
+      mkdirSync(join(f.root, 'persistent'));
+      if (conflict === 'source-symlink') {
+        renameSync(f.source, `${f.source}.original`);
+        symlinkSync(`${f.source}.original`, f.source);
+      } else if (conflict === 'source-hardlink') {
+        linkSync(f.source, `${f.source}.alias`);
+      } else if (conflict === 'target-symlink') {
+        symlinkSync(f.source, f.target);
+      } else if (conflict === 'target-file') {
+        writeFileSync(f.target, f.contents);
+      } else if (conflict === 'target-directory') {
+        mkdirSync(f.target);
+      } else if (conflict === 'target-parent-symlink') {
+        rmSync(join(f.root, 'persistent'), { recursive: true });
+        mkdirSync(join(f.root, 'other'));
+        symlinkSync(join(f.root, 'other'), join(f.root, 'persistent'), 'dir');
+      } else if (conflict === 'backup-directory') {
+        mkdirSync(f.backup);
+        writeFileSync(join(f.backup, 'retained'), 'foreign backup');
+      } else if (conflict === 'shared-writable-parent') {
+        chmodSync(join(f.root, 'persistent'), 0o777);
+      } else if (conflict === 'changed-bytes') {
+        writeFileSync(f.source, f.contents.replace('retain', 'newer'));
+      } else if (conflict === 'lock-symlink') {
+        writeFileSync(join(f.root, 'foreign-lock'), '{"pid":2147483647,"token":"foreign"}');
+        symlinkSync(join(f.root, 'foreign-lock'), `${f.source}.lock`);
+      }
+      const originalSource = readFileSync(f.source, 'utf8');
+      const result = command(f.args(), f.root);
+      assert.notEqual(result.status, 0, `migration must refuse ${conflict}`);
+      assert.equal(readFileSync(f.source, 'utf8'), originalSource);
+      assert.match(result.stderr, /ownership|unsafe|symlink|existing|changed|SHA-256/);
+      if (conflict === 'target-file') assert.equal(readFileSync(f.target, 'utf8'), f.contents);
+      if (conflict === 'backup-directory') assert.equal(readFileSync(join(f.backup, 'retained'), 'utf8'), 'foreign backup');
+    } finally { rmSync(f.root, { recursive: true, force: true }); }
+  }
+});
+
+test('migration retains the existing system temporary source spelling while requiring literal durable destinations', () => {
+  const f = migrationFixture();
+  try {
+    const args = f.args();
+    args[2] = join(tmpdir(), f.root.split('/').at(-1), 'source.json');
+    const result = command(args, f.root);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(readFileSync(f.target, 'utf8'), f.contents);
+    const receipt = JSON.parse(readFileSync(join(f.backup, 'migration.json'), 'utf8'));
+    assert.equal(receipt.canonicalSource, f.source);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test('migration waits for both existing token locks before changing ledger authority', async () => {
+  for (const selected of ['source', 'target']) {
+    const f = migrationFixture();
+    let holder;
+    try {
+      mkdirSync(join(f.root, 'persistent'));
+      const lock = `${selected === 'source' ? f.source : f.target}.lock`;
+      holder = spawn(process.execPath, ['--input-type=module', '-e', `
+        import { open, readFile, unlink } from 'node:fs/promises';
+        const path = process.argv[1];
+        const token = 'fixture-owned-lock';
+        const handle = await open(path, 'wx', 0o600);
+        await handle.writeFile(JSON.stringify({pid: process.pid, token}));
+        console.log('locked');
+        process.stdin.resume();
+        await new Promise(resolve => process.stdin.once('end', resolve));
+        await handle.close();
+        if (JSON.parse(await readFile(path, 'utf8')).token === token) await unlink(path);
+      `, lock], { stdio: ['pipe', 'pipe', 'pipe'] });
+      const finished = new Promise((resolveResult, rejectResult) => {
+        holder.once('error', rejectResult);
+        holder.once('close', (status) => resolveResult(status));
+      });
+      await new Promise((ready, fail) => { holder.stdout.once('data', ready); holder.once('error', fail); });
+      let done = false;
+      const pending = commandAsync(f.args(), f.root).then((result) => { done = true; return result; });
+      await new Promise((resolveWait) => setTimeout(resolveWait, 100));
+      assert.equal(done, false, `migration must respect the ${selected} token lock`);
+      assert.equal(readFileSync(f.source, 'utf8'), f.contents);
+      assert.equal(existsSync(f.backup), false);
+      holder.stdin.end();
+      assert.equal(await finished, 0);
+      const migrated = await pending;
+      assert.equal(migrated.status, 0, migrated.stderr);
+      assert.equal(readFileSync(f.target, 'utf8'), f.contents);
+    } finally {
+      if (holder?.exitCode === null) { holder.stdin.end(); holder.kill(); }
+      rmSync(f.root, { recursive: true, force: true });
+    }
+  }
+});
 
 test('discover reports conflicting explicit and environment ledger paths', () => {
   const fixture = mkdtempSync(join(tmpdir(), 'chain-coordination-discovery-'));

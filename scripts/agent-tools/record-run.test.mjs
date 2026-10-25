@@ -44,6 +44,261 @@ function evidencePathFrom(result) {
   return line.slice('record-run: evidence='.length);
 }
 
+function summaryFrom(result) {
+  assert.equal(result.stderr, '', `summary mode should not print child streams or setup chatter to stderr: ${result.stderr.slice(0, 300)}`);
+  const lines = result.stdout.trimEnd().split('\n');
+  assert.equal(lines.length, 1, `expected one JSON summary line, got ${lines.length} lines`);
+  return JSON.parse(lines[0]);
+}
+
+test('redacts evidence path metadata while retaining real files and child failure status', async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'record-run-private-path-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(temp);
+  const secret = 'PRIVATE-PATH-SECRET-72aa';
+  const evidence = path.join(temp, secret, 'evidence');
+  const result = invokeRecorder({ repo, evidence, purpose: 'green', command: node,
+    args: ['-e', `process.stdout.write('${secret}\\n'); process.stderr.write('complete failure output\\n'); process.exitCode = 7;`],
+    extraOptions: ['--summary', '--redact-pattern', secret],
+  });
+  assert.equal(result.status, 7, result.stderr);
+  assert.equal(result.stdout.includes(secret), false, 'summary paths must follow configured redaction');
+  const summary = summaryFrom(result);
+  assert.equal(summary.status, 'failed');
+  assert.equal(summary.child.exitCode, 7);
+  assert.equal(summary.evidence.status, 'complete');
+  const files = await readdir(evidence);
+  assert.equal(files.length, 3, 'all three complete evidence files exist at the actual caller-owned directory');
+  const metadataName = files.find(file => file.endsWith('.json'));
+  const serialized = await readFile(path.join(evidence, metadataName), 'utf8');
+  assert.equal(serialized.includes(secret), false, 'persisted path metadata must also follow configured redaction');
+  const record = JSON.parse(serialized);
+  assert.deepEqual(record.evidence, summary.evidence);
+  for (const field of ['metadataPath', 'stdoutPath', 'stderrPath']) {
+    assert.ok(record.evidence[field].includes('[REDACTED]'), field + ' is a sanitized display path');
+    assert.ok(record.redaction.locations['evidence.' + field] > 0, field + ' redaction is accounted for');
+  }
+  assert.equal(record.execution.output.stdout, '[REDACTED]\n');
+  assert.equal(record.execution.output.stderr, 'complete failure output\n');
+  assert.equal(await readFile(path.join(evidence, `${record.id}.stdout.txt`), 'utf8'), record.execution.output.stdout);
+  assert.equal(await readFile(path.join(evidence, `${record.id}.stderr.txt`), 'utf8'), record.execution.output.stderr);
+
+  const blockedEvidence = path.join(temp, secret, 'blocked');
+  await writeFile(blockedEvidence, 'preserve blocking file');
+  const refused = invokeRecorder({ repo, evidence: blockedEvidence, purpose: 'green', command: node,
+    args: ['-e', "process.exitCode = 0"], extraOptions: ['--summary', '--redact-pattern', secret] });
+  assert.equal(refused.status, 74);
+  assert.equal(refused.stdout.includes(secret), false, 'preparation failures also redact displayed evidence paths');
+  assert.equal(summaryFrom(refused).status, 'evidence-failure');
+  assert.equal(await readFile(blockedEvidence, 'utf8'), 'preserve blocking file');
+
+  const ordinaryEvidence = path.join(temp, secret, 'ordinary');
+  const ordinary = invokeRecorder({ repo, evidence: ordinaryEvidence, purpose: 'green', command: node,
+    args: ['-e', "process.stdout.write('ordinary complete output\\n')"], extraOptions: ['--redact-pattern', secret] });
+  assert.equal(ordinary.status, 0);
+  assert.equal(ordinary.stdout, 'ordinary complete output\n', 'default child output remains unchanged');
+  assert.equal(ordinary.stderr.includes(secret), false, 'default evidence path announcements also follow redaction');
+  assert.match(evidencePathFrom(ordinary), /\[REDACTED\]/);
+  assert.equal((await readdir(ordinaryEvidence)).length, 1, 'ordinary evidence still exists in the actual caller-owned directory');
+});
+
+test('summarizes large real child output while preserving complete redacted evidence and source identity', async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'record-run-summary-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(temp);
+  const evidence = path.join(temp, 'evidence');
+  const stdoutSecret = 'SUMMARY-STDOUT-SECRET-72a9';
+  const stderrSecret = 'SUMMARY-STDERR-SECRET-18cf';
+  // Generate the large streams in the child: a large literal can exceed Linux's
+  // per-argument exec limit before the recorder can start.
+  const child = `process.stdout.write('O'.repeat(256 * 1024) + ' password=${stdoutSecret}\\n'); process.stderr.write('E'.repeat(128 * 1024) + ' token=${stderrSecret}\\n');`;
+
+  const result = invokeRecorder({
+    repo,
+    evidence,
+    purpose: 'green',
+    command: node,
+    args: ['-e', child],
+    extraOptions: ['--summary'],
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.ok(Buffer.byteLength(result.stdout) + Buffer.byteLength(result.stderr) < 2048, 'console output must stay bounded as child output grows');
+  assert.equal(result.stdout.includes(stdoutSecret), false);
+  assert.equal(result.stdout.includes(stderrSecret), false);
+  const summary = summaryFrom(result);
+  assert.equal(summary.status, 'passed');
+  assert.equal(summary.purpose, 'green');
+  assert.deepEqual(summary.child, { exitCode: 0, signal: null });
+  assert.equal(summary.source.commit, spawnSync('git', ['-C', repo, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim());
+  assert.equal(summary.source.identityStatus, 'complete');
+  assert.match(summary.source.diffSha256, /^[a-f0-9]{64}$/);
+  assert.equal(summary.evidence.status, 'complete');
+
+  const recordPath = summary.evidence.metadataPath;
+  const record = JSON.parse(await readFile(recordPath, 'utf8'));
+  const stdoutPath = path.join(evidence, `${record.id}.stdout.txt`);
+  const stderrPath = path.join(evidence, `${record.id}.stderr.txt`);
+  assert.equal(summary.evidence.stdoutPath, stdoutPath);
+  assert.equal(summary.evidence.stderrPath, stderrPath);
+  assert.equal(record.execution.outcome, 'passed');
+  assert.equal(record.execution.exitCode, 0);
+  assert.equal(record.workingTree.sourceTestDiffSha256, summary.source.diffSha256);
+  assert.equal(record.execution.output.stdout, `${'O'.repeat(256 * 1024)} password=[REDACTED]\n`);
+  assert.equal(record.execution.output.stderr, `${'E'.repeat(128 * 1024)} token=[REDACTED]\n`);
+  assert.equal(await readFile(stdoutPath, 'utf8'), record.execution.output.stdout);
+  assert.equal(await readFile(stderrPath, 'utf8'), record.execution.output.stderr);
+  const serialized = await readFile(recordPath, 'utf8');
+  assert.equal(serialized.includes(stdoutSecret), false);
+  assert.equal(serialized.includes(stderrSecret), false);
+  assert.equal((await readFile(stdoutPath, 'utf8')).includes(stdoutSecret), false);
+  assert.equal((await readFile(stderrPath, 'utf8')).includes(stderrSecret), false);
+});
+
+test('keeps a failed child nonzero and reports its actual exit in the summary', async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'record-run-summary-failure-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(temp);
+  const evidence = path.join(temp, 'evidence');
+  const secret = 'SUMMARY-FAILURE-SECRET-309b';
+  const child = `process.stderr.write("AssertionError: expected failure password=${secret}\\n"); process.exitCode = 7;`;
+
+  const result = invokeRecorder({
+    repo,
+    evidence,
+    purpose: 'preimplementation-red',
+    command: node,
+    args: ['-e', child],
+    extraOptions: ['--summary'],
+  });
+
+  assert.equal(result.status, 7);
+  const summary = summaryFrom(result);
+  assert.equal(summary.status, 'failed');
+  assert.equal(summary.outcome, 'assertion-failure');
+  assert.equal(summary.purpose, 'preimplementation-red');
+  assert.deepEqual(summary.child, { exitCode: 7, signal: null });
+  assert.equal(summary.wrapperExitCode, 7);
+  assert.equal(summary.evidence.status, 'complete');
+  const record = JSON.parse(await readFile(summary.evidence.metadataPath, 'utf8'));
+  assert.equal(record.execution.output.stderr, `AssertionError: expected failure password=[REDACTED]\n`);
+  assert.equal(await readFile(summary.evidence.stderrPath, 'utf8'), record.execution.output.stderr);
+  assert.equal((await readFile(summary.evidence.metadataPath, 'utf8')).includes(secret), false);
+});
+
+test('reports a child signal as interruption while preserving its incomplete evidence', { skip: process.platform === 'win32' }, async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'record-run-summary-signal-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(temp);
+  const evidence = path.join(temp, 'evidence');
+  const result = invokeRecorder({
+    repo,
+    evidence,
+    purpose: 'green',
+    command: node,
+    args: ['-e', 'process.stdout.write("before-summary-signal"); process.kill(process.pid, "SIGTERM");'],
+    extraOptions: ['--summary'],
+  });
+
+  assert.equal(result.status, 143, result.stderr);
+  const summary = summaryFrom(result);
+  assert.equal(summary.status, 'interrupted');
+  assert.equal(summary.outcome, 'interrupted');
+  assert.deepEqual(summary.child, { exitCode: null, signal: 'SIGTERM' });
+  assert.equal(summary.wrapperExitCode, 143);
+  assert.equal(summary.evidence.status, 'complete');
+  const record = JSON.parse(await readFile(summary.evidence.metadataPath, 'utf8'));
+  assert.equal(record.state, 'incomplete');
+  assert.equal(record.interruption.source, 'child-process');
+  assert.equal(record.execution.wrapperExitCode, 143);
+  assert.equal(await readFile(summary.evidence.stdoutPath, 'utf8'), 'before-summary-signal');
+});
+
+test('returns failure when a full output evidence file cannot be written', async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'record-run-summary-evidence-failure-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(temp);
+  const evidence = path.join(temp, 'evidence');
+  const secret = 'SUMMARY-EVIDENCE-SECRET-4c0e';
+  const child = [
+    'const fs = require("node:fs");',
+    'const path = require("node:path");',
+    `const evidence = ${JSON.stringify(evidence)};`,
+    'const metadataName = fs.readdirSync(evidence).find((name) => name.endsWith(".json"));',
+    'const stdoutPath = path.join(evidence, metadataName.replace(/\\.json$/, ".stdout.txt"));',
+    'fs.mkdirSync(stdoutPath);',
+    `process.stdout.write("password=${secret}\\n");`,
+    'process.stderr.write("child reached evidence collision\\n");',
+  ].join('\n');
+
+  const result = invokeRecorder({
+    repo,
+    evidence,
+    purpose: 'green',
+    command: node,
+    args: ['-e', child],
+    extraOptions: ['--summary'],
+  });
+
+  assert.equal(result.status, 74, result.stderr);
+  const summary = summaryFrom(result);
+  assert.equal(summary.status, 'evidence-failure');
+  assert.equal(summary.outcome, 'passed');
+  assert.deepEqual(summary.child, { exitCode: 0, signal: null });
+  assert.equal(summary.wrapperExitCode, 74);
+  assert.equal(summary.evidence.status, 'failed');
+  assert.deepEqual(summary.evidence.errors.map((entry) => entry.file), ['stdout']);
+  const metadata = await readFile(summary.evidence.metadataPath, 'utf8');
+  const record = JSON.parse(metadata);
+  assert.equal(record.execution.output.stdout, 'password=[REDACTED]\n');
+  assert.equal(record.execution.output.stderr, 'child reached evidence collision\n');
+  assert.equal(record.execution.wrapperExitCode, 74);
+  assert.equal(record.evidence.status, 'failed');
+  assert.equal(metadata.includes(secret), false);
+  assert.ok((await readFile(summary.evidence.stderrPath, 'utf8')).includes('child reached evidence collision'));
+});
+
+test('keeps summary corrections in new immutable attempts', async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'record-run-summary-correction-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(temp);
+  const evidence = path.join(temp, 'evidence');
+  const originalResult = invokeRecorder({
+    repo,
+    evidence,
+    purpose: 'preimplementation-red',
+    command: node,
+    args: ['-e', 'process.stdout.write("original-red"); process.exitCode = 1;'],
+    extraOptions: ['--summary'],
+  });
+  assert.equal(originalResult.status, 1);
+  const originalSummary = summaryFrom(originalResult);
+  const originalPath = originalSummary.evidence.metadataPath;
+  const originalBytes = await readFile(originalPath);
+  const original = JSON.parse(originalBytes.toString('utf8'));
+  const note = 'This later check corrects the record without changing original RED evidence.';
+
+  const correctionResult = invokeRecorder({
+    repo,
+    evidence,
+    purpose: 'later-baseline-sensitivity',
+    command: node,
+    args: ['-e', 'process.stdout.write("corrected-attempt");'],
+    extraOptions: ['--summary', '--correction-of', original.id, '--correction-note', note],
+  });
+
+  assert.equal(correctionResult.status, 0, correctionResult.stderr);
+  const correctionSummary = summaryFrom(correctionResult);
+  const correctionPath = correctionSummary.evidence.metadataPath;
+  const correction = JSON.parse(await readFile(correctionPath, 'utf8'));
+  assert.notEqual(correctionPath, originalPath);
+  assert.deepEqual(await readFile(originalPath), originalBytes);
+  assert.equal(correction.correction.originalRecordId, original.id);
+  assert.equal(correction.correction.note, note);
+  assert.equal(correction.declaredPurpose, 'later-baseline-sensitivity');
+  assert.equal(await readFile(correctionSummary.evidence.stdoutPath, 'utf8'), 'corrected-attempt');
+});
+
 test('records the real child command, exit, output and source identity at the command boundary', async (t) => {
   const temp = await mkdtemp(path.join(os.tmpdir(), 'record-run-core-'));
   t.after(() => rm(temp, { recursive: true, force: true }));
