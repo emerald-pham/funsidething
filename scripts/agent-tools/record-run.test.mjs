@@ -63,6 +63,7 @@ async function createQualificationFixture(t) {
     deliveryPort,
     smokePort,
     env: {
+      CI: '',
       CODEX_COORDINATION_FILE: ledger,
       DOW_EMULATOR_COORDINATION_FILE: '',
       CHAIN_NATIVE_CANDIDATE_SHA: commit.stdout.trim(),
@@ -145,10 +146,10 @@ test('qualification readiness rejects missing and stale committed candidate iden
   });
 });
 
-test('qualification readiness requires distinct explicit local ports even when CI is true', async (t) => {
+test('qualification readiness requires distinct explicit local ports and rejects CI mode', async (t) => {
   const missing = await createQualificationFixture(t);
   await assertQualificationSetupRejected(t, missing, {
-    env: { CI: 'true', CHAIN_NATIVE_PORT: '', CHAIN_NATIVE_SMOKE_PORT: '' },
+    env: { CI: '', CHAIN_NATIVE_PORT: '', CHAIN_NATIVE_SMOKE_PORT: '' },
     expectedError: /CHAIN_NATIVE_PORT/,
   });
 
@@ -160,8 +161,14 @@ test('qualification readiness requires distinct explicit local ports even when C
 
   const same = await createQualificationFixture(t);
   await assertQualificationSetupRejected(t, same, {
-    env: { CHAIN_NATIVE_SMOKE_PORT: String(same.deliveryPort) },
+    env: { CI: '', CHAIN_NATIVE_SMOKE_PORT: String(same.deliveryPort) },
     expectedError: /must be distinct/,
+  });
+
+  const ciMode = await createQualificationFixture(t);
+  await assertQualificationSetupRejected(t, ciMode, {
+    env: { CI: 'true' },
+    expectedError: /CI=true.*local qualification/,
   });
 });
 

@@ -262,6 +262,9 @@ async function validateQualificationReadiness({ repo, evidenceDirectory, environ
   if (status.code !== 0) throw new Error('Qualification readiness could not verify the committed worktree status.');
   if (status.stdout.length) throw new Error('Qualification readiness requires the committed candidate working tree to be clean.');
 
+  if (environment.CI === 'true') {
+    throw new Error('CI=true cannot be used for local qualification: native smoke switches to ephemeral port 0 and ignores the allocated CHAIN_NATIVE_SMOKE_PORT.');
+  }
   const deliveryPort = requirePort(environment, 'CHAIN_NATIVE_PORT');
   const smokePort = requirePort(environment, 'CHAIN_NATIVE_SMOKE_PORT');
   if (deliveryPort === smokePort) throw new Error('CHAIN_NATIVE_PORT and CHAIN_NATIVE_SMOKE_PORT must be distinct ports.');

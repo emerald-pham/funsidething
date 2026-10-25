@@ -3273,7 +3273,7 @@
       "file": "scripts/agent-tools/record-run.test.mjs"
     },
     {
-      "root": "qualification readiness requires distinct explicit local ports even when CI is true",
+      "root": "qualification readiness requires distinct explicit local ports and rejects CI mode",
       "group": "native-process",
       "file": "scripts/agent-tools/record-run.test.mjs"
     },

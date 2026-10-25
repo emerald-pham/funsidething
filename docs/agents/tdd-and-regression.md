@@ -91,7 +91,8 @@ For an expensive local full-suite qualification, invoke the recorder with its
 opt-in `--qualification-readiness` flag as shown in
 [test-run provenance](test-run-provenance.md#local-qualification-readiness).
 That gate also requires a distinct explicitly allocated `CHAIN_NATIVE_SMOKE_PORT`
-owned by the same active worktree; `CI=true` never waives either local allocation.
+owned by the same active worktree. It rejects `CI=true` because native smoke
+would switch to ephemeral port 0 and ignore that allocation.
 Focused behavioral RED/GREEN recorder runs omit the flag.
 
 Serve immutable old and candidate Git assets. A dirty runner may exercise an

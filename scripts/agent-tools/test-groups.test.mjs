@@ -179,13 +179,13 @@ function createFixture(t, options = {}) {
   return { root, baselineSha, comparisonBase, sourceSha, outputs, coreTitle, groupAssignments };
 }
 
-function isolatedFixtureNativeOutput(fixture) {
+function isolatedFixtureNativeOutput(fixture, inheritedEnvironment = process.env) {
   const output = fs.mkdtempSync(path.join(os.tmpdir(), 'chain-test-group-native-fixture-'));
   fixture.outputs.push(output);
   return {
     output,
     env: {
-      ...process.env,
+      ...inheritedEnvironment,
       CHAIN_NATIVE_OUTPUT: output,
       CHAIN_NATIVE_CANDIDATE_SHA: fixture.sourceSha,
       CHAIN_NATIVE_CANDIDATE_TREE: git(fixture.root, 'rev-parse', 'HEAD^{tree}'),
@@ -322,10 +322,27 @@ test('test group runner reconciles complete full and grouped fixture cohorts', t
   const fixture = createFixture(t);
   const outerNativeOutput = fs.mkdtempSync(path.join(os.tmpdir(), 'chain-test-group-outer-native-'));
   fs.rmSync(outerNativeOutput, { recursive: true });
-  const nativeFixture = isolatedFixtureNativeOutput(fixture);
+  fixture.outputs.push(outerNativeOutput);
+  const fixtureArgs = ['--test', '--test-reporter=tap', 'tests.js', 'scripts/agent-tools/fixture.test.mjs'];
+  const callerEnv = {
+    ...process.env,
+    CHAIN_NATIVE_OUTPUT: outerNativeOutput,
+    CHAIN_NATIVE_CANDIDATE_SHA: fixture.sourceSha,
+    CHAIN_NATIVE_CANDIDATE_TREE: git(fixture.root, 'rev-parse', 'HEAD^{tree}'),
+  };
+  delete callerEnv.NODE_TEST_CONTEXT;
+  const unisolated = run(process.execPath, fixtureArgs, fixture.root, callerEnv);
+  const unisolatedOutput = `${unisolated.stdout}\n${unisolated.stderr}`;
+  assert.notEqual(unisolated.status, 0, 'the nested fixture proves it writes to its inherited native output without isolation');
+  const negativeControlError = unisolatedOutput.split(/\r?\n/).find(line => line.includes('ENOENT') && line.includes('candidate-identity.json'));
+  assert.ok(negativeControlError, `expected ENOENT for candidate-identity.json, got:\n${unisolatedOutput}`);
+  t.diagnostic(`Nested output negative control: ${negativeControlError}`);
+  assert.equal(fs.existsSync(outerNativeOutput), false, 'the missing caller evidence directory is not created implicitly');
+
+  const nativeFixture = isolatedFixtureNativeOutput(fixture, callerEnv);
   const fullEnv = { ...nativeFixture.env };
-  delete fullEnv.NODE_TEST_CONTEXT;
-  const full = run(process.execPath, ['--test', '--test-reporter=tap', 'tests.js', 'scripts/agent-tools/fixture.test.mjs'], fixture.root, fullEnv);
+  assert.notEqual(fullEnv.CHAIN_NATIVE_OUTPUT, callerEnv.CHAIN_NATIVE_OUTPUT, 'the nested fixture gets a separate output directory');
+  const full = run(process.execPath, fixtureArgs, fixture.root, fullEnv);
   assert.equal(full.status, 0, `${full.stdout}\n${full.stderr}`);
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(nativeFixture.output, 'candidate-identity.json'), 'utf8')),
     { sha: fixture.sourceSha, tree: fullEnv.CHAIN_NATIVE_CANDIDATE_TREE }, 'the nested full fixture keeps candidate identity in its own output directory');
