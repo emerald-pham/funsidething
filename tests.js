@@ -6215,12 +6215,22 @@ const HTML_PATH = path.join(__dirname, "index.html");
 const html = fs.readFileSync(HTML_PATH, "utf8");
 const lzStringSrc = fs.readFileSync(path.join(__dirname, "vendor/lz-string-1.5.0.min.js"), "utf8");
 
+const sceneTimelineScripts=new Map();
+function runSceneTimelineScript(source,context){
+ let script=sceneTimelineScripts.get(source);
+ if(script){sceneTimelineScripts.delete(source);sceneTimelineScripts.set(source,script);}
+ else{
+  script=new vm.Script(source);sceneTimelineScripts.set(source,script);
+  if(sceneTimelineScripts.size>48)sceneTimelineScripts.delete(sceneTimelineScripts.keys().next().value);
+ }
+ return script.runInContext(context);
+}
 function sceneTimeline(transforms={}) {
  const context=vm.createContext({Date,Math,Intl,console});
  for(const file of ['landscape-config.js','vendor/astronomy.min.js','stars.js','landscape-core.js','landscape-geometry.js','landscape-visits.js','landscape-timeline.js']){
   assert.ok(fs.existsSync(path.join(__dirname,file)),`deterministic scenery module missing: ${file}`);
   const source=fs.readFileSync(path.join(__dirname,file),'utf8');
-  vm.runInContext(transforms[file]?transforms[file](source):source,context);
+  runSceneTimelineScript(transforms[file]?transforms[file](source):source,context);
  }
  return context;
 }
@@ -34900,6 +34910,59 @@ test('RISK motion review harness: frozen actual actor painters reconstruct repea
   const outer=html.match(/<script>([\s\S]*)<\/script>/)[1];new vm.Script(outer);
   const pages=JSON.parse(outer.match(/,pages=(.*);document.getElementById/)[1]);for(const page of pages)new vm.Script(page.match(/<script>([\s\S]*)<\/script>/)[1]);
  }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+
+test('RISK immutable scenery fixture preparation: exact source reuse keeps fresh consumer contexts and known output',async()=>{
+ const {readMotionBuild,createMotionProbe}=await import('./scripts/motion-review-harness.mjs');
+ const marker='ci266-'+process.pid+'-'+Date.now(),stateKey='__ci266FixtureState'+process.pid,compiled=[],contexts=[];
+ const runDescriptor=Object.getOwnPropertyDescriptor(vm,'runInContext'),scriptDescriptor=Object.getOwnPropertyDescriptor(vm,'Script'),contextDescriptor=Object.getOwnPropertyDescriptor(vm,'createContext');
+ const observe=source=>{if(typeof source==='string'&&source.includes(marker))compiled.push(source);};
+ vm.runInContext=function(source,...args){observe(source);return Reflect.apply(runDescriptor.value,this,[source,...args]);};
+ vm.Script=new Proxy(scriptDescriptor.value,{construct(target,args){observe(args[0]);return Reflect.construct(target,args,target);}});
+ vm.createContext=function(...args){const context=Reflect.apply(contextDescriptor.value,this,args);contexts.push(context);return context;};
+ try{
+  const sceneFiles=['landscape-config.js','vendor/astronomy.min.js','stars.js','landscape-core.js','landscape-geometry.js','landscape-visits.js','landscape-timeline.js'];
+  const annotate=(source,label)=>source+'\n/*'+marker+':'+label+' */'+(label.endsWith('landscape-config.js')?'\nglobalThis['+JSON.stringify(stateKey)+']=(globalThis['+JSON.stringify(stateKey)+' ]||0)+1;':'');
+  const sceneTransforms=Object.fromEntries(sceneFiles.map(file=>[file,source=>annotate(source,'scene:'+file)]));
+  const sceneStart=compiled.length,contextStart=contexts.length,sceneA=sceneTimeline(sceneTransforms),sceneAfterA=compiled.length;
+  assert.equal(sceneAfterA-sceneStart,7,'first real scene consumer compiles each exact source once');
+  const sceneB=sceneTimeline(sceneTransforms),sceneAfterB=compiled.length;
+  assert.equal(sceneAfterB-sceneAfterA,0,'repeat real scene consumer reuses immutable compiled source');
+  assert.notStrictEqual(contexts[contextStart],contexts[contextStart+1],'scene module bytecode executes in fresh mutable contexts');
+  assert.equal(contexts[contextStart][stateKey],1);assert.equal(contexts[contextStart+1][stateKey],1,'module globals start fresh even when bytecode is reused');
+  const clock=Date.parse('2026-10-06T03:23:42.125Z'),sceneOptions={seed:'ci266-known-scene',season:'summer',sunAt:()=>({altitude:-20,azimuth:0})};
+  const sceneAt=context=>JSON.parse(JSON.stringify(context.LandscapeTimeline.create(sceneOptions).at(clock)));
+  const sceneExpected=sceneAt(sceneTimeline());
+  assert.deepEqual(sceneAt(sceneA),sceneExpected,'comment-only source keys preserve the independent known scene');
+  assert.deepEqual(sceneAt(sceneB),sceneExpected,'cached scene module output matches the independent known scene');
+  const changedSceneTransforms={...sceneTransforms,'stars.js':source=>sceneTransforms['stars.js'](source)+'\n/*'+marker+':changed-stars-source */'};
+  const sceneBeforeChange=compiled.length,sceneChanged=sceneTimeline(changedSceneTransforms);
+  assert.equal(compiled.length-sceneBeforeChange,1,'one changed exact scene source causes one compilation');
+  assert.equal(contexts[contextStart+3][stateKey],1,'the changed-source scene also receives fresh module state');
+  assert.deepEqual(sceneAt(sceneChanged),sceneExpected,'a changed comment-only source retains the exact scene outcome');
+
+  const build=readMotionBuild(__dirname,'WORKTREE'),sources=Object.fromEntries(Object.entries(build.sources).map(([file,source])=>[file,annotate(source,'motion:'+file)]));
+  sources['landscape.js']=sources['landscape.js'].replace('  function person(','  function person(/*'+marker+':motion:painter */');
+  const markedBuild={...build,sources},sampleOptions={actor:'walker',progress:.5,duration:100,seed:.4,lane:.5,zoom:1};
+  const reference=createMotionProbe(build,{width:390,height:844}).sample(sampleOptions);
+  const motionStart=compiled.length,motionContextStart=contexts.length;
+  const first=createMotionProbe(markedBuild,{width:390,height:844}).sample(sampleOptions),motionAfterFirst=compiled.length;
+  assert.equal(motionAfterFirst-motionStart,8,'first actual painter consumer compiles seven modules and its painter');
+  const second=createMotionProbe(markedBuild,{width:390,height:844}).sample(sampleOptions);
+  assert.equal(compiled.length-motionAfterFirst,0,'repeat actual painter consumer reuses immutable compiled source');
+  assert.notStrictEqual(contexts[motionContextStart],contexts[motionContextStart+1],'painter bytecode executes in fresh mutable contexts');
+  assert.equal(contexts[motionContextStart][stateKey],1);assert.equal(contexts[motionContextStart+1][stateKey],1,'painter module globals start fresh on every probe');
+  assert.deepEqual(first,reference,'instrumented source produces the independent actual painter output');
+  assert.deepEqual(second,reference,'compiled reuse retains every actual painter command and metadata');
+  const changedSources={...sources,'landscape-geometry.js':sources['landscape-geometry.js']+'\n/*'+marker+':changed-geometry-source */'},changedBuild={...markedBuild,sources:changedSources};
+  assert.equal(changedBuild.sourcesHash,markedBuild.sourcesHash,'fixture retains a deliberately stale aggregate hash to discriminate exact source keys');
+  const motionBeforeChange=compiled.length,third=createMotionProbe(changedBuild,{width:390,height:844}).sample(sampleOptions);
+  assert.equal(compiled.length-motionBeforeChange,1,'one changed exact painter module source causes one compilation despite the same aggregate hash');
+  assert.equal(contexts[motionContextStart+2][stateKey],1,'changed-source painter still receives fresh module state');
+  assert.deepEqual(third,reference,'the changed comment-only module preserves the independent actual painter output');
+ }finally{
+  Object.defineProperty(vm,'runInContext',runDescriptor);Object.defineProperty(vm,'Script',scriptDescriptor);Object.defineProperty(vm,'createContext',contextDescriptor);
+ }
 });
 
 test('RISK walking scope guidance: extended FAQ and changelog describe walker winter woodland and held-line improvements',()=>{

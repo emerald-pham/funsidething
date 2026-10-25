@@ -852,6 +852,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK motion review harness: frozen actual actor painters reconstruct repeatable before-after sequences across direction viewport and reduced motion
 - RISK walking scope guidance: extended FAQ and changelog describe walker winter woodland and held-line improvements
 - RISK motion harness controls: nonfinite actual painter commands are rejected and foreground deer use their real travel anchor
+- RISK immutable scenery fixture preparation: exact source reuse keeps fresh consumer contexts and known output
 
 - RISK snowangel departing shadow: actual winter painter follows the standing person and preserves the fixed imprint
 
