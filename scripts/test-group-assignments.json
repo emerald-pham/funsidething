@@ -12581,6 +12581,36 @@
       "root": "RISK offline unreadable backup status: useful unsaved work names the protected cause without quota or durability claims",
       "group": "persistence-recovery",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud recovery device read: a temporary database server failure completes the same review without changing sources",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud recovery device read: repeated failures stop honestly and share the cloud retry budget",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud recovery device read: cancellation changed authority and expired budgets cannot restart obsolete review",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud recovery device read: recovered diagnostics keep the failed attempt without private error text",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud recovery device read: permanent storage errors never enter the automatic recheck",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud recovery device read guidance: mounted FAQ and changelog explain the bounded device recheck",
+      "group": "core",
+      "file": "tests.js"
     }
   ],
   "processControls": [

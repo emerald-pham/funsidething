@@ -2197,3 +2197,12 @@ This boundary control holds a successful real provider reply, installs a later a
 - RISK offline unreadable backup status: useful unsaved work names the protected cause without quota or durability claims
 
 - Actual Firestore SDK/classic-app fixtures share the exact app window and real loaded codecs, preserving live planner, storage and backend authority checks rather than a disconnected module window. Original full-shell acknowledgement and rules-first refusal assertions remain unchanged in `Firestore rules: immutable decision-aware full shell conflicts then safely holds same-account completion-upgrade authority and its local edit` and `Firestore rules: first decision against released rules stays exact and pending until rules-first rollout then retry`.
+
+## Cloud recovery interrupted database reads
+
+- RISK cloud recovery device read: a temporary database server failure completes the same review without changing sources
+- RISK cloud recovery device read: repeated failures stop honestly and share the cloud retry budget
+- RISK cloud recovery device read: cancellation changed authority and expired budgets cannot restart obsolete review
+- RISK cloud recovery device read: recovered diagnostics keep the failed attempt without private error text
+- RISK cloud recovery device read: permanent storage errors never enter the automatic recheck
+- RISK cloud recovery device read guidance: mounted FAQ and changelog explain the bounded device recheck

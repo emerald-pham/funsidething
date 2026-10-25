@@ -25,6 +25,143 @@ function test(...args){
  });
 }
 
+async function injectRecoveryDatabaseFailure187(t,app,{key='pending:owner',failAt=[1],errorName='UnknownError',beforeRequest=false,onFailure=()=>{}}={}){
+ const {IDBDatabase}=await import('fake-indexeddb'),originalTransaction=IDBDatabase.prototype.transaction;
+ const observed={reads:0,failures:0};
+ // Inject a browser database-server abort after a native request succeeds.
+ // The real app and storage consumers still run; only the OS boundary fails.
+ IDBDatabase.prototype.transaction=function(names,mode,...args){
+  const tx=originalTransaction.call(this,names,mode,...args);
+  if(mode==='readonly'&&this.name===app.deviceDbName){
+   const objectStore=tx.objectStore.bind(tx);
+   tx.objectStore=name=>{
+    const source=objectStore(name),get=source.get.bind(source);
+    source.get=requestedKey=>{
+     const fail=name==='meta'&&requestedKey===key&&failAt.includes(++observed.reads),trigger=fail&&beforeRequest?source.count():null;
+     const request=get(requestedKey);
+     if(fail){
+      observed.failures++;
+      (trigger??request).addEventListener('success',()=>{
+       Object.defineProperty(tx,'error',{configurable:true,value:Object.assign(Error('An internal error was encountered in the Indexed Database server'),{name:errorName})});
+       onFailure();
+       tx.abort();
+      },{once:true});
+     }
+     return request;
+    };
+    return source;
+   };
+  }
+  return tx;
+ };
+ t.after(()=>{IDBDatabase.prototype.transaction=originalTransaction;});
+ return observed;
+}
+
+test('RISK cloud recovery device read: a temporary database server failure completes the same review without changing sources',async t=>{
+ const cases=['pending:owner','recoveryCloudHold','head'].flatMap(key=>[false,true].map(beforeRequest=>({key,beforeRequest,failAt:[1]})));
+ cases.push({key:'pending:owner',failAt:[2]},{key:'pending:owner',failAt:[5]},{key:'pending:owner',failAt:[1],errorName:'InvalidStateError'});
+ for(const options of cases)await t.test(JSON.stringify(options),async t=>{
+ const app=await freshSourceCheckFixture187(t),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+ shim.document.getElementById('addInput').value='Unfinished task during database recovery';
+ const local=JSON.stringify(ctx.state),head=await store.readHead(),raw=await store.readRawExportSnapshot(),cloud=JSON.stringify([...backend.docs]),writes=backend.writes.length;
+ const observed=await injectRecoveryDatabaseFailure187(t,app,options);
+ ctx.onAction('sync',{});
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="review-cloud-source-recovery"/);
+ const reviewed=await ctx.onAction('review-cloud-source-recovery',{});
+ assert.equal(observed.failures,1,'the browser read fails during the actual recovery action');
+ assert.equal(reviewed,true,'a temporary Indexed Database server failure must recover in the same review action: '+shim.document.getElementById('modalRoot').innerHTML);
+ const modal=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(modal,/data-act="choose-cloud-recovery-source"/);
+ assert.doesNotMatch(modal,/data-act="choose-cloud-recovery-source"[^>]*aria-pressed="true"/);
+ assert.match(modal,/data-act="apply-cloud-source-recovery"[^>]*disabled/);
+ assert.equal(JSON.stringify(ctx.state),local);assert.deepEqual(await store.readHead(),head);assert.deepEqual(await store.readRawExportSnapshot(),raw);
+ assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal(backend.writes.length,writes);
+ assert.equal(shim.document.getElementById('addInput').value,'Unfinished task during database recovery');
+ });
+});
+
+test('RISK cloud recovery device read: repeated failures stop honestly and share the cloud retry budget',async t=>{
+ for(const mixed of [false,true])await t.test(mixed?'device then cloud':'repeated database failure',async t=>{
+  const app=await freshSourceCheckFixture187(t),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+  const local=JSON.stringify(ctx.state),raw=await store.readRawExportSnapshot(),cloud=JSON.stringify([...backend.docs]),writes=backend.writes.length;
+  const observed=await injectRecoveryDatabaseFailure187(t,app,{failAt:mixed?[1]:[1,2]});let roots=0;
+  if(mixed)app.faults.serverRead=async path=>{if(path==='users/owner'){roots++;throw Object.assign(Error('Synthetic unavailable cloud'),{code:'unavailable'});}};
+  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),false);
+  assert.equal(observed.failures,mixed?1:2);assert.equal(roots,mixed?1:0,'a device restart cannot grant a second cloud restart');
+  const modal=shim.document.getElementById('modalRoot').innerHTML;
+  assert.doesNotMatch(modal,/data-act="choose-cloud-recovery-source"/);assert.match(modal,/Checks have stopped/);
+  if(!mixed)assert.match(modal,/device.*saved data.*could not be read/i,'the terminal message identifies the affected device read');
+  assert.match(modal,/automatic recheck has stopped/i);assert.doesNotMatch(modal,/internal error|Indexed Database server/);
+  assert.equal(JSON.stringify(ctx.state),local);assert.deepEqual(await store.readRawExportSnapshot(),raw);assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal(backend.writes.length,writes);
+ });
+});
+
+test('RISK cloud recovery device read: cancellation changed authority and expired budgets cannot restart obsolete review',async t=>{
+ for(const change of ['cancel','draft','accepted edit','backend','UID','deadline','protected browser','protected fallback','pending before hold failure','hold before head failure'])await t.test(change,async t=>{
+  const app=await freshSourceCheckFixture187(t),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+  const local=JSON.stringify(ctx.state),head=await store.readHead(),cloud=JSON.stringify([...backend.docs]),writes=backend.writes.length;let accepted=null,mutation=null;
+  const writer=await new Promise((resolve,reject)=>{const request=app.indexedDB.open(app.deviceDbName,1);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});t.after(()=>writer.close());
+  const changedRecord={account:'e@example.com',identity:'owner',generationId:'new-protected-intent',payloadHash:'e'.repeat(64),baseRev:4,futureProtected:[3,7]};
+  const observed=await injectRecoveryDatabaseFailure187(t,app,{key:change==='pending before hold failure'?'recoveryCloudHold':change==='hold before head failure'?'head':'pending:owner',onFailure:()=>{
+   if(change==='protected browser')shim.localStorage.setItem(LOCAL_HEAD_KEY,'New sole browser original');
+   if(change==='protected fallback')shim.localStorage.setItem(SYNC_STORE_KEY,'New sole fallback original');
+   if(change==='pending before hold failure'||change==='hold before head failure')mutation=new Promise((resolve,reject)=>{
+    const tx=writer.transaction('meta','readwrite');tx.objectStore('meta').put(changedRecord,change==='pending before hold failure'?'pending:owner':'recoveryCloudHold');tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error);
+   });
+   if(change==='cancel')ctx.onAction('close-modal',{});
+   if(change==='draft')shim.document.getElementById('addInput').value='Newer unfinished review task';
+   if(change==='accepted edit'){shim.document.getElementById('addInput').value='Accepted while the database read fails';accepted=Promise.resolve(ctx.onAction('add',{})).then(()=>ctx.persist());}
+   if(change==='backend')ctx.window.CloudSync={...backend.CS};
+   if(change==='UID')backend.emitAuth({uid:'different-owner',email:'e@example.com'});
+   if(change==='deadline'){const now=ctx.performance.now();ctx.performance={now:()=>now+60001};}
+  }});
+  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),false);if(accepted)assert.equal(await accepted,true);if(mutation)await mutation;await flush();
+  assert.equal(observed.failures,1);assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="choose-cloud-recovery-source"/);
+  if(change==='cancel')assert.equal(shim.document.getElementById('modalRoot').innerHTML,'');
+  if(change==='accepted edit')assert.ok(JSON.parse((await store.readHead()).payload).tasks.some(row=>row.title==='Accepted while the database read fails'));
+  else{assert.equal(JSON.stringify(ctx.state),local);assert.deepEqual(await store.readHead(),head);}
+  if(change==='draft')assert.equal(shim.document.getElementById('addInput').value,'Newer unfinished review task');
+  if(change==='protected browser')assert.equal(shim.localStorage.getItem(LOCAL_HEAD_KEY),'New sole browser original');
+  if(change==='protected fallback')assert.equal(shim.localStorage.getItem(SYNC_STORE_KEY),'New sole fallback original');
+  if(change==='pending before hold failure')assert.deepEqual(await store.getPendingUpload('owner'),changedRecord);
+  if(change==='hold before head failure')assert.deepEqual(await store.getRecoveryCloudHold(),changedRecord);
+  assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal(backend.writes.length,writes);
+ });
+});
+
+test('RISK cloud recovery device read: recovered diagnostics keep the failed attempt without private error text',async t=>{
+ const app=await freshSourceCheckFixture187(t),{ctx,shim}=app;let progress='';
+ app.faults.serverRead=async()=>{progress||=shim.document.getElementById('modalRoot').innerHTML;};
+ await injectRecoveryDatabaseFailure187(t,app);
+ assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);
+ assert.match(progress,/device.*read was interrupted/i,'the retry describes the interrupted device read without claiming a source changed');
+ const text=ctx.supportDiagnosticsText(),report=JSON.parse(text);
+ assert.ok(report.sourceOperations.some(op=>op.status==='failed'&&op.events.some(event=>event.stage==='source-read'&&event.status==='failed'&&event.code.value==='unavailable')),'the failed device read remains visible as a bounded unavailable event');
+ assert.ok(report.sourceOperations.some(op=>op.status==='completed'));
+ assert.doesNotMatch(text,/Indexed Database server|pending:owner|Device source only|Fixture A/);assert.ok(Buffer.byteLength(text)<=24*1024);
+});
+
+test('RISK cloud recovery device read: permanent storage errors never enter the automatic recheck',async t=>{
+ for(const errorName of ['SecurityError','QuotaExceededError','AbortError','NotFoundError'])await t.test(errorName,async t=>{
+  const app=await freshSourceCheckFixture187(t),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+  const local=JSON.stringify(ctx.state),raw=await store.readRawExportSnapshot(),cloud=JSON.stringify([...backend.docs]),writes=backend.writes.length;
+  const observed=await injectRecoveryDatabaseFailure187(t,app,{errorName});
+  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),false);assert.equal(observed.reads,1);
+  assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="choose-cloud-recovery-source"/);
+  assert.equal(JSON.stringify(ctx.state),local);assert.deepEqual(await store.readRawExportSnapshot(),raw);assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal(backend.writes.length,writes);
+ });
+});
+
+test('RISK cloud recovery device read guidance: mounted FAQ and changelog explain the bounded device recheck',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(markup,/<dt>Why does a recovery check retry or stop\?<\/dt><dd>A temporary device database failure/);
+ assert.match(markup,/one safe automatic recheck/i);assert.match(markup,/original one-minute limit/i);
+ assert.match(markup,/<li>Cloud recovery retries a temporary device database failure without changing saved sources/,'the mounted changelog includes the released behavior');
+});
+
 test('RISK device database repair guidance: mounted FAQ distinguishes offline exact-copy repair from protected unresolved sources',async()=>{
  const app=await loadApp();app.ctx.openHelp();
  const markup=app.shim.document.getElementById('modalRoot').innerHTML;
@@ -2910,7 +3047,7 @@ test('RISK cloud source lifecycle guidance: mounted Help explains inspection and
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  assert.match(html,/Recovery refuses stale choices when protected device information changes/);
  assert.match(help,/Changed protected information needs a fresh choice/);assert.match(help,/If cloud saving finishes but local recovery stays held, the message says so/);
- assert.match(help,/Can I inspect one cloud copy when another cannot be read/);assert.match(help,/A readable copy does not make it eligible to replace your board/);assert.match(help,/Why does a recovery check retry or stop/);assert.match(help,/Both share the original one-minute limit/);assert.match(html,/Recovery can recheck an unavailable cloud read once/);
+ assert.match(help,/Can I inspect one cloud copy when another cannot be read/);assert.match(help,/A readable copy does not make it eligible to replace your board/);assert.match(help,/Why does a recovery check retry or stop/);assert.match(help,/All share the original one-minute limit/);assert.match(html,/Recovery can recheck an unavailable cloud read once/);
 });
 
 test('RISK cloud source fresh check: a transient root change inside the first capture verifies automatically',async t=>{

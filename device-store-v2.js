@@ -61,6 +61,19 @@
     transaction.onerror=()=>reject(transaction.error||new Error("IndexedDB transaction failed"));
     transaction.onabort=()=>reject(transaction.error||new Error("IndexedDB transaction aborted"));
   });
+  async function readonlyResults(tx,requests){
+    const done=transactionDone(tx);
+    try{
+      // A server failure can abort requests before its own transaction error.
+      // Observe both immediately and retain that cause without leaking a
+      // second unhandled rejection. This helper never retries a mutation.
+      const [values]=await Promise.all([Promise.all(requests),done]);return values;
+    }catch(error){
+      try{tx.abort();}catch{}
+      try{await done;}catch{}
+      throw tx.error||error;
+    }
+  }
 
   function createDeviceStore({indexedDB=root.indexedDB,crypto=root.crypto,dbName="chain-scanner-v2",openTimeoutMs=5000,encodeRecoveryValue=null,onRecovery=null}={}){
     if(!indexedDB) throw new Error("IndexedDB is unavailable");
@@ -167,12 +180,10 @@
     async function readHead(){
       ensureOpen();
       const tx=await beginTransaction(["meta","snapshots"],"readonly");
-      const done=transactionDone(tx);
-      const [meta,snapshots]=await Promise.all([
+      const [meta,snapshots]=await readonlyResults(tx,[
         requestResult(tx.objectStore("meta").get("head")),
         requestResult(tx.objectStore("snapshots").getAll()),
       ]);
-      await done;
       if(!meta) return null;
       if(typeof meta!=="object"||meta.schemaVersion!==SCHEMA_VERSION||typeof meta.hash!=="string"||!/^[0-9a-f]{64}$/.test(meta.hash))
         throw new Error("Durable device head format is unsupported");
@@ -348,8 +359,8 @@
       }catch(error){try{tx.abort();}catch{}try{await done;}catch{}throw error;}
     }
     async function getRecoveryCloudHold(){
-      ensureOpen();const tx=await beginTransaction("meta","readonly"),done=transactionDone(tx);
-      const hold=await requestResult(tx.objectStore("meta").get("recoveryCloudHold"));await done;return hold??null;
+      ensureOpen();const tx=await beginTransaction("meta","readonly");
+      const [hold]=await readonlyResults(tx,[requestResult(tx.objectStore("meta").get("recoveryCloudHold"))]);return hold??null;
     }
     async function clearRecoveryCloudHold({expectedHeadHash,expectedHead,encodeHead=pendingJSON,expectedHold,encodeHold=pendingJSON}={}){
       ensureOpen();if(typeof expectedHeadHash!=="string"||!expectedHold)return false;
@@ -530,8 +541,8 @@
     const pendingKey=account=>"pending:"+account;
     async function getPendingUpload(account){
       ensureOpen();if(typeof account!=="string"||!account)return null;
-      const tx=await beginTransaction("meta","readonly"),done=transactionDone(tx),value=await requestResult(tx.objectStore("meta").get(pendingKey(account)));
-      await done;return value||null;
+      const tx=await beginTransaction("meta","readonly"),[value]=await readonlyResults(tx,[requestResult(tx.objectStore("meta").get(pendingKey(account)))]);
+      return value||null;
     }
     function pendingJSON(value){
       const ancestors=new Set(),valid=value=>{
