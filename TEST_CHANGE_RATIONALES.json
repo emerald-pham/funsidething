@@ -1,6 +1,25 @@
 [
   {
     "baseCommit": "0e47ebfa1ed2331f68ef3a9e2f345085c05a7f19",
+    "testChangesSha256": "4d43a78cf7d27af54275760494643a74e9409591f2d541fae32d5a0553d45a0f",
+    "reason": "Prevent a completed or rejected clipboard request from changing the busy state and status of a newer prepared export after the user closes and reopens the dialog. Reconcile the retained failed-save diagnostic to the single Export flow without weakening accepted-unsaved-data coverage.",
+    "previousBehavior": "Copy completion used shared transfer controls without checking which prepared export owned the request. Settling request A released the busy controls and overwrote the status of pending request B.",
+    "intendedBehavior": "Only the active export generation may update transfer status or release busy controls. Late success and failure from a closed generation are ignored, while the current request completes normally.",
+    "replacementTests": [
+      "RISK JSON COPY PASTE: stale clipboard completion cannot release a newer export transfer"
+    ],
+    "preservedCoverage": [
+      "Existing direct clipboard, download byte equality, accepted unsaved fields, raw-source preservation, protected paste/import, and clipboard denial tests are unchanged. The additional test exercises both late success and late failure and refuses another press while the current request is pending.",
+      "The native WebKit 400-task consumer remains the independently asserted product reproduction; this focused app consumer provides quick coverage of both completion outcomes.",
+      "The ordinary edits and Undo save-failure case keeps every quota, toast, missing-proof and retry assertion. Its obsolete View / copy current board label assertion becomes one Export control plus actual archive readback of the unsaved Undo title. Existing Undo FAQ wording assertions remain unchanged; the route answer is shortened to the existing130-word limit."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <integration-worktree> --evidence-dir <task-artifacts>/clipboard/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern='RISK JSON COPY PASTE: stale clipboard completion' tests.js",
+      "failure": "Native WebKit RED5fe38064 first demonstrated pending Copy B enabled and falsely reported Copied after A settled. Before runtime edits, focused REDab89abe8 failed both resolve and reject at false !== true for the newer Copy disabled state. Additional mounted FAQ REDf61496dd failed the missing pending/late-result explanation. GREENb77806ec passes the complete JSON copy/paste and database export cohort. RED731b8000 repeats the lifecycle cases only because its FAQ selector did not match; it is not FAQ evidence. Full records are outside Git in task-artifacts/webkit-button-safety-20261025/clipboard/runs and gate/clipboard-lifecycle. Preflight5dd3cd1b exposed the expanded route answer at140 words before concise prose; f36d58be retained153 passes and exposed the obsolete viewer label in the ordinary Undo save-failure case. That case now exercises Export and accepted data readback. Final focused224b474b passes brevity, unchanged Undo wording, save failure and Copy/Paste. This is a deliberate coverage migration for the already-authorized consolidated flow, not a new claimed product RED."
+    }
+  },
+  {
+    "baseCommit": "0e47ebfa1ed2331f68ef3a9e2f345085c05a7f19",
     "testChangesSha256": "fcc3e383e18daa824a5b356b11affdd6030a2ddcc55282797394d595db4887e9",
     "reason": "Prevent a completed or rejected clipboard request from changing the busy state and status of a newer prepared export after the user closes and reopens the dialog.",
     "previousBehavior": "Copy completion used shared transfer controls without checking which prepared export owned the request. Settling request A released the busy controls and overwrote the status of pending request B.",

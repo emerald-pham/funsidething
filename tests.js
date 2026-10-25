@@ -18984,7 +18984,10 @@ test('RISK LOCAL DIAGNOSTICS: ordinary edits and Undo identify the exact device 
  assert.equal(JSON.stringify(ctx.deviceSaveIssue()),JSON.stringify({stage:'primary-write',code:'quota-exhausted'}));
  assert.match(shim.document.getElementById('toast').textContent,/device-save:primary-write\/quota-exhausted/);
  ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/primary-write\/quota-exhausted/);
- assert.match(shim.document.getElementById('modalRoot').innerHTML,/View \/ copy current board/);
+ assert.equal((shim.document.getElementById('modalRoot').innerHTML.match(/data-act="export-backup"/g)||[]).length,1);
+ assert.equal(await ctx.onAction('export-backup',{isConnected:true}),true);
+ const exported=JSON.parse(await copyPreparedExport(ctx));
+ assert.equal(exported.currentBoard.tasks.find(row=>row.id===task.id).title,original,'Export retains the accepted Undo edit even when its save failed');
  blockOriginal=false;assert.equal(await ctx.persist(),true);assert.equal(ctx.deviceSaveIssue(),null,'a successful retry clears the stale diagnosis');
 
  const missing=await loadApp();
