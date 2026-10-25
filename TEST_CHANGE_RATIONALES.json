@@ -18567,5 +18567,307 @@
       "command": "Parent actual full candidate69b35e5 recorder2026-10-24T23-27-43-941Z-3b4f2149-beee-4923-858d-4970a5360d57 (validation-69b35e5/) retained six real preflight parent failures and three real shutdown/action-budget parent failures before owner cancellation; cancellation is distinct from those failures. Own before-edit Node22 recorder2026-10-24T23-37-51-242Z-732920c4-020e-4c30-b546-4f8d86ee4e92 ran --test --test-name-pattern=RISK recovery fixture shutdown|RISK corrupt work budget fixture tests.js and reproduced both outer marker-assertion failures. Source tests.js was still69b35e5 during that run.",
       "failure": "Existing parent assertions expected a new server revision escapes the held-source gate / FAILED_FIXTURE_OWNED_RESOURCES_CLOSED and the held action deadline consumer markers, but actual nested output was ERR_MODULE_NOT_FOUND for the copied fixture async-probe path. Own recorder correctly labels infrastructure-failure because that nested import error is present; this is a demonstrated introduced acceptance regression, not the original258 feature RED. Root full transcript additionally identifies the first-Add-prefix parent failing the same missing-module path."
     }
+  },
+  {
+    "baseCommit": "d224107e5e56e5455a16e670dad6bdbc951940b5",
+    "testChangesSha256": "cac810e8a3da1489ab18c801bcdf488d10895dbf09ffb205da73f6ceeb0dcd04",
+    "reason": "Reuse one owned Playwright browser process within each existing four-case native recovery status matrix after exact focused profiling showed repeated process launch setup; keep all fixture isolation and deadlines unchanged.",
+    "previousBehavior": "Each of the four theme and viewport cases launched and closed its own browser despite already owning a fresh context and page. The standalone Chromium 151 profile measured 790.86ms for four separate launch/context/page cycles and 233.47ms for one launch plus four fresh context/page cycles. On d224107 the complete history and startup matrices took 70.98s and 18.44s; the historical matrix includes its real 16-second ACK, so whole-run timing does not isolate launch cost.",
+    "intendedBehavior": "Launch one browser per native matrix and pass it to all four cases. Each case still creates and closes its own BrowserContext and page, synthetic SDK fixture, account state, board, backend map, deferred gates and evidence files. Preserve all four theme and viewport cases, every existing recovery status and neighboring-control assertion, the real 16-second entered ACK, and the original child process and action-deadline controls. This changes test fixture setup only; application runtime and recovery behavior are untouched.",
+    "replacementTests": [
+      "RISK integrated automatic recovery native: persisted startup status and neighboring controls remain usable with one browser and isolated contexts"
+    ],
+    "preservedCoverage": [
+      "The historical and startup native matrices still run light and dark at 390 and 1280 widths. The launch-count guard also requires exactly four distinct fresh BrowserContexts and pages. Per-case account, board, synthetic SDK backend and gates remain constructed inside runNativeRecoveryInspection226; each case retains its own t.after cleanup and screenshots/JSON evidence.",
+      "The historical status path retains retry timer earning and delivery, checking, unsupported-source stop, current-owner ACK, superseded refusal, real account signout, protected archive bytes, later durable edit and unfinished draft. The dark 390 case retains its actual entered 16-second SDK reply and original deadline. No status, neighbor focus, startup, reopen, undo or acknowledgement assertion was removed.",
+      "The held-device-commit and synchronous first-Add-prefix child fixtures remain unchanged: each creates its own temporary child consumer and node_modules link, holds the actual operation beyond the original single 20000ms deadline, requires the normal child exit and original failure, and rejects late synchronous success after deadline. Post-change focused controls passed with 20001ms held commit, 21005ms Add prefix, and the late-success refusal.",
+      "No product file, recovery runtime, persistence behavior, UI copy, account authority, or public process boundary changes. No fixed sleep was shortened and no fake clock was substituted for either earned stall."
+    ],
+    "redEvidence": {
+      "command": "CHAIN_RECOVERY_TEST_ENGINE=chromium CHAIN_RECOVERY_UI_OUTPUT=/Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/267/red/startup-final-title /usr/bin/time -p -o /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/267/red/startup-final-title.time node --test --test-reporter=tap --test-name-pattern='integrated automatic recovery native: persisted startup status and neighboring controls remain usable with one browser and isolated contexts' tests.js",
+      "failure": "With the shared Browser intentionally withheld, the final-title startup matrix completed all four theme and viewport cases and passed the four-distinct-context/page assertions. The launch guard failed only on process count: actual5, expected1 (the matrix launch plus four per-case launches); outer duration19.78s. Exact command, TAP log, and timing are retained under ci-speedup-263/267/red/startup-final-title. This is the intended setup-cost RED, not a recovery behavior failure."
+    }
+  },
+  {
+    "baseCommit": "d224107e5e56e5455a16e670dad6bdbc951940b5",
+    "testChangesSha256": "07695fb14c6eee364fbbc30a7afe38bcea0214f2a20b5e8aa3eff324a10ff94d",
+    "reason": "Reuse immutable compiled scenery fixtures at their actual test consumers while preserving exact source identity and fresh mutable VM contexts. The process-boundary RED measured seven repeated scene-module compilations for the second identical consumer.",
+    "previousBehavior": "sceneTimeline and createMotionProbe each compiled every unchanged module through vm.runInContext for every fixture context. The preserved upright gait and planner cohorts repeatedly prepared the same immutable source bytes across many independent contexts.",
+    "intendedBehavior": "Compile each exact source string once per display filename in a bounded LRU and execute its vm.Script in every newly created context. A changed source with an unchanged stale aggregate sourcesHash must miss the cache; scene and painter outputs, every original sample, and all existing assertions remain unchanged.",
+    "replacementTests": [
+      "RISK immutable scenery fixture preparation: exact source reuse keeps fresh consumer contexts and known output"
+    ],
+    "preservedCoverage": [
+      "No existing animation or scenery assertion, actor, direction, frame, terrain, viewport, reduced-motion case, planner sweep, sample count, or outcome was removed, skipped, narrowed, or changed. The original ten-test profiling cohort remains byte-for-byte unchanged.",
+      "The new actual-consumer test observes both sceneTimeline and exported createMotionProbe, compares comment-only source variants against independent known scene and full painter outputs, verifies per-context mutable globals begin fresh, and uses a stale sourcesHash plus one changed exact geometry source as a discriminating cache-key negative control.",
+      "The bounded source-keyed caches retain at most48 compiled scripts each and include the motion consumer filename in the key. They cache compilation only; every scene/painter module still executes in a fresh vm context. Product runtime, painter algorithms, planner algorithms, dependencies, UI, scenery design, animation frequency, and browser behavior are untouched.",
+      "Focused before/after CPU and wall timing plus all relevant source SHA-256 identities are recorded separately in ci-speedup-263/266/profile. Timing claims are limited to the repeated local cohort; no hosted Actions or product-runtime speedup is inferred."
+    ],
+    "redEvidence": {
+      "command": "Before cache edits, `node --test --test-name-pattern='RISK immutable scenery fixture preparation' --test-reporter=spec tests.js`; output captured at /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/266/profile/red-process-boundary.log.",
+      "failure": "The real repeated sceneTimeline consumer compiled all seven marked module sources again: the assertion expected zero new immutable-source compilations and observed 7. This is process instrumentation of the existing public fixture boundary, not a private cache-helper test or an infrastructure failure."
+    }
+  },
+  {
+    "baseCommit": "d224107e5e56e5455a16e670dad6bdbc951940b5",
+    "testChangesSha256": "278c7fd5da8090acbb93864bc04fcbe666c13f670328960c04c77dfee4e3ea04",
+    "reason": "The current integration diff combines the #267 native recovery matrix browser reuse with #266 immutable animation-fixture preparation; keep the exact aggregate rationale so neither independently profiled fixture change weakens its coverage.",
+    "previousBehavior": "Each recovery matrix case launched its own browser despite owning an independent context and page. Motion fixture consumers also recompiled unchanged module source for every context, including seven repeat compilations in the discriminating second-consumer RED.",
+    "intendedBehavior": "Each native recovery matrix launches one browser and still creates four independent contexts and pages with fresh case state. Motion fixture consumers reuse compiled vm.Script objects by exact source and filename while executing in each fresh VM context. Both changes remain test-fixture-only.",
+    "replacementTests": [
+      "RISK integrated automatic recovery native: persisted startup status and neighboring controls remain usable with one browser and isolated contexts",
+      "RISK immutable scenery fixture preparation: exact source reuse keeps fresh consumer contexts and known output"
+    ],
+    "preservedCoverage": [
+      "The recovery matrices retain all four theme and viewport cases, fresh contexts/pages, independent account/board/backend/gates/evidence, startup/reopen/ACK/protected-source/newer-edit/draft/Undo assertions, and the historical case real 16-second ACK. The original held-device-commit, first-Add-prefix, late-success, child-exit and 20000ms deadlines remain unchanged.",
+      "The animation fixtures still execute modules in fresh mutable contexts and retain every existing sample, scene, painter, planner, viewport, reduced-motion and source-identity assertion. The cache keys preserve exact source and consumer filename, bounded cache size, and the stale aggregate-hash negative control.",
+      "No product runtime, UI, recovery semantics, persistence, app animation algorithm, public process boundary, test timeout or fake-clock behavior changes. The individual #267 and #266 records above retain their separate profiling and test-first histories."
+    ],
+    "redEvidence": {
+      "command": "#267: exact final-title Chromium startup matrix with shared Browser withheld, node --test --test-name-pattern=\"integrated automatic recovery native: persisted startup status and neighboring controls remain usable with one browser and isolated contexts\" tests.js. #266: node --test --test-name-pattern=\"RISK immutable scenery fixture preparation\" --test-reporter=spec tests.js.",
+      "failure": "#267 ran all four original cases and passed four-distinct-context/page guards, then its process-count assertion observed 5 instead of 1 (19.78s outer wall). #266 actual second consumer observed seven repeated immutable-source compilations where zero were expected. Each is the intended fixture-cost RED with preserved functional assertions."
+    }
+  },
+{
+  "baseCommit": "669840e4c05dfe8cd62be771d67eef2b04e31e33",
+  "testChangesSha256": "a3b8d7446e5ace40bde6585fa56ca75b9296d735b52e3c0c94772be18e6ced49",
+  "reason": "Exercise the accepted public workflow cohort process to prevent source-head-only deduplication and preserve the real synthetic merge and outgoing comparison contexts.",
+  "previousBehavior": "Every push and PR event independently executed npm test even when the complete validation context was already covered by a successful exact PR merge producer.",
+  "intendedBehavior": "A branch consumer avoids only the full cohort covered by a completed exact canonical PR merge producer, retaining its outgoing gates and original producer checkout, run and attempt.",
+  "replacementTests": [
+    "RISK repository process: event routing retains exact merge validation before avoiding a duplicate cohort"
+  ],
+  "preservedCoverage": [
+    "All existing scanner, storage, native installed-client, rules, compatibility and test-first assertions remain unchanged; this adds a process consumer using isolated Git and fake external GitHub/npm boundaries.",
+    "The child test clears inherited NODE_TEST_CONTEXT so it executes its named assertion; the initial vacuous wrapper pass is documented and excluded from feature RED evidence."
+  ],
+  "redEvidence": {
+    "command": "node --test --test-name-pattern='RISK repository process: event routing retains exact merge validation' tests.js > /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/268/canonical-routing-red.log 2>&1",
+    "failure": "Before functional routing implementation, the existing workflow command ran the full cohort twice; the assertion failed with2 !==1 for real outgoing source and distinct synthetic PR merge checkout fixtures."
   }
+},
+{
+  "baseCommit": "d224107e5e56e5455a16e670dad6bdbc951940b5",
+  "testChangesSha256": "629306cd844abe04779695f41540e514aaa914f8067904381af1d815fa0a8c3e",
+  "reason": "Reconcile exact integrated protected-test changes for #266 immutable scenery preparation, #267 isolated recovery browser reuse and #268 public event routing without dropping any existing assertions or original evidence.",
+  "previousBehavior": "Each recovery matrix case launched its own browser despite owning an independent context and page. Motion fixture consumers also recompiled unchanged module source for every context, including seven repeat compilations in the discriminating second-consumer RED. Every push and PR event independently executed npm test even when the complete validation context was already covered by a successful exact PR merge producer.",
+  "intendedBehavior": "Each native recovery matrix launches one browser and still creates four independent contexts and pages with fresh case state. Motion fixture consumers reuse compiled vm.Script objects by exact source and filename while executing in each fresh VM context. Both changes remain test-fixture-only. A branch consumer avoids only the full cohort covered by a completed exact canonical PR merge producer, retaining its outgoing gates and original producer checkout, run and attempt.",
+  "replacementTests": [
+    "RISK integrated automatic recovery native: persisted startup status and neighboring controls remain usable with one browser and isolated contexts",
+    "RISK immutable scenery fixture preparation: exact source reuse keeps fresh consumer contexts and known output",
+    "RISK repository process: event routing retains exact merge validation before avoiding a duplicate cohort"
+  ],
+  "preservedCoverage": [
+    "The recovery matrices retain all four theme and viewport cases, fresh contexts/pages, independent account/board/backend/gates/evidence, startup/reopen/ACK/protected-source/newer-edit/draft/Undo assertions, and the historical case real 16-second ACK. The original held-device-commit, first-Add-prefix, late-success, child-exit and 20000ms deadlines remain unchanged.",
+    "The animation fixtures still execute modules in fresh mutable contexts and retain every existing sample, scene, painter, planner, viewport, reduced-motion and source-identity assertion. The cache keys preserve exact source and consumer filename, bounded cache size, and the stale aggregate-hash negative control.",
+    "No product runtime, UI, recovery semantics, persistence, app animation algorithm, public process boundary, test timeout or fake-clock behavior changes. The individual #267 and #266 records above retain their separate profiling and test-first histories.",
+    "All existing scanner, storage, native installed-client, rules, compatibility and test-first assertions remain unchanged; this adds a process consumer using isolated Git and fake external GitHub/npm boundaries.",
+    "The child test clears inherited NODE_TEST_CONTEXT so it executes its named assertion; the initial vacuous wrapper pass is documented and excluded from feature RED evidence."
+  ],
+  "redEvidence": {
+    "command": "#267: exact final-title Chromium startup matrix with shared Browser withheld, node --test --test-name-pattern=\"integrated automatic recovery native: persisted startup status and neighboring controls remain usable with one browser and isolated contexts\" tests.js. #266: node --test --test-name-pattern=\"RISK immutable scenery fixture preparation\" --test-reporter=spec tests.js. node --test --test-name-pattern='RISK repository process: event routing retains exact merge validation' tests.js > /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/268/canonical-routing-red.log 2>&1",
+    "failure": "#267 ran all four original cases and passed four-distinct-context/page guards, then its process-count assertion observed 5 instead of 1 (19.78s outer wall). #266 actual second consumer observed seven repeated immutable-source compilations where zero were expected. Each is the intended fixture-cost RED with preserved functional assertions. Before functional routing implementation, the existing workflow command ran the full cohort twice; the assertion failed with2 !==1 for real outgoing source and distinct synthetic PR merge checkout fixtures."
+  }
+},
+{
+    "baseCommit": "20b12894edd6c1400f6c7428a109da661d3eac07",
+    "testChangesSha256": "0bede3a6fdcd46a2977d9f70fc2ec7640c23c0fc7523065be19e458eb53af412",
+    "reason": "Prepare the independently pinned historical noon expectation once inside each existing planner scenario, avoiding redundant legacy day-plan reconstruction after historical cache eviction without caching or skipping any current consumer query.",
+    "previousBehavior": "The cold-work and rare-reuse scenarios queried the same immutable historical noon result before and after their full offset sweeps. Both actual historical consumers rebuilt it twice per scenario; the observed behavioral RED saw 2 queries instead of the required 1.",
+    "intendedBehavior": "Capture only that exact historical noon result as a scenario-local const serialized string, parse fresh expected data for each comparison, and still execute every current query and unchanged scene/admission/lifetime assertion after midnight, eviction and backward reseeks. Every other historical offset still executes normally. No cross-source, configuration, options, seed, season or scenario sharing exists.",
+    "replacementTests": [
+      "RISK pedestrian planner cold work: full capacity skips unnecessary lifetime solving without changing admitted scenes or reseeks",
+      "RISK pedestrian planner rare reuse: guard join is unique and complete admitted scenes match prior across rare rates midnight and eviction"
+    ],
+    "preservedCoverage": [
+      "Every existing actor, direction, frame, terrain, viewport, reduced-motion, painter, current scene query, offset order, eviction/backseek, deepEqual, admission, lifetime and guard-join negative-control assertion is retained. The original ten-test cohort and risk identities are unchanged. Accepted samples remain60480 upright,196014 dense corridor and4800 painter.",
+      "Historical expectations are still computed independently from pinned git blobs c21ee6f2a1147636f89cc96dae80aa9ba8ba9ea5 and f8fa176ddfaeedb9b2b7aeaf586b8e71a2e5ce3f through the existing reservation policy. Scope inside each isolated VM/options loop binds all inputs by construction; the string cannot be mutated through returned parsed comparison data.",
+      "Only repeated historical noon preparation is eliminated: 4 cold and8 rare calls. All current .at queries still execute, including final noon after deliberate eviction and reseek; no actual result is memoized or used as its own expected value. No product runtime, source algorithm, saved data, deadline, sample loop or tolerance changes.",
+      "The new observed preparation guard measures the real historical timeline at the approved public scenery consumer; it does not replace any existing result comparison. Numerical focused and comparable10case timing evidence remain distinct from hosted CI or rendered product proof."
+    ],
+    "redEvidence": {
+      "command": "Before functional snapshot capture: node --test --test-name-pattern='RISK pedestrian planner (cold work|rare reuse)' --test-reporter=spec tests.js; source20b12894 plus only query observation/assertions. Raw source, SHA256, red.spec.txt and red.time retained under /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/266-finish/.",
+      "failure": "Both real planner consumers failed their new one-preparation assertions with actual2, expected1 after their original full current/historical offset comparisons. No import, syntax, infrastructure or product behavior failure supplied this RED."
+    }
+  },
+{
+  "baseCommit": "d224107e5e56e5455a16e670dad6bdbc951940b5",
+  "testChangesSha256": "8779e9202e4e134bf1b355e8088a176767fa8ec88fd709ed4bea3a979eccda53",
+  "reason": "Reconcile exact integrated protected-test changes for #264 grouped execution, #266 immutable scenery preparation, #267 isolated recovery browser reuse, and #268 public event routing without dropping existing assertions or historical case identities.",
+  "previousBehavior": "Each recovery matrix case launched its own browser despite owning an independent context and page. Motion fixture consumers also recompiled unchanged module source for every context, including seven repeat compilations in the discriminating second-consumer RED. Every push and PR event independently executed npm test even when the complete validation context was already covered by a successful exact PR merge producer. The cold-work and rare-reuse scenarios queried the same immutable historical noon result before and after their full offset sweeps. Both actual historical consumers rebuilt it twice per scenario; the observed behavioral RED saw 2 queries instead of the required 1. The complete suite had no bounded isolated group command or result identity; its combined core test-name pattern also exceeded Linux's per-argument limit. Source-head and synthetic-checkout identities could be conflated, and future event bases could already contain classified additions.",
+  "intendedBehavior": "Each native recovery matrix launches one browser and still creates four independent contexts and pages with fresh case state. Motion fixture consumers reuse compiled vm.Script objects by exact source and filename while executing in each fresh VM context. Both changes remain test-fixture-only. A branch consumer avoids only the full cohort covered by a completed exact canonical PR merge producer, retaining its outgoing gates and original producer checkout, run and attempt. Capture only that exact historical noon result as a scenario-local const serialized string, parse fresh expected data for each comparison, and still execute every current query and unchanged scene/admission/lifetime assertion after midnight, eviction and backward reseeks. Every other historical offset still executes normally. The full npm test entry point remains complete while a public serial group command verifies an independent inventory, exact result identity, actual-checkout native binding, portable pattern arguments, and explicit registration classification across later event bases.",
+  "replacementTests": [
+    "RISK integrated automatic recovery native: persisted startup status and neighboring controls remain usable with one browser and isolated contexts",
+    "RISK immutable scenery fixture preparation: exact source reuse keeps fresh consumer contexts and known output",
+    "RISK repository process: event routing retains exact merge validation before avoiding a duplicate cohort",
+    "RISK pedestrian planner cold work: full capacity skips unnecessary lifetime solving without changing admitted scenes or reseeks",
+    "RISK pedestrian planner rare reuse: guard join is unique and complete admitted scenes match prior across rare rates midnight and eviction",
+    "RISK repository process: grouped runner stays covered at the default npm test boundary"
+  ],
+  "preservedCoverage": [
+    "The recovery matrices retain all four theme and viewport cases, fresh contexts/pages, independent account/board/backend/gates/evidence, startup/reopen/ACK/protected-source/newer-edit/draft/Undo assertions, and the historical case real 16-second ACK. The original held-device-commit, first-Add-prefix, late-success, child-exit and 20000ms deadlines remain unchanged.",
+    "The animation fixtures still execute modules in fresh mutable contexts and retain every existing sample, scene, painter, planner, viewport, reduced-motion and source-identity assertion. The cache keys preserve exact source and consumer filename, bounded cache size, and the stale aggregate-hash negative control.",
+    "No product runtime, UI, recovery semantics, persistence, app animation algorithm, public process boundary, test timeout or fake-clock behavior changes. The individual #267 and #266 records above retain their separate profiling and test-first histories.",
+    "All existing scanner, storage, native installed-client, rules, compatibility and test-first assertions remain unchanged; this adds a process consumer using isolated Git and fake external GitHub/npm boundaries.",
+    "The child test clears inherited NODE_TEST_CONTEXT so it executes its named assertion; the initial vacuous wrapper pass is documented and excluded from feature RED evidence.",
+    "Every existing actor, direction, frame, terrain, viewport, reduced-motion, painter, current scene query, offset order, eviction/backseek, deepEqual, admission, lifetime and guard-join negative-control assertion is retained. The original ten-test cohort and risk identities are unchanged. Accepted samples remain60480 upright,196014 dense corridor and4800 painter.",
+    "Historical expectations are still computed independently from pinned git blobs c21ee6f2a1147636f89cc96dae80aa9ba8ba9ea5 and f8fa176ddfaeedb9b2b7aeaf586b8e71a2e5ce3f through the existing reservation policy. Scope inside each isolated VM/options loop binds all inputs by construction; the string cannot be mutated through returned parsed comparison data.",
+    "Only repeated historical noon preparation is eliminated: 4 cold and8 rare calls. All current .at queries still execute, including final noon after deliberate eviction and reseek; no actual result is memoized or used as its own expected value. No product runtime, source algorithm, saved data, deadline, sample loop or tolerance changes.",
+    "The new observed preparation guard measures the real historical timeline at the approved public scenery consumer; it does not replace any existing result comparison. Numerical focused and comparable10case timing evidence remain distinct from hosted CI or rendered product proof.",
+    "The group runner preserves exact full/group fixture case identity, accepted skips, fail-closed missing and unclassified roots, overlap, empty groups, native registration, output-path aliases, replacement mapping, advanced event bases, actual checkout identity, and bounded repeated Node test-name patterns in one process per group. Independent 2,960-case, PR262 2,997-case, and current-main 2,997-case inventories remain separately recorded."
+  ],
+  "redEvidence": {
+    "command": "#267: exact final-title Chromium startup matrix with shared Browser withheld, node --test --test-name-pattern=\"integrated automatic recovery native: persisted startup status and neighboring controls remain usable with one browser and isolated contexts\" tests.js. #266: node --test --test-name-pattern=\"RISK immutable scenery fixture preparation\" --test-reporter=spec tests.js. #268: node --test --test-name-pattern='RISK repository process: event routing retains exact merge validation' tests.js > /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/268/canonical-routing-red.log 2>&1. #264 oversized-pattern RED: node --test --test-reporter=tap --test-name-pattern='keeps oversized group selections below the portable argument limit' scripts/agent-tools/test-groups.test.mjs; logs under /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/264/.",
+    "failure": "#267 ran all four original cases and passed four-distinct-context/page guards, then its process-count assertion observed 5 instead of 1 (19.78s outer wall). #266 actual second consumer observed seven repeated immutable-source compilations where zero were expected. Each is the intended fixture-cost RED with preserved functional assertions. Before functional routing implementation, the existing workflow command ran the full cohort twice; the assertion failed with2 !==1 for real outgoing source and distinct synthetic PR merge checkout fixtures. Both real planner consumers failed their new one-preparation assertions with actual2, expected1 after their original full current/historical offset comparisons. The pre-fix #264 process contract measured one 181,102-byte core pattern for 851 roots, exceeding Linux MAX_ARG_STRLEN 131,072 bytes; it failed until bounded repeated patterns were added. Separate REDs showed evidence written inside the checkout through a symlink, native children bound to source instead of the synthetic tested checkout, and an advanced event base rejecting an already classified replacement. No import or syntax failure supplied these REDs."
+  }
+},
+  {
+    "baseCommit": "d224107e5e56e5455a16e670dad6bdbc951940b5",
+    "testChangesSha256": "488bb2ea43204f7bfebac4081856bc6b930c787f66f75d5019f998d3fbc4162a",
+    "reason": "Reconcile #268 exact canonical PR event routing with the prior #266 immutable-source compilation and #267 recovery browser isolation changes, plus #266 scenario-local independent historical noon snapshots; preserve every existing assertion and original observed RED.",
+    "previousBehavior": "Each recovery matrix case launched its own browser despite owning an independent context and page. Motion fixture consumers also recompiled unchanged module source for every context, including seven repeat compilations in the discriminating second-consumer RED. Every push and PR event independently executed npm test even when the complete validation context was already covered by a successful exact PR merge producer. The cold-work and rare-reuse scenarios queried the same immutable historical noon result before and after their full offset sweeps. Both actual historical consumers rebuilt it twice per scenario; the observed behavioral RED saw 2 queries instead of the required 1.",
+    "intendedBehavior": "Each native recovery matrix launches one browser and still creates four independent contexts and pages with fresh case state. Motion fixture consumers reuse compiled vm.Script objects by exact source and filename while executing in each fresh VM context. Both changes remain test-fixture-only. A branch consumer avoids only the full cohort covered by a completed exact canonical PR merge producer, retaining its outgoing gates and original producer checkout, run and attempt. Capture only that exact historical noon result as a scenario-local const serialized string, parse fresh expected data for each comparison, and still execute every current query and unchanged scene/admission/lifetime assertion after midnight, eviction and backward reseeks. Every other historical offset still executes normally. No cross-source, configuration, options, seed, season or scenario sharing exists.",
+    "replacementTests": [
+      "RISK integrated automatic recovery native: persisted startup status and neighboring controls remain usable with one browser and isolated contexts",
+      "RISK immutable scenery fixture preparation: exact source reuse keeps fresh consumer contexts and known output",
+      "RISK repository process: event routing retains exact merge validation before avoiding a duplicate cohort",
+      "RISK pedestrian planner cold work: full capacity skips unnecessary lifetime solving without changing admitted scenes or reseeks",
+      "RISK pedestrian planner rare reuse: guard join is unique and complete admitted scenes match prior across rare rates midnight and eviction"
+    ],
+    "preservedCoverage": [
+      "The recovery matrices retain all four theme and viewport cases, fresh contexts/pages, independent account/board/backend/gates/evidence, startup/reopen/ACK/protected-source/newer-edit/draft/Undo assertions, and the historical case real 16-second ACK. The original held-device-commit, first-Add-prefix, late-success, child-exit and 20000ms deadlines remain unchanged.",
+      "The animation fixtures still execute modules in fresh mutable contexts and retain every existing sample, scene, painter, planner, viewport, reduced-motion and source-identity assertion. The cache keys preserve exact source and consumer filename, bounded cache size, and the stale aggregate-hash negative control.",
+      "No product runtime, UI, recovery semantics, persistence, app animation algorithm, public process boundary, test timeout or fake-clock behavior changes. The individual #267 and #266 records above retain their separate profiling and test-first histories.",
+      "All existing scanner, storage, native installed-client, rules, compatibility and test-first assertions remain unchanged; this adds a process consumer using isolated Git and fake external GitHub/npm boundaries.",
+      "The child test clears inherited NODE_TEST_CONTEXT so it executes its named assertion; the initial vacuous wrapper pass is documented and excluded from feature RED evidence.",
+      "Every existing actor, direction, frame, terrain, viewport, reduced-motion, painter, current scene query, offset order, eviction/backseek, deepEqual, admission, lifetime and guard-join negative-control assertion is retained. The original ten-test cohort and risk identities are unchanged. Accepted samples remain60480 upright,196014 dense corridor and4800 painter.",
+      "Historical expectations are still computed independently from pinned git blobs c21ee6f2a1147636f89cc96dae80aa9ba8ba9ea5 and f8fa176ddfaeedb9b2b7aeaf586b8e71a2e5ce3f through the existing reservation policy. Scope inside each isolated VM/options loop binds all inputs by construction; the string cannot be mutated through returned parsed comparison data.",
+      "Only repeated historical noon preparation is eliminated: 4 cold and8 rare calls. All current .at queries still execute, including final noon after deliberate eviction and reseek; no actual result is memoized or used as its own expected value. No product runtime, source algorithm, saved data, deadline, sample loop or tolerance changes.",
+      "The new observed preparation guard measures the real historical timeline at the approved public scenery consumer; it does not replace any existing result comparison. Numerical focused and comparable10case timing evidence remain distinct from hosted CI or rendered product proof."
+    ],
+    "redEvidence": {
+      "command": "#267: exact final-title Chromium startup matrix with shared Browser withheld, node --test --test-name-pattern=\"integrated automatic recovery native: persisted startup status and neighboring controls remain usable with one browser and isolated contexts\" tests.js. #266: node --test --test-name-pattern=\"RISK immutable scenery fixture preparation\" --test-reporter=spec tests.js. node --test --test-name-pattern='RISK repository process: event routing retains exact merge validation' tests.js > /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/268/canonical-routing-red.log 2>&1 Before functional snapshot capture: node --test --test-name-pattern='RISK pedestrian planner (cold work|rare reuse)' --test-reporter=spec tests.js; source20b12894 plus only query observation/assertions. Raw source, SHA256, red.spec.txt and red.time retained under /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/266-finish/. Evidence: /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/268/canonical-routing-red.log; /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/266-finish/red.spec.txt; /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/266/profile/red-process-boundary.log; /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/267/red/startup-final-title.",
+      "failure": "#267 ran all four original cases and passed four-distinct-context/page guards, then its process-count assertion observed 5 instead of 1 (19.78s outer wall). #266 actual second consumer observed seven repeated immutable-source compilations where zero were expected. Each is the intended fixture-cost RED with preserved functional assertions. Before functional routing implementation, the existing workflow command ran the full cohort twice; the assertion failed with2 !==1 for real outgoing source and distinct synthetic PR merge checkout fixtures. Both real planner consumers failed their new one-preparation assertions with actual2, expected1 after their original full current/historical offset comparisons. No import, syntax, infrastructure or product behavior failure supplied this RED."
+    }
+  }
+,
+  {
+    "baseCommit": "d224107e5e56e5455a16e670dad6bdbc951940b5",
+    "testChangesSha256": "348eee3f9618f5e08aa0d6e4c2d80f27e780eba5e1a907eed20515a3b42f05ad",
+    "reason": "Repair three observed #264 release-gate defects while retaining the historical inventory and the public grouped runner contract.",
+    "previousBehavior": "A complete inventory diff larger than Node’s default child-process buffer raised ENOBUFS before release:record could classify its tail. TAP-escaped hash titles selected no matching cases, and source-text registration counting treated quoted fixture text as a second controlled native declaration or as proof of a missing one.",
+    "intendedBehavior": "Release recording reads complete diffs within a bounded 64 MiB buffer and still derives specialist domains from the final diff lines. Group execution selects literal runtime test titles, reports canonical TAP identities while retaining raw inventory provenance, and counts only supported direct literal test registrations so omission and duplicate checks remain fail-closed.",
+    "replacementTests": [
+      "RISK repository process: release recording classifies the tail of a complete large diff"
+    ],
+    "preservedCoverage": [
+      "The default npm test command and workflow topology stay unchanged. The public release:record fixture first passes a valid small-diff control, then reads the full 2,097,442-byte patch whose security-review marker is at the end, records the specialist plan, and verifies its receipt.",
+      "The independent historical inventory bytes, source identity, digest, required cases, all four groups, selected cases, and native checkout binding remain intact. Results expose the raw-baseline to canonical-runtime root map for escaped TAP identities.",
+      "Public group-process controls prove a literal hash title runs and reconciles all cases, quoted registration source text is ignored, a missing declaration counts zero, and an actual duplicate still counts two. The existing full/group fixture reconciliation, missing/unclassified/overlap/empty/skip and portable-pattern tests remain passing.",
+      "No workflow routing, product behavior, test body, native outcome assertion, or release classification rule is weakened; the only release reader change raises the complete-output capacity to the established bounded 64 MiB limit."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=tap --test-name-pattern='RISK repository process: release recording classifies the tail of a complete large diff' tests.js; node --test --test-reporter=tap --test-name-pattern='RISK test group runner preserves hash identities and counts only executable controlled registrations' scripts/agent-tools/test-groups.test.mjs. RED logs: /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/264/release-buffer/release-record-red.log and /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/264/release-buffer/group-contract-red.log.",
+      "failure": "The complete public release:record process failed with spawnSync git ENOBUFS on a 2,097,442-byte fixture diff while a small valid control passed. The group process skipped the literal-hash root and reported required cases missing; registration controls observed a quoted sentinel as a second declaration, let the same sentinel conceal an omission, and counted a real duplicate plus sentinel as three. These failures occurred at the public process boundary, not during import or fixture setup."
+    }
+  },
+{
+  "baseCommit": "d224107e5e56e5455a16e670dad6bdbc951940b5",
+  "testChangesSha256": "9b956141768a80d6274f09dedfb63726bb339cba6b519cb94fe2cf806e546d09",
+  "reason": "Parallelize the complete required CI cohort while retaining an independently verified scanner aggregate, exact event gates and canonical producer references. Replace the obsolete npm-test workflow text assertion with executed public full/group fixture equivalence and retain the actual scanner missing-evidence process RISK.",
+  "previousBehavior": "The scanner job ran the full suite serially. Its protected workflow assertion required the literal npm test command. Group discovery could omit data-driven new top-level roots, and the old observer could accept a legacy-shaped job list even when a parallel candidate required additional jobs.",
+  "intendedBehavior": "Four fixed serial process groups execute independently; scanner-tests succeeds only after complete real case/log/artifact/native reconciliation or four honest references to a freshly reverified completed exact producer. The actual checkout workflow independently determines observer topology. Metadata-only PR edits may reuse an unchanged complete context, while actual head/base/merge changes, main and uncertain observations preserve full validation.",
+  "replacementTests": [
+    "RISK repository process: required parallel scanner aggregation rejects absent group evidence"
+  ],
+  "preservedCoverage": [
+    "All737 prior rationale objects remain byte-exact, including the #266/#267 fixture-cost and #268 routing RED records. The captured2997-case historical inventory bytes and raw baseline runtime maps remain unchanged. Every dynamic #268 scenario is retained beneath one explicitly assigned literal parent, with no assertion removed.",
+    "The existing public npm test boundary is unchanged. Its prior workflow string check becomes a real public full-versus-all-four-groups case-ID equivalence process. Test-first, rules, compatibility, strict main scanner aggregate, exact release-evidence and Pages needs/permissions remain required.",
+    "Groups preserve source versus actual checkout/tree/base/run/attempt identity, every historical accepted skip, real native deadlines and installed-client reports/artifacts/cleanup. Covered records contain no current cases or native execution and preserve the original producer run/attempt/report.",
+    "Per-file bounded public reporter summaries detect unknown dynamic roots, wrong-file duplicate names and exact wrapper-title collisions independently of child exit or TAP names. Actual raw TAP/stderr/summary hashes and complete native/recovery inventories are rechecked by the aggregate. No app, product, credentials, protection, permission grant, cancellation or full-suite assertion weakening is introduced.",
+    "A successful metadata-only covered PR run is never promoted to a full producer. Repeated edits continue past its exact successful covered marker to the original full run and retain that original run/attempt/report identity. Unknown or incomplete observations still run full or fail closed."
+  ],
+  "redEvidence": {
+    "command": "Public command/process RED logs under /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/265/: descriptor-red.log, aggregate-missing-red.log, dynamic-routing-red.log, metadata-edited-red.log, context-planning-red.log, routing-descriptor-red.log, unclassified-dynamic-red.log, workflow-aggregate-red.log, covered-reference-red.log, guard-file-binding-red.log, observer-topology-red.log, grouped-routing-red.log, covered-dynamic-red.log, aggregate-unlisted-red.log, observer-attestation-red.log and guard-malformed-tap-red.log. Earlier exact composite RED pointers remain in every prior record. Repeated covered metadata lifecycle: repeated-metadata-red.log before the narrow producer-search repair, followed by repeated-metadata-green.log.",
+    "failure": "Before each corresponding functional change, the runnable public command produced the discriminating mismatch: descriptor/covered modes executed body sentinels; absent group evidence passed; selected dynamic scenarios did not execute; metadata edited repeated full coverage; planning made external reads; wrong descriptors/sources passed; unknown dynamic/wrong-file roots disappeared; missing parallel jobs or aggregate attestation were accepted; a known exact failed producer fell back to passing full execution; an explicitly assigned dynamic root was rejected; unlisted native files and malformed guard TAP with recomputed hashes were accepted. Fixture setup/import/unknown-option failures are excluded from behavioral RED. The first combined focused run exposed a Bash3 empty-array fixture issue and an error-message preservation issue; both failures and corrected subsequent runs remain external evidence."
+  }
+},
+{
+  "baseCommit": "f738a9838e7027aa39c6f2112c2275ffaaadc3ef",
+  "testChangesSha256": "528b9e801d4140de0b00677accdfa2f86a27ae5dbbbb475467491896d0a213a5",
+  "reason": "Correct two declared test-file owners exposed by the first real hosted per-file guard; retain the strict guard and add an executed public process regression that distinguishes real declarations from identical quoted fixture source.",
+  "previousBehavior": "The two existing default-sky copy and Quick start FAQ tests really register in tests.js, but their catalog rows named scripts/agent-tools/preflight.test.mjs because it contains quoted copies of their registration text. The strict per-file core guard correctly ran those known tests as unknown roots and failed before its cohort.",
+  "intendedBehavior": "Both catalog rows name their actual tests.js declaration file and retain native-process membership and historical baseline measurements. A public fixture with the actual catalog rows, genuine declarations and identical quoted copies in both source files proves the core guard does not execute the native cases, while their assigned group executes each real case exactly once.",
+  "replacementTests": [
+    "RISK repository process: grouped catalog binds real declarations rather than quoted fixtures"
+  ],
+  "preservedCoverage": [
+    "All738 previous rationale objects and the independently captured2997-case inventory remain byte-exact. The composite main comparison retains all prior266/267/268/264/265 RED records and their unchanged feature assertions.",
+    "Only the two existing file fields change: both group memberships, every baseline case, accepted skip, baseline group count/duration, process control, native assertion, workflow, routing, permissions and guard implementation remain unchanged. Two new permanent process roots receive explicit native-process assignments.",
+    "The regression uses the existing public npm test:group process, actual catalog rows, isolated real Git fixtures and runtime body journaling. It includes matching quoted source in both files and asserts zero cross-group execution plus exactly one successful outcome and execution per actual declared case. Existing product assertions are retained."
+  ],
+  "redEvidence": {
+    "command": "Recorder preimplementation-red actual command: npm run test:group -- --group core on clean f738; /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/265/repair-1/core-red-summary.jsonl and actual-core-red/ retain raw guard TAP/stderr/summaries. Permanent public regression: Node22 tests.js --test-name-pattern for the new RISK wrapper; /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/265/repair-1/regression-final-fixture-red-summary.jsonl and its records/* raw outputs precede the two catalog-file corrections.",
+    "failure": "The actual unchanged core process returned1 with child0 and the exact two known tests.js roots classified as unknown. The new RISK process assertion then observed core status1 where0 was required with those catalog rows and matching quoted fixture text. The guard reported the same real root names. This is a behavioral process failure, not a source-string assertion, missing module, unknown option or compile failure."
+  }
+},
+{
+  "baseCommit": "d224107e5e56e5455a16e670dad6bdbc951940b5",
+  "testChangesSha256": "af2a9de4e14cbda5334642245f35e34aba92842f99d4b34e01079731b3d1dd17",
+  "reason": "Correct two declared test-file owners exposed by the first real hosted per-file guard; retain the strict guard and add an executed public process regression that distinguishes real declarations from identical quoted fixture source.",
+  "previousBehavior": "The two existing default-sky copy and Quick start FAQ tests really register in tests.js, but their catalog rows named scripts/agent-tools/preflight.test.mjs because it contains quoted copies of their registration text. The strict per-file core guard correctly ran those known tests as unknown roots and failed before its cohort.",
+  "intendedBehavior": "Both catalog rows name their actual tests.js declaration file and retain native-process membership and historical baseline measurements. A public fixture with the actual catalog rows, genuine declarations and identical quoted copies in both source files proves the core guard does not execute the native cases, while their assigned group executes each real case exactly once.",
+  "replacementTests": [
+    "RISK repository process: grouped catalog binds real declarations rather than quoted fixtures"
+  ],
+  "preservedCoverage": [
+    "All738 previous rationale objects and the independently captured2997-case inventory remain byte-exact. The composite main comparison retains all prior266/267/268/264/265 RED records and their unchanged feature assertions.",
+    "Only the two existing file fields change: both group memberships, every baseline case, accepted skip, baseline group count/duration, process control, native assertion, workflow, routing, permissions and guard implementation remain unchanged. Two new permanent process roots receive explicit native-process assignments.",
+    "The regression uses the existing public npm test:group process, actual catalog rows, isolated real Git fixtures and runtime body journaling. It includes matching quoted source in both files and asserts zero cross-group execution plus exactly one successful outcome and execution per actual declared case. Existing product assertions are retained."
+  ],
+  "redEvidence": {
+    "command": "Recorder preimplementation-red actual command: npm run test:group -- --group core on clean f738; /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/265/repair-1/core-red-summary.jsonl and actual-core-red/ retain raw guard TAP/stderr/summaries. Permanent public regression: Node22 tests.js --test-name-pattern for the new RISK wrapper; /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/265/repair-1/regression-final-fixture-red-summary.jsonl and its records/* raw outputs precede the two catalog-file corrections.",
+    "failure": "The actual unchanged core process returned1 with child0 and the exact two known tests.js roots classified as unknown. The new RISK process assertion then observed core status1 where0 was required with those catalog rows and matching quoted fixture text. The guard reported the same real root names. This is a behavioral process failure, not a source-string assertion, missing module, unknown option or compile failure."
+  }
+},
+{
+  "baseCommit": "d4d50fb969875ac8b56419aaee9d0b39bd69c59b",
+  "testChangesSha256": "934f1a3e576ad122cf4d0c977616dd7b0ca27783e40db79e8a42d3d5b89bd9c8",
+  "reason": "Await the actual registered file-change handler in the existing multi-megabyte Settings restore consumer instead of treating100zero-delay flush turns as operation completion. Add one controlled pending-read child within the same RISK; retain every existing feature assertion and unchanged product bytes.",
+  "previousBehavior": "The second actual hosted persistence group failed the archive-preview assertion with Settings still rendered. Local unchanged focus passed. A controlled public File.arrayBuffer hold reproduced the identical wrong-UI assertion: the helper returned while its real async event handler was pending; that same handler later completedtrue and rendered the correct protected preview.",
+  "intendedBehavior": "Only the two file-selection helpers in this existing RISK await their real dispatched async handler outcomes with a5second failure bound. Valid selections must explicitly returntrue, incomplete-file rejection must explicitly returnfalse, and every original UI/source/durable/adoption assertion still runs. A held real file read must keep the selection promise pending and cannot adopt or show a protected preview early.",
+  "replacementTests": [
+    "file selection stays pending until its real exact-byte read completes"
+  ],
+  "preservedCoverage": [
+    "All740 prior rationale objects remain byte-exact, retaining every earlier263/264/265/266/267/268 RED pointer and the first hosted catalog-ownership repair. Historical inventory, assignments, group IDs, native outcomes/deadlines, workflow, strict guard, routing and all product bytes remain unchanged.",
+    "All61 original assertion-bearing lines in the affected RISK remain exact, including multi-megabyte BOM/Unicode bytes, both protected copies, opaque fields, Cancel, no early durable/cloud adoption, explicit local adoption, cold reopen, automatic rotation, archive currentBoard-only adoption, pending-source nonreplay, incomplete-file error and unchanged saved/live state.",
+    "The DOM shim retains its existing synchronous dispatchEvent semantics. The added completion method invokes actual registered handlers once and propagates their promises and rejections. Only this consumer uses it; no private restore helper bypass or unrelated test migration is introduced. Empty/false/failed positive outcomes cannot count as successful preview.",
+    "The new nested test inherits the existing persistence-recovery parent assignment and adds one meaningful outcome. Its gate holds actual File bytes for120flush turns; it asserts pending completion, unchanged board and no premature preview. The5second bound is an operation failure deadline, not a blanket sleep or longer native budget."
+  ],
+  "redEvidence": {
+    "command": "Actual hosted failed source d4: PR40163225730/1 persistence raw test.tap/result under hosted/d4-pr-failure/persistence/content. Local unchanged-focused-summary.jsonl passed and is explicitly not RED. Recorded external control and held-read probe under /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/265/repair-2/probe-* summaries preserve instrumentation patches and event chronology. Permanent preimplementation RED: /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/265/repair-2/permanent-red-summary.jsonl invokes the exact existing public Node RISK after adding its controlled File read gate but before changing either selection helper or DOM completion method.",
+    "failure": "The external public-file hold made the original helper return Settings with one handler pending and no error toast; that actual handler later returnedtrue and rendered a protected preview. The permanent nested regression then observed settled=true while the real read was held, expectedfalse, and the unchanged original archive-preview regex again saw Settings. This demonstrates a missing fixture completion boundary; the exact hosted pending phase is unavailable, so no production failure is claimed. The final fixture waits for real handler completion and checks its actual boolean result; existing incomplete-file failure assertions remain active."
+  }
+},
+{
+  "baseCommit": "d224107e5e56e5455a16e670dad6bdbc951940b5",
+  "testChangesSha256": "2a2489511452452588301363304a1d7dbd438299a593156d0be82a81a62239da",
+  "reason": "Await the actual registered file-change handler in the existing multi-megabyte Settings restore consumer instead of treating100zero-delay flush turns as operation completion. Add one controlled pending-read child within the same RISK; retain every existing feature assertion and unchanged product bytes.",
+  "previousBehavior": "The second actual hosted persistence group failed the archive-preview assertion with Settings still rendered. Local unchanged focus passed. A controlled public File.arrayBuffer hold reproduced the identical wrong-UI assertion: the helper returned while its real async event handler was pending; that same handler later completedtrue and rendered the correct protected preview.",
+  "intendedBehavior": "Only the two file-selection helpers in this existing RISK await their real dispatched async handler outcomes with a5second failure bound. Valid selections must explicitly returntrue, incomplete-file rejection must explicitly returnfalse, and every original UI/source/durable/adoption assertion still runs. A held real file read must keep the selection promise pending and cannot adopt or show a protected preview early.",
+  "replacementTests": [
+    "file selection stays pending until its real exact-byte read completes"
+  ],
+  "preservedCoverage": [
+    "All740 prior rationale objects remain byte-exact, retaining every earlier263/264/265/266/267/268 RED pointer and the first hosted catalog-ownership repair. Historical inventory, assignments, group IDs, native outcomes/deadlines, workflow, strict guard, routing and all product bytes remain unchanged.",
+    "All61 original assertion-bearing lines in the affected RISK remain exact, including multi-megabyte BOM/Unicode bytes, both protected copies, opaque fields, Cancel, no early durable/cloud adoption, explicit local adoption, cold reopen, automatic rotation, archive currentBoard-only adoption, pending-source nonreplay, incomplete-file error and unchanged saved/live state.",
+    "The DOM shim retains its existing synchronous dispatchEvent semantics. The added completion method invokes actual registered handlers once and propagates their promises and rejections. Only this consumer uses it; no private restore helper bypass or unrelated test migration is introduced. Empty/false/failed positive outcomes cannot count as successful preview.",
+    "The new nested test inherits the existing persistence-recovery parent assignment and adds one meaningful outcome. Its gate holds actual File bytes for120flush turns; it asserts pending completion, unchanged board and no premature preview. The5second bound is an operation failure deadline, not a blanket sleep or longer native budget."
+  ],
+  "redEvidence": {
+    "command": "Actual hosted failed source d4: PR40163225730/1 persistence raw test.tap/result under hosted/d4-pr-failure/persistence/content. Local unchanged-focused-summary.jsonl passed and is explicitly not RED. Recorded external control and held-read probe under /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/265/repair-2/probe-* summaries preserve instrumentation patches and event chronology. Permanent preimplementation RED: /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/265/repair-2/permanent-red-summary.jsonl invokes the exact existing public Node RISK after adding its controlled File read gate but before changing either selection helper or DOM completion method.",
+    "failure": "The external public-file hold made the original helper return Settings with one handler pending and no error toast; that actual handler later returnedtrue and rendered a protected preview. The permanent nested regression then observed settled=true while the real read was held, expectedfalse, and the unchanged original archive-preview regex again saw Settings. This demonstrates a missing fixture completion boundary; the exact hosted pending phase is unavailable, so no production failure is claimed. The final fixture waits for real handler completion and checks its actual boolean result; existing incomplete-file failure assertions remain active."
+  }
+}
 ]

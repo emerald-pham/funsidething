@@ -28,7 +28,7 @@ function git(repoRoot, args) {
 }
 
 function gitRaw(repoRoot, args) {
-  return execFileSync('git', ['-C', repoRoot, ...args], { encoding: 'utf8' });
+  return execFileSync('git', ['-C', repoRoot, ...args], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
 }
 
 function gitShow(repoRoot, commitSha, file) {

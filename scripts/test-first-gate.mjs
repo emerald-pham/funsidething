@@ -11,6 +11,8 @@ const processFiles=new Set([
   'scripts/backward-compatibility.mjs',
   'scripts/release-evidence.mjs',
   'scripts/install-release-hook.mjs',
+  'scripts/test-groups.mjs',
+  'scripts/agent-tools/test-groups.test.mjs',
   '.claude/hooks/test-first-guard.sh',
 ]);
 const isProcessFile=file=>processFiles.has(file)||/^\.github\/workflows\/[^/]+\.ya?ml$/.test(file);
