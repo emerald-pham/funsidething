@@ -92,7 +92,7 @@ async function main() {
       const deadline = Date.now() + args.maxWaitMs;
       while (true) {
       const response = readApi(`actions/workflows/data-safety.yml/runs?head_sha=${sourceSha}&event=pull_request&per_page=20`);
-      if (!Array.isArray(response.workflow_runs) || response.total_count > response.workflow_runs.length) throw new Error('Producer observations are incomplete.');
+      if (!Array.isArray(response.workflow_runs) || !Number.isInteger(response.total_count) || response.total_count !== response.workflow_runs.length) throw new Error('Producer observations are incomplete.');
       const runs = response.workflow_runs.filter(run => run.event === 'pull_request' && run.head_sha === sourceSha
         && run.path === workflowPath && run.name === 'Data safety' && run.repository?.full_name === repository
         && run.head_repository?.full_name === repository && decimal(run.id) && decimal(run.run_attempt))

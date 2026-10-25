@@ -41,7 +41,7 @@ const url=process.argv.at(-1);
 if(url.includes('/runs?')&&x.runSequence?.length){x.runs=x.runSequence.shift();fs.writeFileSync(process.env.ROUTING_GITHUB,JSON.stringify(x));}
 if(url.includes('/pulls?')&&x.pullSequence?.length){x.pulls=x.pullSequence.shift();fs.writeFileSync(process.env.ROUTING_GITHUB,JSON.stringify(x));}
 if(x.error){process.stderr.write('controlled unavailable GitHub');process.exit(22);}
-console.log(JSON.stringify(url.includes('/jobs?')?{total_count:x.jobs.length,jobs:x.jobs}:url.includes('/pulls?')?(x.pulls??[]):url.includes('/git/commits/')?x.merge:{total_count:x.runs.length,workflow_runs:x.runs}));
+console.log(JSON.stringify(url.includes('/jobs?')?{total_count:x.jobs.length,jobs:x.jobs}:url.includes('/pulls?')?(x.pulls??[]):url.includes('/git/commits/')?x.merge:{total_count:x.omitRunTotal?undefined:x.runs.length,workflow_runs:x.runs}));
 `);
   writeFileSync(path.join(bin, 'node'), '#!/bin/sh\nif [ "$1" = "-p" ] && [ "$ROUTING_READ_FAILURE" = "1" ]; then exit 1; fi\nexec ' + JSON.stringify(process.execPath) + ' "$@"\n');
   chmodSync(path.join(bin, 'node'), 0o755);
@@ -152,6 +152,7 @@ const fallbackCases = [
   ['different producer attempt', x => { x.jobs[0].run_attempt = 1; }],
   ['different producer run', x => { x.jobs[0].run_id = 72; }],
   ['unknown producer lifecycle', x => { x.runs[0].status = 'unclassified'; }],
+  ['missing producer inventory count', x => { x.omitRunTotal = true; }],
 ];
 
 for (const [name, change] of fallbackCases) {
