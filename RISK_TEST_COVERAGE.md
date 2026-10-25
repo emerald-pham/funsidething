@@ -13,6 +13,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK repository process: event routing retains exact merge validation before avoiding a duplicate cohort
 - RISK repository process: required parallel scanner aggregation rejects absent group evidence
 - RISK repository process: grouped catalog binds real declarations rather than quoted fixtures
+- RISK repository process: nested native fixture output stays isolated at the command boundary
 
 ## Task state, eligibility, and scanner controls
 
