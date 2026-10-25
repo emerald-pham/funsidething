@@ -192,6 +192,17 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK DEVICE STORAGE V2: migration and head plus recovery commits are atomic, CAS guarded, and preserve legacy bytes
 - RISK DEVICE STORAGE V2: unreferenced immutable snapshots retire while head and recovery references remain exact
 - RISK DEVICE STORAGE V2: raw export snapshot preserves exact sources in one read-only capture
+- RISK JSON COPY PASTE: the current-board viewer copies its exact displayed JSON without saving
+- RISK JSON COPY PASTE: Quick start explains the copy button, manual fallback and guarded paste
+- RISK DATABASE REPAIR EXPORT: the Settings copy includes exact saved sources and repair metadata without writes
+- RISK DATABASE REPAIR EXPORT: unreadable storage produces a labeled partial package with available board and diagnostics
+- RISK DATABASE REPAIR EXPORT: visible Debug log controls use the combined repair export
+- RISK DATABASE REPAIR EXPORT: readonly capture keeps original diagnostic storage even when old entries expire
+- RISK DATABASE REPAIR EXPORT: available worker and cache identities are captured without diagnostic writes
+- RISK DATABASE REPAIR EXPORT: a cancelled capture cannot replace a newer pasted draft
+- RISK DATABASE REPAIR EXPORT: a damaged saved source is retained without inventing a current board
+- RISK DATABASE REPAIR EXPORT: FAQ explains the included database, diagnostics and partial-report limits
+- RISK DATABASE REPAIR EXPORT: reload help routes users to the combined export after standalone log exporters are removed
 - RISK MANUAL JSON EXPORT: the actual Settings actions download current board and recovery archive
 - RISK MANUAL JSON EXPORT: unreadable, unsupported and hydration-placeholder sources stop without a file
 - RISK BACKUP FILE RESTORE: the actual Settings file selection protects exact sources before explicit local adoption

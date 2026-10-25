@@ -20124,5 +20124,34 @@
       "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red --summary -- node --test --test-name-pattern \"^RISK recovery device diagnostics\" tests.js; separate fixed observer privacy control used ^RISK support diagnostics: event retention. Immutable records under /Users/emeraldpham/.codex/task-artifacts/recovery-read-followup-20261025/runs: 7c3bc6c6, 0f546b76 and c9ebbf8a.",
       "failure": "7c3bc6c6 failed before diagnostic runtime edits: copied report had 0 labeled failed device reads instead of 2 in all four real Review/Copy cases. 0f546b76 failed the mounted FAQ category assertion before copy edits. Later development GREENs 9e376a68 and 50165eec exposed a test fixture incorrectly expecting the extended FAQ/changelog directly in Settings; the existing Help template route was restored and 1cf82aa0 passed 94 cases. c9ebbf8a failed private-string exclusion on a changing getter in the draft observer before snapshotting details once. Final focused GREEN f71bba4d passed. None reproduces or claims to fix the remaining phone failure. Specialist finding confirmation4eabe42d failed five actual Review/Copy subcases before repair: terminal transaction observation1 versus2, synchronous pending/hold/head/snapshot setup observations0 versus1. Original specialist external probe5a13f5d0 remains distinct from this permanent consumer RED."
     }
+  },
+  {
+    "baseCommit": "25282cbbeb44de1fc688c29550bff32bb9e16f3f",
+    "testChangesSha256": "0e86badf2395f2fb53961f95d771648c3ae46dbfed6e416796b2d2d397e4bf83",
+    "reason": "Implement #283 after the user requested database data plus enough repair information and removal of redundant Debug log exports; the earlier current-board-only draft is superseded.",
+    "previousBehavior": "Current-board copy offered Select all; database archives were download-only and excluded the bounded Debug log. Failed database capture produced no combined repair report. Settings and log views offered separate metadata-only copy/download controls.",
+    "intendedBehavior": "Copy the exact displayed board or supported recovery archive with readable named app-owned sources, schema/build/worker metadata and the bounded Debug log. Unavailable or changed sources produce an explicit nonrestorable partial report. Preserve originals, diagnostics retention, preview/Cancel/confirmation, and current-board-only application with no archived pending replay. Remove redundant visible log exporters while retaining inspection and selection.",
+    "replacementTests": [
+      "RISK JSON COPY PASTE: the current-board viewer copies its exact displayed JSON without saving",
+      "RISK JSON COPY PASTE: Quick start explains the copy button, manual fallback and guarded paste",
+      "RISK DATABASE REPAIR EXPORT: the Settings copy includes exact saved sources and repair metadata without writes",
+      "RISK DATABASE REPAIR EXPORT: unreadable storage produces a labeled partial package with available board and diagnostics",
+      "RISK DATABASE REPAIR EXPORT: visible Debug log controls use the combined repair export",
+      "RISK DATABASE REPAIR EXPORT: readonly capture keeps original diagnostic storage even when old entries expire",
+      "RISK DATABASE REPAIR EXPORT: available worker and cache identities are captured without diagnostic writes",
+      "RISK DATABASE REPAIR EXPORT: a cancelled capture cannot replace a newer pasted draft",
+      "RISK DATABASE REPAIR EXPORT: a damaged saved source is retained without inventing a current board",
+      "RISK DATABASE REPAIR EXPORT: FAQ explains the included database, diagnostics and partial-report limits",
+      "RISK DATABASE REPAIR EXPORT: reload help routes users to the combined export after standalone log exporters are removed"
+    ],
+    "preservedCoverage": [
+      "Every existing lossless archive codec, source consistency, download, protected Restore, account/cloud authority, cancellation, source retention, privacy/caps and durable readback assertion remains. No importer, saved schema, cloud write or recovery retry policy is replaced.",
+      "The user explicitly superseded old UI advertisements. Existing diagnostics tests update only Settings/inline control and FAQ expectations from standalone log exporters to combined export and View/Select/Refresh. Their bounded metadata, legacy command-output, held-publication and exact source-preservation assertions remain unchanged.",
+      "New real Settings and Restore consumers cover exact clipboard bytes, accepted unsaved/unknown fields, no source writes, absent/denied clipboard, guarded round-trip/Cancel/confirmation, durable originals, complete sources plus log, absent/failed IDB and failed local key, damaged originals without invented board, read-only diagnostic retention, cancellation/latest request, and actual MessageChannel worker/cache observations."
+    ],
+    "redEvidence": {
+      "command": "Immutable recorder attempts in .git/agent-test-runs/issue-283/runs use node --test --test-name-pattern for each RISK JSON COPY PASTE or RISK DATABASE REPAIR EXPORT vertical consumer slice; exact commands, times, source identities and stdout/stderr are retained.",
+      "failure": "Before each corresponding implementation: current-board control899563d6; board FAQdfa883d8; combined Settings control2210b578; unavailable/failed IDB and local sourcee2b8c485 (all3 false vs true); duplicate-control10ec7d35; expired diagnostic-original98fd9ee7 (null vs original); cancelled-view73507e40 (true vs false); repair FAQ0a2bee63. Worker attempt4711f3fb had an incomplete service-worker fixture and is not feature RED. Provisional worker capture was tried then withdrawn; corrected later-baseline-sensitivityf11abde0 observed null vs worker identity before final bounded read-only capture. This is not claimed as original RED; combined export original RED remains2210b578. GREENdd5b5fa1 passed combined consumers afterward. Earlier archive-only draft results are development evidence and its code/tests were discarded. Extended round-tripff4051ad and database fixture3611ae89 failures were fixture corrections, not product failures; corrected8c0614c0 and2e9aa016 passed without importer/runtime repairs. Independent Standards review found adjacent reload help still advertised removed Copy debug log. New mounted FAQ REDd5060f2e preceded the copy repair; GREEN60f7bb18 passed the new check and unchanged FAQ brevity gate. The old reload facts, retention limits, privacy, save-priority and no-crash-inference boundaries remain."
+    }
   }
 ]
