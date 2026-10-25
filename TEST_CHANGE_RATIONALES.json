@@ -20171,5 +20171,39 @@
       "command": "Immutable recorder attempts in .git/agent-test-runs/issue-283/runs use node --test --test-name-pattern for each RISK JSON COPY PASTE or RISK DATABASE REPAIR EXPORT vertical consumer slice; exact commands, times, source identities and stdout/stderr are retained.",
       "failure": "Before each corresponding implementation: current-board control899563d6; board FAQdfa883d8; combined Settings control2210b578; unavailable/failed IDB and local sourcee2b8c485 (all3 false vs true); duplicate-control10ec7d35; expired diagnostic-original98fd9ee7 (null vs original); cancelled-view73507e40 (true vs false); repair FAQ0a2bee63. Worker attempt4711f3fb had an incomplete service-worker fixture and is not feature RED. Provisional worker capture was tried then withdrawn; corrected later-baseline-sensitivityf11abde0 observed null vs worker identity before final bounded read-only capture. This is not claimed as original RED; combined export original RED remains2210b578. GREENdd5b5fa1 passed combined consumers afterward. Earlier archive-only draft results are development evidence and its code/tests were discarded. Extended round-tripff4051ad and database fixture3611ae89 failures were fixture corrections, not product failures; corrected8c0614c0 and2e9aa016 passed without importer/runtime repairs. Independent Standards review found adjacent reload help still advertised removed Copy debug log. New mounted FAQ REDd5060f2e preceded the copy repair; GREEN60f7bb18 passed the new check and unchanged FAQ brevity gate. The old reload facts, retention limits, privacy, save-priority and no-crash-inference boundaries remain."
     }
+  },
+  {
+    "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
+    "testChangesSha256": "f77a05ee06dbb1080f36b5795e46a86914d54656a987c9d8b352e4e792f50fcb",
+    "reason": "Issue webkit-button-safety consolidates Settings transfer into one protected Import and one read-only recovery-archive Export with direct Copy and separate Download, and moves existing cleanup and diagnostic controls into a collapsed Recovery and cleanup section. The merged candidate also retains the separately diagnosed overdue-WOOP repair.",
+    "previousBehavior": "Settings exposed several overlapping raw/current-board/database transfer paths, rendered complete JSON inside large textareas, and mixed transfer with cleanup and diagnostics. Copying required a view/select path. The actual WebKit source export produced a 9.85-million-character modal insertion and a 1,271 ms maximum animation-frame gap on the bounded retained-source fixture. A fresh scan could also close overdue WOOP after Next.",
+    "intendedBehavior": "Data and backups contains one Import, one Export, existing backup status and backup controls. Import keeps supported file, paste, ordinary board, archive and raw-list flows on the protected preview. Export prepares the same exact read-only archive for direct clipboard Copy and Download, keeps large JSON out of DOM layout, reports partial sources honestly, and never writes or replays pending work. Review, cleanup, reset and local diagnostics stay available in a separate collapsed section; the overdue-WOOP Next fix remains intact.",
+    "replacementTests": [
+      "RISK Settings transfer consolidation: one Import, one Export and direct Copy",
+      "RISK Settings transfer sections: cleanup controls stay outside the focused backup section",
+      "RISK backup export safety: unreadable originals stay byte-exact without a raw-data view",
+      "RISK LOCAL BACKUPS: unreadable old copy stays visible and byte-exact in unified Export",
+      "RISK JSON COPY PASTE: Copy and Download send the same full archive without a JSON view or writes",
+      "RISK DATABASE REPAIR EXPORT: unified Copy and Download retain exact sources and metadata without writes",
+      "RISK DATABASE REPAIR EXPORT: unreadable sources are labeled partial and never shown as an empty database",
+      "RISK DATABASE REPAIR EXPORT: Debug log points to the combined archive without duplicate export controls",
+      "RISK DATABASE REPAIR EXPORT: canceled capture keeps the pasted draft and concurrent capture is bounded",
+      "RISK DATABASE REPAIR EXPORT: Help describes direct Copy and partial archive status",
+      "RISK RECOVERY EXPORT: accepted unsaved board stays in direct Copy when device storage fails",
+      "RISK MANUAL JSON EXPORT: unavailable and unsupported sources are explicit partial exports",
+      "RISK overdue WOOP: a newly started scan keeps Next usable and the saved plan through reopening",
+      "RISK support diagnostics: Settings points to the single archive Export"
+    ],
+    "preservedCoverage": [
+      "All supported import formats, exact selected bytes, accepted unsaved fields, unknown board/task fields, account and source revisions, required backups, explicit preview, Cancel draft retention, confirmation, cloud acknowledgement, and stale-source refusal remain covered through their existing consumers.",
+      "The actual export consumer checks complete and partial archives, exact local and IndexedDB source bytes, no saved writes, pending work not replayed, clipboard failure with no download fallback, and identical copied/downloaded bytes; original backups, Restore/Delete and manual backup controls remain present.",
+      "A mounted Settings regression locks the Data and backups section to transfer plus backup status/list/actions and verifies Review saved decisions, Clear history, Reset everything, debug log and recent sync errors remain in the collapsed Recovery and cleanup section.",
+      "The large-output native baseline was the headless WebKit shell on macOS 26.5, not a physical iPhone; process termination on iOS remains unproven. The post-fix native report must be read separately from synthetic Node semantic checks.",
+      "The independently authored overdue-WOOP regression and all prior plan, account, stale-task, Undo and recovery protections from integration commit b9d00ff remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "Export consumer: node scripts/agent-tools/record-run.mjs --repo <worktree> --evidence-dir <task-artifacts>/product/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern=\"RISK Settings transfer consolidation: one Import, one Export and direct Copy\" tests.js; section consumer: node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/webkit-export-repair/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/webkit-button-safety-20261025/product/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern=\"RISK Settings transfer sections: cleanup controls stay outside the focused backup section\" tests.js; overdue WOOP: see the original consumer command in the retained integration rationale.",
+      "failure": "The first export RED on 6c67fb0 reported 0 rendered Import controls where 1 was required; its evidence is /Users/emeraldpham/.codex/task-artifacts/webkit-button-safety-20261025/product/runs/2026-10-25T22-37-24-256Z-7662ce96-4c46-4059-8b8d-0d2ad6c802d5.json. The mounted-section RED at 6c67fb0 failed the explicit doesNotMatch assertion because Review, Reset, debug log and recent sync errors were still inside Data and backups; record /Users/emeraldpham/.codex/task-artifacts/webkit-button-safety-20261025/product/runs/2026-10-25T23-01-11-585Z-d5c96e1c-eab7-48f7-bef6-e276bb3b0530.json. The separate overdue-WOOP preimplementation RED is documented in the existing b9d00ff rationale and its original native report. Copy/download and FAQ refinements added after the first core RED are preservation assertions; no separate original RED is claimed for those additive assertions."
+    }
   }
 ]

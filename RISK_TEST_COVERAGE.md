@@ -20,7 +20,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 ## Task state, eligibility, and scanner controls
 
-- RISK backup format safety: raw-source qualification remains outside the native selector
+- RISK backup export safety: unreadable originals stay byte-exact without a raw-data view
 - RISK backup format browser: enlarged unreadable Settings keeps native selectors and safety text readable
 
 - RISK resilient sync recovery: identity changes after durable source capture cannot bind an old response to a new account
@@ -192,19 +192,19 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK DEVICE STORAGE V2: migration and head plus recovery commits are atomic, CAS guarded, and preserve legacy bytes
 - RISK DEVICE STORAGE V2: unreferenced immutable snapshots retire while head and recovery references remain exact
 - RISK DEVICE STORAGE V2: raw export snapshot preserves exact sources in one read-only capture
-- RISK JSON COPY PASTE: the current-board viewer copies its exact displayed JSON without saving
+- RISK JSON COPY PASTE: Copy and Download send the same full archive without a JSON view or writes
 - RISK JSON COPY PASTE: Quick start explains the copy button, manual fallback and guarded paste
-- RISK DATABASE REPAIR EXPORT: the Settings copy includes exact saved sources and repair metadata without writes
-- RISK DATABASE REPAIR EXPORT: unreadable storage produces a labeled partial package with available board and diagnostics
-- RISK DATABASE REPAIR EXPORT: visible Debug log controls use the combined repair export
+- RISK DATABASE REPAIR EXPORT: unified Copy and Download retain exact sources and metadata without writes
+- RISK DATABASE REPAIR EXPORT: unreadable sources are labeled partial and never shown as an empty database
+- RISK DATABASE REPAIR EXPORT: Debug log points to the combined archive without duplicate export controls
 - RISK DATABASE REPAIR EXPORT: readonly capture keeps original diagnostic storage even when old entries expire
 - RISK DATABASE REPAIR EXPORT: available worker and cache identities are captured without diagnostic writes
-- RISK DATABASE REPAIR EXPORT: a cancelled capture cannot replace a newer pasted draft
+- RISK DATABASE REPAIR EXPORT: canceled capture keeps the pasted draft and concurrent capture is bounded
 - RISK DATABASE REPAIR EXPORT: a damaged saved source is retained without inventing a current board
-- RISK DATABASE REPAIR EXPORT: FAQ explains the included database, diagnostics and partial-report limits
+- RISK DATABASE REPAIR EXPORT: Help describes direct Copy and partial archive status
 - RISK DATABASE REPAIR EXPORT: reload help routes users to the combined export after standalone log exporters are removed
 - RISK MANUAL JSON EXPORT: the actual Settings actions download current board and recovery archive
-- RISK MANUAL JSON EXPORT: unreadable, unsupported and hydration-placeholder sources stop without a file
+- RISK MANUAL JSON EXPORT: unavailable and unsupported sources are explicit partial exports
 - RISK BACKUP FILE RESTORE: the actual Settings file selection protects exact sources before explicit local adoption
 - RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exact sources before explicit local adoption
 - RISK BACKUP FILE RESTORE: compact settings and unknown board fields stay inside the actual preview
@@ -266,7 +266,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK SCALABLE QUOTA: optional IndexedDB history cannot block a primary board that fits
 - RISK CLOUD ACCOUNT: signing out and back into the same account requires a fresh read
 - RISK CLOUD ACCOUNT: signing in after sign-out opens the Google account chooser
-- RISK RECOVERY EXPORT: an unsaved in-memory board remains copyable without device storage
+- RISK RECOVERY EXPORT: accepted unsaved board stays in direct Copy when device storage fails
 - RISK LOCAL DIAGNOSTICS: ordinary edits and Undo identify the exact device save gate
 - RISK CLOUD BACKUP: an exact stable recovery copy satisfies adoption when duplicate writes hit quota
 - RISK CLOUD BACKUP: an unreadable backup row is never discarded to make room
@@ -277,7 +277,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK CLOUD ADOPTION: a board-store quota failure restores both browser keys and holds the cloud
 - RISK CLOUD ADOPTION: failed write rollback preserves another tab newer browser bytes
 - RISK LOCAL BACKUPS: deleting one visible copy preserves hidden unreadable recovery bytes
-- RISK LOCAL BACKUPS: unreadable old copy is visible with exact raw recovery and targeted removal
+- RISK LOCAL BACKUPS: unreadable old copy stays visible and byte-exact in unified Export
 - RISK LOCAL BACKUPS: duplicate IDs and malformed root never permit ambiguous deletion
 - RISK LOCAL BACKUPS: a stale Settings click cannot delete a row rewritten by another tab
 - RISK LOCAL BACKUPS: quota retires the oldest automatic copy while keeping recent, manual, and account recovery
@@ -479,9 +479,10 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK chance forecast: adaptive integration resolves narrow shared-benchmark transitions
 - RISK TrueSkill truncation: inverse-Mills tails match references through the former cutoff and extreme upset
 - RISK rating bounds: hydration and frozen chance opponents normalize extremes without changing healthy ratings
-- RISK backup and Restore consolidation: Settings keeps one guarded action with all formats
+- RISK Settings transfer consolidation: one Import, one Export and direct Copy
+- RISK Settings transfer sections: cleanup controls stay outside the focused backup section
 
-The Settings board-data area exposes one Download backup action with current-board JSON, complete recovery archive, and source-only raw export formats as applicable, plus one Restore action that routes File or Paste into the existing protected preview. The unreadable-startup empty state routes through that shared Settings chooser instead of opening a second paste route. The actual download, file restore, pasted recovery, and unreadable-device consumers retain their exact-source, unsaved-edit, cancellation, and readback checks. Current-board view/copy and Support diagnostics remain separate; lower local/app backup controls are outside this consolidation.
+Settings keeps one Import and one Export in Data and backups alongside the existing backup status, manual backup, local backup list, Restore, and Delete controls. Import accepts supported board JSON, recovery archives, and raw backup lists through the existing protected file-or-paste preview. Export prepares a single read-only recovery archive; separate Download and direct Copy use the exact same bytes. It includes accepted unsaved edits, supported unknown fields, readable saved sources, and bounded diagnostics. Unavailable or changing sources are marked partial, and the original bytes remain protected. The archive is not rendered in a large textarea. Review saved decisions, Clear history, Reset everything, the local debug log, and recent sync errors remain available in the collapsed Recovery and cleanup section.
 
 ## Returning-user first upload
 
@@ -543,7 +544,7 @@ The Settings board-data area exposes one Download backup action with current-boa
 - RISK support diagnostics: source operations report the effective bounded SDK deadline
 - RISK support diagnostics: recovery-copy checks are explicit, passive, and preserve unmatched pending work
 - RISK support diagnostics: real device retries count attempts while unexplained churn remains refused
-- RISK support diagnostics: Settings names the existing board export for its contents
+- RISK support diagnostics: Settings points to the single archive Export
 - RISK support diagnostics: local report stays redacted, bounded, and separate from board recovery
 - RISK support diagnostics: download bytes, selectable copy fallback, and Return preserve an unsaved Settings draft after slow worker capture
 
@@ -1849,7 +1850,7 @@ The full-app control pauses the real startup raw-store capture, then lets authen
 
 ## Incident support diagnostics
 
-- RISK support diagnostics: Settings names the existing board export for its contents
+- RISK support diagnostics: Settings points to the single archive Export
 - RISK support diagnostics: local report stays redacted, bounded, and separate from board recovery
 - RISK support diagnostics: a held local save and cloud acknowledgement stay visibly pending
 - RISK support diagnostics: a held snapshot does not claim durability for a later accepted action
