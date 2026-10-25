@@ -2629,10 +2629,10 @@ function protectedBrowserPayload(raw){
   }
   return raw;
 }
-async function refreshDeviceBackupCache(){
+async function refreshDeviceBackupCache(current=()=>true){
   if(!deviceStore) return [];
-  try{deviceBackupCache=await deviceStore.listBackups();deviceBackupCacheReadable=true;}
-  catch(e){deviceBackupCache=[];deviceBackupCacheReadable=false;}
+  try{const rows=await deviceStore.listBackups();if(current()){deviceBackupCache=rows;deviceBackupCacheReadable=true;}}
+  catch(e){if(current()){deviceBackupCache=[];deviceBackupCacheReadable=false;}}
   return deviceBackupCache;
 }
 function hasDeviceStorageAuthorityMarker(){
@@ -2816,7 +2816,7 @@ function automaticRecoveryExpectedHoldCurrent(captured){
     recoverySourceValueEqual(captured.hold,captured.localRecoveryIntent)&&recoverySourceValueEqual(deviceRecoveryCloudHold,captured.localRecoveryIntent):
     !captured?.hold&&!deviceRecoveryCloudHold;
 }
-async function recoverLocalWorkingDeviceSource({workingBoard=null,expectedMemoryHold=null,bootAttempt=null}={}){
+async function recoverLocalWorkingDeviceSource({workingBoard=null,expectedMemoryHold=null,bootAttempt=null,settledRecoveries=[]}={}){
   const store=deviceStore,accepted=state,acceptedRaw=JSON.stringify(state);
   const held=()=>expectedMemoryHold?memoryRecoveryWorkspace&&deviceRecoveryCloudHold===expectedMemoryHold:
     !deviceRecoveryCloudHold;
@@ -2824,7 +2824,21 @@ async function recoverLocalWorkingDeviceSource({workingBoard=null,expectedMemory
   try{
     const source=await store.readRawExportSnapshot(),browser=readManualArchiveLocalSources(),
       sourceIdentity=rawRecoverySourceIdentity(source),candidates=[],seen=new Map(),hashes=new Map();
-    if(source.stores.meta.keys.includes("recoveryCloudHold"))return null;
+    if(source.stores.meta.keys.includes("recoveryCloudHold")){
+      const installed=source.stores.meta.values[source.stores.meta.keys.indexOf("recoveryCloudHold")],
+        settledRecovery=settledRecoveries.find(row=>recoverySourceValueEqual(installed,row.hold)),
+        head=source.stores.meta.values[source.stores.meta.keys.indexOf("head")],
+        snapshot=source.stores.snapshots.values[source.stores.snapshots.keys.indexOf(head?.hash)],
+        original=source.stores.opaque.values[source.stores.opaque.keys.indexOf(installed?.originalKey)];
+      // Only this process's settled, exact recovery commit may be replaced by
+      // a fresh raw CAS. A foreign/changed hold or advanced head stays held.
+      if(!settledRecovery||!recoverySourceValueEqual(installed,settledRecovery.hold)||
+        head?.schemaVersion!==2||head.hash!==settledRecovery.hold.headHash||head.account!==installed.account||
+        snapshot?.hash!==head.hash||snapshot.payload!==settledRecovery.payload||
+        original?.key!==settledRecovery.archive.key||original.raw!==settledRecovery.archive.raw||
+        !await verifiedLocalWorkingRecoveryIntent(installed,source,installed.account,installed.identity,{allowUnresolved:true}))return null;
+      if(bootAttempt)bootAttempt.recoveryFallback=settledRecovery;
+    }
     let bytes=0,browserHead=null;
     const add=async(payload,key,expectedHash=null)=>{
       if(typeof payload!=="string"||candidates.length>=128)return;
@@ -2896,6 +2910,7 @@ async function recoverLocalWorkingDeviceSource({workingBoard=null,expectedMemory
     const current=()=>localDeviceStartupCurrent(bootAttempt)&&deviceStore===store&&state===accepted&&JSON.stringify(state)===acceptedRaw&&held()&&
       JSON.stringify(readManualArchiveLocalSources())===JSON.stringify(browser);
     if(!current())return null;
+    if(bootAttempt)bootAttempt.recoveryCommit={hold:{...hold,headHash:workingBaseHash},payload,archive};
     const result=await localDeviceStartupWrite(bootAttempt,"writeRecoveredSource",{expectedSource:sourceIdentity,
       encodeSource:rawRecoverySourceIdentity,archives:[archive],payload,account:hold.account,hold,guard:current},store);
     if(!result?.ok||!current())return null;
@@ -2911,13 +2926,16 @@ async function recoverLocalWorkingDeviceSource({workingBoard=null,expectedMemory
   }catch{return null;}
 }
 async function resumeMemoryWorkingDeviceStorage(){
-  const previous=localDeviceStartupAttempt;
-  if(!memoryRecoveryWorkspace||deviceRecoveryCloudHold?.workspace!=="memory-only"||
+  const previous=localDeviceStartupAttempt,
+    settledRecoveries=previous&&!previous.mutationPending?[previous.recoveryCommit,previous.recoveryFallback].filter(Boolean):[];
+  if(!memoryRecoveryWorkspace||(deviceRecoveryCloudHold?.workspace!=="memory-only"&&
+    !settledRecoveries.some(row=>recoverySourceValueEqual(deviceRecoveryCloudHold,row.hold)))||
     previous?.pending&&(!previous.expired||previous.mutationPending))return false;
   const hold=deviceRecoveryCloudHold;
   // An expired readonly delivery can remain pending after storage returns.
   // A new bounded lifetime retires its authority without replaying a write.
   const {result}=await runLocalDeviceStorageAttempt(async attempt=>{
+    [attempt.recoveryCommit,attempt.recoveryFallback]=settledRecoveries;
     try{
       if(!deviceStore){
         if(!window.ChainStorageV2||!window.indexedDB||!crypto?.subtle)return false;
@@ -2926,9 +2944,11 @@ async function resumeMemoryWorkingDeviceStorage(){
           openTimeoutMs:window.CHAIN_STORAGE_OPEN_TIMEOUT_MS||5000});
       }
       await deviceStore.open();if(!localDeviceStartupCurrent(attempt))return false;window.ScannerDeviceStore=deviceStore;
-      const head=await recoverLocalWorkingDeviceSource({workingBoard:automaticRecoveryClone(state),expectedMemoryHold:hold,bootAttempt:attempt});
+      // Finish auxiliary reads before the protected head is committed. Once
+      // its full readback succeeds, activation below contains no further await.
+      await refreshDeviceBackupCache(()=>localDeviceStartupCurrent(attempt));if(!localDeviceStartupCurrent(attempt))return false;
+      const head=await recoverLocalWorkingDeviceSource({workingBoard:automaticRecoveryClone(state),expectedMemoryHold:hold,bootAttempt:attempt,settledRecoveries});
       if(!head||!localDeviceStartupCurrent(attempt))return false;
-      await refreshDeviceBackupCache();if(!localDeviceStartupCurrent(attempt))return false;
       state=JSON.parse(head.payload);deviceHeadHash=head.hash;lastPersistedRaw=head.payload;
       storageOK=true;deviceStorageAuthority=true;deviceStorageRequired=false;memoryRecoveryWorkspace=false;
       unacceptedDeviceSource={reason:"protected-local-working-source",workingWorkspace:true};

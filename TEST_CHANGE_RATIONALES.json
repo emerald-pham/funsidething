@@ -1,5 +1,25 @@
 [
   {
+    "baseCommit": "f0975a0a7b6d6e246770cee2f2e460f231563e4c",
+    "testChangesSha256": "64a895fbb73b8c1c3d1377823080b288b74e85cc774ad4c08bb538355e21aa6d",
+    "reason": "Repair confirmed C2 postcommit activation P1 and its directly adjacent settled-own-write reentry lifetime: a complete protected recovery could install a durable hold but leave accepted memory work permanently unable to save.",
+    "previousBehavior": "After recovered full raw write/readback and durable marker, a stalled final backup-cache read expired before memory/storage flags activated. Later fresh requests worked but the installed new-work hold blocked every save. Independently, a startup recovery write could settle late with no safe current-work reentry.",
+    "intendedBehavior": "Complete auxiliary reads before protected recovery commit, then activate the fully verified head and process flags without another await. A fresh bounded full raw CAS may replace only an exact process-recorded settled own intent after hold, current head, payload, immutable archive and independent source/hash validation. Pending writes never replay; failed read/write retries retain at most two own receipt alternatives; changed holds/advanced heads stay held; late auxiliary deliveries cannot replace current cache or accepted work.",
+    "replacementTests": [
+      "RISK offline recovery activation: a verified committed workspace activates before optional cache reads can strand later edits",
+      "RISK offline recovery reentry: settled own recovery writes permit fresh current work while changed holds stay protected"
+    ],
+    "preservedCoverage": [
+      "All prior product assertions and rationale raw objects remain unchanged; only new tests use the established actual loadApp/sharedStorage marker/external IDB delivery/native onAction/persist seams. No native/browser runtime, new production test hook, new framework, cloud API, device-store API, metadata or global assignment change.",
+      "The main actual consumer checks complete verified save before a marker-triggered next read stalls, current durable head/flags, later Add, Done/Undo, unfinished draft, late delivery, exact original browser archive and cold offline reopen. Settled own intent cases check pending no-replay/no-late-adoption, accepted earlier/later tasks, exact archive/pending preservation, later read-stall retry, later quota-refusal retry, stale-cache non-overwrite and changed-hold raw refusal.",
+      "Existing source owner/UID filters, accepted-baseline reducer, typed full raw CAS/current guard, original archive/reference/hash checks, readback/marker, total operation budget, unresolved-source and cloud ACK guards, unknown/orphan/pending protection, manual Restore and earlier native behavior remain. Parent connection epochs, earliest independent-cloud preflight, legacy fix, FAQ, group map and fingerprints are unchanged."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/offline-working-repair/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/ios-page-failure-20261024/database/offline-working/activation/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern '^RISK offline recovery (?:activation|reentry):' tests.js. Contemporaneous exact-C2 REDa3672c96 preceded runtime edit; directly adjacent retry REDb3fc69e5, stale-cache RED9b33072a and quota-retry REDf1edcba2 preceded their corresponding narrow fixes. Focused GREENf993ae60 passes6/6.",
+      "failure": "Exact C2 actual consumer REDa3672c96: verified committed workspace persist returned false instead of true before process activation; independently settled own write still left current persist=false, while changed-hold refusal passed. Narrow retry REDs then proved loss of own proof after a fresh read timeout, an expired cache callback replacing newer backup rows, and loss of the previous exact own receipt after a quota-aborted fresh write. All real failure streams remain preserved, with original external Standards RED546e55c4 separate. No retroactive baseline check is called original RED."
+    }
+  },
+  {
     "baseCommit": "b636189d398dd1d078cc8773d902c588cd54d8ef",
     "reason": "Repair confirmed Standards P1: a permanently withheld expired readonly startup delivery blocked all later durable saves despite independently working fresh external raw requests. Bound fresh recovery attempts and retain the no-replay rule for uncertain started writes.",
     "previousBehavior": "Memory Add worked after startup timeout, but localDeviceStartupAttempt.pending permanently rejected saves until the obsolete readonly callback returned. After it settled, another stalled raw capture could leave a fresh memory-work save unbounded.",
