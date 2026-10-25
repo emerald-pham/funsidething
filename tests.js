@@ -43472,3 +43472,12 @@ test('RISK repository process: required parallel scanner aggregation rejects abs
  const result=spawnSync(process.execPath,['--test','--test-name-pattern=^test group workflow scanner command rejects missing parallel group evidence$',path.join(__dirname,'scripts/agent-tools/test-groups.test.mjs')],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
  assert.equal(result.status,0,'The executed scanner aggregate must fail closed on absent required group evidence: '+result.stdout+'\n'+result.stderr);
 });
+
+test('RISK repository process: grouped catalog binds real declarations rather than quoted fixtures',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group catalog routes real declarations despite matching quoted fixture text$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
+ const output=(result.stdout||'')+'\n'+(result.stderr||'');
+ assert.equal(result.error,undefined,'The public catalog ownership regression must start: '+output);
+ assert.equal(result.status,0,'Real declarations must be classified and execute once despite quoted fixture copies: '+output);
+ assert.match(result.stdout||'',/^# tests 1$/m);assert.match(result.stdout||'',/^# skipped 0$/m);
+});

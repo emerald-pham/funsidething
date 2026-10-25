@@ -633,3 +633,40 @@ test('test group covered aggregate requires four honest references and fresh ori
     if(passed){const report=JSON.parse(fs.readFileSync(path.join(actual.outputDir,'aggregate.json')));assert.equal(report.mode,'covered');assert.equal(report.caseCount,0);assert.equal(report.groups.length,4);assert.ok(report.groups.every(group=>group.coverage.coveredBy.runId===proof.coveredBy.runId));}
   });
 });
+
+test('test group catalog routes real declarations despite matching quoted fixture text', t => {
+  const fixture = createFixture(t);
+  const titles = [
+    'Landscape location: visible default-sky copy does not name Orlando',
+    'RISK Quick start content: essential steps stay brief and detailed help remains user-facing in existing sections',
+  ];
+  const candidateCatalog = JSON.parse(fs.readFileSync(path.join(repository, 'scripts/test-group-assignments.json'), 'utf8'));
+  const selected = titles.map(title => {
+    const rows = candidateCatalog.rootAssignments.filter(row => row.root === title);
+    assert.equal(rows.length, 1, 'each known real case needs exactly one catalog row');
+    assert.equal(rows[0].group, 'native-process', 'retain the historical group membership');
+    return rows[0];
+  });
+  const journal = path.join(fixture.root, 'real-case-executions.jsonl');
+  const declarations = titles.map(title => `test(${JSON.stringify(title)}, () => { fs.appendFileSync(process.env.CHAIN_REAL_CASE_JOURNAL, ${JSON.stringify(title + '\n')}); });`).join('\n');
+  const quoted = `const quotedFixtureSource = ${JSON.stringify(declarations)};\n`;
+  fs.appendFileSync(path.join(fixture.root, 'tests.js'), '\n' + quoted + declarations + '\n');
+  fs.writeFileSync(path.join(fixture.root, 'scripts/agent-tools/preflight.test.mjs'), "import { test } from 'node:test';\n" + quoted + "test('fixture preflight real owner root', () => {});\n");
+  const catalog = JSON.parse(fs.readFileSync(path.join(fixture.root, 'scripts/test-group-assignments.json'), 'utf8'));
+  catalog.rootAssignments.push(...selected, { root: 'fixture preflight real owner root', group: 'native-process', file: 'scripts/agent-tools/preflight.test.mjs' });
+  writeJson(path.join(fixture.root, 'scripts/test-group-assignments.json'), catalog);
+  git(fixture.root, 'add', '.');
+  git(fixture.root, 'commit', '-qm', 'real declarations with ambiguous quoted fixture copies');
+  fixture.sourceSha = git(fixture.root, 'rev-parse', 'HEAD');
+
+  const core = invoke(fixture, { env: { CHAIN_REAL_CASE_JOURNAL: journal } });
+  assert.equal(core.status, 0, 'the per-file guard must recognize both real declarations: ' + core.stdout + core.stderr);
+  assert.equal(fs.existsSync(journal), false, 'the guard and another group must not execute the assigned native cases');
+  const native = invoke(fixture, { group: 'native-process', env: { CHAIN_REAL_CASE_JOURNAL: journal } });
+  assert.equal(native.status, 0, native.stdout + native.stderr);
+  const executed = fs.readFileSync(journal, 'utf8').trim().split('\n');
+  for (const title of titles) {
+    assert.equal(executed.filter(item => item === title).length, 1, 'execute each actual declaration exactly once');
+    assert.equal(native.evidence.cases.filter(item => item.id === title && item.status === 'passed').length, 1);
+  }
+});

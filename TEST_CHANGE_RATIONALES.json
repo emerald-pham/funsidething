@@ -18791,5 +18791,43 @@
     "command": "Public command/process RED logs under /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/265/: descriptor-red.log, aggregate-missing-red.log, dynamic-routing-red.log, metadata-edited-red.log, context-planning-red.log, routing-descriptor-red.log, unclassified-dynamic-red.log, workflow-aggregate-red.log, covered-reference-red.log, guard-file-binding-red.log, observer-topology-red.log, grouped-routing-red.log, covered-dynamic-red.log, aggregate-unlisted-red.log, observer-attestation-red.log and guard-malformed-tap-red.log. Earlier exact composite RED pointers remain in every prior record. Repeated covered metadata lifecycle: repeated-metadata-red.log before the narrow producer-search repair, followed by repeated-metadata-green.log.",
     "failure": "Before each corresponding functional change, the runnable public command produced the discriminating mismatch: descriptor/covered modes executed body sentinels; absent group evidence passed; selected dynamic scenarios did not execute; metadata edited repeated full coverage; planning made external reads; wrong descriptors/sources passed; unknown dynamic/wrong-file roots disappeared; missing parallel jobs or aggregate attestation were accepted; a known exact failed producer fell back to passing full execution; an explicitly assigned dynamic root was rejected; unlisted native files and malformed guard TAP with recomputed hashes were accepted. Fixture setup/import/unknown-option failures are excluded from behavioral RED. The first combined focused run exposed a Bash3 empty-array fixture issue and an error-message preservation issue; both failures and corrected subsequent runs remain external evidence."
   }
+},
+{
+  "baseCommit": "f738a9838e7027aa39c6f2112c2275ffaaadc3ef",
+  "testChangesSha256": "528b9e801d4140de0b00677accdfa2f86a27ae5dbbbb475467491896d0a213a5",
+  "reason": "Correct two declared test-file owners exposed by the first real hosted per-file guard; retain the strict guard and add an executed public process regression that distinguishes real declarations from identical quoted fixture source.",
+  "previousBehavior": "The two existing default-sky copy and Quick start FAQ tests really register in tests.js, but their catalog rows named scripts/agent-tools/preflight.test.mjs because it contains quoted copies of their registration text. The strict per-file core guard correctly ran those known tests as unknown roots and failed before its cohort.",
+  "intendedBehavior": "Both catalog rows name their actual tests.js declaration file and retain native-process membership and historical baseline measurements. A public fixture with the actual catalog rows, genuine declarations and identical quoted copies in both source files proves the core guard does not execute the native cases, while their assigned group executes each real case exactly once.",
+  "replacementTests": [
+    "RISK repository process: grouped catalog binds real declarations rather than quoted fixtures"
+  ],
+  "preservedCoverage": [
+    "All738 previous rationale objects and the independently captured2997-case inventory remain byte-exact. The composite main comparison retains all prior266/267/268/264/265 RED records and their unchanged feature assertions.",
+    "Only the two existing file fields change: both group memberships, every baseline case, accepted skip, baseline group count/duration, process control, native assertion, workflow, routing, permissions and guard implementation remain unchanged. Two new permanent process roots receive explicit native-process assignments.",
+    "The regression uses the existing public npm test:group process, actual catalog rows, isolated real Git fixtures and runtime body journaling. It includes matching quoted source in both files and asserts zero cross-group execution plus exactly one successful outcome and execution per actual declared case. Existing product assertions are retained."
+  ],
+  "redEvidence": {
+    "command": "Recorder preimplementation-red actual command: npm run test:group -- --group core on clean f738; /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/265/repair-1/core-red-summary.jsonl and actual-core-red/ retain raw guard TAP/stderr/summaries. Permanent public regression: Node22 tests.js --test-name-pattern for the new RISK wrapper; /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/265/repair-1/regression-final-fixture-red-summary.jsonl and its records/* raw outputs precede the two catalog-file corrections.",
+    "failure": "The actual unchanged core process returned1 with child0 and the exact two known tests.js roots classified as unknown. The new RISK process assertion then observed core status1 where0 was required with those catalog rows and matching quoted fixture text. The guard reported the same real root names. This is a behavioral process failure, not a source-string assertion, missing module, unknown option or compile failure."
+  }
+},
+{
+  "baseCommit": "d224107e5e56e5455a16e670dad6bdbc951940b5",
+  "testChangesSha256": "af2a9de4e14cbda5334642245f35e34aba92842f99d4b34e01079731b3d1dd17",
+  "reason": "Correct two declared test-file owners exposed by the first real hosted per-file guard; retain the strict guard and add an executed public process regression that distinguishes real declarations from identical quoted fixture source.",
+  "previousBehavior": "The two existing default-sky copy and Quick start FAQ tests really register in tests.js, but their catalog rows named scripts/agent-tools/preflight.test.mjs because it contains quoted copies of their registration text. The strict per-file core guard correctly ran those known tests as unknown roots and failed before its cohort.",
+  "intendedBehavior": "Both catalog rows name their actual tests.js declaration file and retain native-process membership and historical baseline measurements. A public fixture with the actual catalog rows, genuine declarations and identical quoted copies in both source files proves the core guard does not execute the native cases, while their assigned group executes each real case exactly once.",
+  "replacementTests": [
+    "RISK repository process: grouped catalog binds real declarations rather than quoted fixtures"
+  ],
+  "preservedCoverage": [
+    "All738 previous rationale objects and the independently captured2997-case inventory remain byte-exact. The composite main comparison retains all prior266/267/268/264/265 RED records and their unchanged feature assertions.",
+    "Only the two existing file fields change: both group memberships, every baseline case, accepted skip, baseline group count/duration, process control, native assertion, workflow, routing, permissions and guard implementation remain unchanged. Two new permanent process roots receive explicit native-process assignments.",
+    "The regression uses the existing public npm test:group process, actual catalog rows, isolated real Git fixtures and runtime body journaling. It includes matching quoted source in both files and asserts zero cross-group execution plus exactly one successful outcome and execution per actual declared case. Existing product assertions are retained."
+  ],
+  "redEvidence": {
+    "command": "Recorder preimplementation-red actual command: npm run test:group -- --group core on clean f738; /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/265/repair-1/core-red-summary.jsonl and actual-core-red/ retain raw guard TAP/stderr/summaries. Permanent public regression: Node22 tests.js --test-name-pattern for the new RISK wrapper; /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/265/repair-1/regression-final-fixture-red-summary.jsonl and its records/* raw outputs precede the two catalog-file corrections.",
+    "failure": "The actual unchanged core process returned1 with child0 and the exact two known tests.js roots classified as unknown. The new RISK process assertion then observed core status1 where0 was required with those catalog rows and matching quoted fixture text. The guard reported the same real root names. This is a behavioral process failure, not a source-string assertion, missing module, unknown option or compile failure."
+  }
 }
 ]

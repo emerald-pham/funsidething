@@ -2250,7 +2250,7 @@
     {
       "root": "Landscape location: visible default-sky copy does not name Orlando",
       "group": "native-process",
-      "file": "scripts/agent-tools/preflight.test.mjs"
+      "file": "tests.js"
     },
     {
       "root": "Landscape locomotion: planted feet stay fixed and rabbits pause between hops",
@@ -8940,7 +8940,7 @@
     {
       "root": "RISK Quick start content: essential steps stay brief and detailed help remains user-facing in existing sections",
       "group": "native-process",
-      "file": "scripts/agent-tools/preflight.test.mjs"
+      "file": "tests.js"
     },
     {
       "root": "RISK quiet reconciliation feedback: a displaced dependency choice keeps its recovery notice and exact backup",
@@ -12336,6 +12336,16 @@
       "root": "metadata edits continue past verified covered runs to the original full producer",
       "group": "native-process",
       "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "test group catalog routes real declarations despite matching quoted fixture text",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "RISK repository process: grouped catalog binds real declarations rather than quoted fixtures",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [
