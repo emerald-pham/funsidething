@@ -60,7 +60,7 @@ export async function runTransferScenarios(h){
   await ui.act('export-backup',ready,'[data-act="export-backup"][data-export-scope="repair"]');
   await ui.act('copy-export',copied);assertArchive(await ui.page.evaluate(()=>window.__buttonClipboard.at(-1)),expected);
   if(expected.copies===16){
-   await ui.act('close-modal',()=>!document.getElementById('exportTransferDialog'));await ui.act('settings',()=>!!document.getElementById('stHorizon'));
+   await ui.act('close-modal',()=>!document.getElementById('exportTransferDialog')&&!!document.getElementById('stHorizon'));
    const headBefore=await ui.page.evaluate(async()=>{const head=await ScannerDeviceStore.readHead();return{hash:head.hash,payload:head.payload};});
    await ui.select('#backupRestoreSource','paste');await ui.act('import-backup',()=>!!document.getElementById('jsonBox'));
    await ui.fill('#jsonBox',copiedRaw);await ui.act('preview-pasted-recovery',()=>!!document.querySelector('[data-act="confirm-file-restore"]'));

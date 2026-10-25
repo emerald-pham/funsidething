@@ -337,7 +337,47 @@
     "download refusal keeps the prepared export usable",
     "unavailable saved-source export is visibly partial",
     "guarded file import preview cancel and confirm",
-    "guarded paste import rejects malformed data and retains cancelled draft"
+    "guarded paste import rejects malformed data and retains cancelled draft",
+    "rapid Add and context actions with 400 saved tasks",
+    "rapid Settings, theme, context management, and save with 400 tasks",
+    "rapid All Tasks and bulk editing with 400 saved tasks",
+    "rapid editor, history, and task actions with 400 saved tasks",
+    "rapid Undo consumes one actual saved edit frame",
+    "rapid scanner candidate actions with 400 active tasks",
+    "rapid benchmark bench-done with 400 tasks",
+    "rapid benchmark bench-cant with 400 tasks",
+    "rapid benchmark bench-postpone with 400 tasks",
+    "rapid benchmark dislodge with 400 tasks",
+    "rapid benchmark worked with 400 tasks",
+    "rapid scan and work transitions with 400 tasks",
+    "rapid Continue scan from intervention with 400 tasks",
+    "rapid Rescan on an exhausted 400-task fixture",
+    "rapid New pass on an exhausted 400-task fixture",
+    "rapid overdue WOOP action with 400 tasks",
+    "rapid final-task WOOP walkthrough and delete with 400 saved tasks",
+    "rapid backup creation, restore, and deletion with 400 saved tasks",
+    "rapid history clearing preserves the remaining 400-task workspace",
+    "rapid reset confirms once and retains the 400-task backup",
+    "rapid Debug log and Help actions with 400 saved tasks",
+    "rapid first-run Quick Start acknowledges once with 400 tasks",
+    "rapid native install accepted with 400 tasks",
+    "rapid native install dismissed with 400 tasks",
+    "rapid theme preference changes through its button",
+    "rapid motion settings open and both choices respond",
+    "rapid scene time presets, lock, live time, and close",
+    "rapid location request, save name, reset, and close",
+    "rapid denied location request leaves the default sky",
+    "rapid scene view enters and returns to the task view",
+    "rapid first-run Quick Start can be acknowledged",
+    "rapid all Help and changelog disclosures",
+    "rapid cloud retry, reload, and sign out preserve the device board during read failures",
+    "rapid cloud recovery reviews, protects, and applies a source with read and write failures",
+    "rapid Settings decision review offers Light and saves it while protecting failures",
+    "rapid prepared Export Copy and Download retain exact sources",
+    "rapid pending Copy disables reentry without losing the archive",
+    "rapid guarded file import preview cancel and confirm",
+    "rapid guarded paste import rejects malformed data and retains cancelled draft",
+    "rapid clipboard completion belongs to its prepared transfer"
   ],
   "requiredWorkload": {
     "savedTasks": 400,
@@ -461,8 +501,15 @@
     "scene-view"
   ],
   "scenarioRoles": {
-    "recorded history and final WOOP": "sole",
     "exhausted scanner rescan and new pass": "exhausted",
-    "fresh pass": "exhausted"
-  }
+    "fresh pass": "exhausted",
+    "recorded history and final WOOP": "sole",
+    "rapid Rescan on an exhausted 400-task fixture": "exhausted",
+    "rapid New pass on an exhausted 400-task fixture": "exhausted",
+    "rapid final-task WOOP walkthrough and delete with 400 saved tasks": "sole"
+  },
+  "userStories": [
+    "Buttons work with400saved tasks without crashing.",
+    "Buttons work when pressed ten times within two seconds."
+  ]
 }

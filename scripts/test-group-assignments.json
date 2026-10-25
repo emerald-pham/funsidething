@@ -12801,6 +12801,11 @@
       "root": "RISK Settings transfer sections: cleanup controls stay outside the focused backup section",
       "group": "core",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: native button safety requires 400-task and rapid-press evidence",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [

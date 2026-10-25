@@ -3,8 +3,10 @@ import {runSceneScenarios} from './button-safety-scenes.mjs';
 import {runCloudScenarios} from './button-safety-cloud.mjs';
 import {runTransferScenarios,rawIdentity,assertArchive} from './button-safety-transfer.mjs';
 import fs from 'node:fs';
+import {runRapidCoreScenarios} from './button-safety-rapid-core.mjs';
 const ready=()=>!!document.getElementById('exportTransferDialog')&&!document.querySelector('[data-act="copy-export"]').disabled&&!document.querySelector('[data-act="download-export"]').disabled;
 export async function runRapidScenarios(h){
+ await runRapidCoreScenarios(h);
  await runSceneScenarios({scenario:async(name,options,execute)=>{
   if(name==='Help FAQ and changelog disclosures toggle and close')return;
   await h.scenario('rapid '+name,options,async ui=>{
@@ -12,7 +14,7 @@ export async function runRapidScenarios(h){
    const click=async(selector,expect,description)=>{
     const action=await ui.page.locator(selector).first().evaluate(el=>el.dataset.act||(['landscapeMotion','scenePreset','sceneTime','locationAction'].map((key,i)=>el.dataset[key]===undefined?null:['motion:','scene-preset:','scene-time:','location:'][i]+el.dataset[key]).find(Boolean))||(el.hasAttribute('data-scene-view')?'scene-view':null));
     assert.ok(action,'Reviewed rapid scene control');
-    const one=action.startsWith('motion:')||action.endsWith(':close')||action==='scene-view';
+    const one=action.startsWith('motion:')||action.endsWith(':close')||action==='location:reset'||action==='scene-view';
     return ui.burst(action,expect,{selector,semantics:description+'; '+(one?'first press closes or replaces this control; later attempts cannot activate it':'all available repeated choices retain the same explicit saved value'),expectedAccepted:one?1:action==='location:request'?{min:1,max:10}:10});
    };
    await execute({...ui,act,click});

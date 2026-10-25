@@ -45311,6 +45311,7 @@ test('RISK repository process: native button gate detects errors raised by a rea
 });
 
 test('RISK repository process: required native button actions execute in Chromium and WebKit',async t=>{
+ const inventory=JSON.parse(fs.readFileSync(path.join(__dirname,'scripts/button-safety-inventory.json'),'utf8'));assert.deepEqual(inventory.requiredWorkload,{savedTasks:400,rapidAttempts:10,rapidWindowMs:2000},'Both explicit user workload stories remain required');assert.deepEqual(inventory.requiredRapidActions,inventory.requiredActions,'Every required button/action family needs rapid coverage');
  const output=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(output,'Durable allocated native output required');
  for(const engine of ['chromium','webkit'])await t.test(engine,()=>{
   const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine',engine,'--output-dir',output,'--port',process.env.CHAIN_NATIVE_PORT||'0'],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:300000,maxBuffer:16*1024*1024});

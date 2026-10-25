@@ -171,10 +171,8 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
     const attempts=[];const began=Date.now();
     for(let index=0;index<10;index++){
      let availability={present:false,disabled:false,hit:false},box=originalBox;
-     if(await target.count()){
-      const next=await target.boundingBox();if(next)box=next;
-      availability=await target.evaluate((el,backdrop)=>{const r=el.getBoundingClientRect(),hit=document.elementFromPoint(r.x+(backdrop?5:r.width/2),r.y+(backdrop?5:r.height/2));return{present:!!(r.width&&r.height),disabled:el.matches(':disabled'),hit:!!hit&&(el===hit||el.contains(hit))};},action==='act:mback');
-     }
+     const snapshot=await bounded(target.evaluateAll((els,backdrop)=>{const el=els[0];if(!el)return null;const r=el.getBoundingClientRect(),hit=document.elementFromPoint(r.x+(backdrop?5:r.width/2),r.y+(backdrop?5:r.height/2));return{box:{x:r.x,y:r.y,width:r.width,height:r.height},present:!!(r.width&&r.height),disabled:el.matches(':disabled'),hit:!!hit&&(el===hit||el.contains(hit))};},action==='act:mback'),'rapid target availability');
+     if(snapshot){availability=snapshot;if(snapshot.present)box=snapshot.box;}
      const before={clicks:report.clicks?.length||0,presses:report.presses?.length||0};
      if(availability.present&&availability.hit)await bounded(page.mouse.click(box.x+(action==='act:mback'?5:box.width/2),box.y+(action==='act:mback'?5:box.height/2)),'rapid native press '+actionName);
      else{

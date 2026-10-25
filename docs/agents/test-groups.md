@@ -165,3 +165,25 @@ The regular four-group cohort, existing installed-client artifacts and accepted
 historical skips remain independently enforced. Synthetic SDK, clipboard, location
 and isolated storage boundaries establish repeatable regression evidence only;
 they do not establish physical iPhone behavior or recovery of private saved data.
+
+The required workload stories are: “Buttons work with 400 saved tasks without
+crashing” and “Buttons work when pressed ten times within two seconds.” Both run
+in Chromium and WebKit and block the same required aggregate. Each scenario first
+reads back exactly 400 tasks from the real isolated durable device head and its
+current board, recording the saved hash and active count. Ordinary Add, editor,
+list, Settings, scene, cloud and export/import flows use 400 active tasks. Only
+explicitly named sole/final or exhausted scenarios use documented completed or
+ineligible padding; that exception cannot stand in for the ordinary active load.
+
+Every reviewed action family also needs a successful rapid outcome. Each burst
+records ten real native pointer presses, browser-trusted receipt timestamps, its
+wall-clock window of at most 2,000 ms, and exact accepted-click, refused and
+disappeared counts. Persistent controls must produce their independently expected
+tenth effect, such as even toggle parity, a retained explicit choice, ten identical
+copies or ten real downloads. A closing, replaced, disabled or obscured control
+can accept fewer clicks. Attempts against an absent or obscured original control
+release outside the viewport so they cannot accidentally activate a different
+control; those attempts remain explicitly classified and do not earn accepted
+click credit. The expected state and exact originals are asserted afterward.
+Missing task readback, hidden ordinary load, missing/skipped rapid families,
+untrusted or incomplete counts, a slower burst, or unreconciled outcomes fails.
