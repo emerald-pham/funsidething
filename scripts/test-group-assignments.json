@@ -12541,6 +12541,12 @@
       "root": "RISK offline memory restore: a deliberate Paste after storage returns protects accepted unsaved work",
       "group": "persistence-recovery",
       "file": "tests.js"
+    },
+    {
+      "name": "RISK independent cloud legacy source: supported released v1 boards upgrade only their version during server-only repair",
+      "group": "persistence-recovery",
+      "file": "tests.js",
+      "note": "One new top-level root; parent owns global test-group map update."
     }
   ],
   "processControls": [
