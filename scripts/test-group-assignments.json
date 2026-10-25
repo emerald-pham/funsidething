@@ -12753,8 +12753,58 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK repository process: button safety rejects incomplete native action evidence",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: button safety rejects false passes and newly untested actions",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: native button gate detects errors raised by a real click",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: required native button actions execute in Chromium and WebKit",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: native button gate refuses unallocated local launch before browser startup",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: new and duplicate source buttons require native coverage inventory",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "test group aggregate requires both exact native button safety reports",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "RISK repository process: native button gate awaits an asynchronous false outcome",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: native button gate cannot omit a required stress scenario",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK Settings transfer sections: cleanup controls stay outside the focused backup section",
       "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: native button safety requires 400-task and rapid-press evidence",
+      "group": "native-process",
       "file": "tests.js"
     }
   ],

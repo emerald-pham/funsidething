@@ -45276,3 +45276,112 @@ test('RISK independent cloud boot authority: source-only preflight waits for bou
  assert.equal(JSON.stringify(ctx.state),local);assert.equal(shim.document.getElementById('addInput').value,'Draft after unavailable boot');assert.equal(ctx.state.syncDirty,true);
  assert.equal(JSON.parse(remote.payload).tasks.some(row=>row.title==='Accepted after bounded unavailable boot'),false,'server-only repair never uploads unobserved accepted local work');
 });
+
+test('RISK repository process: button safety rejects incomplete native action evidence',t=>{
+ const directory=fs.mkdtempSync('/tmp/chain-button-process-');t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const report={schemaVersion:1,kind:'button-safety',engine:'webkit',status:'passed',candidateCommit:'a'.repeat(40),candidateTree:'b'.repeat(40),inventorySha256:'c'.repeat(64),requiredActions:['act:add','act:settings'],outcomes:[{action:'act:add',status:'passed',events:['click'],assertions:1,responsive:true}],errors:[],cleanup:{contextClosed:true,browserClosed:true,serverClosed:true}};
+ const file=path.join(directory,'report.json'),inventory=path.join(directory,'inventory.json');fs.writeFileSync(file,JSON.stringify(report));fs.writeFileSync(inventory,JSON.stringify({schemaVersion:1,requiredActions:['act:add','act:settings']}));report.inventorySha256=createHash('sha256').update(fs.readFileSync(inventory)).digest('hex');fs.writeFileSync(file,JSON.stringify(report));
+ const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--verify-report',file,'--inventory',inventory],{cwd:__dirname,encoding:'utf8'});
+ assert.equal(result.error,undefined);assert.notEqual(result.status,0,'required native safety gate must reject a passing report missing the Settings click');
+ assert.match(result.stderr,/Missing required button action: act:settings/);
+});
+
+test('RISK repository process: button safety rejects false passes and newly untested actions',async t=>{
+ const directory=fs.mkdtempSync('/tmp/chain-button-contract-');t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const manifest={schemaVersion:1,requiredActions:['act:add','act:settings']},inventory=path.join(directory,'inventory.json');fs.writeFileSync(inventory,JSON.stringify(manifest));
+ const good={schemaVersion:1,kind:'button-safety',engine:'webkit',status:'passed',candidateCommit:'a'.repeat(40),candidateTree:'b'.repeat(40),inventorySha256:createHash('sha256').update(fs.readFileSync(inventory)).digest('hex'),requiredActions:manifest.requiredActions,outcomes:manifest.requiredActions.map(action=>({action,status:'passed',events:['click'],assertions:1,responsive:true})),errors:[],observedActions:manifest.requiredActions,cleanup:{contextClosed:true,browserClosed:true,serverClosed:true}};
+ const variants={
+  duplicate:r=>r.outcomes.push(r.outcomes[0]), skipped:r=>r.outcomes[0].status='skipped', cancelled:r=>r.outcomes[0].status='cancelled', noClick:r=>r.outcomes[0].events=[], noAssertion:r=>r.outcomes[0].assertions=0, stalled:r=>r.outcomes[0].responsive=false,
+  crash:r=>r.errors.push('page-crash'), close:r=>r.errors.push('unexpected-close'), reload:r=>r.errors.push('unexpected-reload'), navigation:r=>r.errors.push('unexpected-navigation'), pageerror:r=>r.errors.push('pageerror'), unhandled:r=>r.errors.push('unhandledrejection'), unavailable:r=>r.status='unavailable', newAction:r=>r.observedActions.push('act:new-untested'), selfWaived:r=>{r.requiredActions.pop();r.outcomes.pop();}, wrongInventory:r=>r.inventorySha256='d'.repeat(64), cleanup:r=>r.cleanup.browserClosed=false
+ };
+ const invoke=report=>{const file=path.join(directory,'report.json');fs.writeFileSync(file,JSON.stringify(report));return spawnSync(process.execPath,['scripts/button-safety.mjs','--verify-report',file,'--inventory',inventory],{cwd:__dirname,encoding:'utf8'});};
+ assert.equal(invoke(good).status,0,'complete controlled evidence accepted before negative controls');
+ const unbound=spawnSync(process.execPath,['scripts/button-safety.mjs','--verify-report',path.join(directory,'report.json')],{cwd:__dirname,encoding:'utf8'});assert.equal(unbound.error,undefined);assert.notEqual(unbound.status,0,'standalone report cannot self-declare a shorter required action inventory');assert.match(unbound.stderr,/Independent button inventory required/);
+ for(const [name,mutate]of Object.entries(variants))await t.test(name,()=>{const report=structuredClone(good);mutate(report);const result=invoke(report);assert.equal(result.error,undefined);assert.notEqual(result.status,0,'native gate must reject '+name+' false pass');assert.doesNotMatch(result.stderr,/SyntaxError|ERR_MODULE_NOT_FOUND/);});
+});
+
+test('RISK repository process: native button gate detects errors raised by a real click',async t=>{
+ const output=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(output,'Durable allocated native output required');fs.mkdirSync(output,{recursive:true});
+ const controls={pageerror:/pageerror/,unhandled:/unhandledrejection/,close:/unexpected-close/,crash:/page-crash/,reload:/unexpected-navigation-or-reload/,navigation:/unexpected-navigation-or-reload/,stall:/stalled responsiveness|blocked frame loop/,'async-pending':/stalled responsiveness/,'new-action':/New untested button action/};
+ const cases=Object.entries(controls).map(([control,signal])=>({engine:'chromium',control,signal}));cases.push({engine:'webkit',control:'pageerror',signal:/pageerror/},{engine:'webkit',control:'unhandled',signal:/unhandledrejection/},{engine:'webkit',control:'short-stall',signal:/blocked frame loop/});
+ for(const {engine,control,signal}of cases)await t.test(engine+' '+control,()=>{
+  const before=new Set(fs.readdirSync(output));
+  const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine',engine,'--output-dir',output,'--port',process.env.CHAIN_NATIVE_PORT||'0','--probe','--control',control],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:45000,maxBuffer:8*1024*1024});
+  assert.equal(result.error,undefined);assert.equal(result.signal,null);assert.notEqual(result.status,0,'actual native Settings click must reject '+control);
+  const reports=fs.readdirSync(output).filter(file=>!before.has(file)&&file.startsWith('button-safety-'+engine+'-')&&file.endsWith('.json'));assert.equal(reports.length,1,'one preserved real native sensitivity artifact');
+  const report=JSON.parse(fs.readFileSync(path.join(output,reports[0]),'utf8'));assert.equal(report.kind,'button-sensitivity');assert.equal(report.status,'failed');assert.match(JSON.stringify({errors:report.errors,failure:report.failure}),signal,'actual detector must catch '+control);t.diagnostic('Button sensitivity: '+path.join(output,reports[0]));
+ });
+});
+
+test('RISK repository process: required native button actions execute in Chromium and WebKit',async t=>{
+ const inventory=JSON.parse(fs.readFileSync(path.join(__dirname,'scripts/button-safety-inventory.json'),'utf8'));assert.deepEqual(inventory.requiredWorkload,{savedTasks:400,rapidAttempts:10,rapidWindowMs:2000},'Both explicit user workload stories remain required');assert.deepEqual(inventory.requiredRapidActions,inventory.requiredActions,'Every required button/action family needs rapid coverage');
+ const output=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(output,'Durable allocated native output required');
+ for(const engine of ['chromium','webkit'])await t.test(engine,()=>{
+  const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine',engine,'--output-dir',output,'--port',process.env.CHAIN_NATIVE_PORT||'0'],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:300000,maxBuffer:16*1024*1024});
+  assert.equal(result.error,undefined,'Named engine must be available: '+(result.error?.message||result.stderr));assert.equal(result.signal,null);assert.equal(result.status,0,'Every required native button scenario must pass: '+result.stderr);
+  const paths=result.stdout.split('\n').map(line=>line.match(/^Button evidence: (.+)$/)?.[1]).filter(Boolean);assert.equal(paths.length,1,'One exact native button report per engine');
+  const verified=spawnSync(process.execPath,['scripts/button-safety.mjs','--verify-report',paths[0],'--inventory','scripts/button-safety-inventory.json'],{cwd:__dirname,encoding:'utf8'});
+  assert.equal(verified.status,0,'Actual native report must cover the independent required action inventory: '+verified.stderr);t.diagnostic('Button evidence: '+paths[0]);
+ });
+});
+
+test('RISK repository process: native button gate refuses unallocated local launch before browser startup',t=>{
+ const directory=fs.mkdtempSync('/tmp/chain-button-allocation-');t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const file=path.join(directory,'ledger.json');fs.writeFileSync(file,JSON.stringify({version:1,scope:'codex-wide',entries:[],reservations:[]}));
+ const healthy={id:'gate-fixture',worktree:__dirname,status:'active',lease:{state:'healthy',expiresAt:new Date(Date.now()+60000).toISOString(),ownerConfirmationRequired:false},resources:['browser-runtime:playwright-chromium','loopback:127.0.0.1:48820']};
+ const cases=[
+  {entries:[],signal:/Active worktree allocation required/},
+  {entries:[{...healthy,status:'parked'}],signal:/Active worktree allocation required/},
+  {entries:[{...healthy,worktree:directory}],signal:/Active worktree allocation required/},
+  {entries:[{...healthy,lease:{...healthy.lease,expiresAt:'2000-01-01T00:00:00Z'}}],signal:/Current healthy worktree lease required/},
+  {entries:[{...healthy,lease:{...healthy.lease,ownerConfirmationRequired:true}}],signal:/Current healthy worktree lease required/},
+  {entries:[{...healthy,resources:['loopback:127.0.0.1:48820']}],signal:/Local named-engine allocation missing/},
+  {entries:[healthy,{...healthy,id:'foreign',worktree:directory,status:'parked'}],signal:/Conflicting local native allocation/},
+ ];
+ for(const {entries,signal}of cases){
+  fs.writeFileSync(file,JSON.stringify({version:1,scope:'codex-wide',entries,reservations:[]}));
+  const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine','chromium','--output-dir',path.join(directory,'native'),'--port','48820','--probe'],{cwd:__dirname,env:{...process.env,CI:'false',CODEX_COORDINATION_FILE:file},encoding:'utf8'});
+  assert.equal(result.error,undefined);assert.notEqual(result.status,0);assert.match(result.stderr,signal);assert.equal(fs.existsSync(path.join(directory,'native')),false,'refusal precedes native report/runtime creation');
+ }
+});
+
+test('RISK repository process: new and duplicate source buttons require native coverage inventory',async t=>{
+ const directory=fs.mkdtempSync('/tmp/chain-button-source-');t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const tag='<button data-act="add">',manifest=path.join(directory,'inventory.json'),source=path.join(directory,'index.html');
+ fs.writeFileSync(manifest,JSON.stringify({schemaVersion:1,sourceTemplates:{[createHash('sha256').update(tag).digest('hex')]:1},requiredActions:['act:add']}));
+ const invoke=html=>{fs.writeFileSync(source,html);return spawnSync(process.execPath,['scripts/button-safety.mjs','--check-inventory','--source',source,'--inventory',manifest],{cwd:__dirname,encoding:'utf8'});};
+ assert.equal(invoke(tag+'Add</button>').status,0,'reviewed source button template accepted');
+ for(const [name,html]of [['new action',tag+'Add</button><button data-act="new-untested">New</button>'],['duplicate route',tag+'Add</button>'+tag+'Add again</button>'],['nonbutton action consumer',tag+'Add</button><span role="button" data-act="new-untested">New</span>']])await t.test(name,()=>{
+  const result=invoke(html);assert.equal(result.error,undefined);assert.notEqual(result.status,0,'native coverage inventory must fail closed for '+name);assert.match(result.stderr,/Source button templates differ from reviewed native inventory/);
+ });
+});
+
+test('RISK repository process: native button gate awaits an asynchronous false outcome',t=>{
+ const output=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(output,'Durable allocated native output required');
+ const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine','chromium','--output-dir',output,'--port',process.env.CHAIN_NATIVE_PORT||'0','--probe','--control','async-predicate-false'],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:45000});
+ assert.equal(result.error,undefined);assert.equal(result.signal,null);assert.notEqual(result.status,0,'Promise(false) must not be mistaken for a completed expected native button outcome');assert.match(result.stderr,/stalled responsiveness: outcome settings/);
+});
+
+
+test('RISK repository process: native button gate cannot omit a required stress scenario',t=>{
+ const directory=fs.mkdtempSync('/tmp/chain-button-scenarios-');t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const manifest={schemaVersion:1,requiredActions:['act:add'],requiredScenarios:['populated Add','oversized export and retained paste']};
+ const inventory=path.join(directory,'inventory.json');fs.writeFileSync(inventory,JSON.stringify(manifest));
+ const good={schemaVersion:1,kind:'button-safety',engine:'webkit',status:'passed',candidateCommit:'a'.repeat(40),candidateTree:'b'.repeat(40),inventorySha256:createHash('sha256').update(fs.readFileSync(inventory)).digest('hex'),requiredActions:manifest.requiredActions,requiredScenarios:manifest.requiredScenarios,scenarios:manifest.requiredScenarios.map(name=>({name,status:'passed'})),observedActions:['act:add'],outcomes:[{action:'act:add',status:'passed',events:['click'],assertions:1,responsive:true}],errors:[],cleanup:{contextClosed:true,browserClosed:true,serverClosed:true}};
+ const invoke=report=>{const file=path.join(directory,'report.json');fs.writeFileSync(file,JSON.stringify(report));return spawnSync(process.execPath,['scripts/button-safety.mjs','--verify-report',file,'--inventory',inventory],{cwd:__dirname,encoding:'utf8'});};
+ assert.equal(invoke(good).status,0,'complete controlled action and scenario evidence accepted');
+ for(const mutate of [r=>r.scenarios.pop(),r=>r.scenarios[1].status='skipped',r=>r.scenarios.push(r.scenarios[1]),r=>{r.requiredScenarios.pop();r.scenarios.pop();}]){
+  const report=structuredClone(good);mutate(report);const result=invoke(report);assert.equal(result.error,undefined);assert.notEqual(result.status,0,'all action families covered cannot conceal an omitted, skipped, duplicated or self-waived stress scenario');assert.doesNotMatch(result.stderr,/SyntaxError|ERR_MODULE_NOT_FOUND/);
+ }
+});
+
+test('RISK repository process: native button safety requires 400-task and rapid-press evidence',async t=>{
+ const directory=fs.mkdtempSync('/tmp/chain-button-workloads-');t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const manifest={schemaVersion:1,requiredActions:['act:add','act:settings'],requiredScenarios:['populated400'],requiredWorkload:{savedTasks:400,rapidAttempts:10,rapidWindowMs:2000},requiredRapidActions:['act:add','act:settings']};
+ const inventory=path.join(directory,'inventory.json');fs.writeFileSync(inventory,JSON.stringify(manifest));
+ const good={schemaVersion:1,kind:'button-safety',engine:'webkit',status:'passed',candidateCommit:'a'.repeat(40),candidateTree:'b'.repeat(40),inventorySha256:createHash('sha256').update(fs.readFileSync(inventory)).digest('hex'),requiredActions:manifest.requiredActions,requiredScenarios:manifest.requiredScenarios,scenarios:[{name:'populated400',status:'passed',setup:{currentTasks:400,durableTasks:400,activeTasks:400,durableHash:'e'.repeat(64),fixtureRole:'active'}}],requiredWorkload:manifest.requiredWorkload,requiredRapidActions:manifest.requiredRapidActions,rapidOutcomes:manifest.requiredRapidActions.map(action=>({action,status:'passed',assertions:1,responsive:true,bursts:[{attempts:10,windowMs:1900,trustedPresses:10,acceptedClicks:1,refused:9,disappeared:0,semantics:'first action opens its protected dialog'}]})),observedActions:manifest.requiredActions,outcomes:manifest.requiredActions.map(action=>({action,status:'passed',events:['click'],assertions:1,responsive:true})),errors:[],cleanup:{contextClosed:true,browserClosed:true,serverClosed:true}};
+ const invoke=report=>{const file=path.join(directory,'report.json');fs.writeFileSync(file,JSON.stringify(report));return spawnSync(process.execPath,['scripts/button-safety.mjs','--verify-report',file,'--inventory',inventory],{cwd:__dirname,encoding:'utf8'});};
+ assert.equal(invoke(good).status,0,'complete controlled400-task and rapid-action evidence accepted');
+ const variants={missing400:r=>delete r.scenarios[0].setup,unsaved400:r=>r.scenarios[0].setup.durableTasks=399,hiddenOrdinary:r=>r.scenarios[0].setup.activeTasks=8,omittedRapid:r=>r.rapidOutcomes.pop(),skippedRapid:r=>r.rapidOutcomes[0].status='skipped',slowRapid:r=>r.rapidOutcomes[0].bursts[0].windowMs=2001,fewerPresses:r=>r.rapidOutcomes[0].bursts[0].attempts=9,untrusted:r=>r.rapidOutcomes[0].bursts[0].trustedPresses=0,unreconciled:r=>r.rapidOutcomes[0].bursts[0].refused=0,selfWaived:r=>r.requiredRapidActions.pop()};
+ for(const [name,mutate]of Object.entries(variants))await t.test(name,()=>{const report=structuredClone(good);mutate(report);const result=invoke(report);assert.equal(result.error,undefined);assert.notEqual(result.status,0,'required native gate must reject '+name+' workload evidence');assert.doesNotMatch(result.stderr,/SyntaxError|ERR_MODULE_NOT_FOUND/);});
+});

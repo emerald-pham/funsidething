@@ -2246,3 +2246,19 @@ Protect actual automatic recovery, manual source review, exact protected copies 
 - RISK support diagnostics: event retention and malformed observer input stay bounded and redacted
 
 The real Sync → Review action and Copy debug log consumer distinguish failed pending-upload, recovery-hold and head reads, fixed exception categories and temporary connection aliases. Repeated failures still stop after the existing one recheck. Exact device/cloud originals, unfinished drafts, source-selection guards and the 24 KiB report/512-byte event limits stay intact. Arbitrary error messages, paths, account identifiers, out-of-range aliases, extra fields and changing/throwing getters cannot enter the copied report. The current physical-phone failure remains unreproduced; these diagnostics do not repair data or establish its cause.
+
+## Native button safety process
+
+The command/report consumer rejects missing, duplicate, skipped, cancelled, unresponsive or unasserted button outcomes; named Chromium and WebKit must execute. Source button template counts and native observed actions fail closed on new uncovered controls. The independent scenario inventory requires populated, oversized, retained-draft, route and external-failure variants; async predicates must resolve to true, rather than merely return a Promise. Local allocation, exact source/tree and aggregate artifact identities remain required. Desktop synthetic fixtures do not establish physical-device or private-board recovery.
+
+- RISK repository process: button safety rejects incomplete native action evidence
+- RISK repository process: button safety rejects false passes and newly untested actions
+- RISK repository process: native button gate detects errors raised by a real click
+- RISK repository process: required native button actions execute in Chromium and WebKit
+- RISK repository process: native button gate refuses unallocated local launch before browser startup
+- RISK repository process: new and duplicate source buttons require native coverage inventory
+
+- RISK repository process: native button gate awaits an asynchronous false outcome
+- RISK repository process: native button gate cannot omit a required stress scenario
+
+- RISK repository process: native button safety requires 400-task and rapid-press evidence
