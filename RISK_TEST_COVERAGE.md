@@ -10,6 +10,8 @@ This map records the current named RISK contracts in tests.js. It lets reviewers
 
 The named-contract test in tests.js checks that every top-level test whose title starts with RISK appears in this inventory. Add or rename the inventory entry in the same test-first change. If a future feature adds a new risk area, add a heading and place its concrete test names under it.
 
+- RISK repository process: event routing retains exact merge validation before avoiding a duplicate cohort
+
 ## Task state, eligibility, and scanner controls
 
 - RISK backup format safety: raw-source qualification remains outside the native selector

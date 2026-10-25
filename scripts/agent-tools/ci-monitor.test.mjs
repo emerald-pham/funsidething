@@ -432,3 +432,30 @@ test('does not accept success when the raw logs cannot be read after bounded ret
   assert.equal(fixture.calls.filter(({ args }) => args.includes('--log')).length, 3);
   assert.ok(fixture.calls.every(({ args }) => args[0] === 'run' && args[1] === 'view'));
 });
+
+test('canonical producer routing retains scanner aggregate and handoff exit distinctions', async t => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'ci-monitor-routing-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const cases = [
+    { name: 'covered push', event: 'push', status: 'completed', conclusion: 'success', scanner: 'success', expected: 'success', code: 0 },
+    { name: 'pending producer', event: 'push', status: 'in_progress', conclusion: null, scanner: null, expected: 'running', code: 2 },
+    { name: 'failed producer', event: 'push', status: 'completed', conclusion: 'failure', scanner: 'failure', expected: 'failure', code: 1 },
+    { name: 'canceled producer', event: 'pull_request', status: 'completed', conclusion: 'cancelled', scanner: 'cancelled', expected: 'canceled', code: 1 },
+    { name: 'skipped scanner is forbidden', event: 'push', status: 'completed', conclusion: 'success', scanner: 'skipped', expected: 'failure', code: 1 },
+  ];
+  for (const [index, scenario] of cases.entries()) {
+    const location = path.join(root, String(index));
+    const run = { databaseId: Number(requestedRunId), headSha: requestedCommit,
+      event: scenario.event, headBranch: 'topic', workflowName: 'Data safety',
+      status: scenario.status, conclusion: scenario.conclusion, jobs: [
+        { name: 'scanner-tests', status: scenario.scanner ? 'completed' : 'in_progress', conclusion: scenario.scanner,
+          steps: [{ name: 'Run complete regression cohort', conclusion: 'skipped' }] },
+        { name: 'release-evidence', status: 'completed', conclusion: 'skipped' },
+        { name: 'deploy-pages', status: 'completed', conclusion: 'skipped' },
+      ] };
+    const { bin, fixturePath } = await createGhFixture(location, { metadata: [{ stdout: JSON.stringify(run) }], logs: [{ stdout: `canonical producer evidence for ${scenario.name}\n` }] });
+    const result = invokeMonitor({ bin, fixturePath, evidence: path.join(location, 'evidence') });
+    assert.equal(result.status, scenario.code, scenario.name + ': ' + result.stdout + result.stderr);
+    assert.match(result.stdout, new RegExp(`result=${scenario.expected} `), scenario.name);
+  }
+});

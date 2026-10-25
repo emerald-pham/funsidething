@@ -43376,3 +43376,10 @@ test('RISK shared protection changed originals: deliberate current recovery sele
   const after=await list();for(const row of originals)assert.ok(after.some(saved=>saved.key===row.key&&saved.raw===row.raw),'every historical raw archive stays exact');
  });
 });
+
+
+test('RISK repository process: event routing retains exact merge validation before avoiding a duplicate cohort',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-name-pattern=workflow avoids a second complete cohort',path.join(__dirname,'scripts/agent-tools/ci-routing.test.mjs')],{cwd:__dirname,encoding:'utf8',timeout:30000,env});
+ assert.equal(result.status,0,'The public workflow cohort command must preserve exact canonical merge validation: '+result.stdout+'\n'+result.stderr);
+});
