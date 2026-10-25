@@ -770,7 +770,7 @@ async function aggregateResults({options, outputDir, descriptor, inventory, assi
         }
         if(reports.length!==2||new Set(reports.map(report=>report.engine)).size!==2||!['chromium','webkit'].every(engine=>reports.some(report=>report.engine===engine)))fail('Both required distinct native button reports must be present.');
         const bytes=fs.readFileSync(path.join(ROOT,'scripts/button-safety-inventory.json'));
-        const {verifyButtonSafetyReport}=await import('./button-safety.mjs');
+        const {verifyButtonSafetyReport}=await import('./button-safety-contract.mjs');
         for(const report of reports)verifyButtonSafetyReport(report,{inventory:JSON.parse(bytes),inventorySha256:sha256(bytes),candidateCommit:identity.checkoutSha,candidateTree:identity.checkoutTree});
       }
       records.push({group:id,resultSha256:sha256(fs.readFileSync(path.join(root,'result.json'))),cases:cases.length,passed:cases.filter(item=>item.status==='passed').length,skipped:cases.filter(item=>item.status==='skipped').length,artifacts:record.artifacts,identity});

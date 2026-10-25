@@ -711,10 +711,26 @@ test('test group catalog routes real declarations despite matching quoted fixtur
   }
 });
 
-test('test group aggregate requires both exact native button safety reports',t=>{
+test('test group aggregate requires both exact native button safety reports',async t=>{
  const fixture=createFixture(t,{nativeTitle:'RISK repository process: required native button actions execute in Chromium and WebKit'});fixture.originals=new Map();
  for(const group of groups){const result=invoke(fixture,{group});assert.equal(result.status,0,result.stdout+result.stderr);fixture.originals.set(group,result.outputDir);}
- const result=aggregateCopy(t,fixture);
- assert.notEqual(result.status,0,'scanner-tests must reject a passing native root that omitted both required button engine artifacts');
- assert.match(result.stderr,/Both required distinct native button reports must be present/);
+ const absent=aggregateCopy(t,fixture);assert.notEqual(absent.status,0,'scanner-tests must reject a passing native root that omitted both required button engine artifacts');assert.match(absent.stderr,/Both required distinct native button reports must be present/);
+ const manifest={schemaVersion:1,requiredActions:['act:add'],requiredScenarios:['populated','oversized retained-source']},bytes=Buffer.from(JSON.stringify(manifest));
+ fs.copyFileSync(path.join(repository,'scripts/button-safety-contract.mjs'),path.join(fixture.root,'scripts/button-safety-contract.mjs'));fs.writeFileSync(path.join(fixture.root,'scripts/button-safety-inventory.json'),bytes);
+ // Fixture source identity includes the authoritative inventory before producing results.
+ git(fixture.root,'add','.');git(fixture.root,'commit','-qm','fixture button inventory');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');
+ fixture.originals.clear();for(const group of groups){const result=invoke(fixture,{group});assert.equal(result.status,0,result.stdout+result.stderr);fixture.originals.set(group,result.outputDir);}
+ const inject=(root,variant)=>{
+  const group=path.join(root,'native-process'),file=path.join(group,'result.json'),result=JSON.parse(fs.readFileSync(file));
+  for(const engine of ['chromium','webkit']){
+   const report={schemaVersion:1,kind:'button-safety',engine,status:'passed',candidateCommit:result.resultIdentity.checkoutSha,candidateTree:result.resultIdentity.checkoutTree,inventorySha256:createHash('sha256').update(bytes).digest('hex'),requiredActions:['act:add'],requiredScenarios:manifest.requiredScenarios,scenarios:manifest.requiredScenarios.map(name=>({name,status:'passed'})),observedActions:['act:add'],outcomes:[{action:'act:add',status:'passed',events:['click'],assertions:1,responsive:true}],errors:[],cleanup:{contextClosed:true,browserClosed:true,serverClosed:true}};
+   if(engine==='webkit'){
+    if(variant==='wrong engine')report.engine='chromium';if(variant==='wrong candidate')report.candidateCommit='f'.repeat(40);if(variant==='skip')report.outcomes[0].status='skipped';if(variant==='new uncovered action')report.observedActions.push('act:new-untested');if(variant==='missing action')report.outcomes=[];if(variant==='lifecycle')report.errors.push('page-crash');if(variant==='missing stress scenario')report.scenarios.pop();if(variant==='skipped stress scenario')report.scenarios[1].status='skipped';
+   }
+   const relative='native/button-'+engine+'.json',encoded=Buffer.from(JSON.stringify(report));fs.writeFileSync(path.join(group,relative),encoded);result.artifacts.push({path:relative,bytes:encoded.length,sha256:createHash('sha256').update(encoded).digest('hex')});
+  }
+  writeJson(file,result);
+ };
+ const good=aggregateCopy(t,fixture,root=>inject(root,null));assert.equal(good.status,0,'complete two-engine button evidence accepted: '+good.stderr);
+ for(const variant of ['wrong engine','wrong candidate','skip','new uncovered action','missing action','lifecycle','missing stress scenario','skipped stress scenario'])await t.test(variant,sub=>{const result=aggregateCopy(sub,fixture,root=>inject(root,variant));assert.notEqual(result.status,0,'aggregate must reject '+variant+' even with recomputed valid artifact hashes');});
 });

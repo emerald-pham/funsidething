@@ -1,17 +1,19 @@
 [
   {
     "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
-    "testChangesSha256": "0f1693778e09a051d1ca78104d3f5bd785315c6dd1a61639efc71cd2884b8f7b",
+    "testChangesSha256": "ed045f479d0a36228c357da56de12719e6eba204bea57c6b656675549e3f09b4",
     "reason": "Add the user-requested fail-closed native all-button safety gate through actual full-app DOM events and process CLI/CI reconciliation; retain every existing behavior assertion.",
     "previousBehavior": "Required CI had installed-client delivery coverage but no complete native button outcome inventory, lifecycle/error/responsiveness enforcement, or exact two-engine button artifacts.",
-    "intendedBehavior": "Require reviewed source template counts, real trusted native events, independent postconditions, continuous frame responsiveness and both Chromium/WebKit reports for the actual source/tree; failures and incomplete coverage cannot pass.",
+    "intendedBehavior": "Require reviewed source template counts and independent named state scenarios, real trusted native events, awaited strict-true postconditions, continuous frame responsiveness and both Chromium/WebKit reports for the actual source/tree; failures and incomplete coverage cannot pass.",
     "replacementTests": [
       "RISK repository process: button safety rejects incomplete native action evidence",
       "RISK repository process: button safety rejects false passes and newly untested actions",
       "RISK repository process: native button gate detects errors raised by a real click",
       "RISK repository process: required native button actions execute in Chromium and WebKit",
       "RISK repository process: native button gate refuses unallocated local launch before browser startup",
-      "RISK repository process: new and duplicate source buttons require native coverage inventory"
+      "RISK repository process: new and duplicate source buttons require native coverage inventory",
+      "RISK repository process: native button gate awaits an asynchronous false outcome",
+      "RISK repository process: native button gate cannot omit a required stress scenario"
     ],
     "preservedCoverage": [
       "All existing Node, native installed-client, source preservation, cloud authority, import confirmation, saved data and accepted historical skip assertions remain unchanged. Native gate fixtures are isolated synthetic sources and external SDK/clipboard/location boundaries.",
@@ -19,7 +21,7 @@
     ],
     "redEvidence": {
       "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern=<button process root> tests.js; independent aggregate root uses scripts/agent-tools/test-groups.test.mjs",
-      "failure": "Missing-action false pass RED928728d3 before verifier implementation; false-pass variants RED0b4800a3; real native Settings pageerror false pass REDd7e8c21d; source new/duplicate false-pass RED0231ad00; aggregate accepted missing button reports RED58849a59. GREEN records627c4efa,9c8e94de,3ccd001e,eb6a414b,7eac112f. First fixture error598b8c53 and placeholder b03cc885 are infrastructure only. a55028d7 WebKit launched before ownership handoff and earns no acceptance credit; allocation refusal9b2a943a is a safety followup after that observed breach, not a new chronological RED. Focused native missing-action report320135e9 was rejected12c33b0f before scenario implementation. Full native coverage is still in progress at this checkpoint; no release claim."
+      "failure": "Missing-action false pass RED928728d3 before verifier implementation; false-pass variants RED0b4800a3; real native Settings pageerror false pass REDd7e8c21d; source new/duplicate false-pass RED0231ad00; aggregate accepted missing button reports RED58849a59. GREEN records627c4efa,9c8e94de,3ccd001e,eb6a414b,7eac112f. First fixture error598b8c53 and placeholder b03cc885 are infrastructure only. a55028d7 WebKit launched before ownership handoff and earns no acceptance credit; allocation refusal9b2a943a is a safety followup after that observed breach, not a new chronological RED. Focused native missing-action report320135e9 was rejected12c33b0f before scenario implementation. Full native coverage is still in progress at this checkpoint; no release claim. Async false predicate real native false-pass RED6da97207 preceded explicit awaited polling; GREEN37042ee1. Independent required stress scenario omission/skip/duplicate/self-waiver RED89446b25 preceded scenario verification; GREEN62d7afb4. Two-engine aggregate success/mutant checks including omitted/skipped stress scenarios GREENc10f90c1. Native Chromium nine detector controls plus WebKit throw/rejection/1300ms stall passed sensitivityd6d95f68, with WebKit measured1321ms gap rejected by1000ms limit. Earlier async cloud diagnostic receipts are invalidated after discovering Promise(false); strict awaited reruns remain in progress, not acceptance. Standalone verification without an independent inventory falsely passed REDae2a92f7; mandatory independent inventory GREEN6d2a35bc. Exact-ownership allocation refusal controls including expired lease, owner confirmation, foreign/parked worktree and conflicting runtime passed460a91ff without launching browsers. Supported cloud diagnostics3bbf00e7,819fb981,a6f237a2,65de2ada now pass strict awaited expected results; fixture setup uses real Save settings and normalized read-only current board. These remain focused Chromium observations; transfer and full final native acceptance await product integration."
     }
   },
   {

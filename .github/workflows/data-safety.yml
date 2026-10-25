@@ -149,6 +149,9 @@ jobs:
       - name: Install matching native Chromium
         if: needs.cohort-routing.outputs.decision == 'full'
         run: npx --no-install playwright install --with-deps chromium
+      - name: Install matching required native WebKit
+        if: needs.cohort-routing.outputs.decision == 'full' && matrix.group == 'native-process'
+        run: npx --no-install playwright install --with-deps webkit
       - uses: actions/download-artifact@v4
         if: needs.cohort-routing.outputs.decision == 'reuse'
         with:

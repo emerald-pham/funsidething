@@ -126,3 +126,42 @@ Test-first, Firestore rules and compatibility gates always run for the actual
 event checkout and comparison base, including covered branch pushes. Main
 always executes its own full cohort. Pages still requires both `scanner-tests`
 and `release-evidence`; same-run artifact reads add no token permissions.
+
+## Required native button gate
+
+The `native-process` group executes the full app through real Chromium and WebKit
+DOM clicks. `npm run test:buttons` selects its complete two-engine root locally;
+allocate both named browser runtimes and `CHAIN_NATIVE_PORT` in the canonical host
+ledger first, and put `CHAIN_NATIVE_OUTPUT` outside the checkout. The runner checks
+healthy, unexpired ownership before launch. CI uses the explicit isolated grouped
+push or pull-request fixture policy. A missing engine is a failure.
+
+`scripts/button-safety-inventory.json` is the reviewed action and named state
+scenario inventory. It also retains opening button/summary template counts from
+all committed app JavaScript and HTML. A new or repeated template requires review;
+observed unknown controls fail even when their template was already dynamic. Add
+an actual supported scenario with an independent expected result when adding a
+control or route. Do not regenerate the inventory to bypass missing coverage.
+`dormantHandlers` explains old command aliases without pretending to click a
+control that no longer renders. Inert, aria-hidden Saved appearance replicas earn
+no action coverage.
+
+Each step starts a continuous frame heartbeat before the trusted click, uses an
+external transport/deadline watchdog, awaits a strictly true postcondition, and
+rejects a maximum frame gap of 1,000 ms. Input of the large copied archive is also
+monitored. Unexpected crash, close, reload, navigation, page error, rejected async
+work, or browser disconnection fails. The one deliberate Sync reload must visit
+the same app route exactly once and reach a new usable document. Sensitivity
+controls mount real failures on the Settings click, including Chromium renderer
+crash and WebKit throw, rejection and 1,300 ms stall; no physical-device claim is
+made from a desktop engine.
+
+The full reports must contain exactly the required successful action outcomes
+and state scenarios, with real events, assertions, responsiveness and closed owned
+resources. Probe and focused diagnostic reports cannot qualify complete coverage.
+`scanner-tests` requires two distinct engine reports, hashes their artifact bytes,
+and binds their candidate SHA/tree and inventory hash to the reconciled checkout.
+The regular four-group cohort, existing installed-client artifacts and accepted
+historical skips remain independently enforced. Synthetic SDK, clipboard, location
+and isolated storage boundaries establish repeatable regression evidence only;
+they do not establish physical iPhone behavior or recovery of private saved data.

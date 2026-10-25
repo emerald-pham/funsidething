@@ -2247,7 +2247,7 @@ The real Sync → Review action and Copy debug log consumer distinguish failed p
 
 ## Native button safety process
 
-The command/report consumer rejects missing, duplicate, skipped, cancelled, unresponsive or unasserted button outcomes; named Chromium and WebKit must execute. Source button template counts and native observed actions fail closed on new uncovered controls. Local allocation, exact source/tree and aggregate artifact identities remain required. Desktop synthetic fixtures do not establish physical-device or private-board recovery.
+The command/report consumer rejects missing, duplicate, skipped, cancelled, unresponsive or unasserted button outcomes; named Chromium and WebKit must execute. Source button template counts and native observed actions fail closed on new uncovered controls. The independent scenario inventory requires populated, oversized, retained-draft, route and external-failure variants; async predicates must resolve to true, rather than merely return a Promise. Local allocation, exact source/tree and aggregate artifact identities remain required. Desktop synthetic fixtures do not establish physical-device or private-board recovery.
 
 - RISK repository process: button safety rejects incomplete native action evidence
 - RISK repository process: button safety rejects false passes and newly untested actions
@@ -2255,3 +2255,6 @@ The command/report consumer rejects missing, duplicate, skipped, cancelled, unre
 - RISK repository process: required native button actions execute in Chromium and WebKit
 - RISK repository process: native button gate refuses unallocated local launch before browser startup
 - RISK repository process: new and duplicate source buttons require native coverage inventory
+
+- RISK repository process: native button gate awaits an asynchronous false outcome
+- RISK repository process: native button gate cannot omit a required stress scenario

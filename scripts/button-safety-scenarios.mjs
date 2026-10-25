@@ -35,9 +35,11 @@ export async function runButtonScenarios(h){
   await ui.act('bulk-cancel',()=>document.querySelector('[data-act="bulk-select"]').getAttribute('aria-pressed')==='false');
   await ui.act('bulk-select-all',()=>document.querySelector('[data-act="bulk-edit"]').disabled===false);
   await ui.act('bulk-edit',()=>!!document.getElementById('bulkApplyDue'));
-  await ui.act('bulk-clear',()=>document.getElementById('bulkApplyDue').checked,'[data-act="bulk-clear"][data-field="due"]');
+  for(const [field,id]of [['url','Url'],['due','Due'],['startsAt','Start'],['ctx','Contexts']])await ui.act('bulk-clear',new Function('return document.getElementById("bulkApply'+id+'").checked&&document.getElementById("bulkStatus'+id+'").textContent.includes("Will clear")'),'[data-act="bulk-clear"][data-field="'+field+'"]');
   await ui.act('bulk-save',()=>!document.getElementById('bulkApplyDue'));
   await ui.act('edit',()=>!!document.getElementById('etTitle'),'#listBody [data-act="edit"]');
+  await ui.select('#etPrerequisite','synthetic-populated-1');await ui.act('add-dependency',()=>document.querySelectorAll('#editDependencies select').length===2,'#editDependencies [data-act="add-dependency"]');
+  await ui.act('remove-dependency',()=>document.querySelectorAll('#editDependencies select').length===1,'#editDependencies [data-act="remove-dependency"]');await ui.select('#etPrerequisite','');
   await ui.fill('#etTitle','Gate edited title');await ui.fill('#etDue','2026-10-01');await ui.click('#etDueClear',()=>document.getElementById('etDue').value==='','Clear Edit due date');
   await ui.fill('#etStart','2026-10-01');await ui.click('#etStartClear',()=>document.getElementById('etStart').value==='','Clear Edit start date');
   await ui.act('save-edit',()=>state.tasks.some(t=>t.title==='Gate edited title')&&!document.getElementById('etTitle'));
@@ -112,5 +114,24 @@ export async function runButtonScenarios(h){
   await ui.act('refresh-support-diagnostics',()=>document.querySelector('#modalRoot h2').textContent==='Debug log');
   await ui.act('return-support-diagnostics',()=>!!document.getElementById('stHorizon'));
  });
+ await h.scenario('Help original apology and native backdrop dismissal',{decorate:base},async ui=>{
+  await ui.act('help',()=>!!document.querySelector('#modalRoot .help'));
+  await ui.act('reopen-apology',()=>document.querySelector('#modalRoot h2')?.textContent==='Sync and stability apology');
+  await ui.backdrop();
+ });
+ for(const outcome of ['accepted','dismissed'])await h.scenario('native install '+outcome,{decorate:base},async ui=>{
+  await ui.page.evaluate(outcome=>{window.__buttonInstallPrompts=0;const event=new Event('beforeinstallprompt',{cancelable:true});Object.defineProperties(event,{prompt:{value:async()=>{window.__buttonInstallPrompts++;}},userChoice:{value:Promise.resolve({outcome})}});dispatchEvent(event);},outcome);
+  await ui.act('settings',()=>!!document.getElementById('stHorizon'));
+  await ui.act('install-app',()=>!!document.querySelector('[data-act="native-install"]'));
+  await ui.act('native-install',outcome==='accepted'?()=>window.__buttonInstallPrompts===1&&!document.querySelector('#modalRoot .modal'):()=>window.__buttonInstallPrompts===1&&document.querySelector('#modalRoot h2')?.textContent==='Install this app on your phone');
+ });
+ for(const mode of ['descending','chance','squared'])await h.scenario('both-mode scan and resume '+mode,{decorate:board=>{scanBase(board);board.settings.scanMode='both';}},async ui=>{
+  const expected=new Function('return state.scanMode==='+JSON.stringify(mode)+'&&state.chain.length===1');
+  await ui.act('start-scan',expected,'[data-act="start-scan"][data-mode="'+mode+'"]');
+  await ui.act('start-working',()=>state.mode==='work');
+  await ui.act('resume-scan',new Function('return state.mode==="scan"&&state.scanMode==='+JSON.stringify(mode)),'[data-act="resume-scan"][data-mode="'+mode+'"]');
+ });
  const {runSceneScenarios}=await import('./button-safety-scenes.mjs');await runSceneScenarios(h);
+ const {runCloudScenarios}=await import('./button-safety-cloud.mjs');await runCloudScenarios(h);
+ const {runTransferScenarios}=await import('./button-safety-transfer.mjs');await runTransferScenarios(h);
 }
