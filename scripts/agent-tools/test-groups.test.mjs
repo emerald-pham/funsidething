@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -32,7 +33,7 @@ function git(root, ...args) {
 
 function suiteSource({ coreTitle = fixtureRoots.core, additionalCoreRoots = [], unexpectedSkip = false, failOnRequest = false,
   runtimeCoreTitle = coreTitle, processControl = false, omitNativeControl = false, duplicateNativeControl = false,
-  processControlSourceFixture = false } = {}) {
+  processControlSourceFixture = false, nativeTitle = fixtureRoots['native-process'], nativeReports = false } = {}) {
   const skip = unexpectedSkip
     ? "\n  await t.test('new unaccepted skipped case', { skip: 'must fail closed' }, () => {});"
     : '';
@@ -53,22 +54,24 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 test(${JSON.stringify(runtimeCoreTitle)}, async t => {
+  if(process.env.CHAIN_DESCRIPTOR_SENTINEL) fs.writeFileSync(process.env.CHAIN_DESCRIPTOR_SENTINEL,'executed');
   await t.test('fixture accepted environment skip', { skip: 'baseline skip' }, () => {});${skip}${failingControl}
 });
 ${additionalCoreRoots.map(title => `test(${JSON.stringify(title)}, () => {});`).join('\n')}
 test(${JSON.stringify(fixtureRoots.scenery)}, () => {});
 test(${JSON.stringify(fixtureRoots['persistence-recovery'])}, () => {});
-test(${JSON.stringify(fixtureRoots['native-process'])}, () => {
+test(${JSON.stringify(nativeTitle)}, () => {
   if (process.env.CHAIN_NATIVE_OUTPUT) fs.writeFileSync(path.join(process.env.CHAIN_NATIVE_OUTPUT, 'candidate-identity.json'), JSON.stringify({
     sha: process.env.CHAIN_NATIVE_CANDIDATE_SHA,
     tree: process.env.CHAIN_NATIVE_CANDIDATE_TREE,
   }));
+  ${nativeReports ? `for(const mode of ['signed-out','reconcile-held'])fs.writeFileSync(path.join(process.env.CHAIN_NATIVE_OUTPUT,mode+'.json'),JSON.stringify({mode,status:'passed',oldCommit:'779defa4e8c3465fdf535fe17dbe2227d2b76ea1',candidateCommit:process.env.CHAIN_NATIVE_CANDIDATE_SHA,candidateTree:process.env.CHAIN_NATIVE_CANDIDATE_TREE,cleanup:{contextClosed:true,browserClosed:true,serverClosed:true}}));` : ''}
 });
 ${nativeControl}${nativeControlSourceFixture}`;
 }
 
-function inventory(coreTitle = fixtureRoots.core, additionalCoreRoots = []) {
-  const roots = [coreTitle, ...additionalCoreRoots, fixtureRoots.scenery, fixtureRoots['persistence-recovery'], fixtureRoots['native-process'], fixtureScriptRoot];
+function inventory(coreTitle = fixtureRoots.core, additionalCoreRoots = [], nativeTitle = fixtureRoots['native-process']) {
+  const roots = [coreTitle, ...additionalCoreRoots, fixtureRoots.scenery, fixtureRoots['persistence-recovery'], nativeTitle, fixtureScriptRoot];
   const cases = [
     { id: coreTitle, root: coreTitle },
     { id: `${coreTitle} > fixture accepted environment skip`, root: coreTitle },
@@ -94,7 +97,7 @@ function assignments(coreTitle = fixtureRoots.core, options = {}) {
     ...(options.additionalCoreRoots || []).map(root => ({ root, group: 'core', file: 'tests.js' })),
     { root: fixtureRoots.scenery, group: 'scenery', file: 'tests.js' },
     { root: fixtureRoots['persistence-recovery'], group: 'persistence-recovery', file: 'tests.js' },
-    { root: fixtureRoots['native-process'], group: 'native-process', file: 'tests.js' },
+    { root: options.nativeTitle || fixtureRoots['native-process'], group: 'native-process', file: 'tests.js' },
     { root: fixtureScriptRoot, group: 'native-process', file: 'scripts/agent-tools/fixture.test.mjs' },
   ];
   return {
@@ -136,7 +139,7 @@ function createFixture(t, options = {}) {
   fs.writeFileSync(path.join(root, 'tests.js'), suiteSource({ ...options, coreTitle, runtimeCoreTitle: options.runtimeCoreTitle || coreTitle }));
   fs.writeFileSync(path.join(root, 'scripts/agent-tools/fixture.test.mjs'),
     `import { test } from 'node:test';\ntest(${JSON.stringify(fixtureScriptRoot)}, () => {});\n`);
-  writeJson(path.join(root, 'scripts/test-group-inventory.json'), inventory(coreTitle, options.additionalCoreRoots || []));
+  writeJson(path.join(root, 'scripts/test-group-inventory.json'), inventory(coreTitle, options.additionalCoreRoots || [], options.nativeTitle));
   const groupAssignments = assignments(coreTitle, options);
   if (options.emptyGroup) {
     groupAssignments.rootAssignments.find(entry => entry.root === coreTitle).group = options.emptyGroup === true ? 'scenery' : options.emptyGroup;
@@ -176,14 +179,14 @@ function createFixture(t, options = {}) {
   return { root, baselineSha, comparisonBase, sourceSha, outputs, coreTitle, groupAssignments };
 }
 
-function invoke(fixture, { group = 'core', env = {}, repository = 'example/fixture', outputDir: requestedOutputDir } = {}) {
+function invoke(fixture, { group = 'core', env = {}, repository = 'example/fixture', outputDir: requestedOutputDir, args = [] } = {}) {
   const outputDir = requestedOutputDir || path.join(os.tmpdir(), `chain-test-group-output-${process.pid}-${++outputSerial}`);
   fixture.outputs.push(outputDir);
   const childEnv = { ...process.env, ...env };
   delete childEnv.NODE_TEST_CONTEXT;
   const result = run('npm', ['run', 'test:group', '--', '--group', group, '--output-dir', outputDir,
     '--repository', repository, '--event-policy', 'local', '--run-id', 'fixture-run-1', '--run-attempt', '1',
-    '--source-sha', fixture.sourceSha, '--comparison-base', fixture.comparisonBase], fixture.root,
+    '--source-sha', fixture.sourceSha, '--comparison-base', fixture.comparisonBase, ...args], fixture.root,
   childEnv);
   return { ...result, outputDir, evidencePath: path.join(outputDir, 'result.json'), evidence: readEvidence(outputDir) };
 }
@@ -456,5 +459,177 @@ test('RISK test group runner preserves hash identities and counts only executabl
     const result = invoke(fixture, { group: 'native-process' });
     assert.notEqual(result.status, 0, 'duplicate executable declarations must remain rejected');
     assert.match(result.evidence.issues.join('\n'), /registered 2 times/);
+  });
+});
+
+
+test('test group descriptor validates every group without executing a test child', t => {
+  const fixture=createFixture(t),sentinel=path.join(fixture.root,'child-executed');
+  const result=invoke(fixture,{args:['--describe'],env:{CHAIN_DESCRIPTOR_SENTINEL:sentinel}});
+  assert.equal(result.status,0,result.stdout+result.stderr);
+  assert.equal(fs.existsSync(sentinel),false,'describing required coverage must not execute the selected test cohort');
+  const descriptor=JSON.parse(fs.readFileSync(path.join(result.outputDir,'descriptor.json'),'utf8'));
+  assert.deepEqual(descriptor.groups.map(group=>group.id),groups);
+  assert.deepEqual(descriptor.groups[0].requiredCaseIds,[fixtureRoots.core,fixtureRoots.core+' > fixture accepted environment skip']);
+  assert.equal(result.evidence.status,'described');
+});
+
+
+test('test group aggregate rejects a missing result even when every process exits zero', t => {
+  const fixture=createFixture(t),collected=fs.mkdtempSync(path.join(os.tmpdir(),'chain-group-aggregate-'));
+  t.after(()=>fs.rmSync(collected,{recursive:true,force:true}));
+  for(const group of groups){const result=invoke(fixture,{group});assert.equal(result.status,0,result.stdout+result.stderr);fs.cpSync(result.outputDir,path.join(collected,group),{recursive:true});}
+  fs.rmSync(path.join(collected,'scenery','result.json'));
+  const needs=path.join(collected,'needs.json');writeJson(needs,Object.fromEntries(['validation-context','event-gates','cohort-routing','regression'].map(id=>[id,{result:'success'}])));
+  const result=invoke(fixture,{args:['--aggregate','--results-dir',collected,'--needs-json',needs]});
+  assert.notEqual(result.status,0,'zero process exits cannot approve an absent required group result');
+  assert.match(result.stderr,/missing|required|result/i);
+});
+
+test('test group selection executes every uncertain routing scenario under its assigned parent', t => {
+  const env={...process.env};delete env.NODE_TEST_CONTEXT;
+  const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^workflow routing rejects uncertain producer contexts$',path.join(repository,'scripts/agent-tools/ci-routing.test.mjs')],{env,encoding:'utf8',timeout:60000,maxBuffer:8*1024*1024});
+  assert.equal(result.status,0,result.stdout+result.stderr);
+  assert.match(result.stdout,/# tests 27\b/,'the assigned root must execute all26 uncertain scenarios plus its parent');
+});
+
+test('test group preflight rejects a passing dynamic row added at an unchanged registration site', t => {
+  const fixture=createFixture(t),file=path.join(fixture.root,'tests.js');
+  fs.appendFileSync(file,"\nconst futureDynamicRows=[];for(const title of futureDynamicRows)test(title,()=>{});\n");
+  git(fixture.root,'add','tests.js');git(fixture.root,'commit','-qm','existing dynamic registration site');
+  fixture.comparisonBase=git(fixture.root,'rev-parse','HEAD');
+  fs.writeFileSync(file,fs.readFileSync(file,'utf8').replace('futureDynamicRows=[]','futureDynamicRows=["unclassified future dynamic row"]'));
+  git(fixture.root,'add','tests.js');git(fixture.root,'commit','-qm','add an unclassified data row');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');
+  const result=invoke(fixture);
+  assert.notEqual(result.status,0,'a passing unknown runtime root must not disappear from the required grouped cohort');
+  assert.match(result.stderr,/unclassified.*dynamic|dynamic.*unclassified/i);
+});
+
+
+function aggregateFixture(t) {
+  const fixture=createFixture(t,{nativeTitle:'RISK repository process: required installed-client native outcomes and artifacts execute exactly once',nativeReports:true});
+  fixture.originals=new Map();
+  for(const group of groups){const result=invoke(fixture,{group});assert.equal(result.status,0,result.stdout+result.stderr);fixture.originals.set(group,result.outputDir);}
+  return fixture;
+}
+function aggregateCopy(t,fixture,mutate=()=>{},args=[]) {
+  const collected=fs.mkdtempSync(path.join(os.tmpdir(),'chain-group-aggregate-'));t.after(()=>fs.rmSync(collected,{recursive:true,force:true}));
+  for(const [id,output]of fixture.originals)fs.cpSync(output,path.join(collected,id),{recursive:true});
+  const needs=path.join(collected,'needs.json');writeJson(needs,Object.fromEntries(['validation-context','event-gates','cohort-routing','regression'].map(id=>[id,{result:'success'}])));
+  mutate(collected,needs);
+  return invoke(fixture,{args:['--aggregate','--results-dir',collected,'--needs-json',needs,...args]});
+}
+test('test group aggregate verifies the complete actual cohort and native artifacts', t => {
+  const fixture=aggregateFixture(t),result=aggregateCopy(t,fixture);
+  assert.equal(result.status,0,result.stdout+result.stderr);
+  const report=JSON.parse(fs.readFileSync(path.join(result.outputDir,'aggregate.json'),'utf8'));
+  assert.equal(report.status,'passed');assert.equal(report.groups.length,4);assert.equal(report.caseCount,6);
+});
+test('test group aggregate rejects corrupt outcomes identities jobs and native evidence', async parent => {
+  const fixture=aggregateFixture(parent);
+  const scenarios=[
+    ['empty cases',root=>{const f=path.join(root,'core/result.json'),x=JSON.parse(fs.readFileSync(f));x.cases=[];writeJson(f,x);}],
+    ['wrong source',root=>{const f=path.join(root,'core/result.json'),x=JSON.parse(fs.readFileSync(f));x.resultIdentity.sourceSha='a'.repeat(40);writeJson(f,x);}],
+    ['wrong attempt',root=>{const f=path.join(root,'core/result.json'),x=JSON.parse(fs.readFileSync(f));x.resultIdentity.runAttempt=2;writeJson(f,x);}],
+    ['dirty checkout',root=>{const f=path.join(root,'core/result.json'),x=JSON.parse(fs.readFileSync(f));x.resultIdentity.checkoutDirty=true;writeJson(f,x);}],
+    ['canceled process',root=>{const f=path.join(root,'core/result.json'),x=JSON.parse(fs.readFileSync(f));x.process.signal='SIGTERM';writeJson(f,x);}],
+    ['forbidden skip',root=>{const f=path.join(root,'core/result.json'),x=JSON.parse(fs.readFileSync(f));x.cases.find(item=>item.status==='passed').status='skipped';writeJson(f,x);}],
+    ['malformed guard TAP with valid file hash',root=>{const file=path.join(root,'core/result.json'),record=JSON.parse(fs.readFileSync(file)),tap=record.unclassifiedRootGuard.files[0].stdout,absolute=path.join(root,'core',tap.path);fs.writeFileSync(absolute,'TAP version 13\nmalformed incomplete output\n');tap.sha256=createHash('sha256').update(fs.readFileSync(absolute)).digest('hex');writeJson(file,record);}],
+    ['missing guard',root=>{const f=path.join(root,'core/result.json'),x=JSON.parse(fs.readFileSync(f));delete x.unclassifiedRootGuard;writeJson(f,x);}],
+    ['corrupt TAP',root=>fs.appendFileSync(path.join(root,'core/test.tap'),'corruption')],
+    ['unlisted native evidence',root=>fs.writeFileSync(path.join(root,'native-process/native/unlisted.json'),'{}')],
+    ['nonempty guard summary with valid file hash',root=>{const file=path.join(root,'core/result.json'),record=JSON.parse(fs.readFileSync(file)),summary=record.unclassifiedRootGuard.files[0].summary,absolute=path.join(root,'core',summary.path),rows=fs.readFileSync(absolute,'utf8').trim().split('\n').map(JSON.parse);rows.find(row=>row.file).counts.tests=1;fs.writeFileSync(absolute,rows.map(JSON.stringify).join('\n')+'\n');summary.sha256=createHash('sha256').update(fs.readFileSync(absolute)).digest('hex');writeJson(file,record);}],
+    ['missing native artifact',root=>fs.rmSync(path.join(root,'native-process/native/signed-out.json'))],
+    ['duplicate group',root=>fs.cpSync(path.join(root,'core'),path.join(root,'extra-core'),{recursive:true})],
+    ['wrong native candidate with valid file hash',root=>{const file=path.join(root,'native-process/native/signed-out.json'),report=JSON.parse(fs.readFileSync(file));report.candidateCommit='a'.repeat(40);writeJson(file,report);const resultFile=path.join(root,'native-process/result.json'),result=JSON.parse(fs.readFileSync(resultFile)),artifact=result.artifacts.find(item=>item.path==='native/signed-out.json'),bytes=fs.readFileSync(file);artifact.bytes=bytes.length;artifact.sha256=createHash('sha256').update(bytes).digest('hex');writeJson(resultFile,result);}],
+    ['incomplete native cleanup with valid file hash',root=>{const file=path.join(root,'native-process/native/reconcile-held.json'),report=JSON.parse(fs.readFileSync(file));report.cleanup.serverClosed=false;writeJson(file,report);const resultFile=path.join(root,'native-process/result.json'),result=JSON.parse(fs.readFileSync(resultFile)),artifact=result.artifacts.find(item=>item.path==='native/reconcile-held.json'),bytes=fs.readFileSync(file);artifact.bytes=bytes.length;artifact.sha256=createHash('sha256').update(bytes).digest('hex');writeJson(resultFile,result);}],
+
+    ['failed gate',(_root,file)=>{const needs=JSON.parse(fs.readFileSync(file));needs['event-gates'].result='failure';writeJson(file,needs);}],
+    ['canceled group',(_root,file)=>{const needs=JSON.parse(fs.readFileSync(file));needs.regression.result='cancelled';writeJson(file,needs);}],
+    ['skipped required job',(_root,file)=>{const needs=JSON.parse(fs.readFileSync(file));needs.regression.result='skipped';writeJson(file,needs);}],
+  ];
+  for(const [name,mutate]of scenarios)await parent.test(name,t=>{const result=aggregateCopy(t,fixture,mutate);assert.notEqual(result.status,0,'aggregate must reject '+name);});
+});
+
+test('test group workflow scanner command rejects missing parallel group evidence', t => {
+  const fixture=createFixture(t),temporary=fs.mkdtempSync(path.join(os.tmpdir(),'chain-workflow-aggregate-'));
+  t.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));fs.mkdirSync(path.join(temporary,'groups'));
+  for(const group of groups){const result=invoke(fixture,{group});assert.equal(result.status,0,result.stdout+result.stderr);fs.cpSync(result.outputDir,path.join(temporary,'groups',group),{recursive:true});}
+  fs.rmSync(path.join(temporary,'groups/scenery/result.json'));
+  writeJson(path.join(temporary,'needs.json'),Object.fromEntries(['validation-context','event-gates','cohort-routing','regression'].map(id=>[id,{result:'success'}])));
+  const workflow=fs.readFileSync(path.join(repository,'.github/workflows/data-safety.yml'),'utf8');
+  const step=workflow.match(/      - name: Verify complete required cohort\n[\s\S]*?        run: \|\n((?:          [^\n]*\n|\n)*)/);
+  const command=step?step[1].split('\n').map(line=>line.startsWith('          ')?line.slice(10):line).join('\n'):'npm test';
+  const env={...process.env,RUNNER_TEMP:temporary,GITHUB_REPOSITORY:'example/fixture',GITHUB_RUN_ID:'fixture-run-1',GITHUB_RUN_ATTEMPT:'1',CHAIN_TEST_SOURCE_SHA:fixture.sourceSha,CHAIN_TEST_COMPARISON_BASE:fixture.comparisonBase,CHAIN_TEST_EVENT_POLICY:'local'};delete env.NODE_TEST_CONTEXT;
+  const result=spawnSync('bash',['-euo','pipefail','-c',command],{cwd:fixture.root,env,encoding:'utf8',timeout:15000});
+  assert.notEqual(result.status,0,'the actual workflow scanner command must refuse missing required parallel evidence');
+  assert.match(result.stdout+result.stderr,/required result|missing|ENOENT/i);
+});
+
+
+test('test group covered references preserve producer provenance without executing a child', t => {
+  const fixture=createFixture(t),description=invoke(fixture,{args:['--describe']});
+  assert.equal(description.status,0,description.stdout+description.stderr);
+  const descriptor=JSON.parse(fs.readFileSync(path.join(description.outputDir,'descriptor.json'),'utf8')),identity=descriptor.resultIdentity;
+  const context={repository:identity.repository,sourceSha:identity.sourceSha,sourceTree:identity.sourceTree,checkoutSha:'b'.repeat(40),checkoutTree:'c'.repeat(40),comparisonBase:fixture.comparisonBase,requiredCohort:'four-groups-v1',cohortDigestSha256:identity.cohortDigestSha256,inventorySha256:identity.inventorySha256,assignmentsSha256:identity.assignmentsSha256,expectedGroups:groups};
+  const proof={decision:'reuse',runId:'fixture-run-1',runAttempt:'1',validationContext:identity,cohortContext:context,contextSha256:createHash('sha256').update(JSON.stringify(context)).digest('hex'),coveredBy:{runId:'71',runAttempt:'2',checkoutSha:context.checkoutSha,checkoutTree:context.checkoutTree,comparisonBase:context.comparisonBase,reportSha256:'8'.repeat(64)}};
+  const file=path.join(description.outputDir,'coverage-proof.json'),sentinel=path.join(fixture.root,'covered-child-executed');writeJson(file,proof);
+  const result=invoke(fixture,{args:['--covered','--proof',file],env:{CHAIN_DESCRIPTOR_SENTINEL:sentinel}});
+  assert.equal(result.status,0,result.stdout+result.stderr);
+  assert.equal(fs.existsSync(sentinel),false,'covered mode must not duplicate full execution');
+  assert.equal(result.evidence.status,'covered');assert.deepEqual(result.evidence.cases,[]);
+  assert.equal(result.evidence.coverage.coveredBy.checkoutSha,context.checkoutSha);
+});
+
+test('test group registration guard binds names to files and distinguishes empty wrappers', async parent => {
+  const scenarios=[['same name assigned in another file',JSON.stringify(fixtureScriptRoot)],['file wrapper title','"tests.js"'],['unknown skipped root','"unclassified skipped root"']];
+  for(const [name,title]of scenarios)await parent.test(name,t=>{
+    const fixture=createFixture(t),file=path.join(fixture.root,'tests.js');
+    fs.appendFileSync(file,`\nfor(const title of [])test(title,${name==='unknown skipped root'?"{skip:'unexpected'},":''}()=>{});\n`);
+    git(fixture.root,'add','.');git(fixture.root,'commit','-qm','existing dynamic site');fixture.comparisonBase=git(fixture.root,'rev-parse','HEAD');
+    fs.writeFileSync(file,fs.readFileSync(file,'utf8').replace('of []','of ['+title+']'));
+    git(fixture.root,'add','.');git(fixture.root,'commit','-qm','unknown row');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');
+    const result=invoke(fixture);assert.notEqual(result.status,0,'guard must reject '+name);assert.match(result.stderr,/unclassified/i);
+  });
+});
+
+test('test group covered mode rejects a different producer source even with a valid context hash', t => {
+  const fixture=createFixture(t),description=invoke(fixture,{args:['--describe']});assert.equal(description.status,0,description.stderr);
+  const identity=JSON.parse(fs.readFileSync(path.join(description.outputDir,'descriptor.json'))).resultIdentity;
+  const context={...identity,sourceSha:'f'.repeat(40),checkoutSha:'b'.repeat(40),checkoutTree:'c'.repeat(40),requiredCohort:'four-groups-v1'};
+  const proof={decision:'reuse',runId:identity.runId,runAttempt:identity.runAttempt,validationContext:identity,cohortContext:context,contextSha256:createHash('sha256').update(JSON.stringify(context)).digest('hex'),coveredBy:{runId:'71',runAttempt:'2',checkoutSha:context.checkoutSha,checkoutTree:context.checkoutTree,comparisonBase:context.comparisonBase,reportSha256:'8'.repeat(64)}};
+  const file=path.join(description.outputDir,'proof.json');writeJson(file,proof);const result=invoke(fixture,{args:['--covered','--proof',file]});
+  assert.notEqual(result.status,0,'a matching checksum cannot bind another source to this producer');assert.match(result.stderr,/source|context/i);
+});
+
+test('test group explicitly assigned dynamic roots execute in their declared file and group', t => {
+  const fixture=createFixture(t),file=path.join(fixture.root,'tests.js');
+  fs.appendFileSync(file,'\nfor(const title of [])test(title,()=>{});\n');git(fixture.root,'add','.');git(fixture.root,'commit','-qm','existing dynamic site');
+  fixture.comparisonBase=git(fixture.root,'rev-parse','HEAD');
+  fs.writeFileSync(file,fs.readFileSync(file,'utf8').replace('of []','of ["explicit future dynamic root"]'));
+  const catalog=JSON.parse(fs.readFileSync(path.join(fixture.root,'scripts/test-group-assignments.json')));catalog.rootAssignments.push({root:'explicit future dynamic root',file:'tests.js',group:'scenery',registration:'dynamic'});writeJson(path.join(fixture.root,'scripts/test-group-assignments.json'),catalog);
+  git(fixture.root,'add','.');git(fixture.root,'commit','-qm','explicit dynamic assignment');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');
+  const result=invoke(fixture,{group:'scenery'});assert.equal(result.status,0,result.stdout+result.stderr);assert.ok(result.evidence.cases.some(item=>item.id==='explicit future dynamic root'&&item.status==='passed'));
+});
+
+function fixtureCoverage(fixture) {
+  const description=invoke(fixture,{args:['--describe']});assert.equal(description.status,0,description.stdout+description.stderr);
+  const identity=JSON.parse(fs.readFileSync(path.join(description.outputDir,'descriptor.json'))).resultIdentity;
+  const context={repository:identity.repository,sourceSha:identity.sourceSha,sourceTree:identity.sourceTree,checkoutSha:'b'.repeat(40),checkoutTree:'c'.repeat(40),comparisonBase:fixture.comparisonBase,requiredCohort:'four-groups-v1',cohortDigestSha256:identity.cohortDigestSha256,inventorySha256:identity.inventorySha256,assignmentsSha256:identity.assignmentsSha256,expectedGroups:groups};
+  const proof={decision:'reuse',runId:identity.runId,runAttempt:identity.runAttempt,validationContext:identity,cohortContext:context,contextSha256:createHash('sha256').update(JSON.stringify(context)).digest('hex'),coveredBy:{runId:'71',runAttempt:'2',checkoutSha:context.checkoutSha,checkoutTree:context.checkoutTree,comparisonBase:context.comparisonBase,reportSha256:'8'.repeat(64)}};
+  const file=path.join(description.outputDir,'proof.json');writeJson(file,proof);return {file,proof};
+}
+test('test group covered aggregate requires four honest references and fresh original producer proof', async parent => {
+  const fixture=createFixture(parent),{file,proof}=fixtureCoverage(fixture);fixture.originals=new Map();
+  for(const group of groups){const result=invoke(fixture,{group,args:['--covered','--proof',file]});assert.equal(result.status,0,result.stdout+result.stderr);fixture.originals.set(group,result.outputDir);}
+  const scenarios=[['complete references',()=>{},true],['one fabricated current outcome',root=>{const f=path.join(root,'core/result.json'),x=JSON.parse(fs.readFileSync(f));x.cases.push({id:'fabricated',status:'passed'});writeJson(f,x);},false],['mixed producer attempt',root=>{const f=path.join(root,'scenery/result.json'),x=JSON.parse(fs.readFileSync(f));x.coverage.coveredBy.runAttempt='3';writeJson(f,x);},false],['missing group reference',root=>fs.rmSync(path.join(root,'native-process/result.json')),false]];
+  await parent.test('missing fresh proof',t=>{
+    const result=aggregateCopy(t,fixture,(_root,needs)=>{const x=JSON.parse(fs.readFileSync(needs));x['cohort-routing'].outputs={decision:'reuse'};writeJson(needs,x);});
+    assert.notEqual(result.status,0,'covered aggregate must refuse absent fresh proof');
+  });
+  for(const [name,mutate,passed]of scenarios)await parent.test(name,t=>{
+    const actual=aggregateCopy(t,fixture,(root,needs)=>{const x=JSON.parse(fs.readFileSync(needs));x['cohort-routing'].outputs={decision:'reuse'};writeJson(needs,x);mutate(root);},['--proof',file]);
+    assert.equal(actual.status===0,passed,actual.stdout+actual.stderr);
+    if(passed){const report=JSON.parse(fs.readFileSync(path.join(actual.outputDir,'aggregate.json')));assert.equal(report.mode,'covered');assert.equal(report.caseCount,0);assert.equal(report.groups.length,4);assert.ok(report.groups.every(group=>group.coverage.coveredBy.runId===proof.coveredBy.runId));}
   });
 });

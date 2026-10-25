@@ -35,13 +35,24 @@ An unavailable status read is unresolved. A completed success without saved raw
 logs is also unresolved; an observed failure or cancellation keeps that result
 when log retrieval is unavailable.
 
-The current required-job policy comes from
-[`data-safety.yml`](../../.github/workflows/data-safety.yml): `scanner-tests`
-runs for pushes and pull requests; `release-evidence` and `deploy-pages` run
-only for pushes to `main`. Their skips on other workflow events or branches are
-expected. A skip of `scanner-tests`, a skipped main-push release job, an
-unclassified job, or an unknown workflow policy cannot produce success. Update
-the observer and its focused tests when that workflow policy changes.
+The observer reads the committed `data-safety.yml` at the actual checkout,
+independently of the returned job list. It binds that checkout to the persisted
+checkout log or explicit checkout stamp, reads its commit/tree and PR parents,
+and verifies the workflow blob digest. Raw policy reads and the resolved
+`workflow-policy.json` are preserved. Logs are requested for the observed run
+attempt. Missing workflow provenance or an unknown topology remains unresolved;
+absence of new jobs never implies a legacy policy.
+
+For `four-groups-v1`, required jobs are `validation-context`, `event-gates`,
+`cohort-routing`, the four `regression-*` groups and `scanner-tests`. Every one
+must succeed, including covered-reference jobs. The observer also checks exact
+source/checkout/tree/base/workflow announcements and the successful aggregate
+marker; full producers require their separate final completion marker.
+`release-evidence` and `deploy-pages` additionally must succeed on main pushes;
+their skips on other branches/events are expected. A known missing or skipped
+required job is failure, an unknown or duplicate job is unresolved, and a
+canceled job remains canceled. The fixed legacy three-job topology is accepted
+only when the actual committed workflow independently verifies that policy.
 
 For a branch push with one same-repository PR, routing may use that PR's exact
 merge checkout as the complete-cohort producer. The outgoing push still executes
@@ -72,3 +83,10 @@ A successful monitor result establishes the outcome of this exact Actions run
 only. Keep CI batching, required review identities, exact-commit evidence,
 compatibility checks, deployment verification, and live behavior checks in
 [`release-and-review.md`](release-and-review.md).
+
+Metadata-only PR `edited` events may reuse an already completed exact canonical
+merge context. A head, base, merge, workflow or cohort change requires full
+validation; pending producers never count as success. Public observation errors
+use the full-cohort fallback or the observer's unresolved exit, as appropriate.
+The handoff meanings remain: exit 0 is verified success, 1 is failure/cancellation
+or identity mismatch, and 2 requires continued observation or investigation.

@@ -1833,7 +1833,7 @@
       "file": "tests.js"
     },
     {
-      "root": "exact main and fresh PR events execute their own cohort despite matching prior producer observations",
+      "root": "exact main and fresh or base-edited PR events execute their own cohort despite matching prior producer observations",
       "group": "native-process",
       "file": "scripts/agent-tools/ci-routing.test.mjs"
     },
@@ -12216,6 +12216,126 @@
       "root": "yes/no still need a benchmark: with nothing dotted they are refused outright",
       "group": "core",
       "file": "tests.js"
+    },
+    {
+      "root": "test group descriptor validates every group without executing a test child",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "test group aggregate rejects a missing result even when every process exits zero",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "test group selection executes every uncertain routing scenario under its assigned parent",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "test group preflight rejects a passing dynamic row added at an unchanged registration site",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "test group aggregate verifies the complete actual cohort and native artifacts",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "test group aggregate rejects corrupt outcomes identities jobs and native evidence",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "test group workflow scanner command rejects missing parallel group evidence",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "test group covered references preserve producer provenance without executing a child",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "test group registration guard binds names to files and distinguishes empty wrappers",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "test group covered mode rejects a different producer source even with a valid context hash",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "test group explicitly assigned dynamic roots execute in their declared file and group",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "test group covered aggregate requires four honest references and fresh original producer proof",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "workflow routing rejects uncertain producer contexts",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "workflow routing refuses unsuccessful canonical producers",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "workflow routing rechecks final PR identity",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "metadata-only PR edits reuse completed full merge coverage without treating pending as success",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "workflow context planning does not wait on external producer observations",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "workflow routing refuses a descriptor for a different validation candidate",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "grouped routing reuses only an exact completed reconciled producer and preserves origin attempt",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "grouped metadata-only edited PR reuses only its completed exact merge context",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "binds required parallel topology to actual candidate workflow even when new jobs are absent",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-monitor.test.mjs"
+    },
+    {
+      "root": "parallel workflow observation preserves complete missing skipped canceled and unknown distinctions",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-monitor.test.mjs"
+    },
+    {
+      "root": "RISK repository process: required parallel scanner aggregation rejects absent group evidence",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "metadata edits continue past verified covered runs to the original full producer",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
     }
   ],
   "processControls": [

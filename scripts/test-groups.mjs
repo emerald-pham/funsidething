@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const GROUP_IDS = ['core', 'scenery', 'persistence-recovery', 'native-process'];
+export const GROUP_IDS = ['core', 'scenery', 'persistence-recovery', 'native-process'];
 const TEST_NAME_PATTERN_ARGUMENT_BUDGET = 64 * 1024;
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const INVENTORY_PATH = path.join(ROOT, 'scripts/test-group-inventory.json');
@@ -34,9 +34,10 @@ function parseArgs(argv) {
   const keyMap = new Map([
     ['--group', 'group'], ['--output-dir', 'outputDir'], ['--repository', 'repository'],
     ['--event-policy', 'eventPolicy'], ['--run-id', 'runId'], ['--run-attempt', 'runAttempt'],
-    ['--source-sha', 'sourceSha'], ['--comparison-base', 'comparisonBase'],
+    ['--source-sha', 'sourceSha'], ['--comparison-base', 'comparisonBase'], ['--results-dir','resultsDir'], ['--needs-json','needsJson'], ['--proof','proof'],
   ]);
   for (let index = 0; index < argv.length; index++) {
+    if (['--describe','--aggregate','--covered'].includes(argv[index])) { values[argv[index].slice(2)] = true; continue; }
     const key = keyMap.get(argv[index]);
     if (!key) fail(`Unknown argument: ${argv[index]}`);
     if (values[key] !== undefined) fail(`Argument ${argv[index]} was provided more than once.`);
@@ -194,6 +195,7 @@ function validateAssignments(assignments, inventory, inventoryIndex, files) {
     if (!entry || typeof entry.root !== 'string' || !groupSet.has(entry.group) || !fileSet.has(entry.file)) {
       fail('Every root assignment must name a known group and full-suite source file.');
     }
+    if (entry.registration !== undefined && !['literal','dynamic'].includes(entry.registration)) fail('Unknown root registration policy.');
     if (assignmentsByRoot.has(entry.root)) fail(`Root ${JSON.stringify(entry.root)} has overlapping group assignments.`);
     assignmentsByRoot.set(entry.root, entry);
   }
@@ -309,7 +311,7 @@ function validateAddedRegistrations(assignments, inventoryIndex, index, files, i
   }
   for (const root of index.assignmentsByRoot.keys()) {
     if (baseline.has(root) || index.replacementTargets.has(root)) continue;
-    if (!added.has(root)) fail(`Newly assigned root ${JSON.stringify(root)} has no added test registration in the comparison diff.`);
+    if (!added.has(root) && index.assignmentsByRoot.get(root).registration !== 'dynamic') fail(`Newly assigned root ${JSON.stringify(root)} has no added test registration in the comparison diff.`);
   }
   for (const title of added) {
     const assignment = index.assignmentsByRoot.get(title);
@@ -666,10 +668,166 @@ function artifactInventory(nativeDir) {
   return artifacts;
 }
 
+function coverageReference(proof, identity) {
+  if (proof?.decision!=='reuse' || String(proof.runId)!==String(identity.runId) || String(proof.runAttempt)!==String(identity.runAttempt)) fail('Covered mode requires a verified current-run routing proof.');
+  for (const key of ['repository','sourceSha','sourceTree','checkoutSha','checkoutTree','comparisonBase']) if(proof.validationContext?.[key]!==identity[key])fail(`Coverage validation context mismatch: ${key}.`);
+  const context=proof.cohortContext,producer=proof.coveredBy;
+  for(const key of ['repository','sourceSha','sourceTree'])if(context?.[key]!==identity[key])fail(`Coverage producer source context mismatch: ${key}.`);
+  if(identity.checkoutDirty || context?.requiredCohort!=='four-groups-v1' || proof.contextSha256!==sha256(JSON.stringify(context)))fail('Coverage context is incomplete or dirty.');
+  for(const key of ['cohortDigestSha256','inventorySha256','assignmentsSha256','expectedGroups'])if(JSON.stringify(context[key])!==JSON.stringify(identity[key]))fail(`Coverage cohort mismatch: ${key}.`);
+  if(!/^[1-9][0-9]*$/.test(producer?.runId)||!/^[1-9][0-9]*$/.test(producer?.runAttempt)||!/^[a-f0-9]{64}$/.test(producer?.reportSha256)||!['checkoutSha','checkoutTree','comparisonBase'].every(key=>sha1Pattern.test(producer[key])&&producer[key]===context[key]))fail('Original full producer run/attempt/report identity is missing.');
+  return {contextSha256:proof.contextSha256,cohortContext:context,coveredBy:producer};
+}
+
+function aggregateResults({options, outputDir, descriptor, inventory, assignmentIndex, assignments, files, source}) {
+  if (!options.resultsDir || !options.needsJson) fail('Aggregate requires --results-dir and --needs-json.');
+  const needs = readJson(options.needsJson, 'actual workflow predecessor results');
+  const issues = [], records = [], allCases = new Set();
+  const covered=needs['cohort-routing']?.outputs?.decision==='reuse';
+  const freshCoverage=covered?coverageReference(readJson(options.proof,'fresh full-producer proof'),descriptor.resultIdentity):null;
+  for (const id of ['validation-context','event-gates','cohort-routing','regression']) {
+    if (needs[id]?.result !== 'success') issues.push(`Required job ${id} did not succeed: ${needs[id]?.result || 'missing'}.`);
+  }
+  const directories = fs.readdirSync(options.resultsDir).filter(name => fs.lstatSync(path.join(options.resultsDir,name)).isDirectory());
+  if (JSON.stringify([...directories].sort()) !== JSON.stringify([...GROUP_IDS].sort())) issues.push('Required group directories are missing or unknown.');
+  const verifiedFile = (root, relative, expected, bytes) => {
+    if (typeof relative !== 'string' || !relative || path.isAbsolute(relative) || relative.split(/[\\/]/).some(part => !part || part === '..' || part === '.')) fail('Unsafe artifact path.');
+    let current = root;
+    for (const part of relative.split('/')) { current = path.join(current,part); if (fs.lstatSync(current).isSymbolicLink()) fail('Artifact symlinks are forbidden.'); }
+    const stat = fs.lstatSync(current);
+    if (!stat.isFile() || (bytes !== undefined && stat.size !== bytes)) fail(`Artifact missing or wrong size: ${relative}.`);
+    const content = fs.readFileSync(current);
+    if (sha256(content) !== expected) fail(`Artifact hash mismatch: ${relative}.`);
+    return content;
+  };
+  for (const id of GROUP_IDS) {
+    try {
+      const root = path.resolve(options.resultsDir,id);
+      if (fs.lstatSync(root).isSymbolicLink()) fail('Group evidence must be a real directory.');
+      const record = readJson(path.join(root,'result.json'),`required result for ${id}`);
+      if (record.status !== (covered?'covered':'passed') || record.issues?.length || !Array.isArray(record.issues)) fail(`Required group ${id} did not pass.`);
+      const identity = record.resultIdentity;
+      for (const [key,value] of Object.entries(descriptor.resultIdentity)) {
+        if (key === 'selectedGroup') continue;
+        if (JSON.stringify(identity?.[key]) !== JSON.stringify(value)) fail(`Required group ${id} identity mismatch: ${key}.`);
+      }
+      if (identity?.selectedGroup !== id || identity.checkoutDirty) fail(`Wrong or dirty group identity: ${id}.`);
+      if(covered){
+        if(record.cases?.length!==0||record.artifacts?.length!==0||record.process!==null||JSON.stringify(record.coverage)!==JSON.stringify(freshCoverage))fail('Covered records are mixed, incomplete or claim current execution.');
+        records.push({group:id,mode:'covered',identity,coverage:record.coverage});continue;
+      }
+      if (record.process?.exitCode !== 0 || record.process?.signal || record.process?.spawnError) fail(`Required group ${id} process failed or was canceled.`);
+      const tap = verifiedFile(root,record.process.stdout.path,record.process.stdout.sha256).toString('utf8');
+      verifiedFile(root,record.process.stderr.path,record.process.stderr.sha256);
+      const cases = parseTap(tap).map(({id,root,status,skipReason}) => ({id,root,status,skipReason}));
+      if (JSON.stringify(cases) !== JSON.stringify(record.cases)) fail(`Required group ${id} case report differs from actual TAP.`);
+      const errors = verifyResults({cases,group:id,inventory,assignments:{...assignmentIndex,processControls:assignments.processControls},files,source});
+      if (errors.length) fail(errors.join(' '));
+      for (const item of cases) { if (allCases.has(item.id)) fail(`Duplicate case across groups: ${item.id}.`); allCases.add(item.id); }
+      const artifactPaths = new Set();
+      for (const artifact of record.artifacts || []) {
+        if (artifactPaths.has(artifact.path)) fail('Duplicate native/recovery artifact path.');
+        artifactPaths.add(artifact.path); verifiedFile(root,artifact.path,artifact.sha256,artifact.bytes);
+      }
+      const actualArtifacts=['native','recovery-ui'].flatMap(name=>fs.existsSync(path.join(root,name))?artifactInventory(path.join(root,name)):[]);
+      if(JSON.stringify(actualArtifacts.sort((a,b)=>a.path.localeCompare(b.path)))!==JSON.stringify([...(record.artifacts||[])].sort((a,b)=>a.path.localeCompare(b.path))))fail('Native/recovery artifact inventory is incomplete or inconsistent.');
+      if(id==='core'){
+        const guard=record.unclassifiedRootGuard;
+        if(guard?.status!=='passed'||guard.issues?.length!==0||guard.files?.length!==files.length)fail('Missing successful unclassified-root guard.');
+        if(JSON.stringify(guard.files.map(item=>item.file).sort())!==JSON.stringify([...files].sort()))fail('Unclassified-root guard file binding is incomplete.');
+        for(const observed of guard.files){
+          if(observed.process?.code!==0||observed.process.signal||observed.process.error)fail('Unclassified-root guard child failed.');
+          const tap=verifiedFile(root,observed.stdout.path,observed.stdout.sha256).toString('utf8');
+          verifyGuardTap(tap,observed.file);
+          verifiedFile(root,observed.stderr.path,observed.stderr.sha256);
+          verifyGuardSummary(verifiedFile(root,observed.summary.path,observed.summary.sha256).toString('utf8'),observed.file);
+        }
+      }
+      const controls = assignments.processControls.filter(control => control.group === id);
+      if (record.processControls?.length !== controls.length) fail('Required process-control records are missing.');
+      for (const control of controls) {
+        const matches = record.processControls.filter(item => item.id === control.id && item.ownerRoot === control.ownerRoot && item.registrationCount === control.expectedExecutions && item.expectedExecutions === control.expectedExecutions);
+        if (matches.length !== 1) fail('Controlled child registration evidence is missing or duplicated.');
+      }
+      if (descriptor.groups.find(group=>group.id===id).roots.includes('RISK repository process: required installed-client native outcomes and artifacts execute exactly once')) {
+        const reports = [];
+        for (const artifact of record.artifacts || []) {
+          if (!artifact.path.startsWith('native/') || !artifact.path.endsWith('.json')) continue;
+          const report = JSON.parse(verifiedFile(root,artifact.path,artifact.sha256,artifact.bytes));
+          if (['signed-out','reconcile-held'].includes(report.mode)) reports.push(report);
+        }
+        if (reports.length !== 2 || new Set(reports.map(report=>report.mode)).size !== 2) fail('Both required distinct native reports must be present.');
+        for (const report of reports) {
+          if (report.status !== 'passed' || report.oldCommit !== '779defa4e8c3465fdf535fe17dbe2227d2b76ea1' || report.candidateCommit !== identity.checkoutSha || report.candidateTree !== identity.checkoutTree || !['contextClosed','browserClosed','serverClosed'].every(key=>report.cleanup?.[key]===true)) fail('Native report outcome, actual checkout or cleanup mismatch.');
+        }
+      }
+      records.push({group:id,resultSha256:sha256(fs.readFileSync(path.join(root,'result.json'))),cases:cases.length,passed:cases.filter(item=>item.status==='passed').length,skipped:cases.filter(item=>item.status==='skipped').length,artifacts:record.artifacts,identity});
+    } catch (error) { issues.push(`${id}: ${error.message}`); }
+  }
+  const report = {schemaVersion:1,status:issues.length?'failed':'passed',mode:covered?'covered':'full',resultIdentity:descriptor.resultIdentity,groups:records,caseCount:allCases.size,issues,finishedAt:new Date().toISOString()};
+  atomicWrite(path.join(outputDir,'aggregate.json'),report);
+  if (issues.length) fail(issues.join('\n'));
+  process.stdout.write(`Complete required cohort verified: ${allCases.size} cases.\n`);
+  if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT,`report=${sha256(fs.readFileSync(path.join(outputDir,'aggregate.json')))}\n`);
+  return 0;
+}
+
 function atomicWrite(file, value) {
   const temporary = `${file}.tmp-${process.pid}`;
   fs.writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`, { flag: 'wx' });
   fs.renameSync(temporary, file);
+}
+
+function verifyGuardTap(raw, file) {
+  const cases=parseTap(raw), names=new Set([normalizeTapIdentity(file),normalizeTapIdentity(path.resolve(ROOT,file))]);
+  if(!raw.startsWith('TAP version 13\n') || !/^1\.\.1$/m.test(raw) || cases.length!==1 || cases[0].id!==cases[0].root || !names.has(cases[0].root) || cases[0].status!=='passed')fail('Malformed or incomplete zero-root guard TAP.');
+}
+
+function verifyGuardSummary(raw, file) {
+  const summaries = raw.trim().split('\n').filter(Boolean).map(line => JSON.parse(line));
+  const matching = summaries.filter(summary => summary.file === path.resolve(ROOT,file));
+  if (matching.length !== 1) fail('Unclassified-root guard has missing or duplicate per-file summaries.');
+  const counts = matching[0].counts;
+  if (!counts || !['tests','topLevel','suites','passed','failed','cancelled','skipped','todo'].every(key => counts[key] === 0)) fail('Unclassified runtime roots were executed or skipped.');
+  if (!matching[0].success) fail('Unclassified-root guard summary did not succeed.');
+}
+
+async function unclassifiedRootGuard(files, assignments, outputDir) {
+  // Per-file summaries distinguish an empty Node wrapper from an unknown test
+  // with exactly that wrapper's title. Names assigned in another file cannot
+  // suppress a future root here.
+  const reporterPath=path.join(outputDir,'unclassified-reporter.mjs');
+  fs.writeFileSync(reporterPath,`export default async function* (events) { for await (const event of events) if(event.type==='test:summary') yield JSON.stringify(event.data)+'\\n'; }\n`,{flag:'wx'});
+  const env = {...process.env}; delete env.NODE_TEST_CONTEXT;
+  const reports=[],errors=[];
+  for (const [index,file] of files.entries()) {
+    const roots=[...assignments.assignmentsByRoot.values()].filter(entry=>entry.file===file).map(entry=>normalizeTapIdentity(entry.root));
+    const patterns=testNamePatternArguments(roots).map(argument=>argument.replace('--test-name-pattern=','--test-skip-pattern='));
+    const prefix=`unclassified-${index}`;
+    const stdoutPath=path.join(outputDir,prefix+'.tap'),stderrPath=path.join(outputDir,prefix+'.stderr.log'),summaryPath=path.join(outputDir,prefix+'.summary.jsonl');
+    const child=spawn(process.execPath,['--test','--test-reporter=tap','--test-reporter-destination=stdout','--test-reporter='+reporterPath,'--test-reporter-destination='+summaryPath,...patterns,file],{cwd:ROOT,env,detached:true,stdio:['ignore','pipe','pipe']});
+    const stdout=fs.createWriteStream(stdoutPath,{flags:'wx'}),stderr=fs.createWriteStream(stderrPath,{flags:'wx'});
+    child.stdout.pipe(stdout);child.stderr.pipe(stderr);
+    let timedOut=false,overLimit=false,bytes=0;
+    const stop=()=>{if(!child.pid)return;try{process.kill(-child.pid,'SIGKILL');}catch(error){if(error.code!=='ESRCH')throw error;}};
+    for(const stream of [child.stdout,child.stderr])stream.on('data',chunk=>{bytes+=chunk.length;if(bytes>8*1024*1024){overLimit=true;stop();}});
+    const timer=setTimeout(()=>{timedOut=true;stop();},30000);
+    const exit=await new Promise(resolve=>{child.once('error',error=>resolve({code:null,error:error.message}));child.once('close',(code,signal)=>resolve({code,signal}));});
+    clearTimeout(timer);stop();
+    await Promise.all([new Promise(resolve=>stdout.end(resolve)),new Promise(resolve=>stderr.end(resolve))]);
+    const evidence=filePath=>({path:path.basename(filePath),sha256:sha256(fs.readFileSync(filePath))});
+    let summary=null;
+    try {
+      if(exit.code!==0||exit.signal||exit.error||timedOut||overLimit)fail('Unclassified-root guard failed or exceeded its owned process/output limit.');
+      summary=evidence(summaryPath);verifyGuardSummary(fs.readFileSync(summaryPath,'utf8'),file);
+      verifyGuardTap(fs.readFileSync(stdoutPath,'utf8'),file);
+    } catch(error){errors.push(`${file}: ${error.message} Observed guard outcomes: ${parseTap(fs.readFileSync(stdoutPath,'utf8')).map(item=>item.id).join(', ')}.`);}
+    reports.push({file,process:exit,stdout:evidence(stdoutPath),stderr:evidence(stderrPath),summary});
+  }
+  const report={status:errors.length?'failed':'passed',files:reports,issues:errors};
+  atomicWrite(path.join(outputDir,'unclassified-roots.json'),report);
+  if(errors.length)fail(errors.join(' '));
+  return report;
 }
 
 async function runChild(files, roots, outputDir, options, source) {
@@ -796,6 +954,31 @@ async function main() {
       return runtimeRoot === id ? null : { baselineRoot: id, runtimeRoot };
     }).filter(Boolean);
     result.resultIdentity.cohortDigestSha256 = cohortDigest(inventory, assignments, assignmentIndex);
+    {
+      const accepted = new Set(inventory.acceptedSkipCaseIds);
+      const descriptor = { schemaVersion: 1, resultIdentity: { ...result.resultIdentity, selectedGroup: null },
+        groups: GROUP_IDS.map(id => ({ id,
+          roots: assignmentIndex.rootsPerGroup.get(id).map(normalizeTapIdentity).sort(),
+          requiredCaseIds: [...expectedCasesForGroup(inventory, assignmentIndex, id).keys()],
+          acceptedSkipCaseIds: [...expectedCasesForGroup(inventory, assignmentIndex, id)].filter(([, baselineId]) => accepted.has(baselineId)).map(([runtimeId]) => runtimeId),
+          processControls: assignments.processControls.filter(control => control.group === id).map(control => ({ ...control, ownerRoot: normalizeTapIdentity(control.ownerRoot) })),
+        })), baseline: inventory.baseline };
+      if(options.covered){
+        result.coverage=coverageReference(readJson(options.proof,'verified coverage proof'),result.resultIdentity);
+        result.status='covered';result.finishedAt=new Date().toISOString();atomicWrite(path.join(outputDir,'result.json'),result);
+        process.stdout.write(`${options.group}: covered by full producer ${result.coverage.coveredBy.runId}/${result.coverage.coveredBy.runAttempt}; no test child executed.\n`);return 0;
+      }
+      if (options.aggregate) return aggregateResults({options, outputDir, descriptor, inventory, assignmentIndex, assignments, files, source});
+      if (options.describe) {
+        atomicWrite(path.join(outputDir, 'descriptor.json'), descriptor);
+        result.status = 'described';
+        result.finishedAt = new Date().toISOString();
+        atomicWrite(path.join(outputDir, 'result.json'), result);
+        process.stdout.write(`Validated complete cohort descriptor: ${path.join(outputDir, 'descriptor.json')}\n`);
+        return 0;
+      }
+    }
+
     const selectedFiles = [...new Set([
       ...files.filter(file => assignmentIndex.rootsPerGroup.get(options.group).some(root => assignmentIndex.assignmentsByRoot.get(root)?.file === file)),
     ])].sort();
@@ -824,6 +1007,7 @@ async function main() {
       registrationCount: countTestRegistrations(fs.readFileSync(path.join(ROOT, control.file), 'utf8'), control.id),
     }));
 
+    if (options.group === 'core') result.unclassifiedRootGuard = await unclassifiedRootGuard(files,assignmentIndex,outputDir);
     const childResult = await runChild(selectedFiles, selectedRoots, outputDir, options, source);
     nativeDir = childResult.nativeDir;
     result.process = {
@@ -864,7 +1048,9 @@ async function main() {
   return 0;
 }
 
-main().then(code => { process.exitCode = code; }).catch(error => {
+export { parseTap, normalizeTapIdentity };
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main().then(code => { process.exitCode = code; }).catch(error => {
   process.stderr.write(`${error.stack || error.message}\n`);
   process.exitCode = 1;
 });

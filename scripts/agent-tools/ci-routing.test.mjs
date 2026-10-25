@@ -14,7 +14,7 @@ const git = (cwd, ...args) => {
   return result.stdout.trim();
 };
 
-function fixture(t) {
+function fixture(t, grouped=false) {
   const root = mkdtempSync(path.join(os.tmpdir(), 'chain-ci-routing-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const source = path.join(root, 'source'), bin = path.join(root, 'bin');
@@ -24,6 +24,7 @@ function fixture(t) {
   git(source, 'config', 'user.email', 'routing@example.invalid');
   writeFileSync(path.join(source, 'package.json'), JSON.stringify({ private: true, scripts: { test: 'node --test tests.js' } }));
   writeFileSync(path.join(source, 'tests.js'), "import { test } from 'node:test';test('isolated routing fixture',()=>{});\n");
+  if(grouped){for(const file of ['.github/workflows/data-safety.yml','scripts/test-group-inventory.json','scripts/test-group-assignments.json','scripts/test-groups.mjs','scripts/agent-tools/ci-routing.mjs']){mkdirSync(path.dirname(path.join(source,file)),{recursive:true});writeFileSync(path.join(source,file),'fixture '+file+'\n');}}
   git(source, 'add', '.'); git(source, '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'fixture base');
   const base = git(source, 'rev-parse', 'HEAD');
   writeFileSync(path.join(source, 'candidate.txt'), 'isolated candidate\n');
@@ -41,7 +42,8 @@ const url=process.argv.at(-1);
 if(url.includes('/runs?')&&x.runSequence?.length){x.runs=x.runSequence.shift();fs.writeFileSync(process.env.ROUTING_GITHUB,JSON.stringify(x));}
 if(url.includes('/pulls?')&&x.pullSequence?.length){x.pulls=x.pullSequence.shift();fs.writeFileSync(process.env.ROUTING_GITHUB,JSON.stringify(x));}
 if(x.error){process.stderr.write('controlled unavailable GitHub');process.exit(22);}
-console.log(JSON.stringify(url.includes('/jobs?')?{total_count:x.jobs.length,jobs:x.jobs}:url.includes('/pulls?')?(x.pulls??[]).map(({mergeable,...listed})=>listed):url.includes('/pulls/')?x.pulls?.[0]:url.includes('/git/commits/')?x.merge:{total_count:x.omitRunTotal?undefined:x.runs.length,workflow_runs:x.runs}));
+const jobs=x.jobsByRun?.[url.split('/runs/')[1]?.split('/')[0]]??x.jobs;
+console.log(JSON.stringify(url.includes('/jobs?')?{total_count:jobs.length,jobs}:url.includes('/pulls?')?(x.pulls??[]).map(({mergeable,...listed})=>listed):url.includes('/pulls/')?x.pulls?.[0]:url.includes('/git/commits/')?x.merge:url.includes('/git/trees/')?x.tree:{total_count:x.omitRunTotal?undefined:x.runs.length,workflow_runs:x.runs}));
 `);
   writeFileSync(path.join(bin, 'node'), '#!/bin/sh\nif [ "$1" = "-p" ] && [ "$ROUTING_READ_FAILURE" = "1" ]; then exit 1; fi\nexec ' + JSON.stringify(process.execPath) + ' "$@"\n');
   chmodSync(path.join(bin, 'node'), 0o755);
@@ -49,28 +51,25 @@ console.log(JSON.stringify(url.includes('/jobs?')?{total_count:x.jobs.length,job
   return { root, source, bin, base, head, merge, tree, journal, external, attempt: 0 };
 }
 
+// Public routing-command consumer fixtures; the grouped workflow's actual
+// scanner command is separately executed by test-groups.test.mjs.
 function cohortShell() {
-  const workflow = readFileSync(path.join(repo, '.github/workflows/data-safety.yml'), 'utf8');
-  const step = workflow.match(/      - name: Run complete regression cohort\n[\s\S]*?        run: \|\n((?:          [^\n]*\n|\n)*)/);
-  if (!step) {
-    assert.match(workflow, /      - run: npm test\n/, 'execute the current workflow cohort entry point');
-    return 'npm test';
-  }
-  return step[1].split('\n').map(line => line.startsWith('          ') ? line.slice(10) : line).join('\n')
-    .replaceAll('node scripts/agent-tools/ci-routing.mjs', 'node "$ROUTING_COMMAND" --max-wait-ms 1000 --poll-interval-ms 1')
-    .replaceAll('${{ steps.diff-base.outputs.sha }}', '$ROUTING_BASE')
-    .replaceAll('${{ runner.temp }}', '$ROUTING_OUTPUT');
+  return `set -- --max-wait-ms 1000 --poll-interval-ms 1 --comparison-base "$ROUTING_BASE" --evidence-dir "$ROUTING_OUTPUT/ci-routing"
+if [[ -n "\${ROUTING_DESCRIPTOR:-}" ]]; then set -- "$@" --descriptor "$ROUTING_DESCRIPTOR"; fi
+node "$ROUTING_COMMAND" "$@"
+decision="$(node -p "require('$ROUTING_OUTPUT/ci-routing/routing.json').decision")"
+if [[ "$decision" == "full" ]]; then npm test; elif [[ "$decision" != "reuse" ]]; then exit 1; fi`;
 }
 
-function invoke(f, { event = 'push', ref = 'refs/heads/topic', source = f.head, checkout = f.head, base = f.base, action = 'synchronize', environment = {} } = {}) {
+function invoke(f, { event = 'push', ref = 'refs/heads/topic', source = f.head, checkout = f.head, base = f.base, action = 'synchronize', changes = undefined, planOnly = false, environment = {} } = {}) {
   git(f.source, 'checkout', '--detach', checkout);
   const output = path.join(f.root, `attempt-${++f.attempt}`);
   mkdirSync(output);
   const eventPath = path.join(output, 'event.json');
   writeFileSync(eventPath, JSON.stringify(event === 'pull_request' ? {
-    action, number: 17, pull_request: { number: 17, head: { sha: source, repo: { full_name: 'fixture/repo' } }, base: { sha: base, ref: 'main' } },
+    action, changes, number: 17, pull_request: { number: 17, head: { sha: source, ref: 'topic', repo: { full_name: 'fixture/repo' } }, base: { sha: base, ref: 'main' } },
   } : { after: source, before: base, repository: { full_name: 'fixture/repo' } }));
-  const result = spawnSync('bash', ['-euo', 'pipefail', '-c', cohortShell()], {
+  const result = spawnSync('bash', ['-euo', 'pipefail', '-c', planOnly ? 'node "$ROUTING_COMMAND" --comparison-base "$ROUTING_BASE" --evidence-dir "$ROUTING_OUTPUT/ci-routing" --plan-only 1' : cohortShell()], {
     cwd: f.source, encoding: 'utf8', timeout: 15000,
     env: { ...process.env, PATH: f.bin + path.delimiter + process.env.PATH,
       ROUTING_COMMAND: command, ROUTING_BASE: base, ROUTING_OUTPUT: output,
@@ -156,8 +155,9 @@ const fallbackCases = [
   ['missing producer inventory count', x => { x.omitRunTotal = true; }],
 ];
 
+test('workflow routing rejects uncertain producer contexts', async parent => {
 for (const [name, change] of fallbackCases) {
-  test(`workflow runs the actual branch cohort for ${name}`, t => {
+  await parent.test(`workflow runs the actual branch cohort for ${name}`, t => {
     const f = fixture(t);
     const producer = invoke(f, { event: 'pull_request', ref: 'refs/pull/17/merge', checkout: f.merge });
     published(f, producer.record);
@@ -172,9 +172,11 @@ for (const [name, change] of fallbackCases) {
     assert.equal(result.record?.coveredBy, null);
   });
 }
+});
 
+test('workflow routing refuses unsuccessful canonical producers', async parent => {
 for (const conclusion of ['failure', 'cancelled', 'timed_out']) {
-  test(`workflow refuses a known exact canonical producer ${conclusion}`, t => {
+  await parent.test(`workflow refuses a known exact canonical producer ${conclusion}`, t => {
     const f = fixture(t);
     const producer = invoke(f, { event: 'pull_request', ref: 'refs/pull/17/merge', checkout: f.merge });
     published(f, producer.record);
@@ -189,15 +191,16 @@ for (const conclusion of ['failure', 'cancelled', 'timed_out']) {
     assert.equal(executions(f).length, 1, 'a known producer failure must not be converted to a passing consumer');
   });
 }
+});
 
-test('exact main and fresh PR events execute their own cohort despite matching prior producer observations', t => {
+test('exact main and fresh or base-edited PR events execute their own cohort despite matching prior producer observations', t => {
   const f = fixture(t);
   const producer = invoke(f, { event: 'pull_request', ref: 'refs/pull/17/merge', checkout: f.merge });
   published(f, producer.record);
   for (const event of [
     { event: 'push', ref: 'refs/heads/main' },
     { event: 'pull_request', ref: 'refs/pull/17/merge', checkout: f.merge, action: 'opened' },
-    { event: 'pull_request', ref: 'refs/pull/17/merge', checkout: f.merge, action: 'edited' },
+    { event: 'pull_request', ref: 'refs/pull/17/merge', checkout: f.merge, action: 'edited', changes: {base:{ref:{from:'old-base'}}} },
   ]) {
     const result = invoke(f, event);
     assert.equal(result.status, 0, result.stderr);
@@ -217,8 +220,9 @@ test('workflow refuses an outgoing source that differs from its actual push chec
 });
 
 
+test('workflow routing rechecks final PR identity', async parent => {
 for (const field of ['source', 'base', 'merge']) {
-  test(`workflow rechecks the final PR ${field} before accepting producer reuse`, t => {
+  await parent.test(`workflow rechecks the final PR ${field} before accepting producer reuse`, t => {
     const f = fixture(t);
     const producer = invoke(f, { event: 'pull_request', ref: 'refs/pull/17/merge', checkout: f.merge });
     published(f, producer.record);
@@ -235,6 +239,7 @@ for (const field of ['source', 'base', 'merge']) {
     assert.equal(executions(f).length, 2, 'a changed final PR context needs actual checkout validation');
   });
 }
+});
 
 test('canonical reuse preserves different outgoing and merge trees with distinct gate bases', t => {
   const f = fixture(t);
@@ -272,4 +277,84 @@ test('workflow fails instead of claiming completion when the routing record cann
   const result = invoke(f, { environment: { ROUTING_READ_FAILURE: '1' } });
   assert.notEqual(result.status, 0, 'a failed routing evidence read must not silently skip the complete cohort');
   assert.equal(executions(f).length, 0);
+});
+
+
+test('metadata-only PR edits reuse completed full merge coverage without treating pending as success', t => {
+  const f=fixture(t);
+  const producer=invoke(f,{event:'pull_request',ref:'refs/pull/17/merge',checkout:f.merge});
+  published(f,producer.record);
+  const result=invoke(f,{event:'pull_request',ref:'refs/pull/17/merge',checkout:f.merge,action:'edited',changes:{body:{from:'prior evidence'}}});
+  assert.equal(result.status,0,result.stdout+result.stderr);
+  assert.equal(executions(f).length,1,'an unchanged exact PR context must not repeat the complete cohort for body metadata');
+  assert.equal(result.record?.decision,'reuse');
+  assert.equal(result.record.coveredBy.runAttempt,'2');
+});
+
+
+test('workflow context planning does not wait on external producer observations', t => {
+  const f=fixture(t),producer=invoke(f,{event:'pull_request',ref:'refs/pull/17/merge',checkout:f.merge});
+  published(f,producer.record);
+  const result=invoke(f,{planOnly:true});
+  assert.equal(result.status,0,result.stdout+result.stderr);
+  assert.equal(result.record.observations.length,0,'quick context planning must not consume the routing wait/API budget');
+  assert.equal(result.record.decision,'full');
+});
+
+test('workflow routing refuses a descriptor for a different validation candidate', t => {
+  const f=fixture(t),descriptor=path.join(f.root,'wrong-descriptor.json');
+  writeFileSync(descriptor,JSON.stringify({resultIdentity:{repository:'wrong/repo'}}));
+  const result=invoke(f,{environment:{ROUTING_DESCRIPTOR:descriptor}});
+  assert.notEqual(result.status,0,'descriptor identity must bind the actual validation candidate');
+  assert.equal(executions(f).length,0);
+});
+
+
+const groupedIds=['core','scenery','persistence-recovery','native-process'];
+function descriptorFor(f,checkout) {
+  const file=path.join(f.root,'descriptor-'+(f.attempt+1)+'.json');
+  writeFileSync(file,JSON.stringify({resultIdentity:{repository:'fixture/repo',sourceSha:f.head,sourceTree:f.tree,checkoutSha:checkout,checkoutTree:git(f.source,'rev-parse',checkout+'^{tree}'),comparisonBase:f.base,runId:String(101+f.attempt),runAttempt:1,checkoutDirty:false,cohortDigestSha256:'1'.repeat(64),inventorySha256:'2'.repeat(64),assignmentsSha256:'3'.repeat(64),expectedGroups:groupedIds}}));
+  return {ROUTING_DESCRIPTOR:file};
+}
+function publishedGroups(f,record) {
+  published(f,record);const github=JSON.parse(readFileSync(f.external));
+  github.tree={truncated:false,tree:['.github/workflows/data-safety.yml','scripts/test-group-inventory.json','scripts/test-group-assignments.json','scripts/test-groups.mjs','scripts/agent-tools/ci-routing.mjs'].map(file=>({path:file,type:'blob',sha:git(f.source,'rev-parse',f.head+':'+file)}))};
+  const original=github.jobs[0];original.steps=[{name:`Complete regression context ${record.contextSha256} report ${'8'.repeat(64)}`,conclusion:'success'}];
+  github.jobs=['validation-context','event-gates','cohort-routing',...groupedIds.map(id=>'regression-'+id)].map(name=>({...original,name,steps:name==='validation-context'?[{name:`Announce regression context ${record.contextSha256}`,conclusion:'success'}]:[]})).concat(original);
+  writeFileSync(f.external,JSON.stringify(github));return github;
+}
+test('grouped routing reuses only an exact completed reconciled producer and preserves origin attempt', async parent => {
+  const scenarios=[
+    ['exact producer',()=>{},'reuse',0],
+    ['missing group',x=>{x.jobs=x.jobs.filter(job=>job.name!=='regression-scenery');},'full',0],
+    ['skipped group',x=>{x.jobs.find(job=>job.name==='regression-core').conclusion='skipped';},'full',0],
+    ['wrong group attempt',x=>{x.jobs.find(job=>job.name==='regression-core').run_attempt=1;},'full',0],
+    ['unverified marker',x=>{x.jobs.find(job=>job.name==='scanner-tests').steps=[];},'full',0],
+    ['wrong definition',x=>{x.tree.tree[0].sha='f'.repeat(40);},'full',0],
+    ['unknown extra job',x=>{x.jobs.push({...x.jobs[0],name:'unexpected-validation'});},'full',0],
+    ['known failed producer without aggregate',x=>{x.runs[0].conclusion='failure';x.jobs=x.jobs.filter(job=>job.name!=='scanner-tests');},'fail',1],
+  ];
+  for(const [name,mutate,decision,code]of scenarios)await parent.test(name,t=>{
+    const f=fixture(t,true),first=invoke(f,{event:'pull_request',checkout:f.merge,environment:descriptorFor(f,f.merge)});
+    assert.equal(first.status,0,first.stdout+first.stderr);const github=publishedGroups(f,first.record);mutate(github);writeFileSync(f.external,JSON.stringify(github));
+    const second=invoke(f,{environment:descriptorFor(f,f.head)});assert.equal(second.status,code,second.stdout+second.stderr);assert.equal(second.record?.decision,decision,second.stdout);
+    if(decision==='reuse'){assert.equal(second.record.coveredBy.runId,'71');assert.equal(second.record.coveredBy.runAttempt,'2');assert.equal(second.record.coveredBy.reportSha256,'8'.repeat(64));assert.equal(executions(f).length,1);}
+  });
+});
+
+test('grouped metadata-only edited PR reuses only its completed exact merge context', t => {
+  const f=fixture(t,true),first=invoke(f,{event:'pull_request',checkout:f.merge,environment:descriptorFor(f,f.merge)});assert.equal(first.status,0,first.stderr);publishedGroups(f,first.record);
+  const edited=invoke(f,{event:'pull_request',checkout:f.merge,action:'edited',changes:{body:{from:'previous evidence'}},environment:descriptorFor(f,f.merge)});
+  assert.equal(edited.status,0,edited.stdout+edited.stderr);assert.equal(edited.record.decision,'reuse');assert.equal(executions(f).length,1);
+  const baseEdit=invoke(f,{event:'pull_request',checkout:f.merge,action:'edited',changes:{base:{ref:{from:'previous-base'}}},environment:descriptorFor(f,f.merge)});
+  assert.equal(baseEdit.status,0,baseEdit.stderr);assert.equal(baseEdit.record.decision,'full');assert.equal(executions(f).length,2);
+});
+
+
+test('metadata edits continue past verified covered runs to the original full producer', t => {
+  const f=fixture(t,true),first=invoke(f,{event:'pull_request',checkout:f.merge,environment:descriptorFor(f,f.merge)});assert.equal(first.status,0,first.stderr);
+  const github=publishedGroups(f,first.record),covered=github.jobs.map(job=>({...job,run_id:72,run_attempt:1,steps:job.name==='scanner-tests'?[{name:`Verified complete cohort ${first.record.contextSha256} report ${'9'.repeat(64)} mode reuse`,conclusion:'success'}]:job.steps}));
+  github.jobsByRun={'71':github.jobs,'72':covered};github.runs.unshift({...github.runs[0],id:72,run_attempt:1});writeFileSync(f.external,JSON.stringify(github));
+  const edited=invoke(f,{event:'pull_request',checkout:f.merge,action:'edited',changes:{title:{from:'earlier title'}},environment:descriptorFor(f,f.merge)});
+  assert.equal(edited.status,0,edited.stderr);assert.equal(edited.record.decision,'reuse',edited.stdout);assert.equal(edited.record.coveredBy.runId,'71');assert.equal(edited.record.coveredBy.runAttempt,'2');assert.equal(executions(f).length,1);
 });

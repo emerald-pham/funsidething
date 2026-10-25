@@ -86,3 +86,43 @@ full-versus-grouped result reconciliation.
 This command supplements `npm test`; it does not change the full-suite
 boundary. Run the affected focused process tests during development, and use the
 repository's required full suite and CI gates for final qualification.
+
+## Parallel Actions aggregation
+
+Data safety describes the required cohort before routing with the same runner's
+`--describe` mode. It validates the inventory and assignments and writes
+`descriptor.json` without executing test bodies. This is a description of
+required coverage, not a test pass.
+
+The four `regression-*` jobs run independently with serial tests inside each
+process. `core` first runs one bounded private registration guard per full-suite
+file, skipping only roots assigned to that file. Its public Node reporter must
+return exactly one successful per-file summary with zero tests, suites,
+top-level outcomes, failures, skips and cancellations. This catches data-driven
+new roots even when no literal registration line changed, including names
+assigned in another file and names identical to file wrappers. Raw TAP, stderr
+and summaries are retained separately from cohort outcomes. Descendants inherit
+their assigned parent's group and execute in the ordinary group process.
+An explicitly classified dynamic top-level root may declare
+`registration: "dynamic"`; the normal group must still execute that root.
+
+`scanner-tests` remains the required aggregate. Its `--aggregate` invocation
+reads actual predecessor job results, all four same-run result directories,
+raw TAP/stderr, complete native/recovery file inventories and hashes, accepted
+case/skip identities and controlled native registrations. The two installed
+native reports must pass for the actual checkout and close their owned context,
+browser and server. Missing, empty, skipped, canceled, duplicate, mismatched or
+unreadable evidence fails. Only successful reconciliation and report upload
+permit the final full-producer completion marker.
+
+For a verified canonical producer, all four jobs instead use `--covered` with
+the routing proof. Their records explicitly contain no current cases, native
+artifacts or child execution. They retain the original producer run, attempt,
+merge checkout/tree, base and aggregate report digest. The aggregate re-observes
+that producer immediately before accepting all four references; a changed or
+missing proof fails. A covered run cannot become a new full producer.
+
+Test-first, Firestore rules and compatibility gates always run for the actual
+event checkout and comparison base, including covered branch pushes. Main
+always executes its own full cohort. Pages still requires both `scanner-tests`
+and `release-evidence`; same-run artifact reads add no token permissions.

@@ -5,9 +5,19 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, edited]
 
+env:
+  CHAIN_CI_TOPOLOGY: four-groups-v1
+  CHAIN_TEST_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
 jobs:
-  scanner-tests:
+  validation-context:
     runs-on: ubuntu-latest
+    outputs:
+      base: ${{ steps.diff-base.outputs.sha }}
+      context: ${{ steps.plan.outputs.context }}
+      policy: ${{ steps.plan.outputs.policy }}
+      tree: ${{ steps.plan.outputs.tree }}
+      workflow-blob: ${{ steps.plan.outputs.workflow-blob }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -15,14 +25,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
-      - run: npm ci
-      - name: Install matching native Chromium
-        run: npx --no-install playwright install --with-deps chromium
       - name: Resolve comparison base
         id: diff-base
         shell: bash
@@ -44,41 +46,71 @@ jobs:
             exit 1
           fi
           echo "sha=$base" >> "$GITHUB_OUTPUT"
-      - run: node scripts/test-first-gate.mjs "${{ steps.diff-base.outputs.sha }}"
-      - name: Bind exact native candidate tree
-        shell: bash
-        run: echo "CHAIN_NATIVE_CANDIDATE_TREE=$(git rev-parse "${GITHUB_SHA}^{tree}")" >> "$GITHUB_ENV"
-      - name: Run complete regression cohort
-        id: cohort
-        run: |
-          node scripts/agent-tools/ci-routing.mjs --comparison-base "${{ steps.diff-base.outputs.sha }}" --evidence-dir "${{ runner.temp }}/ci-routing"
-          decision="$(node -p "require('${{ runner.temp }}/ci-routing/routing.json').decision")"
-          if [[ "$decision" == "full" ]]; then
-            npm test
-          elif [[ "$decision" != "reuse" ]]; then
-            echo "Unknown routing decision" >&2
-            exit 1
-          fi
-        env:
-          CHAIN_NATIVE_CANDIDATE_SHA: ${{ github.sha }}
-          CHAIN_NATIVE_OUTPUT: ${{ runner.temp }}/installed-client-regression
-      - name: Preserve native regression evidence
-        if: always() && steps.cohort.outputs.decision == 'full'
+      - name: Describe required cohort
+        run: npm run test:group -- --describe --group core --output-dir "$RUNNER_TEMP/descriptor" --repository "$GITHUB_REPOSITORY" --event-policy "$GITHUB_EVENT_NAME" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$CHAIN_TEST_SOURCE_SHA" --comparison-base "${{ steps.diff-base.outputs.sha }}"
+      - name: Bind exact validation context
+        id: plan
+        run: node scripts/agent-tools/ci-routing.mjs --plan-only 1 --descriptor "$RUNNER_TEMP/descriptor/descriptor.json" --comparison-base "${{ steps.diff-base.outputs.sha }}" --evidence-dir "$RUNNER_TEMP/context"
+      - name: Actual checkout ${{ github.sha }} tree ${{ steps.plan.outputs.tree }}
+        run: git rev-parse HEAD
+      - name: Validation source ${{ env.CHAIN_TEST_SOURCE_SHA }} base ${{ steps.diff-base.outputs.sha }}
+        run: git cat-file -e "$CHAIN_TEST_SOURCE_SHA^{commit}"
+      - name: Workflow blob ${{ steps.plan.outputs.workflow-blob }} policy four-groups-v1
+        run: git rev-parse HEAD:.github/workflows/data-safety.yml
+      - name: Announce regression context ${{ steps.plan.outputs.context }}
+        run: echo "Bound source, checkout, comparison and complete cohort before execution"
+      - name: Preserve validation context
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: installed-client-regression-${{ github.sha }}
-          path: ${{ runner.temp }}/installed-client-regression
+          name: validation-context-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/descriptor
+            ${{ runner.temp }}/context
           if-no-files-found: error
+
+  event-gates:
+    needs: validation-context
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci
+      - run: node scripts/test-first-gate.mjs "${{ needs.validation-context.outputs.base }}"
       - run: npm run test:rules
-      - name: Announce regression context ${{ steps.cohort.outputs.context }}
-        run: echo "Exact context bound by ci-routing"
       - name: Backward compatibility
         env:
-          COMPATIBILITY_BASE_SHA: ${{ steps.diff-base.outputs.sha }}
+          COMPATIBILITY_BASE_SHA: ${{ needs.validation-context.outputs.base }}
         run: npm run test:compatibility
-      - name: Complete regression context ${{ steps.cohort.outputs.context }}
-        if: steps.cohort.outputs.decision == 'full'
-        run: echo "Complete required regression cohort and native artifacts succeeded"
+
+  cohort-routing:
+    needs: validation-context
+    runs-on: ubuntu-latest
+    outputs:
+      decision: ${{ steps.route.outputs.decision }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: validation-context-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/validation
+      - name: Resolve complete cohort coverage
+        id: route
+        run: node scripts/agent-tools/ci-routing.mjs --descriptor "$RUNNER_TEMP/validation/descriptor/descriptor.json" --comparison-base "${{ needs.validation-context.outputs.base }}" --evidence-dir "$RUNNER_TEMP/ci-routing"
       - name: Preserve routing observations
         if: always()
         uses: actions/upload-artifact@v4
@@ -86,6 +118,122 @@ jobs:
           name: ci-routing-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/ci-routing
           if-no-files-found: error
+
+  regression:
+    name: regression-${{ matrix.group }}
+    needs: [validation-context, cohort-routing]
+    if: always() && needs.validation-context.result == 'success' && needs.cohort-routing.result == 'success'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [core, scenery, persistence-recovery, native-process]
+    env:
+      CHAIN_TEST_EVENT_POLICY: ${{ needs.validation-context.outputs.policy }}
+      CHAIN_TEST_COMPARISON_BASE: ${{ needs.validation-context.outputs.base }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-java@v4
+        if: needs.cohort-routing.outputs.decision == 'full'
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci
+        if: needs.cohort-routing.outputs.decision == 'full'
+      - name: Install matching native Chromium
+        if: needs.cohort-routing.outputs.decision == 'full'
+        run: npx --no-install playwright install --with-deps chromium
+      - uses: actions/download-artifact@v4
+        if: needs.cohort-routing.outputs.decision == 'reuse'
+        with:
+          name: ci-routing-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ci-routing
+      - name: Execute complete assigned group
+        if: needs.cohort-routing.outputs.decision == 'full'
+        run: npm run test:group -- --group "${{ matrix.group }}" --output-dir "$RUNNER_TEMP/group" --repository "$GITHUB_REPOSITORY" --event-policy "$CHAIN_TEST_EVENT_POLICY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$CHAIN_TEST_SOURCE_SHA" --comparison-base "$CHAIN_TEST_COMPARISON_BASE"
+      - name: Record verified full-producer coverage reference
+        if: needs.cohort-routing.outputs.decision == 'reuse'
+        run: npm run test:group -- --covered --proof "$RUNNER_TEMP/ci-routing/routing.json" --group "${{ matrix.group }}" --output-dir "$RUNNER_TEMP/group" --repository "$GITHUB_REPOSITORY" --event-policy "$CHAIN_TEST_EVENT_POLICY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$CHAIN_TEST_SOURCE_SHA" --comparison-base "$CHAIN_TEST_COMPARISON_BASE"
+      - name: Preserve actual group results and native evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}
+          path: ${{ runner.temp }}/group
+          if-no-files-found: error
+
+  scanner-tests:
+    needs: [validation-context, event-gates, cohort-routing, regression]
+    if: always()
+    runs-on: ubuntu-latest
+    env:
+      CHAIN_TEST_EVENT_POLICY: ${{ needs.validation-context.outputs.policy }}
+      CHAIN_TEST_COMPARISON_BASE: ${{ needs.validation-context.outputs.base }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Retain actual predecessor outcomes
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: node -e 'require("node:fs").writeFileSync(process.env.RUNNER_TEMP+"/needs.json",process.env.NEEDS_JSON)'
+      - uses: actions/download-artifact@v4
+        if: always()
+        with:
+          name: validation-context-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/validation
+      - uses: actions/download-artifact@v4
+        if: always()
+        with:
+          name: regression-${{ github.run_id }}-${{ github.run_attempt }}-core
+          path: ${{ runner.temp }}/groups/core
+      - uses: actions/download-artifact@v4
+        if: always()
+        with:
+          name: regression-${{ github.run_id }}-${{ github.run_attempt }}-scenery
+          path: ${{ runner.temp }}/groups/scenery
+      - uses: actions/download-artifact@v4
+        if: always()
+        with:
+          name: regression-${{ github.run_id }}-${{ github.run_attempt }}-persistence-recovery
+          path: ${{ runner.temp }}/groups/persistence-recovery
+      - uses: actions/download-artifact@v4
+        if: always()
+        with:
+          name: regression-${{ github.run_id }}-${{ github.run_attempt }}-native-process
+          path: ${{ runner.temp }}/groups/native-process
+      - name: Recheck covered producer immediately before aggregation
+        if: needs.cohort-routing.outputs.decision == 'reuse'
+        run: node scripts/agent-tools/ci-routing.mjs --max-wait-ms 0 --descriptor "$RUNNER_TEMP/validation/descriptor/descriptor.json" --comparison-base "$CHAIN_TEST_COMPARISON_BASE" --evidence-dir "$RUNNER_TEMP/final-routing"
+      - name: Verify complete required cohort
+        id: aggregate
+        if: always()
+        run: |
+          npm run test:group -- --aggregate --group core --output-dir "$RUNNER_TEMP/aggregate" --results-dir "$RUNNER_TEMP/groups" --needs-json "$RUNNER_TEMP/needs.json" --proof "$RUNNER_TEMP/final-routing/routing.json" --repository "$GITHUB_REPOSITORY" --event-policy "$CHAIN_TEST_EVENT_POLICY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$CHAIN_TEST_SOURCE_SHA" --comparison-base "$CHAIN_TEST_COMPARISON_BASE"
+      - name: Preserve verified aggregate and final observations
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scanner-aggregate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/aggregate
+            ${{ runner.temp }}/final-routing
+          if-no-files-found: error
+      - name: Verified complete cohort ${{ needs.validation-context.outputs.context }} report ${{ steps.aggregate.outputs.report }} mode ${{ needs.cohort-routing.outputs.decision }}
+        if: success()
+        run: echo "Required current execution or original producer coverage verified"
+      - name: Complete regression context ${{ needs.validation-context.outputs.context }} report ${{ steps.aggregate.outputs.report }}
+        if: success() && needs.cohort-routing.outputs.decision == 'full'
+        run: echo "Every required group, outcome, raw hash, native report and gate reconciled"
 
   release-evidence:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'

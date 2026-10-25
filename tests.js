@@ -27612,7 +27612,11 @@ test('Repository CI gate requires changed tests and risk cases with app source d
  assert.match(validateTestFirst(['index.html','tests.js'],['+test("ordinary",()=>{})'])[0],/RISK/);
  assert.deepEqual(validateTestFirst(['index.html','tests.js'],['+test("RISK eligibility: boundary",()=>{})']),[]);
  const workflow=fs.readFileSync(path.join(__dirname,'.github/workflows/data-safety.yml'),'utf8');
- assert.match(workflow,/test-first-gate\.mjs/);assert.match(workflow,/npm test/);
+ assert.match(workflow,/test-first-gate\.mjs/);
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const equivalent=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group runner reconciles complete full and grouped fixture cohorts$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
+ assert.equal(equivalent.status,0,'The unchanged public full-suite command and all four isolated groups must execute the same fixture case IDs: '+equivalent.stdout+'\n'+equivalent.stderr);
+ assert.match(equivalent.stdout,/^# tests 1$/m);assert.match(equivalent.stdout,/^# skipped 0$/m);
 });
 
 test('Firestore rules: old clients cannot replace a revisioned board', {skip:!process.env.FIRESTORE_EMULATOR_HOST}, async () => {
@@ -43461,4 +43465,10 @@ test('RISK repository process: grouped runner stays covered at the default npm t
  assert.equal(result.status,0,'The default full-suite boundary must keep focused group runner coverage live: '+output);
  assert.match(result.stdout||'',/^# tests 4$/m,'Isolated group, portable pattern sizing, actual-checkout identity, and captured-baseline reconciliation contracts must run');
  assert.match(result.stdout||'',/^# skipped 0$/m,'The runner contract cannot pass through a skip');
+});
+
+test('RISK repository process: required parallel scanner aggregation rejects absent group evidence',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-name-pattern=^test group workflow scanner command rejects missing parallel group evidence$',path.join(__dirname,'scripts/agent-tools/test-groups.test.mjs')],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
+ assert.equal(result.status,0,'The executed scanner aggregate must fail closed on absent required group evidence: '+result.stdout+'\n'+result.stderr);
 });
