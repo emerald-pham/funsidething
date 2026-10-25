@@ -404,6 +404,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 ## Release memory/cloud/sync and independent code review
 
+- RISK repository process: release recording classifies the tail of a complete large diff
 - RISK repository process: review policy derives code and specialist roles from the exact diff
 - RISK repository process: a generic role guard requires a security specialist
 - RISK repository process: generic state persistence requires a memory specialist
@@ -1571,12 +1572,13 @@ The actual intervention Yes records deliberate current-pass Scan intent even whe
 
 - `RISK repository process: npm test fails when an agent-tool cohort assertion fails`
 - `RISK repository process: grouped runner stays covered at the default npm test boundary`
+- `RISK test group runner preserves hash identities and counts only executable controlled registrations`
 
 Preflight comparison coverage:
 - `RISK repository process: preflight catches outgoing upstream rationale gaps after the selected base passes`
   exercises the public command with a real published local Git branch, a passing selected comparison and a missing outgoing rationale. It preserves the existing gate, focused copy checks, refs, HEAD, tracked files and configuration.
 
-The required npm test entry point surfaces a failing isolated agent-tool cohort with a nonzero result and its assertion output.
+The required npm test entry point surfaces a failing isolated agent-tool cohort with a nonzero result and its assertion output. Group-runner identity evidence preserves the independently captured TAP-escaped inventory while reporting canonical runtime titles, and native-child registration checks distinguish executable declarations from quoted fixture text while rejecting missing and duplicate controls.
 
 ## Deletion membership authority after log pruning (#171)
 

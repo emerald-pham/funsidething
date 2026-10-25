@@ -18750,4 +18750,25 @@
       "failure": "#267 ran all four original cases and passed four-distinct-context/page guards, then its process-count assertion observed 5 instead of 1 (19.78s outer wall). #266 actual second consumer observed seven repeated immutable-source compilations where zero were expected. Each is the intended fixture-cost RED with preserved functional assertions. Before functional routing implementation, the existing workflow command ran the full cohort twice; the assertion failed with2 !==1 for real outgoing source and distinct synthetic PR merge checkout fixtures. Both real planner consumers failed their new one-preparation assertions with actual2, expected1 after their original full current/historical offset comparisons. No import, syntax, infrastructure or product behavior failure supplied this RED."
     }
   }
+,
+  {
+    "baseCommit": "d224107e5e56e5455a16e670dad6bdbc951940b5",
+    "testChangesSha256": "348eee3f9618f5e08aa0d6e4c2d80f27e780eba5e1a907eed20515a3b42f05ad",
+    "reason": "Repair three observed #264 release-gate defects while retaining the historical inventory and the public grouped runner contract.",
+    "previousBehavior": "A complete inventory diff larger than Node’s default child-process buffer raised ENOBUFS before release:record could classify its tail. TAP-escaped hash titles selected no matching cases, and source-text registration counting treated quoted fixture text as a second controlled native declaration or as proof of a missing one.",
+    "intendedBehavior": "Release recording reads complete diffs within a bounded 64 MiB buffer and still derives specialist domains from the final diff lines. Group execution selects literal runtime test titles, reports canonical TAP identities while retaining raw inventory provenance, and counts only supported direct literal test registrations so omission and duplicate checks remain fail-closed.",
+    "replacementTests": [
+      "RISK repository process: release recording classifies the tail of a complete large diff"
+    ],
+    "preservedCoverage": [
+      "The default npm test command and workflow topology stay unchanged. The public release:record fixture first passes a valid small-diff control, then reads the full 2,097,442-byte patch whose security-review marker is at the end, records the specialist plan, and verifies its receipt.",
+      "The independent historical inventory bytes, source identity, digest, required cases, all four groups, selected cases, and native checkout binding remain intact. Results expose the raw-baseline to canonical-runtime root map for escaped TAP identities.",
+      "Public group-process controls prove a literal hash title runs and reconciles all cases, quoted registration source text is ignored, a missing declaration counts zero, and an actual duplicate still counts two. The existing full/group fixture reconciliation, missing/unclassified/overlap/empty/skip and portable-pattern tests remain passing.",
+      "No workflow routing, product behavior, test body, native outcome assertion, or release classification rule is weakened; the only release reader change raises the complete-output capacity to the established bounded 64 MiB limit."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=tap --test-name-pattern='RISK repository process: release recording classifies the tail of a complete large diff' tests.js; node --test --test-reporter=tap --test-name-pattern='RISK test group runner preserves hash identities and counts only executable controlled registrations' scripts/agent-tools/test-groups.test.mjs. RED logs: /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/264/release-buffer/release-record-red.log and /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/264/release-buffer/group-contract-red.log.",
+      "failure": "The complete public release:record process failed with spawnSync git ENOBUFS on a 2,097,442-byte fixture diff while a small valid control passed. The group process skipped the literal-hash root and reported required cases missing; registration controls observed a quoted sentinel as a second declaration, let the same sentinel conceal an omission, and counted a real duplicate plus sentinel as three. These failures occurred at the public process boundary, not during import or fixture setup."
+    }
+  }
 ]

@@ -31,7 +31,8 @@ function git(root, ...args) {
 }
 
 function suiteSource({ coreTitle = fixtureRoots.core, additionalCoreRoots = [], unexpectedSkip = false, failOnRequest = false,
-  processControl = false, omitNativeControl = false, duplicateNativeControl = false } = {}) {
+  runtimeCoreTitle = coreTitle, processControl = false, omitNativeControl = false, duplicateNativeControl = false,
+  processControlSourceFixture = false } = {}) {
   const skip = unexpectedSkip
     ? "\n  await t.test('new unaccepted skipped case', { skip: 'must fail closed' }, () => {});"
     : '';
@@ -42,13 +43,16 @@ function suiteSource({ coreTitle = fixtureRoots.core, additionalCoreRoots = [], 
     assert.fail('intentional fixture process failure');
   }` : '';
   const nativeControl = processControl && !omitNativeControl
-    ? `\nif (process.env.CHAIN_GROUP_FIXTURE_CHILD === '1') {\n  test('fixture native controlled child outcome', () => {});\n${duplicateNativeControl ? "  test('fixture native controlled child outcome', () => {});\n" : ''}}\n`
+    ? `\nif (process.env.CHAIN_GROUP_FIXTURE_CHILD === '1') {\n  test('fixture native controlled child outcome', () => {});${duplicateNativeControl ? " test('fixture native controlled child outcome', () => {});" : ''}\n}\n`
+    : '';
+  const nativeControlSourceFixture = processControlSourceFixture
+    ? `\nconst nativeControlSourceFixture = ${JSON.stringify("test('fixture native controlled child outcome', () => {});")};\n`
     : '';
   return `import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
-test(${JSON.stringify(coreTitle)}, async t => {
+test(${JSON.stringify(runtimeCoreTitle)}, async t => {
   await t.test('fixture accepted environment skip', { skip: 'baseline skip' }, () => {});${skip}${failingControl}
 });
 ${additionalCoreRoots.map(title => `test(${JSON.stringify(title)}, () => {});`).join('\n')}
@@ -60,7 +64,7 @@ test(${JSON.stringify(fixtureRoots['native-process'])}, () => {
     tree: process.env.CHAIN_NATIVE_CANDIDATE_TREE,
   }));
 });
-${nativeControl}`;
+${nativeControl}${nativeControlSourceFixture}`;
 }
 
 function inventory(coreTitle = fixtureRoots.core, additionalCoreRoots = []) {
@@ -129,7 +133,7 @@ function createFixture(t, options = {}) {
     type: 'module',
     scripts: { 'test:group': 'node scripts/test-groups.mjs', test: 'node --test tests.js scripts/agent-tools/*.test.mjs' },
   });
-  fs.writeFileSync(path.join(root, 'tests.js'), suiteSource({ ...options, coreTitle }));
+  fs.writeFileSync(path.join(root, 'tests.js'), suiteSource({ ...options, coreTitle, runtimeCoreTitle: options.runtimeCoreTitle || coreTitle }));
   fs.writeFileSync(path.join(root, 'scripts/agent-tools/fixture.test.mjs'),
     `import { test } from 'node:test';\ntest(${JSON.stringify(fixtureScriptRoot)}, () => {});\n`);
   writeJson(path.join(root, 'scripts/test-group-inventory.json'), inventory(coreTitle, options.additionalCoreRoots || []));
@@ -408,4 +412,49 @@ test('test group runner fails closed when a required native child registration i
   const duplicate = invoke(duplicateFixture, { group: 'native-process' });
   assert.notEqual(duplicate.status, 0);
   assert.match(duplicate.evidence.issues.join('\n'), /registered 2 times/);
+});
+
+test('RISK test group runner preserves hash identities and counts only executable controlled registrations', async t => {
+  await t.test('literal hash titles reconcile against escaped TAP baseline identities', t => {
+    const baselineRoot = 'fixture core escaped \\# baseline identity';
+    const runtimeRoot = baselineRoot.replace('\\#', '#');
+    const fixture = createFixture(t, { coreTitle: baselineRoot, runtimeCoreTitle: runtimeRoot });
+    const fullEnv = { ...process.env };
+    delete fullEnv.NODE_TEST_CONTEXT;
+    const full = run(process.execPath, ['--test', '--test-reporter=tap', 'tests.js'], fixture.root, fullEnv);
+    assert.equal(full.status, 0, `${full.stdout}\n${full.stderr}`);
+    assert.ok(full.stdout.includes(`Subtest: ${baselineRoot}`), 'the actual Node TAP process escapes the literal hash in its reported title');
+    const result = invoke(fixture);
+    const tap = fs.readFileSync(path.join(result.outputDir, 'test.tap'), 'utf8');
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}\n${tap}`);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(fixture.root, 'scripts/test-group-inventory.json'), 'utf8')).rootTests[0].id,
+      baselineRoot, 'independent baseline title remains captured in its original TAP-escaped form');
+    assert.deepEqual(result.evidence.resultIdentity.baselineRootRuntimeMap, [{ baselineRoot, runtimeRoot }],
+      'group evidence links the preserved baseline spelling to its canonical runtime identity');
+    assert.deepEqual(result.evidence.cases.map(item => item.id).sort(), [
+      runtimeRoot,
+      `${runtimeRoot} > fixture accepted environment skip`,
+    ].sort(), 'result identity uses the literal runtime title and retains every baseline case');
+  });
+
+  await t.test('quoted source fixture text is not a second native registration', t => {
+    const fixture = createFixture(t, { processControl: true, processControlSourceFixture: true });
+    const result = invoke(fixture, { group: 'native-process' });
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}\n${result.evidence?.issues?.join('\n')}`);
+    assert.deepEqual(result.evidence.processControls.map(control => control.registrationCount), [1]);
+  });
+
+  await t.test('a quoted sentinel cannot hide an omitted native registration', t => {
+    const fixture = createFixture(t, { processControl: true, omitNativeControl: true, processControlSourceFixture: true });
+    const result = invoke(fixture, { group: 'native-process' });
+    assert.notEqual(result.status, 0, 'quoted source fixture text must not satisfy registration presence');
+    assert.match(result.evidence.issues.join('\n'), /registered 0 times/);
+  });
+
+  await t.test('an actual duplicate native registration still fails closed', t => {
+    const fixture = createFixture(t, { processControl: true, duplicateNativeControl: true, processControlSourceFixture: true });
+    const result = invoke(fixture, { group: 'native-process' });
+    assert.notEqual(result.status, 0, 'duplicate executable declarations must remain rejected');
+    assert.match(result.evidence.issues.join('\n'), /registered 2 times/);
+  });
 });

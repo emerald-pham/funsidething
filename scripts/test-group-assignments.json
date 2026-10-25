@@ -9323,6 +9323,11 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK repository process: release recording classifies the tail of a complete large diff",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK repository process: required installed-client native outcomes and artifacts execute exactly once",
       "group": "native-process",
       "file": "tests.js"
@@ -10691,6 +10696,11 @@
       "root": "RISK terrain walking planner budget: flat canonical routes retain bounded analytic clock work",
       "group": "core",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK test group runner preserves hash identities and counts only executable controlled registrations",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
     },
     {
       "root": "RISK test inventory: every named risk contract maps to a feature boundary",

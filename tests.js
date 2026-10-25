@@ -28064,6 +28064,66 @@ test('RISK repository process: CSS comment removal cannot join selector tokens u
  }finally{cleanupReleaseGateFixture(cssTokenJoin);}
 });
 
+test('RISK repository process: release recording classifies the tail of a complete large diff',async t=>{
+ const makeFixture=options=>{
+  const fixture=makeReleaseGateFixture(options);
+  fs.writeFileSync(path.join(fixture.repo,'package.json'),JSON.stringify({private:true,type:'module',scripts:{
+   'release:record':'node scripts/release-evidence.mjs record',
+   'release:verify':'node scripts/release-evidence.mjs verify'
+  }}));
+  fs.copyFileSync(path.join(__dirname,'scripts/release-evidence.mjs'),path.join(fixture.repo,'scripts/release-evidence.mjs'));
+  const inputPath=path.join(fixture.root,'release-input.json');
+  fs.writeFileSync(inputPath,JSON.stringify(riskBasedReleaseInput(fixture,{domains:['security-deployment']}),null,2)+'\n');
+  return { ...fixture,inputPath,receiptPath:path.join(fixture.repo,'.git','funsidething-release-evidence',fixture.candidateSha,'receipt.json') };
+ };
+ const env={...process.env,npm_config_audit:'false',npm_config_fund:'false',npm_config_update_notifier:'false'};delete env.NODE_TEST_CONTEXT;
+ const run=(fixture,command,args)=>spawnSync('npm',['run',command,'--',...args],{
+  cwd:fixture.repo,encoding:'utf8',timeout:30000,maxBuffer:4*1024*1024,
+  env
+ });
+ const control=makeFixture({changedPath:'scripts/test-group-inventory.json',baseText:'{"ordinary":"old"}\n',
+  candidateText:'{"permissionBoundary":"requires security review"}\n'});
+ const neutralPayload='x'.repeat(2*1024*1024);
+ const candidateText=JSON.stringify({ordinary:neutralPayload,permissionBoundary:'requires security review'})+'\n';
+ const oversized=makeFixture({changedPath:'scripts/test-group-inventory.json',baseText:'{"ordinary":"old"}\n',candidateText});
+ try{
+  const controlResult=spawnSync('npm',['run','release:record','--',control.inputPath],{
+   cwd:control.repo,encoding:'utf8',timeout:30000,maxBuffer:4*1024*1024,env
+  });
+  const controlOutput=[controlResult.stdout,controlResult.stderr].filter(Boolean).join('\n');
+  assert.equal(controlResult.error,undefined,controlResult.error?.message||controlOutput);
+  assert.equal(controlResult.signal,null,controlOutput);
+  assert.equal(controlResult.status,0,'a valid small-diff public release:record control must pass before the large-diff probe:\n'+controlOutput);
+  const controlReceipt=JSON.parse(fs.readFileSync(control.receiptPath,'utf8'));
+  assert.deepEqual(controlReceipt.reviewPlan.specialistDomains,['security-deployment'],
+   'the small public process control proves the receipt input and classification assertion are valid');
+
+  const completeDiff=spawnSync('git',['-C',oversized.repo,'diff','--unified=2',oversized.baseSha,oversized.candidateSha,'--',oversized.changedPath],{
+   encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024
+  });
+  assert.equal(completeDiff.error,undefined,completeDiff.error?.message);
+  assert.equal(completeDiff.status,0,completeDiff.stderr);
+  assert.ok(Buffer.byteLength(completeDiff.stdout)>1024*1024,'the exact fixture patch exceeds Node execFileSync default output capacity');
+  assert.match(completeDiff.stdout.slice(-1024),/permissionBoundary.*security review/,
+   'the only security classification marker remains at the complete patch tail');
+  t.diagnostic(JSON.stringify({fixtureDiffBytes:Buffer.byteLength(completeDiff.stdout),tail:completeDiff.stdout.slice(-160)}));
+
+  const recorded=run(oversized,'release:record',[oversized.inputPath]);
+  const output=[recorded.stdout,recorded.stderr].filter(Boolean).join('\n');
+  assert.equal(recorded.error,undefined,recorded.error?.message||output);
+  assert.equal(recorded.signal,null,output);
+  assert.equal(recorded.status,0,'public release:record must process the complete oversized diff:\n'+output);
+  const receipt=JSON.parse(fs.readFileSync(oversized.receiptPath,'utf8'));
+  assert.deepEqual(receipt.reviewPlan.specialistDomains,['security-deployment'],
+   'the complete diff tail must still require its security specialist');
+  assert.equal(receipt.reviewPlan.mode,'dual-review');
+  const verified=run(oversized,'release:verify',[oversized.candidateSha]);
+  assert.equal(verified.error,undefined,verified.error?.message);
+  assert.equal(verified.signal,null,[verified.stdout,verified.stderr].filter(Boolean).join('\n'));
+  assert.equal(verified.status,0,[verified.stdout,verified.stderr].filter(Boolean).join('\n'));
+ }finally{cleanupReleaseGateFixture(control);cleanupReleaseGateFixture(oversized);}
+});
+
 test('RISK repository process: risk-based receipts require the derived exact-final reviewer roles',async()=>{
  const {recordReleaseEvidence,verifyReleaseEvidence}=await import('./scripts/release-evidence.mjs');
  const docs=makeReleaseGateFixture({changedPath:'README.md',baseText:'Old copy.\n',candidateText:'Updated copy.\n'});

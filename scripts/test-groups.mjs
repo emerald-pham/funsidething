@@ -358,6 +358,173 @@ function sourceIdentity(options) {
 
 function escapeRegExp(value) { return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
+function normalizeTapIdentity(value) {
+  let normalized = '';
+  for (let index = 0; index < value.length; index++) {
+    if (value[index] === '\\' && index + 1 < value.length && (value[index + 1] === '\\' || value[index + 1] === '#')) {
+      normalized += value[++index];
+    } else normalized += value[index];
+  }
+  return normalized;
+}
+
+function countTestRegistrations(source, testName) {
+  let count = 0;
+  let index = 0;
+  let pendingTestCall = false;
+  let awaitingTitle = false;
+  let previousToken = null;
+  const expressionPrefixes = new Set(['(', '[', '{', ',', ':', ';', '=', '!', '?', '&&', '||', '??', '=>',
+    'return', 'throw', 'case', 'delete', 'void', 'typeof', 'yield', 'await', 'in', 'of', 'instanceof']);
+  const regexCanStartAfter = token => token === null || expressionPrefixes.has(token);
+  const readQuoted = (start, quote) => {
+    let value = '';
+    let escaped = false;
+    let cursor = start + 1;
+    while (cursor < source.length) {
+      const character = source[cursor++];
+      if (character === quote) return { value, escaped, next: cursor };
+      if (character === '\\') {
+        escaped = true;
+        if (cursor < source.length) value += source[cursor++];
+      } else value += character;
+    }
+    return { value: null, escaped: true, next: cursor };
+  };
+  const skipRegex = start => {
+    let cursor = start + 1;
+    let inCharacterClass = false;
+    while (cursor < source.length) {
+      const character = source[cursor++];
+      if (character === '\\') { cursor++; continue; }
+      if (character === '[') inCharacterClass = true;
+      else if (character === ']') inCharacterClass = false;
+      else if (character === '/' && !inCharacterClass) {
+        while (/[a-z]/i.test(source[cursor] || '')) cursor++;
+        return cursor;
+      } else if (character === '\n' || character === '\r') return cursor;
+    }
+    return cursor;
+  };
+  const skipTemplate = start => {
+    const modes = [{ kind: 'template' }];
+    let cursor = start + 1;
+    let prior = null;
+    while (cursor < source.length && modes.length) {
+      const mode = modes.at(-1);
+      const character = source[cursor];
+      if (mode.kind === 'template') {
+        if (character === '\\') { cursor += 2; continue; }
+        if (character === '`') { modes.pop(); cursor++; continue; }
+        if (character === '$' && source[cursor + 1] === '{') {
+          modes.push({ kind: 'expression', depth: 1 });
+          cursor += 2;
+          prior = null;
+          continue;
+        }
+        cursor++;
+        continue;
+      }
+      if (/\s/.test(character)) { cursor++; continue; }
+      if (source.startsWith('//', cursor)) {
+        const newline = source.indexOf('\n', cursor + 2);
+        cursor = newline < 0 ? source.length : newline + 1;
+        continue;
+      }
+      if (source.startsWith('/*', cursor)) {
+        const close = source.indexOf('*/', cursor + 2);
+        cursor = close < 0 ? source.length : close + 2;
+        continue;
+      }
+      if (character === "'" || character === '"') {
+        cursor = readQuoted(cursor, character).next;
+        prior = 'string';
+        continue;
+      }
+      if (character === '`') {
+        modes.push({ kind: 'template' });
+        cursor++;
+        continue;
+      }
+      if (character === '/' && regexCanStartAfter(prior)) {
+        cursor = skipRegex(cursor);
+        prior = 'regex';
+        continue;
+      }
+      if (character === '{') mode.depth++;
+      else if (character === '}' && --mode.depth === 0) { modes.pop(); cursor++; continue; }
+      if (/[A-Za-z_$]/.test(character)) {
+        const wordStart = cursor++;
+        while (/[\w$]/.test(source[cursor] || '')) cursor++;
+        prior = source.slice(wordStart, cursor);
+        continue;
+      }
+      prior = character;
+      cursor++;
+    }
+    return cursor;
+  };
+  // Count direct test(<plain string>, ...) tokens in code; strings, comments,
+  // templates, and regular expressions are opaque, and dynamic titles fail closed.
+  while (index < source.length) {
+    const character = source[index];
+    if (/\s/.test(character)) { index++; continue; }
+    if (source.startsWith('//', index)) {
+      const newline = source.indexOf('\n', index + 2);
+      index = newline < 0 ? source.length : newline + 1;
+      continue;
+    }
+    if (source.startsWith('/*', index)) {
+      const close = source.indexOf('*/', index + 2);
+      index = close < 0 ? source.length : close + 2;
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      const literal = readQuoted(index, character);
+      if (awaitingTitle && !literal.escaped && literal.value === testName) count++;
+      awaitingTitle = false;
+      pendingTestCall = false;
+      previousToken = 'string';
+      index = literal.next;
+      continue;
+    }
+    if (character === '`') {
+      index = skipTemplate(index);
+      awaitingTitle = false;
+      pendingTestCall = false;
+      previousToken = 'template';
+      continue;
+    }
+    if (character === '/' && regexCanStartAfter(previousToken)) {
+      index = skipRegex(index);
+      awaitingTitle = false;
+      pendingTestCall = false;
+      previousToken = 'regex';
+      continue;
+    }
+    if (/[A-Za-z_$]/.test(character)) {
+      const wordStart = index++;
+      while (/[\w$]/.test(source[index] || '')) index++;
+      const token = source.slice(wordStart, index);
+      if (awaitingTitle) awaitingTitle = false;
+      pendingTestCall = token === 'test' && previousToken !== '.' && previousToken !== '?.';
+      previousToken = token;
+      continue;
+    }
+    const token = character === '?' && source[index + 1] === '.' ? '?.' : character;
+    if (pendingTestCall && token === '(') {
+      awaitingTitle = true;
+      pendingTestCall = false;
+    } else {
+      if (awaitingTitle) awaitingTitle = false;
+      pendingTestCall = false;
+    }
+    previousToken = token;
+    index += token.length;
+  }
+  return count;
+}
+
 function testNamePatternArguments(roots) {
   const argumentsForPatterns = [];
   let currentRoots = [];
@@ -398,7 +565,7 @@ function parseTap(text) {
     const indentation = result[1].length;
     const active = stack.filter(item => item.indentation <= indentation);
     if (!active.length) fail(`Could not associate TAP result with a test identity: ${line}`);
-    const names = active.map(item => item.name);
+    const names = active.map(item => normalizeTapIdentity(item.name));
     const directive = result[4]?.toLowerCase();
     cases.push({
       id: names.join(' > '),
@@ -418,7 +585,10 @@ function expectedCasesForGroup(inventory, assignments, group) {
     const replacement = assignments.replacementByBaseline.get(item.root);
     const currentRoot = replacement?.currentRoot || item.root;
     const assignment = roots.get(currentRoot);
-    if (assignment?.group === group) expected.set(replacement ? replacementCaseId(item.id, replacement) : item.id, item.id);
+    if (assignment?.group === group) {
+      const currentId = replacement ? replacementCaseId(item.id, replacement) : item.id;
+      expected.set(normalizeTapIdentity(currentId), item.id);
+    }
   }
   return expected;
 }
@@ -427,7 +597,7 @@ function verifyResults({ cases, group, inventory, assignments, files, source }) 
   const errors = [];
   const selectedRoots = [...assignments.assignmentsByRoot.values()]
     .filter(entry => entry.group === group)
-    .map(entry => entry.root)
+    .map(entry => normalizeTapIdentity(entry.root))
     .sort();
   const selectedRootSet = new Set(selectedRoots);
   const actualRoots = cases.filter(item => item.id === item.root).map(item => item.root);
@@ -450,7 +620,7 @@ function verifyResults({ cases, group, inventory, assignments, files, source }) 
   const acceptedSkips = new Set(inventory.acceptedSkipCaseIds.map(id => {
     const root = inventory.requiredCases.find(item => item.id === id)?.root;
     const replacement = assignments.replacementByBaseline.get(root);
-    return replacement ? replacementCaseId(id, replacement) : id;
+    return normalizeTapIdentity(replacement ? replacementCaseId(id, replacement) : id);
   }));
   for (const item of cases) {
     if (item.status === 'failed') errors.push(`Test case failed: ${item.id}`);
@@ -464,12 +634,9 @@ function verifyResults({ cases, group, inventory, assignments, files, source }) 
 
   for (const control of assignments.processControls.filter(item => item.group === group)) {
     const sourceText = fs.readFileSync(path.join(ROOT, control.file), 'utf8');
-    const encodedSingle = `test('${control.id.replaceAll("'", "\\'")}'`;
-    const encodedDouble = `test("${control.id.replaceAll('"', '\\"')}"`;
-    const registrations = (sourceText.match(new RegExp(escapeRegExp(encodedSingle), 'g')) || []).length +
-      (sourceText.match(new RegExp(escapeRegExp(encodedDouble), 'g')) || []).length;
+    const registrations = countTestRegistrations(sourceText, control.id);
     if (registrations !== control.expectedExecutions) errors.push(`Controlled child ${JSON.stringify(control.id)} is registered ${registrations} times; expected exactly ${control.expectedExecutions}.`);
-    if (!cases.some(item => item.id === control.ownerRoot && item.status === 'passed')) {
+    if (!cases.some(item => item.id === normalizeTapIdentity(control.ownerRoot) && item.status === 'passed')) {
       errors.push(`Controlled child owner root ${JSON.stringify(control.ownerRoot)} did not pass exactly once.`);
     }
   }
@@ -516,7 +683,7 @@ async function runChild(files, roots, outputDir, options, source) {
   const stderrPath = path.join(outputDir, 'test.stderr.log');
   const tap = fs.createWriteStream(tapPath, { flags: 'wx' });
   const stderr = fs.createWriteStream(stderrPath, { flags: 'wx' });
-  const patternArguments = testNamePatternArguments(roots);
+  const patternArguments = testNamePatternArguments(roots.map(normalizeTapIdentity));
   const env = {
     ...process.env,
     TMPDIR: runtimeTmp,
@@ -615,6 +782,7 @@ async function main() {
       assignmentsSha256: sha256(assignmentsBytes),
       addedRootTitles: [],
       mappedBaselineRoots: [],
+      baselineRootRuntimeMap: [],
       sourceDiffFiles: [...new Set([...changedFiles, ...untrackedFiles])].sort(),
     };
     const inventoryIndex = validateInventory(inventory);
@@ -622,6 +790,11 @@ async function main() {
     const registrationInfo = validateAddedRegistrations(assignments, inventoryIndex, assignmentIndex, files, inventory.baseline.sourceSha);
     result.resultIdentity.addedRootTitles = registrationInfo.addedRootTitles;
     result.resultIdentity.mappedBaselineRoots = registrationInfo.mappedBaselineRoots;
+    result.resultIdentity.baselineRootRuntimeMap = inventory.rootTests.map(({ id }) => {
+      const replacement = assignmentIndex.replacementByBaseline.get(id);
+      const runtimeRoot = normalizeTapIdentity(replacement?.currentRoot || id);
+      return runtimeRoot === id ? null : { baselineRoot: id, runtimeRoot };
+    }).filter(Boolean);
     result.resultIdentity.cohortDigestSha256 = cohortDigest(inventory, assignments, assignmentIndex);
     const selectedFiles = [...new Set([
       ...files.filter(file => assignmentIndex.rootsPerGroup.get(options.group).some(root => assignmentIndex.assignmentsByRoot.get(root)?.file === file)),
@@ -648,8 +821,7 @@ async function main() {
       file: control.file,
       ownerRoot: control.ownerRoot,
       expectedExecutions: control.expectedExecutions,
-      registrationCount: (fs.readFileSync(path.join(ROOT, control.file), 'utf8').match(new RegExp(escapeRegExp(`test('${control.id.replaceAll("'", "\\'")}'`), 'g')) || []).length +
-        (fs.readFileSync(path.join(ROOT, control.file), 'utf8').match(new RegExp(escapeRegExp(`test("${control.id.replaceAll('"', '\\"')}"`), 'g')) || []).length,
+      registrationCount: countTestRegistrations(fs.readFileSync(path.join(ROOT, control.file), 'utf8'), control.id),
     }));
 
     const childResult = await runChild(selectedFiles, selectedRoots, outputDir, options, source);
