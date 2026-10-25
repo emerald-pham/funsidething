@@ -12651,6 +12651,16 @@
       "root": "RISK cloud recovery device read guidance: mounted FAQ and changelog explain the bounded device recheck",
       "group": "core",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud recovery memory: retained saved copies leave automatic checks and manual review usable in a bounded heap",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud recovery memory guidance: mounted FAQ and changelog explain lower memory use and retained originals",
+      "group": "core",
+      "file": "tests.js"
     }
   ],
   "processControls": [

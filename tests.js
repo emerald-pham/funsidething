@@ -58,6 +58,53 @@ async function injectRecoveryDatabaseFailure187(t,app,{key='pending:owner',failA
  return observed;
 }
 
+test('RISK cloud recovery memory: retained saved copies leave automatic checks and manual review usable in a bounded heap',async t=>{
+ if(process.env.CHAIN_RECOVERY_MEMORY_CHILD!=='1'){
+  const env={...process.env,CHAIN_RECOVERY_MEMORY_CHILD:'1'};delete env.NODE_TEST_CONTEXT;
+  // A deterministic process budget catches amplification of 32 MiB of saved
+  // copies. It is a regression budget, not an asserted iPhone memory limit.
+  const child=spawnSync(process.execPath,['--max-old-space-size=512','--test','--test-reporter=tap',
+   '--test-name-pattern=^RISK cloud recovery memory: retained saved copies',fileURLToPath(import.meta.url)],
+   {cwd:__dirname,env,encoding:'utf8',timeout:60000,maxBuffer:4*1024*1024});
+  const output=(child.stdout||'')+(child.stderr||'');
+  assert.match(output,/recovery-memory-consumer-started/,'the populated setup reaches the actual consumer: '+output);
+  assert.equal(child.error,undefined,'the bounded consumer must finish: '+String(child.error));
+  assert.equal(child.signal,null,'the consumer must not be terminated: '+output);
+  assert.equal(child.status,0,'automatic recovery and the actual manual action must finish without exhausting memory: '+output);
+  assert.match(output,/recovery-memory-preserved-and-usable/);return;
+ }
+ // Finish the actual setup Add's debounce before populating the protected
+ // copies; a late setup save must not abort the recovery before its full check.
+ const app=await divergentCloudSourceApp187(t,{phase:'automatic-inputs',settleDeviceBeforeCloud:true,holdCloudPush:true}),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+ const current=await store.readHead(),originals=[];
+ for(let i=0;i<16;i++){
+  const board=JSON.parse(current.payload);board.futureProtected={id:i,text:'p'.repeat(2*1024*1024)};
+  const payload=JSON.stringify(board),id='protected-memory-'+i;
+  assert.equal((await store.putBackup({expectedHash:current.hash,backup:{id,kind:'manual',at:i+1,day:'2026-10-25',payload}})).ok,true);
+  originals.push({id,hash:createHash('sha256').update(payload).digest('hex')});
+ }
+ const cloud=JSON.stringify([...backend.docs]);
+ console.error('recovery-memory-consumer-started');
+ await ctx.cloudPull();
+ const checks=ctx.buildSupportDiagnosticsReport().sourceOperations.flatMap(operation=>operation.events);
+ for(const role of ['first','second'])assert.ok(checks.some(event=>event.stage==='aggregate'&&event.status==='completed'&&event.role===role),'automatic recovery completes both full source checks before manual review');
+ assert.equal((await store.readHead()).payload,current.payload,'automatic checks retain the accepted device board');
+ assert.equal(JSON.stringify([...backend.docs]),cloud,'held recovery must preserve the original cloud records');
+ ctx.onAction('sync',{});
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="review-cloud-source-recovery"/);
+ assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);
+ assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="choose-cloud-recovery-source"[^>]*aria-pressed="true"/);
+ assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),false,'opening review does not choose a source');
+ await ctx.onAction('close-modal',{});
+ assert.equal((await store.readHead()).payload,current.payload);
+ assert.equal(JSON.stringify([...backend.docs]),cloud);
+ const after=await store.listBackups();
+ for(const row of originals){const saved=after.find(copy=>copy.id===row.id);assert.ok(saved);assert.equal(createHash('sha256').update(saved.payload).digest('hex'),row.hash,'every protected copy retains its exact unknown fields');}
+ shim.document.getElementById('addInput').value='Usable after populated recovery review';await ctx.onAction('add',{});
+ assert.equal(await ctx.persist(),true);assert.ok(JSON.parse((await store.readHead()).payload).tasks.some(row=>row.title==='Usable after populated recovery review'));
+ console.error('recovery-memory-preserved-and-usable');
+});
+
 test('RISK cloud recovery device read: a temporary database server failure completes the same review without changing sources',async t=>{
  const cases=['pending:owner','recoveryCloudHold','head'].flatMap(key=>[false,true].map(beforeRequest=>({key,beforeRequest,failAt:[1]})));
  cases.push({key:'pending:owner',failAt:[2]},{key:'pending:owner',failAt:[5]},{key:'pending:owner',failAt:[1],errorName:'InvalidStateError'});
@@ -151,6 +198,18 @@ test('RISK cloud recovery device read: permanent storage errors never enter the 
   assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="choose-cloud-recovery-source"/);
   assert.equal(JSON.stringify(ctx.state),local);assert.deepEqual(await store.readRawExportSnapshot(),raw);assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal(backend.writes.length,writes);
  });
+});
+
+test('RISK cloud recovery memory guidance: mounted FAQ and changelog explain lower memory use and retained originals',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(markup,/Why did my app reload while checking cloud recovery/);
+ assert.match(markup,/use less memory while still checking every saved source/);
+ assert.match(markup,/Original copies are retained/);assert.match(markup,/copy the Debug log/);
+ assert.match(markup,/may explain a restart, but does not establish why a particular device restarted/);
+ assert.match(markup,/Debug log as evidence for investigation/);
+ assert.match(markup,/<li>Cloud recovery uses less memory when many saved copies are present/);
 });
 
 test('RISK cloud recovery device read guidance: mounted FAQ and changelog explain the bounded device recheck',async t=>{

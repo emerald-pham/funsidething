@@ -1,6 +1,25 @@
 [
   {
     "baseCommit": "daa757649f0d0c2e5bd8e7283987b216d26de638",
+    "testChangesSha256": "81d0927b5a73ee0c2b49ac0007e82a08cc508f65b846fd6c32d6b2c963273ddb",
+    "reason": "Close the populated retained-copy memory gap in automatic cloud recovery, reached before manual source review on the reported restart path.",
+    "previousBehavior": "Repeated device captures held separate raw snapshots, typed encodings and full serialized identities concurrently. Sixteen protected 2 MiB copies made the actual automatic cloudPull consumer exhaust a 512 MiB Node heap before manual review could open.",
+    "intendedBehavior": "Every capture still reads and encodes the current complete device source. Only after exact serialized equality does it reuse the latest same-store capture within that bounded attempt. The regression requires automatic checks, actual Review and Cancel, unchosen Apply refusal, exact protected copy preservation and a subsequent durable Add to complete under the unchanged heap budget. Setup delivers the final Add debounce before source population, and the consumer must report both full automatic aggregate checks completed so an early stale-source stop cannot masquerade as success.",
+    "preservedCoverage": [
+      "All pre-existing tests and assertions remain unchanged, including typed source authority, account changes, bounded retry/cancellation, exact archive readback and automatic recovery publication guards. The added child process runs the actual app, device store, codecs and existing isolated SDK fixture.",
+      "The 32 MiB fixture and 512 MiB heap are a repeatable amplification regression, not a device limit or physical iOS crash reproduction. Existing native WebKit complete-source interaction remains required. The metadata-only user report does not supply the original device database or OS termination reason."
+    ],
+    "replacementTests": [
+      "RISK cloud recovery memory: retained saved copies leave automatic checks and manual review usable in a bounded heap",
+      "RISK cloud recovery memory guidance: mounted FAQ and changelog explain lower memory use and retained originals"
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <task-worktree> --evidence-dir <task-artifacts>/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern='^RISK cloud recovery memory:' tests.js; same command selecting '^RISK cloud recovery memory guidance:' for FAQ",
+      "failure": "Contemporaneous run 5e5d33c5 (2026-10-25T15:06:46Z, baseline daa7576 plus regression only) reaches recovery-memory-consumer-started then fails child status 1 versus 0 with V8 heap exhaustion. Raw records retain the OOM and source identity. Earlier diagnostic 16-copy failures reproduced three times; 8- and 12-copy controls completed. FAQ RED 0ebca09a at 15:12:06Z fails missing mounted reload guidance before copy edits. A readHead-only attempt still exhausted memory; that exploratory change was removed. Minimal capture-sharing GREEN fd8faa6d and Node22 GREEN 916f8a93 pass. Native b6fd2609 passes both existing WebKit complete-source cases; de0e748c selected zero tests and is not evidence. Independent FAQ review found implied physical causation; RED495b2162 at15:23:08Z fails the new qualification assertion on f2e7d7e before the wording repair. This copy change does not claim a device crash diagnosis. Independent Node22 sensitivity c92660ba/d6afd86a exposed a late setup save that could stop the earlier fixture before complete capture. The rejected24-copy experiment1000b5f6 also failed fixed code. Keeping16copies and512MiB, completing the actual setup save yields marked baseline OOM e942026b and fixed pass6c507961; da2ea0ef confirms both aggregates. Later sensitivity is not relabeled preimplementation RED. Permanent completed-aggregate assertions also pass Node23 run13a18a9c."
+    }
+  },
+  {
+    "baseCommit": "daa757649f0d0c2e5bd8e7283987b216d26de638",
     "testChangesSha256": "19ac142e0ee278f69fec32d91232a65ff6917fd3a0b2882f0e75b61a9159f722",
     "reason": "Correct the existing cloud-backend test fixture to emulate Firestore read-time snapshots and exercise that contract through its SDK boundary, so later Map changes cannot rewrite facts held by recovery consumers.",
     "previousBehavior": "snap() recomputed exists() from the mutable docs Map and data() cloned the current Map value only when called. Existing direct, server-query, and transaction snapshots therefore changed retroactively after nested mutation, replacement, or deletion; a held absent snapshot could also become present after creation.",
