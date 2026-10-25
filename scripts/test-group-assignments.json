@@ -12561,6 +12561,16 @@
       "root": "RISK offline startup resume budget: fresh stalled captures stop and uncertain started writes never replay",
       "group": "persistence-recovery",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK offline recovery activation: a verified committed workspace activates before optional cache reads can strand later edits",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK offline recovery reentry: settled own recovery writes permit fresh current work while changed holds stay protected",
+      "group": "persistence-recovery",
+      "file": "tests.js"
     }
   ],
   "processControls": [
