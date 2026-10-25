@@ -9173,16 +9173,20 @@ test("app harness: disposal cancels its real wake and late timers while another 
  assert.equal(otherWake._destroyed,false,"another live app retains its own wake");
 });
 
-test('RISK recovery fixture shutdown: a failed real source observation stops its own polling and exits',async t=>{
+test('RISK recovery fixture shutdown: a failed real source observation stops its own polling and exits',
+async t=>{
  const os=await import('node:os'),root=fs.mkdtempSync(path.join(os.tmpdir(),'scanner-source-failure-'));
  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
  const source=fs.readFileSync(path.join(__dirname,'tests.js'),'utf8'),name='RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations';
  const start=source.indexOf("test('"+name+"'"),end=source.indexOf('\nasync function coldDamagedSourceWithoutAck214',start);
  assert.ok(start>=0&&end>start);
- const anchor=" shim.window.dispatchEvent(new ctx.CustomEvent('cloudboardchange',{detail:{user:backend.CS.user,rev:originalRoot.rev+1}}));";
- const consumer=source.slice(start,end);assert.equal(consumer.split(anchor).length,2,'the fault attaches to the one actual healthy-revision SDK read');
- const failed=consumer.replace(anchor,` app.faults.pull=Object.assign(Error('Controlled unavailable next revision'),{code:'unavailable'});
- t.after(async()=>{await app.dispose();assert.equal(vm.runInContext('scanWakeTimer',ctx)?._destroyed,true);assert.ok(backend.subscriptions.every(row=>!row.active));console.log('FAILED_FIXTURE_OWNED_RESOURCES_CLOSED');});
+ const anchor=' const healthyPayload=ctx.cloudPayload(),healthy=';
+ const consumer=source.slice(start,end);assert.equal(consumer.split(anchor).length,2,'the fault starts before the healthy source can become observable');
+ const failed=consumer.replace(anchor,` const refusal=Object.assign(Error('Controlled unavailable next revision'),{code:'unavailable'}),observe=app.faults.serverRead;let refusedReads=0;
+ app.faults.pull=refusal;
+ app.faults.serverRead=async(...args)=>{await observe?.(...args);refusedReads++;throw refusal;};
+ app.faults.transactionRead=async()=>{refusedReads++;throw refusal;};
+ t.after(async()=>{await app.dispose();assert.ok(refusedReads>0,'the actual SDK must encounter the injected source refusal');assert.equal(vm.runInContext('scanWakeTimer',ctx)?._destroyed,true);assert.ok(backend.subscriptions.every(row=>!row.active));console.log('FAILED_FIXTURE_OWNED_RESOURCES_CLOSED');});
 `+anchor);
  const childSource=(source.slice(0,start)+failed+source.slice(end)).replace('const __dirname = path.dirname(fileURLToPath(import.meta.url));','const __dirname = '+JSON.stringify(__dirname)+';');
  fs.writeFileSync(path.join(root,'failed-consumer.mjs'),childSource);fs.symlinkSync(path.join(__dirname,'node_modules'),path.join(root,'node_modules'),'dir');
@@ -9190,7 +9194,7 @@ test('RISK recovery fixture shutdown: a failed real source observation stops its
  const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^'+name+'$','failed-consumer.mjs'],{cwd:root,env,encoding:'utf8',timeout:70000,maxBuffer:1024*1024}),output=child.stdout+child.stderr;
  assert.equal(child.error,undefined,'the real failed consumer must finish before its process cleanup bound: '+output);
  assert.equal(child.signal,null,'the actual failed consumer must exit without a polling worker: '+output);
- assert.equal(child.status,1,'the deliberate external refusal remains a real failed consumer');
+ assert.equal(child.status,1,'the deliberate external refusal remains a real failed consumer: '+output);
  assert.match(output,/a new server revision escapes the held-source gate/);assert.match(output,/FAILED_FIXTURE_OWNED_RESOURCES_CLOSED/);
  assert.match(output,/# tests 1\b/);assert.match(output,/# fail 1\b/);assert.match(output,/# cancelled 0\b/);
 });

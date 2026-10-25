@@ -1,5 +1,24 @@
 [
   {
+    "baseCommit": "fa243c82b300994c19bcb88aa56a34504d0f236b",
+    "testChangesSha256": "f9d28abeac085f1855cdb64318a707d4a0c33e837bf3aaebe65bbb8b2bb75dbf",
+    "reason": "Make the existing failed-consumer cleanup control reliably model an unavailable source. Exact-main CI showed its intentionally failed child succeeding because the late root-only refusal left other actual SDK paths available.",
+    "previousBehavior": "The shutdown control installed faults.pull after creating the healthy source. That hook only refused root getDoc reads; query and transaction reads remained available, and an already-returned lazy fixture snapshot could observe later Map changes. Exact main run 40193694304 attempt 1 returned child status 0 instead of required 1. The artifact did not retain child stdout at that assertion, so the exact winning interleaving remains unproven.",
+    "intendedBehavior": "Install the provider refusal before constructing the healthy source; preserve the existing server-read observation counter while refusing server and transaction reads as well as direct pulls. Require an actual refused SDK read. Keep the real original consumer, healthy-revision deadline, failed child outcome and owned-resource cleanup. Include child output if its exit-status assertion ever fails again.",
+    "preservedCoverage": [
+      "The unchanged healthy positive consumer still exercises Add, Start, No, Done, durable head readback, held originals, bounded repeated reads and acknowledgement after a healthy new revision.",
+      "The failed child must still report the original healthy-revision deadline, exit normally with status 1, retain exactly one failed test and zero cancellations, close its scanner wake and subscriptions, and emit the existing owned-resource marker. No deadline, assertion or process-exit requirement is weakened.",
+      "Only the targeted shutdown fault fixture and exact-diff rationale change. Product shell bytes, cloud protocol, source authority, rules, CI workflow, test groups, inventory and accepted skips remain exact. Existing test identity is retained; declaration wrapping exposes it to the unchanged rationale validator."
+    ],
+    "redEvidence": {
+      "command": "Exact-main Data safety run 40193694304 attempt 1, job 121169989920: npm run test:group -- --group persistence-recovery --output-dir \"$RUNNER_TEMP/group\" --repository emerald-pham/funsidething --event-policy exact-main-push-v1 --run-id 40193694304 --run-attempt 1 --source-sha fa243c82b300994c19bcb88aa56a34504d0f236b --comparison-base f35b68afc51233155c4a57a7b919ced29e6226e8. Retained original test.tap and result.json artifact regression-40193694304-1-persistence-recovery.",
+      "failure": "The existing shutdown test failed tests.js:9193: actual deliberate-child exit status 0 versus expected 1, after 12001.98 ms. The failed qualification predates this fixture correction and remains a failed discovery; later focused passes do not relabel it or establish the exact winning CI interleaving."
+    },
+    "replacementTests": [
+      "RISK recovery fixture shutdown: a failed real source observation stops its own polling and exits"
+    ]
+  },
+  {
     "baseCommit": "ec0686a3cadf239c82efb854cd1136f216160fd3",
     "testChangesSha256": "b55a5f4c78ca8ab3f9c96eecb881c23ea4dd628877164b18144ed574c0121a23",
     "reason": "Reproduce the user screenshot through the actual Review cloud recovery sources action when an asynchronous IndexedDB request or transaction fails. Retain device and cloud originals while bounded safe read verification resumes.",
