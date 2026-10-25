@@ -19525,6 +19525,27 @@ test('RISK JSON COPY PASTE: large native paste retains full draft without render
   }
 });
 
+test('RISK JSON COPY PASTE: closing a large paste during encoding stops before backup writes',async t=>{
+  const keepAlive=setTimeout(()=>{},10000);t.after(()=>clearTimeout(keepAlive)); // App fixture timers are intentionally unrefed.
+  const {IDBFactory}=await import('fake-indexeddb');
+  const app=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'large-paste-close-'+Date.now()}),{ctx,shim}=app;
+  t.after(()=>app.dispose());ctx.addTask('Keep original during encoding',false);await prepareBackupFileFixtureSource(app);
+  const source=JSON.parse(ctx.currentBoardExportPayload());source.largeUnknown='x'.repeat(2*1024*1024);
+  const raw=JSON.stringify(source),original=JSON.stringify(ctx.state),store=ctx.window.ScannerDeviceStore,head=await store.readHead();
+  await ctx.onAction('open-paste-recovery',{});const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value='';box.selectionStart=0;box.selectionEnd=0;
+  shim.document.dispatchEvent({type:'paste',target:box,clipboardData:{getData:()=>raw},preventDefault(){}});
+  const protectedWrites=[],put=store.putBackup.bind(store);store.putBackup=async options=>{if(['before-file-restore','restore-file-source'].includes(options?.backup?.kind))protectedWrites.push(options.backup.kind);return put(options);};
+  let scheduled=false,closed=false;ctx.btoa=bytes=>{if(!scheduled){scheduled=true;setTimeout(()=>{ctx.onAction('close-paste-recovery',{});closed=true;},0);}return globalThis.btoa(bytes);};
+  assert.equal(await ctx.onAction('preview-pasted-recovery',{}),false);
+  assert.equal(closed,true,'the UI receives Close while a large source is being encoded');
+  assert.deepEqual(protectedWrites,[],'revoked preview consent cannot start protection writes after a yielded encoding chunk');
+  assert.equal(JSON.stringify(ctx.state),original);assert.equal((await store.readHead()).hash,head.hash);
+  assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/confirm-file-restore/);
+  ctx.btoa=globalThis.btoa;await ctx.onAction('open-paste-recovery',{});
+  assert.equal(await ctx.onAction('preview-pasted-recovery',{}),true,'the complete retained draft can be previewed again');
+  assert.ok((await store.listBackups()).some(row=>row.restoreFile?.bytesBase64===Buffer.from(raw).toString('base64')));
+});
+
 test('RISK JSON COPY PASTE: stale clipboard completion cannot release a newer export transfer',async t=>{
   for(const outcome of ['resolve','reject'])await t.test(outcome,async t=>{
     const pending=[],{IDBFactory}=await import('fake-indexeddb');

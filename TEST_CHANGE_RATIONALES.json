@@ -1,5 +1,24 @@
 [
   {
+    "baseCommit": "cf8b1d591e7d4882b4f3c0a206560024c05ffaf3",
+    "testChangesSha256": "251bb4fd856a564378b31ebd9efd52e85bbf5b2c3f78269791b84789cd53216f",
+    "reason": "Yield between bounded exact file-encoding chunks so large Preview work remains cancellable and rechecks the same board, account, source and paste consent before protection writes.",
+    "previousBehavior": "The native optimized encoder passed the45MB gate but still consumed905-925ms synchronously, close to the1000ms responsiveness bound. Closing during that synchronous encoding could only run after the first protection write had started.",
+    "intendedBehavior": "Each786432-byte block preserves Base64 alignment and yields to the event loop. Close or any changed source invalidates the preview before further chunks and before starting protection writes; full draft and current board remain intact.",
+    "replacementTests": [
+      "RISK JSON COPY PASTE: closing a large paste during encoding stops before backup writes"
+    ],
+    "preservedCoverage": [
+      "The complete exact source, all byte values and padding remainders, unknown fields, ordinary native paste, original current board, protected preview, cancellation and late-consent contracts remain covered by the retained transfer and recovery tests.",
+      "The new actual app-consumer test injects Close through the external timer boundary while a real platform encoder runs, observes durable storage writes, checks unchanged current head and retained draft, then successfully previews the complete source again.",
+      "A keepalive timer is scoped to the new test because the established app fixture intentionally unrefs its owned timers; it does not alter production timing or bypass the yield."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <integration> --evidence-dir <task-artifacts>/paste-diagnosis/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern=\"RISK JSON COPY PASTE: closing a large paste\" tests.js",
+      "failure": "Before chunk yielding,15edb3b8 failed with actual[before-file-restore] versus expected[] after queued Close. After the change e55a5124 was cancelled by the test harness because only unrefed timers remained; it is not an app failure or pass. GREEN0ce21fad passes the focused copy, database, pasted-recovery and file cohort with a scoped keepalive. Earlier actual native62b56966 verified exact45MB source retention and168ms Paste but max944ms Preview; chunk timing is rechecked on the committed candidate."
+    }
+  },
+  {
     "baseCommit": "ca2d7641413b6e3462dc04d04835346a285f7e7e",
     "testChangesSha256": "6ff9f50909977450c8860712636158d7c638080e62c2468bcb5a533a042f785b",
     "reason": "Keep complete large pasted recovery archives outside native textarea layout so WebKit remains responsive while the same guarded preview, cancel, close and restore preserve all source bytes. Use bounded native Base64 chunks when available to keep exact file protection responsive.",

@@ -193,6 +193,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK DEVICE STORAGE V2: unreferenced immutable snapshots retire while head and recovery references remain exact
 - RISK DEVICE STORAGE V2: raw export snapshot preserves exact sources in one read-only capture
 - RISK JSON COPY PASTE: large native paste retains full draft without rendering the archive
+- RISK JSON COPY PASTE: closing a large paste during encoding stops before backup writes
 - RISK JSON COPY PASTE: stale clipboard completion cannot release a newer export transfer
 - RISK JSON COPY PASTE: Copy and Download send the same full archive without a JSON view or writes
 - RISK JSON COPY PASTE: Quick start explains the copy button, manual fallback and guarded paste

@@ -13923,6 +13923,15 @@ async function handleFileRestoreBackupChange(value){
     if(generation===fileRestoreConsentGeneration){fileRestoreBusy=false;if(fileRestorePreview)renderFileRestorePreview(fileRestorePreview);}
   }
 }
+async function encodeRestoreFileBytes(buffer,stillCurrent){
+  const parts=[],chunkBytes=786432; // Divisible by three: only the final chunk pads.
+  for(let offset=0;offset<buffer.byteLength;offset+=chunkBytes){
+    if(!stillCurrent())throw Error("The board, recovery sources or pasted text changed. Review the current source and try again.");
+    parts.push(manualArchiveBase64(buffer.slice(offset,offset+chunkBytes)));
+    if(offset+chunkBytes<buffer.byteLength)await new Promise(resolve=>setTimeout(resolve,0));
+  }
+  return parts.join("");
+}
 async function handleRestoreBackupFileChange(input,{pasteDraft=null}={}){
   const file=input?.files?.[0];if(!file||fileRestoreBusy)return false;
   const consentGeneration=++fileRestoreConsentGeneration,settingsDraft=pasteDraft?.settingsDraft??captureSettingsDraft();fileRestoreBusy=true;
@@ -13934,9 +13943,11 @@ async function handleRestoreBackupFileChange(input,{pasteDraft=null}={}){
     const buffer=await file.arrayBuffer(),bytes=new Uint8Array(buffer);
     if(!fileRestoreSourcesMatchSync(baseline))throw Error("The board, recovery sources or pasted text changed while the file was read. Review the current source and try again.");
     if(!await fileRestoreSourcesStillCurrent({...baseline,currentCopyId:null,fileCopyId:null}))throw Error("The board or signed-in account changed while the file was read. Choose the file again.");
+    const bytesBase64=await encodeRestoreFileBytes(buffer,()=>fileRestoreSourcesMatchSync(baseline));
+    if(!fileRestoreSourcesMatchSync(baseline))throw Error("The board, recovery sources or pasted text changed. Review the current source and try again.");
     const restoreFile={format:RESTORE_FILE_SOURCE_FORMAT,formatVersion:1,
       fileName:typeof file.name==="string"?file.name:"backup.json",mediaType:typeof file.type==="string"?file.type:"",
-      byteLength:bytes.byteLength,bytesBase64:manualArchiveBase64(buffer)};
+      byteLength:bytes.byteLength,bytesBase64};
     const currentCopy=baseline.unacceptedSource?await protectUnacceptedFileRestore(baseline,restoreFile):await saveDurableBackup("before-file-restore",baseline.currentRaw);
     if(!currentCopy?.id)throw Error("The current board could not be backed up. Nothing was restored.");
     if(!fileRestoreSourcesMatchSync(baseline))throw Error("The pasted text changed while the current board was protected. Review the latest text and preview again.");
@@ -13971,6 +13982,7 @@ async function handleRestoreBackupFileChange(input,{pasteDraft=null}={}){
   }
 }
 function previewPastedRecovery(raw){
+  if(fileRestoreBusy)return false;
   const bytes=new TextEncoder().encode(raw),session=pasteEditorSession;
   const pasteDraft={raw,settingsDraft:session?.settingsDraft??captureSettingsDraft(),sessionId:session?.id??null,revision:session?.revision??null};
   return handleRestoreBackupFileChange({files:[{name:"Pasted board.json",type:"application/json",arrayBuffer:async()=>bytes.buffer}]},{pasteDraft});
