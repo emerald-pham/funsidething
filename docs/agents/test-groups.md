@@ -137,7 +137,7 @@ healthy, unexpired ownership before launch. CI uses the explicit isolated groupe
 push or pull-request fixture policy. A missing engine is a failure.
 
 `scripts/button-safety-inventory.json` is the reviewed action and named state
-scenario inventory. It also retains opening button/summary template counts from
+scenario inventory. It also retains opening button/summary and owned action/role consumer template counts from
 all committed app JavaScript and HTML. A new or repeated template requires review;
 observed unknown controls fail even when their template was already dynamic. Add
 an actual supported scenario with an independent expected result when adding a

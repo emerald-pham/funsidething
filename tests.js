@@ -45311,7 +45311,7 @@ test('RISK repository process: new and duplicate source buttons require native c
  fs.writeFileSync(manifest,JSON.stringify({schemaVersion:1,sourceTemplates:{[createHash('sha256').update(tag).digest('hex')]:1},requiredActions:['act:add']}));
  const invoke=html=>{fs.writeFileSync(source,html);return spawnSync(process.execPath,['scripts/button-safety.mjs','--check-inventory','--source',source,'--inventory',manifest],{cwd:__dirname,encoding:'utf8'});};
  assert.equal(invoke(tag+'Add</button>').status,0,'reviewed source button template accepted');
- for(const [name,html]of [['new action',tag+'Add</button><button data-act="new-untested">New</button>'],['duplicate route',tag+'Add</button>'+tag+'Add again</button>']])await t.test(name,()=>{
+ for(const [name,html]of [['new action',tag+'Add</button><button data-act="new-untested">New</button>'],['duplicate route',tag+'Add</button>'+tag+'Add again</button>'],['nonbutton action consumer',tag+'Add</button><span role="button" data-act="new-untested">New</span>']])await t.test(name,()=>{
   const result=invoke(html);assert.equal(result.error,undefined);assert.notEqual(result.status,0,'native coverage inventory must fail closed for '+name);assert.match(result.stderr,/Source button templates differ from reviewed native inventory/);
  });
 });

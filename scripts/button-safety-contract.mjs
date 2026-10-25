@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 export function sourceButtonTemplates(source){
  const counts={};
- for(const match of source.matchAll(/<(?:button|summary)\b[^>]*>|createElement\(\s*['"](?:button|summary)['"]\s*\)/g)){const key=digest(match[0]);counts[key]=(counts[key]||0)+1;}
+ for(const match of source.matchAll(/<(?:button|summary)\b[^>]*>|<[a-z][^>]*\b(?:data-act|data-scene-view|data-landscape-motion|data-scene-time|data-scene-preset|data-location-action|role\s*=\s*[\"']button[\"'])[^>]*>|createElement\(\s*['"](?:button|summary)['"]\s*\)/g)){const key=digest(match[0]);counts[key]=(counts[key]||0)+1;}
  return Object.fromEntries(Object.entries(counts).sort(([a],[b])=>a.localeCompare(b)));
 }
 export function verifyButtonInventorySource(source,inventory){

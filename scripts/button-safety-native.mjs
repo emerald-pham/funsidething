@@ -52,6 +52,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
   const {runButtonScenarios}=await import('./button-safety-scenarios.mjs');
   const observed=new Set(),outcomes=new Map();
   const actionFor=el=>{
+   if(el===document.documentElement)return null; // Landscape uses this root attribute only as rendered state.
    if(el.closest('[data-saved-preview][inert][aria-hidden="true"]'))return null;
    if(el.matches('summary'))return 'disclosure';
    if(el.dataset.act)return 'act:'+el.dataset.act;
@@ -114,8 +115,8 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
     const key=eval('('+keySource+')');
     window.__buttonHeartbeat={at:performance.now(),maxGapMs:0,frames:0};const pulse=now=>{const h=window.__buttonHeartbeat;h.maxGapMs=Math.max(h.maxGapMs,now-h.at);h.at=now;h.frames++;if(h.clickAt!==undefined&&h.firstFrameAfterClickMs===undefined)h.firstFrameAfterClickMs=now-h.clickAt;requestAnimationFrame(pulse);};requestAnimationFrame(pulse);
     addEventListener('unhandledrejection',event=>void window.__buttonSafetyFailure('unhandledrejection: '+String(event.reason)));
-    document.addEventListener('click',event=>{const el=event.target.closest('button,summary,[data-act="mback"]');if(el&&event.isTrusted){window.__buttonHeartbeat.clickAt=performance.now();delete window.__buttonHeartbeat.firstFrameAfterClickMs;void window.__buttonClicked(key(el));}},true);
-    const scan=()=>{if(document.documentElement){const els=[...document.querySelectorAll('button,summary,[data-act="mback"]')];void window.__buttonObserved(els.map(key).filter(value=>value!==null));for(const el of els)if(key(el)?.startsWith('button-id:'))void window.__buttonUnidentified(el.outerHTML.slice(0,1000));}};
+    document.addEventListener('click',event=>{const el=event.target.closest('button,summary,[data-act],[role="button"],[data-scene-view],[data-landscape-motion],[data-scene-time],[data-scene-preset],[data-location-action]');if(el&&event.isTrusted){window.__buttonHeartbeat.clickAt=performance.now();delete window.__buttonHeartbeat.firstFrameAfterClickMs;void window.__buttonClicked(key(el));}},true);
+    const scan=()=>{if(document.documentElement){const els=[...document.querySelectorAll('button,summary,[data-act],[role="button"],[data-scene-view],[data-landscape-motion],[data-scene-time],[data-scene-preset],[data-location-action]')];void window.__buttonObserved(els.map(key).filter(value=>value!==null));for(const el of els)if(key(el)?.startsWith('button-id:'))void window.__buttonUnidentified(el.outerHTML.slice(0,1000));}};
     addEventListener('DOMContentLoaded',()=>{scan();new MutationObserver(scan).observe(document.documentElement,{childList:true,subtree:true});});
    },{keySource:actionFor.toString()});
    await page.goto(origin+prefix);await page.waitForFunction(()=>typeof state!=='undefined'&&state&&window.ScannerDeviceStore);await page.waitForFunction(()=>window.CloudSync?.ready);localArmed=true;
@@ -168,6 +169,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
   };
   if(probe)await scenario('detector sensitivity',{},async ui=>{await ui.act('settings',control==='async-predicate-false'?async()=>false:()=>!!document.getElementById('stHorizon'));});
   else await runButtonScenarios({scenario});
+  if(scenarioFilter)assert.equal(report.scenarios?.length,1,'Exactly one requested diagnostic scenario must execute');
   for(const action of observed)assert.ok(report.requiredActions.includes(action),'New untested button action: '+action);
   report.observedActions=[...observed].sort();report.outcomes=[...outcomes.values()];if(scenarioFilter)report.scope='focused-diagnostic';
   report.status='passed';
