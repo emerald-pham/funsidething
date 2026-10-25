@@ -44023,3 +44023,26 @@ test('RISK independent cloud final readback: repeated damage after permitted pub
  const result=await backend.CS.repairCloudSources();assert.equal(result.ok,undefined,'a permitted write is not successful repair without independently decoded readback');assert.equal(result.error,true);assert.equal(result.code,'verification-failed');assert.equal(damages,2,'one fresh restart remains the whole publication retry budget');
  assert.equal((await backend.CS.pull()).code,'corrupt-generation');assert.equal(JSON.stringify(ctx.state),local);
 });
+
+test('RISK independent cloud confirmation status: repairing server bytes cannot show an unchanged local board as acknowledged',async t=>{
+ const {IDBFactory,forceCloseDatabase}=await import('fake-indexeddb'),handles=[],open=IDBFactory.prototype.open;
+ IDBFactory.prototype.open=function(...args){const request=open.apply(this,args);request.addEventListener('success',()=>handles.push(request.result));return request;};
+ let app;try{app=await damagedAcknowledgedApp187(t);}finally{IDBFactory.prototype.open=open;}
+ const {ctx,shim,backend,originalRoot}=app,local=JSON.stringify(ctx.state);assert.equal(ctx.state.syncDirty,false,'the old acknowledged board starts clean before cloud corruption is observed');
+ for(const connection of handles.filter(db=>db.name===app.deviceDbName))forceCloseDatabase(connection);
+ const reopen=app.indexedDB.open;app.indexedDB.open=()=>{throw Object.assign(Error('Synthetic unreadable local storage'),{name:'UnknownError'});};
+ try{
+  await fixtureDeadline(ctx.cloudPull(),'server-only repair settles with unchanged old local acknowledgement');
+  assert.ok(backend.docs.get('users/owner').rev>originalRoot.rev);assert.equal(JSON.stringify(ctx.state),local);
+  assert.doesNotMatch(shim.document.getElementById('syncBtn').textContent,/synced/,'independent server repair cannot display this unchanged local board as acknowledged');
+  assert.equal(ctx.reconciled(),false,'a separate current local reconciliation remains required');
+ }finally{app.indexedDB.open=reopen;}
+});
+
+test('RISK independent cloud failure status: protected terminal errors stay visible until verified server recovery',async t=>{
+ const app=await damagedAcknowledgedApp187(t),{backend,originalRoot}=app,path='users/owner/generations/'+originalRoot.activeGeneration,header=backend.docs.get(path);
+ backend.docs.set(path,{...header,state:'deleting'});const result=await backend.CS.repairCloudSources();assert.equal(result.error,true);
+ assert.equal(backend.CS.status,'error','a protected remote failure is reported through the existing backend status consumer');assert.equal(backend.CS.errorCode,'recovery-source-unavailable');assert.equal(backend.CS.knownDamagedSource,true);
+ backend.docs.set(path,header);const recovered=await backend.CS.repairCloudSources();assert.equal(recovered.ok,true);assert.equal(backend.CS.knownDamagedSource,false);
+ assert.equal(backend.CS.errorCode,null,'only independently verified remote recovery clears its transport error');
+});

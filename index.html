@@ -5515,6 +5515,7 @@ async function cloudPull(){
     }catch{unavailable=true;}finally{clearTimeout(timer);}
     if(!current()||remainingMs()<=0)return;
     if(unavailable){
+      cloudAdoptionHeld=true;
       const result=await backend.repairCloudSources({stillCurrent:current,remainingMs});
       if(!current())return;
       // A healthy remote read permits ordinary legacy reconciliation. A repair
@@ -14909,6 +14910,7 @@ if(configured){
     CS.repairCloudSources=({stillCurrent,signal=null,remainingMs=null}={})=>{
       if(remoteRepairInFlight)return remoteRepairInFlight;
       const uid=auth.currentUser?.uid,account=CS.user,epoch=recoveryAuthEpoch,operation=++remoteRepairOperation;
+      const statusPullOperation=pullOperation,statusPushOperation=pushOperation;
       const started=performance.now(),remaining=()=>Math.max(0,Math.min(CLOUD_RECOVERY_READ_TIMEOUT_MS-(performance.now()-started),
         typeof remainingMs==="function"?Number(remainingMs()):Infinity));
       const owned=()=>!!uid&&window.CloudSync===CS&&!suspended&&auth.currentUser?.uid===uid&&CS.user===account&&
@@ -14931,6 +14933,7 @@ if(configured){
             const healthy=await bounded(()=>generationStore.pull(uid,{stillCurrent:current}));
             if(typeof healthy?.payload==="string")return {ok:true,remoteOnly:true,alreadyHealthy:true,rev:healthy.rev,pendingObservation:"unobserved"};
             if(healthy?.code!=="corrupt-generation")return healthy;
+            CS.knownDamagedSource=true;
             const protections=await bounded(()=>F.getDocsFromServer(F.query(F.collection(db,"users",uid,"recoveryProtections"),F.limit(17))));
             if(protections.docs.length>16)return {error:true,code:"recovery-source-budget"};
             if(protections.docs.some(row=>!validProtection(row.data())))return {error:true,code:"recovery-protection-unsupported"};
@@ -15003,7 +15006,16 @@ if(configured){
           return {error:true,code:"recovery-source-changed"};
         }catch(error){return owned()?{error:true,code:safeCloudErrorCode(error)}:{cancelled:true};}
       })();
-      remoteRepairInFlight=work.finally(()=>{remoteRepairInFlight=null;});return remoteRepairInFlight;
+      remoteRepairInFlight=work.then(result=>{
+        // This operation reports server recovery, never local-board saving.
+        // A newer ordinary pull/push owns its own transport status and error.
+        if(owned()&&pullOperation===statusPullOperation&&pushOperation===statusPushOperation){
+          if(result?.error||result?.conflict||result?.cancelled)
+            cloudFailure("pull",{code:result.code||(result.cancelled?"recovery-source-changed":"manifest-changed")});
+          else if(result?.ok&&!result.alreadyHealthy){clearCloudError();CS.status="ok";ping();}
+        }
+        return result;
+      }).finally(()=>{remoteRepairInFlight=null;});return remoteRepairInFlight;
     };
     CS.signIn = ()=>{
       clearCloudError();CS.status = "syncing"; ping();

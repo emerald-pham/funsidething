@@ -19197,5 +19197,63 @@
     "failure": "a91603d5: actual remote decoder payload remained undefined instead of a complete repaired string while the external native pending-key request stayed stalled. d07f612f: unsupported known root/header fields incorrectly yielded ok true rather than preserving the root. d4ab900d: total-budget result code was undefined rather than deadline-exceeded. Initial postmerge a5056e36 was an infrastructure cancellation, not behavioral RED."
   },
   "observedGreen": "Resumed all-independent f56389a6 passed39/39 before the additional final-readback case; final expanded focused preservation917c80f0 passed130/130, zero failed/canceled/skipped. Later isolated source mutants c347f404(local payload),5b68fc9d(pins),c0b65bac(revision CAS),2bb0feb4(auth epoch),abb2358e(exact readback) each failed intended behavioral assertions. Mutant files and SHA256 identities live under external sensitivity/ and are later sensitivity evidence, never original chronology. No resumed browser/emulator/CI/production/full-suite evidence claimed."
+},
+{
+  "baseCommit": "b2c2799ce251af8b06b92841af2fbf3cdd075408",
+  "testChangesSha256": "745aec33ea879c5cb2e72b09ca33d266bda1cf9c03dcbf03db170d8c89786a0a",
+  "reason": "Owner self-review of the completed independent repair exposed a false current-board cloud confirmation and invisible terminal remote failures. Lock both through actual app/backend consumers while preserving the original server-only/data authority boundary.",
+  "previousBehavior": "With unavailable local storage, a previously clean acknowledged board could still display synced after independent repair published a different remote revision. Safe terminal source refusal returned an error but left backend status ok, so the existing error consumer did not expose it.",
+  "intendedBehavior": "Unobserved device pending availability suspends only process-local reconciliation before independent cloud repair. It never edits local state, pending, durable head or hold and cannot acknowledge the unchanged local board. Remote failures remain visible in the existing transport status until actual verified recovery; a newer ordinary pull/push retains ownership of its own status.",
+  "replacementTests": [
+    "RISK independent cloud confirmation status: repairing server bytes cannot show an unchanged local board as acknowledged",
+    "RISK independent cloud failure status: protected terminal errors stay visible until verified server recovery"
+  ],
+  "preservedCoverage": [
+    "All earlier stalled/absent/unavailable device, source-only payload, exact raw local and cloud-original preservation, accepted native Add/comparison/draft, same-account/epoch/backend/cancel, revision CAS, pins, source mutation, uncertain staged/committed reply and finite budget assertions remain unchanged.",
+    "The new displayed-label assertion starts with a real previously acknowledged clean board, makes the external IndexedDB unavailable and exercises actual cloudPull. Backend source refusal is exercised through the real synthetic Firestore decoder with an unprotectable deleting header. No passing test expectation was removed or weakened.",
+    "Ordinary CS.push, device-store-v2.js, Firestore schema/rules, parent local recovery, global test grouping and release assets remain outside this owner follow-up. Parent owns integration and all final release qualification."
+  ],
+  "redEvidence": {
+    "command": "node scripts/agent-tools/record-run.mjs --repo <worktree> --evidence-dir <external>/independent-cloud/resume-runs --purpose preimplementation-red --summary -- node --test --test-reporter=spec --test-name-pattern='^RISK independent cloud (confirmation status:|failure status:)' tests.js; cd4ed39b-52ef-4cfc-a3ae-031cb0494933 on committed b2c2799 before status implementation.",
+    "failure": "Both intended assertions failed: sync button actual text was cloud synced despite a different independently repaired server revision and unchanged local board; protected deleting-header failure left backend status ok instead of error. Earlier original capability c39e8f45, stalled request a91603d5, root value safety d07f612f and deadline classification d4ab900d retain their original chronology."
+  },
+  "observedGreen": "64d5c748-ef61-435b-a7d7-568e7d7b1c2c: all independent cloud cases passed after the status fix. Prior exact b2c2799 cohort a529ade6 passed130/130; it does not cover this later status follow-up. Final exact follow-up validation is recorded outside checkout before handoff."
+},
+{
+  "baseCommit": "f6d1da402787162d17b635b00044c881b97929b7",
+  "testChangesSha256": "f7002dcb46997579742268e2b80bd7ab8009e41bc39d7d466a73c588f2e9da5d",
+  "reason": "Owner self-review of the completed independent repair exposed a false current-board cloud confirmation and invisible terminal remote failures. Lock both through actual app/backend consumers while preserving the original server-only/data authority boundary.",
+  "previousBehavior": "With unavailable local storage, a previously clean acknowledged board could still display synced after independent repair published a different remote revision. Safe terminal source refusal returned an error but left backend status ok, so the existing error consumer did not expose it.",
+  "intendedBehavior": "Unobserved device pending availability suspends only process-local reconciliation before independent cloud repair. It never edits local state, pending, durable head or hold and cannot acknowledge the unchanged local board. Remote failures remain visible in the existing transport status until actual verified recovery; a newer ordinary pull/push retains ownership of its own status.",
+  "replacementTests": [
+    "RISK independent cloud repair: unavailable device storage repairs retained server sources without acknowledging local work",
+    "RISK independent cloud source safety: unsupported roots headers boards and absent candidates remain protected",
+    "RISK independent cloud capability: server-only repair ignores injected payloads and never observes local pending state",
+    "RISK independent cloud authority: cancellation account epoch backend and suspension changes cannot publish stale repairs",
+    "RISK independent cloud races: fresh peer roots win during reads and publication while failed pins keep originals",
+    "RISK independent cloud uncertain reply: deterministic publication reads back a lost reply and never clears pending uploads",
+    "RISK independent cloud retained discovery: pinned originals survive ordinary rotations and repair another damaged root without local storage",
+    "RISK independent cloud exact reconstruction: a matching retained hash cannot discard other complete server facts",
+    "RISK independent cloud stalled storage: a pending native IDB request cannot block remote-only repair",
+    "RISK independent cloud absent storage: actual cloudPull repairs remote bytes without a device capability",
+    "RISK independent cloud live work: accepted Add comparison and unfinished draft survive a held server-only repair",
+    "RISK independent cloud explicit abort: canceled reads and uncertain committed replies cannot acknowledge local work",
+    "RISK independent cloud staged reply: retry resumes the same deterministic generation after uncertain creation",
+    "RISK independent cloud restart budget: repeated fresh root changes stop after one restart without replacement",
+    "RISK independent cloud total budget: clock skew and late server replies cannot extend the original operation",
+    "RISK independent cloud final readback: repeated damage after permitted publication cannot become verified repair",
+    "RISK independent cloud confirmation status: repairing server bytes cannot show an unchanged local board as acknowledged",
+    "RISK independent cloud failure status: protected terminal errors stay visible until verified server recovery"
+  ],
+  "preservedCoverage": [
+    "All earlier stalled/absent/unavailable device, source-only payload, exact raw local and cloud-original preservation, accepted native Add/comparison/draft, same-account/epoch/backend/cancel, revision CAS, pins, source mutation, uncertain staged/committed reply and finite budget assertions remain unchanged.",
+    "The new displayed-label assertion starts with a real previously acknowledged clean board, makes the external IndexedDB unavailable and exercises actual cloudPull. Backend source refusal is exercised through the real synthetic Firestore decoder with an unprotectable deleting header. No passing test expectation was removed or weakened.",
+    "Ordinary CS.push, device-store-v2.js, Firestore schema/rules, parent local recovery, global test grouping and release assets remain outside this owner follow-up. Parent owns integration and all final release qualification."
+  ],
+  "redEvidence": {
+    "command": "node scripts/agent-tools/record-run.mjs --repo <worktree> --evidence-dir <external>/independent-cloud/resume-runs --purpose preimplementation-red --summary -- node --test --test-reporter=spec --test-name-pattern='^RISK independent cloud (confirmation status:|failure status:)' tests.js; cd4ed39b-52ef-4cfc-a3ae-031cb0494933 on committed b2c2799 before status implementation.",
+    "failure": "Both intended assertions failed: sync button actual text was cloud synced despite a different independently repaired server revision and unchanged local board; protected deleting-header failure left backend status ok instead of error. Earlier original capability c39e8f45, stalled request a91603d5, root value safety d07f612f and deadline classification d4ab900d retain their original chronology."
+  },
+  "observedGreen": "64d5c748-ef61-435b-a7d7-568e7d7b1c2c: all independent cloud cases passed after the status fix. Prior exact b2c2799 cohort a529ade6 passed130/130; it does not cover this later status follow-up. Final exact follow-up validation is recorded outside checkout before handoff."
 }
 ]
