@@ -2,7 +2,7 @@
 
 import { spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { lstat, mkdir, open, readFile, readlink, rename } from 'node:fs/promises';
+import { lstat, mkdir, open, readFile, readlink, realpath, rename, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -24,6 +24,11 @@ function parseArguments(argv) {
     if (!name.startsWith('--')) throw new Error(`Unexpected option: ${name}`);
     if (name === '--summary') {
       options.summary = true;
+      continue;
+    }
+    if (name === '--qualification-readiness') {
+      if (options.qualificationReadiness) throw new Error('--qualification-readiness may be provided only once.');
+      options.qualificationReadiness = true;
       continue;
     }
     const value = argv[index + 1];
@@ -117,6 +122,177 @@ async function gitIdentity(repo, redaction) {
   return result.code === 0
     ? { commit: result.stdout.toString('utf8').trim() }
     : { commit: null, identityError: sanitizeText(result.error || result.stderr.toString('utf8').trim() || 'git rev-parse failed', redaction, 'git.identityError') };
+}
+
+function pathContains(parent, candidate) {
+  const relative = path.relative(parent, candidate);
+  return relative === '' || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative));
+}
+
+async function resolveFuturePath(candidate) {
+  let ancestor = candidate;
+  const suffix = [];
+  while (true) {
+    try {
+      await lstat(ancestor);
+      return path.join(await realpath(ancestor), ...suffix);
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+      const parent = path.dirname(ancestor);
+      if (parent === ancestor) throw error;
+      suffix.unshift(path.basename(ancestor));
+      ancestor = parent;
+    }
+  }
+}
+
+async function ensureWritableDirectory(candidate, label) {
+  try {
+    await mkdir(candidate, { recursive: true, mode: 0o700 });
+    const info = await stat(candidate);
+    if (!info.isDirectory()) throw new Error('destination is not a directory');
+    const directory = await realpath(candidate);
+    const probePath = path.join(directory, `.record-run-readiness-${randomUUID()}`);
+    const probe = await open(probePath, 'wx', 0o600);
+    try {
+      await probe.writeFile('qualification readiness probe');
+      await probe.sync();
+    } finally {
+      await probe.close();
+      await unlink(probePath);
+    }
+    return directory;
+  } catch (error) {
+    throw new Error(`${label} must be a writable directory (${error instanceof Error ? error.message : String(error)}).`, { cause: error });
+  }
+}
+
+async function gitValue(repo, args, label) {
+  const result = await runGit(repo, args);
+  if (result.code !== 0) throw new Error(`${label} could not be read from the committed worktree.`);
+  return result.stdout.toString('utf8').trim();
+}
+
+async function canonicalWorktreePath(value) {
+  const candidate = path.resolve(String(value ?? ''));
+  try { return await realpath(candidate); } catch { return candidate; }
+}
+
+function configuredCoordinationPath(environment) {
+  const canonical = environment.CODEX_COORDINATION_FILE?.trim();
+  const legacy = environment.DOW_EMULATOR_COORDINATION_FILE?.trim();
+  const canonicalPath = canonical ? path.resolve(canonical) : undefined;
+  const legacyPath = legacy ? path.resolve(legacy) : undefined;
+  if (canonicalPath && legacyPath && canonicalPath !== legacyPath) {
+    throw new Error(`Conflicting coordination paths: CODEX_COORDINATION_FILE selects ${canonicalPath}, while DOW_EMULATOR_COORDINATION_FILE selects ${legacyPath}.`);
+  }
+  const selected = canonicalPath ?? legacyPath;
+  if (!selected) throw new Error('Qualification readiness requires CODEX_COORDINATION_FILE (or its DOW_EMULATOR_COORDINATION_FILE compatibility alias) to select the live host ledger.');
+  return selected;
+}
+
+function requirePort(environment, name) {
+  const value = environment[name];
+  if (typeof value !== 'string' || !/^[1-9]\d{0,4}$/.test(value) || Number(value) > 65535) {
+    throw new Error(`${name} must be an explicit locally allocated TCP port from 1 through 65535.`);
+  }
+  return Number(value);
+}
+
+async function validateHostPortOwnership(environment, worktree, deliveryPort, smokePort) {
+  const filePath = configuredCoordinationPath(environment);
+  let state;
+  try {
+    state = JSON.parse(await readFile(filePath, 'utf8'));
+  } catch (error) {
+    throw new Error(`Cannot read live host coordination ledger at ${filePath}: ${error instanceof Error ? error.message : String(error)}.`, { cause: error });
+  }
+  if (!state || typeof state !== 'object' || state.version !== 1 || state.scope !== 'codex-wide' || !Array.isArray(state.entries)) {
+    throw new Error(`Live host coordination ledger at ${filePath} is not a valid codex-wide v1 ledger.`);
+  }
+  const activeEntries = state.entries.filter((entry) => entry && ['active', 'parked'].includes(entry.status));
+  const activeWorktreeEntries = [];
+  for (const entry of activeEntries) {
+    if (entry.status === 'active' && entry.worktree && await canonicalWorktreePath(entry.worktree) === worktree) {
+      activeWorktreeEntries.push(entry);
+    }
+  }
+  if (activeWorktreeEntries.length !== 1) {
+    throw new Error(`Qualification readiness requires exactly one active host coordination entry for this worktree; found ${activeWorktreeEntries.length}.`);
+  }
+  const owner = activeWorktreeEntries[0];
+  if (typeof owner.id !== 'string' || !owner.id.trim()) {
+    throw new Error('The active host coordination entry for this worktree has no valid owner ID.');
+  }
+  const requiredResources = new Map([
+    [deliveryPort, `loopback:127.0.0.1:${deliveryPort}`],
+    [smokePort, `loopback:127.0.0.1:${smokePort}`],
+  ]);
+  for (const [port, resource] of requiredResources) {
+    const variable = port === deliveryPort ? 'CHAIN_NATIVE_PORT' : 'CHAIN_NATIVE_SMOKE_PORT';
+    const ownsResource = (entry) => Array.isArray(entry.resources)
+      && entry.resources.some((item) => String(item).trim().toLowerCase() === resource);
+    if (!ownsResource(owner)) {
+      throw new Error(`${variable} resource ${resource} is not allocated to the active worktree in the live host coordination ledger.`);
+    }
+    const otherOwner = activeEntries.find((entry) => entry !== owner && ownsResource(entry));
+    if (otherOwner) {
+      throw new Error(`${variable} resource ${resource} is already owned by another active or parked worktree (${otherOwner.worktree ?? 'unknown worktree'}).`);
+    }
+  }
+}
+
+async function validateQualificationReadiness({ repo, evidenceDirectory, environment = process.env }) {
+  const repository = await realpath(repo).catch((error) => {
+    throw new Error(`Qualification readiness cannot resolve --repo ${repo}: ${error.message}.`, { cause: error });
+  });
+  const topLevel = await gitValue(repo, ['rev-parse', '--show-toplevel'], 'Git worktree root');
+  const actualRoot = await realpath(topLevel);
+  if (repository !== actualRoot) throw new Error(`Qualification readiness requires --repo to name the Git worktree root (${actualRoot}).`);
+
+  const commit = await gitValue(repo, ['rev-parse', 'HEAD^{commit}'], 'Committed candidate SHA');
+  const tree = await gitValue(repo, ['rev-parse', 'HEAD^{tree}'], 'Committed candidate tree');
+  if (environment.CHAIN_NATIVE_CANDIDATE_SHA !== commit) {
+    throw new Error(`CHAIN_NATIVE_CANDIDATE_SHA must exactly match committed HEAD (${commit}).`);
+  }
+  if (environment.CHAIN_NATIVE_CANDIDATE_TREE !== tree) {
+    throw new Error(`CHAIN_NATIVE_CANDIDATE_TREE must exactly match committed HEAD tree (${tree}).`);
+  }
+  const status = await runGit(repo, ['status', '--porcelain=v1', '--untracked-files=all', '-z']);
+  if (status.code !== 0) throw new Error('Qualification readiness could not verify the committed worktree status.');
+  if (status.stdout.length) throw new Error('Qualification readiness requires the committed candidate working tree to be clean.');
+
+  const deliveryPort = requirePort(environment, 'CHAIN_NATIVE_PORT');
+  const smokePort = requirePort(environment, 'CHAIN_NATIVE_SMOKE_PORT');
+  if (deliveryPort === smokePort) throw new Error('CHAIN_NATIVE_PORT and CHAIN_NATIVE_SMOKE_PORT must be distinct ports.');
+  await validateHostPortOwnership(environment, repository, deliveryPort, smokePort);
+
+  const nativeOutputValue = environment.CHAIN_NATIVE_OUTPUT;
+  if (typeof nativeOutputValue !== 'string' || !path.isAbsolute(nativeOutputValue)) {
+    throw new Error('CHAIN_NATIVE_OUTPUT must be an absolute, durable evidence directory.');
+  }
+  const nativeOutputCandidate = path.resolve(nativeOutputValue);
+  const evidenceCandidate = path.resolve(evidenceDirectory);
+  const [resolvedEvidence, resolvedNativeOutput] = await Promise.all([
+    resolveFuturePath(evidenceCandidate),
+    resolveFuturePath(nativeOutputCandidate),
+  ]);
+  if (pathContains(repository, resolvedEvidence) || pathContains(repository, resolvedNativeOutput)) {
+    throw new Error('Qualification evidence destinations must be outside the candidate Git worktree.');
+  }
+  if (pathContains(resolvedEvidence, resolvedNativeOutput) || pathContains(resolvedNativeOutput, resolvedEvidence)) {
+    throw new Error('Recorder evidence and CHAIN_NATIVE_OUTPUT must be separate, non-overlapping directories.');
+  }
+  const [actualEvidence, actualNativeOutput] = await Promise.all([
+    ensureWritableDirectory(evidenceCandidate, 'Recorder evidence destination'),
+    ensureWritableDirectory(nativeOutputCandidate, 'CHAIN_NATIVE_OUTPUT evidence destination'),
+  ]);
+  if (pathContains(repository, actualEvidence) || pathContains(repository, actualNativeOutput)) {
+    throw new Error('Qualification evidence destinations must resolve outside the candidate Git worktree.');
+  }
+  if (pathContains(actualEvidence, actualNativeOutput) || pathContains(actualNativeOutput, actualEvidence)) {
+    throw new Error('Recorder evidence and CHAIN_NATIVE_OUTPUT must be separate, non-overlapping directories.');
+  }
 }
 
 const sourceExtensions = new Set(['.c', '.cc', '.cpp', '.cjs', '.css', '.go', '.h', '.html', '.java', '.js', '.json', '.jsonc', '.jsx', '.kt', '.m', '.mjs', '.mm', '.py', '.rb', '.rs', '.sass', '.scss', '.sh', '.swift', '.ts', '.tsx', '.toml', '.vue', '.yaml', '.yml', '.zsh', '.rules', '.webmanifest']);
@@ -448,6 +624,7 @@ async function main(argv) {
   for (const pattern of redaction.patterns) {
     try { new RegExp(pattern); } catch (error) { throw new Error(`Invalid --redact-pattern: ${error.message}`); }
   }
+  if (options.qualificationReadiness) await validateQualificationReadiness({ repo, evidenceDirectory, environment: process.env });
   const git = await gitIdentity(repo, redaction);
   const workingTree = await collectSourceTestState(repo, redaction);
   // Keep filesystem destinations private to I/O; evidence metadata follows the

@@ -3258,6 +3258,31 @@
       "file": "tests.js"
     },
     {
+      "root": "qualification readiness creates evidence destinations and launches the requested child",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "qualification readiness rejects dirty candidates and unusable evidence destinations before launch",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "qualification readiness rejects missing and stale committed candidate identity before launch",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "qualification readiness requires distinct explicit local ports even when CI is true",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "qualification readiness requires live host ownership for both native ports",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
       "root": "quick-add context selection does NOT leak into the separate Settings → Import flow",
       "group": "core",
       "file": "tests.js"

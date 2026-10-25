@@ -19,6 +19,31 @@ node scripts/agent-tools/record-run.mjs \
   -- node --test scripts/agent-tools/record-run.test.mjs
 ```
 
+### Local qualification readiness
+
+For an expensive local qualification run, opt in to the readiness gate explicitly. It checks that `--repo` is a clean Git worktree root; `CHAIN_NATIVE_CANDIDATE_SHA` and `CHAIN_NATIVE_CANDIDATE_TREE` exactly match its committed `HEAD`; recorder evidence and `CHAIN_NATIVE_OUTPUT` are separate writable directories outside that checkout; and distinct `CHAIN_NATIVE_PORT` and `CHAIN_NATIVE_SMOKE_PORT` values are allocated to this active worktree in the configured host coordination ledger. The delivery resource names are `loopback:127.0.0.1:<CHAIN_NATIVE_PORT>` and `loopback:127.0.0.1:<CHAIN_NATIVE_SMOKE_PORT>`. An allocation held by another active or parked worktree is rejected. `CI=true` does not waive local port allocation. A failed check exits before the requested child starts.
+
+Allocate both ports to the current active worktree through the host coordination flow first, then set the variables from those resource claims. For example, with the allocated values already exported in the shell:
+
+```sh
+GIT_COMMON_DIR="$(git rev-parse --path-format=absolute --git-common-dir)"
+EVIDENCE_DIR="$GIT_COMMON_DIR/agent-test-runs/issue-277/recorder"
+export CHAIN_NATIVE_CANDIDATE_SHA="$(git rev-parse 'HEAD^{commit}')"
+export CHAIN_NATIVE_CANDIDATE_TREE="$(git rev-parse 'HEAD^{tree}')"
+export CHAIN_NATIVE_OUTPUT="$GIT_COMMON_DIR/agent-test-runs/issue-277/native"
+: "${CHAIN_NATIVE_PORT:?allocate loopback:127.0.0.1:<port> to this worktree first}"
+: "${CHAIN_NATIVE_SMOKE_PORT:?allocate a distinct loopback:127.0.0.1:<port> to this worktree first}"
+node scripts/agent-tools/record-run.mjs \
+  --repo "$PWD" \
+  --evidence-dir "$EVIDENCE_DIR" \
+  --purpose green \
+  --qualification-readiness \
+  --summary \
+  -- npm test
+```
+
+This option only checks setup before launching the requested process; a passing readiness check is not evidence that the tests passed or that a native device/runtime recovered. It does not replace the suite's native reports, test-change rationale, review, CI, or release gates. Ordinary behavioral RED/GREEN recording continues to omit `--qualification-readiness` so focused iterations do not require native port allocations.
+
 By default, the recorder prints the JSON record path to stderr before starting the child and prints the sanitized child output when it exits. A normal run returns the child's exit code; an interrupted run returns 128 plus the signal number. Both the child's result and the recorder's wrapper exit code are stored in the record. A missing executable is recorded as a launch failure and returns 127.
 
 Pass `--summary` before `--` to emit one bounded JSON line instead of the child streams. It reports the declared purpose, child exit and signal, source identity, evidence status, and sanitized absolute display paths for metadata, stdout, and stderr. A finalized attempt keeps the complete redacted streams in its metadata record and per-attempt `.stdout.txt` and `.stderr.txt` files when those evidence writes complete. The process keeps the child's exit or interruption status; if evidence writes fail while the child otherwise succeeds, it returns 74 and reports `evidence-failure`.
