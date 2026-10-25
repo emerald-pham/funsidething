@@ -2193,16 +2193,16 @@ async function waitForNativeHistoryAck226(page,owner){
  try{return await result.jsonValue();}finally{await result.dispose();}
 }
 
-async function runNativeRecoveryInspection226(t,width=390,holdDemoted=false,completeSource=null,automaticView=null){
+async function runNativeRecoveryInspection226(t,width=390,holdDemoted=false,completeSource=null,automaticView=null,sharedBrowser=null){
  const {waitForTruthyProbe}=await import('./scripts/agent-tools/async-probe.mjs');
  const playwright=await import('playwright'),engine=(completeSource||automaticView)?(automaticView?.engine||process.env.CHAIN_RECOVERY_TEST_ENGINE||'chromium'):'chromium';assert.ok(['chromium','webkit'].includes(engine),'the native source consumer uses an existing supported engine');
- const sdk=await import('./scripts/installed-client-fixture.mjs'),browser=await playwright[engine].launch({headless:true}),context=await browser.newContext({viewport:{width,height:844},serviceWorkers:'block',reducedMotion:'reduce'}),page=await context.newPage();
+ const sdk=await import('./scripts/installed-client-fixture.mjs'),ownsBrowser=!sharedBrowser,browser=sharedBrowser||await playwright[engine].launch({headless:true}),context=await browser.newContext({viewport:{width,height:844},serviceWorkers:'block',reducedMotion:'reduce'}),page=await context.newPage();
  const current=deferredSyncFixture(),previous=deferredSyncFixture(),finalRoot=deferredSyncFixture(),freshFinalRoot=deferredSyncFixture(),demoted=deferredSyncFixture(),raw=JSON.stringify({...sdk.fixture('reconcile-held'),...(automaticView?{settings:{...sdk.fixture('reconcile-held').settings,theme:automaticView.theme}}:{})}),encoded=await loadStorageV2().encodeSnapshot(raw),{chunks,...header}=encoded,remote=new Map([['users/owner',{schemaVersion:2,rev:4,activeGeneration:'held-current',previousGeneration:'received-previous'}],['users/owner/generations/held-current',{...header,hash:'f'.repeat(64),state:'published',baseRev:3}],['users/owner/generations/received-previous',{...header,state:'published',baseRev:2}],...chunks.map(c=>['users/owner/generations/received-previous/chunks/'+String(c.index).padStart(8,'0'),c])]);
  if(automaticView){remote.set('users/owner/generations/held-current',{...header,state:'published',baseRev:3});for(const chunk of chunks)remote.set('users/owner/generations/held-current/chunks/'+chunk.index,chunk);}
  let publicationAllowed=false,historyArmed=false,historyEntered=false;const historyGate=deferredSyncFixture();
  const boundedAck={armed:false,enteredAt:null,deliveredAt:null,observation:null},boundedAckDelivered=deferredSyncFixture();let boundedAckTimer=null,boundedAckOwner=null;const nativeHistoryOwners=[];
  const origin='https://recovery-inspection.invalid',prefix='/synthetic-sdk/';let armed=false,previousEntered=false,freshFinalEntered=false,demotedEntered=false,roots=0;
- t.after(async()=>{if(boundedAckTimer)await boundedAckDelivered.promise;if(boundedAckOwner)await boundedAckOwner.dispose();for(const owner of nativeHistoryOwners)await owner.dispose();if(automaticView?.boundedAck&&process.env.CHAIN_RECOVERY_UI_OUTPUT){fs.mkdirSync(process.env.CHAIN_RECOVERY_UI_OUTPUT,{recursive:true});fs.writeFileSync(path.join(process.env.CHAIN_RECOVERY_UI_OUTPUT,automaticView.theme+'-'+width+'-bounded-ack.json'),JSON.stringify(boundedAck,null,2));}try{await page.evaluate(()=>{closeModal();window.__releaseNativeRetry?.();});}catch{}current.resolve();previous.resolve();finalRoot.resolve();freshFinalRoot.resolve();demoted.resolve();historyGate.resolve();await context.close();await browser.close();});
+ t.after(async()=>{if(boundedAckTimer)await boundedAckDelivered.promise;if(boundedAckOwner)await boundedAckOwner.dispose();for(const owner of nativeHistoryOwners)await owner.dispose();if(automaticView?.boundedAck&&process.env.CHAIN_RECOVERY_UI_OUTPUT){fs.mkdirSync(process.env.CHAIN_RECOVERY_UI_OUTPUT,{recursive:true});fs.writeFileSync(path.join(process.env.CHAIN_RECOVERY_UI_OUTPUT,automaticView.theme+'-'+width+'-bounded-ack.json'),JSON.stringify(boundedAck,null,2));}try{await page.evaluate(()=>{closeModal();window.__releaseNativeRetry?.();});}catch{}current.resolve();previous.resolve();finalRoot.resolve();freshFinalRoot.resolve();demoted.resolve();historyGate.resolve();await context.close();if(ownsBrowser)await browser.close();});
  await context.exposeBinding('__installedRPC',async(_,kind,args)=>{const key=args?.[0];if(boundedAck.armed&&kind==='get'&&key==='users/owner/generations/held-current'){
   boundedAck.armed=false;boundedAck.enteredAt=Date.now();boundedAckOwner=await page.evaluateHandle(()=>window.__nativeHistoryBudget());
   boundedAckTimer=setTimeout(async()=>{try{boundedAck.observation=await page.evaluate(owner=>({sameRead:cloudSourceRecoveryRead===owner.read,sameController:cloudSourceRecoveryRead?.controller===owner.controller,serial:cloudSourceRecoveryRead?.serial,originalSerial:owner.read.serial,deadline:owner.deadline,deadlineUnchanged:window.__nativeHistoryBudget()===owner,remaining:owner.deadline-performance.now(),state:automaticCloudSourceResumeStatus.state,aborted:owner.controller.signal.aborted}),boundedAckOwner);boundedAck.deliveredAt=Date.now();}catch(error){boundedAck.error=String(error);}finally{boundedAckTimer=null;boundedAckDelivered.resolve();}},16000);
@@ -2380,13 +2380,31 @@ async function runNativeRecoveryInspection226(t,width=390,holdDemoted=false,comp
  assert.deepEqual(settledReader,readerBefore,'unchanged visible text must also stay in place through the next two frames');
 }
 
+async function runNativeRecoveryInspectionMatrix226(t,engine,viewForCase){
+ const playwright=await import('playwright'),browserType=playwright[engine],originalLaunch=browserType.launch,launches=[],contexts=[],pages=[];let sharedBrowser=null;
+ browserType.launch=async function(...args){
+  const browser=await originalLaunch.apply(this,args);launches.push(browser);const newContext=browser.newContext.bind(browser);
+  browser.newContext=async function(...contextArgs){
+   const context=await newContext(...contextArgs);contexts.push(context);const newPage=context.newPage.bind(context);
+   context.newPage=async function(...pageArgs){const page=await newPage(...pageArgs);pages.push(page);return page;};return context;
+  };return browser;
+ };
+ t.after(async()=>{browserType.launch=originalLaunch;if(sharedBrowser)await sharedBrowser.close();});
+ sharedBrowser=await browserType.launch({headless:true});
+ for(const [theme,width]of [['light',390],['dark',390],['light',1280],['dark',1280]])await t.test(theme+' '+width,sub=>runNativeRecoveryInspection226(sub,width,false,null,viewForCase(theme,width),sharedBrowser));
+ assert.equal(contexts.length,4,'each theme/viewport scenario must create its own fresh browser context');assert.equal(new Set(contexts).size,4,'theme/viewport scenarios cannot share browser context state');
+ assert.equal(pages.length,4,'each theme/viewport scenario must create its own page');assert.equal(new Set(pages).size,4,'theme/viewport scenarios cannot share page state');
+ assert.equal(launches.length,1,'all four independent theme/viewport scenarios should reuse one browser process');assert.equal(launches[0],sharedBrowser);
+}
+
 test('RISK automatic source status native: historical retry checking stop and confirmation remain current',
 async t=>{
- for(const [theme,width]of [['light',390],['dark',390],['light',1280],['dark',1280]])await t.test(theme+' '+width,sub=>runNativeRecoveryInspection226(sub,width,false,null,{theme,history:true,boundedAck:theme==='dark'&&width===390}));
+ const engine=process.env.CHAIN_RECOVERY_TEST_ENGINE||'chromium';
+ await runNativeRecoveryInspectionMatrix226(t,engine,(theme,width)=>({theme,history:true,boundedAck:theme==='dark'&&width===390}));
 });
 
-test('RISK integrated automatic recovery native: persisted startup status and neighboring controls remain usable',async t=>{const engine=process.env.CHAIN_RECOVERY_TEST_ENGINE||'chromium';
- for(const [theme,width]of [['light',390],['dark',390],['light',1280],['dark',1280]])await t.test(theme+' '+width,sub=>runNativeRecoveryInspection226(sub,width,false,null,{theme,engine}));
+test('RISK integrated automatic recovery native: persisted startup status and neighboring controls remain usable with one browser and isolated contexts',async t=>{const engine=process.env.CHAIN_RECOVERY_TEST_ENGINE||'chromium';
+ await runNativeRecoveryInspectionMatrix226(t,engine,(theme,width)=>({theme,engine}));
 });
 
 test('RISK cloud source inspection: native asynchronous updates retain focus disclosure scroll and current source roles',async t=>runNativeRecoveryInspection226(t));
