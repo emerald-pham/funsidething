@@ -1,5 +1,46 @@
 [
   {
+    "baseCommit": "b636189d398dd1d078cc8773d902c588cd54d8ef",
+    "reason": "Repair confirmed Standards P1: a permanently withheld expired readonly startup delivery blocked all later durable saves despite independently working fresh external raw requests. Bound fresh recovery attempts and retain the no-replay rule for uncertain started writes.",
+    "previousBehavior": "Memory Add worked after startup timeout, but localDeviceStartupAttempt.pending permanently rejected saves until the obsolete readonly callback returned. After it settled, another stalled raw capture could leave a fresh memory-work save unbounded.",
+    "intendedBehavior": "An expired readonly lifetime loses authority when a fresh bounded save begins. Fresh full raw capture/CAS/readback can durably save accepted memory work without old delivery; late results cannot adopt or overwrite it. Fresh stalled captures stop within one local budget, and pending started mutations remain blocked without replay.",
+    "replacementTests": [
+      "RISK offline startup resume: fresh storage saves accepted memory work while an expired readonly delivery remains withheld",
+      "RISK offline startup resume budget: fresh stalled captures stop and uncertain started writes never replay"
+    ],
+    "preservedCoverage": [
+      "Additive actual loadApp/raw-IDB/onAction/persist/cold-reopen cases preserve all prior product assertions. The existing external IDB seam now retains withheld callback releases for cleanup and can withhold a native readwrite transaction completion; no production test hook or new framework is introduced.",
+      "The readonly probe independently proves fresh raw reads match exact originals before saving, then verifies exact raw archive, current saved head, late old callback non-adoption, hold/archive identity and cold offline reopen. Fresh stalled capture and withheld started write cases check bounded failure, unchanged accepted work, no raw replay and no late activation.",
+      "One existing local budget helper serves startup and a separate fresh save. Existing full raw CAS, archive hashes, readback, marker, source owner/UID selection, cloud intent/ACK, explicit Restore and ordinary guarded writes remain. Parent device-store epochs, earliest independent-cloud preflight, cloud backend, public FAQ, fingerprints and global assignments stay untouched."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/offline-working-repair/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/ios-page-failure-20261024/database/offline-working/ownership/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern '^RISK offline startup resume' tests.js. Permanent RED52620076 on clean ownership candidate b636189 preceded runtime fix; specialist C1 REDd74dcdb8 is separately preserved. Focused GREEN93cae809 follows the repair.",
+      "failure": "Actual RED52620076: fresh external raw capture succeeded exactly while the obsolete callback stayed withheld, but ordinary persist returned false instead of true. Fresh stalled capture also exceeded the400ms fixture deadline; the uncertain-started-write negative control passed. First GREEN69448e11 cancelled because this Node harness unrefs app clocks; retained callback releases and existing fixtureDeadline around awaited test actions corrected only fixture lifetime. GREEN93cae809 passes all4 outcomes with no skips."
+    },
+    "testChangesSha256": "b22ef34024690b2ba14d71e61269a25849d4ad310f350e53dcb6044d4c2692f8"
+  },
+  {
+    "baseCommit": "ba826db17076d31be90e2f2375f32f87d792c5b7",
+    "reason": "Repair confirmed Standards P1: a permanently withheld expired readonly startup delivery blocked all later durable saves despite independently working fresh external raw requests. Bound fresh recovery attempts and retain the no-replay rule for uncertain started writes. This aggregate exact-C1 diff also retains the preceding ownership P1 root and its separately recorded preimplementation RED52f75f00, proof guard RED43b874f3 and owner-alias RED53f40790.",
+    "previousBehavior": "Memory Add worked after startup timeout, but localDeviceStartupAttempt.pending permanently rejected saves until the obsolete readonly callback returned. After it settled, another stalled raw capture could leave a fresh memory-work save unbounded.",
+    "intendedBehavior": "An expired readonly lifetime loses authority when a fresh bounded save begins. Fresh full raw capture/CAS/readback can durably save accepted memory work without old delivery; late results cannot adopt or overwrite it. Fresh stalled captures stop within one local budget, and pending started mutations remain blocked without replay.",
+    "replacementTests": [
+      "RISK offline working ownership: startup binds explicit null and proved browser UID while preserving ambiguous alternatives",
+      "RISK offline startup resume: fresh storage saves accepted memory work while an expired readonly delivery remains withheld",
+      "RISK offline startup resume budget: fresh stalled captures stop and uncertain started writes never replay"
+    ],
+    "preservedCoverage": [
+      "Additive actual loadApp/raw-IDB/onAction/persist/cold-reopen cases preserve all prior product assertions. The existing external IDB seam now retains withheld callback releases for cleanup and can withhold a native readwrite transaction completion; no production test hook or new framework is introduced.",
+      "The readonly probe independently proves fresh raw reads match exact originals before saving, then verifies exact raw archive, current saved head, late old callback non-adoption, hold/archive identity and cold offline reopen. Fresh stalled capture and withheld started write cases check bounded failure, unchanged accepted work, no raw replay and no late activation.",
+      "One existing local budget helper serves startup and a separate fresh save. Existing full raw CAS, archive hashes, readback, marker, source owner/UID selection, cloud intent/ACK, explicit Restore and ordinary guarded writes remain. Parent device-store epochs, earliest independent-cloud preflight, cloud backend, public FAQ, fingerprints and global assignments stay untouched."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/offline-working-repair/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/ios-page-failure-20261024/database/offline-working/ownership/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern '^RISK offline startup resume' tests.js. Permanent RED52620076 on clean ownership candidate b636189 preceded runtime fix; specialist C1 REDd74dcdb8 is separately preserved. Focused GREEN93cae809 follows the repair.",
+      "failure": "Actual RED52620076: fresh external raw capture succeeded exactly while the obsolete callback stayed withheld, but ordinary persist returned false instead of true. Fresh stalled capture also exceeded the400ms fixture deadline; the uncertain-started-write negative control passed. First GREEN69448e11 cancelled because this Node harness unrefs app clocks; retained callback releases and existing fixtureDeadline around awaited test actions corrected only fixture lifetime. GREEN93cae809 passes all4 outcomes with no skips."
+    },
+    "testChangesSha256": "4f4cef6e1af4b20681d7a9cdef9d162700d9b22be67e97b5513881ef88e156c3"
+  },
+  {
     "baseCommit": "ba826db17076d31be90e2f2375f32f87d792c5b7",
     "testChangesSha256": "ac8a72f2150cad947890b07338b14f3248891e0171bc660811db04ecd7f5f5bd",
     "reason": "Repair independently observed P1: lexical source ordering selected a foreign account or UID before ownership qualification during protected offline startup. Add actual startup cases and keep ambiguous alternatives usable and protected.",

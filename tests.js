@@ -318,6 +318,44 @@ test('RISK offline startup budget: stalled open and raw reads expose unsaved wor
  });
 });
 
+test('RISK offline startup resume: fresh storage saves accepted memory work while an expired readonly delivery remains withheld',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),factory=new IDBFactory(),deviceDbName='offline-readonly-resume-'+Math.random(),control={stallRawRead:true};
+ const inspector=loadStorageV2({indexedDB:factory}).createDeviceStore({indexedDB:factory,crypto:webcrypto,dbName:deviceDbName});await inspector.open();t.after(()=>inspector.close());
+ const original=JSON.stringify(syncState({v:2,tasks:[syncTask('withheld-original','Protected original before withheld callback')]}));await inspector.commitHead({expectedHash:null,payload:original});const head=await inspector.readHead();await inspector.putBackup({expectedHash:head.hash,backup:{id:'withheld-backup',kind:'manual',at:1,day:'2026-10-25',payload:original}});await editRawDevice187(factory,deviceDbName,tx=>{tx.objectStore('meta').delete('head');tx.objectStore('meta').put({unknown:[31]},'pending:withheld');});
+ const before=await inspector.readRawExportSnapshot(),storage=sharedScannerStorage({[DEVICE_AUTHORITY_KEY]:'1'});let app;
+ const loading=loadApp({indexedDBProvider:deviceFaultProvider187(factory,control),deviceDbName,deviceOpenTimeoutMs:35,sharedStorage:storage,navigatorProvider:{onLine:false}}).then(value=>app=value);
+ t.after(async()=>{for(const release of control.rawReadReleases||[])release();await loading;await app?.dispose();});await new Promise(resolve=>setTimeout(resolve,150));assert.ok(app);const releaseOld=control.releaseRawRead;assert.equal(typeof releaseOld,'function');
+ app.shim.document.getElementById('addInput').value='Accepted while old readonly delivery stays withheld';await fixtureDeadline(app.ctx.onAction('add',{}),'withheld readonly Add returns',400);assert.equal(await fixtureDeadline(app.ctx.persist(),'withheld readonly save returns',400),false);const accepted=JSON.stringify(app.ctx.state),id=app.ctx.state.tasks.find(row=>row.title==='Accepted while old readonly delivery stays withheld').id;
+ assert.equal(vm.runInContext('localDeviceStartupAttempt.expired&&localDeviceStartupAttempt.pending',app.ctx),true);
+ control.stallRawRead=false;
+ const fresh=await fixtureDeadline(app.ctx.window.ScannerDeviceStore.readRawExportSnapshot(),'fresh raw request completes before old callback',400);assert.equal(JSON.stringify(fresh),JSON.stringify(before));
+ assert.equal(await fixtureDeadline(app.ctx.persist(),'fresh save after readonly storage returns',400),true,'an expired readonly callback cannot permanently block a fresh guarded save');
+ const saved=await inspector.readHead(),hold=await inspector.getRecoveryCloudHold(),archive=(await inspector.listOpaqueArchives()).find(row=>row.key===hold.originalKey);assert.ok(JSON.parse(saved.payload).tasks.some(row=>row.id===id));assert.ok(archive);
+ assert.equal(JSON.stringify(JSON.parse(archive.raw).indexedDB),JSON.stringify(app.ctx.encodeManualArchiveSnapshot(before).stores));
+ releaseOld();await flush();await flush();assert.equal((await inspector.readHead()).payload,saved.payload,'obsolete readonly delivery cannot overwrite the verified current head');assert.equal(JSON.stringify(app.ctx.state),saved.payload,'obsolete delivery cannot adopt the old original over current work');assert.notEqual(saved.payload,original);assert.ok(JSON.parse(accepted).tasks.some(row=>row.id===id));
+ await app.dispose();const cold=await loadApp({indexedDBProvider:factory,deviceDbName,sharedStorage:storage,navigatorProvider:{onLine:false}});t.after(()=>cold.dispose());assert.ok(cold.ctx.state.tasks.some(row=>row.id===id));assert.equal((await inspector.getRecoveryCloudHold()).originalKey,hold.originalKey);assert.equal((await inspector.listOpaqueArchives()).find(row=>row.key===hold.originalKey).raw,archive.raw);
+});
+
+test('RISK offline startup resume budget: fresh stalled captures stop and uncertain started writes never replay',async t=>{
+ for(const fault of ['fresh-read-stalls','startup-write-withheld'])await t.test(fault,async t=>{
+  const {IDBFactory}=await import('fake-indexeddb'),factory=new IDBFactory(),deviceDbName='offline-resume-bound-'+fault+'-'+Math.random(),control={stallRawRead:fault==='fresh-read-stalls',stallRawWrite:fault==='startup-write-withheld'};
+  const inspector=loadStorageV2({indexedDB:factory}).createDeviceStore({indexedDB:factory,crypto:webcrypto,dbName:deviceDbName});await inspector.open();t.after(()=>inspector.close());
+  const original=JSON.stringify(syncState({v:2,tasks:[syncTask('budget-original','Protected source before delayed storage')]}));await inspector.commitHead({expectedHash:null,payload:original});const head=await inspector.readHead();await inspector.putBackup({expectedHash:head.hash,backup:{id:'budget-backup',kind:'manual',at:1,day:'2026-10-25',payload:original}});await editRawDevice187(factory,deviceDbName,tx=>tx.objectStore('meta').delete('head'));
+  let app;const loading=loadApp({indexedDBProvider:deviceFaultProvider187(factory,control),deviceDbName,deviceOpenTimeoutMs:35,seedStorage:{[DEVICE_AUTHORITY_KEY]:'1'},navigatorProvider:{onLine:false}}).then(value=>app=value);
+  t.after(async()=>{for(const release of control.rawReadReleases||[])release();control.releaseRawWrite?.();await loading;await app?.dispose();});await new Promise(resolve=>setTimeout(resolve,150));assert.ok(app);
+  app.shim.document.getElementById('addInput').value='Accepted work during delayed '+fault;await fixtureDeadline(app.ctx.onAction('add',{}),'delayed storage Add returns',400);const accepted=JSON.stringify(app.ctx.state);
+  if(fault==='fresh-read-stalls'){
+   control.releaseRawRead();await flush();await flush();control.stallRawRead=true;
+   assert.equal(await fixtureDeadline(app.ctx.persist(),'fresh recovery capture has one bounded budget',400),false);
+   assert.equal(app.ctx.deviceStorageActive(),false);assert.equal(JSON.stringify(app.ctx.state),accepted);control.releaseRawRead();await flush();await flush();assert.equal(JSON.stringify(app.ctx.state),accepted);assert.equal(app.ctx.deviceStorageActive(),false,'late fresh read cannot activate after its own timeout');assert.equal(await inspector.readHead(),null);
+  }else{
+   assert.equal(typeof control.releaseRawWrite,'function','the original recovery write started before its completion delivery was withheld');const before=await inspector.readRawExportSnapshot();
+   assert.equal(await fixtureDeadline(app.ctx.persist(),'uncertain started mutation remains protected',400),false);assert.equal(JSON.stringify(await inspector.readRawExportSnapshot()),JSON.stringify(before),'a pending started mutation cannot be replayed as a fresh recovery write');
+   control.releaseRawWrite();await flush();await flush();assert.equal(JSON.stringify(app.ctx.state),accepted);assert.equal(app.ctx.deviceStorageActive(),false,'late original write completion cannot adopt over accepted memory work');
+  }
+ });
+});
+
 test('RISK offline memory restore: a deliberate Paste after storage returns protects accepted unsaved work',async t=>{
  const {IDBFactory}=await import('fake-indexeddb'),factory=new IDBFactory(),control={quotaOpaque:true},indexedDB=deviceFaultProvider187(factory,control),deviceDbName='memory-paste-'+Math.random(),original='{unreadable sole browser source';
  const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName,seedStorage:{[SYNC_STORE_KEY]:original,[LOCAL_HEAD_KEY]:original}});t.after(()=>app.dispose());
@@ -594,7 +632,7 @@ function deviceFaultProvider187(factory,control){
       if(key==='objectStore')return name=>{const store=target.objectStore(name);return new Proxy(store,{get(target,key){
        if(key==='getAll'&&name==='opaque'&&control.stallRawRead)return(...args)=>{
         const request=target.getAll(...args);return new Proxy(request,{get:(target,key)=>Reflect.get(target,key,target),set(target,key,value){
-         if(key==='onsuccess'){target.onsuccess=event=>{control.releaseRawRead=()=>{control.stallRawRead=false;value.call(target,event);};};return true;}
+         if(key==='onsuccess'){target.onsuccess=event=>{const release=()=>{control.stallRawRead=false;value.call(target,event);};control.releaseRawRead=release;(control.rawReadReleases??=[]).push(release);};return true;}
          return Reflect.set(target,key,value,target);
         }});
        };
@@ -615,7 +653,10 @@ function deviceFaultProvider187(factory,control){
        const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;
       }});};
       const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;
-     },set(target,key,value){return Reflect.set(target,key,value,target);}});
+     },set(target,key,value){
+      if(key==='oncomplete'&&mode==='readwrite'&&stores.includes('opaque')&&control.stallRawWrite){target.oncomplete=event=>{control.releaseRawWrite=()=>{control.stallRawWrite=false;value.call(target,event);};};return true;}
+      return Reflect.set(target,key,value,target);
+     }});
     };
    }});}
    const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;

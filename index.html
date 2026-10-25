@@ -2721,7 +2721,7 @@ async function repairExactLocalDeviceHead(bootAttempt=null){
       const archive={key:"device-recovery-original:"+uid(),raw:JSON.stringify({format:"chain-scanner.device-recovery-source",formatVersion:1,
         reason:"exact-local-head-repair",localStorage:browser,indexedDB:encodeManualArchiveSnapshot(source).stores})};
       const guard=()=>localDeviceStartupCurrent(bootAttempt)&&deviceStore===store&&state===accepted&&JSON.stringify(readManualArchiveLocalSources())===JSON.stringify(browser);
-      const repaired=await deviceWriteBeforeDiagnostics("repairHeadSnapshot",{expectedSource:rawRecoverySourceIdentity(source),
+      const repaired=await localDeviceStartupWrite(bootAttempt,"repairHeadSnapshot",{expectedSource:rawRecoverySourceIdentity(source),
         encodeSource:rawRecoverySourceIdentity,payload,archive,guard},store);
       if(repaired?.ok)return repaired.head;
       return null;
@@ -2896,7 +2896,7 @@ async function recoverLocalWorkingDeviceSource({workingBoard=null,expectedMemory
     const current=()=>localDeviceStartupCurrent(bootAttempt)&&deviceStore===store&&state===accepted&&JSON.stringify(state)===acceptedRaw&&held()&&
       JSON.stringify(readManualArchiveLocalSources())===JSON.stringify(browser);
     if(!current())return null;
-    const result=await deviceWriteBeforeDiagnostics("writeRecoveredSource",{expectedSource:sourceIdentity,
+    const result=await localDeviceStartupWrite(bootAttempt,"writeRecoveredSource",{expectedSource:sourceIdentity,
       encodeSource:rawRecoverySourceIdentity,archives:[archive],payload,account:hold.account,hold,guard:current},store);
     if(!result?.ok||!current())return null;
     const [head,savedHold,raw]=await Promise.all([store.readHead(),store.getRecoveryCloudHold(),store.readRawExportSnapshot()]),
@@ -2911,23 +2911,31 @@ async function recoverLocalWorkingDeviceSource({workingBoard=null,expectedMemory
   }catch{return null;}
 }
 async function resumeMemoryWorkingDeviceStorage(){
-  if(!memoryRecoveryWorkspace||deviceRecoveryCloudHold?.workspace!=="memory-only"||localDeviceStartupAttempt?.pending)return false;
+  const previous=localDeviceStartupAttempt;
+  if(!memoryRecoveryWorkspace||deviceRecoveryCloudHold?.workspace!=="memory-only"||
+    previous?.pending&&(!previous.expired||previous.mutationPending))return false;
   const hold=deviceRecoveryCloudHold;
-  try{
-    if(!deviceStore){
-      if(!window.ChainStorageV2||!window.indexedDB||!crypto?.subtle)return false;
-      deviceStore=ChainStorageV2.createDeviceStore({indexedDB:window.indexedDB,crypto,
-        dbName:window.CHAIN_STORAGE_DB_NAME||"chain-scanner-v2",encodeRecoveryValue:encodeManualArchiveValue,
-        openTimeoutMs:window.CHAIN_STORAGE_OPEN_TIMEOUT_MS||5000});
-    }
-    await deviceStore.open();window.ScannerDeviceStore=deviceStore;
-    const head=await recoverLocalWorkingDeviceSource({workingBoard:automaticRecoveryClone(state),expectedMemoryHold:hold});
-    if(!head)return false;
-    state=JSON.parse(head.payload);deviceHeadHash=head.hash;lastPersistedRaw=head.payload;
-    storageOK=true;deviceStorageAuthority=true;deviceStorageRequired=false;memoryRecoveryWorkspace=false;
-    unacceptedDeviceSource={reason:"protected-local-working-source",workingWorkspace:true};
-    await refreshDeviceBackupCache();clearDeviceSaveIssue();render();return true;
-  }catch{return false;}
+  // An expired readonly delivery can remain pending after storage returns.
+  // A new bounded lifetime retires its authority without replaying a write.
+  const {result}=await runLocalDeviceStorageAttempt(async attempt=>{
+    try{
+      if(!deviceStore){
+        if(!window.ChainStorageV2||!window.indexedDB||!crypto?.subtle)return false;
+        deviceStore=ChainStorageV2.createDeviceStore({indexedDB:window.indexedDB,crypto,
+          dbName:window.CHAIN_STORAGE_DB_NAME||"chain-scanner-v2",encodeRecoveryValue:encodeManualArchiveValue,
+          openTimeoutMs:window.CHAIN_STORAGE_OPEN_TIMEOUT_MS||5000});
+      }
+      await deviceStore.open();if(!localDeviceStartupCurrent(attempt))return false;window.ScannerDeviceStore=deviceStore;
+      const head=await recoverLocalWorkingDeviceSource({workingBoard:automaticRecoveryClone(state),expectedMemoryHold:hold,bootAttempt:attempt});
+      if(!head||!localDeviceStartupCurrent(attempt))return false;
+      await refreshDeviceBackupCache();if(!localDeviceStartupCurrent(attempt))return false;
+      state=JSON.parse(head.payload);deviceHeadHash=head.hash;lastPersistedRaw=head.payload;
+      storageOK=true;deviceStorageAuthority=true;deviceStorageRequired=false;memoryRecoveryWorkspace=false;
+      unacceptedDeviceSource={reason:"protected-local-working-source",workingWorkspace:true};
+      clearDeviceSaveIssue();render();return true;
+    }catch{return false;}
+  });
+  return !!result;
 }
 function localDeviceStartupCurrent(attempt){
   if(!attempt)return true;
@@ -2935,14 +2943,24 @@ function localDeviceStartupCurrent(attempt){
   if(performance.now()>=attempt.deadline){attempt.expired=true;return false;}
   return true;
 }
-async function initializeDeviceStorage(){
+async function localDeviceStartupWrite(attempt,method,options,store=deviceStore){
+  if(!localDeviceStartupCurrent(attempt))return null;
+  if(attempt)attempt.mutationPending=true;
+  try{return await deviceWriteBeforeDiagnostics(method,options,store);}
+  finally{if(attempt)attempt.mutationPending=false;}
+}
+async function runLocalDeviceStorageAttempt(work){
   const configured=Number(window.CHAIN_STORAGE_OPEN_TIMEOUT_MS),timeout=Number.isFinite(configured)&&configured>0?configured:5000,
-    attempt={expired:false,pending:true,deadline:performance.now()+timeout};
+    attempt={expired:false,pending:true,mutationPending:false,deadline:performance.now()+timeout};
   localDeviceStartupAttempt=attempt;
   let timer;
-  const work=initializeDeviceStorageWithinBudget(attempt).catch(()=>null).finally(()=>{attempt.pending=false;});
+  const pending=work(attempt).catch(()=>null).finally(()=>{attempt.pending=false;});
   const expired=new Promise(resolve=>{timer=setTimeout(()=>{attempt.expired=true;resolve(null);},timeout);});
-  const result=await Promise.race([work,expired]);clearTimeout(timer);
+  const result=await Promise.race([pending,expired]);clearTimeout(timer);
+  return {result,attempt,timeout};
+}
+async function initializeDeviceStorage(){
+  const {result,attempt,timeout}=await runLocalDeviceStorageAttempt(initializeDeviceStorageWithinBudget);
   if(attempt.expired){
     deviceStorageAuthority=false;deviceStorageRequired=true;
     unacceptedDeviceSource={reason:"unavailable-device-storage"};
@@ -2980,7 +2998,7 @@ async function initializeDeviceStorageWithinBudget(bootAttempt){
     }
     if(!head&&legacy&&!deviceStorageRequired){
       const migration=legacyMigrationBundle(legacy,legacyCopies),sourceFingerprint=await ChainStorageV2.hashPayload(legacySignature);
-      const result=await deviceWriteBeforeDiagnostics("migrateLegacy",{headPayload:migration.headPayload,account:JSON.parse(legacy).syncAccount??null,
+      const result=await localDeviceStartupWrite(bootAttempt,"migrateLegacy",{headPayload:migration.headPayload,account:JSON.parse(legacy).syncAccount??null,
         sourceFingerprint,backups:migration.rows,opaqueArchives:migration.opaqueArchives});
       if(!localDeviceStartupCurrent(bootAttempt)||!result?.ok||!result.verified) return null;
       head=await deviceStore.readHead();

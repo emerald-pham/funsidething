@@ -2178,3 +2178,6 @@ This boundary control holds a successful real provider reply, installs a later a
 - A supported released backend's byte-exact v1 retained board can repair current missing cloud chunks through real cloudPull with no device store; only the known version upgrade is allowed, including an exact retained copy. Unknown versions, foreign ownership, lossy original fields and unsupported decision facts remain held with exact original pins/bytes: `RISK independent cloud legacy source: supported released v1 boards upgrade only their version during server-only repair`.
 
 - RISK offline working ownership: startup binds explicit null and proved browser UID while preserving ambiguous alternatives
+
+- RISK offline startup resume: fresh storage saves accepted memory work while an expired readonly delivery remains withheld
+- RISK offline startup resume budget: fresh stalled captures stop and uncertain started writes never replay
