@@ -1,5 +1,23 @@
 [
   {
+    "baseCommit": "daa757649f0d0c2e5bd8e7283987b216d26de638",
+    "testChangesSha256": "19ac142e0ee278f69fec32d91232a65ff6917fd3a0b2882f0e75b61a9159f722",
+    "reason": "Correct the existing cloud-backend test fixture to emulate Firestore read-time snapshots and exercise that contract through its SDK boundary, so later Map changes cannot rewrite facts held by recovery consumers.",
+    "previousBehavior": "snap() recomputed exists() from the mutable docs Map and data() cloned the current Map value only when called. Existing direct, server-query, and transaction snapshots therefore changed retroactively after nested mutation, replacement, or deletion; a held absent snapshot could also become present after creation.",
+    "intendedBehavior": "Capture existence and a deep copy synchronously when each fixture snapshot is created, and return a fresh deep copy of that captured payload from data(). Held direct/server documents, query rows, and transaction reads keep their read-time facts through later mutations while fresh reads observe the changed state.",
+    "replacementTests": [
+      "RISK backend fixture: Firestore read snapshots retain existence and deep payload"
+    ],
+    "preservedCoverage": [
+      "The new contract calls direct getDoc, getDocFromServer, getDocsFromServer, and transaction tx.get through the exact SDK object installed in the existing backend consumer fixture. It covers deep mutation, replacement, deletion, creation of an absent document, and fresh reads after changes.",
+      "The fixture retains its outage and shutdown gates, transaction and batch behavior, time controls, subscriptions, and every existing cloud consumer. Only the test helper exposes its merged SDK object; no product runtime, cloud protocol, FAQ, rules, saved data, or release metadata changes."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/issue-275-snapshot/funsidething --evidence-dir /Users/emeraldpham/Documents/GitHub/funsidething/.git/agent-test-runs/issue-275/snapshot276/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern '^RISK backend fixture: Firestore read snapshots retain existence and deep payload$' tests.js",
+      "failure": "On unchanged base daa757649f0d0c2e5bd8e7283987b216d26de638, all three nested route cases failed because their held snapshot reflected a later nested mutation: direct document, server-query row, and transaction read. The complete assertion-failure record and stdout are retained at /Users/emeraldpham/Documents/GitHub/funsidething/.git/agent-test-runs/issue-275/snapshot276/runs/2026-10-25T14-01-46-866Z-6e5ec00c-ad9c-4667-acba-6e6dc45a1fce.json and its .stdout.txt file."
+    }
+  },
+  {
     "baseCommit": "fa243c82b300994c19bcb88aa56a34504d0f236b",
     "testChangesSha256": "f9d28abeac085f1855cdb64318a707d4a0c33e837bf3aaebe65bbb8b2bb75dbf",
     "reason": "Make the existing failed-consumer cleanup control reliably model an unavailable source. Exact-main CI showed its intentionally failed child succeeding because the late root-only refusal left other actual SDK paths available.",

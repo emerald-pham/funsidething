@@ -16342,7 +16342,10 @@ async function loadCloudBackendV2({artifacts=null,sharedDocs=null,rootData=null,
  if(rootData)docs.set(rootPath,clone(rootData));
  const pathOf=(parts)=>parts.filter(part=>part!==undefined).join('/');
  const ref=(...parts)=>({path:pathOf(parts),id:String(parts.at(-1))});
- const snap=reference=>({id:reference.id,ref:reference,exists:()=>docs.has(reference.path),data:()=>clone(docs.get(reference.path))});
+ const snap=reference=>{
+  const observedExists=docs.has(reference.path),observedData=observedExists?clone(docs.get(reference.path)):undefined;
+  return {id:reference.id,ref:reference,exists:()=>observedExists,data:()=>observedExists?clone(observedData):undefined};
+ };
  const directRows=collectionRef=>[...docs].filter(([key])=>key.startsWith(collectionRef.path+'/')&&
   !key.slice(collectionRef.path.length+1).includes('/')).map(([key])=>snap(ref(...key.split('/')))).slice(0,collectionRef.limit??Infinity);
  const writes=[],popupProviders=[],authCalls=[],queries=[],network=[];let batchCommits=0,transactionCalls=0;
@@ -16388,15 +16391,80 @@ async function loadCloudBackendV2({artifacts=null,sharedDocs=null,rootData=null,
   };
  }
  if(!runtimeWindow||recordSyncError!==undefined)window.recordSyncError=recordSyncError;
- const context=vm.createContext({window,CustomEvent:class{constructor(type,options){this.type=type;this.detail=options?.detail;}},__cloudModules:[{initializeApp:()=>({})},A,firebaseSDK?{...F,...firebaseSDK}:F],
+ const sdk=firebaseSDK?{...F,...firebaseSDK}:F;
+ const context=vm.createContext({window,CustomEvent:class{constructor(type,options){this.type=type;this.detail=options?.detail;}},__cloudModules:[{initializeApp:()=>({})},A,sdk],
   console,crypto:cryptoProvider,TextEncoder,TextDecoder,Uint8Array,structuredClone,performance:timerProvider?.performance??performance,...(timerProvider?.Date?{Date:timerProvider.Date}:{}),setTimeout:timerProvider?.setTimeout??setTimeout,clearTimeout:timerProvider?.clearTimeout??clearTimeout});context.globalThis=context;
  for(const file of ['device-store-v2.js','cloud-store-v2.js'])vm.runInContext(artifacts?(file==='device-store-v2.js'?artifacts.storage:artifacts.cloud):fs.readFileSync(path.join(__dirname,file),'utf8'),context,{filename:file});
  if(!runtimeWindow)window.ChainStorageV2=context.ChainStorageV2;window.ChainCloudV2=context.ChainCloudV2;
  await vm.runInContext(`(async()=>{${moduleSource}\n})()`,context,{filename:'index.html#cloud-v2-backend'});
- return {CS:window.CloudSync,auth,docs,pending,events,batchCommits,writes,popupProviders,authCalls,transactionCalls,queries,network,subscriptions,
+ return {CS:window.CloudSync,sdk,auth,docs,pending,events,batchCommits,writes,popupProviders,authCalls,transactionCalls,queries,network,subscriptions,
   emitSnapshot(entry,data,{fromCache=false,hasPendingWrites=false}={}){entry.next({exists:()=>data!==null,data:()=>clone(data),metadata:{fromCache,hasPendingWrites}});},
   emitAuth(user){auth.currentUser=user;authListener?.(user);}};
 }
+
+test('RISK backend fixture: Firestore read snapshots retain existence and deep payload',async t=>{
+ await t.test('direct reads retain the original payload through mutation, replacement, and deletion',async t=>{
+  const h=await loadCloudBackendV2({failures:{authPending:true},timeoutMs:5000});t.after(()=>h.CS.suspend());
+  const db=h.sdk.getFirestore(),rootRef=h.sdk.doc(db,'users','owner'),rootPath=rootRef.path;
+  const original={nested:{tasks:[{id:'read-time'}],opaque:{values:[1,2]}}};h.docs.set(rootPath,structuredClone(original));
+  const direct=await h.sdk.getDoc(rootRef),server=await h.sdk.getDocFromServer(rootRef);
+  h.docs.get(rootPath).nested.tasks[0].id='later';h.docs.get(rootPath).nested.opaque.values.push(3);
+  assert.deepEqual(direct.data(),original,'a direct read retains a deep copy from its read time');
+  assert.deepEqual(server.data(),original,'a server read retains a deep copy from its read time');
+  const replacement={nested:{tasks:[{id:'replacement'}],opaque:{values:[9]}}};h.docs.set(rootPath,structuredClone(replacement));
+  assert.equal(direct.exists(),true);assert.equal(server.exists(),true);
+  assert.deepEqual(direct.data(),original,'replacement does not rewrite the held direct snapshot');
+  const freshReplacement=await h.sdk.getDoc(rootRef);assert.deepEqual(freshReplacement.data(),replacement,'a fresh direct read sees the replacement');
+  h.docs.delete(rootPath);
+  assert.equal(direct.exists(),true,'deletion does not rewrite the held direct snapshot existence');
+  assert.deepEqual(direct.data(),original,'deletion does not erase the held direct snapshot payload');
+  assert.equal(server.exists(),true,'deletion does not rewrite the held server snapshot existence');
+  const absentDirect=await h.sdk.getDoc(rootRef),absentServer=await h.sdk.getDocFromServer(rootRef);
+  assert.equal(absentDirect.exists(),false);assert.equal(absentServer.exists(),false);
+  const created={nested:{tasks:[{id:'created'}],opaque:{values:[7]}}};h.docs.set(rootPath,structuredClone(created));
+  assert.equal(absentDirect.exists(),false,'creation does not rewrite a held absent direct snapshot');assert.equal(absentDirect.data(),undefined);
+  assert.equal(absentServer.exists(),false,'creation does not rewrite a held absent server snapshot');assert.equal(absentServer.data(),undefined);
+  assert.deepEqual((await h.sdk.getDoc(rootRef)).data(),created,'a fresh direct read sees creation');
+  assert.deepEqual((await h.sdk.getDocFromServer(rootRef)).data(),created,'a fresh server read sees creation');
+ });
+ await t.test('server-query snapshots retain originals and fresh queries see replacement, deletion, and creation',async t=>{
+  const h=await loadCloudBackendV2({failures:{authPending:true},timeoutMs:5000});t.after(()=>h.CS.suspend());
+  const db=h.sdk.getFirestore(),collection=h.sdk.collection(db,'users','owner','generations','g','chunks');
+  const queryRef=h.sdk.query(collection,h.sdk.limit(10)),rowRef=h.sdk.doc(db,'users','owner','generations','g','chunks','c0');
+  const original={index:0,payload:{nested:{values:['read-time']}}};h.docs.set(rowRef.path,structuredClone(original));
+  const first=(await h.sdk.getDocsFromServer(queryRef)).docs[0];assert.ok(first);assert.equal(first.exists(),true);
+  h.docs.get(rowRef.path).payload.nested.values.push('later');
+  assert.deepEqual(first.data(),original,'a server-query row keeps its deep read-time payload');
+  const replacement={index:0,payload:{nested:{values:['replacement']}}};h.docs.set(rowRef.path,structuredClone(replacement));
+  assert.equal(first.exists(),true);assert.deepEqual(first.data(),original,'replacement does not rewrite the held query snapshot');
+  const freshReplacement=(await h.sdk.getDocsFromServer(queryRef)).docs[0];assert.deepEqual(freshReplacement.data(),replacement,'a fresh query sees the replacement');
+  h.docs.delete(rowRef.path);assert.equal(first.exists(),true,'deletion does not rewrite the held query snapshot existence');
+  assert.deepEqual(first.data(),original);
+  assert.deepEqual((await h.sdk.getDocsFromServer(queryRef)).docs,[],'a fresh query sees deletion');
+  const createdRef=h.sdk.doc(db,'users','owner','generations','g','chunks','created'),created={index:1,payload:{nested:{values:['created']}}};
+  const absent=await h.sdk.getDoc(createdRef);assert.equal(absent.exists(),false);h.docs.set(createdRef.path,structuredClone(created));
+  assert.equal(absent.exists(),false,'creation does not rewrite a held absent snapshot');assert.equal(absent.data(),undefined);
+  const freshRows=(await h.sdk.getDocsFromServer(queryRef)).docs;assert.ok(freshRows.some(snapshot=>snapshot.ref.path===createdRef.path),'a fresh query sees creation');
+ });
+ await t.test('transaction snapshots retain their read-time document through replacement, deletion, and creation',async t=>{
+  const h=await loadCloudBackendV2({failures:{authPending:true},timeoutMs:5000});t.after(()=>h.CS.suspend());
+  const db=h.sdk.getFirestore(),rootRef=h.sdk.doc(db,'users','owner'),rootPath=rootRef.path;
+  const original={nested:{tasks:[{id:'read-time'}],opaque:{values:[1,2]}}};h.docs.set(rootPath,structuredClone(original));
+  const held=await h.sdk.runTransaction(db,tx=>tx.get(rootRef));
+  h.docs.get(rootPath).nested.tasks[0].id='later';h.docs.get(rootPath).nested.opaque.values.push(3);
+  assert.deepEqual(held.data(),original,'a transaction read retains a deep copy from its read time');
+  const replacement={nested:{tasks:[{id:'replacement'}],opaque:{values:[9]}}};h.docs.set(rootPath,structuredClone(replacement));
+  assert.equal(held.exists(),true);assert.deepEqual(held.data(),original,'replacement does not rewrite the held transaction snapshot');
+  const freshReplacement=await h.sdk.runTransaction(db,tx=>tx.get(rootRef));assert.deepEqual(freshReplacement.data(),replacement,'a fresh transaction read sees the replacement');
+  h.docs.delete(rootPath);assert.equal(held.exists(),true,'deletion does not rewrite the held transaction snapshot existence');
+  assert.deepEqual(held.data(),original);const freshMissing=await h.sdk.runTransaction(db,tx=>tx.get(rootRef));
+  assert.equal(freshMissing.exists(),false);assert.equal(freshMissing.data(),undefined);
+  const createdRef=h.sdk.doc(db,'users','owner','new-document'),absent=await h.sdk.runTransaction(db,tx=>tx.get(createdRef));
+  const created={nested:{values:['created']}};h.docs.set(createdRef.path,structuredClone(created));
+  assert.equal(absent.exists(),false,'creation does not rewrite a held absent transaction snapshot');assert.equal(absent.data(),undefined);
+  const freshCreated=await h.sdk.runTransaction(db,tx=>tx.get(createdRef));assert.equal(freshCreated.exists(),true);assert.deepEqual(freshCreated.data(),created);
+ });
+});
 
 test('RISK decision capability adapter: first decision activates a sticky fence while plain legacy boards remain compatible',async()=>{
  const h=await loadCloudBackendV2({timeoutMs:5000});
