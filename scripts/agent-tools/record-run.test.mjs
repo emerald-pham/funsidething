@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { test } from 'node:test';
-import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -27,8 +27,8 @@ async function createCommittedRepository(root) {
   return repo;
 }
 
-function invokeRecorder({ repo, evidence, purpose, command, args = [], extraOptions = [] }) {
-  const env = { ...process.env };
+function invokeRecorder({ repo, evidence, purpose, command, args = [], extraOptions = [], env: overrides = {} }) {
+  const env = { ...process.env, ...overrides };
   delete env.NODE_TEST_CONTEXT;
   return spawnSync(node, [recorder, '--repo', repo, '--evidence-dir', evidence, '--purpose', purpose, ...extraOptions, '--', command, ...args], {
     cwd: repo,
@@ -36,6 +36,44 @@ function invokeRecorder({ repo, evidence, purpose, command, args = [], extraOpti
     timeout: 15000,
     env,
   });
+}
+
+async function createQualificationFixture(t) {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'record-run-qualification-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(root);
+  const commit = spawnSync('git', ['-C', repo, 'rev-parse', 'HEAD'], { encoding: 'utf8' });
+  const tree = spawnSync('git', ['-C', repo, 'rev-parse', 'HEAD^{tree}'], { encoding: 'utf8' });
+  assert.equal(commit.status, 0, commit.stderr);
+  assert.equal(tree.status, 0, tree.stderr);
+  const deliveryPort = 51631;
+  const smokePort = 51632;
+  const ledger = path.join(root, 'coordination.json');
+  const resources = [`loopback:127.0.0.1:${deliveryPort}`, `loopback:127.0.0.1:${smokePort}`];
+  await writeFile(ledger, JSON.stringify({ version: 1, scope: 'codex-wide', entries: [{ id: 'fixture-owner', status: 'active', worktree: repo, resources }] }));
+  return {
+    root,
+    repo,
+    commit: commit.stdout.trim(),
+    tree: tree.stdout.trim(),
+    evidence: path.join(root, 'recorder-evidence'),
+    nativeOutput: path.join(root, 'native-output'),
+    sentinel: path.join(root, 'expensive-child-launched'),
+    ledger,
+    deliveryPort,
+    smokePort,
+    env: {
+      CI: '',
+      CODEX_COORDINATION_FILE: ledger,
+      DOW_EMULATOR_COORDINATION_FILE: '',
+      CHAIN_NATIVE_CANDIDATE_SHA: commit.stdout.trim(),
+      CHAIN_NATIVE_CANDIDATE_TREE: tree.stdout.trim(),
+      CHAIN_NATIVE_OUTPUT: path.join(root, 'native-output'),
+      CHAIN_NATIVE_PORT: String(deliveryPort),
+      CHAIN_NATIVE_SMOKE_PORT: String(smokePort),
+      CHAIN_QUALIFICATION_READINESS_SENTINEL: path.join(root, 'expensive-child-launched'),
+    },
+  };
 }
 
 function evidencePathFrom(result) {
@@ -50,6 +88,140 @@ function summaryFrom(result) {
   assert.equal(lines.length, 1, `expected one JSON summary line, got ${lines.length} lines`);
   return JSON.parse(lines[0]);
 }
+
+test('qualification readiness creates evidence destinations and launches the requested child', async (t) => {
+  const fixture = await createQualificationFixture(t);
+  const result = invokeRecorder({
+    repo: fixture.repo,
+    evidence: fixture.evidence,
+    purpose: 'green',
+    command: node,
+    args: ['-e', "require('node:fs').writeFileSync(process.env.CHAIN_QUALIFICATION_READINESS_SENTINEL, 'launched')"],
+    extraOptions: ['--qualification-readiness', '--summary'],
+    env: fixture.env,
+  });
+
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  const summary = summaryFrom(result);
+  assert.equal(summary.status, 'passed');
+  assert.equal(await readFile(fixture.sentinel, 'utf8'), 'launched');
+  assert.ok((await readdir(fixture.evidence)).length >= 3, 'recorder metadata and child streams are retained');
+  assert.ok((await readdir(fixture.nativeOutput)).length === 0, 'readiness probes leave no files in the native evidence destination');
+  const record = JSON.parse(await readFile(summary.evidence.metadataPath, 'utf8'));
+  assert.equal(record.git.commit, fixture.commit);
+});
+
+async function assertQualificationSetupRejected(t, fixture, { env = {}, evidence = fixture.evidence, expectedError }) {
+  const result = invokeRecorder({
+    repo: fixture.repo,
+    evidence,
+    purpose: 'green',
+    command: node,
+    args: ['-e', "require('node:fs').writeFileSync(process.env.CHAIN_QUALIFICATION_READINESS_SENTINEL, 'launched')"],
+    extraOptions: ['--qualification-readiness', '--summary'],
+    env: { ...fixture.env, ...env },
+  });
+  assert.notEqual(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.match(result.stderr, expectedError, `${result.stdout}\n${result.stderr}`);
+  await assert.rejects(readFile(fixture.sentinel, 'utf8'), { code: 'ENOENT' }, 'the expensive child never starts on invalid setup');
+}
+
+test('qualification readiness rejects missing and stale committed candidate identity before launch', async (t) => {
+  const missing = await createQualificationFixture(t);
+  await assertQualificationSetupRejected(t, missing, {
+    env: { CHAIN_NATIVE_CANDIDATE_SHA: '' },
+    expectedError: /CHAIN_NATIVE_CANDIDATE_SHA/,
+  });
+
+  const staleSha = await createQualificationFixture(t);
+  await assertQualificationSetupRejected(t, staleSha, {
+    env: { CHAIN_NATIVE_CANDIDATE_SHA: '0'.repeat(40) },
+    expectedError: /CHAIN_NATIVE_CANDIDATE_SHA/,
+  });
+
+  const stale = await createQualificationFixture(t);
+  await assertQualificationSetupRejected(t, stale, {
+    env: { CHAIN_NATIVE_CANDIDATE_TREE: '0'.repeat(40) },
+    expectedError: /CHAIN_NATIVE_CANDIDATE_TREE/,
+  });
+});
+
+test('qualification readiness requires distinct explicit local ports and rejects CI mode', async (t) => {
+  const missing = await createQualificationFixture(t);
+  await assertQualificationSetupRejected(t, missing, {
+    env: { CI: '', CHAIN_NATIVE_PORT: '', CHAIN_NATIVE_SMOKE_PORT: '' },
+    expectedError: /CHAIN_NATIVE_PORT/,
+  });
+
+  const missingSmoke = await createQualificationFixture(t);
+  await assertQualificationSetupRejected(t, missingSmoke, {
+    env: { CI: 'true', CHAIN_NATIVE_SMOKE_PORT: '' },
+    expectedError: /CHAIN_NATIVE_SMOKE_PORT/,
+  });
+
+  const same = await createQualificationFixture(t);
+  await assertQualificationSetupRejected(t, same, {
+    env: { CI: '', CHAIN_NATIVE_SMOKE_PORT: String(same.deliveryPort) },
+    expectedError: /must be distinct/,
+  });
+
+  const ciMode = await createQualificationFixture(t);
+  await assertQualificationSetupRejected(t, ciMode, {
+    env: { CI: 'true' },
+    expectedError: /CI=true.*local qualification/,
+  });
+});
+
+test('qualification readiness requires live host ownership for both native ports', async (t) => {
+  const unowned = await createQualificationFixture(t);
+  await writeFile(unowned.ledger, JSON.stringify({ version: 1, scope: 'codex-wide', entries: [{
+    id: 'fixture-owner',
+    status: 'active', worktree: unowned.repo, resources: [`loopback:127.0.0.1:${unowned.deliveryPort}`],
+  }] }));
+  await assertQualificationSetupRejected(t, unowned, { expectedError: /CHAIN_NATIVE_SMOKE_PORT.*active worktree/ });
+
+  const conflict = await createQualificationFixture(t);
+  await writeFile(conflict.ledger, JSON.stringify({ version: 1, scope: 'codex-wide', entries: [
+    { id: 'fixture-owner', status: 'active', worktree: conflict.repo, resources: [`loopback:127.0.0.1:${conflict.deliveryPort}`, `loopback:127.0.0.1:${conflict.smokePort}`] },
+    { id: 'other-owner', status: 'parked', worktree: path.join(conflict.root, 'other-repo'), resources: [`loopback:127.0.0.1:${conflict.smokePort}`] },
+  ] }));
+  await assertQualificationSetupRejected(t, conflict, { expectedError: /already owned by another active or parked worktree/ });
+});
+
+test('qualification readiness rejects dirty candidates and unusable evidence destinations before launch', async (t) => {
+  const dirty = await createQualificationFixture(t);
+  await writeFile(path.join(dirty.repo, 'untracked-test.js'), 'export const dirty = true;\n');
+  await assertQualificationSetupRejected(t, dirty, { expectedError: /working tree .*clean/ });
+
+  const unwritable = await createQualificationFixture(t);
+  const evidenceFile = path.join(unwritable.root, 'evidence-file');
+  await writeFile(evidenceFile, 'not a directory');
+  await assertQualificationSetupRejected(t, unwritable, { evidence: evidenceFile, expectedError: /evidence destination.*directory|evidence destination.*writable/i });
+
+  const nativeOutputFile = await createQualificationFixture(t);
+  const outputFile = path.join(nativeOutputFile.root, 'native-output-file');
+  await writeFile(outputFile, 'not a directory');
+  await assertQualificationSetupRejected(t, nativeOutputFile, {
+    env: { CHAIN_NATIVE_OUTPUT: outputFile },
+    expectedError: /CHAIN_NATIVE_OUTPUT evidence destination.*directory|CHAIN_NATIVE_OUTPUT evidence destination.*writable/i,
+  });
+
+  const symlinkedOutput = await createQualificationFixture(t);
+  const insideCheckout = path.join(symlinkedOutput.repo, 'qualification-output');
+  const outputAlias = path.join(symlinkedOutput.root, 'native-output-alias');
+  await symlink(insideCheckout, outputAlias);
+  await assertQualificationSetupRejected(t, symlinkedOutput, {
+    env: { CHAIN_NATIVE_OUTPUT: outputAlias },
+    expectedError: /outside the candidate Git worktree|resolve|writable/,
+  });
+  await assert.rejects(stat(insideCheckout), { code: 'ENOENT' }, 'a broken output symlink cannot create evidence inside the candidate checkout');
+
+  const overlapping = await createQualificationFixture(t);
+  await assertQualificationSetupRejected(t, overlapping, {
+    env: { CHAIN_NATIVE_OUTPUT: overlapping.evidence },
+    expectedError: /separate, non-overlapping directories/,
+  });
+});
 
 test('redacts evidence path metadata while retaining real files and child failure status', async (t) => {
   const temp = await mkdtemp(path.join(os.tmpdir(), 'record-run-private-path-'));

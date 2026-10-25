@@ -179,6 +179,20 @@ function createFixture(t, options = {}) {
   return { root, baselineSha, comparisonBase, sourceSha, outputs, coreTitle, groupAssignments };
 }
 
+function isolatedFixtureNativeOutput(fixture, inheritedEnvironment = process.env) {
+  const output = fs.mkdtempSync(path.join(os.tmpdir(), 'chain-test-group-native-fixture-'));
+  fixture.outputs.push(output);
+  return {
+    output,
+    env: {
+      ...inheritedEnvironment,
+      CHAIN_NATIVE_OUTPUT: output,
+      CHAIN_NATIVE_CANDIDATE_SHA: fixture.sourceSha,
+      CHAIN_NATIVE_CANDIDATE_TREE: git(fixture.root, 'rev-parse', 'HEAD^{tree}'),
+    },
+  };
+}
+
 function invoke(fixture, { group = 'core', env = {}, repository = 'example/fixture', outputDir: requestedOutputDir, args = [] } = {}) {
   const outputDir = requestedOutputDir || path.join(os.tmpdir(), `chain-test-group-output-${process.pid}-${++outputSerial}`);
   fixture.outputs.push(outputDir);
@@ -306,10 +320,33 @@ function parseTapIds(output) {
 
 test('test group runner reconciles complete full and grouped fixture cohorts', t => {
   const fixture = createFixture(t);
-  const fullEnv = { ...process.env };
-  delete fullEnv.NODE_TEST_CONTEXT;
-  const full = run(process.execPath, ['--test', '--test-reporter=tap', 'tests.js', 'scripts/agent-tools/fixture.test.mjs'], fixture.root, fullEnv);
+  const outerNativeOutput = fs.mkdtempSync(path.join(os.tmpdir(), 'chain-test-group-outer-native-'));
+  fs.rmSync(outerNativeOutput, { recursive: true });
+  fixture.outputs.push(outerNativeOutput);
+  const fixtureArgs = ['--test', '--test-reporter=tap', 'tests.js', 'scripts/agent-tools/fixture.test.mjs'];
+  const callerEnv = {
+    ...process.env,
+    CHAIN_NATIVE_OUTPUT: outerNativeOutput,
+    CHAIN_NATIVE_CANDIDATE_SHA: fixture.sourceSha,
+    CHAIN_NATIVE_CANDIDATE_TREE: git(fixture.root, 'rev-parse', 'HEAD^{tree}'),
+  };
+  delete callerEnv.NODE_TEST_CONTEXT;
+  const unisolated = run(process.execPath, fixtureArgs, fixture.root, callerEnv);
+  const unisolatedOutput = `${unisolated.stdout}\n${unisolated.stderr}`;
+  assert.notEqual(unisolated.status, 0, 'the nested fixture proves it writes to its inherited native output without isolation');
+  const negativeControlError = unisolatedOutput.split(/\r?\n/).find(line => line.includes('ENOENT') && line.includes('candidate-identity.json'));
+  assert.ok(negativeControlError, `expected ENOENT for candidate-identity.json, got:\n${unisolatedOutput}`);
+  t.diagnostic(`Nested output negative control: ${negativeControlError}`);
+  assert.equal(fs.existsSync(outerNativeOutput), false, 'the missing caller evidence directory is not created implicitly');
+
+  const nativeFixture = isolatedFixtureNativeOutput(fixture, callerEnv);
+  const fullEnv = { ...nativeFixture.env };
+  assert.notEqual(fullEnv.CHAIN_NATIVE_OUTPUT, callerEnv.CHAIN_NATIVE_OUTPUT, 'the nested fixture gets a separate output directory');
+  const full = run(process.execPath, fixtureArgs, fixture.root, fullEnv);
   assert.equal(full.status, 0, `${full.stdout}\n${full.stderr}`);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(nativeFixture.output, 'candidate-identity.json'), 'utf8')),
+    { sha: fixture.sourceSha, tree: fullEnv.CHAIN_NATIVE_CANDIDATE_TREE }, 'the nested full fixture keeps candidate identity in its own output directory');
+  assert.equal(fs.existsSync(path.join(outerNativeOutput, 'candidate-identity.json')), false, 'the nested fixture does not write into its caller native output');
   const fullIds = parseTapIds(full.stdout).sort();
   const groupedIds = [];
   const cohortDigests = [];
@@ -422,10 +459,13 @@ test('RISK test group runner preserves hash identities and counts only executabl
     const baselineRoot = 'fixture core escaped \\# baseline identity';
     const runtimeRoot = baselineRoot.replace('\\#', '#');
     const fixture = createFixture(t, { coreTitle: baselineRoot, runtimeCoreTitle: runtimeRoot });
-    const fullEnv = { ...process.env };
+    const nativeFixture = isolatedFixtureNativeOutput(fixture);
+    const fullEnv = { ...nativeFixture.env };
     delete fullEnv.NODE_TEST_CONTEXT;
     const full = run(process.execPath, ['--test', '--test-reporter=tap', 'tests.js'], fixture.root, fullEnv);
     assert.equal(full.status, 0, `${full.stdout}\n${full.stderr}`);
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(nativeFixture.output, 'candidate-identity.json'), 'utf8')),
+      { sha: fixture.sourceSha, tree: fullEnv.CHAIN_NATIVE_CANDIDATE_TREE }, 'the nested full fixture writes its own candidate identity');
     assert.ok(full.stdout.includes(`Subtest: ${baselineRoot}`), 'the actual Node TAP process escapes the literal hash in its reported title');
     const result = invoke(fixture);
     const tap = fs.readFileSync(path.join(result.outputDir, 'test.tap'), 'utf8');
