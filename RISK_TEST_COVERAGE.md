@@ -2198,6 +2198,10 @@ This boundary control holds a successful real provider reply, installs a later a
 
 - Actual Firestore SDK/classic-app fixtures share the exact app window and real loaded codecs, preserving live planner, storage and backend authority checks rather than a disconnected module window. Original full-shell acknowledgement and rules-first refusal assertions remain unchanged in `Firestore rules: immutable decision-aware full shell conflicts then safely holds same-account completion-upgrade authority and its local edit` and `Firestore rules: first decision against released rules stays exact and pending until rules-first rollout then retry`.
 
+## Cloud SDK fixture snapshots
+
+- The backend fixture models Firestore reads as snapshots of existence and a deep-copied payload. Direct and server document reads, server-query rows, and transaction reads remain stable across later nested mutation, replacement, deletion, and creation; fresh reads observe the changed state: `RISK backend fixture: Firestore read snapshots retain existence and deep payload`.
+
 ## Cloud recovery interrupted database reads
 
 - RISK cloud recovery device read: a temporary database server failure completes the same review without changing sources
