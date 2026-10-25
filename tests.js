@@ -38883,6 +38883,32 @@ function overdueWoopControl(app){
  const tag=html.match(/<button[^>]*data-act="run-woop"[^>]*>/)?.[0];assert.ok(tag,'overdue offered task must expose Run WOOP');
  return {dataset:Object.fromEntries([...tag.matchAll(/data-([a-z]+)="([^"]*)"/g)].map(m=>[m[1],m[2]]))};
 }
+test('RISK overdue WOOP: a newly started scan keeps Next usable and the saved plan through reopening',async t=>{
+ const app=await loadApp({seed:971}),{ctx,shim}=app;t.after(()=>app.dispose());
+ for(let i=0;i<2;i++)ctx.addTask('Overdue walkthrough task '+i,false,[],{due:'2000-01-01'});
+ ctx.onAction('start-scan',{dataset:{}});
+ const candidate=ctx.state.candidateId,benchmarkId=ctx.state.chain.at(-1);
+ assert.ok(candidate&&benchmarkId&&candidate!==benchmarkId,'Start scanning offers an overdue candidate against its automatic first dot');
+ ctx.onAction('run-woop',overdueWoopControl(app));
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/Step 1 of 3/);
+ woopStep(app,'Finish the overdue task');
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/Step 2 of 3/,'Next must advance the newly started scan walkthrough instead of closing it as stale');
+ assert.equal(ctx.state.mode,'work','Run WOOP deliberately pauses scanning while working this task');
+ woopStep(app,'Getting distracted');woopStep(app,'If distracted, then return to the first step');
+ const task=ctx.state.tasks.find(row=>row.id===candidate);
+ assert.equal(task.woopPlan.plan,'If distracted, then return to the first step');
+ assert.equal(ctx.state.chain.filter(id=>id===candidate).length,1,'WOOP chooses its task exactly once');
+ assert.equal(ctx.taskComparisonEligible(task),true,'the chosen task receives the explicit dot even against a neutral automatic benchmark');
+ const saved=await ctx.persist();assert.notEqual(saved,false);
+ const reload=await loadApp({seedStorage:{[STORE_KEY]:JSON.stringify(ctx.state)}});t.after(()=>reload.dispose());
+ assert.equal(reload.ctx.state.mode,'work');
+ assert.equal(reload.ctx.state.tasks.find(row=>row.id===candidate).woopPlan.plan,'If distracted, then return to the first step');
+ assert.ok(reload.ctx.state.chain.includes(benchmarkId),'the automatic benchmark remains in the chain');
+ ctx.undo();ctx.undo();
+ assert.equal(ctx.state.mode,'scan','Undo restores the previous scanner mode together with the explicit dot');
+ assert.equal(ctx.state.chain.includes(candidate),false);
+ assert.equal(ctx.state.chain.at(-1),benchmarkId);
+});
 test('RISK overdue WOOP: offered action dots through existing comparison and saves with Last task WOOP off',async()=>{
  const app=await overdueWoopFixture(),{ctx,shim,task,base}=app;
  assert.equal(ctx.state.settings.lastTaskWoop,false);const control=overdueWoopControl(app);

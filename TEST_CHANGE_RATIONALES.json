@@ -1,5 +1,23 @@
 [
   {
+    "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
+    "testChangesSha256": "15fde5d84d770551d07b3b312fa2286df16f6c8566e05a43bde583acbd815842",
+    "reason": "The required native button walkthrough found that Next closes overdue WOOP after Start creates the first automatic benchmark. Add a minimal two-task regression through the actual Start, Run WOOP and Next consumers.",
+    "previousBehavior": "The explicit overdue WOOP Dot temporarily set mode to work, but did not record that choice in its decision gesture. Decision projection replayed the previous Start scanning fact and restored scan mode, so the next answer failed the session validity guard and closed the walkthrough.",
+    "intendedBehavior": "Record the work-mode choice in the same existing Dot gesture. Next advances and saves the task-owned plan; reopening retains work mode and the plan. Undo restores the previous scanner mode together with the explicit dot.",
+    "replacementTests": [
+      "RISK overdue WOOP: a newly started scan keeps Next usable and the saved plan through reopening"
+    ],
+    "preservedCoverage": [
+      "Existing overdue and Last task WOOP boundaries remain unchanged: stale task, board and account authority, preserved peer plans, unsupported plans, save failure, deliberate successor and cloud reconciliation coverage remain active.",
+      "The automatic neutral benchmark remains neutral; the chosen task receives one explicit dot without an invented rating-history requirement. Saved plans and the previous chain survive reload, and the two actual Undo consumers restore the pre-WOOP scan."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <integration-worktree> --evidence-dir <task-artifacts>/woop/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern='RISK overdue WOOP: a newly started scan' tests.js",
+      "failure": "Native Chromium button scenario fab7972d failed when Next closed the modal with This task changed. Node preimplementation RED1debfd52 minimized it to two overdue tasks and failed empty modal versus Step 2. Diagnostic9c2256e2 confirmed same task and board but mode scan and no recorded work-mode choice. Initial GREEN6da922bf and c8a400e9 reached the repaired step then exposed test-only invalid taskById export and rating-history assumptions; those records remain failures. Corrected GREEN4d7496b2 and extended Undo GREEN4271a750 pass the focused WOOP cohort. Original logs remain outside Git at task-artifacts/webkit-button-safety-20261025/woop/runs; later added Undo assertions are preservation coverage, not a claimed original RED."
+    }
+  },
+  {
     "baseCommit": "7fa87a84ca1c67a43b5fb2d61d6847fc1024e774",
     "testChangesSha256": "e43a2a79d83c575975a63108d6c2d3bc155bf6c818af0c36d70774be4e416938",
     "reason": "Close the failed-connection gap in bounded device-read recovery through the actual Sync and Review consumer. Existing retry tests simulated one request failure, then allowed the same handle to work; the new case keeps that handle unusable until reopened.",

@@ -8218,6 +8218,11 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK overdue WOOP: a newly started scan keeps Next usable and the saved plan through reopening",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK overdue WOOP: existing and legacy plans show explicit delete without silent replacement",
       "group": "core",
       "file": "tests.js"

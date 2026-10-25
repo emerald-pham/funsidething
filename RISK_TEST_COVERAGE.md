@@ -1293,6 +1293,8 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 ## Explicit overdue scanner WOOP
 
+- RISK overdue WOOP: a newly started scan keeps Next usable and the saved plan through reopening
+
 - RISK overdue WOOP: offered action dots through existing comparison and saves with Last task WOOP off
 - RISK overdue WOOP: local due-day boundary stale eligibility and cancel retain the explicit dot
 - RISK overdue WOOP: existing and legacy plans show explicit delete without silent replacement
