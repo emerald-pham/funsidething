@@ -41,7 +41,7 @@ const url=process.argv.at(-1);
 if(url.includes('/runs?')&&x.runSequence?.length){x.runs=x.runSequence.shift();fs.writeFileSync(process.env.ROUTING_GITHUB,JSON.stringify(x));}
 if(url.includes('/pulls?')&&x.pullSequence?.length){x.pulls=x.pullSequence.shift();fs.writeFileSync(process.env.ROUTING_GITHUB,JSON.stringify(x));}
 if(x.error){process.stderr.write('controlled unavailable GitHub');process.exit(22);}
-console.log(JSON.stringify(url.includes('/jobs?')?{total_count:x.jobs.length,jobs:x.jobs}:url.includes('/pulls?')?(x.pulls??[]):url.includes('/git/commits/')?x.merge:{total_count:x.omitRunTotal?undefined:x.runs.length,workflow_runs:x.runs}));
+console.log(JSON.stringify(url.includes('/jobs?')?{total_count:x.jobs.length,jobs:x.jobs}:url.includes('/pulls?')?(x.pulls??[]).map(({mergeable,...listed})=>listed):url.includes('/pulls/')?x.pulls?.[0]:url.includes('/git/commits/')?x.merge:{total_count:x.omitRunTotal?undefined:x.runs.length,workflow_runs:x.runs}));
 `);
   writeFileSync(path.join(bin, 'node'), '#!/bin/sh\nif [ "$1" = "-p" ] && [ "$ROUTING_READ_FAILURE" = "1" ]; then exit 1; fi\nexec ' + JSON.stringify(process.execPath) + ' "$@"\n');
   chmodSync(path.join(bin, 'node'), 0o755);
@@ -106,6 +106,7 @@ test('workflow avoids a second complete cohort only for an already successful ex
   published(f, first.record);
   const second = invoke(f);
   assert.equal(second.status, 0, second.stderr);
+  assert.ok(second.record.observations.every(observation => observation.exitCode === 0), second.stdout);
   assert.equal(executions(f).length, 1, 'an equivalent completed cohort must not execute twice');
   assert.equal(second.record?.decision, 'reuse');
   assert.deepEqual(second.record?.coveredBy, { runId: '71', runAttempt: '2', checkoutSha: f.merge, checkoutTree: f.tree, comparisonBase: f.base });

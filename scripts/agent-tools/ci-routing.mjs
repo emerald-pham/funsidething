@@ -76,7 +76,10 @@ async function main() {
     if (!process.env.GITHUB_REF?.startsWith('refs/heads/') || !branch) throw new Error('Unknown source branch.');
     const pulls = readApi(`pulls?state=open&head=${encodeURIComponent(repository.split('/')[0] + ':' + branch)}&per_page=100`);
     if (!Array.isArray(pulls) || pulls.length !== 1) throw new Error('No unique open PR for this branch.');
-    const pull = pulls[0];
+    if (!decimal(pulls[0]?.number)) throw new Error('Open PR number is unavailable.');
+    // List responses omit mergeability; read the exact PR before trusting its merge.
+    const pull = readApi(`pulls/${pulls[0].number}`);
+    if (pull.number !== pulls[0].number) throw new Error('PR detail identity changed.');
     if (pull.state !== 'open' || !decimal(pull.number) || pull.mergeable !== true || !sha(pull.merge_commit_sha)
       || pull.head?.sha !== sourceSha || pull.head?.ref !== branch || pull.head?.repo?.full_name !== repository
       || pull.base?.repo?.full_name !== repository || !sha(pull.base?.sha)) throw new Error('Open PR identity or merge state is uncertain.');
