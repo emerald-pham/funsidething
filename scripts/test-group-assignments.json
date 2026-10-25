@@ -4033,7 +4033,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK automatic recovery defaults: an unaccepted device uses stable source keys and preserves exact alternatives",
+      "root": "RISK automatic recovery defaults: a protected local browser baseline keeps its accepted value and exact alternatives",
       "group": "core",
       "file": "tests.js"
     },
@@ -7773,7 +7773,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK malformed device recovery capture: inaccessible and unsupported archives retain typed refusals",
+      "root": "RISK malformed device recovery capture: working-source refusals remain typed and preserve originals",
       "group": "core",
       "file": "tests.js"
     },
@@ -10833,7 +10833,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK unreadable device recovery: an unsupported saved version cannot be replaced by Quick start or ordinary saving",
+      "root": "RISK unreadable device recovery: an unsupported original remains protected while a distinct working workspace accepts saving",
       "group": "core",
       "file": "tests.js"
     },
@@ -10858,7 +10858,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK unreadable device recovery: placeholder actions cannot create backups and unsupported selected decisions stay evidence",
+      "root": "RISK unreadable device recovery: workspace backups retain original evidence and unsupported selected decisions stay evidence",
       "group": "core",
       "file": "tests.js"
     },
@@ -12486,6 +12486,61 @@
       "root": "RISK independent cloud failure status: protected terminal errors stay visible until verified server recovery",
       "group": "persistence-recovery",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK offline working recovery: surviving linked backups open useful protected work before any network",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK offline working recovery: verified protected archive and browser decisions combine without foreign sources",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK offline working reconnect: current offline edits and retained peer work reach exact cloud acknowledgement",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK offline new-work recovery: absent complete original opens a distinct durable workspace and preserves unseen cloud tasks",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK offline memory recovery: refused durable media still permit new work with an honest unsaved status",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK offline memory recovery resume: returning storage saves current new work without replacing the refused original",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK offline working authority: a changed original archive cannot activate a claimed recovered working head",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK offline working archives: prior exact originals are referenced without recursively copying their bytes",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK offline working reconnect guards: changed source hold pending draft and account retain the current workspace",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK offline startup budget: stalled open and raw reads expose unsaved work without late adoption",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK offline memory restore: a deliberate Paste after storage returns protects accepted unsaved work",
+      "group": "persistence-recovery",
+      "file": "tests.js"
     }
   ],
   "processControls": [
@@ -12512,6 +12567,38 @@
       "group": "native-process",
       "file": "tests.js",
       "reason": "Ticket #267 renamed the startup root to describe its one-browser isolated-context fixture; all four theme and viewport child cases and assertions remain."
+    },
+    {
+      "baselineRoot": "RISK unreadable device recovery: an unsupported saved version cannot be replaced by Quick start or ordinary saving",
+      "currentRoot": "RISK unreadable device recovery: an unsupported original remains protected while a distinct working workspace accepts saving",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "User explicitly requested useful protected offline recovery rather than an unaccepted placeholder. Preserve raw originals, unknown data, manual Restore, source CAS and authority assertions while identifying the working workspace; see exact-source offline-working/HANDOFF.md and original RED/GREEN evidence."
+    },
+    {
+      "baselineRoot": "RISK unreadable device recovery: placeholder actions cannot create backups and unsupported selected decisions stay evidence",
+      "currentRoot": "RISK unreadable device recovery: workspace backups retain original evidence and unsupported selected decisions stay evidence",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "User explicitly requested useful protected offline recovery rather than an unaccepted placeholder. Preserve raw originals, unknown data, manual Restore, source CAS and authority assertions while identifying the working workspace; see exact-source offline-working/HANDOFF.md and original RED/GREEN evidence."
+    },
+    {
+      "baselineRoot": "RISK malformed device recovery capture: inaccessible and unsupported archives retain typed refusals",
+      "currentRoot": "RISK malformed device recovery capture: working-source refusals remain typed and preserve originals",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "User explicitly requested useful protected offline recovery rather than an unaccepted placeholder. Preserve raw originals, unknown data, manual Restore, source CAS and authority assertions while identifying the working workspace; see exact-source offline-working/HANDOFF.md and original RED/GREEN evidence."
+    },
+    {
+      "baselineRoot": "RISK automatic recovery defaults: an unaccepted device uses stable source keys and preserves exact alternatives",
+      "currentRoot": "RISK automatic recovery defaults: a protected local browser baseline keeps its accepted value and exact alternatives",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "User explicitly requested useful protected offline recovery rather than an unaccepted placeholder. Preserve raw originals, unknown data, manual Restore, source CAS and authority assertions while identifying the working workspace; see exact-source offline-working/HANDOFF.md and original RED/GREEN evidence."
     }
   ]
 }
