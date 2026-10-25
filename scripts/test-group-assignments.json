@@ -12741,6 +12741,41 @@
       "root": "RISK DATABASE REPAIR EXPORT: reload help routes users to the combined export after standalone log exporters are removed",
       "group": "core",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: button safety rejects incomplete native action evidence",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: button safety rejects false passes and newly untested actions",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: native button gate detects errors raised by a real click",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: required native button actions execute in Chromium and WebKit",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: native button gate refuses unallocated local launch before browser startup",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: new and duplicate source buttons require native coverage inventory",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "test group aggregate requires both exact native button safety reports",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
     }
   ],
   "processControls": [

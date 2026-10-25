@@ -710,3 +710,11 @@ test('test group catalog routes real declarations despite matching quoted fixtur
     assert.equal(native.evidence.cases.filter(item => item.id === title && item.status === 'passed').length, 1);
   }
 });
+
+test('test group aggregate requires both exact native button safety reports',t=>{
+ const fixture=createFixture(t,{nativeTitle:'RISK repository process: required native button actions execute in Chromium and WebKit'});fixture.originals=new Map();
+ for(const group of groups){const result=invoke(fixture,{group});assert.equal(result.status,0,result.stdout+result.stderr);fixture.originals.set(group,result.outputDir);}
+ const result=aggregateCopy(t,fixture);
+ assert.notEqual(result.status,0,'scanner-tests must reject a passing native root that omitted both required button engine artifacts');
+ assert.match(result.stderr,/Both required distinct native button reports must be present/);
+});

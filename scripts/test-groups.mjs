@@ -679,7 +679,7 @@ function coverageReference(proof, identity) {
   return {contextSha256:proof.contextSha256,cohortContext:context,coveredBy:producer};
 }
 
-function aggregateResults({options, outputDir, descriptor, inventory, assignmentIndex, assignments, files, source}) {
+async function aggregateResults({options, outputDir, descriptor, inventory, assignmentIndex, assignments, files, source}) {
   if (!options.resultsDir || !options.needsJson) fail('Aggregate requires --results-dir and --needs-json.');
   const needs = readJson(options.needsJson, 'actual workflow predecessor results');
   const issues = [], records = [], allCases = new Set();
@@ -760,6 +760,18 @@ function aggregateResults({options, outputDir, descriptor, inventory, assignment
         for (const report of reports) {
           if (report.status !== 'passed' || report.oldCommit !== '779defa4e8c3465fdf535fe17dbe2227d2b76ea1' || report.candidateCommit !== identity.checkoutSha || report.candidateTree !== identity.checkoutTree || !['contextClosed','browserClosed','serverClosed'].every(key=>report.cleanup?.[key]===true)) fail('Native report outcome, actual checkout or cleanup mismatch.');
         }
+      }
+      if (descriptor.groups.find(group=>group.id===id).roots.includes('RISK repository process: required native button actions execute in Chromium and WebKit')) {
+        const reports=[];
+        for(const artifact of record.artifacts||[]){
+          if(!artifact.path.startsWith('native/')||!artifact.path.endsWith('.json'))continue;
+          const report=JSON.parse(verifiedFile(root,artifact.path,artifact.sha256,artifact.bytes));
+          if(report.kind==='button-safety')reports.push(report);
+        }
+        if(reports.length!==2||new Set(reports.map(report=>report.engine)).size!==2||!['chromium','webkit'].every(engine=>reports.some(report=>report.engine===engine)))fail('Both required distinct native button reports must be present.');
+        const bytes=fs.readFileSync(path.join(ROOT,'scripts/button-safety-inventory.json'));
+        const {verifyButtonSafetyReport}=await import('./button-safety.mjs');
+        for(const report of reports)verifyButtonSafetyReport(report,{inventory:JSON.parse(bytes),inventorySha256:sha256(bytes),candidateCommit:identity.checkoutSha,candidateTree:identity.checkoutTree});
       }
       records.push({group:id,resultSha256:sha256(fs.readFileSync(path.join(root,'result.json'))),cases:cases.length,passed:cases.filter(item=>item.status==='passed').length,skipped:cases.filter(item=>item.status==='skipped').length,artifacts:record.artifacts,identity});
     } catch (error) { issues.push(`${id}: ${error.message}`); }

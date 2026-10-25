@@ -45211,3 +45211,61 @@ test('RISK independent cloud boot authority: source-only preflight waits for bou
  assert.equal(JSON.stringify(ctx.state),local);assert.equal(shim.document.getElementById('addInput').value,'Draft after unavailable boot');assert.equal(ctx.state.syncDirty,true);
  assert.equal(JSON.parse(remote.payload).tasks.some(row=>row.title==='Accepted after bounded unavailable boot'),false,'server-only repair never uploads unobserved accepted local work');
 });
+
+test('RISK repository process: button safety rejects incomplete native action evidence',t=>{
+ const directory=fs.mkdtempSync('/tmp/chain-button-process-');t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const report={schemaVersion:1,kind:'button-safety',engine:'webkit',status:'passed',candidateCommit:'a'.repeat(40),candidateTree:'b'.repeat(40),inventorySha256:'c'.repeat(64),requiredActions:['act:add','act:settings'],outcomes:[{action:'act:add',status:'passed',events:['click'],assertions:1,responsive:true}],errors:[],cleanup:{contextClosed:true,browserClosed:true,serverClosed:true}};
+ const file=path.join(directory,'report.json');fs.writeFileSync(file,JSON.stringify(report));
+ const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--verify-report',file],{cwd:__dirname,encoding:'utf8'});
+ assert.equal(result.error,undefined);assert.notEqual(result.status,0,'required native safety gate must reject a passing report missing the Settings click');
+ assert.match(result.stderr,/Missing required button action: act:settings/);
+});
+
+test('RISK repository process: button safety rejects false passes and newly untested actions',async t=>{
+ const directory=fs.mkdtempSync('/tmp/chain-button-contract-');t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const manifest={schemaVersion:1,requiredActions:['act:add','act:settings']},inventory=path.join(directory,'inventory.json');fs.writeFileSync(inventory,JSON.stringify(manifest));
+ const good={schemaVersion:1,kind:'button-safety',engine:'webkit',status:'passed',candidateCommit:'a'.repeat(40),candidateTree:'b'.repeat(40),inventorySha256:createHash('sha256').update(fs.readFileSync(inventory)).digest('hex'),requiredActions:manifest.requiredActions,outcomes:manifest.requiredActions.map(action=>({action,status:'passed',events:['click'],assertions:1,responsive:true})),errors:[],observedActions:manifest.requiredActions,cleanup:{contextClosed:true,browserClosed:true,serverClosed:true}};
+ const variants={
+  duplicate:r=>r.outcomes.push(r.outcomes[0]), skipped:r=>r.outcomes[0].status='skipped', cancelled:r=>r.outcomes[0].status='cancelled', noClick:r=>r.outcomes[0].events=[], noAssertion:r=>r.outcomes[0].assertions=0, stalled:r=>r.outcomes[0].responsive=false,
+  crash:r=>r.errors.push('page-crash'), close:r=>r.errors.push('unexpected-close'), reload:r=>r.errors.push('unexpected-reload'), navigation:r=>r.errors.push('unexpected-navigation'), pageerror:r=>r.errors.push('pageerror'), unhandled:r=>r.errors.push('unhandledrejection'), unavailable:r=>r.status='unavailable', newAction:r=>r.observedActions.push('act:new-untested'), selfWaived:r=>{r.requiredActions.pop();r.outcomes.pop();}, wrongInventory:r=>r.inventorySha256='d'.repeat(64), cleanup:r=>r.cleanup.browserClosed=false
+ };
+ const invoke=report=>{const file=path.join(directory,'report.json');fs.writeFileSync(file,JSON.stringify(report));return spawnSync(process.execPath,['scripts/button-safety.mjs','--verify-report',file,'--inventory',inventory],{cwd:__dirname,encoding:'utf8'});};
+ assert.equal(invoke(good).status,0,'complete controlled evidence accepted before negative controls');
+ for(const [name,mutate]of Object.entries(variants))await t.test(name,()=>{const report=structuredClone(good);mutate(report);const result=invoke(report);assert.equal(result.error,undefined);assert.notEqual(result.status,0,'native gate must reject '+name+' false pass');assert.doesNotMatch(result.stderr,/SyntaxError|ERR_MODULE_NOT_FOUND/);});
+});
+
+test('RISK repository process: native button gate detects errors raised by a real click',t=>{
+ const output=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(output,'Durable allocated native output required');
+ const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine','chromium','--output-dir',output,'--port',process.env.CHAIN_NATIVE_PORT||'0','--probe','--control','pageerror'],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:45000});
+ assert.equal(result.error,undefined);assert.equal(result.signal,null);assert.notEqual(result.status,0,'actual native Settings click raising pageerror must fail button safety');
+ assert.match(result.stderr,/Native button safety detected.*pageerror/);t.diagnostic(result.stderr);
+});
+
+test('RISK repository process: required native button actions execute in Chromium and WebKit',async t=>{
+ const output=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(output,'Durable allocated native output required');
+ for(const engine of ['chromium','webkit'])await t.test(engine,()=>{
+  const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine',engine,'--output-dir',output,'--port',process.env.CHAIN_NATIVE_PORT||'0'],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:300000,maxBuffer:16*1024*1024});
+  assert.equal(result.error,undefined,'Named engine must be available: '+(result.error?.message||result.stderr));assert.equal(result.signal,null);assert.equal(result.status,0,'Every required native button scenario must pass: '+result.stderr);
+  const paths=result.stdout.split('\n').map(line=>line.match(/^Button evidence: (.+)$/)?.[1]).filter(Boolean);assert.equal(paths.length,1,'One exact native button report per engine');
+  const verified=spawnSync(process.execPath,['scripts/button-safety.mjs','--verify-report',paths[0],'--inventory','scripts/button-safety-inventory.json'],{cwd:__dirname,encoding:'utf8'});
+  assert.equal(verified.status,0,'Actual native report must cover the independent required action inventory: '+verified.stderr);t.diagnostic('Button evidence: '+paths[0]);
+ });
+});
+
+test('RISK repository process: native button gate refuses unallocated local launch before browser startup',t=>{
+ const directory=fs.mkdtempSync('/tmp/chain-button-allocation-');t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const file=path.join(directory,'ledger.json');fs.writeFileSync(file,JSON.stringify({version:1,scope:'codex-wide',entries:[],reservations:[]}));
+ const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine','chromium','--output-dir',path.join(directory,'native'),'--port','48820','--probe'],{cwd:__dirname,env:{...process.env,CI:'false',CODEX_COORDINATION_FILE:file},encoding:'utf8'});
+ assert.equal(result.error,undefined);assert.notEqual(result.status,0);assert.match(result.stderr,/Active worktree allocation required before native launch/);assert.equal(fs.existsSync(path.join(directory,'native')),false,'refusal precedes native report/runtime creation');
+});
+
+test('RISK repository process: new and duplicate source buttons require native coverage inventory',async t=>{
+ const directory=fs.mkdtempSync('/tmp/chain-button-source-');t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const tag='<button data-act="add">',manifest=path.join(directory,'inventory.json'),source=path.join(directory,'index.html');
+ fs.writeFileSync(manifest,JSON.stringify({schemaVersion:1,sourceTemplates:{[createHash('sha256').update(tag).digest('hex')]:1},requiredActions:['act:add']}));
+ const invoke=html=>{fs.writeFileSync(source,html);return spawnSync(process.execPath,['scripts/button-safety.mjs','--check-inventory','--source',source,'--inventory',manifest],{cwd:__dirname,encoding:'utf8'});};
+ assert.equal(invoke(tag+'Add</button>').status,0,'reviewed source button template accepted');
+ for(const [name,html]of [['new action',tag+'Add</button><button data-act="new-untested">New</button>'],['duplicate route',tag+'Add</button>'+tag+'Add again</button>']])await t.test(name,()=>{
+  const result=invoke(html);assert.equal(result.error,undefined);assert.notEqual(result.status,0,'native coverage inventory must fail closed for '+name);assert.match(result.stderr,/Source button templates differ from reviewed native inventory/);
+ });
+});
