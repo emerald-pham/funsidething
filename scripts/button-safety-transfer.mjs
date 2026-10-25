@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {fixture} from './installed-client-fixture.mjs';
+import {buttonFixture as fixture} from './button-safety-fixture.mjs';
 
 function decode(value){
  switch(value?.type){
@@ -96,7 +96,7 @@ export async function runTransferScenarios(h){
  });
  await h.scenario('guarded paste import rejects malformed data and retains cancelled draft',{decorate:transferFixture},async ui=>{
   await ui.act('settings',()=>!!document.getElementById('stHorizon'));await ui.select('#backupRestoreSource','paste');await ui.act('import-backup',()=>!!document.getElementById('jsonBox'));
-  await ui.fill('#jsonBox','{broken synthetic JSON');await ui.act('preview-pasted-recovery',()=>!!document.getElementById('jsonBox')&&!document.querySelector('[data-act="confirm-file-restore"]')&&state.tasks.length===64);
+  await ui.fill('#jsonBox','{broken synthetic JSON');await ui.act('preview-pasted-recovery',()=>!!document.getElementById('jsonBox')&&!document.querySelector('[data-act="confirm-file-restore"]')&&state.tasks.length===400);
   await ui.fill('#jsonBox',importedRaw);await ui.act('preview-pasted-recovery',()=>!!document.querySelector('[data-act="confirm-file-restore"]'));
   await ui.act('cancel-file-restore',()=>!!document.getElementById('jsonBox')&&document.getElementById('jsonBox').value.includes('Gate imported supported task'));
   await ui.act('preview-pasted-recovery',()=>!!document.querySelector('[data-act="confirm-file-restore"]'));

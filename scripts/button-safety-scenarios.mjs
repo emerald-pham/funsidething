@@ -74,10 +74,10 @@ export async function runButtonScenarios(h){
  await h.scenario('intervention continue and skipped fresh pass',{decorate:board=>{scanBase(board);board.chain=['synthetic-kept'];board.interventionActive=true;board.candidateId=null;}},async ui=>{
   await ui.act('continue-scan',()=>state.interventionActive===false&&state.mode==='scan');
  });
- await h.scenario('exhausted scanner rescan and new pass',{decorate:board=>{scanBase(board);board.chain=['synthetic-kept'];for(const task of board.tasks.slice(1))board.considered[task.id]='no';}},async ui=>{
+ await h.scenario('exhausted scanner rescan and new pass',{fixtureRole:'exhausted',decorate:board=>{scanBase(board);board.chain=['synthetic-kept'];for(const task of board.tasks.slice(1))board.considered[task.id]='no';}},async ui=>{
   await ui.act('rescan',()=>!Object.values(state.considered).includes('no'));
  });
- await h.scenario('fresh pass',{decorate:board=>{scanBase(board);board.chain=['synthetic-kept'];for(const task of board.tasks.slice(1))board.considered[task.id]='no';}},async ui=>{
+ await h.scenario('fresh pass',{fixtureRole:'exhausted',decorate:board=>{scanBase(board);board.chain=['synthetic-kept'];for(const task of board.tasks.slice(1))board.considered[task.id]='no';}},async ui=>{
   await ui.act('new-pass',()=>Object.keys(state.considered).length===0);
  });
  await h.scenario('overdue WOOP native walkthrough',{decorate:board=>{scanBase(board);for(const task of board.tasks)task.due='2000-01-01';}},async ui=>{
@@ -86,7 +86,7 @@ export async function runButtonScenarios(h){
   await ui.fill('#woopAnswer','Gate obstacle');await ui.act('woop-next',()=>document.querySelector('[data-act="woop-next"]').dataset.step==='2');
   await ui.fill('#woopAnswer','If blocked then begin one small action');await ui.act('woop-next',()=>state.tasks.find(t=>t.id==='synthetic-populated-1').woopPlan?.outcome==='Gate best outcome');
  });
- await h.scenario('recorded history and final WOOP',{decorate:board=>{
+ await h.scenario('recorded history and final WOOP',{fixtureRole:'sole',decorate:board=>{
   scanBase(board);board.tasks=board.tasks.slice(0,1);board.mode='work';board.chain=['synthetic-kept'];board.settings.lastTaskWoop=true;
   board.tasks[0].ratingHistory=Array.from({length:25},(_,i)=>({v:1,id:'gate-observation-'+i,at:Date.now()-100000+i,seq:i+1,kind:i<2?'dislodge':'edit',after:{mu:25,sigma:8.3,likelihood:1,eligible:true,fallback:false,n:1,samples:250,topK:1}}));
  }},async ui=>{

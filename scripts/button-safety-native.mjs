@@ -4,7 +4,8 @@ import path from 'node:path';
 import http from 'node:http';
 import {execFileSync} from 'node:child_process';
 import {randomUUID,createHash} from 'node:crypto';
-import {browserInit,appModule,authModule,firestoreModule,fixture} from './installed-client-fixture.mjs';
+import {browserInit,appModule,authModule,firestoreModule} from './installed-client-fixture.mjs';
+import {buttonFixture,populateButtonWorkload,TASK_COUNT} from './button-safety-fixture.mjs';
 const digest=value=>createHash('sha256').update(value).digest('hex');
 const MIME={'.js':'text/javascript','.html':'text/html','.css':'text/css','.svg':'image/svg+xml','.png':'image/png','.webmanifest':'application/manifest+json'};
 export async function runButtonSafety({repo,engine,outputDir,port=0,control=null,probe=false,scenarioFilter=null}){
@@ -29,7 +30,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
 
  fs.mkdirSync(outputDir,{recursive:true});
  const git=(...args)=>execFileSync('git',args,{cwd:repo,maxBuffer:32*1024*1024}),candidateCommit=git('rev-parse','HEAD').toString().trim(),candidateTree=git('rev-parse','HEAD^{tree}').toString().trim();
- const report={schemaVersion:1,kind:probe?'button-sensitivity':scenarioFilter?'button-diagnostic':'button-safety',engine,candidateCommit,candidateTree,status:'running',startedAt:new Date().toISOString(),requiredActions:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredActions,requiredScenarios:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredScenarios,inventorySha256:digest(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'))),observedActions:[],outcomes:[],errors:[],cleanup:{},limits:['Synthetic isolated browser storage and Firebase/clipboard/geolocation boundaries.','Native desktop engine; no physical iPhone or private-board recovery claim.']};
+ const report={schemaVersion:1,kind:probe?'button-sensitivity':scenarioFilter?'button-diagnostic':'button-safety',engine,candidateCommit,candidateTree,status:'running',startedAt:new Date().toISOString(),requiredActions:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredActions,requiredScenarios:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredScenarios,requiredWorkload:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredWorkload,requiredRapidActions:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredRapidActions,inventorySha256:digest(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'))),observedActions:[],outcomes:[],errors:[],cleanup:{},limits:['Synthetic isolated browser storage and Firebase/clipboard/geolocation boundaries.','Native desktop engine; no physical iPhone or private-board recovery claim.']};
  const reportPath=path.join(outputDir,'button-safety-'+engine+'-'+randomUUID()+'.json'),save=()=>fs.writeFileSync(reportPath,JSON.stringify(report,null,2)+'\n');save();
  const prefix='/button-'+randomUUID()+'/',sdk='/sdk-'+randomUUID()+'/',sources=new Map();
  for(const file of git('ls-files').toString().trim().split('\n'))if(file!=='tests.js'&&!file.startsWith('scripts/')&&/\.(html|js|css|svg|png|webmanifest)$/.test(file))sources.set(file,fs.readFileSync(path.join(repo,file)));
@@ -50,7 +51,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
   const origin='http://127.0.0.1:'+server.address().port;
   const playwright=await import('playwright');browser=await playwright[engine].launch({headless:true});browser.on('disconnected',()=>{if(!closing)report.errors.push('browser-disconnected');});report.runtime={engine,version:browser.version(),playwright:'1.62.1'};
   const {runButtonScenarios}=await import('./button-safety-scenarios.mjs');
-  const observed=new Set(),outcomes=new Map();
+  const observed=new Set(),outcomes=new Map(),rapidOutcomes=new Map();
   const actionFor=el=>{
    if(el===document.documentElement)return null; // Landscape uses this root attribute only as rendered state.
    if(el.closest('[data-saved-preview][inert][aria-hidden="true"]'))return null;
@@ -64,9 +65,10 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
    if(scenarioFilter&&name!==scenarioFilter)return;
    if(context){closing=true;await context.close();closing=false;}
    context=await browser.newContext({serviceWorkers:'block',viewport:options.viewport||{width:1100,height:850},reducedMotion:'reduce'});
-   const board=fixture(options.authMode||'signed-out');
+   const board=buttonFixture(options.authMode||'signed-out');
    if(options.board)Object.assign(board,options.board);
    if(options.decorate)options.decorate(board);
+   populateButtonWorkload(board,{role:options.fixtureRole||'active'});
    await context.exposeBinding('__installedRPC',(_,kind,args)=>{
     if((kind==='get'||kind==='list')&&options.cloudReadFail)return{fixtureFailure:'unavailable'};
     if(kind==='get')return structuredClone(options.remote?.get(args[0])??null);
@@ -110,16 +112,24 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
    await page.exposeBinding('__buttonSafetyFailure',(_,message)=>report.errors.push(message));
    await page.exposeBinding('__buttonUnidentified',(_,html)=>{report.unidentifiedButtons??=[];if(!report.unidentifiedButtons.includes(html))report.unidentifiedButtons.push(html);});
    await page.exposeBinding('__buttonObserved',(_,keys)=>{for(const key of keys)observed.add(key);});
+   await page.exposeBinding('__buttonPressed',(_,receipt)=>{report.presses??=[];report.presses.push({scenario:name,...receipt});});
    await page.exposeBinding('__buttonClicked',(_,key)=>{report.clicks??=[];report.clicks.push({scenario:name,action:key,at:Date.now()});});
    await page.addInitScript(({keySource})=>{
     const key=eval('('+keySource+')');
+    window.__buttonNativePresses=[];window.__buttonNativeClicks=[];
+    document.addEventListener('pointerdown',event=>{if(event.isTrusted){const receipt={at:performance.timeOrigin+performance.now(),action:key(event.target.closest('button,summary,[data-act],[role="button"]')||document.documentElement)};window.__buttonNativePresses.push(receipt);void window.__buttonPressed(receipt);}},true);
     window.__buttonHeartbeat={at:performance.now(),maxGapMs:0,frames:0};const pulse=now=>{const h=window.__buttonHeartbeat;h.maxGapMs=Math.max(h.maxGapMs,now-h.at);h.at=now;h.frames++;if(h.clickAt!==undefined&&h.firstFrameAfterClickMs===undefined)h.firstFrameAfterClickMs=now-h.clickAt;requestAnimationFrame(pulse);};requestAnimationFrame(pulse);
     addEventListener('unhandledrejection',event=>void window.__buttonSafetyFailure('unhandledrejection: '+String(event.reason)));
-    document.addEventListener('click',event=>{const el=event.target.closest('button,summary,[data-act],[role="button"],[data-scene-view],[data-landscape-motion],[data-scene-time],[data-scene-preset],[data-location-action]');if(el&&event.isTrusted){window.__buttonHeartbeat.clickAt=performance.now();delete window.__buttonHeartbeat.firstFrameAfterClickMs;void window.__buttonClicked(key(el));}},true);
+    document.addEventListener('click',event=>{const el=event.target.closest('button,summary,[data-act],[role="button"],[data-scene-view],[data-landscape-motion],[data-scene-time],[data-scene-preset],[data-location-action]');if(el&&event.isTrusted){window.__buttonHeartbeat.clickAt=performance.now();delete window.__buttonHeartbeat.firstFrameAfterClickMs;window.__buttonNativeClicks.push({at:performance.now(),action:key(el)});void window.__buttonClicked(key(el));}},true);
     const scan=()=>{if(document.documentElement){const els=[...document.querySelectorAll('button,summary,[data-act],[role="button"],[data-scene-view],[data-landscape-motion],[data-scene-time],[data-scene-preset],[data-location-action]')];void window.__buttonObserved(els.map(key).filter(value=>value!==null));for(const el of els)if(key(el)?.startsWith('button-id:'))void window.__buttonUnidentified(el.outerHTML.slice(0,1000));}};
     addEventListener('DOMContentLoaded',()=>{scan();new MutationObserver(scan).observe(document.documentElement,{childList:true,subtree:true});});
    },{keySource:actionFor.toString()});
    await page.goto(origin+prefix);await page.waitForFunction(()=>typeof state!=='undefined'&&state&&window.ScannerDeviceStore);await page.waitForFunction(()=>window.CloudSync?.ready);localArmed=true;
+   const setup=await bounded((async()=>{for(let attempt=0;attempt<200;attempt++){
+    const result=await page.evaluate(async()=>{const head=await ScannerDeviceStore.readHead();return{currentTasks:state.tasks.length,activeTasks:state.tasks.filter(task=>!task.done).length,durableTasks:head?.payload?JSON.parse(head.payload).tasks.length:0,durableHash:head?.hash};});
+    if(result.currentTasks===TASK_COUNT&&result.durableTasks===TASK_COUNT)return{...result,fixtureRole:options.fixtureRole||'active'};
+    await new Promise(resolve=>setTimeout(resolve,25));
+   }throw Error('Independent400-task setup did not reach durable storage');})(),'400-task durable setup',12000);
    if(options.writeFailAfterReady)await page.evaluate(()=>window.__buttonRefuseWrites=true);
    if(options.readFailAfterReady)await page.evaluate(()=>window.__buttonRefuseReads=true);
    if(options.downloadFail)await page.evaluate(()=>{URL.createObjectURL=()=>{throw new DOMException('Synthetic download refused','NotAllowedError');};});
@@ -151,8 +161,47 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
     await bounded(page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>resolve()))),'input frame '+selector);check();
     const heartbeat=await bounded(page.evaluate(()=>({...window.__buttonHeartbeat})),'input heartbeat '+selector);report.inputSamples??=[];report.inputSamples.push({kind,selector,characters:value.length,elapsedMs:Date.now()-started,maxFrameGapMs:heartbeat.maxGapMs});assert.ok(heartbeat.maxGapMs<1000,'Native button safety detected blocked input frame loop: '+selector+' '+heartbeat.maxGapMs+'ms');
    };
-   const ui={page,click:step,waitFor,backdrop:()=>step('.mback',()=>!document.querySelector('#modalRoot .modal'),'Dismiss dialog backdrop',{position:{x:5,y:5}}),expectReload:async action=>{const before=await page.evaluate(()=>window.__installedFixture.documentId);allowedNavigation={url:page.url(),remaining:1,action};const expected=new Function('return window.__installedFixture?.documentId!=='+JSON.stringify(before)+'&&document.documentElement.dataset.appReady==="true"');await step('[data-act="'+action+'"]',expected,action+' bounded reload');assert.equal(allowedNavigation.remaining,0,'exactly one expected same-route reload');allowedNavigation=null;},act:async(action,expect,selector)=>{if(!selector){selector='[data-act="'+action+'"]';if(await page.locator('#modalRoot '+selector).count())selector='#modalRoot '+selector;}return step(selector,expect,action);},fill:(selector,value)=>nativeInput('fill',selector,value),select:(selector,value)=>nativeInput('select',selector,value),expose};
-   report.scenarios??=[];const record={name,status:'running'};report.scenarios.push(record);save();
+   const burst=async(actionName,expect,{selector,semantics,expectedAccepted=10,reload=false}={})=>{
+    assert.ok(typeof semantics==='string'&&semantics.length>=10,'Explicit independent repeated-effect semantics required');
+    selector??='[data-act="'+actionName+'"]';if(!selector.startsWith('#')&&await page.locator('#modalRoot '+selector).count())selector='#modalRoot '+selector;
+    await expose(selector);const target=page.locator(selector).first(),originalBox=await target.boundingBox();assert.ok(originalBox,'Rapid target is initially rendered');
+    const action=await target.evaluate(actionFor);assert.ok(action===actionName||action==='act:'+actionName,'Rapid target action must match independent family');
+    await page.evaluate(()=>{window.__buttonHeartbeat.maxGapMs=0;window.__buttonHeartbeat.at=performance.now();});const start={presses:report.presses?.length||0,clicks:report.clicks?.length||0};
+    const previousDocument=reload?await page.evaluate(()=>window.__installedFixture.documentId):null;if(reload)allowedNavigation={url:page.url(),remaining:1,action};
+    const attempts=[];const began=Date.now();
+    for(let index=0;index<10;index++){
+     let availability={present:false,disabled:false,hit:false},box=originalBox;
+     if(await target.count()){
+      const next=await target.boundingBox();if(next)box=next;
+      availability=await target.evaluate(el=>{const r=el.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return{present:!!(r.width&&r.height),disabled:el.matches(':disabled'),hit:!!hit&&(el===hit||el.contains(hit))};});
+     }
+     const before={clicks:report.clicks?.length||0,presses:report.presses?.length||0};
+     if(availability.present&&availability.hit)await bounded(page.mouse.click(box.x+box.width/2,box.y+box.height/2),'rapid native press '+actionName);
+     else{
+      // The original control has disappeared or is obscured by its result. A
+      // real down followed by release outside the viewport cannot activate a
+      // different app control under its former position.
+      await bounded((async()=>{await page.mouse.move(originalBox.x+originalBox.width/2,originalBox.y+originalBox.height/2);await page.mouse.down();await page.mouse.move(-10,-10);await page.mouse.up();})(),'rapid refused press '+actionName);
+     }
+     if(reload&&index===0){await bounded(page.waitForFunction(old=>window.__installedFixture?.documentId!==old&&document.documentElement.dataset.appReady==='true',previousDocument),'rapid bounded reload',2000);assert.equal(allowedNavigation.remaining,0,'Exactly one expected rapid reload');allowedNavigation=null;}
+     await bounded(page.evaluate(()=>true),'rapid native receipt');const received={presses:(report.presses||[]).slice(before.presses),clicks:(report.clicks||[]).slice(before.clicks).filter(row=>row.action===action)};
+     attempts.push({index,availability,trustedPresses:received.presses.length,acceptedClicks:received.clicks.length,classification:received.clicks.length?'accepted':availability.present?'refused':'disappeared',at:received.presses[0]?.at});
+    }
+    const finished=Date.now();const presses=(report.presses||[]).slice(start.presses);
+    assert.equal(presses.length,10,'Ten browser-trusted native press receipts: '+actionName);
+    assert.ok(finished-began<=2000,'Ten native press attempts must finish within two seconds: '+actionName+' '+(finished-began)+'ms');
+    await waitFor(expect,12000,'rapid outcome '+actionName);await bounded(page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(resolve))),'rapid response '+actionName);check();
+    const heartbeat=await page.evaluate(()=>({...window.__buttonHeartbeat}));assert.ok(heartbeat.maxGapMs<1000,'Rapid button action blocked frame loop: '+actionName+' '+heartbeat.maxGapMs+'ms');
+    const acceptedClicks=attempts.reduce((sum,row)=>sum+row.acceptedClicks,0),refused=attempts.filter(row=>row.classification==='refused').length,disappeared=attempts.filter(row=>row.classification==='disappeared').length;
+    if(typeof expectedAccepted==='number')assert.equal(acceptedClicks,expectedAccepted,'Independent accepted native click count: '+actionName);
+    else assert.ok(acceptedClicks>=expectedAccepted.min&&acceptedClicks<=expectedAccepted.max,'Independent accepted native click bounds: '+actionName);
+    const row=rapidOutcomes.get(action)||{action,status:'passed',responsive:true,assertions:0,bursts:[]};row.assertions++;
+    row.bursts.push({scenario:name,attempts:10,trustedPresses:presses.length,windowMs:finished-began,browserWindowMs:presses.at(-1).at-presses[0].at,acceptedClicks,refused,disappeared,semantics,maxFrameGapMs:heartbeat.maxGapMs,attemptDetails:attempts});rapidOutcomes.set(action,row);report.rapidOutcomes=[...rapidOutcomes.values()];
+    const normal=outcomes.get(action)||{action,status:'passed',events:['click'],assertions:0,responsive:true,steps:[]};normal.assertions++;normal.steps.push({scenario:name,description:'Rapid '+semantics,elapsedMs:finished-began,maxFrameGapMs:heartbeat.maxGapMs});outcomes.set(action,normal);report.outcomes=[...outcomes.values()];
+    return row.bursts.at(-1);
+   };
+   const ui={page,click:step,waitFor,burst,backdrop:()=>step('.mback',()=>!document.querySelector('#modalRoot .modal'),'Dismiss dialog backdrop',{position:{x:5,y:5}}),expectReload:async action=>{const before=await page.evaluate(()=>window.__installedFixture.documentId);allowedNavigation={url:page.url(),remaining:1,action};const expected=new Function('return window.__installedFixture?.documentId!=='+JSON.stringify(before)+'&&document.documentElement.dataset.appReady==="true"');await step('[data-act="'+action+'"]',expected,action+' bounded reload');assert.equal(allowedNavigation.remaining,0,'exactly one expected same-route reload');allowedNavigation=null;},act:async(action,expect,selector)=>{if(!selector){selector='[data-act="'+action+'"]';if(await page.locator('#modalRoot '+selector).count())selector='#modalRoot '+selector;}return step(selector,expect,action);},fill:(selector,value)=>nativeInput('fill',selector,value),select:(selector,value)=>nativeInput('select',selector,value),expose};
+   report.scenarios??=[];const record={name,status:'running',setup};report.scenarios.push(record);save();
    if(control==='new-action')await page.evaluate(()=>{const button=document.createElement('button');button.dataset.act='gate-new-untested';button.textContent='New untested button';document.body.append(button);});
    if(control){
     await page.evaluate(control=>{document.querySelector('[data-act="settings"]').addEventListener('click',event=>{
@@ -168,10 +217,11 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
    await execute(ui);check();record.status='passed';
   };
   if(probe)await scenario('detector sensitivity',{},async ui=>{await ui.act('settings',control==='async-predicate-false'?async()=>false:()=>!!document.getElementById('stHorizon'));});
-  else await runButtonScenarios({scenario});
+  else if(scenarioFilter?.startsWith('rapid ')){const {runRapidScenarios}=await import('./button-safety-rapid.mjs');await runRapidScenarios({scenario});}
+  else {await runButtonScenarios({scenario});const {runRapidScenarios}=await import('./button-safety-rapid.mjs');await runRapidScenarios({scenario});}
   if(scenarioFilter)assert.equal(report.scenarios?.length,1,'Exactly one requested diagnostic scenario must execute');
   for(const action of observed)assert.ok(report.requiredActions.includes(action),'New untested button action: '+action);
-  report.observedActions=[...observed].sort();report.outcomes=[...outcomes.values()];if(scenarioFilter)report.scope='focused-diagnostic';
+  report.observedActions=[...observed].sort();report.outcomes=[...outcomes.values()];report.rapidOutcomes=[...rapidOutcomes.values()];if(scenarioFilter)report.scope='focused-diagnostic';
   report.status='passed';
  }catch(error){report.status='failed';report.failure=error.stack;try{report.failureObservation=await bounded(page.evaluate(()=>({modal:document.getElementById('modalRoot')?.innerText,toast:document.getElementById('toast')?.innerText,mode:state.mode,chain:state.chain,candidateId:state.candidateId,taskTitles:state.tasks.slice(0,10).map(t=>({id:t.id,title:t.title}))})),'failure observation');}catch(observationError){report.failureObservationError=String(observationError);}throw error;}
  finally{

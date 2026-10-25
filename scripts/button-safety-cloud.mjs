@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {fixture} from './installed-client-fixture.mjs';
+import {buttonFixture as fixture} from './button-safety-fixture.mjs';
 
 const MANIFEST = 'users/owner';
 
@@ -93,15 +93,15 @@ export async function runCloudScenarios(h){
     await ui.act('sync',async()=>{
       const head=await window.ScannerDeviceStore.readHead(),saved=head?.payload?JSON.parse(head.payload):null;
       return window.CloudSync?.user===null&&window.CloudSync.status==='signed-out'&&
-        document.getElementById('syncBtn')?.textContent.includes('sign in')&&state.tasks.length===64&&
-        state.futurePopulated?.opaque.length===1048576&&saved?.tasks.length===64&&saved.futurePopulated?.opaque.length===1048576;
+        document.getElementById('syncBtn')?.textContent.includes('sign in')&&state.tasks.length===400&&
+        state.futurePopulated?.opaque.length===1048576&&saved?.tasks.length===400&&saved.futurePopulated?.opaque.length===1048576;
     },'#syncBtn');
     await assertCurrentAndStoredFixtureBoard(ui,'Signed-out transition');
     await ui.act('sync',async()=>{
       const head=await window.ScannerDeviceStore.readHead(),saved=head?.payload?JSON.parse(head.payload):null;
       return window.CloudSync?.user===null&&window.CloudSync.status==='error'&&window.CloudSync.errorStage==='sign-in'&&
-        document.getElementById('syncBtn')?.textContent.includes('error')&&state.tasks.length===64&&
-        state.futurePopulated?.opaque.length===1048576&&saved?.tasks.length===64&&saved.futurePopulated?.opaque.length===1048576;
+        document.getElementById('syncBtn')?.textContent.includes('error')&&state.tasks.length===400&&
+        state.futurePopulated?.opaque.length===1048576&&saved?.tasks.length===400&&saved.futurePopulated?.opaque.length===1048576;
     },'#syncBtn');
     await assertCurrentAndStoredFixtureBoard(ui,'Signed-out authentication failure');
   });
@@ -114,8 +114,8 @@ export async function runCloudScenarios(h){
     await ui.act('sync-retry',async()=>{
       const head=await window.ScannerDeviceStore.readHead(),saved=head?.payload?JSON.parse(head.payload):null;
       return !document.querySelector('#modalRoot .modal')&&window.CloudSync?.status==='error'&&
-        window.CloudSync.errorCode==='unavailable'&&state.tasks.length===64&&
-        state.futurePopulated?.opaque.length===1048576&&saved?.tasks.length===64&&saved.futurePopulated?.opaque.length===1048576&&
+        window.CloudSync.errorCode==='unavailable'&&state.tasks.length===400&&
+        state.futurePopulated?.opaque.length===1048576&&saved?.tasks.length===400&&saved.futurePopulated?.opaque.length===1048576&&
         !pulling&&!cloudPushInFlight&&!cloudSourceRecoveryBusy;
     },'#modalRoot [data-act="sync-retry"]');
     await assertCurrentAndStoredFixtureBoard(ui,'Cloud retry read failure');
@@ -124,8 +124,8 @@ export async function runCloudScenarios(h){
     await ui.waitFor(async()=>{
       const head=await window.ScannerDeviceStore.readHead(),saved=head?.payload?JSON.parse(head.payload):null;
       return window.CloudSync?.ready===true&&window.CloudSync.status==='error'&&window.CloudSync.errorCode==='unavailable'&&
-        state.tasks.length===64&&state.futurePopulated?.opaque.length===1048576&&
-        saved?.tasks.length===64&&saved.futurePopulated?.opaque.length===1048576&&
+        state.tasks.length===400&&state.futurePopulated?.opaque.length===1048576&&
+        saved?.tasks.length===400&&saved.futurePopulated?.opaque.length===1048576&&
         !pulling&&!cloudPushInFlight&&!cloudSourceRecoveryBusy;
     },10000);
     await assertCurrentAndStoredFixtureBoard(ui,'Cloud reload read failure');
@@ -133,8 +133,8 @@ export async function runCloudScenarios(h){
     await ui.act('sync-signout',async()=>{
       const head=await window.ScannerDeviceStore.readHead(),saved=head?.payload?JSON.parse(head.payload):null;
       return window.CloudSync?.user===null&&window.CloudSync.status==='signed-out'&&
-        state.tasks.length===64&&state.futurePopulated?.opaque.length===1048576&&
-        saved?.tasks.length===64&&saved.futurePopulated?.opaque.length===1048576;
+        state.tasks.length===400&&state.futurePopulated?.opaque.length===1048576&&
+        saved?.tasks.length===400&&saved.futurePopulated?.opaque.length===1048576;
     },'#modalRoot [data-act="sync-signout"]');
     await assertCurrentAndStoredFixtureBoard(ui,'Cloud read failure and sign out');
   });
@@ -154,8 +154,8 @@ export async function runCloudScenarios(h){
       return modal?.querySelector('h2')?.textContent==='Review cloud recovery sources'&&
         /cloud reads are still unavailable/i.test(modal.textContent)&&
         !modal.querySelector('[data-act="choose-cloud-recovery-source"]')&&
-        !modal.querySelector('[data-act="apply-cloud-source-recovery"]')&&state.tasks.length===64&&
-        state.futurePopulated?.opaque.length===1048576&&saved?.tasks.length===64&&saved.futurePopulated?.opaque.length===1048576;
+        !modal.querySelector('[data-act="apply-cloud-source-recovery"]')&&state.tasks.length===400&&
+        state.futurePopulated?.opaque.length===1048576&&saved?.tasks.length===400&&saved.futurePopulated?.opaque.length===1048576;
     },'#modalRoot [data-act="review-cloud-source-recovery"]');
     await assertCurrentAndStoredFixtureBoard(ui,'Cloud source review read failure');
 
@@ -182,8 +182,8 @@ export async function runCloudScenarios(h){
       const head=await window.ScannerDeviceStore.readHead(),saved=head?.payload?JSON.parse(head.payload):null;
       const modal=document.querySelector('#modalRoot');
       return modal?.querySelector('h2')?.textContent==='Review cloud recovery sources'&&
-        /cloud confirmation is unavailable/i.test(modal.textContent)&&state.tasks.length===64&&
-        state.futurePopulated?.opaque.length===1048576&&saved?.tasks.length===64&&saved.futurePopulated?.opaque.length===1048576;
+        /cloud confirmation is unavailable/i.test(modal.textContent)&&state.tasks.length===400&&
+        state.futurePopulated?.opaque.length===1048576&&saved?.tasks.length===400&&saved.futurePopulated?.opaque.length===1048576;
     },'#modalRoot [data-act="apply-cloud-source-recovery"]');
     assert.deepEqual(cloudOptions.remote.get(MANIFEST),rootBeforeFailure,'A refused cloud write leaves the damaged root unchanged');
     await assertCurrentAndStoredFixtureBoard(ui,'Refused cloud source publication');
@@ -205,7 +205,7 @@ export async function runCloudScenarios(h){
     await confirmedAction(ui,'apply-cloud-source-recovery',async()=>{
       const head=await window.ScannerDeviceStore.readHead(),saved=head?.payload?JSON.parse(head.payload):null;
       return !document.querySelector('#modalRoot .modal')&&window.CloudSync?.status==='ok'&&state.syncDirty===false&&state.syncRev>4&&
-        state.tasks.length===64&&state.futurePopulated?.opaque.length===1048576&&saved?.tasks.length===64&&
+        state.tasks.length===400&&state.futurePopulated?.opaque.length===1048576&&saved?.tasks.length===400&&
         saved.futurePopulated?.opaque.length===1048576&&saved.syncDirty===false;
     },'#modalRoot [data-act="apply-cloud-source-recovery"]');
     await assertCurrentAndStoredFixtureBoard(ui,'Cloud source recovery');
@@ -250,7 +250,7 @@ export async function runCloudScenarios(h){
         /cloud could not be read/i.test(modal.textContent)&&
         !modal.querySelector('[data-act="choose-decision-recovery"]')&&
         modal.querySelector('[data-act="apply-decision-recovery"]')?.disabled===true&&
-        state.settings.theme==='light'&&saved?.settings?.theme==='light'&&state.tasks.length===64;
+        state.settings.theme==='light'&&saved?.settings?.theme==='light'&&state.tasks.length===400;
     },'#modalRoot [data-act="review-decision-recovery"]');
     await assertCurrentAndStoredFixtureBoard(ui,'Saved-decision review read failure');
 
@@ -276,7 +276,7 @@ export async function runCloudScenarios(h){
       const modal=document.querySelector('#modalRoot');
       return modal?.querySelector('h2')?.textContent==='Review saved decisions'&&
         /cloud sync is not confirmed/i.test(modal.textContent)&&
-        state.settings.theme==='light'&&saved?.settings?.theme==='light'&&state.tasks.length===64&&
+        state.settings.theme==='light'&&saved?.settings?.theme==='light'&&state.tasks.length===400&&
         modal.querySelector('[data-act="apply-decision-recovery"]')?.disabled===true;
     },'#modalRoot [data-act="apply-decision-recovery"]');
     assert.deepEqual(decisionOptions.remote.get(MANIFEST),rootBeforeFailure,'A refused decision write leaves its current cloud root unchanged');
@@ -299,8 +299,8 @@ export async function runCloudScenarios(h){
     await confirmedAction(ui,'apply-decision-recovery',async()=>{
       const head=await window.ScannerDeviceStore.readHead(),saved=head?.payload?JSON.parse(head.payload):null;
       return !document.querySelector('#modalRoot .modal')&&window.CloudSync?.status==='ok'&&state.syncDirty===false&&state.syncRev>4&&
-        state.settings.theme==='light'&&state.tasks.length===64&&saved?.settings?.theme==='light'&&
-        saved.tasks.length===64&&saved.syncDirty===false;
+        state.settings.theme==='light'&&state.tasks.length===400&&saved?.settings?.theme==='light'&&
+        saved.tasks.length===400&&saved.syncDirty===false;
     },'#modalRoot [data-act="apply-decision-recovery"]');
     await assertCurrentAndStoredFixtureBoard(ui,'Saved-decision recovery');
     await assertPublished(decisionOptions.remote,'Saved-decision recovery');
