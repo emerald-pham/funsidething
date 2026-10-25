@@ -3993,7 +3993,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK AUTH HYDRATION: a corrupt device-head read stays visible and keeps cloud adoption held",
+      "root": "RISK AUTH HYDRATION: a corrupt device-head read protects exact originals before supported local recovery releases hydration",
       "group": "core",
       "file": "tests.js"
     },
@@ -12571,6 +12571,16 @@
       "root": "RISK offline recovery reentry: settled own recovery writes permit fresh current work while changed holds stay protected",
       "group": "persistence-recovery",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud boot authority: source-only preflight waits for bounded device startup before repairing remote bytes",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK offline unreadable backup status: useful unsaved work names the protected cause without quota or durability claims",
+      "group": "persistence-recovery",
+      "file": "tests.js"
     }
   ],
   "processControls": [
@@ -12629,6 +12639,14 @@
       "group": "core",
       "file": "tests.js",
       "reason": "User explicitly requested useful protected offline recovery rather than an unaccepted placeholder. Preserve raw originals, unknown data, manual Restore, source CAS and authority assertions while identifying the working workspace; see exact-source offline-working/HANDOFF.md and original RED/GREEN evidence."
+    },
+    {
+      "baselineRoot": "RISK AUTH HYDRATION: a corrupt device-head read stays visible and keeps cloud adoption held",
+      "currentRoot": "RISK AUTH HYDRATION: a corrupt device-head read protects exact originals before supported local recovery releases hydration",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "The user authorized automatic useful offline recovery. Preserve pre-hydration no-read/no-adoption, exact current-head repair, full raw originals, manual/protected copies and remote authority; replace obsolete unusable-placeholder expectations with the proven supported local workspace. Fresh cloud reads may follow verified local recovery; source-bound tests measure the actual ordering."
     }
   ]
 }
