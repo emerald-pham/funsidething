@@ -27,12 +27,12 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK resilient sync recovery: automatic rebuilding preserves peer pending intent across staging
 - RISK resilient sync recovery: verified empty and explicit ACK transitions release failed rebuild contexts
 
-- RISK unreadable device recovery: an unsupported saved version cannot be replaced by Quick start or ordinary saving
+- RISK unreadable device recovery: an unsupported original remains protected while a distinct working workspace accepts saving
 - RISK unreadable device recovery: native Paste previews and restores a supported board while preserving unreadable originals
 - RISK unreadable device recovery: raw startup preserves sources and supports native File restore
 - RISK unreadable device recovery: raw source export excludes the placeholder and preserves exact device evidence
 - RISK unreadable device recovery: locally restored work stays durable and visibly pending across sign-in and reopen
-- RISK unreadable device recovery: placeholder actions cannot create backups and unsupported selected decisions stay evidence
+- RISK unreadable device recovery: workspace backups retain original evidence and unsupported selected decisions stay evidence
 - RISK unreadable device recovery: preservation refusals transaction failures and late identity changes never accept a source
 - RISK unreadable device recovery: raw transaction CAS refuses peer source changes after the last preview read
 - RISK unreadable device recovery: partial raw rows remain exact while the restored board accepts later local edits
@@ -43,7 +43,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK unreadable device recovery review: the native header reaches SDK sign-in and Settings account correction while sources stay held
 - RISK unreadable device recovery review: preserved partial raw rows permit native cloud choice ACK and cold reopen
 - RISK unreadable device recovery review: receipt collisions never overwrite a raw unknown row at the same physical key
-- RISK malformed device recovery capture: inaccessible and unsupported archives retain typed refusals
+- RISK malformed device recovery capture: working-source refusals remain typed and preserve originals
 - RISK DEVICE STORAGE V2: conditional pending writes compare complete physical rows and preserve ordinary staging
 - RISK cloud source recovery pending capture: a peer pending pointer arriving between own pending write and read is never consented
 - RISK cloud source recovery pending capture: peer pending intent created after the existing read is never overwritten by recovery staging
@@ -141,7 +141,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK AUTH RESTORE: configured startup stays syncing until Firebase resolves the actual session
 - RISK AUTH RESTORE: remembered boards show syncing in header and Settings while restoration is pending
 - RISK AUTH HYDRATION: real Auth and native resume wait for the durable board, then reconcile once
-- RISK AUTH HYDRATION: a corrupt device-head read stays visible and keeps cloud adoption held
+- RISK AUTH HYDRATION: a corrupt device-head read protects exact originals before supported local recovery releases hydration
 - RISK AUTH HYDRATION: extended FAQ and current Changelog explain the saved-board wait
 
 - RISK IMPORT RENDERING: restored identifiers cannot inject attributes or break task reveal
@@ -552,6 +552,9 @@ The Settings board-data area exposes one Download backup action with current-boa
 
 ## Installed PWA wake and sync recovery
 
+App-bound wake cases share the actual app window and an isolated IndexedDB with
+the production cloud backend. Backend-only cancellation cases remain separate.
+
 - RISK PWA SYNC RESUME: sleeping requests cancel promptly and cannot report a stale timeout or acknowledgement
 - RISK PWA SYNC RESUME: cloud authority requires server reads and never an offline cache miss
 - RISK PWA SYNC RESUME: reopening drains interrupted reads and writes before one fresh reconciliation
@@ -689,6 +692,8 @@ Completion authority ends only after a deliberate return event observes every ou
 - RISK shared scenery: the same seed and UTC instant select identical events after different open frame and interruption histories
 - RISK shared scenery: normalized clouds and bounded schedules survive midnight viewport season and reduced motion changes
 - RISK shared scenery: deterministic opportunities preserve rail rare-show refractory periods and finite complete lifetimes
+- RISK daytime people: daytime and twilight spawn rate halves while complete visits and night schedules finish intact
+- RISK daytime spawn birth phase: rejected daylight parties stay absent after sunset
 - RISK rain cloud consistency: every drifting cloud uses the shaded rain contour while clear daytime clouds retain their paint
 - RISK shared scene time: numeric locks and selected seasons use the synced sky zone rather than the device zone
 - RISK shared scenery runtime: every scene owner consumes the UTC snapshot without random frame draws or board writes
@@ -1775,6 +1780,11 @@ The native needs-attention action uses real IndexedDB and the production backend
 
 - RISK cloud source recovery: native restored-device hold clears only after exact cloud ACK and durable current-head recovery
 
+The Restore draft is focused before auth so automatic recovery cannot replace
+the intended protected unreadable-source path. Every remote row stays exact
+until the deliberate native preview and confirmation; the resulting hold still
+requires exact cloud acknowledgement, durable current-head recovery and reopen.
+
 - RISK cloud source recovery metadata: native preview distinguishes server save time upload clock and missing decision time
 
 - RISK cloud source recovery drafts: Settings drafts survive native review cancel delayed reads and confirmed recovery
@@ -2084,7 +2094,7 @@ This boundary control holds a successful real provider reply, installs a later a
 - RISK shared protection cancellation: a stopped transaction cannot start dependent source-marker reads
 - RISK shared protection absent-root authority: retained orphan sources lock only under verified unchanged root absence (Firestore rules: retention empty root)
 - RISK shared protection changed originals: deliberate current recovery selects exact server capture independently of archive order
-- RISK automatic recovery defaults: an unaccepted device uses stable source keys and preserves exact alternatives
+- RISK automatic recovery defaults: a protected local browser baseline keeps its accepted value and exact alternatives
 - RISK automatic recovery baseline refresh: a concurrent accepted Add gets one fresh capture without losing its draft
 - RISK automatic recovery publication: exact current-context cloud ACK releases only its automatic hold
 - RISK automatic recovery uncertain publication: a lost reply is verified before retry and never duplicates a cloud save
@@ -2125,3 +2135,65 @@ This boundary control holds a successful real provider reply, installs a later a
 - The first actual Add synchronous prefix consumes the original single20s action budget: `RISK recovery observation budget: the first actual Add prefix belongs to the single action deadline`.
 
 - A successful callback cannot be accepted after its original monotonic deadline even when host timer delivery is blocked: `RISK recovery observation budget: late synchronous success cannot outlive the original deadline`.
+
+- Cloud-only repair retains damaged generations with immutable server pins, publishes a fresh independently readable generation, and leaves unavailable-device pending work and drafts unchanged: `RISK independent cloud repair: unavailable device storage repairs retained server sources without acknowledging local work`.
+
+- Server-only capability does not accept arbitrary local payloads or observe pending state; unsupported manifest/header/board evidence and missing candidates cannot replace originals: `RISK independent cloud source safety: unsupported roots headers boards and absent candidates remain protected`; `RISK independent cloud capability: server-only repair ignores injected payloads and never observes local pending state`.
+
+- Cloud-only authority, bounded restart, source pins and readback preserve local pending intent under cancellation, UID/epoch/backend/suspend changes, fresh peer revisions, refused pins, changed chunks, lost write replies and later source discovery: `RISK independent cloud authority: cancellation account epoch backend and suspension changes cannot publish stale repairs`; `RISK independent cloud races: fresh peer roots win during reads and publication while failed pins keep originals`; `RISK independent cloud uncertain reply: deterministic publication reads back a lost reply and never clears pending uploads`; `RISK independent cloud retained discovery: pinned originals survive ordinary rotations and repair another damaged root without local storage`.
+
+- Exact-current hash reconstruction still retains compatible facts from every complete retained server source: `RISK independent cloud exact reconstruction: a matching retained hash cannot discard other complete server facts`.
+
+## Offline device database recovery
+
+- RISK device database repair guidance: mounted FAQ distinguishes offline exact-copy repair from protected unresolved sources
+- RISK offline device recovery: an exact retained local copy repairs damaged current bytes without cloud
+- RISK device connection startup: one internal server failure recovers the authoritative offline board within a bounded attempt
+- RISK device connection recovery: offline accepted work survives a lost handle and durable reopen
+- RISK device connection recovery: a closed local handle still permits exact cloud reconstruction without losing originals
+
+- An actual externally stalled native IndexedDB pending-key read cannot block source-only server repair, alter device rows or consume a local draft: `RISK independent cloud stalled storage: a pending native IDB request cannot block remote-only repair`.
+
+- Source-only repair handles absent storage and preserves in-flight native work, explicit cancellation and uncertain staged/committed replies, with one finite restart and total monotonic budget: `RISK independent cloud absent storage: actual cloudPull repairs remote bytes without a device capability`; `RISK independent cloud live work: accepted Add comparison and unfinished draft survive a held server-only repair`; `RISK independent cloud explicit abort: canceled reads and uncertain committed replies cannot acknowledge local work`; `RISK independent cloud staged reply: retry resumes the same deterministic generation after uncertain creation`; `RISK independent cloud restart budget: repeated fresh root changes stop after one restart without replacement`; `RISK independent cloud total budget: clock skew and late server replies cannot extend the original operation`.
+
+- Permitted writes followed by repeatedly damaged remote bytes cannot report successful repair, and share the same one-restart budget: `RISK independent cloud final readback: repeated damage after permitted publication cannot become verified repair`.
+
+- A server-only acknowledgement cannot display an unchanged local board as synced; protected terminal remote failures remain visible until independently verified recovery: `RISK independent cloud confirmation status: repairing server bytes cannot show an unchanged local board as acknowledged`; `RISK independent cloud failure status: protected terminal errors stay visible until verified server recovery`.
+
+## Device connection cancellation
+
+- `RISK device connection cancellation: explicit close invalidates a delayed open without resurrecting or replacing sources`
+- `RISK device connection cancellation: closing before first upgrade leaves no replacement database`
+
+## Automatic offline and independent cloud guidance
+
+- `RISK offline repair guidance: help distinguishes a working workspace cloud repair and exact preserved originals`
+
+## Protected offline working recovery
+
+- RISK offline working recovery: surviving linked backups open useful protected work before any network
+- RISK offline working recovery: verified protected archive and browser decisions combine without foreign sources
+- RISK offline working reconnect: current offline edits and retained peer work reach exact cloud acknowledgement
+- RISK offline new-work recovery: absent complete original opens a distinct durable workspace and preserves unseen cloud tasks
+- RISK offline memory recovery: refused durable media still permit new work with an honest unsaved status
+- RISK offline memory recovery resume: returning storage saves current new work without replacing the refused original
+- RISK offline working authority: a changed original archive cannot activate a claimed recovered working head
+- RISK offline working archives: prior exact originals are referenced without recursively copying their bytes
+- RISK offline working reconnect guards: changed source hold pending draft and account retain the current workspace
+- RISK offline startup budget: stalled open and raw reads expose unsaved work without late adoption
+- RISK offline memory restore: a deliberate Paste after storage returns protects accepted unsaved work
+
+- A supported released backend's byte-exact v1 retained board can repair current missing cloud chunks through real cloudPull with no device store; only the known version upgrade is allowed, including an exact retained copy. Unknown versions, foreign ownership, lossy original fields and unsupported decision facts remain held with exact original pins/bytes: `RISK independent cloud legacy source: supported released v1 boards upgrade only their version during server-only repair`.
+
+- RISK offline working ownership: startup binds explicit null and proved browser UID while preserving ambiguous alternatives
+
+- RISK offline startup resume: fresh storage saves accepted memory work while an expired readonly delivery remains withheld
+- RISK offline startup resume budget: fresh stalled captures stop and uncertain started writes never replay
+
+- RISK offline recovery activation: a verified committed workspace activates before optional cache reads can strand later edits
+- RISK offline recovery reentry: settled own recovery writes permit fresh current work while changed holds stay protected
+
+- Independent cloud preflight queues Auth and native wake events until hydration and exact boot capture settle, then still repairs real remote chunks after permanently unavailable native startup reaches its bound; accepted unsaved Add/draft remain pending: `RISK independent cloud boot authority: source-only preflight waits for bounded device startup before repairing remote bytes`.
+- RISK offline unreadable backup status: useful unsaved work names the protected cause without quota or durability claims
+
+- Actual Firestore SDK/classic-app fixtures share the exact app window and real loaded codecs, preserving live planner, storage and backend authority checks rather than a disconnected module window. Original full-shell acknowledgement and rules-first refusal assertions remain unchanged in `Firestore rules: immutable decision-aware full shell conflicts then safely holds same-account completion-upgrade authority and its local edit` and `Firestore rules: first decision against released rules stays exact and pending until rules-first rollout then retry`.

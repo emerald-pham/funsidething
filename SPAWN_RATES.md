@@ -14,6 +14,12 @@ seeded travel-speed range and works in all seasons, by day and night.
 
 Ordinary visitors use relative selection weights, so increasing one reduces
 others' share of the same limited visitor budget. Seasonal eligibility still applies.
+New human-bearing visits that start in daytime or twilight (solar altitude at
+least -6 degrees) keep about half of admitted visits through a stable seeded
+choice. This happens after the shared arrival budget is settled, so removing a
+visit cannot admit a replacement. Whole parties keep their original duration,
+including through sunset. Nighttime and nonhuman schedules keep their existing
+admission rules.
 Train and metro have dedicated seeded-chance service: 65 and 50 seconds baseline
 crossing, respectively. Opportunities are one maximum sampled crossing apart
 (65/.82 and 50/.82 seconds, rounded upwards to a millisecond to prevent

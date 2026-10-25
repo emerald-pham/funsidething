@@ -3993,7 +3993,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK AUTH HYDRATION: a corrupt device-head read stays visible and keeps cloud adoption held",
+      "root": "RISK AUTH HYDRATION: a corrupt device-head read protects exact originals before supported local recovery releases hydration",
       "group": "core",
       "file": "tests.js"
     },
@@ -4033,7 +4033,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK automatic recovery defaults: an unaccepted device uses stable source keys and preserves exact alternatives",
+      "root": "RISK automatic recovery defaults: a protected local browser baseline keeps its accepted value and exact alternatives",
       "group": "core",
       "file": "tests.js"
     },
@@ -7773,7 +7773,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK malformed device recovery capture: inaccessible and unsupported archives retain typed refusals",
+      "root": "RISK malformed device recovery capture: working-source refusals remain typed and preserve originals",
       "group": "core",
       "file": "tests.js"
     },
@@ -10833,7 +10833,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK unreadable device recovery: an unsupported saved version cannot be replaced by Quick start or ordinary saving",
+      "root": "RISK unreadable device recovery: an unsupported original remains protected while a distinct working workspace accepts saving",
       "group": "core",
       "file": "tests.js"
     },
@@ -10858,7 +10858,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK unreadable device recovery: placeholder actions cannot create backups and unsupported selected decisions stay evidence",
+      "root": "RISK unreadable device recovery: workspace backups retain original evidence and unsupported selected decisions stay evidence",
       "group": "core",
       "file": "tests.js"
     },
@@ -12346,6 +12346,241 @@
       "root": "RISK repository process: grouped catalog binds real declarations rather than quoted fixtures",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK device database repair guidance: mounted FAQ distinguishes offline exact-copy repair from protected unresolved sources",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK offline repair guidance: help distinguishes a working workspace cloud repair and exact preserved originals",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK offline device recovery: an exact retained local copy repairs damaged current bytes without cloud",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK device connection startup: one internal server failure recovers the authoritative offline board within a bounded attempt",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK device connection recovery: offline accepted work survives a lost handle and durable reopen",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK device connection cancellation: explicit close invalidates a delayed open without resurrecting or replacing sources",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK device connection cancellation: closing before first upgrade leaves no replacement database",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK daytime people: daytime and twilight spawn rate halves while complete visits and night schedules finish intact",
+      "group": "scenery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK daytime spawn birth phase: rejected daylight parties stay absent after sunset",
+      "group": "scenery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud repair: unavailable device storage repairs retained server sources without acknowledging local work",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud source safety: unsupported roots headers boards and absent candidates remain protected",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud capability: server-only repair ignores injected payloads and never observes local pending state",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud authority: cancellation account epoch backend and suspension changes cannot publish stale repairs",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud races: fresh peer roots win during reads and publication while failed pins keep originals",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud uncertain reply: deterministic publication reads back a lost reply and never clears pending uploads",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud retained discovery: pinned originals survive ordinary rotations and repair another damaged root without local storage",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud exact reconstruction: a matching retained hash cannot discard other complete server facts",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK device connection recovery: a closed local handle still permits exact cloud reconstruction without losing originals",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud stalled storage: a pending native IDB request cannot block remote-only repair",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud absent storage: actual cloudPull repairs remote bytes without a device capability",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud live work: accepted Add comparison and unfinished draft survive a held server-only repair",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud explicit abort: canceled reads and uncertain committed replies cannot acknowledge local work",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud staged reply: retry resumes the same deterministic generation after uncertain creation",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud restart budget: repeated fresh root changes stop after one restart without replacement",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud total budget: clock skew and late server replies cannot extend the original operation",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud final readback: repeated damage after permitted publication cannot become verified repair",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud confirmation status: repairing server bytes cannot show an unchanged local board as acknowledged",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud failure status: protected terminal errors stay visible until verified server recovery",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK offline working recovery: surviving linked backups open useful protected work before any network",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK offline working recovery: verified protected archive and browser decisions combine without foreign sources",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK offline working reconnect: current offline edits and retained peer work reach exact cloud acknowledgement",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK offline new-work recovery: absent complete original opens a distinct durable workspace and preserves unseen cloud tasks",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK offline memory recovery: refused durable media still permit new work with an honest unsaved status",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK offline memory recovery resume: returning storage saves current new work without replacing the refused original",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK offline working authority: a changed original archive cannot activate a claimed recovered working head",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK offline working archives: prior exact originals are referenced without recursively copying their bytes",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK offline working reconnect guards: changed source hold pending draft and account retain the current workspace",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK offline startup budget: stalled open and raw reads expose unsaved work without late adoption",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK offline memory restore: a deliberate Paste after storage returns protects accepted unsaved work",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "group": "persistence-recovery",
+      "file": "tests.js",
+      "root": "RISK independent cloud legacy source: supported released v1 boards upgrade only their version during server-only repair"
+    },
+    {
+      "root": "RISK offline working ownership: startup binds explicit null and proved browser UID while preserving ambiguous alternatives",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK offline startup resume: fresh storage saves accepted memory work while an expired readonly delivery remains withheld",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK offline startup resume budget: fresh stalled captures stop and uncertain started writes never replay",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK offline recovery activation: a verified committed workspace activates before optional cache reads can strand later edits",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK offline recovery reentry: settled own recovery writes permit fresh current work while changed holds stay protected",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud boot authority: source-only preflight waits for bounded device startup before repairing remote bytes",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK offline unreadable backup status: useful unsaved work names the protected cause without quota or durability claims",
+      "group": "persistence-recovery",
+      "file": "tests.js"
     }
   ],
   "processControls": [
@@ -12372,6 +12607,46 @@
       "group": "native-process",
       "file": "tests.js",
       "reason": "Ticket #267 renamed the startup root to describe its one-browser isolated-context fixture; all four theme and viewport child cases and assertions remain."
+    },
+    {
+      "baselineRoot": "RISK unreadable device recovery: an unsupported saved version cannot be replaced by Quick start or ordinary saving",
+      "currentRoot": "RISK unreadable device recovery: an unsupported original remains protected while a distinct working workspace accepts saving",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "User explicitly requested useful protected offline recovery rather than an unaccepted placeholder. Preserve raw originals, unknown data, manual Restore, source CAS and authority assertions while identifying the working workspace; see exact-source offline-working/HANDOFF.md and original RED/GREEN evidence."
+    },
+    {
+      "baselineRoot": "RISK unreadable device recovery: placeholder actions cannot create backups and unsupported selected decisions stay evidence",
+      "currentRoot": "RISK unreadable device recovery: workspace backups retain original evidence and unsupported selected decisions stay evidence",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "User explicitly requested useful protected offline recovery rather than an unaccepted placeholder. Preserve raw originals, unknown data, manual Restore, source CAS and authority assertions while identifying the working workspace; see exact-source offline-working/HANDOFF.md and original RED/GREEN evidence."
+    },
+    {
+      "baselineRoot": "RISK malformed device recovery capture: inaccessible and unsupported archives retain typed refusals",
+      "currentRoot": "RISK malformed device recovery capture: working-source refusals remain typed and preserve originals",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "User explicitly requested useful protected offline recovery rather than an unaccepted placeholder. Preserve raw originals, unknown data, manual Restore, source CAS and authority assertions while identifying the working workspace; see exact-source offline-working/HANDOFF.md and original RED/GREEN evidence."
+    },
+    {
+      "baselineRoot": "RISK automatic recovery defaults: an unaccepted device uses stable source keys and preserves exact alternatives",
+      "currentRoot": "RISK automatic recovery defaults: a protected local browser baseline keeps its accepted value and exact alternatives",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "User explicitly requested useful protected offline recovery rather than an unaccepted placeholder. Preserve raw originals, unknown data, manual Restore, source CAS and authority assertions while identifying the working workspace; see exact-source offline-working/HANDOFF.md and original RED/GREEN evidence."
+    },
+    {
+      "baselineRoot": "RISK AUTH HYDRATION: a corrupt device-head read stays visible and keeps cloud adoption held",
+      "currentRoot": "RISK AUTH HYDRATION: a corrupt device-head read protects exact originals before supported local recovery releases hydration",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "The user authorized automatic useful offline recovery. Preserve pre-hydration no-read/no-adoption, exact current-head repair, full raw originals, manual/protected copies and remote authority; replace obsolete unusable-placeholder expectations with the proven supported local workspace. Fresh cloud reads may follow verified local recovery; source-bound tests measure the actual ordering."
     }
   ]
 }
