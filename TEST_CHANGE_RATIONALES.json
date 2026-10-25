@@ -19106,5 +19106,47 @@
     "failure": "644c6e34: both offline close variants returned false instead of verified persistence; actual settled cloud decoder returned undefined instead of the complete expected payload. 7fefe6c3: one internal-server failure left authoritative offline storage inactive. cb1b9b7b: damaged current bytes with an exact retained copy left authority false. a5739b3d later exposed unintended orphan retirement after repair; source GC was tightened. FAQ293c676b failed before copy changed. All chronology and failed intermediate attempts are retained."
   },
   "observedGreen": "d8317f32: six local/offline/cloud connection and exact-source cases passed; extended preservation cohort8a686a5f passed with zero failures/skips; final FAQ/PWA/inventoryefd799ea passed. This is an unshipped checkpoint: broader forced local working recovery, independent-cloud integration and final release gates remain unfinished."
+},
+{
+  "baseCommit": "f6d1da402787162d17b635b00044c881b97929b7",
+  "testChangesSha256": "8a02d5cec61b9960d162e188e6461ffbba6bff311de22701a22c60daca1b5fb3",
+  "reason": "Preserve explicit device-store shutdown across delayed initial/replacement connections and upgrades. Integrate current-main historical-planner caching while retaining the previously authorized daytime policy and all original equality and operation budgets.",
+  "previousBehavior": "Closing during an open let a late success resurrect authority, made a subsequent explicit open reuse the cancelled promise, and could leave a newly created empty database after shutdown. Earlier offline exact-copy/connection/daytime changes retain their original RED evidence in prior append-only records.",
+  "intendedBehavior": "Explicit close revokes its open lifetime; late results close safely, delayed upgrades abort, and a later explicit open has independent authority. Existing bytes, pending work, raw sources, ordinary offline repairs and source-CAS guards remain unchanged.",
+  "replacementTests": [
+    "RISK device connection cancellation: explicit close invalidates a delayed open without resurrecting or replacing sources",
+    "RISK device connection cancellation: closing before first upgrade leaves no replacement database"
+  ],
+  "preservedCoverage": [
+    "All earlier planner scene equality and numerical budgets retain their assertions; only the immutable historical reference applies the already-tested daytime spawn policy alongside current-main fixture caching. No frequency entry is added to public notes.",
+    "New cancellation cases compare complete structured-cloned physical source values across isolated VM realms, preserving every supported type and value. The initial cross-realm prototype mismatch is retained as fixture correction, not defect evidence.",
+    "Real app offline Add/draft/reopen, exact matching-head repair, bounded startup retry, cloud exact-ACK reconstruction and all DEVICE STORAGE V2 cases pass after the repair. No uncertain transaction is replayed; no database is reset."
+  ],
+  "redEvidence": {
+    "command": "record-run preimplementation-red fe744173 (2026-10-25T06:54:32Z), node --test --test-reporter=spec --test-name-pattern=^RISK device connection cancellation: tests.js; then separate new first-upgrade slice c97b3ae7 (06:58:11Z) before upgrade guard.",
+    "failure": "fe744173 actual two assertions: cancelled delayed success returned ok:true, and fresh explicit open issued one request instead of two. c97b3ae7 actual assertion: a cancelled first open left the new empty database present. Original outputs retained in database/lifecycle/runs. Existing broader offline/daytime REDs remain referenced in prior records."
+  },
+  "observedGreen": "8339f644 and final1afebe8d pass focused cancellation, app connection, exact offline repair and DEVICE STORAGE V2 cases. This is owner development evidence; full/native/rules/compatibility/review/CI/live gates remain pending."
+},
+{
+  "baseCommit": "c27a36be08dbc73f33643f66f0daea0b1d6b074a",
+  "testChangesSha256": "3e38fbc92de354566462ec13d1d4f7e81979c0b7cd33f3fd54272b43faa98d65",
+  "reason": "Preserve explicit device-store shutdown across delayed initial/replacement connections and upgrades. Integrate current-main historical-planner caching while retaining the previously authorized daytime policy and all original equality and operation budgets.",
+  "previousBehavior": "Closing during an open let a late success resurrect authority, made a subsequent explicit open reuse the cancelled promise, and could leave a newly created empty database after shutdown. Earlier offline exact-copy/connection/daytime changes retain their original RED evidence in prior append-only records.",
+  "intendedBehavior": "Explicit close revokes its open lifetime; late results close safely, delayed upgrades abort, and a later explicit open has independent authority. Existing bytes, pending work, raw sources, ordinary offline repairs and source-CAS guards remain unchanged.",
+  "replacementTests": [
+    "RISK device connection cancellation: explicit close invalidates a delayed open without resurrecting or replacing sources",
+    "RISK device connection cancellation: closing before first upgrade leaves no replacement database"
+  ],
+  "preservedCoverage": [
+    "All earlier planner scene equality and numerical budgets retain their assertions; only the immutable historical reference applies the already-tested daytime spawn policy alongside current-main fixture caching. No frequency entry is added to public notes.",
+    "New cancellation cases compare complete structured-cloned physical source values across isolated VM realms, preserving every supported type and value. The initial cross-realm prototype mismatch is retained as fixture correction, not defect evidence.",
+    "Real app offline Add/draft/reopen, exact matching-head repair, bounded startup retry, cloud exact-ACK reconstruction and all DEVICE STORAGE V2 cases pass after the repair. No uncertain transaction is replayed; no database is reset."
+  ],
+  "redEvidence": {
+    "command": "record-run preimplementation-red fe744173 (2026-10-25T06:54:32Z), node --test --test-reporter=spec --test-name-pattern=^RISK device connection cancellation: tests.js; then separate new first-upgrade slice c97b3ae7 (06:58:11Z) before upgrade guard.",
+    "failure": "fe744173 actual two assertions: cancelled delayed success returned ok:true, and fresh explicit open issued one request instead of two. c97b3ae7 actual assertion: a cancelled first open left the new empty database present. Original outputs retained in database/lifecycle/runs. Existing broader offline/daytime REDs remain referenced in prior records."
+  },
+  "observedGreen": "8339f644 and final1afebe8d pass focused cancellation, app connection, exact offline repair and DEVICE STORAGE V2 cases. This is owner development evidence; full/native/rules/compatibility/review/CI/live gates remain pending."
 }
 ]

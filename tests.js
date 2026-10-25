@@ -111,6 +111,50 @@ test('RISK device connection recovery: offline accepted work survives a lost han
  });
 });
 
+test('RISK device connection cancellation: explicit close invalidates a delayed open without resurrecting or replacing sources',async t=>{
+ for(const freshOpen of [false,true])await t.test(freshOpen?'fresh explicit open owns the replacement':'late success stays closed',async sub=>{
+  const {IDBFactory}=await import('fake-indexeddb'),factory=new IDBFactory(),dbName='cancel-device-open-'+Math.random();
+  const seed=loadStorageV2({indexedDB:factory}).createDeviceStore({indexedDB:factory,crypto:webcrypto,dbName});await seed.open();
+  const payload=JSON.stringify(syncState({tasks:[syncTask('cancel-original','Preserved through cancellation')],futureCancel:{keep:47}}));
+  assert.equal((await seed.commitHead({expectedHash:null,payload,account:null})).ok,true);
+  await seed.setPendingUpload('another-owner',{generationId:'cancel-original-pending',baseRev:4,payloadHash:'a'.repeat(64),updatedAt:1});
+  const original=await seed.readRawExportSnapshot();await seed.close();
+  let release,opened,opens=0;const gate=new Promise(resolve=>{release=resolve;}),arrived=new Promise(resolve=>{opened=resolve;});
+  const indexedDB={open(...args){
+   const native=factory.open(...args);opens++;if(opens!==1)return native;
+   const request={};for(const key of ['result','error','transaction'])Object.defineProperty(request,key,{get:()=>native[key]});
+   for(const event of ['upgradeneeded','error','blocked'])native.addEventListener(event,()=>request['on'+event]?.());
+   native.addEventListener('success',async()=>{opened();await gate;request.onsuccess?.();});return request;
+  }};
+  const store=loadStorageV2({indexedDB}).createDeviceStore({indexedDB,crypto:webcrypto,dbName,openTimeoutMs:1000});
+  sub.after(async()=>{release();await store.close();});
+  const old=store.open().then(()=>({ok:true}),error=>({ok:false,name:error.name}));await fixtureDeadline(arrived,'native open reaches delayed external delivery');
+  await store.close();
+  if(freshOpen){
+   const next=store.open();await new Promise(resolve=>setImmediate(resolve));
+   assert.equal(opens,2,'an explicit new open has a fresh operation, independent of the cancelled request');
+   await fixtureDeadline(next,'fresh explicit open completes while stale delivery waits');
+  }
+  release();const outcome=await fixtureDeadline(old,'cancelled old open settles');
+  assert.equal(outcome.ok,false,'explicit close must invalidate a delayed success instead of silently reopening authority');
+  assert.equal(outcome.name,'AbortError');
+  if(!freshOpen){await assert.rejects(()=>store.readHead(),/not open/);await store.open();}
+  assert.deepEqual(structuredClone(await store.readRawExportSnapshot()),structuredClone(original),'cancellation and explicit reopening preserve every original physical source across isolated runtime realms');
+ });
+});
+
+test('RISK device connection cancellation: closing before first upgrade leaves no replacement database',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),factory=new IDBFactory(),dbName='cancel-before-upgrade-'+Math.random();let delivered;
+ const nativeSettled=new Promise(resolve=>{delivered=resolve;});
+ const indexedDB={open(...args){const request=factory.open(...args);for(const event of ['success','error'])request.addEventListener(event,delivered);return request;}};
+ const store=loadStorageV2({indexedDB}).createDeviceStore({indexedDB,crypto:webcrypto,dbName});t.after(()=>store.close());
+ const opening=store.open().then(()=>({ok:true}),error=>({ok:false,name:error.name}));await store.close();
+ assert.equal((await fixtureDeadline(opening,'explicit shutdown settles the opening')).name,'AbortError');
+ await fixtureDeadline(nativeSettled,'the cancelled native request settles');
+ assert.ok(!(await factory.databases()).some(row=>row.name===dbName),'a cancelled first open cannot create an empty replacement database after authority was revoked');
+ await store.open();assert.equal(await store.readHead(),null,'a later explicit open can initialize its own new store');
+});
+
 test('RISK repository process: Playwright waitForFunction predicates are synchronous',()=>{
  const source=fs.readFileSync(fileURLToPath(import.meta.url),'utf8');
  const asyncWaitCalls=[...source.matchAll(/\.waitForFunction\s*\(\s*async\b/g)].map(match=>source.slice(0,match.index).split('\n').length);

@@ -2135,3 +2135,8 @@ This boundary control holds a successful real provider reply, installs a later a
 - RISK device connection startup: one internal server failure recovers the authoritative offline board within a bounded attempt
 - RISK device connection recovery: offline accepted work survives a lost handle and durable reopen
 - RISK device connection recovery: a closed local handle still permits exact cloud reconstruction without losing originals
+
+## Device connection cancellation
+
+- `RISK device connection cancellation: explicit close invalidates a delayed open without resurrecting or replacing sources`
+- `RISK device connection cancellation: closing before first upgrade leaves no replacement database`
