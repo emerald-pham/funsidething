@@ -61,19 +61,6 @@
     transaction.onerror=()=>reject(transaction.error||new Error("IndexedDB transaction failed"));
     transaction.onabort=()=>reject(transaction.error||new Error("IndexedDB transaction aborted"));
   });
-  async function readonlyResults(tx,requests){
-    const done=transactionDone(tx);
-    try{
-      // A server failure can abort requests before its own transaction error.
-      // Observe both immediately and retain that cause without leaking a
-      // second unhandled rejection. This helper never retries a mutation.
-      const [values]=await Promise.all([Promise.all(requests),done]);return values;
-    }catch(error){
-      try{tx.abort();}catch{}
-      try{await done;}catch{}
-      throw tx.error||error;
-    }
-  }
 
   function createDeviceStore({indexedDB=root.indexedDB,crypto=root.crypto,dbName="chain-scanner-v2",openTimeoutMs=5000,encodeRecoveryValue=null,onRecovery=null}={}){
     if(!indexedDB) throw new Error("IndexedDB is unavailable");
@@ -141,6 +128,28 @@
       try{return await pending;}finally{if(opening===pending)opening=null;}
     }
     const ensureOpen=()=>{if(!db&&!reconnectAllowed) throw new Error("Device store is not open");};
+    async function readonlyResults(tx,requests){
+      const done=transactionDone(tx);
+      try{
+        // Observe requests and completion together: a server failure can
+        // abort requests before its transaction error becomes available.
+        const [values]=await Promise.all([Promise.all(requests),done]);return values;
+      }catch(error){
+        try{tx.abort();}catch{}
+        try{await done;}catch{}
+        const failure=tx.error||error;
+        // The server can reject reads before delivering connection.onclose.
+        // Retire only this failed handle so the caller's bounded recheck opens
+        // the existing database. Never replay a transaction or close a newer
+        // connection when an older concurrent read finishes late.
+        if(db===tx.db&&["UnknownError","InvalidStateError"].includes(failure?.name)){
+          const connection=db;db=null;
+          try{connection.close();}catch{}
+          observeRecovery("unavailable",failure);
+        }
+        throw failure;
+      }
+    }
     async function beginTransaction(names,mode){
       ensureOpen();
       if(!db)await open();

@@ -25,22 +25,23 @@ function test(...args){
  });
 }
 
-async function injectRecoveryDatabaseFailure187(t,app,{key='pending:owner',failAt=[1],errorName='UnknownError',beforeRequest=false,onFailure=()=>{}}={}){
+async function injectRecoveryDatabaseFailure187(t,app,{key='pending:owner',failAt=[1],errorName='UnknownError',beforeRequest=false,untilReopened=false,onFailure=()=>{}}={}){
  const {IDBDatabase}=await import('fake-indexeddb'),originalTransaction=IDBDatabase.prototype.transaction;
- const observed={reads:0,failures:0};
+ const observed={reads:0,failures:0};let failedConnection=null;
  // Inject a browser database-server abort after a native request succeeds.
  // The real app and storage consumers still run; only the OS boundary fails.
  IDBDatabase.prototype.transaction=function(names,mode,...args){
-  const tx=originalTransaction.call(this,names,mode,...args);
+  const connection=this,tx=originalTransaction.call(this,names,mode,...args);
   if(mode==='readonly'&&this.name===app.deviceDbName){
    const objectStore=tx.objectStore.bind(tx);
    tx.objectStore=name=>{
     const source=objectStore(name),get=source.get.bind(source);
     source.get=requestedKey=>{
-     const fail=name==='meta'&&requestedKey===key&&failAt.includes(++observed.reads),trigger=fail&&beforeRequest?source.count():null;
+     const fail=name==='meta'&&requestedKey===key&&(failAt.includes(++observed.reads)||untilReopened&&connection===failedConnection),trigger=fail&&beforeRequest?source.count():null;
      const request=get(requestedKey);
      if(fail){
       observed.failures++;
+      if(untilReopened)failedConnection=connection;
       (trigger??request).addEventListener('success',()=>{
        Object.defineProperty(tx,'error',{configurable:true,value:Object.assign(Error('An internal error was encountered in the Indexed Database server'),{name:errorName})});
        onFailure();
@@ -57,6 +58,30 @@ async function injectRecoveryDatabaseFailure187(t,app,{key='pending:owner',failA
  t.after(()=>{IDBDatabase.prototype.transaction=originalTransaction;});
  return observed;
 }
+
+test('RISK cloud recovery device connection: a failed handle is reopened within the same protected review',async t=>{
+ for(const key of ['pending:owner','recoveryCloudHold','head'])for(const errorName of ['UnknownError','InvalidStateError'])await t.test(key+' '+errorName,async t=>{
+  const app=await freshSourceCheckFixture187(t,{nativeDeviceConnection:true}),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+  shim.document.getElementById('addInput').value='Unfinished task while the device connection recovers';
+  const local=JSON.stringify(ctx.state),raw=await store.readRawExportSnapshot(),cloud=JSON.stringify([...backend.docs]),writes=backend.writes.length;
+  const fault=await injectRecoveryDatabaseFailure187(t,app,{key,errorName,untilReopened:true});
+  ctx.onAction('sync',{});
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="review-cloud-source-recovery"/);
+  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true,'the existing automatic recheck must recover a failed connection: '+shim.document.getElementById('modalRoot').innerHTML);
+  assert.equal(fault.failures,1,'one failed connection must not consume the fresh read on that same unusable handle');
+  const modal=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(modal,/data-act="choose-cloud-recovery-source"/);
+  assert.doesNotMatch(modal,/data-act="choose-cloud-recovery-source"[^>]*aria-pressed="true"/);
+  assert.match(modal,/data-act="apply-cloud-source-recovery"[^>]*disabled/);
+  assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),false);
+  assert.equal(JSON.stringify(ctx.state),local);assert.deepEqual(await store.readRawExportSnapshot(),raw);
+  assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal(backend.writes.length,writes);
+  assert.equal(shim.document.getElementById('addInput').value,'Unfinished task while the device connection recovers');
+  const report=ctx.buildSupportDiagnosticsReport();
+  assert.ok(report.sourceOperations.some(op=>op.status==='failed'),'the original failed read remains in diagnostics');
+  assert.ok(report.sourceOperations.some(op=>op.status==='completed'),'fresh source verification completes separately');
+ });
+});
 
 test('RISK cloud recovery memory: retained saved copies leave automatic checks and manual review usable in a bounded heap',async t=>{
  if(process.env.CHAIN_RECOVERY_MEMORY_CHILD!=='1'){
@@ -109,7 +134,7 @@ test('RISK cloud recovery device read: a temporary database server failure compl
  const cases=['pending:owner','recoveryCloudHold','head'].flatMap(key=>[false,true].map(beforeRequest=>({key,beforeRequest,failAt:[1]})));
  cases.push({key:'pending:owner',failAt:[2]},{key:'pending:owner',failAt:[5]},{key:'pending:owner',failAt:[1],errorName:'InvalidStateError'});
  for(const options of cases)await t.test(JSON.stringify(options),async t=>{
- const app=await freshSourceCheckFixture187(t),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+ const app=await freshSourceCheckFixture187(t,{nativeDeviceConnection:true}),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
  shim.document.getElementById('addInput').value='Unfinished task during database recovery';
  const local=JSON.stringify(ctx.state),head=await store.readHead(),raw=await store.readRawExportSnapshot(),cloud=JSON.stringify([...backend.docs]),writes=backend.writes.length;
  const observed=await injectRecoveryDatabaseFailure187(t,app,options);
@@ -130,7 +155,7 @@ test('RISK cloud recovery device read: a temporary database server failure compl
 
 test('RISK cloud recovery device read: repeated failures stop honestly and share the cloud retry budget',async t=>{
  for(const mixed of [false,true])await t.test(mixed?'device then cloud':'repeated database failure',async t=>{
-  const app=await freshSourceCheckFixture187(t),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+  const app=await freshSourceCheckFixture187(t,{nativeDeviceConnection:true}),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
   const local=JSON.stringify(ctx.state),raw=await store.readRawExportSnapshot(),cloud=JSON.stringify([...backend.docs]),writes=backend.writes.length;
   const observed=await injectRecoveryDatabaseFailure187(t,app,{failAt:mixed?[1]:[1,2]});let roots=0;
   if(mixed)app.faults.serverRead=async path=>{if(path==='users/owner'){roots++;throw Object.assign(Error('Synthetic unavailable cloud'),{code:'unavailable'});}};
@@ -146,7 +171,7 @@ test('RISK cloud recovery device read: repeated failures stop honestly and share
 
 test('RISK cloud recovery device read: cancellation changed authority and expired budgets cannot restart obsolete review',async t=>{
  for(const change of ['cancel','draft','accepted edit','backend','UID','deadline','protected browser','protected fallback','pending before hold failure','hold before head failure'])await t.test(change,async t=>{
-  const app=await freshSourceCheckFixture187(t),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+  const app=await freshSourceCheckFixture187(t,{nativeDeviceConnection:true}),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
   const local=JSON.stringify(ctx.state),head=await store.readHead(),cloud=JSON.stringify([...backend.docs]),writes=backend.writes.length;let accepted=null,mutation=null;
   const writer=await new Promise((resolve,reject)=>{const request=app.indexedDB.open(app.deviceDbName,1);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});t.after(()=>writer.close());
   const changedRecord={account:'e@example.com',identity:'owner',generationId:'new-protected-intent',payloadHash:'e'.repeat(64),baseRev:4,futureProtected:[3,7]};
@@ -178,7 +203,7 @@ test('RISK cloud recovery device read: cancellation changed authority and expire
 });
 
 test('RISK cloud recovery device read: recovered diagnostics keep the failed attempt without private error text',async t=>{
- const app=await freshSourceCheckFixture187(t),{ctx,shim}=app;let progress='';
+ const app=await freshSourceCheckFixture187(t,{nativeDeviceConnection:true}),{ctx,shim}=app;let progress='';
  app.faults.serverRead=async()=>{progress||=shim.document.getElementById('modalRoot').innerHTML;};
  await injectRecoveryDatabaseFailure187(t,app);
  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);
@@ -191,13 +216,23 @@ test('RISK cloud recovery device read: recovered diagnostics keep the failed att
 
 test('RISK cloud recovery device read: permanent storage errors never enter the automatic recheck',async t=>{
  for(const errorName of ['SecurityError','QuotaExceededError','AbortError','NotFoundError'])await t.test(errorName,async t=>{
-  const app=await freshSourceCheckFixture187(t),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+  const app=await freshSourceCheckFixture187(t,{nativeDeviceConnection:true}),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
   const local=JSON.stringify(ctx.state),raw=await store.readRawExportSnapshot(),cloud=JSON.stringify([...backend.docs]),writes=backend.writes.length;
   const observed=await injectRecoveryDatabaseFailure187(t,app,{errorName});
   assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),false);assert.equal(observed.reads,1);
   assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="choose-cloud-recovery-source"/);
   assert.equal(JSON.stringify(ctx.state),local);assert.deepEqual(await store.readRawExportSnapshot(),raw);assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal(backend.writes.length,writes);
  });
+});
+
+test('RISK cloud recovery reconnect guidance: mounted help explains reconnecting without replacing saved data',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(markup,/The recheck reconnects to this device’s saved data if its earlier connection failed/);
+ assert.match(markup,/It never clears or replaces the saved database/);
+ assert.match(markup,/<li>Cloud recovery now reconnects to saved device data after an interrupted read/);
+ assert.match(markup,/original one-minute limit/);
 });
 
 test('RISK cloud recovery memory guidance: mounted FAQ and changelog explain lower memory use and retained originals',async t=>{
@@ -1265,11 +1300,11 @@ test('RISK recovery fixture ownership: acknowledged damage inputs finish both na
  assert.equal((await backend.CS.pull()).code,'corrupt-generation','the real first automatic read still has a damaged generation to recover');
 });
 
-async function damagedAcknowledgedApp187(t,{timeoutMs=5000,sourcePadding=0,timerProvider=null,recoveryTimeoutMs=timeoutMs,artifacts=null}={}){
+async function damagedAcknowledgedApp187(t,{timeoutMs=5000,sourcePadding=0,timerProvider=null,recoveryTimeoutMs=timeoutMs,artifacts=null,nativeDeviceConnection=false}={}){
  const fixture=heldDecisionFixture188();
  if(sourcePadding)fixture.remote.futureIOSReportFixture={opaque:'q'.repeat(sourcePadding)};
  fixture.local=structuredClone(fixture.remote);
- const faults={},app=await heldDecisionApp188(t,{fixture,failures:faults,timeoutMs,timerProvider,recoveryTimeoutMs,artifacts}),{ctx,shim,backend}=app;
+ const faults={},app=await heldDecisionApp188(t,{fixture,failures:faults,timeoutMs,timerProvider,recoveryTimeoutMs,artifacts,nativeDeviceConnection}),{ctx,shim,backend}=app;
  ctx.window.CLOUD_PUSH_DELAY_MS=60000;
  // Own only the two setup Add callbacks. Their real persistence finishes before
  // damage/recovery, so neither can later replace a consented recovery head.
@@ -41219,9 +41254,11 @@ test('RISK CLOUD CONFORMANCE: controlled crypto delivery executes original adapt
 // Isolated original mixed-release replay: current typed light choice, then the
 // released pre-decision client saved dark while retaining that exact choice.
 function heldDecisionFixture188(){return {"local":{"v":2,"tasks":[{"id":"a","title":"Fixture A","url":null,"due":null,"evergreen":false,"ctx":[],"mu":25,"sigma":8.333333333333334,"done":false,"createdAt":1,"completedAt":null,"lastDoneAt":null,"startsAt":null,"prerequisiteRevision":0,"prerequisiteIds":[],"prerequisiteId":null,"prerequisiteMirror":null,"prerequisiteOps":{},"evergreenHours":18,"evergreenResetAtDay":true}],"contexts":[],"chain":[],"considered":{},"cantAt":{},"workedAt":{},"candidateId":null,"workLog":[],"interventionActive":false,"interventionP":0,"snooze":0,"mode":"scan","decisionsMs":[],"presentedAt":0,"passStartedAt":1792321140000,"listOpen":false,"ctxOpen":true,"histOpen":false,"seenQuickStart":true,"updatedAt":1792321201000,"settings":{"horizonMin":60,"thresholdPct":25,"samples":250,"cantMin":30,"workedHours":16,"postponeHours":1,"evergreenHours":18,"evergreenResetAtDay":true,"scanMode":"squared","squaredDefaultVersion":1,"listMetric":"rank","excludeNoContext":false,"lastTaskWoop":false,"floatingHeader":false,"patternedIndicators":false,"showPostpone":true,"theme":"dark","dateFormat":"system","hourlyQuotes":{},"scene":{"time":null,"season":null,"location":null},"skipOldestFirstDot":false},"passId":"mixed-rollout","scanMode":"descending","syncAccount":"e@example.com","syncRev":4,"syncDirty":true,"deletionLog":[],"deletedTaskIds":{},"clearedHistoryIds":{},"restoredTaskIds":{},"restoredHistoryIds":{},"restoredTaskOps":{},"restoredHistoryOps":{},"deletedAfterRestoreOps":{},"clearedAfterRestoreOps":{},"chance":null,"addOpen":true,"decisionBase":{"v":1,"id":"db1:ef0eff3a10121ebe968caa55bd33d2bb","account":"e@example.com","revision":4,"payload":"{\"v\":2,\"tasks\":[{\"id\":\"a\",\"title\":\"Fixture A\",\"url\":null,\"due\":null,\"evergreen\":false,\"ctx\":[],\"mu\":25,\"sigma\":8.333333333333334,\"done\":false,\"createdAt\":1,\"completedAt\":null,\"lastDoneAt\":null,\"startsAt\":null,\"prerequisiteRevision\":0,\"prerequisiteIds\":[],\"prerequisiteId\":null,\"prerequisiteMirror\":null,\"prerequisiteOps\":{},\"evergreenHours\":18,\"evergreenResetAtDay\":true}],\"contexts\":[],\"chain\":[],\"considered\":{},\"cantAt\":{},\"workedAt\":{},\"candidateId\":null,\"workLog\":[],\"interventionActive\":false,\"interventionP\":0,\"snooze\":0,\"mode\":\"scan\",\"decisionsMs\":[],\"presentedAt\":0,\"passStartedAt\":1792321140000,\"listOpen\":false,\"ctxOpen\":true,\"histOpen\":false,\"seenQuickStart\":true,\"updatedAt\":0,\"settings\":{\"horizonMin\":60,\"thresholdPct\":25,\"samples\":250,\"cantMin\":30,\"workedHours\":16,\"postponeHours\":1,\"evergreenHours\":18,\"evergreenResetAtDay\":true,\"scanMode\":\"squared\",\"squaredDefaultVersion\":1,\"listMetric\":\"rank\",\"excludeNoContext\":false,\"lastTaskWoop\":false,\"skipOldestFirstDot\":false,\"floatingHeader\":false,\"patternedIndicators\":false,\"showPostpone\":true,\"theme\":\"system\",\"dateFormat\":\"system\",\"hourlyQuotes\":{},\"scene\":{\"time\":null,\"season\":null,\"location\":null}},\"passId\":\"mixed-rollout\",\"scanMode\":\"descending\",\"deletionLog\":[],\"deletedTaskIds\":{},\"clearedHistoryIds\":{},\"restoredTaskIds\":{},\"restoredHistoryIds\":{},\"restoredTaskOps\":{},\"restoredHistoryOps\":{},\"deletedAfterRestoreOps\":{},\"clearedAfterRestoreOps\":{},\"chance\":null,\"addOpen\":true}"},"decisionBaseline":{"v":1,"account":"e@example.com","sourceBaseId":"db1:ef0eff3a10121ebe968caa55bd33d2bb","sourceRevision":4,"includedActionIds":[],"ratings":[{"taskId":"a","mu":25,"sigma":8.333333333333334}],"chainIds":[],"passId":"mixed-rollout","passAt":1792321140000,"considered":{},"cantAt":{},"workedAt":{},"observedRatingHistoryIds":[],"id":"dlb2:6b9e4e304cf1e2aa3f14f7dfde0b3097"},"decisionEvents":[{"v":1,"id":"te9703fc8-b286-48a2-ac2b-b42b9c803f19","at":1792321200000,"account":"e@example.com","baseId":"db1:ef0eff3a10121ebe968caa55bd33d2bb","kind":"current-choice","actionId":"tfa255a29-fb5d-40f6-ab66-73248fed8170","target":{"type":"setting","id":"board","property":"theme"},"value":"light","after":{"present":true},"before":{"present":true,"value":"system"},"passId":"mixed-rollout","passAt":1792321140000,"scanMode":"descending","chainIds":[],"observedActionIds":[]}]},"remote":{"v":1,"tasks":[{"id":"a","title":"Fixture A","url":null,"due":null,"evergreen":false,"ctx":[],"mu":25,"sigma":8.333333333333334,"done":false,"createdAt":1,"completedAt":null,"lastDoneAt":null}],"contexts":[],"chain":[],"considered":{},"cantAt":{},"workedAt":{},"candidateId":null,"workLog":[],"interventionActive":false,"interventionP":0,"snooze":0,"mode":"idle","decisionsMs":[],"presentedAt":0,"passStartedAt":1792321140000,"listOpen":false,"ctxOpen":true,"histOpen":false,"seenQuickStart":true,"updatedAt":0,"settings":{"horizonMin":60,"thresholdPct":25,"samples":250,"cantMin":30,"workedHours":8,"theme":"system"},"passId":"mixed-rollout","scanMode":"descending","syncAccount":"e@example.com","syncRev":4,"syncDirty":false},"rev":4,"producer":{"current":"52d4b25","old":"69a9fed","actions":["current cycle-theme system to light","old cycle-theme light to dark"]}};}
-async function heldDecisionApp188(t,{fixture=heldDecisionFixture188(),failures={},storageBackend="indexedDB",timeoutMs=5000,timerProvider=null,recoveryTimeoutMs=timeoutMs,artifacts=null}={}){
+async function heldDecisionApp188(t,{fixture=heldDecisionFixture188(),failures={},storageBackend="indexedDB",timeoutMs=5000,timerProvider=null,recoveryTimeoutMs=timeoutMs,artifacts=null,nativeDeviceConnection=false}={}){
  const {IDBFactory}=await import('fake-indexeddb'),factory=new IDBFactory(),deviceDbName='held-choice-188-'+Math.random(),idbFault={};
- const indexedDB={open(...args){const request=factory.open(...args);return new Proxy(request,{
+ // Connection-lifecycle consumers need the native transaction.db identity;
+ // the optional per-write fixture proxies below do not preserve that identity.
+ const indexedDB=nativeDeviceConnection?factory:{open(...args){const request=factory.open(...args);return new Proxy(request,{
   get(target,key){
    if(key==='result'){const db=Reflect.get(target,key,target);if(!db?.transaction)return db;return new Proxy(db,{get(target,key){
     if(key!=='transaction'){const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;}

@@ -1,5 +1,25 @@
 [
   {
+    "baseCommit": "7fa87a84ca1c67a43b5fb2d61d6847fc1024e774",
+    "testChangesSha256": "e43a2a79d83c575975a63108d6c2d3bc155bf6c818af0c36d70774be4e416938",
+    "reason": "Close the failed-connection gap in bounded device-read recovery through the actual Sync and Review consumer. Existing retry tests simulated one request failure, then allowed the same handle to work; the new case keeps that handle unusable until reopened.",
+    "previousBehavior": "An asynchronous UnknownError or InvalidStateError left the failed database handle installed. The single recheck reused it and stopped with the same device-read error even when a fresh connection could read all original data.",
+    "intendedBehavior": "Retire only the current failed readonly connection; the existing caller-owned bounded recheck reopens the existing database and verifies all sources. No mutation is replayed, no source selected, no database created as a replacement, and late failures cannot retire a newer handle.",
+    "replacementTests": [
+      "RISK cloud recovery device connection: a failed handle is reopened within the same protected review",
+      "RISK cloud recovery reconnect guidance: mounted help explains reconnecting without replacing saved data"
+    ],
+    "preservedCoverage": [
+      "All existing assertions for retry exhaustion, shared cloud/device budget, cancellation, drafts, accepted edits, UID/backend changes, changed pending and holds, permanent errors, diagnostics and exact source preservation remain intact; their fixtures now use unwrapped database handles to preserve the native transaction.db identity.",
+      "The default per-write fault fixture remains unchanged for existing consumers. Only connection lifecycle tests opt into the unwrapped fake-indexeddb factory. No private production data is used.",
+      "The earlier retained-copy bounded-memory test and explicit source-choice durable/cloud readback contracts pass. A review pass is not a claim of recovery for the affected private database or the original physical iPhone restart."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <task-worktree> --evidence-dir <task-artifacts>/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern='^RISK cloud recovery device connection:' tests.js",
+      "failure": "Preimplementation a4fed341 on baseline7fa87a8 failed all six cases at the real Review consumer with the exact device saved-data unavailable modal. Initial implementation run46aab97b remained red because the old fixture proxy did not preserve transaction.db identity. The new nativeDeviceConnection option corrects that external-boundary fidelity without weakening assertions. Corrected fixed run e7955101 passes; correction-linked later baseline sensitivity57d04a4e fails all six at the same assertion. This later control does not replace original chronology. Mounted guidance RED739a23e5 fails missing reconnect explanation before copy edits; Node22 focused GREEN a3f67110 passes. Full records are retained outside Git in task-artifacts/recovery-device-reconnect-20261025/runs."
+    }
+  },
+  {
     "baseCommit": "22a6622b6345582e2b6512c6bffd717bed10edf4",
     "testChangesSha256": "a8887b9edbdc00240f83dfd531d212fc628e4e76ab352cf431745f33488887f4",
     "reason": "Bind the unchanged issue275 snapshot and nested-process test changes to the newly merged current main. Upstream recovery memory coverage moves protected line coordinates; both sets of assertions and original chronological records are retained.",
