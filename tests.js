@@ -31642,13 +31642,16 @@ test('RISK PWA SYNC RESUME: cloud authority requires server reads and never an o
  assert.equal(offline.CS.errorCode,'unavailable');assert.equal(offline.writes.length,0);
 });
 
-test('RISK PWA SYNC RESUME: reopening drains interrupted reads and writes before one fresh reconciliation',async()=>{
+test('RISK PWA SYNC RESUME: reopening drains interrupted reads and writes before one fresh reconciliation',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb');
  for(const stage of ['pull','push']){
   const board=syncState({tasks:[syncTask('kept','Keep this task')],syncRev:4,syncAccount:'owner@example.test',syncDirty:false});
-  const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(board)}}),failures={},logged=[];
-  const h=await loadCloudBackendV2({rootData:{rev:4,payload:app.ctx.cloudPayload()},failures,timeoutMs:500,recordSyncError:(...row)=>logged.push(row)});
+  const app=await loadApp({indexedDBProvider:new IDBFactory(),seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(board)}}),failures={},logged=[];
+  const h=await loadCloudBackendV2({runtimeWindow:app.ctx.window,rootData:{rev:4,payload:app.ctx.cloudPayload()},failures,timeoutMs:500,recordSyncError:(...row)=>logged.push(row)});
+  t.after(()=>h.CS.suspend());
   app.shim.window.CloudSync=h.CS;app.shim.window.CLOUD_PUSH_DELAY_MS=0;
   await app.ctx.cloudPull();
+  assert.equal(vm.runInContext('deviceStorageAuthority',app.ctx),true,'wake starts from the actual browser device authority');
   failures[stage+'Pending']=new Promise(()=>{});
   let old;
   if(stage==='pull')old=app.ctx.cloudPull();
@@ -31674,7 +31677,10 @@ test('RISK PWA SYNC RESUME: reopening drains interrupted reads and writes before
 });
 
 test('RISK PWA SYNC RESUME: restoration preserves editor drafts and sign-out while asleep',async()=>{
- const app=await loadApp(),h=await loadCloudBackendV2({rootData:null,timeoutMs:200});
+ const {IDBFactory}=await import('fake-indexeddb');
+ const app=await loadApp({indexedDBProvider:new IDBFactory()});
+ await fixtureDeadline(async wait=>{while(vm.runInContext('automaticCloudFallbackBootCapturePending',app.ctx))await wait();},'durable startup completes before the wake/editor gesture');
+ const h=await loadCloudBackendV2({runtimeWindow:app.ctx.window,rootData:null,timeoutMs:200});
  app.shim.window.CloudSync=h.CS;
  app.shim.document.hidden=true;app.shim.window.dispatchEvent({type:'pagehide'});
  app.shim.document.hidden=false;app.shim.document.querySelector=()=>({});
@@ -31690,8 +31696,9 @@ test('RISK PWA SYNC RESUME: restoration preserves editor drafts and sign-out whi
 
 
 test('RISK PWA SYNC RESUME: visibility before pageshow shares one reconnect and genuine reconnect failures stay bounded',async()=>{
+ const {IDBFactory}=await import('fake-indexeddb');
  let enable;const failures={enablePending:new Promise(resolve=>{enable=resolve;})};
- const app=await loadApp(),h=await loadCloudBackendV2({failures,timeoutMs:100});
+ const app=await loadApp({indexedDBProvider:new IDBFactory()}),h=await loadCloudBackendV2({runtimeWindow:app.ctx.window,failures,timeoutMs:100});
  app.shim.window.CloudSync=h.CS;
  app.shim.document.hidden=true;app.shim.document.dispatchEvent({type:'visibilitychange'});app.shim.window.dispatchEvent({type:'pagehide'});
  app.shim.document.hidden=false;app.shim.document.dispatchEvent({type:'visibilitychange'});await syncSettle(5);
@@ -31704,8 +31711,9 @@ test('RISK PWA SYNC RESUME: visibility before pageshow shares one reconnect and 
 });
 
 test('RISK PWA SYNC RESUME: a publication committed during sleep is read back without a duplicate write',async()=>{
+ const {IDBFactory}=await import('fake-indexeddb');
  let acknowledge;const failures={},board=syncState({tasks:[syncTask('safe','Keep me')],syncRev:4,syncAccount:'owner@example.test',syncDirty:false});
- const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(board)}}),h=await loadCloudBackendV2({rootData:{rev:4,payload:app.ctx.cloudPayload()},failures,timeoutMs:500});
+ const app=await loadApp({indexedDBProvider:new IDBFactory(),seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(board)}}),h=await loadCloudBackendV2({runtimeWindow:app.ctx.window,rootData:{rev:4,payload:app.ctx.cloudPayload()},failures,timeoutMs:500});
  app.shim.window.CloudSync=h.CS;app.shim.window.CLOUD_PUSH_DELAY_MS=0;
  await app.ctx.cloudPull();failures.publishPending=new Promise(resolve=>{acknowledge=resolve;});
  app.ctx.addTask('Publication before sleep');app.ctx.cloudPushNow();
@@ -31723,10 +31731,11 @@ test('RISK PWA SYNC RESUME: a publication committed during sleep is read back wi
 
 
 test('RISK PWA SYNC RESUME: a timed-out reconnect cannot poison later online or wake recovery',async()=>{
+ const {IDBFactory}=await import('fake-indexeddb');
  for(const recovery of ['online','wake']){
   let finishOld;const failures={enablePending:new Promise(resolve=>{finishOld=resolve;})};
   const board=syncState({tasks:[syncTask('retained','Do not lose this')],syncRev:4,syncAccount:'owner@example.test',syncDirty:false});
-  const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(board)}}),h=await loadCloudBackendV2({rootData:{rev:4,payload:app.ctx.cloudPayload()},failures,timeoutMs:20});
+  const app=await loadApp({indexedDBProvider:new IDBFactory(),seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(board)}}),h=await loadCloudBackendV2({runtimeWindow:app.ctx.window,rootData:{rev:4,payload:app.ctx.cloudPayload()},failures,timeoutMs:20});
   app.shim.window.CloudSync=h.CS;
   app.shim.document.hidden=true;app.shim.window.dispatchEvent({type:'pagehide'});
   app.shim.document.hidden=false;app.shim.window.dispatchEvent({type:'pageshow',persisted:true});
@@ -42678,10 +42687,17 @@ test('RISK cloud source recovery: native restored-device hold clears only after 
   }
   if(shape==='empty device choice')cloud.backend.docs.delete('users/owner');
   const original='{ "tasks": [ same-device original truncated \ud800',app=await loadAppAtTime(1792323000000,{indexedDBProvider:indexedDB,deviceDbName,seedStorage:{[SYNC_STORE_KEY]:original,[LOCAL_HEAD_KEY]:original}}),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;sub.after(()=>closeLegacyApp173(app));
-  const backend=await loadCloudBackendV2({runtimeWindow:ctx.window,failures:{authPending:true},timeoutMs:5000});sub.after(()=>backend.CS.suspend());for(const [key,value]of cloud.backend.docs)backend.docs.set(key,value);backend.emitAuth({uid:'owner',email:'e@example.com'});await ctx.cloudPull();
+  const backend=await loadCloudBackendV2({runtimeWindow:ctx.window,failures:{authPending:true},timeoutMs:5000});sub.after(()=>backend.CS.suspend());for(const [key,value]of cloud.backend.docs)backend.docs.set(key,value);
   const selected=syncState({tasks:[syncTask('restored-local-choice','Deliberately restored local task')],seenQuickStart:true,syncAccount:'e@example.com',syncRev:0,syncDirty:true});selected.futureRestored={keep:['original-selected',31]};
   ctx.onAction('settings',{});ctx.onAction('open-paste-recovery',{});const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=JSON.stringify(selected);shim.document.dispatchEvent({type:'input',target:box});
+  // The real focused Restore draft defers automatic recovery until the user's
+  // source has been previewed; starting sync first can legitimately repair it.
+  box.matches=selector=>selector.includes('textarea');shim.document.activeElement=box;
+  const beforeRestoreCloud=JSON.stringify([...backend.docs]);backend.emitAuth({uid:'owner',email:'e@example.com'});await ctx.cloudPull();
+  assert.equal(JSON.stringify([...backend.docs]),beforeRestoreCloud,'an open native Restore draft cannot publish automatic recovery first');
+  assert.equal(vm.runInContext('unacceptedDeviceSource?.workingWorkspace',ctx),true,'the deliberate restore must still use its protected unreadable-source path');
   assert.equal(await ctx.onAction('preview-pasted-recovery',{}),true,'native restore preview: '+shim.document.getElementById('toast').textContent);assert.equal(await ctx.onAction('confirm-file-restore',{}),true,'native restore confirm: '+shim.document.getElementById('modalRoot').innerHTML.slice(-2200));
+  shim.document.activeElement=null;
   const protectedOriginals=await store.listOpaqueArchives();assert.ok(protectedOriginals.some(row=>{try{return JSON.parse(row.raw).localStorage?.some(source=>source.raw===original);}catch{return false;}}),'the native local restore must first protect the exact unreadable original');
   const hold=await store.getRecoveryCloudHold();assert.ok(hold,'the actual native device restore creates the real persistent hold');assert.equal(hold.identity,'owner');
   shim.document.getElementById('addInput').value='Local work after recovered head';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);

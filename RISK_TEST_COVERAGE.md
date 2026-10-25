@@ -552,6 +552,9 @@ The Settings board-data area exposes one Download backup action with current-boa
 
 ## Installed PWA wake and sync recovery
 
+App-bound wake cases share the actual app window and an isolated IndexedDB with
+the production cloud backend. Backend-only cancellation cases remain separate.
+
 - RISK PWA SYNC RESUME: sleeping requests cancel promptly and cannot report a stale timeout or acknowledgement
 - RISK PWA SYNC RESUME: cloud authority requires server reads and never an offline cache miss
 - RISK PWA SYNC RESUME: reopening drains interrupted reads and writes before one fresh reconciliation
@@ -1776,6 +1779,11 @@ The native needs-attention action uses real IndexedDB and the production backend
 - RISK cloud source recovery: an empty preview cannot overwrite a legacy root published at the transaction boundary
 
 - RISK cloud source recovery: native restored-device hold clears only after exact cloud ACK and durable current-head recovery
+
+The Restore draft is focused before auth so automatic recovery cannot replace
+the intended protected unreadable-source path. Every remote row stays exact
+until the deliberate native preview and confirmation; the resulting hold still
+requires exact cloud acknowledgement, durable current-head recovery and reopen.
 
 - RISK cloud source recovery metadata: native preview distinguishes server save time upload clock and missing decision time
 

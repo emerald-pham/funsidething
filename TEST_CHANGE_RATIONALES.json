@@ -1,5 +1,24 @@
 [
   {
+    "baseCommit": "41b92a115fe117ee246e73ec5d62168621cfeaa3",
+    "testChangesSha256": "cff62d7f51e721d486a7782cba097cbf706c03e2981f4bf18670424bbbd7d62a",
+    "reason": "Repair six C4 regression failures caused by obsolete fixture lifecycle: PWA tests attached a backend from a separate window with no actual device store, and native Restore ran automatic recovery before opening its deliberate source draft. No product code or guard changes are needed.",
+    "previousBehavior": "Actual full qualification GREEN616cb6cc and unchanged-C4 focused RED36953ec0 fail four wake/reconnect/publication/editor outcomes and two nested restored-device holds. The detached backend cannot access the real app recovery planner when the omitted store triggers independent availability preflight. Signing in before opening Restore can legitimately finish automatic local/cloud recovery, so the later restore is no longer the intended unreadable-source consumer.",
+    "intendedBehavior": "Use the same real app window and an isolated IndexedDB per PWA scenario, preserving the normal device authority and actual SDK/event lifecycle. Await the existing durable boot capture before the editor gesture. Open and focus the actual native Paste draft before auth; prove cloudPull leaves the full remote namespace unchanged and the protected unreadable-source workspace active, then execute the existing preview/confirm/current-head/ACK/reopen path.",
+    "replacementTests": [
+      "RISK PWA SYNC RESUME: reopening drains interrupted reads and writes before one fresh reconciliation"
+    ],
+    "preservedCoverage": [
+      "Every previous assertion in the five app-bound PWA roots and the three restored-device subcases remains intact. All request cancellation, deadline-exceeded, no stale acknowledgement, draft deferral, sign-out, reconnect coalescing, server-read ordering, no duplicate write and later recovery expectations are unchanged. The first wake root additionally proves actual device authority before interruption; the backend-only PWA cases are unchanged.",
+      "Every native Restore original-byte/archive, real persistent hold, UID, later Add/persist/current-head hash, no ordinary pre-consent publication, explicit no-default source choice, exact cloud ACK, durable hold clearance, unknown selected data and cold-reopen assertion remains. Added assertions prove all remote rows exact before native Restore and real working-source provenance; no process hold, planner, state guard, CAS or source result is injected.",
+      "No runtime source, device/cloud store, rules, timeout budget, FAQ, PWA release metadata, fingerprints or global test assignments change. Existing root names are unchanged. This Node consumer repair is distinct from the parent’s already-passing installed-client native browser qualification; no browser/emulator/full-suite/CI/push is run here. Earlier rationale objects remain byte-exact."
+    ],
+    "redEvidence": {
+      "command": "Focused unchanged-C4 preimplementation-red36953ec0: node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/offline-working-repair/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/ios-page-failure-20261024/database/offline-working/c4-regression/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern '^(?:RISK PWA SYNC RESUME:|RISK cloud source recovery: native restored-device hold)' tests.js. Parent full616cb6cc remains a failed purpose=green discovery, not relabeled RED.",
+      "failure": "Focused baseline reproduces wake error vs ok, no reconciliation after editor close, missing publicationStarted, recovery-source-changed vs deadline-exceeded, and missing actual restored-device holds for damaged/healthy cloud cases. First postfixture GREENfe5898da identifies a late first-boot Help call against the old object-only modal stub and a lexical binding read made through an object property; wait for the existing boot completion flag and read the actual VM lexical binding. Corrected focused GREENcd18fd36 passes11/11 with all original assertions preserved."
+    }
+  },
+  {
     "baseCommit": "e7599f5964e50ac4cbb3388c36ad6fd87547a3e6",
     "testChangesSha256": "284bbfbeb9be6d8945b8d8214515aada85138aae9fdad5610d4aa5e6314878e9",
     "reason": "Replace an obsolete postcompletion zero-read timing assertion with actual first-SDK-read ordering proof after parent integrated the cloud hydration guard and local exact repair migration. Reads are allowed once supported local authority and protected originals are complete.",
