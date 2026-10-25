@@ -3263,6 +3263,11 @@
       "file": "scripts/agent-tools/record-run.test.mjs"
     },
     {
+      "root": "qualification readiness redacts setup failures in summary and default output without launching the child",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
       "root": "qualification readiness rejects dirty candidates and unusable evidence destinations before launch",
       "group": "native-process",
       "file": "scripts/agent-tools/record-run.test.mjs"

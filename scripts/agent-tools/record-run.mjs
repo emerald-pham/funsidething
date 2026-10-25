@@ -627,7 +627,6 @@ async function main(argv) {
   for (const pattern of redaction.patterns) {
     try { new RegExp(pattern); } catch (error) { throw new Error(`Invalid --redact-pattern: ${error.message}`); }
   }
-  if (options.qualificationReadiness) await validateQualificationReadiness({ repo, evidenceDirectory, environment: process.env });
   const git = await gitIdentity(repo, redaction);
   const workingTree = await collectSourceTestState(repo, redaction);
   // Keep filesystem destinations private to I/O; evidence metadata follows the
@@ -670,6 +669,7 @@ async function main(argv) {
   };
 
   try {
+    if (options.qualificationReadiness) await validateQualificationReadiness({ repo, evidenceDirectory, environment: process.env });
     await mkdir(evidenceDirectory, { recursive: true, mode: 0o700 });
     await writeRecord(recordPath, record);
     record.startedAt = new Date().toISOString();
@@ -677,8 +677,8 @@ async function main(argv) {
     record.execution.outcome = 'running';
     await writeRecord(recordPath, record);
   } catch (error) {
-    if (!options.summary) throw error;
     const message = summarizeEvidenceError(error, redaction, 'evidence.prepareError');
+    if (!options.summary) throw new Error(message, { cause: error });
     emitSummary({
       status: 'evidence-failure',
       outcome: 'not-started',
