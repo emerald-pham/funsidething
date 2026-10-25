@@ -19481,6 +19481,37 @@ test('SETTINGS: manual local backups replace visible JSON import and export cont
   assert.match(html,/title="Settings, contexts, and backups"/);
 });
 
+test('RISK JSON COPY PASTE: stale clipboard completion cannot release a newer export transfer',async t=>{
+  for(const outcome of ['resolve','reject'])await t.test(outcome,async t=>{
+    const pending=[],{IDBFactory}=await import('fake-indexeddb');
+    const app=await loadApp({indexedDBProvider:new IDBFactory(),deviceDbName:'clipboard-generation-'+outcome+'-'+Date.now()}),{ctx,shim}=app;
+    t.after(()=>app.dispose());
+    ctx.addTask('Keep the new transfer pending');await ctx.persist();
+    ctx.navigator={clipboard:{writeText(raw){return new Promise((resolve,reject)=>pending.push({raw,resolve,reject}));}}};
+    const original=shim.document.getElementById.bind(shim.document);let controls;
+    shim.document.getElementById=id=>controls?.[id]||original(id);
+    async function openExport(){
+      ctx.openSettings();assert.equal(await ctx.onAction('export-backup',{isConnected:true}),true);
+      controls=Object.fromEntries(['copyExportButton','downloadExportButton','exportTransferStatus'].map(id=>[id,makeFakeElement()]));
+    }
+    await openExport();const first=ctx.onAction('copy-export',{});
+    assert.equal(pending.length,1);ctx.closeModal();
+    await openExport();const second=ctx.onAction('copy-export',{});
+    assert.equal(pending.length,2);assert.equal(controls.copyExportButton.disabled,true);
+    const waiting=controls.exportTransferStatus.textContent;
+    pending[0][outcome](outcome==='reject'?Error('late clipboard refusal'):undefined);await first;
+    assert.equal(controls.copyExportButton.disabled,true,'the earlier transfer cannot release the pending Copy');
+    assert.equal(controls.downloadExportButton.disabled,true,'the newer transfer remains guarded');
+    assert.equal(controls.exportTransferStatus.textContent,waiting,'only the active clipboard request may change its status');
+    assert.equal(await ctx.onAction('copy-export',{}),false,'another press stays refused while the new request is pending');
+    assert.equal(pending.length,2);
+    pending[1].resolve();assert.equal(await second,true);
+    assert.equal(controls.copyExportButton.disabled,false);assert.equal(controls.downloadExportButton.disabled,false);
+    assert.match(controls.exportTransferStatus.textContent,/Copied/);
+    assert.equal(JSON.parse(pending[1].raw).currentBoard.tasks.length,1);
+  });
+});
+
 test('RISK JSON COPY PASTE: Copy and Download send the same full archive without a JSON view or writes',async t=>{
   const {IDBFactory}=await import('fake-indexeddb'),storage=sharedScannerStorage();
   const app=await loadApp({sharedStorage:storage,indexedDBProvider:new IDBFactory(),deviceDbName:'direct-copy-export-'+Date.now()}),{ctx,shim}=app;
@@ -19553,6 +19584,8 @@ test('RISK JSON COPY PASTE: Quick start explains the copy button, manual fallbac
   assert.match(answer,/Settings.*Export.*choose Copy/i);
   assert.match(answer,/same recovery archive offered by Download/i);
   assert.match(answer,/not shown as a large text view/i);
+  assert.match(answer,/Copy and Download stay unavailable while Copy is pending/i);
+  assert.match(answer,/A late result from a closed export cannot change a newer export/i);
   assert.match(answer,/If clipboard access is unavailable, use Download/i);
   assert.match(answer,/Import.*Paste JSON.*preview.*confirm/i);
   assert.match(answer,/accepted unsaved edits/i);

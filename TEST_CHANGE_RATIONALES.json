@@ -1,5 +1,23 @@
 [
   {
+    "baseCommit": "0e47ebfa1ed2331f68ef3a9e2f345085c05a7f19",
+    "testChangesSha256": "fcc3e383e18daa824a5b356b11affdd6030a2ddcc55282797394d595db4887e9",
+    "reason": "Prevent a completed or rejected clipboard request from changing the busy state and status of a newer prepared export after the user closes and reopens the dialog.",
+    "previousBehavior": "Copy completion used shared transfer controls without checking which prepared export owned the request. Settling request A released the busy controls and overwrote the status of pending request B.",
+    "intendedBehavior": "Only the active export generation may update transfer status or release busy controls. Late success and failure from a closed generation are ignored, while the current request completes normally.",
+    "replacementTests": [
+      "RISK JSON COPY PASTE: stale clipboard completion cannot release a newer export transfer"
+    ],
+    "preservedCoverage": [
+      "Existing direct clipboard, download byte equality, accepted unsaved fields, raw-source preservation, protected paste/import, and clipboard denial tests are unchanged. The additional test exercises both late success and late failure and refuses another press while the current request is pending.",
+      "The native WebKit 400-task consumer remains the independently asserted product reproduction; this focused app consumer provides quick coverage of both completion outcomes."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <integration-worktree> --evidence-dir <task-artifacts>/clipboard/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern='RISK JSON COPY PASTE: stale clipboard completion' tests.js",
+      "failure": "Native WebKit RED5fe38064 first demonstrated pending Copy B enabled and falsely reported Copied after A settled. Before runtime edits, focused REDab89abe8 failed both resolve and reject at false !== true for the newer Copy disabled state. Additional mounted FAQ REDf61496dd failed the missing pending/late-result explanation. GREENb77806ec passes the complete JSON copy/paste and database export cohort. RED731b8000 repeats the lifecycle cases only because its FAQ selector did not match; it is not FAQ evidence. Full records are outside Git in task-artifacts/webkit-button-safety-20261025/clipboard/runs and gate/clipboard-lifecycle."
+    }
+  },
+  {
     "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
     "testChangesSha256": "f6da52e0fa8da624bbe3bb7c4adb1fad5d3eb289c79d279b8f473083c47ca72f",
     "reason": "Add the user-requested fail-closed native all-button safety gate through actual full-app DOM events and process CLI/CI reconciliation; retain every existing behavior assertion.",
