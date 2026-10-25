@@ -18654,5 +18654,32 @@
     "failure": "The four recorded baseline tests each failed ERR_ASSERTION full-scene equality because the historical scenes retained intentionally omitted daytime humans. New sunset control975676f4 passed on the unchanged actual public timeline; isolated current-bucket-sun mutant f32e2aae failed ERR_ASSERTION: a rejected daylight party must not appear again after sunset. This is retrospective sensitivity, not a new original feature RED."
   },
   "observedGreen": "Recorde5f848dc-c3fd-4703-a095-a14611b9a02d: seven focused cases passed,0failed/skipped, including four planner controls, original feature and restored FAQ assertions. Rejected-party permanent test ad31b44f passed separately. Existing PWA and changelog fingerprints failed before refresh b2b6dbc2 then passed93ed8710 after refresh; no dated public tuning note added under AGENTS exception."
+},
+{
+  "baseCommit": "9596b9c4b7245955ea775079184039c8f68252fb",
+  "testChangesSha256": "18b82c83d4683288febb5c0f3f1647852a244acbaec66a1aaaa477be4e4cf968",
+  "reason": "The user authorized independent server repair even while the device database remains unavailable. New isolated app/backend consumers preserve local pending intent and every remote original; the synthetic Firestore SDK adds bounded query support without changing existing assertions.",
+  "previousBehavior": "Actual cloudPull settled while the missing-chunk remote generation stayed corrupt whenever local IndexedDB remained unavailable. No server-only source-bound repair path existed. During implementation, an unknown root field could be erased and exact-hash selection could suppress another retained compatible server fact.",
+  "intendedBehavior": "A distinct server-only capability validates retained cloud boards with the original app validator and reducer, pins intact supported source headers/chunks, conditionally publishes a deterministic fresh generation and independently verifies its exact remote result. Local pending upload observation remains unobserved and no device state or cloud acknowledgement changes. Unknown roots, unsupported/missing headers and unsafe candidates remain held.",
+  "replacementTests": [
+    "RISK independent cloud repair: unavailable device storage repairs retained server sources without acknowledging local work",
+    "RISK independent cloud source safety: unsupported roots headers boards and absent candidates remain protected",
+    "RISK independent cloud capability: server-only repair ignores injected payloads and never observes local pending state",
+    "RISK independent cloud authority: cancellation account epoch backend and suspension changes cannot publish stale repairs",
+    "RISK independent cloud races: fresh peer roots win during reads and publication while failed pins keep originals",
+    "RISK independent cloud uncertain reply: deterministic publication reads back a lost reply and never clears pending uploads",
+    "RISK independent cloud retained discovery: pinned originals survive ordinary rotations and repair another damaged root without local storage",
+    "RISK independent cloud exact reconstruction: a matching retained hash cannot discard other complete server facts"
+  ],
+  "preservedCoverage": [
+    "No passing feature assertions were removed or weakened. Existing synthetic Firestore SDK read behavior is unchanged when no limit constraint is present.",
+    "Ordinary CS.push retains local pending/archive guards, consent, root revision CAS, account and epoch authority. New tests explicitly prove unavailable storage cannot grant ordinary upload authority.",
+    "New app consumer uses genuine fake-indexeddb handles and the external factory boundary for permanent local refusal. It preserves exact local raw rows, accepted offline work and draft. Supplemental direct backend tests prove zero device calls, peer revision precedence, source mutation refusal, lost-write readback and retained-source discovery."
+  ],
+  "redEvidence": {
+    "command": "node scripts/agent-tools/record-run.mjs --repo <worktree> --evidence-dir <external>/independent-cloud/runs --purpose preimplementation-red --summary -- node --test --test-reporter=spec --test-name-pattern='^RISK independent cloud repair:' tests.js; record c39e8f45-d290-4a19-a8c3-57a984eae899. Later new-slice REDs: source safety925d2fba-e090-419b-b4b0-647826e11d5e and exact reconstruction1bfa40bb-9ecc-47a9-9f8c-d3d77ef60877.",
+    "failure": "Actual app-consumer assertion failed: the actual server decoder must return a complete board despite permanent local unavailability; actual undefined, expected string. Separate later new-slice assertions failed because unknown root evidence was replaced and a retained independent server field was missing from the resulting payload."
+  },
+  "observedGreen": "Focused all-new suite9ce83e02-421a-4515-8c06-160031c96fa0 passed. Explicit Node-only preservation cohort e942b2c1-ecdb-4149-b12b-f7474dcb8c7c passed. Broader7ad0e40d-35eb-4c1c-a12a-522e775bfd30 unintentionally selected native tests and is an interrupted143 attempt, never acceptance. Parent-requested stopping boundary leaves independent review, emulator compatibility/rules, full/native/rendered/FAQ/CI/deployment and local-preflight hang bounding pending."
 }
 ]

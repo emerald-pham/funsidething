@@ -15650,7 +15650,7 @@ async function loadCloudBackendV2({artifacts=null,sharedDocs=null,rootData=null,
  const ref=(...parts)=>({path:pathOf(parts),id:String(parts.at(-1))});
  const snap=reference=>({id:reference.id,ref:reference,exists:()=>docs.has(reference.path),data:()=>clone(docs.get(reference.path))});
  const directRows=collectionRef=>[...docs].filter(([key])=>key.startsWith(collectionRef.path+'/')&&
-  !key.slice(collectionRef.path.length+1).includes('/')).map(([key])=>snap(ref(...key.split('/'))));
+  !key.slice(collectionRef.path.length+1).includes('/')).map(([key])=>snap(ref(...key.split('/')))).slice(0,collectionRef.limit??Infinity);
  const writes=[],popupProviders=[],authCalls=[],queries=[],network=[];let batchCommits=0,transactionCalls=0;
  const normalize=value=>Object.fromEntries(Object.entries(value).map(([key,item])=>[key,item?.__serverTimestamp?{toMillis:()=>1234}:item]));
  const apply=(operation)=>{
@@ -15660,6 +15660,7 @@ async function loadCloudBackendV2({artifacts=null,sharedDocs=null,rootData=null,
  };
  const F={
   getFirestore:()=>({}),doc:(_db,...parts)=>ref(...parts),collection:(_db,...parts)=>ref(...parts),
+  query:(reference,...constraints)=>({...reference,...Object.assign({},...constraints)}),limit:limit=>({limit}),
   getDoc:async reference=>{if(reference.path===rootPath&&docs.get(rootPath)?.schemaVersion===2&&failures.stampPending)return failures.stampPending;if(reference.path===rootPath&&failures.pullPending)return failures.pullPending;if(reference.path===rootPath&&failures.pull)throw failures.pull;return snap(reference);},getDocs:async collectionRef=>{queries.push(collectionRef.path);return {docs:directRows(collectionRef)};},
   serverTimestamp:()=>({__serverTimestamp:true}),
   runTransaction:async(_db,fn)=>{transactionCalls++;await failures.beforeTransaction?.(docs);if(failures.pushPending)return failures.pushPending;if(failures.push)throw failures.push;const operations=[],tx={get:async reference=>{await failures.transactionRead?.(reference.path,docs);return snap(reference);},set:(reference,value)=>operations.push({type:'set',ref:reference,value}),update:(reference,value)=>operations.push({type:'update',ref:reference,value}),delete:reference=>operations.push({type:'delete',ref:reference})};const result=await fn(tx);if(failures.publishPending&&operations.some(op=>op.ref.path===rootPath)){failures.publicationStarted=true;await failures.publishPending;}for(const operation of operations){if(failures.enforceDeletingTransition&&operation.type==='update'&&operation.value.state==='deleting'&&docs.get(operation.ref.path)?.state==='deleting')throw Object.assign(Error('rules reject deleting to deleting'),{code:'permission-denied'});apply(operation);}await failures.afterTransaction?.(docs);return result;},
@@ -43422,4 +43423,146 @@ test('RISK shared protection changed originals: deliberate current recovery sele
   }
   const after=await list();for(const row of originals)assert.ok(after.some(saved=>saved.key===row.key&&saved.raw===row.raw),'every historical raw archive stays exact');
  });
+});
+
+test('RISK independent cloud repair: unavailable device storage repairs retained server sources without acknowledging local work',async t=>{
+ const {IDBFactory,forceCloseDatabase}=await import('fake-indexeddb'),handles=[],open=IDBFactory.prototype.open;
+ IDBFactory.prototype.open=function(...args){const request=open.apply(this,args);request.addEventListener('success',()=>handles.push(request.result));return request;};
+ let app;try{app=await damagedAcknowledgedApp187(t);}finally{IDBFactory.prototype.open=open;}
+ const {ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ shim.document.getElementById('addInput').value='Accepted local work not present on the server';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ vm.runInContext('clearTimeout(saveTimer);saveTimer=null;clearTimeout(cloudTimer);cloudTimer=null;clearCloudRetry()',ctx);
+ shim.document.getElementById('addInput').value='Unfinished local draft';
+ const localBefore=JSON.stringify(ctx.state),draft=shim.document.getElementById('addInput').value,rawBefore=await store.readRawExportSnapshot();
+ const originals=[...backend.docs].filter(([key])=>key!=='users/owner').map(([key,row])=>[key,JSON.stringify(row)]);
+ const prior=originalRoot.previousGeneration,header=backend.docs.get('users/owner/generations/'+prior),chunks=[...backend.docs].filter(([key])=>key.startsWith('users/owner/generations/'+prior+'/chunks/')).map(([,row])=>row);
+ const previous=JSON.parse(await ctx.ChainStorageV2.decodeSnapshot(header,chunks));
+ assert.equal((await backend.CS.pull()).code,'corrupt-generation');
+ for(const connection of handles.filter(db=>db.name===app.deviceDbName))forceCloseDatabase(connection);
+ const reopen=app.indexedDB.open;app.indexedDB.open=()=>{throw Object.assign(Error('Synthetic permanent IndexedDB refusal'),{name:'UnknownError'});};
+ t.after(()=>{app.indexedDB.open=reopen;});
+ let repairResult;const repair=backend.CS.repairCloudSources?.bind(backend.CS);if(repair)backend.CS.repairCloudSources=async options=>{repairResult=await repair(options);return repairResult;};
+ await ctx.cloudPull();t.diagnostic('Independent remote result '+JSON.stringify(repairResult));
+ await fixtureDeadline(async wait=>{while(vm.runInContext('pulling||cloudPushInFlight',ctx))await wait(5);},'server-only repair settles');
+ const remote=await backend.CS.pull();
+ assert.equal(typeof remote.payload,'string','the actual server decoder must return a complete board despite permanent local unavailability');
+ assert.ok(remote.rev>originalRoot.rev);assert.notEqual(remote.generationId,originalRoot.activeGeneration);
+ for(const task of previous.tasks)assert.deepEqual(JSON.parse(remote.payload).tasks.find(row=>row.id===task.id),task,'complete retained server task fields survive');
+ assert.equal(JSON.stringify(ctx.state),localBefore,'remote repair cannot adopt a board or acknowledge unseen local decisions');
+ assert.equal(ctx.state.syncDirty,true);assert.equal(shim.document.getElementById('addInput').value,draft);
+ for(const [key,value]of originals)assert.equal(JSON.stringify(backend.docs.get(key)),value,'every original header and chunk remains exact');
+ for(const id of [originalRoot.activeGeneration,prior])assert.equal(backend.docs.get('users/owner/recoveryProtections/'+id)?.v,1,'original server references receive durable immutable pins');
+ app.indexedDB.open=reopen;
+ const fresh=ctx.ChainStorageV2.createDeviceStore({indexedDB:app.indexedDB,crypto:ctx.crypto,dbName:app.deviceDbName});await fresh.open();
+ try{assert.deepEqual(await fresh.readRawExportSnapshot(),rawBefore,'no local head pending hold backup or archive changes');}finally{await fresh.close();}
+});
+
+async function replaceIndependentServerPayload263(app,id,payload){
+ const path='users/owner/generations/'+id,old=app.backend.docs.get(path),encoded=await app.ctx.ChainStorageV2.encodeSnapshot(payload);
+ for(const key of [...app.backend.docs.keys()])if(key.startsWith(path+'/chunks/'))app.backend.docs.delete(key);
+ app.backend.docs.set(path,{...old,...encoded,chunks:undefined});delete app.backend.docs.get(path).chunks;
+ for(const chunk of encoded.chunks)app.backend.docs.set(path+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
+}
+
+test('RISK independent cloud source safety: unsupported roots headers boards and absent candidates remain protected',async t=>{
+ for(const mode of ['unknown-root','missing-header','unsupported-header','incomplete-only','foreign-board','malformed-board'])await t.test(mode,async sub=>{
+  const app=await damagedAcknowledgedApp187(sub),{ctx,backend,originalRoot}=app,prior=originalRoot.previousGeneration,path='users/owner/generations/'+prior;
+  if(mode==='unknown-root')backend.docs.get('users/owner').futureRootEvidence={retain:'opaque original manifest'};
+  if(mode==='missing-header')backend.docs.delete('users/owner/generations/'+originalRoot.activeGeneration);
+  if(mode==='unsupported-header')backend.docs.get('users/owner/generations/'+originalRoot.activeGeneration).schemaVersion=99;
+  if(mode==='incomplete-only')for(const key of [...backend.docs.keys()])if(key.startsWith(path+'/chunks/'))backend.docs.delete(key);
+  if(mode==='foreign-board')await replaceIndependentServerPayload263(app,prior,JSON.stringify({...JSON.parse(ctx.state.decisionBase.payload),syncAccount:'other@example.test',syncIdentity:'other'}));
+  if(mode==='malformed-board')await replaceIndependentServerPayload263(app,prior,'{"tasks":[{"partial":true}]}');
+  const before=JSON.stringify([...backend.docs]),local=JSON.stringify(ctx.state);
+  const result=await backend.CS.repairCloudSources();assert.equal(result.ok,undefined,'unreadable or unsupported evidence cannot authorize replacement');
+  assert.equal(JSON.stringify([...backend.docs]),before,'held source bytes and root remain exact');assert.equal(JSON.stringify(ctx.state),local);
+ });
+});
+
+test('RISK independent cloud capability: server-only repair ignores injected payloads and never observes local pending state',async t=>{
+ const app=await damagedAcknowledgedApp187(t),{ctx,backend}=app,local=JSON.stringify(ctx.state),store=ctx.window.ScannerDeviceStore;let deviceCalls=0;
+ Object.defineProperty(ctx.window,'ScannerDeviceStore',{configurable:true,get(){deviceCalls++;throw Error('Device storage is outside this capability');}});
+ let result;try{
+ const evidence=backend.CS.cloudRecoveryEvidence();assert.equal(evidence.pendingObservation,'unobserved');assert.equal(Object.hasOwn(evidence,'pending'),false);
+ result=await backend.CS.repairCloudSources({payload:'{"tasks":[{"id":"injected-local-fact"}]}',pending:null});
+ assert.equal(result.ok,true);assert.equal(result.remoteOnly,true);assert.equal(result.pendingObservation,'unobserved');assert.equal(deviceCalls,0);
+ }finally{Object.defineProperty(ctx.window,'ScannerDeviceStore',{configurable:true,writable:true,value:store});}
+ const peer=await loadCloudBackendV2({sharedDocs:backend.docs,timeoutMs:5000});t.after(()=>peer.CS.suspend());
+ const actual=await peer.CS.pull();assert.equal(typeof actual.payload,'string');assert.equal(JSON.parse(actual.payload).tasks.some(row=>row.id==='injected-local-fact'),false);
+ assert.equal(JSON.stringify(ctx.state),local);
+});
+
+test('RISK independent cloud authority: cancellation account epoch backend and suspension changes cannot publish stale repairs',async t=>{
+ for(const mode of ['cancel','account','epoch','backend','suspend'])await t.test(mode,async sub=>{
+  const app=await damagedAcknowledgedApp187(sub),{ctx,backend,faults,originalRoot}=app,original=JSON.stringify(backend.docs.get('users/owner'));let changed=false,allowed=true;
+  faults.serverRead=async path=>{
+   if(changed||!path.endsWith('/chunks'))return;changed=true;
+   if(mode==='cancel')allowed=false;
+   if(mode==='account')backend.emitAuth({uid:'other',email:'other@example.test'});
+   if(mode==='epoch'){backend.emitAuth(null);backend.emitAuth({uid:'owner',email:'e@example.com'});}
+   if(mode==='backend')ctx.window.CloudSync={...backend.CS};
+   if(mode==='suspend')backend.CS.suspend();
+  };
+  const result=await backend.CS.repairCloudSources({stillCurrent:()=>allowed});
+  assert.ok(changed);assert.equal(result.ok,undefined);assert.equal(JSON.stringify(backend.docs.get('users/owner')),original);
+  assert.equal(backend.docs.get('users/owner').activeGeneration,originalRoot.activeGeneration);ctx.window.CloudSync=backend.CS;
+ });
+});
+
+test('RISK independent cloud races: fresh peer roots win during reads and publication while failed pins keep originals',async t=>{
+ for(const mode of ['read-race','publish-race','pin-refusal','source-mutation'])await t.test(mode,async sub=>{
+  const app=await damagedAcknowledgedApp187(sub),{ctx,backend,faults,originalRoot}=app;
+  const prior=originalRoot.previousGeneration,path='users/owner/generations/'+prior,header=backend.docs.get(path),chunks=[...backend.docs].filter(([key])=>key.startsWith(path+'/chunks/')).map(([,value])=>value);
+  const peerBoard=JSON.parse(await ctx.ChainStorageV2.decodeSnapshot(header,chunks));peerBoard.futurePeerEvidence={keep:'newer peer revision'};
+  const peerPayload=JSON.stringify(peerBoard);await replaceIndependentServerPayload263(app,'peer-current',peerPayload);backend.docs.get('users/owner/generations/peer-current').state='published';
+  const peerRoot={...originalRoot,rev:originalRoot.rev+1,activeGeneration:'peer-current',previousGeneration:originalRoot.activeGeneration};let injected=false,reads=0;
+  if(mode==='read-race')faults.serverRead=async key=>{if(!injected&&key.endsWith('/chunks')){injected=true;backend.docs.set('users/owner',peerRoot);}};
+  if(mode==='publish-race'||mode==='pin-refusal')faults.beforeTransaction=async docs=>{
+   if(mode==='pin-refusal')throw Object.assign(Error('Synthetic refused source pin'),{code:'permission-denied'});
+   if(!injected&&[...docs].some(([key,row])=>key.startsWith('users/owner/generations/repair-')&&row.state==='sealed')){injected=true;docs.set('users/owner',peerRoot);}
+  };
+  if(mode==='source-mutation')faults.serverRead=async key=>{if(key===path+'/chunks'&&++reads===4){injected=true;backend.docs.get(key+'/00000000').text+='changed';}};
+  const result=await backend.CS.repairCloudSources();
+  if(mode.endsWith('race')){assert.equal(result.ok,true);assert.ok(injected);assert.deepEqual(backend.docs.get('users/owner'),peerRoot);assert.equal((await backend.CS.pull()).payload,peerPayload);}
+  else{assert.equal(result.ok,undefined);assert.deepEqual(backend.docs.get('users/owner'),originalRoot);if(mode==='source-mutation')assert.ok(injected);}
+ });
+});
+
+test('RISK independent cloud uncertain reply: deterministic publication reads back a lost reply and never clears pending uploads',async t=>{
+ const app=await damagedAcknowledgedApp187(t),{ctx,backend,faults,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ const pending={generationId:'unobserved-local-upload',payloadHash:'7'.repeat(64),baseRev:originalRoot.rev,futurePending:{keep:true}};
+ await store.setPendingUpload('owner',pending);const before=await store.getPendingUpload('owner');let lost=false;
+ faults.afterTransaction=async docs=>{if(!lost&&docs.get('users/owner')?.activeGeneration?.startsWith('repair-')){lost=true;throw Object.assign(Error('Synthetic lost publication reply'),{code:'unavailable'});}};
+ const writes=backend.writes.length,result=await backend.CS.repairCloudSources();assert.equal(result.ok,true);assert.ok(lost);assert.equal(result.rev,originalRoot.rev+1);
+ const complete=await backend.CS.pull();assert.equal(complete.generationId,result.generationId);assert.equal(createHash('sha256').update(complete.payload).digest('hex'),result.payloadHash);
+ const again=await backend.CS.repairCloudSources();assert.equal(again.ok,true);assert.equal(again.alreadyHealthy,true);assert.equal(backend.writes.length,writes+1,'lost reply cannot cause a second revision');
+ assert.deepEqual(await store.getPendingUpload('owner'),before,'independent remote ACK does not clear an unseen upload');
+ const saved=ctx.window.ScannerDeviceStore;ctx.window.ScannerDeviceStore={async getPendingUpload(){throw Error('Permanent local storage refusal');}};
+ try{const ordinary=await backend.CS.push(ctx.cloudPayload(),1,result.rev);assert.equal(ordinary.ok,undefined);assert.equal(backend.writes.length,writes+1,'ordinary push retains device protection');}finally{ctx.window.ScannerDeviceStore=saved;}
+});
+
+test('RISK independent cloud retained discovery: pinned originals survive ordinary rotations and repair another damaged root without local storage',async t=>{
+ const app=await damagedAcknowledgedApp187(t),{ctx,backend,originalRoot}=app;
+ assert.equal((await backend.CS.repairCloudSources()).ok,true);const recovered=await backend.CS.pull(),originalPins=[originalRoot.activeGeneration,originalRoot.previousGeneration];
+ const peer=await loadCloudBackendV2({sharedDocs:backend.docs,timeoutMs:5000});t.after(()=>peer.CS.suspend());
+ let revision=recovered.rev;for(let index=0;index<3;index++){const result=await peer.CS.push(recovered.payload,index,revision);assert.equal(result.ok,true);revision=result.rev;}
+ const root=backend.docs.get('users/owner');assert.ok(originalPins.every(id=>id!==root.activeGeneration&&id!==root.previousGeneration));
+ for(const id of [root.activeGeneration,root.previousGeneration])for(const key of [...backend.docs.keys()])if(key.startsWith('users/owner/generations/'+id+'/chunks/'))backend.docs.delete(key);
+ const store=ctx.window.ScannerDeviceStore;ctx.window.ScannerDeviceStore=null;
+ try{const repaired=await backend.CS.repairCloudSources();assert.equal(repaired.ok,true);assert.equal(typeof (await backend.CS.pull()).payload,'string');assert.ok(backend.queries.includes('users/owner/recoveryProtections'));}
+ finally{ctx.window.ScannerDeviceStore=store;}
+ for(const id of originalPins)assert.equal(backend.docs.get('users/owner/recoveryProtections/'+id).v,1);
+});
+
+test('RISK independent cloud exact reconstruction: a matching retained hash cannot discard other complete server facts',async t=>{
+ const app=await damagedAcknowledgedApp187(t),{ctx,backend,originalRoot,activeSource}=app;
+ const duplicate='retained-current-duplicate',extra='retained-independent-facts';
+ backend.docs.set('users/owner/generations/'+duplicate,{...activeSource.header});
+ for(const chunk of activeSource.chunks)backend.docs.set('users/owner/generations/'+duplicate+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
+ const original=ctx.state.decisionBase.payload,board=JSON.parse(original);board.retainedIndependentField={accepted:'server source fact'};
+ await replaceIndependentServerPayload263(app,extra,JSON.stringify(board));backend.docs.get('users/owner/generations/'+extra).state='published';
+ for(const id of [duplicate,extra])backend.docs.set('users/owner/recoveryProtections/'+id,{v:1,rootRevision:originalRoot.rev,createdAt:{toMillis:()=>1}});
+ const result=await backend.CS.repairCloudSources();assert.equal(result.ok,true);
+ const remote=await backend.CS.pull();assert.deepEqual(JSON.parse(remote.payload).retainedIndependentField,{accepted:'server source fact'},'exact reconstruction still retains compatible facts from every complete server source');
+ assert.deepEqual(JSON.parse(remote.payload).tasks,JSON.parse(original).tasks);
 });

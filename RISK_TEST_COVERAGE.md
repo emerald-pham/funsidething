@@ -2117,3 +2117,11 @@ This boundary control holds a successful real provider reply, installs a later a
 - The first actual Add synchronous prefix consumes the original single20s action budget: `RISK recovery observation budget: the first actual Add prefix belongs to the single action deadline`.
 
 - A successful callback cannot be accepted after its original monotonic deadline even when host timer delivery is blocked: `RISK recovery observation budget: late synchronous success cannot outlive the original deadline`.
+
+- Cloud-only repair retains damaged generations with immutable server pins, publishes a fresh independently readable generation, and leaves unavailable-device pending work and drafts unchanged: `RISK independent cloud repair: unavailable device storage repairs retained server sources without acknowledging local work`.
+
+- Server-only capability does not accept arbitrary local payloads or observe pending state; unsupported manifest/header/board evidence and missing candidates cannot replace originals: `RISK independent cloud source safety: unsupported roots headers boards and absent candidates remain protected`; `RISK independent cloud capability: server-only repair ignores injected payloads and never observes local pending state`.
+
+- Cloud-only authority, bounded restart, source pins and readback preserve local pending intent under cancellation, UID/epoch/backend/suspend changes, fresh peer revisions, refused pins, changed chunks, lost write replies and later source discovery: `RISK independent cloud authority: cancellation account epoch backend and suspension changes cannot publish stale repairs`; `RISK independent cloud races: fresh peer roots win during reads and publication while failed pins keep originals`; `RISK independent cloud uncertain reply: deterministic publication reads back a lost reply and never clears pending uploads`; `RISK independent cloud retained discovery: pinned originals survive ordinary rotations and repair another damaged root without local storage`.
+
+- Exact-current hash reconstruction still retains compatible facts from every complete retained server source: `RISK independent cloud exact reconstruction: a matching retained hash cannot discard other complete server facts`.
