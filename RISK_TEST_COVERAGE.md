@@ -27,12 +27,12 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK resilient sync recovery: automatic rebuilding preserves peer pending intent across staging
 - RISK resilient sync recovery: verified empty and explicit ACK transitions release failed rebuild contexts
 
-- RISK unreadable device recovery: an unsupported saved version cannot be replaced by Quick start or ordinary saving
+- RISK unreadable device recovery: an unsupported original remains protected while a distinct working workspace accepts saving
 - RISK unreadable device recovery: native Paste previews and restores a supported board while preserving unreadable originals
 - RISK unreadable device recovery: raw startup preserves sources and supports native File restore
 - RISK unreadable device recovery: raw source export excludes the placeholder and preserves exact device evidence
 - RISK unreadable device recovery: locally restored work stays durable and visibly pending across sign-in and reopen
-- RISK unreadable device recovery: placeholder actions cannot create backups and unsupported selected decisions stay evidence
+- RISK unreadable device recovery: workspace backups retain original evidence and unsupported selected decisions stay evidence
 - RISK unreadable device recovery: preservation refusals transaction failures and late identity changes never accept a source
 - RISK unreadable device recovery: raw transaction CAS refuses peer source changes after the last preview read
 - RISK unreadable device recovery: partial raw rows remain exact while the restored board accepts later local edits
@@ -43,7 +43,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK unreadable device recovery review: the native header reaches SDK sign-in and Settings account correction while sources stay held
 - RISK unreadable device recovery review: preserved partial raw rows permit native cloud choice ACK and cold reopen
 - RISK unreadable device recovery review: receipt collisions never overwrite a raw unknown row at the same physical key
-- RISK malformed device recovery capture: inaccessible and unsupported archives retain typed refusals
+- RISK malformed device recovery capture: working-source refusals remain typed and preserve originals
 - RISK DEVICE STORAGE V2: conditional pending writes compare complete physical rows and preserve ordinary staging
 - RISK cloud source recovery pending capture: a peer pending pointer arriving between own pending write and read is never consented
 - RISK cloud source recovery pending capture: peer pending intent created after the existing read is never overwritten by recovery staging
@@ -2086,7 +2086,7 @@ This boundary control holds a successful real provider reply, installs a later a
 - RISK shared protection cancellation: a stopped transaction cannot start dependent source-marker reads
 - RISK shared protection absent-root authority: retained orphan sources lock only under verified unchanged root absence (Firestore rules: retention empty root)
 - RISK shared protection changed originals: deliberate current recovery selects exact server capture independently of archive order
-- RISK automatic recovery defaults: an unaccepted device uses stable source keys and preserves exact alternatives
+- RISK automatic recovery defaults: a protected local browser baseline keeps its accepted value and exact alternatives
 - RISK automatic recovery baseline refresh: a concurrent accepted Add gets one fresh capture without losing its draft
 - RISK automatic recovery publication: exact current-context cloud ACK releases only its automatic hold
 - RISK automatic recovery uncertain publication: a lost reply is verified before retry and never duplicates a cloud save
@@ -2151,3 +2151,26 @@ This boundary control holds a successful real provider reply, installs a later a
 - Permitted writes followed by repeatedly damaged remote bytes cannot report successful repair, and share the same one-restart budget: `RISK independent cloud final readback: repeated damage after permitted publication cannot become verified repair`.
 
 - A server-only acknowledgement cannot display an unchanged local board as synced; protected terminal remote failures remain visible until independently verified recovery: `RISK independent cloud confirmation status: repairing server bytes cannot show an unchanged local board as acknowledged`; `RISK independent cloud failure status: protected terminal errors stay visible until verified server recovery`.
+
+## Device connection cancellation
+
+- `RISK device connection cancellation: explicit close invalidates a delayed open without resurrecting or replacing sources`
+- `RISK device connection cancellation: closing before first upgrade leaves no replacement database`
+
+## Automatic offline and independent cloud guidance
+
+- `RISK offline repair guidance: help distinguishes a working workspace cloud repair and exact preserved originals`
+
+## Protected offline working recovery
+
+- RISK offline working recovery: surviving linked backups open useful protected work before any network
+- RISK offline working recovery: verified protected archive and browser decisions combine without foreign sources
+- RISK offline working reconnect: current offline edits and retained peer work reach exact cloud acknowledgement
+- RISK offline new-work recovery: absent complete original opens a distinct durable workspace and preserves unseen cloud tasks
+- RISK offline memory recovery: refused durable media still permit new work with an honest unsaved status
+- RISK offline memory recovery resume: returning storage saves current new work without replacing the refused original
+- RISK offline working authority: a changed original archive cannot activate a claimed recovered working head
+- RISK offline working archives: prior exact originals are referenced without recursively copying their bytes
+- RISK offline working reconnect guards: changed source hold pending draft and account retain the current workspace
+- RISK offline startup budget: stalled open and raw reads expose unsaved work without late adoption
+- RISK offline memory restore: a deliberate Paste after storage returns protects accepted unsaved work

@@ -1,5 +1,37 @@
 [
   {
+    "baseCommit": "f6d1da402787162d17b635b00044c881b97929b7",
+    "testChangesSha256": "4ac582a624fd06be70ac16a7849ff0f30cdd2a82011c5f7641906cd0ed365454",
+    "reason": "Implement the explicitly authorized protected offline working recovery and new-work workspace, keeping the actual app startup, native Add/Done/Undo, cold reopen, raw IndexedDB, and extracted backend consumer seams. Migrate only obsolete unusable-placeholder expectations; original bytes and manual raw-CAS authority remain protected.",
+    "previousBehavior": "Missing or malformed device heads refused every surviving local source without network. No complete source left an unaccepted shell whose edits could not save; the automatic cloud publisher did not recognize a local-only intent. Raw startup reads could stall beyond the original open budget.",
+    "intendedBehavior": "Complete supported same-owner local sources provide a verified durable working head and local intent; unknown originals remain exact. No complete original provides a distinct protected new-work basis, and all storage refused provides honest memory-only work that can later save. Fresh identity/source evidence transitions the exact intent through one full raw CAS into the existing publisher and exact cloud ACK.",
+    "replacementTests": [
+      "RISK offline working recovery: surviving linked backups open useful protected work before any network",
+      "RISK offline working recovery: verified protected archive and browser decisions combine without foreign sources",
+      "RISK offline working reconnect: current offline edits and retained peer work reach exact cloud acknowledgement",
+      "RISK offline new-work recovery: absent complete original opens a distinct durable workspace and preserves unseen cloud tasks",
+      "RISK offline memory recovery: refused durable media still permit new work with an honest unsaved status",
+      "RISK offline memory recovery resume: returning storage saves current new work without replacing the refused original",
+      "RISK offline working authority: a changed original archive cannot activate a claimed recovered working head",
+      "RISK offline working archives: prior exact originals are referenced without recursively copying their bytes",
+      "RISK offline working reconnect guards: changed source hold pending draft and account retain the current workspace",
+      "RISK offline startup budget: stalled open and raw reads expose unsaved work without late adoption",
+      "RISK offline memory restore: a deliberate Paste after storage returns protects accepted unsaved work"
+    ],
+    "preservedCoverage": [
+      "Retain exact original snapshots, corrupt/unknown auxiliary and pending rows, all browser values, immutable archive bytes, manual File/Paste preview/Cancel/full-raw-CAS/typed/account/readback checks and unsupported selected-source rejection. A new working head is not a recovered empty original.",
+      "Old unsupported-source and raw-startup tests now require a separate working workspace plus lossless original archival, rather than refusing every ordinary save. The raw peer fixture now mutates the actual post-recovery head, preserving the same transaction-time race assertion. Partial collections remain exact; browser-only refused durability remains unsaved.",
+      "All changed and added tests are Node-only existing consumers. No browser/emulator/native-process test, private account, CI, push, deployment, FAQ/fingerprint or test-group assignment is performed here. Final independent risk/rendered/FAQ/full/native/compatibility/CI/release acceptance belongs to the parent.",
+      "The reconnect guard cohort initially passed five defenses but failed a changed unfinished draft (record823c97c5, declared green failure). That real failure preceded a narrow local-intent draft lifetime guard. Initial stalled-open observation1c78476e was cancelled due unref timing and is not behavioral RED; the corrected fixtureDeadline consumer produced actual raw-read REDcfcb6bb4.",
+      "The malformed capture regression now exercises exact typed raw-source/encoder refusals through cloudSourceRecoveryDeviceSources and actual cloudPull on the accepted protected workspace, retaining the same complete raw graph. The automatic browser-default test now expects its proven accepted local baseline (16 hours) instead of an unaccepted cloud-key default (8 hours); exact browser/cloud alternatives and cold reopen remain covered.",
+      "A successful explicit File/Paste Restore from a memory-only workspace archives its exact accepted unsaved board and current drafts alongside full raw originals, then retires the memory-only status. It retains the existing complete-source preview, full raw CAS and exact hold/account/readback checks; currentWorkingBoard is protected evidence, not a new automatic source-selection shortcut."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo $PWD --evidence-dir /Users/emeraldpham/.codex/task-artifacts/ios-page-failure-20261024/database/offline-working/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern <explicit Node root pattern> tests.js. Contemporaneous records6307d9f4 (linked source), b3008d48 (archive/browser), a21326e5 (reconnect), 666e1640 (new work), 5994538a (memory), 19c96932 (returning storage), a7a06871 (archive authority), f592ac7b (archive references), 3952aa1c (mislabel sibling), cfcb6bb4 (stalled raw read). Guard regression823c97c5 (declared green failure) and corrected startup budget REDcfcb6bb4 also precede their narrow fixes; source/node-only run89c2aa14 exposed only the two obsolete accepted-baseline assertions. Final memory-only deliberate Paste RED78170154 precedes the guarded manual Restore repair; GREENbdc2cd2b verifies exact accepted unsaved board plus draft preservation and memory-state retirement.",
+      "failure": "Observed assertion mismatches before each corresponding runtime slice: device authority false despite complete backup; archived task absent; local recovery hold never ACKs; distinct new-work/unsaved status absent; returning storage still cannot save; changed original archive activated; prior archive recursively copied; mislabelled sibling hides healthy browser payload; permanently stalled initial raw read keeps state null beyond35ms budget. All failed attempts and corrections remain retained. Later focused GREEN and source-preservation runs are separately recorded."
+    }
+  },
+  {
     "baseCommit": "c531eff5ce57575c69142a1529c37837286b4c50",
     "testChangesSha256": "55b7bfd7c9e8442707929b63b335cb6d22c7d4929164e890fec91630b58ac3fd",
     "reason": "Separate two actual native reading gestures after measured Chromium PageDown smooth scrolling consumed an immediate horizontal wheel despite correct PRE target and no prevention. Keep vertical movement, then observe3unchanged native scrollTop frames within the existing1000ms bound before one horizontal wheel and its unchanged movement assertion.",
@@ -19108,6 +19140,48 @@
   "observedGreen": "d8317f32: six local/offline/cloud connection and exact-source cases passed; extended preservation cohort8a686a5f passed with zero failures/skips; final FAQ/PWA/inventoryefd799ea passed. This is an unshipped checkpoint: broader forced local working recovery, independent-cloud integration and final release gates remain unfinished."
 },
 {
+  "baseCommit": "f6d1da402787162d17b635b00044c881b97929b7",
+  "testChangesSha256": "8a02d5cec61b9960d162e188e6461ffbba6bff311de22701a22c60daca1b5fb3",
+  "reason": "Preserve explicit device-store shutdown across delayed initial/replacement connections and upgrades. Integrate current-main historical-planner caching while retaining the previously authorized daytime policy and all original equality and operation budgets.",
+  "previousBehavior": "Closing during an open let a late success resurrect authority, made a subsequent explicit open reuse the cancelled promise, and could leave a newly created empty database after shutdown. Earlier offline exact-copy/connection/daytime changes retain their original RED evidence in prior append-only records.",
+  "intendedBehavior": "Explicit close revokes its open lifetime; late results close safely, delayed upgrades abort, and a later explicit open has independent authority. Existing bytes, pending work, raw sources, ordinary offline repairs and source-CAS guards remain unchanged.",
+  "replacementTests": [
+    "RISK device connection cancellation: explicit close invalidates a delayed open without resurrecting or replacing sources",
+    "RISK device connection cancellation: closing before first upgrade leaves no replacement database"
+  ],
+  "preservedCoverage": [
+    "All earlier planner scene equality and numerical budgets retain their assertions; only the immutable historical reference applies the already-tested daytime spawn policy alongside current-main fixture caching. No frequency entry is added to public notes.",
+    "New cancellation cases compare complete structured-cloned physical source values across isolated VM realms, preserving every supported type and value. The initial cross-realm prototype mismatch is retained as fixture correction, not defect evidence.",
+    "Real app offline Add/draft/reopen, exact matching-head repair, bounded startup retry, cloud exact-ACK reconstruction and all DEVICE STORAGE V2 cases pass after the repair. No uncertain transaction is replayed; no database is reset."
+  ],
+  "redEvidence": {
+    "command": "record-run preimplementation-red fe744173 (2026-10-25T06:54:32Z), node --test --test-reporter=spec --test-name-pattern=^RISK device connection cancellation: tests.js; then separate new first-upgrade slice c97b3ae7 (06:58:11Z) before upgrade guard.",
+    "failure": "fe744173 actual two assertions: cancelled delayed success returned ok:true, and fresh explicit open issued one request instead of two. c97b3ae7 actual assertion: a cancelled first open left the new empty database present. Original outputs retained in database/lifecycle/runs. Existing broader offline/daytime REDs remain referenced in prior records."
+  },
+  "observedGreen": "8339f644 and final1afebe8d pass focused cancellation, app connection, exact offline repair and DEVICE STORAGE V2 cases. This is owner development evidence; full/native/rules/compatibility/review/CI/live gates remain pending."
+},
+{
+  "baseCommit": "c27a36be08dbc73f33643f66f0daea0b1d6b074a",
+  "testChangesSha256": "3e38fbc92de354566462ec13d1d4f7e81979c0b7cd33f3fd54272b43faa98d65",
+  "reason": "Preserve explicit device-store shutdown across delayed initial/replacement connections and upgrades. Integrate current-main historical-planner caching while retaining the previously authorized daytime policy and all original equality and operation budgets.",
+  "previousBehavior": "Closing during an open let a late success resurrect authority, made a subsequent explicit open reuse the cancelled promise, and could leave a newly created empty database after shutdown. Earlier offline exact-copy/connection/daytime changes retain their original RED evidence in prior append-only records.",
+  "intendedBehavior": "Explicit close revokes its open lifetime; late results close safely, delayed upgrades abort, and a later explicit open has independent authority. Existing bytes, pending work, raw sources, ordinary offline repairs and source-CAS guards remain unchanged.",
+  "replacementTests": [
+    "RISK device connection cancellation: explicit close invalidates a delayed open without resurrecting or replacing sources",
+    "RISK device connection cancellation: closing before first upgrade leaves no replacement database"
+  ],
+  "preservedCoverage": [
+    "All earlier planner scene equality and numerical budgets retain their assertions; only the immutable historical reference applies the already-tested daytime spawn policy alongside current-main fixture caching. No frequency entry is added to public notes.",
+    "New cancellation cases compare complete structured-cloned physical source values across isolated VM realms, preserving every supported type and value. The initial cross-realm prototype mismatch is retained as fixture correction, not defect evidence.",
+    "Real app offline Add/draft/reopen, exact matching-head repair, bounded startup retry, cloud exact-ACK reconstruction and all DEVICE STORAGE V2 cases pass after the repair. No uncertain transaction is replayed; no database is reset."
+  ],
+  "redEvidence": {
+    "command": "record-run preimplementation-red fe744173 (2026-10-25T06:54:32Z), node --test --test-reporter=spec --test-name-pattern=^RISK device connection cancellation: tests.js; then separate new first-upgrade slice c97b3ae7 (06:58:11Z) before upgrade guard.",
+    "failure": "fe744173 actual two assertions: cancelled delayed success returned ok:true, and fresh explicit open issued one request instead of two. c97b3ae7 actual assertion: a cancelled first open left the new empty database present. Original outputs retained in database/lifecycle/runs. Existing broader offline/daytime REDs remain referenced in prior records."
+  },
+  "observedGreen": "8339f644 and final1afebe8d pass focused cancellation, app connection, exact offline repair and DEVICE STORAGE V2 cases. This is owner development evidence; full/native/rules/compatibility/review/CI/live gates remain pending."
+},
+{
   "baseCommit": "9596b9c4b7245955ea775079184039c8f68252fb",
   "testChangesSha256": "18b82c83d4683288febb5c0f3f1647852a244acbaec66a1aaaa477be4e4cf968",
   "reason": "The user authorized independent server repair even while the device database remains unavailable. New isolated app/backend consumers preserve local pending intent and every remote original; the synthetic Firestore SDK adds bounded query support without changing existing assertions.",
@@ -19255,5 +19329,43 @@
     "failure": "Both intended assertions failed: sync button actual text was cloud synced despite a different independently repaired server revision and unchanged local board; protected deleting-header failure left backend status ok instead of error. Earlier original capability c39e8f45, stalled request a91603d5, root value safety d07f612f and deadline classification d4ab900d retain their original chronology."
   },
   "observedGreen": "64d5c748-ef61-435b-a7d7-568e7d7b1c2c: all independent cloud cases passed after the status fix. Prior exact b2c2799 cohort a529ade6 passed130/130; it does not cover this later status follow-up. Final exact follow-up validation is recorded outside checkout before handoff."
+},
+{
+  "baseCommit": "3bfb4fd3eaa53df5bb805b25e668f29b9665ba91",
+  "testChangesSha256": "278e77fed4e3acac2e5b97aedc9a14aaeecb152f55597c4af8cabcc9612cd5ce",
+  "reason": "Document the authorized automatic offline working-board/new-work fallback and source-only cloud repair without erasing the established deliberate Restore instructions. All prior runtime/daytime/cloud/lifecycle evidence remains in earlier preserved records.",
+  "previousBehavior": "The FAQ only described exact matching-current-copy restoration and unresolved protected sources, and its shortened Restore wording no longer met the established File/Paste guide contract. It did not explain a new-work workspace or independent remote repair versus local acknowledgement.",
+  "intendedBehavior": "Separate concise help answers explain protected originals, new offline work, honest unsaved state under refused storage, and independent cloud repair whose outcome does not acknowledge device edits. Retain the original deliberate Restore answer and unrelated FAQ/changelog structure. Routine spawn tuning stays omitted from public bug notes.",
+  "replacementTests": [
+    "RISK offline repair guidance: help distinguishes a working workspace cloud repair and exact preserved originals"
+  ],
+  "preservedCoverage": [
+    "No original assertion is removed or weakened by this copy slice. The established Quick start/Restore/File/Paste/raw-source, initial mounted exact-copy guidance and brevity cases pass with the new mounted-help consumer.",
+    "New guidance supplements the already recorded full offline/device/cloud and scene contracts; it does not claim the unfinished parent integration or physical iPhone failure has been fully repaired. Final rendered independent FAQ/typography and exact release gates remain mandatory."
+  ],
+  "redEvidence": {
+    "command": "record-run preimplementation-red dc51d3f4-e467-426a-9f0f-75a78e74e94d, 2026-10-25T07:16:25Z, node --test --test-reporter=spec --test-name-pattern=^RISK offline repair guidance: tests.js on3bfb4fd plus test-only changes.",
+    "failure": "Actual mounted-help assertion lacked new offline workspace, protected-originals and independent cloud versus local acknowledgement guidance. GREEN faba080e follows copy changes and restores the original116-word Restore answer; new answers are108 and68 words."
+  },
+  "observedGreen": "faba080e passed the focused new/old mounted help and brevity consumers. All earlier runtime RED/GREEN source evidence and failed intermediate attempts remain preserved; this is copy validation rather than new native or release proof."
+},
+{
+  "baseCommit": "c27a36be08dbc73f33643f66f0daea0b1d6b074a",
+  "testChangesSha256": "93f1cb212fc91cb6b2513c769c557790f62cc562774a03ee703fbe8020f6d6b5",
+  "reason": "Document the authorized automatic offline working-board/new-work fallback and source-only cloud repair without erasing the established deliberate Restore instructions. All prior runtime/daytime/cloud/lifecycle evidence remains in earlier preserved records.",
+  "previousBehavior": "The FAQ only described exact matching-current-copy restoration and unresolved protected sources, and its shortened Restore wording no longer met the established File/Paste guide contract. It did not explain a new-work workspace or independent remote repair versus local acknowledgement.",
+  "intendedBehavior": "Separate concise help answers explain protected originals, new offline work, honest unsaved state under refused storage, and independent cloud repair whose outcome does not acknowledge device edits. Retain the original deliberate Restore answer and unrelated FAQ/changelog structure. Routine spawn tuning stays omitted from public bug notes.",
+  "replacementTests": [
+    "RISK offline repair guidance: help distinguishes a working workspace cloud repair and exact preserved originals"
+  ],
+  "preservedCoverage": [
+    "No original assertion is removed or weakened by this copy slice. The established Quick start/Restore/File/Paste/raw-source, initial mounted exact-copy guidance and brevity cases pass with the new mounted-help consumer.",
+    "New guidance supplements the already recorded full offline/device/cloud and scene contracts; it does not claim the unfinished parent integration or physical iPhone failure has been fully repaired. Final rendered independent FAQ/typography and exact release gates remain mandatory."
+  ],
+  "redEvidence": {
+    "command": "record-run preimplementation-red dc51d3f4-e467-426a-9f0f-75a78e74e94d, 2026-10-25T07:16:25Z, node --test --test-reporter=spec --test-name-pattern=^RISK offline repair guidance: tests.js on3bfb4fd plus test-only changes.",
+    "failure": "Actual mounted-help assertion lacked new offline workspace, protected-originals and independent cloud versus local acknowledgement guidance. GREEN faba080e follows copy changes and restores the original116-word Restore answer; new answers are108 and68 words."
+  },
+  "observedGreen": "faba080e passed the focused new/old mounted help and brevity consumers. All earlier runtime RED/GREEN source evidence and failed intermediate attempts remain preserved; this is copy validation rather than new native or release proof."
 }
 ]

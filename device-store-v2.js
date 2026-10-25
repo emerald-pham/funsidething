@@ -66,7 +66,7 @@
     if(!indexedDB) throw new Error("IndexedDB is unavailable");
     if(!crypto?.subtle) throw new Error("Web Crypto is unavailable");
     if(!Number.isFinite(openTimeoutMs)||openTimeoutMs<1) throw new Error("IndexedDB open timeout is invalid");
-    let db=null,opening=null,reconnectAllowed=false;
+    let db=null,opening=null,reconnectAllowed=false,openEpoch=0,cancelOpen=null;
     const sha=async value=>hex(await crypto.subtle.digest("SHA-256",bytes(value)));
     const storeNames=["meta","snapshots","backups","opaque"];
     const recoveryNow=()=>typeof root.performance?.now==="function"?root.performance.now():Date.now();
@@ -76,13 +76,17 @@
       try{if(typeof onRecovery==="function")onRecovery({status,code});}catch{}
     };
 
-    function openOnce(existingOnly,remainingMs){
+    const cancelledOpen=()=>Object.assign(new Error("Device store opening was cancelled"),{name:"AbortError"});
+    function openOnce(existingOnly,remainingMs,epoch){
       return new Promise((resolve,reject)=>{
         const request=indexedDB.open(dbName,1);
         let settled=false;
-        const finish=(fn,value)=>{if(settled)return;settled=true;clearTimeout(timer);fn(value);};
+        const cancel=()=>finish(reject,cancelledOpen());
+        const finish=(fn,value)=>{if(settled)return;settled=true;clearTimeout(timer);if(cancelOpen===cancel)cancelOpen=null;fn(value);};
         const timer=setTimeout(()=>finish(reject,Object.assign(new Error("IndexedDB open timed out"),{name:"TimeoutError"})),remainingMs);
+        cancelOpen=cancel;
         request.onupgradeneeded=()=>{
+          if(settled||epoch!==openEpoch){try{request.transaction.abort();}catch{}if(!settled)finish(reject,cancelledOpen());return;}
           // Reconnection never creates an empty replacement for a database
           // that disappeared. Its former authority and sources stay held.
           if(existingOnly){try{request.transaction.abort();}catch{}finish(reject,new Error("The existing device database is unavailable"));return;}
@@ -90,7 +94,7 @@
           for(const name of storeNames) if(!next.objectStoreNames.contains(name)) next.createObjectStore(name);
         };
         request.onsuccess=()=>{
-          if(settled){try{request.result?.close();}catch(e){}return;}
+          if(settled||epoch!==openEpoch){try{request.result?.close();}catch(e){}if(!settled)finish(reject,cancelledOpen());return;}
           const connection=request.result;
           db=connection;reconnectAllowed=true;
           connection.onclose=()=>{if(db===connection){db=null;observeRecovery("unavailable",new Error("Connection closed"));}};
@@ -104,11 +108,12 @@
     async function open(){
       if(db)return api;
       if(opening)return opening;
-      const existingOnly=reconnectAllowed,deadline=recoveryNow()+openTimeoutMs;
+      const existingOnly=reconnectAllowed,deadline=recoveryNow()+openTimeoutMs,epoch=openEpoch;
       const pending=(async()=>{
         for(let attempt=0;attempt<2;attempt++){
+          if(epoch!==openEpoch)throw cancelledOpen();
           observeRecovery("started");
-          try{const result=await openOnce(existingOnly,Math.max(1,deadline-recoveryNow()));observeRecovery("completed");return result;}
+          try{const result=await openOnce(existingOnly,Math.max(1,deadline-recoveryNow()),epoch);if(epoch!==openEpoch)throw cancelledOpen();observeRecovery("completed");return result;}
           catch(error){
             observeRecovery("failed",error);
             const remaining=deadline-recoveryNow();
@@ -593,7 +598,12 @@
       store.put({...current,sourceFingerprint:fingerprint},"head");await done;return true;
     }
 
-    async function close(){reconnectAllowed=false;if(db){db.close();db=null;}}
+    async function close(){
+      // Explicit shutdown revokes pending and late opens as well as the live
+      // handle. A later explicit open owns a separate lifetime.
+      openEpoch++;reconnectAllowed=false;cancelOpen?.();cancelOpen=null;opening=null;
+      if(db){db.close();db=null;}
+    }
     const api={open,close,readRawExportSnapshot,readHead,withCurrentHead,listBackups,listOpaqueArchives,protectRecoverySource,repairHeadSnapshot,writeRecoveredSource,getRecoveryCloudHold,clearRecoveryCloudHold,clearRecoveryCloudHoldIfCurrent:clearRecoveryCloudHold,migrateLegacy,commitHead,commitHeadIfCurrent:commitHead,putBackup,
       updateBackupKind,deleteBackup,getPendingUpload,setPendingUpload,setPendingUploadIfCurrent,clearPendingUpload,clearPendingUploadIfCurrent,setLegacyFingerprint};
     return api;

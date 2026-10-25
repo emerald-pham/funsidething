@@ -12346,6 +12346,146 @@
       "root": "RISK repository process: grouped catalog binds real declarations rather than quoted fixtures",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK device database repair guidance: mounted FAQ distinguishes offline exact-copy repair from protected unresolved sources",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK offline repair guidance: help distinguishes a working workspace cloud repair and exact preserved originals",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK offline device recovery: an exact retained local copy repairs damaged current bytes without cloud",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK device connection startup: one internal server failure recovers the authoritative offline board within a bounded attempt",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK device connection recovery: offline accepted work survives a lost handle and durable reopen",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK device connection cancellation: explicit close invalidates a delayed open without resurrecting or replacing sources",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK device connection cancellation: closing before first upgrade leaves no replacement database",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK daytime people: daytime and twilight spawn rate halves while complete visits and night schedules finish intact",
+      "group": "scenery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK daytime spawn birth phase: rejected daylight parties stay absent after sunset",
+      "group": "scenery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud repair: unavailable device storage repairs retained server sources without acknowledging local work",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud source safety: unsupported roots headers boards and absent candidates remain protected",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud capability: server-only repair ignores injected payloads and never observes local pending state",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud authority: cancellation account epoch backend and suspension changes cannot publish stale repairs",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud races: fresh peer roots win during reads and publication while failed pins keep originals",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud uncertain reply: deterministic publication reads back a lost reply and never clears pending uploads",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud retained discovery: pinned originals survive ordinary rotations and repair another damaged root without local storage",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud exact reconstruction: a matching retained hash cannot discard other complete server facts",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK device connection recovery: a closed local handle still permits exact cloud reconstruction without losing originals",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud stalled storage: a pending native IDB request cannot block remote-only repair",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud absent storage: actual cloudPull repairs remote bytes without a device capability",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud live work: accepted Add comparison and unfinished draft survive a held server-only repair",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud explicit abort: canceled reads and uncertain committed replies cannot acknowledge local work",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud staged reply: retry resumes the same deterministic generation after uncertain creation",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud restart budget: repeated fresh root changes stop after one restart without replacement",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud total budget: clock skew and late server replies cannot extend the original operation",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud final readback: repeated damage after permitted publication cannot become verified repair",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud confirmation status: repairing server bytes cannot show an unchanged local board as acknowledged",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK independent cloud failure status: protected terminal errors stay visible until verified server recovery",
+      "group": "persistence-recovery",
+      "file": "tests.js"
     }
   ],
   "processControls": [
