@@ -4983,13 +4983,14 @@ test('RISK completion source reuse: a source removed after lookup cannot authori
  assert.equal((app.ctx.state.protectedBackupIds||[]).includes(prior.id),false,'a disappeared source ID is never pinned without readback');
 });
 
-test('Firestore rules: immutable decision-aware full shell conflicts then safely holds same-account completion-upgrade authority and its local edit',{skip:!process.env.FIRESTORE_EMULATOR_HOST},async t=>{
+test('Firestore rules: immutable decision-aware full shell conflicts then safely holds same-account completion-upgrade authority and its local edit',
+ {skip:!process.env.FIRESTORE_EMULATOR_HOST},async t=>{
  const {readReleasedClient}=await import('./scripts/backward-compatibility.mjs'),{initializeTestEnvironment}=await import('@firebase/rules-unit-testing'),F=await import('firebase/firestore');
  const artifacts=readReleasedClient(__dirname,LEGACY_COMPLETION_RELEASE),f=await legacyCompletionSource173(t,LEGACY_COMPLETION_RELEASE,'e@example.com'),env=await initializeTestEnvironment({projectId:'demo-legacy-completion-173',firestore:{rules:fs.readFileSync(path.join(__dirname,'firestore.rules'),'utf8')}}),handles=[],apps=[];
  try{
   const old=await decisionBackend146(artifacts,env.authenticatedContext('owner').firestore(),F),next=await decisionBackend146(decisionCandidate146(),env.authenticatedContext('owner').firestore(),F);handles.push(old,next);assert.equal(f.board.syncAccount,old.CS.user,'the actual immutable producer belongs to the real authenticated account');assert.equal(f.board.decisionBaseline.account,old.CS.user);assert.ok(f.board.decisionEvents.every(event=>event.account===old.CS.user),'original journal owners are never relabelled by the fixture');assert.equal((await old.CS.push(f.published,1,0)).ok,true);const read=await old.CS.pull(),seed=JSON.stringify({...JSON.parse(read.payload),syncAccount:old.CS.user,syncRev:read.rev,syncDirty:false});
-  const legacy=await loadAppAtTime(f.at+2*3600000,{appSource:extractAppScript(artifacts.html),seedStorage:{[SYNC_STORE_KEY]:seed,[LOCAL_HEAD_KEY]:seed},cloudSyncFactory:()=>old.CS});apps.push(legacy);await legacy.ctx.cloudPull();old.CS.ready=false;const task=legacy.ctx.addTask('Real released pending edit');await legacy.ctx.persist();const pending=legacy.shim.localStorage.getItem(SYNC_STORE_KEY);let updates=0;legacy.ctx.window.checkForAppUpdate=async()=>{updates++;};
-  const modern=await loadAppAtTime(f.at+2*3600000,{seedStorage:{[SYNC_STORE_KEY]:seed,[LOCAL_HEAD_KEY]:seed},cloudSyncFactory:()=>next.CS});apps.push(modern);assert.equal(modern.ctx.decisionEvidenceIssue(modern.ctx.state,next.CS.user),null,'the real candidate can consume the unchanged source journal');assert.ok(modern.ctx.state.decisionEvents.some(event=>event.kind==='completion-boundary'),'validated startup actually upgrades the source before publication');assert.equal(await modern.ctx.persist(),true);await modern.ctx.cloudPull();await modern.ctx.cloudPushNow();for(let n=0;n<80&&modern.ctx.state.syncDirty;n++)await syncSettle(25);assert.equal(modern.ctx.state.syncDirty,false,'the real candidate publication is acknowledged before the stale writer resumes');const exact=await next.CS.pull();t.diagnostic(JSON.stringify({sourceAccount:f.board.syncAccount,sourceBaselineAccount:f.board.decisionBaseline?.account,authenticatedAccount:next.CS.user,seedAccount:JSON.parse(seed).syncAccount,candidateIssue:modern.ctx.decisionEvidenceIssue(modern.ctx.state,next.CS.user),candidateError:next.CS.errorCode,candidateBoundaries:modern.ctx.state.decisionEvents?.filter(event=>event.kind==='completion-boundary').length,acknowledgedBoundaries:JSON.parse(exact.payload).decisionEvents?.filter(event=>event.kind==='completion-boundary').length}));assert.ok(JSON.parse(exact.payload).decisionEvents.some(event=>event.kind==='completion-boundary'));assert.equal(exact.payload,modern.ctx.cloudPayload(),'the real server acknowledges the exact coherent upgraded board');assert.ok(exact.rev>read.rev);assert.equal(modern.ctx.state.syncRev,exact.rev);assert.equal(JSON.stringify(JSON.parse(modern.shim.localStorage.getItem(SYNC_STORE_KEY)).decisionEvents),JSON.stringify(JSON.parse(exact.payload).decisionEvents),'device and acknowledged journals are exact');
+  const legacy=await loadAppAtTime(f.at+2*3600000,{appSource:extractAppScript(artifacts.html),seedStorage:{[SYNC_STORE_KEY]:seed,[LOCAL_HEAD_KEY]:seed},cloudSyncFactory:window=>old.attachAppWindow(window)});apps.push(legacy);await legacy.ctx.cloudPull();old.CS.ready=false;const task=legacy.ctx.addTask('Real released pending edit');await legacy.ctx.persist();const pending=legacy.shim.localStorage.getItem(SYNC_STORE_KEY);let updates=0;legacy.ctx.window.checkForAppUpdate=async()=>{updates++;};
+  const modern=await loadAppAtTime(f.at+2*3600000,{seedStorage:{[SYNC_STORE_KEY]:seed,[LOCAL_HEAD_KEY]:seed},cloudSyncFactory:window=>next.attachAppWindow(window)});apps.push(modern);assert.equal(modern.ctx.decisionEvidenceIssue(modern.ctx.state,next.CS.user),null,'the real candidate can consume the unchanged source journal');assert.ok(modern.ctx.state.decisionEvents.some(event=>event.kind==='completion-boundary'),'validated startup actually upgrades the source before publication');assert.equal(await modern.ctx.persist(),true);await modern.ctx.cloudPull();await modern.ctx.cloudPushNow();for(let n=0;n<80&&modern.ctx.state.syncDirty;n++)await syncSettle(25);assert.equal(modern.ctx.state.syncDirty,false,'the real candidate publication is acknowledged before the stale writer resumes');const exact=await next.CS.pull();t.diagnostic(JSON.stringify({sourceAccount:f.board.syncAccount,sourceBaselineAccount:f.board.decisionBaseline?.account,authenticatedAccount:next.CS.user,seedAccount:JSON.parse(seed).syncAccount,candidateIssue:modern.ctx.decisionEvidenceIssue(modern.ctx.state,next.CS.user),candidateError:next.CS.errorCode,candidateBoundaries:modern.ctx.state.decisionEvents?.filter(event=>event.kind==='completion-boundary').length,acknowledgedBoundaries:JSON.parse(exact.payload).decisionEvents?.filter(event=>event.kind==='completion-boundary').length}));assert.ok(JSON.parse(exact.payload).decisionEvents.some(event=>event.kind==='completion-boundary'));assert.equal(exact.payload,modern.ctx.cloudPayload(),'the real server acknowledges the exact coherent upgraded board');assert.ok(exact.rev>read.rev);assert.equal(modern.ctx.state.syncRev,exact.rev);assert.equal(JSON.stringify(JSON.parse(modern.shim.localStorage.getItem(SYNC_STORE_KEY)).decisionEvents),JSON.stringify(JSON.parse(exact.payload).decisionEvents),'device and acknowledged journals are exact');
   const attempts=[],push=old.CS.push.bind(old.CS),pull=old.CS.pull.bind(old.CS);old.CS.push=async(...args)=>{const result=await push(...args);attempts.push({type:'push',conflict:result.conflict===true,baseRev:args[2]});return result;};old.CS.pull=async(...args)=>{const result=await pull(...args);attempts.push({type:'pull'});return result;};
   old.CS.ready=true;await legacy.ctx.cloudPushNow();for(let n=0;n<80&&old.CS.errorCode!=='unsupported-decision-evidence';n++)await syncSettle(25);const conflict=attempts.findIndex(row=>row.type==='push'&&row.conflict);assert.ok(conflict>=0,'the immutable full shell actually attempts a stale real-backend CAS');assert.ok(attempts.slice(conflict+1).some(row=>row.type==='pull'),'the old shell pulls after its real revision conflict');assert.equal(old.CS.errorCode,'unsupported-decision-evidence');assert.equal(legacy.ctx.state.syncDirty,true);assert.ok(updates>0);assert.ok(legacy.ctx.state.tasks.some(row=>row.id===task.id));assert.equal(legacy.shim.localStorage.getItem(SYNC_STORE_KEY),pending);const after=await next.CS.pull();assert.equal(after.payload,exact.payload);assert.equal(after.rev,exact.rev);
  }finally{for(const app of apps)await closeLegacyApp173(app);await Promise.all(handles.map(handle=>handle.drain()));await env.cleanup();}
@@ -30190,7 +30191,14 @@ async function decisionBackend146(artifacts,db,F,uid='owner',{beforePublication=
  const module=artifacts.html.match(/<script type="module">([\s\S]*?)<\/script>/)[1].replace(/const \[appMod, A, F\] = await Promise\.all\(\[[\s\S]*?\]\);/,'const [appMod,A,F]=globalThis.__modules;');
  await vm.runInContext(`(async()=>{${module}\n})()`,context);
  assert.equal(window.CloudSync.ready,true);
- return {CS:window.CloudSync,async drain(){for(let idle=0;idle<2;){if(pending.size){idle=0;await Promise.allSettled([...pending]);}else idle++;await flush();}}};
+ const CS=window.CloudSync;
+ return {CS,attachAppWindow(appWindow){
+  // Browser classic and module scripts share this exact window. Binding the
+  // actual app keeps its planner, pending store and live backend checks real.
+  appWindow.ChainStorageV2??=context.ChainStorageV2;
+  appWindow.ChainCloudV2??=context.ChainCloudV2;
+  appWindow.CloudSync=CS;context.window=appWindow;return CS;
+ },async drain(){for(let idle=0;idle<2;){if(pending.size){idle=0;await Promise.allSettled([...pending]);}else idle++;await flush();}}};
 }
 function decisionCandidate146(){return {html,cloud:fs.readFileSync(path.join(__dirname,'cloud-store-v2.js'),'utf8'),storage:fs.readFileSync(path.join(__dirname,'device-store-v2.js'),'utf8')};}
 
@@ -30255,7 +30263,7 @@ test('Firestore rules: real pinned writer reads decision authority then holds it
   // The action producer's separate synthetic revision4 must not attest that
   // this old device already read the later real activation at revision4.
   const oldLocal=JSON.stringify({...JSON.parse(oldRead.payload),syncRev:oldRead.rev,syncAccount:oldReadAccount,syncDirty:false});
-  const oldApp=await loadApp({appSource:extractAppScript(floor.html),seedStorage:{[SYNC_STORE_KEY]:oldLocal,[LOCAL_HEAD_KEY]:oldLocal},cloudSyncFactory:()=>old.CS});
+  const oldApp=await loadApp({appSource:extractAppScript(floor.html),seedStorage:{[SYNC_STORE_KEY]:oldLocal,[LOCAL_HEAD_KEY]:oldLocal},cloudSyncFactory:window=>old.attachAppWindow(window)});
   let updates=0;oldApp.ctx.window.checkForAppUpdate=async()=>{updates++;};
   t.after(()=>{old.CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',oldApp.ctx);});
   await oldApp.ctx.cloudPull();
@@ -30273,7 +30281,8 @@ test('Firestore rules: real pinned writer reads decision authority then holds it
  });
 });
 
-test('Firestore rules: first decision against released rules stays exact and pending until rules-first rollout then retry', {skip:!process.env.FIRESTORE_EMULATOR_HOST},async t=>{
+test('Firestore rules: first decision against released rules stays exact and pending until rules-first rollout then retry',
+ {skip:!process.env.FIRESTORE_EMULATOR_HOST},async t=>{
  const {SUPPORTED_RELEASE,readReleasedClient}=await import('./scripts/backward-compatibility.mjs');
  const {initializeTestEnvironment}=await import('@firebase/rules-unit-testing'),F=await import('firebase/firestore');
  const floor=readReleasedClient(__dirname,SUPPORTED_RELEASE),projectId='demo-decision-rollout-146';
@@ -30282,7 +30291,7 @@ test('Firestore rules: first decision against released rules stays exact and pen
  try{
   const f=await decisionRecoveryApp146();t.after(()=>{f.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',f.ctx);});
   const plain=JSON.stringify(f.h.remoteState());assert.equal((await handle.CS.push(plain,1,0)).ok,true);
-  const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:plain,[LOCAL_HEAD_KEY]:plain},cloudSyncFactory:()=>handle.CS});
+  const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:plain,[LOCAL_HEAD_KEY]:plain},cloudSyncFactory:window=>handle.attachAppWindow(window)});
   t.after(()=>{handle.CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
   app.shim.window.CLOUD_PUSH_DELAY_MS=2;await app.ctx.cloudPull();handle.CS.ready=false;app.ctx.renderScan();app.ctx.onAction('no',{dataset:{candidate:'candidate',benchmark:'bench'}});await recordMixedDecisionActions146(app);await app.ctx.persist();handle.CS.ready=true;
   const evidence=JSON.stringify(app.ctx.state.decisionEvents),ratings=JSON.stringify(app.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma]));
