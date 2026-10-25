@@ -2094,7 +2094,7 @@ This boundary control holds a successful real provider reply, installs a later a
 ## Integrated automatic recovery qualification
 
 - RISK integrated automatic recovery: persisted multichunk sources retain pending ACK and true Done Undo through restart
-- RISK integrated automatic recovery native: persisted startup status and neighboring controls remain usable
+- RISK integrated automatic recovery native: persisted startup status and neighboring controls remain usable with one browser and isolated contexts
 - RISK integrated automatic recovery: a failed current read cannot hide the healthy previous source
 
 - RISK automatic source status: completed confirmation follows current edits and signed-in identity
@@ -2108,6 +2108,8 @@ This boundary control holds a successful real provider reply, installs a later a
 - Acknowledged damaged-source fixture inputs finish both real native seed Add saves before later recovery/consent: `RISK recovery fixture ownership: acknowledged damage inputs finish both native seed saves before recovery`.
 
 - The native historical status consumer retains15s new-owner entry, then only that read/controller/serial's original remaining60s budget; an entered16s SDK reply, true stopped/superseded/signout refusals and normal ACK cleanup are exercised in `RISK automatic source status native: historical retry checking stop and confirmation remain current`.
+
+- The startup matrix identifier `RISK integrated automatic recovery native: persisted startup status and neighboring controls remain usable` was renamed to `RISK integrated automatic recovery native: persisted startup status and neighboring controls remain usable with one browser and isolated contexts`; its four theme/viewport children and recovery assertions remain intact. The renamed startup matrix and historical matrix `RISK automatic source status native: historical retry checking stop and confirmation remain current` each launch one Playwright browser for four cases while preserving four fresh contexts and pages, independent synthetic account/board/backend/gates, per-case evidence, and all startup/reopen/ACK/protected-source/newer-edit/draft/Undo assertions. The historical dark390 case retains its real16s held ACK.
 
 - Failed source observations retain their original rejection while their own polling timers terminate and the real consumer exits: `RISK recovery fixture shutdown: a failed real source observation stops its own polling and exits`.
 
