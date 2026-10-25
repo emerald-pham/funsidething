@@ -1,7 +1,7 @@
 [
   {
     "baseCommit": "ec0686a3cadf239c82efb854cd1136f216160fd3",
-    "testChangesSha256": "eb5958d658066cd6499fe760774705f92cd604e9973c89bd956239d475ecbab2",
+    "testChangesSha256": "b55a5f4c78ca8ab3f9c96eecb881c23ea4dd628877164b18144ed574c0121a23",
     "reason": "Reproduce the user screenshot through the actual Review cloud recovery sources action when an asynchronous IndexedDB request or transaction fails. Retain device and cloud originals while bounded safe read verification resumes.",
     "previousBehavior": "One transient database server failure terminated recovery with the exact raw Indexed Database server dialog. A head request aborted by that failure also leaked an unhandled transaction rejection. Pending-pointer and recovery-hold request aborts had the same defect.",
     "intendedBehavior": "Only manual review retries known transient device read failures once within its existing shared minute and restart budget, after validating current account, backend, work and draft. Request and transaction failures are observed together. Permanent errors, cancellation, changed authority and exhausted budgets stop without publication; friendly status and bounded diagnostics remain honest. Each protected fact stays bound from its first successful observation, including synchronous browser copies and partial captures before a later database failure.",
@@ -14,13 +14,13 @@
       "RISK cloud recovery device read guidance: mounted FAQ and changelog explain the bounded device recheck"
     ],
     "preservedCoverage": [
-      "All preexisting tests and assertions remain unchanged; only six roots and a native database fault injector are added. Existing cloud retry, source choice, publication, automatic recovery, persistence, cancellation and installed-client contracts remain intact.",
+      "All original functional assertions remain unchanged. One existing lifecycle FAQ assertion updates Both to All because the guidance now names three failure categories; its one-minute limit expectation and all adjacent source, authority and lifecycle assertions remain. Six new roots and the native database fault injector add the regression coverage.",
       "Faults are injected at the real fake-indexeddb transaction/request boundary. Actual app action, storage reads, backend, codecs and source comparisons run. Exact raw device/cloud data, pending rows, draft and zero-write assertions prevent a retry from becoming restore consent.",
       "First guidance draft incorrectly expected the FAQ inside the Settings modal. Failed green fde6044b is retained; the fixture now exercises the existing Help-mounted FAQ and Changelog without inventing a new Settings route. Guard cases already green when added are supplemental coverage, not claimed original RED."
     ],
     "redEvidence": {
       "command": "node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/cloud-review-database-error/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/cloud-review-database-error-20261025/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern='^RISK cloud recovery device read:' tests.js",
-      "failure": "Original baseline ec0686a: 0c1bdd6d at 11:28:50Z fails false versus true with the exact screenshot dialog. Before head-read repair 3a8b7e26 fails head review and emits an unhandled UnknownError; before pending/hold request repair ad0d92ee fails both and leaks their rejection. Before status/FAQ/diagnostics changes de886910 and 1ddb8464 fail the corresponding visible assertions. Chronological raw records are retained outside Git. Independent review found early partial-capture rebinding: preimplementation RED5530fb5c fails protected browser/fallback and already-read pending/hold changes on d45a65d before the repair. GREENd7dd2ac5 passes128/128 after binding each observed fact."
+      "failure": "Original baseline ec0686a: 0c1bdd6d at 11:28:50Z fails false versus true with the exact screenshot dialog. Before head-read repair 3a8b7e26 fails head review and emits an unhandled UnknownError; before pending/hold request repair ad0d92ee fails both and leaks their rejection. Before status/FAQ/diagnostics changes de886910 and 1ddb8464 fail the corresponding visible assertions. Chronological raw records are retained outside Git. Independent review found early partial-capture rebinding: preimplementation RED5530fb5c fails protected browser/fallback and already-read pending/hold changes on d45a65d before the repair. GREENd7dd2ac5 passes128/128 after binding each observed fact. Full a838461f discovered the old lifecycle FAQ copy expectation; focused RED6b09e1ba confirms Both versus All before that assertion update. Full run retains its7failed outcomes, including missing native smoke allocation/output setup and an unrelated token-lock fixture race; those are not product GREEN."
     }
   },
   {

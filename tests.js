@@ -3047,7 +3047,7 @@ test('RISK cloud source lifecycle guidance: mounted Help explains inspection and
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  assert.match(html,/Recovery refuses stale choices when protected device information changes/);
  assert.match(help,/Changed protected information needs a fresh choice/);assert.match(help,/If cloud saving finishes but local recovery stays held, the message says so/);
- assert.match(help,/Can I inspect one cloud copy when another cannot be read/);assert.match(help,/A readable copy does not make it eligible to replace your board/);assert.match(help,/Why does a recovery check retry or stop/);assert.match(help,/Both share the original one-minute limit/);assert.match(html,/Recovery can recheck an unavailable cloud read once/);
+ assert.match(help,/Can I inspect one cloud copy when another cannot be read/);assert.match(help,/A readable copy does not make it eligible to replace your board/);assert.match(help,/Why does a recovery check retry or stop/);assert.match(help,/All share the original one-minute limit/);assert.match(html,/Recovery can recheck an unavailable cloud read once/);
 });
 
 test('RISK cloud source fresh check: a transient root change inside the first capture verifies automatically',async t=>{
