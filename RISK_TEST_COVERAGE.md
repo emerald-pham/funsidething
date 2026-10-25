@@ -2186,3 +2186,5 @@ This boundary control holds a successful real provider reply, installs a later a
 - RISK offline recovery reentry: settled own recovery writes permit fresh current work while changed holds stay protected
 
 - Independent cloud preflight queues Auth and native wake events until hydration and exact boot capture settle, then still repairs real remote chunks after permanently unavailable native startup reaches its bound; accepted unsaved Add/draft remain pending: `RISK independent cloud boot authority: source-only preflight waits for bounded device startup before repairing remote bytes`.
+
+- Actual Firestore SDK/classic-app fixtures share the exact app window and real loaded codecs, preserving live planner, storage and backend authority checks rather than a disconnected module window. Original full-shell acknowledgement and rules-first refusal assertions remain unchanged in `Firestore rules: immutable decision-aware full shell conflicts then safely holds same-account completion-upgrade authority and its local edit` and `Firestore rules: first decision against released rules stays exact and pending until rules-first rollout then retry`.

@@ -19703,5 +19703,28 @@
     "892b5ced1cf42319ab4ca7292dea570d546f29b0",
     "be86c40e787dcb24bb80e2cf464a9ab29206737a"
   ]
+},
+{
+  "testChangesSha256": "dc22a7ddeea7f602e5e24ffeee6753971be6f1b5af4b4d5294870ad02c59dc85",
+  "reason": "Repair a demonstrated test-environment mismatch: the actual SDK module and its classic app used separate windows, so live backend and real recovery planner authority checks could not see the app. Connect each existing real app fixture to its actual module VM window and share only actual loaded codec exports when missing.",
+  "previousBehavior": "On clean0785, the two existing real Firestore consumers fail their intended exact candidate acknowledgement and old-rules permission-denied assertions because independent repair checks a disconnected module window. Parent integrated81ce1fae is a purpose=green failed discovery; focused clean-source9b36d976 independently reproduces the same assertions before fixture changes.",
+  "intendedBehavior": "Use one exact app host window for the unchanged actual classic app and real SDK module. Keep the real app planner, real pending-store capability, exact CloudSync object and loaded codec modules; do not fake a planner or weaken runtime, rules, account, root revision or ACK authority. All established assertions execute unchanged.",
+  "preservedCoverage": [
+    "Every original runtime, Firestore rules and authority assertion is unchanged. Both existing test names remain exact; declaration wrapping only makes their deliberately updated fixture roots explicit in the exact test-change diff. No new runtime module or test root is introduced.",
+    "decisionBackend146 attachAppWindow connects the same VM global window to the actual app host supplied by its existing cloudSyncFactory boundary. Actual ChainStorageV2 and ChainCloudV2 exports fill absent host dependencies; existing host module objects remain intact. No synthetic plan, fake acknowledgement, bypass flag or consent relaxation is introduced.",
+    "All four existing classic-app attachments for this real-SDK fixture use the connection, including historical readers. Exact candidate publication, stale real-backend conflict, unsupported legacy decision hold, full local edit and byte preservation, rules-first permission denial and later exact retry assertions remain intact.",
+    "The intermediate first connector attempt23daec24 remains failed: changing only the host exposed its missing real codec globals and yielded codec-unavailable. Real loaded exports repaired that fixture dependency; focused919f18a6 then passes both original cases. The full24-case rules cohort on final committed source and clean preflight are reported separately in WINDOW_WIRING_HANDOFF.md.",
+    "No product runtime, Firestore rules/schema, parent local recovery code, global root map, FAQ/fingerprint, native/browser/CI/push/deployment change belongs to this fixture-only slice. Emulator resources were temporarily delegated by parent, with actual9150 allocation correction and cleanup recorded in window-wiring/DELEGATION.json."
+  ],
+  "redEvidence": {
+    "command": "Focused actual preimplementation-red9b36d976-2179-48a0-b98b-78b9eb008c38 on clean0785: node_modules/.bin/firebase emulators:exec --only firestore --project demo-chain-scanner-data-safety \"node --test --test-reporter=spec --test-name-pattern='^Firestore rules: (immutable decision-aware full shell conflicts then safely holds same-account completion-upgrade authority and its local edit|first decision against released rules stays exact and pending until rules-first rollout then retry)$' tests.js\". Exact command and complete stdout retained in independent-cloud/window-wiring/runs.",
+    "failure": "Both original consumers reach intended assertions: real candidate publication remains syncDirtytrue instead offalse; first decision against released rules reports recovery-source-changed instead ofpermission-denied.0passed2failed0skipped/cancelled. This is actual consumer authority mismatch, not import or missing-global failure. Parent81ce1fae remains purpose=green failed discovery and is not relabeled."
+  },
+  "replacementTests": [
+    "Firestore rules: immutable decision-aware full shell conflicts then safely holds same-account completion-upgrade authority and its local edit",
+    "Firestore rules: first decision against released rules stays exact and pending until rules-first rollout then retry"
+  ],
+  "observedGreen": "Actual focused919f18a6-99ae-4f24-a688-82fa1199d611 passes2/2 original consumers with no skipped/cancelled cases. Full final committed rules, Node cloud preservation and preflight receipts follow in WINDOW_WIRING_HANDOFF.md.",
+  "integrationBase": "0785e5319a87edc3dc11db879bf8c03bca448f71"
 }
 ]
