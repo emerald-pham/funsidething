@@ -8316,6 +8316,15 @@ function makeDomShim({ prefersDark = false, sharedStorage = null } = {}) {
       for (const fn of (documentListeners[evt.type] || [])) fn(evt);
       return true;
     },
+    // Observe completion through the actual registered async event handlers.
+    dispatchEventAndWait(evt) {
+      const completions=[];
+      for(const fn of (documentListeners[evt.type]||[])){
+        const outcome=fn(evt);
+        if(outcome&&typeof outcome.then==='function')completions.push(outcome);
+      }
+      return Promise.all(completions);
+    },
     createElement() { return makeFakeElement(); },
     body: { appendChild() {} },
     documentElement,
@@ -19032,9 +19041,15 @@ test('RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exac
   shim.document.getElementById=id=>id==='restoreBackupFile'?input:id==='backupRestoreSource'?restoreSource:originalGet(id);
   const cloudPushCalls=[],originalPush=ctx.window.CloudSync?.push?.bind(ctx.window.CloudSync);
   if(originalPush)ctx.window.CloudSync.push=(...args)=>{cloudPushCalls.push(args);return originalPush(...args);};
+  async function awaitFileFixtureOperation(operation,label){
+    let timer;
+    try{return await Promise.race([operation,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(label+' did not complete within 5 seconds')),5000);})]);}
+    finally{clearTimeout(timer);}
+  }
   async function selectFile(selected){
-    input.files=[selected];shim.document.dispatchEvent({type:'change',target:input});
-    for(let attempt=0;attempt<100&&!shim.document.getElementById('modalRoot').innerHTML.includes('data-act="confirm-file-restore"');attempt++)await flush();
+    input.files=[selected];
+    const outcomes=await awaitFileFixtureOperation(shim.document.dispatchEventAndWait({type:'change',target:input}),'selected-file change handlers');
+    assert.deepEqual(outcomes,[true],'the actual selected-file handler must complete successfully: '+shim.document.getElementById('toast').textContent);
     return shim.document.getElementById('modalRoot').innerHTML;
   }
   await ctx.onAction(restoreAction[1],{});
@@ -19097,9 +19112,10 @@ test('RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exac
   const reopenedGet=reopened.shim.document.getElementById.bind(reopened.shim.document);
   reopened.shim.document.getElementById=id=>id==='restoreBackupFile'?archiveInput:reopenedGet(id);
   let archivePickerOpens=0;archiveInput.click=()=>{archivePickerOpens++;};
-  async function selectReopenedFile(selected){
-    archiveInput.files=[selected];reopened.shim.document.dispatchEvent({type:'change',target:archiveInput});
-    for(let attempt=0;attempt<100&&!reopened.shim.document.getElementById('modalRoot').innerHTML.includes('data-act="confirm-file-restore"');attempt++)await flush();
+  async function selectReopenedFile(selected,{accepted=true}={}){
+    archiveInput.files=[selected];
+    const outcomes=await awaitFileFixtureOperation(reopened.shim.document.dispatchEventAndWait({type:'change',target:archiveInput}),'reopened selected-file change handlers');
+    assert.deepEqual(outcomes,[accepted],'the actual handler must report the expected source outcome: '+reopened.shim.document.getElementById('toast').textContent);
     return reopened.shim.document.getElementById('modalRoot').innerHTML;
   }
   const archiveBoard=JSON.parse(JSON.stringify(reopened.ctx.state));
@@ -19113,7 +19129,31 @@ test('RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exac
       backups:[{key:{type:'string',value:'pending-upload'},value:{type:'object',value:{task:{id:'pending-queue-task',title:'Pending queue task'}}}}],opaque:[]}}}};
   const archiveBytes=new TextEncoder().encode(JSON.stringify(archive,null,2)),archiveFile=new File([archiveBytes],'recovery <archive>.json',{type:'application/json'});
   await reopened.ctx.onAction(reopenedAction[1],{});assert.equal(archivePickerOpens,1);
-  const archivePreview=await selectReopenedFile(archiveFile);
+  let archivePreview;
+  await t.test('file selection stays pending until its real exact-byte read completes',async()=>{
+    const read=archiveFile.arrayBuffer.bind(archiveFile);
+    let readEntered,releaseRead;
+    const entered=new Promise(resolve=>{readEntered=resolve;}),released=new Promise(resolve=>{releaseRead=resolve;});
+    archiveFile.arrayBuffer=async()=>{readEntered();await released;return read();};
+    let settled=false;
+    const selection=selectReopenedFile(archiveFile).then(preview=>{settled=true;return preview;});
+    try{
+      await awaitFileFixtureOperation(entered,'the actual selected-file read');
+      // Keep the real read pending beyond the former100flush-turn cap. The
+      // selected-file consumer must await its handler, without adopting early.
+      for(let turn=0;turn<120;turn++)await flush();
+      assert.equal(settled,false,'a pending real file read cannot count as a completed selection');
+      assert.equal(reopened.ctx.state.tasks[0].title,'Restored file task','holding the selected read cannot adopt its currentBoard');
+      assert.doesNotMatch(reopened.shim.document.getElementById('modalRoot').innerHTML,/data-act="confirm-file-restore"/,'protected preview waits for the actual selected bytes');
+    }finally{
+      releaseRead();archivePreview=await selection;
+      // Drain the actual UI operation before fixture disposal even when the
+      // pending-selection assertion fails on the unchanged polling helper.
+      const deadline=Date.now()+5000;
+      while(!reopened.shim.document.getElementById('modalRoot').innerHTML.includes('data-act="confirm-file-restore"')&&!reopened.shim.document.getElementById('toast').textContent&&Date.now()<deadline)await flush();
+      archiveFile.arrayBuffer=read;
+    }
+  });
   assert.match(archivePreview,/Only its ordinary <code>currentBoard<\/code> can be restored/);
   assert.doesNotMatch(archivePreview,/pending-queue-task|Pending queue task/,'raw pending appSources are not rendered as an adopted-board task');
   assert.equal(reopened.ctx.state.tasks[0].title,'Restored file task','archive preview does not apply its currentBoard early');
@@ -19126,7 +19166,7 @@ test('RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exac
   const incompleteFile=new File([JSON.stringify(incomplete)],'incomplete.json',{type:'application/json'});
   const pickerBefore=archivePickerOpens;await reopened.ctx.onAction(reopenedAction[1],{});assert.equal(archivePickerOpens,pickerBefore+1);
   const priorToast=reopened.shim.document.getElementById('toast').textContent;reopened.shim.document.getElementById('toast').textContent='';
-  await selectReopenedFile(incompleteFile);
+  await selectReopenedFile(incompleteFile,{accepted:false});
   for(let attempt=0;attempt<100&&!reopened.shim.document.getElementById('toast').textContent.includes('incomplete');attempt++)await flush();
   assert.match(reopened.shim.document.getElementById('toast').textContent,/incomplete/,'partial archives stop with an honest source error');
   assert.deepEqual(await reopenedStore.readHead(),heldHead,'an incomplete archive cannot replace the saved board');
