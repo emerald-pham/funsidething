@@ -176,13 +176,14 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
      const before={clicks:report.clicks?.length||0,presses:report.presses?.length||0};
      if(availability.present&&availability.hit)await bounded(page.mouse.click(box.x+(action==='act:mback'?5:box.width/2),box.y+(action==='act:mback'?5:box.height/2)),'rapid native press '+actionName);
      else{
-      // The original control has disappeared or is obscured by its result. A
-      // real down followed by release outside the viewport cannot activate a
-      // different app control under its former position.
-      await bounded((async()=>{await page.mouse.move(originalBox.x+originalBox.width/2,originalBox.y+originalBox.height/2);await page.mouse.down();await page.mouse.move(-10,-10);await page.mouse.up();})(),'rapid refused press '+actionName);
+      // Chromium can clamp an outside-viewport release onto the modal backdrop
+      // and synthesize a different click. Release in a separate neutral document
+      // instead; the original document still records the trusted attempted down.
+      await bounded(page.evaluate(()=>{if(!document.getElementById('__buttonReleaseSink')){const sink=document.createElement('iframe');sink.id='__buttonReleaseSink';sink.title='Native test release surface';sink.srcdoc='<!doctype html><style>html,body{margin:0;width:100%;height:100%}</style>';sink.style.cssText='position:fixed;left:0;top:0;width:8px;height:8px;border:0;z-index:2147483647';document.body.append(sink);}}),'rapid release surface');
+      await bounded((async()=>{await page.mouse.move(originalBox.x+originalBox.width/2,originalBox.y+originalBox.height/2);await page.mouse.down();await page.mouse.move(4,4);await page.mouse.up();await page.evaluate(()=>document.getElementById('__buttonReleaseSink')?.remove());})(),'rapid refused press '+actionName);
      }
      if(reload&&index===0){await bounded(page.waitForFunction(old=>window.__installedFixture?.documentId!==old&&document.documentElement.dataset.appReady==='true',previousDocument),'rapid bounded reload',2000);assert.equal(allowedNavigation.remaining,0,'Exactly one expected rapid reload');allowedNavigation=null;}
-     await bounded(page.evaluate(()=>true),'rapid native receipt');const received={presses:(report.presses||[]).slice(before.presses),clicks:(report.clicks||[]).slice(before.clicks).filter(row=>row.action===action)};
+     await bounded(page.evaluate(()=>true),'rapid native receipt');const recentClicks=(report.clicks||[]).slice(before.clicks);const unrelated=recentClicks.filter(row=>row.action!==null&&row.action!==action);assert.deepEqual(unrelated,[],'Rapid attempt activated a different app action');const received={presses:(report.presses||[]).slice(before.presses),clicks:recentClicks.filter(row=>row.action===action)};
      attempts.push({index,availability,trustedPresses:received.presses.length,acceptedClicks:received.clicks.length,classification:received.clicks.length?'accepted':availability.present?'refused':'disappeared',at:received.presses[0]?.at});
     }
     const finished=Date.now();const presses=(report.presses||[]).slice(start.presses);
@@ -194,7 +195,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
     if(typeof expectedAccepted==='number')assert.equal(acceptedClicks,expectedAccepted,'Independent accepted native click count: '+actionName);
     else assert.ok(acceptedClicks>=expectedAccepted.min&&acceptedClicks<=expectedAccepted.max,'Independent accepted native click bounds: '+actionName);
     const row=rapidOutcomes.get(action)||{action,status:'passed',responsive:true,assertions:0,bursts:[]};row.assertions++;
-    row.bursts.push({scenario:name,attempts:10,trustedPresses:presses.length,windowMs:finished-began,browserWindowMs:presses.at(-1).at-presses[0].at,acceptedClicks,refused,disappeared,semantics,maxFrameGapMs:heartbeat.maxGapMs,attemptDetails:attempts});rapidOutcomes.set(action,row);report.rapidOutcomes=[...rapidOutcomes.values()];
+    row.bursts.push({scenario:name,attempts:10,trustedPresses:presses.length,unrelatedClicks:0,windowMs:finished-began,browserWindowMs:presses.at(-1).at-presses[0].at,acceptedClicks,refused,disappeared,semantics,maxFrameGapMs:heartbeat.maxGapMs,attemptDetails:attempts});rapidOutcomes.set(action,row);report.rapidOutcomes=[...rapidOutcomes.values()];
     const normal=outcomes.get(action)||{action,status:'passed',events:['click'],assertions:0,responsive:true,steps:[]};normal.assertions++;normal.steps.push({scenario:name,description:'Rapid '+semantics,elapsedMs:finished-began,maxFrameGapMs:heartbeat.maxGapMs});outcomes.set(action,normal);report.outcomes=[...outcomes.values()];
     return row.bursts.at(-1);
    };

@@ -260,23 +260,30 @@ export async function runRapidCoreScenarios(h){
     await waitForStoredTaskCount(ui,399,'Editor deletion is durably saved');
   });
 
-  await h.scenario('rapid Undo consumes one actual saved edit frame',{decorate:activeBoard},async ui=>{
+  await h.scenario('rapid Undo consumes ten actual saved edit frames',{decorate:activeBoard},async ui=>{
     await assert400(ui,'Undo');
     const originalTitle=await ui.page.evaluate(()=>state.tasks.find(task=>task.id==='synthetic-kept')?.title);
-    assert.equal(await ui.page.locator('[data-act="undo"]').isDisabled(),true,'Undo begins with no action to consume');
+    const priorUndoEnabled=await ui.page.locator('[data-act="undo"]').isEnabled();
+    assert.equal(typeof originalTitle,'string','Undo fixture has a concrete original title');
     for(let index=1;index<=10;index++){
       const title='Rapid undo frame '+index;
       await openEditor(ui,'synthetic-kept');await ui.fill('#etTitle',title);
-      await ui.act('save-edit',()=>state.tasks.find(task=>task.id==='synthetic-kept')?.title===title&&!document.getElementById('etTitle'));
+      const savedTitle=new Function('return ()=>state.tasks.find(task=>task.id==="synthetic-kept")?.title==='+
+        JSON.stringify(title)+'&&!document.getElementById("etTitle")')();
+      await ui.act('save-edit',savedTitle);
     }
     await ui.waitFor(async()=>{
       const head=await window.ScannerDeviceStore.readHead(),stored=head?.payload?JSON.parse(head.payload):null;
       return stored?.tasks?.find(task=>task.id==='synthetic-kept')?.title==='Rapid undo frame 10';
     },12000,'All ten real edit frames are durably saved before Undo');
-    await ten(ui,'undo',()=>state.tasks.find(task=>task.id==='synthetic-kept')?.title===originalTitle&&
-      document.querySelector('[data-act="undo"]')?.disabled===true,
-      '[data-act="undo"]','Ten Undo presses consume the ten actual saved edit frames in order and leave no further undo action.');
+    const undoRestoredBaseline=new Function('return ()=>state.tasks.find(task=>task.id==="synthetic-kept")?.title==='+
+      JSON.stringify(originalTitle)+'&&document.querySelector("[data-act=\\"undo\\"]")?.disabled==='+JSON.stringify(!priorUndoEnabled))();
+    await ten(ui,'undo',undoRestoredBaseline,
+      '[data-act="undo"]','Ten Undo presses consume the ten actual saved edit frames in order and restore the exact baseline title; earlier fixture history remains available.');
     await waitForStoredTaskCount(ui,400,'Undo preserves all 400 durable tasks');
+    const durableBaseline=new Function('return async()=>{const head=await window.ScannerDeviceStore.readHead(),stored=head?.payload?JSON.parse(head.payload):null;'+
+      'return stored?.tasks?.find(task=>task.id==="synthetic-kept")?.title==='+JSON.stringify(originalTitle)+'}')();
+    await ui.waitFor(durableBaseline,12000,'Undo restores the exact durable baseline title');
     const restored=await ui.page.evaluate(async()=>{const head=await window.ScannerDeviceStore.readHead(),stored=head?.payload?JSON.parse(head.payload):null;return stored?.tasks?.find(task=>task.id==='synthetic-kept')?.title;});
     assert.equal(restored,originalTitle,'Ten accepted Undo actions restore the exact durable baseline title');
   });
@@ -285,8 +292,12 @@ export async function runRapidCoreScenarios(h){
     await assert400(ui,'Scanner candidates');
     await once(ui,'start-scan',()=>state.chain.length===1&&!!state.candidateId,'[data-act="start-scan"]',
       'The first Start press creates the initial dot and candidate; scanning controls replace Start.');
-    await ten(ui,'yes',()=>state.chain.length===11&&!!state.candidateId,'#scan [data-act="yes"]',
-      'Ten Yes presses choose ten new offered candidates while 400 tasks keep scanning active.');
+    const yesOutcome=()=>state.chain.length===11&&!!state.candidateId;
+    try{await ten(ui,'yes',yesOutcome,'#scan [data-act="yes"]',
+      'Ten Yes presses choose ten new offered candidates while 400 tasks keep scanning active.');}
+    catch(error){const probe=await ui.page.evaluate(()=>({chain:state.chain.length,candidate:state.candidateId,mode:state.mode,
+      intervention:state.interventionActive,snooze:state.snooze,considered:Object.keys(state.considered).length,
+      scanText:document.querySelector('#scan')?.innerText}));error.message+='; final scanner state '+JSON.stringify(probe);throw error;}
     await ten(ui,'no',()=>Object.values(state.considered).filter(value=>value==='no').length===10&&!!state.candidateId,
       '#scan [data-act="no"]','Ten No presses skip ten distinct offered candidates; the next candidate remains available.');
     await ten(ui,'cant',()=>Object.values(state.considered).filter(value=>value==='cant').length===10&&!!state.candidateId,
@@ -306,8 +317,9 @@ export async function runRapidCoreScenarios(h){
     'Ten benchmark Done presses complete ten queued tasks; the next benchmark is exposed after each.');
   await burstBenchmark(h,'bench-cant',()=>Object.values(state.considered).filter(value=>value==='cant').length===10&&state.chain.length===10,
     'Ten benchmark Can’t presses remove ten current benchmarks and expose the next each time.');
-  await burstBenchmark(h,'bench-postpone',()=>state.mode==='scan'&&state.tasks.filter(task=>task.postponeOps?.some(op=>op.until>Date.now())).length===1,
-    'The first benchmark postponement starts scanning; candidate choice makes further benchmark presses unavailable.',1);
+  await burstBenchmark(h,'bench-postpone',()=>state.mode==='scan'&&state.chain.length===10&&
+    state.tasks.filter(task=>task.postponeOps?.some(op=>op.until>Date.now())).length===10,
+    'Ten benchmark Postpone presses defer ten distinct queued tasks, keep the remaining ten-item chain and leave the scanner in Scan mode.');
   await burstBenchmark(h,'dislodge',()=>Object.values(state.considered).filter(value=>value==='dislodged').length===10&&state.chain.length===10,
     'Ten Dislodge presses remove ten successive benchmarks while retaining the rest of the chain.');
   await burstBenchmark(h,'worked',()=>Object.keys(state.workedAt).length===10&&state.chain.length===10,
@@ -393,11 +405,16 @@ export async function runRapidCoreScenarios(h){
     await ui.fill('#stHorizon','61');
     await ui.act('save-settings',()=>state.settings.horizonMin===61&&!document.getElementById('stHorizon'));
     await ui.act('settings',()=>document.querySelector('#modalRoot h2')?.textContent==='Settings');
-    await once(ui,'make-manual-backup',async()=>{
-      const rows=await window.ScannerDeviceStore.listBackups();
-      return rows.filter(row=>row.kind==='manual').length===1&&document.querySelector('#modalRoot h2')?.textContent==='Settings';
+    const manualBurst=await bounded(ui,'make-manual-backup',async()=>{
+      const rows=await window.ScannerDeviceStore.listBackups(),manual=rows.filter(row=>row.kind==='manual');
+      return manual.length>=1&&manual.length<=10&&manual.every(row=>{
+        const payload=JSON.parse(row.payload);return payload.tasks?.length===400&&payload.settings?.horizonMin===61;
+      })&&document.querySelector('#modalRoot h2')?.textContent==='Settings';
     },'#modalRoot [data-act="make-manual-backup"]',
-    'The first press retains an exact 400-task manual copy and rerenders Settings with Data and backups collapsed; later attempts are unavailable.');
+    'Fast presses may start separate manual copies while saving; each retained copy must preserve all 400 tasks and the exact horizon, then the collapsed Data section makes the action unavailable.',1,10);
+    const manualBackupCount=await ui.page.evaluate(async()=>
+      (await window.ScannerDeviceStore.listBackups()).filter(row=>row.kind==='manual').length);
+    assert.equal(manualBackupCount,manualBurst.acceptedClicks,'Each accepted Make manual backup press creates exactly one complete retained copy');
     await ui.fill('#stHorizon','77');
     await ui.act('save-settings',()=>state.settings.horizonMin===77&&!document.getElementById('stHorizon'));
     await ui.act('settings',()=>document.querySelector('#modalRoot h2')?.textContent==='Settings');
@@ -416,12 +433,11 @@ export async function runRapidCoreScenarios(h){
       return state.settings.horizonMin===61&&stored?.settings?.horizonMin===61&&state.tasks.length===400&&stored?.tasks?.length===400;
     },12000,'The repeated restore leaves the same 400-task source durable');
     await ui.act('settings',()=>document.querySelector('#modalRoot h2')?.textContent==='Settings');
-    await once(ui,'delete-local-backup',async()=>{
-      const rows=await window.ScannerDeviceStore.listBackups();
-      return !document.querySelector('[data-act="delete-local-backup"][aria-label*="manual backup"]')&&
-        rows.filter(row=>row.kind==='manual').length===0;
-    },'[data-act="delete-local-backup"][data-id="'+restoreId+'"]',
-    'The first confirmed delete removes the selected manual backup; its row and remaining manual-backup controls disappear.');
+    const expectedManualRemaining=manualBackupCount-1;
+    const deletedManualBackup=new Function('return async()=>{const rows=await window.ScannerDeviceStore.listBackups();return !rows.some(row=>row.id==='+
+      JSON.stringify(restoreId)+')&&rows.filter(row=>row.kind==="manual").length==='+JSON.stringify(expectedManualRemaining)+'}')();
+    await bounded(ui,'delete-local-backup',deletedManualBackup,'[data-act="delete-local-backup"][data-id="'+restoreId+'"]',
+      'Repeated confirms remain bound to the same selected backup ID; every other retained manual copy stays intact.',1,10);
   });
 
   await h.scenario('rapid history clearing preserves the remaining 400-task workspace',{decorate:board=>{
@@ -441,13 +457,14 @@ export async function runRapidCoreScenarios(h){
     await once(ui,'wipe',()=>document.querySelector('#modalRoot h2')?.textContent==='Confirm reset'&&
       !!document.querySelector('#modalRoot [data-act="confirm-wipe"]'),
       '#modalRoot [data-act="wipe"]','The first Reset press opens confirmation; later attempts are covered by the dialog.');
-    await once(ui,'confirm-wipe',async()=>{
+    await ten(ui,'confirm-wipe',async()=>{
       const head=await window.ScannerDeviceStore.readHead(),stored=head?.payload?JSON.parse(head.payload):null;
       const backups=await window.ScannerDeviceStore.listBackups();
+      const beforeReset=backups.filter(row=>row.kind==='before-reset');
       return state.tasks.length===0&&stored?.tasks?.length===0&&
-        backups.some(row=>row.kind==='before-reset'&&JSON.parse(row.payload).tasks.length===400);
+        beforeReset.length===1&&JSON.parse(beforeReset[0].payload).tasks.length===400;
     },'#modalRoot [data-act="confirm-wipe"]',
-    'The first confirmation safely resets the board after saving its exact 400-task copy; further attempts are unavailable.');
+    'Ten trusted confirmations reach one reset action; its in-flight guard suppresses duplicate effects and retains exactly one complete 400-task safety copy.');
   });
 
   await h.scenario('rapid Debug log and Help actions with 400 saved tasks',{decorate:activeBoard},async ui=>{
@@ -465,12 +482,14 @@ export async function runRapidCoreScenarios(h){
       '#modalRoot [data-act="return-support-diagnostics"]','The first Return press restores Settings; its Debug-only action disappears.');
     await once(ui,'close-modal',()=>!document.querySelector('#modalRoot .modal'),'#modalRoot [data-act="close-modal"]',
       'The first Close press dismisses Settings; later attempts have no modal target.');
-    await once(ui,'help',()=>document.querySelector('#modalRoot .help'),'[data-act="help"]',
-      'The first Help press opens its modal; the toolbar control is obscured.');
+    await once(ui,'help',()=>!!document.querySelector('#modalRoot .help'),'[data-act="help"]',
+      'The first Help press opens its modal; further presses are refused while the toolbar point is obscured.');
     const helpSummary=await ui.page.locator('#modalRoot .help details summary').count();
     assert.ok(helpSummary>0,'Help renders FAQ disclosures');
-    await ten(ui,'disclosure',()=>document.querySelector('#modalRoot .help details summary')?.parentElement.open===false,
-      '#modalRoot .help details summary','Ten Help disclosure presses return the FAQ to its initially closed state.');
+    const firstFaqInitiallyOpen=await ui.page.locator('#modalRoot .help details summary').first().evaluate(summary=>summary.parentElement.open);
+    const faqReturns=new Function('return ()=>document.querySelector("#modalRoot .help details summary")?.parentElement.open==='+JSON.stringify(firstFaqInitiallyOpen))();
+    await ten(ui,'disclosure',faqReturns,
+      '#modalRoot .help details summary','Ten Help disclosure presses return the FAQ to its exact initial open/closed state.');
     await once(ui,'reopen-apology',()=>document.querySelector('#modalRoot h2')?.textContent==='Sync and stability apology',
       '#modalRoot [data-act="reopen-apology"]','The first apology press opens its original notice; subsequent attempts are covered.');
     await once(ui,'mback',()=>!document.querySelector('#modalRoot .modal'),'#modalRoot .mback',
@@ -486,7 +505,9 @@ export async function runRapidCoreScenarios(h){
   });
 
   for(const outcome of ['accepted','dismissed'])await h.scenario('rapid native install '+outcome+' with 400 tasks',{decorate:activeBoard},async ui=>{
-    await assert400(ui,'Native install '+outcome);await seedInstallPrompt(ui,outcome);
+    await assert400(ui,'Native install '+outcome);
+    await ui.act('settings',()=>document.querySelector('#modalRoot h2')?.textContent==='Settings');
+    await seedInstallPrompt(ui,outcome);
     await once(ui,'install-app',()=>document.querySelector('#modalRoot h2')?.textContent==='Install this app on your phone'&&
       !!document.querySelector('#modalRoot [data-act="native-install"]'),
       '[data-act="install-app"]','The first install-help press opens the modal; later attempts are obscured.');

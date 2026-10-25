@@ -342,7 +342,7 @@
     "rapid Settings, theme, context management, and save with 400 tasks",
     "rapid All Tasks and bulk editing with 400 saved tasks",
     "rapid editor, history, and task actions with 400 saved tasks",
-    "rapid Undo consumes one actual saved edit frame",
+    "rapid Undo consumes ten actual saved edit frames",
     "rapid scanner candidate actions with 400 active tasks",
     "rapid benchmark bench-done with 400 tasks",
     "rapid benchmark bench-cant with 400 tasks",
@@ -509,7 +509,7 @@
     "rapid final-task WOOP walkthrough and delete with 400 saved tasks": "sole"
   },
   "userStories": [
-    "Buttons work with400saved tasks without crashing.",
+    "Buttons work with 400 saved tasks without crashing.",
     "Buttons work when pressed ten times within two seconds."
   ]
 }

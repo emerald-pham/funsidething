@@ -68,6 +68,7 @@ export function verifyButtonSafetyReport(report,{inventory,inventorySha256,candi
    for(const burst of row.bursts){
     assert.equal(burst.attempts,workload.rapidAttempts,'Ten native press attempts required: '+action);
     assert.equal(burst.trustedPresses,workload.rapidAttempts,'Trusted native press receipts required: '+action);
+    assert.equal(burst.unrelatedClicks,0,'A rapid attempt cannot silently activate another app action: '+action);
     assert.ok(Number.isFinite(burst.windowMs)&&burst.windowMs>=0&&burst.windowMs<=workload.rapidWindowMs,'Ten presses must finish within two seconds: '+action);
     assert.ok(Number.isSafeInteger(burst.acceptedClicks)&&burst.acceptedClicks>0,'Actual action click required: '+action);
     assert.ok(Number.isSafeInteger(burst.refused)&&burst.refused>=0&&Number.isSafeInteger(burst.disappeared)&&burst.disappeared>=0,'Explicit refused/disappeared press classification required');

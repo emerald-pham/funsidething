@@ -182,8 +182,10 @@ disappeared counts. Persistent controls must produce their independently expecte
 tenth effect, such as even toggle parity, a retained explicit choice, ten identical
 copies or ten real downloads. A closing, replaced, disabled or obscured control
 can accept fewer clicks. Attempts against an absent or obscured original control
-release outside the viewport so they cannot accidentally activate a different
-control; those attempts remain explicitly classified and do not earn accepted
-click credit. The expected state and exact originals are asserted afterward.
+record a trusted down at its former point, then release in a separate neutral
+harness document so they cannot accidentally activate a different app control;
+those attempts remain explicitly classified and do not earn accepted
+click credit. Any accepted click on a different app action fails immediately.
+The expected state and exact originals are asserted afterward.
 Missing task readback, hidden ordinary load, missing/skipped rapid families,
 untrusted or incomplete counts, a slower burst, or unreconciled outcomes fails.
