@@ -1,5 +1,85 @@
 [
   {
+    "baseCommit": "f0975a0a7b6d6e246770cee2f2e460f231563e4c",
+    "testChangesSha256": "64a895fbb73b8c1c3d1377823080b288b74e85cc774ad4c08bb538355e21aa6d",
+    "reason": "Repair confirmed C2 postcommit activation P1 and its directly adjacent settled-own-write reentry lifetime: a complete protected recovery could install a durable hold but leave accepted memory work permanently unable to save.",
+    "previousBehavior": "After recovered full raw write/readback and durable marker, a stalled final backup-cache read expired before memory/storage flags activated. Later fresh requests worked but the installed new-work hold blocked every save. Independently, a startup recovery write could settle late with no safe current-work reentry.",
+    "intendedBehavior": "Complete auxiliary reads before protected recovery commit, then activate the fully verified head and process flags without another await. A fresh bounded full raw CAS may replace only an exact process-recorded settled own intent after hold, current head, payload, immutable archive and independent source/hash validation. Pending writes never replay; failed read/write retries retain at most two own receipt alternatives; changed holds/advanced heads stay held; late auxiliary deliveries cannot replace current cache or accepted work.",
+    "replacementTests": [
+      "RISK offline recovery activation: a verified committed workspace activates before optional cache reads can strand later edits",
+      "RISK offline recovery reentry: settled own recovery writes permit fresh current work while changed holds stay protected"
+    ],
+    "preservedCoverage": [
+      "All prior product assertions and rationale raw objects remain unchanged; only new tests use the established actual loadApp/sharedStorage marker/external IDB delivery/native onAction/persist seams. No native/browser runtime, new production test hook, new framework, cloud API, device-store API, metadata or global assignment change.",
+      "The main actual consumer checks complete verified save before a marker-triggered next read stalls, current durable head/flags, later Add, Done/Undo, unfinished draft, late delivery, exact original browser archive and cold offline reopen. Settled own intent cases check pending no-replay/no-late-adoption, accepted earlier/later tasks, exact archive/pending preservation, later read-stall retry, later quota-refusal retry, stale-cache non-overwrite and changed-hold raw refusal.",
+      "Existing source owner/UID filters, accepted-baseline reducer, typed full raw CAS/current guard, original archive/reference/hash checks, readback/marker, total operation budget, unresolved-source and cloud ACK guards, unknown/orphan/pending protection, manual Restore and earlier native behavior remain. Parent connection epochs, earliest independent-cloud preflight, legacy fix, FAQ, group map and fingerprints are unchanged."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/offline-working-repair/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/ios-page-failure-20261024/database/offline-working/activation/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern '^RISK offline recovery (?:activation|reentry):' tests.js. Contemporaneous exact-C2 REDa3672c96 preceded runtime edit; directly adjacent retry REDb3fc69e5, stale-cache RED9b33072a and quota-retry REDf1edcba2 preceded their corresponding narrow fixes. Focused GREENf993ae60 passes6/6.",
+      "failure": "Exact C2 actual consumer REDa3672c96: verified committed workspace persist returned false instead of true before process activation; independently settled own write still left current persist=false, while changed-hold refusal passed. Narrow retry REDs then proved loss of own proof after a fresh read timeout, an expired cache callback replacing newer backup rows, and loss of the previous exact own receipt after a quota-aborted fresh write. All real failure streams remain preserved, with original external Standards RED546e55c4 separate. No retroactive baseline check is called original RED."
+    }
+  },
+  {
+    "baseCommit": "b636189d398dd1d078cc8773d902c588cd54d8ef",
+    "reason": "Repair confirmed Standards P1: a permanently withheld expired readonly startup delivery blocked all later durable saves despite independently working fresh external raw requests. Bound fresh recovery attempts and retain the no-replay rule for uncertain started writes.",
+    "previousBehavior": "Memory Add worked after startup timeout, but localDeviceStartupAttempt.pending permanently rejected saves until the obsolete readonly callback returned. After it settled, another stalled raw capture could leave a fresh memory-work save unbounded.",
+    "intendedBehavior": "An expired readonly lifetime loses authority when a fresh bounded save begins. Fresh full raw capture/CAS/readback can durably save accepted memory work without old delivery; late results cannot adopt or overwrite it. Fresh stalled captures stop within one local budget, and pending started mutations remain blocked without replay.",
+    "replacementTests": [
+      "RISK offline startup resume: fresh storage saves accepted memory work while an expired readonly delivery remains withheld",
+      "RISK offline startup resume budget: fresh stalled captures stop and uncertain started writes never replay"
+    ],
+    "preservedCoverage": [
+      "Additive actual loadApp/raw-IDB/onAction/persist/cold-reopen cases preserve all prior product assertions. The existing external IDB seam now retains withheld callback releases for cleanup and can withhold a native readwrite transaction completion; no production test hook or new framework is introduced.",
+      "The readonly probe independently proves fresh raw reads match exact originals before saving, then verifies exact raw archive, current saved head, late old callback non-adoption, hold/archive identity and cold offline reopen. Fresh stalled capture and withheld started write cases check bounded failure, unchanged accepted work, no raw replay and no late activation.",
+      "One existing local budget helper serves startup and a separate fresh save. Existing full raw CAS, archive hashes, readback, marker, source owner/UID selection, cloud intent/ACK, explicit Restore and ordinary guarded writes remain. Parent device-store epochs, earliest independent-cloud preflight, cloud backend, public FAQ, fingerprints and global assignments stay untouched."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/offline-working-repair/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/ios-page-failure-20261024/database/offline-working/ownership/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern '^RISK offline startup resume' tests.js. Permanent RED52620076 on clean ownership candidate b636189 preceded runtime fix; specialist C1 REDd74dcdb8 is separately preserved. Focused GREEN93cae809 follows the repair.",
+      "failure": "Actual RED52620076: fresh external raw capture succeeded exactly while the obsolete callback stayed withheld, but ordinary persist returned false instead of true. Fresh stalled capture also exceeded the400ms fixture deadline; the uncertain-started-write negative control passed. First GREEN69448e11 cancelled because this Node harness unrefs app clocks; retained callback releases and existing fixtureDeadline around awaited test actions corrected only fixture lifetime. GREEN93cae809 passes all4 outcomes with no skips."
+    },
+    "testChangesSha256": "b22ef34024690b2ba14d71e61269a25849d4ad310f350e53dcb6044d4c2692f8"
+  },
+  {
+    "baseCommit": "ba826db17076d31be90e2f2375f32f87d792c5b7",
+    "reason": "Repair confirmed Standards P1: a permanently withheld expired readonly startup delivery blocked all later durable saves despite independently working fresh external raw requests. Bound fresh recovery attempts and retain the no-replay rule for uncertain started writes. This aggregate exact-C1 diff also retains the preceding ownership P1 root and its separately recorded preimplementation RED52f75f00, proof guard RED43b874f3 and owner-alias RED53f40790.",
+    "previousBehavior": "Memory Add worked after startup timeout, but localDeviceStartupAttempt.pending permanently rejected saves until the obsolete readonly callback returned. After it settled, another stalled raw capture could leave a fresh memory-work save unbounded.",
+    "intendedBehavior": "An expired readonly lifetime loses authority when a fresh bounded save begins. Fresh full raw capture/CAS/readback can durably save accepted memory work without old delivery; late results cannot adopt or overwrite it. Fresh stalled captures stop within one local budget, and pending started mutations remain blocked without replay.",
+    "replacementTests": [
+      "RISK offline working ownership: startup binds explicit null and proved browser UID while preserving ambiguous alternatives",
+      "RISK offline startup resume: fresh storage saves accepted memory work while an expired readonly delivery remains withheld",
+      "RISK offline startup resume budget: fresh stalled captures stop and uncertain started writes never replay"
+    ],
+    "preservedCoverage": [
+      "Additive actual loadApp/raw-IDB/onAction/persist/cold-reopen cases preserve all prior product assertions. The existing external IDB seam now retains withheld callback releases for cleanup and can withhold a native readwrite transaction completion; no production test hook or new framework is introduced.",
+      "The readonly probe independently proves fresh raw reads match exact originals before saving, then verifies exact raw archive, current saved head, late old callback non-adoption, hold/archive identity and cold offline reopen. Fresh stalled capture and withheld started write cases check bounded failure, unchanged accepted work, no raw replay and no late activation.",
+      "One existing local budget helper serves startup and a separate fresh save. Existing full raw CAS, archive hashes, readback, marker, source owner/UID selection, cloud intent/ACK, explicit Restore and ordinary guarded writes remain. Parent device-store epochs, earliest independent-cloud preflight, cloud backend, public FAQ, fingerprints and global assignments stay untouched."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/offline-working-repair/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/ios-page-failure-20261024/database/offline-working/ownership/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern '^RISK offline startup resume' tests.js. Permanent RED52620076 on clean ownership candidate b636189 preceded runtime fix; specialist C1 REDd74dcdb8 is separately preserved. Focused GREEN93cae809 follows the repair.",
+      "failure": "Actual RED52620076: fresh external raw capture succeeded exactly while the obsolete callback stayed withheld, but ordinary persist returned false instead of true. Fresh stalled capture also exceeded the400ms fixture deadline; the uncertain-started-write negative control passed. First GREEN69448e11 cancelled because this Node harness unrefs app clocks; retained callback releases and existing fixtureDeadline around awaited test actions corrected only fixture lifetime. GREEN93cae809 passes all4 outcomes with no skips."
+    },
+    "testChangesSha256": "4f4cef6e1af4b20681d7a9cdef9d162700d9b22be67e97b5513881ef88e156c3"
+  },
+  {
+    "baseCommit": "ba826db17076d31be90e2f2375f32f87d792c5b7",
+    "testChangesSha256": "ac8a72f2150cad947890b07338b14f3248891e0171bc660811db04ecd7f5f5bd",
+    "reason": "Repair independently observed P1: lexical source ordering selected a foreign account or UID before ownership qualification during protected offline startup. Add actual startup cases and keep ambiguous alternatives usable and protected.",
+    "previousBehavior": "A malformed explicit-null head, an absent head, or an email-only malformed head could select a-foreign-owner ahead of the retained local board, adopt another UID and record no unresolved source refs.",
+    "intendedBehavior": "Explicit null binds unsigned ownership. A complete captured browser head with explicit owner and UID provenance or a sole eligible owner group supports local recovery. Multiple unproved owner groups open a separate protected new-work workspace retaining all exact alternatives and unresolved refs; native Add, saving, cold reopen and held reconnect stay useful.",
+    "replacementTests": [
+      "RISK offline working ownership: startup binds explicit null and proved browser UID while preserving ambiguous alternatives"
+    ],
+    "preservedCoverage": [
+      "Only additive tests; no preceding assertion, root, fixture, native case, CI assignment, public FAQ or source guard is changed. Complete payload validation, independent hashing, exact raw CAS/readback, original archives, unknown rows and pending rows remain protected.",
+      "Eleven actual loadApp/raw-IDB startup cases cover null ownership, absent provenance, complete browser owner/UID, missing browser owner or UID, same-email different-UID groups, conflicting foreign task IDs, reversed source keys and nonauthoritative browser store values. Separate new work retains accepted Add/save/cold reopen and does not publish over unseen cloud work. Empty-string ownership cannot alias explicit unsigned ownership during compatibility filtering.",
+      "The existing offline local-intent, working-head lifecycle, reconnect ACK, explicit Restore, bounded startup and memory-only recovery contracts stay unchanged. Parent connection epoch handling and earliest independent-cloud preflight are untouched; no native, live, full-suite or CI acceptance is claimed by these Node cases."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/offline-working-repair/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/ios-page-failure-20261024/database/offline-working/ownership/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern '^RISK offline working ownership:' tests.js. Exact C1 original RED52f75f00; additional incomplete browser ownership proof RED43b874f3 occurred after first narrow fix and before its ownerProved guard. Self-review edge RED53f40790 exposed empty-string owner conflation before a local strict nullish owner comparison; final focused GREENa1e138d0 passes all eleven scenarios and root.",
+      "failure": "Original exact-C1 RED: seven of eight scenarios adopted foreign-provenance (true instead of false), while reversed-key positive control passed. The later two new missing-browser-owner/UID cases failed supported-source instead of new-work before the narrow proof guard. Full original raw archive checks passed before ownership assertions. Final focused GREEN1c6dee4a passes all ten scenarios and root, including unresolved reconnect preservation. Self-review RED53f40790: an empty-string owner beside an explicit-null head merged foreign-provenance through the legacy truthy owner comparison; strict local owner equality repairs it without changing the shared owner helper."
+    }
+  },
+  {
     "baseCommit": "f6d1da402787162d17b635b00044c881b97929b7",
     "testChangesSha256": "4ac582a624fd06be70ac16a7849ff0f30cdd2a82011c5f7641906cd0ed365454",
     "reason": "Implement the explicitly authorized protected offline working recovery and new-work workspace, keeping the actual app startup, native Add/Done/Undo, cold reopen, raw IndexedDB, and extracted backend consumer seams. Migrate only obsolete unusable-placeholder expectations; original bytes and manual raw-CAS authority remain protected.",
@@ -19392,5 +19472,211 @@
     "10e1346f61f9095452035bd309a4f06f4b124ae4",
     "e7ca868238a2d09cb4a409224df17f66ef42330a"
   ]
+},
+{
+  "baseCommit": "c27a36be08dbc73f33643f66f0daea0b1d6b074a",
+  "testChangesSha256": "81f212cb7caeabe3a2b1a67e4412fd67b99847861805077351a05ac75030a96b",
+  "reason": "Reconcile the complete authorized checkpoint after current-main tooling integration: daytime half spawn rate, local connection/exact and provisional offline recovery, usable protected new work and unsaved fallback, fresh guarded reconnect, independent source-only cloud repair and supported released v1 migration. Preserve baseline case identities via explicit group replacements rather than dropping required coverage.",
+  "previousBehavior": "Prior local startup could remain unusable after transient/disconnected/stalled IndexedDB or a damaged authoritative head despite complete retained sources. Independent cloud repair depended on local availability and rejected supported v1 saved boards. Existing placeholder tests explicitly prevented the newly authorized protected working workspace and must retain their source/authority protections under the changed product requirement.",
+  "intendedBehavior": "Automatically open supported protected local work or a clearly identified new-work workspace offline, retain accepted Add/Done/Undo/drafts/current edits and exact originals, remain honest about refused storage, and reconcile through current account/UID/epoch/source CAS and exact cloud acknowledgement. Independently repair only validated server sources with immutable pins/new conditional generation and no local adoption or ACK. Admit only the known v1 version upgrade; unsupported/foreign/lossy sources remain held. Keep complete scene lifetimes and unchanged nonhuman/night policy.",
+  "replacementTests": [
+    "RISK device database repair guidance: mounted FAQ distinguishes offline exact-copy repair from protected unresolved sources",
+    "RISK offline repair guidance: help distinguishes a working workspace cloud repair and exact preserved originals",
+    "RISK offline device recovery: an exact retained local copy repairs damaged current bytes without cloud",
+    "RISK offline working recovery: surviving linked backups open useful protected work before any network",
+    "RISK offline working recovery: verified protected archive and browser decisions combine without foreign sources",
+    "RISK offline working reconnect: current offline edits and retained peer work reach exact cloud acknowledgement",
+    "RISK offline new-work recovery: absent complete original opens a distinct durable workspace and preserves unseen cloud tasks",
+    "RISK offline memory recovery: refused durable media still permit new work with an honest unsaved status",
+    "RISK offline memory recovery resume: returning storage saves current new work without replacing the refused original",
+    "RISK offline working authority: a changed original archive cannot activate a claimed recovered working head",
+    "RISK offline working archives: prior exact originals are referenced without recursively copying their bytes",
+    "RISK offline working reconnect guards: changed source hold pending draft and account retain the current workspace",
+    "RISK offline startup budget: stalled open and raw reads expose unsaved work without late adoption",
+    "RISK offline memory restore: a deliberate Paste after storage returns protects accepted unsaved work",
+    "RISK device connection startup: one internal server failure recovers the authoritative offline board within a bounded attempt",
+    "RISK device connection recovery: offline accepted work survives a lost handle and durable reopen",
+    "RISK device connection cancellation: explicit close invalidates a delayed open without resurrecting or replacing sources",
+    "RISK device connection cancellation: closing before first upgrade leaves no replacement database",
+    "RISK unreadable device recovery: an unsupported original remains protected while a distinct working workspace accepts saving",
+    "RISK unreadable device recovery: workspace backups retain original evidence and unsupported selected decisions stay evidence",
+    "RISK malformed device recovery capture: working-source refusals remain typed and preserve originals",
+    "RISK automatic recovery defaults: a protected local browser baseline keeps its accepted value and exact alternatives",
+    "RISK daytime people: daytime and twilight spawn rate halves while complete visits and night schedules finish intact",
+    "RISK daytime spawn birth phase: rejected daylight parties stay absent after sunset",
+    "RISK independent cloud repair: unavailable device storage repairs retained server sources without acknowledging local work",
+    "RISK independent cloud source safety: unsupported roots headers boards and absent candidates remain protected",
+    "RISK independent cloud capability: server-only repair ignores injected payloads and never observes local pending state",
+    "RISK independent cloud authority: cancellation account epoch backend and suspension changes cannot publish stale repairs",
+    "RISK independent cloud races: fresh peer roots win during reads and publication while failed pins keep originals",
+    "RISK independent cloud uncertain reply: deterministic publication reads back a lost reply and never clears pending uploads",
+    "RISK independent cloud retained discovery: pinned originals survive ordinary rotations and repair another damaged root without local storage",
+    "RISK independent cloud exact reconstruction: a matching retained hash cannot discard other complete server facts",
+    "RISK device connection recovery: a closed local handle still permits exact cloud reconstruction without losing originals",
+    "RISK independent cloud stalled storage: a pending native IDB request cannot block remote-only repair",
+    "RISK independent cloud absent storage: actual cloudPull repairs remote bytes without a device capability",
+    "RISK independent cloud live work: accepted Add comparison and unfinished draft survive a held server-only repair",
+    "RISK independent cloud explicit abort: canceled reads and uncertain committed replies cannot acknowledge local work",
+    "RISK independent cloud staged reply: retry resumes the same deterministic generation after uncertain creation",
+    "RISK independent cloud restart budget: repeated fresh root changes stop after one restart without replacement",
+    "RISK independent cloud total budget: clock skew and late server replies cannot extend the original operation",
+    "RISK independent cloud final readback: repeated damage after permitted publication cannot become verified repair",
+    "RISK independent cloud confirmation status: repairing server bytes cannot show an unchanged local board as acknowledged",
+    "RISK independent cloud failure status: protected terminal errors stay visible until verified server recovery",
+    "RISK independent cloud legacy source: supported released v1 boards upgrade only their version during server-only repair"
+  ],
+  "preservedCoverage": [
+    "All prior rationale raw objects are preserved. Four deliberately renamed existing roots retain their baseline descendants through explicit rootReplacements; no baseline inventory, accepted skip, actual operation budget or ordinary upload/rules guard is removed. Complete raw/typed/unknown/orphan/pending and manual File/Paste/Cancel protections remain asserted.",
+    "Historical planner equality retains every accepted event and numerical budget while applying only the separately tested daytime admission policy to the immutable prior reference; current-main fixture caching remains. The independent unmodified day-rate baseline and rejected-sunset lifetime checks remain.",
+    "Local raw-source adoption is a full source CAS with exact original archive/readback and durable local-only intent, separate from fresh cloud evidence/confirmation. New-work and memory-only cases never label an empty original recovered. All storage-refused cases preserve usable new work and drafts without asserting durability.",
+    "Cloud-only operation reads no device source/pending, preserves accepted local work/drafts and exact originals, binds auth epoch/backend/root revision and independently decoded readback, and verifies uncertain mutations. Missing/unsupported/deleting cloud headers stay protected and held.",
+    "Current-main grouped runner receives explicit owners for each new real root; baseline case IDs, four groups, required native reports, full suite, rules and zero-skipped compatibility are unchanged. Proper descriptor missing-assignment failure4dcd8789 precedes additive mapping; earlier missing --group invocations are CLI usage failures, not feature RED."
+  ],
+  "redEvidence": {
+    "command": "Original contemporaneous recorder attempts are preserved under database/local/runs, lifecycle/runs, offline-working/runs, independent-cloud/runs and resume-runs, faq-runs and historical scenery evidence. Key original assertion REDs: 644c6e34/7fefe6c3/cb1b9b7b local connection/exact source; fe744173/c97b3ae7 explicit cancellation/upgrade; e090ec2d/6307d9f4 offline working; 666e1640 new-work; cfcb6bb4 stalled startup; 78170154 memory Restore; c39e8f45/a91603d5 independent cloud unavailable/stalled; f89565a3 supported v1 cloud source; dc51d3f4 mounted FAQ.",
+    "failure": "Before each functional slice, real app/store consumers failed the intended preservation/usability/acknowledgement assertion. The supported released backend/app positive control publishes and reads unchanged v1 while the independent current decoder returned undefined. Child handoffs preserve all failed intermediate fixtures and distinguish them from true RED; later isolated mutants are sensitivity only. Existing assertions changed solely for explicitly authorized useful working workspace behavior, retaining exact source and no-premature-publication checks."
+  },
+  "observedGreen": "Child exact local2dc176/176, independent6373 141/141 plus18/18, legacyf702140/140, root lifecycle17/17; clean integrated10e127/127 and prior3bfb52/52. These are focused development/protection results, not final full/native/rules/compatibility/review/CI/live acceptance. Final exact-source gates remain required."
+},
+{
+  "baseCommit": "c27a36be08dbc73f33643f66f0daea0b1d6b074a",
+  "testChangesSha256": "aecca80eeee8b653bcb7bb0fb08aefaadc0e050c8b2b38f8d0a2390903cc4100",
+  "reason": "Reconcile the complete authorized checkpoint after current-main tooling integration: daytime half spawn rate, local connection/exact and provisional offline recovery, usable protected new work and unsaved fallback, fresh guarded reconnect, independent source-only cloud repair and supported released v1 migration. Preserve baseline case identities via explicit group replacements rather than dropping required coverage. Close independent-review ownership and expired-startup gaps before final qualification; preserve all earlier protected assertions and explicit baseline root migrations.",
+  "previousBehavior": "Prior local startup could remain unusable after transient/disconnected/stalled IndexedDB or a damaged authoritative head despite complete retained sources. Independent cloud repair depended on local availability and rejected supported v1 saved boards. Existing placeholder tests explicitly prevented the newly authorized protected working workspace and must retain their source/authority protections under the changed product requirement. C1 additionally chose a lexical foreign owner when head provenance was ambiguous, and an expired readonly startup promise prevented safe returning-storage saves indefinitely.",
+  "intendedBehavior": "Automatically open supported protected local work or a clearly identified new-work workspace offline, retain accepted Add/Done/Undo/drafts/current edits and exact originals, remain honest about refused storage, and reconcile through current account/UID/epoch/source CAS and exact cloud acknowledgement. Independently repair only validated server sources with immutable pins/new conditional generation and no local adoption or ACK. Admit only the known v1 version upgrade; unsupported/foreign/lossy sources remain held. Keep complete scene lifetimes and unchanged nonhuman/night policy. Bind explicit signed-out ownership and independently complete browser owner/UID evidence. Preserve ambiguous alternatives in protected new work. Permit a fresh bounded storage capture after an expired readonly attempt while old results cannot adopt newer work and uncertain started mutations cannot replay.",
+  "replacementTests": [
+    "RISK device database repair guidance: mounted FAQ distinguishes offline exact-copy repair from protected unresolved sources",
+    "RISK offline repair guidance: help distinguishes a working workspace cloud repair and exact preserved originals",
+    "RISK offline device recovery: an exact retained local copy repairs damaged current bytes without cloud",
+    "RISK offline working recovery: surviving linked backups open useful protected work before any network",
+    "RISK offline working recovery: verified protected archive and browser decisions combine without foreign sources",
+    "RISK offline working reconnect: current offline edits and retained peer work reach exact cloud acknowledgement",
+    "RISK offline new-work recovery: absent complete original opens a distinct durable workspace and preserves unseen cloud tasks",
+    "RISK offline memory recovery: refused durable media still permit new work with an honest unsaved status",
+    "RISK offline memory recovery resume: returning storage saves current new work without replacing the refused original",
+    "RISK offline working authority: a changed original archive cannot activate a claimed recovered working head",
+    "RISK offline working archives: prior exact originals are referenced without recursively copying their bytes",
+    "RISK offline working reconnect guards: changed source hold pending draft and account retain the current workspace",
+    "RISK offline startup budget: stalled open and raw reads expose unsaved work without late adoption",
+    "RISK offline memory restore: a deliberate Paste after storage returns protects accepted unsaved work",
+    "RISK device connection startup: one internal server failure recovers the authoritative offline board within a bounded attempt",
+    "RISK device connection recovery: offline accepted work survives a lost handle and durable reopen",
+    "RISK device connection cancellation: explicit close invalidates a delayed open without resurrecting or replacing sources",
+    "RISK device connection cancellation: closing before first upgrade leaves no replacement database",
+    "RISK unreadable device recovery: an unsupported original remains protected while a distinct working workspace accepts saving",
+    "RISK unreadable device recovery: workspace backups retain original evidence and unsupported selected decisions stay evidence",
+    "RISK malformed device recovery capture: working-source refusals remain typed and preserve originals",
+    "RISK automatic recovery defaults: a protected local browser baseline keeps its accepted value and exact alternatives",
+    "RISK daytime people: daytime and twilight spawn rate halves while complete visits and night schedules finish intact",
+    "RISK daytime spawn birth phase: rejected daylight parties stay absent after sunset",
+    "RISK independent cloud repair: unavailable device storage repairs retained server sources without acknowledging local work",
+    "RISK independent cloud source safety: unsupported roots headers boards and absent candidates remain protected",
+    "RISK independent cloud capability: server-only repair ignores injected payloads and never observes local pending state",
+    "RISK independent cloud authority: cancellation account epoch backend and suspension changes cannot publish stale repairs",
+    "RISK independent cloud races: fresh peer roots win during reads and publication while failed pins keep originals",
+    "RISK independent cloud uncertain reply: deterministic publication reads back a lost reply and never clears pending uploads",
+    "RISK independent cloud retained discovery: pinned originals survive ordinary rotations and repair another damaged root without local storage",
+    "RISK independent cloud exact reconstruction: a matching retained hash cannot discard other complete server facts",
+    "RISK device connection recovery: a closed local handle still permits exact cloud reconstruction without losing originals",
+    "RISK independent cloud stalled storage: a pending native IDB request cannot block remote-only repair",
+    "RISK independent cloud absent storage: actual cloudPull repairs remote bytes without a device capability",
+    "RISK independent cloud live work: accepted Add comparison and unfinished draft survive a held server-only repair",
+    "RISK independent cloud explicit abort: canceled reads and uncertain committed replies cannot acknowledge local work",
+    "RISK independent cloud staged reply: retry resumes the same deterministic generation after uncertain creation",
+    "RISK independent cloud restart budget: repeated fresh root changes stop after one restart without replacement",
+    "RISK independent cloud total budget: clock skew and late server replies cannot extend the original operation",
+    "RISK independent cloud final readback: repeated damage after permitted publication cannot become verified repair",
+    "RISK independent cloud confirmation status: repairing server bytes cannot show an unchanged local board as acknowledged",
+    "RISK independent cloud failure status: protected terminal errors stay visible until verified server recovery",
+    "RISK independent cloud legacy source: supported released v1 boards upgrade only their version during server-only repair",
+    "RISK offline working ownership: startup binds explicit null and proved browser UID while preserving ambiguous alternatives",
+    "RISK offline startup resume: fresh storage saves accepted memory work while an expired readonly delivery remains withheld",
+    "RISK offline startup resume budget: fresh stalled captures stop and uncertain started writes never replay"
+  ],
+  "preservedCoverage": [
+    "All prior rationale raw objects are preserved. Four deliberately renamed existing roots retain their baseline descendants through explicit rootReplacements; no baseline inventory, accepted skip, actual operation budget or ordinary upload/rules guard is removed. Complete raw/typed/unknown/orphan/pending and manual File/Paste/Cancel protections remain asserted.",
+    "Historical planner equality retains every accepted event and numerical budget while applying only the separately tested daytime admission policy to the immutable prior reference; current-main fixture caching remains. The independent unmodified day-rate baseline and rejected-sunset lifetime checks remain.",
+    "Local raw-source adoption is a full source CAS with exact original archive/readback and durable local-only intent, separate from fresh cloud evidence/confirmation. New-work and memory-only cases never label an empty original recovered. All storage-refused cases preserve usable new work and drafts without asserting durability.",
+    "Cloud-only operation reads no device source/pending, preserves accepted local work/drafts and exact originals, binds auth epoch/backend/root revision and independently decoded readback, and verifies uncertain mutations. Missing/unsupported/deleting cloud headers stay protected and held.",
+    "Current-main grouped runner receives explicit owners for each new real root; baseline case IDs, four groups, required native reports, full suite, rules and zero-skipped compatibility are unchanged. Proper descriptor missing-assignment failure4dcd8789 precedes additive mapping; earlier missing --group invocations are CLI usage failures, not feature RED.",
+    "All C1 protected tests remain verbatim; three additive owner/UID and startup-resume roots cover explicit null versus missing ownership, complete browser provenance, same-email distinct UID, alternate source order, current memory work/drafts, exact raw archive preservation, new-request durable readback/cold reopen, old late delivery, fresh deadline and uncertain-write no-replay. The immutable baseline inventory, four group policies, accepted skips and required native process contracts remain unchanged."
+  ],
+  "redEvidence": {
+    "command": "Original contemporaneous recorder attempts are preserved under database/local/runs, lifecycle/runs, offline-working/runs, independent-cloud/runs and resume-runs, faq-runs and historical scenery evidence. Key original assertion REDs: 644c6e34/7fefe6c3/cb1b9b7b local connection/exact source; fe744173/c97b3ae7 explicit cancellation/upgrade; e090ec2d/6307d9f4 offline working; 666e1640 new-work; cfcb6bb4 stalled startup; 78170154 memory Restore; c39e8f45/a91603d5 independent cloud unavailable/stalled; f89565a3 supported v1 cloud source; dc51d3f4 mounted FAQ. Permanent owner/UID preimplementation RED52f75f00, incomplete provenance43b874f3, strict empty-owner alias53f40790; permanent returning-storage/budget RED52620076. External independent clean-C1 confirmations70e16cb0 and d74dcdb8 are separately retained. Clean C1 descriptor539c178d is a structural gate failure for name versus root, not a runtime assertion RED.",
+    "failure": "Before each functional slice, real app/store consumers failed the intended preservation/usability/acknowledgement assertion. The supported released backend/app positive control publishes and reads unchanged v1 while the independent current decoder returned undefined. Child handoffs preserve all failed intermediate fixtures and distinguish them from true RED; later isolated mutants are sensitivity only. Existing assertions changed solely for explicitly authorized useful working workspace behavior, retaining exact source and no-premature-publication checks. Ownership REDs selected or merged a foreign owner; returning-storage persist falsely refused a fresh capture while the obsolete readonly callback stayed withheld, and a fresh stalled capture exceeded its budget. Existing descriptor refused the malformed legacy assignment before its field correction."
+  },
+  "observedGreen": "Owner ownership exact b636189d cohort243/243 and preflight pass. Returning-storage focused93cae809 passes durability, cold reopen, old late non-adoption, fresh deadline and uncertain-write no-replay. Final owner and integrated source-bound qualification is recorded externally in offline-working/ownership/HANDOFF.md, the resume handoff and final-runs; broad/native/rules/compatibility/CI/deployment must retain their separate actual identities."
+},
+{
+  "baseCommit": "c27a36be08dbc73f33643f66f0daea0b1d6b074a",
+  "testChangesSha256": "3e62ab47a8b8cb2667ca869a65eb32de5095a5ea1e790315732c4fe3ff785e08",
+  "reason": "Finalize the complete authorized recovery/daytime checkpoint against current main after independent-review repairs. Preserve every earlier assertion, explicit baseline root migration, original source and ordinary authority guard while closing ownership, expired-startup and postcommit activation/reentry gaps.",
+  "previousBehavior": "Prior local startup could remain unusable after transient/disconnected/stalled IndexedDB or a damaged authoritative head despite complete retained sources. Independent cloud repair depended on local availability and rejected supported v1 saved boards. Existing placeholder tests explicitly prevented the newly authorized protected working workspace and must retain their source/authority protections under the changed product requirement. C1 additionally chose a lexical foreign owner when head provenance was ambiguous, and an expired readonly startup promise prevented safe returning-storage saves indefinitely. C2 additionally allowed an optional postcommit cache read to strand process activation, and an independently settled own recovery write prevented a later fresh save of current memory work.",
+  "intendedBehavior": "Automatically open supported protected local work or a clearly identified new-work workspace offline, retain accepted Add/Done/Undo/drafts/current edits and exact originals, remain honest about refused storage, and reconcile through current account/UID/epoch/source CAS and exact cloud acknowledgement. Independently repair only validated server sources with immutable pins/new conditional generation and no local adoption or ACK. Admit only the known v1 version upgrade; unsupported/foreign/lossy sources remain held. Keep complete scene lifetimes and unchanged nonhuman/night policy. Bind explicit signed-out ownership and independently complete browser owner/UID evidence. Preserve ambiguous alternatives in protected new work. Permit a fresh bounded storage capture after an expired readonly attempt while old results cannot adopt newer work and uncertain started mutations cannot replay. Complete auxiliary reads before protected commit and activate verified state without another await. After an own uncertain write settles, permit fresh full raw CAS only with the exact bounded process receipt and freshly verified hold/head/payload/archive/hash; retain all predecessor data and current accepted memory work. Pending mutations and changed/foreign/advanced sources stay protected.",
+  "replacementTests": [
+    "RISK device database repair guidance: mounted FAQ distinguishes offline exact-copy repair from protected unresolved sources",
+    "RISK offline repair guidance: help distinguishes a working workspace cloud repair and exact preserved originals",
+    "RISK offline device recovery: an exact retained local copy repairs damaged current bytes without cloud",
+    "RISK offline working recovery: surviving linked backups open useful protected work before any network",
+    "RISK offline working recovery: verified protected archive and browser decisions combine without foreign sources",
+    "RISK offline working reconnect: current offline edits and retained peer work reach exact cloud acknowledgement",
+    "RISK offline new-work recovery: absent complete original opens a distinct durable workspace and preserves unseen cloud tasks",
+    "RISK offline memory recovery: refused durable media still permit new work with an honest unsaved status",
+    "RISK offline memory recovery resume: returning storage saves current new work without replacing the refused original",
+    "RISK offline working authority: a changed original archive cannot activate a claimed recovered working head",
+    "RISK offline working archives: prior exact originals are referenced without recursively copying their bytes",
+    "RISK offline working reconnect guards: changed source hold pending draft and account retain the current workspace",
+    "RISK offline startup budget: stalled open and raw reads expose unsaved work without late adoption",
+    "RISK offline memory restore: a deliberate Paste after storage returns protects accepted unsaved work",
+    "RISK device connection startup: one internal server failure recovers the authoritative offline board within a bounded attempt",
+    "RISK device connection recovery: offline accepted work survives a lost handle and durable reopen",
+    "RISK device connection cancellation: explicit close invalidates a delayed open without resurrecting or replacing sources",
+    "RISK device connection cancellation: closing before first upgrade leaves no replacement database",
+    "RISK unreadable device recovery: an unsupported original remains protected while a distinct working workspace accepts saving",
+    "RISK unreadable device recovery: workspace backups retain original evidence and unsupported selected decisions stay evidence",
+    "RISK malformed device recovery capture: working-source refusals remain typed and preserve originals",
+    "RISK automatic recovery defaults: a protected local browser baseline keeps its accepted value and exact alternatives",
+    "RISK daytime people: daytime and twilight spawn rate halves while complete visits and night schedules finish intact",
+    "RISK daytime spawn birth phase: rejected daylight parties stay absent after sunset",
+    "RISK independent cloud repair: unavailable device storage repairs retained server sources without acknowledging local work",
+    "RISK independent cloud source safety: unsupported roots headers boards and absent candidates remain protected",
+    "RISK independent cloud capability: server-only repair ignores injected payloads and never observes local pending state",
+    "RISK independent cloud authority: cancellation account epoch backend and suspension changes cannot publish stale repairs",
+    "RISK independent cloud races: fresh peer roots win during reads and publication while failed pins keep originals",
+    "RISK independent cloud uncertain reply: deterministic publication reads back a lost reply and never clears pending uploads",
+    "RISK independent cloud retained discovery: pinned originals survive ordinary rotations and repair another damaged root without local storage",
+    "RISK independent cloud exact reconstruction: a matching retained hash cannot discard other complete server facts",
+    "RISK device connection recovery: a closed local handle still permits exact cloud reconstruction without losing originals",
+    "RISK independent cloud stalled storage: a pending native IDB request cannot block remote-only repair",
+    "RISK independent cloud absent storage: actual cloudPull repairs remote bytes without a device capability",
+    "RISK independent cloud live work: accepted Add comparison and unfinished draft survive a held server-only repair",
+    "RISK independent cloud explicit abort: canceled reads and uncertain committed replies cannot acknowledge local work",
+    "RISK independent cloud staged reply: retry resumes the same deterministic generation after uncertain creation",
+    "RISK independent cloud restart budget: repeated fresh root changes stop after one restart without replacement",
+    "RISK independent cloud total budget: clock skew and late server replies cannot extend the original operation",
+    "RISK independent cloud final readback: repeated damage after permitted publication cannot become verified repair",
+    "RISK independent cloud confirmation status: repairing server bytes cannot show an unchanged local board as acknowledged",
+    "RISK independent cloud failure status: protected terminal errors stay visible until verified server recovery",
+    "RISK independent cloud legacy source: supported released v1 boards upgrade only their version during server-only repair",
+    "RISK offline working ownership: startup binds explicit null and proved browser UID while preserving ambiguous alternatives",
+    "RISK offline startup resume: fresh storage saves accepted memory work while an expired readonly delivery remains withheld",
+    "RISK offline startup resume budget: fresh stalled captures stop and uncertain started writes never replay",
+    "RISK offline recovery activation: a verified committed workspace activates before optional cache reads can strand later edits",
+    "RISK offline recovery reentry: settled own recovery writes permit fresh current work while changed holds stay protected"
+  ],
+  "preservedCoverage": [
+    "All prior rationale raw objects are preserved. Four deliberately renamed existing roots retain their baseline descendants through explicit rootReplacements; no baseline inventory, accepted skip, actual operation budget or ordinary upload/rules guard is removed. Complete raw/typed/unknown/orphan/pending and manual File/Paste/Cancel protections remain asserted.",
+    "Historical planner equality retains every accepted event and numerical budget while applying only the separately tested daytime admission policy to the immutable prior reference; current-main fixture caching remains. The independent unmodified day-rate baseline and rejected-sunset lifetime checks remain.",
+    "Local raw-source adoption is a full source CAS with exact original archive/readback and durable local-only intent, separate from fresh cloud evidence/confirmation. New-work and memory-only cases never label an empty original recovered. All storage-refused cases preserve usable new work and drafts without asserting durability.",
+    "Cloud-only operation reads no device source/pending, preserves accepted local work/drafts and exact originals, binds auth epoch/backend/root revision and independently decoded readback, and verifies uncertain mutations. Missing/unsupported/deleting cloud headers stay protected and held.",
+    "Current-main grouped runner receives explicit owners for each new real root; baseline case IDs, four groups, required native reports, full suite, rules and zero-skipped compatibility are unchanged. Proper descriptor missing-assignment failure4dcd8789 precedes additive mapping; earlier missing --group invocations are CLI usage failures, not feature RED.",
+    "All C1 protected tests remain verbatim; three additive owner/UID and startup-resume roots cover explicit null versus missing ownership, complete browser provenance, same-email distinct UID, alternate source order, current memory work/drafts, exact raw archive preservation, new-request durable readback/cold reopen, old late delivery, fresh deadline and uncertain-write no-replay. The immutable baseline inventory, four group policies, accepted skips and required native process contracts remain unchanged.",
+    "All C2 protected tests remain verbatim. Two additive activation/reentry roots exercise actual Add, Done/Undo, later current work, unfinished draft, full saved-head equality, exact originals/pending graph/cold reopen, changed hold and pending-write refusal, late readonly/cache rejection, and fresh quota/read retries. Bounded process receipts do not grant authority to unrelated holds. The immutable baseline inventory, four group policies, accepted skips and required native process contracts remain unchanged."
+  ],
+  "redEvidence": {
+    "command": "Original contemporaneous recorder attempts are preserved under database/local/runs, lifecycle/runs, offline-working/runs, independent-cloud/runs and resume-runs, faq-runs and historical scenery evidence. Key original assertion REDs: 644c6e34/7fefe6c3/cb1b9b7b local connection/exact source; fe744173/c97b3ae7 explicit cancellation/upgrade; e090ec2d/6307d9f4 offline working; 666e1640 new-work; cfcb6bb4 stalled startup; 78170154 memory Restore; c39e8f45/a91603d5 independent cloud unavailable/stalled; f89565a3 supported v1 cloud source; dc51d3f4 mounted FAQ. Permanent owner/UID preimplementation RED52f75f00, incomplete provenance43b874f3, strict empty-owner alias53f40790; permanent returning-storage/budget RED52620076. External independent clean-C1 confirmations70e16cb0 and d74dcdb8 are separately retained. Clean C1 descriptor539c178d is a structural gate failure for name versus root, not a runtime assertion RED. Permanent exact-C2 activation/reentry preimplementation REDa3672c96 and adjacent read-retryb3fc69e5, stale-cache9b33072a, quota-retryf1edcba2 precede their narrow fixes. External unchanged C2 Standards546e55c4 is separate confirmation.",
+    "failure": "Before each functional slice, real app/store consumers failed the intended preservation/usability/acknowledgement assertion. The supported released backend/app positive control publishes and reads unchanged v1 while the independent current decoder returned undefined. Child handoffs preserve all failed intermediate fixtures and distinguish them from true RED; later isolated mutants are sensitivity only. Existing assertions changed solely for explicitly authorized useful working workspace behavior, retaining exact source and no-premature-publication checks. Ownership REDs selected or merged a foreign owner; returning-storage persist falsely refused a fresh capture while the obsolete readonly callback stayed withheld, and a fresh stalled capture exceeded its budget. Existing descriptor refused the malformed legacy assignment before its field correction. C2 returned false after a fully verified commit but before process activation; a later fresh save also refused an independently settled own intent. Adjacent retry and stale-cache assertions discriminated their corresponding consumer lifetime failures."
+  },
+  "observedGreen": "Original checkpoint and C1/C2 qualification retain their exact identities above. Final local owner81c9e65d focusedf993ae60 passes6/6; exact broader34e5af02 passes253/253 and exact-C2 preflight3d3ac05b passes. Final parent source-bound descriptor/preflight/native/full/rules/compatibility/review/CI/deployment are recorded separately under final-runs and final-reviews; no source-level pass substitutes for those gates."
 }
 ]
