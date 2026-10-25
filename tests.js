@@ -44297,3 +44297,40 @@ test('RISK independent cloud failure status: protected terminal errors stay visi
  backend.docs.set(path,header);const recovered=await backend.CS.repairCloudSources();assert.equal(recovered.ok,true);assert.equal(backend.CS.knownDamagedSource,false);
  assert.equal(backend.CS.errorCode,null,'only independently verified remote recovery clears its transport error');
 });
+
+test('RISK independent cloud legacy source: supported released v1 boards upgrade only their version during server-only repair',async t=>{
+ const {readReleasedClient,SUPPORTED_RELEASE}=await import('./scripts/backward-compatibility.mjs'),released=readReleasedClient(__dirname,SUPPORTED_RELEASE);
+ for(const mode of ['v2-control','supported-v1','supported-v1-exact-copy','unknown-v99','foreign-owner','lossy-task-context','unsupported-decisions'])await t.test(mode,async sub=>{
+  const task={...syncTask('legacy-cloud-task','Supported retained legacy cloud task'),futureLegacyTask:{keep:['exact',7]}},board=syncState({v:mode==='v2-control'?2:mode==='unknown-v99'?99:1,tasks:[task],futureLegacyBoard:{keep:['unchanged',9]}});
+  if(mode==='foreign-owner'){board.syncAccount='other@example.test';board.syncIdentity='other';}
+  if(mode==='lossy-task-context')task.ctx=[17];
+  if(mode==='unsupported-decisions')board.decisionEvents=[{v:99,id:'future-legacy-decision',kind:'future-authority',opaque:'retain exact'}];
+  const raw=JSON.stringify(board),producer=await loadCloudBackendV2({artifacts:released,timeoutMs:5000});sub.after(()=>producer.CS.suspend?.());
+  assert.equal((await producer.CS.push(raw,1,0)).ok,true,'the real supported released backend publishes this unchanged retained source under its v2 generation protocol');
+  const retained=await producer.CS.pull();assert.equal(retained.payload,raw,'the real released codec reads back every original byte');const retainedId=retained.generationId;
+  if(mode.startsWith('supported-v1')){
+   const control=await loadAppAtTime(1792323000000,{artifacts:released,appSource:extractAppScript(released.html)}),reader=await loadCloudBackendV2({artifacts:released,runtimeWindow:control.ctx.window,sharedDocs:producer.docs,failures:{authPending:true},timeoutMs:5000});sub.after(()=>reader.CS.suspend?.());
+   reader.emitAuth({uid:'owner',email:'e@example.com'});await fixtureDeadline(control.ctx.cloudPull(),'normal released app accepts the same unmodified v1 cloud board');
+   assert.equal(control.ctx.state.v,2,'the released app already supports the known v1 to v2 saved-board upgrade');assert.equal(control.ctx.state.tasks[0].title,task.title);assert.deepEqual(JSON.parse(JSON.stringify(control.ctx.state.futureLegacyBoard)),board.futureLegacyBoard);
+  }
+  const current=syncState({v:2,tasks:[task,syncTask('unseen-current-cloud-task','Unavailable newer cloud bytes')],futureLegacyBoard:board.futureLegacyBoard}),currentRaw=mode==='supported-v1-exact-copy'?raw:JSON.stringify(current),base=producer.docs.get('users/owner').rev;
+  assert.equal((await producer.CS.push(currentRaw,2,base)).ok,true);for(let i=0;i<10;i++)await flush();
+  const originalRoot={...producer.docs.get('users/owner')};assert.equal(originalRoot.previousGeneration,retainedId,'the legitimate next publication retains the supported old generation');
+  for(const key of [...producer.docs.keys()])if(key.startsWith('users/owner/generations/'+originalRoot.activeGeneration+'/chunks/'))producer.docs.delete(key);
+  const originals=[...producer.docs].filter(([key])=>key!=='users/owner').map(([key,row])=>[key,JSON.stringify(row)]);
+  const app=await loadAppAtTime(1792323000000,{seedStorage:{[SYNC_STORE_KEY]:currentRaw,[LOCAL_HEAD_KEY]:currentRaw}}),{ctx,shim}=app;
+  if(!ctx.window.ChainStorageV2){vm.runInContext(fs.readFileSync(path.join(__dirname,'device-store-v2.js'),'utf8'),ctx);ctx.window.ChainStorageV2=ctx.ChainStorageV2;}
+  const backend=await loadCloudBackendV2({runtimeWindow:ctx.window,sharedDocs:producer.docs,failures:{authPending:true},timeoutMs:5000});sub.after(()=>backend.CS.suspend());backend.emitAuth({uid:'owner',email:'e@example.com'});
+  const local=JSON.stringify(ctx.state);shim.document.getElementById('addInput').value='Unfinished local draft during legacy cloud repair';
+  await fixtureDeadline(ctx.cloudPull(),'actual current cloudPull attempts source-only repair with no device store');const remote=await backend.CS.pull();
+  if(mode==='v2-control'||mode.startsWith('supported-v1')){
+   assert.equal(typeof remote.payload,'string','actual remote decoder must return a complete board from the supported retained cloud source');assert.ok(remote.rev>originalRoot.rev);assert.notEqual(remote.generationId,retainedId);assert.notEqual(remote.generationId,originalRoot.activeGeneration);
+   const repaired=JSON.parse(remote.payload);assert.equal(repaired.v,2);assert.deepEqual(repaired.tasks[0],JSON.parse(JSON.stringify(ctx.state.tasks.find(row=>row.id===task.id))));
+   for(const [key,value]of Object.entries(task))assert.deepEqual(repaired.tasks[0][key],value,'each original legacy task field is retained independently of hydration defaults');
+   for(const [key,value]of Object.entries(board.settings))assert.deepEqual(repaired.settings[key],value,'each original setting remains unchanged');
+   assert.deepEqual(repaired.futureLegacyBoard,board.futureLegacyBoard);assert.equal(repaired.tasks.some(row=>row.id==='unseen-current-cloud-task'),false,'missing newer bytes are not invented from the unobserved local board');
+   for(const id of [retainedId,originalRoot.activeGeneration])assert.equal(backend.docs.get('users/owner/recoveryProtections/'+id)?.v,1);
+  }else{assert.equal(remote.code,'corrupt-generation');assert.deepEqual(backend.docs.get('users/owner'),originalRoot,'unknown versions foreign ownership and other lossy fields cannot authorize replacement');}
+  assert.equal(JSON.stringify(ctx.state),local);assert.equal(shim.document.getElementById('addInput').value,'Unfinished local draft during legacy cloud repair');for(const [key,value]of originals)assert.equal(JSON.stringify(backend.docs.get(key)),value,'every original published header and chunk remains exact');
+ });
+});
