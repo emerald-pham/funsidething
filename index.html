@@ -12314,9 +12314,17 @@ function reduceAutomaticRecoveryCandidates({acceptedBaseline=null,candidates=[]}
 // Only verified server payloads enter this planner. It never inspects the
 // live board, pending upload, device archives, editor or unfinished draft.
 window.__chainPlanIndependentCloudRecovery=({account,identity,generations,activeHash})=>{
-  const candidates=[];
+  const candidates=[],validate=payload=>{
+    try{
+      const original=JSON.parse(payload);assertCompleteSavedCollections(original);
+      // The released v1 board format has one known version upgrade. Keep the
+      // exact server bytes pinned; every other original value still passes
+      // the strict retention, owner and decision checks without relaxation.
+      return cloudSourceRecoveryBoard(original.v===1?JSON.stringify({...original,v:STATE_VERSION}):payload,account);
+    }catch{return {};}
+  };
   for(const row of generations){
-    const validated=cloudSourceRecoveryBoard(row.payload,account),board=validated.board;
+    const validated=validate(row.payload),board=validated.board;
     if(!board||board.syncAccount!==account||board.syncIdentity!=null&&board.syncIdentity!==identity)return null;
     board.syncIdentity=identity;
     if(automaticRecoveryBoardIssue(board,account))return null;
@@ -12328,8 +12336,9 @@ window.__chainPlanIndependentCloudRecovery=({account,identity,generations,active
   const payload=cloudPayloadFor(reduced.board),exact=generations.find(row=>row.hash===activeHash);
   // Byte-exact reconstruction is valid only if it represents the complete
   // compatible union; a hash match cannot suppress another retained fact.
-  const exactBoard=exact&&cloudSourceRecoveryBoard(exact.payload,account).board;
-  return {payload:exactBoard&&canonicalDecisionFact(JSON.parse(cloudPayloadFor(exactBoard)))===
+  // A v1 source still needs its known version upgrade when its hash matches.
+  const exactBoard=exact&&validate(exact.payload).board;
+  return {payload:exactBoard&&JSON.parse(exact.payload).v!==1&&canonicalDecisionFact(JSON.parse(cloudPayloadFor(exactBoard)))===
     canonicalDecisionFact(JSON.parse(payload))?exact.payload:payload};
 };
 function cloudSourceRecoveryFacts(candidate){

@@ -2174,3 +2174,5 @@ This boundary control holds a successful real provider reply, installs a later a
 - RISK offline working reconnect guards: changed source hold pending draft and account retain the current workspace
 - RISK offline startup budget: stalled open and raw reads expose unsaved work without late adoption
 - RISK offline memory restore: a deliberate Paste after storage returns protects accepted unsaved work
+
+- A supported released backend's byte-exact v1 retained board can repair current missing cloud chunks through real cloudPull with no device store; only the known version upgrade is allowed, including an exact retained copy. Unknown versions, foreign ownership, lossy original fields and unsupported decision facts remain held with exact original pins/bytes: `RISK independent cloud legacy source: supported released v1 boards upgrade only their version during server-only repair`.

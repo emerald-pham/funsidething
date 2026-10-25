@@ -19367,5 +19367,30 @@
     "failure": "Actual mounted-help assertion lacked new offline workspace, protected-originals and independent cloud versus local acknowledgement guidance. GREEN faba080e follows copy changes and restores the original116-word Restore answer; new answers are108 and68 words."
   },
   "observedGreen": "faba080e passed the focused new/old mounted help and brevity consumers. All earlier runtime RED/GREEN source evidence and failed intermediate attempts remain preserved; this is copy validation rather than new native or release proof."
+},
+{
+  "testChangesSha256": "80f3c493326e1e3dee2ef88658376c8b263564b6d07c4ca241b8119005922e9a",
+  "reason": "Confirm and repair a supported released-client v1 cloud source rejected only because hydration upgrades its known saved-board version; add actual cloudPull/backend acceptance and strict rejection controls without changing old assertions.",
+  "previousBehavior": "The supported release publishes and normally reads the byte-exact v1 source under its v2 generation codec, but current independent server repair leaves missing current chunks corrupt because strict retention compares original v1 with hydrated v2.",
+  "intendedBehavior": "Permit only the known v1 to current v2 upgrade in the independent server-source planner. Preserve every other original value and validation, pin exact original server bytes and headers, publish a fresh verified v2 generation, and leave unobserved local state and unfinished drafts unchanged.",
+  "preservedCoverage": [
+    "All existing tests and both parent append-only rationale sets remain intact after the exact parent10e1346 merge. Parent local recovery, lifecycle, public guidance, group map and ordinary CS.push authority rules remain unchanged.",
+    "A genuine supported released backend publishes and independently decodes each original source. The actual released app accepts the same unmodified v1 board before the current app cloudPull uses the real current backend with no device-store capability.",
+    "Positive v2 and supported v1 cases cover a complete retained source and a byte-identical retained v1 source. Unknown v99, foreign ownership, lossy task context and unsupported decision facts remain held. Successful repair preserves every original task/setting value and unknown board field, all original headers/chunks and immutable protection pins, local state and unfinished draft.",
+    "The exact-copy, unsupported-decision and independent field-value assertions were supplemental after the original supported-v1 RED and initial five-mode GREEN; no preimplementation RED is claimed for these additions. Later external sensitivity mutants remove the known upgrade, allow unknown upgrades or reuse raw v1 exact bytes; each fails its intended new consumer assertion.",
+    "No rules/schema, generic validator, local helper, FAQ/fingerprint or global group-map edit is part of this slice. Focused Node-only evidence is not full/native/rules/emulator/physical-device/production release acceptance."
+  ],
+  "redEvidence": {
+    "command": "Preimplementation-red recorder f89565a3-43aa-4bc2-b629-29815f90bc03: node --test --test-reporter=spec --test-name-pattern=\"^RISK independent cloud legacy source:\" tests.js on e7ca868 runtime before planner edits, with the appended initial five-mode consumer.",
+    "failure": "The v2 control and held-source controls pass; the supported released app v1 positive control passes, then current app cloudPull settles while actual backend.CS.pull payload remains undefined instead of string. Prior764c1b1d also had obsolete released-CS teardown errors and is not the preferred clean defect RED."
+  },
+  "replacementTests": [
+    "RISK independent cloud legacy source: supported released v1 boards upgrade only their version during server-only repair"
+  ],
+  "observedGreen": "Initial5-mode a10a20c6, expanded7-mode11663322 and full focused140/140 f75080c0 pass. External later-baseline sensitivity445acaff fails supported-v1 remote payload,2769cc94 fails v99 protection,ce314572 fails exact-copy version1 versus2. Immutable artifacts are in database/independent-cloud/legacy-runs and legacy-sensitivity; final clean-SHA focused evidence follows in LEGACY_HANDOFF.md.",
+  "integrationBases": [
+    "10e1346f61f9095452035bd309a4f06f4b124ae4",
+    "e7ca868238a2d09cb4a409224df17f66ef42330a"
+  ]
 }
 ]
