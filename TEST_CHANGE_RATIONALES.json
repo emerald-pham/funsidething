@@ -18587,5 +18587,45 @@
       "command": "CHAIN_RECOVERY_TEST_ENGINE=chromium CHAIN_RECOVERY_UI_OUTPUT=/Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/267/red/startup-final-title /usr/bin/time -p -o /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/267/red/startup-final-title.time node --test --test-reporter=tap --test-name-pattern='integrated automatic recovery native: persisted startup status and neighboring controls remain usable with one browser and isolated contexts' tests.js",
       "failure": "With the shared Browser intentionally withheld, the final-title startup matrix completed all four theme and viewport cases and passed the four-distinct-context/page assertions. The launch guard failed only on process count: actual5, expected1 (the matrix launch plus four per-case launches); outer duration19.78s. Exact command, TAP log, and timing are retained under ci-speedup-263/267/red/startup-final-title. This is the intended setup-cost RED, not a recovery behavior failure."
     }
+  },
+  {
+    "baseCommit": "d224107e5e56e5455a16e670dad6bdbc951940b5",
+    "testChangesSha256": "07695fb14c6eee364fbbc30a7afe38bcea0214f2a20b5e8aa3eff324a10ff94d",
+    "reason": "Reuse immutable compiled scenery fixtures at their actual test consumers while preserving exact source identity and fresh mutable VM contexts. The process-boundary RED measured seven repeated scene-module compilations for the second identical consumer.",
+    "previousBehavior": "sceneTimeline and createMotionProbe each compiled every unchanged module through vm.runInContext for every fixture context. The preserved upright gait and planner cohorts repeatedly prepared the same immutable source bytes across many independent contexts.",
+    "intendedBehavior": "Compile each exact source string once per display filename in a bounded LRU and execute its vm.Script in every newly created context. A changed source with an unchanged stale aggregate sourcesHash must miss the cache; scene and painter outputs, every original sample, and all existing assertions remain unchanged.",
+    "replacementTests": [
+      "RISK immutable scenery fixture preparation: exact source reuse keeps fresh consumer contexts and known output"
+    ],
+    "preservedCoverage": [
+      "No existing animation or scenery assertion, actor, direction, frame, terrain, viewport, reduced-motion case, planner sweep, sample count, or outcome was removed, skipped, narrowed, or changed. The original ten-test profiling cohort remains byte-for-byte unchanged.",
+      "The new actual-consumer test observes both sceneTimeline and exported createMotionProbe, compares comment-only source variants against independent known scene and full painter outputs, verifies per-context mutable globals begin fresh, and uses a stale sourcesHash plus one changed exact geometry source as a discriminating cache-key negative control.",
+      "The bounded source-keyed caches retain at most48 compiled scripts each and include the motion consumer filename in the key. They cache compilation only; every scene/painter module still executes in a fresh vm context. Product runtime, painter algorithms, planner algorithms, dependencies, UI, scenery design, animation frequency, and browser behavior are untouched.",
+      "Focused before/after CPU and wall timing plus all relevant source SHA-256 identities are recorded separately in ci-speedup-263/266/profile. Timing claims are limited to the repeated local cohort; no hosted Actions or product-runtime speedup is inferred."
+    ],
+    "redEvidence": {
+      "command": "Before cache edits, `node --test --test-name-pattern='RISK immutable scenery fixture preparation' --test-reporter=spec tests.js`; output captured at /Users/emeraldpham/.codex/task-artifacts/ci-speedup-263/266/profile/red-process-boundary.log.",
+      "failure": "The real repeated sceneTimeline consumer compiled all seven marked module sources again: the assertion expected zero new immutable-source compilations and observed 7. This is process instrumentation of the existing public fixture boundary, not a private cache-helper test or an infrastructure failure."
+    }
+  },
+  {
+    "baseCommit": "d224107e5e56e5455a16e670dad6bdbc951940b5",
+    "testChangesSha256": "278c7fd5da8090acbb93864bc04fcbe666c13f670328960c04c77dfee4e3ea04",
+    "reason": "The current integration diff combines the #267 native recovery matrix browser reuse with #266 immutable animation-fixture preparation; keep the exact aggregate rationale so neither independently profiled fixture change weakens its coverage.",
+    "previousBehavior": "Each recovery matrix case launched its own browser despite owning an independent context and page. Motion fixture consumers also recompiled unchanged module source for every context, including seven repeat compilations in the discriminating second-consumer RED.",
+    "intendedBehavior": "Each native recovery matrix launches one browser and still creates four independent contexts and pages with fresh case state. Motion fixture consumers reuse compiled vm.Script objects by exact source and filename while executing in each fresh VM context. Both changes remain test-fixture-only.",
+    "replacementTests": [
+      "RISK integrated automatic recovery native: persisted startup status and neighboring controls remain usable with one browser and isolated contexts",
+      "RISK immutable scenery fixture preparation: exact source reuse keeps fresh consumer contexts and known output"
+    ],
+    "preservedCoverage": [
+      "The recovery matrices retain all four theme and viewport cases, fresh contexts/pages, independent account/board/backend/gates/evidence, startup/reopen/ACK/protected-source/newer-edit/draft/Undo assertions, and the historical case real 16-second ACK. The original held-device-commit, first-Add-prefix, late-success, child-exit and 20000ms deadlines remain unchanged.",
+      "The animation fixtures still execute modules in fresh mutable contexts and retain every existing sample, scene, painter, planner, viewport, reduced-motion and source-identity assertion. The cache keys preserve exact source and consumer filename, bounded cache size, and the stale aggregate-hash negative control.",
+      "No product runtime, UI, recovery semantics, persistence, app animation algorithm, public process boundary, test timeout or fake-clock behavior changes. The individual #267 and #266 records above retain their separate profiling and test-first histories."
+    ],
+    "redEvidence": {
+      "command": "#267: exact final-title Chromium startup matrix with shared Browser withheld, node --test --test-name-pattern=\"integrated automatic recovery native: persisted startup status and neighboring controls remain usable with one browser and isolated contexts\" tests.js. #266: node --test --test-name-pattern=\"RISK immutable scenery fixture preparation\" --test-reporter=spec tests.js.",
+      "failure": "#267 ran all four original cases and passed four-distinct-context/page guards, then its process-count assertion observed 5 instead of 1 (19.78s outer wall). #266 actual second consumer observed seven repeated immutable-source compilations where zero were expected. Each is the intended fixture-cost RED with preserved functional assertions."
+    }
   }
 ]
