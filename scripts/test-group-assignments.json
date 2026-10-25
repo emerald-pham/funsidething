@@ -12806,6 +12806,11 @@
       "root": "RISK repository process: native button safety requires 400-task and rapid-press evidence",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: required button enforcement changes need process coverage",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [
@@ -12892,54 +12897,6 @@
     {
       "baselineRoot": "RISK LOCAL BACKUPS: unreadable old copy is visible with exact raw recovery and targeted removal",
       "currentRoot": "RISK LOCAL BACKUPS: unreadable old copy stays visible and byte-exact in unified Export",
-      "baselineGroup": "core",
-      "group": "core",
-      "file": "tests.js",
-      "reason": "Issue webkit-button-safety renames this contract around the final unified Import and recovery-archive Export behavior; exact-source, preview, cancellation, partial-state and diagnostics assertions remain."
-    },
-    {
-      "baselineRoot": "RISK JSON COPY PASTE: the current-board viewer copies its exact displayed JSON without saving",
-      "currentRoot": "RISK JSON COPY PASTE: Copy and Download send the same full archive without a JSON view or writes",
-      "baselineGroup": "core",
-      "group": "core",
-      "file": "tests.js",
-      "reason": "Issue webkit-button-safety renames this contract around the final unified Import and recovery-archive Export behavior; exact-source, preview, cancellation, partial-state and diagnostics assertions remain."
-    },
-    {
-      "baselineRoot": "RISK DATABASE REPAIR EXPORT: the Settings copy includes exact saved sources and repair metadata without writes",
-      "currentRoot": "RISK DATABASE REPAIR EXPORT: unified Copy and Download retain exact sources and metadata without writes",
-      "baselineGroup": "core",
-      "group": "core",
-      "file": "tests.js",
-      "reason": "Issue webkit-button-safety renames this contract around the final unified Import and recovery-archive Export behavior; exact-source, preview, cancellation, partial-state and diagnostics assertions remain."
-    },
-    {
-      "baselineRoot": "RISK DATABASE REPAIR EXPORT: unreadable storage produces a labeled partial package with available board and diagnostics",
-      "currentRoot": "RISK DATABASE REPAIR EXPORT: unreadable sources are labeled partial and never shown as an empty database",
-      "baselineGroup": "core",
-      "group": "core",
-      "file": "tests.js",
-      "reason": "Issue webkit-button-safety renames this contract around the final unified Import and recovery-archive Export behavior; exact-source, preview, cancellation, partial-state and diagnostics assertions remain."
-    },
-    {
-      "baselineRoot": "RISK DATABASE REPAIR EXPORT: visible Debug log controls use the combined repair export",
-      "currentRoot": "RISK DATABASE REPAIR EXPORT: Debug log points to the combined archive without duplicate export controls",
-      "baselineGroup": "core",
-      "group": "core",
-      "file": "tests.js",
-      "reason": "Issue webkit-button-safety renames this contract around the final unified Import and recovery-archive Export behavior; exact-source, preview, cancellation, partial-state and diagnostics assertions remain."
-    },
-    {
-      "baselineRoot": "RISK DATABASE REPAIR EXPORT: a cancelled capture cannot replace a newer pasted draft",
-      "currentRoot": "RISK DATABASE REPAIR EXPORT: canceled capture keeps the pasted draft and concurrent capture is bounded",
-      "baselineGroup": "core",
-      "group": "core",
-      "file": "tests.js",
-      "reason": "Issue webkit-button-safety renames this contract around the final unified Import and recovery-archive Export behavior; exact-source, preview, cancellation, partial-state and diagnostics assertions remain."
-    },
-    {
-      "baselineRoot": "RISK DATABASE REPAIR EXPORT: FAQ explains the included database, diagnostics and partial-report limits",
-      "currentRoot": "RISK DATABASE REPAIR EXPORT: Help describes direct Copy and partial archive status",
       "baselineGroup": "core",
       "group": "core",
       "file": "tests.js",

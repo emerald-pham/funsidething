@@ -12,6 +12,10 @@ const processFiles=new Set([
   'scripts/release-evidence.mjs',
   'scripts/install-release-hook.mjs',
   'scripts/test-groups.mjs',
+  'scripts/button-safety.mjs',
+  'scripts/button-safety-contract.mjs',
+  'scripts/button-safety-native.mjs',
+  'scripts/button-safety-inventory.json',
   'scripts/agent-tools/test-groups.test.mjs',
   '.claude/hooks/test-first-guard.sh',
 ]);

@@ -45382,3 +45382,16 @@ test('RISK repository process: native button safety requires 400-task and rapid-
  const variants={missing400:r=>delete r.scenarios[0].setup,unsaved400:r=>r.scenarios[0].setup.durableTasks=399,hiddenOrdinary:r=>r.scenarios[0].setup.activeTasks=8,omittedRapid:r=>r.rapidOutcomes.pop(),skippedRapid:r=>r.rapidOutcomes[0].status='skipped',slowRapid:r=>r.rapidOutcomes[0].bursts[0].windowMs=2001,fewerPresses:r=>r.rapidOutcomes[0].bursts[0].attempts=9,untrusted:r=>r.rapidOutcomes[0].bursts[0].trustedPresses=0,unreconciled:r=>r.rapidOutcomes[0].bursts[0].refused=0,selfWaived:r=>r.requiredRapidActions.pop()};
  for(const [name,mutate]of Object.entries(variants))await t.test(name,()=>{const report=structuredClone(good);mutate(report);const result=invoke(report);assert.equal(result.error,undefined);assert.notEqual(result.status,0,'required native gate must reject '+name+' workload evidence');assert.doesNotMatch(result.stderr,/SyntaxError|ERR_MODULE_NOT_FOUND/);});
 });
+
+test('RISK repository process: required button enforcement changes need process coverage',async t=>{
+ const root=fs.mkdtempSync('/tmp/chain-button-enforcement-');t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ for(const name of ['button-safety.mjs','button-safety-contract.mjs','button-safety-native.mjs','button-safety-inventory.json'])await t.test(name,()=>{
+  const directory=path.join(root,name);fs.mkdirSync(path.join(directory,'scripts'),{recursive:true});
+  const git=(...args)=>{const result=spawnSync('git',args,{cwd:directory,encoding:'utf8'});assert.equal(result.status,0,result.stderr);return result.stdout.trim();};
+  fs.copyFileSync(path.join(__dirname,'scripts/test-first-gate.mjs'),path.join(directory,'scripts/test-first-gate.mjs'));
+  fs.writeFileSync(path.join(directory,'scripts',name),name.endsWith('.json')?'{}':'export const revision=1;');fs.writeFileSync(path.join(directory,'tests.js'),"test('baseline',()=>{});\n");fs.writeFileSync(path.join(directory,'TEST_CHANGE_RATIONALES.json'),'[]');
+  git('init','-q','--initial-branch=fixture');git('add','.');git('-c','user.name=Button gate fixture','-c','user.email=gate@example.invalid','commit','-qm','baseline');const base=git('rev-parse','HEAD');
+  fs.writeFileSync(path.join(directory,'scripts',name),name.endsWith('.json')?'{"weakened":true}':'export const revision=2;');git('add','.');git('-c','user.name=Button gate fixture','-c','user.email=gate@example.invalid','commit','-qm','uncovered gate edit');
+  const result=spawnSync(process.execPath,['scripts/test-first-gate.mjs',base],{cwd:directory,encoding:'utf8'});assert.equal(result.error,undefined);assert.notEqual(result.status,0,'actual test-first CLI cannot accept uncovered required native gate edits');assert.match(result.stderr,/Test-first enforcement changed.*without tests.js process coverage/);
+ });
+});
