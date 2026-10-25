@@ -156,6 +156,15 @@ controls mount real failures on the Settings click, including Chromium renderer
 crash and WebKit throw, rejection and 1,300 ms stall; no physical-device claim is
 made from a desktop engine.
 
+The oversized Copy → Import → Paste scenario delivers the full archive through
+an explicit `ClipboardEvent`/`DataTransfer` fixture (`trusted: false`) to the real
+paste consumer. This avoids conflating simulated typing with native paste and
+keeps CI independent of the host clipboard. Its monitored input must leave a
+bounded text field, protect the complete source bytes, survive Preview → Cancel
+→ Preview, and preserve the exact current head and sixteen saved originals.
+Actual host Clipboard API and trusted Paste evidence remains a separate native
+acceptance artifact; the fixture does not claim that proof.
+
 The full reports must contain exactly the required successful action outcomes
 and state scenarios, with real events, assertions, responsiveness and closed owned
 resources. Probe and focused diagnostic reports cannot qualify complete coverage.
@@ -182,8 +191,10 @@ disappeared counts. Persistent controls must produce their independently expecte
 tenth effect, such as even toggle parity, a retained explicit choice, ten identical
 copies or ten real downloads. A closing, replaced, disabled or obscured control
 can accept fewer clicks. Attempts against an absent or obscured original control
-release outside the viewport so they cannot accidentally activate a different
-control; those attempts remain explicitly classified and do not earn accepted
-click credit. The expected state and exact originals are asserted afterward.
+record a trusted down at its former point, then release in a separate neutral
+harness document so they cannot accidentally activate a different app control;
+those attempts remain explicitly classified and do not earn accepted
+click credit. Any accepted click on a different app action fails immediately.
+The expected state and exact originals are asserted afterward.
 Missing task readback, hidden ordinary load, missing/skipped rapid families,
 untrusted or incomplete counts, a slower burst, or unreconciled outcomes fails.

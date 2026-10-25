@@ -2264,3 +2264,5 @@ The command/report consumer rejects missing, duplicate, skipped, cancelled, unre
 - RISK repository process: native button gate cannot omit a required stress scenario
 
 - RISK repository process: native button safety requires 400-task and rapid-press evidence
+
+- RISK repository process: required button enforcement changes need process coverage
