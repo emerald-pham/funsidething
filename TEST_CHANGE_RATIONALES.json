@@ -1,6 +1,28 @@
 [
   {
     "baseCommit": "ca2d7641413b6e3462dc04d04835346a285f7e7e",
+    "testChangesSha256": "6ff9f50909977450c8860712636158d7c638080e62c2468bcb5a533a042f785b",
+    "reason": "Keep complete large pasted recovery archives outside native textarea layout so WebKit remains responsive while the same guarded preview, cancel, close and restore preserve all source bytes. Use bounded native Base64 chunks when available to keep exact file protection responsive.",
+    "previousBehavior": "Native Clipboard Copy then Meta+V of a45MB recovery archive stalled the WebKit frame loop9176ms. Bulk value insertion still stalled2734ms; rendering the complete text was unsafe. After bounded paste capture, native Preview still stalled1888ms; eaa3b5b6 measured1897ms in the byte-at-a-time Base64 encoder.",
+    "intendedBehavior": "Large paste is captured in the revisioned draft with a bounded visible notice. Preview uses all source text, Cancel and Close retain it, and typing or pasting a replacement creates a new draft. Ordinary small paste remains native. Three-byte-aligned native encoding preserves every byte and final padding while avoiding millions of intermediate concatenations; the portable fallback remains.",
+    "replacementTests": [
+      "RISK JSON COPY PASTE: large native paste retains full draft without rendering the archive",
+      "RISK JSON COPY PASTE: Quick start explains the copy button, manual fallback and guarded paste",
+      "RISK pasted recovery UI: archive and raw backup text use the visible Settings route and explicit rating choice"
+    ],
+    "preservedCoverage": [
+      "Existing protected preview, source bytes, durable head, explicit rating choice, cancellation and small paste contracts remain. The new consumer verifies exact unknown-field import and original-board backup after closing and reopening.",
+      "The old FAQ route assertion is deliberately migrated from Restore to the user-requested single Import label. No saved-source, rating-choice or adoption assertion is removed.",
+      "Native WebKit clipboard reproduction is separate from the Inspector typing limitation. Required400-task and rapid-button checks remain fail-closed; physical iPhone and the unavailable original private source remain unverified.",
+      "Additional actual file-selection positive controls cover every byte value and all three padding remainders with the real platform btoa API. The existing suite continues to exercise the portable fallback. Invalid UTF-8 remains protected and cannot replace the board."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <integration> --evidence-dir <task-artifacts>/paste-diagnosis/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern=\"RISK JSON COPY PASTE: (large native paste|Quick start)\" tests.js",
+      "failure": "Before app edits,80d5d1fb failed the actual paste event prevention assertion false !== true and missing large-paste FAQ. Native5fa8d890 first recorded9176ms max frame gap for actual Clipboard API Copy then Meta+V; runtime-only bulk experiment f49c1cd2 still stalled2734ms. GREEN57c3c41d passes24 focused cases after38f8461e exposed only the obsolete Restore FAQ label. Diagnostic harness edits are external/temporary and not product source. The later distinct Preview performance RED is e8af825f; eaa3b5b6 isolates the hot encoder before its change. f6d9b576 is a passing byte-preservation control before optimization, explicitly not a RED. GREEN1b2ba9d2 passes20 relevant export, archive and backup-file cases after native encoding. Native timing revalidation follows the committed source."
+    }
+  },
+  {
+    "baseCommit": "ca2d7641413b6e3462dc04d04835346a285f7e7e",
     "testChangesSha256": "dc30e5c8231ba185aa8c6bf0d93b1b615f4d422b1836aa40dea4ef15b305a614",
     "reason": "Keep complete large pasted recovery archives outside native textarea layout so WebKit remains responsive while the same guarded preview, cancel, close and restore preserve all source bytes.",
     "previousBehavior": "Native Clipboard Copy then Meta+V of a45MB recovery archive stalled the WebKit frame loop9176ms. Bulk value insertion still stalled2734ms; rendering the complete text was unsafe.",

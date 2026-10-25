@@ -19487,6 +19487,7 @@ test('SETTINGS: manual local backups replace visible JSON import and export cont
 test('RISK JSON COPY PASTE: large native paste retains full draft without rendering the archive',async t=>{
   const {IDBFactory}=await import('fake-indexeddb');
   const app=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'large-paste-'+Date.now()}),{ctx,shim}=app;
+  ctx.btoa=globalThis.btoa; // Real platform encoder; the remaining suite retains the portable fallback.
   t.after(()=>app.dispose());ctx.addTask('Original remains until confirmation',false);await prepareBackupFileFixtureSource(app);
   const original=JSON.stringify(ctx.state),head=await ctx.window.ScannerDeviceStore.readHead();
   const source=JSON.parse(ctx.currentBoardExportPayload());source.futureLargePaste='retain 🌿\n'.repeat(40000);
@@ -19516,6 +19517,12 @@ test('RISK JSON COPY PASTE: large native paste retains full draft without render
   replacement.value=small;shim.document.dispatchEvent({type:'input',target:replacement});
   assert.equal(await ctx.onAction('preview-pasted-recovery',{}),true);await ctx.onAction('confirm-file-restore',{});
   assert.equal(ctx.state.futureLargePaste,'deliberate replacement','a new draft replaces the buffered source explicitly');
+  for(const remainder of [0,1,2]){
+    const bytes=Uint8Array.from({length:49152+remainder},(_,i)=>i%256),before=JSON.stringify(ctx.state);
+    assert.equal(await ctx.handleRestoreBackupFileChange({files:[{name:'binary-original-'+remainder,type:'application/octet-stream',arrayBuffer:async()=>bytes.buffer}]}),false,'invalid UTF-8 is protected without adoption');
+    assert.ok((await ctx.window.ScannerDeviceStore.listBackups()).some(row=>row.restoreFile?.bytesBase64===Buffer.from(bytes).toString('base64')),'every binary byte and Base64 padding remainder survives file protection');
+    assert.equal(JSON.stringify(ctx.state),before);
+  }
 });
 
 test('RISK JSON COPY PASTE: stale clipboard completion cannot release a newer export transfer',async t=>{
