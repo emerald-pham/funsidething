@@ -251,10 +251,13 @@ async function runNativeSmoke(options) {
       const action = index < 10 ? 'yes' : 'bench-done';
       const before = await page.evaluate(() => ({ candidate: state.candidateId, benchmark: benchmark()?.id, clicks: window.__releaseClicks.length }));
       const control = page.locator('[data-act="' + action + '"]').first();
-      // Use native default input timing: an artificial held press can span a
-      // normal rerender and detach the delegated target between down and up.
-      if (index === 10) await control.dblclick();
-      else await control.click();
+      // Completing the benchmark can remove one wrapped crumbs row. Its new
+      // button still overlaps the old button near the top, while the old center
+      // can hit the panel. Keep both native inputs on that shared interior.
+      if (index === 10) {
+        const position = await control.evaluate(element => ({ x: element.clientWidth / 2, y: 1 }));
+        await control.dblclick({ position });
+      } else await control.click();
       const delivered = await page.evaluate(({ count, action }) => window.__releaseClicks.slice(count).filter(row => row.act === action),
         { count: before.clicks, action });
       const guardedDoubleClick = index === 10;

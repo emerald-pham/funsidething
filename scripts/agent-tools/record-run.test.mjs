@@ -109,9 +109,9 @@ test('summarizes large real child output while preserving complete redacted evid
   const evidence = path.join(temp, 'evidence');
   const stdoutSecret = 'SUMMARY-STDOUT-SECRET-72a9';
   const stderrSecret = 'SUMMARY-STDERR-SECRET-18cf';
-  const expectedStdout = `${'O'.repeat(256 * 1024)} password=${stdoutSecret}\n`;
-  const expectedStderr = `${'E'.repeat(128 * 1024)} token=${stderrSecret}\n`;
-  const child = `process.stdout.write(${JSON.stringify(expectedStdout)}); process.stderr.write(${JSON.stringify(expectedStderr)});`;
+  // Generate the large streams in the child: a large literal can exceed Linux's
+  // per-argument exec limit before the recorder can start.
+  const child = `process.stdout.write('O'.repeat(256 * 1024) + ' password=${stdoutSecret}\\n'); process.stderr.write('E'.repeat(128 * 1024) + ' token=${stderrSecret}\\n');`;
 
   const result = invokeRecorder({
     repo,
