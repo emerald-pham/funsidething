@@ -98,10 +98,17 @@ test('RISK cloud recovery device read: repeated failures stop honestly and share
 });
 
 test('RISK cloud recovery device read: cancellation changed authority and expired budgets cannot restart obsolete review',async t=>{
- for(const change of ['cancel','draft','accepted edit','backend','UID','deadline'])await t.test(change,async t=>{
+ for(const change of ['cancel','draft','accepted edit','backend','UID','deadline','protected browser','protected fallback','pending before hold failure','hold before head failure'])await t.test(change,async t=>{
   const app=await freshSourceCheckFixture187(t),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
-  const local=JSON.stringify(ctx.state),head=await store.readHead(),cloud=JSON.stringify([...backend.docs]),writes=backend.writes.length;let accepted=null;
-  const observed=await injectRecoveryDatabaseFailure187(t,app,{onFailure:()=>{
+  const local=JSON.stringify(ctx.state),head=await store.readHead(),cloud=JSON.stringify([...backend.docs]),writes=backend.writes.length;let accepted=null,mutation=null;
+  const writer=await new Promise((resolve,reject)=>{const request=app.indexedDB.open(app.deviceDbName,1);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});t.after(()=>writer.close());
+  const changedRecord={account:'e@example.com',identity:'owner',generationId:'new-protected-intent',payloadHash:'e'.repeat(64),baseRev:4,futureProtected:[3,7]};
+  const observed=await injectRecoveryDatabaseFailure187(t,app,{key:change==='pending before hold failure'?'recoveryCloudHold':change==='hold before head failure'?'head':'pending:owner',onFailure:()=>{
+   if(change==='protected browser')shim.localStorage.setItem(LOCAL_HEAD_KEY,'New sole browser original');
+   if(change==='protected fallback')shim.localStorage.setItem(SYNC_STORE_KEY,'New sole fallback original');
+   if(change==='pending before hold failure'||change==='hold before head failure')mutation=new Promise((resolve,reject)=>{
+    const tx=writer.transaction('meta','readwrite');tx.objectStore('meta').put(changedRecord,change==='pending before hold failure'?'pending:owner':'recoveryCloudHold');tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error);
+   });
    if(change==='cancel')ctx.onAction('close-modal',{});
    if(change==='draft')shim.document.getElementById('addInput').value='Newer unfinished review task';
    if(change==='accepted edit'){shim.document.getElementById('addInput').value='Accepted while the database read fails';accepted=Promise.resolve(ctx.onAction('add',{})).then(()=>ctx.persist());}
@@ -109,12 +116,16 @@ test('RISK cloud recovery device read: cancellation changed authority and expire
    if(change==='UID')backend.emitAuth({uid:'different-owner',email:'e@example.com'});
    if(change==='deadline'){const now=ctx.performance.now();ctx.performance={now:()=>now+60001};}
   }});
-  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),false);if(accepted)assert.equal(await accepted,true);await flush();
+  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),false);if(accepted)assert.equal(await accepted,true);if(mutation)await mutation;await flush();
   assert.equal(observed.failures,1);assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="choose-cloud-recovery-source"/);
   if(change==='cancel')assert.equal(shim.document.getElementById('modalRoot').innerHTML,'');
   if(change==='accepted edit')assert.ok(JSON.parse((await store.readHead()).payload).tasks.some(row=>row.title==='Accepted while the database read fails'));
   else{assert.equal(JSON.stringify(ctx.state),local);assert.deepEqual(await store.readHead(),head);}
   if(change==='draft')assert.equal(shim.document.getElementById('addInput').value,'Newer unfinished review task');
+  if(change==='protected browser')assert.equal(shim.localStorage.getItem(LOCAL_HEAD_KEY),'New sole browser original');
+  if(change==='protected fallback')assert.equal(shim.localStorage.getItem(SYNC_STORE_KEY),'New sole fallback original');
+  if(change==='pending before hold failure')assert.deepEqual(await store.getPendingUpload('owner'),changedRecord);
+  if(change==='hold before head failure')assert.deepEqual(await store.getRecoveryCloudHold(),changedRecord);
   assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal(backend.writes.length,writes);
  });
 });

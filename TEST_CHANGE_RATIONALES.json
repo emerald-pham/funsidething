@@ -1,10 +1,10 @@
 [
   {
     "baseCommit": "ec0686a3cadf239c82efb854cd1136f216160fd3",
-    "testChangesSha256": "ed99474139b1b88baa339795ef433b55b2b828eb1d15d50a60d19bfb3ce8f4e3",
+    "testChangesSha256": "eb5958d658066cd6499fe760774705f92cd604e9973c89bd956239d475ecbab2",
     "reason": "Reproduce the user screenshot through the actual Review cloud recovery sources action when an asynchronous IndexedDB request or transaction fails. Retain device and cloud originals while bounded safe read verification resumes.",
     "previousBehavior": "One transient database server failure terminated recovery with the exact raw Indexed Database server dialog. A head request aborted by that failure also leaked an unhandled transaction rejection. Pending-pointer and recovery-hold request aborts had the same defect.",
-    "intendedBehavior": "Only manual review retries known transient device read failures once within its existing shared minute and restart budget, after validating current account, backend, work and draft. Request and transaction failures are observed together. Permanent errors, cancellation, changed authority and exhausted budgets stop without publication; friendly status and bounded diagnostics remain honest.",
+    "intendedBehavior": "Only manual review retries known transient device read failures once within its existing shared minute and restart budget, after validating current account, backend, work and draft. Request and transaction failures are observed together. Permanent errors, cancellation, changed authority and exhausted budgets stop without publication; friendly status and bounded diagnostics remain honest. Each protected fact stays bound from its first successful observation, including synchronous browser copies and partial captures before a later database failure.",
     "replacementTests": [
       "RISK cloud recovery device read: a temporary database server failure completes the same review without changing sources",
       "RISK cloud recovery device read: repeated failures stop honestly and share the cloud retry budget",
@@ -20,7 +20,7 @@
     ],
     "redEvidence": {
       "command": "node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/cloud-review-database-error/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/cloud-review-database-error-20261025/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern='^RISK cloud recovery device read:' tests.js",
-      "failure": "Original baseline ec0686a: 0c1bdd6d at 11:28:50Z fails false versus true with the exact screenshot dialog. Before head-read repair 3a8b7e26 fails head review and emits an unhandled UnknownError; before pending/hold request repair ad0d92ee fails both and leaks their rejection. Before status/FAQ/diagnostics changes de886910 and 1ddb8464 fail the corresponding visible assertions. Chronological raw records are retained outside Git."
+      "failure": "Original baseline ec0686a: 0c1bdd6d at 11:28:50Z fails false versus true with the exact screenshot dialog. Before head-read repair 3a8b7e26 fails head review and emits an unhandled UnknownError; before pending/hold request repair ad0d92ee fails both and leaks their rejection. Before status/FAQ/diagnostics changes de886910 and 1ddb8464 fail the corresponding visible assertions. Chronological raw records are retained outside Git. Independent review found early partial-capture rebinding: preimplementation RED5530fb5c fails protected browser/fallback and already-read pending/hold changes on d45a65d before the repair. GREENd7dd2ac5 passes128/128 after binding each observed fact."
     }
   },
   {
