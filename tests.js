@@ -2279,16 +2279,16 @@ async function waitForNativeHistoryAck226(page,owner){
  try{return await result.jsonValue();}finally{await result.dispose();}
 }
 
-async function runNativeRecoveryInspection226(t,width=390,holdDemoted=false,completeSource=null,automaticView=null){
+async function runNativeRecoveryInspection226(t,width=390,holdDemoted=false,completeSource=null,automaticView=null,sharedBrowser=null){
  const {waitForTruthyProbe}=await import('./scripts/agent-tools/async-probe.mjs');
  const playwright=await import('playwright'),engine=(completeSource||automaticView)?(automaticView?.engine||process.env.CHAIN_RECOVERY_TEST_ENGINE||'chromium'):'chromium';assert.ok(['chromium','webkit'].includes(engine),'the native source consumer uses an existing supported engine');
- const sdk=await import('./scripts/installed-client-fixture.mjs'),browser=await playwright[engine].launch({headless:true}),context=await browser.newContext({viewport:{width,height:844},serviceWorkers:'block',reducedMotion:'reduce'}),page=await context.newPage();
+ const sdk=await import('./scripts/installed-client-fixture.mjs'),ownsBrowser=!sharedBrowser,browser=sharedBrowser||await playwright[engine].launch({headless:true}),context=await browser.newContext({viewport:{width,height:844},serviceWorkers:'block',reducedMotion:'reduce'}),page=await context.newPage();
  const current=deferredSyncFixture(),previous=deferredSyncFixture(),finalRoot=deferredSyncFixture(),freshFinalRoot=deferredSyncFixture(),demoted=deferredSyncFixture(),raw=JSON.stringify({...sdk.fixture('reconcile-held'),...(automaticView?{settings:{...sdk.fixture('reconcile-held').settings,theme:automaticView.theme}}:{})}),encoded=await loadStorageV2().encodeSnapshot(raw),{chunks,...header}=encoded,remote=new Map([['users/owner',{schemaVersion:2,rev:4,activeGeneration:'held-current',previousGeneration:'received-previous'}],['users/owner/generations/held-current',{...header,hash:'f'.repeat(64),state:'published',baseRev:3}],['users/owner/generations/received-previous',{...header,state:'published',baseRev:2}],...chunks.map(c=>['users/owner/generations/received-previous/chunks/'+String(c.index).padStart(8,'0'),c])]);
  if(automaticView){remote.set('users/owner/generations/held-current',{...header,state:'published',baseRev:3});for(const chunk of chunks)remote.set('users/owner/generations/held-current/chunks/'+chunk.index,chunk);}
  let publicationAllowed=false,historyArmed=false,historyEntered=false;const historyGate=deferredSyncFixture();
  const boundedAck={armed:false,enteredAt:null,deliveredAt:null,observation:null},boundedAckDelivered=deferredSyncFixture();let boundedAckTimer=null,boundedAckOwner=null;const nativeHistoryOwners=[];
  const origin='https://recovery-inspection.invalid',prefix='/synthetic-sdk/';let armed=false,previousEntered=false,freshFinalEntered=false,demotedEntered=false,roots=0;
- t.after(async()=>{if(boundedAckTimer)await boundedAckDelivered.promise;if(boundedAckOwner)await boundedAckOwner.dispose();for(const owner of nativeHistoryOwners)await owner.dispose();if(automaticView?.boundedAck&&process.env.CHAIN_RECOVERY_UI_OUTPUT){fs.mkdirSync(process.env.CHAIN_RECOVERY_UI_OUTPUT,{recursive:true});fs.writeFileSync(path.join(process.env.CHAIN_RECOVERY_UI_OUTPUT,automaticView.theme+'-'+width+'-bounded-ack.json'),JSON.stringify(boundedAck,null,2));}try{await page.evaluate(()=>{closeModal();window.__releaseNativeRetry?.();});}catch{}current.resolve();previous.resolve();finalRoot.resolve();freshFinalRoot.resolve();demoted.resolve();historyGate.resolve();await context.close();await browser.close();});
+ t.after(async()=>{if(boundedAckTimer)await boundedAckDelivered.promise;if(boundedAckOwner)await boundedAckOwner.dispose();for(const owner of nativeHistoryOwners)await owner.dispose();if(automaticView?.boundedAck&&process.env.CHAIN_RECOVERY_UI_OUTPUT){fs.mkdirSync(process.env.CHAIN_RECOVERY_UI_OUTPUT,{recursive:true});fs.writeFileSync(path.join(process.env.CHAIN_RECOVERY_UI_OUTPUT,automaticView.theme+'-'+width+'-bounded-ack.json'),JSON.stringify(boundedAck,null,2));}try{await page.evaluate(()=>{closeModal();window.__releaseNativeRetry?.();});}catch{}current.resolve();previous.resolve();finalRoot.resolve();freshFinalRoot.resolve();demoted.resolve();historyGate.resolve();await context.close();if(ownsBrowser)await browser.close();});
  await context.exposeBinding('__installedRPC',async(_,kind,args)=>{const key=args?.[0];if(boundedAck.armed&&kind==='get'&&key==='users/owner/generations/held-current'){
   boundedAck.armed=false;boundedAck.enteredAt=Date.now();boundedAckOwner=await page.evaluateHandle(()=>window.__nativeHistoryBudget());
   boundedAckTimer=setTimeout(async()=>{try{boundedAck.observation=await page.evaluate(owner=>({sameRead:cloudSourceRecoveryRead===owner.read,sameController:cloudSourceRecoveryRead?.controller===owner.controller,serial:cloudSourceRecoveryRead?.serial,originalSerial:owner.read.serial,deadline:owner.deadline,deadlineUnchanged:window.__nativeHistoryBudget()===owner,remaining:owner.deadline-performance.now(),state:automaticCloudSourceResumeStatus.state,aborted:owner.controller.signal.aborted}),boundedAckOwner);boundedAck.deliveredAt=Date.now();}catch(error){boundedAck.error=String(error);}finally{boundedAckTimer=null;boundedAckDelivered.resolve();}},16000);
@@ -2466,13 +2466,31 @@ async function runNativeRecoveryInspection226(t,width=390,holdDemoted=false,comp
  assert.deepEqual(settledReader,readerBefore,'unchanged visible text must also stay in place through the next two frames');
 }
 
+async function runNativeRecoveryInspectionMatrix226(t,engine,viewForCase){
+ const playwright=await import('playwright'),browserType=playwright[engine],originalLaunch=browserType.launch,launches=[],contexts=[],pages=[];let sharedBrowser=null;
+ browserType.launch=async function(...args){
+  const browser=await originalLaunch.apply(this,args);launches.push(browser);const newContext=browser.newContext.bind(browser);
+  browser.newContext=async function(...contextArgs){
+   const context=await newContext(...contextArgs);contexts.push(context);const newPage=context.newPage.bind(context);
+   context.newPage=async function(...pageArgs){const page=await newPage(...pageArgs);pages.push(page);return page;};return context;
+  };return browser;
+ };
+ t.after(async()=>{browserType.launch=originalLaunch;if(sharedBrowser)await sharedBrowser.close();});
+ sharedBrowser=await browserType.launch({headless:true});
+ for(const [theme,width]of [['light',390],['dark',390],['light',1280],['dark',1280]])await t.test(theme+' '+width,sub=>runNativeRecoveryInspection226(sub,width,false,null,viewForCase(theme,width),sharedBrowser));
+ assert.equal(contexts.length,4,'each theme/viewport scenario must create its own fresh browser context');assert.equal(new Set(contexts).size,4,'theme/viewport scenarios cannot share browser context state');
+ assert.equal(pages.length,4,'each theme/viewport scenario must create its own page');assert.equal(new Set(pages).size,4,'theme/viewport scenarios cannot share page state');
+ assert.equal(launches.length,1,'all four independent theme/viewport scenarios should reuse one browser process');assert.equal(launches[0],sharedBrowser);
+}
+
 test('RISK automatic source status native: historical retry checking stop and confirmation remain current',
 async t=>{
- for(const [theme,width]of [['light',390],['dark',390],['light',1280],['dark',1280]])await t.test(theme+' '+width,sub=>runNativeRecoveryInspection226(sub,width,false,null,{theme,history:true,boundedAck:theme==='dark'&&width===390}));
+ const engine=process.env.CHAIN_RECOVERY_TEST_ENGINE||'chromium';
+ await runNativeRecoveryInspectionMatrix226(t,engine,(theme,width)=>({theme,history:true,boundedAck:theme==='dark'&&width===390}));
 });
 
-test('RISK integrated automatic recovery native: persisted startup status and neighboring controls remain usable',async t=>{const engine=process.env.CHAIN_RECOVERY_TEST_ENGINE||'chromium';
- for(const [theme,width]of [['light',390],['dark',390],['light',1280],['dark',1280]])await t.test(theme+' '+width,sub=>runNativeRecoveryInspection226(sub,width,false,null,{theme,engine}));
+test('RISK integrated automatic recovery native: persisted startup status and neighboring controls remain usable with one browser and isolated contexts',async t=>{const engine=process.env.CHAIN_RECOVERY_TEST_ENGINE||'chromium';
+ await runNativeRecoveryInspectionMatrix226(t,engine,(theme,width)=>({theme,engine}));
 });
 
 test('RISK cloud source inspection: native asynchronous updates retain focus disclosure scroll and current source roles',async t=>runNativeRecoveryInspection226(t));
@@ -6301,12 +6319,22 @@ const HTML_PATH = path.join(__dirname, "index.html");
 const html = fs.readFileSync(HTML_PATH, "utf8");
 const lzStringSrc = fs.readFileSync(path.join(__dirname, "vendor/lz-string-1.5.0.min.js"), "utf8");
 
+const sceneTimelineScripts=new Map();
+function runSceneTimelineScript(source,context){
+ let script=sceneTimelineScripts.get(source);
+ if(script){sceneTimelineScripts.delete(source);sceneTimelineScripts.set(source,script);}
+ else{
+  script=new vm.Script(source);sceneTimelineScripts.set(source,script);
+  if(sceneTimelineScripts.size>48)sceneTimelineScripts.delete(sceneTimelineScripts.keys().next().value);
+ }
+ return script.runInContext(context);
+}
 function sceneTimeline(transforms={}) {
  const context=vm.createContext({Date,Math,Intl,console});
  for(const file of ['landscape-config.js','vendor/astronomy.min.js','stars.js','landscape-core.js','landscape-geometry.js','landscape-visits.js','landscape-timeline.js']){
   assert.ok(fs.existsSync(path.join(__dirname,file)),`deterministic scenery module missing: ${file}`);
   const source=fs.readFileSync(path.join(__dirname,file),'utf8');
-  vm.runInContext(transforms[file]?transforms[file](source):source,context);
+  runSceneTimelineScript(transforms[file]?transforms[file](source):source,context);
  }
  return context;
 }
@@ -8373,6 +8401,15 @@ function makeDomShim({ prefersDark = false, sharedStorage = null } = {}) {
     dispatchEvent(evt) {
       for (const fn of (documentListeners[evt.type] || [])) fn(evt);
       return true;
+    },
+    // Observe completion through the actual registered async event handlers.
+    dispatchEventAndWait(evt) {
+      const completions=[];
+      for(const fn of (documentListeners[evt.type]||[])){
+        const outcome=fn(evt);
+        if(outcome&&typeof outcome.then==='function')completions.push(outcome);
+      }
+      return Promise.all(completions);
     },
     createElement() { return makeFakeElement(); },
     body: { appendChild() {} },
@@ -19090,9 +19127,15 @@ test('RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exac
   shim.document.getElementById=id=>id==='restoreBackupFile'?input:id==='backupRestoreSource'?restoreSource:originalGet(id);
   const cloudPushCalls=[],originalPush=ctx.window.CloudSync?.push?.bind(ctx.window.CloudSync);
   if(originalPush)ctx.window.CloudSync.push=(...args)=>{cloudPushCalls.push(args);return originalPush(...args);};
+  async function awaitFileFixtureOperation(operation,label){
+    let timer;
+    try{return await Promise.race([operation,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(label+' did not complete within 5 seconds')),5000);})]);}
+    finally{clearTimeout(timer);}
+  }
   async function selectFile(selected){
-    input.files=[selected];shim.document.dispatchEvent({type:'change',target:input});
-    for(let attempt=0;attempt<100&&!shim.document.getElementById('modalRoot').innerHTML.includes('data-act="confirm-file-restore"');attempt++)await flush();
+    input.files=[selected];
+    const outcomes=await awaitFileFixtureOperation(shim.document.dispatchEventAndWait({type:'change',target:input}),'selected-file change handlers');
+    assert.deepEqual(outcomes,[true],'the actual selected-file handler must complete successfully: '+shim.document.getElementById('toast').textContent);
     return shim.document.getElementById('modalRoot').innerHTML;
   }
   await ctx.onAction(restoreAction[1],{});
@@ -19155,9 +19198,10 @@ test('RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exac
   const reopenedGet=reopened.shim.document.getElementById.bind(reopened.shim.document);
   reopened.shim.document.getElementById=id=>id==='restoreBackupFile'?archiveInput:reopenedGet(id);
   let archivePickerOpens=0;archiveInput.click=()=>{archivePickerOpens++;};
-  async function selectReopenedFile(selected){
-    archiveInput.files=[selected];reopened.shim.document.dispatchEvent({type:'change',target:archiveInput});
-    for(let attempt=0;attempt<100&&!reopened.shim.document.getElementById('modalRoot').innerHTML.includes('data-act="confirm-file-restore"');attempt++)await flush();
+  async function selectReopenedFile(selected,{accepted=true}={}){
+    archiveInput.files=[selected];
+    const outcomes=await awaitFileFixtureOperation(reopened.shim.document.dispatchEventAndWait({type:'change',target:archiveInput}),'reopened selected-file change handlers');
+    assert.deepEqual(outcomes,[accepted],'the actual handler must report the expected source outcome: '+reopened.shim.document.getElementById('toast').textContent);
     return reopened.shim.document.getElementById('modalRoot').innerHTML;
   }
   const archiveBoard=JSON.parse(JSON.stringify(reopened.ctx.state));
@@ -19171,7 +19215,31 @@ test('RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exac
       backups:[{key:{type:'string',value:'pending-upload'},value:{type:'object',value:{task:{id:'pending-queue-task',title:'Pending queue task'}}}}],opaque:[]}}}};
   const archiveBytes=new TextEncoder().encode(JSON.stringify(archive,null,2)),archiveFile=new File([archiveBytes],'recovery <archive>.json',{type:'application/json'});
   await reopened.ctx.onAction(reopenedAction[1],{});assert.equal(archivePickerOpens,1);
-  const archivePreview=await selectReopenedFile(archiveFile);
+  let archivePreview;
+  await t.test('file selection stays pending until its real exact-byte read completes',async()=>{
+    const read=archiveFile.arrayBuffer.bind(archiveFile);
+    let readEntered,releaseRead;
+    const entered=new Promise(resolve=>{readEntered=resolve;}),released=new Promise(resolve=>{releaseRead=resolve;});
+    archiveFile.arrayBuffer=async()=>{readEntered();await released;return read();};
+    let settled=false;
+    const selection=selectReopenedFile(archiveFile).then(preview=>{settled=true;return preview;});
+    try{
+      await awaitFileFixtureOperation(entered,'the actual selected-file read');
+      // Keep the real read pending beyond the former100flush-turn cap. The
+      // selected-file consumer must await its handler, without adopting early.
+      for(let turn=0;turn<120;turn++)await flush();
+      assert.equal(settled,false,'a pending real file read cannot count as a completed selection');
+      assert.equal(reopened.ctx.state.tasks[0].title,'Restored file task','holding the selected read cannot adopt its currentBoard');
+      assert.doesNotMatch(reopened.shim.document.getElementById('modalRoot').innerHTML,/data-act="confirm-file-restore"/,'protected preview waits for the actual selected bytes');
+    }finally{
+      releaseRead();archivePreview=await selection;
+      // Drain the actual UI operation before fixture disposal even when the
+      // pending-selection assertion fails on the unchanged polling helper.
+      const deadline=Date.now()+5000;
+      while(!reopened.shim.document.getElementById('modalRoot').innerHTML.includes('data-act="confirm-file-restore"')&&!reopened.shim.document.getElementById('toast').textContent&&Date.now()<deadline)await flush();
+      archiveFile.arrayBuffer=read;
+    }
+  });
   assert.match(archivePreview,/Only its ordinary <code>currentBoard<\/code> can be restored/);
   assert.doesNotMatch(archivePreview,/pending-queue-task|Pending queue task/,'raw pending appSources are not rendered as an adopted-board task');
   assert.equal(reopened.ctx.state.tasks[0].title,'Restored file task','archive preview does not apply its currentBoard early');
@@ -19184,7 +19252,7 @@ test('RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exac
   const incompleteFile=new File([JSON.stringify(incomplete)],'incomplete.json',{type:'application/json'});
   const pickerBefore=archivePickerOpens;await reopened.ctx.onAction(reopenedAction[1],{});assert.equal(archivePickerOpens,pickerBefore+1);
   const priorToast=reopened.shim.document.getElementById('toast').textContent;reopened.shim.document.getElementById('toast').textContent='';
-  await selectReopenedFile(incompleteFile);
+  await selectReopenedFile(incompleteFile,{accepted:false});
   for(let attempt=0;attempt<100&&!reopened.shim.document.getElementById('toast').textContent.includes('incomplete');attempt++)await flush();
   assert.match(reopened.shim.document.getElementById('toast').textContent,/incomplete/,'partial archives stop with an honest source error');
   assert.deepEqual(await reopenedStore.readHead(),heldHead,'an incomplete archive cannot replace the saved board');
@@ -27670,7 +27738,11 @@ test('Repository CI gate requires changed tests and risk cases with app source d
  assert.match(validateTestFirst(['index.html','tests.js'],['+test("ordinary",()=>{})'])[0],/RISK/);
  assert.deepEqual(validateTestFirst(['index.html','tests.js'],['+test("RISK eligibility: boundary",()=>{})']),[]);
  const workflow=fs.readFileSync(path.join(__dirname,'.github/workflows/data-safety.yml'),'utf8');
- assert.match(workflow,/test-first-gate\.mjs/);assert.match(workflow,/npm test/);
+ assert.match(workflow,/test-first-gate\.mjs/);
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const equivalent=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group runner reconciles complete full and grouped fixture cohorts$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
+ assert.equal(equivalent.status,0,'The unchanged public full-suite command and all four isolated groups must execute the same fixture case IDs: '+equivalent.stdout+'\n'+equivalent.stderr);
+ assert.match(equivalent.stdout,/^# tests 1$/m);assert.match(equivalent.stdout,/^# skipped 0$/m);
 });
 
 test('Firestore rules: old clients cannot replace a revisioned board', {skip:!process.env.FIRESTORE_EMULATOR_HOST}, async () => {
@@ -27817,7 +27889,7 @@ test('RISK test-first gate: scanner, landscape, time, rules, and offline-shell e
 
 test('RISK test-first gate: changing enforcement code requires process tests and a new risk case',async()=>{
  const {validateTestFirst}=await import('./scripts/test-first-gate.mjs');
- for(const file of ['scripts/test-first-gate.mjs','scripts/release-evidence.mjs','scripts/install-release-hook.mjs','.claude/hooks/test-first-guard.sh','.github/workflows/data-safety.yml']){
+ for(const file of ['scripts/test-first-gate.mjs','scripts/release-evidence.mjs','scripts/install-release-hook.mjs','scripts/test-groups.mjs','.claude/hooks/test-first-guard.sh','.github/workflows/data-safety.yml']){
   assert.match(validateTestFirst([file],[]).join(' '),/tests\.js/,`${file} must be covered by a process test`);
   assert.match(validateTestFirst([file,'tests.js'],['+test("ordinary behavior test",()=>{})']).join(' '),/RISK/,`${file} requires a risk-labeled process test`);
  }
@@ -28120,6 +28192,66 @@ test('RISK repository process: CSS comment removal cannot join selector tokens u
   assert.equal(deriveReleaseReviewPlan(cssTokenJoin.repo,cssTokenJoin.candidateSha,cssTokenJoin.baseSha).mode,'independent-review',
    'removing a CSS comment that joins selector tokens is executable behavior');
  }finally{cleanupReleaseGateFixture(cssTokenJoin);}
+});
+
+test('RISK repository process: release recording classifies the tail of a complete large diff',async t=>{
+ const makeFixture=options=>{
+  const fixture=makeReleaseGateFixture(options);
+  fs.writeFileSync(path.join(fixture.repo,'package.json'),JSON.stringify({private:true,type:'module',scripts:{
+   'release:record':'node scripts/release-evidence.mjs record',
+   'release:verify':'node scripts/release-evidence.mjs verify'
+  }}));
+  fs.copyFileSync(path.join(__dirname,'scripts/release-evidence.mjs'),path.join(fixture.repo,'scripts/release-evidence.mjs'));
+  const inputPath=path.join(fixture.root,'release-input.json');
+  fs.writeFileSync(inputPath,JSON.stringify(riskBasedReleaseInput(fixture,{domains:['security-deployment']}),null,2)+'\n');
+  return { ...fixture,inputPath,receiptPath:path.join(fixture.repo,'.git','funsidething-release-evidence',fixture.candidateSha,'receipt.json') };
+ };
+ const env={...process.env,npm_config_audit:'false',npm_config_fund:'false',npm_config_update_notifier:'false'};delete env.NODE_TEST_CONTEXT;
+ const run=(fixture,command,args)=>spawnSync('npm',['run',command,'--',...args],{
+  cwd:fixture.repo,encoding:'utf8',timeout:30000,maxBuffer:4*1024*1024,
+  env
+ });
+ const control=makeFixture({changedPath:'scripts/test-group-inventory.json',baseText:'{"ordinary":"old"}\n',
+  candidateText:'{"permissionBoundary":"requires security review"}\n'});
+ const neutralPayload='x'.repeat(2*1024*1024);
+ const candidateText=JSON.stringify({ordinary:neutralPayload,permissionBoundary:'requires security review'})+'\n';
+ const oversized=makeFixture({changedPath:'scripts/test-group-inventory.json',baseText:'{"ordinary":"old"}\n',candidateText});
+ try{
+  const controlResult=spawnSync('npm',['run','release:record','--',control.inputPath],{
+   cwd:control.repo,encoding:'utf8',timeout:30000,maxBuffer:4*1024*1024,env
+  });
+  const controlOutput=[controlResult.stdout,controlResult.stderr].filter(Boolean).join('\n');
+  assert.equal(controlResult.error,undefined,controlResult.error?.message||controlOutput);
+  assert.equal(controlResult.signal,null,controlOutput);
+  assert.equal(controlResult.status,0,'a valid small-diff public release:record control must pass before the large-diff probe:\n'+controlOutput);
+  const controlReceipt=JSON.parse(fs.readFileSync(control.receiptPath,'utf8'));
+  assert.deepEqual(controlReceipt.reviewPlan.specialistDomains,['security-deployment'],
+   'the small public process control proves the receipt input and classification assertion are valid');
+
+  const completeDiff=spawnSync('git',['-C',oversized.repo,'diff','--unified=2',oversized.baseSha,oversized.candidateSha,'--',oversized.changedPath],{
+   encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024
+  });
+  assert.equal(completeDiff.error,undefined,completeDiff.error?.message);
+  assert.equal(completeDiff.status,0,completeDiff.stderr);
+  assert.ok(Buffer.byteLength(completeDiff.stdout)>1024*1024,'the exact fixture patch exceeds Node execFileSync default output capacity');
+  assert.match(completeDiff.stdout.slice(-1024),/permissionBoundary.*security review/,
+   'the only security classification marker remains at the complete patch tail');
+  t.diagnostic(JSON.stringify({fixtureDiffBytes:Buffer.byteLength(completeDiff.stdout),tail:completeDiff.stdout.slice(-160)}));
+
+  const recorded=run(oversized,'release:record',[oversized.inputPath]);
+  const output=[recorded.stdout,recorded.stderr].filter(Boolean).join('\n');
+  assert.equal(recorded.error,undefined,recorded.error?.message||output);
+  assert.equal(recorded.signal,null,output);
+  assert.equal(recorded.status,0,'public release:record must process the complete oversized diff:\n'+output);
+  const receipt=JSON.parse(fs.readFileSync(oversized.receiptPath,'utf8'));
+  assert.deepEqual(receipt.reviewPlan.specialistDomains,['security-deployment'],
+   'the complete diff tail must still require its security specialist');
+  assert.equal(receipt.reviewPlan.mode,'dual-review');
+  const verified=run(oversized,'release:verify',[oversized.candidateSha]);
+  assert.equal(verified.error,undefined,verified.error?.message);
+  assert.equal(verified.signal,null,[verified.stdout,verified.stderr].filter(Boolean).join('\n'));
+  assert.equal(verified.status,0,[verified.stdout,verified.stderr].filter(Boolean).join('\n'));
+ }finally{cleanupReleaseGateFixture(control);cleanupReleaseGateFixture(oversized);}
 });
 
 test('RISK repository process: risk-based receipts require the derived exact-final reviewer roles',async()=>{
@@ -34988,6 +35120,59 @@ test('RISK motion review harness: frozen actual actor painters reconstruct repea
  }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
 
+test('RISK immutable scenery fixture preparation: exact source reuse keeps fresh consumer contexts and known output',async()=>{
+ const {readMotionBuild,createMotionProbe}=await import('./scripts/motion-review-harness.mjs');
+ const marker='ci266-'+process.pid+'-'+Date.now(),stateKey='__ci266FixtureState'+process.pid,compiled=[],contexts=[];
+ const runDescriptor=Object.getOwnPropertyDescriptor(vm,'runInContext'),scriptDescriptor=Object.getOwnPropertyDescriptor(vm,'Script'),contextDescriptor=Object.getOwnPropertyDescriptor(vm,'createContext');
+ const observe=source=>{if(typeof source==='string'&&source.includes(marker))compiled.push(source);};
+ vm.runInContext=function(source,...args){observe(source);return Reflect.apply(runDescriptor.value,this,[source,...args]);};
+ vm.Script=new Proxy(scriptDescriptor.value,{construct(target,args){observe(args[0]);return Reflect.construct(target,args,target);}});
+ vm.createContext=function(...args){const context=Reflect.apply(contextDescriptor.value,this,args);contexts.push(context);return context;};
+ try{
+  const sceneFiles=['landscape-config.js','vendor/astronomy.min.js','stars.js','landscape-core.js','landscape-geometry.js','landscape-visits.js','landscape-timeline.js'];
+  const annotate=(source,label)=>source+'\n/*'+marker+':'+label+' */'+(label.endsWith('landscape-config.js')?'\nglobalThis['+JSON.stringify(stateKey)+']=(globalThis['+JSON.stringify(stateKey)+' ]||0)+1;':'');
+  const sceneTransforms=Object.fromEntries(sceneFiles.map(file=>[file,source=>annotate(source,'scene:'+file)]));
+  const sceneStart=compiled.length,contextStart=contexts.length,sceneA=sceneTimeline(sceneTransforms),sceneAfterA=compiled.length;
+  assert.equal(sceneAfterA-sceneStart,7,'first real scene consumer compiles each exact source once');
+  const sceneB=sceneTimeline(sceneTransforms),sceneAfterB=compiled.length;
+  assert.equal(sceneAfterB-sceneAfterA,0,'repeat real scene consumer reuses immutable compiled source');
+  assert.notStrictEqual(contexts[contextStart],contexts[contextStart+1],'scene module bytecode executes in fresh mutable contexts');
+  assert.equal(contexts[contextStart][stateKey],1);assert.equal(contexts[contextStart+1][stateKey],1,'module globals start fresh even when bytecode is reused');
+  const clock=Date.parse('2026-10-06T03:23:42.125Z'),sceneOptions={seed:'ci266-known-scene',season:'summer',sunAt:()=>({altitude:-20,azimuth:0})};
+  const sceneAt=context=>JSON.parse(JSON.stringify(context.LandscapeTimeline.create(sceneOptions).at(clock)));
+  const sceneExpected=sceneAt(sceneTimeline());
+  assert.deepEqual(sceneAt(sceneA),sceneExpected,'comment-only source keys preserve the independent known scene');
+  assert.deepEqual(sceneAt(sceneB),sceneExpected,'cached scene module output matches the independent known scene');
+  const changedSceneTransforms={...sceneTransforms,'stars.js':source=>sceneTransforms['stars.js'](source)+'\n/*'+marker+':changed-stars-source */'};
+  const sceneBeforeChange=compiled.length,sceneChanged=sceneTimeline(changedSceneTransforms);
+  assert.equal(compiled.length-sceneBeforeChange,1,'one changed exact scene source causes one compilation');
+  assert.equal(contexts[contextStart+3][stateKey],1,'the changed-source scene also receives fresh module state');
+  assert.deepEqual(sceneAt(sceneChanged),sceneExpected,'a changed comment-only source retains the exact scene outcome');
+
+  const build=readMotionBuild(__dirname,'WORKTREE'),sources=Object.fromEntries(Object.entries(build.sources).map(([file,source])=>[file,annotate(source,'motion:'+file)]));
+  sources['landscape.js']=sources['landscape.js'].replace('  function person(','  function person(/*'+marker+':motion:painter */');
+  const markedBuild={...build,sources},sampleOptions={actor:'walker',progress:.5,duration:100,seed:.4,lane:.5,zoom:1};
+  const reference=createMotionProbe(build,{width:390,height:844}).sample(sampleOptions);
+  const motionStart=compiled.length,motionContextStart=contexts.length;
+  const first=createMotionProbe(markedBuild,{width:390,height:844}).sample(sampleOptions),motionAfterFirst=compiled.length;
+  assert.equal(motionAfterFirst-motionStart,8,'first actual painter consumer compiles seven modules and its painter');
+  const second=createMotionProbe(markedBuild,{width:390,height:844}).sample(sampleOptions);
+  assert.equal(compiled.length-motionAfterFirst,0,'repeat actual painter consumer reuses immutable compiled source');
+  assert.notStrictEqual(contexts[motionContextStart],contexts[motionContextStart+1],'painter bytecode executes in fresh mutable contexts');
+  assert.equal(contexts[motionContextStart][stateKey],1);assert.equal(contexts[motionContextStart+1][stateKey],1,'painter module globals start fresh on every probe');
+  assert.deepEqual(first,reference,'instrumented source produces the independent actual painter output');
+  assert.deepEqual(second,reference,'compiled reuse retains every actual painter command and metadata');
+  const changedSources={...sources,'landscape-geometry.js':sources['landscape-geometry.js']+'\n/*'+marker+':changed-geometry-source */'},changedBuild={...markedBuild,sources:changedSources};
+  assert.equal(changedBuild.sourcesHash,markedBuild.sourcesHash,'fixture retains a deliberately stale aggregate hash to discriminate exact source keys');
+  const motionBeforeChange=compiled.length,third=createMotionProbe(changedBuild,{width:390,height:844}).sample(sampleOptions);
+  assert.equal(compiled.length-motionBeforeChange,1,'one changed exact painter module source causes one compilation despite the same aggregate hash');
+  assert.equal(contexts[motionContextStart+2][stateKey],1,'changed-source painter still receives fresh module state');
+  assert.deepEqual(third,reference,'the changed comment-only module preserves the independent actual painter output');
+ }finally{
+  Object.defineProperty(vm,'runInContext',runDescriptor);Object.defineProperty(vm,'Script',scriptDescriptor);Object.defineProperty(vm,'createContext',contextDescriptor);
+ }
+});
+
 test('RISK walking scope guidance: extended FAQ and changelog describe walker winter woodland and held-line improvements',()=>{
  const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8'),faq=html.split('<dt>How do I change the scenery?</dt>')[1].split('</dd>')[0];
  assert.match(faq,/Reduced motion keeps scenery still/);
@@ -37505,7 +37690,7 @@ test('RISK pedestrian ski preparation attachments: hat follows the painted head 
  }
 });
 
-test('RISK pedestrian planner cold work: full capacity skips unnecessary lifetime solving without changing admitted scenes or reseeks',()=>{
+test('RISK pedestrian planner cold work: full capacity skips unnecessary lifetime solving without changing admitted scenes or reseeks', () => {
  const prior=spawnSync('git',['show','c21ee6f2a1147636f89cc96dae80aa9ba8ba9ea5:landscape-timeline.js'],{cwd:__dirname,encoding:'utf8'});assert.equal(prior.status,0,prior.stderr);
  const epoch=Date.parse('2026-10-06T00:00Z'),day=86400000,snapshot=value=>JSON.parse(JSON.stringify(value));
  for(const season of ['winter','summer'])for(const night of [false,true]){
@@ -37513,13 +37698,18 @@ test('RISK pedestrian planner cold work: full capacity skips unnecessary lifetim
   current.LandscapeGeometry.create=(w,h)=>{const geometry=create(w,h);if(w===8192){const lifetime=geometry.walkingLifetime;geometry.walkingLifetime=e=>{calls++;return lifetime(e);};}return geometry;};
   for(const c of[current,reference])assert.equal(c.LandscapeConfig.setSpawnRates('| blimp | 0 |'),true);
   const options={seed:'private-schedule',season,sunAt:()=>({altitude:night?-20:30,azimuth:night?0:90})},actual=current.LandscapeTimeline.create(options),baseline=reference.LandscapeTimeline.create(options),first=epoch+12*3600000;
-  assert.deepEqual(snapshot(actual.at(first)),snapshot(baseline.at(first)),'the actual cold consumer preserves every admitted event, duration and independent scenery stream');
+  let historicalNoonQueries=0;const historicalAt=baseline.at;baseline.at=at=>{if(at===first)historicalNoonQueries++;return historicalAt(at);};
+  // The pinned historical source and all options are fixed within this scenario.
+  // Keep only its repeated noon result; current queries still rebuild after eviction.
+  const firstExpected=JSON.stringify(baseline.at(first));
+  assert.deepEqual(snapshot(actual.at(first)),JSON.parse(firstExpected),'the actual cold consumer preserves every admitted event, duration and independent scenery stream');
   assert.ok(calls<=(night?1300:season==='winter'?1300:1800),`${season} ${night?'night':'day'} cold planning solved ${calls} lifetimes despite full capacity`);
   const coldCalls=calls;actual.at(first+8000);actual.at(first-8000);actual.at(first);assert.ok(calls<=coldCalls+4,'same-day buckets reuse admission and resolve only newly inspected immutable recipes');
   for(const offset of [1,23*3600000+40*60000,day-1,day,day+1,-1,2*day+1,-2*day+1,12*3600000]){
-   const at=epoch+offset,scene=actual.at(at);assert.deepEqual(snapshot(scene),snapshot(baseline.at(at)),'midnight, eviction and backwards reseek preserve exact scheduling');assertPedestrianReservationBound(scene);
+   const at=epoch+offset,scene=actual.at(at);assert.deepEqual(snapshot(scene),at===first?JSON.parse(firstExpected):snapshot(baseline.at(at)),'midnight, eviction and backwards reseek preserve exact scheduling');assertPedestrianReservationBound(scene);
    for(const e of scene.events)if(!['train','metro'].includes(e.type)){const born=at-e.age*1000;assert.ok(born+Math.max(e.duration,e.scheduleDuration||e.activityDuration||e.duration)*1000<=(Math.floor(born/day)+1)*day+.001,'full reservations still fit their admitted UTC day');}
   }
+  assert.equal(historicalNoonQueries,1,'the identical independent historical noon expectation is prepared once per isolated scenario');
  }
 });
 
@@ -37531,13 +37721,17 @@ test('RISK pedestrian planner proposal work: rare admission reuses immutable day
  const before=context.proposalDraws;timeline.at(at+8000);timeline.at(at-8000);assert.equal(context.proposalDraws,before,'the bounded same-day memo remains effective');
 });
 
-test('RISK pedestrian planner rare reuse: guard join is unique and complete admitted scenes match prior across rare rates midnight and eviction',()=>{
+test('RISK pedestrian planner rare reuse: guard join is unique and complete admitted scenes match prior across rare rates midnight and eviction', () => {
  const released=spawnSync('git',['show','f8fa176ddfaeedb9b2b7aeaf586b8e71a2e5ce3f:landscape-timeline.js'],{cwd:__dirname,encoding:'utf8'});assert.equal(released.status,0,released.stderr);
  const epoch=Date.parse('2026-10-06T00:00Z'),day=86400000,snapshot=value=>JSON.parse(JSON.stringify(value));
  for(const season of ['summer','winter'])for(const night of [false,true])for(const rareRate of [0,2]){
   const actual=sceneTimeline(),prior=sceneTimeline({'landscape-timeline.js':()=>pedestrianDaytimeSpawnPolicy(pedestrianReservationPolicy(released.stdout))});for(const c of[actual,prior])assert.equal(c.LandscapeConfig.setSpawnRates(`| abduction | ${rareRate} |\n| festival | ${rareRate} |\n| blimp | 0 |`),true);
-  const options={seed:rareRate?'private-schedule':'chain-scanner-scene-v1',season,sunAt:()=>({altitude:night?-20:30,azimuth:night?0:90})},a=actual.LandscapeTimeline.create(options),b=prior.LandscapeTimeline.create(options);
-  for(const offset of[12*3600000,-1,0,1,day-1,day,day+1,2*day+1,12*3600000]){const value=a.at(epoch+offset);assert.deepEqual(snapshot(value),snapshot(b.at(epoch+offset)),'raw reuse retains accepted IDs, lifetimes, independent streams and cache/UTC reconstruction');assertPedestrianReservationBound(value);}
+  const options={seed:rareRate?'private-schedule':'chain-scanner-scene-v1',season,sunAt:()=>({altitude:night?-20:30,azimuth:night?0:90})},a=actual.LandscapeTimeline.create(options),b=prior.LandscapeTimeline.create(options),first=epoch+12*3600000;
+  let historicalNoonQueries=0;const historicalAt=b.at;b.at=at=>{if(at===first)historicalNoonQueries++;return historicalAt(at);};
+  // Serialized data is immutable and belongs only to this source/config/seed scenario.
+  const firstExpected=JSON.stringify(b.at(first));
+  for(const offset of[12*3600000,-1,0,1,day-1,day,day+1,2*day+1,12*3600000]){const value=a.at(epoch+offset);assert.deepEqual(snapshot(value),epoch+offset===first?JSON.parse(firstExpected):snapshot(b.at(epoch+offset)),'raw reuse retains accepted IDs, lifetimes, independent streams and cache/UTC reconstruction');assertPedestrianReservationBound(value);}
+  assert.equal(historicalNoonQueries,1,'rare-rate scenarios prepare their own identical independent historical noon expectation once');
  }
  const boundarySlot=epoch/1000/8-75,inject=source=>source.replace('function random(seed,stream,slot=0){',`function random(seed,stream,slot=0){if(seed==='private-rare-boundary'&&stream==='arrival'&&slot===${boundarySlot})return ()=>0;`).replace('const rare=rareRaw.filter','globalThis.rareIds=rareRaw.map(e=>e.id);const rare=rareRaw.filter');
  const a=sceneTimeline({'landscape-timeline.js':inject}),b=sceneTimeline({'landscape-timeline.js':()=>inject(pedestrianDaytimeSpawnPolicy(pedestrianReservationPolicy(released.stdout)))}),options={seed:'private-rare-boundary',season:'summer',sunAt:()=>({altitude:30,azimuth:90})};
@@ -43538,4 +43732,36 @@ test('RISK device connection recovery: a closed local handle still permits exact
  for(const [key,raw]of originals)assert.equal(JSON.stringify(backend.docs.get(key)),raw,'original generation/header/chunks remain exact');
  assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state),'the acknowledged app board is durably saved');
  assert.equal(ctx.state.syncRev,remote.rev);assert.equal(ctx.state.syncDirty,false);
+});
+
+test('RISK repository process: event routing retains exact merge validation before avoiding a duplicate cohort',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-name-pattern=workflow avoids a second complete cohort',path.join(__dirname,'scripts/agent-tools/ci-routing.test.mjs')],{cwd:__dirname,encoding:'utf8',timeout:30000,env});
+ assert.equal(result.status,0,'The public workflow cohort command must preserve exact canonical merge validation: '+result.stdout+'\n'+result.stderr);
+});
+
+test('RISK repository process: grouped runner stays covered at the default npm test boundary',t=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group runner (executes a complete isolated group with bound identity|keeps oversized group selections below the portable argument limit|binds native tests to the actual checkout commit and tree|reconciles a renamed root and preserves baseline case identities)$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
+ const output=[result.stdout,result.stderr].filter(Boolean).join('\n');t.diagnostic(output);
+ assert.equal(result.error,undefined,'The grouped runner process contract must start: '+(result.error?.message||output));
+ assert.equal(result.signal,null,'The focused group runner process contract must finish: '+output);
+ assert.equal(result.status,0,'The default full-suite boundary must keep focused group runner coverage live: '+output);
+ assert.match(result.stdout||'',/^# tests 4$/m,'Isolated group, portable pattern sizing, actual-checkout identity, and captured-baseline reconciliation contracts must run');
+ assert.match(result.stdout||'',/^# skipped 0$/m,'The runner contract cannot pass through a skip');
+});
+
+test('RISK repository process: required parallel scanner aggregation rejects absent group evidence',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-name-pattern=^test group workflow scanner command rejects missing parallel group evidence$',path.join(__dirname,'scripts/agent-tools/test-groups.test.mjs')],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
+ assert.equal(result.status,0,'The executed scanner aggregate must fail closed on absent required group evidence: '+result.stdout+'\n'+result.stderr);
+});
+
+test('RISK repository process: grouped catalog binds real declarations rather than quoted fixtures',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group catalog routes real declarations despite matching quoted fixture text$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
+ const output=(result.stdout||'')+'\n'+(result.stderr||'');
+ assert.equal(result.error,undefined,'The public catalog ownership regression must start: '+output);
+ assert.equal(result.status,0,'Real declarations must be classified and execute once despite quoted fixture copies: '+output);
+ assert.match(result.stdout||'',/^# tests 1$/m);assert.match(result.stdout||'',/^# skipped 0$/m);
 });

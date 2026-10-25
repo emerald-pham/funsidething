@@ -8,6 +8,17 @@ import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 
 const files=['landscape-config.js','vendor/astronomy.min.js','stars.js','landscape-core.js','landscape-appearance.js','landscape-geometry.js','landscape-winter.js','landscape.js'];
+const compiledMotionScripts=new Map();
+function runMotionScript(source,context,filename){
+ const displayName=filename||'evalmachine.<anonymous>',key=displayName+'\0'+source;
+ let script=compiledMotionScripts.get(key);
+ if(script){compiledMotionScripts.delete(key);compiledMotionScripts.set(key,script);}
+ else{
+  script=new vm.Script(source,filename?{filename}:undefined);compiledMotionScripts.set(key,script);
+  if(compiledMotionScripts.size>48)compiledMotionScripts.delete(compiledMotionScripts.keys().next().value);
+ }
+ return script.runInContext(context);
+}
 export function readMotionBuild(repository,ref){
  const resolved=ref==='WORKTREE'?ref:execFileSync('git',['rev-parse',`${ref}^{commit}`],{cwd:repository,encoding:'utf8'}).trim();
  const sources=Object.fromEntries(files.map(file=>[file,resolved==='WORKTREE'?fs.readFileSync(path.join(repository,file),'utf8'):execFileSync('git',['show',`${resolved}:${file}`],{cwd:repository,encoding:'utf8',maxBuffer:4*1024*1024})]));
@@ -53,10 +64,10 @@ function painterProgram(build){
 }
 function loadProbe(build,width,height,onHumanPose){
  const context=vm.createContext({Math,Date,Intl,JSON,console});
- for(const file of files.filter(f=>f!=='landscape.js'))vm.runInContext(build.sources[file],context,{filename:file});
+ for(const file of files.filter(f=>f!=='landscape.js'))runMotionScript(build.sources[file],context,file);
  if(onHumanPose){
   context.observeHumanPose=onHumanPose;
-  vm.runInContext(`{
+  runMotionScript(`{
    const create=LandscapeGeometry.create;
    LandscapeGeometry.create=(...dimensions)=>{
     const geometry=create(...dimensions),walk=geometry.humanWalkPose;
@@ -65,7 +76,7 @@ function loadProbe(build,width,height,onHumanPose){
    };
   }`,context);
  }
- return vm.runInContext(painterProgram(build),context)(width,height);
+ return runMotionScript(painterProgram(build),context)(width,height);
 }
 export function createMotionProbe(build,{width=820,height=1180,onHumanPose}={}){
  const renderer=loadProbe(build,width,height,onHumanPose);

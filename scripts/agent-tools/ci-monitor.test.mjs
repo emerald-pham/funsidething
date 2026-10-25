@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
@@ -11,21 +12,35 @@ const monitor = fileURLToPath(new URL('./ci-monitor.mjs', import.meta.url));
 const requestedRunId = '88442211';
 const requestedCommit = 'a'.repeat(40);
 
-async function createGhFixture(root, { metadata = [], logs = [] } = {}) {
+const legacyWorkflow='name: Data safety\njobs:\n  scanner-tests:\n  release-evidence:\n  deploy-pages:\n';
+const checkoutPrefix=sha=>`scanner-tests\tCheckout\tgit log -1 --format=%H\nscanner-tests\tCheckout\t${sha}\n`;
+async function createGhFixture(root, { metadata = [], logs = [], workflow = legacyWorkflow, apiError = null } = {}) {
   const bin = path.join(root, 'bin');
   await mkdir(root, { recursive: true });
-  await writeFile(path.join(root, 'gh-fixture.json'), JSON.stringify({ metadata, logs, calls: [] }), 'utf8');
+  await writeFile(path.join(root, 'gh-fixture.json'), JSON.stringify({ metadata:metadata.map(response=>{try{const run=JSON.parse(response.stdout);return run.attempt?response:{...response,stdout:JSON.stringify({...run,attempt:1})};}catch{return response;}}), logs, workflow, apiError, calls: [] }), 'utf8');
   await mkdir(bin, { recursive: true });
   const fakeGh = path.join(bin, 'gh');
   await writeFile(fakeGh, `#!/usr/bin/env node
 import { readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 const fixturePath = process.env.CI_MONITOR_GH_FIXTURE;
 const fixture = JSON.parse(readFileSync(fixturePath, 'utf8'));
 const args = process.argv.slice(2);
 fixture.calls.push({ args, godebug: process.env.GODEBUG ?? null });
 const isLog = args.includes('--log');
-const queue = isLog ? fixture.logs : fixture.metadata;
-const response = queue.length ? queue.shift() : { stdout: '' };
+let response;
+if(args[0]==='api') {
+  const sha=fixture.lastRun?.event==='pull_request'?'d'.repeat(40):fixture.lastRun?.headSha;
+  if(fixture.apiError)response={code:1,stderr:fixture.apiError};
+  else if(args[1].includes('/git/commits/')) response={stdout:JSON.stringify({sha,tree:{sha:'e'.repeat(40)},parents:fixture.lastRun?.event==='pull_request'?[{sha:'b'.repeat(40)},{sha:fixture.lastRun.headSha}]:[{sha:'b'.repeat(40)}]})};
+  else if(args[1].includes('/contents/.github/workflows/data-safety.yml')){const bytes=Buffer.from(fixture.workflow);response={stdout:JSON.stringify({encoding:'base64',content:bytes.toString('base64'),sha:createHash('sha1').update(Buffer.concat([Buffer.from('blob '+bytes.length+'\\0'),bytes])).digest('hex')})};}
+  else response={code:1,stderr:'unexpected API path'};
+} else {
+  const queue = isLog ? fixture.logs : fixture.metadata;
+  response = queue.length ? queue.shift() : { stdout: '' };
+  if(!isLog){try{fixture.lastRun=JSON.parse(response.stdout);}catch{}}
+  else if(!response.code){const sha=fixture.lastRun?.event==='pull_request'?'d'.repeat(40):fixture.lastRun?.headSha;response={...response,stdout:'scanner-tests\\tCheckout\\tgit log -1 --format=%H\\nscanner-tests\\tCheckout\\t'+sha+'\\n'+(response.stdout||'')};}
+}
 writeFileSync(fixturePath, JSON.stringify(fixture));
 if (response.delayMs) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, response.delayMs);
 if (response.stderr) process.stderr.write(response.stderr);
@@ -226,8 +241,8 @@ test('observes changed progress without repeating unchanged status lines until t
     { poll: 3, changed: false, status: 'in_progress', nextDelayMs: 2 },
     { poll: 4, changed: true, status: 'completed', nextDelayMs: 0 },
   ]);
-  assert.equal(fixture.calls.filter(({ args }) => !args.includes('--log')).length, 4);
-  assert.ok(fixture.calls.every(({ args }) => args[0] === 'run' && args[1] === 'view' && args[2] === requestedRunId));
+  assert.equal(fixture.calls.filter(({ args }) => args[0]==='run' && !args.includes('--log')).length, 4);
+  assert.ok(fixture.calls.every(({ args }) => args[0] === 'api' || (args[0] === 'run' && args[1] === 'view' && args[2] === requestedRunId)));
 });
 
 test('persists the exact metadata response and full raw run logs with the terminal result', async (t) => {
@@ -235,6 +250,7 @@ test('persists the exact metadata response and full raw run logs with the termin
   t.after(() => rm(root, { recursive: true, force: true }));
   const rawLogs = 'scanner-tests\tResolve comparison base\nscanner-tests\tAssertions passed ✓\n';
   const metadata = `${JSON.stringify({
+    attempt: 1,
     databaseId: Number(requestedRunId),
     headSha: requestedCommit,
     status: 'completed',
@@ -268,7 +284,7 @@ test('persists the exact metadata response and full raw run logs with the termin
   }, {
     exitCode: 0,
     fullLogRequest: true,
-    logs: rawLogs,
+    logs: checkoutPrefix('d'.repeat(40))+rawLogs,
     snapshot: metadata,
   }, `${result.stdout}\nresolved evidence path: ${attempt ?? '(missing)'}`);
 });
@@ -331,8 +347,8 @@ test('retries transient reads within a fixed bound and applies the TLS fallback 
     const result = invokeMonitor({ bin, fixturePath, evidence: path.join(scenarioRoot, 'evidence') });
     const fixture = JSON.parse(await readFile(fixturePath, 'utf8'));
     const terminal = result.stdout.split('\n').find((line) => line.startsWith('CI monitor result=')) ?? '';
-    const metadataCalls = fixture.calls.filter(({ args }) => !args.includes('--log'));
-    const readOnly = fixture.calls.every(({ args }) => args[0] === 'run' && args[1] === 'view');
+    const metadataCalls = fixture.calls.filter(({ args }) => args[0]==='run' && !args.includes('--log'));
+    const readOnly = fixture.calls.every(({ args }) => args[0]==='api' || (args[0] === 'run' && args[1] === 'view'));
     const fallbackLocal = scenario.fallbackUsed
       ? !String(metadataCalls[0]?.godebug ?? '').includes('http2client=0')
         && String(metadataCalls[1]?.godebug ?? '').includes('http2client=0')
@@ -387,7 +403,7 @@ test('honors the interactive wait bound even when gh stalls inside one status re
 
   assert.equal(result.status, 2, result.stdout + result.stderr);
   assert.match(result.stdout, /CI monitor result=unresolved/);
-  assert.equal(fixture.calls.filter(({ args }) => !args.includes('--log')).length, 1);
+  assert.equal(fixture.calls.filter(({ args }) => args[0]==='run' && !args.includes('--log')).length, 1);
   assert.ok(elapsedMs < 500, `monitor exceeded its 120 ms wait bound: ${elapsedMs} ms`);
 });
 
@@ -431,4 +447,71 @@ test('does not accept success when the raw logs cannot be read after bounded ret
   assert.equal(logs, null);
   assert.equal(fixture.calls.filter(({ args }) => args.includes('--log')).length, 3);
   assert.ok(fixture.calls.every(({ args }) => args[0] === 'run' && args[1] === 'view'));
+});
+
+test('canonical producer routing retains scanner aggregate and handoff exit distinctions', async t => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'ci-monitor-routing-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const cases = [
+    { name: 'covered push', event: 'push', status: 'completed', conclusion: 'success', scanner: 'success', expected: 'success', code: 0 },
+    { name: 'pending producer', event: 'push', status: 'in_progress', conclusion: null, scanner: null, expected: 'running', code: 2 },
+    { name: 'failed producer', event: 'push', status: 'completed', conclusion: 'failure', scanner: 'failure', expected: 'failure', code: 1 },
+    { name: 'canceled producer', event: 'pull_request', status: 'completed', conclusion: 'cancelled', scanner: 'cancelled', expected: 'canceled', code: 1 },
+    { name: 'skipped scanner is forbidden', event: 'push', status: 'completed', conclusion: 'success', scanner: 'skipped', expected: 'failure', code: 1 },
+  ];
+  for (const [index, scenario] of cases.entries()) {
+    const location = path.join(root, String(index));
+    const run = { databaseId: Number(requestedRunId), headSha: requestedCommit,
+      event: scenario.event, headBranch: 'topic', workflowName: 'Data safety',
+      status: scenario.status, conclusion: scenario.conclusion, jobs: [
+        { name: 'scanner-tests', status: scenario.scanner ? 'completed' : 'in_progress', conclusion: scenario.scanner,
+          steps: [{ name: 'Run complete regression cohort', conclusion: 'skipped' }] },
+        { name: 'release-evidence', status: 'completed', conclusion: 'skipped' },
+        { name: 'deploy-pages', status: 'completed', conclusion: 'skipped' },
+      ] };
+    const { bin, fixturePath } = await createGhFixture(location, { metadata: [{ stdout: JSON.stringify(run) }], logs: [{ stdout: `canonical producer evidence for ${scenario.name}\n` }] });
+    const result = invokeMonitor({ bin, fixturePath, evidence: path.join(location, 'evidence') });
+    assert.equal(result.status, scenario.code, scenario.name + ': ' + result.stdout + result.stderr);
+    assert.match(result.stdout, new RegExp(`result=${scenario.expected} `), scenario.name);
+  }
+});
+
+
+test('binds required parallel topology to actual candidate workflow even when new jobs are absent', async t => {
+  const root=await mkdtemp(path.join(os.tmpdir(),'ci-monitor-topology-'));t.after(()=>rm(root,{recursive:true,force:true}));
+  const workflow=await readFile(new URL('../../.github/workflows/data-safety.yml',import.meta.url),'utf8');
+  const run={databaseId:Number(requestedRunId),headSha:requestedCommit,status:'completed',conclusion:'success',event:'pull_request',headBranch:'feature',workflowName:'Data safety',jobs:[{name:'scanner-tests',status:'completed',conclusion:'success'},{name:'release-evidence',conclusion:'skipped'},{name:'deploy-pages',conclusion:'skipped'}]};
+  const {bin,fixturePath}=await createGhFixture(root,{metadata:[{stdout:JSON.stringify(run)}],workflow});
+  const result=invokeMonitor({bin,fixturePath,evidence:path.join(root,'evidence')});
+  assert.equal(result.status,1,result.stdout+result.stderr);assert.match(result.stdout,/Required job validation-context is missing/);
+});
+
+test('parallel workflow observation preserves complete missing skipped canceled and unknown distinctions', async parent => {
+  const workflow=await readFile(new URL('../../.github/workflows/data-safety.yml',import.meta.url),'utf8');
+  const required=['validation-context','event-gates','cohort-routing','regression-core','regression-scenery','regression-persistence-recovery','regression-native-process','scanner-tests'];
+  const scenarios=[
+    ['complete full cohort',()=>{},0,'success'],
+    ['complete covered cohort',run=>{run.jobs.find(job=>job.name==='scanner-tests').steps=run.jobs.find(job=>job.name==='scanner-tests').steps.filter(step=>!step.name.startsWith('Complete regression')).map(step=>({...step,name:step.name.replace('mode full','mode reuse')}));},0,'success'],
+    ['absent verified aggregate marker',run=>{run.jobs.find(job=>job.name==='scanner-tests').steps=[];},1,'failure'],
+    ['absent core group',run=>{run.jobs=run.jobs.filter(job=>job.name!=='regression-core');},1,'failure'],
+    ['skipped group',run=>{run.jobs[3].conclusion='skipped';},1,'failure'],
+    ['canceled group',run=>{run.jobs[4].conclusion='cancelled';},1,'canceled'],
+    ['duplicate group',run=>{run.jobs.push({...run.jobs[3]});},2,'unresolved'],
+    ['unknown group',run=>{run.jobs.push({name:'regression-other',conclusion:'success'});},2,'unresolved'],
+    ['unknown candidate topology',()=>{},2,'unresolved',workflow.replace('four-groups-v1','unrecognized-v2')],
+    ['unavailable candidate bytes',()=>{},2,'unresolved',workflow,'controlled public API failure'],
+  ];
+  for(const [name,mutate,code,outcome,bytes=workflow,apiError=null]of scenarios)await parent.test(name,async t=>{
+    const root=await mkdtemp(path.join(os.tmpdir(),'ci-monitor-parallel-'));t.after(()=>rm(root,{recursive:true,force:true}));
+    const run={attempt:2,databaseId:Number(requestedRunId),headSha:requestedCommit,event:'pull_request',headBranch:'feature',workflowName:'Data safety',status:'completed',conclusion:'success',jobs:required.map(name=>({name,status:'completed',conclusion:'success'})).concat([{name:'release-evidence',conclusion:'skipped'},{name:'deploy-pages',conclusion:'skipped'}])};
+    const context='1'.repeat(64),report='8'.repeat(64),bytesForBlob=Buffer.from(bytes),blob=createHash('sha1').update(Buffer.concat([Buffer.from('blob '+bytesForBlob.length+'\0'),bytesForBlob])).digest('hex');
+    run.jobs[0].steps=[{name:'Actual checkout '+ 'd'.repeat(40)+' tree '+'e'.repeat(40),conclusion:'success'},{name:'Validation source '+requestedCommit+' base '+'b'.repeat(40),conclusion:'success'},{name:'Workflow blob '+blob+' policy four-groups-v1',conclusion:'success'},{name:'Announce regression context '+context,conclusion:'success'}];
+    run.jobs.find(job=>job.name==='scanner-tests').steps=[{name:'Verify complete required cohort',conclusion:'success'},{name:'Verified complete cohort '+context+' report '+report+' mode full',conclusion:'success'},{name:'Complete regression context '+context+' report '+report,conclusion:'success'}];
+    mutate(run);
+    const {bin,fixturePath}=await createGhFixture(root,{metadata:[{stdout:JSON.stringify(run)}],workflow:bytes,apiError});
+    const result=invokeMonitor({bin,fixturePath,evidence:path.join(root,'evidence'),args:['--max-retries','0']});
+    assert.equal(result.status,code,result.stdout+result.stderr);assert.match(result.stdout,new RegExp('result='+outcome+' '));
+    const fixture=JSON.parse(await readFile(fixturePath,'utf8'));
+    assert.ok(fixture.calls.filter(call=>call.args.includes('--log')).every(call=>call.args[call.args.indexOf('--attempt')+1]==='2'),'raw logs must be pinned to the observed attempt');
+  });
 });
