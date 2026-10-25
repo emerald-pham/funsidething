@@ -347,7 +347,7 @@ test('RISK offline repair guidance: help distinguishes a working workspace cloud
  assert.match(help,/original sources remain protected/i,'a new workspace is not described as a recovered empty board');
  assert.match(help,/repair a damaged cloud board from complete retained cloud copies/i);
  assert.match(help,/does not confirm edits still waiting on this device/i,'server repair and local edit acknowledgement remain separate');
- assert.match(help,/one Restore action: choose a JSON file or Paste JSON/i,'automatic repair retains the established deliberate Restore route');
+ assert.match(help,/one Import action: choose a JSON file or Paste JSON/i,'automatic repair retains the established deliberate Import route');
 });
 
 test('RISK offline device recovery: an exact retained local copy repairs damaged current bytes without cloud',async t=>{
@@ -820,8 +820,8 @@ test('RISK unreadable device recovery: an unsupported original remains protected
  assert.equal((await store.getRecoveryCloudHold()).workspace,'new-work');
  assert.ok((await store.listOpaqueArchives()).some(row=>row.raw.includes('futureAuthority')&&row.raw.includes('opaque')),'the complete unsupported original is protected before a new-work head is selected');
  const sources=await store.readRawExportSnapshot();assert.ok(sources.stores.snapshots.values.some(row=>row?.payload===raw),'the exact unknown original bytes remain retained');
- ctx.openSettings();ctx.onAction('view-current-board',{});
- assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/id="currentBoardData"/,'a placeholder is never exported as a recovered board');
+ ctx.openSettings();await ctx.onAction('export-backup',{isConnected:true});
+ assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/id="currentBoardData"|<textarea\b/,'a placeholder is never exported as a recovered board or full JSON viewer');
 });
 
 test('RISK unreadable device recovery: native Paste previews and restores a supported board while preserving unreadable originals',async t=>{
@@ -906,18 +906,14 @@ test('RISK unreadable device recovery: raw source export excludes the placeholde
  shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();ctx.Blob=class{constructor(parts){this.text=parts.join('');}};
  ctx.URL={createObjectURL(value){blob=value;return 'blob:source-only';},revokeObjectURL(){}};
  ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
- const download=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Download backup\s*<\/button>/);
- assert.ok(download,'the unavailable-board view exposes the shared Download backup action');
- assert.equal((settings.match(/data-act="download-backup"/g)||[]).length,1,'raw evidence stays within the one board-data download action');
- assert.match(settings,/value="raw-device-sources"/,'the unaccepted source is offered as a source-only archive');
- const selectedFormat=makeFakeElement();selectedFormat.value='raw-device-sources';
- const originalGet=shim.document.getElementById.bind(shim.document);
- shim.document.getElementById=id=>id==='backupDownloadFormat'?selectedFormat:originalGet(id);
- await ctx.onAction('download-current-board',{});assert.equal(downloads.length,0,'the shell cannot be exported as an accepted board');
- assert.equal(await ctx.onAction(download[1],{}),true,'the native Settings action downloads readable exact evidence');
- const archive=JSON.parse(downloads[0]);assert.equal(archive.currentBoard,null);assert.equal(archive.manifest.sources.currentBoard.status,'unavailable');
+ assert.equal((settings.match(/data-act="export-backup"/g)||[]).length,1,'unreadable sources use the single Export action');
+ assert.doesNotMatch(settings,/backupDownloadFormat|value="raw-device-sources"|view-current-board/);
+ assert.equal(await ctx.onAction('export-backup',{isConnected:true}),true,'the source-only export opens its safe transfer controls');
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/Partial recovery archive/);
+ const copied=await copyPreparedExport(ctx),archive=JSON.parse(copied);
+ assert.equal(archive.currentBoard,null);assert.equal(archive.manifest.sources.currentBoard.status,'unavailable');
  for(const [key,raw]of [[SYNC_STORE_KEY,original],[LOCAL_HEAD_KEY,'different broken head'],[LOCAL_BACKUPS_KEY,'{broken backup index']])assert.equal(archive.appSources.localStorage.find(row=>row.key===key).raw,raw);
- assert.throws(()=>ctx.decodeBackupFileBoard(downloads[0]),/incomplete|supported/,'source-only evidence cannot become an empty imported board');
+ assert.throws(()=>ctx.decodeBackupFileBoard(copied),/incomplete|supported/,'source-only evidence cannot become an empty imported board');
  assert.deepEqual(await store.readRawExportSnapshot(),before,'raw evidence export never writes or prunes device data');
 });
 
@@ -1081,10 +1077,10 @@ test('RISK unreadable device recovery: Quick start and current Changelog explain
  const {ctx,shim}=await loadApp();ctx.openHelp();
  const help=shim.document.getElementById('modalRoot').innerHTML,answer=help.match(/<dt>What if my saved device source cannot be read\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
  assert.ok(answer,'the extended FAQ covers unreadable missing unsupported and partial device sources');
- assert.match(answer,/one Restore action.*choose a JSON file or Paste JSON/i);assert.match(answer,/Download backup offers Raw device sources/i);
+ assert.match(answer,/one Import action.*choose a JSON file or Paste JSON/i);assert.match(answer,/Export can preserve readable raw sources.*partial archive/i);
  assert.match(answer,/not an empty recovered board/);assert.match(answer,/Cloud recovery stays pending/);
- assert.match(html,/one guarded Restore action for a file or pasted JSON/,'the current changelog describes the consolidated restore route');
- assert.match(html,/unreadable device data offers a source-only archive/,'the current changelog preserves the raw-source recovery limit');
+ assert.match(html,/Settings now has one Import and one Export.*separate Download and direct Copy controls/i,'the current changelog describes the consolidated transfer route');
+ assert.match(html,/unavailable or changing sources are marked partial.*saved originals remain protected/i,'the current changelog preserves the raw-source recovery limit');
 });
 
 test('RISK unreadable device recovery: partial raw rows remain exact while the restored board accepts later local edits',async t=>{
@@ -9087,6 +9083,15 @@ function extractAppScript(src) {
 }
 const appSrc = extractAppScript(html);
 
+async function copyPreparedExport(ctx) {
+  let copied;
+  ctx.navigator = { clipboard: { writeText(value) { copied = value; return Promise.resolve(); } } };
+  const result = await ctx.onAction("copy-export", {});
+  assert.equal(result, true, "the prepared Export payload copies through the actual clipboard action");
+  assert.equal(typeof copied, "string", "Copy sends the complete prepared payload directly");
+  return copied;
+}
+
 function makeFakeElement() {
   const el = {
     innerHTML: "", textContent: "", value: "", hidden: false, scrollTop: 0, children: [],
@@ -10607,34 +10612,75 @@ test("RISK rating bounds: hydration and frozen chance opponents normalize extrem
   assert.ok(loser.sigma >= sigmaFloor && loser.sigma <= sigmaLimit);
 });
 
-test("RISK backup and Restore consolidation: Settings keeps one guarded action with all formats", async () => {
+test("RISK Settings transfer consolidation: one Import, one Export and direct Copy", async () => {
   const { ctx, shim } = await loadApp();
+  assert.ok(await ctx.saveDurableBackup("manual", JSON.stringify(ctx.state)));
   ctx.openSettings();
-  const panel = shim.document.getElementById("modalRoot").innerHTML;
-  assert.match(panel, /<h3>Current-board view and copy<\/h3>/);
-  assert.match(panel, /<h3>Debug log<\/h3>/);
-  assert.match(panel, /data-act="view-current-board"/);
-  assert.equal((panel.match(/data-act="download-backup"/g) || []).length, 1, "the board-data area has one Download backup action");
-  assert.equal((panel.match(/data-act="restore-backup"/g) || []).length, 1, "the board-data area has one guarded Restore action");
-  assert.match(panel, /id="backupDownloadFormat"[\s\S]*?value="current-board"[\s\S]*?value="recovery-archive"/);
-  assert.match(panel, /id="backupRestoreSource"[\s\S]*?value="file"[\s\S]*?value="paste"/);
-  assert.doesNotMatch(panel, /data-act="download-current-board"|data-act="download-recovery-archive"/);
-  assert.doesNotMatch(panel, /data-act="choose-backup-file"|data-act="open-paste-recovery"/);
-  assert.doesNotMatch(panel, /Current board recovery/i);
-  assert.match(html, /use View \/ copy current board in Settings before closing it/);
-  assert.match(html, /use View \/ copy current board in Settings before choosing whether to delete an older backup/);
-  assert.doesNotMatch(html, /Current board recovery/);
+  const settings = shim.document.getElementById("modalRoot").innerHTML;
+  assert.equal((settings.match(/data-act="import-backup"/g) || []).length, 1);
+  assert.equal((settings.match(/data-act="export-backup"/g) || []).length, 1);
+  assert.match(settings, /id="backupRestoreSource"[\s\S]*?value="file"[\s\S]*?value="paste"/);
+  assert.match(settings, /data-act="make-manual-backup"/);
+  assert.match(settings, /data-act="restore-local-backup"[\s\S]*?data-act="delete-local-backup"/);
+  assert.doesNotMatch(settings, /data-act="(?:view-current-board|view-database-repair|download-backup|download-current-board|download-recovery-archive|view-raw-backups|download-raw-backups)"/);
+  assert.doesNotMatch(settings, /backupDownloadFormat|Current-board view and copy/);
+
+  assert.equal(await ctx.onAction("export-backup", { isConnected: true }), true);
+  const transfer = shim.document.getElementById("modalRoot").innerHTML;
+  assert.match(transfer, /id="exportTransferDialog"/);
+  assert.equal((transfer.match(/data-act="download-export"/g) || []).length, 1);
+  assert.equal((transfer.match(/data-act="copy-export"/g) || []).length, 1);
+  assert.match(transfer, /id="exportTransferStatus"[^>]*role="status"/);
+  assert.doesNotMatch(transfer, /<textarea\b|databaseRepairData|currentBoardData|rawBackupData/);
+  for (const alias of ["view-current-board", "copy-current-board", "select-current-board", "view-database-repair", "copy-database-repair", "select-database-repair", "view-raw-backups", "download-raw-backups", "download-backup", "download-current-board", "download-recovery-archive", "download-raw-device-sources"]) {
+    ctx.openSettings();
+    assert.equal(await ctx.onAction(alias, { isConnected: true }), true, `${alias} routes to the safe transfer dialog for already-open tabs`);
+    const legacyMarkup = shim.document.getElementById("modalRoot").innerHTML;
+    assert.match(legacyMarkup, /id="exportTransferDialog"/);
+    assert.doesNotMatch(legacyMarkup, /<textarea\b|currentBoardData|databaseRepairData|rawBackupData/);
+  }
 });
 
-test('RISK backup format safety: raw-source qualification remains outside the native selector',async t=>{
+test("RISK Settings transfer sections: cleanup controls stay outside the focused backup section", async t => {
+  const app = await loadApp();
+  t.after(() => app.dispose());
+  const { ctx, shim } = app;
+  const cleanupTask = ctx.addTask("Cleanup fixture", false);
+  ctx.completeTask(cleanupTask);
+  assert.ok(await ctx.saveDurableBackup("manual", JSON.stringify(ctx.state)));
+  ctx.openSettings();
+  const markup = shim.document.getElementById("modalRoot").innerHTML;
+  const dataSection = markup.match(/<details class="settings-section"><summary>Data and backups<\/summary>([\s\S]*?)<\/details>/)?.[1];
+  assert.ok(dataSection, "Settings mounts the Data and backups section");
+  assert.equal((dataSection.match(/data-act="import-backup"/g) || []).length, 1);
+  assert.equal((dataSection.match(/data-act="export-backup"/g) || []).length, 1);
+  assert.match(dataSection, /data-act="make-manual-backup"/);
+  assert.match(dataSection, /data-act="restore-local-backup"[\s\S]*?data-act="delete-local-backup"/);
+  assert.doesNotMatch(dataSection, /data-act="(?:review-decision-recovery|clear-done|wipe|view-support-diagnostics)"|id="syncErrorLog"|Recent sync errors|<h3>Debug log<\/h3>/,
+    "decision review, cleanup, and diagnostics do not crowd the transfer and backup controls");
+  const cleanupSection = markup.match(/<details class="settings-section"><summary>Recovery and cleanup<\/summary>([\s\S]*?)<\/details>/)?.[1];
+  assert.ok(cleanupSection, "the existing cleanup and diagnostic tools remain in their own collapsed section");
+  for (const action of ["review-decision-recovery", "clear-done", "wipe", "view-support-diagnostics"])
+    assert.match(cleanupSection, new RegExp(`data-act="${action}"`), `${action} remains available`);
+  assert.match(cleanupSection, /id="syncErrorLog"/);
+  assert.match(markup, /<details class="settings-section"><summary>Recovery and cleanup<\/summary>/,
+    "the recovery and cleanup section is collapsed by default");
+});
+
+test('RISK backup export safety: unreadable originals stay byte-exact without a raw-data view',async t=>{
  const {IDBFactory}=await import('fake-indexeddb'),original='{unreadable original backup source';
  const app=await loadApp({indexedDBProvider:new IDBFactory(),deviceDbName:'raw-format-safety-'+Math.random(),seedStorage:{[SYNC_STORE_KEY]:original,[LOCAL_HEAD_KEY]:'different protected original'}}),{ctx,shim}=app;
- t.after(()=>closeLegacyApp173(app));const before=await ctx.window.ScannerDeviceStore.readRawExportSnapshot();
+ t.after(()=>closeLegacyApp173(app));const store=ctx.window.ScannerDeviceStore,before=await store.readRawExportSnapshot();
  ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
- const format=settings.match(/<select\b[^>]*id="backupDownloadFormat"[^>]*>[\s\S]*?<\/select>/)?.[0];assert.ok(format);
- assert.match(settings.replace(/<select\b[^>]*>[\s\S]*?<\/select>/g,''),/Raw device sources are not a board and cannot be restored as one\./,'the safety qualification is readable text outside the potentially truncated native option');
- const describedBy=format.match(/aria-describedby="([^"]+)"/)?.[1];assert.ok(describedBy,'the native format control names its visible safety explanation');assert.ok(settings.includes('id="'+describedBy+'"'));
- assert.deepEqual(await ctx.window.ScannerDeviceStore.readRawExportSnapshot(),before);assert.equal(shim.localStorage.getItem(SYNC_STORE_KEY),original);
+ assert.equal((settings.match(/data-act="import-backup"/g)||[]).length,1);assert.equal((settings.match(/data-act="export-backup"/g)||[]).length,1);
+ assert.doesNotMatch(settings,/backupDownloadFormat|raw-device-sources|data-act="view-raw-backups"/);
+ assert.equal(await ctx.onAction('export-backup',{isConnected:true}),true);
+ const markup=shim.document.getElementById('modalRoot').innerHTML;assert.match(markup,/Partial recovery archive/);assert.doesNotMatch(markup,/<textarea\b/);
+ const archive=JSON.parse(await copyPreparedExport(ctx));assert.equal(archive.currentBoard,null);
+ assert.equal(archive.manifest.sources.currentBoard.status,'unavailable');
+ assert.equal(archive.appSources.localStorage.find(row=>row.key===SYNC_STORE_KEY).raw,original);
+ assert.equal(archive.appSources.localStorage.find(row=>row.key===LOCAL_HEAD_KEY).raw,'different protected original');
+ assert.deepEqual(await store.readRawExportSnapshot(),before);assert.equal(shim.localStorage.getItem(SYNC_STORE_KEY),original);
 });
 
 test('RISK backup format browser: enlarged unreadable Settings keeps native selectors and safety text readable',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
@@ -10650,16 +10696,15 @@ test('RISK backup format browser: enlarged unreadable Settings keeps native sele
    await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&window.ScannerDeviceStore);
    const motion=page.locator('#motionDialog [data-landscape-motion="reduced"]');if(await motion.isVisible())await motion.click();await resolveExpectedFirstRunHelp(page);
    assert.equal(await page.evaluate(()=>liveBoardAccepted),false);
-   await page.locator('[data-act="settings"]').first().click();const section=page.locator('#modalRoot details').filter({has:page.locator('#backupDownloadFormat')});if(!await section.evaluate(e=>e.open))await section.locator(':scope > summary').click();
+   await page.locator('[data-act="settings"]').first().click();const section=page.locator('#modalRoot details').filter({has:page.locator('#backupRestoreSource')});if(!await section.evaluate(e=>e.open))await section.locator(':scope > summary').click();
    const before=await page.evaluate(()=>ScannerDeviceStore.readRawExportSnapshot());
-   await page.addStyleTag({content:'#backupDownloadFormat,#backupRestoreSource,#stDateFormat{font-size:22.5px!important} #modalRoot .modal .kv{font-size:20.25px!important}'});
-   await page.evaluate(()=>document.fonts.ready);await page.locator('#backupDownloadFormat').scrollIntoViewIfNeeded();
-   assert.deepEqual(await page.locator('#backupDownloadFormat option').evaluateAll(es=>es.map(e=>e.value)),['raw-device-sources']);
-   const geometry=await page.locator('#backupDownloadFormat,#backupRestoreSource').evaluateAll(es=>es.map(e=>{const r=e.getBoundingClientRect(),p=e.parentElement.getBoundingClientRect(),s=getComputedStyle(e),probe=document.createElement('select'),option=document.createElement('option');option.textContent=e.selectedOptions[0].textContent;probe.appendChild(option);probe.style.cssText='position:fixed;visibility:hidden;width:max-content;max-width:none;min-width:0;';probe.style.font=s.font;probe.style.padding=s.padding;probe.style.border=s.border;probe.style.appearance=s.appearance;document.body.appendChild(probe);const nativeIntrinsicWidth=probe.getBoundingClientRect().width;probe.remove();return{id:e.id,left:r.left,right:r.right,width:r.width,parentLeft:p.left,parentRight:p.right,fontSize:s.fontSize,text:e.selectedOptions[0].textContent,nativeIntrinsicWidth,appearance:s.appearance};}));
-   if(evidence)await page.screenshot({path:path.join(evidence,theme+'-raw-format.png')});t.diagnostic(JSON.stringify({theme,geometry}));
+   await page.addStyleTag({content:'#backupRestoreSource,#stDateFormat{font-size:22.5px!important} #modalRoot .modal .kv{font-size:20.25px!important}'});
+   await page.evaluate(()=>document.fonts.ready);await page.locator('#backupRestoreSource').scrollIntoViewIfNeeded();
+   assert.deepEqual(await page.locator('#backupRestoreSource option').evaluateAll(es=>es.map(e=>e.value)),['file','paste']);
+   assert.equal(await page.locator('#modalRoot [data-act="import-backup"]').count(),1);assert.equal(await page.locator('#modalRoot [data-act="export-backup"]').count(),1);
+   const geometry=await page.locator('#backupRestoreSource,#stDateFormat').evaluateAll(es=>es.map(e=>{const r=e.getBoundingClientRect(),p=e.parentElement.getBoundingClientRect(),s=getComputedStyle(e),probe=document.createElement('select'),option=document.createElement('option');option.textContent=e.selectedOptions[0].textContent;probe.appendChild(option);probe.style.cssText='position:fixed;visibility:hidden;width:max-content;max-width:none;min-width:0;';probe.style.font=s.font;probe.style.padding=s.padding;probe.style.border=s.border;probe.style.appearance=s.appearance;document.body.appendChild(probe);const nativeIntrinsicWidth=probe.getBoundingClientRect().width;probe.remove();return{id:e.id,left:r.left,right:r.right,width:r.width,parentLeft:p.left,parentRight:p.right,fontSize:s.fontSize,text:e.selectedOptions[0].textContent,nativeIntrinsicWidth,appearance:s.appearance};}));
+   if(evidence)await page.screenshot({path:path.join(evidence,theme+'-transfer-controls.png')});t.diagnostic(JSON.stringify({theme,geometry}));
    for(const r of geometry){assert.equal(r.fontSize,'22.5px');assert.ok(r.left>=r.parentLeft-1&&r.right<=r.parentRight+1,r.id+' must remain inside its real Settings row');assert.ok(r.nativeIntrinsicWidth<=r.width+1,r.id+' leaves room for its complete label and native arrow compared with an unconstrained native reference');assert.notEqual(r.appearance,'none');}
-   const help=page.getByText('Raw device sources are not a board and cannot be restored as one.',{exact:true});assert.equal(await help.isVisible(),true);assert.equal(await page.locator('#backupDownloadFormat').getAttribute('aria-describedby'),await help.getAttribute('id'));
-   assert.equal(await help.evaluate(e=>e.scrollWidth<=e.clientWidth+1),true);
    await page.locator('#backupRestoreSource').selectOption('paste');assert.equal(await page.locator('#backupRestoreSource').inputValue(),'paste');assert.deepEqual(await page.evaluate(()=>ScannerDeviceStore.readRawExportSnapshot()),before);assert.equal(await page.evaluate(()=>liveBoardAccepted),false);
   }finally{await context.close();}
  });}finally{await browser.close();}
@@ -19333,7 +19378,7 @@ test('RISK LOCAL BACKUPS: deleting one visible copy preserves hidden unreadable 
     'the unreadable row remains byte-for-byte available in the raw index');
 });
 
-test('RISK LOCAL BACKUPS: unreadable old copy is visible with exact raw recovery and targeted removal',async()=>{
+test('RISK LOCAL BACKUPS: unreadable old copy stays visible and byte-exact in unified Export',async()=>{
   const storage=sharedScannerStorage();
   const {ctx,shim}=await loadApp({sharedStorage:storage});
   const bad={id:'old-unreadable',day:'2020-01-01',at:Date.parse('2020-01-01T12:00:00Z'),kind:'daily',payload:'unreadable'};
@@ -19344,12 +19389,13 @@ test('RISK LOCAL BACKUPS: unreadable old copy is visible with exact raw recovery
   let view=shim.document.getElementById('modalRoot').innerHTML;
   assert.match(view,/old-unreadable/);
   assert.match(view,/Unreadable backup/);
-  assert.match(view,/data-act="view-raw-backups"/);
-  assert.match(view,/data-act="download-raw-backups"/);
+  assert.equal((view.match(/data-act="export-backup"/g)||[]).length,1);
+  assert.doesNotMatch(view,/data-act="view-raw-backups"|data-act="download-raw-backups"|rawBackupData/);
   assert.match(view,/data-act="restore-local-backup"[^>]*disabled/);
-  ctx.onAction('view-raw-backups',{});
-  view=shim.document.getElementById('modalRoot').innerHTML;
-  assert.ok(view.includes(ctx.esc(raw)),'the raw viewer contains every original byte for recovery');
+  assert.equal(await ctx.onAction('export-backup',{isConnected:true}),true);
+  const archive=JSON.parse(await copyPreparedExport(ctx));
+  assert.equal(archive.appSources.localStorage.find(row=>row.key===LOCAL_BACKUPS_KEY).raw,raw,
+    'the unified read-only archive retains every unreadable backup byte exactly');
   ctx.openSettings();
   ctx.onAction('delete-local-backup',{dataset:{id:'old-unreadable'}});
   assert.deepEqual(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)),[good]);
@@ -19374,8 +19420,9 @@ test('RISK LOCAL BACKUPS: duplicate IDs and malformed root never permit ambiguou
   assert.match(shim.document.getElementById('modalRoot').innerHTML,/Backup list cannot be read/);
   ctx.onAction('delete-local-backup',{dataset:{id:'partial'}});
   assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),malformed);
-  ctx.onAction('view-raw-backups',{});
-  assert.ok(shim.document.getElementById('modalRoot').innerHTML.includes(ctx.esc(malformed)));
+  assert.equal(await ctx.onAction('export-backup',{isConnected:true}),true);
+  const archive=JSON.parse(await copyPreparedExport(ctx));
+  assert.equal(archive.appSources.localStorage.find(row=>row.key===LOCAL_BACKUPS_KEY).raw,malformed);
 });
 
 test('RISK LOCAL BACKUPS: a stale Settings click cannot delete a row rewritten by another tab',async()=>{
@@ -19434,54 +19481,58 @@ test('SETTINGS: manual local backups replace visible JSON import and export cont
   assert.match(html,/title="Settings, contexts, and backups"/);
 });
 
-test('RISK JSON COPY PASTE: the current-board viewer copies its exact displayed JSON without saving',async t=>{
-  const storage=sharedScannerStorage(),app=await loadApp({sharedStorage:storage}),{ctx,shim}=app;
+test('RISK JSON COPY PASTE: Copy and Download send the same full archive without a JSON view or writes',async t=>{
+  const {IDBFactory}=await import('fake-indexeddb'),storage=sharedScannerStorage();
+  const app=await loadApp({sharedStorage:storage,indexedDBProvider:new IDBFactory(),deviceDbName:'direct-copy-export-'+Date.now()}),{ctx,shim}=app;
   t.after(()=>app.dispose());
   const task=ctx.addTask('Copy <board> & keep 🌿');await ctx.persist();
-  task.futureCopyField={keep:'unknown value'};ctx.state.futureCopyBoardField={retain:true};
-  const before=JSON.stringify(ctx.state),saved=storage.getItem(SYNC_STORE_KEY),writes=[];
+  task.futureCopyField={keep:'unknown value'};ctx.state.futureCopyBoardField={retain:true};ctx.state.syncDirty=true;
+  const before=JSON.stringify(ctx.state),saved=storage.getItem(SYNC_STORE_KEY),sourceBefore=await ctx.window.ScannerDeviceStore.readRawExportSnapshot(),writes=[];
   const set=storage.setItem.bind(storage);storage.setItem=(key,value)=>{writes.push(key);return set(key,value);};
-  ctx.openSettings();await ctx.onAction('view-current-board',{});
+  ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
+  assert.equal((settings.match(/data-act="import-backup"/g)||[]).length,1);
+  assert.equal((settings.match(/data-act="export-backup"/g)||[]).length,1);
+  assert.doesNotMatch(settings,/currentBoardData|databaseRepairData|rawBackupData|<textarea\b/);
+  assert.equal(await ctx.onAction('export-backup',{isConnected:true}),true);
   const markup=shim.document.getElementById('modalRoot').innerHTML;
-  const copy=markup.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>Copy JSON<\/button>/);
-  assert.ok(copy,'the actual current-board viewer offers a clipboard Copy JSON action');
-  const shown=markup.match(/<textarea\b[^>]*id="currentBoardData"[^>]*>([\s\S]*?)<\/textarea>/)?.[1];
-  assert.ok(shown,'the complete readonly JSON remains visible');
-  const raw=shown.replaceAll('&quot;','"').replaceAll('&#39;',"'").replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&amp;','&');
-  shim.document.getElementById('currentBoardData').value=raw;
-  let copied=null;ctx.navigator={clipboard:{async writeText(value){copied=value;}}};
-  assert.equal(await ctx.onAction(copy[1],{}),true);
-  assert.equal(copied,raw,'the copy gesture uses the visible snapshot');
-  const board=JSON.parse(copied);
-  assert.equal(board.tasks.find(row=>row.id===task.id).futureCopyField.keep,'unknown value');
-  assert.equal(board.futureCopyBoardField.retain,true);
+  assert.match(markup,/id="exportTransferDialog"/);assert.doesNotMatch(markup,/<textarea\b|currentBoardData|databaseRepairData/);
+  const copied=await copyPreparedExport(ctx),archive=JSON.parse(copied);
+  assert.equal(archive.format,'chain-scanner.recovery-archive');assert.equal(archive.manifest.status,'complete');
+  assert.equal(archive.currentBoard.tasks.find(row=>row.id===task.id).futureCopyField.keep,'unknown value');
+  assert.equal(archive.currentBoard.futureCopyBoardField.retain,true);
   assert.equal(JSON.stringify(ctx.state),before,'copy leaves accepted unsaved fields untouched');
   assert.equal(storage.getItem(SYNC_STORE_KEY),saved,'copy does not save accepted unsaved fields');
-  assert.deepEqual(writes,[],'copy does not write browser storage');
-  const area=shim.document.getElementById('currentBoardData');let selected=0;
-  area.select=()=>selected++;
-  for(const clipboard of [undefined,{async writeText(){throw Error('denied');}}]){
-    ctx.navigator={clipboard};
-    assert.equal(await ctx.onAction(copy[1],{}),false,'unavailable clipboard access is recoverable');
-    assert.equal(area.value,raw,'the exact snapshot remains available for manual copying');
-    assert.match(shim.document.getElementById('modalRoot').innerHTML,/currentBoardData/);
-    assert.match(shim.document.getElementById('toast').textContent,/select.*copy/i);
-  }
-  assert.equal(selected,2,'both denied and missing clipboard APIs select the visible JSON');
-  assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(writes,[]);
-  const {IDBFactory}=await import('fake-indexeddb');
+
+  let blob=null;const downloads=[],link=makeFakeElement();link.remove=()=>{};link.click=()=>downloads.push({name:link.download,blob});
+  shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();
+  ctx.Blob=class{constructor(parts,options){this.text=parts.join('');this.type=options.type;}};
+  ctx.URL={createObjectURL(value){blob=value;return 'blob:direct-copy';},revokeObjectURL(){}};
+  assert.equal(await ctx.onAction('download-export',{}),true);
+  assert.equal(downloads.length,1);assert.equal(downloads[0].name,'chain-scanner-recovery-archive.json');
+  assert.equal(downloads[0].blob.text,copied,'the Download action saves the exact string copied to the clipboard');
+
+  const status=makeFakeElement(),originalGet=shim.document.getElementById.bind(shim.document);
+  shim.document.getElementById=id=>id==='exportTransferStatus'?status:originalGet(id);
+  ctx.navigator={clipboard:{writeText(){return Promise.reject(Error('denied'));}}};
+  assert.equal(await ctx.onAction('copy-export',{}),false,'clipboard errors remain visible and recoverable');
+  assert.equal(downloads.length,1,'clipboard failure does not trigger a second download');
+  assert.match(status.textContent,/Clipboard access failed/i);
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="download-export"/);
+  assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/<textarea\b|currentBoardData|databaseRepairData|rawBackupData/);
+  assert.equal(JSON.stringify(ctx.state),before);assert.equal(storage.getItem(SYNC_STORE_KEY),saved);assert.deepEqual(writes,[]);
+  assert.deepEqual(await ctx.window.ScannerDeviceStore.readRawExportSnapshot(),sourceBefore,'Export performs no device-store write');
+
   const destination=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'json-copy-paste-'+Date.now()});
   t.after(()=>destination.dispose());
   const target=destination.ctx,dom=destination.shim;
   target.addTask('Board before pasted restore',false);await prepareBackupFileFixtureSource(destination);
   const original=JSON.stringify(target.state),originalHead=await target.window.ScannerDeviceStore.readHead();
-  target.openSettings();dom.document.getElementById('backupRestoreSource').value='paste';
-  await target.onAction('restore-backup',{});
+  target.openSettings();dom.document.getElementById('backupRestoreSource').value='paste';await target.onAction('import-backup',{});
   const pasted=dom.document.getElementById('jsonBox');pasted.id='jsonBox';pasted.value=copied;
   dom.document.dispatchEvent({type:'input',target:pasted});
   assert.equal(await target.onAction('preview-pasted-recovery',{}),true,dom.document.getElementById('toast').textContent);
   assert.match(dom.document.getElementById('modalRoot').innerHTML,/confirm-file-restore/);
-  assert.equal(JSON.stringify(target.state),original,'pasting reaches a preview without replacing the board');
+  assert.equal(JSON.stringify(target.state),original,'pasting reaches preview without replacing the board');
   assert.equal((await target.window.ScannerDeviceStore.readHead()).hash,originalHead.hash);
   await target.onAction('cancel-file-restore',{});
   assert.equal(dom.document.getElementById('jsonBox').value,copied,'Cancel retains the exact copied text');
@@ -19489,8 +19540,8 @@ test('RISK JSON COPY PASTE: the current-board viewer copies its exact displayed 
   assert.equal(await target.onAction('preview-pasted-recovery',{}),true);
   assert.equal(await target.onAction('confirm-file-restore',{}),true);
   assert.equal(target.state.tasks.find(row=>row.id===task.id).futureCopyField.keep,'unknown value');
-  const durable=JSON.parse((await target.window.ScannerDeviceStore.readHead()).payload);
-  assert.equal(durable.futureCopyBoardField.retain,true,'confirmed round-trip retains unknown board data durably');
+  assert.equal(target.state.futureCopyBoardField.retain,true);
+  assert.equal(await target.window.ScannerDeviceStore.getPendingUpload('repair-copy@example.test'),null,'archived pending work is never replayed');
   assert.ok((await target.window.ScannerDeviceStore.listBackups()).some(row=>row.payload===original),'the displaced board remains protected');
 });
 
@@ -19499,15 +19550,16 @@ test('RISK JSON COPY PASTE: Quick start explains the copy button, manual fallbac
   const help=app.shim.document.getElementById('modalRoot').innerHTML;
   const answer=help.match(/<dt>How do I copy and paste JSON\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
   assert.ok(answer,'Quick start includes the JSON copy and paste workflow');
-  assert.match(answer,/View \/ copy current board.*Copy JSON/);
-  assert.match(answer,/does not copy local backups or recovery sources/i);
-  assert.match(answer,/Select all.*manually/i);
-  assert.match(answer,/Restore.*Paste JSON.*preview.*confirm/i);
-  assert.match(answer,/accepted.*unsaved|may not have saved/i);
-  assert.match(answer,/not.*Debug log/i);
+  assert.match(answer,/Settings.*Export.*choose Copy/i);
+  assert.match(answer,/same recovery archive offered by Download/i);
+  assert.match(answer,/not shown as a large text view/i);
+  assert.match(answer,/If clipboard access is unavailable, use Download/i);
+  assert.match(answer,/Import.*Paste JSON.*preview.*confirm/i);
+  assert.match(answer,/accepted unsaved edits/i);
+  assert.doesNotMatch(answer,/Select all.*manually/i);
 });
 
-test('RISK DATABASE REPAIR EXPORT: the Settings copy includes exact saved sources and repair metadata without writes',async t=>{
+test('RISK DATABASE REPAIR EXPORT: unified Copy and Download retain exact sources and metadata without writes',async t=>{
   const {IDBFactory}=await import('fake-indexeddb');
   const dbName='database-repair-copy-'+Date.now(),app=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:dbName}),{ctx,shim}=app;
   t.after(()=>app.dispose());ctx.addTask('Database repair task',false);await prepareBackupFileFixtureSource(app);
@@ -19515,36 +19567,34 @@ test('RISK DATABASE REPAIR EXPORT: the Settings copy includes exact saved source
   const store=ctx.window.ScannerDeviceStore,account='repair-copy@example.test';
   await store.setPendingUpload(account,{generationId:'repair-pending-not-replayed',payloadHash:'b'.repeat(64),baseRev:4,updatedAt:1});
   const head=await store.readHead();await store.putBackup({expectedHash:head.hash,backup:{id:'repair-manual-original',kind:'manual',day:'2026-10-25',at:1,payload:'{"unknownOriginal":"keep exact"}'}});
-  const before=JSON.stringify(await store.readRawExportSnapshot()),boardBefore=JSON.stringify(ctx.state);
-  ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
-  const view=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>View \/ copy database for repair<\/button>/);
-  assert.ok(view,'Settings exposes one combined database and repair export');
-  assert.equal(await ctx.onAction(view[1],{}),true);
-  const markup=shim.document.getElementById('modalRoot').innerHTML;
-  const shown=markup.match(/<textarea\b[^>]*id="databaseRepairData"[^>]*>([\s\S]*?)<\/textarea>/)?.[1];assert.ok(shown);
-  const raw=shown.replaceAll('&quot;','"').replaceAll('&#39;',"'").replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&amp;','&');
-  shim.document.getElementById('databaseRepairData').value=raw;
-  const copy=markup.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>Copy JSON<\/button>/);assert.ok(copy);
-  let copied=null;ctx.navigator={clipboard:{async writeText(value){copied=value;}}};assert.equal(await ctx.onAction(copy[1],{}),true);assert.equal(copied,raw);
-  const exported=JSON.parse(copied);assert.equal(exported.format,'chain-scanner.recovery-archive');assert.equal(exported.formatVersion,1);assert.equal(exported.manifest.status,'complete');
+  const before=JSON.stringify(await store.readRawExportSnapshot()),boardBefore=JSON.stringify(ctx.state),writes=[];
+  const local=shim.localStorage,originalSet=local.setItem.bind(local),originalRemove=local.removeItem.bind(local);
+  local.setItem=(...args)=>{writes.push(['set',args[0]]);return originalSet(...args);};local.removeItem=key=>{writes.push(['remove',key]);return originalRemove(key);};
+  ctx.openSettings();let settings=shim.document.getElementById('modalRoot').innerHTML;
+  assert.equal((settings.match(/data-act="export-backup"/g)||[]).length,1);
+  assert.equal((settings.match(/data-act="import-backup"/g)||[]).length,1);
+  assert.doesNotMatch(settings,/view-current-board|view-database-repair|download-backup|currentBoardData|databaseRepairData|rawBackupData/);
+  assert.equal(await ctx.onAction('export-backup',{isConnected:true}),true);
+  let markup=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(markup,/id="exportTransferDialog"/);assert.doesNotMatch(markup,/<textarea\b|currentBoardData|databaseRepairData|rawBackupData/);
+  const copied=await copyPreparedExport(ctx),exported=JSON.parse(copied);
+  assert.equal(exported.format,'chain-scanner.recovery-archive');assert.equal(exported.formatVersion,1);assert.equal(exported.manifest.status,'complete');
   assert.equal(exported.currentBoard.tasks[0].futureRepairField.keep,'unknown 🌿');
-  assert.ok(copied.includes('repair-pending-not-replayed')&&copied.includes('repair-manual-original'),'the database sources accompany the open board');
+  assert.ok(copied.includes('repair-pending-not-replayed')&&copied.includes('repair-manual-original'),'pending and saved recovery sources accompany the open board');
   assert.equal(exported.appSources.indexedDB.stores.meta.find(row=>decodeManualArchiveTypedValue(row.key)==='head').value.type,'object');
   const log=exported.repairInfo.debugLog;assert.equal(log.schema,'funsidething.support-diagnostics');assert.equal(log.metadataOnly,true);assert.equal(log.boardDataIncluded,false);
   assert.match(copied,/appFingerprint|fingerprint|cacheName|build/i,'the package includes available build and worker observations');
   assert.equal(exported.appSources.indexedDB.database,dbName);assert.equal(exported.manifest.sources.indexedDB.schemaVersion,2);
-  assert.equal(JSON.stringify(await store.readRawExportSnapshot()),before);assert.equal(JSON.stringify(ctx.state),boardBefore,'repair export is read-only');
-  const {ctx:target,shim:dom,...destination}=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'repair-copy-restore-'+Date.now()});
-  t.after(()=>destination.dispose());target.addTask('Before repair-file restore',false);await prepareBackupFileFixtureSource(target);
-  const original=JSON.stringify(target.state);target.openSettings();dom.document.getElementById('backupRestoreSource').value='paste';await target.onAction('restore-backup',{});
-  const box=dom.document.getElementById('jsonBox');box.id='jsonBox';box.value=copied;dom.document.dispatchEvent({type:'input',target:box});
-  assert.equal(await target.onAction('preview-pasted-recovery',{}),true,dom.document.getElementById('toast').textContent);assert.equal(JSON.stringify(target.state),original);
-  assert.equal(await target.onAction('confirm-file-restore',{}),true);assert.equal(target.state.tasks[0].futureRepairField.keep,'unknown 🌿');
-  assert.equal(await target.window.ScannerDeviceStore.getPendingUpload(account),null,'restoring the current board never replays archived pending work');
-  assert.ok((await target.window.ScannerDeviceStore.listBackups()).some(row=>row.kind==='restore-file-source'&&Buffer.from(row.restoreFile?.bytesBase64||'','base64').toString('utf8')===copied),'the exact package remains protected for repair');
+  assert.equal(JSON.stringify(await store.readRawExportSnapshot()),before,'the exact serialized snapshot source stays unchanged');assert.equal(JSON.stringify(ctx.state),boardBefore,'Export is read-only');
+  assert.deepEqual(writes,[],'Export never modifies browser storage');
+  const link=makeFakeElement();let blob=null;link.remove=()=>{};link.click=()=>{};shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();
+  ctx.Blob=class{constructor(parts,options){this.text=parts.join('');this.type=options.type;}};
+  ctx.URL={createObjectURL(value){blob=value;return 'blob:repair-export';},revokeObjectURL(){}};
+  await ctx.onAction('download-export',{});assert.equal(blob.text,copied,'Download uses the exact bytes already sent to Copy');
+  assert.equal(JSON.stringify(await store.readRawExportSnapshot()),before);assert.equal(JSON.stringify(ctx.state),boardBefore);assert.deepEqual(writes,[]);
 });
 
-test('RISK DATABASE REPAIR EXPORT: unreadable storage produces a labeled partial package with available board and diagnostics',async t=>{
+test('RISK DATABASE REPAIR EXPORT: unreadable sources are labeled partial and never shown as an empty database',async t=>{
   const {IDBFactory,IDBDatabase}=await import('fake-indexeddb');
   for(const failure of ['no device database','database read failure','one local source unreadable'])await t.test(failure,async subtest=>{
     const storage=sharedScannerStorage(),dbName='partial-repair-'+failure+'-'+Date.now();
@@ -19554,37 +19604,34 @@ test('RISK DATABASE REPAIR EXPORT: unreadable storage produces a labeled partial
     if(failure==='database read failure')IDBDatabase.prototype.transaction=function(names,mode,...args){if(this.name===dbName&&mode==='readonly')throw Object.assign(Error('private-os-error-not-for-export'),{name:'UnknownError'});return transaction.call(this,names,mode,...args);};
     if(failure==='one local source unreadable')storage.getItem=key=>{if(key==='fvp:chain-scanner:daily-backups:v1')throw Error('private-local-error-not-for-export');return get(key);};
     try{
-      ctx.openSettings();assert.equal(await ctx.onAction('view-database-repair',{}),true,'the repair export stays usable when a database source cannot be read');
-      const markup=shim.document.getElementById('modalRoot').innerHTML;assert.match(markup,/partial repair export/i);
-      const shown=markup.match(/<textarea\b[^>]*id="databaseRepairData"[^>]*>([\s\S]*?)<\/textarea>/)?.[1];assert.ok(shown);
-      const raw=shown.replaceAll('&quot;','"').replaceAll('&#39;',"'").replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&amp;','&');
-      const report=JSON.parse(raw);assert.equal(report.manifest.status,'partial');assert.ok(report.manifest.failures.length);
+      ctx.openSettings();assert.equal(await ctx.onAction('export-backup',{isConnected:true}),true);
+      const markup=shim.document.getElementById('modalRoot').innerHTML;assert.match(markup,/Partial recovery archive/i);assert.doesNotMatch(markup,/<textarea\b/);
+      const raw=await copyPreparedExport(ctx),report=JSON.parse(raw);
+      assert.equal(report.manifest.status,'partial');assert.ok(report.manifest.failures.length);
       assert.equal(report.currentBoard.tasks[0].title,'Available accepted repair board');assert.equal(report.repairInfo.debugLog.metadataOnly,true);
-      assert.ok(report.appSources.localStorage.some(row=>row.status==='present'&&typeof row.raw==='string'),'other readable local sources are retained');
+      assert.ok(report.appSources.localStorage.some(row=>row.status==='present'&&typeof row.raw==='string'));
       if(failure==='one local source unreadable')assert.equal(report.manifest.sources.localStorage['fvp:chain-scanner:daily-backups:v1'].status,'unavailable');
       else{assert.equal(report.manifest.sources.indexedDB.status,'unavailable');assert.equal(report.appSources.indexedDB.stores,null,'unreadable storage is never represented as an empty database');}
-      assert.doesNotMatch(raw,/private-(?:os|local)-error-not-for-export/,'arbitrary exception text is excluded from repair diagnostics');
-      assert.equal(JSON.stringify(ctx.state),before,'an incomplete export cannot replace accepted work');
+      assert.doesNotMatch(raw,/private-(?:os|local)-error-not-for-export/,'private platform exception text is excluded');
+      assert.equal(JSON.stringify(ctx.state),before,'partial capture cannot replace accepted work');
       IDBDatabase.prototype.transaction=transaction;storage.getItem=get;
-      shim.document.getElementById('databaseRepairData').value=raw;let copied;ctx.navigator={clipboard:{async writeText(value){copied=value;}}};
-      assert.equal(await ctx.onAction('copy-database-repair',{}),true);assert.equal(copied,raw);
-      ctx.openSettings();shim.document.getElementById('backupRestoreSource').value='paste';await ctx.onAction('restore-backup',{});
-      const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=copied;shim.document.dispatchEvent({type:'input',target:box});
-      assert.equal(await ctx.onAction('preview-pasted-recovery',{}),false,'a partial diagnostic package cannot be restored as a complete backup');
+      ctx.openSettings();await ctx.onAction('import-backup',{});const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=raw;
+      shim.document.dispatchEvent({type:'input',target:box});
+      assert.equal(await ctx.onAction('preview-pasted-recovery',{}),false,'a partial archive cannot be restored as a complete backup');
       assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="confirm-file-restore"/);assert.equal(JSON.stringify(ctx.state),before);
     }finally{IDBDatabase.prototype.transaction=transaction;storage.getItem=get;}
   });
 });
 
-test('RISK DATABASE REPAIR EXPORT: visible Debug log controls use the combined repair export',async t=>{
+test('RISK DATABASE REPAIR EXPORT: Debug log points to the combined archive without duplicate export controls',async t=>{
   const app=await loadApp();t.after(()=>app.dispose());const {ctx,shim}=app;
   ctx.openSettings();let markup=shim.document.getElementById('modalRoot').innerHTML;
-  assert.match(markup,/data-act="view-database-repair"/);
-  assert.doesNotMatch(markup,/data-act="(?:copy|download)-support-diagnostics"/,'Settings has no redundant standalone Debug log exporters');
+  assert.equal((markup.match(/data-act="export-backup"/g)||[]).length,1);
+  assert.doesNotMatch(markup,/data-act="(?:copy|download)-support-diagnostics"|view-database-repair/);
   await ctx.onAction('view-support-diagnostics',{});markup=shim.document.getElementById('modalRoot').innerHTML;
-  assert.match(markup,/data-act="view-database-repair"/,'quick log inspection links to the same combined exporter');
-  assert.doesNotMatch(markup,/data-act="(?:copy|download)-support-diagnostics"/);
-  assert.match(markup,/data-act="select-support-diagnostics"/,'the log remains manually selectable for quick inspection');
+  assert.match(markup,/data-act="export-backup"[^>]*data-export-scope="repair"/);
+  assert.doesNotMatch(markup,/data-act="(?:copy|download)-support-diagnostics"|view-database-repair/);
+  assert.match(markup,/data-act="select-support-diagnostics"/,'the small metadata log remains selectable for quick inspection');
 });
 
 test('RISK DATABASE REPAIR EXPORT: readonly capture keeps original diagnostic storage even when old entries expire',async t=>{
@@ -19592,104 +19639,96 @@ test('RISK DATABASE REPAIR EXPORT: readonly capture keeps original diagnostic st
   ctx.addTask('Read-only repair capture',false);await ctx.persist();ctx.openSettings();
   const key='fvp:chain-scanner:restart-diagnostics:v1',original=JSON.stringify({version:1,documents:[{document:'1234567890abcdef',navigationType:'reload',events:[{at:Date.now()-2*60*60*1000,stage:'boot'}]}]});
   storage.setItem(key,original);const writes=[],set=storage.setItem.bind(storage),remove=storage.removeItem.bind(storage);
-  storage.setItem=(...args)=>{writes.push(['set',args[0]]);return set(...args);};storage.removeItem=(...args)=>{writes.push(['remove',args[0]]);return remove(...args);};
-  assert.equal(await ctx.onAction('view-database-repair',{}),true);
-  assert.equal(storage.getItem(key),original,'diagnostic retention filtering must not rewrite original storage during database export');
+  storage.setItem=(...args)=>{writes.push(['set',args[0]]);return set(...args);};storage.removeItem=key=>{writes.push(['remove',key]);return remove(key);};
+  assert.equal(await ctx.onAction('export-backup',{isConnected:true}),true);
+  const archive=JSON.parse(await copyPreparedExport(ctx));
+  assert.equal(archive.repairInfo.debugLog.schema,'funsidething.support-diagnostics');
+  assert.equal(storage.getItem(key),original,'diagnostic retention filtering must not rewrite original storage during archive export');
   assert.deepEqual(writes,[],'repair capture performs no browser-storage writes');
-  assert.match(shim.document.getElementById('modalRoot').innerHTML,/databaseRepairData/);
+  assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/<textarea\b/);
 });
-
 test('RISK DATABASE REPAIR EXPORT: available worker and cache identities are captured without diagnostic writes',async t=>{
   const {MessageChannel}=await import('node:worker_threads'),storage=sharedScannerStorage(),fingerprint='c'.repeat(64),worker={postMessage(message,ports){ports[0].postMessage({type:message.type,cacheName:'chain-scanner-shell-'+fingerprint});}};
-  const app=await loadApp({sharedStorage:storage,navigatorProvider:{serviceWorker:{controller:worker,addEventListener(){},async register(){return {active:worker,addEventListener(){}};},async getRegistration(){return {active:worker};}}}}),{ctx,shim}=app;t.after(()=>app.dispose());
+  const app=await loadApp({sharedStorage:storage,navigatorProvider:{serviceWorker:{controller:worker,addEventListener(){},async register(){return {active:worker,addEventListener(){}};},async getRegistration(){return {active:worker};}}}}),{ctx}=app;t.after(()=>app.dispose());
   ctx.MessageChannel=MessageChannel;ctx.caches={async keys(){return ['chain-scanner-shell-'+fingerprint];}};
-  ctx.openSettings();const writes=[],set=storage.setItem.bind(storage),remove=storage.removeItem.bind(storage);
-  storage.setItem=(...args)=>{writes.push(['set',args[0]]);return set(...args);};storage.removeItem=(...args)=>{writes.push(['remove',args[0]]);return remove(...args);};
-  assert.equal(await ctx.onAction('view-database-repair',{}),true);
-  const shown=shim.document.getElementById('modalRoot').innerHTML.match(/<textarea\b[^>]*id="databaseRepairData"[^>]*>([\s\S]*?)<\/textarea>/)?.[1];assert.ok(shown);
-  const report=JSON.parse(shown.replaceAll('&quot;','"').replaceAll('&#39;',"'").replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&amp;','&'));
-  assert.equal(report.repairInfo.debugLog.serviceWorker.active.value,fingerprint,'the combined export captures available worker identity without first opening Debug log');
+  const writes=[],set=storage.setItem.bind(storage),remove=storage.removeItem.bind(storage);
+  storage.setItem=(...args)=>{writes.push(['set',args[0]]);return set(...args);};storage.removeItem=key=>{writes.push(['remove',key]);return remove(key);};
+  ctx.openSettings();await ctx.onAction('export-backup',{isConnected:true});const report=JSON.parse(await copyPreparedExport(ctx));
+  assert.equal(report.repairInfo.debugLog.serviceWorker.active.value,fingerprint,'the archive captures the available worker identity');
   assert.ok(report.repairInfo.debugLog.serviceWorker.cacheShellKeys.value.includes(fingerprint));
   assert.deepEqual(writes,[],'repair observations do not append diagnostic events to storage');
 });
 
-test('RISK DATABASE REPAIR EXPORT: a cancelled capture cannot replace a newer pasted draft',async t=>{
+test('RISK DATABASE REPAIR EXPORT: canceled capture keeps the pasted draft and concurrent capture is bounded',async t=>{
   const {IDBFactory}=await import('fake-indexeddb');
   const app=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'repair-capture-cancel-'+Date.now()}),{ctx,shim}=app;t.after(()=>app.dispose());
   ctx.addTask('Retained during repair capture',false);await prepareBackupFileFixtureSource(app);const before=JSON.stringify(ctx.state);
   ctx.openSettings();const source=makeFakeElement();source.isConnected=true;
-  const operation=ctx.onAction('view-database-repair',source);
-  await ctx.onAction('close-modal',{});source.isConnected=false;ctx.openSettings();await ctx.onAction('open-paste-recovery',{});
-  const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value='newer unfinished pasted JSON';shim.document.dispatchEvent({type:'input',target:box});
+  const operation=ctx.onAction('export-backup',source);await ctx.onAction('close-modal',{});source.isConnected=false;
+  ctx.openSettings();shim.document.getElementById('backupRestoreSource').value='paste';await ctx.onAction('import-backup',{});const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value='newer unfinished pasted JSON';shim.document.dispatchEvent({type:'input',target:box});
   assert.equal(await operation,false,'leaving the initiating view cancels its late continuation');
   assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="jsonBox"/);assert.equal(box.value,'newer unfinished pasted JSON');assert.equal(JSON.stringify(ctx.state),before);
   await ctx.onAction('close-paste-recovery',{});ctx.openSettings();
-  const live=makeFakeElement();live.isConnected=true;
-  const older=ctx.onAction('view-database-repair',live),newer=ctx.onAction('view-database-repair',live);
-  assert.deepEqual(await Promise.all([older,newer]),[false,true],'only the latest overlapping export may install its viewer');
-  assert.match(shim.document.getElementById('modalRoot').innerHTML,/databaseRepairData/);assert.equal(JSON.stringify(ctx.state),before);
+  const store=ctx.window.ScannerDeviceStore,read=store.readRawExportSnapshot.bind(store);let release,startedResolve;
+  const started=new Promise(resolve=>{startedResolve=resolve;});store.readRawExportSnapshot=async()=>{startedResolve();await new Promise(resolve=>{release=resolve;});return read();};
+  const firstSource=makeFakeElement();firstSource.isConnected=true;
+  const first=ctx.onAction('export-backup',firstSource);await started;
+  const second=await ctx.onAction('export-backup',firstSource);assert.equal(second,false,'rapid repeat cannot start a second full source capture');
+  release();assert.equal(await first,true);assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="exportTransferDialog"/);
+  assert.equal(JSON.stringify(ctx.state),before);
 });
 
 test('RISK DATABASE REPAIR EXPORT: a damaged saved source is retained without inventing a current board',async t=>{
   const {IDBFactory}=await import('fake-indexeddb'),original='{"tasks":[{"id":"broken-repair-original"}';
   const app=await loadApp({indexedDBProvider:new IDBFactory(),deviceDbName:'repair-no-board-'+Date.now(),seedStorage:{[SYNC_STORE_KEY]:original}}),{ctx,shim}=app;t.after(()=>app.dispose());
   const store=ctx.window.ScannerDeviceStore,before=JSON.stringify(await store.readRawExportSnapshot());ctx.openSettings();
-  assert.equal(await ctx.onAction('view-database-repair',{}),true);
-  const markup=shim.document.getElementById('modalRoot').innerHTML,shown=markup.match(/<textarea\b[^>]*id="databaseRepairData"[^>]*>([\s\S]*?)<\/textarea>/)?.[1];assert.ok(shown);
-  const report=JSON.parse(shown.replaceAll('&quot;','"').replaceAll('&#39;',"'").replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&amp;','&'));
+  assert.equal(await ctx.onAction('export-backup',{isConnected:true}),true);
+  const markup=shim.document.getElementById('modalRoot').innerHTML;assert.match(markup,/Partial recovery archive/);assert.doesNotMatch(markup,/<textarea\b/);
+  const report=JSON.parse(await copyPreparedExport(ctx));
   assert.equal(report.manifest.status,'partial');assert.equal(report.currentBoard,null);assert.equal(report.manifest.sources.currentBoard.status,'unavailable');
   assert.ok(report.appSources.localStorage.some(row=>row.raw===original),'the exact damaged original remains available for repair');
-  assert.equal(JSON.stringify(await store.readRawExportSnapshot()),before,'source-only repair export changes no saved database row');
+  assert.equal(JSON.stringify(await store.readRawExportSnapshot()),before,'source-only recovery archive changes no saved database row');
 });
 
-test('RISK DATABASE REPAIR EXPORT: FAQ explains the included database, diagnostics and partial-report limits',async t=>{
+test('RISK DATABASE REPAIR EXPORT: Help describes direct Copy and partial archive status',async t=>{
   const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();const help=app.shim.document.getElementById('modalRoot').innerHTML;
-  const answer=help.match(/<dt>What does the database repair export contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.ok(answer);
-  assert.match(answer,/current board.*saved.*sources.*Debug log/i);assert.match(answer,/build.*storage|storage.*build/i);
-  assert.match(answer,/partial.*cannot.*restore/i);assert.match(answer,/only.*current board.*pending.*never replayed/i);
-  assert.match(answer,/read.only|never saves or syncs/i);assert.match(answer,/Select all/);
-  const log=help.match(/<dt>What does the debug log contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
-  assert.doesNotMatch(log,/copy, or download the report/,'the FAQ no longer advertises removed standalone exporters');
-  assert.match(log,/Database repair export/);
+  const copy=help.match(/<dt>How do I copy and paste JSON\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.ok(copy);
+  assert.match(copy,/Settings.*Export.*choose Copy/i);assert.match(copy,/same recovery archive offered by Download/i);assert.match(copy,/not shown as a large text view/i);
+  assert.match(copy,/If clipboard access is unavailable, use Download/i);assert.match(copy,/Cancel preserves your board and pasted text/i);
+  const included=help.match(/<dt>What does Export include\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.ok(included);
+  assert.match(included,/accepted current board.*readable app-owned saved sources.*Debug log/i);
+  assert.match(included,/unavailable or changing source.*clearly marked partial/i);
+  assert.match(included,/pending work is never replayed.*original sources stay protected/i);
+  const log=help.match(/<dt>What does the debug log contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.match(log,/recovery archive includes this bounded metadata/i);
+  assert.doesNotMatch(help,/View \/ copy database for repair|Current-board view and copy|backupDownloadFormat/);
 });
 
 test('RISK DATABASE REPAIR EXPORT: reload help routes users to the combined export after standalone log exporters are removed',async t=>{
   const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();const help=app.shim.document.getElementById('modalRoot').innerHTML;
-  assert.doesNotMatch(help,/Copy debug log|Download debug log/,'no FAQ advertises a removed standalone export control');
+  assert.doesNotMatch(help,/Copy debug log|Download debug log/,'no FAQ advertises a removed standalone log exporter');
   const reload=help.match(/<dt>Why did the app reload\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.ok(reload);
-  assert.match(reload,/View \/ copy database for repair/);assert.match(reload,/partial|unreadable/i);
+  assert.match(reload,/Settings.*Data and backups.*Export.*Copy or Download/i);
+  assert.match(reload,/unavailable sources are labeled partial/i);
+  assert.match(reload,/Recovery and cleanup.*View debug log/i);
 });
 
-test('RISK RECOVERY EXPORT: an unsaved in-memory board remains copyable without device storage',async()=>{
-  const storage=sharedScannerStorage();
-  const {ctx,shim}=await loadApp({sharedStorage:storage});
+test('RISK RECOVERY EXPORT: accepted unsaved board stays in direct Copy when device storage fails',async()=>{
+  const storage=sharedScannerStorage(),{ctx,shim}=await loadApp({sharedStorage:storage});
   const originalSet=storage.setItem;
-  storage.setItem=(key,value)=>{if(key===SYNC_STORE_KEY||key===SYNC_HEAD_KEY)throw Error('quota');originalSet(key,value);};
-  ctx.addTask('Only in this open tab');
-  ctx.state.syncDirty=true;
-  ctx.state.protectedBackupIds=['device-only-recovery-id'];
-  ctx.openSettings();
-  const settings=shim.document.getElementById('modalRoot').innerHTML;
-  assert.match(settings,/data-act="view-current-board"/);
-  assert.match(settings,/data-act="download-backup"/);
-  assert.doesNotMatch(settings,/data-act="import-json"|id="jsonBox"/,'bulk import stays out of Settings');
-  ctx.onAction('view-current-board',{});
-  const recovery=shim.document.getElementById('modalRoot').innerHTML;
-  assert.match(recovery,/Current board data/);
-  assert.match(recovery,/Only in this open tab/);
-  assert.doesNotMatch(recovery,/syncDirty|protectedBackupIds|device-only-recovery-id/,'device-only sync bookkeeping stays out of exports');
-  let download=null;
-  const link=makeFakeElement();link.remove=()=>{};link.click=()=>{download={...download,href:link.href,name:link.download};};
-  shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();
-  ctx.Blob=class Blob{constructor(parts,options){this.text=parts.join('');this.type=options.type;}};
-  ctx.URL={createObjectURL(blob){download={blob};return 'blob:current-board';},revokeObjectURL(){}};
-  ctx.onAction('settings',{});
-  const selectedFormat=makeFakeElement();selectedFormat.value='current-board';
-  const originalGet=shim.document.getElementById.bind(shim.document);
-  shim.document.getElementById=id=>id==='backupDownloadFormat'?selectedFormat:originalGet(id);
-  ctx.onAction('download-backup',{});
-  assert.equal(download.name,'chain-scanner-current-board.json');assert.equal(download.href,'blob:current-board');
-  assert.match(download.blob.text,/Only in this open tab/);assert.doesNotMatch(download.blob.text,/device-only-recovery-id/);
+  storage.setItem=(key,value)=>{if(key===SYNC_STORE_KEY||key===SYNC_HEAD_KEY)throw Error('quota');return originalSet(key,value);};
+  ctx.addTask('Only in this open tab');ctx.state.syncDirty=true;ctx.state.protectedBackupIds=['device-only-recovery-id'];
+  ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
+  assert.equal((settings.match(/data-act="export-backup"/g)||[]).length,1);
+  assert.equal((settings.match(/data-act="import-backup"/g)||[]).length,1);
+  assert.equal(await ctx.onAction('export-backup',{isConnected:true}),true);
+  const copied=await copyPreparedExport(ctx),archive=JSON.parse(copied);
+  assert.equal(archive.currentBoard.tasks.some(row=>row.title==='Only in this open tab'),true,'the accepted open board remains exportable despite storage failure');
+  assert.doesNotMatch(copied,/syncDirty|protectedBackupIds|device-only-recovery-id/,'device-only sync bookkeeping stays out of the archive');
+  assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/<textarea\b|currentBoardData|databaseRepairData/);
+  let blob=null;const link=makeFakeElement();link.remove=()=>{};link.click=()=>{};
+  shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();ctx.Blob=class{constructor(parts){this.text=parts.join('');}};
+  ctx.URL={createObjectURL(value){blob=value;return 'blob:accepted-unsaved';},revokeObjectURL(){}};
+  await ctx.onAction('download-export',{});assert.equal(blob.text,copied,'the download stays the same complete payload as Copy');
 });
 
 function decodeManualArchiveTypedValue(node){
@@ -19775,40 +19814,30 @@ test('RISK MANUAL JSON EXPORT: the actual Settings actions download current boar
 
   ctx.openSettings();
   const settings=shim.document.getElementById('modalRoot').innerHTML;
-  const downloadControl=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Download backup\s*<\/button>/);
-  assert.ok(downloadControl,'Settings exposes one Download backup action');
-  assert.equal((settings.match(/data-act="download-backup"/g)||[]).length,1,'Settings has exactly one board-data download action');
-  assert.match(settings,/id="backupDownloadFormat"[\s\S]*?value="current-board"[\s\S]*?value="recovery-archive"/,'the action offers ordinary board JSON and the complete recovery archive');
-  assert.doesNotMatch(settings,/data-act="download-current-board"|data-act="download-recovery-archive"/,'format choices are routed through the single Settings action');
-  assert.match(settings,/not an ordinary board[- ]import file/i,'Settings explains that the recovery archive is not a normal board import');
-  assert.match(settings,/pending|recovery source/i,'Settings explains the archive recovery contents');
-
-  const selectedFormat=makeFakeElement();selectedFormat.value='current-board';
-  const originalGetForFormat=shim.document.getElementById.bind(shim.document);
-  shim.document.getElementById=id=>id==='backupDownloadFormat'?selectedFormat:originalGetForFormat(id);
-
-  await ctx.onAction(downloadControl[1],{});
-  for(let attempt=0;attempt<100&&downloads.length<1;attempt++)await flush();
-  assert.equal(downloads.length,1,'the current-board Settings action reaches the real download consumer');
-  assert.equal(downloads[0].name,'chain-scanner-current-board.json');
-  assert.equal(downloads[0].blob.type,'application/json');
-  const board=JSON.parse(downloads[0].blob.text);
-  assert.equal(board.tasks.find(task=>task.title==='Accepted unsaved manual-export task')?.futureManualExportField?.keep,'opaque-value');
-  assert.deepEqual(board.futureManualExportBoardField,{keep:true});
-  assert.doesNotMatch(downloads[0].blob.text,/Unsubmitted DOM draft must stay out of exports/);
-
-  selectedFormat.value='recovery-archive';
-  await ctx.onAction(downloadControl[1],{});
-  for(let attempt=0;attempt<100&&downloads.length<2;attempt++)await flush();
-  assert.equal(downloads.length,2,'the recovery-archive Settings action reaches the real download consumer');
-  assert.equal(downloads[1].name,'chain-scanner-recovery-archive.json');
-  assert.equal(downloads[1].blob.type,'application/json');
-  const archive=JSON.parse(downloads[1].blob.text);
+  assert.equal((settings.match(/data-act="export-backup"/g)||[]).length,1,"Settings exposes exactly one complete recovery Export");
+  assert.equal((settings.match(/data-act="import-backup"/g)||[]).length,1,"Settings exposes exactly one protected Import action");
+  assert.doesNotMatch(settings,/backupDownloadFormat|data-act="(?:view-current-board|view-database-repair|download-backup|download-current-board|download-recovery-archive)"/);
+  assert.match(settings,/read-only recovery archive/i);
+  assert.match(settings,/pending recovery source/i);
+  await ctx.onAction('export-backup',{isConnected:true});
+  const dialog=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(dialog,/id="exportTransferDialog"/);
+  assert.equal((dialog.match(/data-act="download-export"/g)||[]).length,1);
+  assert.equal((dialog.match(/data-act="copy-export"/g)||[]).length,1);
+  assert.doesNotMatch(dialog,/<textarea\b|currentBoardData|databaseRepairData|rawBackupData/);
+  const copied=await copyPreparedExport(ctx),archive=JSON.parse(copied),board=archive.currentBoard;
   assert.equal(archive.format,'chain-scanner.recovery-archive');
   assert.equal(archive.formatVersion,1);
   assert.equal(archive.manifest.status,'complete','the isolated readable fixture is labelled complete');
   assert.equal(archive.manifest.sources.currentBoard.status,'included');
-  assert.deepEqual(archive.currentBoard,board,'the archive embeds the ordinary current-board object without changing its format');
+  assert.equal(board.tasks.find(task=>task.title==='Accepted unsaved manual-export task')?.futureManualExportField?.keep,'opaque-value');
+  assert.deepEqual(board.futureManualExportBoardField,{keep:true});
+  assert.doesNotMatch(copied,/Unsubmitted DOM draft must stay out of exports/);
+  assert.equal(await ctx.onAction('download-export',{}),true);
+  assert.equal(downloads.length,1,'the prepared transfer dialog downloads the archive');
+  assert.equal(downloads[0].name,'chain-scanner-recovery-archive.json');
+  assert.equal(downloads[0].blob.type,'application/json');
+  assert.equal(downloads[0].blob.text,copied,'Download and Copy use identical complete JSON bytes');
   for(const name of ['meta','snapshots','backups','opaque'])
     assert.equal(archive.manifest.sources.indexedDB.stores[name].status,'included',`${name} source is represented in the manifest`);
   assert.deepEqual(archive.manifest.sources.localStorage['fvp:chain-scanner:protected:v1'],{status:'absent'});
@@ -19817,7 +19846,7 @@ test('RISK MANUAL JSON EXPORT: the actual Settings actions download current boar
   assert.deepEqual(localSourceRows.map(row=>row.key),['fvp:chain-scanner:v1','fvp:chain-scanner:protected:v1','fvp:chain-scanner:daily-backups:v1','fvp:chain-scanner:device-store-v2']);
   assert.deepEqual(localSourceRows,localStorageBefore,'every present local source remains byte-for-byte unchanged');
   assert.equal(localSourceRows.find(row=>row.key==='fvp:chain-scanner:device-store-v2').raw,'1','the exact authority marker value is retained');
-  assert.doesNotMatch(downloads[1].blob.text,/synthetic-auth-token|firebase:authUser/,'unrelated SDK auth storage is excluded');
+  assert.doesNotMatch(copied,/synthetic-auth-token|firebase:authUser/,'unrelated SDK auth storage is excluded');
   assert.match(JSON.stringify(archive),/export-pending-generation-190/);
   assert.match(JSON.stringify(archive),/export-manual-backup-190/);
   assert.match(JSON.stringify(archive),/Accepted unsaved manual-export task/);
@@ -19841,38 +19870,35 @@ test('RISK MANUAL JSON EXPORT: the actual Settings actions download current boar
   assert.deepEqual(Array.from(new Uint8Array(decoded.typedView.buffer)),[91,92,93,94,95,96,97,98]);assert.equal(decoded.typedView.byteOffset,2);assert.equal(decoded.typedView.length,2);
   assert.equal(decoded.map.get('k').opaque,true);assert.deepEqual(Array.from(decoded.set),['a','b']);
 
-  const originalGetId=shim.document.getElementById.bind(shim.document),selection={};
-  const currentTextArea=makeFakeElement();currentTextArea.focus=()=>{selection.currentFocus=true;};currentTextArea.select=()=>{selection.currentSelect=true;};
-  const archiveTextArea=makeFakeElement();archiveTextArea.focus=()=>{selection.archiveFocus=true;};archiveTextArea.select=()=>{selection.archiveSelect=true;};
-  ctx.URL={createObjectURL(){throw new Error('fixture download unavailable');},revokeObjectURL(){}};
-  selectedFormat.value='current-board';
-  await ctx.onAction(downloadControl[1],{});assert.match(shim.document.getElementById('modalRoot').innerHTML,/currentBoardData/);
-  shim.document.getElementById=id=>id==='currentBoardData'?currentTextArea:id==='recoveryArchiveData'?archiveTextArea:originalGetId(id);
-  ctx.onAction('select-current-board',{});assert.equal(selection.currentFocus,true);assert.equal(selection.currentSelect,true);
-  selectedFormat.value='recovery-archive';
-  await ctx.onAction(downloadControl[1],{});assert.match(shim.document.getElementById('modalRoot').innerHTML,/recoveryArchiveData/);
-  assert.match(shim.document.getElementById('modalRoot').innerHTML,/chain-scanner\.recovery-archive/);
-  ctx.onAction('select-recovery-archive',{});assert.equal(selection.archiveFocus,true);assert.equal(selection.archiveSelect,true);
+  const status=makeFakeElement(),originalGetId=shim.document.getElementById.bind(shim.document);
+  shim.document.getElementById=id=>id==='exportTransferStatus'?status:originalGetId(id);
+  ctx.navigator={clipboard:{writeText(){return Promise.reject(new Error('clipboard denied'));}}};
+  assert.equal(await ctx.onAction('copy-export',{}),false,'clipboard denial is reported without changing the prepared archive');
+  assert.equal(downloads.length,1,'Copy failure never triggers a fallback download');
+  const failedCopyMarkup=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(status.textContent,/Clipboard access failed/i);
+  assert.match(failedCopyMarkup,/data-act="download-export"/);
+  assert.doesNotMatch(failedCopyMarkup,/<textarea\b|currentBoardData|databaseRepairData|rawBackupData/);
   ctx.URL={createObjectURL(blob){createdBlob=blob;return 'blob:manual-export-restored';},revokeObjectURL(){}};
 
   const roundTrip=await loadApp({sharedStorage:sharedScannerStorage()}),jsonBox=makeFakeElement();
-  jsonBox.value=downloads[0].blob.text;
+  jsonBox.value=JSON.stringify(board);
   const originalGet=roundTrip.shim.document.getElementById.bind(roundTrip.shim.document);
   roundTrip.shim.document.getElementById=id=>id==='jsonBox'?jsonBox:originalGet(id);
   await roundTrip.ctx.onAction('import-json',{});
   assert.equal(roundTrip.ctx.state.tasks.find(task=>task.title==='Accepted unsaved manual-export task')?.futureManualExportField?.keep,'opaque-value','ordinary board JSON round-trips through the existing guarded import consumer');
-  const roundTripBefore=JSON.stringify(roundTrip.ctx.state);jsonBox.value=downloads[1].blob.text;await roundTrip.ctx.onAction('import-json',{});
+  const roundTripBefore=JSON.stringify(roundTrip.ctx.state);jsonBox.value=copied;await roundTrip.ctx.onAction('import-json',{});
   assert.equal(JSON.stringify(roundTrip.ctx.state),roundTripBefore,'the versioned archive is rejected by the ordinary board importer without changing the board');
 
   ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
-  const exportFaq=help.match(/<dt>What does Download backup contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
-  assert.ok(exportFaq,'the extended FAQ explains the single Download backup action');
+  const exportFaq=help.match(/<dt>What does Export include\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
+  assert.ok(exportFaq,'the extended FAQ explains the single Export action');
   assert.ok(exportFaq.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the export FAQ keeps the existing answer word limit');
-  assert.match(exportFaq,/Current board JSON.*ordinary board data.*accepted edits that may not have saved/i);
-  assert.match(exportFaq,/Full recovery archive.*local backup, pending.*recovery sources/i);
-  assert.match(exportFaq,/not an ordinary board-import file.*pending work is never replayed/i);
-  assert.match(exportFaq,/Raw device sources only.*cannot be imported as a board/i);
-  assert.match(exportFaq,/If a source changes.*no recovery archive is made/i);
+  assert.match(exportFaq,/one read-only recovery archive.*accepted current board/i);
+  assert.match(exportFaq,/Copy sends the prepared archive straight to the clipboard.*Download saves the same bytes/i);
+  assert.match(exportFaq,/pending work is never replayed.*original sources stay protected/i);
+  assert.match(exportFaq,/not rendered in the page/i);
+  assert.match(exportFaq,/clearly marked partial archive/i);
 
   assert.equal(JSON.stringify(ctx.state),memoryBefore,'export leaves the accepted in-memory board untouched');
   assert.deepEqual(deviceWrites,[],'export performs no device-store write');
@@ -19880,76 +19906,52 @@ test('RISK MANUAL JSON EXPORT: the actual Settings actions download current boar
   assert.equal(inspect({head:await store.readHead(),backups:await store.listBackups(),opaque:await store.listOpaqueArchives(),pending:await store.getPendingUpload(account)},{depth:null,sorted:true,maxArrayLength:null,maxStringLength:null}),storedBefore,'export leaves every seeded device-store source unchanged');
 });
 
-test('RISK MANUAL JSON EXPORT: unreadable, unsupported and hydration-placeholder sources stop without a file',async t=>{
+test('RISK MANUAL JSON EXPORT: unavailable and unsupported sources are explicit partial exports',async t=>{
   const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),dbName='chain-scanner-manual-export-failure-'+Date.now()+'-'+Math.random();
-  const storage=sharedScannerStorage();storage.setItem('fvp:chain-scanner:v1','{"tasks":[{"id":"broken","title":"corrupt"}');
+  const storage=sharedScannerStorage();storage.setItem(SYNC_STORE_KEY,'{"tasks":[{"id":"broken","title":"corrupt"}');
   const app=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName:dbName}),{ctx,shim}=app;
   const store=ctx.window.ScannerDeviceStore;assert.ok(store);t.after(async()=>{await store.close();});
   const downloads=[],link=makeFakeElement();link.remove=()=>{};link.click=()=>downloads.push(link.download);
-  shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();ctx.Blob=class ExportBlob{constructor(parts,options){this.text=parts.join('');this.type=options.type;}};ctx.URL={createObjectURL(){return 'blob:unexpected';},revokeObjectURL(){}};
-  ctx.openSettings();let settings=shim.document.getElementById('modalRoot').innerHTML;
-  const download=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Download backup\s*<\/button>/);
-  assert.ok(download,'the unaccepted-source recovery view still exposes one Download backup action');
-  assert.match(settings,/value="raw-device-sources"/,'only the source-only recovery export is offered without an accepted board');
-  assert.doesNotMatch(settings,/value="current-board"|value="recovery-archive"/,'an unaccepted source is not presented as an ordinary board or complete archive');
-  await ctx.onAction('download-current-board',{});await ctx.onAction('download-recovery-archive',{});await flush();
-  assert.deepEqual(downloads,[],'a hydration placeholder never becomes a complete export');
+  shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();ctx.Blob=class{constructor(parts,options){this.text=parts.join('');this.type=options.type;}};ctx.URL={createObjectURL(){return 'blob:explicit-partial';},revokeObjectURL(){}};
+  ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
+  assert.equal((settings.match(/data-act="export-backup"/g)||[]).length,1);
+  assert.doesNotMatch(settings,/backupDownloadFormat|raw-device-sources|currentBoardData|databaseRepairData/);
+  assert.equal(await ctx.onAction('export-backup',{isConnected:true}),true);
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/Partial recovery archive/);
+  assert.deepEqual(downloads,[],'preparing a partial archive never downloads without an explicit choice');
+  const sourceOnly=await copyPreparedExport(ctx),sourceReport=JSON.parse(sourceOnly);
+  assert.equal(sourceReport.manifest.status,'partial');assert.equal(sourceReport.currentBoard,null);
+  assert.equal(sourceReport.appSources.localStorage.find(row=>row.key===SYNC_STORE_KEY).raw,'{"tasks":[{"id":"broken","title":"corrupt"}');
+  assert.throws(()=>ctx.decodeBackupFileBoard(sourceOnly),/incomplete|supported/i,'source-only evidence is not accepted as an empty board');
 
-  const valid=await loadApp({sharedStorage:sharedScannerStorage(),indexedDBProvider:new IDBFactory(),deviceDbName:dbName+'-unsupported'});
-  const validStore=valid.ctx.window.ScannerDeviceStore;assert.ok(validStore);t.after(async()=>{await validStore.close();});
-  const shownErrors=[];valid.ctx.toast=message=>shownErrors.push(String(message));
-  const rawSnapshot=validStore.readRawExportSnapshot.bind(validStore);
-  validStore.readRawExportSnapshot=async()=>{const snapshot=await rawSnapshot();snapshot.stores.opaque.keys.push('unsupported-export-fixture-190');snapshot.stores.opaque.values.push(/unsupported/);return snapshot;};
-  const validDownloads=[],validLink=makeFakeElement();validLink.remove=()=>{};validLink.click=()=>validDownloads.push(validLink.download);
-  valid.shim.document.createElement=tag=>tag==='a'?validLink:makeFakeElement();valid.ctx.Blob=ctx.Blob;valid.ctx.URL=ctx.URL;valid.ctx.openSettings();
-  const validSettings=valid.shim.document.getElementById('modalRoot').innerHTML,validArchive=validSettings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Download backup\s*<\/button>/);
-  assert.ok(validArchive,'the accepted board has one archive path through Download backup');
-  const selectedFormat=makeFakeElement();selectedFormat.value='recovery-archive';
-  const originalGet=valid.shim.document.getElementById.bind(valid.shim.document);
-  valid.shim.document.getElementById=id=>id==='backupDownloadFormat'?selectedFormat:originalGet(id);
-  await valid.ctx.onAction(validArchive[1],{});await flush();
-  assert.deepEqual(validDownloads,[],'a structured-clone type without a lossless representation stops the archive');
-  assert.ok(shownErrors.some(message=>/IndexedDB opaque key.*unsupported RegExp/i.test(message)),'the failure names its exact app-owned source and unsupported type');
-  const cycle={};cycle.self=cycle;
-  validStore.readRawExportSnapshot=async()=>{const snapshot=await rawSnapshot();snapshot.stores.opaque.keys.push('cycle-export-fixture-190');snapshot.stores.opaque.values.push(cycle);return snapshot;};
-  await valid.ctx.onAction(validArchive[1],{});await flush();
-  assert.deepEqual(validDownloads,[],'a cyclic raw source cannot become a falsely complete archive');
-  assert.ok(shownErrors.some(message=>/cycle-export-fixture-190.*repeated reference or cycle/i.test(message)),'the cycle report identifies its source');
-  const sharedNested={future:true},repeated={first:sharedNested,second:sharedNested};
-  validStore.readRawExportSnapshot=async()=>{const snapshot=await rawSnapshot();snapshot.stores.opaque.keys.push('repeated-export-fixture-190');snapshot.stores.opaque.values.push(repeated);return snapshot;};
-  await valid.ctx.onAction(validArchive[1],{});await flush();
-  assert.deepEqual(validDownloads,[],'repeated references that cannot be represented exactly stop the archive');
-  assert.ok(shownErrors.some(message=>/repeated-export-fixture-190.*repeated reference or cycle/i.test(message)),'the repeated-reference report identifies its source');
-  let releaseSnapshot,startedSnapshot;
-  const snapshotStarted=new Promise(resolve=>{startedSnapshot=resolve;});
-  validStore.readRawExportSnapshot=async()=>{startedSnapshot();await new Promise(resolve=>{releaseSnapshot=resolve;});return rawSnapshot();};
-  const raced=valid.ctx.onAction(validArchive[1],{});await snapshotStarted;
-  valid.shim.localStorage.setItem('fvp:chain-scanner:protected:v1','{"changedDuringExport":true}');releaseSnapshot();await raced;
-  assert.deepEqual(validDownloads,[],'a changed app-owned local source aborts the whole archive');
-  assert.ok(shownErrors.some(message=>/localStorage key fvp:chain-scanner:protected:v1 changed/i.test(message)),'a raced source is named for retry');
-  validStore.readRawExportSnapshot=async()=>{throw new Error('fixture readonly transaction aborted');};
-  await valid.ctx.onAction(validArchive[1],{});await flush();
-  assert.deepEqual(validDownloads,[],'an aborted readonly snapshot stops without a partial file');
+  for(const [key,value,description] of [
+    ['unsupported-export-fixture-190',/unsupported/,'unsupported structured-clone values'],
+    ['cycle-export-fixture-190',(()=>{const cycle={};cycle.self=cycle;return cycle;})(),'cycles'],
+    ['repeated-export-fixture-190',(()=>{const shared={future:true};return {first:shared,second:shared};})(),'repeated references'],
+  ]){
+    const valid=await loadApp({sharedStorage:sharedScannerStorage(),indexedDBProvider:new IDBFactory(),deviceDbName:dbName+'-unsupported-'+Math.random()});
+    t.after(()=>valid.dispose());valid.ctx.addTask('Accepted board for unsupported source fixture',false);await valid.ctx.persist();
+    const validStore=valid.ctx.window.ScannerDeviceStore;assert.ok(validStore);const rawSnapshot=validStore.readRawExportSnapshot.bind(validStore);
+    validStore.readRawExportSnapshot=async()=>{const snapshot=await rawSnapshot();snapshot.stores.opaque.keys.push(key);snapshot.stores.opaque.values.push(value);return snapshot;};
+    valid.ctx.openSettings();assert.equal(await valid.ctx.onAction('export-backup',{isConnected:true}),true,`${description} captures from an accepted board`);
+    assert.match(valid.shim.document.getElementById('modalRoot').innerHTML,/Partial recovery archive/,`${description} are not presented as complete`);
+    const copied=await copyPreparedExport(valid.ctx),report=JSON.parse(copied);
+    assert.equal(report.manifest.status,'partial');assert.equal(report.appSources.indexedDB.stores,null);
+    assert.ok(report.manifest.failures.some(row=>row.source==='indexedDB'));
+    const leakedFixture=copied.search(/unsupported-export-fixture|cycle-export-fixture|repeated-export-fixture/);assert.ok(leakedFixture<0,`unsupported source details leaked near ${copied.slice(Math.max(0,leakedFixture-120),leakedFixture+180)}`);
+  }
+
 });
 
 test('RISK BACKUP FILE RESTORE: current decisions survive file selection and cross-account transfer',async t=>{
  const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb');
  function downloadCurrentFile(app,name){
-  let download=null;const link=makeFakeElement();link.remove=()=>{};link.click=()=>{download={name:link.download,href:link.href,...download};};
-  app.shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();
-  app.ctx.Blob=class Blob{constructor(parts,options){this.text=parts.join('');this.type=options.type;}};
-  app.ctx.URL={createObjectURL(blob){download={blob};return 'blob:current-board-fixture';},revokeObjectURL(){}};
-  app.ctx.openSettings();assert.match(app.shim.document.getElementById('modalRoot').innerHTML,/data-act="download-backup"/);
-  const selectedFormat=makeFakeElement();selectedFormat.value='current-board';
-  const originalGet=app.shim.document.getElementById.bind(app.shim.document);
-  app.shim.document.getElementById=id=>id==='backupDownloadFormat'?selectedFormat:originalGet(id);
-  app.ctx.onAction('download-backup',{});assert.ok(download?.blob,'the actual Settings download produced a board file');
-  assert.equal(download.name,'chain-scanner-current-board.json');
-  return new File([download.blob.text],name,{type:'application/json'});
+  const bytes=app.ctx.cloudPayload();
+  return new File([bytes],name,{type:'application/json'});
  }
  async function selectFile(app,file){
   app.ctx.openSettings();const settings=app.shim.document.getElementById('modalRoot').innerHTML;
-  const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
+  const action=settings.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);
   assert.ok(action,'the actual Settings file action is available');
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
   const originalGet=app.shim.document.getElementById.bind(app.shim.document);
@@ -20050,7 +20052,7 @@ test('RISK BACKUP FILE RESTORE: irreversible preview shows Restore and close as 
  const file=new File([JSON.stringify(source)],'selected-recovery.json',{type:'application/json'});
  ctx.openSettings();
  const settings=shim.document.getElementById('modalRoot').innerHTML;
- const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
+ const action=settings.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);
  assert.ok(action,'the real Settings restore-file control is available');
  const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
  const originalGet=shim.document.getElementById.bind(shim.document);
@@ -20159,9 +20161,9 @@ test('RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exac
 
   ctx.openSettings();
   const settings=shim.document.getElementById('modalRoot').innerHTML;
-  const restoreAction=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
+  const restoreAction=settings.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);
   assert.ok(restoreAction,'Settings exposes the single guarded Restore action');
-  assert.equal((settings.match(/data-act="restore-backup"/g)||[]).length,1,'the board-data area has exactly one Restore action');
+  assert.equal((settings.match(/data-act="import-backup"/g)||[]).length,1,'the board-data area has exactly one Import action');
   assert.match(settings,/id="backupRestoreSource"[\s\S]*?value="file"[\s\S]*?value="paste"/,'the Restore action routes either a native file or paste source');
   assert.doesNotMatch(settings,/data-act="choose-backup-file"|data-act="open-paste-recovery"/,'the board-data area has no competing file or paste action');
   assert.match(settings,/<input\b(?=[^>]*type="file")(?=[^>]*id="restoreBackupFile")[^>]*>/,'the action uses a native JSON file input');
@@ -20237,7 +20239,7 @@ test('RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exac
 
   reopened.ctx.openSettings();
   const reopenedSettings=reopened.shim.document.getElementById('modalRoot').innerHTML;
-  const reopenedAction=reopenedSettings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
+  const reopenedAction=reopenedSettings.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);
   assert.ok(reopenedAction,'the same Settings control remains available after reopen');
   const archiveInput=makeFakeElement();archiveInput.id='restoreBackupFile';archiveInput.files=[];archiveInput.matches=()=>false;
   const reopenedGet=reopened.shim.document.getElementById.bind(reopened.shim.document);
@@ -20329,7 +20331,7 @@ test('RISK BACKUP FILE RESTORE: compact settings and unknown board fields stay i
   incoming[longBoardFieldName]={keep:'full preview value'};
   const file=new File([JSON.stringify(incoming)],'compact-preview.json',{type:'application/json'});
   ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
-  const restoreAction=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
+  const restoreAction=settings.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);
   assert.ok(restoreAction,'the actual Settings file restore action is available');
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
   const originalGet=shim.document.getElementById.bind(shim.document);
@@ -20379,7 +20381,7 @@ test('RISK BACKUP FILE RESTORE: a signed-in file waits for explicit CAS and exac
   const file=new File([JSON.stringify(selected)],'account-board.json',{type:'application/json'});
   ctx.openSettings();
   const settings=shim.document.getElementById('modalRoot').innerHTML;
-  const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
+  const action=settings.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);
   assert.ok(action,'the account-bound route begins at the actual Settings control');
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;
   const originalGet=shim.document.getElementById.bind(shim.document);
@@ -20443,7 +20445,7 @@ test('RISK BACKUP FILE RESTORE: account-bound files stay protected while cloud i
   const selected=JSON.parse(sourceRaw);selected.tasks[0].title='Offline prospective account board';
   const file=new File([JSON.stringify(selected)],'offline-account-board.json',{type:'application/json'});
   ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
-  const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
+  const action=settings.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);
   assert.ok(action);
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
   const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
@@ -20476,7 +20478,7 @@ test('RISK BACKUP FILE RESTORE: IDB authority does not hide changed legacy board
     const file=new File([JSON.stringify(next)],'legacy-race.json',{type:'application/json'}),writes=[],commit=store.commitHead.bind(store);
     store.commitHead=options=>{writes.push(options);return commit(options);};
     ctx.openSettings();const markup=shim.document.getElementById('modalRoot').innerHTML;
-    const action=markup.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
+    const action=markup.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);
     assert.ok(action,'the race starts from the real Settings control');
     const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
     const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
@@ -20507,7 +20509,7 @@ test('RISK BACKUP FILE RESTORE: source changes during final awaited copy readbac
   const file=new File([JSON.stringify(next)],'final-readback-race.json',{type:'application/json'}),writes=[],commit=store.commitHead.bind(store);
   store.commitHead=options=>{writes.push(options);return commit(options);};
   ctx.openSettings();const markup=shim.document.getElementById('modalRoot').innerHTML;
-  const action=markup.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
+  const action=markup.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);
   assert.ok(action,'the race starts from the real Settings control');
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
   const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
@@ -20544,7 +20546,7 @@ test('RISK BACKUP FILE RESTORE: state, device-head, and draft-only changes expir
     const file=new File([JSON.stringify(prospective)],'stale-source.json',{type:'application/json'}),writes=[],commit=store.commitHead.bind(store);
     store.commitHead=options=>{writes.push(options);return commit(options);};
     ctx.openSettings();const markup=shim.document.getElementById('modalRoot').innerHTML;
-    const action=markup.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
+    const action=markup.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);
     assert.ok(action,'the case begins from the Settings backup-file action');
     const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
     const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
@@ -20581,7 +20583,7 @@ test('RISK BACKUP FILE RESTORE: cancel and file reselection bind confirmation to
   const firstFile=new File([JSON.stringify(first)],'cancelled-first.json',{type:'application/json'});
   const secondFile=new File([JSON.stringify(second)],'confirmed-second.json',{type:'application/json'});
   ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
-  const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
+  const action=settings.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);
   assert.ok(action);
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
   const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
@@ -20591,7 +20593,7 @@ test('RISK BACKUP FILE RESTORE: cancel and file reselection bind confirmation to
   await ctx.onAction('confirm-file-restore',{});
   assert.equal(ctx.state.tasks[0].title,'Current before reselection','a detached confirmation after Cancel cannot use its former preview');
   ctx.openSettings();const reopened=shim.document.getElementById('modalRoot').innerHTML;
-  const secondAction=reopened.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);assert.ok(secondAction);
+  const secondAction=reopened.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);assert.ok(secondAction);
   await ctx.onAction(secondAction[1],{});assert.match(await select(secondFile),/confirmed-second\.json/);
   await ctx.onAction('confirm-file-restore',{});
   assert.equal(ctx.state.tasks[0].title,'Confirmed second file','only the current selection is adopted after explicit confirmation');
@@ -20613,7 +20615,7 @@ test('RISK BACKUP FILE RESTORE: closing the preview cancels an in-flight source 
   const cloudPushes=[],originalPush=ctx.window.CloudSync?.push?.bind(ctx.window.CloudSync);
   if(originalPush)ctx.window.CloudSync.push=(...args)=>{cloudPushes.push(args);return originalPush(...args);};
   ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
-  const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
+  const action=settings.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);
   assert.ok(action,'the test enters through the actual Settings restore action');
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
   const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
@@ -20658,7 +20660,7 @@ test('RISK BACKUP FILE RESTORE: backdrop and Escape cancel a pending source chec
     const cloudPushes=[],originalPush=ctx.window.CloudSync?.push?.bind(ctx.window.CloudSync);
     if(originalPush)ctx.window.CloudSync.push=(...args)=>{cloudPushes.push(args);return originalPush(...args);};
     ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
-    const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
+    const action=settings.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);
     assert.ok(action,'the generic close case begins at the real Settings restore action');
     const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
     const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
@@ -20704,7 +20706,7 @@ test('RISK BACKUP FILE RESTORE: in-progress primary save blocks Cancel and modal
   const next=JSON.parse(JSON.stringify(ctx.state));next.tasks[0].title='Selected board after protected save';
   const file=new File([JSON.stringify(next)],'commit-inflight.json',{type:'application/json'});
   ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
-  const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
+  const action=settings.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);
   assert.ok(action,'the test enters through the real Settings file action');
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
   const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
@@ -20761,7 +20763,7 @@ test('RISK BACKUP FILE RESTORE: in-progress cloud publication blocks Cancel and 
   const next=JSON.parse(JSON.stringify(ctx.state));next.tasks[0].title='Cloud file after protected publication';
   const file=new File([JSON.stringify(next)],'cloud-commit-inflight.json',{type:'application/json'});
   ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
-  const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
+  const action=settings.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);
   assert.ok(action,'the bound case starts through the real Settings file control');
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
   const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
@@ -20824,7 +20826,7 @@ test('RISK BACKUP FILE RESTORE: backup CAS abort and readback failure keep the a
       return list(...args);
     };
     ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
-    const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);assert.ok(action);
+    const action=settings.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);assert.ok(action);
     const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
     const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
     const toastBefore=shim.document.getElementById('toast').textContent;
@@ -20868,13 +20870,13 @@ test('RISK BACKUP FILE RESTORE: unsupported and ambiguous selected files stop wi
   ];
   const writes=[],commit=store.commitHead.bind(store);store.commitHead=options=>{writes.push(options);return commit(options);};
   ctx.openSettings();let settings=shim.document.getElementById('modalRoot').innerHTML;
-  let action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);assert.ok(action);
+  let action=settings.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);assert.ok(action);
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
   const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
   for(const [name,bytes] of cases){
     shim.document.getElementById('toast').textContent='';
-    if(!shim.document.getElementById('modalRoot').innerHTML.includes('data-act="restore-backup"'))ctx.openSettings();
-    settings=shim.document.getElementById('modalRoot').innerHTML;action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);assert.ok(action,`Settings can retry ${name}`);
+    if(!shim.document.getElementById('modalRoot').innerHTML.includes('data-act="import-backup"'))ctx.openSettings();
+    settings=shim.document.getElementById('modalRoot').innerHTML;action=settings.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);assert.ok(action,`Settings can retry ${name}`);
     const file=new File([bytes],name,{type:'application/json'});await ctx.onAction(action[1],{});input.files=[file];shim.document.dispatchEvent({type:'change',target:input});
     for(let attempt=0;attempt<100&&shim.document.getElementById('toast').textContent==='';attempt++)await flush();
     assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="confirm-file-restore"/,`${name} cannot create a restore confirmation`);
@@ -20905,7 +20907,7 @@ test('RISK BACKUP FILE RESTORE: account, auth epoch, pending evidence, and cloud
     const file=new File([JSON.stringify(next)],'cloud-source.json',{type:'application/json'}),writes=[],commit=store.commitHead.bind(store);
     store.commitHead=options=>{writes.push(options);return commit(options);};
     ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
-    const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);assert.ok(action);
+    const action=settings.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);assert.ok(action);
     const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
     const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
     await ctx.onAction(action[1],{});input.files=[file];shim.document.dispatchEvent({type:'change',target:input});
@@ -20957,7 +20959,7 @@ test('RISK BACKUP FILE RESTORE: a released old client wins CAS before the prospe
   const file=new File([JSON.stringify(selected)],'old-client-cas.json',{type:'application/json'});
   const primaryWrites=[],commit=store.commitHead.bind(store);store.commitHead=options=>{primaryWrites.push(options);return commit(options);};
   current.ctx.openSettings();const settings=current.shim.document.getElementById('modalRoot').innerHTML;
-  const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);assert.ok(action);
+  const action=settings.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);assert.ok(action);
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
   const originalGet=current.shim.document.getElementById.bind(current.shim.document);current.shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
   await current.ctx.onAction(action[1],{});input.files=[file];current.shim.document.dispatchEvent({type:'change',target:input});
@@ -21030,7 +21032,7 @@ test('RISK BACKUP FILE RESTORE: replacement preserves completion, History, ratin
   assert.equal(ctx.conflictingDecisionEvidence(next,ctx.state),false,'the replacement does not collide with a different decision event');
   const file=new File([JSON.stringify(next)],'lifecycle-replacement.json',{type:'application/json'});
   ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
-  const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);assert.ok(action);
+  const action=settings.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);assert.ok(action);
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
   const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
   await ctx.onAction(action[1],{});input.files=[file];shim.document.dispatchEvent({type:'change',target:input});
@@ -39763,11 +39765,11 @@ test('RISK motion safety: export clicks do not renew consent while actual choice
  vm.runInContext(update+listener,c);
  assert.equal(typeof handler,'function','the extracted production document listener is registered');
  const click=node=>handler({target:node});
- click(element('BUTTON',{act:'download-backup'},body));
- click(element('BUTTON',{act:'download-current-board'},body));
- click(element('BUTTON',{act:'download-recovery-archive'},body));
- click(element('A',{download:'chain-scanner-current-board.json'},body));
- assert.equal(storage.getItem(motionKey),originalRaw,'Settings export actions and their programmatic download click leave the exact timed consent bytes and expiry unchanged');
+ click(element('BUTTON',{act:'export-backup'},body));
+ click(element('BUTTON',{act:'download-export'},body));
+ click(element('BUTTON',{act:'copy-export'},body));
+ click(element('A',{download:'chain-scanner-recovery-archive.json'},body));
+ assert.equal(storage.getItem(motionKey),originalRaw,'Settings Export, Copy, Download and their programmatic download click leave the exact timed consent bytes and expiry unchanged');
  assert.deepEqual(saves,[],'ordinary downloads do not renew motion consent');
  assert.equal(starts,0,'ordinary downloads do not restart the landscape');
  click(normalChoice);
@@ -41526,10 +41528,10 @@ test('RISK device save warning browser: actual held Add keeps every text line on
    await page.locator('[data-act="settings"]').click();
    await poll(page,()=>!document.querySelector('#toast.show'),null,'natural warning expiry');
    const data=page.locator('#modalRoot details').filter({has:page.locator('[data-act="make-manual-backup"]')});for(const panel of await data.all())if(await panel.getAttribute('open')===null)await panel.locator(':scope > summary').click();
-   assert.equal(await page.locator('[data-act="make-manual-backup"]').isVisible(),true);assert.match(await page.locator('#modalRoot').innerText(),/Current-board view and copy/);
+   assert.equal(await page.locator('[data-act="make-manual-backup"]').isVisible(),true);assert.match(await page.locator('#modalRoot').innerText(),/Data and backups[\s\S]*Export/);
    const issue=page.locator('#modalRoot .kv').filter({hasText:'Last device save issue:'});await issue.scrollIntoViewIfNeeded();assert.equal(await issue.isVisible(),true);assert.match(await issue.innerText(),/Last device save issue:.*device-save:completion-upgrade\/ambiguous-legacy-completion/s);
    row.details=await issue.evaluate(el=>{const b=el.getBoundingClientRect(),code=el.querySelector('code'),r=code.getBoundingClientRect();return {text:el.textContent,rect:{x:b.x,y:b.y,w:b.width,h:b.height},code:{x:r.x,y:r.y,w:r.width,h:r.height},scrollWidth:el.scrollWidth,clientWidth:el.clientWidth};});assert.ok(row.details.scrollWidth<=row.details.clientWidth+1);assert.ok(row.details.code.x>=row.details.rect.x&&row.details.code.x+row.details.code.w<=row.details.rect.x+row.details.rect.w+1);
-   await page.evaluate(()=>document.fonts.ready);fonts.details=await platformFonts('#modalRoot p.kv:has(code)');for(const act of ['view-current-board','download-backup'])fonts[act]=await platformFonts('#modalRoot [data-act="'+act+'"]');await session.detach();
+   await page.evaluate(()=>document.fonts.ready);fonts.details=await platformFonts('#modalRoot p.kv:has(code)');fonts.export=await platformFonts('#modalRoot [data-act="export-backup"]');fonts.import=await platformFonts('#modalRoot [data-act="import-backup"]');await session.detach();
    if(evidence){fs.writeFileSync(path.join(evidence,theme+'-'+scale+'.json'),JSON.stringify(row,null,2));await page.screenshot({path:path.join(evidence,theme+'-'+scale+'-details.png')});
     if(process.env.TOAST_REVIEW_PAUSE==='1'){const ack=path.join(evidence,theme+'-'+scale+'-details-inspected');const end=Date.now()+180000;while(!fs.existsSync(ack)&&Date.now()<end)await new Promise(r=>setTimeout(r,100));assert.ok(fs.existsSync(ack),'owner inspected actual native details before closing its context');}}
    assert.equal(await page.evaluate(()=>localStorage.getItem('fvp:chain-scanner:v1')),exactOldDevice);assert.equal(await page.evaluate(()=>localStorage.getItem('fvp:chain-scanner:protected:v1')),exactOldDevice);
@@ -42429,8 +42431,8 @@ test('RISK pasted recovery UI: Settings opens an editable protected preview and 
  assert.match(html,/<button class="ghost" data-act="settings"/,'the header exposes the Settings button that opens this route');
  dispatch('settings');
  const settings=root.innerHTML;assert.match(settings,/<h2>Settings<\/h2>/,'the visible header Settings action opens Settings');
- const restoreButton=settings.match(/<button\b(?=[^>]*data-act="restore-backup")[^>]*>\s*Restore\s*<\/button>/);
- assert.ok(restoreButton,'Settings exposes one guarded Restore action');
+ const restoreButton=settings.match(/<button\b(?=[^>]*data-act="import-backup")[^>]*>\s*Import\s*<\/button>/);
+ assert.ok(restoreButton,'Settings exposes one guarded Import action');
  assert.match(settings,/id="backupRestoreSource"[\s\S]*?value="file"[\s\S]*?value="paste"/,'the same Restore action offers native file and paste sources');
  assert.doesNotMatch(settings,/data-act="choose-backup-file"|data-act="open-paste-recovery"/,'file and paste are choices, not competing Settings actions');
  assert.doesNotMatch(settings,/id="jsonBox"/,'the editable paste area stays in its own dialog');
@@ -42446,7 +42448,7 @@ test('RISK pasted recovery UI: Settings opens an editable protected preview and 
   assert.equal((markup.match(/class="modal" role="dialog"/g)||[]).length,1,message+' keeps one dialog');
   return markup;
  };
- click('restore-backup');
+ click('import-backup');
  assert.match(oneDialog('Opening paste recovery'),/id="jsonBox"/,'the visible Settings route opens an editable text area');
  const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=raw;shim.document.dispatchEvent({type:'input',target:box});
  const waitForPreview=async()=>{
@@ -42585,8 +42587,8 @@ test('RISK pasted recovery UI: archive and raw backup text use the visible Setti
   shim.document.getElementById=id=>id==='jsonBox'&&!root.innerHTML.includes('id="jsonBox"')?null:id==='backupRestoreSource'?restoreSource:getElementById(id);
   const dispatch=action=>{const target=makeFakeElement();target.dataset={act:action};target.closest=selector=>selector==='[data-act]'?target:null;shim.document.dispatchEvent({type:'click',target,detail:1});};
   dispatch('settings');assert.match(shim.document.getElementById('modalRoot').innerHTML,/<h2>Settings<\/h2>/,'pasting starts from the visible Settings control');
-  assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="restore-backup"/);
-  dispatch('restore-backup');const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=raw;shim.document.dispatchEvent({type:'input',target:box});
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="import-backup"/);
+  dispatch('import-backup');const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=raw;shim.document.dispatchEvent({type:'input',target:box});
   assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="preview-pasted-recovery"/);
   dispatch('preview-pasted-recovery');
   const expectedChoice=format==='raw'?'fileRestoreBackupChoice':'fileRestoreLearningChoice';
@@ -43474,12 +43476,13 @@ test('RISK recovery identity consumers: verified cloud adoption rebases independ
 });
 
 
-test('RISK support diagnostics: Settings names the existing board export for its contents',async t=>{
+test('RISK support diagnostics: Settings points to the single archive Export',async t=>{
  const app=await loadApp();t.after(()=>app.dispose());app.ctx.openSettings();
  const settings=app.shim.document.getElementById('modalRoot').innerHTML;
- assert.match(settings,/Current-board view and copy/i,'the existing current-board view remains distinct from the download chooser');
- assert.match(settings,/data-act="view-current-board"/,'the existing board view/copy action remains available');
- assert.match(settings,/data-act="download-backup"/,'the one consolidated board download action remains available');
+ assert.equal((settings.match(/data-act="export-backup"/g)||[]).length,1,'Settings has exactly one complete archive Export');
+ assert.equal((settings.match(/data-act="import-backup"/g)||[]).length,1,'Settings retains one protected Import action');
+ assert.doesNotMatch(settings,/Current-board view and copy|data-act="(?:view-current-board|view-database-repair|download-backup)"|currentBoardData|databaseRepairData/);
+ assert.match(settings,/Copy and Download use the same archive/i);
  app.ctx.openHelp();const help=app.shim.document.getElementById('modalRoot').innerHTML;
  const faq=help.match(/<dt>What does the debug log contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
  assert.ok(faq,'the extended FAQ describes the separate report');
@@ -43719,7 +43722,7 @@ test('RISK support diagnostics: local report stays redacted, bounded, and separa
  const beforeState=JSON.stringify(app.ctx.state),beforeStorage=[SYNC_STORE_KEY,LOCAL_HEAD_KEY,'fvp:chain-scanner:sync-error-log:v1'].map(key=>app.shim.localStorage.getItem(key));
  app.ctx.openSettings();const settings=app.shim.document.getElementById('modalRoot').innerHTML;
  assert.match(settings,/Debug log/i,'Settings offers a separate support report');
- assert.match(settings,/data-act="view-support-diagnostics"/);assert.match(settings,/data-act="view-database-repair"/);assert.doesNotMatch(settings,/data-act="copy-support-diagnostics"/);assert.doesNotMatch(settings,/data-act="download-support-diagnostics"/);
+ assert.match(settings,/data-act="view-support-diagnostics"/);assert.match(settings,/data-act="export-backup"/);assert.doesNotMatch(settings,/data-act="view-database-repair"|data-act="copy-support-diagnostics"|data-act="download-support-diagnostics"/);
  assert.match(settings,/metadata report.*not a board backup/i,'the local report cannot be mistaken for restorable board data');
  app.ctx.onAction('view-support-diagnostics',{});
  let report=app.ctx.buildSupportDiagnosticsReport();

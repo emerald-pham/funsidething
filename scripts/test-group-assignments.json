@@ -98,7 +98,7 @@
       "file": "scripts/agent-tools/browser-audit.test.mjs"
     },
     {
-      "root": "a pass 17h old that has not crossed 02:00 does NOT recycle — the marks are still there",
+      "root": "a pass 17h old that has not crossed 02:00 does NOT recycle \u2014 the marks are still there",
       "group": "core",
       "file": "tests.js"
     },
@@ -143,7 +143,7 @@
       "file": "scripts/agent-tools/rendered-evidence.test.mjs"
     },
     {
-      "root": "a sub-day worked window can hand a morning task back the same evening — the min() trade-off",
+      "root": "a sub-day worked window can hand a morning task back the same evening \u2014 the min() trade-off",
       "group": "core",
       "file": "tests.js"
     },
@@ -223,7 +223,7 @@
       "file": "tests.js"
     },
     {
-      "root": "addTask: typing a completed title by hand still adds it — an explicit act, not a stale paste",
+      "root": "addTask: typing a completed title by hand still adds it \u2014 an explicit act, not a stale paste",
       "group": "core",
       "file": "tests.js"
     },
@@ -453,7 +453,7 @@
       "file": "tests.js"
     },
     {
-      "root": "AUDIT H5: with nothing dotted, only the task Start scanning will dot carries the '→' marker",
+      "root": "AUDIT H5: with nothing dotted, only the task Start scanning will dot carries the '\u2192' marker",
       "group": "core",
       "file": "tests.js"
     },
@@ -588,7 +588,7 @@
       "file": "tests.js"
     },
     {
-      "root": "benchCant: applies NO strength signal — it's a circumstance, not a comparison",
+      "root": "benchCant: applies NO strength signal \u2014 it's a circumstance, not a comparison",
       "group": "core",
       "file": "tests.js"
     },
@@ -783,7 +783,7 @@
       "file": "tests.js"
     },
     {
-      "root": "cand-done does NOT trigger the auto-halt — it's still suggestion-list activity, not queue activity",
+      "root": "cand-done does NOT trigger the auto-halt \u2014 it's still suggestion-list activity, not queue activity",
       "group": "core",
       "file": "tests.js"
     },
@@ -1338,7 +1338,7 @@
       "file": "scripts/agent-tools/checkpoint.test.mjs"
     },
     {
-      "root": "crossing 02:00 recycles a worked mark with the pass — not just no / dislodged marks",
+      "root": "crossing 02:00 recycles a worked mark with the pass \u2014 not just no / dislodged marks",
       "group": "core",
       "file": "tests.js"
     },
@@ -1413,7 +1413,7 @@
       "file": "tests.js"
     },
     {
-      "root": "decide('can') is retired — a stale 'can' must not dot anything or drop the candidate",
+      "root": "decide('can') is retired \u2014 a stale 'can' must not dot anything or drop the candidate",
       "group": "core",
       "file": "tests.js"
     },
@@ -1548,7 +1548,7 @@
       "file": "tests.js"
     },
     {
-      "root": "dislodge: by contrast, does NOT expire — it stays skipped for the pass",
+      "root": "dislodge: by contrast, does NOT expire \u2014 it stays skipped for the pass",
       "group": "core",
       "file": "tests.js"
     },
@@ -1663,7 +1663,7 @@
       "file": "tests.js"
     },
     {
-      "root": "dotTask: a completed task is a no-op — a done task must never be dotted",
+      "root": "dotTask: a completed task is a no-op \u2014 a done task must never be dotted",
       "group": "core",
       "file": "tests.js"
     },
@@ -1678,7 +1678,7 @@
       "file": "tests.js"
     },
     {
-      "root": "dotTask: clears a no / can't / dislodged / worked mark — a dotted task is not skipped",
+      "root": "dotTask: clears a no / can't / dislodged / worked mark \u2014 a dotted task is not skipped",
       "group": "core",
       "file": "tests.js"
     },
@@ -1703,7 +1703,7 @@
       "file": "tests.js"
     },
     {
-      "root": "dotTask: dots an ineligible task anyway — a future start date does not block a deliberate dot",
+      "root": "dotTask: dots an ineligible task anyway \u2014 a future start date does not block a deliberate dot",
       "group": "core",
       "file": "tests.js"
     },
@@ -1723,7 +1723,7 @@
       "file": "tests.js"
     },
     {
-      "root": "dotTask: leaves the mode alone — dotting while working does not resume scanning",
+      "root": "dotTask: leaves the mode alone \u2014 dotting while working does not resume scanning",
       "group": "core",
       "file": "tests.js"
     },
@@ -2093,7 +2093,7 @@
       "file": "tests.js"
     },
     {
-      "root": "isEligible: a task whose startsAt is today is eligible — the start date has occurred",
+      "root": "isEligible: a task whose startsAt is today is eligible \u2014 the start date has occurred",
       "group": "core",
       "file": "tests.js"
     },
@@ -3288,7 +3288,7 @@
       "file": "scripts/agent-tools/record-run.test.mjs"
     },
     {
-      "root": "quick-add context selection does NOT leak into the separate Settings → Import flow",
+      "root": "quick-add context selection does NOT leak into the separate Settings \u2192 Import flow",
       "group": "core",
       "file": "tests.js"
     },
@@ -3408,7 +3408,7 @@
       "file": "tests.js"
     },
     {
-      "root": "reconcileHistory: evergreen repeats survive — recurring is the whole point",
+      "root": "reconcileHistory: evergreen repeats survive \u2014 recurring is the whole point",
       "group": "core",
       "file": "tests.js"
     },
@@ -3528,7 +3528,7 @@
       "file": "tests.js"
     },
     {
-      "root": "REGRESSION: signing in as a different account re-arms the gate — no write before reading that account's copy",
+      "root": "REGRESSION: signing in as a different account re-arms the gate \u2014 no write before reading that account's copy",
       "group": "persistence-recovery",
       "file": "tests.js"
     },
@@ -3643,7 +3643,7 @@
       "file": "tests.js"
     },
     {
-      "root": "rescanSkipped() remains a deliberate manual override — clears can't immediately regardless of the timer",
+      "root": "rescanSkipped() remains a deliberate manual override \u2014 clears can't immediately regardless of the timer",
       "group": "core",
       "file": "tests.js"
     },
@@ -4138,7 +4138,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK backup and Restore consolidation: Settings keeps one guarded action with all formats",
+      "root": "RISK Settings transfer consolidation: one Import, one Export and direct Copy",
       "group": "core",
       "file": "tests.js"
     },
@@ -4253,7 +4253,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK backup format safety: raw-source qualification remains outside the native selector",
+      "root": "RISK backup export safety: unreadable originals stay byte-exact without a raw-data view",
       "group": "core",
       "file": "tests.js"
     },
@@ -4748,7 +4748,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK cloud current choices: Can’t and Return are timed, causally linked disposition actions",
+      "root": "RISK cloud current choices: Can\u2019t and Return are timed, causally linked disposition actions",
       "group": "core",
       "file": "tests.js"
     },
@@ -4803,7 +4803,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK cloud current choices: projected Can’t and Return preserve the original hold then clear it",
+      "root": "RISK cloud current choices: projected Can\u2019t and Return preserve the original hold then clear it",
       "group": "core",
       "file": "tests.js"
     },
@@ -5633,12 +5633,12 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK completion lifecycle recovery: expired rest cannot restore 2→1 or 13→4 saved chains",
+      "root": "RISK completion lifecycle recovery: expired rest cannot restore 2\u21921 or 13\u21924 saved chains",
       "group": "persistence-recovery",
       "file": "tests.js"
     },
     {
-      "root": "RISK completion lifecycle recovery: saved device source cannot restore a 2→1 chain before scan refresh",
+      "root": "RISK completion lifecycle recovery: saved device source cannot restore a 2\u21921 chain before scan refresh",
       "group": "core",
       "file": "tests.js"
     },
@@ -7763,7 +7763,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK LOCAL BACKUPS: unreadable old copy is visible with exact raw recovery and targeted removal",
+      "root": "RISK LOCAL BACKUPS: unreadable old copy stays visible and byte-exact in unified Export",
       "group": "core",
       "file": "tests.js"
     },
@@ -7818,7 +7818,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK MANUAL JSON EXPORT: unreadable, unsupported and hydration-placeholder sources stop without a file",
+      "root": "RISK MANUAL JSON EXPORT: unavailable and unsupported sources are explicit partial exports",
       "group": "core",
       "file": "tests.js"
     },
@@ -9078,7 +9078,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK RECOVERY EXPORT: an unsaved in-memory board remains copyable without device storage",
+      "root": "RISK RECOVERY EXPORT: accepted unsaved board stays in direct Copy when device storage fails",
       "group": "core",
       "file": "tests.js"
     },
@@ -10408,7 +10408,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK support diagnostics: Settings names the existing board export for its contents",
+      "root": "RISK support diagnostics: Settings points to the single archive Export",
       "group": "core",
       "file": "tests.js"
     },
@@ -10783,7 +10783,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK timed-hold coherence: native Can’t expires at the exact deadline through IndexedDB and ordinary cloud pull",
+      "root": "RISK timed-hold coherence: native Can\u2019t expires at the exact deadline through IndexedDB and ordinary cloud pull",
       "group": "core",
       "file": "tests.js"
     },
@@ -10793,7 +10793,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK timed-hold coherence: use each board’s Worked settings and keep orphan evidence fail-closed",
+      "root": "RISK timed-hold coherence: use each board\u2019s Worked settings and keep orphan evidence fail-closed",
       "group": "core",
       "file": "tests.js"
     },
@@ -11678,7 +11678,7 @@
       "file": "tests.js"
     },
     {
-      "root": "UI: 'done adding for now' shows from the first decision — Start scanning already dotted something",
+      "root": "UI: 'done adding for now' shows from the first decision \u2014 Start scanning already dotted something",
       "group": "core",
       "file": "tests.js"
     },
@@ -11728,12 +11728,12 @@
       "file": "tests.js"
     },
     {
-      "root": "UI: a greyed action row's buttons are still clickable — you can change your mind",
+      "root": "UI: a greyed action row's buttons are still clickable \u2014 you can change your mind",
       "group": "core",
       "file": "tests.js"
     },
     {
-      "root": "UI: a new task shows an arrow → to the Start scanning button when nothing's dotted yet",
+      "root": "UI: a new task shows an arrow \u2192 to the Start scanning button when nothing's dotted yet",
       "group": "core",
       "file": "tests.js"
     },
@@ -11788,7 +11788,7 @@
       "file": "tests.js"
     },
     {
-      "root": "UI: once scanning starts it's Yes/No — no Can button, no chain-start question",
+      "root": "UI: once scanning starts it's Yes/No \u2014 no Can button, no chain-start question",
       "group": "core",
       "file": "tests.js"
     },
@@ -11843,7 +11843,7 @@
       "file": "tests.js"
     },
     {
-      "root": "UI: the benchmark's d/⌫ keyhints hide when a candidate is showing",
+      "root": "UI: the benchmark's d/\u232b keyhints hide when a candidate is showing",
       "group": "core",
       "file": "tests.js"
     },
@@ -11953,7 +11953,7 @@
       "file": "tests.js"
     },
     {
-      "root": "UI: with nothing dotted the scan offers Start scanning — no benchmark, no candidate, no decide row",
+      "root": "UI: with nothing dotted the scan offers Start scanning \u2014 no benchmark, no candidate, no decide row",
       "group": "core",
       "file": "tests.js"
     },
@@ -12693,7 +12693,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK JSON COPY PASTE: the current-board viewer copies its exact displayed JSON without saving",
+      "root": "RISK JSON COPY PASTE: Copy and Download send the same full archive without a JSON view or writes",
       "group": "core",
       "file": "tests.js"
     },
@@ -12703,17 +12703,17 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK DATABASE REPAIR EXPORT: the Settings copy includes exact saved sources and repair metadata without writes",
+      "root": "RISK DATABASE REPAIR EXPORT: unified Copy and Download retain exact sources and metadata without writes",
       "group": "core",
       "file": "tests.js"
     },
     {
-      "root": "RISK DATABASE REPAIR EXPORT: unreadable storage produces a labeled partial package with available board and diagnostics",
+      "root": "RISK DATABASE REPAIR EXPORT: unreadable sources are labeled partial and never shown as an empty database",
       "group": "core",
       "file": "tests.js"
     },
     {
-      "root": "RISK DATABASE REPAIR EXPORT: visible Debug log controls use the combined repair export",
+      "root": "RISK DATABASE REPAIR EXPORT: Debug log points to the combined archive without duplicate export controls",
       "group": "core",
       "file": "tests.js"
     },
@@ -12728,7 +12728,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK DATABASE REPAIR EXPORT: a cancelled capture cannot replace a newer pasted draft",
+      "root": "RISK DATABASE REPAIR EXPORT: canceled capture keeps the pasted draft and concurrent capture is bounded",
       "group": "core",
       "file": "tests.js"
     },
@@ -12738,7 +12738,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK DATABASE REPAIR EXPORT: FAQ explains the included database, diagnostics and partial-report limits",
+      "root": "RISK DATABASE REPAIR EXPORT: Help describes direct Copy and partial archive status",
       "group": "core",
       "file": "tests.js"
     },
@@ -12790,6 +12790,11 @@
     {
       "root": "RISK repository process: native button gate cannot omit a required stress scenario",
       "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK Settings transfer sections: cleanup controls stay outside the focused backup section",
+      "group": "core",
       "file": "tests.js"
     }
   ],
@@ -12857,6 +12862,102 @@
       "group": "core",
       "file": "tests.js",
       "reason": "The user authorized automatic useful offline recovery. Preserve pre-hydration no-read/no-adoption, exact current-head repair, full raw originals, manual/protected copies and remote authority; replace obsolete unusable-placeholder expectations with the proven supported local workspace. Fresh cloud reads may follow verified local recovery; source-bound tests measure the actual ordering."
+    },
+    {
+      "baselineRoot": "RISK backup and Restore consolidation: Settings keeps one guarded action with all formats",
+      "currentRoot": "RISK Settings transfer consolidation: one Import, one Export and direct Copy",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "Issue webkit-button-safety renames this contract around the final unified Import and recovery-archive Export behavior; exact-source, preview, cancellation, partial-state and diagnostics assertions remain."
+    },
+    {
+      "baselineRoot": "RISK backup format safety: raw-source qualification remains outside the native selector",
+      "currentRoot": "RISK backup export safety: unreadable originals stay byte-exact without a raw-data view",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "Issue webkit-button-safety renames this contract around the final unified Import and recovery-archive Export behavior; exact-source, preview, cancellation, partial-state and diagnostics assertions remain."
+    },
+    {
+      "baselineRoot": "RISK LOCAL BACKUPS: unreadable old copy is visible with exact raw recovery and targeted removal",
+      "currentRoot": "RISK LOCAL BACKUPS: unreadable old copy stays visible and byte-exact in unified Export",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "Issue webkit-button-safety renames this contract around the final unified Import and recovery-archive Export behavior; exact-source, preview, cancellation, partial-state and diagnostics assertions remain."
+    },
+    {
+      "baselineRoot": "RISK JSON COPY PASTE: the current-board viewer copies its exact displayed JSON without saving",
+      "currentRoot": "RISK JSON COPY PASTE: Copy and Download send the same full archive without a JSON view or writes",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "Issue webkit-button-safety renames this contract around the final unified Import and recovery-archive Export behavior; exact-source, preview, cancellation, partial-state and diagnostics assertions remain."
+    },
+    {
+      "baselineRoot": "RISK DATABASE REPAIR EXPORT: the Settings copy includes exact saved sources and repair metadata without writes",
+      "currentRoot": "RISK DATABASE REPAIR EXPORT: unified Copy and Download retain exact sources and metadata without writes",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "Issue webkit-button-safety renames this contract around the final unified Import and recovery-archive Export behavior; exact-source, preview, cancellation, partial-state and diagnostics assertions remain."
+    },
+    {
+      "baselineRoot": "RISK DATABASE REPAIR EXPORT: unreadable storage produces a labeled partial package with available board and diagnostics",
+      "currentRoot": "RISK DATABASE REPAIR EXPORT: unreadable sources are labeled partial and never shown as an empty database",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "Issue webkit-button-safety renames this contract around the final unified Import and recovery-archive Export behavior; exact-source, preview, cancellation, partial-state and diagnostics assertions remain."
+    },
+    {
+      "baselineRoot": "RISK DATABASE REPAIR EXPORT: visible Debug log controls use the combined repair export",
+      "currentRoot": "RISK DATABASE REPAIR EXPORT: Debug log points to the combined archive without duplicate export controls",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "Issue webkit-button-safety renames this contract around the final unified Import and recovery-archive Export behavior; exact-source, preview, cancellation, partial-state and diagnostics assertions remain."
+    },
+    {
+      "baselineRoot": "RISK DATABASE REPAIR EXPORT: a cancelled capture cannot replace a newer pasted draft",
+      "currentRoot": "RISK DATABASE REPAIR EXPORT: canceled capture keeps the pasted draft and concurrent capture is bounded",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "Issue webkit-button-safety renames this contract around the final unified Import and recovery-archive Export behavior; exact-source, preview, cancellation, partial-state and diagnostics assertions remain."
+    },
+    {
+      "baselineRoot": "RISK DATABASE REPAIR EXPORT: FAQ explains the included database, diagnostics and partial-report limits",
+      "currentRoot": "RISK DATABASE REPAIR EXPORT: Help describes direct Copy and partial archive status",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "Issue webkit-button-safety renames this contract around the final unified Import and recovery-archive Export behavior; exact-source, preview, cancellation, partial-state and diagnostics assertions remain."
+    },
+    {
+      "baselineRoot": "RISK RECOVERY EXPORT: an unsaved in-memory board remains copyable without device storage",
+      "currentRoot": "RISK RECOVERY EXPORT: accepted unsaved board stays in direct Copy when device storage fails",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "Issue webkit-button-safety renames this contract around the final unified Import and recovery-archive Export behavior; exact-source, preview, cancellation, partial-state and diagnostics assertions remain."
+    },
+    {
+      "baselineRoot": "RISK MANUAL JSON EXPORT: unreadable, unsupported and hydration-placeholder sources stop without a file",
+      "currentRoot": "RISK MANUAL JSON EXPORT: unavailable and unsupported sources are explicit partial exports",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "Issue webkit-button-safety renames this contract around the final unified Import and recovery-archive Export behavior; exact-source, preview, cancellation, partial-state and diagnostics assertions remain."
+    },
+    {
+      "baselineRoot": "RISK support diagnostics: Settings names the existing board export for its contents",
+      "currentRoot": "RISK support diagnostics: Settings points to the single archive Export",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "Issue webkit-button-safety renames this contract around the final unified Import and recovery-archive Export behavior; exact-source, preview, cancellation, partial-state and diagnostics assertions remain."
     }
   ]
 }
