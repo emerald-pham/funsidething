@@ -19133,5 +19133,69 @@
     "failure": "Actual app-consumer assertion failed: the actual server decoder must return a complete board despite permanent local unavailability; actual undefined, expected string. Separate later new-slice assertions failed because unknown root evidence was replaced and a retained independent server field was missing from the resulting payload."
   },
   "observedGreen": "Focused all-new suite9ce83e02-421a-4515-8c06-160031c96fa0 passed. Explicit Node-only preservation cohort e942b2c1-ecdb-4149-b12b-f7474dcb8c7c passed. Broader7ad0e40d-35eb-4c1c-a12a-522e775bfd30 unintentionally selected native tests and is an interrupted143 attempt, never acceptance. Parent-requested stopping boundary leaves independent review, emulator compatibility/rules, full/native/rendered/FAQ/CI/deployment and local-preflight hang bounding pending."
+},
+{
+  "baseCommit": "53e50cd03656dc0fb5ccc236f1a821d3f6776284",
+  "testChangesSha256": "92154877f1a590546572c75076f94a623856db4d9231c4d7f16fd352cbc04655",
+  "reason": "Complete the explicitly resumed independent cloud repair owner scope after merging the parent checkpoint and accepted current-main tooling. Keep actual cloudPull usable when local pending availability stalls or has no capability; retain source-only publication and exact originals.",
+  "previousBehavior": "The parked cloudPull availability read could wait forever on an existing native IndexedDB request, and absent storage skipped dispatch. Unsupported values in otherwise known manifest fields could be erased. Exhausting a finite repair budget was mislabeled cancellation. The original merged outage test also needed its existing fixtureDeadline while the parent reconnect implementation awaited an unref retry timer.",
+  "intendedBehavior": "Classify device availability within a bounded fraction of one original monotonic recovery budget and pass only its remaining time to server repair. Preserve local state and pending intent while current server sources alone authorize a fresh immutable generation. Refuse malformed root or header authority, report actual deadline failure, read back uncertain staged and published outcomes, and stop after one fresh restart.",
+  "replacementTests": [
+    "RISK independent cloud stalled storage: a pending native IDB request cannot block remote-only repair",
+    "RISK independent cloud absent storage: actual cloudPull repairs remote bytes without a device capability",
+    "RISK independent cloud live work: accepted Add comparison and unfinished draft survive a held server-only repair",
+    "RISK independent cloud explicit abort: canceled reads and uncertain committed replies cannot acknowledge local work",
+    "RISK independent cloud staged reply: retry resumes the same deterministic generation after uncertain creation",
+    "RISK independent cloud restart budget: repeated fresh root changes stop after one restart without replacement",
+    "RISK independent cloud total budget: clock skew and late server replies cannot extend the original operation",
+    "RISK independent cloud final readback: repeated damage after permitted publication cannot become verified repair"
+  ],
+  "preservedCoverage": [
+    "No existing passing assertion is removed or weakened. The permanent external-IDB test suppresses only native pending-key request events; app storage methods, cloud consumers, original codecs, task and decision reducers remain real. The old unavailable-storage test retains its full raw row/header/chunk/draft checks with an explicit fixture watchdog.",
+    "The additive synthetic Firestore query/limit and performance clock boundaries retain ordinary reads, legal published metadata and existing upload protections. All parent merged-main tests and append-only rationales remain intact. Parent owns global group classification, FAQ, fingerprints and release gates.",
+    "Accepted native Add and comparison facts plus draft are created while an actual server request is held. An external unreadable pending-key metadata guard keeps ordinary uploads held; independent repair must never import that unseen live local payload or alter any local row.",
+    "Explicit abort at read/prepublication/postcommit, account/epoch/backend/suspend, peer revisions, damaged/unsupported/missing/deleting sources, failed pins, lost staged/publication replies, one-restart exhaustion and independent remote decode remain required. The repeated final-readback damage case cannot claim a permitted write is verified recovery."
+  ],
+  "redEvidence": {
+    "command": "Recorder resume-runs a91603d5-033c-479e-a62a-f0cb3fb29a42: node --test --test-reporter=spec --test-name-pattern='^RISK independent cloud stalled storage:' tests.js on merged53e50cd before timeout changes. Later new-slice preimplementation source-safety d07f612f-83df-4441-ad6f-214ec83c9e5a and total-budget d4ab900d-8d3a-4152-a1a9-7978cafc277b. Original first capability RED c39e8f45 and earlier source/union REDs remain in the original runs directory.",
+    "failure": "a91603d5: actual remote decoder payload remained undefined instead of a complete repaired string while the external native pending-key request stayed stalled. d07f612f: unsupported known root/header fields incorrectly yielded ok true rather than preserving the root. d4ab900d: total-budget result code was undefined rather than deadline-exceeded. Initial postmerge a5056e36 was an infrastructure cancellation, not behavioral RED."
+  },
+  "observedGreen": "Resumed all-independent f56389a6 passed39/39 before the additional final-readback case; final expanded focused preservation917c80f0 passed130/130, zero failed/canceled/skipped. Later isolated source mutants c347f404(local payload),5b68fc9d(pins),c0b65bac(revision CAS),2bb0feb4(auth epoch),abb2358e(exact readback) each failed intended behavioral assertions. Mutant files and SHA256 identities live under external sensitivity/ and are later sensitivity evidence, never original chronology. No resumed browser/emulator/CI/production/full-suite evidence claimed."
+},
+{
+  "baseCommit": "f6d1da402787162d17b635b00044c881b97929b7",
+  "testChangesSha256": "6cac9f3950ae2cf348a8c48523b07a40d8364a34f05d3c8a4cd168702fb203ac",
+  "reason": "Complete the explicitly resumed independent cloud repair owner scope after merging the parent checkpoint and accepted current-main tooling. Keep actual cloudPull usable when local pending availability stalls or has no capability; retain source-only publication and exact originals.",
+  "previousBehavior": "The parked cloudPull availability read could wait forever on an existing native IndexedDB request, and absent storage skipped dispatch. Unsupported values in otherwise known manifest fields could be erased. Exhausting a finite repair budget was mislabeled cancellation. The original merged outage test also needed its existing fixtureDeadline while the parent reconnect implementation awaited an unref retry timer.",
+  "intendedBehavior": "Classify device availability within a bounded fraction of one original monotonic recovery budget and pass only its remaining time to server repair. Preserve local state and pending intent while current server sources alone authorize a fresh immutable generation. Refuse malformed root or header authority, report actual deadline failure, read back uncertain staged and published outcomes, and stop after one fresh restart.",
+  "replacementTests": [
+    "RISK independent cloud repair: unavailable device storage repairs retained server sources without acknowledging local work",
+    "RISK independent cloud source safety: unsupported roots headers boards and absent candidates remain protected",
+    "RISK independent cloud capability: server-only repair ignores injected payloads and never observes local pending state",
+    "RISK independent cloud authority: cancellation account epoch backend and suspension changes cannot publish stale repairs",
+    "RISK independent cloud races: fresh peer roots win during reads and publication while failed pins keep originals",
+    "RISK independent cloud uncertain reply: deterministic publication reads back a lost reply and never clears pending uploads",
+    "RISK independent cloud retained discovery: pinned originals survive ordinary rotations and repair another damaged root without local storage",
+    "RISK independent cloud exact reconstruction: a matching retained hash cannot discard other complete server facts",
+    "RISK independent cloud stalled storage: a pending native IDB request cannot block remote-only repair",
+    "RISK independent cloud absent storage: actual cloudPull repairs remote bytes without a device capability",
+    "RISK independent cloud live work: accepted Add comparison and unfinished draft survive a held server-only repair",
+    "RISK independent cloud explicit abort: canceled reads and uncertain committed replies cannot acknowledge local work",
+    "RISK independent cloud staged reply: retry resumes the same deterministic generation after uncertain creation",
+    "RISK independent cloud restart budget: repeated fresh root changes stop after one restart without replacement",
+    "RISK independent cloud total budget: clock skew and late server replies cannot extend the original operation",
+    "RISK independent cloud final readback: repeated damage after permitted publication cannot become verified repair"
+  ],
+  "preservedCoverage": [
+    "No existing passing assertion is removed or weakened. The permanent external-IDB test suppresses only native pending-key request events; app storage methods, cloud consumers, original codecs, task and decision reducers remain real. The old unavailable-storage test retains its full raw row/header/chunk/draft checks with an explicit fixture watchdog.",
+    "The additive synthetic Firestore query/limit and performance clock boundaries retain ordinary reads, legal published metadata and existing upload protections. All parent merged-main tests and append-only rationales remain intact. Parent owns global group classification, FAQ, fingerprints and release gates.",
+    "Accepted native Add and comparison facts plus draft are created while an actual server request is held. An external unreadable pending-key metadata guard keeps ordinary uploads held; independent repair must never import that unseen live local payload or alter any local row.",
+    "Explicit abort at read/prepublication/postcommit, account/epoch/backend/suspend, peer revisions, damaged/unsupported/missing/deleting sources, failed pins, lost staged/publication replies, one-restart exhaustion and independent remote decode remain required. The repeated final-readback damage case cannot claim a permitted write is verified recovery."
+  ],
+  "redEvidence": {
+    "command": "Recorder resume-runs a91603d5-033c-479e-a62a-f0cb3fb29a42: node --test --test-reporter=spec --test-name-pattern='^RISK independent cloud stalled storage:' tests.js on merged53e50cd before timeout changes. Later new-slice preimplementation source-safety d07f612f-83df-4441-ad6f-214ec83c9e5a and total-budget d4ab900d-8d3a-4152-a1a9-7978cafc277b. Original first capability RED c39e8f45 and earlier source/union REDs remain in the original runs directory.",
+    "failure": "a91603d5: actual remote decoder payload remained undefined instead of a complete repaired string while the external native pending-key request stayed stalled. d07f612f: unsupported known root/header fields incorrectly yielded ok true rather than preserving the root. d4ab900d: total-budget result code was undefined rather than deadline-exceeded. Initial postmerge a5056e36 was an infrastructure cancellation, not behavioral RED."
+  },
+  "observedGreen": "Resumed all-independent f56389a6 passed39/39 before the additional final-readback case; final expanded focused preservation917c80f0 passed130/130, zero failed/canceled/skipped. Later isolated source mutants c347f404(local payload),5b68fc9d(pins),c0b65bac(revision CAS),2bb0feb4(auth epoch),abb2358e(exact readback) each failed intended behavioral assertions. Mutant files and SHA256 identities live under external sensitivity/ and are later sensitivity evidence, never original chronology. No resumed browser/emulator/CI/production/full-suite evidence claimed."
 }
 ]

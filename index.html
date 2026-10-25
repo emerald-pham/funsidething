@@ -5499,14 +5499,27 @@ async function exactAcknowledgedCloudSource(failed,account){
 async function cloudPull(){
   // This read classifies only device availability. Server-only repair cannot
   // consume, clear or acknowledge pending local work that it cannot observe.
-  if(cloudReady()&&!cloudSuspended&&!document.hidden&&deviceStore&&
+  if(cloudReady()&&!cloudSuspended&&!document.hidden&&
     typeof window.CloudSync.repairCloudSources==="function"){
-    const backend=window.CloudSync,account=backend.user,identity=backend.recoveryIdentity?.();
-    try{await deviceStore.getPendingUpload(identity);}
-    catch{
-      await backend.repairCloudSources({stillCurrent:()=>window.CloudSync===backend&&backend.user===account&&
-        backend.recoveryIdentity?.()===identity&&!cloudSuspended&&!document.hidden});
-      renderSync();return;
+    const backend=window.CloudSync,account=backend.user,identity=backend.recoveryIdentity?.(),
+      started=performance.now(),budget=cloudSourceRecoveryReadTimeout(),remainingMs=()=>Math.max(0,budget-(performance.now()-started));
+    const current=()=>window.CloudSync===backend&&backend.user===account&&backend.recoveryIdentity?.()===identity&&
+      !cloudSuspended&&!document.hidden;
+    let unavailable=typeof deviceStore?.getPendingUpload!=="function",timer;
+    if(!unavailable)try{
+      // This read grants no local authority. A transaction that never reports
+      // success must not consume the whole independent server repair budget.
+      await Promise.race([deviceStore.getPendingUpload(identity),new Promise((_,reject)=>{
+        timer=setTimeout(()=>reject(Error("Device availability read timed out")),Math.min(1000,budget/4));
+      })]);
+    }catch{unavailable=true;}finally{clearTimeout(timer);}
+    if(!current()||remainingMs()<=0)return;
+    if(unavailable){
+      const result=await backend.repairCloudSources({stillCurrent:current,remainingMs});
+      if(!current())return;
+      // A healthy remote read permits ordinary legacy reconciliation. A repair
+      // acknowledges server bytes only; this attempt cannot adopt it locally.
+      if(!result?.alreadyHealthy){renderSync();return;}
     }
   }
   if(deviceRecoveryCloudHold){
@@ -14893,16 +14906,18 @@ if(configured){
     // storage capability. Normal push retains all device and consent guards.
     CS.cloudRecoveryEvidence=()=>({identity:auth.currentUser?.uid??null,account:CS.user,
       epoch:recoveryAuthEpoch,pendingObservation:"unobserved"});
-    CS.repairCloudSources=({stillCurrent,signal=null}={})=>{
+    CS.repairCloudSources=({stillCurrent,signal=null,remainingMs=null}={})=>{
       if(remoteRepairInFlight)return remoteRepairInFlight;
       const uid=auth.currentUser?.uid,account=CS.user,epoch=recoveryAuthEpoch,operation=++remoteRepairOperation;
-      const until=Date.now()+CLOUD_RECOVERY_READ_TIMEOUT_MS;
-      const current=()=>!!uid&&window.CloudSync===CS&&!suspended&&auth.currentUser?.uid===uid&&CS.user===account&&
-        recoveryAuthEpoch===epoch&&remoteRepairOperation===operation&&!signal?.aborted&&Date.now()<until&&
+      const started=performance.now(),remaining=()=>Math.max(0,Math.min(CLOUD_RECOVERY_READ_TIMEOUT_MS-(performance.now()-started),
+        typeof remainingMs==="function"?Number(remainingMs()):Infinity));
+      const owned=()=>!!uid&&window.CloudSync===CS&&!suspended&&auth.currentUser?.uid===uid&&CS.user===account&&
+        recoveryAuthEpoch===epoch&&remoteRepairOperation===operation&&!signal?.aborted&&
         (typeof stillCurrent!=="function"||stillCurrent());
-      const stopped=()=>Object.assign(Error("Independent cloud repair stopped"),{code:current()?"deadline-exceeded":"cancelled"});
+      const current=()=>owned()&&remaining()>0;
+      const stopped=()=>Object.assign(Error("Independent cloud repair stopped"),{code:remaining()<=0?"deadline-exceeded":"cancelled"});
       const readAttempt={signal:signal??{aborted:false,addEventListener(){},removeEventListener(){}},isCurrent:current,
-        remainingMs:()=>Math.max(0,until-Date.now()),checkBudget(){if(!current())throw stopped();}};
+        remainingMs:remaining,checkBudget(){if(!current())throw stopped();}};
       const bounded=async work=>{
         readAttempt.checkBudget();const value=await cloudDeadline(Promise.resolve().then(work),readAttempt.remainingMs(),signal);
         readAttempt.checkBudget();return value;
@@ -14925,8 +14940,11 @@ if(configured){
             catch(error){if(error?.code==="recovery-source-changed"&&attempt===0)continue;throw error;}
             const manifest=source.manifest,rootKeys=["schemaVersion","rev","activeGeneration","previousGeneration","updatedAt","serverUpdatedAt","decisionCapability"];
             if(!manifest||manifest.rev<1||Object.keys(manifest).some(key=>!rootKeys.includes(key))||
-              typeof manifest.activeGeneration!=="string"||!manifest.activeGeneration||manifest.activeGeneration.includes("/")||
-              manifest.previousGeneration!=null&&(typeof manifest.previousGeneration!=="string"||!manifest.previousGeneration||manifest.previousGeneration.includes("/")))
+              rootKeys.slice(0,6).some(key=>!Object.hasOwn(manifest,key))||!Number.isSafeInteger(manifest.updatedAt)||
+              typeof manifest.serverUpdatedAt?.toMillis!=="function"||!Number.isFinite(manifest.serverUpdatedAt.toMillis())||
+              Object.hasOwn(manifest,"decisionCapability")&&manifest.decisionCapability!==1||
+              typeof manifest.activeGeneration!=="string"||!manifest.activeGeneration||manifest.activeGeneration.length>256||manifest.activeGeneration.includes("/")||
+              manifest.previousGeneration!=null&&(typeof manifest.previousGeneration!=="string"||!manifest.previousGeneration||manifest.previousGeneration.length>256||manifest.previousGeneration.includes("/")))
               return {error:true,code:"recovery-source-unavailable"};
             const candidates=[],unresolved=[];
             for(const row of source.generations){
@@ -14934,6 +14952,7 @@ if(configured){
               // Preserve the root until a separately reviewed protocol can do so.
               if(!row.header||row.header.schemaVersion!==2||row.header.encoding!=="utf8"||
                 !["staging","sealed","published"].includes(row.header.state)||
+                !validRevision(row.header.baseRev)||
                 !Number.isSafeInteger(row.header.chunkCount)||row.header.chunkCount<1||
                 !Number.isSafeInteger(row.header.byteLength)||row.header.byteLength<1||!/^[a-f0-9]{64}$/.test(row.header.hash||""))
                 return {error:true,code:"recovery-source-unavailable"};
@@ -14982,7 +15001,7 @@ if(configured){
             return result?.ok?{error:true,code:"verification-failed"}:result;
           }
           return {error:true,code:"recovery-source-changed"};
-        }catch(error){return current()?{error:true,code:safeCloudErrorCode(error)}:{cancelled:true};}
+        }catch(error){return owned()?{error:true,code:safeCloudErrorCode(error)}:{cancelled:true};}
       })();
       remoteRepairInFlight=work.finally(()=>{remoteRepairInFlight=null;});return remoteRepairInFlight;
     };

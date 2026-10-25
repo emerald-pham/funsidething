@@ -15818,7 +15818,7 @@ async function loadCloudBackendV2({artifacts=null,sharedDocs=null,rootData=null,
  }
  if(!runtimeWindow||recordSyncError!==undefined)window.recordSyncError=recordSyncError;
  const context=vm.createContext({window,CustomEvent:class{constructor(type,options){this.type=type;this.detail=options?.detail;}},__cloudModules:[{initializeApp:()=>({})},A,firebaseSDK?{...F,...firebaseSDK}:F],
-  console,crypto:cryptoProvider,TextEncoder,TextDecoder,Uint8Array,structuredClone,...(timerProvider?.Date?{Date:timerProvider.Date}:{}),setTimeout:timerProvider?.setTimeout??setTimeout,clearTimeout:timerProvider?.clearTimeout??clearTimeout});context.globalThis=context;
+  console,crypto:cryptoProvider,TextEncoder,TextDecoder,Uint8Array,structuredClone,performance:timerProvider?.performance??performance,...(timerProvider?.Date?{Date:timerProvider.Date}:{}),setTimeout:timerProvider?.setTimeout??setTimeout,clearTimeout:timerProvider?.clearTimeout??clearTimeout});context.globalThis=context;
  for(const file of ['device-store-v2.js','cloud-store-v2.js'])vm.runInContext(artifacts?(file==='device-store-v2.js'?artifacts.storage:artifacts.cloud):fs.readFileSync(path.join(__dirname,file),'utf8'),context,{filename:file});
  if(!runtimeWindow)window.ChainStorageV2=context.ChainStorageV2;window.ChainCloudV2=context.ChainCloudV2;
  await vm.runInContext(`(async()=>{${moduleSource}\n})()`,context,{filename:'index.html#cloud-v2-backend'});
@@ -43722,7 +43722,7 @@ test('RISK independent cloud repair: unavailable device storage repairs retained
  const reopen=app.indexedDB.open;app.indexedDB.open=()=>{throw Object.assign(Error('Synthetic permanent IndexedDB refusal'),{name:'UnknownError'});};
  t.after(()=>{app.indexedDB.open=reopen;});
  let repairResult;const repair=backend.CS.repairCloudSources?.bind(backend.CS);if(repair)backend.CS.repairCloudSources=async options=>{repairResult=await repair(options);return repairResult;};
- await ctx.cloudPull();t.diagnostic('Independent remote result '+JSON.stringify(repairResult));
+ await fixtureDeadline(ctx.cloudPull(),'independent remote repair completes despite device reconnection refusal');t.diagnostic('Independent remote result '+JSON.stringify(repairResult));
  await fixtureDeadline(async wait=>{while(vm.runInContext('pulling||cloudPushInFlight',ctx))await wait(5);},'server-only repair settles');
  const remote=await backend.CS.pull();
  assert.equal(typeof remote.payload,'string','the actual server decoder must return a complete board despite permanent local unavailability');
@@ -43740,16 +43740,22 @@ test('RISK independent cloud repair: unavailable device storage repairs retained
 async function replaceIndependentServerPayload263(app,id,payload){
  const path='users/owner/generations/'+id,old=app.backend.docs.get(path),encoded=await app.ctx.ChainStorageV2.encodeSnapshot(payload);
  for(const key of [...app.backend.docs.keys()])if(key.startsWith(path+'/chunks/'))app.backend.docs.delete(key);
- app.backend.docs.set(path,{...old,...encoded,chunks:undefined});delete app.backend.docs.get(path).chunks;
+ app.backend.docs.set(path,{state:'published',baseRev:app.backend.docs.get('users/owner')?.rev??0,createdAt:{toMillis:()=>1},...old,...encoded,chunks:undefined});delete app.backend.docs.get(path).chunks;
  for(const chunk of encoded.chunks)app.backend.docs.set(path+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
 }
 
 test('RISK independent cloud source safety: unsupported roots headers boards and absent candidates remain protected',async t=>{
- for(const mode of ['unknown-root','missing-header','unsupported-header','incomplete-only','foreign-board','malformed-board'])await t.test(mode,async sub=>{
+ for(const mode of ['unknown-root','missing-root-field','unsupported-root-capability','malformed-root-clock','malformed-server-clock','missing-header','unsupported-header','deleting-header','unsupported-header-revision','incomplete-only','foreign-board','malformed-board'])await t.test(mode,async sub=>{
   const app=await damagedAcknowledgedApp187(sub),{ctx,backend,originalRoot}=app,prior=originalRoot.previousGeneration,path='users/owner/generations/'+prior;
   if(mode==='unknown-root')backend.docs.get('users/owner').futureRootEvidence={retain:'opaque original manifest'};
+  if(mode==='missing-root-field')delete backend.docs.get('users/owner').updatedAt;
+  if(mode==='unsupported-root-capability')backend.docs.get('users/owner').decisionCapability=99;
+  if(mode==='malformed-root-clock')backend.docs.get('users/owner').updatedAt='unsupported source clock';
+  if(mode==='malformed-server-clock')backend.docs.get('users/owner').serverUpdatedAt={opaque:'original timestamp evidence'};
   if(mode==='missing-header')backend.docs.delete('users/owner/generations/'+originalRoot.activeGeneration);
   if(mode==='unsupported-header')backend.docs.get('users/owner/generations/'+originalRoot.activeGeneration).schemaVersion=99;
+  if(mode==='deleting-header')backend.docs.get('users/owner/generations/'+originalRoot.activeGeneration).state='deleting';
+  if(mode==='unsupported-header-revision')backend.docs.get('users/owner/generations/'+originalRoot.activeGeneration).baseRev='unsupported original revision';
   if(mode==='incomplete-only')for(const key of [...backend.docs.keys()])if(key.startsWith(path+'/chunks/'))backend.docs.delete(key);
   if(mode==='foreign-board')await replaceIndependentServerPayload263(app,prior,JSON.stringify({...JSON.parse(ctx.state.decisionBase.payload),syncAccount:'other@example.test',syncIdentity:'other'}));
   if(mode==='malformed-board')await replaceIndependentServerPayload263(app,prior,'{"tasks":[{"partial":true}]}');
@@ -43907,4 +43913,113 @@ test('RISK repository process: grouped catalog binds real declarations rather th
  assert.equal(result.error,undefined,'The public catalog ownership regression must start: '+output);
  assert.equal(result.status,0,'Real declarations must be classified and execute once despite quoted fixture copies: '+output);
  assert.match(result.stdout||'',/^# tests 1$/m);assert.match(result.stdout||'',/^# skipped 0$/m);
+});
+
+test('RISK independent cloud stalled storage: a pending native IDB request cannot block remote-only repair',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),handles=[],open=IDBFactory.prototype.open;
+ IDBFactory.prototype.open=function(...args){const request=open.apply(this,args);request.addEventListener('success',()=>handles.push(request.result));return request;};
+ let app;try{app=await damagedAcknowledgedApp187(t);}finally{IDBFactory.prototype.open=open;}
+ const {ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore,connection=handles.filter(db=>db.name===app.deviceDbName).at(-1);
+ assert.ok(connection);const local=JSON.stringify(ctx.state),raw=await store.readRawExportSnapshot(),originals=[...backend.docs].filter(([key])=>key!=='users/owner').map(([key,row])=>[key,JSON.stringify(row)]);
+ shim.document.getElementById('addInput').value='Draft while native IndexedDB read is stalled';const transaction=connection.transaction.bind(connection);let held=0;
+ connection.transaction=(...args)=>{
+  const tx=transaction(...args);
+  return new Proxy(tx,{get(target,key){if(key==='objectStore')return name=>{const objectStore=target.objectStore(name);return new Proxy(objectStore,{get(target,key){if(key==='get')return input=>{
+   const request=target.get(input);if(input!=='pending:owner')return request;held++;
+   return new Proxy(request,{get(target,key){const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;},set(target,key,value){if(key==='onsuccess'||key==='onerror')return true;return Reflect.set(target,key,value,target);}});
+  };const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;}});};const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;}});
+ };
+ try{
+  const operation=ctx.cloudPull();operation.catch(()=>{});
+  await new Promise(resolve=>setTimeout(resolve,1500));assert.ok(held>0,'the real app reaches a stalled external pending-key IDB request');
+  const remote=await backend.CS.pull();assert.equal(typeof remote.payload,'string','actual remote decoder must return a complete repaired board while the native device request remains stalled');
+  await fixtureDeadline(operation,'the app remote-only operation settles inside its original finite budget');
+  assert.ok(remote.rev>originalRoot.rev);assert.equal(JSON.stringify(ctx.state),local);assert.equal(shim.document.getElementById('addInput').value,'Draft while native IndexedDB read is stalled');
+  for(const [key,value]of originals)assert.equal(JSON.stringify(backend.docs.get(key)),value);
+ }finally{connection.transaction=transaction;}
+ assert.deepEqual(await store.readRawExportSnapshot(),raw,'timing out a read cannot mutate local pending hold or board rows');
+});
+
+test('RISK independent cloud absent storage: actual cloudPull repairs remote bytes without a device capability',async t=>{
+ const seed=await damagedAcknowledgedApp187(t),local=JSON.stringify(seed.ctx.state),app=await loadAppAtTime(1792323000000,{seedStorage:{[SYNC_STORE_KEY]:local,[LOCAL_HEAD_KEY]:local}}),{ctx,shim}=app;
+ assert.equal(ctx.window.ScannerDeviceStore,undefined,'this app has no IndexedDB store capability');
+ if(!ctx.window.ChainStorageV2){vm.runInContext(fs.readFileSync(path.join(__dirname,'device-store-v2.js'),'utf8'),ctx);ctx.window.ChainStorageV2=ctx.ChainStorageV2;}
+ const backend=await loadCloudBackendV2({runtimeWindow:ctx.window,sharedDocs:seed.backend.docs,failures:{authPending:true},timeoutMs:5000});t.after(()=>backend.CS.suspend());
+ backend.emitAuth({uid:'owner',email:'e@example.com'});const before=JSON.stringify(ctx.state);shim.document.getElementById('addInput').value='Draft without device database';
+ await fixtureDeadline(ctx.cloudPull(),'cloud-only repair works without any local device-store capability');
+ const remote=await backend.CS.pull();assert.equal(typeof remote.payload,'string');assert.ok(remote.rev>seed.originalRoot.rev);
+ assert.equal(JSON.stringify(ctx.state),before);assert.equal(shim.document.getElementById('addInput').value,'Draft without device database');
+});
+
+test('RISK independent cloud live work: accepted Add comparison and unfinished draft survive a held server-only repair',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),handles=[],open=IDBFactory.prototype.open;
+ IDBFactory.prototype.open=function(...args){const request=open.apply(this,args);request.addEventListener('success',()=>handles.push(request.result));return request;};
+ let app;try{app=await damagedAcknowledgedApp187(t);}finally{IDBFactory.prototype.open=open;}
+ const {ctx,shim,backend,faults}=app,entered=deferredSyncFixture(),gate=deferredSyncFixture(),connection=handles.filter(db=>db.name===app.deviceDbName).at(-1),transaction=connection.transaction.bind(connection);let blocked=false;
+ // Only the external pending-key read is unavailable. Local head durability
+ // remains real; ordinary user pushes must retain their own pending guard.
+ connection.transaction=(...args)=>{const tx=transaction(...args);return new Proxy(tx,{get(target,key){if(key==='objectStore')return name=>{const objectStore=target.objectStore(name);return new Proxy(objectStore,{get(target,key){if(key==='get')return input=>{if(input==='pending:owner')throw Object.assign(Error('Synthetic unavailable native pending read'),{name:'UnknownError'});return target.get(input);};const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;}});};const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;}});};
+ faults.serverRead=async path=>{if(!blocked&&path.endsWith('/chunks')){blocked=true;entered.resolve();await gate.promise;}};
+ const operation=backend.CS.repairCloudSources();await fixtureDeadline(entered.promise,'independent repair reaches an actual held server request');
+ try{
+  shim.document.getElementById('addInput').value='Accepted while independent server repair is waiting';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+  ctx.onAction('start-scan',{dataset:{mode:'descending'}});const candidate=ctx.state.candidateId,benchmark=ctx.state.chain.at(-1);assert.ok(candidate&&benchmark);
+  ctx.onAction('no',{dataset:{candidate,benchmark}});assert.equal(await ctx.persist(),true);
+  vm.runInContext('clearTimeout(saveTimer);saveTimer=null;clearTimeout(cloudTimer);cloudTimer=null;clearCloudRetry()',ctx);
+  const local=JSON.stringify(ctx.state),raw=await ctx.window.ScannerDeviceStore.readRawExportSnapshot();assert.equal(ctx.state.syncDirty,true);
+  shim.document.getElementById('addInput').value='Unfinished draft accepted while remote request is waiting';gate.resolve();
+  const result=await fixtureDeadline(operation,'held independent server repair completes');assert.equal(result.ok,true);
+  assert.equal(JSON.stringify(ctx.state),local);assert.equal(shim.document.getElementById('addInput').value,'Unfinished draft accepted while remote request is waiting');
+  assert.deepEqual(await ctx.window.ScannerDeviceStore.readRawExportSnapshot(),raw,'server repair cannot alter current local decisions pending head or hold');
+  const remote=JSON.parse((await backend.CS.pull()).payload);assert.equal(remote.tasks.some(row=>row.title==='Accepted while independent server repair is waiting'),false,'unseen local work is not uploaded by a remote-only capability');
+ }finally{gate.resolve();connection.transaction=transaction;}
+});
+
+test('RISK independent cloud explicit abort: canceled reads and uncertain committed replies cannot acknowledge local work',async t=>{
+ for(const mode of ['read','before-publication','after-publication'])await t.test(mode,async sub=>{
+  const app=await damagedAcknowledgedApp187(sub),{ctx,backend,faults,originalRoot}=app,controller=new AbortController(),local=JSON.stringify(ctx.state);let aborted=false;
+  const abort=()=>{aborted=true;controller.abort(Object.assign(Error('Synthetic explicit Cancel'),{code:'lifecycle-cancelled'}));};
+  if(mode==='read')faults.serverRead=async path=>{if(!aborted&&path.endsWith('/chunks'))abort();};
+  if(mode==='before-publication')faults.beforeTransaction=async docs=>{if(!aborted&&[...docs].some(([key,row])=>key.startsWith('users/owner/generations/repair-')&&row.state==='sealed'))abort();};
+  if(mode==='after-publication')faults.afterTransaction=async docs=>{if(!aborted&&docs.get('users/owner')?.activeGeneration?.startsWith('repair-'))abort();};
+  const result=await backend.CS.repairCloudSources({signal:controller.signal});assert.ok(aborted);assert.equal(result.ok,undefined);assert.equal(result.cancelled,true);assert.equal(JSON.stringify(ctx.state),local);
+  if(mode==='after-publication'){const remote=await backend.CS.pull();assert.equal(typeof remote.payload,'string');assert.equal(remote.rev,originalRoot.rev+1,'a permitted uncertain server commit remains readable without a false local ACK');}
+  else assert.deepEqual(backend.docs.get('users/owner'),originalRoot);
+ });
+});
+
+test('RISK independent cloud staged reply: retry resumes the same deterministic generation after uncertain creation',async t=>{
+ const app=await damagedAcknowledgedApp187(t),{backend,faults,originalRoot}=app;let lost=false;
+ faults.afterTransaction=async docs=>{if(!lost&&[...docs].some(([key,row])=>key.startsWith('users/owner/generations/repair-')&&row.state==='staging')){lost=true;throw Object.assign(Error('Synthetic lost staging creation reply'),{code:'unavailable'});}};
+ const writes=backend.writes.length,first=await backend.CS.repairCloudSources();assert.ok(lost);assert.equal(first.error,true);assert.deepEqual(backend.docs.get('users/owner'),originalRoot);
+ const staged=[...backend.docs].filter(([key])=>/^users\/owner\/generations\/repair-[^/]+$/.test(key));assert.equal(staged.length,1);assert.equal(staged[0][1].state,'staging');
+ const second=await backend.CS.repairCloudSources();assert.equal(second.ok,true);assert.equal('users/owner/generations/'+second.generationId,staged[0][0]);
+ assert.equal([...backend.docs].filter(([key])=>/^users\/owner\/generations\/repair-[^/]+$/.test(key)).length,1);assert.equal(backend.writes.length,writes+1);
+ assert.equal((await backend.CS.pull()).generationId,second.generationId);
+});
+
+test('RISK independent cloud restart budget: repeated fresh root changes stop after one restart without replacement',async t=>{
+ const app=await damagedAcknowledgedApp187(t),{backend,faults,originalRoot}=app,originals=[...backend.docs].filter(([key])=>key!=='users/owner').map(([key,row])=>[key,JSON.stringify(row)]);let roots=0,changes=0;
+ faults.serverRead=async path=>{if(path==='users/owner'&&++roots%4===0){changes++;backend.docs.set(path,{...backend.docs.get(path),rev:originalRoot.rev+changes});}};
+ const result=await backend.CS.repairCloudSources();assert.equal(result.ok,undefined);assert.equal(result.code,'recovery-source-changed');assert.equal(changes,2);assert.equal(roots,8,'only one fresh restart is permitted');
+ assert.equal(backend.docs.get('users/owner').activeGeneration,originalRoot.activeGeneration);for(const [key,value]of originals)assert.equal(JSON.stringify(backend.docs.get(key)),value);
+});
+
+test('RISK independent cloud total budget: clock skew and late server replies cannot extend the original operation',async t=>{
+ let clock=Date.now();const app=await damagedAcknowledgedApp187(t,{timerProvider:{Date:class extends Date{static now(){return clock;}}}}),{backend,faults,originalRoot}=app,started=performance.now(),budget=90;let reads=0;
+ faults.serverRead=async()=>{reads++;clock-=86400000;await new Promise(resolve=>setTimeout(resolve,60));};
+ const result=await backend.CS.repairCloudSources({remainingMs:()=>Math.max(0,budget-(performance.now()-started))});
+ assert.equal(result.ok,undefined);assert.equal(result.code,'deadline-exceeded','budget exhaustion remains an honest deadline failure rather than pretending user cancellation');
+ assert.ok(performance.now()-started<600,'the shared budget bounds all dependent server work');const stoppedAt=reads;
+ await new Promise(resolve=>setTimeout(resolve,100));assert.equal(reads,stoppedAt,'late SDK completion cannot schedule more dependent reads');assert.deepEqual(backend.docs.get('users/owner'),originalRoot);
+});
+
+test('RISK independent cloud final readback: repeated damage after permitted publication cannot become verified repair',async t=>{
+ const app=await damagedAcknowledgedApp187(t),{ctx,backend,faults}=app,local=JSON.stringify(ctx.state);let damages=0;
+ faults.afterTransaction=async docs=>{const root=docs.get('users/owner');if(!root?.activeGeneration?.startsWith('repair-'))return;
+  const prefix='users/owner/generations/'+root.activeGeneration+'/chunks/',chunks=[...docs.keys()].filter(key=>key.startsWith(prefix));
+  if(chunks.length){damages++;for(const key of chunks)docs.delete(key);}
+ };
+ const result=await backend.CS.repairCloudSources();assert.equal(result.ok,undefined,'a permitted write is not successful repair without independently decoded readback');assert.equal(result.error,true);assert.equal(result.code,'verification-failed');assert.equal(damages,2,'one fresh restart remains the whole publication retry budget');
+ assert.equal((await backend.CS.pull()).code,'corrupt-generation');assert.equal(JSON.stringify(ctx.state),local);
 });

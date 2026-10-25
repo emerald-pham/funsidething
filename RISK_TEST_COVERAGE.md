@@ -2143,3 +2143,9 @@ This boundary control holds a successful real provider reply, installs a later a
 - RISK device connection startup: one internal server failure recovers the authoritative offline board within a bounded attempt
 - RISK device connection recovery: offline accepted work survives a lost handle and durable reopen
 - RISK device connection recovery: a closed local handle still permits exact cloud reconstruction without losing originals
+
+- An actual externally stalled native IndexedDB pending-key read cannot block source-only server repair, alter device rows or consume a local draft: `RISK independent cloud stalled storage: a pending native IDB request cannot block remote-only repair`.
+
+- Source-only repair handles absent storage and preserves in-flight native work, explicit cancellation and uncertain staged/committed replies, with one finite restart and total monotonic budget: `RISK independent cloud absent storage: actual cloudPull repairs remote bytes without a device capability`; `RISK independent cloud live work: accepted Add comparison and unfinished draft survive a held server-only repair`; `RISK independent cloud explicit abort: canceled reads and uncertain committed replies cannot acknowledge local work`; `RISK independent cloud staged reply: retry resumes the same deterministic generation after uncertain creation`; `RISK independent cloud restart budget: repeated fresh root changes stop after one restart without replacement`; `RISK independent cloud total budget: clock skew and late server replies cannot extend the original operation`.
+
+- Permitted writes followed by repeatedly damaged remote bytes cannot report successful repair, and share the same one-restart budget: `RISK independent cloud final readback: repeated damage after permitted publication cannot become verified repair`.
