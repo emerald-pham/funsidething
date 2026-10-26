@@ -25122,14 +25122,16 @@ test('Landscape messages: every hour has five distinct short, season-independent
  }
 });
 
-test('Landscape browser: scene time presets persist and return to live without changing tasks',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+test('RISK scenery scene time readiness: loading controls wait before native presets save reload and return to live',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
  const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT),browser=await chromium.launch({channel:'chrome'});
- try{
+ let releaseRates=()=>{};try{
   const page=await browser.newPage({viewport:{width:390,height:844},timezoneId:'America/New_York'});
-  await page.addInitScript(()=>localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()})));
-  await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.locator('#modalRoot [data-act="close-modal"]').click();
+  await page.addInitScript(()=>{localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));globalThis.sceneryControlClicks=[];document.addEventListener('click',event=>{const button=event.target.closest('[data-act="scene-settings"], [data-act="scene-time-settings"], [data-scene-view]');if(button&&sceneryControlClicks.length<8)sceneryControlClicks.push({key:button.id||button.dataset.act,trusted:event.isTrusted,ready:typeof applySyncedSceneTime});},true);});
+  const ratesHeld=new Promise(resolve=>{releaseRates=resolve;});await page.route('**/SPAWN_RATES.md',async route=>{const response=await route.fetch();assert.equal(response.status(),200);assert.equal(createHash('sha256').update(await response.body()).digest('hex'),createHash('sha256').update(fs.readFileSync(path.join(__dirname,'SPAWN_RATES.md'))).digest('hex'));await ratesHeld;await route.fulfill({response});});
+  await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.locator('#modalRoot [data-act="ok-quickstart"]').click();
   const tasks=await page.evaluate(()=>JSON.stringify(state.tasks));
-  await page.evaluate(()=>openSettings());await page.locator('[data-act="scene-time-settings"]').click();
+  for(const selector of ['#motionButton','#viewScene','#exitScene'])assert.equal(await page.locator(selector).isDisabled(),true,'static scenery controls wait for their shared real handler: '+selector);
+  await page.locator('#appHeader [data-act="settings"]').click();assert.equal(await page.locator('#modalRoot [data-act="scene-settings"]').isDisabled(),true,'Settings Motion waits for the shared real handler');const waitingMotion=await page.locator('#modalRoot [data-act="scene-settings"]').elementHandle();assert.equal(await page.locator('[data-act="scene-time-settings"]').isDisabled(),true,'Scene Time cannot silently drop a click before its real renderer is ready');assert.match(await page.locator('#settingsSceneTimeStatus').innerText(),/scenery.*loading/i);const waitingControl=await page.locator('[data-act="scene-time-settings"]').elementHandle();const waitingFocus=await page.locator('#modalRoot [data-act="location-settings"]').elementHandle();await waitingFocus.focus();releaseRates();await page.waitForFunction(()=>typeof applySyncedSceneTime==='function'&&!document.querySelector('[data-act="scene-time-settings"]').disabled);assert.equal(await waitingControl.evaluate(el=>el.isConnected&&!el.disabled),true,'ready enables the same mounted control');assert.equal(await waitingMotion.evaluate(el=>el.isConnected&&!el.disabled),true,'ready enables mounted Settings Motion without replacing the form');assert.equal(await waitingFocus.evaluate(el=>el===document.activeElement),true,'ready retains focus in the same mounted Settings form');await page.locator('#modalRoot [data-act="scene-settings"]').click();await page.locator('#motionDialog').waitFor({state:'visible'});await page.locator('#motionDialog [data-landscape-motion="reduced"]').click();await page.locator('#modalRoot [data-act="close-modal"]').click();await page.locator('#motionButton').click();await page.locator('#motionDialog').waitFor({state:'visible'});await page.locator('#motionDialog [data-landscape-motion="reduced"]').click();await page.locator('#viewScene').click();assert.equal(await page.evaluate(()=>document.documentElement.classList.contains('viewing-scene')),true);await page.locator('#exitScene').click();assert.equal(await page.evaluate(()=>document.documentElement.classList.contains('viewing-scene')),false);await page.locator('#appHeader [data-act="settings"]').click();await page.locator('[data-act="scene-time-settings"]').click();await page.locator('#sceneTimeDialog').waitFor({state:'visible'});const receipts=await page.evaluate(()=>sceneryControlClicks);for(const key of ['motionButton','viewScene','exitScene','scene-settings','scene-time-settings'])assert.ok(receipts.some(row=>row.key===key&&row.trusted&&row.ready==='function'),'ready control receives its native trusted action: '+key);t.diagnostic('Native ready-control receipts: '+JSON.stringify(receipts));
   assert.equal(await page.locator('#sceneTimeDialog').evaluate(e=>e.scrollHeight>e.clientHeight),false,'time controls fit a typical phone without hiding Close');
   const timeBox=await page.locator('#sceneTimeInput').boundingBox(),seasonLabel=await page.locator('[for="sceneSeasonInput"]').boundingBox();assert.ok(seasonLabel.y>=timeBox.y+timeBox.height+8,'Season has its own clearly separated field');
   await page.locator('[data-scene-preset="00:00"]').click();assert.equal(await page.locator('#sceneTimeInput').inputValue(),'00:00');assert.equal(await page.evaluate(()=>document.documentElement.dataset.scenePeriod),'night');
@@ -25137,10 +25139,10 @@ test('Landscape browser: scene time presets persist and return to live without c
   await page.locator('[data-scene-preset="sunrise"]').click();await page.locator('[data-scene-preset="sunset"]').click();assert.equal(await page.evaluate(()=>LivingSky.readSceneTime(localStorage)),'sunset');
   await page.locator('#sceneSeasonInput').selectOption('winter');await page.locator('#sceneTimeInput').fill('23:15');await page.locator('[data-scene-time="lock"]').click();
   await page.reload();assert.equal(await page.evaluate(()=>LivingSky.readSceneSeason(localStorage)),'winter');assert.equal(await page.evaluate(()=>LivingSky.readSceneTime(localStorage)),'23:15');assert.equal(await page.evaluate(()=>document.documentElement.dataset.scenePeriod),'night');
-  await page.evaluate(()=>openSettings());await page.locator('[data-act="scene-time-settings"]').click();await page.locator('[data-scene-time="live"]').click();
+  await page.locator('#appHeader [data-act="settings"]').click();await page.locator('[data-act="scene-time-settings"]').click();await page.locator('[data-scene-time="live"]').click();
   assert.equal(await page.evaluate(()=>LivingSky.readSceneSeason(localStorage)),null);assert.equal(await page.evaluate(()=>LivingSky.readSceneTime(localStorage)),null);assert.equal(await page.evaluate(()=>JSON.stringify(state.tasks)),tasks);
   await page.locator('[data-scene-time="close"]').click();assert.equal(await page.locator('[data-act="scene-time-settings"]').evaluate(e=>e===document.activeElement),true);await page.locator('#modalRoot [data-act="close-modal"]').click();await page.locator('#appHeader [data-act="help"]').click();await page.locator('[data-help-changelog] > summary').click();assert.ok(await page.getByText('Cyclists pedal with connected hips and naturally bending knees.').isVisible());
- }finally{await browser.close();}
+ }finally{releaseRates();await browser.close();}
 });
 
 test('Landscape comments explicitly name their hour and the intro has no location caption',()=>{
@@ -45641,10 +45643,11 @@ test('RISK scenery startup: native mobile paints once while hidden return saved 
  const source=fs.readFileSync(path.join(__dirname,'tests.js'),'utf8'),begin=source.indexOf("\ntest('RISK shared scenery browser:"),fragment=source.slice(begin,source.indexOf("test('RISK list presentation browser:",begin));
  const pixelProbe=fragment.match(/body=body\.replace\(anchor,anchor\+`([\s\S]*?)`\)/)[1];
  t.after(()=>{playwright.webkit.launch=launch;});
- for(const motion of ['normal','reduced'])for(const hidden of [false,true])await t.test(motion+(hidden?' hidden then visible':' visible'),async()=>{
-  const evidence={motion,hidden,route:[],observations:[]},directory=path.join(output,motion+(hidden?'-hidden':'-visible'));fs.mkdirSync(directory,{recursive:true});
+ for(const {motion,hidden,failProbe}of [...['normal','reduced'].flatMap(motion=>[false,true].map(hidden=>({motion,hidden,failProbe:false}))),{motion:'reduced',hidden:false,failProbe:true}])await t.test(failProbe?'controlled failing probe cleanup':motion+(hidden?' hidden then visible':' visible'),async()=>{
+  const evidence={motion,hidden,route:[],observations:[]},directory=path.join(output,failProbe?'controlled-failure':motion+(hidden?'-hidden':'-visible'));fs.mkdirSync(directory,{recursive:true});
+  let ownedServer,ownedBrowser,probeFailure,runFailure;const http=(await import('node:http')).default,createServer=http.createServer;http.createServer=(...args)=>{ownedServer=createServer(...args);return ownedServer;};
   playwright.webkit.launch=async(...args)=>{
-   const browser=await launch.apply(playwright.webkit,args),newContext=browser.newContext.bind(browser);
+   const browser=await launch.apply(playwright.webkit,args);ownedBrowser=browser;const newContext=browser.newContext.bind(browser);
    browser.newContext=async(...args)=>{const context=await newContext(...args),newPage=context.newPage.bind(context),close=context.close.bind(context);
     await context.addInitScript(hidden=>{
      const NativeDate=Date,at=Date.parse('2026-10-06T03:23:42.125Z');globalThis.Date=class extends NativeDate{constructor(...args){super(...(args.length?args:[at]));}static now(){return at;}};
@@ -45657,17 +45660,18 @@ test('RISK scenery startup: native mobile paints once while hidden return saved 
       evidence.route.push({status:response.status(),sha256:createHash('sha256').update(body).digest('hex')});
       const anchor="  window.addEventListener('pageshow'";assert.ok(body.includes(anchor));body=body.replace(anchor,` const background=paintBackground,life=paintLife;paintBackground=(...args)=>{const value=background(...args);startupScene.background++;return value;};paintLife=(...args)=>{const value=life(...args);startupScene.life++;return value;};\n${pixelProbe}\n`+anchor);
       const ready="  document.dispatchEvent(new CustomEvent('landscape-scene-time-ready'));";assert.ok(body.includes(ready));body=body.replace(ready,"  globalThis.initialScenePaint=JSON.parse(JSON.stringify(startupScene));\n"+ready);await route.fulfill({response,body});});return page;};
-    context.close=async(...args)=>{try{for(const page of context.pages())if(await page.evaluate(()=>typeof sharedSceneProbe==='function')){
+    context.close=async(...args)=>{try{if(failProbe)throw Error('Controlled scenery probe failure retained');for(const page of context.pages())if(await page.evaluate(()=>typeof sharedSceneProbe==='function')){
       const original=await page.evaluate(()=>{globalThis.startupHidden=false;document.dispatchEvent(new Event('visibilitychange'));const prepared=sharedScenePrepare(),clear=sharedSceneProbe('clear'),rain=sharedSceneProbe('rain');return {initial:initialScenePaint,prepared,clear,rain,dimensions:{width:innerWidth,height:innerHeight},taskCount:state.tasks.length,motion:document.documentElement.dataset.landscapeMotion};});
       assert.equal(original.taskCount,400);assert.equal(original.motion,motion);assert.equal(original.prepared.backgroundPaints,1);assert.equal(original.clear.backgroundPaints,0);assert.equal(original.rain.backgroundPaints,0);assert.equal(original.rain.back,original.clear.back,'rain preserves exact cached backdrop');assert.notEqual(original.rain.front,original.clear.front);assert.deepEqual(original.rain.scene,original.clear.scene);
       await page.setViewportSize({width:421,height:863});await page.waitForFunction(()=>document.querySelector('[data-scenery]').width===Math.floor(421*1.5));const resized=await page.evaluate(()=>sharedScenePrepare());assert.deepEqual(resized.scene,original.clear.scene,'real resize retains UTC objects');assert.notEqual(resized.back,original.clear.back,'real resize repaints changed dimensions');
       const saved=await page.evaluate(()=>{applySyncedSceneTime('12:00','summer');const result=sharedScenePrepare();return {time:LivingSky.readSceneTime(localStorage),season:LivingSky.readSceneSeason(localStorage),scene:result.scene,period:document.documentElement.dataset.scenePeriod};});assert.equal(saved.time,'12:00');assert.equal(saved.season,'summer');assert.notDeepEqual(saved.scene,original.clear.scene,'saved scene adoption still refreshes selected time and season');
       evidence.observations.push({initial:original.initial,taskCount:original.taskCount,motion:original.motion,scene:original.clear.scene,clearBackSha256:createHash('sha256').update(original.clear.back).digest('hex'),clearFrontSha256:createHash('sha256').update(original.clear.front).digest('hex'),rainFrontSha256:createHash('sha256').update(original.rain.front).digest('hex'),resizedScene:resized.scene,saved});
-     }}finally{await close(...args);}};return context;};return browser;
+     }}catch(error){probeFailure=error;}finally{await close(...args);}};return context;};return browser;
   };
-  try{const result=await runButtonSafety({repo:__dirname,engine:'webkit',port:Number(process.env.CHAIN_NATIVE_PORT),outputDir:directory,mobileYesMotion:motion});verifyMobileFunctionalReport(result.report,{motion});evidence.reportPath=result.reportPath;}
-  finally{playwright.webkit.launch=launch;fs.writeFileSync(path.join(directory,'scenery-observation.json'),JSON.stringify(evidence,null,2)+'\n');}
-  assert.equal(evidence.observations.length,1);assert.equal(evidence.observations[0].initial.background,1,'initial scene completes exactly one background paint');assert.equal(evidence.observations[0].initial.life,1,'initial scene completes exactly one life paint');
+  let result;try{result=await runButtonSafety({repo:__dirname,engine:'webkit',port:Number(process.env.CHAIN_NATIVE_PORT),outputDir:directory,mobileYesMotion:motion});verifyMobileFunctionalReport(result.report,{motion});evidence.reportPath=result.reportPath;}
+  catch(error){runFailure=error;}finally{http.createServer=createServer;evidence.nativeCleanupBeforeFallback={browserConnected:ownedBrowser?.isConnected()===true,serverListening:ownedServer?.listening===true};if(ownedBrowser?.isConnected())await ownedBrowser.close();if(ownedServer?.listening)await new Promise(resolve=>ownedServer.close(resolve));playwright.webkit.launch=launch;evidence.probeFailure=probeFailure?.stack;evidence.runFailure=runFailure?.stack;fs.writeFileSync(path.join(directory,'scenery-observation.json'),JSON.stringify(evidence,null,2)+'\n');}
+  if(failProbe){assert.deepEqual(evidence.nativeCleanupBeforeFallback,{browserConnected:false,serverListening:false},'Native runner closes its actual browser and listener before the external fallback');assert.match(probeFailure?.message||'',/^Controlled scenery probe failure retained$/);assert.equal(runFailure,undefined,'Probe failure must not interrupt native cleanup and persisted report');const report=JSON.parse(fs.readFileSync(result.reportPath));for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(report.cleanup[key],true,'Failed probe still requires '+key);assert.throws(()=>{throw probeFailure;},error=>error===probeFailure,'Original probe error is retained for failure after cleanup');return;}
+  if(runFailure)throw runFailure;if(probeFailure)throw probeFailure;assert.equal(evidence.observations.length,1);assert.equal(evidence.observations[0].initial.background,1,'initial scene completes exactly one background paint');assert.equal(evidence.observations[0].initial.life,1,'initial scene completes exactly one life paint');
   t.diagnostic('Uncapped native scenery evidence, not512MB proof: '+directory);
  });
 });
@@ -45696,7 +45700,7 @@ test('RISK repository process: native rapid cloud selection preserves the two-se
  });
 });
 
-test('RISK repository process: native paste prepares complete fixture bytes before its consumer frame budget',t=>{
+test('RISK repository process: native paste prepares complete fixture bytes before its consumer frame budget',async t=>{
  const output=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(output,'Durable allocated native output required');
  const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine','chromium','--scenario','oversized retained-source export','--output-dir',output,'--port',process.env.CHAIN_NATIVE_PORT||'0'],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:60000,maxBuffer:2*1024*1024});
  assert.equal(result.status,0,result.stderr);
@@ -45707,6 +45711,7 @@ test('RISK repository process: native paste prepares complete fixture bytes befo
  assert.equal(sample.fixturePreparation.characters,sample.characters);assert.match(sample.fixturePreparation.sha256,/^[a-f0-9]{64}$/);
  assert.equal(sample.fixturePreparation.verified,true);assert.equal(sample.trusted,false);assert.equal(sample.prevented,true);assert.ok(sample.maxFrameGapMs<1000);
  assert.equal(report.scenarios[0].status,'passed','Complete Preview and Cancel source-preservation assertions still execute');
+ await t.test('all sixteen exact retained source IDs and hash readbacks',()=>{const proof=report.retainedSources[0].bootstrap;assert.equal(proof.retainedSources.length,16);assert.deepEqual(proof.retainedSources.map(row=>row.id).sort(),Array.from({length:16},(_,i)=>'gate-retained-'+i).sort());for(const row of proof.retainedSources)assert.match(row.payloadHash,/^[a-f0-9]{64}$/);});
  for(const value of Object.values(report.cleanup))assert.equal(value,true);
 });
 

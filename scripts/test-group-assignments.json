@@ -2143,7 +2143,7 @@
       "file": "tests.js"
     },
     {
-      "root": "Landscape browser: scene time presets persist and return to live without changing tasks",
+      "root": "RISK scenery scene time readiness: loading controls wait before native presets save reload and return to live",
       "group": "core",
       "file": "tests.js"
     },
@@ -13095,6 +13095,14 @@
       "group": "core",
       "file": "tests.js",
       "reason": "Issue webkit-button-safety renames this contract around the final unified Import and recovery-archive Export behavior; exact-source, preview, cancellation, partial-state and diagnostics assertions remain."
+    },
+    {
+      "baselineRoot": "Landscape browser: scene time presets persist and return to live without changing tasks",
+      "currentRoot": "RISK scenery scene time readiness: loading controls wait before native presets save reload and return to live",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "Preserve the complete native scene-time preset/save/reload/live consumer while adding the observed renderer-loading readiness transition before its trusted click."
     }
   ]
 }

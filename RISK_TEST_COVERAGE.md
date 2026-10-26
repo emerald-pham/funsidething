@@ -2303,3 +2303,5 @@ The command/report consumer rejects missing, duplicate, skipped, cancelled, unre
 - RISK scenery startup: native mobile paints once while hidden return saved choices resize and rain preserve the scene
 
 - RISK repository process: retained native sources seed once without a persistent board bootstrap
+
+- RISK scenery scene time readiness: loading controls wait before native presets save reload and return to live

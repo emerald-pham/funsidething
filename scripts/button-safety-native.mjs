@@ -124,7 +124,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
     const proof=report.retainedSources.at(-1).bootstrap,expected=digest(JSON.stringify(board));
     assert.equal(proof.legacyPayloadHash,proof.legacySeeded?expected:proof.legacyBeforeHash,'Observer retains exact guarded legacy bytes');
     assert.equal(proof.headPayloadHash,expected,'Observer reads back exact fixture head');assert.equal(proof.headPayloadBytes,Buffer.byteLength(JSON.stringify(board)));
-    assert.deepEqual(proof.retainedSources,Array.from({length:options.retainedCopies},(_,i)=>({id:'gate-retained-'+i,payloadHash:digest(JSON.stringify({...board,futureSourceRole:i}))})),'Observer reads back both exact retained sources');
+    assert.deepEqual(proof.retainedSources,Array.from({length:options.retainedCopies},(_,i)=>({id:'gate-retained-'+i,payloadHash:digest(JSON.stringify({...board,futureSourceRole:i}))})).sort((a,b)=>a.id.localeCompare(b.id)),'Observer reads back both exact retained sources');
     await observer.close();
    }
    await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
