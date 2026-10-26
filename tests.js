@@ -19713,6 +19713,9 @@ test('RISK button safety guidance: mounted FAQ states required browser checks an
   assert.match(plain,/ten rapid presses within two seconds/i);
   assert.match(plain,/mobile WebKit.equivalent.*ten distinct offered tasks.*Yes.*400.task board.*two seconds.*enforced 512 MB/i,'the separate capped mobile story is explicit');
   assert.match(plain,/Normal and Reduced motion/i);
+  assert.match(plain,/512 MB browser-process budget/i,'The mounted FAQ names the user-selected browser budget');
+  assert.match(plain,/test automation runs separately/i,'The FAQ distinguishes the external workload driver');
+  assert.match(help,/512 MB browser-process budget/i,'The changelog names the same enforced budget scope');
   assert.match(plain,/physical iPhone behavior.*private saved boards/i);
   assert.match(plain,/failed check or missing required coverage blocks release/i);
   assert.match(plain,/cannot prove every device or browser condition/i);
@@ -45934,4 +45937,58 @@ test('RISK repository process: routed hosted policies reach native consumers wit
 
 test('RISK repository process: current producer reuse requires successful capped mobile evidence',t=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;const result=spawnSync(process.execPath,['--test','--test-name-pattern=^current grouped routing requires the completed capped mobile producer before reuse$','scripts/agent-tools/ci-routing.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:4*1024*1024});assert.equal(result.error,undefined);assert.equal(result.status,0,'The actual routing consumer must require the exact current mobile producer: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# tests 16$/m,'All required current producer acceptance and ambiguity controls must execute');assert.match(result.stdout,/^# skipped 0$/m);t.diagnostic('Executed current producer positive and ambiguous-row rejection controls through the actual routing command.');
+});
+
+test('RISK repository process: mobile budget planner caps browsers before launch and isolates the external driver',async()=>{
+ const {containerArgs}=await import('./scripts/button-safety-mobile-memory.mjs');
+ const common={repo:'/synthetic/repo',output:'/synthetic/evidence',nodeBinary:'/synthetic/node22',motion:'normal',control:false,eventPolicy:'push',eventName:'push',eventRef:'refs/heads/fixture'},id='7'.repeat(64);
+ const browser=containerArgs({...common,role:'browser'}),driver=containerArgs({...common,role:'driver',browserContainerId:id});
+ assert.equal(driver[driver.indexOf('--network')+1],'container:'+id,'Actual workload driver must share only the exact capped browser namespace');
+ assert.equal(browser[browser.indexOf('--network')+1],'none');
+ for(const flag of ['--memory','--memory-swap']){assert.equal(browser[browser.indexOf(flag)+1],'512000000');assert.equal(driver[driver.indexOf(flag)+1],'2147483648','Driver is separately bounded outside the browser budget');}
+ assert.ok(browser.includes('--browser-server'));assert.ok(driver.includes('--driver'));
+ for(const args of [browser,driver]){assert.ok(args.includes('--read-only'));assert.equal(args[args.indexOf('--cap-drop')+1],'ALL');assert.match(args[args.indexOf('--user')+1],/^[1-9]\d*:[1-9]\d*$/);assert.equal(args.some(arg=>/docker\.sock|--privileged|--publish|--network=host|--ipc=host/.test(arg)),false);}
+ assert.throws(()=>containerArgs({...common,role:'driver',browserContainerId:'another-owner'}),/container identity/i);
+});
+
+test('RISK repository process: mobile budget scope cannot relabel whole-container evidence or disconnected browsers',async t=>{
+ const {createMobileBundle,refreshMobileBundle}=await import('./scripts/agent-tools/mobile-memory-fixture.mjs');
+ const {verifyMobileMemoryReport}=await import('./scripts/button-safety-mobile-contract.mjs');
+ const directory=fs.mkdtempSync('/tmp/chain-mobile-browser-budget-');t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const old=createMobileBundle(path.join(directory,'legacy'));old.report.schemaVersion=1;refreshMobileBundle(old);
+ assert.throws(()=>verifyMobileMemoryReport(old.report,{artifactRoot:old.directory}),/schema|scope|version/i,'Old combined driver/browser evidence cannot be relabeled as the new scope');
+ const good=createMobileBundle(path.join(directory,'new'));assert.equal(verifyMobileMemoryReport(good.report,{artifactRoot:good.directory}).status,'passed','Controlled parser fixture, not hosted proof');
+ const mutations={
+  'driver charged to browser group':b=>b.report.cases[0].driver.containerId=b.report.cases[0].containerId,
+  'driver has external network':b=>b.report.cases[0].driver.networkMode='bridge',
+  'wrong scope':b=>b.report.cases[0].after.scope='entire-container-process-tree',
+  'missing engine membership':b=>b.report.cases[0].server.browser.processes=[],
+  'engine escaped cgroup':b=>b.report.cases[0].server.browser.processes[0].cgroup='0::/escape',
+  'different driver namespace':b=>b.report.cases[0].driver.namespace='net:[999]',
+  'disconnect without engine exit':b=>b.report.cases[0].server.cleanup.engineExited=false,
+  'no server owner closure':b=>b.report.cases[0].server.cleanup.serverClosed=false,
+  'unbounded driver':b=>b.report.cases[0].driver.memoryMaxBytes=0,
+  'wrong executable':b=>b.report.cases[0].server.browser.executableSha256='unverified',
+  'negative control outside browser group':b=>b.report.negativeControl.server.control.membership='0::/outside',
+  'negative control without live browser':b=>b.report.negativeControl.server.control.browserAlive=false,
+ };
+ for(const [name,mutate]of Object.entries(mutations))await t.test(name,()=>{const b=createMobileBundle(path.join(directory,name.replaceAll(' ','-')));mutate(b);refreshMobileBundle(b);assert.throws(()=>verifyMobileMemoryReport(b.report,{artifactRoot:b.directory}),name);});
+});
+
+test('RISK repository process: remote mobile consumer waits for browser owner exit after disconnect',async t=>{
+ const http=(await import('node:http')).default,playwright=await import('playwright'),{runButtonSafety}=await import('./scripts/button-safety-native.mjs');
+ const directory=fs.mkdtempSync('/tmp/chain-remote-owner-');t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const listener=http.createServer();await new Promise(resolve=>listener.listen(0,'127.0.0.1',resolve));const port=listener.address().port;await new Promise(resolve=>listener.close(resolve));
+ const ledger=path.join(directory,'ledger.json');fs.writeFileSync(ledger,JSON.stringify({entries:[{status:'active',worktree:__dirname,lease:{state:'healthy',expiresAt:new Date(Date.now()+60000).toISOString()},resources:['browser-runtime:playwright-webkit','loopback:127.0.0.1:'+port]}]}));
+ const env={CI:process.env.CI,CODEX_COORDINATION_FILE:process.env.CODEX_COORDINATION_FILE,DOW_EMULATOR_COORDINATION_FILE:process.env.DOW_EMULATOR_COORDINATION_FILE},launch=playwright.webkit.launch,connect=playwright.webkit.connect;
+ t.after(()=>{playwright.webkit.launch=launch;playwright.webkit.connect=connect;for(const [k,v]of Object.entries(env))if(v===undefined)delete process.env[k];else process.env[k]=v;});
+ delete process.env.CI;delete process.env.DOW_EMULATOR_COORDINATION_FILE;process.env.CODEX_COORDINATION_FILE=ledger;
+ const events=[],stop=Error('Controlled fixture stops before any native context');
+ playwright.webkit.launch=async()=>{events.push('local-launch');throw stop;};
+ playwright.webkit.connect=async endpoint=>{assert.equal(endpoint,'ws://127.0.0.1:1234/owned');events.push('connect');return{on(){},version:()=> '26.5',newContext:async()=>{events.push('newContext');throw stop;},close:async()=>events.push('disconnect')};};
+ await assert.rejects(runButtonSafety({repo:__dirname,engine:'webkit',outputDir:directory,port,mobileYesMotion:'normal',browserServerEndpoint:'ws://127.0.0.1:1234/owned',closeBrowserServer:async()=>{events.push('owner-exit');return{serverClosed:true,engineExited:true};}}),error=>error===stop);
+ assert.deepEqual(events,['connect','newContext','disconnect','owner-exit'],'Remote disconnect must be followed by owner-confirmed engine exit; no local engine may launch');
+ const report=JSON.parse(fs.readFileSync(path.join(directory,fs.readdirSync(directory).find(file=>file.startsWith('button-safety-')))));assert.equal(report.cleanup.browserDisconnected,true);assert.equal(report.cleanup.browserServerClosed,true);assert.equal(report.cleanup.browserClosed,true);assert.equal(report.cleanup.serverClosed,true);
+ events.length=0;const failed=path.join(directory,'refused');await assert.rejects(runButtonSafety({repo:__dirname,engine:'webkit',outputDir:failed,port,mobileYesMotion:'normal',browserServerEndpoint:'ws://127.0.0.1:1234/owned',closeBrowserServer:async()=>{throw Error('Owner exit not observed');}}),/Owner exit not observed/);
+ const partial=JSON.parse(fs.readFileSync(path.join(failed,fs.readdirSync(failed).find(file=>file.startsWith('button-safety-')))));assert.notEqual(partial.cleanup.browserClosed,true);assert.equal(partial.cleanup.serverClosed,true,'An owner-close failure still closes HTTP and persists the failed report');assert.equal(partial.status,'failed');
 });

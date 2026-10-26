@@ -186,7 +186,7 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - name: Kernel-capped mobile WebKit Yes with actual OOM negative control
+      - name: Kernel-capped browser family with external driver and live-WebKit OOM control
         run: node scripts/button-safety-mobile-memory.mjs --run --output-dir "$RUNNER_TEMP/mobile-memory"
       - name: Preserve capped runtime configuration control and native results
         if: always()

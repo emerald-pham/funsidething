@@ -2307,3 +2307,9 @@ The command/report consumer rejects missing, duplicate, skipped, cancelled, unre
 - RISK scenery scene time readiness: loading controls look unavailable before native presets save reload and return to live
 
 - RISK synced scene durability: native retained boards keep immediate scene locks through reload without changing tasks or sources
+
+## Browser budget scope and remote ownership
+
+- RISK repository process: mobile budget planner caps browsers before launch and isolates the external driver
+- RISK repository process: mobile budget scope cannot relabel whole-container evidence or disconnected browsers
+- RISK repository process: remote mobile consumer waits for browser owner exit after disconnect

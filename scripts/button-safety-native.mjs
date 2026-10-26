@@ -10,8 +10,9 @@ import {MOBILE_PROFILE,MOBILE_SCENARIO} from './button-safety-mobile-contract.mj
 import {hostedButtonPolicy} from './button-safety-ci-policy.mjs';
 const digest=value=>createHash('sha256').update(value).digest('hex');
 const MIME={'.js':'text/javascript','.html':'text/html','.css':'text/css','.svg':'image/svg+xml','.png':'image/png','.webmanifest':'application/manifest+json','.md':'text/markdown; charset=utf-8'};
-export async function runButtonSafety({repo,engine,outputDir,port=0,control=null,probe=false,scenarioFilter=null,mobileYesMotion=null}){
+export async function runButtonSafety({repo,engine,outputDir,port=0,control=null,probe=false,scenarioFilter=null,mobileYesMotion=null,browserServerEndpoint=null,closeBrowserServer=null}){
  assert.ok(['chromium','webkit'].includes(engine),'Explicit supported engine');
+ if(browserServerEndpoint!==null){assert.equal(engine,'webkit');assert.ok(mobileYesMotion,'Remote launch is only admitted for the capped mobile consumer');assert.match(browserServerEndpoint,/^ws:\/\/127\.0\.0\.1:[1-9][0-9]*\/[a-zA-Z0-9_-]+$/);assert.equal(typeof closeBrowserServer,'function','Remote browser requires owner-confirmed closure');}
  if(mobileYesMotion){assert.equal(engine,'webkit');assert.ok(['normal','reduced'].includes(mobileYesMotion));assert.ok(scenarioFilter===null||scenarioFilter===MOBILE_SCENARIO);scenarioFilter=MOBILE_SCENARIO;}
  assert.ok(control===null||['pageerror','unhandled','reload','navigation','stall','short-stall','async-pending','async-predicate-false','close','crash','new-action'].includes(control),'Known explicit sensitivity control');
  let hostedPolicy=null;
@@ -56,7 +57,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
    res.writeHead(bytes?200:404,{'Content-Type':module?'text/javascript':MIME[path.extname(name)]||'text/plain','Cache-Control':'no-store'});res.end(bytes||'Not found');
   });await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',resolve);});
   const origin='http://127.0.0.1:'+server.address().port;
-  const playwright=await import('playwright');browser=await playwright[engine].launch({headless:true});browser.on('disconnected',()=>{if(!closing)report.errors.push('browser-disconnected');});report.runtime={engine,version:browser.version(),playwright:'1.62.1',platform:process.platform,nodeVersion:process.version};
+  const playwright=await import('playwright');browser=browserServerEndpoint?await playwright[engine].connect(browserServerEndpoint,{timeout:15000}):await playwright[engine].launch({headless:true});browser.on('disconnected',()=>{if(!closing)report.errors.push('browser-disconnected');});report.runtime={engine,version:browser.version(),playwright:'1.62.1',platform:process.platform,nodeVersion:process.version};
   const {runButtonScenarios}=await import('./button-safety-scenarios.mjs');
   const observed=new Set(),outcomes=new Map(),rapidOutcomes=new Map();
   const actionFor=el=>{
@@ -327,10 +328,16 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
  }catch(error){report.status='failed';report.failure=error.stack;try{report.failureObservation=await bounded(page.evaluate(()=>({modal:document.getElementById('modalRoot')?.innerText,toast:document.getElementById('toast')?.innerText,mode:state.mode,chain:state.chain,candidateId:state.candidateId,taskTitles:state.tasks.slice(0,10).map(t=>({id:t.id,title:t.title}))})),'failure observation');}catch(observationError){report.failureObservationError=String(observationError);}throw error;}
  finally{
   closing=true;
-  if(context){await context.close();report.cleanup.contextClosed=true;}
-  if(browser){await browser.close();report.cleanup.browserClosed=true;}
-  if(server){await new Promise(resolve=>server.close(resolve));report.cleanup.serverClosed=true;}
-  report.finishedAt=new Date().toISOString();save();
+  let cleanupError;
+  const close=async work=>{try{await work();}catch(error){cleanupError??=error;report.status='failed';report.errors.push('cleanup: '+String(error));}};
+  if(context)await close(async()=>{await context.close();report.cleanup.contextClosed=true;});
+  if(browser)await close(async()=>{
+   await browser.close();
+   if(browserServerEndpoint){report.cleanup.browserDisconnected=true;const owned=await closeBrowserServer();assert.equal(owned?.serverClosed,true,'BrowserServer owner closure required');assert.equal(owned.engineExited,true,'Observed engine exit required after remote disconnect');report.cleanup.browserServerClosed=true;}
+   report.cleanup.browserClosed=true;
+  });
+  if(server)await close(async()=>{await new Promise(resolve=>server.close(resolve));report.cleanup.serverClosed=true;});
+  report.finishedAt=new Date().toISOString();save();if(cleanupError)throw cleanupError;
  }
  return{report,reportPath};
 }

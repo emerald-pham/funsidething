@@ -212,14 +212,30 @@ without overriding it; actual trusted touch receipts establish the input used.
 This is an emulated mobile WebKit client, not physical iPhone or private-board proof.
 
 The pinned official Playwright image and matching package run a minimal Node 22
-consumer. Linux cgroup v2 must read back exactly **512,000,000 bytes**, with zero
-swap allowance and use. The cap charges the entire container process tree,
-including Node, the isolated fixture/server and every browser descendant. Before
-the two fresh client cases, another fresh container must demonstrate a real kernel
-OOM kill of a child that commits more than the budget. Successful clients must
-have no OOM events and a recorded peak within the budget. Docker configuration,
-kernel readbacks, raw native reports, exact source/tree and run identity, artifact
-hashes and owned-container cleanup all accompany the report.
+`launchServer` owner in a browser container. Its Linux cgroup v2 limit is exactly
+**512,000,000 bytes**, with zero swap allowance and use, before any WebKit process
+launches. Every browser descendant plus the minimal protocol-server Node shares
+this cap; including that Node is conservative evidence for the browser budget.
+The actual workload driver and fixture HTTP server run in a separate container,
+independently bounded to 2 GiB with no swap, sharing only the exact browser
+container's network-none loopback namespace. Neither container exposes a host port,
+Docker socket or writable cgroup mount; both retain nonroot UID, dropped
+capabilities, read-only root and private tmpfs/shm.
+
+A fresh pair first proves a real kernel OOM kill of a child committing 1 GiB
+**inside the live browser's capped group**. Normal and Reduced each use a new
+browser/driver pair and retain the complete 400-task, 1 MiB unknown-field,
+two-backup, opaque-source and pending-upload fixture and all original timing and
+rendering checks. Successful browser cases must have no OOM events and a peak
+within the budget. Owner `BrowserServer.close()` and actual engine/container exit
+are required; remote `Browser.close()` alone is only a disconnection.
+
+Schema version 2 records `browser-family-plus-minimal-protocol-server`, separate
+container roles, actual host cgroup/net namespace identities, observed browser
+process start identities and executable hashes, pinned image resolution, raw
+limits, kernel OOM proof and durable native results. Complete artifact hashes,
+source/tree/run identity and both owned-container removals accompany the report.
+Version 1 whole-container failures remain preserved and cannot be relabeled.
 
 `scanner-tests` consumes this job and its complete artifact bundle independently
 of the four test groups, including when their full-producer result is reused.
