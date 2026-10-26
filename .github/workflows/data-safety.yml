@@ -1,86 +1,43 @@
-# NONMERGEABLE: early capped comparison; no aggregate, release or deployment credit.
-name: NONMERGEABLE canonical capped WebKit comparison
+# NONMERGEABLE: attribution only; no PR, aggregate, release or deployment credit.
+name: NONMERGEABLE canonical capped WebKit attribution
 on:
   push:
     branches: [diagnose/webkit-cap-canonical-startup]
 permissions:
   contents: read
 jobs:
-  canonical-cap-comparison:
+  cap-attribution:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
       CHAIN_TEST_EVENT_POLICY: outgoing-branch-push-v1
-      BASELINE_SHA: de1d26480052ffd6335c886a1f76b5de697752cf
-      CANDIDATE_SHA: 7a1f976e241d5f3ea1e5ade9278f026b27e9a53a
+      CANDIDATE_SHA: fe42f57e880c5edafc26b01af954bfe3205e1d22
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: de1d26480052ffd6335c886a1f76b5de697752cf
-          path: baseline
+          ref: ${{ github.sha }}
+          path: observer
           fetch-depth: 0
       - uses: actions/checkout@v4
         with:
-          ref: 7a1f976e241d5f3ea1e5ade9278f026b27e9a53a
+          ref: fe42f57e880c5edafc26b01af954bfe3205e1d22
           path: candidate
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: |
-            baseline/package-lock.json
-            candidate/package-lock.json
-      - name: Install exact baseline dependencies
-        working-directory: baseline
-        run: npm ci
-      - name: Install exact candidate dependencies
+          cache-dependency-path: candidate/package-lock.json
+      - name: Install exact canonical dependencies
         working-directory: candidate
         run: npm ci
-      - name: Bind immutable sources separately from workflow runner
-        id: source-binding
-        working-directory: candidate
-        run: |
-          node --input-type=module <<'JS'
-          import assert from 'node:assert/strict';
-          import fs from 'node:fs';
-          import path from 'node:path';
-          import {execFileSync} from 'node:child_process';
-          import {createHash} from 'node:crypto';
-          const env=process.env;
-          assert.equal(env.CI,'true');assert.equal(env.GITHUB_EVENT_NAME,'push');
-          assert.equal(env.GITHUB_REF,'refs/heads/diagnose/webkit-cap-canonical-startup');
-          assert.equal(env.CHAIN_TEST_EVENT_POLICY,'outgoing-branch-push-v1');
-          assert.match(env.GITHUB_SHA,/^[a-f0-9]{40}$/);
-          const git=(repo,...args)=>execFileSync('git',['-C',repo,...args],{encoding:'utf8'}).trim();
-          const sources={};
-          for(const [label,expected]of [['baseline',env.BASELINE_SHA],['candidate',env.CANDIDATE_SHA]]){
-            const repo=path.join(env.GITHUB_WORKSPACE,label);
-            assert.equal(fs.lstatSync(path.join(repo,'.git')).isDirectory(),true,'Each container mount needs its own real Git directory');
-            const commit=git(repo,'rev-parse','HEAD'),tree=git(repo,'rev-parse','HEAD^{tree}');
-            assert.equal(commit,expected,'Actual checkout must equal its explicit source');
-            assert.equal(git(repo,'status','--porcelain=v1'),'','Immutable source checkout must be clean');
-            const files={};
-            for(const file of git(repo,'ls-files','-z').split('\u0000').filter(Boolean))files[file]=createHash('sha256').update(fs.readFileSync(path.join(repo,file))).digest('hex');
-            sources[label]={commit,tree,files};
-          }
-          const manifest={kind:'nonmergeable-canonical-cap-comparison',acceptanceEligible:false,workflowCommit:env.GITHUB_SHA,workflowRef:env.GITHUB_REF,eventName:env.GITHUB_EVENT_NAME,eventPolicy:env.CHAIN_TEST_EVENT_POLICY,repository:env.GITHUB_REPOSITORY,runId:env.GITHUB_RUN_ID,runAttempt:Number(env.GITHUB_RUN_ATTEMPT),sources};
-          fs.writeFileSync(path.join(env.RUNNER_TEMP,'mobile-cap-identity.json'),JSON.stringify(manifest,null,2)+'\n');
-          JS
-      - name: Observe exact baseline without waiving the candidate
-        id: baseline-cap
-        working-directory: baseline
-        continue-on-error: true
-        env:
-          CHAIN_TEST_SOURCE_SHA: de1d26480052ffd6335c886a1f76b5de697752cf
-        run: node scripts/button-safety-mobile-memory.mjs --run --output-dir "$RUNNER_TEMP/mobile-memory-baseline"
-      - name: Require exact repaired canonical capped result
-        id: candidate-cap
+      - name: Observe one unchanged canonical capped command
+        id: profile
         working-directory: candidate
         env:
-          CHAIN_TEST_SOURCE_SHA: 7a1f976e241d5f3ea1e5ade9278f026b27e9a53a
-        run: node scripts/button-safety-mobile-memory.mjs --run --output-dir "$RUNNER_TEMP/mobile-memory-candidate"
-      - name: Require both inventories and identity while preserving partial failures
+          CHAIN_TEST_SOURCE_SHA: fe42f57e880c5edafc26b01af954bfe3205e1d22
+        run: python3 ../observer/scripts/cap-attribution.py --run --repo "$PWD" --output "$RUNNER_TEMP/mobile-cap-attribution"
+      - name: Require exact source inventories and complete attribution without granting acceptance
         id: artifact-completeness
         if: always()
         working-directory: candidate
@@ -89,40 +46,34 @@ jobs:
           import assert from 'node:assert/strict';
           import fs from 'node:fs';
           import path from 'node:path';
+          import {createHash} from 'node:crypto';
+          import {execFileSync} from 'node:child_process';
           import {pathToFileURL} from 'node:url';
-          const env=process.env,check={kind:'nonmergeable-canonical-cap-artifact-check',acceptanceEligible:false,status:'running',sources:{},errors:[]};let identity;
+          const env=process.env,output=path.join(env.RUNNER_TEMP,'mobile-cap-attribution');fs.mkdirSync(output,{recursive:true});
+          const check={kind:'nonmergeable-cap-attribution-artifact-check',acceptanceEligible:false,status:'incomplete',errors:[]};
           try{
-            identity=JSON.parse(fs.readFileSync(path.join(env.RUNNER_TEMP,'mobile-cap-identity.json'),'utf8'));
-            assert.equal(identity.kind,'nonmergeable-canonical-cap-comparison');assert.equal(identity.acceptanceEligible,false);
-            for(const [key,value]of Object.entries({workflowCommit:env.GITHUB_SHA,workflowRef:env.GITHUB_REF,eventName:env.GITHUB_EVENT_NAME,eventPolicy:env.CHAIN_TEST_EVENT_POLICY,repository:env.GITHUB_REPOSITORY,runId:env.GITHUB_RUN_ID,runAttempt:Number(env.GITHUB_RUN_ATTEMPT)}))assert.equal(identity[key],value,'Identity must bind actual workflow metadata: '+key);
-          }catch(error){check.errors.push('identity: '+String(error));}
-          for(const [label,expected]of [['baseline',env.BASELINE_SHA],['candidate',env.CANDIDATE_SHA]]){
-            try{
-              assert.ok(identity?.sources?.[label],'Both source identities are required');assert.equal(identity.sources[label].commit,expected);
-              const directory=path.join(env.RUNNER_TEMP,'mobile-memory-'+label),report=JSON.parse(fs.readFileSync(path.join(directory,'report.json'),'utf8'));
-              const {mobileArtifactInventory,verifyMobileMemoryReport}=await import(pathToFileURL(path.join(env.GITHUB_WORKSPACE,label,'scripts/button-safety-mobile-contract.mjs')));
-              assert.equal(report.kind,'button-mobile-memory');assert.ok(report.artifacts?.length>0,'Actual canonical raw inventory required');assert.deepEqual(report.artifacts,mobileArtifactInventory(directory),'Every available raw artifact must be inventoried');
-              const source={candidateCommit:expected,candidateTree:identity.sources[label].tree,sourceSha:expected,repository:env.GITHUB_REPOSITORY,runId:env.GITHUB_RUN_ID,runAttempt:Number(env.GITHUB_RUN_ATTEMPT),eventPolicy:env.CHAIN_TEST_EVENT_POLICY};
-              for(const [key,value]of Object.entries(source))assert.equal(report[key],value,'Report source identity: '+key);assert.equal(report.cleanup?.containersRemoved,true);
-              if(report.status==='passed'){
-                verifyMobileMemoryReport(report,{artifactRoot:directory,...source});check.sources[label]={status:'passed',classification:'full-canonical-pass',rawFiles:report.artifacts.length};
-              }else{
-                assert.equal(label,'baseline','Candidate cannot substitute partial observations for success');assert.equal(report.status,'failed');
-                check.sources[label]={status:'observed-failure',classification:'failed-canonical-invocation-partial-observations',rawFiles:report.artifacts.length};
-              }
-            }catch(error){check.sources[label]={status:'failed',error:String(error)};check.errors.push(label+': '+String(error));}
-          }
-          check.status=check.errors.length?'failed':'passed';fs.writeFileSync(path.join(env.RUNNER_TEMP,'mobile-cap-artifact-check.json'),JSON.stringify(check,null,2)+'\n');
-          if(check.errors.length){process.stderr.write(check.errors.join('\n')+'\n');process.exitCode=1;}
+            const read=name=>JSON.parse(fs.readFileSync(path.join(output,name),'utf8')),source=read('source.json'),command=read('command.json'),attribution=read('attribution.json');
+            const git=(repo,...args)=>execFileSync('git',['-C',repo,...args],{encoding:'utf8'}).trim(),repo=path.join(env.GITHUB_WORKSPACE,'candidate'),runner=path.join(env.GITHUB_WORKSPACE,'observer');
+            assert.equal(env.CI,'true');assert.equal(env.GITHUB_EVENT_NAME,'push');assert.equal(env.GITHUB_REF,'refs/heads/diagnose/webkit-cap-canonical-startup');assert.equal(env.CHAIN_TEST_EVENT_POLICY,'outgoing-branch-push-v1');
+            assert.equal(git(runner,'rev-parse','HEAD'),env.GITHUB_SHA);assert.equal(git(runner,'status','--porcelain=v1'),'');
+            assert.equal(source.source,env.CANDIDATE_SHA);assert.equal(source.source,git(repo,'rev-parse','HEAD'));assert.equal(source.tree,git(repo,'rev-parse','HEAD^{tree}'));assert.equal(git(repo,'status','--porcelain=v1'),'');
+            for(const [key,value]of Object.entries({workflowCommit:env.GITHUB_SHA,runId:env.GITHUB_RUN_ID,runAttempt:Number(env.GITHUB_RUN_ATTEMPT),eventName:env.GITHUB_EVENT_NAME,eventRef:env.GITHUB_REF,eventPolicy:env.CHAIN_TEST_EVENT_POLICY,repository:env.GITHUB_REPOSITORY}))assert.equal(source[key],value,'Actual workflow source binding: '+key);
+            const hash=file=>createHash('sha256').update(fs.readFileSync(file)).digest('hex'),files={};for(const file of git(repo,'ls-files','-z').split('\u0000').filter(Boolean))files[file]=hash(path.join(repo,file));assert.deepEqual(source.files,files,'Every exact canonical file must remain unchanged');assert.equal(source.observerSha256,hash(path.join(runner,'scripts/cap-attribution.py')));
+            assert.equal(command.acceptanceEligible,false);assert.equal(command.observerExit,0);assert.deepEqual(command.cleanup,{canonicalChildClosed:true,observerClosed:true});assert.deepEqual(command.errors,[]);
+            assert.equal(attribution.kind,'nonmergeable-cap-attribution');assert.equal(attribution.acceptanceEligible,false);assert.equal(attribution.status,'complete');assert.deepEqual(attribution.errors,[]);
+            const directory=path.join(output,'canonical'),report=read('canonical/report.json');const {mobileArtifactInventory,verifyMobileMemoryReport}=await import(pathToFileURL(path.join(repo,'scripts/button-safety-mobile-contract.mjs')));
+            assert.ok(report.artifacts?.length>0);assert.deepEqual(report.artifacts,mobileArtifactInventory(directory));
+            const identity={candidateCommit:source.source,candidateTree:source.tree,sourceSha:source.source,repository:env.GITHUB_REPOSITORY,runId:env.GITHUB_RUN_ID,runAttempt:Number(env.GITHUB_RUN_ATTEMPT),eventPolicy:env.CHAIN_TEST_EVENT_POLICY};for(const [key,value]of Object.entries(identity))assert.equal(report[key],value);assert.deepEqual(report.cleanup,{containersRemoved:true});
+            if(report.status==='passed'){assert.equal(command.canonicalExit,0);verifyMobileMemoryReport(report,{artifactRoot:directory,...identity});check.canonicalClassification='full-canonical-pass-still-no-diagnostic-release-credit';}
+            else{assert.equal(report.status,'failed');assert.notEqual(command.canonicalExit,0);assert.equal(typeof command.canonicalExit,'number');check.canonicalClassification='failed-canonical-invocation-partial-observations';}
+            check.status='complete';check.source=source.source;check.canonicalExit=command.canonicalExit;
+          }catch(error){check.errors.push(String(error));}
+          fs.writeFileSync(path.join(output,'artifact-check.json'),JSON.stringify(check,null,2)+'\n');if(check.status!=='complete'){process.stderr.write(check.errors.join('\n')+'\n');process.exitCode=1;}
           JS
-      - name: Preserve both complete canonical command observations
+      - name: Preserve all available canonical and host attribution evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: NONMERGEABLE-canonical-cap-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            ${{ runner.temp }}/mobile-memory-baseline
-            ${{ runner.temp }}/mobile-memory-candidate
-            ${{ runner.temp }}/mobile-cap-identity.json
-            ${{ runner.temp }}/mobile-cap-artifact-check.json
+          name: NONMERGEABLE-cap-attribution-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/mobile-cap-attribution
           if-no-files-found: error
