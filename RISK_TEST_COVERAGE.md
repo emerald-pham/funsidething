@@ -2304,10 +2304,8 @@ The command/report consumer rejects missing, duplicate, skipped, cancelled, unre
 
 - RISK repository process: retained native sources seed once without a persistent board bootstrap
 
-- RISK scenery scene time readiness: loading controls wait before native presets save reload and return to live
+- RISK scenery scene time readiness: loading controls look unavailable before native presets save reload and return to live
 
 - RISK synced scene durability: native retained boards keep immediate scene locks through reload without changing tasks or sources
 
-
-
-- RISK repository process: capped attribution requires owned kernel victims and complete canonical evidence — Nonmergeable one-source fe42 command retains the complete canonical cap/story and raw inventory; external host observer requires actual kernel memcg/victim correlation, loss accounting, PID lifetime boundaries, Node/browser separation and owned cleanup. Actual CLI/process and parsed workflow fixtures reject partial, foreign, reused and missing evidence; no local or diagnostic release credit.
+- RISK repository process: capped attribution requires owned kernel victims and complete canonical evidence — One unchanged frozen fe42 canonical command, strict cap and full story run after an external host observer is ready. Actual kernel memcg/victim correlation, format/loss/PID boundaries, Node/browser scalar separation, cleanup and complete source/inventories fail closed. Process fixtures and diagnostic CI confer no release acceptance.
