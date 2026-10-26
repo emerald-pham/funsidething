@@ -166,22 +166,59 @@ def stop_observer(control,expected,proc=pathlib.Path('/proc')):
   if descriptor is not None:os.close(descriptor)
   if pidfd is not None:os.close(pidfd)
 
-def publish_evidence(output,result):
+def publication_writers(output,result):
+ state={'knownContainers':[],'containerCleanup':{'inventoryComplete':None,'unresolved':[],'quiescenceConfirmed':False,'reason':'Observer cleanup is not confirmed'}}
+ if not result['cleanup']['observerClosed']:return state
+ try:
+  raw=json.loads((output/'observer.json').read_text())
+  if raw.get('source')!=SOURCE:raise ValueError('Observer source mismatch')
+  state['knownContainers']=raw.get('ownedObjects',[])
+  receipt=raw.get('containerCleanup',{})
+  state['containerCleanup'].update({key:receipt[key] for key in ['inventoryComplete','removed','alreadyRemoved','unresolved'] if key in receipt})
+  if raw.get('ownedContainersRemoved') is not True or receipt.get('inventoryComplete') is not True or receipt.get('unresolved')!=[]:raise ValueError('Container removal or inventory is unresolved')
+  if result['canonicalStarted']:
+   # A killed client can leave an in-flight daemon create after an empty
+   # inventory. No amount of early absence establishes that RPC completed.
+   if type(result['canonicalExit']) is not int or result['canonicalExit']<0:raise ValueError('Interrupted canonical create completion is unknown')
+   # This parent receipt is outside every container's label-specific bind
+   # mount and its sole writer has been collected. Never inspect live files
+   # within those mounts to decide whether they are safe to copy.
+   report_path=output/'canonical/report.json'
+   if report_path.is_symlink():raise ValueError('Untrusted canonical cleanup receipt')
+   report=json.loads(report_path.read_text())
+   if report.get('candidateCommit')!=SOURCE or report.get('candidateTree')!='6c26511caaff846e42a2417076ed2a7acaf69e02' or report.get('sourceSha')!=SOURCE or report.get('status') not in ['passed','failed'] or report.get('cleanup',{}).get('containersRemoved') is not True:raise ValueError('Completed canonical cleanup receipt unavailable')
+   # The immutable consumer creates each label directory before its single
+   # Docker create. An unobserved label may still be an in-flight create,
+   # even if that failed client already wrote a nominal cleanup receipt.
+   labels=[label for label in ['negative','normal','reduced'] if (output/'canonical'/label).exists()]
+   for label in labels:
+    matches=[c for c in state['knownContainers'] if c.get('label')==label and c.get('validBoundary') is True and re.fullmatch('[a-f0-9]{64}',c.get('id',''))]
+    if len(matches)!=1:raise ValueError('Created label lacks a unique observed daemon identity')
+  state['containerCleanup'].update(quiescenceConfirmed=True,reason='Exact owned inventory and completed canonical lifecycle confirmed')
+ except Exception as failure:
+  # Fixed metadata only; missing/partial receipts are not an empty inventory.
+  state['containerCleanup']['reason']=str(failure) if isinstance(failure,ValueError) else 'Container cleanup receipt unavailable or malformed'
+ return state
+
+def publish_evidence(output,result,writers):
  published=output.with_name(output.name+'-published')
  if published.exists():raise ValueError('Publication path already exists')
- if result['cleanup']['observerClosed']:
-  # Collected process: no privileged writer can still mutate these files.
+ result['publicationWriters']=writers
+ if not writers['containerCleanup']['quiescenceConfirmed']:result['errors'].append('Container writer cleanup unconfirmed; only stable metadata will be published')
+ (output/'command.json').write_text(json.dumps(result,indent=2)+'\n')
+ if result['cleanup']['observerClosed'] and writers['containerCleanup']['quiescenceConfirmed']:
+  # Both the root observer and daemon-owned canonical writers are settled.
   for entry in output.rglob('*'):
    if entry.is_symlink() or not (entry.is_dir() or entry.is_file()):raise ValueError('Unsafe evidence entry')
   shutil.copytree(output,published)
  else:
-  # Never read/copy mutable observer files. This handoff is stable even if a
-  # verified observer could not be collected; it confers no cleanup credit.
+  # Never read/copy mutable observer/container files. A collected parent or
+  # an early empty daemon inventory alone cannot establish writer completion.
   published.mkdir()
   for name in ['source.json','command.json']:
    file=output/name
    if file.is_file() and not file.is_symlink():shutil.copyfile(file,published/name)
-  handoff={'kind':'unresolved-owned-observer-cleanup','acceptanceEligible':False,'status':'unresolved','liveEvidence':str(output),'owner':result.get('observerIdentity'),'stop':result.get('observerStop'),'canonicalChildClosed':result['cleanup']['canonicalChildClosed'],'observerClosed':False,'mutableEvidenceExcluded':True}
+  handoff={'kind':'unresolved-owned-writer-cleanup','acceptanceEligible':False,'status':'unresolved','liveEvidence':str(output),'owner':result.get('observerIdentity'),'stop':result.get('observerStop'),'canonicalChildClosed':result['cleanup']['canonicalChildClosed'],'observerClosed':result['cleanup']['observerClosed'],'containerWritersClosed':writers['containerCleanup']['quiescenceConfirmed'],**writers,'mutableEvidenceExcluded':True}
   (published/'cleanup-unresolved.json').write_text(json.dumps(handoff,indent=2)+'\n')
  return published
 
@@ -400,7 +437,7 @@ def run(args):
  if output.exists() or output.with_name(output.name+'-published').exists():raise ValueError('New external evidence and publication directories required')
  if output==repo or repo in output.parents:raise ValueError('Evidence must be outside checkout')
  output.mkdir(parents=True);canonical=output/'canonical'
- child=None;worker=None;result={'kind':'nonmergeable-cap-attribution-command','acceptanceEligible':False,'canonicalExit':None,'observerExit':None,'cleanup':{'canonicalChildClosed':True,'observerClosed':True},'errors':[]}
+ child=None;worker=None;result={'kind':'nonmergeable-cap-attribution-command','acceptanceEligible':False,'canonicalStarted':False,'canonicalExit':None,'observerExit':None,'cleanup':{'canonicalChildClosed':True,'observerClosed':True},'errors':[]}
  stop=False
  def stopping(*unused):
   nonlocal stop;stop=True
@@ -419,6 +456,7 @@ def run(args):
   if not ready.get('ready'):raise ValueError('Kernel observer capability unavailable; no canonical invocation started')
   with (output/'canonical.stdout.txt').open('w') as stdout,(output/'canonical.stderr.txt').open('w') as stderr:
    child=subprocess.Popen(['node','scripts/button-safety-mobile-memory.mjs','--run','--output-dir',str(canonical)],cwd=repo,stdout=stdout,stderr=stderr,start_new_session=True)
+   result['canonicalStarted']=True
    deadline=time.monotonic()+420
    while child.poll() is None and not stop and time.monotonic()<deadline:time.sleep(.05)
    if child.poll() is None:raise ValueError('Owned command interrupted or outer deadline exceeded')
@@ -448,8 +486,13 @@ def run(args):
    result['observerExit']=worker.poll();result['cleanup']['observerClosed']=worker.poll() is not None
   result['cleanup']['canonicalChildClosed']=child is None or child.poll() is not None
   (output/'command.json').write_text(json.dumps(result,indent=2)+'\n')
-  summary=safe_summary(output) if result['cleanup']['observerClosed'] else None
-  publish_evidence(output,result)
+  writers=publication_writers(output,result)
+  if result['cleanup']['observerClosed'] and writers['containerCleanup']['quiescenceConfirmed']:summary=safe_summary(output)
+  else:
+   # No summarizer may read mutable container payloads before quiescence.
+   summary={'kind':'nonmergeable-cap-attribution','acceptanceEligible':False,'status':'incomplete','errors':['Writer cleanup is unconfirmed; mutable evidence was not read']}
+   (output/'attribution.json').write_text(json.dumps(summary,indent=2)+'\n')
+  publish_evidence(output,result,writers)
  return 0 if result['canonicalExit']==0 and result['observerExit']==0 and summary and summary['status']=='complete' and not result['errors'] else 1
 
 def safe_summary(directory):

@@ -13111,6 +13111,21 @@
       "root": "privileged shutdown binds the root record PID start time namespace and pidfd before signalling",
       "group": "native-process",
       "file": "scripts/agent-tools/cap-attribution.test.mjs"
+    },
+    {
+      "root": "collected observer cannot publish live container evidence after cancellation",
+      "group": "native-process",
+      "file": "scripts/agent-tools/cap-attribution.test.mjs"
+    },
+    {
+      "root": "completed canonical failure retains full evidence only with positive container cleanup",
+      "group": "native-process",
+      "file": "scripts/agent-tools/cap-attribution.test.mjs"
+    },
+    {
+      "root": "RISK repository process: container writers require positive quiescence before publication",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [

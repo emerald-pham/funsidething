@@ -192,13 +192,25 @@ test('control startup may progress from inherited score zero to its deliberate f
  const f=fixture(t),c=f.raw.containers[0];delete f.raw.victims[0].identity;c.samples[0].processes[0].oomScoreAdj=0;c.samples.splice(1,0,{...structuredClone(c.samples[0]),mono:1.95,processes:[{...c.samples[0].processes[0],observedMono:1.95,oomScoreAdj:1000}]});const r=f.run();assert.equal(r.status,0,r.stderr);assert.equal(r.report.status,'complete','The latest pre-kill sample identifies the deliberate child without erasing its earlier startup state');
 });
 
-function cancellationFixture(t,{ignoreEOF=false,refuseStop=false}={}){
+function cancellationFixture(t,{ignoreEOF=false,refuseStop=false,containerFailure=null}={}){
  const f=commandFixture(t),bin=path.join(f.directory,'bin'),daemon=path.join(f.directory,'daemon.json'),marker=path.join(f.directory,'created.json');fs.writeFileSync(daemon,'{}');
  const image='mcr.microsoft.com/playwright@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e';
  const executable=(name,body)=>{const file=path.join(bin,name);fs.writeFileSync(file,'#!/usr/bin/env python3\n'+body);fs.chmodSync(file,0o755);};
- executable('node',`import pathlib,json,time,sys,os\na=sys.argv;directory=pathlib.Path(${JSON.stringify(f.directory)});canonical=pathlib.Path(a[-1]);canonical.mkdir();repo=os.path.realpath(${JSON.stringify(f.repo)});state={}\nfor cid,evidence in [('a'*64,str(canonical/'negative')),('f'*64,'/foreign/evidence')]:state[cid]={'Id':cid,'Pid':0,'Memory':512000000,'MemorySwap':512000000,'Image':${JSON.stringify(image)},'Mounts':[{'Destination':'/repo','Source':repo,'RW':False},{'Destination':'/evidence','Source':evidence}]}\n(directory/'daemon.json').write_text(json.dumps(state));(directory/'created.json').write_text('created before start')\nwhile True:time.sleep(.01)\n`);
+ executable('node',`import pathlib,json,time,sys,os\na=sys.argv;directory=pathlib.Path(${JSON.stringify(f.directory)});canonical=pathlib.Path(a[-1]);canonical.mkdir();(canonical/'negative').mkdir();repo=os.path.realpath(${JSON.stringify(f.repo)});state={}\nfor cid,evidence in [('a'*64,str(canonical/'negative')),('f'*64,'/foreign/evidence')]:state[cid]={'Id':cid,'Pid':0,'Memory':512000000,'MemorySwap':512000000,'Image':${JSON.stringify(image)},'Mounts':[{'Destination':'/repo','Source':repo,'RW':False},{'Destination':'/evidence','Source':evidence}]}\n(directory/'daemon.json').write_text(json.dumps(state));(directory/'created.json').write_text('created before start')\nwhile True:time.sleep(.01)\n`);
  executable('docker',`import pathlib,json,sys\np=pathlib.Path(${JSON.stringify(daemon)});state=json.loads(p.read_text());a=sys.argv[1:]\nif a[0]=='ps':print('\\n'.join(state));sys.exit(0)\ncid=a[-1]\nif a[0]=='rm':\n state.pop(cid,None);p.write_text(json.dumps(state));print(cid);sys.exit(0)\nif cid not in state:print('Error: No such object: '+cid,file=sys.stderr);sys.exit(1)\nc=state[cid];fmt=a[a.index('--format')+1]\nif fmt=='{{.Id}}':print(cid);sys.exit(0)\nvalues=[cid]+([c['Pid']] if '.State.Pid' in fmt else [])+[c['Memory'],c['MemorySwap'],c['Image'],c['Mounts']];print('|'.join(json.dumps(x) for x in values))\n`);
  executable('sudo',`import pathlib,json,sys,os,time,signal,runpy\na=sys.argv\nif '--stop-observer' in a:\n expected=json.loads(a[a.index('--expected-owner')+1]);control=pathlib.Path(a[a.index('--control-path')+1]);saved=json.loads(control.read_text())\n if ${refuseStop?'True':'False'} or expected!=saved:print(json.dumps({'status':'refused'}));sys.exit(1)\n os.kill(saved['pid'],signal.SIGTERM);print(json.dumps({'status':'signalled'}));sys.exit(0)\nout=pathlib.Path(a[a.index('--output')+1]);repo=pathlib.Path(a[a.index('--repo')+1]);canonical=pathlib.Path(a[a.index('--canonical')+1]);owner={'pid':os.getpid(),'startTime':1,'namespacePids':[os.getpid()],'bootId':'fixture','nonce':'fixture-owned-nonce','output':str(out),'source':'fe42f57e880c5edafc26b01af954bfe3205e1d22'}\n(out/'observer-owner.json').write_text(json.dumps(owner));pathlib.Path(${JSON.stringify(path.join(f.directory,'worker.json'))}).write_text(json.dumps(owner))\ndef stop(*args):raise SystemExit(0)\nsignal.signal(signal.SIGTERM,stop)\ntry:\n print(json.dumps({'ready':True,**owner}),flush=True)\n if ${ignoreEOF?'True':'False'}:\n  while True:(out/'live-writer.json').write_text(str(time.monotonic()));time.sleep(.01)\n else:sys.stdin.read()\nfinally:\n signal.signal(signal.SIGTERM,signal.SIG_IGN)\n module=runpy.run_path(${JSON.stringify(observer)});receipt=module['cleanup_owned_containers']([],repo,canonical);(out/'fixture-cleanup.json').write_text(json.dumps(receipt));(out/'fixture-worker-closed.json').write_text(json.dumps({'closed':True}));(out/'observer.json').write_text(json.dumps({'source':owner['source'],'capability':{'available':False},'cleanup':{'traceRemoved':True,'childrenClosed':True},'ownedContainersRemoved':not receipt['unresolved'],'errors':['fixture-only']}))\n`);
+ if(containerFailure){
+  // A daemon-owned writer survives the killed client and collected observer.
+  // It is a real separate process; only this fixture's driver collects it.
+  const node=path.join(bin,'node'),sudo=path.join(bin,'sudo'),docker=path.join(bin,'docker');
+  const writer="import pathlib,time,sys\np=pathlib.Path(sys.argv[1])\nwhile True:p.write_text(str(time.monotonic()));time.sleep(.005)\n";
+  let source=fs.readFileSync(node,'utf8').replace('import pathlib,json,time,sys,os','import pathlib,json,time,sys,os,subprocess');
+  const inventoryChild=containerFailure==='inventory'?"(canonical/'normal').mkdir();state['b'*64]={**state['a'*64],'Id':'b'*64,'Mounts':[{'Destination':'/repo','Source':repo,'RW':False},{'Destination':'/evidence','Source':str(canonical/'normal')}]};(directory/'daemon.json').write_text(json.dumps(state))\n":'';
+  source=source.replace("(directory/'created.json').write_text('created before start')",`${inventoryChild}${containerFailure==='inflight'?"state.pop('a'*64);(directory/'daemon.json').write_text(json.dumps(state))\n":''}writer=subprocess.Popen([sys.executable,'-c',${JSON.stringify(writer)},str(canonical/${containerFailure==='inventory'?"'normal'":"'negative'"}/'live-container.json')],start_new_session=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL);(directory/'container-writer.json').write_text(json.dumps({'pid':writer.pid,'path':str(canonical/${containerFailure==='inventory'?"'normal'":"'negative'"}/'live-container.json')}));(directory/'created.json').write_text('created before start')`);fs.writeFileSync(node,source);
+  source=fs.readFileSync(docker,'utf8').replace("if a[0]=='ps':",`${containerFailure==='inventory'?"if a[0]=='ps':print('fixture inventory unavailable',file=sys.stderr);sys.exit(1)\n":''}${containerFailure==='rm'?"if a[0]=='rm':print('fixture removal refused',file=sys.stderr);sys.exit(1)\n":''}if a[0]=='ps':`);fs.writeFileSync(docker,source);
+  const known=containerFailure==='inflight'?[]:[{id:'a'.repeat(64),label:'negative',validBoundary:true}];
+  source=fs.readFileSync(sudo,'utf8').replace("receipt=module['cleanup_owned_containers']([],repo,canonical)",`known=json.loads(${JSON.stringify(JSON.stringify(known))});receipt=module['cleanup_owned_containers'](known,repo,canonical)`).replace("'ownedContainersRemoved':not receipt['unresolved']","'ownedObjects':known,'containerCleanup':receipt,'ownedContainersRemoved':receipt['inventoryComplete'] and not receipt['unresolved']");fs.writeFileSync(sudo,source);
+ }
  return{...f,marker,daemon};
 }
 function cancelCommand(f,{deadline=false}={}){
@@ -227,13 +239,20 @@ if pid:
  try:os.kill(pid,0);alive=True
  except ProcessLookupError:pass
 published=pathlib.Path(output+'-published');snapshot={str(x.relative_to(published)):x.read_text() for x in published.rglob('*') if x.is_file()} if published.exists() else None
+writerfile=workerfile.with_name('container-writer.json');writerinfo=json.loads(writerfile.read_text()) if writerfile.exists() else {};writerpid=writerinfo.get('pid')
+writeralive=False;live=pathlib.Path(writerinfo.get('path',output+'/canonical/live-container.json'));before=live.read_text() if live.exists() else None
+if writerpid:
+ try:os.kill(writerpid,0);writeralive=True
+ except ProcessLookupError:pass
 time.sleep(.04)
 stable=snapshot==({str(x.relative_to(published)):x.read_text() for x in published.rglob('*') if x.is_file()} if published.exists() else None)
+advanced=live.exists() and live.read_text()!=before
+if writeralive:os.kill(writerpid,signal.SIGTERM)
 # The fixture itself collects its process even when exercising the original leak.
 if alive:
  os.kill(pid,signal.SIGTERM);end=time.monotonic()+3
  while not (pathlib.Path(output)/'fixture-worker-closed.json').exists() and time.monotonic()<end:time.sleep(.01)
-print(json.dumps({'exit':p.returncode,'workerAliveAtReturn':alive,'published':snapshot,'publishedStable':stable}))
+print(json.dumps({'exit':p.returncode,'workerAliveAtReturn':alive,'containerWriterAliveAtReturn':writeralive,'liveContainerAdvanced':advanced,'published':snapshot,'publishedStable':stable}))
 `;
  const result=spawnSync('python3',['-c',driver,observer,f.repo,f.output,f.marker,path.join(f.directory,'worker.json'),deadline?'yes':'no'],{env:f.env,encoding:'utf8',timeout:12000});assert.equal(result.status,0,result.stderr);return JSON.parse(result.stdout);
 }
@@ -246,6 +265,25 @@ test('cancellation collects an EOF-ignoring observer before returning on signals
 
 test('cancellation publishes only a stable unresolved handoff when observer shutdown is refused',t=>{
  const f=cancellationFixture(t,{ignoreEOF:true,refuseStop:true}),r=cancelCommand(f);assert.equal(r.workerAliveAtReturn,true,'The fixture deliberately withholds shutdown');assert.equal(r.publishedStable,true);assert.ok(r.published['cleanup-unresolved.json']);assert.equal(JSON.parse(r.published['cleanup-unresolved.json']).observerClosed,false);assert.equal(r.published['observer.json'],undefined,'No mutable observer evidence is copied');assert.equal(r.published['live-writer.json'],undefined);assert.equal(r.published['observations.ndjson'],undefined);assert.equal(JSON.parse(r.published['command.json']).cleanup.observerClosed,false);
+});
+
+test('collected observer cannot publish live container evidence after cancellation',async t=>{
+ for(const failure of ['rm','inventory','inflight'])await t.test(failure,t=>{
+  const f=cancellationFixture(t,{containerFailure:failure}),r=cancelCommand(f);assert.notEqual(r.exit,0);assert.equal(r.workerAliveAtReturn,false,'The observer itself has been collected');assert.equal(r.containerWriterAliveAtReturn,true);assert.equal(r.liveContainerAdvanced,true,'The separate daemon writer still mutates canonical evidence');assert.equal(r.publishedStable,true);
+  assert.ok(r.published['cleanup-unresolved.json'],'A collected observer cannot establish daemon quiescence');const handoff=JSON.parse(r.published['cleanup-unresolved.json']);assert.equal(handoff.observerClosed,true);assert.equal(handoff.containerWritersClosed,false);assert.equal(handoff.liveEvidence,fs.realpathSync(f.output));assert.equal(Object.keys(r.published).some(name=>name.startsWith('canonical/')),false,'No live canonical evidence may be copied');assert.equal(r.published['observer.json'],undefined);assert.ok(JSON.parse(fs.readFileSync(f.daemon,'utf8'))['f'.repeat(64)],'Foreign object is preserved');
+  if(failure==='inflight'){assert.equal(handoff.containerCleanup.inventoryComplete,true);assert.deepEqual(handoff.knownContainers,[]);assert.equal(handoff.containerCleanup.quiescenceConfirmed,false,'Early absence is not completion of an interrupted create');}
+  else{assert.deepEqual(handoff.knownContainers.map(c=>c.id),['a'.repeat(64)]);assert.equal(handoff.containerCleanup.inventoryComplete,failure!=='inventory');if(failure==='rm')assert.ok(handoff.containerCleanup.unresolved.includes('a'.repeat(64)));else{assert.ok(handoff.containerCleanup.removed.includes('a'.repeat(64)));assert.deepEqual(handoff.containerCleanup.unresolved,[]);assert.ok(JSON.parse(fs.readFileSync(f.daemon,'utf8'))['b'.repeat(64)],'An unobserved owned writer remains when final inventory fails');}}
+ });
+});
+
+test('completed canonical failure retains full evidence only with positive container cleanup',async t=>{
+ for(const observed of [true,false])await t.test(String(observed),t=>{
+ const f=commandFixture(t),bin=path.join(f.directory,'bin'),node=path.join(bin,'node'),sudo=path.join(bin,'sudo');
+ let source=fs.readFileSync(node,'utf8').replace('sys.exit(23)',`(out/'negative').mkdir();(out/'negative/stable.json').write_text('settled');(out/'report.json').write_text(json.dumps({'candidateCommit':'fe42f57e880c5edafc26b01af954bfe3205e1d22','candidateTree':'6c26511caaff846e42a2417076ed2a7acaf69e02','sourceSha':'fe42f57e880c5edafc26b01af954bfe3205e1d22','status':'failed','cleanup':{'containersRemoved':True}}));sys.exit(23)`);fs.writeFileSync(node,source);
+ source=fs.readFileSync(sudo,'utf8').replace("'errors':['fixture-only']",`'ownedObjects':${observed?"[{'id':'a'*64,'label':'negative','validBoundary':True}]":'[]'},'containerCleanup':{'removed':[],'alreadyRemoved':['a'*64],'unresolved':[],'inventoryComplete':True},'ownedContainersRemoved':True,'errors':['fixture-only']`);fs.writeFileSync(sudo,source);
+ const r=f.run();assert.notEqual(r.status,0,'A failed canonical command remains failed');const published=f.output+'-published';if(observed){assert.equal(fs.readFileSync(path.join(published,'canonical/negative/stable.json'),'utf8'),'settled');assert.equal(fs.existsSync(path.join(published,'cleanup-unresolved.json')),false);}
+ else{const handoff=JSON.parse(fs.readFileSync(path.join(published,'cleanup-unresolved.json'),'utf8'));assert.equal(handoff.containerWritersClosed,false);assert.match(handoff.containerCleanup.reason,/lacks a unique observed daemon identity/);assert.equal(fs.existsSync(path.join(published,'canonical')),false,'An unobserved in-flight create cannot inherit its client cleanup claim');}
+ });
 });
 
 test('privileged shutdown refuses a missing root identity record instead of claiming observer exit',t=>{

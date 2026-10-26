@@ -22686,5 +22686,62 @@
       "command": "Node22 recorder --purpose preimplementation-red -- node --test --test-name-pattern=\"^cancellation \" scripts/agent-tools/cap-attribution.test.mjs; corresponding observer-publication RISK root",
       "failure": "Actual a0fe69cb-be64-4798-9333-b17b4e286573 on clean5c plus new tests observed all4 cancellation assertions fail before implementation: owned PID0 object persisted and EOF-ignoring observer remained alive at wrapper return for both signal/deadline. Actual af83a29b-2899-4125-88f5-8cd3be4f4d9c rejected original live upload path before workflow change. ATTR01 targeted GREEN8ac32aaa follows inventory repair; both cancellation seams GREEN8132a928 and publication RISK GREENe6c4e9f0 follow identity shutdown/stable publication. Additional missing-root-record REDb83ff2e3 precedes truthful refusal. Full focused GREEN08d6144c has38passes/0skips. f718 and568 are retained intermediate failures: P2 exposed the fixture cleanup grace and then a Python fixture quoting defect, corrected before green. Evidence under canonical-cap-fe42-attribution/cleanup-repair/runs; no Docker/native/hosted runtime occurred."
     }
+  },
+  {
+    "baseCommit": "3c2477f7d575fb5cdc3945fe9793cbfe6e7a49e6",
+    "testChangesSha256": "1519a636b356b09bbdb18fa551ec8a7e19ba7dca73add8aad413d531f7cef714",
+    "reason": "Close the remaining ATTR-CODE-02 publication race after independent review: an exited root observer does not establish daemon-owned container writer completion.",
+    "previousBehavior": "The wrapper copied all evidence solely because observerClosed was true, even if scoped Docker removal/inventory failed or a killed create client left daemon completion unknown.",
+    "intendedBehavior": "Full publication requires positive stable observer removal/inventory plus a completed canonical lifecycle, source-bound parent cleanup receipt and a unique observed identity for each initiated label. Interrupted or unobserved creates remain unknown. Unresolved writers publish metadata-only cleanup handoff with known IDs, inventory status and live path; no mutable observer/container bytes are copied.",
+    "replacementTests": [
+      "RISK repository process: container writers require positive quiescence before publication"
+    ],
+    "preservedCoverage": [
+      "Frozen fe42 app, complete canonical tests prefix and every native/mobile/fixture/policy/validator byte remain unchanged, including the original stricter whole-container512000000/no-swap boundary,400tasks/full1MiB sources/two backups/both motion consumers/ten distinct trustedYes/2s and all outcomes/frame/transport bounds.",
+      "Existing foreign ownership, root observer lifetime/pidfd shutdown, actual kernel control/context/loss/PID reuse and privacy requirements remain fail-closed. No parent/client exit substitutes for daemon completion; unresolved inventory is never early-empty success.",
+      "Actual public CLI fixture uses a separate surviving writer, proves its live bytes advance after observer collection, then tears down only its owned processes. A positive completed canonical failure still preserves settled raw evidence without converting failure into acceptance."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder --purpose preimplementation-red -- node --test --test-name-pattern=\"^collected observer cannot publish live container evidence after cancellation$\" scripts/agent-tools/cap-attribution.test.mjs; corresponding container-publication RISK root",
+      "failure": "Actual pre-edit0b97c9cb-7ab0-4b9d-a487-d327c0b03b03 failed all3 daemon-writer subcases on3c: observer collected, separate writer alive/advancing, but no stable cleanup handoff. Actual RISK RED8522a543-d4b1-477e-ad18-0154e88ff47d precedes implementation and retains the settled-canonical positive control. Subsequent fa8af256 is a macOS /var vs /private/var fixture-path mismatch;6abda1a8 is a fixture quoting infrastructure failure;d1a50b43 catches inconsistent removal-success inventory-failure fixture modeling. All retained as intermediate attempts, not new product RED. Focused actual process GREEN follows corrected fixture. Evidence under canonical-cap-fe42-attribution/container-publication-repair/runs; no browser/Docker/hosted/cap runtime."
+    }
+  },
+  {
+    "baseCommit": "fe42f57e880c5edafc26b01af954bfe3205e1d22",
+    "testChangesSha256": "75209fa0dba8d944a230b5ccf44994190524b4beca7bfc92c2731c4bf3f361d9",
+    "reason": "Close the remaining ATTR-CODE-02 publication race after independent review: an exited root observer does not establish daemon-owned container writer completion.",
+    "previousBehavior": "The wrapper copied all evidence solely because observerClosed was true, even if scoped Docker removal/inventory failed or a killed create client left daemon completion unknown.",
+    "intendedBehavior": "Full publication requires positive stable observer removal/inventory plus a completed canonical lifecycle, source-bound parent cleanup receipt and a unique observed identity for each initiated label. Interrupted or unobserved creates remain unknown. Unresolved writers publish metadata-only cleanup handoff with known IDs, inventory status and live path; no mutable observer/container bytes are copied.",
+    "replacementTests": [
+      "RISK repository process: container writers require positive quiescence before publication"
+    ],
+    "preservedCoverage": [
+      "Frozen fe42 app, complete canonical tests prefix and every native/mobile/fixture/policy/validator byte remain unchanged, including the original stricter whole-container512000000/no-swap boundary,400tasks/full1MiB sources/two backups/both motion consumers/ten distinct trustedYes/2s and all outcomes/frame/transport bounds.",
+      "Existing foreign ownership, root observer lifetime/pidfd shutdown, actual kernel control/context/loss/PID reuse and privacy requirements remain fail-closed. No parent/client exit substitutes for daemon completion; unresolved inventory is never early-empty success.",
+      "Actual public CLI fixture uses a separate surviving writer, proves its live bytes advance after observer collection, then tears down only its owned processes. A positive completed canonical failure still preserves settled raw evidence without converting failure into acceptance."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder --purpose preimplementation-red -- node --test --test-name-pattern=\"^collected observer cannot publish live container evidence after cancellation$\" scripts/agent-tools/cap-attribution.test.mjs; corresponding container-publication RISK root",
+      "failure": "Actual pre-edit0b97c9cb-7ab0-4b9d-a487-d327c0b03b03 failed all3 daemon-writer subcases on3c: observer collected, separate writer alive/advancing, but no stable cleanup handoff. Actual RISK RED8522a543-d4b1-477e-ad18-0154e88ff47d precedes implementation and retains the settled-canonical positive control. Subsequent fa8af256 is a macOS /var vs /private/var fixture-path mismatch;6abda1a8 is a fixture quoting infrastructure failure;d1a50b43 catches inconsistent removal-success inventory-failure fixture modeling. All retained as intermediate attempts, not new product RED. Focused actual process GREEN follows corrected fixture. Evidence under canonical-cap-fe42-attribution/container-publication-repair/runs; no browser/Docker/hosted/cap runtime."
+    }
+  },
+  {
+    "baseCommit": "b6e83899240d9546cab1bf481aa1b99de0a121f5",
+    "testChangesSha256": "7dd36ba2a611fbd20e8e7811815f9d74ec4dd708c13f94f1c383ef42763502c7",
+    "reason": "Close the remaining ATTR-CODE-02 publication race after independent review: an exited root observer does not establish daemon-owned container writer completion.",
+    "previousBehavior": "The wrapper copied all evidence solely because observerClosed was true, even if scoped Docker removal/inventory failed or a killed create client left daemon completion unknown.",
+    "intendedBehavior": "Full publication requires positive stable observer removal/inventory plus a completed canonical lifecycle, source-bound parent cleanup receipt and a unique observed identity for each initiated label. Interrupted or unobserved creates remain unknown. Unresolved writers publish metadata-only cleanup handoff with known IDs, inventory status and live path; no mutable observer/container bytes are copied.",
+    "replacementTests": [
+      "RISK repository process: container writers require positive quiescence before publication"
+    ],
+    "preservedCoverage": [
+      "Frozen fe42 app, complete canonical tests prefix and every native/mobile/fixture/policy/validator byte remain unchanged, including the original stricter whole-container512000000/no-swap boundary,400tasks/full1MiB sources/two backups/both motion consumers/ten distinct trustedYes/2s and all outcomes/frame/transport bounds.",
+      "Existing foreign ownership, root observer lifetime/pidfd shutdown, actual kernel control/context/loss/PID reuse and privacy requirements remain fail-closed. No parent/client exit substitutes for daemon completion; unresolved inventory is never early-empty success.",
+      "Actual public CLI fixture uses a separate surviving writer, proves its live bytes advance after observer collection, then tears down only its owned processes. A positive completed canonical failure still preserves settled raw evidence without converting failure into acceptance."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder --purpose preimplementation-red -- node --test --test-name-pattern=\"^collected observer cannot publish live container evidence after cancellation$\" scripts/agent-tools/cap-attribution.test.mjs; corresponding container-publication RISK root",
+      "failure": "Actual pre-edit0b97c9cb-7ab0-4b9d-a487-d327c0b03b03 failed all3 daemon-writer subcases on3c: observer collected, separate writer alive/advancing, but no stable cleanup handoff. Actual RISK RED8522a543-d4b1-477e-ad18-0154e88ff47d precedes implementation and retains the settled-canonical positive control. Subsequent fa8af256 is a macOS /var vs /private/var fixture-path mismatch;6abda1a8 is a fixture quoting infrastructure failure;d1a50b43 catches inconsistent removal-success inventory-failure fixture modeling. All retained as intermediate attempts, not new product RED. Focused actual process GREEN follows corrected fixture. Evidence under canonical-cap-fe42-attribution/container-publication-repair/runs; no browser/Docker/hosted/cap runtime."
+    }
   }
 ]
