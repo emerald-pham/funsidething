@@ -45521,15 +45521,15 @@ test('RISK repository process: required native button actions execute in Chromiu
  });
 });
 
-test('RISK repository process: rapid native attempts preserve outcomes across completion and moving dialogs',async t=>{
+test('RISK repository process: rapid native attempts preserve Add and asynchronous dialog outcomes',async t=>{
  const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});
  const output=fs.mkdtempSync(path.join(base,'rapid-actions-'));
- const scenarios=['rapid reset confirms once and retains the 400-task backup','rapid motion settings open and both choices respond','rapid Settings decision review offers Light and saves it while protecting failures','rapid prepared Export Copy and Download retain exact sources'];
+ const scenarios=['rapid Add and context actions with 400 saved tasks','rapid reset confirms once and retains the 400-task backup','rapid motion settings open and both choices respond','rapid Settings decision review offers Light and saves it while protecting failures','rapid prepared Export Copy and Download retain exact sources'];
  for(const engine of ['chromium','webkit'])for(const scenario of scenarios)await t.test(engine+' '+scenario,()=>{
   const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine',engine,'--output-dir',output,'--port',process.env.CHAIN_NATIVE_PORT||'0','--scenario',scenario],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:45000,maxBuffer:1024*1024});
   assert.equal(result.error,undefined);assert.equal(result.signal,null);assert.equal(result.status,0,'Rapid actions must preserve their independent outcome and reconcile ten native attempts: '+result.stderr);
   const paths=result.stdout.split('\n').map(line=>line.match(/^Button evidence: (.+)$/)?.[1]).filter(Boolean);assert.equal(paths.length,1);
-  const report=JSON.parse(fs.readFileSync(paths[0],'utf8'));assert.equal(report.status,'passed');assert.equal(report.scenarios.length,1);
+  const report=JSON.parse(fs.readFileSync(paths[0],'utf8'));assert.equal(report.status,'passed');assert.equal(report.scenarios.length,1);assert.equal(report.scenarios[0].name,scenario);
   assert.equal(report.scenarios[0].status,'passed');assert.equal(report.scenarios[0].setup.currentTasks,400);assert.equal(report.scenarios[0].setup.durableTasks,400);assert.equal(report.scenarios[0].setup.activeTasks,400);
   assert.ok(report.rapidOutcomes.length>0);for(const outcome of report.rapidOutcomes)for(const burst of outcome.bursts){assert.equal(burst.attempts,10);assert.equal(burst.trustedPresses,10);assert.ok(burst.windowMs<=2000);assert.equal(burst.unrelatedClicks,0);
   assert.ok(burst.acceptedClicks>=1&&burst.acceptedClicks<=10);assert.equal(burst.acceptedClicks+burst.refused+burst.disappeared,10);

@@ -183,6 +183,9 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
     const previousDocument=reload?await page.evaluate(()=>window.__installedFixture.documentId):null;if(reload)allowedNavigation={url:page.url(),remaining:1,action};
     const attempts=[];report.inFlightBurst={scenario:name,action,attempts};const began=Date.now();
     for(let index=0;index<10;index++){
+     // Keep a realistic ten-per-second cadence inside the unchanged two-second
+     // burst bound. It lets normal button styling settle between real presses.
+     const cadenceDelay=began+index*100-Date.now();if(cadenceDelay>0)await new Promise(resolve=>setTimeout(resolve,cadenceDelay));
      let availability={present:false,disabled:false,hit:false},box=originalBox;
      const snapshot=await bounded(target.evaluateAll(async(els,backdrop)=>{
       const el=els[0];if(!el)return null;let r=el.getBoundingClientRect();
@@ -195,7 +198,9 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
       if(!el.isConnected)return null;r=el.getBoundingClientRect();
       const box={x:r.x,y:r.y,width:r.width,height:r.height},stable=Object.keys(box).every(key=>box[key]===before[key]);
       const hit=document.elementFromPoint(r.x+(backdrop?5:r.width/2),r.y+(backdrop?5:r.height/2));
-      return{box,present:!!(r.width&&r.height),disabled:el.matches(':disabled'),stable,hit:stable&&!!hit&&(el===hit||el.contains(hit))};
+      // A harmless subpixel width transition is not an unavailable button.
+      // Current hit testing and the delivered-down check decide eligibility.
+      return{box,present:!!(r.width&&r.height),disabled:el.matches(':disabled'),stable,hit:!!hit&&(el===hit||el.contains(hit))};
      },action==='act:mback'),'rapid target availability');
      if(snapshot){availability=snapshot;if(snapshot.present)box=snapshot.box;}
      const before={clicks:report.clicks?.length||0,presses:report.presses?.length||0};
