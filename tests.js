@@ -14365,7 +14365,7 @@ test("UI: 'Return as candidate' stays disabled for an ordinary task with an orph
 });
 
 test("UI: unavailable Return as candidate has a grey button style", () => {
-  assert.match(styleSrc, /\.btn\.subtle:disabled\{[^}]*background:[^;}]*;[^}]*color:[^;}]*;[^}]*cursor:not-allowed/);
+  assert.match(styleSrc, /\.btn\.subtle:disabled(?:,[^{]+)?\{[^}]*background:light-dark\(#e8e8eb,#343840\);[^}]*color:light-dark\(#777b83,#9ba0aa\);[^}]*cursor:not-allowed/);
 });
 
 test("UI: 'Return as candidate' appears when the task is marked 'cant'", async () => {
@@ -26945,7 +26945,7 @@ test('Hourly prompts: 5:30 AM and every other hour require human copy, without d
  assert.equal(mood.message(new Date('2026-09-14T09:30:00Z'),'America/New_York',0),'My dawn line');
  assert.equal(mood.message(new Date('2026-09-14T10:00:00Z'),'America/New_York',0),'');
  assert.equal(mood.skywriterMessage(0),'SKY');
- assert.match(html,/<span id="sceneStatus"><\/span>/,'no AI placeholder before human text loads');
+ assert.match(html,/<span id="sceneStatus">(?:Scenery is loading\.)?<\/span>/,'no AI placeholder before human text loads');
 });
 
 test('Rail service: both lines run regularly in every season, even at night',()=>{
@@ -37968,7 +37968,7 @@ test('RISK Postpone: scan surfaces match neighboring decision button sizing with
  for(const woop of [false,true]){const {ctx,shim}=await loadApp({seed:998});ctx.state.settings.showPostpone=true;const t=ctx.addTask('Only remaining task',true);ctx.state.settings.lastTaskWoop=woop;ctx.state.mode='work';ctx.render();assertNeighbors(shim.elements.get('scan').innerHTML,'bench-postpone','bench-done',t.id);}
  const source=fs.readFileSync(new URL('./index.html',import.meta.url),'utf8');
  assert.match(source,/\.btn\.subtle\{background:var\(--surface\);color:var\(--ink\);border:1px solid var\(--line\);box-shadow:none;font-weight:600\}/,'unrelated Edit palette stays intact');
- assert.match(source,/\.btn\.subtle:disabled\{/,'shared disabled treatment remains available');
+ assert.match(source,/\.btn\.subtle:disabled(?:,[^{]+)?\{/,'shared disabled treatment remains available');
 });
 
 test('RISK Postpone: day paint stays white and night paint matches Edit on both scanner surfaces',async()=>{
@@ -37979,7 +37979,7 @@ test('RISK Postpone: day paint stays white and night paint matches Edit on both 
   assert.ok(classes?.includes('subtle')&&classes.includes('postpone'),'both mounted Postpone surfaces use their scoped theme treatment');
  }
  assert.match(html,/\.btn\.subtle\.postpone\{background:light-dark\(#fff,var\(--surface\)\);color:light-dark\(#20242b,var\(--ink\)\)\}/,'day paint remains white while night fill and ink reuse Edit theme tokens without overriding component geometry');
- assert.ok(html.indexOf('.btn.subtle.postpone{')<html.indexOf('.btn.subtle:disabled{'),'shared disabled palette still takes precedence');
+ assert.ok(html.indexOf('.btn.subtle.postpone{')<html.indexOf('.btn.subtle:disabled'),'shared disabled palette still takes precedence');
 });
 
 test('RISK Postpone layout: mounted duration field uses the bounded numeric Settings width',async()=>{
@@ -45309,7 +45309,7 @@ test('RISK repository process: capped mobile reports bind kernel memory distinct
 test('RISK repository process: required mobile memory evidence cannot be replaced by passing desktop groups',()=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
  const result=spawnSync(process.execPath,['--test','--test-name-pattern=^test group aggregate refuses a declared mobile memory story without a capped runtime report$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
- assert.equal(result.error,undefined);assert.equal(result.status,0,'The actual four-group aggregate must reject absent required mobile512MB proof: '+result.stdout+'\n'+result.stderr);
+ assert.equal(result.error,undefined);assert.equal(result.status,0,'The actual four-group aggregate must reject absent required1GB and reported512MB proof: '+result.stdout+'\n'+result.stderr);
 });
 
 test('RISK repository process: required parallel scanner aggregation rejects absent group evidence',()=>{
@@ -45632,7 +45632,7 @@ test('RISK repository process: retained native sources seed once without a persi
      }
      return result;
     };return page;};return context;};return browser;};
-  let result;try{result=await runButtonSafety({repo:__dirname,engine:'webkit',port:Number(process.env.CHAIN_NATIVE_PORT),outputDir:directory,...(mode==='ordinary'?{probe:true}:{mobileYesMotion:mode})});}
+  let result;try{result=await runButtonSafety({repo:__dirname,engine:'webkit',port:Number(process.env.CHAIN_NATIVE_PORT||0),outputDir:directory,...(mode==='ordinary'?{probe:true}:{mobileYesMotion:mode})});}
   finally{playwright.webkit.launch=launch;fs.writeFileSync(path.join(directory,'bootstrap-observation.json'),JSON.stringify({mode,persistent,guards},null,2)+'\n');}
   if(mode==='ordinary'){assert.equal(result.report.status,'passed');assert.equal(persistent.length,1,'nonretained setup retains its guarded persistent board seed');assert.ok(persistent[0].bytes>1048576);}
   else{verifyMobileFunctionalReport(result.report,{motion:mode});assert.deepEqual(persistent,[],'retained-copy native consumer must not serialize a full board into persistent context initialization');assert.equal(guards.length,2);const proof=result.report.retainedSources[0].bootstrap;assert.equal(proof.delivery,'observer-evaluate-once');assert.equal(proof.legacySeeded,true);assert.equal(proof.legacyBeforeHash,null);assert.equal(proof.legacyPayloadHash,proof.headPayloadHash);assert.ok(proof.headPayloadBytes>1048576);assert.equal(proof.retainedSources.length,2);}
@@ -45651,7 +45651,7 @@ test('RISK synced scene durability: native retained boards keep immediate scene 
    evidence.before=await snapshot();assert.equal(JSON.parse(evidence.before.tasks).length,400);assert.ok(evidence.before.payloadBytes>1048576);assert.equal(JSON.parse(evidence.before.backups).length,2);
    await page.locator('#appHeader [data-act="settings"]').click();await page.locator('[data-act="scene-time-settings"]').click();await page.locator('#sceneSeasonInput').selectOption('winter');await page.locator('#sceneTimeInput').fill('23:15');await page.locator('[data-scene-time="lock"]').click();await page.reload();await page.locator('#appHeader').waitFor({state:'visible'});await page.waitForFunction(()=>typeof applySyncedSceneTime==='function');evidence.after=await snapshot();assert.deepEqual(evidence.receipts,[{trusted:true}]);assert.equal(evidence.after.scene.time,'23:15','immediate reload keeps the scene lock in the authoritative board');assert.equal(evidence.after.scene.season,'winter');assert.deepEqual(evidence.after.visibleScene,evidence.after.scene);for(const key of ['tasks','storedTasks','backups','opaque','pending'])assert.equal(evidence.after[key],evidence.before[key],'immediate scene reload preserves exact '+key);
   }catch(error){probeFailure=error;}finally{await close(...args);}};return context;};return browser;};
-  let result;try{result=await runButtonSafety({repo:__dirname,engine:'webkit',port:Number(process.env.CHAIN_NATIVE_PORT),outputDir:directory,mobileYesMotion:motion});verifyMobileFunctionalReport(result.report,{motion});evidence.reportPath=result.reportPath;}
+  let result;try{result=await runButtonSafety({repo:__dirname,engine:'webkit',port:Number(process.env.CHAIN_NATIVE_PORT||0),outputDir:directory,mobileYesMotion:motion});verifyMobileFunctionalReport(result.report,{motion});evidence.reportPath=result.reportPath;}
   finally{playwright.webkit.launch=launch;evidence.failure=probeFailure?.stack;fs.writeFileSync(path.join(directory,'scene-durability-observation.json'),JSON.stringify(evidence,null,2)+'\n');}
   if(probeFailure)throw probeFailure;t.diagnostic('Uncapped actual native retained-board immediate scene reload: '+directory);
  });
@@ -45688,7 +45688,7 @@ test('RISK scenery startup: native mobile paints once while hidden return saved 
       evidence.observations.push({initial:original.initial,taskCount:original.taskCount,motion:original.motion,scene:original.clear.scene,clearBackSha256:createHash('sha256').update(original.clear.back).digest('hex'),clearFrontSha256:createHash('sha256').update(original.clear.front).digest('hex'),rainFrontSha256:createHash('sha256').update(original.rain.front).digest('hex'),resizedScene:resized.scene,saved});
      }}catch(error){probeFailure=error;}finally{await close(...args);}};return context;};return browser;
   };
-  let result;try{result=await runButtonSafety({repo:__dirname,engine:'webkit',port:Number(process.env.CHAIN_NATIVE_PORT),outputDir:directory,mobileYesMotion:motion});verifyMobileFunctionalReport(result.report,{motion});evidence.reportPath=result.reportPath;}
+  let result;try{result=await runButtonSafety({repo:__dirname,engine:'webkit',port:Number(process.env.CHAIN_NATIVE_PORT||0),outputDir:directory,mobileYesMotion:motion});verifyMobileFunctionalReport(result.report,{motion});evidence.reportPath=result.reportPath;}
   catch(error){runFailure=error;}finally{http.createServer=createServer;evidence.nativeCleanupBeforeFallback={browserConnected:ownedBrowser?.isConnected()===true,serverListening:ownedServer?.listening===true};if(ownedBrowser?.isConnected())await ownedBrowser.close();if(ownedServer?.listening)await new Promise(resolve=>ownedServer.close(resolve));playwright.webkit.launch=launch;evidence.probeFailure=probeFailure?.stack;evidence.runFailure=runFailure?.stack;fs.writeFileSync(path.join(directory,'scenery-observation.json'),JSON.stringify(evidence,null,2)+'\n');}
   if(failProbe){assert.deepEqual(evidence.nativeCleanupBeforeFallback,{browserConnected:false,serverListening:false},'Native runner closes its actual browser and listener before the external fallback');assert.match(probeFailure?.message||'',/^Controlled scenery probe failure retained$/);assert.equal(runFailure,undefined,'Probe failure must not interrupt native cleanup and persisted report');const report=JSON.parse(fs.readFileSync(result.reportPath));for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(report.cleanup[key],true,'Failed probe still requires '+key);assert.throws(()=>{throw probeFailure;},error=>error===probeFailure,'Original probe error is retained for failure after cleanup');return;}
   if(runFailure)throw runFailure;if(probeFailure)throw probeFailure;assert.equal(evidence.observations.length,1);assert.equal(evidence.observations[0].initial.background,1,'initial scene completes exactly one background paint');assert.equal(evidence.observations[0].initial.life,1,'initial scene completes exactly one life paint');
@@ -45945,7 +45945,7 @@ test('RISK repository process: mobile budget planner caps browsers before launch
  const browser=containerArgs({...common,role:'browser'}),driver=containerArgs({...common,role:'driver',browserContainerId:id});
  assert.equal(driver[driver.indexOf('--network')+1],'container:'+id,'Actual workload driver must share only the exact capped browser namespace');
  assert.equal(browser[browser.indexOf('--network')+1],'none');
- for(const flag of ['--memory','--memory-swap']){assert.equal(browser[browser.indexOf(flag)+1],'512000000');assert.equal(driver[driver.indexOf(flag)+1],'2147483648','Driver is separately bounded outside the browser budget');}
+ for(const flag of ['--memory','--memory-swap']){assert.equal(browser[browser.indexOf(flag)+1],'1000000000');assert.equal(driver[driver.indexOf(flag)+1],'2147483648','Driver is separately bounded outside the browser budget');}
  assert.ok(browser.includes('--browser-server'));assert.ok(driver.includes('--driver'));
  for(const args of [browser,driver]){assert.ok(args.includes('--read-only'));assert.equal(args[args.indexOf('--cap-drop')+1],'ALL');assert.match(args[args.indexOf('--user')+1],/^[1-9]\d*:[1-9]\d*$/);assert.equal(args.some(arg=>/docker\.sock|--privileged|--publish|--network=host|--ipc=host/.test(arg)),false);}
  assert.throws(()=>containerArgs({...common,role:'driver',browserContainerId:'another-owner'}),/container identity/i);
@@ -46000,4 +46000,85 @@ test('RISK repository process: pending mobile creates retain ownership until dae
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
  const result=spawnSync(process.execPath,['--test','scripts/agent-tools/mobile-memory-lifecycle.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:20000,maxBuffer:4*1024*1024});
  assert.equal(result.error,undefined);assert.equal(result.status,0,'Actual mobile CLI must retain unresolved late create ownership and clean positively identified objects: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# tests 5$/m);assert.match(result.stdout,/^# skipped 0$/m);
+});
+
+
+test('RISK repository process: expected native reload retries only its navigation context loss',async t=>{
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Allocated durable native output required');fs.mkdirSync(base,{recursive:true});
+ const playwright=await import('playwright'),launch=playwright.chromium.launch,{runButtonSafety}=await import('./scripts/button-safety-native.mjs');t.after(()=>{playwright.chromium.launch=launch;});
+ for(const mode of ['expected context loss','unrelated evaluation error','unexpected navigation'])await t.test(mode,async()=>{
+  const output=fs.mkdtempSync(path.join(base,'reload-observer-'));let injected=0;
+  // The real app click/reload and durable assertions run unchanged. At the
+  // automation boundary, deliver the context-loss race once deterministically.
+  playwright.chromium.launch=async(...args)=>{const browser=await launch.apply(playwright.chromium,args),newContext=browser.newContext.bind(browser);
+   browser.newContext=async(...args)=>{const context=await newContext(...args),newPage=context.newPage.bind(context);
+    context.newPage=async(...args)=>{const page=await newPage(...args),evaluate=page.evaluate.bind(page);
+     page.evaluate=async(fn,arg)=>{if(!injected&&typeof fn==='function'&&fn.toString().includes('window.__installedFixture?.documentId!==')){
+      injected++;if(mode==='unexpected navigation')await page.goto(new URL('/unexpected-observer-navigation',page.url()).href);
+      throw Error(mode==='unrelated evaluation error'?'Controlled unrelated evaluation error':'page.evaluate: Execution context was destroyed, most likely because of a navigation');
+     }return evaluate(fn,arg);};return page;};return context;};return browser;};
+  let result,failure;try{result=await runButtonSafety({repo:__dirname,engine:'chromium',outputDir:output,port:Number(process.env.CHAIN_NATIVE_PORT||0),scenarioFilter:'cloud retry, reload, and sign out preserve the device board during read failures'});}catch(error){failure=error;}finally{playwright.chromium.launch=launch;}
+  assert.equal(injected,1,'The controlled driver race reached the real expected-reload consumer');
+  const report=JSON.parse(fs.readFileSync(path.join(output,fs.readdirSync(output).find(name=>name.startsWith('button-safety-')))));
+  for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(report.cleanup[key],true,'Each outcome closes '+key);
+  if(mode==='expected context loss'){
+   assert.equal(failure,undefined,'One allowed reload must survive its transient automation context loss: '+failure);
+   assert.equal(result.report.status,'passed');assert.deepEqual(result.report.errors,[]);assert.equal(result.report.allowedNavigations.length,1);
+   assert.equal(result.report.scenarios[0].setup.currentTasks,400);assert.equal(result.report.scenarios[0].setup.durableTasks,400);
+  }else{assert.ok(failure,'Other evaluation failures and unexpected navigation still fail');assert.match(String(failure),mode==='unrelated evaluation error'?/Controlled unrelated evaluation error/:/unexpected-navigation-or-reload/);assert.equal(report.status,'failed');}
+  t.diagnostic('Actual cloud-read-failure reload consumer with controlled automation race: '+output);
+ });
+});
+
+
+test('RISK repository process: hosted direct native callers retain ephemeral listener defaults',()=>{
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable caller evidence required');fs.mkdirSync(base,{recursive:true});const output=fs.mkdtempSync(path.join(base,'ephemeral-caller-'));
+ // This subprocess tests the hosted-policy boundary; it is not hosted proof.
+ const env={...process.env,CI:'true',CHAIN_TEST_EVENT_POLICY:'canonical-pr-merge-v1',GITHUB_EVENT_NAME:'pull_request',GITHUB_REF:'refs/pull/1/merge',CHAIN_NATIVE_OUTPUT:output};delete env.CHAIN_NATIVE_PORT;delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-name-pattern=^(RISK repository process: retained native sources seed once without a persistent board bootstrap|RISK synced scene durability: native retained boards keep immediate scene locks through reload without changing tasks or sources|RISK scenery startup: native mobile paints once while hidden return saved choices resize and rain preserve the scene)$','tests.js'],{cwd:__dirname,env,encoding:'utf8',timeout:180000,maxBuffer:4*1024*1024});
+ assert.equal(result.error,undefined);assert.equal(result.signal,null);assert.equal(result.status,0,'Actual direct callers must pass an ephemeral port when the hosted environment has no local allocation: '+result.stdout+'\n'+result.stderr);
+ assert.match(result.stdout,/^# tests 13$/m);assert.match(result.stdout,/^# skipped 0$/m);
+});
+
+
+test('RISK scenery FAQ: mounted help names scene time without implementation details',async()=>{
+ const {ctx,shim}=await loadApp();await ctx.onAction('help',{});const mounted=shim.elements.get('modalRoot').innerHTML;
+ const answer=mounted.match(/<dt>How do I change the scenery\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.ok(answer,'Actual Quick start help contains the scenery answer');
+ assert.match(answer,/Settings.*motion.*scene time.*season.*sky location/);
+ assert.doesNotMatch(answer,/Opening avoids|repeated redraw/,'Help explains user controls without implementation work');
+ assert.match(answer,/Motion stays in this browser/);assert.match(answer,/task dates stay live/);assert.match(answer,/Reduced motion keeps scenery still/);
+});
+
+
+test('RISK repository process: required one GB and reported 512MB stress profiles cannot substitute for each other',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-name-pattern=mobile budget profiles|mobile stress CLI','scripts/agent-tools/mobile-memory.test.mjs','scripts/agent-tools/mobile-memory-stress-lifecycle.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:10000,maxBuffer:4*1024*1024});
+ assert.equal(result.error,undefined);assert.equal(result.status,0,'Actual public profile planners and immutable validators preserve required versus stress policy: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# skipped 0$/m);
+});
+
+
+test('RISK repository process: native burst preparation survives remounts without waiving missing or late input',async t=>{
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});
+ const playwright=await import('playwright'),launch=playwright.webkit.launch,{runButtonSafety}=await import('./scripts/button-safety-native.mjs');t.after(()=>{playwright.webkit.launch=launch;});
+ for(const mode of ['replaced target','missing target','late native input'])await t.test(mode,async()=>{
+  const output=fs.mkdtempSync(path.join(base,'burst-remount-'));let changed=0,delayed=0;
+  playwright.webkit.launch=async(...args)=>{const browser=await launch.apply(playwright.webkit,args),newContext=browser.newContext.bind(browser);
+   browser.newContext=async(...args)=>{const context=await newContext(...args),newPage=context.newPage.bind(context);
+    context.newPage=async(...args)=>{const page=await newPage(...args),locator=page.locator.bind(page),wrapped=new WeakSet();
+     const wrap=target=>{if(wrapped.has(target))return target;wrapped.add(target);const first=target.first.bind(target),scroll=target.scrollIntoViewIfNeeded.bind(target);
+      target.first=()=>wrap(first());target.scrollIntoViewIfNeeded=async(...args)=>{
+       if(mode!=='late native input'&&!changed){changed++;const old=await target.elementHandle();await target.evaluate((el,remove)=>{if(remove)el.remove();else el.replaceWith(el.cloneNode(true));},mode==='missing target');
+        // This is the actual Playwright stale-handle error after a real DOM
+        // replacement, not a synthesized failure string.
+        return old.scrollIntoViewIfNeeded(...args);
+       }return scroll(...args);
+      };return target;};page.locator=(...args)=>wrap(locator(...args));
+     const up=page.mouse.up.bind(page.mouse);page.mouse.up=async(...args)=>{if(mode==='late native input'&&!delayed){delayed++;await new Promise(resolve=>setTimeout(resolve,2100));}return up(...args);};return page;
+    };return context;};return browser;};
+  let result,failure;try{result=await runButtonSafety({repo:__dirname,engine:'webkit',port:Number(process.env.CHAIN_NATIVE_PORT||0),outputDir:output,scenarioFilter:'rapid motion settings open and both choices respond'});}catch(error){failure=error;}finally{playwright.webkit.launch=launch;}
+  const report=JSON.parse(fs.readFileSync(path.join(output,fs.readdirSync(output).find(name=>name.startsWith('button-safety-')))));for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(report.cleanup[key],true);
+  if(mode==='replaced target'){assert.equal(changed,1);assert.equal(failure,undefined,'A fresh mounted locator must survive the real preparation remount: '+failure);assert.equal(result.report.status,'passed');for(const row of report.rapidOutcomes)for(const burst of row.bursts){assert.equal(burst.trustedPresses,10);assert.ok(burst.windowMs<=2000);}}
+  else{assert.ok(failure,'Unavailable and late input must remain failed');assert.equal(report.status,'failed');if(mode==='missing target'){assert.equal(changed,1);assert.match(String(failure),/stalled responsiveness: rapid target scroll|Timeout/);}else{assert.equal(delayed,1);assert.match(String(failure),/Ten native press attempts must finish within two seconds/);assert.equal(report.inFlightBurst.attempts.length,10);assert.ok(report.inFlightBurst.windowMs>2000);}}
+  t.diagnostic('Actual native remount/input sensitivity evidence: '+output);
+ });
 });

@@ -181,7 +181,17 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
     const indexes=await page.locator(selector).first().evaluate(el=>{const all=[...document.querySelectorAll('details')],rows=[];for(let p=el.parentElement;p;p=p.parentElement)if(p.matches('details')&&!p.open&&!(el.matches('summary')&&el.parentElement===p))rows.unshift(all.indexOf(p));return rows;});
     for(const index of indexes){await step('details >> nth='+index+' >> :scope > summary',new Function('return document.querySelectorAll("details")['+index+']?.open===true'),'Expand containing disclosure');}
    };
-   const waitFor=async(expect,timeoutMs=2500,label='expected state')=>bounded((async()=>{while(true){if(await page.evaluate(expect)===true)return;await new Promise(resolve=>setTimeout(resolve,25));}})(),label,timeoutMs);
+   const waitFor=async(expect,timeoutMs=2500,label='expected state')=>bounded((async()=>{while(true){
+    try{if(await page.evaluate(expect)===true)return;}
+    catch(error){
+     // A permitted reload can retire the context between click and readback.
+     // Only that transient driver failure is retried; navigation accounting,
+     // page errors, durable outcomes and the original deadline remain required.
+     if(!allowedNavigation||!/Execution context was destroyed, most likely because of a navigation/.test(error.message))throw error;
+     check();
+    }
+    await new Promise(resolve=>setTimeout(resolve,25));
+   }})(),label,timeoutMs);
    const step=async(selector,expect,description=selector,clickOptions={})=>{
     await expose(selector);const target=page.locator(selector).first();
     const action=await target.evaluate(actionFor);assert.ok(action,'Passive inert appearance replicas cannot earn action coverage');const before=report.clicks?.length||0;
@@ -230,7 +240,11 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
    const burst=async(actionName,expect,{selector,semantics,expectedAccepted=10,reload=false}={})=>{
     assert.ok(typeof semantics==='string'&&semantics.length>=10,'Explicit independent repeated-effect semantics required');
     selector??='[data-act="'+actionName+'"]';if(!selector.startsWith('#')&&await page.locator('#modalRoot '+selector).count())selector='#modalRoot '+selector;
-    await expose(selector);const target=page.locator(selector).first();await bounded(target.scrollIntoViewIfNeeded(),'rapid target scroll');const originalBox=await target.boundingBox();assert.ok(originalBox,'Rapid target is initially rendered');
+    await expose(selector);const target=page.locator(selector).first();
+    const originalBox=await bounded((async()=>{for(;;){
+     try{await target.scrollIntoViewIfNeeded();return await target.boundingBox();}
+     catch(error){if(!/Element is not attached to the DOM/.test(error.message))throw error;check();await new Promise(resolve=>setTimeout(resolve,25));}
+    }})(),'rapid target scroll');assert.ok(originalBox,'Rapid target is initially rendered');
     const action=await target.evaluate(actionFor);assert.ok(action===actionName||action==='act:'+actionName,'Rapid target action must match independent family');
     await page.evaluate(()=>{window.__buttonHeartbeat.maxGapMs=0;window.__buttonHeartbeat.at=performance.now();});const start={presses:report.presses?.length||0,clicks:report.clicks?.length||0};
     const previousDocument=reload?await page.evaluate(()=>window.__installedFixture.documentId):null;if(reload)allowedNavigation={url:page.url(),remaining:1,action};
@@ -288,7 +302,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
      await bounded(page.evaluate(()=>true),'rapid native receipt');const recentClicks=(report.clicks||[]).slice(before.clicks);const unrelated=recentClicks.filter(row=>row.action!==null&&row.action!==action);assert.deepEqual(unrelated,[],'Rapid attempt activated a different app action');const received={presses:(report.presses||[]).slice(before.presses),clicks:recentClicks.filter(row=>row.action===action)};
      attempts.push({index,availability,nativeDownAction:down.action,neutralDocumentId,neutralRelease:!availability.present||!availability.hit||availability.disabled||!down.canRelease,trustedPresses:received.presses.length,acceptedClicks:received.clicks.length,classification:received.clicks.length?'accepted':availability.present?'refused':'disappeared',at:received.presses[0]?.at});
     }
-    const finished=Date.now();const presses=(report.presses||[]).slice(start.presses);
+    const finished=Date.now();report.inFlightBurst.windowMs=finished-began;const presses=(report.presses||[]).slice(start.presses);
     assert.equal(presses.length,10,'Ten browser-trusted native press receipts: '+actionName);
     assert.ok(finished-began<=2000,'Ten native press attempts must finish within two seconds: '+actionName+' '+(finished-began)+'ms');
     await waitFor(expect,12000,'rapid outcome '+actionName);await bounded(page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(resolve))),'rapid response '+actionName);check();

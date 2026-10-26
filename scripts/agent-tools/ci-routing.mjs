@@ -65,7 +65,7 @@ async function main() {
     if(/^  mobile-memory:\s*$/m.test(workflow)){
       const jobs=[...workflow.matchAll(/^  ([a-z][a-z0-9-]*):\s*$/gm)].map(match=>match[1]).filter(id=>!['push','pull_request'].includes(id));
       const job=id=>workflow.split(new RegExp('^  '+id+':\\s*$','m'))[1]?.split(/^  [a-z][a-z0-9-]*:\s*$/m)[0]||'';
-      if(JSON.stringify(jobs)!==JSON.stringify(['validation-context','event-gates','cohort-routing','regression','mobile-memory','scanner-tests','release-evidence','deploy-pages'])||!/^    name: mobile-WebKit-512MB$/m.test(job('mobile-memory'))||!/^    needs: \[validation-context, event-gates, cohort-routing, regression, mobile-memory\]$/m.test(job('scanner-tests')))throw new Error('Unknown required mobile producer topology.');
+      if(JSON.stringify(jobs)!==JSON.stringify(['validation-context','event-gates','cohort-routing','regression','mobile-memory','scanner-tests','release-evidence','deploy-pages'])||!/^    name: mobile-WebKit-1GB-and-512MB-stress$/m.test(job('mobile-memory'))||!/^    needs: \[validation-context, event-gates, cohort-routing, regression, mobile-memory\]$/m.test(job('scanner-tests')))throw new Error('Unknown required mobile producer topology.');
       mobileProducer=true;
     }
     cohort={requiredCohort:'four-groups-v1',cohortDigestSha256:identity.cohortDigestSha256,inventorySha256:identity.inventorySha256,assignmentsSha256:identity.assignmentsSha256,expectedGroups:identity.expectedGroups,workflowBlob:git('rev-parse',`${checkoutSha}:${workflowPath}`)};
@@ -153,7 +153,7 @@ async function main() {
           record.decision = 'fail'; record.reason = `Exact producer ${run.id}/${run.run_attempt} concluded ${run.conclusion}.`; break;
         }
         if(cohort){
-          const required=['validation-context','event-gates','cohort-routing',...cohort.expectedGroups.map(id=>'regression-'+id),...(mobileProducer?['mobile-WebKit-512MB']:[]),'scanner-tests'];
+          const required=['validation-context','event-gates','cohort-routing',...cohort.expectedGroups.map(id=>'regression-'+id),...(mobileProducer?['mobile-WebKit-1GB-and-512MB-stress']:[]),'scanner-tests'];
           for(const name of required){
             const matches=result.jobs.filter(job=>job.name===name);
             if(matches.length!==1)throw new Error('Producer required topology is incomplete or ambiguous.');

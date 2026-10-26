@@ -213,7 +213,7 @@ This is an emulated mobile WebKit client, not physical iPhone or private-board p
 
 The pinned official Playwright image and matching package run a minimal Node 22
 `launchServer` owner in a browser container. Its Linux cgroup v2 limit is exactly
-**512,000,000 bytes**, with zero swap allowance and use, before any WebKit process
+**1,000,000,000 bytes**, with zero swap allowance and use, before any WebKit process
 launches. Every browser descendant plus the minimal protocol-server Node shares
 this cap; including that Node is conservative evidence for the browser budget.
 The actual workload driver and fixture HTTP server run in a separate container,
@@ -222,7 +222,7 @@ container's network-none loopback namespace. Neither container exposes a host po
 Docker socket or writable cgroup mount; both retain nonroot UID, dropped
 capabilities, read-only root and private tmpfs/shm.
 
-A fresh pair first proves a real kernel OOM kill of a child committing 1 GiB
+A fresh pair first proves a real kernel OOM kill of a child committing more than twice its profile limit
 **inside the live browser's capped group**. Normal and Reduced each use a new
 browser/driver pair and retain the complete 400-task, 1 MiB unknown-field,
 two-backup, opaque-source and pending-upload fixture and all original timing and
@@ -230,12 +230,22 @@ rendering checks. Successful browser cases must have no OOM events and a peak
 within the budget. Owner `BrowserServer.close()` and actual engine/container exit
 are required; remote `Browser.close()` alone is only a disconnection.
 
-Schema version 2 records `browser-family-plus-minimal-protocol-server`, separate
+Schema version 3 records immutable `required-1gb` and `stress-512mb` profiles and `browser-family-plus-minimal-protocol-server`, separate
 container roles, actual host cgroup/net namespace identities, observed browser
 process start identities and executable hashes, pinned image resolution, raw
 limits, kernel OOM proof and durable native results. Complete artifact hashes,
 source/tree/run identity and both owned-container removals accompany the report.
-Version 1 whole-container failures remain preserved and cannot be relabeled.
+Historical version1 whole-container and version2 512MB browser-family failures remain preserved and cannot be relabeled.
+
+The required1GB profile must pass every original functional and cleanup check.
+A separately recorded512,000,000-byte stress profile also runs a fresh live-WebKit
+kernel OOM control and attempts both motions, even if Normal fails. Its original
+native report keeps any application crash, observed blocked frame or ten-touch
+deadline failure as a failed stress outcome. Such measured app failures are
+nonblocking; missing execution, source/profile mismatch, driver, transport,
+control or cleanup faults remain invalid. Passing stress cannot substitute for
+required proof. The aggregate requires both independently hashed, exact-source
+bundles; no arbitrary budget input or historical report relabeling is admitted.
 
 `scanner-tests` consumes this job and its complete artifact bundle independently
 of the four test groups, including when their full-producer result is reused.
@@ -256,6 +266,6 @@ explicit event/ref check, and the capped child receives all three values. Raw
 `push`/`pull_request` fixture labels remain supported only with matching hosted
 context. Invalid/missing/local admission cannot waive resource or kernel limits.
 For the current workflow, complete-producer reuse also requires the exact successful
-`mobile-WebKit-512MB` job from the producer run/attempt/source; absent, incomplete,
+`mobile-WebKit-1GB-and-512MB-stress` job from the producer run/attempt/source; absent, incomplete,
 failed or ambiguous evidence falls back to a fresh complete cohort. Local
 admission/artifact fixtures never establish an actual hosted cap pass.

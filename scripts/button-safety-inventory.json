@@ -9,8 +9,11 @@
     "yesCount": 10,
     "distinctTasks": true,
     "windowMs": 2000,
-    "memoryBudgetBytes": 512000000,
-    "motions": ["normal", "reduced"]
+    "memoryBudgetBytes": 1000000000,
+    "motions": [
+      "normal",
+      "reduced"
+    ]
   },
   "requiredActions": [
     "act:add",

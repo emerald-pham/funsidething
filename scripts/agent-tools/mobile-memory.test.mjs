@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {verifyMobileMemoryReport,MOBILE_IMAGE} from '../button-safety-mobile-contract.mjs';
+import {verifyMobileMemoryReport,verifyMobileStressReport,MOBILE_IMAGE} from '../button-safety-mobile-contract.mjs';
 import {readMemoryBoundary,containerArgs} from '../button-safety-mobile-memory.mjs';
 import {createMobileBundle,refreshMobileBundle} from './mobile-memory-fixture.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
@@ -16,7 +16,7 @@ test('mobile memory parser rejects waived limits synthetic touch and mismatched 
  const mutations=[
   ['unbounded or enlarged memory',b=>b.report.cases[0].after.memoryMaxBytes=1024000000],
   ['swappable client',b=>b.report.cases[0].after.swapMaxBytes=512000000],
-  ['peak above budget',b=>b.report.cases[0].after.peakBytes=512004096],
+  ['peak above budget',b=>b.report.cases[0].after.peakBytes=1000004096],
   ['fake OOM negative control',b=>b.report.negativeControl.after.events.oom_kill=0],
   ['unconfirmed control exit',b=>b.report.negativeControl.childSignal='SIGTERM'],
   ['reused container',b=>b.report.cases[1].containerId=b.report.cases[0].containerId],
@@ -39,15 +39,15 @@ test('mobile memory parser rejects waived limits synthetic touch and mismatched 
 });
 test('mobile memory boundary refuses unsupported or unbounded runtimes before native launch',()=>{
  assert.throws(()=>readMemoryBoundary({platform:'darwin',read:()=>assert.fail('Darwin must not invent cgroup evidence')}),/Linux cgroup-v2/);
- const files={'memory.max':'512000000','memory.swap.max':'0','memory.swap.current':'0','memory.current':'20000000','memory.peak':'30000000','memory.events':'max 0\noom 0\noom_kill 0','/proc/self/cgroup':'0::/'};
- const read=file=>files[file]??files[path.basename(file)];assert.equal(readMemoryBoundary({platform:'linux',read}).memoryMaxBytes,512000000);
+ const files={'memory.max':'1000000000','memory.swap.max':'0','memory.swap.current':'0','memory.current':'20000000','memory.peak':'30000000','memory.events':'max 0\noom 0\noom_kill 0','/proc/self/cgroup':'0::/'};
+ const read=file=>files[file]??files[path.basename(file)];assert.equal(readMemoryBoundary({platform:'linux',read}).memoryMaxBytes,1000000000);
  for(const [key,value]of [['memory.max','max'],['memory.max','1024000000'],['memory.swap.max','max'],['memory.swap.max','512000000']])assert.throws(()=>readMemoryBoundary({platform:'linux',read:file=>path.basename(file)===key?value:read(file)}));
 });
 test('mobile memory command cannot run a pretend local cap and pins the owned container boundary',t=>{
  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'chain-mobile-refusal-'));t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
  const result=spawnSync(process.execPath,['scripts/button-safety-mobile-memory.mjs','--run','--output-dir',path.join(directory,'proof')],{cwd:root,env:{...process.env,CI:'false'},encoding:'utf8',timeout:5000});assert.notEqual(result.status,0);assert.match(result.stderr,/hosted Linux/);assert.equal(fs.existsSync(path.join(directory,'proof')),false);
  const args=containerArgs({repo:'/synthetic/repo',output:'/synthetic/output',nodeBinary:'/synthetic/node22',motion:'normal',control:false,eventPolicy:'push'});
- for(const name of ['--memory','--memory-swap'])assert.equal(args[args.indexOf(name)+1],'512000000');assert.equal(args[args.indexOf('--network')+1],'none');assert.ok(args.includes(MOBILE_IMAGE));assert.ok(args.includes('/opt/chain-node'));assert.equal(args.includes('--privileged'),false);assert.equal(args.includes('--ipc=host'),false);assert.equal(args.some(value=>value.includes('docker.sock')),false);
+ for(const name of ['--memory','--memory-swap'])assert.equal(args[args.indexOf(name)+1],'1000000000');assert.equal(args[args.indexOf('--network')+1],'none');assert.ok(args.includes(MOBILE_IMAGE));assert.ok(args.includes('/opt/chain-node'));assert.equal(args.includes('--privileged'),false);assert.equal(args.includes('--ipc=host'),false);assert.equal(args.some(value=>value.includes('docker.sock')),false);
 });
 
 test('mobile memory intentional OOM control binds the Docker flag while clients reject it',async t=>{
@@ -71,4 +71,43 @@ test('mobile memory parser rejects changed final browser or driver container iso
   row.dockerAfterSha256=(await import('../button-safety-mobile-contract.mjs')).mobileDigest(fs.readFileSync(file));bundle.report.artifacts=(await import('../button-safety-mobile-contract.mjs')).mobileArtifactInventory(bundle.directory);
   assert.throws(()=>verify(bundle),'Rehashed post-run Docker configuration cannot relax the observed budget/isolation');
  });
+});
+
+
+test('mobile budget profiles require one decimal GB without accepting the reported stress limit',t=>{
+ const args=containerArgs({repo:'/synthetic/repo',output:'/synthetic/output',nodeBinary:'/synthetic/node22',motion:'normal',eventPolicy:'push'});
+ assert.equal(args[args.indexOf('--memory')+1],'1000000000','Required browser-family planner uses the newly authorized1GB cap from launch');
+ const bundle=fixture(t);assert.equal(bundle.report.schemaVersion,3,'New policy has its own schema; historical512MB reports stay historical');assert.equal(bundle.report.budgetProfile,'required-1gb');assert.equal(bundle.report.requiredStory.memoryBudgetBytes,1000000000);
+ assert.equal(verify(bundle).status,'passed');
+ const stress=containerArgs({repo:'/synthetic/repo',output:'/synthetic/output',nodeBinary:'/synthetic/node22',motion:'normal',eventPolicy:'push',budgetProfile:'stress-512mb'});assert.equal(stress[stress.indexOf('--memory')+1],'512000000');
+ assert.throws(()=>containerArgs({repo:'/synthetic/repo',output:'/synthetic/output',nodeBinary:'/synthetic/node22',eventPolicy:'push',budgetProfile:'arbitrary-limit'}),/profile/);
+ for(const mutate of [b=>b.report.budgetProfile='stress-512mb',b=>b.report.cases[0].after.memoryMaxBytes=512000000,b=>b.report.schemaVersion=2]){const b=fixture(t);mutate(b);refreshMobileBundle(b);assert.throws(()=>verify(b),'Required gate rejects changed profile, numeric boundary and legacy relabeling');}
+});
+
+
+test('mobile budget profiles report authentic stress application failures without waiving execution integrity',async t=>{
+ const make=()=>{const directory=fs.mkdtempSync(path.join(os.tmpdir(),'chain-stress-parser-'));t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));return createMobileBundle(directory,{},'stress-512mb');};
+ const verifyStress=b=>verifyMobileStressReport(b.report,{artifactRoot:b.directory});
+ const passed=make();assert.equal(verifyStress(passed).status,'passed','A complete stress pass is reportable but cannot substitute for required proof');assert.throws(()=>verify(passed));
+ const fail=(b,kind)=>{const row=b.report.cases[0],n=b.native.normal;b.report.status='failed';row.appOutcome=kind;n.status='failed';
+  if(kind==='kernel-oom'){row.after.events={max:1,oom:1,oom_kill:1};row.containerOOMKilled=true;row.server.status='failed';row.server.errors=['Browser budget OOM: oom','Browser budget OOM: oom_kill'];n.errors=['page-crash'];n.failure='page.goto: Page crashed';}
+  else if(kind==='app-runtime-failure'){n.errors=['page-crash'];n.failure='Page crashed';}
+  else{n.samples=[{maxFrameGapMs:1001}];n.failure='AssertionError: Native button safety detected blocked frame loop: start-scan 1001ms';}
+  refreshMobileBundle(b);return b;};
+ for(const kind of ['kernel-oom','app-runtime-failure','app-budget-failure'])await t.test(kind,()=>{const b=fail(make(),kind);assert.equal(verifyStress(b).status,'failed');assert.throws(()=>verify(b));});
+ await t.test('ten-touch deadline requires ten actually delivered trusted attempts',()=>{
+  const b=fail(make(),'app-budget-failure'),n=b.native.normal;n.samples=[];n.inFlightBurst={windowMs:2001,attempts:Array.from({length:10},()=>({trustedPresses:1,nativeDownAction:'act:yes'}))};n.failure='AssertionError: Ten native press attempts must finish within two seconds: yes 2001ms';refreshMobileBundle(b);assert.equal(verifyStress(b).status,'failed','The raw measured deadline failure stays reported');
+  n.presses.pop();refreshMobileBundle(b);assert.throws(()=>verifyStress(b),'A missing native input cannot be waived as a measured ten-touch deadline breach');
+ });
+ const invalids={
+  'missing execution':b=>b.report.cases.pop(),
+  'waived driver failure':b=>b.report.cases[0].driver.containerExitCode=1,
+  'transport error':b=>{b.native.normal.errors=[];b.native.normal.failure='Browser endpoint transport refused';},
+  'failed owner cleanup':b=>b.report.cases[0].server.cleanup.engineExited=false,
+  'fake OOM':b=>{b.report.cases[0].after.events.oom_kill=0;b.native.normal.errors=[];},
+  'changed profile':b=>b.report.budgetProfile='required-1gb',
+  'changed source':b=>b.native.normal.candidateCommit='0'.repeat(40),
+  'fake failed stress label':b=>b.native.normal.status='passed',
+ };
+ for(const [name,mutate]of Object.entries(invalids))await t.test(name,()=>{const b=fail(make(),'kernel-oom');mutate(b);refreshMobileBundle(b);assert.throws(()=>verifyStress(b),name);});
 });

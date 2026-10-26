@@ -34,7 +34,7 @@ function parseArgs(argv) {
   const keyMap = new Map([
     ['--group', 'group'], ['--output-dir', 'outputDir'], ['--repository', 'repository'],
     ['--event-policy', 'eventPolicy'], ['--run-id', 'runId'], ['--run-attempt', 'runAttempt'],
-    ['--source-sha', 'sourceSha'], ['--mobile-report','mobileReport'], ['--comparison-base', 'comparisonBase'], ['--results-dir','resultsDir'], ['--needs-json','needsJson'], ['--proof','proof'],
+    ['--source-sha', 'sourceSha'], ['--mobile-stress-report','mobileStressReport'], ['--mobile-report','mobileReport'], ['--comparison-base', 'comparisonBase'], ['--results-dir','resultsDir'], ['--needs-json','needsJson'], ['--proof','proof'],
   ]);
   for (let index = 0; index < argv.length; index++) {
     if (['--describe','--aggregate','--covered'].includes(argv[index])) { values[argv[index].slice(2)] = true; continue; }
@@ -688,7 +688,7 @@ async function aggregateResults({options, outputDir, descriptor, inventory, assi
   const mobileInventory=path.join(ROOT,'scripts/button-safety-inventory.json');
   const mobilePolicy=fs.existsSync(mobileInventory)?readJson(mobileInventory,'mobile story policy').requiredMobileStory:null;
   if(fs.existsSync(mobileInventory)||descriptor.groups.some(group=>group.roots.includes('RISK repository process: mobile WebKit accepts ten distinct offered tasks using real touch'))){
-    try{const {MOBILE_STORY}=await import('./button-safety-mobile-contract.mjs');if(!mobilePolicy||Object.keys(MOBILE_STORY).some(key=>JSON.stringify(mobilePolicy[key])!==JSON.stringify(MOBILE_STORY[key])))issues.push('Mobile memory policy cannot waive required512MB/motion/Yes workload.');}catch(error){issues.push('Mobile memory policy unavailable: '+error.message);}
+    try{const {MOBILE_STORY}=await import('./button-safety-mobile-contract.mjs');if(!mobilePolicy||Object.keys(MOBILE_STORY).some(key=>JSON.stringify(mobilePolicy[key])!==JSON.stringify(MOBILE_STORY[key])))issues.push('Mobile memory policy cannot waive required1GB/reported512MB/motion/Yes workload.');}catch(error){issues.push('Mobile memory policy unavailable: '+error.message);}
     if(needs['mobile-memory']?.result!=='success')issues.push('Required mobile memory job did not succeed.');
     if(!options.mobileReport)issues.push('Required capped mobile memory report is missing.');
     else try{
@@ -696,6 +696,10 @@ async function aggregateResults({options, outputDir, descriptor, inventory, assi
       const mobileReport=readJson(options.mobileReport,'capped mobile memory report');
       verifyMobileMemoryReport(mobileReport,{artifactRoot:path.dirname(path.resolve(options.mobileReport)),candidateCommit:descriptor.resultIdentity.checkoutSha,candidateTree:descriptor.resultIdentity.checkoutTree,sourceSha:options.sourceSha,repository:options.repository,runId:options.runId,runAttempt:options.runAttempt,eventPolicy:options.eventPolicy});
       mobileMemory={reportSha256:sha256(fs.readFileSync(options.mobileReport)),candidateCommit:mobileReport.candidateCommit,candidateTree:mobileReport.candidateTree,image:mobileReport.image,cases:mobileReport.cases.length,artifactCount:mobileReport.artifacts.length};
+      if(!options.mobileStressReport)throw Error('Required reported stress execution bundle is missing.');
+      const {verifyMobileStressReport}=await import('./button-safety-mobile-contract.mjs'),stress=readJson(options.mobileStressReport,'reported512MB stress report');
+      verifyMobileStressReport(stress,{artifactRoot:path.dirname(path.resolve(options.mobileStressReport)),candidateCommit:descriptor.resultIdentity.checkoutSha,candidateTree:descriptor.resultIdentity.checkoutTree,sourceSha:options.sourceSha,repository:options.repository,runId:options.runId,runAttempt:options.runAttempt,eventPolicy:options.eventPolicy});
+      mobileMemory.stress={reportSha256:sha256(fs.readFileSync(options.mobileStressReport)),status:stress.status,cases:stress.cases.map(row=>({motion:row.motion,outcome:row.appOutcome})),artifactCount:stress.artifacts.length};
     }catch(error){issues.push('Mobile memory report: '+error.message);}
   }
   const covered=needs['cohort-routing']?.outputs?.decision==='reuse';

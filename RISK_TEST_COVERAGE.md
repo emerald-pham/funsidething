@@ -2315,3 +2315,13 @@ The command/report consumer rejects missing, duplicate, skipped, cancelled, unre
 - RISK repository process: remote mobile consumer waits for browser owner exit after disconnect
 
 - RISK repository process: pending mobile creates retain ownership until daemon completion and owned removal
+
+## Exact candidate qualification repairs
+
+- RISK repository process: expected native reload retries only its navigation context loss
+- RISK repository process: hosted direct native callers retain ephemeral listener defaults
+- RISK scenery FAQ: mounted help names scene time without implementation details
+
+- RISK repository process: required one GB and reported 512MB stress profiles cannot substitute for each other
+
+- RISK repository process: native burst preparation survives remounts without waiving missing or late input
