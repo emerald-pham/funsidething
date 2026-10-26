@@ -2301,3 +2301,5 @@ The command/report consumer rejects missing, duplicate, skipped, cancelled, unre
 - RISK repository process: mobile artifact consumers require reviewed runtime asset hashes
 
 - RISK scenery startup: native mobile paints once while hidden return saved choices resize and rain preserve the scene
+
+- RISK repository process: retained native sources seed once without a persistent board bootstrap

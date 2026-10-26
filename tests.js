@@ -45606,6 +45606,35 @@ test('RISK repository process: rapid native attempts preserve Add and asynchrono
  });
 });
 
+test('RISK repository process: retained native sources seed once without a persistent board bootstrap',async t=>{
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});const output=fs.mkdtempSync(path.join(base,'observer-bootstrap-'));
+ const playwright=await import('playwright'),launch=playwright.webkit.launch,{runButtonSafety}=await import('./scripts/button-safety-native.mjs'),{verifyMobileFunctionalReport}=await import('./scripts/button-safety-mobile-contract.mjs');t.after(()=>{playwright.webkit.launch=launch;});
+ for(const mode of ['normal','reduced','ordinary'])await t.test(mode,async()=>{
+  const persistent=[],guards=[],directory=path.join(output,mode);fs.mkdirSync(directory,{recursive:true});
+  playwright.webkit.launch=async(...args)=>{const browser=await launch.apply(playwright.webkit,args),newContext=browser.newContext.bind(browser);
+   browser.newContext=async(...args)=>{const context=await newContext(...args),add=context.addInitScript.bind(context),newPage=context.newPage.bind(context);
+    context.addInitScript=async(script,arg)=>{if(arg&&Object.hasOwn(arg,'board'))persistent.push({bytes:Buffer.byteLength(JSON.stringify(arg.board)),sha256:createHash('sha256').update(JSON.stringify(arg.board)).digest('hex')});return add(script,arg);};
+    context.newPage=async(...args)=>{const page=await newPage(...args),evaluate=page.evaluate.bind(page);page.evaluate=async(fn,arg)=>{
+     const result=await evaluate(fn,arg);
+     if(arg?.board&&arg?.count&&result?.bootstrap){
+      const prior=await evaluate(()=>({legacy:localStorage.getItem('fvp:chain-scanner:v1'),marker:localStorage.getItem('fvp:chain-scanner:device-store-v2')}));
+      try{for(const kind of ['existing legacy','existing device marker']){
+       await evaluate(({kind,legacy})=>{localStorage.removeItem('fvp:chain-scanner:device-store-v2');localStorage.removeItem('fvp:chain-scanner:v1');if(kind==='existing legacy')localStorage.setItem('fvp:chain-scanner:v1',legacy);else localStorage.setItem('fvp:chain-scanner:device-store-v2','guard-marker');},{kind,legacy:JSON.stringify({...arg.board,guardedOriginal:true})});
+       const before=await evaluate(()=>localStorage.getItem('fvp:chain-scanner:v1')),dbName=arg.dbName+'-'+kind.replaceAll(' ','-'),proof=await evaluate(fn,{...arg,dbName});
+       assert.equal(proof.bootstrap.legacySeeded,false,'existing legacy/marker must decline new seed');assert.equal(await evaluate(()=>localStorage.getItem('fvp:chain-scanner:v1')),before,'guarded exact legacy bytes remain untouched');guards.push({kind,legacySeeded:proof.bootstrap.legacySeeded,headPayloadHash:proof.bootstrap.headPayloadHash});
+       await evaluate(dbName=>new Promise((resolve,reject)=>{const request=indexedDB.deleteDatabase(dbName);request.onsuccess=()=>resolve();request.onerror=()=>reject(request.error);}),dbName);
+      }}finally{await evaluate(prior=>{for(const [key,value]of [['fvp:chain-scanner:v1',prior.legacy],['fvp:chain-scanner:device-store-v2',prior.marker]])if(value===null)localStorage.removeItem(key);else localStorage.setItem(key,value);},prior);}
+     }
+     return result;
+    };return page;};return context;};return browser;};
+  let result;try{result=await runButtonSafety({repo:__dirname,engine:'webkit',port:Number(process.env.CHAIN_NATIVE_PORT),outputDir:directory,...(mode==='ordinary'?{probe:true}:{mobileYesMotion:mode})});}
+  finally{playwright.webkit.launch=launch;fs.writeFileSync(path.join(directory,'bootstrap-observation.json'),JSON.stringify({mode,persistent,guards},null,2)+'\n');}
+  if(mode==='ordinary'){assert.equal(result.report.status,'passed');assert.equal(persistent.length,1,'nonretained setup retains its guarded persistent board seed');assert.ok(persistent[0].bytes>1048576);}
+  else{verifyMobileFunctionalReport(result.report,{motion:mode});assert.deepEqual(persistent,[],'retained-copy native consumer must not serialize a full board into persistent context initialization');assert.equal(guards.length,2);const proof=result.report.retainedSources[0].bootstrap;assert.equal(proof.delivery,'observer-evaluate-once');assert.equal(proof.legacySeeded,true);assert.equal(proof.legacyBeforeHash,null);assert.equal(proof.legacyPayloadHash,proof.headPayloadHash);assert.ok(proof.headPayloadBytes>1048576);assert.equal(proof.retainedSources.length,2);}
+  t.diagnostic('Uncapped actual native bootstrap and guarded source readbacks: '+directory);
+ });
+});
+
 test('RISK scenery startup: native mobile paints once while hidden return saved choices resize and rain preserve the scene',async t=>{
  const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});const output=fs.mkdtempSync(path.join(base,'scenery-startup-'));
  const playwright=await import('playwright'),launch=playwright.webkit.launch,{runButtonSafety}=await import('./scripts/button-safety-native.mjs'),{verifyMobileFunctionalReport}=await import('./scripts/button-safety-mobile-contract.mjs');

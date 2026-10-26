@@ -89,13 +89,18 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
    // The neutral pointer-release iframe must never reseed shared browser
    // preferences or app storage while a button burst is in progress.
    await context.addInitScript({content:'if(window.top===window){('+browserInit.toString()+')('+JSON.stringify({dbName,authMode:options.authMode||'signed-out',sdkBase:origin+sdk})+');'+(mobileYesMotion?'localStorage.setItem("fvp:chain-scanner:landscape-motion",JSON.stringify({choice:'+JSON.stringify(mobileYesMotion)+',savedAt:Date.now()}));':'')+'}'});
-   await context.addInitScript(({board,clipboardFail,clipboardDeferred,geoFail})=>{
+   // Retained sources are seeded once in the observer below, not serialized
+   // into every later page/frame bootstrap. Ordinary fixtures keep their seed.
+   if(!options.retainedCopies)await context.addInitScript(({board})=>{
     if(window.top!==window)return;
     if(!localStorage.getItem('fvp:chain-scanner:device-store-v2')&&localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',JSON.stringify(board));
+   },{board});
+   await context.addInitScript(({clipboardFail,clipboardDeferred,geoFail})=>{
+    if(window.top!==window)return;
     window.__buttonClipboard=[];window.__buttonClipboardPending=[];
     Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{if(clipboardFail)throw new DOMException('Synthetic clipboard permission refused','NotAllowedError');window.__buttonClipboard.push(text);if(clipboardDeferred)await new Promise((resolve,reject)=>window.__buttonClipboardPending.push({resolve,reject}));}}});
     Object.defineProperty(navigator,'geolocation',{configurable:true,value:{getCurrentPosition:(success,failure)=>geoFail?failure?.({code:1,message:'Synthetic location refused'}):success({coords:{latitude:40.7,longitude:-74,accuracy:20}})}});
-   },{board,clipboardFail:options.clipboardFail,clipboardDeferred:options.clipboardDeferred,geoFail:options.geoFail});
+   },{clipboardFail:options.clipboardFail,clipboardDeferred:options.clipboardDeferred,geoFail:options.geoFail});
    await context.addInitScript(()=>{
     if(window.top!==window)return;
     window.__buttonRefuseWrites=false;window.__buttonRefuseReads=false;
@@ -105,12 +110,22 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
    if(options.retainedCopies){
     const observer=await context.newPage();await observer.goto(origin+prefix+'__button-observer');await observer.addScriptTag({content:sources.get('device-store-v2.js').toString()});
     report.retainedSources??=[];report.retainedSources.push(await observer.evaluate(async({dbName,board,count})=>{
-     const store=ChainStorageV2.createDeviceStore({dbName});await store.open();const raw=JSON.stringify(board);
+     const raw=JSON.stringify(board),legacyKey='fvp:chain-scanner:v1',legacyBefore=localStorage.getItem(legacyKey);let legacySeeded=false;
+     if(!localStorage.getItem('fvp:chain-scanner:device-store-v2')&&legacyBefore===null){localStorage.setItem(legacyKey,raw);legacySeeded=true;}
+     const store=ChainStorageV2.createDeviceStore({dbName});await store.open();
      const backups=Array.from({length:count},(_,i)=>({id:'gate-retained-'+i,kind:'manual',at:Date.now()-i,day:'2026-10-25',payload:JSON.stringify({...board,futureSourceRole:i})}));
      const result=await store.migrateLegacy({headPayload:raw,account:null,sourceFingerprint:await ChainStorageV2.hashPayload(JSON.stringify([{key:'fvp:chain-scanner:v1',raw}])),backups,opaqueArchives:[{key:'gate-opaque-exact',raw:'opaque exact bytes\u0000retain',futureBytes:new Uint8Array([0,17,255]),futureMinusZero:-0}]});
-     if(!result.verified)throw Error('Native retained source fixture failed');const head=await store.readHead();await store.setPendingUpload('gate-owner',{generationId:'gate-pending',payloadHash:head.hash,baseRev:0,updatedAt:7});await store.close();
-     return{count,eachPayloadBytes:backups[0].payload.length,ids:backups.map(row=>row.id)};
-    },{dbName,board,count:options.retainedCopies}));await observer.close();
+     if(!result.verified)throw Error('Native retained source fixture failed');const head=await store.readHead();await store.setPendingUpload('gate-owner',{generationId:'gate-pending',payloadHash:head.hash,baseRev:0,updatedAt:7});
+     const legacyAfter=localStorage.getItem(legacyKey),retainedSources=[];
+     for(const row of (await store.listBackups()).filter(row=>row.id.startsWith('gate-retained-')).sort((a,b)=>a.id.localeCompare(b.id)))retainedSources.push({id:row.id,payloadHash:await ChainStorageV2.hashPayload(row.payload)});
+     const bootstrap={delivery:'observer-evaluate-once',legacySeeded,legacyBeforeHash:legacyBefore===null?null:await ChainStorageV2.hashPayload(legacyBefore),legacyPayloadHash:legacyAfter===null?null:await ChainStorageV2.hashPayload(legacyAfter),headPayloadHash:await ChainStorageV2.hashPayload(head.payload),headPayloadBytes:new TextEncoder().encode(head.payload).byteLength,retainedSources};
+     await store.close();return{count,eachPayloadBytes:backups[0].payload.length,ids:backups.map(row=>row.id),bootstrap};
+    },{dbName,board,count:options.retainedCopies}));
+    const proof=report.retainedSources.at(-1).bootstrap,expected=digest(JSON.stringify(board));
+    assert.equal(proof.legacyPayloadHash,proof.legacySeeded?expected:proof.legacyBeforeHash,'Observer retains exact guarded legacy bytes');
+    assert.equal(proof.headPayloadHash,expected,'Observer reads back exact fixture head');assert.equal(proof.headPayloadBytes,Buffer.byteLength(JSON.stringify(board)));
+    assert.deepEqual(proof.retainedSources,Array.from({length:options.retainedCopies},(_,i)=>({id:'gate-retained-'+i,payloadHash:digest(JSON.stringify({...board,futureSourceRole:i}))})),'Observer reads back both exact retained sources');
+    await observer.close();
    }
    await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
    page=await context.newPage();page.setDefaultTimeout(4000);let localArmed=false,allowedNavigation=null;

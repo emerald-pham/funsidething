@@ -12976,6 +12976,11 @@
       "root": "RISK scenery startup: native mobile paints once while hidden return saved choices resize and rain preserve the scene",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: retained native sources seed once without a persistent board bootstrap",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [
