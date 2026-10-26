@@ -24568,5 +24568,43 @@
       "command": "Root recorder5949d993: node --test --test-name-pattern=\"^RISK repository process: diagnostic observer retains\" tests.js before root observer repair. Initial workflow RED b442f72b and actual native observer RED8560696b remain in external evidence.",
       "failure": "Actual installed observer in controlled bookkeeping fixture retained sequence1 instead of expected17 after80 inputs; original native bulk observation had zero bulk-select action rows. The corrected current observer passes both process checks in be4641fa; owner v2 native observer62 checks passed34b79356 after rejecting v1 error suppression."
     }
+  },
+  {
+    "baseCommit": "937975d4bc09d3e539f796621b4d8e00f4a91408",
+    "testChangesSha256": "be8b05a01bfd15792036313e86e4b2dcd09ec007f22c94ee503d0a67917bfa01",
+    "reason": "Expected diagnostic pageerror must remain failed when owned cleanup or unrelated execution also fails; source review found a false-positive control outcome.",
+    "previousBehavior": "The diagnostic wrapper accepted any pageerror plus a trusted Settings click and failed native status, even if browser/context/server cleanup failed or additional faults were recorded.",
+    "intendedBehavior": "Recognize the exact intentional pageerror separately, and approve the detector control only with complete original context/browser/server cleanup and no unrelated errors. Preserve native failure and detector observation.",
+    "replacementTests": [
+      "RISK repository process: diagnostic phase workflow is bounded and cannot qualify a partial mobile matrix",
+      "RISK repository process: diagnostic observer retains recent actions after a long setup",
+      "RISK repository process: expected diagnostic pageerror never hides failed cleanup or unrelated errors"
+    ],
+    "preservedCoverage": [
+      "All prior diagnostic and canonical tests remain. Application files, original400-task workloads, cap, input/frame thresholds, actual error injection and owned native cleanup are unchanged.",
+      "Synthetic report-consumer fixtures prove outcome handling only; they do not claim a new native run or repair any outstanding hosted runtime failure. This diagnostic branch remains nonmergeable."
+    ],
+    "redEvidence": {
+      "command": "Recorder616e7c9a at qualification/phase-carrier-root/runs: node --test --test-name-pattern=\"^RISK repository process: expected diagnostic pageerror\" tests.js after behavior-neutral extraction of the old predicate, before integrity repair. Earlier workflow/ring REDs b442f72b and5949d993 retain their immutable observed failures.",
+      "failure": "Expected pageerror cannot hide missing contextClosed: actual detectorPassed true, expected false. GREEN63a4309d then passes all3 process checks including missing context/browser/server flags, unrelated error cases, absent/incorrect intentional error and untrusted clicks."
+    }
+  },
+  {
+    "baseCommit": "88bd0815b4a40d212c055226d09cc6ac409000a3",
+    "testChangesSha256": "40189cc5b9d8fc171022dc58227798e4cd94381e9cb8ecf00ac76d89b7334d9c",
+    "reason": "Expected diagnostic pageerror must remain failed when owned cleanup or unrelated execution also fails; source review found a false-positive control outcome.",
+    "previousBehavior": "The diagnostic wrapper accepted any pageerror plus a trusted Settings click and failed native status, even if browser/context/server cleanup failed or additional faults were recorded.",
+    "intendedBehavior": "Recognize the exact intentional pageerror separately, and approve the detector control only with complete original context/browser/server cleanup and no unrelated errors. Preserve native failure and detector observation.",
+    "replacementTests": [
+      "RISK repository process: expected diagnostic pageerror never hides failed cleanup or unrelated errors"
+    ],
+    "preservedCoverage": [
+      "All prior diagnostic and canonical tests remain. Application files, original400-task workloads, cap, input/frame thresholds, actual error injection and owned native cleanup are unchanged.",
+      "Synthetic report-consumer fixtures prove outcome handling only; they do not claim a new native run or repair any outstanding hosted runtime failure. This diagnostic branch remains nonmergeable."
+    ],
+    "redEvidence": {
+      "command": "Recorder616e7c9a at qualification/phase-carrier-root/runs: node --test --test-name-pattern=\"^RISK repository process: expected diagnostic pageerror\" tests.js after behavior-neutral extraction of the old predicate, before integrity repair. Earlier workflow/ring REDs b442f72b and5949d993 retain their immutable observed failures.",
+      "failure": "Expected pageerror cannot hide missing contextClosed: actual detectorPassed true, expected false. GREEN63a4309d then passes all3 process checks including missing context/browser/server flags, unrelated error cases, absent/incorrect intentional error and untrusted clicks."
+    }
   }
 ]
