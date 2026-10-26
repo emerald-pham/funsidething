@@ -19577,13 +19577,16 @@ test('RISK JSON COPY PASTE: stale clipboard completion cannot release a newer ex
   });
 });
 
-test('RISK JSON COPY PASTE: Copy and Download send the same full archive without a JSON view or writes',async t=>{
+test('RISK JSON COPY PASTE: Copy and Download round-trip seeded pending archives without replaying sources',async t=>{
   const {IDBFactory}=await import('fake-indexeddb'),storage=sharedScannerStorage();
   const app=await loadApp({sharedStorage:storage,indexedDBProvider:new IDBFactory(),deviceDbName:'direct-copy-export-'+Date.now()}),{ctx,shim}=app;
   t.after(()=>app.dispose());
   const task=ctx.addTask('Copy <board> & keep 🌿');await ctx.persist();
   task.futureCopyField={keep:'unknown value'};ctx.state.futureCopyBoardField={retain:true};ctx.state.syncDirty=true;
-  const before=JSON.stringify(ctx.state),saved=storage.getItem(SYNC_STORE_KEY),sourceBefore=await ctx.window.ScannerDeviceStore.readRawExportSnapshot(),writes=[];
+  const pendingAccount='repair-copy@example.test',pending={generationId:'repair-pending-not-replayed',payloadHash:'b'.repeat(64),baseRev:4,updatedAt:1},pendingStored={...pending,account:pendingAccount};
+  const sourceStore=ctx.window.ScannerDeviceStore;assert.equal((await sourceStore.setPendingUpload(pendingAccount,pending)).ok,true);
+  assert.deepEqual(await sourceStore.getPendingUpload(pendingAccount),pendingStored,'the source really has pending work before archive capture');
+  const before=JSON.stringify(ctx.state),saved=storage.getItem(SYNC_STORE_KEY),sourceBefore=await sourceStore.readRawExportSnapshot(),writes=[];
   const set=storage.setItem.bind(storage);storage.setItem=(key,value)=>{writes.push(key);return set(key,value);};
   ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
   assert.equal((settings.match(/data-act="import-backup"/g)||[]).length,1);
@@ -19596,6 +19599,9 @@ test('RISK JSON COPY PASTE: Copy and Download send the same full archive without
   assert.equal(archive.format,'chain-scanner.recovery-archive');assert.equal(archive.manifest.status,'complete');
   assert.equal(archive.currentBoard.tasks.find(row=>row.id===task.id).futureCopyField.keep,'unknown value');
   assert.equal(archive.currentBoard.futureCopyBoardField.retain,true);
+  const pendingRow=archive.appSources.indexedDB.stores.meta.find(row=>decodeManualArchiveTypedValue(row.key)==='pending:'+pendingAccount);
+  assert.ok(pendingRow,'the seeded pending row is included in the exact archived device sources');
+  assert.deepEqual(decodeManualArchiveTypedValue(pendingRow.value),pendingStored,'archive encoding preserves the complete pending object');
   assert.equal(JSON.stringify(ctx.state),before,'copy leaves accepted unsaved fields untouched');
   assert.equal(storage.getItem(SYNC_STORE_KEY),saved,'copy does not save accepted unsaved fields');
 
@@ -19630,6 +19636,8 @@ test('RISK JSON COPY PASTE: Copy and Download send the same full archive without
   assert.match(dom.document.getElementById('modalRoot').innerHTML,/confirm-file-restore/);
   assert.equal(JSON.stringify(target.state),original,'pasting reaches preview without replacing the board');
   assert.equal((await target.window.ScannerDeviceStore.readHead()).hash,originalHead.hash);
+  const previewBackups=await target.window.ScannerDeviceStore.listBackups(),previewSource=previewBackups.find(row=>row.kind==='restore-file-source');
+  assert.equal(previewSource?.restoreFile?.bytesBase64,Buffer.from(copied).toString('base64'),'the complete original archive bytes are durably protected before restore');
   await target.onAction('cancel-file-restore',{});
   assert.equal(dom.document.getElementById('jsonBox').value,copied,'Cancel retains the exact copied text');
   assert.equal(JSON.stringify(target.state),original);
@@ -19637,8 +19645,13 @@ test('RISK JSON COPY PASTE: Copy and Download send the same full archive without
   assert.equal(await target.onAction('confirm-file-restore',{}),true);
   assert.equal(target.state.tasks.find(row=>row.id===task.id).futureCopyField.keep,'unknown value');
   assert.equal(target.state.futureCopyBoardField.retain,true);
-  assert.equal(await target.window.ScannerDeviceStore.getPendingUpload('repair-copy@example.test'),null,'archived pending work is never replayed');
-  assert.ok((await target.window.ScannerDeviceStore.listBackups()).some(row=>row.payload===original),'the displaced board remains protected');
+  assert.equal(await target.window.ScannerDeviceStore.getPendingUpload(pendingAccount),null,'the seeded archived pending generation is not replayed to the destination');
+  const durableReadback=await target.window.ScannerDeviceStore.readHead(),durableBoard=JSON.parse(durableReadback.payload);
+  assert.equal(durableBoard.tasks.find(row=>row.id===task.id).futureCopyField.keep,'unknown value','unknown task fields survive durable save and readback');
+  assert.deepEqual(durableBoard.futureCopyBoardField,{retain:true},'unknown board fields survive durable save and readback');
+  const retained=(await target.window.ScannerDeviceStore.listBackups());
+  assert.ok(retained.some(row=>row.kind==='before-file-restore'&&row.payload===original),'the exact displaced board bytes remain protected');
+  assert.ok(retained.some(row=>row.kind==='restore-file-source'&&row.restoreFile?.bytesBase64===Buffer.from(copied).toString('base64')),'the complete original archive bytes remain protected after confirmation');
 });
 
 test('RISK JSON COPY PASTE: Quick start explains the copy button, manual fallback and guarded paste',async t=>{
@@ -19656,6 +19669,25 @@ test('RISK JSON COPY PASTE: Quick start explains the copy button, manual fallbac
   assert.match(answer,/accepted unsaved edits/i);
   assert.match(help,/Large pasted archives stay captured without filling the text box/);
   assert.doesNotMatch(answer,/Select all.*manually/i);
+});
+
+test('RISK button safety guidance: mounted FAQ states required browser checks and limits',async t=>{
+  const app=await loadApp();t.after(()=>app.dispose());
+  for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+  app.ctx.openHelp();
+  const help=app.shim.document.getElementById('modalRoot').innerHTML;
+  const answer=help.match(/<dt>How are button crashes checked\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
+  assert.ok(answer,'the mounted FAQ explains how required button checks work');
+  const plain=answer.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
+  assert.ok(plain.split(/\s+/).filter(Boolean).length<=130,'button safety guidance stays within the FAQ word limit');
+  assert.match(plain,/Chromium and WebKit/i);
+  assert.match(plain,/400 saved tasks/i);
+  assert.match(plain,/ten rapid presses within two seconds/i);
+  assert.match(plain,/failed check or missing required coverage blocks release/i);
+  assert.match(plain,/cannot prove every device or browser condition/i);
+  assert.match(plain,/cannot determine what caused the original physical iOS crash/i);
+  assert.match(help,/Required button checks run in Chromium and WebKit.*A failed check or missing coverage blocks release/i,'the Settings changelog names the required release checks');
+  assert.doesNotMatch(plain,/never crash|crash[- ]free/i,'the guidance does not promise universal crash prevention');
 });
 
 test('RISK DATABASE REPAIR EXPORT: unified Copy and Download retain exact sources and metadata without writes',async t=>{
@@ -19720,6 +19752,97 @@ test('RISK DATABASE REPAIR EXPORT: unreadable sources are labeled partial and ne
       assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="confirm-file-restore"/);assert.equal(JSON.stringify(ctx.state),before);
     }finally{IDBDatabase.prototype.transaction=transaction;storage.getItem=get;}
   });
+});
+
+test('RISK DATABASE REPAIR EXPORT: held capture preserves exact before and after sources and rejects partial restore',async t=>{
+  const {IDBFactory}=await import('fake-indexeddb');
+  const app=await loadBackupFileFixtureApp({sharedStorage:sharedScannerStorage(),indexedDBProvider:new IDBFactory(),deviceDbName:'held-partial-export-'+Date.now()}),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+  t.after(()=>app.dispose());ctx.addTask('Stable board before held capture',false);await prepareBackupFileFixtureSource(app);
+  const local=shim.localStorage,originalSet=local.setItem.bind(local),originalRemove=local.removeItem.bind(local),localKey=SYNC_STORE_KEY;
+  const localBeforeRaw='{"fixture":"source before held capture","unknown":"🌿"}',localAfterRaw='{"fixture":"source changed during held capture","unknown":"🧭"}';
+  originalSet(localKey,localBeforeRaw);
+  const boardBefore=ctx.currentBoardExportPayload(),stateBefore=JSON.stringify(ctx.state),headBefore=await store.readHead(),snapshotBefore=await store.readRawExportSnapshot(),writes=[];
+  local.setItem=(key,value)=>{writes.push(['set',key]);return originalSet(key,value);};
+  local.removeItem=key=>{writes.push(['remove',key]);return originalRemove(key);};
+  const originalRead=store.readRawExportSnapshot.bind(store);let release,enteredResolve;
+  const entered=new Promise(resolve=>{enteredResolve=resolve;});
+  store.readRawExportSnapshot=async()=>{const snapshot=await originalRead();enteredResolve(snapshot);await new Promise(resolve=>{release=resolve;});return snapshot;};
+  t.after(()=>{release?.();store.readRawExportSnapshot=originalRead;local.setItem=originalSet;local.removeItem=originalRemove;});
+  ctx.openSettings();const capture=ctx.onAction('export-backup',{isConnected:true}),capturedSnapshot=await entered;
+  assert.deepEqual(capturedSnapshot,snapshotBefore,'the real read-only device snapshot is held after its source transaction completes');
+  originalSet(localKey,localAfterRaw);
+  ctx.state.futureCaptureRaceField={changedDuringCapture:'keep the live value'};
+  const stateAfter=JSON.stringify(ctx.state),boardAfter=ctx.currentBoardExportPayload();
+  assert.notEqual(boardAfter,boardBefore,'the live accepted board changes while capture is waiting');
+  release();assert.equal(await capture,true,'the held operation completes into an honest partial archive');store.readRawExportSnapshot=originalRead;
+  const raw=await copyPreparedExport(ctx),archive=JSON.parse(raw);
+  assert.equal(archive.manifest.status,'partial');assert.equal(archive.manifest.consistency,'partial-readonly-observations');
+  assert.deepEqual(archive.currentBoard,JSON.parse(boardBefore),'partial archive retains the exact accepted board observed before capture');
+  assert.ok(archive.manifest.failures.some(row=>row.source==='localStorage'&&row.key===localKey&&row.code==='changed-during-capture'),'local source change is named precisely');
+  assert.ok(archive.manifest.failures.some(row=>row.source==='currentBoard'&&row.code==='changed-during-capture'),'live board change is named precisely');
+  assert.equal(archive.appSources.localStorage.find(row=>row.key===localKey).raw,localBeforeRaw,'archive source observations retain the exact before bytes');
+  assert.equal(archive.repairInfo.localStorageAfter.find(row=>row.key===localKey).raw,localAfterRaw,'partial diagnostics retain the exact after bytes');
+  assert.deepEqual(await originalRead(),snapshotBefore,'partial export does not change any saved device source');
+  assert.deepEqual(await store.readHead(),headBefore,'partial export leaves the durable head unchanged');
+  assert.equal(JSON.stringify(ctx.state),stateAfter,'partial export leaves the changed live board untouched');
+  assert.equal(local.getItem(localKey),localAfterRaw,'partial export preserves the changed browser source');assert.deepEqual(writes,[],'capture and Copy do not write browser storage');
+
+  ctx.openSettings();shim.document.getElementById('backupRestoreSource').value='paste';await ctx.onAction('import-backup',{});
+  const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=raw;shim.document.dispatchEvent({type:'input',target:box});
+  assert.equal(await ctx.onAction('preview-pasted-recovery',{}),false,'partial changing-source evidence cannot become a complete import');
+  assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="confirm-file-restore"/);
+  assert.equal(JSON.stringify(ctx.state),stateAfter,'rejected partial preview keeps the changed live board');
+  assert.deepEqual(await store.readHead(),headBefore,'rejected partial preview keeps the durable board');
+  const rejectedSnapshot=await originalRead();
+  for(const name of ['meta','opaque'])assert.deepEqual(rejectedSnapshot.stores[name],snapshotBefore.stores[name],`rejected partial preview leaves ${name} sources unchanged`);
+  for(let index=0;index<snapshotBefore.stores.snapshots.keys.length;index++){
+    const key=snapshotBefore.stores.snapshots.keys[index],afterIndex=rejectedSnapshot.stores.snapshots.keys.indexOf(key);
+    assert.notEqual(afterIndex,-1,'every original complete snapshot remains present');
+    assert.deepEqual(rejectedSnapshot.stores.snapshots.values[afterIndex],snapshotBefore.stores.snapshots.values[index],'existing snapshot bytes stay exact');
+  }
+  const newSnapshotKeys=rejectedSnapshot.stores.snapshots.keys.filter(key=>!snapshotBefore.stores.snapshots.keys.includes(key));
+  assert.equal(newSnapshotKeys.length,1,'partial import refusal stores one deliberate current-board protection snapshot');
+  const protectedSnapshot=rejectedSnapshot.stores.snapshots.values[rejectedSnapshot.stores.snapshots.keys.indexOf(newSnapshotKeys[0])];
+  assert.deepEqual(JSON.parse(protectedSnapshot.payload),JSON.parse(stateAfter),'the only added snapshot preserves the complete current local state');
+  assert.equal(protectedSnapshot.hash,createHash('sha256').update(protectedSnapshot.payload).digest('hex'));
+  const oldBackupKeys=new Set(snapshotBefore.stores.backups.keys);
+  for(let index=0;index<snapshotBefore.stores.backups.keys.length;index++){
+    const key=snapshotBefore.stores.backups.keys[index],afterIndex=rejectedSnapshot.stores.backups.keys.indexOf(key);
+    assert.notEqual(afterIndex,-1,'every existing backup source remains present');
+    assert.deepEqual(rejectedSnapshot.stores.backups.values[afterIndex],snapshotBefore.stores.backups.values[index],'existing backup metadata and hashes stay exact');
+  }
+  const newProtectionKeys=rejectedSnapshot.stores.backups.keys.filter(key=>!oldBackupKeys.has(key));
+  assert.equal(newProtectionKeys.length,2,'refusing the pasted source adds only the expected current-board and exact-source protection records');
+  const refusedImportProtection=await store.listBackups();
+  assert.ok(refusedImportProtection.some(row=>row.kind==='before-file-restore'&&row.payload===stateAfter),'the current accepted board remains exactly available as a protected copy');
+  assert.ok(refusedImportProtection.some(row=>row.kind==='restore-file-source'&&row.restoreFile?.bytesBase64===Buffer.from(raw).toString('base64')),'the refused partial archive remains exactly available as a protected copy');
+  assert.equal(local.getItem(localKey),localAfterRaw,'rejected partial preview keeps the exact after source');assert.deepEqual(writes,[]);
+});
+
+test('RISK DATABASE REPAIR EXPORT: asynchronous snapshot rejection stays partial and unavailable',async t=>{
+  const {IDBFactory}=await import('fake-indexeddb');
+  const app=await loadBackupFileFixtureApp({sharedStorage:sharedScannerStorage(),indexedDBProvider:new IDBFactory(),deviceDbName:'rejected-partial-export-'+Date.now()}),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+  t.after(()=>app.dispose());ctx.addTask('Accepted board with a rejected source read',false);await prepareBackupFileFixtureSource(app);
+  const local=shim.localStorage,originalSet=local.setItem.bind(local),originalRemove=local.removeItem.bind(local),localKey=SYNC_STORE_KEY;
+  const localRaw='{"fixture":"preserve exact source on rejected read","unknown":"🌿"}';originalSet(localKey,localRaw);
+  const boardBefore=ctx.currentBoardExportPayload(),stateBefore=JSON.stringify(ctx.state),headBefore=await store.readHead(),originalRead=store.readRawExportSnapshot.bind(store),snapshotBefore=await originalRead(),writes=[];
+  local.setItem=(key,value)=>{writes.push(['set',key]);return originalSet(key,value);};local.removeItem=key=>{writes.push(['remove',key]);return originalRemove(key);};
+  store.readRawExportSnapshot=async()=>{await Promise.resolve();throw Error('private snapshot failure must not enter the archive');};
+  t.after(()=>{store.readRawExportSnapshot=originalRead;local.setItem=originalSet;local.removeItem=originalRemove;});
+  try{
+    ctx.openSettings();assert.equal(await ctx.onAction('export-backup',{isConnected:true}),true);
+    const raw=await copyPreparedExport(ctx),archive=JSON.parse(raw);
+    assert.equal(archive.manifest.status,'partial','an asynchronous read rejection cannot appear complete');
+    assert.ok(archive.manifest.failures.some(row=>row.source==='indexedDB'&&row.code==='read-failed'));
+    assert.equal(archive.manifest.sources.indexedDB.status,'unavailable');
+    assert.equal(archive.appSources.indexedDB.stores,null,'rejected storage is unavailable rather than an empty database');
+    assert.deepEqual(archive.currentBoard,JSON.parse(boardBefore),'the accepted board remains available despite the rejected source read');
+    assert.equal(archive.appSources.localStorage.find(row=>row.key===localKey).raw,localRaw,'the other original source stays exact');
+    assert.doesNotMatch(raw,/private snapshot failure must not enter the archive/,'private exception text is excluded');
+    assert.equal(JSON.stringify(ctx.state),stateBefore);assert.deepEqual(await store.readHead(),headBefore);
+    assert.deepEqual(await originalRead(),snapshotBefore,'the rejected export leaves the physical sources unchanged');
+    assert.equal(local.getItem(localKey),localRaw);assert.deepEqual(writes,[],'rejected capture remains read-only');
+  }finally{store.readRawExportSnapshot=originalRead;}
 });
 
 test('RISK DATABASE REPAIR EXPORT: Debug log points to the combined archive without duplicate export controls',async t=>{
@@ -45460,4 +45583,30 @@ test('RISK repository process: required button enforcement changes need process 
   fs.writeFileSync(path.join(directory,'scripts',name),name.endsWith('.json')?'{"weakened":true}':'export const revision=2;');git('add','.');git('-c','user.name=Button gate fixture','-c','user.email=gate@example.invalid','commit','-qm','uncovered gate edit');
   const result=spawnSync(process.execPath,['scripts/test-first-gate.mjs',base],{cwd:directory,encoding:'utf8'});assert.equal(result.error,undefined);assert.notEqual(result.status,0,'actual test-first CLI cannot accept uncovered required native gate edits');assert.match(result.stderr,/Test-first enforcement changed.*without tests.js process coverage/);
  });
+});
+
+test('RISK repository process: every button safety module fails the actual CLI without process coverage',async t=>{
+ const root=fs.mkdtempSync(path.join('/tmp','chain-button-enforcement-all-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const directory=path.join(root,'fixture'),scriptDir=path.join(directory,'scripts');fs.mkdirSync(scriptDir,{recursive:true});
+ const modules=[
+  'scripts/button-safety-cloud.mjs','scripts/button-safety-fixture.mjs','scripts/button-safety-rapid-core.mjs',
+  'scripts/button-safety-rapid.mjs','scripts/button-safety-scenarios.mjs','scripts/button-safety-scenes.mjs',
+  'scripts/button-safety-transfer.mjs','scripts/button-safety.mjs','scripts/button-safety-contract.mjs',
+  'scripts/button-safety-native.mjs','scripts/button-safety-inventory.json'
+ ];
+ fs.copyFileSync(path.join(__dirname,'scripts/test-first-gate.mjs'),path.join(scriptDir,'test-first-gate.mjs'));
+ for(const file of modules){const target=path.join(directory,file);fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,file.endsWith('.json')?'{}':'export const revision=1;\n');}
+ const git=(...args)=>{const result=spawnSync('git',args,{cwd:directory,encoding:'utf8'});assert.equal(result.status,0,result.stderr);return result.stdout.trim();};
+ git('init','-q','--initial-branch=fixture');git('add','.');git('-c','user.name=Button gate fixture','-c','user.email=gate@example.invalid','commit','-qm','baseline');
+ const base=git('rev-parse','HEAD');
+ for(const file of modules){
+  git('reset','--hard',base);
+  const target=path.join(directory,file),source=fs.readFileSync(target,'utf8');
+  fs.writeFileSync(target,source+(file.endsWith('.json')?'\n':'// changed implementation behavior\n'));
+  git('add',file);git('-c','user.name=Button gate fixture','-c','user.email=gate@example.invalid','commit','-qm','uncovered gate module edit');
+  const result=spawnSync(process.execPath,['scripts/test-first-gate.mjs',base],{cwd:directory,encoding:'utf8'});
+  assert.equal(result.error,undefined);assert.notEqual(result.status,0,`actual test-first CLI must reject uncovered module ${file}`);
+  assert.match(result.stderr,/Test-first enforcement changed.*without tests\.js process coverage/);
+  assert.ok(result.stderr.includes(file),`actual CLI names the uncovered module ${file}: ${result.stderr}`);
+ }
 });
