@@ -22574,5 +22574,25 @@
       "failure": "d377aa09 actual b148 Normal/Reduced retained native consumers both failed authoritative scene null versus23:15 after an immediate reload; original full mobile reports passed and cleanup completed. da5e7d9d repeats both failures while the separate proof page serves immutable de1 bytes with96 hashed response deliveries; this is current fixture plus immutable baseline app, not clean de1 native qualification. Earlier fresh legacy-only comparisons passed without authoritative heads and do not contradict this durable reproduction. fda0b355 separately captured winter/23:15 mirrors while app hidden, then null/null after older head adoption. No readiness wait fixes this loss, no source is promoted from mirror, and no real cap acceptance is inferred."
     },
     "testChangesSha256": "3e45f2e475db219c5fdfe915c83e492d3802050da6df630b190fb2cafb2ba76e"
+  },
+  {
+    "baseCommit": "aa20bb5399e0d3691345550401627c97ea7747dc",
+    "testChangesSha256": "886a06d6b786588afe86adc49919441028e6eb5a4ed73128ab83710f89f75b3a",
+    "reason": "Run the root-approved early nonmergeable comparison of exact de1 versus the repaired canonical source before expensive full qualification, using two unmodified actual capped commands and source-bound artifacts.",
+    "previousBehavior": "The canonical workflow starts the normal PR/push topology, complete regression and deployment gates; it is not the narrowly isolated two-source capped observation. No source/runner manifest exists for this diagnostic comparison.",
+    "intendedBehavior": "Only the new diagnostic branch runs one bounded comparison job. Two real clean sibling clones pin full baseline/candidate SHAs, Node22 and canonical npm dependencies. Only baseline may continue after failure; the candidate must satisfy the unchanged kernel negative control, both full mobile motions and report validators. All raw artifacts and immutable source hashes survive failures.",
+    "replacementTests": [
+      "RISK repository process: canonical capped comparison isolates exact sources and never waives candidate failures"
+    ],
+    "preservedCoverage": [
+      "All product assets, canonical capped/native/fixture/policy/inventory/validator modules and existing tests are byte-identical to aa20; hosted checkouts are the actual pinned de1/aa20 commits rather than the workflow-runner commit. No old diagnostic consumer, 31c asset or fallback response is copied into this probe.",
+      "The existing command retains exact512000000/no-swap cap, fresh intentional kernel OOM control, complete Normal/Reduced400-task/ten distinct trusted Yes/2s/preservation/rendering/cleanup checks and current real Markdown asset enforcement. Baseline generic nonzero is not an app RED, and early baseline failure can leave Reduced unexecuted.",
+      "Parsed YAML controls reject wrong route/ref/source, extra jobs/steps, weakened candidate or identity steps, modified command and missing always-upload. The actual identity script runs only on isolated public Git fixtures, rejecting dirty/mismatched sources and wrong raw ref without writing a receipt. Local fixtures are not Linux memory or release evidence.",
+      "Only .github/workflows/data-safety.yml and required process RISK/catalog/map/rationale metadata differ from canonical aa20. Normal canonical CI is untouched; this separate topology has no PR, producer, aggregate, release/deployment job or status publication. Historical2ba branch/remote/evidence are preserved; root owns exact review/receipt/push."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder --purpose preimplementation-red -- node --test '--test-name-pattern=^RISK repository process: canonical capped comparison' tests.js",
+      "failure": "Actual pre-edit8f464923-e999-438e-b21a-b94b187be738 onaa20 parsed the real canonical YAML and rejected its Data safety identity instead of required NONMERGEABLE comparison. After provisional workflow GREENf0636855/2adaada9, the draft was saved/undone and later-baseline-sensitivity4f13b75c-affe-4140-bacb-9aa25d3cdd31 discriminated actual canonical unrestricted push/PR topology from the required branch-only route. This later behavioral sensitivity is not relabeled original RED. Restored unchanged draft GREEN24ce1f4d and extended malformed/identity/dirty/candidate controls GREENc425d4a5. All raw command records retained under gate/mobile-512mb/canonical-cap-aa20bb5/runs; no cap/browser runtime executed."
+    }
   }
 ]

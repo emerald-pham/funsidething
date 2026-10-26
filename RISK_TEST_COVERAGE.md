@@ -2307,3 +2307,5 @@ The command/report consumer rejects missing, duplicate, skipped, cancelled, unre
 - RISK scenery scene time readiness: loading controls wait before native presets save reload and return to live
 
 - RISK synced scene durability: native retained boards keep immediate scene locks through reload without changing tasks or sources
+
+- RISK repository process: canonical capped comparison isolates exact sources and never waives candidate failures — Nonmergeable push-only two-source workflow uses unmodified canonical capped commands, pinned clean sibling checkouts, real source/runner identity and complete always-upload; only baseline can continue, candidate and invalid/dirty binding fail closed. Controlled parser/Git fixtures confer no runtime or release credit.

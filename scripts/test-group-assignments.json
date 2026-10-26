@@ -12986,6 +12986,11 @@
       "root": "RISK repository process: retained native sources seed once without a persistent board bootstrap",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: canonical capped comparison isolates exact sources and never waives candidate failures",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [
