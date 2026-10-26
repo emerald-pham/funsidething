@@ -2373,5 +2373,5 @@ The pinned Linux x64 reader preserves the raw AT_PAGESZ witness and binds it to 
 
 ## Nonmergeable startup diagnostic
 
-- RISK repository process: startup diagnostic is bounded and cannot qualify the release matrix
+- RISK repository process: native activation comparison preserves full rendering and original gates
 - RISK repository process: diagnostic observer retains recent actions after a long setup

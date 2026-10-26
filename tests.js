@@ -46342,13 +46342,14 @@ test('RISK Undo scene guidance: FAQ and Changelog explain task Undo keeps scene 
 });
 
 
-test('RISK repository process: startup diagnostic is bounded and cannot qualify the release matrix',async t=>{
+test('RISK repository process: native activation comparison preserves full rendering and original gates',async t=>{
  const {parse}=await import('yaml'),workflow=parse(fs.readFileSync(path.join(__dirname,'.github/workflows/data-safety.yml'),'utf8'));
- assert.deepEqual(workflow.on,{push:{branches:['diagnose/webkit-startup-phases']}},'Only the dedicated nonmergeable startup branch may run this diagnostic');
+ assert.deepEqual(workflow.on,{push:{branches:['diagnose/webkit-native-activation']}},'Only the dedicated nonmergeable activation branch may run this diagnostic');
  assert.deepEqual(workflow.permissions,{contents:'read'});
  assert.deepEqual(Object.keys(workflow.jobs),['diagnostic-mobile-startup']);
  const job=workflow.jobs['diagnostic-mobile-startup'];
- assert.equal(job['timeout-minutes'],15);assert.deepEqual(job.strategy,{'fail-fast':false,matrix:{motion:['normal','reduced']}});
+ assert.equal(job['timeout-minutes'],15);assert.deepEqual(job.strategy,{'fail-fast':false,matrix:{variant:['baseline','native-active']}});
+ assert.equal(job.env.CHAIN_DIAGNOSTIC_MOTION,'reduced');assert.equal(job.env.CHAIN_DIAGNOSTIC_ACTIVATION,'${{ matrix.variant }}');
  assert.equal(job.env.FROZEN_APP_COMMIT,'6dde63c21525c5c792bc84ff4c24158fdf446943');
  for(const value of Object.values(job.env))assert.doesNotMatch(String(value),/\$\{\{\s*runner\b/,'Runner expressions require a step context');
  assert.equal(job.steps.at(-1).if,'always()');assert.equal(job.steps.at(-1).with['if-no-files-found'],'error');

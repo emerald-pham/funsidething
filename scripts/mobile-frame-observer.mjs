@@ -2,6 +2,9 @@
 export function installMobileFrameObserver(){
  if(window.top!==window||window.__mobileFrameObservation)return;
  const data=window.__mobileFrameObservation={schemaVersion:3,kind:'diagnostic-mobile-phases',timeOrigin:performance.timeOrigin,startedAt:performance.now(),aggregates:{},slowIntervals:[],worstGaps:[],actions:[],actionCount:0,limits:{slowIntervals:32,worstGaps:8,actions:64,slowThresholdMs:20},appReadyAt:null};
+ data.lifecycle={maxEvents:16,totalEvents:0,events:[]};
+ const lifecycle=event=>{data.lifecycle.totalEvents++;data.lifecycle.events.push({event,at:performance.now(),hidden:typeof document.hidden==='boolean'?document.hidden:null,visibilityState:document.visibilityState||null,hasFocus:document.hasFocus?.()??null,readyState:document.readyState||null});if(data.lifecycle.events.length>16)data.lifecycle.events.shift();};
+ lifecycle('observer-installed');document.addEventListener('visibilitychange',()=>lifecycle('visibilitychange'));for(const event of ['focus','blur','pageshow','pagehide'])window.addEventListener?.(event,()=>lifecycle(event));
  let currentAction=null,lastFrame=null;
  const taskInterval=window.setInterval.bind(window);let lastTask=performance.now();data.timerTask={periodMs:100,count:0,worstGaps:[]};
  taskInterval(()=>{const end=performance.now(),row={start:lastTask,end,ms:end-lastTask,lateMs:end-lastTask-100,lastFrame,appReady:document.documentElement?.dataset.appReady==='true',action:currentAction?.sequence??null};data.timerTask.count++;if(data.timerTask.worstGaps.length<8||row.ms>data.timerTask.worstGaps.at(-1).ms){data.timerTask.worstGaps.push(row);data.timerTask.worstGaps.sort((a,b)=>b.ms-a.ms);data.timerTask.worstGaps.length=Math.min(8,data.timerTask.worstGaps.length);}lastTask=end;},100);

@@ -46,6 +46,8 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
  for(const [file,hash]of Object.entries(runtimeAssets))assert.equal(report.assets[file],hash,'Reviewed runtime asset missing or changed: '+file);
  const {verifyButtonInventorySource}=await import('./button-safety-contract.mjs');verifyButtonInventorySource([...sources].filter(([file])=>/\.(?:js|html)$/.test(file)).map(([,bytes])=>bytes.toString()).join('\n'),JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')));
  for(const [file,bytes]of sources)assert.equal(digest(bytes),digest(git('show','HEAD:'+file)),'Button run requires exact committed app bytes: '+file);
+ const activationVariant=process.env.CHAIN_DIAGNOSTIC_ACTIVATION;assert.ok(['baseline','native-active'].includes(activationVariant),'Explicit native-activation diagnostic variant required');assert.equal(mobileYesMotion,'reduced','Native-activation comparison fixes Reduced motion');
+ report.diagnosticNativeActivation={kind:'nonqualifying-native-view-lifecycle-diagnostic',variant:activationVariant,activationCount:0,boundary:'after-newPage-before-first-app-navigation',observerClosed:false};
  let server,browser,context,page,armed=false,closing=false;
  const check=()=>{assert.equal(report.errors.length,0,'Native button safety detected '+report.errors.join(', '));};
  report.diagnosticControllerPhases={kind:'diagnostic-controller-wall',timeOrigin:performance.timeOrigin,aggregates:{},slowOperations:[],unretainedLabels:0,limits:{aggregateLabels:32,slowOperations:32}};
@@ -135,10 +137,15 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
      const observed=await observer.evaluate(()=>({width:innerWidth,height:innerHeight,screenWidth:screen.width,screenHeight:screen.height,deviceScaleFactor:devicePixelRatio,maxTouchPoints:navigator.maxTouchPoints,coarsePointer:matchMedia('(pointer:coarse)').matches,userAgent:navigator.userAgent,reducedMedia:matchMedia('(prefers-reduced-motion:reduce)').matches,appMotion:JSON.parse(localStorage.getItem('fvp:chain-scanner:landscape-motion')).choice}));
      report.mobileAttempt={phase:'before-app-navigation',scenario:name,profile:MOBILE_PROFILE,motion:mobileYesMotion,observed,headPayloadHash:proof.headPayloadHash};save();
     }
-    await observer.close();
+    await observer.close();report.diagnosticNativeActivation.observerClosed=true;report.diagnosticNativeActivation.pagesAfterObserverClose=context.pages().length;
    }
    await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
-   page=await context.newPage();page.setDefaultTimeout(4000);let localArmed=false,allowedNavigation=null;
+   page=await context.newPage();
+   if(activationVariant==='native-active'){
+    report.diagnosticNativeActivation.command='Page.bringToFront';report.diagnosticNativeActivation.requestedAt=Date.now();
+    await page.bringToFront();report.diagnosticNativeActivation.activationCount=1;report.diagnosticNativeActivation.completedAt=Date.now();
+   }
+   page.setDefaultTimeout(4000);let localArmed=false,allowedNavigation=null;
    page.on('pageerror',error=>report.errors.push('pageerror: '+error.message));
    page.on('crash',()=>report.errors.push('page-crash'));
    page.on('close',()=>{if(!closing)report.errors.push('unexpected-close');});
@@ -163,9 +170,10 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
     const scan=()=>{if(document.documentElement){const els=[...document.querySelectorAll('button,summary,[data-act],[role="button"],[data-scene-view],[data-landscape-motion],[data-scene-time],[data-scene-preset],[data-location-action]')];void window.__buttonObserved(els.map(key).filter(value=>value!==null));for(const el of els)if(key(el)?.startsWith('button-id:'))void window.__buttonUnidentified(el.outerHTML.slice(0,1000));}};
     addEventListener('DOMContentLoaded',()=>{scan();new MutationObserver(scan).observe(document.documentElement,{childList:true,subtree:true});});
    },{keySource:actionFor.toString()});
+   report.diagnosticNativeActivation.pagesBeforeAppNavigation=context.pages().length;report.diagnosticNativeActivation.appNavigationRequestedAt=Date.now();
    await page.goto(origin+prefix);await page.waitForFunction(()=>typeof state!=='undefined'&&state&&window.ScannerDeviceStore);await page.waitForFunction(()=>window.CloudSync?.ready);if(mobileYesMotion)await page.waitForFunction(motion=>document.documentElement.dataset.landscapeMotion===motion,mobileYesMotion,{timeout:12000});localArmed=true;
    const setup=await bounded((async()=>{for(let attempt=0;attempt<200;attempt++){
-    const result=await page.evaluate(async()=>{const head=await ScannerDeviceStore.readHead();return{currentTasks:state.tasks.length,activeTasks:state.tasks.filter(task=>!task.done).length,durableTasks:head?.payload?JSON.parse(head.payload).tasks.length:0,durableHash:head?.hash};});
+    const result=await page.evaluate(async()=>{const head=await ScannerDeviceStore.readHead();return{currentTasks:state.tasks.length,activeTasks:state.tasks.filter(task=>!task.done).length,durableTasks:head?.payload?JSON.parse(head.payload).tasks.length:0,durableHash:head?.hash,lifecycle:{hidden:document.hidden,visibilityState:document.visibilityState,hasFocus:document.hasFocus(),readyState:document.readyState}};});
     if(result.currentTasks===TASK_COUNT&&result.durableTasks===TASK_COUNT)return{...result,fixtureRole:options.fixtureRole||'active'};
     await new Promise(resolve=>setTimeout(resolve,25));
    }throw Error('Independent400-task setup did not reach durable storage');})(),'400-task durable setup',12000);
@@ -355,7 +363,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
   report.status='passed';
  }catch(error){report.status='failed';report.failure=error.stack;try{report.failureObservation=await bounded(page.evaluate(()=>({modal:document.getElementById('modalRoot')?.innerText,toast:document.getElementById('toast')?.innerText,heartbeat:{...window.__buttonHeartbeat},mode:state.mode,chain:state.chain,candidateId:state.candidateId,taskTitles:state.tasks.slice(0,10).map(t=>({id:t.id,title:t.title}))})),'failure observation');}catch(observationError){report.failureObservationError=String(observationError);}throw error;}
  finally{
-  if(context){report.mobilePhaseObservations=[];for(const observedPage of context.pages())try{const observation=await bounded(observedPage.evaluate(()=>window.__mobileFrameObservation),'diagnostic phase observation',1000);if(observation)report.mobilePhaseObservations.push(observation);}catch(error){report.mobilePhaseObservationError=String(error);}}
+  if(context){report.mobilePhaseObservations=[];for(const observedPage of context.pages())try{const observation=await bounded(observedPage.evaluate(()=>window.__mobileFrameObservation?{...window.__mobileFrameObservation,lifecycle:{...window.__mobileFrameObservation.lifecycle,current:{at:performance.now(),hidden:document.hidden,visibilityState:document.visibilityState,hasFocus:document.hasFocus(),readyState:document.readyState}}}:null),'diagnostic phase observation',1000);if(observation)report.mobilePhaseObservations.push(observation);}catch(error){report.mobilePhaseObservationError=String(error);}}
   closing=true;
   let cleanupError;
   const close=async work=>{try{await work();}catch(error){cleanupError??=error;report.status='failed';report.errors.push('cleanup: '+String(error));}};

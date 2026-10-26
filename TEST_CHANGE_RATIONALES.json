@@ -25221,5 +25221,46 @@
       "command": "Recorded f381bed6: node --test --test-name-pattern=\"^RISK repository process: startup diagnostic is bounded\" tests.js on frozen6dde with only the new test added; exact raw record in qualification/startup-carrier-root/runs. Also5c83ed51 reuses the original96ee observer consumer against the proposed package before repair.",
       "failure": "Actual assertion failed: Only the dedicated nonmergeable startup branch may run this diagnostic. Canonical push and pull_request triggers did not equal the required dedicated startup branch. After the five-file overlay, c5ac4d39 passes3/3 including actual canonical verifier rejection and unchanged coverage/catalog consumers.5c83ed51 fails Long setup cannot displace the recent failing action:1 instead of17. The same prior96ee ring/counter repair restores the recent64 with explicit omission count; original package bytes/evidence stay retained."
     }
+  },
+  {
+    "baseCommit": "2de770251526dcf0a749699bf787cd4aa59fc72f",
+    "testChangesSha256": "c27dfa16e4970fcebe4236fcc5aef8e46a21390d95c9b891850010aa3bf76486",
+    "reason": "Replace the prior motion-only diagnostic with one paired native-view activation comparison while preserving full app rendering, the original workload, and strict exclusion from release acceptance.",
+    "previousBehavior": "The startup diagnostic ran Normal and Reduced without explicitly varying native window activation. It could reproduce missing animation frames but could not distinguish native view activation from app behavior.",
+    "intendedBehavior": "Only diagnose/webkit-native-activation runs fresh Reduced baseline and native-active jobs. One real Page.bringToFront call may occur before app navigation; no wait, retry, forced tap, CSS change, cap or timing waiver is introduced. Both retain original full-story checks; diagnostic kind and incomplete matrix cannot qualify release.",
+    "replacementTests": [
+      "RISK repository process: native activation comparison preserves full rendering and original gates"
+    ],
+    "preservedCoverage": [
+      "Original400 saved tasks,1MiB unknown field, two exact protected source copies, full rendering, durable facts and ten distinct accepted native-touch Yes within2000ms remain unchanged.",
+      "Required1GB browser-family cap, zero swap, separate2GiB driver, actual OOM control, original1000ms frame and2500ms step thresholds and owned cleanup remain unchanged.",
+      "Canonical verifier continues rejecting diagnostic kind and a relabeled partial motion matrix; no release aggregation or deployment job exists. All earlier canonical tests and exact rationale records are retained.",
+      "Existing latest64 action history and error/return channels remain; bounded lifecycle observations add no acceptance credit. Old failed hosted runs and the negative canvas intervention remain preserved."
+    ],
+    "redEvidence": {
+      "command": "Actual recorder59b99280: node --test --test-name-pattern=\"^RISK repository process: native activation comparison preserves\" tests.js against2de with only updated process contract before overlay implementation; qualification/activation-carrier-root/runs. Native actual delivery RED3e2caa5a is separately bound in the activation-probe-2de package.",
+      "failure": "59b99280 fails because old diagnose/webkit-startup-phases trigger does not equal required diagnose/webkit-native-activation. After the four-file runtime/workflow overlay,57ae273e passes7 roots/14 TAP cases, including unchanged recent-action retention and actual canonical verifier refusals. Native3e2caa5a independently observes zero actual activation calls instead of one;8111b69b native-active anddcdbca13 baseline pass unchanged full local story. Neither local result proves hosted causality."
+    }
+  },
+  {
+    "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
+    "testChangesSha256": "f58a03147dd65f8285126ffa96ede2d5d7a4f2baf40ede1be2674105af90988e",
+    "reason": "Replace the prior motion-only diagnostic with one paired native-view activation comparison while preserving full app rendering, the original workload, and strict exclusion from release acceptance.",
+    "previousBehavior": "The startup diagnostic ran Normal and Reduced without explicitly varying native window activation. It could reproduce missing animation frames but could not distinguish native view activation from app behavior.",
+    "intendedBehavior": "Only diagnose/webkit-native-activation runs fresh Reduced baseline and native-active jobs. One real Page.bringToFront call may occur before app navigation; no wait, retry, forced tap, CSS change, cap or timing waiver is introduced. Both retain original full-story checks; diagnostic kind and incomplete matrix cannot qualify release.",
+    "replacementTests": [
+      "RISK repository process: native activation comparison preserves full rendering and original gates",
+      "RISK repository process: diagnostic observer retains recent actions after a long setup"
+    ],
+    "preservedCoverage": [
+      "Original400 saved tasks,1MiB unknown field, two exact protected source copies, full rendering, durable facts and ten distinct accepted native-touch Yes within2000ms remain unchanged.",
+      "Required1GB browser-family cap, zero swap, separate2GiB driver, actual OOM control, original1000ms frame and2500ms step thresholds and owned cleanup remain unchanged.",
+      "Canonical verifier continues rejecting diagnostic kind and a relabeled partial motion matrix; no release aggregation or deployment job exists. All earlier canonical tests and exact rationale records are retained.",
+      "Existing latest64 action history and error/return channels remain; bounded lifecycle observations add no acceptance credit. Old failed hosted runs and the negative canvas intervention remain preserved."
+    ],
+    "redEvidence": {
+      "command": "Actual recorder59b99280: node --test --test-name-pattern=\"^RISK repository process: native activation comparison preserves\" tests.js against2de with only updated process contract before overlay implementation; qualification/activation-carrier-root/runs. Native actual delivery RED3e2caa5a is separately bound in the activation-probe-2de package.",
+      "failure": "59b99280 fails because old diagnose/webkit-startup-phases trigger does not equal required diagnose/webkit-native-activation. After the four-file runtime/workflow overlay,57ae273e passes7 roots/14 TAP cases, including unchanged recent-action retention and actual canonical verifier refusals. Native3e2caa5a independently observes zero actual activation calls instead of one;8111b69b native-active anddcdbca13 baseline pass unchanged full local story. Neither local result proves hosted causality."
+    }
   }
 ]
