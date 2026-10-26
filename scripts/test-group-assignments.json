@@ -13006,6 +13006,16 @@
       "root": "mobile memory parser rejects changed final browser or driver container isolation",
       "group": "native-process",
       "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "RISK repository process: pending mobile creates retain ownership until daemon completion and owned removal",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "mobile budget CLI preserves uncertain create ownership and cleans confirmed objects",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory-lifecycle.test.mjs"
     }
   ],
   "processControls": [

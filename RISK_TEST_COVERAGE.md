@@ -2313,3 +2313,5 @@ The command/report consumer rejects missing, duplicate, skipped, cancelled, unre
 - RISK repository process: mobile budget planner caps browsers before launch and isolates the external driver
 - RISK repository process: mobile budget scope cannot relabel whole-container evidence or disconnected browsers
 - RISK repository process: remote mobile consumer waits for browser owner exit after disconnect
+
+- RISK repository process: pending mobile creates retain ownership until daemon completion and owned removal

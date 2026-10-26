@@ -45995,3 +45995,9 @@ test('RISK repository process: remote mobile consumer waits for browser owner ex
  events.length=0;const failed=path.join(directory,'refused');await assert.rejects(runButtonSafety({repo:__dirname,engine:'webkit',outputDir:failed,port,mobileYesMotion:'normal',browserServerEndpoint:'ws://127.0.0.1:1234/owned',closeBrowserServer:async()=>{throw Error('Owner exit not observed');}}),/Owner exit not observed/);
  const partial=JSON.parse(fs.readFileSync(path.join(failed,fs.readdirSync(failed).find(file=>file.startsWith('button-safety-')))));assert.notEqual(partial.cleanup.browserClosed,true);assert.equal(partial.cleanup.serverClosed,true,'An owner-close failure still closes HTTP and persists the failed report');assert.equal(partial.status,'failed');
 });
+
+test('RISK repository process: pending mobile creates retain ownership until daemon completion and owned removal',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','scripts/agent-tools/mobile-memory-lifecycle.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:20000,maxBuffer:4*1024*1024});
+ assert.equal(result.error,undefined);assert.equal(result.status,0,'Actual mobile CLI must retain unresolved late create ownership and clean positively identified objects: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# tests 5$/m);assert.match(result.stdout,/^# skipped 0$/m);
+});

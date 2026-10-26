@@ -156,7 +156,10 @@ export async function runCappedMobile({outputDir}){
    let id=key;
    if(!/^[a-f0-9]{64}$/.test(id)){
     const recovered=await docker(['inspect',metadata.name],{allowFailure:true});
-    if(recovered.status!==0){if(!interrupted&&!recovered.error&&/No such (?:object|container)/i.test(recovered.stderr))owned.delete(key);else removed=false;continue;}
+    // A killed/timed-out create CLI can leave daemon work in flight. An
+    // early missing name is not proof that creation can no longer complete.
+    // Keep the durable intent until positive owned removal is observed.
+    if(recovered.status!==0){removed=false;continue;}
     const value=JSON.parse(recovered.stdout)[0];if(value.Config?.Labels?.['chain.mobile.owner']!==ownerToken){removed=false;continue;}id=value.Id;
    }
    await preserve(id,metadata);const result=await docker(['rm','--force',id],{allowFailure:true});if(result.error||result.status!==0)removed=false;else owned.delete(key);
