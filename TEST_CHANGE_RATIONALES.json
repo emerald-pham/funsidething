@@ -24531,5 +24531,42 @@
       "command": "Node22 recorder b442f72b at qualification/phase-carrier-root/runs: node --test --test-name-pattern=\"^RISK repository process: diagnostic phase workflow\" tests.js before applying any workflow/runner package.",
       "failure": "Meaningful process RED: the existing parsed workflow routes all pushes and pull_request events instead of the sole authorized diagnostic branch; explicit expected branch routing assertion failed."
     }
+  },
+  {
+    "baseCommit": "937975d4bc09d3e539f796621b4d8e00f4a91408",
+    "testChangesSha256": "baf47ddf16e1a19edb1b7c20bedd9bbf59319914f767e2d9463b81a0e66adf11",
+    "reason": "Keep this nonmergeable diagnostic read-only/bounded and retain the recent failing interaction after long native setup, without altering Promise error channels or application behavior.",
+    "previousBehavior": "The first64-only trace lost all bulk-select events after actual native setup, and action sequence65 repeated indefinitely. Earlier v1 Promise observation also consumed native unhandled rejections; that v1 source/evidence remains preserved separately.",
+    "intendedBehavior": "The actual observer keeps only the latest64 trusted action rows with monotonic identities and explicit total count. It measures synchronous invocation and leaves Promise returns untouched. Dedicated branch-only workflow retains15-minute read-only jobs and cannot satisfy canonical matrix verification.",
+    "replacementTests": [
+      "RISK repository process: diagnostic phase workflow is bounded and cannot qualify a partial mobile matrix",
+      "RISK repository process: diagnostic observer retains recent actions after a long setup"
+    ],
+    "preservedCoverage": [
+      "Existing canonical tests, budgets, original400-task workloads, protected sources, real kernel controls, original input/frame limits and owned cleanup remain unchanged. This diagnostic branch can never merge or qualify a release.",
+      "Original native bulk phase evidence retains its64 setup-only rows. The new observer bookkeeping fixture is explicitly synthetic; separate actual WebKit/Chromium error-channel62-check proof stays native and unchanged in scope."
+    ],
+    "redEvidence": {
+      "command": "Root recorder5949d993: node --test --test-name-pattern=\"^RISK repository process: diagnostic observer retains\" tests.js before root observer repair. Initial workflow RED b442f72b and actual native observer RED8560696b remain in external evidence.",
+      "failure": "Actual installed observer in controlled bookkeeping fixture retained sequence1 instead of expected17 after80 inputs; original native bulk observation had zero bulk-select action rows. The corrected current observer passes both process checks in be4641fa; owner v2 native observer62 checks passed34b79356 after rejecting v1 error suppression."
+    }
+  },
+  {
+    "baseCommit": "ae7c9bdaa16bde202546e5437724a5508669f01c",
+    "testChangesSha256": "d7ef1980e1bed4ff51dadce4002a9aff423baeb9f88e5d0b752d40b874e4606c",
+    "reason": "Keep this nonmergeable diagnostic read-only/bounded and retain the recent failing interaction after long native setup, without altering Promise error channels or application behavior.",
+    "previousBehavior": "The first64-only trace lost all bulk-select events after actual native setup, and action sequence65 repeated indefinitely. Earlier v1 Promise observation also consumed native unhandled rejections; that v1 source/evidence remains preserved separately.",
+    "intendedBehavior": "The actual observer keeps only the latest64 trusted action rows with monotonic identities and explicit total count. It measures synchronous invocation and leaves Promise returns untouched. Dedicated branch-only workflow retains15-minute read-only jobs and cannot satisfy canonical matrix verification.",
+    "replacementTests": [
+      "RISK repository process: diagnostic observer retains recent actions after a long setup"
+    ],
+    "preservedCoverage": [
+      "Existing canonical tests, budgets, original400-task workloads, protected sources, real kernel controls, original input/frame limits and owned cleanup remain unchanged. This diagnostic branch can never merge or qualify a release.",
+      "Original native bulk phase evidence retains its64 setup-only rows. The new observer bookkeeping fixture is explicitly synthetic; separate actual WebKit/Chromium error-channel62-check proof stays native and unchanged in scope."
+    ],
+    "redEvidence": {
+      "command": "Root recorder5949d993: node --test --test-name-pattern=\"^RISK repository process: diagnostic observer retains\" tests.js before root observer repair. Initial workflow RED b442f72b and actual native observer RED8560696b remain in external evidence.",
+      "failure": "Actual installed observer in controlled bookkeeping fixture retained sequence1 instead of expected17 after80 inputs; original native bulk observation had zero bulk-select action rows. The corrected current observer passes both process checks in be4641fa; owner v2 native observer62 checks passed34b79356 after rejecting v1 error suppression."
+    }
   }
 ]

@@ -2367,3 +2367,4 @@ The pinned Linux x64 reader preserves the raw AT_PAGESZ witness and binds it to 
 ## Nonmergeable action-phase diagnostic
 
 - RISK repository process: diagnostic phase workflow is bounded and cannot qualify a partial mobile matrix
+- RISK repository process: diagnostic observer retains recent actions after a long setup

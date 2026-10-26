@@ -46300,3 +46300,20 @@ test('RISK repository process: diagnostic phase workflow is bounded and cannot q
  bundle.report.kind='button-mobile-memory-diagnostic';assert.throws(verify,'A diagnostic report cannot satisfy the canonical verifier');
  bundle.report.kind='button-mobile-memory';bundle.report.cases=bundle.report.cases.slice(0,1);refreshMobileBundle(bundle);assert.throws(verify,'Relabeling a selected-motion report cannot satisfy the required full matrix');
 });
+
+test('RISK repository process: diagnostic observer retains recent actions after a long setup',async()=>{
+ const {installMobileFrameObserver}=await import('./scripts/mobile-frame-observer.mjs'),listeners=new Map();let now=0;
+ class ElementFixture{}Object.defineProperty(ElementFixture.prototype,'innerHTML',{configurable:true,get(){return '';},set(){}});
+ const sandbox={performance:{timeOrigin:1,now:()=>++now},Element:ElementFixture,MutationObserver:class{},requestAnimationFrame:()=>0,setTimeout:()=>0,setInterval:()=>0,document:{documentElement:{dataset:{}},addEventListener:(type,callback)=>listeners.set(type,callback)}};sandbox.window=sandbox;sandbox.top=sandbox;
+ vm.runInNewContext('('+installMobileFrameObserver.toString()+')()',sandbox);
+ const emit=(sequence,trusted=true)=>listeners.get('pointerdown')({type:'pointerdown',isTrusted:trusted,target:{closest:()=>({dataset:{act:sequence<64?'setup':'bulk-select'}})}});
+ // Synthetic observer bookkeeping only. Native trusted-input proof remains
+ // in the separately recorded real browser reports.
+ for(let i=0;i<80;i++)emit(i);emit(80,false);
+ const observed=sandbox.__mobileFrameObservation;
+ assert.equal(observed.actions.length,64,'The observer keeps its existing bound');
+ assert.equal(observed.actions[0].sequence,17,'Long setup cannot displace the recent failing action');
+ assert.equal(observed.actions.at(-1).sequence,80,'Action identities remain monotonic after truncation');
+ assert.equal(observed.actions.at(-1).action,'act:bulk-select');
+ assert.equal(observed.actionCount,80,'The report makes omitted older actions explicit without counting synthetic events');
+});

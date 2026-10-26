@@ -13181,6 +13181,11 @@
       "root": "RISK repository process: diagnostic phase workflow is bounded and cannot qualify a partial mobile matrix",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: diagnostic observer retains recent actions after a long setup",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [
