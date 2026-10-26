@@ -154,7 +154,12 @@ async function main() {
         }
         if(cohort){
           const required=['validation-context','event-gates','cohort-routing',...cohort.expectedGroups.map(id=>'regression-'+id),...(mobileProducer?['mobile-WebKit-512MB']:[]),'scanner-tests'];
-          if(required.some(name=>result.jobs.filter(job=>job.name===name&&job.status==='completed'&&job.conclusion==='success'&&String(job.run_id)===String(run.id)&&String(job.run_attempt)===String(run.run_attempt)&&job.head_sha===sourceSha).length!==1))throw new Error('Producer required topology is incomplete.');
+          for(const name of required){
+            const matches=result.jobs.filter(job=>job.name===name);
+            if(matches.length!==1)throw new Error('Producer required topology is incomplete or ambiguous.');
+            const job=matches[0];
+            if(job.status!=='completed'||job.conclusion!=='success'||String(job.run_id)!==String(run.id)||String(job.run_attempt)!==String(run.run_attempt)||job.head_sha!==sourceSha)throw new Error('Producer required topology is incomplete.');
+          }
           if(result.jobs.some(job=>!required.includes(job.name)&&!['release-evidence','deploy-pages'].includes(job.name)))throw new Error('Producer topology is unknown.');
         }
         const completed = steps.filter(step => (cohort ? new RegExp(`^Complete regression context ${expected} report [a-f0-9]{64}$`).test(step.name) : step.name === `Complete regression context ${expected}`) && step.conclusion === 'success');

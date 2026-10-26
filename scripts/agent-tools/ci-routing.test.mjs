@@ -372,6 +372,12 @@ test('current grouped routing requires the completed capped mobile producer befo
   ['wrong mobile attempt',x=>{x.jobs.find(job=>job.name==='mobile-WebKit-512MB').run_attempt=1;},'full'],
   ['wrong mobile source',x=>{x.jobs.find(job=>job.name==='mobile-WebKit-512MB').head_sha='0'.repeat(40);},'full'],
   ['duplicate mobile',x=>{x.jobs.push({...x.jobs.find(job=>job.name==='mobile-WebKit-512MB')});},'full'],
+  ['valid mobile plus failed duplicate',x=>{x.jobs.push({...x.jobs.find(job=>job.name==='mobile-WebKit-512MB'),conclusion:'failure'});},'full'],
+  ['valid mobile plus running duplicate',x=>{x.jobs.push({...x.jobs.find(job=>job.name==='mobile-WebKit-512MB'),status:'in_progress'});},'full'],
+  ['valid mobile plus wrong-run duplicate',x=>{x.jobs.push({...x.jobs.find(job=>job.name==='mobile-WebKit-512MB'),run_id:72});},'full'],
+  ['valid mobile plus wrong-attempt duplicate',x=>{x.jobs.push({...x.jobs.find(job=>job.name==='mobile-WebKit-512MB'),run_attempt:1});},'full'],
+  ['valid mobile plus wrong-source duplicate',x=>{x.jobs.push({...x.jobs.find(job=>job.name==='mobile-WebKit-512MB'),head_sha:'0'.repeat(40)});},'full'],
+  ['valid core plus failed duplicate',x=>{x.jobs.push({...x.jobs.find(job=>job.name==='regression-core'),conclusion:'failure'});},'full'],
  ];
  for(const [name,mutate,decision]of scenarios)await parent.test(name,t=>{
   const f=fixture(t,'mobile'),first=invoke(f,{event:'pull_request',ref:'refs/pull/17/merge',checkout:f.merge,environment:descriptorFor(f,f.merge)});assert.equal(first.status,0,first.stderr);
