@@ -1611,6 +1611,142 @@ function applyScenePreferences(){
     window.applySyncedSceneTime?.(scene.time,scene.season);
   }finally{ applyingSceneFromState=false; }
 }
+const SCENE_INTENT_PREFIX="fvp:chain-scanner:pending-scene-choice:v1:";
+const SCENE_INTENT_MAX_BYTES=65536,SCENE_INTENT_MAX_EVENTS=32,SCENE_INTENT_MAX_KEYS=128;
+let sceneIntentOwnKey=null;
+function sceneIntentKeys(){
+  const count=localStorage.length;
+  if(!Number.isSafeInteger(count)||count<0||count>10000)throw Error("Scene intent storage enumeration unavailable");
+  const keys=[];for(let i=0;i<count;i++){const key=localStorage.key(i);if(typeof key==="string"&&key.startsWith(SCENE_INTENT_PREFIX))keys.push(key);}
+  return [...new Set(keys)].sort();
+}
+function sceneIntentScene(receipt,count){
+  const scene=normalizeSceneSettings(receipt.priorScene);
+  for(const event of receipt.events.slice(0,count))scene[event.target.property]=event.value;
+  return scene;
+}
+function readSceneIntent(raw){
+  if(typeof raw!=="string"||new TextEncoder().encode(raw).byteLength>SCENE_INTENT_MAX_BYTES)return null;
+  try{
+    const receipt=JSON.parse(raw);
+    if(receipt?.v!==1||!(receipt.parent===null||typeof receipt.parent==="string"&&receipt.parent.startsWith(SCENE_INTENT_PREFIX)&&receipt.parent.length<256)||!(receipt.account===null||typeof receipt.account==="string"&&receipt.account)||!(receipt.identity===null||typeof receipt.identity==="string"&&receipt.identity)||!decisionId(receipt.baselineId)||!Array.isArray(receipt.events)||!receipt.events.length||receipt.events.length>SCENE_INTENT_MAX_EVENTS||!Array.isArray(receipt.heads)||!receipt.heads.length||receipt.heads.length>SCENE_INTENT_MAX_EVENTS+1||receipt.heads[0].count!==0)return null;
+    if(receipt.priorScene!==null&&!currentChoiceSceneShapeSupported(receipt.priorScene))return null;
+    const ids=new Set(),scene=normalizeSceneSettings(receipt.priorScene),hashes=new Set();
+    for(const event of receipt.events){
+      if(!supportedCurrentChoiceEvent(event)||event.account!==receipt.account||event.target.type!=="scene"||event.target.id!=="board"||!["time","season","location"].includes(event.target.property)||event.after.present!==true||ids.has(event.id)||canonicalDecisionFact(event.before)!==canonicalDecisionFact(currentChoiceDescriptor(scene,event.target.property)))return null;
+      ids.add(event.id);scene[event.target.property]=event.value;
+    }
+    for(const head of receipt.heads){if(!/^[a-f0-9]{64}$/.test(head?.hash||"")||!Number.isSafeInteger(head.count)||head.count<0||head.count>receipt.events.length||hashes.has(head.hash))return null;hashes.add(head.hash);}
+    return receipt;
+  }catch{return null;}
+}
+function sceneIntentPrefix(receipt,board){
+  const ids=new Set(receipt.events.map(event=>event.id)),facts=(board.decisionEvents||[]).filter(event=>ids.has(event?.id));
+  return facts.length<=receipt.events.length&&canonicalDecisionFact(facts)===canonicalDecisionFact(receipt.events.slice(0,facts.length))?facts.length:-1;
+}
+function sceneIntentMatches(receipt,head,board){
+  if(!head||head.account!==receipt.account||(board.syncAccount??null)!==receipt.account||(board.syncIdentity??null)!==receipt.identity)return false;
+  const prefix=sceneIntentPrefix(receipt,board),bound=receipt.heads.find(row=>row.hash===head.hash&&row.count===prefix);
+  if(!bound)return false;
+  const scene=prefix?sceneIntentScene(receipt,prefix):receipt.priorScene;
+  if(canonicalDecisionFact(board.settings?.scene??null)!==canonicalDecisionFact(scene))return false;
+  const baseline=board.decisionBaseline||baselineFromSource(board,receipt.events[0]);
+  return baseline?.id===receipt.baselineId;
+}
+function holdSceneIntent(code){
+  deviceRecoveryCloudHold||={v:1,reason:"pending-scene-choice"};
+  return reportDeviceSaveFailure("scene-choice",code,"The saved board and pending scene choice are protected. Use Settings → Export to keep their originals.");
+}
+function sceneIntentSources(){
+  const keys=sceneIntentKeys();if(keys.length>SCENE_INTENT_MAX_KEYS)throw Error("Scene intent generation bound reached");
+  const sources=keys.map(key=>{const raw=localStorage.getItem(key),receipt=readSceneIntent(raw);if(!receipt)throw Error("Unreadable scene intent");return {key,raw,receipt};}),byKey=new Map(sources.map(source=>[source.key,source])),parents=new Set();
+  for(const {key,receipt} of sources){
+    if(receipt.parent===key)throw Error("Cyclic scene intent");
+    const parent=byKey.get(receipt.parent)?.receipt;if(!parent)continue;parents.add(receipt.parent);
+    if(receipt.account!==parent.account||receipt.identity!==parent.identity||receipt.baselineId!==parent.baselineId||canonicalDecisionFact(receipt.priorScene)!==canonicalDecisionFact(parent.priorScene)||canonicalDecisionFact(receipt.events.slice(0,parent.events.length))!==canonicalDecisionFact(parent.events)||canonicalDecisionFact(receipt.heads.slice(0,parent.heads.length))!==canonicalDecisionFact(parent.heads))throw Error("Changed scene intent lineage");
+    const seen=new Set([key]);let cursor=receipt.parent;while(byKey.has(cursor)){if(seen.has(cursor))throw Error("Cyclic scene intent");seen.add(cursor);cursor=byKey.get(cursor).receipt.parent;}
+  }
+  return {sources,tips:sources.filter(source=>!parents.has(source.key))};
+}
+function writeSceneIntentGeneration(parent,receipt){
+  const key=SCENE_INTENT_PREFIX+uid(),next={...receipt,parent:parent?.key??null},raw=JSON.stringify(next);
+  if(sceneIntentKeys().length>=SCENE_INTENT_MAX_KEYS||new TextEncoder().encode(raw).byteLength>SCENE_INTENT_MAX_BYTES||!readSceneIntent(raw)||parent&&localStorage.getItem(parent.key)!==parent.raw||localStorage.getItem(key)!==null)return null;
+  // Never rewrite a receipt. Foreign retirement may remove an old key while
+  // a live tab writes this new key; both generations retain their exact facts.
+  localStorage.setItem(key,raw);return localStorage.getItem(key)===raw?key:null;
+}
+function stageSceneIntent(events){
+  if(!deviceStorageAuthority)return true;
+  try{
+    const {sources,tips}=sceneIntentSources(),saved=JSON.parse(lastPersistedRaw);let source=sources.find(row=>row.key===sceneIntentOwnKey)||null;
+    if(source&&tips.length===1){let cursor=tips[0];while(cursor){if(cursor.key===source.key){source=tips[0];break;}cursor=sources.find(row=>row.key===cursor.receipt.parent);}}
+    let receipt=source?.receipt;
+    if(receipt&&sceneIntentMatches(receipt,{hash:deviceHeadHash,account:saved.syncAccount??null},saved)&&sceneIntentPrefix(receipt,saved)===receipt.events.length){receipt=null;source=null;}
+    if(receipt){
+      if(receipt.account!==(state.syncAccount??null)||receipt.identity!==(state.syncIdentity??null)||canonicalDecisionFact(state.settings.scene)!==canonicalDecisionFact(sceneIntentScene(receipt,receipt.events.length)))return false;
+      receipt={...receipt,events:[...receipt.events,...events]};
+    }else{
+      const baseline=state.decisionBaseline||baselineFromSource(saved,events[0]);
+      receipt={v:1,account:state.syncAccount??null,identity:state.syncIdentity??null,baselineId:baseline?.id,priorScene:saved.settings?.scene??null,events,heads:[{hash:deviceHeadHash,count:0}]};
+    }
+    const key=writeSceneIntentGeneration(source,receipt);if(!key)return false;sceneIntentOwnKey=key;return true;
+  }catch{return false;}
+}
+async function recordSceneIntentCommit(options,attempt=null){
+  if(!localDeviceStartupCurrent(attempt))return false;
+  if(!sceneIntentKeys().length)return true;
+  const board=JSON.parse(options.payload),hash=await ChainStorageV2.hashPayload(options.payload);
+  if(!localDeviceStartupCurrent(attempt))return false;
+  const {tips}=sceneIntentSources();if(tips.length!==1)return false;
+  const source=tips[0],receipt=source.receipt;
+  if(receipt.account!==(board.syncAccount??null)||receipt.identity!==(board.syncIdentity??null))return true;
+  const count=sceneIntentPrefix(receipt,board);if(count<=0)return false;
+  if(canonicalDecisionFact(board.settings?.scene)!==canonicalDecisionFact(sceneIntentScene(receipt,count))||board.decisionBaseline?.id!==receipt.baselineId||!receipt.heads.some(row=>row.hash===options.expectedHash))return false;
+  const recorded=receipt.heads.find(row=>row.hash===hash);if(recorded)return recorded.count===count;
+  if(receipt.heads.length>=SCENE_INTENT_MAX_EVENTS+1)return false;
+  const key=writeSceneIntentGeneration(source,{...receipt,heads:[...receipt.heads,{hash,count}]});if(!key)return false;sceneIntentOwnKey=key;
+  const current=sceneIntentSources();return localDeviceStartupCurrent(attempt)&&current.tips.length===1&&current.tips[0].key===key;
+}
+async function retireSceneIntents(attempt=null){
+  if(!localDeviceStartupCurrent(attempt))return false;
+  if(!sceneIntentKeys().length)return true;
+  const {sources}=sceneIntentSources(),head=await deviceStore.readHead();if(!head||!localDeviceStartupCurrent(attempt))return false;const board=JSON.parse(head.payload);
+  const proofs=sources.filter(source=>sceneIntentMatches(source.receipt,head,board));
+  for(const source of sources){const receipt=source.receipt;
+    if(!proofs.some(({receipt:proof})=>receipt.account===proof.account&&receipt.identity===proof.identity&&receipt.baselineId===proof.baselineId&&canonicalDecisionFact(receipt.priorScene)===canonicalDecisionFact(proof.priorScene)&&receipt.events.length<=sceneIntentPrefix(proof,board)&&canonicalDecisionFact(receipt.events)===canonicalDecisionFact(proof.events.slice(0,receipt.events.length))))continue;
+    if(localDeviceStartupCurrent(attempt)&&localStorage.getItem(source.key)===source.raw){localStorage.removeItem(source.key);if(localStorage.getItem(source.key)!==null)return false;}
+  }
+  return true;
+}
+
+async function resumeSceneIntents(){
+  try{if(!sceneIntentKeys().length)return true;}catch{return holdSceneIntent("unreadable-source");}
+  let prior=null;
+  const {result}=await runLocalDeviceStorageAttempt(async attempt=>{
+    if(!sceneIntentKeys().length)return true;
+    if(!deviceStorageAuthority||!deviceStore)return false;
+    if(!await retireSceneIntents(attempt)||!localDeviceStartupCurrent(attempt))return false;
+    const {sources,tips}=sceneIntentSources();if(!sources.length)return true;
+    if(tips.length!==1)return false;
+    const {receipt}=tips[0],head=await deviceStore.readHead();
+    if(!receipt||!head||!localDeviceStartupCurrent(attempt))return false;
+    const board=JSON.parse(head.payload);if(!sceneIntentMatches(receipt,head,board)||head.hash!==deviceHeadHash||head.payload!==lastPersistedRaw)return false;
+    prior={scene:state.settings.scene,events:state.decisionEvents,baseline:state.decisionBaseline,updatedAt:state.updatedAt,syncDirty:state.syncDirty};
+    const count=sceneIntentPrefix(receipt,board);
+    ensureDecisionBaseline(receipt.events[0]);
+    if(state.decisionBaseline?.id!==receipt.baselineId)return false;
+    state.settings.scene=sceneIntentScene(receipt,receipt.events.length);
+    for(const event of receipt.events.slice(count))appendDecisionEvent(event);
+    state.updatedAt=Date.now();state.syncDirty=true;saveRequestGeneration++;
+    return await persist(true,null,0,attempt)&&localDeviceStartupCurrent(attempt)&&await retireSceneIntents(attempt)&&sceneIntentKeys().length===0;
+  });
+  if(result===true)return true;
+  // Expired continuations are fenced before a receipt/database mutation and
+  // after commit acknowledgement. The saved board remains usable on failure.
+  if(prior){state.settings.scene=prior.scene;for(const key of ["events","baseline"]){const property=key==="events"?"decisionEvents":"decisionBaseline";if(prior[key]===undefined)delete state[property];else state[property]=prior[key];}state.updatedAt=prior.updatedAt;state.syncDirty=prior.syncDirty;}
+  return holdSceneIntent("unverified-source");
+}
+
 function recordScenePreferences(patch){
   if(!state?.settings || applyingSceneFromState) return;
   const before=state.settings.scene||defaultSceneSettings();
@@ -1625,12 +1761,13 @@ function recordScenePreferences(patch){
     choices.push({target:{type:"scene",id:"board",property},value:next.value,after:{present:true},before:prior});
   }
   if(!choices.length)return;
-  const gesture=captureCurrentChoiceGesture();
+  const gesture=captureCurrentChoiceGesture(),events=prepareCurrentChoiceEvents(choices,gesture);
+  if(!stageSceneIntent(events)){applyScenePreferences();reportDeviceSaveFailure("scene-choice","intent-unavailable","The previous scene choice remains protected. Try again when browser storage is available.");const status=document.getElementById("sceneTimeStatus");if(status)status.textContent="Could not save this scene choice. The previous choice is still in place.";return false;}
   // Scene controls do not have their own Undo item. Seal an older local frame
   // so Undo cannot absorb this separate, immediate preference action.
   sealUndoFrame();
   state.settings.scene=after;
-  appendCurrentChoiceEvents(prepareCurrentChoiceEvents(choices,gesture));
+  appendCurrentChoiceEvents(events);
   // The renderer mirrors the choice immediately; start its authoritative save
   // now so a quick reload cannot replace it with the previous board choice.
   save(null,true);
@@ -1889,7 +2026,9 @@ function encodeManualArchiveValue(rootValue,sourcePath){
   return visit(rootValue,sourcePath);
 }
 function readManualArchiveLocalSources({allowUnavailable=false}={}){
-  return MANUAL_EXPORT_LOCAL_KEYS.map(key=>{
+  let keys=MANUAL_EXPORT_LOCAL_KEYS,unavailable=[];
+  try{keys=[...keys,...sceneIntentKeys()];}catch(error){if(!allowUnavailable)throw error;unavailable=[{key:SCENE_INTENT_PREFIX,status:"unavailable",reason:"enumeration-failed"}];}
+  return keys.map(key=>{
     let raw;
     try{raw=localStorage.getItem(key);}catch(e){
       if(allowUnavailable)return {key,status:"unavailable",reason:"read-failed"};
@@ -1900,7 +2039,7 @@ function readManualArchiveLocalSources({allowUnavailable=false}={}){
       throw new Error("Recovery archive received an unreadable localStorage value for "+key+".");
     }
     return raw===null?{key,status:"absent"}:{key,status:"present",raw};
-  });
+  }).concat(unavailable);
 }
 function manualArchiveKeyLabel(encodedKey){return JSON.stringify(encodedKey);}
 function encodeManualArchiveSnapshot(snapshot){
@@ -3601,7 +3740,7 @@ function deviceQuotaFailure(error){
    push callback in sendPush() has to record a revision without that counting
    as a change, or every write re-stamps the state and schedules the next one,
    a 2-second write loop with no edit behind it. */
-async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceRetry=0){
+async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceRetry=0,sceneReplayAttempt=null){
   if(!liveBoardAccepted){
     const unreadableBackup=inspectBackupIndex().rows===null;
     return reportDeviceSaveFailure("device-recovery","unaccepted-source",unreadableBackup
@@ -3645,6 +3784,7 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
     const recovered=mergeUndeletedTasks(state, JSON.parse(lastPersistedRaw));
     if(recovered){ recomputeRanks(); render(); toast("A missing task was kept in the saved board.", 6000); }
   }
+  if(!localDeviceStartupCurrent(sceneReplayAttempt))return false;
   const chanceSeed = state.chance?.seed;
   const requestGeneration = saveRequestGeneration;
   const payload = JSON.stringify(state);
@@ -3652,7 +3792,7 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
     try{
       const commit=async options=>{
         let result;
-        try{result=await deviceWriteBeforeDiagnostics("commitHead",options);}
+        try{if(!await recordSceneIntentCommit(options,sceneReplayAttempt)||!localDeviceStartupCurrent(sceneReplayAttempt))return {error:true,code:"scene-intent-unavailable"};result=await deviceWriteBeforeDiagnostics("commitHead",options);if(!localDeviceStartupCurrent(sceneReplayAttempt))return {error:true,code:"scene-intent-expired"};}
         catch(error){if(deviceQuotaFailure(error))result={error:true,code:"quota-exhausted"};else throw error;}
         return result;
       };
@@ -3670,6 +3810,7 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
         result=await commit({expectedHash:deviceHeadHash,payload,account:state.syncAccount??null,
           backups:completionSourceBackup?[completionSourceBackup]:[],removeBackupIds});
       }
+      if(sceneReplayAttempt&&(result?.conflict||result?.superseded))return reportDeviceSaveFailure("scene-choice","changed-during-save");
       let committedPayload=payload,observedPayload=payload,mergedState=null;
       if(result?.superseded){
         const head=result.head;
@@ -3760,6 +3901,7 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
         return persist(backupAlreadySafe,preserveBackupId,followUp?0:deviceRetry+1);
       }
       if(completionSourcePayload!==null&&pendingLegacyCompletionSource===completionSourcePayload)pendingLegacyCompletionSource=null;
+      if(!await retireSceneIntents(sceneReplayAttempt))return reportDeviceSaveFailure("scene-choice","readback-failed");
       clearDeviceSaveIssue();if(pendingDeviceCloudBackup)await acknowledgeDeviceCloudBackupSave(result.hash,committedPayload);return true;
     }catch(e){return reportDeviceSaveFailure("device-store","write-failed","The previous durable board remains unchanged; keep this tab open and try again.");}
   }
@@ -4625,7 +4767,7 @@ function downloadSupportDiagnostics(){
     viewSupportDiagnostics();toast("Download is unavailable. The report remains selectable on this device.",7000);return false;
   }
 }
-async function persist(backupAlreadySafe=false,preserveBackupId=null,deviceRetry=0){
+async function persist(backupAlreadySafe=false,preserveBackupId=null,deviceRetry=0,sceneReplayAttempt=null){
   const startedAt=supportDiagnosticsNow(),requestGeneration=saveRequestGeneration,priorIssue=lastDeviceSaveIssue;
   supportDiagnosticsPersistCalls++;
   if(Number.isSafeInteger(deviceRetry)&&deviceRetry>0)supportDiagnosticsRetryAttempts++;
@@ -4633,7 +4775,7 @@ async function persist(backupAlreadySafe=false,preserveBackupId=null,deviceRetry
   supportDiagnosticsLastLocalStatus="pending";supportDiagnosticsLastLocalAt=startedAt;
   supportDiagnosticsObserve("persist","started","current",null,null,null,null,null,null,null,null,null,"unknown");
   try{
-    const result=await persistImpl(backupAlreadySafe,preserveBackupId,deviceRetry);
+    const result=await persistImpl(backupAlreadySafe,preserveBackupId,deviceRetry,sceneReplayAttempt);
     const at=supportDiagnosticsNow();
     if(result===true){
       supportDiagnosticsLastLocalStatus="durable";supportDiagnosticsLastLocalCode="unknown";
@@ -7434,7 +7576,9 @@ const taskActionOwnerBundle=(()=>{
       if(typeof head==="string"&&Array.isArray(task.ratingHistory)&&task.ratingHistory.some(row=>row?.id===head&&validRatingHistoryRow(row)))task.ratingHistoryHead=head;
     }
     replaceState(next);
-    if(cancellation)projectDecisionEvents(state);
+    // The final refresh below follows cancellation projection; sampling here
+    // would immediately discard a second full distribution for the same Undo.
+    if(cancellation)projectDecisionEvents(state,null,{refreshRanks:false});
     // Restore ratings without replaying a fresh-pass/day random draw.
     if(!targets.some(event=>event.kind==="current-choice"&&event.target?.type==="pass"&&event.target.property==="scanMode")&&currentChance&&Date.now()<passResetCutoff(currentChance.at)&&
       (frame.generation!==chanceGeneration||(state.chance&&Date.now()>=passResetCutoff(state.chance.at)))){
@@ -14904,6 +15048,7 @@ function hotkeyDelete(){
   // edits made while the first cloud read is in flight.
   baseUpdatedAt = rejectedSavedState ? 0 : (state.updatedAt || 0);
   if(!rejectedSavedState && loaded) saveLocalBackup("daily", JSON.stringify(state), true);
+  await resumeSceneIntents();
   applyTheme();
   applyScenePreferences();
   if(migratedScene) save();

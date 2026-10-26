@@ -13096,6 +13096,46 @@
       "root": "mobile kernel page floor actual CLI preserves exact requests and rejects substituted observations",
       "group": "native-process",
       "file": "scripts/agent-tools/mobile-memory-stress-lifecycle.test.mjs"
+    },
+    {
+      "root": "RISK repository process: refused native releases avoid drag round trips while preserving ten real attempts",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK synced scene intent: rapid choices survive interrupted device hashing without changing protected sources",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK task action history: Undo refreshes ranks once after projecting its immutable cancellation",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK synced scene intent: exact own-prefix commits replay only the missing rapid choice suffix",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK synced scene intent: storage refusal bounds and foreign heads preserve originals and existing Export",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK synced scene intent: interrupted replay and two tab originals never lose pending facts",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK synced scene intent: bounded replay exposes the saved board and rejects a late hash completion",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK synced scene intent: foreign retirement cannot erase a newer live tab choice generation",
+      "group": "core",
+      "file": "tests.js"
     }
   ],
   "processControls": [

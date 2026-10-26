@@ -9157,6 +9157,8 @@ function makeDomShim({ prefersDark = false, sharedStorage = null } = {}) {
     documentElement,
   };
   const localStorage = sharedStorage || {
+    get length() { return localStorageMap.size; },
+    key(index) { return [...localStorageMap.keys()][index] ?? null; },
     getItem(k) { return localStorageMap.has(k) ? localStorageMap.get(k) : null; },
     setItem(k, v) { localStorageMap.set(k, String(v)); },
     removeItem(k) { localStorageMap.delete(k); },
@@ -9549,7 +9551,7 @@ test('RISK apology release identity: malformed continuation fails closed at the 
 
 test('RISK apology notice: continuation preserves expiry dismissal manual reopen and separate Stable',async()=>{
  const startsAt=Date.parse('2026-10-20T19:42:33.722Z'),day=86400000,values=new Map();
- const storage={getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,String(value)),removeItem:key=>values.delete(key)};
+ const storage={get length(){return values.size;},key:index=>[...values.keys()][index]??null,getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,String(value)),removeItem:key=>values.delete(key)};
  const setup=async(channel,at,uid)=>{
   const envelope=channelReleaseEnvelope(channel,channel==='beta'?startsAt:at-day/24,channel==='beta'?startsAt+day:at-day/24);
   if(channel==='beta')envelope.notices[APOLOGY_NOTICE_ID].continuation=publishedBetaContinuation();
@@ -16469,6 +16471,8 @@ const HOUR = 3600000;
 function sharedScannerStorage(initial = {}) {
   const values = new Map(Object.entries(initial));
   return {
+    get length() { return values.size; },
+    key: index => [...values.keys()][index] ?? null,
     getItem: key => values.has(key) ? values.get(key) : null,
     setItem: (key, value) => values.set(key, String(value)),
     removeItem: key => values.delete(key),
@@ -18195,6 +18199,7 @@ test('RISK LOCAL BACKUPS: lossless compaction frees protected archive quota with
  const values=new Map(),used=()=>[...values].reduce((sum,[key,value])=>sum+key.length+value.length,0);
  let quota=Infinity;
  const storage={
+  get length(){return values.size;},key:index=>[...values.keys()][index]??null,
   getItem:key=>values.get(key)??null,
   removeItem:key=>values.delete(key),
   setItem(key,value){
@@ -18231,6 +18236,7 @@ test('RISK LOCAL BACKUPS: Undo compacts retained recovery before growing the gua
  const values=new Map(),used=()=>[...values].reduce((sum,[key,value])=>sum+key.length+value.length,0);
  let quota=Infinity;
  const storage={
+  get length(){return values.size;},key:index=>[...values.keys()][index]??null,
   getItem:key=>values.get(key)??null,
   removeItem:key=>values.delete(key),
   setItem(key,value){
@@ -18382,6 +18388,7 @@ test('RISK CLOUD BACKUP: mandatory adoption backup compacts protected recovery a
  const values=new Map(),used=()=>[...values].reduce((sum,[key,value])=>sum+key.length+value.length,0);
  let quota=Infinity;
  const storage={
+  get length(){return values.size;},key:index=>[...values.keys()][index]??null,
   getItem:key=>values.get(key)??null,
   removeItem:key=>values.delete(key),
   setItem(key,value){
@@ -18684,6 +18691,7 @@ test('RISK CLOUD BACKUP: clean adoption frees automatic history for the next ord
  const values=new Map(),used=()=>[...values].reduce((sum,[key,value])=>sum+key.length+value.length,0);
  let quota=Infinity;
  const storage={
+  get length(){return values.size;},key:index=>[...values.keys()][index]??null,
   getItem:key=>values.get(key)??null,
   removeItem:key=>values.delete(key),
   setItem(key,value){
@@ -18839,6 +18847,7 @@ test('RISK LOCAL STORAGE: a full iOS store still opens its readable primary boar
  const used=()=>[...values].reduce((sum,[key,value])=>sum+key.length+value.length,0);
  const quota=used();
  const storage={
+  get length(){return values.size;},key:index=>[...values.keys()][index]??null,
   getItem:key=>values.has(key)?values.get(key):null,
   removeItem:key=>values.delete(key),
   setItem(key,value){
@@ -18936,6 +18945,7 @@ test('RISK LOCAL BACKUPS: single-device Undo frees old automatic history for its
  const values=new Map();let quota=Infinity;
  const used=()=>[...values].reduce((sum,[key,value])=>sum+key.length+value.length,0);
  const storage={
+  get length(){return values.size;},key:index=>[...values.keys()][index]??null,
   getItem:key=>values.has(key)?values.get(key):null,
   removeItem:key=>values.delete(key),
   setItem(key,value){
@@ -19044,6 +19054,7 @@ test('RISK LOCAL BACKUPS: full optional history cannot block an ordinary edit th
  const values=new Map(),used=()=>[...values].reduce((sum,[key,value])=>sum+key.length+value.length,0);
  let quota=Infinity;
  const storage={
+  get length(){return values.size;},key:index=>[...values.keys()][index]??null,
   getItem:key=>values.get(key)??null,
   setItem:(key,value)=>{
    const next=String(value),prior=values.get(key)||'';
@@ -19080,6 +19091,7 @@ test('RISK LOCAL BACKUPS: quota during Restore keeps the immediate pre-restore b
  let appCtx=null;
  const used=()=>[...values].reduce((sum,[key,value])=>sum+key.length+value.length,0);
  const storage={
+  get length(){return values.size;},key:index=>[...values.keys()][index]??null,
   getItem:key=>values.has(key)?values.get(key):null,
   removeItem:key=>values.delete(key),
   setItem(key,value){
@@ -30220,7 +30232,7 @@ test('RISK RESET SAFETY: backup failure aborts reset before state or primary sto
 
 test('RISK RESET SAFETY: quota compaction makes room for the mandatory copy without deleting retained rows',async()=>{
  const values=new Map(),used=()=>[...values].reduce((sum,[key,value])=>sum+key.length+value.length,0);let quota=Infinity;
- const storage={getItem:key=>values.get(key)??null,removeItem:key=>values.delete(key),setItem(key,value){
+ const storage={get length(){return values.size;},key:index=>[...values.keys()][index]??null,getItem:key=>values.get(key)??null,removeItem:key=>values.delete(key),setItem(key,value){
   const next=String(value),prior=values.get(key)||'';
   if(used()-prior.length+next.length>quota){const error=Error('aggregate quota');error.name='QuotaExceededError';throw error;}
   values.set(key,next);
@@ -31254,6 +31266,7 @@ test('RISK SCALABLE LOCAL BOARD: a multi-megabyte legacy board migrates without 
  assert.ok(Buffer.byteLength(raw,'utf8')>1048576,'production fixture exceeds Firestore and common localStorage headroom');
  const values=new Map([[LOCAL_HEAD_KEY,raw],[SYNC_STORE_KEY,raw],[LOCAL_BACKUPS_KEY,'opaque legacy archive bytes']]);
  const storage={
+  get length(){return values.size;},key:index=>[...values.keys()][index]??null,
   getItem:key=>values.has(key)?values.get(key):null,
   setItem(key,value){value=String(value);if(value.length>300000)throw Object.assign(Error('quota'),{name:'QuotaExceededError'});values.set(key,value);},
   removeItem:key=>values.delete(key),
@@ -31293,6 +31306,7 @@ test('RISK SCALABLE RECOVERY: cloud replacement awaits an IndexedDB safety copy 
  local.futureBoardData={blob:'L'.repeat(1150000)};
  const localRaw=JSON.stringify(local),values=new Map([[LOCAL_HEAD_KEY,localRaw],[SYNC_STORE_KEY,localRaw]]);
  const storage={
+  get length(){return values.size;},key:index=>[...values.keys()][index]??null,
   getItem:key=>values.has(key)?values.get(key):null,
   setItem(key,value){value=String(value);if(value.length>350000)throw Object.assign(Error('quota'),{name:'QuotaExceededError'});values.set(key,value);},
   removeItem:key=>values.delete(key),
@@ -46089,4 +46103,112 @@ test('RISK repository process: mobile kernel page floor requires actual observat
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
  const result=spawnSync(process.execPath,['--test','--test-name-pattern=mobile kernel page floor','scripts/agent-tools/mobile-memory.test.mjs','scripts/agent-tools/mobile-memory-stress-lifecycle.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:15000,maxBuffer:4*1024*1024});
  assert.equal(result.error,undefined);assert.equal(result.status,0,'Actual kernel-reader and immutable CLI consumers require deterministic page flooring: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# skipped 0$/m);
+});
+
+
+test('RISK repository process: refused native releases avoid drag round trips while preserving ten real attempts',async t=>{
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});const playwright=await import('playwright'),{runButtonSafety}=await import('./scripts/button-safety-native.mjs');
+ for(const engine of ['chromium','webkit'])await t.test(engine,async()=>{
+  const output=fs.mkdtempSync(path.join(base,'neutral-release-')),launch=playwright[engine].launch;let heldMoves=0;
+  playwright[engine].launch=async(...args)=>{const browser=await launch.apply(playwright[engine],args),newContext=browser.newContext.bind(browser);browser.newContext=async(...args)=>{const context=await newContext(...args),newPage=context.newPage.bind(context);context.newPage=async(...args)=>{const page=await newPage(...args),move=page.mouse.move.bind(page.mouse),down=page.mouse.down.bind(page.mouse),up=page.mouse.up.bind(page.mouse);let held=false;
+   page.mouse.down=async(...args)=>{await down(...args);held=true;};page.mouse.up=async(...args)=>{try{return await up(...args);}finally{held=false;}};
+   // Model the observed cross-frame drag-controller round trips, not app work.
+   // A neutral release should require no drag; actual native up remains awaited.
+   page.mouse.move=async(...args)=>{if(held){heldMoves++;await new Promise(resolve=>setTimeout(resolve,250));}return move(...args);};return page;};return context;};return browser;};
+  let result,failure;try{result=await runButtonSafety({repo:__dirname,engine,port:Number(process.env.CHAIN_NATIVE_PORT||0),outputDir:output,scenarioFilter:'rapid motion settings open and both choices respond'});}catch(error){failure=error;}finally{playwright[engine].launch=launch;}
+  assert.equal(failure,undefined,'Refused presses must meet the original deadline without cross-frame native drag work: '+failure);assert.equal(heldMoves,0);assert.equal(result.report.status,'passed');let refused=0;
+  for(const row of result.report.rapidOutcomes)for(const burst of row.bursts){assert.equal(burst.trustedPresses,10);assert.equal(burst.attempts,10);assert.ok(burst.windowMs<=2000);assert.equal(burst.unrelatedClicks,0);for(const attempt of burst.attemptDetails)if(attempt.neutralRelease){refused++;assert.equal(attempt.acceptedClicks,0);assert.equal(attempt.neutralDocumentId,result.report.releaseSurfaces[0].documentId);}}
+  assert.ok(refused>=9);assert.deepEqual(result.report.errors,[]);for(const value of Object.values(result.report.cleanup))assert.equal(value,true);t.diagnostic('Actual native neutral release and controller-latency evidence: '+output);
+ });
+});
+
+
+test('RISK synced scene intent: rapid choices survive interrupted device hashing without changing protected sources',async()=>{
+ const {indexedDB}=await import('fake-indexeddb'),{buttonFixture}=await import('./scripts/button-safety-fixture.mjs'),storage=makeDomShim().localStorage,deviceDbName='scene-intent-'+Date.now(),board=buttonFixture('signed-out');let armed=false,release;const gate=new Promise(resolve=>{release=resolve;});let delayed=0;
+ const cryptoProvider={randomUUID:()=>webcrypto.randomUUID(),getRandomValues:a=>webcrypto.getRandomValues(a),subtle:{digest:async(...args)=>{if(armed){delayed++;await gate;}return webcrypto.subtle.digest(...args);}}};
+ const first=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName,cryptoProvider,seedStorage:{'fvp:chain-scanner:v1':JSON.stringify(board)}}),store=first.shim.window.ScannerDeviceStore;assert.equal(await first.ctx.persist(true),true);
+ for(let i=0;i<2;i++)assert.equal((await store.putBackup({expectedHash:(await store.readHead()).hash,backup:{id:'scene-protected-'+i,kind:'manual',day:'2026-10-26',at:i+1,payload:JSON.stringify({...board,futureProtected:i})}})).ok,true);
+ const pending={generationId:'scene-pending',payload:JSON.stringify(board)};await store.setPendingUpload('scene-owner',pending);
+ const before={head:await store.readHead(),backups:JSON.stringify(await store.listBackups()),opaque:JSON.stringify(await store.listOpaqueArchives()),pending:JSON.stringify(await store.getPendingUpload('scene-owner'))};armed=true;
+ first.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'23:15',season:'winter'}});
+ first.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'07:10',season:'summer'}});
+ assert.equal(first.ctx.state.settings.scene.time,'07:10');await flush();assert.ok(delayed,'The actual device save is awaiting its real digest boundary');await first.dispose();armed=false;release();await flush();
+ const reopened=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName});const deadline=Date.now()+5000;while([...Array(storage.length)].some((_,i)=>storage.key(i).startsWith('fvp:chain-scanner:pending-scene-choice:v1:'))&&Date.now()<deadline)await flush();const after=await reopened.shim.window.ScannerDeviceStore.readHead(),saved=JSON.parse(after.payload);
+ assert.equal(saved.settings.scene?.time,'07:10','Immediate reopen durably retains the latest accepted scene choice');assert.equal(saved.settings.scene.season,'summer');assert.equal(reopened.ctx.state.settings.scene.time,'07:10');
+ assert.equal(JSON.stringify(saved.tasks),JSON.stringify(JSON.parse(before.head.payload).tasks));assert.equal(JSON.stringify(saved.futurePopulated),JSON.stringify(board.futurePopulated));assert.equal(JSON.stringify(await reopened.shim.window.ScannerDeviceStore.listBackups()),before.backups);assert.equal(JSON.stringify(await reopened.shim.window.ScannerDeviceStore.listOpaqueArchives()),before.opaque);assert.equal(JSON.stringify(await reopened.shim.window.ScannerDeviceStore.getPendingUpload('scene-owner')),before.pending);
+ assert.equal([...Array(storage.length)].map((_,i)=>storage.key(i)).filter(key=>key.startsWith('fvp:chain-scanner:pending-scene-choice:v1:')).length,0,'Only exact durable fact readback retires the scene intent');
+});
+
+
+test('RISK task action history: Undo refreshes ranks once after projecting its immutable cancellation',async()=>{
+ const {ctx,shim,a,b}=await ratingHistoryFixture(791);ctx.state.chain=[a.id];ctx.state.candidateId=b.id;ctx.onAction('yes',{dataset:{candidate:b.id,benchmark:a.id}});assert.equal(ctx.state.chain.at(-1),b.id);
+ // Count the real sampling boundary while the existing Undo consumer projects
+ // its cancellation. Duplicate rank distributions needlessly consume the rapid
+ // native budget; the final distribution and observation must still be fresh.
+ vm.runInContext('this.undoRankSamples=0;this.originalUndoRankStats=rankStats;rankStats=(...args)=>{undoRankSamples++;return originalUndoRankStats(...args);}',ctx);
+ assert.equal(ctx.onAction('undo',{}),true);assert.equal(ctx.undoRankSamples,1,'One Undo must sample one final rank distribution, after projecting cancellation');assert.equal(ctx.state.chain.includes(b.id),false);
+ const cancellations=ctx.state.decisionEvents.filter(row=>row.kind==='undo');assert.equal(cancellations.length,1);assert.equal(cancellations[0].targetEventIds.length,1);assert.equal(ctx.state.tasks.length,3);assert.ok(ctx.state.tasks.every(row=>Number.isFinite(row.mu)&&Number.isFinite(row.sigma)));
+ assert.match(shim.elements.get('scan').innerHTML,/data-act="yes"/);assert.equal(await ctx.persist(),true);
+});
+
+
+const sceneIntentTestKeys=storage=>[...Array(storage.length)].map((_,i)=>storage.key(i)).filter(key=>key.startsWith('fvp:chain-scanner:pending-scene-choice:v1:'));
+async function sceneIntentTestFixture(){
+ const {IDBFactory}=await import('fake-indexeddb'),{buttonFixture}=await import('./scripts/button-safety-fixture.mjs'),indexedDBProvider=new IDBFactory(),deviceDbName='scene-edge-'+webcrypto.randomUUID(),sharedStorage=makeDomShim().localStorage;
+ const app=await loadApp({sharedStorage,indexedDBProvider,deviceDbName,seedStorage:{'fvp:chain-scanner:v1':JSON.stringify(buttonFixture('signed-out'))}});assert.equal(await app.ctx.persist(true),true);
+ return {app,sharedStorage,indexedDBProvider,deviceDbName};
+}
+async function waitSceneIntentBoot(app,storage){const deadline=Date.now()+5000;while(sceneIntentTestKeys(storage).length&&!app.ctx.deviceSaveIssue()&&Date.now()<deadline)await flush();}
+
+test('RISK synced scene intent: exact own-prefix commits replay only the missing rapid choice suffix',async()=>{
+ const fixture=await sceneIntentTestFixture(),{app,sharedStorage,indexedDBProvider,deviceDbName}=fixture,store=app.shim.window.ScannerDeviceStore,commit=store.commitHead.bind(store);let release,entered;const gate=new Promise(resolve=>{release=resolve;}),firstCommitted=new Promise(resolve=>{entered=resolve;});
+ store.commitHead=async options=>{const time=JSON.parse(options.payload).settings.scene.time;if(time==='07:10'){await gate;return commit(options);}const result=await commit(options);if(time==='23:15'){entered();await gate;}return result;};
+ app.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'23:15',season:'winter'}});await firstCommitted;
+ app.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'07:10',season:'summer'}});await flush();const prefix=await store.readHead(),keys=sceneIntentTestKeys(sharedStorage),receipts=keys.map(key=>JSON.parse(sharedStorage.getItem(key)));assert.ok(keys.length>=2);const receipt=receipts.find(row=>row.events.length===4&&row.heads.some(head=>head.hash===prefix.hash));assert.ok(receipt.heads.some(row=>row.hash===prefix.hash&&row.count===2));assert.equal(receipt.events.length,4);const priorTasks=JSON.stringify(JSON.parse(prefix.payload).tasks);
+ await app.dispose();release();await flush();const reopened=await loadApp({sharedStorage,indexedDBProvider,deviceDbName});await waitSceneIntentBoot(reopened,sharedStorage);const head=await reopened.shim.window.ScannerDeviceStore.readHead(),board=JSON.parse(head.payload);
+ assert.equal(board.settings.scene.time,'07:10');assert.equal(board.settings.scene.season,'summer');assert.equal(JSON.stringify(board.tasks),priorTasks);assert.equal(board.decisionEvents.filter(row=>receipt.events.some(event=>event.id===row.id)).length,4);assert.deepEqual(sceneIntentTestKeys(sharedStorage),[]);
+});
+
+test('RISK synced scene intent: storage refusal bounds and foreign heads preserve originals and existing Export',async t=>{
+ for(const mode of ['storage refusal','receipt bound','changed head','changed account','malformed receipt'])await t.test(mode,async()=>{
+  const {app,sharedStorage,indexedDBProvider,deviceDbName}=await sceneIntentTestFixture(),store=app.shim.window.ScannerDeviceStore,before=await store.readHead(),beforeScene=JSON.stringify(app.ctx.state.settings.scene),write=sharedStorage.setItem.bind(sharedStorage),commit=store.commitHead.bind(store);let release;const gate=new Promise(resolve=>{release=resolve;});store.commitHead=async options=>{await gate;return commit(options);};
+  if(mode==='storage refusal')sharedStorage.setItem=(key,value)=>{if(key.startsWith('fvp:chain-scanner:pending-scene-choice:v1:'))throw new DOMException('Controlled full local receipt store','QuotaExceededError');return write(key,value);};
+  if(mode==='receipt bound')for(let i=0;i<128;i++)write('fvp:chain-scanner:pending-scene-choice:v1:retained-'+i,'unreadable original '+i);
+  app.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'23:15',season:'winter'}});await flush();
+  if(mode==='storage refusal'||mode==='receipt bound'){assert.equal(JSON.stringify(app.ctx.state.settings.scene),beforeScene,'Refused intent cannot claim a new accepted scene choice');assert.equal((await store.readHead()).hash,before.hash);assert.equal(app.ctx.deviceSaveIssue().stage,'scene-choice');sharedStorage.setItem=write;await app.dispose();release();return;}
+  const key=sceneIntentTestKeys(sharedStorage)[0];assert.ok(key);
+  if(mode==='changed head'||mode==='changed account'){const board=JSON.parse(before.payload);board.futurePeer={keep:'new authoritative peer bytes'};if(mode==='changed account'){board.syncAccount='other@example.test';board.syncIdentity='other-identity';}const result=await commit({expectedHash:before.hash,payload:JSON.stringify(board),account:board.syncAccount??null});assert.equal(result.ok,true);}
+  if(mode==='malformed receipt')write(key,'{unreadable exact scene original');const raw=sharedStorage.getItem(key),protectedHead=await store.readHead();await app.dispose();release();await flush();const reopened=await loadApp({sharedStorage,indexedDBProvider,deviceDbName});await waitSceneIntentBoot(reopened,sharedStorage);
+  assert.equal((await reopened.shim.window.ScannerDeviceStore.readHead()).hash,protectedHead.hash);assert.equal(sharedStorage.getItem(key),raw);assert.equal(reopened.ctx.deviceSaveIssue().stage,'scene-choice');reopened.ctx.openSettings();assert.equal(await reopened.ctx.onAction('export-backup',{isConnected:true}),true);const exported=await copyPreparedExport(reopened.ctx);assert.ok(exported.includes(raw.replaceAll('"','\\"'))||exported.includes(raw),'Existing Export preserves the unresolved exact local scene source');
+ });
+});
+
+test('RISK synced scene intent: interrupted replay and two tab originals never lose pending facts',async t=>{
+ await t.test('interrupted replay later succeeds',async()=>{
+  const {app,sharedStorage,indexedDBProvider,deviceDbName}=await sceneIntentTestFixture(),store=app.shim.window.ScannerDeviceStore,commit=store.commitHead.bind(store);let release;const gate=new Promise(resolve=>{release=resolve;});store.commitHead=async options=>{await gate;return commit(options);};app.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'23:15',season:'winter'}});await flush();await app.dispose();release();await flush();
+  let resume,delayed=0;const replayGate=new Promise(resolve=>{resume=resolve;}),cryptoProvider={randomUUID:()=>webcrypto.randomUUID(),getRandomValues:a=>webcrypto.getRandomValues(a),subtle:{digest:async(...args)=>{if(new TextDecoder().decode(args[1]).includes('"time":"23:15"')){delayed++;await replayGate;}return webcrypto.subtle.digest(...args);}}};
+  const interrupted=await loadApp({sharedStorage,indexedDBProvider,deviceDbName,cryptoProvider});const deadline=Date.now()+5000;while(!delayed&&Date.now()<deadline)await flush();assert.ok(delayed);assert.notEqual(interrupted.shim.documentElement.getAttribute('data-app-ready'),'true');const key=sceneIntentTestKeys(sharedStorage)[0],raw=sharedStorage.getItem(key);await interrupted.dispose();resume();await flush();assert.deepEqual(JSON.parse(sharedStorage.getItem(key)).events,JSON.parse(raw).events);assert.equal(JSON.parse(sharedStorage.getItem(key)).heads[0].hash,JSON.parse(raw).heads[0].hash);
+  const reopened=await loadApp({sharedStorage,indexedDBProvider,deviceDbName});await waitSceneIntentBoot(reopened,sharedStorage);assert.equal(JSON.parse((await reopened.shim.window.ScannerDeviceStore.readHead()).payload).settings.scene.time,'23:15');assert.deepEqual(sceneIntentTestKeys(sharedStorage),[]);
+ });
+ await t.test('two tabs retain distinct unresolved originals',async()=>{
+  const {app,sharedStorage,indexedDBProvider,deviceDbName}=await sceneIntentTestFixture(),second=await loadApp({sharedStorage,indexedDBProvider,deviceDbName});let release;const gate=new Promise(resolve=>{release=resolve;});for(const tab of [app,second]){const store=tab.shim.window.ScannerDeviceStore,commit=store.commitHead.bind(store);store.commitHead=async options=>{await gate;return commit(options);};}
+  const before=await app.shim.window.ScannerDeviceStore.readHead();app.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'23:15',season:'winter'}});second.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'07:10',season:'summer'}});await flush();const keys=sceneIntentTestKeys(sharedStorage),raws=keys.map(key=>sharedStorage.getItem(key));assert.ok(keys.length>=2);assert.equal(new Set(raws.flatMap(raw=>JSON.parse(raw).events.map(event=>event.actionId))).size,2);assert.notEqual(raws[0],raws[1]);await app.dispose();await second.dispose();release();await flush();const settledRaws=keys.map(key=>sharedStorage.getItem(key));for(let i=0;i<keys.length;i++)assert.deepEqual(JSON.parse(settledRaws[i]).events,JSON.parse(raws[i]).events);
+  const reopened=await loadApp({sharedStorage,indexedDBProvider,deviceDbName});await waitSceneIntentBoot(reopened,sharedStorage);assert.equal((await reopened.shim.window.ScannerDeviceStore.readHead()).hash,before.hash);assert.deepEqual(keys.map(key=>sharedStorage.getItem(key)),settledRaws);assert.equal(reopened.ctx.deviceSaveIssue().stage,'scene-choice');reopened.ctx.openSettings();assert.equal(await reopened.ctx.onAction('export-backup',{isConnected:true}),true);const exported=await copyPreparedExport(reopened.ctx);for(const key of keys)assert.ok(exported.includes(key));
+ });
+});
+
+
+test('RISK synced scene intent: bounded replay exposes the saved board and rejects a late hash completion',async()=>{
+ const {app,sharedStorage,indexedDBProvider,deviceDbName}=await sceneIntentTestFixture(),store=app.shim.window.ScannerDeviceStore,commit=store.commitHead.bind(store),before=await store.readHead();let release;const gate=new Promise(resolve=>{release=resolve;});store.commitHead=async options=>{await gate;return commit(options);};app.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'23:15',season:'winter'}});await flush();await app.dispose();release();await flush();
+ let resume;const delayed=new Promise(resolve=>{resume=resolve;}),cryptoProvider={randomUUID:()=>webcrypto.randomUUID(),getRandomValues:a=>webcrypto.getRandomValues(a),subtle:{digest:async(...args)=>{if(new TextDecoder().decode(args[1]).includes('"time":"23:15"'))await delayed;return webcrypto.subtle.digest(...args);}}};
+ const cold=await loadApp({sharedStorage,indexedDBProvider,deviceDbName,cryptoProvider,deviceOpenTimeoutMs:60});try{const deadline=Date.now()+300;while(!cold.ctx.deviceSaveIssue()&&Date.now()<deadline)await flush();assert.equal(cold.shim.documentElement.getAttribute('data-app-ready'),'true','A timed-out scene replay must expose the unchanged saved board, not wait indefinitely');assert.equal(cold.ctx.state.settings.scene.time,null);assert.equal(cold.ctx.deviceSaveIssue().stage,'scene-choice');}finally{resume();await flush();}
+ assert.equal((await cold.shim.window.ScannerDeviceStore.readHead()).hash,before.hash,'Expired replay cannot commit after a late real digest resolves');assert.ok(sceneIntentTestKeys(sharedStorage).length>=1);
+});
+
+
+test('RISK synced scene intent: foreign retirement cannot erase a newer live tab choice generation',async()=>{
+ const {app,sharedStorage,indexedDBProvider,deviceDbName}=await sceneIntentTestFixture(),store=app.shim.window.ScannerDeviceStore,commit=store.commitHead.bind(store);let release,entered;const gate=new Promise(resolve=>{release=resolve;}),committed=new Promise(resolve=>{entered=resolve;});store.commitHead=async options=>{const time=JSON.parse(options.payload).settings.scene.time;if(time==='07:10'){await gate;return commit(options);}const result=await commit(options);entered();await gate;return result;};
+ app.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'23:15',season:'winter'}});await committed;const remove=sharedStorage.removeItem.bind(sharedStorage);let overlap=0;
+ sharedStorage.removeItem=key=>{if(key.startsWith('fvp:chain-scanner:pending-scene-choice:v1:')&&!overlap++){app.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'07:10',season:'summer'}});}return remove(key);};
+ let other;try{other=await loadApp({sharedStorage,indexedDBProvider,deviceDbName});await waitSceneIntentBoot(other,sharedStorage);assert.ok(overlap);assert.equal(app.ctx.state.settings.scene.time,'07:10');const keys=sceneIntentTestKeys(sharedStorage);const durable=JSON.parse((await other.shim.window.ScannerDeviceStore.readHead()).payload);assert.ok(keys.some(key=>JSON.parse(sharedStorage.getItem(key)).events.some(event=>event.value==='07:10'))||durable.settings.scene.time==='07:10'&&durable.decisionEvents.some(event=>event.kind==='current-choice'&&event.target.type==='scene'&&event.value==='07:10'),'Retiring a read-back old generation must retain or durably confirm the new accepted live-tab scene original');}finally{sharedStorage.removeItem=remove;await app.dispose();await other?.dispose();release();await flush();}
 });

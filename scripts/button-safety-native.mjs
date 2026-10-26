@@ -299,8 +299,11 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
       // and synthesize a different click. Release in a separate neutral document
       // instead; prepare it once per document, then reveal only for a refused
       // release. The app still records every trusted attempted down.
-      neutralDocumentId=await bounded(page.evaluate(()=>{const sink=document.getElementById('__buttonReleaseSink');if(!sink?.isConnected||sink.contentDocument?.readyState!=='complete'||!sink.contentWindow.__buttonReleaseDocumentId)throw Error('Prepared neutral release document unavailable');sink.hidden=false;return sink.contentWindow.__buttonReleaseDocumentId;}),'rapid release surface');
-      await bounded((async()=>{await page.mouse.move(4,4);await page.mouse.up();await page.evaluate(()=>{const sink=document.getElementById('__buttonReleaseSink');if(sink)sink.hidden=true;document.getElementById('__buttonDisabledAttempt')?.remove();});})(),'rapid refused press '+actionName);
+      // Put the prepared release document under the existing pointer. A held
+      // mouse move invokes Playwright drag interception across every frame;
+      // it is controller work and is unnecessary for a separate-document up.
+      neutralDocumentId=await bounded(page.evaluate(point=>{const sink=document.getElementById('__buttonReleaseSink');if(!sink?.isConnected||sink.contentDocument?.readyState!=='complete'||!sink.contentWindow.__buttonReleaseDocumentId)throw Error('Prepared neutral release document unavailable');sink.style.left=(point.x-4)+'px';sink.style.top=(point.y-4)+'px';sink.hidden=false;return sink.contentWindow.__buttonReleaseDocumentId;},pressPoint),'rapid release surface');
+      await bounded((async()=>{await page.mouse.up();await page.evaluate(()=>{const sink=document.getElementById('__buttonReleaseSink');if(sink)sink.hidden=true;document.getElementById('__buttonDisabledAttempt')?.remove();});})(),'rapid refused press '+actionName);
      }
      }
      if(reload&&index===0){await bounded(page.waitForFunction(old=>window.__installedFixture?.documentId!==old&&document.documentElement.dataset.appReady==='true',previousDocument),'rapid bounded reload',2000);assert.equal(allowedNavigation.remaining,0,'Exactly one expected rapid reload');allowedNavigation=null;if(!mobileYesMotion)await prepareReleaseSurface();}

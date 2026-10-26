@@ -2337,3 +2337,19 @@ The existing immutable stress verifier binds the thrown primary error independen
 - RISK repository process: mobile kernel page floor requires actual observations and exact requested budgets
 
 The pinned Linux x64 reader preserves the raw AT_PAGESZ witness and binds it to browser, external driver, host membership and image architecture. Only the exact observed downward page floor can satisfy the kernel limit; Docker/requested budgets remain exact. Missing, substituted, unsupported or inflated observations and peaks above the effective cap fail closed. The existing unreadable-source help test preserves approved Copy/Download, accepted unsaved work, originals and partial-archive semantics without obsolete literal wording.
+
+- RISK repository process: refused native releases avoid drag round trips while preserving ten real attempts
+
+- RISK synced scene intent: rapid choices survive interrupted device hashing without changing protected sources
+
+- RISK task action history: Undo refreshes ranks once after projecting its immutable cancellation
+
+- RISK synced scene intent: exact own-prefix commits replay only the missing rapid choice suffix
+
+- RISK synced scene intent: storage refusal bounds and foreign heads preserve originals and existing Export
+
+- RISK synced scene intent: interrupted replay and two tab originals never lose pending facts
+
+- RISK synced scene intent: bounded replay exposes the saved board and rejects a late hash completion
+
+- RISK synced scene intent: foreign retirement cannot erase a newer live tab choice generation
