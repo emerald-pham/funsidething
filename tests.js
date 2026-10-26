@@ -45727,7 +45727,7 @@ test('RISK repository process: current producer reuse requires successful capped
 });
 
 test('RISK repository process: nonmergeable mobile startup diagnostics preserve strict caps and independent controls',t=>{
- const env={...process.env};delete env.NODE_TEST_CONTEXT;const result=spawnSync(process.execPath,['--test','scripts/agent-tools/mobile-diagnostic.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:4*1024*1024});assert.equal(result.error,undefined);assert.equal(result.status,0,'The actual diagnostic consumer must preserve cap, branch, app identity, independent cases and nonacceptance boundaries: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# tests 13$/m);assert.match(result.stdout,/^# skipped 0$/m);t.diagnostic('Parsed the exact cap-only diagnostic workflow command with the existing locked js-yaml dependency; startup-only reports cannot qualify Yes.');
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;const result=spawnSync(process.execPath,['--test','scripts/agent-tools/mobile-diagnostic.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:4*1024*1024});assert.equal(result.error,undefined);assert.equal(result.status,0,'The actual diagnostic consumer must preserve cap, branch, app identity, independent cases and nonacceptance boundaries: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# tests 14$/m);assert.match(result.stdout,/^# skipped 0$/m);t.diagnostic('Parsed the exact cap-only diagnostic workflow command with the existing locked js-yaml dependency; startup-only reports cannot qualify Yes.');
 });
 
 test('RISK repository process: diagnostic native timings retain strict failures without changing app promises or burst pacing',()=>{
@@ -45742,4 +45742,8 @@ test('RISK repository process: startup-only mobile diagnostics cannot satisfy th
 
 test('RISK repository process: delayed landscape responses preserve startup diagnostic causality and cleanup',()=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;const result=spawnSync(process.execPath,['--test','--test-name-pattern=^actual native response path|^actual native startup releases|^delayed landscape response cleanup','scripts/agent-tools/mobile-diagnostic.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:4*1024*1024});assert.equal(result.error,undefined);assert.equal(result.status,0,'The actual native response/readiness consumers must preserve identical fallback bytes, real held-request ordering, cancellation and inconclusive timeout boundaries: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# tests 3$/m);assert.match(result.stdout,/^# skipped 0$/m);
+});
+
+test('RISK repository process: observer-only fixture delivery retains the full mobile story and exact sources',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;const result=spawnSync(process.execPath,['--test','--test-name-pattern=^actual native observer seeding|^diagnostic CLI retains nine','scripts/agent-tools/mobile-diagnostic.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:4*1024*1024});assert.equal(result.error,undefined);assert.equal(result.status,0,'The real init/observer consumer must remove only persistent fixture-board allocation, preserve byte-exact guarded sources, and retain full-story variants: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# tests 2$/m);assert.match(result.stdout,/^# skipped 0$/m);
 });

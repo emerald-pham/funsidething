@@ -12943,7 +12943,7 @@
       "file": "scripts/agent-tools/ci-routing.test.mjs"
     },
     {
-      "root": "diagnostic CLI retains seven references and adds two bounded delayed-paint controls",
+      "root": "diagnostic CLI retains nine references and adds two full observer-seeded controls",
       "group": "native-process",
       "file": "scripts/agent-tools/mobile-diagnostic.test.mjs"
     },
@@ -12983,7 +12983,7 @@
       "file": "tests.js"
     },
     {
-      "root": "actual diagnostic batch retains an OOM case and removes all nine fixture containers",
+      "root": "actual diagnostic batch retains an OOM case and removes all eleven fixture containers",
       "group": "native-process",
       "file": "scripts/agent-tools/mobile-diagnostic.test.mjs"
     },
@@ -13059,6 +13059,16 @@
     },
     {
       "root": "RISK repository process: delayed landscape responses preserve startup diagnostic causality and cleanup",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "actual native observer seeding removes persistent board arguments while preserving exact guarded sources",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-diagnostic.test.mjs"
+    },
+    {
+      "root": "RISK repository process: observer-only fixture delivery retains the full mobile story and exact sources",
       "group": "native-process",
       "file": "tests.js"
     }

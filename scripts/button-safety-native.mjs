@@ -60,7 +60,8 @@ export function createDelayedPaintResponse({report,phase,save}){
  };
 }
 export async function runButtonSafety({repo,engine,outputDir,port=0,control=null,probe=false,scenarioFilter=null,mobileYesMotion=null,diagnostic=null}){
- const timingEnabled=process.env.CHAIN_BUTTON_DIAGNOSTIC_TIMINGS==='1',startupOnly=diagnostic?.startupOnly===true,delayedPaint=diagnostic?.delayedPaint===true;
+ const timingEnabled=process.env.CHAIN_BUTTON_DIAGNOSTIC_TIMINGS==='1',startupOnly=diagnostic?.startupOnly===true,delayedPaint=diagnostic?.delayedPaint===true,observerSeedBoard=diagnostic?.observerSeedBoard===true;
+ assert.ok(!observerSeedBoard||(mobileYesMotion&&!startupOnly&&!delayedPaint),'Observer-only fixture delivery retains the full mobile story');
  assert.ok(!delayedPaint||startupOnly,'Delayed paint is exclusively a startup-only diagnostic');
  assert.equal(diagnostic?.minimalPageObservation===true,startupOnly,'Minimal page observation is exclusively a startup-only diagnostic');
  assert.ok(!startupOnly||!timingEnabled,'Startup and timing diagnostics cannot be mixed');
@@ -90,7 +91,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
  const report={schemaVersion:1,kind:startupOnly?'button-mobile-startup-diagnostic':timingEnabled?'button-timing-diagnostic':diagnostic?'button-mobile-diagnostic-native':mobileYesMotion?'button-mobile-functional':probe?'button-sensitivity':scenarioFilter?'button-diagnostic':'button-safety',engine,candidateCommit,candidateTree,hostedPolicy,status:'running',startedAt:new Date().toISOString(),requiredActions:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredActions,requiredScenarios:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredScenarios,requiredWorkload:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredWorkload,requiredRapidActions:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredRapidActions,inventorySha256:digest(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'))),observedActions:[],outcomes:[],errors:[],cleanup:{},limits:['Synthetic isolated browser storage and Firebase/clipboard/geolocation boundaries.',mobileYesMotion?'Emulated mobile WebKit; uncapped functional evidence unless independently bound to a verified Linux cgroup report; no physical iPhone or private-board recovery claim.':'Native desktop engine; no physical iPhone or private-board recovery claim.']};
  const phase=stage=>diagnostic?.phase(stage);
  if(timingEnabled){report.acceptanceEligible=false;report.diagnosticTiming={schemaVersion:1,clock:{node:'performance.now; burst phase startMs relative to nodeOriginMs, paste endpoints absolute monotonic',browser:'performance.timeOrigin + performance.now; no cross-clock subtraction'},bursts:[],paste:[],limits:['Node phase durations include driver, protocol and browser work; they are not pure app durations.','onAction measures synchronous return only; asynchronous completion remains governed by the existing independent outcome.','Paste keeps the full argument/construct/dispatch/readback boundary; browser dispatch includes all listeners. No cross-clock subtraction or ingress attribution is inferred.','Diagnostic collection is outside the frozen burst window and cannot waive any original assertion.']};}
- if(diagnostic){assert.ok(mobileYesMotion&&!control&&!probe,'Diagnostics retain the actual mobile scenario');report.acceptanceEligible=false;report.diagnostic={reuseObserverPage:diagnostic.reuseObserverPage===true,startupOnly,minimalPageObservation:startupOnly};if(startupOnly){assert.ok(!diagnostic.reuseObserverPage,'Startup observation uses the original observer-close/new-page handoff');report.omittedAssertions=['Ten distinct offered-task Yes inputs and trusted touch/click receipts','Two-second input burst, per-action transport and outcomes','Continuous frame heartbeat and one-second frame budget','DOM census and unknown-action coverage'];}}
+ if(diagnostic){assert.ok(mobileYesMotion&&!control&&!probe,'Diagnostics retain the actual mobile scenario');report.acceptanceEligible=false;report.diagnostic={reuseObserverPage:diagnostic.reuseObserverPage===true,startupOnly,minimalPageObservation:startupOnly,...(observerSeedBoard?{observerSeedBoard:true}:{})};if(startupOnly){assert.ok(!diagnostic.reuseObserverPage,'Startup observation uses the original observer-close/new-page handoff');report.omittedAssertions=['Ten distinct offered-task Yes inputs and trusted touch/click receipts','Two-second input burst, per-action transport and outcomes','Continuous frame heartbeat and one-second frame budget','DOM census and unknown-action coverage'];}}
  const reportPath=path.join(outputDir,'button-safety-'+engine+'-'+randomUUID()+'.json'),save=()=>fs.writeFileSync(reportPath,JSON.stringify(report,null,2)+'\n');save();
  const paintGate=delayedPaint?createDelayedPaintResponse({report,phase,save}):null;
  const prefix='/button-'+randomUUID()+'/',sdk='/sdk-'+randomUUID()+'/',sources=new Map();
@@ -148,6 +149,15 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
    // The neutral pointer-release iframe must never reseed shared browser
    // preferences or app storage while a button burst is in progress.
    await context.addInitScript({content:'if(window.top===window){('+browserInit.toString()+')('+JSON.stringify({dbName,authMode:options.authMode||'signed-out',sdkBase:origin+sdk})+');'+(mobileYesMotion?'localStorage.setItem("fvp:chain-scanner:landscape-motion",JSON.stringify({choice:'+JSON.stringify(mobileYesMotion)+',savedAt:Date.now()}));':'')+'}'});
+   // This diagnostic variable changes only fixture transport. App documents
+   // retain the original clipboard/geolocation faults without a serialized board.
+   if(observerSeedBoard)await context.addInitScript(({clipboardFail,clipboardDeferred,geoFail})=>{
+    if(window.top!==window)return;
+    window.__buttonClipboard=[];window.__buttonClipboardPending=[];
+    Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{if(clipboardFail)throw new DOMException('Synthetic clipboard permission refused','NotAllowedError');window.__buttonClipboard.push(text);if(clipboardDeferred)await new Promise((resolve,reject)=>window.__buttonClipboardPending.push({resolve,reject}));}}});
+    Object.defineProperty(navigator,'geolocation',{configurable:true,value:{getCurrentPosition:(success,failure)=>geoFail?failure?.({code:1,message:'Synthetic location refused'}):success({coords:{latitude:40.7,longitude:-74,accuracy:20}})}});
+   },{clipboardFail:options.clipboardFail,clipboardDeferred:options.clipboardDeferred,geoFail:options.geoFail});
+   else{
    await context.addInitScript(({board,clipboardFail,clipboardDeferred,geoFail})=>{
     if(window.top!==window)return;
     if(!localStorage.getItem('fvp:chain-scanner:device-store-v2')&&localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',JSON.stringify(board));
@@ -155,6 +165,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
     Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{if(clipboardFail)throw new DOMException('Synthetic clipboard permission refused','NotAllowedError');window.__buttonClipboard.push(text);if(clipboardDeferred)await new Promise((resolve,reject)=>window.__buttonClipboardPending.push({resolve,reject}));}}});
     Object.defineProperty(navigator,'geolocation',{configurable:true,value:{getCurrentPosition:(success,failure)=>geoFail?failure?.({code:1,message:'Synthetic location refused'}):success({coords:{latitude:40.7,longitude:-74,accuracy:20}})}});
    },{board,clipboardFail:options.clipboardFail,clipboardDeferred:options.clipboardDeferred,geoFail:options.geoFail});
+   }
    await context.addInitScript(()=>{
     if(window.top!==window)return;
     window.__buttonRefuseWrites=false;window.__buttonRefuseReads=false;
@@ -163,13 +174,28 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
    });
    if(options.retainedCopies){
     phase('before-observer-page');const observer=await context.newPage();phase('before-observer-goto');await observer.goto(origin+prefix+'__button-observer');await observer.addScriptTag({content:sources.get('device-store-v2.js').toString()});phase('before-source-seed');
-    report.retainedSources??=[];report.retainedSources.push(await observer.evaluate(async({dbName,board,count})=>{
+    report.retainedSources??=[];report.retainedSources.push(await observer.evaluate(async({dbName,board,count,observerSeedBoard=false})=>{
+     const legacyKey='fvp:chain-scanner:v1',legacyBefore=observerSeedBoard?localStorage.getItem(legacyKey):null;let legacySeeded=false;
+     if(observerSeedBoard&&!localStorage.getItem('fvp:chain-scanner:device-store-v2')&&legacyBefore===null){localStorage.setItem(legacyKey,JSON.stringify(board));legacySeeded=true;}
      const store=ChainStorageV2.createDeviceStore({dbName});await store.open();const raw=JSON.stringify(board);
      const backups=Array.from({length:count},(_,i)=>({id:'gate-retained-'+i,kind:'manual',at:Date.now()-i,day:'2026-10-25',payload:JSON.stringify({...board,futureSourceRole:i})}));
      const result=await store.migrateLegacy({headPayload:raw,account:null,sourceFingerprint:await ChainStorageV2.hashPayload(JSON.stringify([{key:'fvp:chain-scanner:v1',raw}])),backups,opaqueArchives:[{key:'gate-opaque-exact',raw:'opaque exact bytes\u0000retain',futureBytes:new Uint8Array([0,17,255]),futureMinusZero:-0}]});
-     if(!result.verified)throw Error('Native retained source fixture failed');const head=await store.readHead();await store.setPendingUpload('gate-owner',{generationId:'gate-pending',payloadHash:head.hash,baseRev:0,updatedAt:7});await store.close();
-     return{count,eachPayloadBytes:backups[0].payload.length,ids:backups.map(row=>row.id)};
-    },{dbName,board,count:options.retainedCopies}));phase('after-source-seed');
+     if(!result.verified)throw Error('Native retained source fixture failed');const head=await store.readHead();await store.setPendingUpload('gate-owner',{generationId:'gate-pending',payloadHash:head.hash,baseRev:0,updatedAt:7});
+     let bootstrap;
+     if(observerSeedBoard){
+      const legacyAfter=localStorage.getItem(legacyKey),retainedSources=[];
+      for(const row of (await store.listBackups()).filter(row=>row.id.startsWith('gate-retained-')).sort((a,b)=>a.id.localeCompare(b.id)))retainedSources.push({id:row.id,payloadHash:await ChainStorageV2.hashPayload(row.payload)});
+      bootstrap={delivery:'observer-evaluate-once',legacySeeded,legacyBeforeHash:legacyBefore===null?null:await ChainStorageV2.hashPayload(legacyBefore),legacyPayloadHash:legacyAfter===null?null:await ChainStorageV2.hashPayload(legacyAfter),headPayloadHash:await ChainStorageV2.hashPayload(head.payload),headPayloadBytes:new TextEncoder().encode(head.payload).byteLength,retainedSources};
+     }
+     await store.close();return{count,eachPayloadBytes:backups[0].payload.length,ids:backups.map(row=>row.id),...(bootstrap?{bootstrap}:{})};
+    },{dbName,board,count:options.retainedCopies,...(observerSeedBoard?{observerSeedBoard:true}:{})}));
+    if(observerSeedBoard){
+     const proof=report.retainedSources.at(-1).bootstrap,expected=digest(JSON.stringify(board));
+     assert.equal(proof.delivery,'observer-evaluate-once');assert.equal(proof.legacyPayloadHash,proof.legacySeeded?expected:proof.legacyBeforeHash,'Observer retains exact guarded legacy bytes');
+     assert.equal(proof.headPayloadHash,expected,'Observer reads back the exact fixture head');assert.equal(proof.headPayloadBytes,Buffer.byteLength(JSON.stringify(board)));
+     assert.deepEqual(proof.retainedSources,Array.from({length:options.retainedCopies},(_,i)=>({id:'gate-retained-'+i,payloadHash:digest(JSON.stringify({...board,futureSourceRole:i}))})),'Observer reads back both exact retained sources');
+    }
+    phase('after-source-seed');
     if(diagnostic?.reuseObserverPage){preparedPage=observer;phase('observer-retained-for-reuse');}else{await observer.close();phase('after-observer-close');}
    }
    await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());

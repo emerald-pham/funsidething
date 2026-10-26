@@ -22854,5 +22854,44 @@
       "command": "Node22 recorder --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK repository process: nonmergeable mobile startup diagnostics|^RISK repository process: delayed landscape responses\" tests.js; gate/mobile-512mb/hosted-oom-31c/runs/2026-10-26T07-46-13-059Z-86babfa1-d09c-4f6b-8b4b-3939c026b371.json",
       "failure": "Existing --plan/controller ran seven instead of required nine; extracted actual HTTP callback immediately wrote the fallback instead of holding; actual readiness consumer recorded zero releases instead of one. New helper existence assertion is not separately credited as an existing-consumerRED. Intermediate4f41c8b6 retained a cross-realm fixture header comparison and missing catalog rows; fixed by wire-value normalization/catalog migration. Focused dirty GREEN2c5e1182 follows. Hosted exact547 OOM/raw64-file observations remain retained; no new native/Linux proof is claimed locally."
     }
+  },
+  {
+    "baseCommit": "5ec97f4275e03d4f69aee9c157814998f2171f98",
+    "testChangesSha256": "66c367518d6f55c1bbf190d4a4e57bf924a84dff6f7fa3744dc86634f09a71b9",
+    "reason": "Add the parent-approved nonmergeable observer-only fixture transport counterfactual after nine capped observations still OOM before readiness. Preserve every historical control and the full mobile Yes acceptance consumer.",
+    "previousBehavior": "The persistent context bootstrap serialized the entire 400-task/1MiB fixture into every document, although the neutral observer already received the board for durable seeding. The nine-case plan had no full-story counterfactual without that persistent board channel.",
+    "intendedBehavior": "Eleven diagnostic containers retain the original nine with observerSeedBoard=false and add Normal/Reduced full-story variants. Only those two seed exact legacy bytes once in the existing observer evaluate call, verify legacy/head/two-backup readback before app navigation, retain all six page bindings and complete Yes semantics, and never qualify a release.",
+    "replacementTests": [
+      "RISK repository process: observer-only fixture delivery retains the full mobile story and exact sources"
+    ],
+    "preservedCoverage": [
+      "The existing seven references and two delayed-paint controls retain their case definitions, original persistent bootstrap path and response timing. The small clipboard/geolocation and authority/write-failure initialization remains active for the new pair. Existing legacy/authority guards refuse overwrite; corrupted head and backup readback fail before app startup.",
+      "All original mobile touch/profile/motion/rendering, 400 saved tasks/full1MiB unknown source, two exact retained sources/opaque/pending, ten accepted distinct Yes within2seconds, durable11-chain and frame/transport/outcome/deadline/cleanup requirements remain unchanged. App36asset hashes remain exact31c. No runtime flags, Markdown response fidelity, GC or memory/swap budget changes.",
+      "Focused VM consumers use the actual native init/observer source and real device-store implementation with isolated fake IndexedDB; Docker orchestration is a controlled process fixture. These establish test-contract behavior only, not live Linux memory, browser success or release acceptance. Prior hosted OOM evidence and all raw local attempts are retained outside Git."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder --purpose preimplementation-red -- node --test '--test-name-pattern=^actual native observer seeding|^diagnostic CLI retains nine' scripts/agent-tools/mobile-diagnostic.test.mjs",
+      "failure": "Actual pre-edit recorder66af5434-2f5d-4a3a-b4c4-5d6c7be2a7a5 at5ec: CLI returned9 rather than11 cases and real native init/observer consumer found1 persistent board argument rather than0. Earlier test-fixture prefix/undefined-serialization failures b3868b4a andb19e326a are retained but not implementation RED. Dirty focused GREEN1476f2db14cases andcad3f3525processRISKroots preserve intermediate fixture/cross-realm/catalog repairs2ff3936e/99d8f31c; no native runtime ran."
+    }
+  },
+  {
+    "baseCommit": "31c98a6e075f180681a49d1647b2462521c7ac5f",
+    "testChangesSha256": "70b612e2dd5151011f02bf7f65900cedde1d48bdae510e451fb378fe78b5f4c6",
+    "reason": "Add the parent-approved nonmergeable observer-only fixture transport counterfactual after nine capped observations still OOM before readiness. Preserve every historical control and the full mobile Yes acceptance consumer.",
+    "previousBehavior": "The persistent context bootstrap serialized the entire 400-task/1MiB fixture into every document, although the neutral observer already received the board for durable seeding. The nine-case plan had no full-story counterfactual without that persistent board channel.",
+    "intendedBehavior": "Eleven diagnostic containers retain the original nine with observerSeedBoard=false and add Normal/Reduced full-story variants. Only those two seed exact legacy bytes once in the existing observer evaluate call, verify legacy/head/two-backup readback before app navigation, retain all six page bindings and complete Yes semantics, and never qualify a release.",
+    "replacementTests": [
+      "RISK repository process: observer-only fixture delivery retains the full mobile story and exact sources",
+      "RISK repository process: nonmergeable mobile startup diagnostics preserve strict caps and independent controls"
+    ],
+    "preservedCoverage": [
+      "The existing seven references and two delayed-paint controls retain their case definitions, original persistent bootstrap path and response timing. The small clipboard/geolocation and authority/write-failure initialization remains active for the new pair. Existing legacy/authority guards refuse overwrite; corrupted head and backup readback fail before app startup.",
+      "All original mobile touch/profile/motion/rendering, 400 saved tasks/full1MiB unknown source, two exact retained sources/opaque/pending, ten accepted distinct Yes within2seconds, durable11-chain and frame/transport/outcome/deadline/cleanup requirements remain unchanged. App36asset hashes remain exact31c. No runtime flags, Markdown response fidelity, GC or memory/swap budget changes.",
+      "Focused VM consumers use the actual native init/observer source and real device-store implementation with isolated fake IndexedDB; Docker orchestration is a controlled process fixture. These establish test-contract behavior only, not live Linux memory, browser success or release acceptance. Prior hosted OOM evidence and all raw local attempts are retained outside Git."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder --purpose preimplementation-red -- node --test '--test-name-pattern=^actual native observer seeding|^diagnostic CLI retains nine' scripts/agent-tools/mobile-diagnostic.test.mjs",
+      "failure": "Actual pre-edit recorder66af5434-2f5d-4a3a-b4c4-5d6c7be2a7a5 at5ec: CLI returned9 rather than11 cases and real native init/observer consumer found1 persistent board argument rather than0. Earlier test-fixture prefix/undefined-serialization failures b3868b4a andb19e326a are retained but not implementation RED. Dirty focused GREEN1476f2db14cases andcad3f3525processRISKroots preserve intermediate fixture/cross-realm/catalog repairs2ff3936e/99d8f31c; no native runtime ran."
+    }
   }
 ]
