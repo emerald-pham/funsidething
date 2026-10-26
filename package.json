@@ -11,6 +11,7 @@
     "agent:host-coordination": "node scripts/agent-tools/coordination.mjs",
     "agent:preflight": "node scripts/agent-tools/preflight.mjs",
     "agent:browser-audit": "node scripts/agent-tools/browser-audit.mjs",
+    "agent:ci-handoff": "node scripts/agent-tools/ci-handoff.mjs",
     "agent:ci-monitor": "node scripts/agent-tools/ci-monitor.mjs",
     "agent:pr-body-update": "node scripts/agent-tools/pr-body-update.mjs",
     "test:rules": "firebase emulators:exec --only firestore --project demo-chain-scanner-data-safety \"node --test --test-name-pattern='Firestore rules:' tests.js\"",
