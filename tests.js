@@ -45698,6 +45698,56 @@ test('RISK repository process: native button gate awaits an asynchronous false o
 });
 
 
+test('RISK repository process: native HTTP serves exact committed runtime Markdown without exposing other files',async t=>{
+ const http=(await import('node:http')).default,crypto=(await import('node:crypto')).default,{syncBuiltinESMExports}=await import('node:module');
+ const directory=fs.mkdtempSync('/tmp/chain-button-http-');t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const reservation=http.createServer();await new Promise(resolve=>reservation.listen(0,'127.0.0.1',resolve));
+ const port=reservation.address().port;await new Promise(resolve=>reservation.close(resolve));
+ const ledger=path.join(directory,'ledger.json');fs.writeFileSync(ledger,JSON.stringify({entries:[{status:'active',worktree:__dirname,lease:{state:'healthy',expiresAt:new Date(Date.now()+60000).toISOString()},resources:['browser-runtime:playwright-chromium','loopback:127.0.0.1:'+port]}]}));
+ const envKeys=['CI','CODEX_COORDINATION_FILE','DOW_EMULATOR_COORDINATION_FILE'],before=Object.fromEntries(envKeys.map(key=>[key,process.env[key]]));
+ delete process.env.CI;delete process.env.DOW_EMULATOR_COORDINATION_FILE;process.env.CODEX_COORDINATION_FILE=ledger;
+ t.after(()=>{for(const key of envKeys)if(before[key]===undefined)delete process.env[key];else process.env[key]=before[key];});
+ // Observe external randomness unchanged so the test discovers the server's private URL without a production helper.
+ const ids=[],uuid=crypto.randomUUID;crypto.randomUUID=(...args)=>{const id=uuid(...args);ids.push(id);return id;};syncBuiltinESMExports();
+ t.after(()=>{crypto.randomUUID=uuid;syncBuiltinESMExports();});
+ const request=urlPath=>new Promise((resolve,reject)=>{const req=http.get({hostname:'127.0.0.1',port,path:urlPath},res=>{const chunks=[];res.on('data',chunk=>chunks.push(chunk));res.on('end',()=>resolve({status:res.statusCode,headers:res.headers,bytes:Buffer.concat(chunks)}));});req.on('error',reject);req.setTimeout(4000,()=>req.destroy(Error('HTTP fixture stalled')));});
+ const playwright=await import('playwright'),launch=playwright.chromium.launch,stop=Error('HTTP-only fixture stops before native launch');
+ t.after(()=>{playwright.chromium.launch=launch;});
+ playwright.chromium.launch=async()=>{
+  let prefix;for(const id of ids){const candidate='/button-'+id+'/',response=await request(candidate+'index.html');if(response.status===200){assert.deepEqual(response.bytes,fs.readFileSync(path.join(__dirname,'index.html')));prefix=candidate;break;}}
+  assert.ok(prefix,'real HTTP response discovers the isolated native route');
+  const files=['SPAWN_RATES.md','HUMAN_WRITTEN_HOURLY_TAGS.md'],responses=await Promise.all(files.map(file=>request(prefix+file)));
+  assert.deepEqual(responses.map(response=>response.status),[200,200],'both Markdown files fetched by landscape must be available');
+  for(const [index,file]of files.entries()){
+   const expected=fs.readFileSync(path.join(__dirname,file)),response=responses[index];
+   assert.deepEqual(response.bytes,expected,'full committed runtime bytes: '+file);
+   assert.equal(createHash('sha256').update(response.bytes).digest('hex'),createHash('sha256').update(expected).digest('hex'),'independent runtime source digest: '+file);
+   assert.match(response.headers['content-type'],/^text\/markdown/);assert.equal(response.headers['cache-control'],'no-store');
+   t.diagnostic('HTTP runtime asset '+JSON.stringify({file,status:response.status,bytes:response.bytes.length,sha256:createHash('sha256').update(response.bytes).digest('hex')}));
+  }
+  for(const route of [prefix+'not-a-runtime.js',prefix+'CLAUDE.md',prefix+'../SPAWN_RATES.md',prefix+'%2e%2e/SPAWN_RATES.md','/SPAWN_RATES.md'])assert.equal((await request(route)).status,404,'unknown/outside/path traversal request stays unavailable: '+route);
+  throw stop;
+ };
+ const {runButtonSafety}=await import('./scripts/button-safety-native.mjs');
+ await assert.rejects(runButtonSafety({repo:__dirname,engine:'chromium',outputDir:directory,port}),error=>{if(error!==stop)throw error;return true;});
+ const report=JSON.parse(fs.readFileSync(path.join(directory,fs.readdirSync(directory).find(file=>file.startsWith('button-safety-')))));
+ for(const file of ['SPAWN_RATES.md','HUMAN_WRITTEN_HOURLY_TAGS.md'])assert.equal(report.assets[file],createHash('sha256').update(fs.readFileSync(path.join(__dirname,file))).digest('hex'));
+ assert.equal(report.cleanup.serverClosed,true,'actual HTTP listener closes after the deliberate prelaunch stop');
+ assert.equal(report.cleanup.browserClosed,undefined,'no browser launched; HTTP test is not native qualification');
+});
+
+test('RISK repository process: native report cannot omit or change reviewed runtime asset bytes',async t=>{
+ const directory=fs.mkdtempSync('/tmp/chain-button-assets-');t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const requiredRuntimeAssets={'SPAWN_RATES.md':'c'.repeat(64),'HUMAN_WRITTEN_HOURLY_TAGS.md':'d'.repeat(64)};
+ const manifest={schemaVersion:1,requiredActions:['act:add'],requiredRuntimeAssets},inventory=path.join(directory,'inventory.json');fs.writeFileSync(inventory,JSON.stringify(manifest));
+ const good={schemaVersion:1,kind:'button-safety',engine:'webkit',status:'passed',candidateCommit:'a'.repeat(40),candidateTree:'b'.repeat(40),inventorySha256:createHash('sha256').update(fs.readFileSync(inventory)).digest('hex'),assets:{...requiredRuntimeAssets},requiredActions:['act:add'],observedActions:['act:add'],outcomes:[{action:'act:add',status:'passed',events:['click'],assertions:1,responsive:true}],errors:[],cleanup:{contextClosed:true,browserClosed:true,serverClosed:true}};
+ const invoke=report=>{const file=path.join(directory,'report.json');fs.writeFileSync(file,JSON.stringify(report));return spawnSync(process.execPath,['scripts/button-safety.mjs','--verify-report',file,'--inventory',inventory],{cwd:__dirname,encoding:'utf8'});};
+ assert.equal(invoke(good).status,0,'complete independently reviewed asset evidence accepted');
+ for(const [name,mutate]of Object.entries({missingAssets:r=>delete r.assets,omittedMarkdown:r=>delete r.assets['SPAWN_RATES.md'],changedBytes:r=>r.assets['HUMAN_WRITTEN_HOURLY_TAGS.md']='e'.repeat(64),invalidDigest:r=>r.assets['SPAWN_RATES.md']='unverified'}))await t.test(name,()=>{
+  const report=structuredClone(good);mutate(report);const result=invoke(report);assert.equal(result.error,undefined);assert.notEqual(result.status,0,'reviewed runtime asset coverage cannot be waived: '+name);assert.match(result.stderr,/runtime asset/);
+ });
+});
+
 test('RISK repository process: native button gate cannot omit a required stress scenario',t=>{
  const directory=fs.mkdtempSync('/tmp/chain-button-scenarios-');t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
  const manifest={schemaVersion:1,requiredActions:['act:add'],requiredScenarios:['populated Add','oversized export and retained paste']};

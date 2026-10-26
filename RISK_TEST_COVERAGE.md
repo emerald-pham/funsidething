@@ -2294,3 +2294,6 @@ The command/report consumer rejects missing, duplicate, skipped, cancelled, unre
 - RISK saved view continuity: repeated selected eligibility retains mounted rows and still refreshes changed views
 - RISK repository process: native paste prepares complete fixture bytes before its consumer frame budget
 - RISK repository process: unavailable native attempts reuse one prepared isolated release document
+
+- RISK repository process: native HTTP serves exact committed runtime Markdown without exposing other files
+- RISK repository process: native report cannot omit or change reviewed runtime asset bytes

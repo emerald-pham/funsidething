@@ -18,6 +18,10 @@ export function verifyButtonSafetyReport(report,{inventory,inventorySha256,candi
  for(const [key,expected]of Object.entries({candidateCommit,candidateTree,engine,inventorySha256}))if(expected!==undefined)assert.equal(report[key],expected,'Button report '+key+' mismatch');
  for(const key of ['candidateCommit','candidateTree'])assert.match(report[key]||'',/^[a-f0-9]{40}$/,'Exact '+key+' required');
  assert.ok(inventory,'Independent button inventory required');
+ for(const [file,hash]of Object.entries(inventory.requiredRuntimeAssets||{})){
+  assert.match(hash,/^[a-f0-9]{64}$/,'Reviewed runtime asset SHA256 required: '+file);
+  assert.equal(report.assets?.[file],hash,'Native runtime asset missing or changed: '+file);
+ }
  const actions=inventory.requiredActions;
  assert.ok(Array.isArray(actions)&&actions.length>0,'Nonempty independent button inventory required');
  assert.equal(new Set(actions).size,actions.length,'Duplicate expected button action');

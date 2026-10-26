@@ -1,5 +1,9 @@
 {
   "schemaVersion": 1,
+  "requiredRuntimeAssets": {
+    "SPAWN_RATES.md": "55a9ca30de892180303edd99bd2858c64af33183b0971457453cb2504672f3e0",
+    "HUMAN_WRITTEN_HOURLY_TAGS.md": "4fa6c96f6628dbd9f1e0fd8ce14f4059d5d0270fa1450afa5a8304f9c066d7c2"
+  },
   "requiredMobileStory": {
     "savedTasks": 400,
     "yesCount": 10,
