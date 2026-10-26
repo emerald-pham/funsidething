@@ -12698,6 +12698,11 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK JSON COPY PASTE: closing a large paste during encoding stops before backup writes",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK JSON COPY PASTE: stale clipboard completion cannot release a newer export transfer",
       "group": "core",
       "file": "tests.js"

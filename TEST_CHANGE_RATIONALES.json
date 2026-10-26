@@ -1,5 +1,52 @@
 [
   {
+    "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
+    "testChangesSha256": "52ec4bd26a19e91c43a9fcaf91e6e2be64be61680afdd8eb302657abcc157f0f",
+    "reason": "Integrate the user-requested single Import/Export and direct Copy/Download with protected source preservation, WebKit export/paste/preview repairs, fresh-scan WOOP repair, late clipboard-generation guard, and required fail-closed400-task/ten-press native release checks.",
+    "previousBehavior": "Settings exposed redundant transfer controls and mounted complete multi-megabyte exports in modal HTML. Native WebKit stalled while rendering export and pasted JSON, and its file byte encoder blocked Preview. An obsolete Copy completion could release a newer transfer. Fresh scan WOOP Next could lose its work-mode state. Existing CI did not require a complete independently enumerated native button/workload matrix.",
+    "intendedBehavior": "One Import and one Export remain with retained backups; Copy and Download use identical prepared read-only archive bytes. Large text remains outside DOM; recovery encoding yields with source/consent guards. WOOP and clipboard lifecycle are bound to the correct state. Both Chromium and WebKit must cover every maintained action/state, durable400-task fixture, and ten trusted press attempts within2seconds with independently asserted outcomes, responsiveness and preservation.",
+    "replacementTests": [
+      "RISK Settings transfer consolidation: one Import, one Export and direct Copy",
+      "RISK Settings transfer sections: cleanup controls stay outside the focused backup section",
+      "RISK backup export safety: unreadable originals stay byte-exact without a raw-data view",
+      "RISK LOCAL BACKUPS: unreadable old copy stays visible and byte-exact in unified Export",
+      "RISK JSON COPY PASTE: large native paste retains full draft without rendering the archive",
+      "RISK JSON COPY PASTE: closing a large paste during encoding stops before backup writes",
+      "RISK JSON COPY PASTE: stale clipboard completion cannot release a newer export transfer",
+      "RISK JSON COPY PASTE: Copy and Download send the same full archive without a JSON view or writes",
+      "RISK DATABASE REPAIR EXPORT: unified Copy and Download retain exact sources and metadata without writes",
+      "RISK DATABASE REPAIR EXPORT: unreadable sources are labeled partial and never shown as an empty database",
+      "RISK DATABASE REPAIR EXPORT: Debug log points to the combined archive without duplicate export controls",
+      "RISK DATABASE REPAIR EXPORT: canceled capture keeps the pasted draft and concurrent capture is bounded",
+      "RISK DATABASE REPAIR EXPORT: Help describes direct Copy and partial archive status",
+      "RISK RECOVERY EXPORT: accepted unsaved board stays in direct Copy when device storage fails",
+      "RISK MANUAL JSON EXPORT: unavailable and unsupported sources are explicit partial exports",
+      "RISK overdue WOOP: a newly started scan keeps Next usable and the saved plan through reopening",
+      "RISK support diagnostics: Settings points to the single archive Export",
+      "RISK repository process: button safety rejects incomplete native action evidence",
+      "RISK repository process: button safety rejects false passes and newly untested actions",
+      "RISK repository process: native button gate detects errors raised by a real click",
+      "RISK repository process: required native button actions execute in Chromium and WebKit",
+      "RISK repository process: native button gate refuses unallocated local launch before browser startup",
+      "RISK repository process: new and duplicate source buttons require native coverage inventory",
+      "RISK repository process: native button gate awaits an asynchronous false outcome",
+      "RISK repository process: native button gate cannot omit a required stress scenario",
+      "RISK repository process: native button safety requires 400-task and rapid-press evidence",
+      "RISK repository process: required button enforcement changes need process coverage"
+    ],
+    "preservedCoverage": [
+      "All existing source-preservation, unknown-field, typed-value, negative-zero, partial-archive, accepted-unsaved-work, guarded file/paste/rating choice, protected backup, cloud consent and durable readback boundaries are retained. Old raw-view and duplicate-format assertions are deliberately migrated to the user-authorized single prepared Copy/Download flow. Existing working-board and raw-source evidence remains in the archive.",
+      "Save-failure/Undo diagnostics retain quota, toast, retry and unsaved title readback while replacing the obsolete View label with actual Export. FAQ route assertions now use Import; unrelated Undo wording and130-word brevity remain. Optional new raw restart-diagnostic storage scope was removed because its later baseline comparison did not establish original RED.",
+      "The gate independently binds source inventory, named supported states, durable400tasks and all114 rapid action families. Native clicks, crashes/rejections/navigation/close/disconnect and continuous frame gaps are real browser observations; clipboard/Firebase/geolocation are isolated external boundaries. Synthetic ClipboardEvent is explicitly untrusted; separate actual WebKit Clipboard API+Meta+V proof remains external. Refused/disappeared target attempts release in a neutral harness document and earn no accepted app-action credit.",
+      "The exact-four-group CI architecture, frozen baseline census, legitimate historical root aliases, existing installed-client delivery, compatibility, full tests and protected process gates remain. Six nonbaseline #283 rename aliases were removed only because their alleged original roots never existed in frozen baseline40150306422; assignments remain. New native gate controller/contract/runner/inventory files are protected process files.",
+      "Actual RED chronology and invalid/diagnostic artifacts remain outsideGit in task-artifacts/webkit-button-safety-20261025. Early unallocatedWebKit a55028d7 and async-Promise false passes earn no acceptance credit. PhysicaliPhone/private-board causes remain unverified. Stable only; Beta stays paused."
+    ],
+    "redEvidence": {
+      "command": "Recorded per-slice commands under task-artifacts/webkit-button-safety-20261025/{product,gate,woop,clipboard,paste-diagnosis}/runs using scripts/agent-tools/record-run.mjs; see worker HANDOFF.md, paste-diagnosis/REPORT.md and exact recorder JSON for arguments, source identities, outputs and chronology.",
+      "failure": "Product native export RED measured1271ms maxframe/822ms modal insertion before repair; native final9.7MB transfer22ms dialog/18ms maxgap with native clipboard/download equality. LayoutREDd5c96e1c; WOOP RED1debfd52→GREEN4271a750/native422c4fdd. Clipboard nativeRED5fe38064+unitab89abe8 and FAQf61496dd→unitb77806ec/nativebbfca08a. Native PasteRED5fa8d8909176ms and app/FAQ80d5d1fb precede bounded draft; PreviewREDe8af825f/eaa3b5b6 isolates1897ms encoding. Close-while-encodingRED15edb3b8 precedes cooperative yielding; GREEN0ce21fad and actual native27952e26 prove166ms Paste/136ms Preview, exact45MB source/currenthead/16originals. Byte controlsf6d9b576 passed before optimization and are notRED. GateREDs928728d3,d7e8c21d,0231ad00,e122fbb1,58849a59,6da97207,89446b25,ae2a92f7,5ba59773,904becac,4fdc7ccd preceded their gate repairs; HANDOFF.md maps GREENs and limits. Focused Chromium oversized85204dce and all114 families have development coverage; only the forthcoming coherent exact-final matrix can qualify release. This combined rationale binds the integrated test diff; it does not reclassify later sensitivity as originalRED."
+    }
+  },
+  {
     "baseCommit": "cf8b1d591e7d4882b4f3c0a206560024c05ffaf3",
     "testChangesSha256": "251bb4fd856a564378b31ebd9efd52e85bbf5b2c3f78269791b84789cd53216f",
     "reason": "Yield between bounded exact file-encoding chunks so large Preview work remains cancellable and rechecks the same board, account, source and paste consent before protection writes.",
