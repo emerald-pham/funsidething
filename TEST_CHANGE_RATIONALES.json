@@ -22791,5 +22791,68 @@
       "command": "Node22 recorder --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK repository process: nonmergeable mobile startup diagnostics|^RISK repository process: startup-only mobile diagnostics\" tests.js; gate/mobile-512mb/hosted-oom-31c/runs/2026-10-26T07-12-08-193Z-af5e268f-867c-4131-abfc-804795bb650b.json",
       "failure": "Existing CLI returned reuse-normal/reuse-reduced instead of startup variants; actual parsed workflow retained ordinary-timing-diagnostic; extracted actual native scenario installed all six page bindings and executed story despite requested startup-only minimal observation. New helper assertion also failed but receives no distinct existing-consumer RED credit. Verified hosted40282208588/job121437785335 cap7 data and all raw original failures remain preserved. Focused GREEN166e3b4f follows implementation; intermediate fixture ReferenceError1702e436 and syntax fb3d3809 are retained, not productRED. No new Linux run or capped acceptance occurs locally."
     }
+  },
+  {
+    "baseCommit": "5474551d299f569d21707d92c76ccc8e4d341cb3",
+    "testChangesSha256": "c574b6ff8536972263a0171304569f629ca729ac96675b12442755128d5be1a9",
+    "reason": "Parent approved one diagnostic-only response-release variable after exact547 originals and minimal-observation cases all OOM before readiness. Preserve the current seven references and add fresh delayed-paint Normal/Reduced controls for same-job causal comparison.",
+    "previousBehavior": "The547 controller had seven cases. Its actual native HTTP consumer wrote the SPAWN_RATES404 response immediately; scanner readiness had no held-response release step. Existing startup-only source verification, exact cap/profile/data contracts and original full button story already remained protected.",
+    "intendedBehavior": "Nine independent cases retain60s wrappers within the same12min cap-only job. Only the added pair holds the existing identical404 fallback until state/store and CloudSync.ready, records a stage, releases it, and continues all unchanged motion/durable400/exact-source/full-render checks. Pending responses are cancelled on close/final cleanup, held-stage timeout is explicitly inconclusive, and no new report qualifies the Yes story.",
+    "replacementTests": [
+      "RISK repository process: delayed landscape responses preserve startup diagnostic causality and cleanup"
+    ],
+    "preservedCoverage": [
+      "All36 app assets remain exact31c. No app, runtime flag, GC, viewport/DPR/touch, fixture/context/RPC/storage,512000000/no-swap/image/shm/tmpfs,400tasks/1MiB/two retained sources or original button input/frame/transport/outcome requirement changes.",
+      "All seven existing reference cases remain in order and retain their behavior; two separately named delayed-paint Normal/Reduced cases are added. Original full and minimal-observation consumers keep their existing story/nonacceptance distinctions.",
+      "Existing historical404 Markdown response remains byte/status/header identical; adding actual deployed Markdown serving is a separately retained canonical follow-up, not part of this causal experiment. Actual YAML parses one cap-only12min job with unchanged exact shell command and malformed-command negative control.",
+      "Actual native HTTP/readiness/finalizer boundaries execute with isolated external response/page/context fixtures; cancellation precedes browser close, send failure closes the response, and timeout classification invents no memory cause. These process contracts and fake Docker continuation are not actual Linux cap or app proof.",
+      "Existing timing scalar/Promise/paste failures, nine-container cleanup/admission/exact-source contracts, release-kind refusals, risk map and derived gate protection remain. Catalog migrates two count-named roots, adds three process tests and one RISK root without dropping earlier cases."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK repository process: nonmergeable mobile startup diagnostics|^RISK repository process: delayed landscape responses\" tests.js; gate/mobile-512mb/hosted-oom-31c/runs/2026-10-26T07-46-13-059Z-86babfa1-d09c-4f6b-8b4b-3939c026b371.json",
+      "failure": "Existing --plan/controller ran seven instead of required nine; extracted actual HTTP callback immediately wrote the fallback instead of holding; actual readiness consumer recorded zero releases instead of one. New helper existence assertion is not separately credited as an existing-consumerRED. Intermediate4f41c8b6 retained a cross-realm fixture header comparison and missing catalog rows; fixed by wire-value normalization/catalog migration. Focused dirty GREEN2c5e1182 follows. Hosted exact547 OOM/raw64-file observations remain retained; no new native/Linux proof is claimed locally."
+    }
+  },
+  {
+    "baseCommit": "31c98a6e075f180681a49d1647b2462521c7ac5f",
+    "testChangesSha256": "8824e07b4d8ba349f383c37bc40cc01a6d0aa241d6044df677703485d7cb21b3",
+    "reason": "Parent approved one diagnostic-only response-release variable after exact547 originals and minimal-observation cases all OOM before readiness. Preserve the current seven references and add fresh delayed-paint Normal/Reduced controls for same-job causal comparison.",
+    "previousBehavior": "The547 controller had seven cases. Its actual native HTTP consumer wrote the SPAWN_RATES404 response immediately; scanner readiness had no held-response release step. Existing startup-only source verification, exact cap/profile/data contracts and original full button story already remained protected.",
+    "intendedBehavior": "Nine independent cases retain60s wrappers within the same12min cap-only job. Only the added pair holds the existing identical404 fallback until state/store and CloudSync.ready, records a stage, releases it, and continues all unchanged motion/durable400/exact-source/full-render checks. Pending responses are cancelled on close/final cleanup, held-stage timeout is explicitly inconclusive, and no new report qualifies the Yes story.",
+    "replacementTests": [
+      "RISK repository process: delayed landscape responses preserve startup diagnostic causality and cleanup"
+    ],
+    "preservedCoverage": [
+      "All36 app assets remain exact31c. No app, runtime flag, GC, viewport/DPR/touch, fixture/context/RPC/storage,512000000/no-swap/image/shm/tmpfs,400tasks/1MiB/two retained sources or original button input/frame/transport/outcome requirement changes.",
+      "All seven existing reference cases remain in order and retain their behavior; two separately named delayed-paint Normal/Reduced cases are added. Original full and minimal-observation consumers keep their existing story/nonacceptance distinctions.",
+      "Existing historical404 Markdown response remains byte/status/header identical; adding actual deployed Markdown serving is a separately retained canonical follow-up, not part of this causal experiment. Actual YAML parses one cap-only12min job with unchanged exact shell command and malformed-command negative control.",
+      "Actual native HTTP/readiness/finalizer boundaries execute with isolated external response/page/context fixtures; cancellation precedes browser close, send failure closes the response, and timeout classification invents no memory cause. These process contracts and fake Docker continuation are not actual Linux cap or app proof.",
+      "Existing timing scalar/Promise/paste failures, nine-container cleanup/admission/exact-source contracts, release-kind refusals, risk map and derived gate protection remain. Catalog migrates two count-named roots, adds three process tests and one RISK root without dropping earlier cases."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK repository process: nonmergeable mobile startup diagnostics|^RISK repository process: delayed landscape responses\" tests.js; gate/mobile-512mb/hosted-oom-31c/runs/2026-10-26T07-46-13-059Z-86babfa1-d09c-4f6b-8b4b-3939c026b371.json",
+      "failure": "Existing --plan/controller ran seven instead of required nine; extracted actual HTTP callback immediately wrote the fallback instead of holding; actual readiness consumer recorded zero releases instead of one. New helper existence assertion is not separately credited as an existing-consumerRED. Intermediate4f41c8b6 retained a cross-realm fixture header comparison and missing catalog rows; fixed by wire-value normalization/catalog migration. Focused dirty GREEN2c5e1182 follows. Hosted exact547 OOM/raw64-file observations remain retained; no new native/Linux proof is claimed locally."
+    }
+  },
+  {
+    "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
+    "testChangesSha256": "090d7e3031f680a777b214f1b6cdb5146def1e6095ea68ca6d087f2ffcb40459",
+    "reason": "Parent approved one diagnostic-only response-release variable after exact547 originals and minimal-observation cases all OOM before readiness. Preserve the current seven references and add fresh delayed-paint Normal/Reduced controls for same-job causal comparison.",
+    "previousBehavior": "The547 controller had seven cases. Its actual native HTTP consumer wrote the SPAWN_RATES404 response immediately; scanner readiness had no held-response release step. Existing startup-only source verification, exact cap/profile/data contracts and original full button story already remained protected.",
+    "intendedBehavior": "Nine independent cases retain60s wrappers within the same12min cap-only job. Only the added pair holds the existing identical404 fallback until state/store and CloudSync.ready, records a stage, releases it, and continues all unchanged motion/durable400/exact-source/full-render checks. Pending responses are cancelled on close/final cleanup, held-stage timeout is explicitly inconclusive, and no new report qualifies the Yes story.",
+    "replacementTests": [
+      "RISK repository process: delayed landscape responses preserve startup diagnostic causality and cleanup"
+    ],
+    "preservedCoverage": [
+      "All36 app assets remain exact31c. No app, runtime flag, GC, viewport/DPR/touch, fixture/context/RPC/storage,512000000/no-swap/image/shm/tmpfs,400tasks/1MiB/two retained sources or original button input/frame/transport/outcome requirement changes.",
+      "All seven existing reference cases remain in order and retain their behavior; two separately named delayed-paint Normal/Reduced cases are added. Original full and minimal-observation consumers keep their existing story/nonacceptance distinctions.",
+      "Existing historical404 Markdown response remains byte/status/header identical; adding actual deployed Markdown serving is a separately retained canonical follow-up, not part of this causal experiment. Actual YAML parses one cap-only12min job with unchanged exact shell command and malformed-command negative control.",
+      "Actual native HTTP/readiness/finalizer boundaries execute with isolated external response/page/context fixtures; cancellation precedes browser close, send failure closes the response, and timeout classification invents no memory cause. These process contracts and fake Docker continuation are not actual Linux cap or app proof.",
+      "Existing timing scalar/Promise/paste failures, nine-container cleanup/admission/exact-source contracts, release-kind refusals, risk map and derived gate protection remain. Catalog migrates two count-named roots, adds three process tests and one RISK root without dropping earlier cases."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK repository process: nonmergeable mobile startup diagnostics|^RISK repository process: delayed landscape responses\" tests.js; gate/mobile-512mb/hosted-oom-31c/runs/2026-10-26T07-46-13-059Z-86babfa1-d09c-4f6b-8b4b-3939c026b371.json",
+      "failure": "Existing --plan/controller ran seven instead of required nine; extracted actual HTTP callback immediately wrote the fallback instead of holding; actual readiness consumer recorded zero releases instead of one. New helper existence assertion is not separately credited as an existing-consumerRED. Intermediate4f41c8b6 retained a cross-realm fixture header comparison and missing catalog rows; fixed by wire-value normalization/catalog migration. Focused dirty GREEN2c5e1182 follows. Hosted exact547 OOM/raw64-file observations remain retained; no new native/Linux proof is claimed locally."
+    }
   }
 ]

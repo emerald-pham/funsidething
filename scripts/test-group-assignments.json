@@ -12943,7 +12943,7 @@
       "file": "scripts/agent-tools/ci-routing.test.mjs"
     },
     {
-      "root": "diagnostic CLI exposes exactly seven bounded controls without launching a runtime",
+      "root": "diagnostic CLI retains seven references and adds two bounded delayed-paint controls",
       "group": "native-process",
       "file": "scripts/agent-tools/mobile-diagnostic.test.mjs"
     },
@@ -12983,7 +12983,7 @@
       "file": "tests.js"
     },
     {
-      "root": "actual diagnostic batch retains an OOM case and removes all seven fixture containers",
+      "root": "actual diagnostic batch retains an OOM case and removes all nine fixture containers",
       "group": "native-process",
       "file": "scripts/agent-tools/mobile-diagnostic.test.mjs"
     },
@@ -13039,6 +13039,26 @@
     },
     {
       "root": "RISK repository process: startup-only mobile diagnostics cannot satisfy the Yes story",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "actual native response path holds only the existing landscape fallback until release",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-diagnostic.test.mjs"
+    },
+    {
+      "root": "actual native startup releases landscape after scanner predicates and before motion readiness",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-diagnostic.test.mjs"
+    },
+    {
+      "root": "delayed landscape response cleanup records cancellation and held timeouts without a causal claim",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-diagnostic.test.mjs"
+    },
+    {
+      "root": "RISK repository process: delayed landscape responses preserve startup diagnostic causality and cleanup",
       "group": "native-process",
       "file": "tests.js"
     }

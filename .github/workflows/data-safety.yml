@@ -23,7 +23,7 @@ jobs:
       - name: Diagnostic process contracts only
         run: |
           node --test --test-name-pattern='^RISK repository process: nonmergeable mobile startup diagnostics preserve strict caps and independent controls$' tests.js
-      - name: Seven capped observations, never acceptance
+      - name: Nine capped observations, never acceptance
         run: node scripts/button-safety-mobile-diagnostic.mjs --run --output-dir "$RUNNER_TEMP/webkit-cap-diagnosis"
       - name: Preserve every observed failure and phase
         if: always()

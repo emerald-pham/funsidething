@@ -39,8 +39,29 @@ export async function verifyDiagnosticStartup({page,board,motion}){
  assert.ok(Number.isSafeInteger(observed.maxTouchPoints)&&observed.maxTouchPoints>=0);assert.equal(observed.coarsePointer,true);assert.match(observed.userAgent,/iPhone.*AppleWebKit.*Mobile/);assert.equal(observed.reducedMedia,motion==='reduced');assert.equal(observed.appMotion,motion);assert.equal(observed.appliedMotion,motion);
  assert.equal(observed.canvasSizes.length,2);assert.ok(observed.canvasSizes.every(row=>row.width>0&&row.height>0),'Full landscape remains mounted');return observation;
 }
+// Diagnostic-only single response gate; it changes response timing, never bytes.
+export function createDelayedPaintResponse({report,phase,save}){
+ const row=report.delayedPaint={scope:'startup-only-delayed-landscape-paint',held:false,released:false,responseWritten:false,scannerPredicatesPassed:false,cancelled:false};let pending=null;
+ const cancel=(reason='cleanup')=>{if(!pending)return;const {response}=pending;pending=null;row.cancelled=true;row.cancellationReason=reason;if(!response.destroyed)response.destroy();save();};
+ return{
+  hold({response,send,status,body}){
+   assert.ok(!row.held&&!pending,'Exactly one landscape response may be held');assert.ok(!response.destroyed,'Landscape response must still be pending');
+   row.held=true;row.heldAt=new Date().toISOString();row.responseStatus=status;row.responseSha256=digest(body);pending={response,send};
+   response.once('close',()=>{if(pending?.response===response)cancel('connection-closed-before-release');});phase('landscape-response-held');save();
+  },
+  releaseAfterScannerPredicates(){
+   assert.ok(pending&&!pending.response.destroyed,'Actual pending held landscape request required before release');row.scannerPredicatesPassed=true;phase('scanner-ready-before-landscape-release');save();
+   const current=pending;pending=null;
+   try{current.send();row.responseWritten=current.response.writableEnded===true;assert.ok(row.responseWritten,'Original landscape response must be written');row.released=true;row.releasedAt=new Date().toISOString();phase('landscape-response-released');save();}
+   catch(error){row.releaseError=String(error);if(!current.response.destroyed)current.response.destroy();save();throw error;}
+  },
+  noteFailure(error){row.failureStage=row.released?'released':row.held?'held':'before-request';row.heldStageTimeoutInconclusive=row.held&&!row.released&&/timeout|timed out|stalled responsiveness/i.test(String(error));save();},
+  cancel,
+ };
+}
 export async function runButtonSafety({repo,engine,outputDir,port=0,control=null,probe=false,scenarioFilter=null,mobileYesMotion=null,diagnostic=null}){
- const timingEnabled=process.env.CHAIN_BUTTON_DIAGNOSTIC_TIMINGS==='1',startupOnly=diagnostic?.startupOnly===true;
+ const timingEnabled=process.env.CHAIN_BUTTON_DIAGNOSTIC_TIMINGS==='1',startupOnly=diagnostic?.startupOnly===true,delayedPaint=diagnostic?.delayedPaint===true;
+ assert.ok(!delayedPaint||startupOnly,'Delayed paint is exclusively a startup-only diagnostic');
  assert.equal(diagnostic?.minimalPageObservation===true,startupOnly,'Minimal page observation is exclusively a startup-only diagnostic');
  assert.ok(!startupOnly||!timingEnabled,'Startup and timing diagnostics cannot be mixed');
  assert.ok(['chromium','webkit'].includes(engine),'Explicit supported engine');
@@ -71,6 +92,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
  if(timingEnabled){report.acceptanceEligible=false;report.diagnosticTiming={schemaVersion:1,clock:{node:'performance.now; burst phase startMs relative to nodeOriginMs, paste endpoints absolute monotonic',browser:'performance.timeOrigin + performance.now; no cross-clock subtraction'},bursts:[],paste:[],limits:['Node phase durations include driver, protocol and browser work; they are not pure app durations.','onAction measures synchronous return only; asynchronous completion remains governed by the existing independent outcome.','Paste keeps the full argument/construct/dispatch/readback boundary; browser dispatch includes all listeners. No cross-clock subtraction or ingress attribution is inferred.','Diagnostic collection is outside the frozen burst window and cannot waive any original assertion.']};}
  if(diagnostic){assert.ok(mobileYesMotion&&!control&&!probe,'Diagnostics retain the actual mobile scenario');report.acceptanceEligible=false;report.diagnostic={reuseObserverPage:diagnostic.reuseObserverPage===true,startupOnly,minimalPageObservation:startupOnly};if(startupOnly){assert.ok(!diagnostic.reuseObserverPage,'Startup observation uses the original observer-close/new-page handoff');report.omittedAssertions=['Ten distinct offered-task Yes inputs and trusted touch/click receipts','Two-second input burst, per-action transport and outcomes','Continuous frame heartbeat and one-second frame budget','DOM census and unknown-action coverage'];}}
  const reportPath=path.join(outputDir,'button-safety-'+engine+'-'+randomUUID()+'.json'),save=()=>fs.writeFileSync(reportPath,JSON.stringify(report,null,2)+'\n');save();
+ const paintGate=delayedPaint?createDelayedPaintResponse({report,phase,save}):null;
  const prefix='/button-'+randomUUID()+'/',sdk='/sdk-'+randomUUID()+'/',sources=new Map();
  for(const file of git('ls-files').toString().trim().split('\n'))if(file!=='tests.js'&&!file.startsWith('scripts/')&&/\.(html|js|css|svg|png|webmanifest)$/.test(file))sources.set(file,fs.readFileSync(path.join(repo,file)));
  report.assets=Object.fromEntries([...sources].map(([file,bytes])=>[file,digest(bytes)]));
@@ -85,6 +107,10 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
    const name=pathname.slice(prefix.length)||'index.html',module=pathname.startsWith(sdk)?pathname.slice(sdk.length):null;
    const observer=pathname===prefix+'__button-observer';
    const bytes=observer?'<!doctype html><title>Isolated storage fixture</title>':module?{'firebase-app.js':appModule,'firebase-auth.js':authModule,'firebase-firestore.js':firestoreModule.replace('const rpc=(kind,args)=>window.__installedRPC(kind,args)',"const rpc=async(kind,args)=>{const result=await window.__installedRPC(kind,args);if(result?.fixtureFailure)throw Object.assign(Error('Synthetic external SDK refusal'),{code:result.fixtureFailure});return result;}")}[module]:pathname.startsWith(prefix)&&!name.includes('..')?sources.get(name):null;
+   if(paintGate&&pathname===prefix+'SPAWN_RATES.md'){
+    try{paintGate.hold({response:res,status:bytes?200:404,body:bytes||'Not found',send:()=>{res.writeHead(bytes?200:404,{'Content-Type':module?'text/javascript':MIME[path.extname(name)]||'text/plain','Cache-Control':'no-store'});res.end(bytes||'Not found');}});}
+    catch(error){report.errors.push('delayed-landscape-response: '+String(error));res.destroy();}return;
+   }
    res.writeHead(bytes?200:404,{'Content-Type':module?'text/javascript':MIME[path.extname(name)]||'text/plain','Cache-Control':'no-store'});res.end(bytes||'Not found');
   });await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',resolve);});
   const origin='http://127.0.0.1:'+server.address().port;
@@ -175,7 +201,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
     addEventListener('DOMContentLoaded',()=>{scan();new MutationObserver(scan).observe(document.documentElement,{childList:true,subtree:true});});
    },{keySource:actionFor.toString()});
    }
-   phase('before-app-goto');await page.goto(origin+prefix);phase('after-app-goto');await page.waitForFunction(()=>typeof state!=='undefined'&&state&&window.ScannerDeviceStore);await page.waitForFunction(()=>window.CloudSync?.ready);if(mobileYesMotion)await page.waitForFunction(motion=>document.documentElement.dataset.landscapeMotion===motion,mobileYesMotion,{timeout:12000});phase('after-app-ready');localArmed=true;
+   phase('before-app-goto');await page.goto(origin+prefix);phase('after-app-goto');await page.waitForFunction(()=>typeof state!=='undefined'&&state&&window.ScannerDeviceStore);await page.waitForFunction(()=>window.CloudSync?.ready);if(paintGate)paintGate.releaseAfterScannerPredicates();if(mobileYesMotion)await page.waitForFunction(motion=>document.documentElement.dataset.landscapeMotion===motion,mobileYesMotion,{timeout:12000});phase('after-app-ready');localArmed=true;
    const setup=await bounded((async()=>{for(let attempt=0;attempt<200;attempt++){
     const result=await page.evaluate(async()=>{const head=await ScannerDeviceStore.readHead();return{currentTasks:state.tasks.length,activeTasks:state.tasks.filter(task=>!task.done).length,durableTasks:head?.payload?JSON.parse(head.payload).tasks.length:0,durableHash:head?.hash};});
     if(result.currentTasks===TASK_COUNT&&result.durableTasks===TASK_COUNT)return{...result,fixtureRole:options.fixtureRole||'active'};
@@ -341,9 +367,9 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
   for(const action of observed)assert.ok(report.requiredActions.includes(action),'New untested button action: '+action);
   report.observedActions=[...observed].sort();report.outcomes=[...outcomes.values()];report.rapidOutcomes=[...rapidOutcomes.values()];if(scenarioFilter)report.scope=startupOnly?'startup-only-diagnostic':'focused-diagnostic';
   report.status='passed';
- }catch(error){report.status='failed';report.failure=error.stack;try{report.failureObservation=await bounded(page.evaluate(()=>({modal:document.getElementById('modalRoot')?.innerText,toast:document.getElementById('toast')?.innerText,mode:state.mode,chain:state.chain,candidateId:state.candidateId,taskTitles:state.tasks.slice(0,10).map(t=>({id:t.id,title:t.title}))})),'failure observation');}catch(observationError){report.failureObservationError=String(observationError);}throw error;}
+ }catch(error){paintGate?.noteFailure(error);report.status='failed';report.failure=error.stack;try{report.failureObservation=await bounded(page.evaluate(()=>({modal:document.getElementById('modalRoot')?.innerText,toast:document.getElementById('toast')?.innerText,mode:state.mode,chain:state.chain,candidateId:state.candidateId,taskTitles:state.tasks.slice(0,10).map(t=>({id:t.id,title:t.title}))})),'failure observation');}catch(observationError){report.failureObservationError=String(observationError);}throw error;}
  finally{
-  closing=true;
+  closing=true;paintGate?.cancel('cleanup');
   if(context){await context.close();report.cleanup.contextClosed=true;}
   if(browser){await browser.close();report.cleanup.browserClosed=true;}
   if(server){await new Promise(resolve=>server.close(resolve));report.cleanup.serverClosed=true;}
