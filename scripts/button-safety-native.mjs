@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {installMobileFrameObserver} from './mobile-frame-observer.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
@@ -47,7 +48,9 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
  for(const [file,bytes]of sources)assert.equal(digest(bytes),digest(git('show','HEAD:'+file)),'Button run requires exact committed app bytes: '+file);
  let server,browser,context,page,armed=false,closing=false;
  const check=()=>{assert.equal(report.errors.length,0,'Native button safety detected '+report.errors.join(', '));};
- const bounded=async(work,label,timeoutMs=2500)=>{let timer;try{return await Promise.race([work,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Native button safety detected stalled responsiveness: '+label)),timeoutMs);})]);}finally{clearTimeout(timer);}};
+ report.diagnosticControllerPhases={kind:'diagnostic-controller-wall',timeOrigin:performance.timeOrigin,aggregates:{},slowOperations:[],unretainedLabels:0,limits:{aggregateLabels:32,slowOperations:32}};
+ const controllerPhase=(label,start,end)=>{const data=report.diagnosticControllerPhases,ms=end-start;let row=data.aggregates[label];if(!row&&Object.keys(data.aggregates).length<32)row=data.aggregates[label]={count:0,totalMs:0,maxMs:0};if(row){row.count++;row.totalMs+=ms;row.maxMs=Math.max(row.maxMs,ms);}else data.unretainedLabels++;if(data.slowOperations.length<32||ms>data.slowOperations.at(-1).ms){data.slowOperations.push({label,start,end,ms});data.slowOperations.sort((a,b)=>b.ms-a.ms);data.slowOperations.length=Math.min(32,data.slowOperations.length);}};
+ const bounded=async(work,label,timeoutMs=2500)=>{const start=performance.timeOrigin+performance.now();let timer;try{return await Promise.race([work,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Native button safety detected stalled responsiveness: '+label)),timeoutMs);})]);}finally{clearTimeout(timer);controllerPhase(label,start,performance.timeOrigin+performance.now());}};
  try{
   server=http.createServer((req,res)=>{
    const pathname=new URL(req.url,'http://127.0.0.1').pathname;
@@ -74,6 +77,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
    if(context){closing=true;await context.close();closing=false;}
    const device=mobileYesMotion?playwright.devices['iPhone 13']:null;
    context=await browser.newContext({...(device?{userAgent:device.userAgent,screen:MOBILE_PROFILE.screen,deviceScaleFactor:3,isMobile:true,hasTouch:true}:{}),serviceWorkers:'block',viewport:mobileYesMotion?MOBILE_PROFILE.viewport:options.viewport||{width:1100,height:850},reducedMotion:mobileYesMotion==='normal'?'no-preference':'reduce'});
+   await context.addInitScript(installMobileFrameObserver);
    if(mobileYesMotion)options={...options,retainedCopies:2};
    const board=buttonFixture(options.authMode||'signed-out');
    if(options.board)Object.assign(board,options.board);
@@ -201,7 +205,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
     await expose(selector);const target=page.locator(selector).first();
     const action=await target.evaluate(actionFor);assert.ok(action,'Passive inert appearance replicas cannot earn action coverage');const before=report.clicks?.length||0;
     await bounded(page.evaluate(()=>{window.__buttonHeartbeat.maxGapMs=0;window.__buttonHeartbeat.at=performance.now();window.__buttonHeartbeat.inputArmed=true;window.__buttonHeartbeat.inputAt=null;window.__buttonHeartbeat.inputMaxGapMs=0;window.__buttonHeartbeat.preInputMaxGapMs=0;return window.__buttonHeartbeat.frames;}),'preclick heartbeat');const started=Date.now();
-    await bounded(mobileYesMotion?target.tap(clickOptions):target.click(clickOptions),name+' / '+description);
+    const inputStarted=performance.timeOrigin+performance.now();try{await bounded(mobileYesMotion?target.tap(clickOptions):target.click(clickOptions),name+' / '+description);}finally{controllerPhase('input-dispatch:'+description,inputStarted,performance.timeOrigin+performance.now());}
     if(expect)await waitFor(expect,control==='async-pending'||control==='async-predicate-false'?2500:12000,'outcome '+description);
     else assert.fail('Every button step requires an independent expected outcome: '+description);
     await bounded(page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>resolve(true)))),'frame '+description);
@@ -351,6 +355,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
   report.status='passed';
  }catch(error){report.status='failed';report.failure=error.stack;try{report.failureObservation=await bounded(page.evaluate(()=>({modal:document.getElementById('modalRoot')?.innerText,toast:document.getElementById('toast')?.innerText,heartbeat:{...window.__buttonHeartbeat},mode:state.mode,chain:state.chain,candidateId:state.candidateId,taskTitles:state.tasks.slice(0,10).map(t=>({id:t.id,title:t.title}))})),'failure observation');}catch(observationError){report.failureObservationError=String(observationError);}throw error;}
  finally{
+  if(context){report.mobilePhaseObservations=[];for(const observedPage of context.pages())try{const observation=await bounded(observedPage.evaluate(()=>window.__mobileFrameObservation),'diagnostic phase observation',1000);if(observation)report.mobilePhaseObservations.push(observation);}catch(error){report.mobilePhaseObservationError=String(error);}}
   closing=true;
   let cleanupError;
   const close=async work=>{try{await work();}catch(error){cleanupError??=error;report.status='failed';report.errors.push('cleanup: '+String(error));}};

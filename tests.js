@@ -46340,3 +46340,41 @@ test('RISK Undo scene guidance: FAQ and Changelog explain task Undo keeps scene 
  const source=fs.readFileSync(path.join(__dirname,'index.html'),'utf8'),faq=source.match(/<dt>Can I undo, restore, or remove a task\?<\/dt><dd>(.*?)<\/dd>/s)?.[1],changelog=source.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1];
  assert.match(faq||'',/Task Undo keeps scene choices\./);assert.match(changelog||'',/Task Undo responds faster while keeping your scene choices\./);
 });
+
+
+test('RISK repository process: startup diagnostic is bounded and cannot qualify the release matrix',async t=>{
+ const {parse}=await import('yaml'),workflow=parse(fs.readFileSync(path.join(__dirname,'.github/workflows/data-safety.yml'),'utf8'));
+ assert.deepEqual(workflow.on,{push:{branches:['diagnose/webkit-startup-phases']}},'Only the dedicated nonmergeable startup branch may run this diagnostic');
+ assert.deepEqual(workflow.permissions,{contents:'read'});
+ assert.deepEqual(Object.keys(workflow.jobs),['diagnostic-mobile-startup']);
+ const job=workflow.jobs['diagnostic-mobile-startup'];
+ assert.equal(job['timeout-minutes'],15);assert.deepEqual(job.strategy,{'fail-fast':false,matrix:{motion:['normal','reduced']}});
+ assert.equal(job.env.FROZEN_APP_COMMIT,'6dde63c21525c5c792bc84ff4c24158fdf446943');
+ for(const value of Object.values(job.env))assert.doesNotMatch(String(value),/\$\{\{\s*runner\b/,'Runner expressions require a step context');
+ assert.equal(job.steps.at(-1).if,'always()');assert.equal(job.steps.at(-1).with['if-no-files-found'],'error');
+ assert.ok(job.steps.every(step=>!String(step.uses||step.run||'').match(/deploy-pages|release:publish|test:group.*--aggregate/)),'Diagnostic results cannot deploy or aggregate release acceptance');
+ assert.ok(job.steps.some(step=>step.run==='node scripts/button-safety-mobile-memory.mjs --run --profile required-1gb --output-dir "$RUNNER_TEMP/mobile-startup/capped"'),'Real capped control and original full story remain on the pinned launcher');
+ const {tmpdir}=await import('node:os'),{createMobileBundle,refreshMobileBundle}=await import('./scripts/agent-tools/mobile-memory-fixture.mjs'),{verifyMobileMemoryReport}=await import('./scripts/button-safety-mobile-contract.mjs');
+ const directory=fs.mkdtempSync(path.join(tmpdir(),'chain-startup-diagnostic-contract-'));t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const bundle=createMobileBundle(directory),verify=()=>verifyMobileMemoryReport(bundle.report,{artifactRoot:directory});
+ assert.equal(verify().status,'passed','Synthetic positive parser control supplies no runtime acceptance');
+ bundle.report.kind='button-mobile-memory-diagnostic';assert.throws(verify,'Diagnostic report kind cannot qualify release');
+ bundle.report.kind='button-mobile-memory';bundle.report.cases=bundle.report.cases.slice(0,1);refreshMobileBundle(bundle);assert.throws(verify,'Relabeling a partial motion matrix cannot qualify release');
+});
+
+test('RISK repository process: diagnostic observer retains recent actions after a long setup',async()=>{
+ const {installMobileFrameObserver}=await import('./scripts/mobile-frame-observer.mjs'),listeners=new Map();let now=0;
+ class ElementFixture{}Object.defineProperty(ElementFixture.prototype,'innerHTML',{configurable:true,get(){return '';},set(){}});
+ const sandbox={performance:{timeOrigin:1,now:()=>++now},Element:ElementFixture,MutationObserver:class{},requestAnimationFrame:()=>0,setTimeout:()=>0,setInterval:()=>0,document:{documentElement:{dataset:{}},addEventListener:(type,callback)=>listeners.set(type,callback)}};sandbox.window=sandbox;sandbox.top=sandbox;
+ vm.runInNewContext('('+installMobileFrameObserver.toString()+')()',sandbox);
+ const emit=(sequence,trusted=true)=>listeners.get('pointerdown')({type:'pointerdown',isTrusted:trusted,target:{closest:()=>({dataset:{act:sequence<64?'setup':'bulk-select'}})}});
+ // Synthetic observer bookkeeping only. Native trusted-input proof remains
+ // in the separately recorded real browser reports.
+ for(let i=0;i<80;i++)emit(i);emit(80,false);
+ const observed=sandbox.__mobileFrameObservation;
+ assert.equal(observed.actions.length,64,'The observer keeps its existing bound');
+ assert.equal(observed.actions[0].sequence,17,'Long setup cannot displace the recent failing action');
+ assert.equal(observed.actions.at(-1).sequence,80,'Action identities remain monotonic after truncation');
+ assert.equal(observed.actions.at(-1).action,'act:bulk-select');
+ assert.equal(observed.actionCount,80,'The report makes omitted older actions explicit without counting synthetic events');
+});

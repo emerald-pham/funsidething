@@ -13196,6 +13196,16 @@
       "file": "tests.js",
       "root": "RISK Undo scene guidance: FAQ and Changelog explain task Undo keeps scene choices",
       "group": "core"
+    },
+    {
+      "file": "tests.js",
+      "root": "RISK repository process: startup diagnostic is bounded and cannot qualify the release matrix",
+      "group": "native-process"
+    },
+    {
+      "file": "tests.js",
+      "root": "RISK repository process: diagnostic observer retains recent actions after a long setup",
+      "group": "native-process"
     }
   ],
   "processControls": [

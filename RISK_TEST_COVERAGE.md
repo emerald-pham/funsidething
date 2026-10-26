@@ -2370,3 +2370,8 @@ The pinned Linux x64 reader preserves the raw AT_PAGESZ witness and binds it to 
 - RISK repository process: ordinary task Undo keeps unchanged scenery while separate scene choices repaint and save
 - RISK repository process: native frame accounting separates pre-input and post-input stalls without waiving either
 - RISK Undo scene guidance: FAQ and Changelog explain task Undo keeps scene choices
+
+## Nonmergeable startup diagnostic
+
+- RISK repository process: startup diagnostic is bounded and cannot qualify the release matrix
+- RISK repository process: diagnostic observer retains recent actions after a long setup

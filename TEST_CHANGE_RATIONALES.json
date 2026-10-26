@@ -25177,5 +25177,49 @@
       "command": "Recorded actual chronology in qualification/phase-causal-96ee7cd/runs:274211ae node --test --test-name-pattern=^RISK synced scene repaint:|^RISK repository process: ordinary task Undo keeps tests.js; c874c02d node --test --test-name-pattern=^RISK repository process: native frame accounting tests.js (original canonical937 app asset baseline restored only for this distinct frame slice, product candidate bytes preserved/restored); ae6a2e1e node --test --test-name-pattern=^RISK Undo scene guidance: tests.js. Full exact commands, original source hashes and raw TAP streams are retained in each recorder. Earlier base-specific migration chronology remains in unchanged historical rationale entries.",
       "failure": "274211ae: ordinary title Undo must not repaint unchanged scenery,26 !==6; unchanged effective scene must not request another sky repaint,2 !==1. c874c02d: the observed stall predates input and actual post-input stall remains attributed to input both fail because native phase evidence is absent, while actual trusted clicks, original frame failures and complete cleanup were observed. ae6a2e1e: missing concise Scene choices stay in place FAQ sentence. These actual assertion failures precede the corresponding functional edits; historical receipts are not relabeled."
     }
+  },
+  {
+    "baseCommit": "6dde63c21525c5c792bc84ff4c24158fdf446943",
+    "testChangesSha256": "90774d5a68e9a09fcc7416463eeae22284d74ba1e7025f2ea099fe064c248d22",
+    "reason": "Bind one nonmergeable startup diagnostic to both required motions with bounded execution, immutable app bytes and strict rejection by the canonical release verifier. Prior canonical coverage remains protected by its exact historical entries.",
+    "previousBehavior": "The canonical workflow is intended for release and is not restricted to a dedicated diagnostic branch. Its canonical verifier already rejects incomplete matrices; the new diagnostic process test must preserve that rejection and keep instrumented partial evidence outside deployment.",
+    "intendedBehavior": "Only diagnose/webkit-startup-phases launches two isolated Normal and Reduced diagnostic jobs. Each keeps the actual capped control and original full story, read-only permissions and a fifteen-minute bound; actual canonical verification rejects diagnostic kind and selected-motion substitution. No deployment or aggregate release acceptance is available.",
+    "replacementTests": [
+      "RISK repository process: startup diagnostic is bounded and cannot qualify the release matrix",
+      "RISK repository process: diagnostic observer retains recent actions after a long setup"
+    ],
+    "preservedCoverage": [
+      "Original400 saved tasks,1MiB unknown field, two protected backup originals, opaque/pending sources, full paint and ten distinct accepted native-touch Yes within2000ms remain unchanged.",
+      "Required1GB whole-browser-family cap with zero swap, separate2GiB driver, actual OOM control, exact source/profile/membership and owned cleanup remain unchanged; this diagnostic earns no release credit.",
+      "Existing unchanged-scene Undo/native phase consumers, strict1000ms complete-step threshold, independent accepted/durable facts and all earlier source/data protections remain in place.",
+      "Actual observer error-channel/identity controls8a10dc0b, timer/rAF sensitivitydc737229 and actual remote server actionabilityd9a64534 remain separately recorded diagnostic evidence; they do not establish hosted application success.",
+      "The exact96ee recent64-action ring and monotonic actionCount remain, preserving the most recent failing action after a long setup; synthetic bookkeeping is separate from native trusted-input proof."
+    ],
+    "redEvidence": {
+      "command": "Recorded f381bed6: node --test --test-name-pattern=\"^RISK repository process: startup diagnostic is bounded\" tests.js on frozen6dde with only the new test added; exact raw record in qualification/startup-carrier-root/runs. Also5c83ed51 reuses the original96ee observer consumer against the proposed package before repair.",
+      "failure": "Actual assertion failed: Only the dedicated nonmergeable startup branch may run this diagnostic. Canonical push and pull_request triggers did not equal the required dedicated startup branch. After the five-file overlay, c5ac4d39 passes3/3 including actual canonical verifier rejection and unchanged coverage/catalog consumers.5c83ed51 fails Long setup cannot displace the recent failing action:1 instead of17. The same prior96ee ring/counter repair restores the recent64 with explicit omission count; original package bytes/evidence stay retained."
+    }
+  },
+  {
+    "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
+    "testChangesSha256": "62348c78a08efa4d513aeb3fcc8a5eed1c16190a94ea866544b4a10639f0018b",
+    "reason": "Bind one nonmergeable startup diagnostic to both required motions with bounded execution, immutable app bytes and strict rejection by the canonical release verifier. Prior canonical coverage remains protected by its exact historical entries.",
+    "previousBehavior": "The canonical workflow is intended for release and is not restricted to a dedicated diagnostic branch. Its canonical verifier already rejects incomplete matrices; the new diagnostic process test must preserve that rejection and keep instrumented partial evidence outside deployment.",
+    "intendedBehavior": "Only diagnose/webkit-startup-phases launches two isolated Normal and Reduced diagnostic jobs. Each keeps the actual capped control and original full story, read-only permissions and a fifteen-minute bound; actual canonical verification rejects diagnostic kind and selected-motion substitution. No deployment or aggregate release acceptance is available.",
+    "replacementTests": [
+      "RISK repository process: startup diagnostic is bounded and cannot qualify the release matrix",
+      "RISK repository process: diagnostic observer retains recent actions after a long setup"
+    ],
+    "preservedCoverage": [
+      "Original400 saved tasks,1MiB unknown field, two protected backup originals, opaque/pending sources, full paint and ten distinct accepted native-touch Yes within2000ms remain unchanged.",
+      "Required1GB whole-browser-family cap with zero swap, separate2GiB driver, actual OOM control, exact source/profile/membership and owned cleanup remain unchanged; this diagnostic earns no release credit.",
+      "Existing unchanged-scene Undo/native phase consumers, strict1000ms complete-step threshold, independent accepted/durable facts and all earlier source/data protections remain in place.",
+      "Actual observer error-channel/identity controls8a10dc0b, timer/rAF sensitivitydc737229 and actual remote server actionabilityd9a64534 remain separately recorded diagnostic evidence; they do not establish hosted application success.",
+      "The exact96ee recent64-action ring and monotonic actionCount remain, preserving the most recent failing action after a long setup; synthetic bookkeeping is separate from native trusted-input proof."
+    ],
+    "redEvidence": {
+      "command": "Recorded f381bed6: node --test --test-name-pattern=\"^RISK repository process: startup diagnostic is bounded\" tests.js on frozen6dde with only the new test added; exact raw record in qualification/startup-carrier-root/runs. Also5c83ed51 reuses the original96ee observer consumer against the proposed package before repair.",
+      "failure": "Actual assertion failed: Only the dedicated nonmergeable startup branch may run this diagnostic. Canonical push and pull_request triggers did not equal the required dedicated startup branch. After the five-file overlay, c5ac4d39 passes3/3 including actual canonical verifier rejection and unchanged coverage/catalog consumers.5c83ed51 fails Long setup cannot displace the recent failing action:1 instead of17. The same prior96ee ring/counter repair restores the recent64 with explicit omission count; original package bytes/evidence stay retained."
+    }
   }
 ]

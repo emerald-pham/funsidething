@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
+import {installDiagnosticApiLog} from './diagnostic-api-log.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {spawn,spawnSync} from 'node:child_process';
@@ -42,6 +43,7 @@ async function browserServer(output,control,budgetProfile='required-1gb'){
  const budget=mobileBudgetBytes(budgetProfile);
  fs.mkdirSync(output,{recursive:true});const source=identity(),report={...source,budgetProfile,status:'running',role:'browser',scope:MOBILE_MEMORY_SCOPE,nodeVersion:process.version,hostedPolicy:hostedButtonPolicy(),uid:process.getuid(),gid:process.getgid(),namespace:fs.readlinkSync('/proc/self/ns/net'),pidNamespace:fs.readlinkSync('/proc/self/ns/pid'),ownerPid:process.pid,errors:[],cleanup:{}};
  const file=path.join(output,'browser-server.json'),readyFile=path.join(output,'ready.json'),requestFile=path.join(output,'owner-request.json');let server,monitor,monitorError;const seen=new Map();
+ installDiagnosticApiLog(report); // Before importing the real remote Playwright server; process ends after owned cleanup.
  try{
   assert.match(process.version,/^v22\./);assert.ok(report.uid>0&&report.gid>0);report.before=readMemoryBoundary({budgetProfile});
   const playwright=await import('playwright'),packageInfo=json(path.join(path.dirname(fileURLToPath(import.meta.resolve('playwright'))),'package.json'));
@@ -118,9 +120,10 @@ export function containerArgs({repo,output,nodeBinary,motion,control,eventPolicy
 export async function runCappedMobile({outputDir,budgetProfile='required-1gb'}){
  mobileBudgetBytes(budgetProfile);
  if(process.platform!=='linux'||process.env.CI!=='true')throw Error('Capped mobile acceptance requires the isolated hosted Linux push/pull-request runtime; local functional evidence cannot waive it.');
+ const diagnosticMotion=process.env.CHAIN_DIAGNOSTIC_MOTION;assert.ok(['normal','reduced'].includes(diagnosticMotion),'Diagnostic carrier requires one explicit motion');assert.equal(budgetProfile,'required-1gb','This diagnostic cannot change the required budget');
  const hostedPolicy=hostedButtonPolicy(),output=path.resolve(outputDir);if(output===root||output.startsWith(root+path.sep))throw Error('Capped mobile evidence must be outside the checkout');fs.mkdirSync(output,{recursive:true});if(fs.readdirSync(output).length)throw Error('Capped mobile output must be new and empty');
  const source=identity();if(git('status','--porcelain=v1'))throw Error('Capped mobile requires exact clean committed source');
- const ownerToken=randomUUID(),report={schemaVersion:3,budgetProfile,kind:'button-mobile-memory',scope:MOBILE_MEMORY_SCOPE,status:'running',requiredStory:{...MOBILE_STORY,memoryBudgetBytes:mobileBudgetBytes(budgetProfile)},image:MOBILE_IMAGE,ownerToken,...source,hostedPolicy,cases:[],errors:[],cleanup:{containersRemoved:false}},owned=new Map(),commands=new Set();let interrupted=null,cleaning=false;
+ const ownerToken=randomUUID(),report={schemaVersion:3,budgetProfile,kind:'button-mobile-memory-diagnostic',scope:MOBILE_MEMORY_SCOPE,status:'running',requiredStory:{...MOBILE_STORY,memoryBudgetBytes:mobileBudgetBytes(budgetProfile)},image:MOBILE_IMAGE,ownerToken,...source,hostedPolicy,cases:[],errors:[],cleanup:{containersRemoved:false}},owned=new Map(),commands=new Set();let interrupted=null,cleaning=false;
  const persistOwnership=()=>write(path.join(output,'ownership.json'),{ownerToken,...source,objects:[...owned].map(([identity,metadata])=>({identity,...metadata}))});
  const onSignal=signal=>{interrupted??=signal;if(!cleaning)for(const child of commands)child.kill('SIGTERM');};
  const handlers=Object.fromEntries(['SIGINT','SIGTERM'].map(signal=>[signal,()=>onSignal(signal)]));for(const [signal,handler]of Object.entries(handlers))process.on(signal,handler);
@@ -143,7 +146,7 @@ export async function runCappedMobile({outputDir,budgetProfile='required-1gb'}){
  };
  try{
   await docker(['pull',MOBILE_IMAGE],{timeout:180000});const image=JSON.parse((await docker(['image','inspect',MOBILE_IMAGE])).stdout)[0];assert.ok(image.RepoDigests.includes(MOBILE_IMAGE));assert.equal(image.Architecture,'amd64');assert.equal(image.Os,'linux');report.imageId=image.Id;write(path.join(output,'image.json'),image);report.imageInspectPath='image.json';report.imageInspectSha256=mobileDigest(fs.readFileSync(path.join(output,'image.json')));
-  for(const [label,motion,control]of [['negative',null,true],['normal','normal',false],['reduced','reduced',false]]){
+  for(const [label,motion,control]of [['negative',null,true],[diagnosticMotion,diagnosticMotion,false]]){
    const directory=path.join(output,label);fs.mkdirSync(directory);let browserId,driverId;
    const create=async role=>{
     const name='chain-mobile-'+randomUUID(),metadata={directory,role,name};owned.set(name,metadata);persistOwnership();
@@ -169,7 +172,7 @@ export async function runCappedMobile({outputDir,budgetProfile='required-1gb'}){
    if(control)report.negativeControl=row;else{row.nativeReportPath=label+'/'+row.nativeReportPath;report.cases.push(row);}
    for(const id of [driverId,browserId]){await docker(['rm',id]);owned.delete(id);persistOwnership();}write(path.join(output,'report.json'),report);
   }
-  report.cleanup.containersRemoved=true;report.status=report.cases.every(row=>row.appOutcome==='passed')?'passed':'failed';report.artifacts=mobileArtifactInventory(output);(budgetProfile==='stress-512mb'?verifyMobileStressReport:verifyMobileMemoryReport)(report,{artifactRoot:output,...source});return report;
+  report.cleanup.containersRemoved=true;report.status=report.cases.every(row=>row.appOutcome==='passed')?'passed':'failed';report.artifacts=mobileArtifactInventory(output);return report; // Nonmergeable diagnostic: canonical verifier rejects kind and incomplete motion matrix.
  }catch(error){report.status='failed';report.errors.push(error.stack||String(error));throw error;}
  finally{
   cleaning=true;let removed=true;
