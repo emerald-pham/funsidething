@@ -184,8 +184,11 @@ export async function runCloudScenarios(h){
     });
     await ui.click('#modalRoot [data-act="choose-cloud-recovery-source"][data-value="device"]',()=>{
       const saved=window.__selectedSourceReview;
-      return saved.modal===document.querySelector('#modalRoot .modal')&&saved.button.isConnected&&document.activeElement===saved.button&&saved.modal.scrollTop===saved.scrollTop&&saved.button.getAttribute('aria-pressed')==='true';
-    },'Repeated selected cloud source retains mounted facts, focus and scroll');
+      return saved.modal===document.querySelector('#modalRoot .modal')&&saved.button.isConnected&&saved.modal.scrollTop===saved.scrollTop&&saved.button.getAttribute('aria-pressed')==='true';
+    },'Repeated selected cloud source retains mounted facts and scroll');
+    await ui.page.evaluate(()=>{const saved=window.__selectedSourceReview;saved.button.focus();saved.scrollTop=saved.modal.scrollTop;saved.button.addEventListener('click',event=>{window.__selectedSourceKeyboard={trusted:event.isTrusted,detail:event.detail};},{once:true});});
+    await ui.page.locator('#modalRoot [data-act="choose-cloud-recovery-source"][data-value="device"]').press('Enter',{timeout:2500});
+    await ui.waitFor(()=>{const saved=window.__selectedSourceReview,receipt=window.__selectedSourceKeyboard;return receipt?.trusted===true&&receipt.detail===0&&saved.modal===document.querySelector('#modalRoot .modal')&&saved.button.isConnected&&document.activeElement===saved.button&&saved.modal.scrollTop===saved.scrollTop;},12000,'Repeated keyboard source choice retains mounted facts, focus and scroll');
     await ui.click('#modalRoot [data-act="choose-cloud-recovery-source"][data-value="generation:gate-valid-previous"]',()=>document.querySelector('#modalRoot [data-value="generation:gate-valid-previous"]')?.getAttribute('aria-pressed')==='true'&&document.querySelector('#modalRoot [data-value="device"]')?.getAttribute('aria-pressed')==='false','An alternate cloud source still changes the selection');
     await ui.click('#modalRoot [data-act="choose-cloud-recovery-source"][data-value="device"]',()=>document.querySelector('#modalRoot [data-value="device"]')?.getAttribute('aria-pressed')==='true','Returning to the device source still changes the selection');
 
