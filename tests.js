@@ -33118,9 +33118,13 @@ test('RISK completion lifecycle FAQ: expired rest and saved-chain return match t
  assert.match(help,/Done itself does not change preference ratings/i);
 });
 
-test('RISK completion boundaries FAQ: Retry explains an uncertain cloud acknowledgement',async()=>{
- const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(help,/After a lost reply, Retry sync checks the current saved cloud board before trying again/i);
+test('RISK completion boundaries FAQ: Retry explains an uncertain cloud acknowledgement',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();const help=app.shim.document.getElementById('modalRoot').innerHTML;
+ const answer=help.match(/<dt>What can I do if a save or sync fails\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.ok(answer,'mounted sync-failure FAQ remains present');
+ assert.match(answer,/After a lost reply, Retry sync checks the (?:current )?saved cloud board before (?:trying again|retrying)/i);
+ assert.match(answer,/an error alone does not confirm (?:the save|saving)/i);
+ assert.match(answer,/Synced requires server acknowledgement of the latest save/i);
+ assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the existing FAQ stays bounded');
 });
 
 test('RISK completion boundaries: delayed stale cloud adoption retains Done and concurrent task edit before exact retry acknowledgement',async t=>{
