@@ -50,7 +50,7 @@ def summarize(directory):
   need(len([v for v in result['victims'] if v['containerId']==c['id']])==delta,'Kernel kill count lacks exact victim correlation')
   if c['label']=='negative':
    need(inside['status']=='passed' and inside['childSignal']=='SIGKILL' and delta==1 and docker['State']['OOMKilled'] is True and docker['State']['ExitCode']==0,'Actual control did not pass')
-   need(all(not v['priorObservations'] or all(p.get('oomScoreAdj')==1000 for p in v['priorObservations']) for v in result['victims'] if v['containerId']==c['id']),'Observed control lifetime does not identify the deliberate allocating child')
+   need(all(not v['priorObservations'] or max(v['priorObservations'],key=lambda p:p['sampleMono']).get('oomScoreAdj')==1000 for v in result['victims'] if v['containerId']==c['id']),'Observed control lifetime does not identify the deliberate allocating child')
  need(any(c['label']=='negative' for c in raw.get('containers',[])),'Negative control absent')
  result['processSamples']=[{'containerId':c['id'],'label':c['label'],'mono':frame['mono'],'current':frame['current'],'peak':frame['peak'],'stat':frame['stat'],'processes':categories(frame['processes']),'incompleteProcesses':frame.get('incompleteProcesses',[]),'durationSeconds':frame.get('durationSeconds')} for c in raw['containers'] for frame in c['samples']]
  result['limits']=['Host observer outside unchanged whole-container cap; diagnostic perturbation possible','Process/PSS samples are sequential, non-atomic and not interchangeable with cgroup charge','No physical iPhone, app allocation stack or release acceptance claim']

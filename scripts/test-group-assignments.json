@@ -13076,6 +13076,11 @@
       "root": "direct kernel context never silently associates a reused prior PID lifetime",
       "group": "native-process",
       "file": "scripts/agent-tools/cap-attribution.test.mjs"
+    },
+    {
+      "root": "control startup may progress from inherited score zero to its deliberate final score",
+      "group": "native-process",
+      "file": "scripts/agent-tools/cap-attribution.test.mjs"
     }
   ],
   "processControls": [

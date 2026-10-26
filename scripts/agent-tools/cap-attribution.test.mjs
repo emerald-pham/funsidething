@@ -185,3 +185,7 @@ print('|'.join(json.dumps(v) for v in [cid,512000000,512000000,image,mounts]))
 test('direct kernel context never silently associates a reused prior PID lifetime',t=>{
  const f=fixture(t),c=f.raw.containers[0];delete f.raw.victims[0].identity;c.samples.splice(1,0,{...structuredClone(c.samples[0]),mono:1.95,processes:[{...c.samples[0].processes[0],observedMono:1.95,startTime:999,namespacePids:[301,88]}]});const r=f.run();assert.notEqual(r.status,0);assert.equal(r.report.status,'incomplete');assert.ok(r.report.errors.some(e=>e.includes('PID reuse')));
 });
+
+test('control startup may progress from inherited score zero to its deliberate final score',t=>{
+ const f=fixture(t),c=f.raw.containers[0];delete f.raw.victims[0].identity;c.samples[0].processes[0].oomScoreAdj=0;c.samples.splice(1,0,{...structuredClone(c.samples[0]),mono:1.95,processes:[{...c.samples[0].processes[0],observedMono:1.95,oomScoreAdj:1000}]});const r=f.run();assert.equal(r.status,0,r.stderr);assert.equal(r.report.status,'complete','The latest pre-kill sample identifies the deliberate child without erasing its earlier startup state');
+});
