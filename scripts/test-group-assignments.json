@@ -2143,7 +2143,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK scenery scene time readiness: loading controls wait before native presets save reload and return to live",
+      "root": "RISK scenery scene time readiness: loading controls look unavailable before native presets save reload and return to live",
       "group": "core",
       "file": "tests.js"
     },
@@ -13103,7 +13103,7 @@
     },
     {
       "baselineRoot": "Landscape browser: scene time presets persist and return to live without changing tasks",
-      "currentRoot": "RISK scenery scene time readiness: loading controls wait before native presets save reload and return to live",
+      "currentRoot": "RISK scenery scene time readiness: loading controls look unavailable before native presets save reload and return to live",
       "baselineGroup": "core",
       "group": "core",
       "file": "tests.js",
