@@ -45937,7 +45937,7 @@ test('RISK repository process: current producer reuse requires successful capped
 });
 
 test('RISK repository process: canonical capped comparison isolates exact sources and never waives candidate failures',async t=>{
- const yaml=(await import('js-yaml')).default,B='de1d26480052ffd6335c886a1f76b5de697752cf',C='aa20bb5399e0d3691345550401627c97ea7747dc',branch='diagnose/webkit-cap-canonical-startup';
+ const yaml=(await import('js-yaml')).default,B='de1d26480052ffd6335c886a1f76b5de697752cf',C='7a1f976e241d5f3ea1e5ade9278f026b27e9a53a',branch='diagnose/webkit-cap-canonical-startup';
  const validate=w=>{
   assert.deepEqual(w.on,{push:{branches:[branch]}},'Diagnostic pushes must never activate the canonical PR/main topology');assert.equal(w.name,'NONMERGEABLE canonical capped WebKit comparison');assert.deepEqual(w.permissions,{contents:'read'});assert.deepEqual(Object.keys(w.jobs),['canonical-cap-comparison']);
   const j=w.jobs['canonical-cap-comparison'];assert.equal(j.steps.length,10);assert.notEqual(j['continue-on-error'],true);assert.equal(j.if,undefined);assert.equal(j['runs-on'],'ubuntu-latest');assert.equal(j['timeout-minutes'],15);assert.deepEqual(j.env,{CHAIN_TEST_EVENT_POLICY:'outgoing-branch-push-v1',BASELINE_SHA:B,CANDIDATE_SHA:C});

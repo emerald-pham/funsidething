@@ -12,7 +12,7 @@ jobs:
     env:
       CHAIN_TEST_EVENT_POLICY: outgoing-branch-push-v1
       BASELINE_SHA: de1d26480052ffd6335c886a1f76b5de697752cf
-      CANDIDATE_SHA: aa20bb5399e0d3691345550401627c97ea7747dc
+      CANDIDATE_SHA: 7a1f976e241d5f3ea1e5ade9278f026b27e9a53a
     steps:
       - uses: actions/checkout@v4
         with:
@@ -21,7 +21,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/checkout@v4
         with:
-          ref: aa20bb5399e0d3691345550401627c97ea7747dc
+          ref: 7a1f976e241d5f3ea1e5ade9278f026b27e9a53a
           path: candidate
           fetch-depth: 0
       - uses: actions/setup-node@v4
@@ -78,7 +78,7 @@ jobs:
         id: candidate-cap
         working-directory: candidate
         env:
-          CHAIN_TEST_SOURCE_SHA: aa20bb5399e0d3691345550401627c97ea7747dc
+          CHAIN_TEST_SOURCE_SHA: 7a1f976e241d5f3ea1e5ade9278f026b27e9a53a
         run: node scripts/button-safety-mobile-memory.mjs --run --output-dir "$RUNNER_TEMP/mobile-memory-candidate"
       - name: Require both inventories and identity while preserving partial failures
         id: artifact-completeness

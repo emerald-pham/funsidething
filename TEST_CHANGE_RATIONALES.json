@@ -22632,5 +22632,26 @@
       "command": "Node22 recorder --purpose preimplementation-red -- node --test '--test-name-pattern=^RISK repository process: canonical capped artifacts' tests.js",
       "failure": "Actual6e pre-edit af244271-4128-4861-bcf7-08d67bf72b40 parsed the existing workflow and observed no per-invocation completeness check despite always-upload. GREEN88e000d3 executes the actual new script against complete and partial existing canonical parser fixtures, then rejects missing directories/identity, mismatched inventory and omitted Reduced. Original workflow8f464923 pre-edit label guard and later topology sensitivity4f13b75c remain retained and distinct; no native or hosted run occurred."
     }
+  },
+  {
+    "baseCommit": "7a1f976e241d5f3ea1e5ade9278f026b27e9a53a",
+    "testChangesSha256": "0caa2f0e4da75a66755cf16fcaf261253668d5e2627e795e20f4e2d754b9feec",
+    "reason": "Rebase only the approved nonmergeable comparison workflow/process metadata onto exact frozen canonical7a1 and bind its real checkout/source labels, while retaining exactde1 baseline and complete evidence enforcement.",
+    "previousBehavior": "The early workflow draft was rooted/pinnedaa20 while the canonical source gained disabled Scene Time palette and immediate scene persistence repairs. Its candidate labels would execute stale aa20 rather than the parent-approved early7a1 source.",
+    "intendedBehavior": "Both the workflow checkout and source identity now pin exact7a1, preserving every canonical consumer/app byte and existing test prefix. The two unchanged canonical commands compare de1 versus7a1, baseline-only continue, with separate runner identity, full available inventories and strict candidate verification. This early diagnostic is frozen independently of later appearance-only release changes.",
+    "replacementTests": [
+      "RISK repository process: canonical capped comparison isolates exact sources and never waives candidate failures",
+      "RISK repository process: canonical capped artifacts cannot conceal a missing invocation or identity"
+    ],
+    "preservedCoverage": [
+      "Only five workflow/process metadata paths differ from7a1. Actual hosted B/C clones are complete immutable sources, including real Markdown HTTP serving/current asset validators, kernel OOM negative control, Normal/Reduced400-task/ten trusted distinct Yes/2s/512000000/no-swap/preservation/cleanup requirements. No old diagnostic module or31c/404 workload is imported.",
+      "Original8f464923 pre-edit configuration identity RED, later topology sensitivity4f13b75c, and upload-gap pre-edit af244271 remain actual separate chronology. The always-run script requires both identity-bound exact nonempty raw inventories; failed baseline is explicitly partial observations, passed reports use each source unchanged full validator, and upload preserves available data even after failure.",
+      "Existing configuration/Git identity/parser fixture controls remain protected: wrong route/ref/source, modified commands, softened candidate or checks, missing directories/identity, unlisted bytes and omitted Reduced fail. They provide local process evidence only, not browser/kernel/hosted/release acceptance.",
+      "Original2ba local/remote refs and unpublishedaa20 draft14e are preserved. Rebase retained canonical risk/map/rationale additions and exact test-prefix bytes. Parent owns review receipt/CI allocation/push and later actual hosted assessment; this frozen early7a1 comparison cannot qualify an advancing final product candidate."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder --purpose preimplementation-red -- node --test '--test-name-pattern=^RISK repository process: canonical capped comparison' tests.js",
+      "failure": "Actual767d15ef-22c4-4388-b5e9-5b4c005d85d7 on rebaseddfc5def, with only expected-C test changed, parsed the workflow and observed actual CANDIDATE_SHAaa20 versus expected7a1 before any workflow rebind. Only the three candidate workflow literals then changed; dirty e4b9a539 passes all4selected process roots/8TAP cases. Original and upload-loop evidence remains under canonical-cap-aa20bb5; current raw outputs/source identities under canonical-cap-7a1f976. No native/cap/full suite ran."
+    }
   }
 ]
