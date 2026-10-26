@@ -131,10 +131,18 @@ export function classifyMobileStressOutcome(row,native){
  assert.equal(native.status,'failed');
  const oom=row.after.events.oom_kill>row.before.events.oom_kill;assert.ok(Array.isArray(native.errors),'Actual native error inventory required');
  assert.ok(native.errors.every(error=>/^(?:page-crash|unexpected-close)$/.test(error)||/^(?:pageerror: |unhandledrejection: )/.test(error)||(oom&&error==='browser-disconnected')),'Invalid stress execution: non-application transport, navigation or control error');
- if(row.after.events.oom_kill>row.before.events.oom_kill){assert.ok(row.after.events.max>row.before.events.max);assert.ok(native.errors?.some(error=>/^(?:page-crash|browser-disconnected|unexpected-close)/.test(error))||/Page crashed|Target page, context or browser has been closed|Browser has been closed/.test(native.failure||''),'Kernel OOM must coincide with an observed app crash or engine loss');return 'kernel-oom';}
- if(native.errors?.some(error=>/^(?:page-crash|pageerror:|unhandledrejection:|unexpected-close)/.test(error)))return 'app-runtime-failure';
- if(native.samples?.some(sample=>sample.maxFrameGapMs>=1000)&&/blocked frame loop:/.test(native.failure||''))return 'app-budget-failure';
- if(native.inFlightBurst?.windowMs>2000&&native.inFlightBurst.attempts?.length===10&&/Ten native press attempts must finish within two seconds:/.test(native.failure||'')){
+ // Page events and the thrown primary error are independent channels. An
+ // allowed app event cannot turn an unrelated driver exception into app proof.
+ assert.equal(typeof native.failure,'string','Actual primary failure required');const primary=native.failure.split('\n',1)[0].trim();
+ const assertionHeaders=['AssertionError [ERR_ASSERTION]: ','AssertionError: '];
+ const eventCheck=native.errors.length>0&&assertionHeaders.some(header=>{const exact=header+'Native button safety detected '+native.errors.join(', ');return native.failure===exact||native.failure.startsWith(exact+'\n');});
+ const crashEvent=native.errors.some(error=>error==='page-crash'||error==='unexpected-close'||(oom&&error==='browser-disconnected'));
+ const crashConsequence=crashEvent&&/^(?:Error: )?(?:(?:page\.(?:goto|evaluate|waitForFunction)|locator\.(?:tap|click|evaluate|scrollIntoViewIfNeeded)|touchscreen\.tap): )?(?:Page crashed|Target crashed|Target page, context or browser has been closed|Browser has been closed)$/.test(primary);
+ if(oom){assert.ok(row.after.events.max>row.before.events.max);assert.ok(crashEvent&&(crashConsequence||eventCheck),'Kernel OOM must coincide with an attributable primary crash or engine-loss failure');return 'kernel-oom';}
+ if(crashConsequence||eventCheck)return 'app-runtime-failure';
+ const frame=primary.match(/^AssertionError(?: \[ERR_ASSERTION\])?: Native button safety detected blocked frame loop: .+ ([0-9]+(?:\.[0-9]+)?)ms$/);
+ if(frame&&native.samples?.some(sample=>sample.maxFrameGapMs>=1000&&sample.maxFrameGapMs===Number(frame[1])))return 'app-budget-failure';
+ if(native.inFlightBurst?.windowMs>2000&&native.inFlightBurst.attempts?.length===10&&assertionHeaders.some(header=>primary===header+'Ten native press attempts must finish within two seconds: yes '+native.inFlightBurst.windowMs+'ms')){
   const presses=(native.presses||[]).filter(row=>row.action==='act:yes');assert.equal(presses.length,10,'Reported deadline needs ten delivered native touches');assert.ok(presses.every(row=>row.trusted===true&&row.pointerType==='touch'));
   assert.ok(native.inFlightBurst.attempts.every(row=>row.trustedPresses===1&&row.nativeDownAction==='act:yes'),'Missing or misdirected automation cannot become an app deadline failure');return 'app-budget-failure';
  }

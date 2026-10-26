@@ -138,3 +138,30 @@ test('mobile budget profiles reject failed stress setup substitutions and mixed 
  for(const [name,mutate]of Object.entries(mutations))await t.test(name,()=>{const b=make();mutate(b.native.normal);refreshMobileBundle(b);assert.throws(()=>verify(b),name);});
  await t.test('real kernel OOM admits engine disconnect but never unrelated navigation',()=>{const b=make(),r=b.report.cases[0],n=b.native.normal;r.appOutcome='kernel-oom';r.after.events={max:1,oom:1,oom_kill:1};r.containerOOMKilled=true;r.server.status='failed';r.server.errors=['Browser budget OOM: oom_kill'];n.errors=['page-crash','browser-disconnected','unexpected-close'];refreshMobileBundle(b);assert.equal(verify(b).status,'failed');n.errors.push('unexpected-navigation-or-reload: https://example.invalid');refreshMobileBundle(b);assert.throws(()=>verify(b),'A kernel OOM cannot waive an unrelated navigation fault');});
 });
+
+
+test('mobile budget profiles require attributable primary failures for reported stress',async t=>{
+ const make=(outcome='app-runtime-failure')=>{const directory=fs.mkdtempSync(path.join(os.tmpdir(),'chain-stress-primary-'));t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));const b=createMobileBundle(directory,{},'stress-512mb'),r=b.report.cases[0],n=b.native.normal;b.report.status='failed';r.appOutcome=outcome;n.status='failed';n.errors=['page-crash'];n.failure='page.goto: Page crashed';delete n.mobileStory;n.scenarios=[];
+  if(outcome==='kernel-oom'){r.after.events={max:1,oom:1,oom_kill:1};r.containerOOMKilled=true;r.server.status='failed';r.server.errors=['Browser budget OOM: oom_kill'];n.errors=['page-crash','browser-disconnected'];}
+  if(outcome==='app-budget-failure'){n.errors=[];n.samples=[{maxFrameGapMs:1001}];n.failure='AssertionError [ERR_ASSERTION]: Native button safety detected blocked frame loop: start-scan 1001ms';}
+  return b;};
+ const verify=b=>{refreshMobileBundle(b);return verifyMobileStressReport(b.report,{artifactRoot:b.directory});};
+ for(const [name,outcome,errors,failure]of [
+  ['startup page crash','app-runtime-failure',['page-crash'],'page.goto: Page crashed'],
+  ['crashed target evaluation','app-runtime-failure',['page-crash'],'page.evaluate: Target crashed '],
+  ['app closed its page','app-runtime-failure',['unexpected-close'],'page.evaluate: Target page, context or browser has been closed'],
+  ['actual app event assertion','app-runtime-failure',['pageerror: Controlled application error'],'AssertionError [ERR_ASSERTION]: Native button safety detected pageerror: Controlled application error\n    at check (native-consumer)'],
+  ['kernel engine loss','kernel-oom',['page-crash','browser-disconnected'],'page.evaluate: Target page, context or browser has been closed'],
+ ])await t.test(name,()=>{const b=make(outcome);b.native.normal.errors=errors;b.native.normal.failure=failure;assert.equal(verify(b).status,'failed');});
+ await t.test('measured blocked frame remains reportable',()=>assert.equal(verify(make('app-budget-failure')).status,'failed'));
+ const late=()=>{const b=make('app-budget-failure'),n=b.native.normal;n.samples=[];n.inFlightBurst={windowMs:2001,attempts:Array.from({length:10},()=>({trustedPresses:1,nativeDownAction:'act:yes'}))};n.failure='AssertionError [ERR_ASSERTION]: Ten native press attempts must finish within two seconds: yes 2001ms';return b;};
+ await t.test('ten delivered late touches remain reportable',()=>assert.equal(verify(late()).status,'failed'));
+ for(const [name,build]of [
+  ['pageerror plus unrelated primary driver error',()=>{const b=make();b.native.normal.errors=['pageerror: Controlled application error'];return b;}],
+  ['page crash plus unrelated primary driver error',()=>make()],
+  ['kernel OOM plus unrelated primary driver error',()=>make('kernel-oom')],
+  ['measured frame plus unrelated primary driver error',()=>make('app-budget-failure')],
+  ['late touches plus unrelated primary driver error',late],
+ ])await t.test(name,()=>{const b=build();b.native.normal.failure='Error: Controlled unrelated evaluation/transport error';assert.throws(()=>verify(b),name);});
+ await t.test('app event cannot conceal an unrelated primary with crash text later in the stack',()=>{const b=make();b.native.normal.errors=['pageerror: Controlled application error'];b.native.normal.failure='Error: Controlled unrelated evaluation/transport error\n    at page.goto: Page crashed';assert.throws(()=>verify(b));});
+});

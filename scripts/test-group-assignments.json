@@ -13071,6 +13071,16 @@
       "root": "mobile budget profiles reject failed stress setup substitutions and mixed nonapp errors",
       "group": "native-process",
       "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "RISK repository process: failed mobile stress primary errors cannot hide unrelated driver failures",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "mobile budget profiles require attributable primary failures for reported stress",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
     }
   ],
   "processControls": [

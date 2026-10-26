@@ -2329,3 +2329,7 @@ The command/report consumer rejects missing, duplicate, skipped, cancelled, unre
 - RISK repository process: failed mobile stress attempts retain actual setup and reject mixed transport faults
 
 Failed stress reports require the independently observed mobile context and durable pre-navigation fixture, even before app-ready. Synthetic parser controls reject absent or substituted setup, reduced workload and mixed transport/navigation errors while a measured startup kernel OOM remains a failed reportable app outcome. Successful stories additionally bind their task and unknown-source hashes back to that prepared fixture. Mounted button, Copy and reload answers retain useful routes and limitations; separate paste and export answers retain preview, Cancel, protected-original and partial-source guidance.
+
+- RISK repository process: failed mobile stress primary errors cannot hide unrelated driver failures
+
+The existing immutable stress verifier binds the thrown primary error independently of the page-event inventory. Exact native app-event assertions, attributable crash/closed-target consequences and measured frame/ten-touch assertions remain reportable; a separate driver/transport primary error remains invalid even beside a recorded app error or kernel OOM.

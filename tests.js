@@ -19932,7 +19932,8 @@ test('RISK DATABASE REPAIR EXPORT: a damaged saved source is retained without in
 });
 
 test('RISK DATABASE REPAIR EXPORT: Help describes direct Copy and partial archive status',async t=>{
-  const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();const help=app.shim.document.getElementById('modalRoot').innerHTML;
+  const app=await loadApp();t.after(()=>app.dispose());for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];app.ctx.openHelp();const help=app.shim.document.getElementById('modalRoot').innerHTML;
+  const transfer=help.match(/<li>(Settings now has one Import.*?)<\/li>/)?.[1];assert.equal(transfer,'Settings now has one Import and one Export, with separate Copy and Download choices. Exports include accepted unsaved edits and readable recovery sources; originals stay protected, and incomplete archives are marked partial.','The mounted changelog gives the transfer outcome without late-Copy or draft-rendering mechanics');
   const copy=help.match(/<dt>How do I copy and paste JSON\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.ok(copy);
   assert.match(copy,/Settings.*Export.*Copy/i);assert.match(copy,/If copying is unavailable, choose Download/i);assert.match(copy,/Import.*Paste JSON/i);
   const paste=help.match(/<dt>How do I paste a saved board\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.match(paste,/Cancel and Close keep it.*current board stay protected before preview.*Nothing applies until you confirm Restore/);
@@ -46074,4 +46075,11 @@ test('RISK repository process: failed mobile stress attempts retain actual setup
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
  const result=spawnSync(process.execPath,['--test','--test-name-pattern=mobile budget profiles reject failed stress setup','scripts/agent-tools/mobile-memory.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:10000,maxBuffer:4*1024*1024});
  assert.equal(result.error,undefined);assert.equal(result.status,0,'The actual immutable stress verifier must reject wrong setup and mixed transport faults: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# skipped 0$/m);
+});
+
+
+test('RISK repository process: failed mobile stress primary errors cannot hide unrelated driver failures',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-name-pattern=mobile budget profiles require attributable primary','scripts/agent-tools/mobile-memory.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:10000,maxBuffer:4*1024*1024});
+ assert.equal(result.error,undefined);assert.equal(result.status,0,'The actual immutable stress verifier must bind the primary thrown failure as well as page events: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# skipped 0$/m);
 });
