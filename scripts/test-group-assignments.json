@@ -12991,6 +12991,11 @@
       "root": "RISK repository process: canonical capped comparison isolates exact sources and never waives candidate failures",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: canonical capped artifacts cannot conceal a missing invocation or identity",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [

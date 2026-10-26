@@ -2309,3 +2309,5 @@ The command/report consumer rejects missing, duplicate, skipped, cancelled, unre
 - RISK synced scene durability: native retained boards keep immediate scene locks through reload without changing tasks or sources
 
 - RISK repository process: canonical capped comparison isolates exact sources and never waives candidate failures — Nonmergeable push-only two-source workflow uses unmodified canonical capped commands, pinned clean sibling checkouts, real source/runner identity and complete always-upload; only baseline can continue, candidate and invalid/dirty binding fail closed. Controlled parser/Git fixtures confer no runtime or release credit.
+
+- RISK repository process: canonical capped artifacts cannot conceal a missing invocation or identity — Always-upload preserves available bytes while an independent always-run check requires both canonical report inventories and workflow/source identity; failed baseline observations remain partial, passed candidate uses its full unchanged validator. Missing directories/identity, unlisted bytes and omitted motion fail through the actual workflow script on controlled fixtures.

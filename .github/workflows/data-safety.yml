@@ -80,6 +80,41 @@ jobs:
         env:
           CHAIN_TEST_SOURCE_SHA: aa20bb5399e0d3691345550401627c97ea7747dc
         run: node scripts/button-safety-mobile-memory.mjs --run --output-dir "$RUNNER_TEMP/mobile-memory-candidate"
+      - name: Require both inventories and identity while preserving partial failures
+        id: artifact-completeness
+        if: always()
+        working-directory: candidate
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import {pathToFileURL} from 'node:url';
+          const env=process.env,check={kind:'nonmergeable-canonical-cap-artifact-check',acceptanceEligible:false,status:'running',sources:{},errors:[]};let identity;
+          try{
+            identity=JSON.parse(fs.readFileSync(path.join(env.RUNNER_TEMP,'mobile-cap-identity.json'),'utf8'));
+            assert.equal(identity.kind,'nonmergeable-canonical-cap-comparison');assert.equal(identity.acceptanceEligible,false);
+            for(const [key,value]of Object.entries({workflowCommit:env.GITHUB_SHA,workflowRef:env.GITHUB_REF,eventName:env.GITHUB_EVENT_NAME,eventPolicy:env.CHAIN_TEST_EVENT_POLICY,repository:env.GITHUB_REPOSITORY,runId:env.GITHUB_RUN_ID,runAttempt:Number(env.GITHUB_RUN_ATTEMPT)}))assert.equal(identity[key],value,'Identity must bind actual workflow metadata: '+key);
+          }catch(error){check.errors.push('identity: '+String(error));}
+          for(const [label,expected]of [['baseline',env.BASELINE_SHA],['candidate',env.CANDIDATE_SHA]]){
+            try{
+              assert.ok(identity?.sources?.[label],'Both source identities are required');assert.equal(identity.sources[label].commit,expected);
+              const directory=path.join(env.RUNNER_TEMP,'mobile-memory-'+label),report=JSON.parse(fs.readFileSync(path.join(directory,'report.json'),'utf8'));
+              const {mobileArtifactInventory,verifyMobileMemoryReport}=await import(pathToFileURL(path.join(env.GITHUB_WORKSPACE,label,'scripts/button-safety-mobile-contract.mjs')));
+              assert.equal(report.kind,'button-mobile-memory');assert.ok(report.artifacts?.length>0,'Actual canonical raw inventory required');assert.deepEqual(report.artifacts,mobileArtifactInventory(directory),'Every available raw artifact must be inventoried');
+              const source={candidateCommit:expected,candidateTree:identity.sources[label].tree,sourceSha:expected,repository:env.GITHUB_REPOSITORY,runId:env.GITHUB_RUN_ID,runAttempt:Number(env.GITHUB_RUN_ATTEMPT),eventPolicy:env.CHAIN_TEST_EVENT_POLICY};
+              for(const [key,value]of Object.entries(source))assert.equal(report[key],value,'Report source identity: '+key);assert.equal(report.cleanup?.containersRemoved,true);
+              if(report.status==='passed'){
+                verifyMobileMemoryReport(report,{artifactRoot:directory,...source});check.sources[label]={status:'passed',classification:'full-canonical-pass',rawFiles:report.artifacts.length};
+              }else{
+                assert.equal(label,'baseline','Candidate cannot substitute partial observations for success');assert.equal(report.status,'failed');
+                check.sources[label]={status:'observed-failure',classification:'failed-canonical-invocation-partial-observations',rawFiles:report.artifacts.length};
+              }
+            }catch(error){check.sources[label]={status:'failed',error:String(error)};check.errors.push(label+': '+String(error));}
+          }
+          check.status=check.errors.length?'failed':'passed';fs.writeFileSync(path.join(env.RUNNER_TEMP,'mobile-cap-artifact-check.json'),JSON.stringify(check,null,2)+'\n');
+          if(check.errors.length){process.stderr.write(check.errors.join('\n')+'\n');process.exitCode=1;}
+          JS
       - name: Preserve both complete canonical command observations
         if: always()
         uses: actions/upload-artifact@v4
@@ -89,4 +124,5 @@ jobs:
             ${{ runner.temp }}/mobile-memory-baseline
             ${{ runner.temp }}/mobile-memory-candidate
             ${{ runner.temp }}/mobile-cap-identity.json
+            ${{ runner.temp }}/mobile-cap-artifact-check.json
           if-no-files-found: error

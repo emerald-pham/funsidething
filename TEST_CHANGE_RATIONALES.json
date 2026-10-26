@@ -22594,5 +22594,43 @@
       "command": "Node22 recorder --purpose preimplementation-red -- node --test '--test-name-pattern=^RISK repository process: canonical capped comparison' tests.js",
       "failure": "Actual pre-edit8f464923-e999-438e-b21a-b94b187be738 onaa20 parsed the real canonical YAML and rejected its Data safety identity instead of required NONMERGEABLE comparison. After provisional workflow GREENf0636855/2adaada9, the draft was saved/undone and later-baseline-sensitivity4f13b75c-affe-4140-bacb-9aa25d3cdd31 discriminated actual canonical unrestricted push/PR topology from the required branch-only route. This later behavioral sensitivity is not relabeled original RED. Restored unchanged draft GREEN24ce1f4d and extended malformed/identity/dirty/candidate controls GREENc425d4a5. All raw command records retained under gate/mobile-512mb/canonical-cap-aa20bb5/runs; no cap/browser runtime executed."
     }
+  },
+  {
+    "baseCommit": "6e3f61cb45332e3e9235826100cd55bd307c27ec",
+    "testChangesSha256": "d837b21dab77ba22008ce34f3202d0cef71f31b229a23bb0d8cb1160dc087804",
+    "reason": "Close the parent-confirmed diagnostic upload gap: upload-artifact error only detects all paths missing and cannot guarantee both canonical invocations and identity produced complete available inventories.",
+    "previousBehavior": "The workflow always uploaded named paths but could remain successful when only one result directory existed. A literal configuration assertion did not execute a per-invocation completeness boundary.",
+    "intendedBehavior": "An always-run workflow check requires identity and both complete nonempty raw artifact inventories, binds report/source/workflow metadata, and preserves all available evidence on failure. Passed reports use their own unchanged canonical validator; failed baseline remains explicitly partial observations, while candidate failure cannot pass.",
+    "replacementTests": [
+      "RISK repository process: canonical capped artifacts cannot conceal a missing invocation or identity"
+    ],
+    "preservedCoverage": [
+      "The two pinned canonical commands, actual source checkouts, native/cap/workload/runtime-asset validators and baseline-only continue remain unchanged. No product or canonical consumer file is edited. This workflow draft still pins aa20 and is explicitly pending final C; it cannot be pushed until truthful rebind and exact reviews.",
+      "Missing baseline/candidate directory, missing identity, unlisted raw bytes and an omitted Required Reduced motion fail the actual embedded workflow script. Existing parser fixture bundles also prove full pass and legitimate failed-baseline partial inventory classifications. No incomplete report is fabricated into a completed motion or app RED.",
+      "Always-upload runs after the check even when it fails, includes its independent classification file, and preserves raw report/identity/available directories. The guard reads files only and does not delete or rewrite canonical observations. All generated bundles are labeled synthetic and confer no browser/kernel/release proof."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder --purpose preimplementation-red -- node --test '--test-name-pattern=^RISK repository process: canonical capped artifacts' tests.js",
+      "failure": "Actual6e pre-edit af244271-4128-4861-bcf7-08d67bf72b40 parsed the existing workflow and observed no per-invocation completeness check despite always-upload. GREEN88e000d3 executes the actual new script against complete and partial existing canonical parser fixtures, then rejects missing directories/identity, mismatched inventory and omitted Reduced. Original workflow8f464923 pre-edit label guard and later topology sensitivity4f13b75c remain retained and distinct; no native or hosted run occurred."
+    }
+  },
+  {
+    "baseCommit": "aa20bb5399e0d3691345550401627c97ea7747dc",
+    "testChangesSha256": "162c5d6b22b39f7645f2a1b63fd6eef782c97415b97359dd5b24f81f6e299b0a",
+    "reason": "Close the parent-confirmed diagnostic upload gap: upload-artifact error only detects all paths missing and cannot guarantee both canonical invocations and identity produced complete available inventories.",
+    "previousBehavior": "The workflow always uploaded named paths but could remain successful when only one result directory existed. A literal configuration assertion did not execute a per-invocation completeness boundary.",
+    "intendedBehavior": "An always-run workflow check requires identity and both complete nonempty raw artifact inventories, binds report/source/workflow metadata, and preserves all available evidence on failure. Passed reports use their own unchanged canonical validator; failed baseline remains explicitly partial observations, while candidate failure cannot pass.",
+    "replacementTests": [
+      "RISK repository process: canonical capped artifacts cannot conceal a missing invocation or identity"
+    ],
+    "preservedCoverage": [
+      "The two pinned canonical commands, actual source checkouts, native/cap/workload/runtime-asset validators and baseline-only continue remain unchanged. No product or canonical consumer file is edited. This workflow draft still pins aa20 and is explicitly pending final C; it cannot be pushed until truthful rebind and exact reviews.",
+      "Missing baseline/candidate directory, missing identity, unlisted raw bytes and an omitted Required Reduced motion fail the actual embedded workflow script. Existing parser fixture bundles also prove full pass and legitimate failed-baseline partial inventory classifications. No incomplete report is fabricated into a completed motion or app RED.",
+      "Always-upload runs after the check even when it fails, includes its independent classification file, and preserves raw report/identity/available directories. The guard reads files only and does not delete or rewrite canonical observations. All generated bundles are labeled synthetic and confer no browser/kernel/release proof."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder --purpose preimplementation-red -- node --test '--test-name-pattern=^RISK repository process: canonical capped artifacts' tests.js",
+      "failure": "Actual6e pre-edit af244271-4128-4861-bcf7-08d67bf72b40 parsed the existing workflow and observed no per-invocation completeness check despite always-upload. GREEN88e000d3 executes the actual new script against complete and partial existing canonical parser fixtures, then rejects missing directories/identity, mismatched inventory and omitted Reduced. Original workflow8f464923 pre-edit label guard and later topology sensitivity4f13b75c remain retained and distinct; no native or hosted run occurred."
+    }
   }
 ]
