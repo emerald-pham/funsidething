@@ -2353,3 +2353,11 @@ The pinned Linux x64 reader preserves the raw AT_PAGESZ witness and binds it to 
 - RISK synced scene intent: bounded replay exposes the saved board and rejects a late hash completion
 
 - RISK synced scene intent: foreign retirement cannot erase a newer live tab choice generation
+
+## Scene replay transaction and held-source independence
+
+- RISK synced scene replay transaction: expiry during the actual store hash cannot replace the saved head
+- RISK synced scene ordinary saves: held receipt sources never block unrelated durable task edits
+- RISK scene receipt Export: a source appended during the real snapshot is preserved as a partial observation
+- RISK synced scene ordinary saves: a fresh current-account scene choice ignores a foreign receipt tip
+- RISK DEVICE STORAGE V2: current attempt refusal fences all mutations and the real capacity retry

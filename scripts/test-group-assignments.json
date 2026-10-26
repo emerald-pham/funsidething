@@ -13136,6 +13136,31 @@
       "root": "RISK synced scene intent: foreign retirement cannot erase a newer live tab choice generation",
       "group": "core",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK synced scene replay transaction: expiry during the actual store hash cannot replace the saved head",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK synced scene ordinary saves: held receipt sources never block unrelated durable task edits",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK scene receipt Export: a source appended during the real snapshot is preserved as a partial observation",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK synced scene ordinary saves: a fresh current-account scene choice ignores a foreign receipt tip",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK DEVICE STORAGE V2: current attempt refusal fences all mutations and the real capacity retry",
+      "group": "core",
+      "file": "tests.js"
     }
   ],
   "processControls": [

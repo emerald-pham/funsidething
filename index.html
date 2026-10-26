@@ -1614,6 +1614,9 @@ function applyScenePreferences(){
 const SCENE_INTENT_PREFIX="fvp:chain-scanner:pending-scene-choice:v1:";
 const SCENE_INTENT_MAX_BYTES=65536,SCENE_INTENT_MAX_EVENTS=32,SCENE_INTENT_MAX_KEYS=128;
 let sceneIntentOwnKey=null;
+// Only choices accepted in this live tab require a new scene commit proof.
+// Unresolved sources discovered on boot cannot veto unrelated ordinary edits.
+const sceneIntentPendingIds=new Set();
 function sceneIntentKeys(){
   const count=localStorage.length;
   if(!Number.isSafeInteger(count)||count<0||count>10000)throw Error("Scene intent storage enumeration unavailable");
@@ -1689,23 +1692,27 @@ function stageSceneIntent(events){
       const baseline=state.decisionBaseline||baselineFromSource(saved,events[0]);
       receipt={v:1,account:state.syncAccount??null,identity:state.syncIdentity??null,baselineId:baseline?.id,priorScene:saved.settings?.scene??null,events,heads:[{hash:deviceHeadHash,count:0}]};
     }
-    const key=writeSceneIntentGeneration(source,receipt);if(!key)return false;sceneIntentOwnKey=key;return true;
+    const key=writeSceneIntentGeneration(source,receipt);if(!key)return false;sceneIntentOwnKey=key;for(const event of events)sceneIntentPendingIds.add(event.id);return true;
   }catch{return false;}
 }
 async function recordSceneIntentCommit(options,attempt=null){
   if(!localDeviceStartupCurrent(attempt))return false;
-  if(!sceneIntentKeys().length)return true;
-  const board=JSON.parse(options.payload),hash=await ChainStorageV2.hashPayload(options.payload);
+  if(!attempt&&!sceneIntentPendingIds.size)return true;
+  const board=JSON.parse(options.payload);
+  if(!attempt&&!(board.decisionEvents||[]).some(event=>sceneIntentPendingIds.has(event?.id)))return true;
+  if(!sceneIntentKeys().length)return false;
+  const hash=await ChainStorageV2.hashPayload(options.payload);
   if(!localDeviceStartupCurrent(attempt))return false;
-  const {tips}=sceneIntentSources();if(tips.length!==1)return false;
-  const source=tips[0],receipt=source.receipt;
-  if(receipt.account!==(board.syncAccount??null)||receipt.identity!==(board.syncIdentity??null))return true;
+  const applicable=sceneIntentSources().tips.filter(({receipt})=>receipt.account===(board.syncAccount??null)&&receipt.identity===(board.syncIdentity??null));
+  if(applicable.length!==1)return false;
+  const source=applicable[0],receipt=source.receipt;
   const count=sceneIntentPrefix(receipt,board);if(count<=0)return false;
   if(canonicalDecisionFact(board.settings?.scene)!==canonicalDecisionFact(sceneIntentScene(receipt,count))||board.decisionBaseline?.id!==receipt.baselineId||!receipt.heads.some(row=>row.hash===options.expectedHash))return false;
   const recorded=receipt.heads.find(row=>row.hash===hash);if(recorded)return recorded.count===count;
   if(receipt.heads.length>=SCENE_INTENT_MAX_EVENTS+1)return false;
   const key=writeSceneIntentGeneration(source,{...receipt,heads:[...receipt.heads,{hash,count}]});if(!key)return false;sceneIntentOwnKey=key;
-  const current=sceneIntentSources();return localDeviceStartupCurrent(attempt)&&current.tips.length===1&&current.tips[0].key===key;
+  const current=sceneIntentSources().tips.filter(({receipt})=>receipt.account===(board.syncAccount??null)&&receipt.identity===(board.syncIdentity??null));
+  return localDeviceStartupCurrent(attempt)&&current.length===1&&current[0].key===key;
 }
 async function retireSceneIntents(attempt=null){
   if(!localDeviceStartupCurrent(attempt))return false;
@@ -2123,8 +2130,9 @@ async function prepareRecoveryArchive({rawSourcesOnly,serial,viewSource}){
   const localAfter=readManualArchiveLocalSources({allowUnavailable:true});
   for(const row of [...localBefore,...localAfter])if(row.status==="unavailable"&&!failures.some(item=>item.source==="localStorage"&&item.key===row.key))
     failures.push({source:"localStorage",key:row.key,code:row.reason});
-  const changedLocal=localBefore.find((row,index)=>JSON.stringify(row)!==JSON.stringify(localAfter[index]));
-  if(changedLocal)failures.push({source:"localStorage",key:changedLocal.key,code:"changed-during-capture"});
+  const beforeByKey=new Map(localBefore.map(row=>[row.key,row])),afterByKey=new Map(localAfter.map(row=>[row.key,row]));
+  const changedLocal=[...new Set([...beforeByKey.keys(),...afterByKey.keys()])].filter(key=>JSON.stringify(beforeByKey.get(key))!==JSON.stringify(afterByKey.get(key)));
+  for(const key of changedLocal)failures.push({source:"localStorage",key,code:"changed-during-capture"});
   let boardChanged=false;
   try{boardChanged=rawSourcesOnly?(!unacceptedDeviceSource||JSON.stringify(state)!==boardRaw):!liveBoardAccepted||currentBoardExportPayload()!==boardRaw;}catch{boardChanged=true;}
   if(boardChanged)failures.push({source:"currentBoard",code:"changed-during-capture"});
@@ -2141,7 +2149,7 @@ async function prepareRecoveryArchive({rawSourcesOnly,serial,viewSource}){
       currentBoard:board?{status:"included",format:"existing-board-json"}:{status:"unavailable",reason:rawSourcesOnly?"unaccepted-device-source":"unavailable"},localStorage:localManifest,
       indexedDB:encoded?{database,schemaVersion,stores:encoded.manifestStores}:{database,schemaVersion,status:"unavailable",reason:failures.find(item=>item.source==="indexedDB")?.code||"unavailable"}},failures},
     appSources:{localStorage:localBefore,indexedDB:{database,stores:encoded?.stores??null}},
-    repairInfo:{version:1,debugLog,...(changedLocal?{localStorageAfter:localAfter}:{})}};
+    repairInfo:{version:1,debugLog,...(changedLocal.length?{localStorageAfter:localAfter}:{})}};
   return {raw:JSON.stringify(archive,null,2),partial};
 }
 async function exportRecoveryArchive({rawSourcesOnly=exportTransferSourceOnly(),viewSource=null}={}){
@@ -3787,12 +3795,12 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
   if(!localDeviceStartupCurrent(sceneReplayAttempt))return false;
   const chanceSeed = state.chance?.seed;
   const requestGeneration = saveRequestGeneration;
-  const payload = JSON.stringify(state);
+  const payload = JSON.stringify(state),sceneCommitRequired=!!sceneReplayAttempt||(state.decisionEvents||[]).some(event=>sceneIntentPendingIds.has(event?.id));
   if(deviceStorageAuthority){
     try{
       const commit=async options=>{
         let result;
-        try{if(!await recordSceneIntentCommit(options,sceneReplayAttempt)||!localDeviceStartupCurrent(sceneReplayAttempt))return {error:true,code:"scene-intent-unavailable"};result=await deviceWriteBeforeDiagnostics("commitHead",options);if(!localDeviceStartupCurrent(sceneReplayAttempt))return {error:true,code:"scene-intent-expired"};}
+        try{if(!await recordSceneIntentCommit(options,sceneReplayAttempt)||!localDeviceStartupCurrent(sceneReplayAttempt))return {error:true,code:"scene-intent-unavailable"};result=await deviceWriteBeforeDiagnostics("commitHead",{...options,...(sceneReplayAttempt?{isCurrent:()=>localDeviceStartupCurrent(sceneReplayAttempt)}:{})});if(!localDeviceStartupCurrent(sceneReplayAttempt))return {error:true,code:"scene-intent-expired"};}
         catch(error){if(deviceQuotaFailure(error))result={error:true,code:"quota-exhausted"};else throw error;}
         return result;
       };
@@ -3901,7 +3909,17 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
         return persist(backupAlreadySafe,preserveBackupId,followUp?0:deviceRetry+1);
       }
       if(completionSourcePayload!==null&&pendingLegacyCompletionSource===completionSourcePayload)pendingLegacyCompletionSource=null;
-      if(!await retireSceneIntents(sceneReplayAttempt))return reportDeviceSaveFailure("scene-choice","readback-failed");
+      if(sceneCommitRequired){
+        let retired=false;try{retired=await retireSceneIntents(sceneReplayAttempt);}catch{}
+        if(!retired){
+          if(sceneReplayAttempt)return reportDeviceSaveFailure("scene-choice","readback-failed");
+          // The normal store already verified this save. Receipt cleanup is
+          // separate recovery work and cannot turn durable success into failure.
+          deviceRecoveryCloudHold||={v:1,reason:"pending-scene-choice"};
+        }
+        const durableFacts=new Set((JSON.parse(committedPayload).decisionEvents||[]).map(event=>event?.id));
+        for(const id of sceneIntentPendingIds)if(durableFacts.has(id))sceneIntentPendingIds.delete(id);
+      }
       clearDeviceSaveIssue();if(pendingDeviceCloudBackup)await acknowledgeDeviceCloudBackupSave(result.hash,committedPayload);return true;
     }catch(e){return reportDeviceSaveFailure("device-store","write-failed","The previous durable board remains unchanged; keep this tab open and try again.");}
   }
