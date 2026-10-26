@@ -13206,6 +13206,16 @@
       "root": "RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: scenery consumers use allocated fallback ports and preserve early native failures",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: native scene-time bursts cannot activate controls behind a refused top-layer release",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [

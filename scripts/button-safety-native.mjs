@@ -169,8 +169,9 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
     const receipt=await bounded(page.evaluate(async identity=>{
      const sink=document.createElement('iframe');sink.id='__buttonReleaseSink';sink.title='Native test release surface';sink.hidden=true;
      sink.srcdoc='<!doctype html><style>html,body{margin:0;width:100%;height:100%}</style>';
-     sink.style.cssText='position:fixed;left:0;top:0;width:8px;height:8px;border:0;z-index:2147483647';
-     await new Promise(resolve=>{sink.addEventListener('load',resolve,{once:true});document.body.append(sink);});
+     sink.style.cssText='position:fixed;left:0;top:0;width:8px;height:8px;border:0;margin:0;padding:0;inset:auto;z-index:2147483647';
+     const layer=document.createElement('dialog');layer.id='__buttonReleaseLayer';layer.style.cssText='position:fixed;width:8px;height:8px;max-width:none;max-height:none;margin:0;padding:0;border:0;inset:auto;overflow:hidden';document.body.append(layer);
+     await new Promise(resolve=>{sink.addEventListener('load',resolve,{once:true});layer.append(sink);});
      sink.contentWindow.__buttonReleaseDocumentId=identity;
      return{documentId:identity,readyState:sink.contentDocument.readyState};
     },randomUUID()),'prepare neutral release document');
@@ -299,13 +300,14 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
      else{
       // Chromium can clamp an outside-viewport release onto the modal backdrop
       // and synthesize a different click. Release in a separate neutral document
-      // instead; prepare it once per document, then reveal only for a refused
+      // in the top layer above any open modal; prepare it once per document,
+      // then reveal only for a refused
       // release. The app still records every trusted attempted down.
       // Put the prepared release document under the existing pointer. A held
       // mouse move invokes Playwright drag interception across every frame;
       // it is controller work and is unnecessary for a separate-document up.
-      neutralDocumentId=await bounded(page.evaluate(point=>{const sink=document.getElementById('__buttonReleaseSink');if(!sink?.isConnected||sink.contentDocument?.readyState!=='complete'||!sink.contentWindow.__buttonReleaseDocumentId)throw Error('Prepared neutral release document unavailable');sink.style.left=(point.x-4)+'px';sink.style.top=(point.y-4)+'px';sink.hidden=false;return sink.contentWindow.__buttonReleaseDocumentId;},pressPoint),'rapid release surface');
-      await bounded((async()=>{await page.mouse.up();await page.evaluate(()=>{const sink=document.getElementById('__buttonReleaseSink');if(sink)sink.hidden=true;document.getElementById('__buttonDisabledAttempt')?.remove();});})(),'rapid refused press '+actionName);
+      neutralDocumentId=await bounded(page.evaluate(point=>{const sink=document.getElementById('__buttonReleaseSink');if(!sink?.isConnected||sink.contentDocument?.readyState!=='complete'||!sink.contentWindow.__buttonReleaseDocumentId)throw Error('Prepared neutral release document unavailable');const layer=document.getElementById('__buttonReleaseLayer');layer.style.left=(point.x-4)+'px';layer.style.top=(point.y-4)+'px';sink.style.left=(point.x-4)+'px';sink.style.top=(point.y-4)+'px';sink.hidden=false;layer.showModal();return sink.contentWindow.__buttonReleaseDocumentId;},pressPoint),'rapid release surface');
+      await bounded((async()=>{await page.mouse.up();await page.evaluate(()=>{const sink=document.getElementById('__buttonReleaseSink');if(sink){document.getElementById('__buttonReleaseLayer').close();sink.hidden=true;}document.getElementById('__buttonDisabledAttempt')?.remove();});})(),'rapid refused press '+actionName);
      }
      }
      if(reload&&index===0){await bounded(page.waitForFunction(old=>window.__installedFixture?.documentId!==old&&document.documentElement.dataset.appReady==='true',previousDocument),'rapid bounded reload',2000);assert.equal(allowedNavigation.remaining,0,'Exactly one expected rapid reload');allowedNavigation=null;if(!mobileYesMotion)await prepareReleaseSurface();}
