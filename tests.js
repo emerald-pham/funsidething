@@ -46322,19 +46322,26 @@ test('RISK repository process: expected diagnostic pageerror never hides failed 
  const {assessPageerrorControl}=await import('./scripts/diagnostic-native-outcome.mjs');
  // Public report-consumer contract only; these are synthetic output records,
  // not evidence that a browser ran or that native cleanup succeeded.
- const clean=()=>({status:'failed',errors:['pageerror: button sensitivity pageerror'],clicks:[{trusted:true,action:'act:settings'}],cleanup:{contextClosed:true,browserClosed:true,serverClosed:true}});
- assert.equal(assessPageerrorControl(clean()).detectorPassed,true,'The intended error with complete cleanup remains a positive diagnostic control');
+ const expectedFailure='AssertionError [ERR_ASSERTION]: Native button safety detected pageerror: button sensitivity pageerror';
+ const assess=report=>assessPageerrorControl(report,report.failure);
+ const clean=()=>({failure:expectedFailure,status:'failed',errors:['pageerror: button sensitivity pageerror'],clicks:[{trusted:true,action:'act:settings'}],cleanup:{contextClosed:true,browserClosed:true,serverClosed:true}});
+ assert.equal(assess(clean()).detectorPassed,true,'The intended error with complete cleanup remains a positive diagnostic control');
  for(const field of ['contextClosed','browserClosed','serverClosed']){
-  const report=clean();delete report.cleanup[field];const result=assessPageerrorControl(report);
+  const report=clean();delete report.cleanup[field];const result=assess(report);
   assert.equal(result.detectorObserved,true,'The original expected detector observation is retained');
   assert.equal(result.detectorPassed,false,'Expected pageerror cannot hide missing '+field);
  }
  for(const fault of ['cleanup: Error: browser close failed','unexpected-close','pageerror: unrelated app fault']){
-  const report=clean();report.errors.push(fault);const result=assessPageerrorControl(report);
+  const report=clean();report.errors.push(fault);const result=assess(report);
   assert.equal(result.detectorObserved,true);
   assert.equal(result.detectorPassed,false,'Expected pageerror cannot hide '+fault);
  }
- const unrelated=clean();unrelated.errors=['pageerror: unrelated app fault'];assert.equal(assessPageerrorControl(unrelated).detectorPassed,false);
- const absent=clean();absent.errors=[];assert.equal(assessPageerrorControl(absent).detectorPassed,false);
- const untrusted=clean();untrusted.clicks[0].trusted=false;assert.equal(assessPageerrorControl(untrusted).detectorPassed,false);
+ const unrelated=clean();unrelated.errors=['pageerror: unrelated app fault'];assert.equal(assess(unrelated).detectorPassed,false);
+ const absent=clean();absent.errors=[];assert.equal(assess(absent).detectorPassed,false);
+ const untrusted=clean();untrusted.clicks[0].trusted=false;assert.equal(assess(untrusted).detectorPassed,false);
+ const primaryFaults=['Error: Native button safety detected stalled responsiveness: outcome settings','TimeoutError: page.waitForFunction timed out','AssertionError [ERR_ASSERTION]: unrelated app assertion',undefined];
+ const reportResults=primaryFaults.map(failure=>{const report=clean();report.failure=failure;return assess(report).detectorPassed;});
+ assert.deepEqual(reportResults,[false,false,false,false],'The expected secondary pageerror cannot hide an unrelated or absent primary failure');
+ const thrownResults=primaryFaults.map(failure=>assessPageerrorControl(clean(),failure).detectorPassed);
+ assert.deepEqual(thrownResults,[false,false,false,false],'The wrapper must retain and check its actual caught failure as well as the report');
 });

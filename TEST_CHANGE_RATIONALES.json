@@ -24606,5 +24606,61 @@
       "command": "Recorder616e7c9a at qualification/phase-carrier-root/runs: node --test --test-name-pattern=\"^RISK repository process: expected diagnostic pageerror\" tests.js after behavior-neutral extraction of the old predicate, before integrity repair. Earlier workflow/ring REDs b442f72b and5949d993 retain their immutable observed failures.",
       "failure": "Expected pageerror cannot hide missing contextClosed: actual detectorPassed true, expected false. GREEN63a4309d then passes all3 process checks including missing context/browser/server flags, unrelated error cases, absent/incorrect intentional error and untrusted clicks."
     }
+  },
+  {
+    "baseCommit": "937975d4bc09d3e539f796621b4d8e00f4a91408",
+    "testChangesSha256": "f7449d0a270227ef173d399b5ec3b8cc6932aadc11d1de7a7c3f33ac7693b1f7",
+    "reason": "Close diagnostic false success for a secondary intentional pageerror accompanied by an unrelated primary timeout or caught failure.",
+    "previousBehavior": "The corrected cleanup/error-inventory assessment still accepted a report whose primary failure was a timeout rather than the intentional detector assertion; missing primary failures were also accepted.",
+    "intendedBehavior": "Diagnostic control success additionally requires both the original report failure and the wrapper caught failure to start with the exact intentional AssertionError line, while retaining observed detector and original native failure independently.",
+    "replacementTests": [
+      "RISK repository process: diagnostic phase workflow is bounded and cannot qualify a partial mobile matrix",
+      "RISK repository process: diagnostic observer retains recent actions after a long setup",
+      "RISK repository process: expected diagnostic pageerror never hides failed cleanup or unrelated errors"
+    ],
+    "preservedCoverage": [
+      "Existing cleanup flags, exact expected error inventory, trusted Settings click and failed native status remain required. All earlier tests, cap/input/frame limits and full workload stay unchanged.",
+      "Application assets, diagnostic observer and workflow are unchanged; synthetic output-consumer tests establish result handling, not native/hosted/physical acceptance."
+    ],
+    "redEvidence": {
+      "command": "Recorderd8d1bbc6 before primary-failure guard: node --test --test-name-pattern=\"^RISK repository process: expected diagnostic pageerror\" tests.js. Earlier cleanup RED616e7c9a, workflow REDb442f72b and ring RED5949d993 remain immutable.",
+      "failure": "Primary unrelated/absent failure matrix returned [true,true,true,true] instead of [false,false,false,false]. GREEN9d8ff2a4 then passes all3 process tests, including reported and caught primary failures. Actual historical raw native report and caught failure still pass the new assessment without reclassifying or rerunning their original scope."
+    }
+  },
+  {
+    "baseCommit": "88bd0815b4a40d212c055226d09cc6ac409000a3",
+    "testChangesSha256": "75fb46b93a76608a19133afbd05414993a322139c2dae4defd5569d5a7578ea9",
+    "reason": "Close diagnostic false success for a secondary intentional pageerror accompanied by an unrelated primary timeout or caught failure.",
+    "previousBehavior": "The corrected cleanup/error-inventory assessment still accepted a report whose primary failure was a timeout rather than the intentional detector assertion; missing primary failures were also accepted.",
+    "intendedBehavior": "Diagnostic control success additionally requires both the original report failure and the wrapper caught failure to start with the exact intentional AssertionError line, while retaining observed detector and original native failure independently.",
+    "replacementTests": [
+      "RISK repository process: expected diagnostic pageerror never hides failed cleanup or unrelated errors"
+    ],
+    "preservedCoverage": [
+      "Existing cleanup flags, exact expected error inventory, trusted Settings click and failed native status remain required. All earlier tests, cap/input/frame limits and full workload stay unchanged.",
+      "Application assets, diagnostic observer and workflow are unchanged; synthetic output-consumer tests establish result handling, not native/hosted/physical acceptance."
+    ],
+    "redEvidence": {
+      "command": "Recorderd8d1bbc6 before primary-failure guard: node --test --test-name-pattern=\"^RISK repository process: expected diagnostic pageerror\" tests.js. Earlier cleanup RED616e7c9a, workflow REDb442f72b and ring RED5949d993 remain immutable.",
+      "failure": "Primary unrelated/absent failure matrix returned [true,true,true,true] instead of [false,false,false,false]. GREEN9d8ff2a4 then passes all3 process tests, including reported and caught primary failures. Actual historical raw native report and caught failure still pass the new assessment without reclassifying or rerunning their original scope."
+    }
+  },
+  {
+    "baseCommit": "c1df726620ced7ac0338b7c49a21a69228e09fc0",
+    "testChangesSha256": "c3163fcaa7888630e9884da8fc87f3b83a9af573bde9bececd045f532da69a4e",
+    "reason": "Close diagnostic false success for a secondary intentional pageerror accompanied by an unrelated primary timeout or caught failure.",
+    "previousBehavior": "The corrected cleanup/error-inventory assessment still accepted a report whose primary failure was a timeout rather than the intentional detector assertion; missing primary failures were also accepted.",
+    "intendedBehavior": "Diagnostic control success additionally requires both the original report failure and the wrapper caught failure to start with the exact intentional AssertionError line, while retaining observed detector and original native failure independently.",
+    "replacementTests": [
+      "RISK repository process: expected diagnostic pageerror never hides failed cleanup or unrelated errors"
+    ],
+    "preservedCoverage": [
+      "Existing cleanup flags, exact expected error inventory, trusted Settings click and failed native status remain required. All earlier tests, cap/input/frame limits and full workload stay unchanged.",
+      "Application assets, diagnostic observer and workflow are unchanged; synthetic output-consumer tests establish result handling, not native/hosted/physical acceptance."
+    ],
+    "redEvidence": {
+      "command": "Recorderd8d1bbc6 before primary-failure guard: node --test --test-name-pattern=\"^RISK repository process: expected diagnostic pageerror\" tests.js. Earlier cleanup RED616e7c9a, workflow REDb442f72b and ring RED5949d993 remain immutable.",
+      "failure": "Primary unrelated/absent failure matrix returned [true,true,true,true] instead of [false,false,false,false]. GREEN9d8ff2a4 then passes all3 process tests, including reported and caught primary failures. Actual historical raw native report and caught failure still pass the new assessment without reclassifying or rerunning their original scope."
+    }
   }
 ]
