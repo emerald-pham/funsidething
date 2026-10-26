@@ -2290,3 +2290,5 @@ The command/report consumer rejects missing, duplicate, skipped, cancelled, unre
 - RISK repository process: routed hosted policies reach native consumers without waiving invalid launches
 
 - RISK repository process: current producer reuse requires successful capped mobile evidence
+
+- RISK saved view continuity: repeated selected eligibility retains mounted rows and still refreshes changed views

@@ -15529,6 +15529,30 @@ test('RISK saved view account boundary: an All Tasks filter is cleared when the 
  assert.equal(shim.document.getElementById('listCount').textContent,'(1)','the new account must not inherit the prior account filter');
 });
 
+test('RISK saved view continuity: repeated selected eligibility retains mounted rows and still refreshes changed views',async()=>{
+ const board=syncState({tasks:Array.from({length:400},(_,i)=>syncTask('repeat-eligible-'+i,'Eligible task '+i)),
+  contexts:[{id:'selected-context',name:'Selected context',active:true}],listOpen:true,seenQuickStart:true});
+ const {ctx,shim}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(board)}});
+ const select=id=>ctx.onAction('list-eligibility',{dataset:{id}}),body=shim.document.getElementById('listBody');
+ select('eligible');const before=JSON.stringify(ctx.state);let markup=body.innerHTML,replacements=0;
+ Object.defineProperty(body,'innerHTML',{configurable:true,get:()=>markup,set:value=>{markup=value;replacements++;}});
+ body.scrollTop=340;
+ for(let i=0;i<10;i++)select('eligible');
+ assert.equal(replacements,0,'reselecting the same Eligible view must preserve its mounted task rows');
+ assert.equal(body.scrollTop,340);assert.equal(JSON.stringify(ctx.state),before,'view choices never mutate the saved board');
+ ctx.setListQuery('no matching task');assert.match(markup,/No tasks match/);
+ select('eligible');assert.equal((markup.match(/data-act="edit"/g)||[]).length,400,'the same selection still clears a real search');
+ ctx.onAction('list-tag',{dataset:{id:'c:selected-context'}});assert.match(markup,/No tasks match/);
+ select('eligible');assert.equal((markup.match(/data-act="edit"/g)||[]).length,400,'the same selection still clears a real tag');
+ ctx.state.tasks[0].title='Changed by a current board update';select('eligible');assert.match(markup,/Changed by a current board update/,'in-place board edits are not hidden by idempotence');
+ ctx.replaceState({...ctx.state,tasks:[...ctx.state.tasks,syncTask('new-current-board','New current board task')]});
+ select('eligible');assert.match(markup,/New current board task/,'replacement board content is freshly projected');
+ shim.window.CloudSync={user:'next-view-owner'};select('eligible');
+ assert.equal(JSON.parse(shim.localStorage.getItem('fvp:chain-scanner:saved-view:v1')).account,'next-view-owner','owner changes refresh this device view');
+ select('ineligible');assert.equal((markup.match(/data-act="edit"/g)||[]).length,0,'a different filter still changes the rendered membership');
+ ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/Repeatedly selecting the same eligibility filter keeps unchanged rows in place/);
+});
+
 test('RISK saved view restoration: the eligibility filter remains selected after reopening All Tasks',async()=>{
  const board=syncState({tasks:[syncTask('eligibility-view','Eligibility view task')],listOpen:true,seenQuickStart:true});
  const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(board)}),first=await loadApp({sharedStorage:storage});

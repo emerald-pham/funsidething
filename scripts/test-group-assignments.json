@@ -12941,6 +12941,11 @@
       "root": "current grouped routing requires the completed capped mobile producer before reuse",
       "group": "native-process",
       "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "RISK saved view continuity: repeated selected eligibility retains mounted rows and still refreshes changed views",
+      "group": "core",
+      "file": "tests.js"
     }
   ],
   "processControls": [
