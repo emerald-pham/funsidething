@@ -46378,3 +46378,23 @@ test('RISK repository process: diagnostic observer retains recent actions after 
  assert.equal(observed.actions.at(-1).action,'act:bulk-select');
  assert.equal(observed.actionCount,80,'The report makes omitted older actions explicit without counting synthetic events');
 });
+
+test('RISK repository process: diagnostic driver records generic verification refusals without misclassifying earlier setup failures',async t=>{
+ const {verifyDriverMobileReport}=await import('./scripts/button-safety-mobile-memory.mjs'),{createMobileBundle}=await import('./scripts/agent-tools/mobile-memory-fixture.mjs'),{tmpdir}=await import('node:os');
+ const directory=fs.mkdtempSync(path.join(tmpdir(),'chain-diagnostic-refusal-'));t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));const bundle=createMobileBundle(directory),source={candidateCommit:bundle.report.candidateCommit,candidateTree:bundle.report.candidateTree};
+ await t.test('a valid baseline report is returned unchanged',()=>{
+  const native=structuredClone(bundle.native.reduced),report={};assert.equal(verifyDriverMobileReport(native,{source,motion:'reduced',report}),native);assert.deepEqual(report,{});
+ });
+ for(const kind of ['hidden kind refusal','missing attempt before kind','invalid attempt profile before kind'])await t.test(kind,()=>{
+  const native=structuredClone(bundle.native.reduced),report={};native.kind='button-mobile-rendering-diagnostic';native.diagnosticCanvasVariant={variant:'canvas-hidden'};
+  if(kind==='missing attempt before kind')delete native.mobileAttempt;
+  if(kind==='invalid attempt profile before kind')native.mobileAttempt.profile.viewport.width=391;
+  let failure;try{verifyDriverMobileReport(native,{source,motion:'reduced',report});}catch(error){failure=error;}
+  assert.ok(failure,'The actual driver verifier must still reject the native evidence');assert.equal(failure.code,'ERR_ASSERTION');
+  if(kind==='hidden kind refusal'){assert.equal(failure.actual,'button-mobile-rendering-diagnostic');assert.equal(failure.expected,'button-mobile-functional');}
+  else{assert.notEqual(failure.expected,'button-mobile-functional','An earlier setup failure must remain distinguishable from the intended kind refusal');if(kind==='missing attempt before kind')assert.match(failure.message,/Actual pre-attempt mobile setup required/);}
+  assert.equal(report.diagnosticKindRefusal,undefined,'An earlier validation failure must not be labeled an expected kind refusal');
+  assert.deepEqual(report.diagnosticVerificationRefusal,{code:failure.code,message:failure.message},'Generic annotation preserves the actual thrown refusal without asserting its cause or expectation');
+  assert.equal(Object.hasOwn(report.diagnosticVerificationRefusal,'expected'),false);assert.equal(report.appOutcome,undefined,'No refused verification may claim functional acceptance');
+ });
+});

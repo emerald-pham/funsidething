@@ -25262,5 +25262,252 @@
       "command": "Recorder a2e6943a on2de with only replacement process test modified: node --test --test-name-pattern=\"^RISK repository process: Reduced canvas comparison\" tests.js. Worker native consumer d5e76ce1 precedes overlay implementation; exact artifacts under qualification/startup-rendering-repair.",
       "failure": "Actual process assertion fails because oldstartup branch differs from requiredcanvas-composition branch. Native consumer d5e76ce1 observes requested hidden variant still visible onold2de before CSS/variant implementation; GREEN2bd50a7d and38ee4f99 respectively observe hidden and baseline with full unchanged native story. Later tests do not rewrite chronology."
     }
+  },
+  {
+    "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
+    "testChangesSha256": "391d4a55e56a6e0f77a96d428cc56c762b773b9889a067a0c2f1c971df148342",
+    "reason": "Repair review C1: the diagnostic driver must not describe every verifier failure as an expected native-kind refusal.",
+    "previousBehavior": "The hidden diagnostic catch attached expected=true to errors from setup/profile verification that occur before the native-kind assertion, while still rethrowing the original error.",
+    "intendedBehavior": "The same driver consumer and verifier ordering retain the original return or thrown error. Hidden diagnostic failures receive only a generic diagnosticVerificationRefusal code/message annotation, without an expected-kind claim.",
+    "replacementTests": [
+      "RISK repository process: diagnostic driver records generic verification refusals without misclassifying earlier setup failures"
+    ],
+    "preservedCoverage": [
+      "A valid full mobile functional parser fixture is returned unchanged and receives no refusal annotation; synthetic parser fixtures are not native runtime proof.",
+      "The intended nonqualifying hidden-kind mismatch and missing or invalid earlier mobileAttempt remain separately observed assertion failures and are rethrown without claiming acceptance.",
+      "All existing native scenario, data preservation, timing, source/cap/control/cleanup and diagnostic-only release rejection protections remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder09b271d4: node --test --test-name-pattern=\"^RISK repository process: diagnostic driver records generic verification refusals\" tests.js. Artifact qualification/startup-rendering-repair/c1-refusal-repair/runs/2026-10-26T19-13-10-863Z-09b271d4-525b-4e61-8a3d-0f52ba23b4d6.json.",
+      "failure": "After the parent-authorized behavior-preserving extraction, actual consumer RED passes the valid baseline and rejects all three malformed hidden reports, then fails because diagnosticKindRefusal incorrectly contains expected:true. Missing attempt fails at Actual pre-attempt mobile setup required before the kind assertion; invalid profile is also distinguished. Only afterward generic annotation repair yields GREENe67ce182."
+    }
+  },
+  {
+    "baseCommit": "31c98a6e075f180681a49d1647b2462521c7ac5f",
+    "testChangesSha256": "712d452d5e80d6da905c2f9ac045c74ce9d8341d37699dbadb5134cf5e3308c4",
+    "reason": "Repair review C1: the diagnostic driver must not describe every verifier failure as an expected native-kind refusal.",
+    "previousBehavior": "The hidden diagnostic catch attached expected=true to errors from setup/profile verification that occur before the native-kind assertion, while still rethrowing the original error.",
+    "intendedBehavior": "The same driver consumer and verifier ordering retain the original return or thrown error. Hidden diagnostic failures receive only a generic diagnosticVerificationRefusal code/message annotation, without an expected-kind claim.",
+    "replacementTests": [
+      "RISK repository process: diagnostic driver records generic verification refusals without misclassifying earlier setup failures"
+    ],
+    "preservedCoverage": [
+      "A valid full mobile functional parser fixture is returned unchanged and receives no refusal annotation; synthetic parser fixtures are not native runtime proof.",
+      "The intended nonqualifying hidden-kind mismatch and missing or invalid earlier mobileAttempt remain separately observed assertion failures and are rethrown without claiming acceptance.",
+      "All existing native scenario, data preservation, timing, source/cap/control/cleanup and diagnostic-only release rejection protections remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder09b271d4: node --test --test-name-pattern=\"^RISK repository process: diagnostic driver records generic verification refusals\" tests.js. Artifact qualification/startup-rendering-repair/c1-refusal-repair/runs/2026-10-26T19-13-10-863Z-09b271d4-525b-4e61-8a3d-0f52ba23b4d6.json.",
+      "failure": "After the parent-authorized behavior-preserving extraction, actual consumer RED passes the valid baseline and rejects all three malformed hidden reports, then fails because diagnosticKindRefusal incorrectly contains expected:true. Missing attempt fails at Actual pre-attempt mobile setup required before the kind assertion; invalid profile is also distinguished. Only afterward generic annotation repair yields GREENe67ce182."
+    }
+  },
+  {
+    "baseCommit": "ec1403bb0fb84bd0cce6afb22c20851ec6af6907",
+    "testChangesSha256": "2443c1ae787cb0f564744f99679f9a2f1e2bad3e687c3fcfa3a976a1b6a59c41",
+    "reason": "Repair review C1: the diagnostic driver must not describe every verifier failure as an expected native-kind refusal.",
+    "previousBehavior": "The hidden diagnostic catch attached expected=true to errors from setup/profile verification that occur before the native-kind assertion, while still rethrowing the original error.",
+    "intendedBehavior": "The same driver consumer and verifier ordering retain the original return or thrown error. Hidden diagnostic failures receive only a generic diagnosticVerificationRefusal code/message annotation, without an expected-kind claim.",
+    "replacementTests": [
+      "RISK repository process: diagnostic driver records generic verification refusals without misclassifying earlier setup failures"
+    ],
+    "preservedCoverage": [
+      "A valid full mobile functional parser fixture is returned unchanged and receives no refusal annotation; synthetic parser fixtures are not native runtime proof.",
+      "The intended nonqualifying hidden-kind mismatch and missing or invalid earlier mobileAttempt remain separately observed assertion failures and are rethrown without claiming acceptance.",
+      "All existing native scenario, data preservation, timing, source/cap/control/cleanup and diagnostic-only release rejection protections remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder09b271d4: node --test --test-name-pattern=\"^RISK repository process: diagnostic driver records generic verification refusals\" tests.js. Artifact qualification/startup-rendering-repair/c1-refusal-repair/runs/2026-10-26T19-13-10-863Z-09b271d4-525b-4e61-8a3d-0f52ba23b4d6.json.",
+      "failure": "After the parent-authorized behavior-preserving extraction, actual consumer RED passes the valid baseline and rejects all three malformed hidden reports, then fails because diagnosticKindRefusal incorrectly contains expected:true. Missing attempt fails at Actual pre-attempt mobile setup required before the kind assertion; invalid profile is also distinguished. Only afterward generic annotation repair yields GREENe67ce182."
+    }
+  },
+  {
+    "baseCommit": "1d2e45444901405db329d6adf921cdb38160a9c1",
+    "testChangesSha256": "aaaba0649f4e2cfbf9d32cc1a71819eab566543affc319b05ab976e43162d842",
+    "reason": "Repair review C1: the diagnostic driver must not describe every verifier failure as an expected native-kind refusal.",
+    "previousBehavior": "The hidden diagnostic catch attached expected=true to errors from setup/profile verification that occur before the native-kind assertion, while still rethrowing the original error.",
+    "intendedBehavior": "The same driver consumer and verifier ordering retain the original return or thrown error. Hidden diagnostic failures receive only a generic diagnosticVerificationRefusal code/message annotation, without an expected-kind claim.",
+    "replacementTests": [
+      "RISK repository process: diagnostic driver records generic verification refusals without misclassifying earlier setup failures"
+    ],
+    "preservedCoverage": [
+      "A valid full mobile functional parser fixture is returned unchanged and receives no refusal annotation; synthetic parser fixtures are not native runtime proof.",
+      "The intended nonqualifying hidden-kind mismatch and missing or invalid earlier mobileAttempt remain separately observed assertion failures and are rethrown without claiming acceptance.",
+      "All existing native scenario, data preservation, timing, source/cap/control/cleanup and diagnostic-only release rejection protections remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder09b271d4: node --test --test-name-pattern=\"^RISK repository process: diagnostic driver records generic verification refusals\" tests.js. Artifact qualification/startup-rendering-repair/c1-refusal-repair/runs/2026-10-26T19-13-10-863Z-09b271d4-525b-4e61-8a3d-0f52ba23b4d6.json.",
+      "failure": "After the parent-authorized behavior-preserving extraction, actual consumer RED passes the valid baseline and rejects all three malformed hidden reports, then fails because diagnosticKindRefusal incorrectly contains expected:true. Missing attempt fails at Actual pre-attempt mobile setup required before the kind assertion; invalid profile is also distinguished. Only afterward generic annotation repair yields GREENe67ce182."
+    }
+  },
+  {
+    "baseCommit": "3a34902a680545c8a9c82f37f23bd2baabe85159",
+    "testChangesSha256": "e344a9d51db87cbfe08ea4f5684e5ec57bae20cd881aa9b635f0738ec8108ffc",
+    "reason": "Repair review C1: the diagnostic driver must not describe every verifier failure as an expected native-kind refusal.",
+    "previousBehavior": "The hidden diagnostic catch attached expected=true to errors from setup/profile verification that occur before the native-kind assertion, while still rethrowing the original error.",
+    "intendedBehavior": "The same driver consumer and verifier ordering retain the original return or thrown error. Hidden diagnostic failures receive only a generic diagnosticVerificationRefusal code/message annotation, without an expected-kind claim.",
+    "replacementTests": [
+      "RISK repository process: diagnostic driver records generic verification refusals without misclassifying earlier setup failures"
+    ],
+    "preservedCoverage": [
+      "A valid full mobile functional parser fixture is returned unchanged and receives no refusal annotation; synthetic parser fixtures are not native runtime proof.",
+      "The intended nonqualifying hidden-kind mismatch and missing or invalid earlier mobileAttempt remain separately observed assertion failures and are rethrown without claiming acceptance.",
+      "All existing native scenario, data preservation, timing, source/cap/control/cleanup and diagnostic-only release rejection protections remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder09b271d4: node --test --test-name-pattern=\"^RISK repository process: diagnostic driver records generic verification refusals\" tests.js. Artifact qualification/startup-rendering-repair/c1-refusal-repair/runs/2026-10-26T19-13-10-863Z-09b271d4-525b-4e61-8a3d-0f52ba23b4d6.json.",
+      "failure": "After the parent-authorized behavior-preserving extraction, actual consumer RED passes the valid baseline and rejects all three malformed hidden reports, then fails because diagnosticKindRefusal incorrectly contains expected:true. Missing attempt fails at Actual pre-attempt mobile setup required before the kind assertion; invalid profile is also distinguished. Only afterward generic annotation repair yields GREENe67ce182."
+    }
+  },
+  {
+    "baseCommit": "7dacd9b31d19eafb1a820db94f63661f254201bc",
+    "testChangesSha256": "992ea3e1111e789e4ec03b07ba74752534551b148fc33e22f2d41c50504dcfdf",
+    "reason": "Repair review C1: the diagnostic driver must not describe every verifier failure as an expected native-kind refusal.",
+    "previousBehavior": "The hidden diagnostic catch attached expected=true to errors from setup/profile verification that occur before the native-kind assertion, while still rethrowing the original error.",
+    "intendedBehavior": "The same driver consumer and verifier ordering retain the original return or thrown error. Hidden diagnostic failures receive only a generic diagnosticVerificationRefusal code/message annotation, without an expected-kind claim.",
+    "replacementTests": [
+      "RISK repository process: diagnostic driver records generic verification refusals without misclassifying earlier setup failures"
+    ],
+    "preservedCoverage": [
+      "A valid full mobile functional parser fixture is returned unchanged and receives no refusal annotation; synthetic parser fixtures are not native runtime proof.",
+      "The intended nonqualifying hidden-kind mismatch and missing or invalid earlier mobileAttempt remain separately observed assertion failures and are rethrown without claiming acceptance.",
+      "All existing native scenario, data preservation, timing, source/cap/control/cleanup and diagnostic-only release rejection protections remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder09b271d4: node --test --test-name-pattern=\"^RISK repository process: diagnostic driver records generic verification refusals\" tests.js. Artifact qualification/startup-rendering-repair/c1-refusal-repair/runs/2026-10-26T19-13-10-863Z-09b271d4-525b-4e61-8a3d-0f52ba23b4d6.json.",
+      "failure": "After the parent-authorized behavior-preserving extraction, actual consumer RED passes the valid baseline and rejects all three malformed hidden reports, then fails because diagnosticKindRefusal incorrectly contains expected:true. Missing attempt fails at Actual pre-attempt mobile setup required before the kind assertion; invalid profile is also distinguished. Only afterward generic annotation repair yields GREENe67ce182."
+    }
+  },
+  {
+    "baseCommit": "aea93daef04e4f2982337c6082031cdb3f7de984",
+    "testChangesSha256": "5bd468d3d327fb9e9ebd1d2c4defec14acce54b4540e863d091334b34ce8a041",
+    "reason": "Repair review C1: the diagnostic driver must not describe every verifier failure as an expected native-kind refusal.",
+    "previousBehavior": "The hidden diagnostic catch attached expected=true to errors from setup/profile verification that occur before the native-kind assertion, while still rethrowing the original error.",
+    "intendedBehavior": "The same driver consumer and verifier ordering retain the original return or thrown error. Hidden diagnostic failures receive only a generic diagnosticVerificationRefusal code/message annotation, without an expected-kind claim.",
+    "replacementTests": [
+      "RISK repository process: diagnostic driver records generic verification refusals without misclassifying earlier setup failures"
+    ],
+    "preservedCoverage": [
+      "A valid full mobile functional parser fixture is returned unchanged and receives no refusal annotation; synthetic parser fixtures are not native runtime proof.",
+      "The intended nonqualifying hidden-kind mismatch and missing or invalid earlier mobileAttempt remain separately observed assertion failures and are rethrown without claiming acceptance.",
+      "All existing native scenario, data preservation, timing, source/cap/control/cleanup and diagnostic-only release rejection protections remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder09b271d4: node --test --test-name-pattern=\"^RISK repository process: diagnostic driver records generic verification refusals\" tests.js. Artifact qualification/startup-rendering-repair/c1-refusal-repair/runs/2026-10-26T19-13-10-863Z-09b271d4-525b-4e61-8a3d-0f52ba23b4d6.json.",
+      "failure": "After the parent-authorized behavior-preserving extraction, actual consumer RED passes the valid baseline and rejects all three malformed hidden reports, then fails because diagnosticKindRefusal incorrectly contains expected:true. Missing attempt fails at Actual pre-attempt mobile setup required before the kind assertion; invalid profile is also distinguished. Only afterward generic annotation repair yields GREENe67ce182."
+    }
+  },
+  {
+    "baseCommit": "2767934b65279a22391b5cf920e8195a0830f5bd",
+    "testChangesSha256": "6c608cc84645c94143bf1b55ec2c165cf627b3b83f7e7ac460434e75121d3d2c",
+    "reason": "Repair review C1: the diagnostic driver must not describe every verifier failure as an expected native-kind refusal.",
+    "previousBehavior": "The hidden diagnostic catch attached expected=true to errors from setup/profile verification that occur before the native-kind assertion, while still rethrowing the original error.",
+    "intendedBehavior": "The same driver consumer and verifier ordering retain the original return or thrown error. Hidden diagnostic failures receive only a generic diagnosticVerificationRefusal code/message annotation, without an expected-kind claim.",
+    "replacementTests": [
+      "RISK repository process: diagnostic driver records generic verification refusals without misclassifying earlier setup failures"
+    ],
+    "preservedCoverage": [
+      "A valid full mobile functional parser fixture is returned unchanged and receives no refusal annotation; synthetic parser fixtures are not native runtime proof.",
+      "The intended nonqualifying hidden-kind mismatch and missing or invalid earlier mobileAttempt remain separately observed assertion failures and are rethrown without claiming acceptance.",
+      "All existing native scenario, data preservation, timing, source/cap/control/cleanup and diagnostic-only release rejection protections remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder09b271d4: node --test --test-name-pattern=\"^RISK repository process: diagnostic driver records generic verification refusals\" tests.js. Artifact qualification/startup-rendering-repair/c1-refusal-repair/runs/2026-10-26T19-13-10-863Z-09b271d4-525b-4e61-8a3d-0f52ba23b4d6.json.",
+      "failure": "After the parent-authorized behavior-preserving extraction, actual consumer RED passes the valid baseline and rejects all three malformed hidden reports, then fails because diagnosticKindRefusal incorrectly contains expected:true. Missing attempt fails at Actual pre-attempt mobile setup required before the kind assertion; invalid profile is also distinguished. Only afterward generic annotation repair yields GREENe67ce182."
+    }
+  },
+  {
+    "baseCommit": "3781d21b3e2592d0942ca80eeabbebea44557809",
+    "testChangesSha256": "10949ad3f837864b1313f18c2fb84be56929f0b37697732d9d8bfe1de9d88d92",
+    "reason": "Repair review C1: the diagnostic driver must not describe every verifier failure as an expected native-kind refusal.",
+    "previousBehavior": "The hidden diagnostic catch attached expected=true to errors from setup/profile verification that occur before the native-kind assertion, while still rethrowing the original error.",
+    "intendedBehavior": "The same driver consumer and verifier ordering retain the original return or thrown error. Hidden diagnostic failures receive only a generic diagnosticVerificationRefusal code/message annotation, without an expected-kind claim.",
+    "replacementTests": [
+      "RISK repository process: diagnostic driver records generic verification refusals without misclassifying earlier setup failures"
+    ],
+    "preservedCoverage": [
+      "A valid full mobile functional parser fixture is returned unchanged and receives no refusal annotation; synthetic parser fixtures are not native runtime proof.",
+      "The intended nonqualifying hidden-kind mismatch and missing or invalid earlier mobileAttempt remain separately observed assertion failures and are rethrown without claiming acceptance.",
+      "All existing native scenario, data preservation, timing, source/cap/control/cleanup and diagnostic-only release rejection protections remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder09b271d4: node --test --test-name-pattern=\"^RISK repository process: diagnostic driver records generic verification refusals\" tests.js. Artifact qualification/startup-rendering-repair/c1-refusal-repair/runs/2026-10-26T19-13-10-863Z-09b271d4-525b-4e61-8a3d-0f52ba23b4d6.json.",
+      "failure": "After the parent-authorized behavior-preserving extraction, actual consumer RED passes the valid baseline and rejects all three malformed hidden reports, then fails because diagnosticKindRefusal incorrectly contains expected:true. Missing attempt fails at Actual pre-attempt mobile setup required before the kind assertion; invalid profile is also distinguished. Only afterward generic annotation repair yields GREENe67ce182."
+    }
+  },
+  {
+    "baseCommit": "937975d4bc09d3e539f796621b4d8e00f4a91408",
+    "testChangesSha256": "a43c1baadd8b65297e8d0207ab06dca3926fb95398468528228563e5e2be774b",
+    "reason": "Repair review C1: the diagnostic driver must not describe every verifier failure as an expected native-kind refusal.",
+    "previousBehavior": "The hidden diagnostic catch attached expected=true to errors from setup/profile verification that occur before the native-kind assertion, while still rethrowing the original error.",
+    "intendedBehavior": "The same driver consumer and verifier ordering retain the original return or thrown error. Hidden diagnostic failures receive only a generic diagnosticVerificationRefusal code/message annotation, without an expected-kind claim.",
+    "replacementTests": [
+      "RISK repository process: diagnostic driver records generic verification refusals without misclassifying earlier setup failures"
+    ],
+    "preservedCoverage": [
+      "A valid full mobile functional parser fixture is returned unchanged and receives no refusal annotation; synthetic parser fixtures are not native runtime proof.",
+      "The intended nonqualifying hidden-kind mismatch and missing or invalid earlier mobileAttempt remain separately observed assertion failures and are rethrown without claiming acceptance.",
+      "All existing native scenario, data preservation, timing, source/cap/control/cleanup and diagnostic-only release rejection protections remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder09b271d4: node --test --test-name-pattern=\"^RISK repository process: diagnostic driver records generic verification refusals\" tests.js. Artifact qualification/startup-rendering-repair/c1-refusal-repair/runs/2026-10-26T19-13-10-863Z-09b271d4-525b-4e61-8a3d-0f52ba23b4d6.json.",
+      "failure": "After the parent-authorized behavior-preserving extraction, actual consumer RED passes the valid baseline and rejects all three malformed hidden reports, then fails because diagnosticKindRefusal incorrectly contains expected:true. Missing attempt fails at Actual pre-attempt mobile setup required before the kind assertion; invalid profile is also distinguished. Only afterward generic annotation repair yields GREENe67ce182."
+    }
+  },
+  {
+    "baseCommit": "6dde63c21525c5c792bc84ff4c24158fdf446943",
+    "testChangesSha256": "9619fb258dbd52b6623e119b0d902794eeca605c0bc3be2502f7d740b84f349a",
+    "reason": "Repair review C1: the diagnostic driver must not describe every verifier failure as an expected native-kind refusal.",
+    "previousBehavior": "The hidden diagnostic catch attached expected=true to errors from setup/profile verification that occur before the native-kind assertion, while still rethrowing the original error.",
+    "intendedBehavior": "The same driver consumer and verifier ordering retain the original return or thrown error. Hidden diagnostic failures receive only a generic diagnosticVerificationRefusal code/message annotation, without an expected-kind claim.",
+    "replacementTests": [
+      "RISK repository process: diagnostic driver records generic verification refusals without misclassifying earlier setup failures"
+    ],
+    "preservedCoverage": [
+      "A valid full mobile functional parser fixture is returned unchanged and receives no refusal annotation; synthetic parser fixtures are not native runtime proof.",
+      "The intended nonqualifying hidden-kind mismatch and missing or invalid earlier mobileAttempt remain separately observed assertion failures and are rethrown without claiming acceptance.",
+      "All existing native scenario, data preservation, timing, source/cap/control/cleanup and diagnostic-only release rejection protections remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder09b271d4: node --test --test-name-pattern=\"^RISK repository process: diagnostic driver records generic verification refusals\" tests.js. Artifact qualification/startup-rendering-repair/c1-refusal-repair/runs/2026-10-26T19-13-10-863Z-09b271d4-525b-4e61-8a3d-0f52ba23b4d6.json.",
+      "failure": "After the parent-authorized behavior-preserving extraction, actual consumer RED passes the valid baseline and rejects all three malformed hidden reports, then fails because diagnosticKindRefusal incorrectly contains expected:true. Missing attempt fails at Actual pre-attempt mobile setup required before the kind assertion; invalid profile is also distinguished. Only afterward generic annotation repair yields GREENe67ce182."
+    }
+  },
+  {
+    "baseCommit": "2de770251526dcf0a749699bf787cd4aa59fc72f",
+    "testChangesSha256": "23f9532e3429ceace388e715d99918a59597518168ad7e086668135aa6be4ddc",
+    "reason": "Repair review C1: the diagnostic driver must not describe every verifier failure as an expected native-kind refusal.",
+    "previousBehavior": "The hidden diagnostic catch attached expected=true to errors from setup/profile verification that occur before the native-kind assertion, while still rethrowing the original error.",
+    "intendedBehavior": "The same driver consumer and verifier ordering retain the original return or thrown error. Hidden diagnostic failures receive only a generic diagnosticVerificationRefusal code/message annotation, without an expected-kind claim.",
+    "replacementTests": [
+      "RISK repository process: diagnostic driver records generic verification refusals without misclassifying earlier setup failures"
+    ],
+    "preservedCoverage": [
+      "A valid full mobile functional parser fixture is returned unchanged and receives no refusal annotation; synthetic parser fixtures are not native runtime proof.",
+      "The intended nonqualifying hidden-kind mismatch and missing or invalid earlier mobileAttempt remain separately observed assertion failures and are rethrown without claiming acceptance.",
+      "All existing native scenario, data preservation, timing, source/cap/control/cleanup and diagnostic-only release rejection protections remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder09b271d4: node --test --test-name-pattern=\"^RISK repository process: diagnostic driver records generic verification refusals\" tests.js. Artifact qualification/startup-rendering-repair/c1-refusal-repair/runs/2026-10-26T19-13-10-863Z-09b271d4-525b-4e61-8a3d-0f52ba23b4d6.json.",
+      "failure": "After the parent-authorized behavior-preserving extraction, actual consumer RED passes the valid baseline and rejects all three malformed hidden reports, then fails because diagnosticKindRefusal incorrectly contains expected:true. Missing attempt fails at Actual pre-attempt mobile setup required before the kind assertion; invalid profile is also distinguished. Only afterward generic annotation repair yields GREENe67ce182."
+    }
+  },
+  {
+    "baseCommit": "921c904614170ea188be7f2ed27c3d2f7035f8f8",
+    "testChangesSha256": "b7d67465fea9c75f1d67287549a25ad3843e8362b671b0b1664dab1e7f4e15ba",
+    "reason": "Repair review C1: the diagnostic driver must not describe every verifier failure as an expected native-kind refusal.",
+    "previousBehavior": "The hidden diagnostic catch attached expected=true to errors from setup/profile verification that occur before the native-kind assertion, while still rethrowing the original error.",
+    "intendedBehavior": "The same driver consumer and verifier ordering retain the original return or thrown error. Hidden diagnostic failures receive only a generic diagnosticVerificationRefusal code/message annotation, without an expected-kind claim.",
+    "replacementTests": [
+      "RISK repository process: diagnostic driver records generic verification refusals without misclassifying earlier setup failures"
+    ],
+    "preservedCoverage": [
+      "A valid full mobile functional parser fixture is returned unchanged and receives no refusal annotation; synthetic parser fixtures are not native runtime proof.",
+      "The intended nonqualifying hidden-kind mismatch and missing or invalid earlier mobileAttempt remain separately observed assertion failures and are rethrown without claiming acceptance.",
+      "All existing native scenario, data preservation, timing, source/cap/control/cleanup and diagnostic-only release rejection protections remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder09b271d4: node --test --test-name-pattern=\"^RISK repository process: diagnostic driver records generic verification refusals\" tests.js. Artifact qualification/startup-rendering-repair/c1-refusal-repair/runs/2026-10-26T19-13-10-863Z-09b271d4-525b-4e61-8a3d-0f52ba23b4d6.json.",
+      "failure": "After the parent-authorized behavior-preserving extraction, actual consumer RED passes the valid baseline and rejects all three malformed hidden reports, then fails because diagnosticKindRefusal incorrectly contains expected:true. Missing attempt fails at Actual pre-attempt mobile setup required before the kind assertion; invalid profile is also distinguished. Only afterward generic annotation repair yields GREENe67ce182."
+    }
   }
 ]

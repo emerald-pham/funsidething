@@ -78,6 +78,15 @@ async function browserServer(output,control,budgetProfile='required-1gb'){
   write(file,report);if(report.status!=='passed')process.exitCode=1;
  }
 }
+// The driver consumes the original functional verifier result without changing
+// its returned report or thrown error. Kept separate from hosted process setup.
+export function verifyDriverMobileReport(native,{source,motion,report}){
+ try{return verifyMobileFunctionalReport(native,{...source,motion});}
+ catch(error){
+  if(native.kind==='button-mobile-rendering-diagnostic'&&native.status==='passed'&&native.diagnosticCanvasVariant?.variant==='canvas-hidden')report.diagnosticVerificationRefusal={code:error.code,message:error.message};
+  throw error;
+ }
+}
 async function driver(output,motion,control,budgetProfile='required-1gb'){
  mobileBudgetBytes(budgetProfile);
  fs.mkdirSync(output,{recursive:true});const source=identity(),report={...source,budgetProfile,status:'running',role:'external-driver',nodeVersion:process.version,hostedPolicy:hostedButtonPolicy(),errors:[]};const file=path.join(output,'inside.json');let ready,requested=false;
@@ -99,11 +108,7 @@ async function driver(output,motion,control,budgetProfile='required-1gb'){
    else{
     if(native.diagnosticCanvasVariant)report.diagnosticNativeOutcome={variant:native.diagnosticCanvasVariant.variant,kind:native.kind,status:native.status,fullStoryCompleted:!!native.mobileStory,qualifiesAcceptance:false};
     if(appError)throw appError;
-    try{verifyMobileFunctionalReport(native,{...source,motion});}
-    catch(error){
-     if(native.kind==='button-mobile-rendering-diagnostic'&&native.status==='passed'&&native.diagnosticCanvasVariant?.variant==='canvas-hidden')report.diagnosticKindRefusal={expected:true,code:error.code,message:error.message};
-     throw error;
-    }
+    verifyDriverMobileReport(native,{source,motion,report});
     report.appOutcome='passed';
    }
   }

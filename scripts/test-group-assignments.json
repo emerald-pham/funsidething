@@ -13206,6 +13206,11 @@
       "file": "tests.js",
       "root": "RISK repository process: diagnostic observer retains recent actions after a long setup",
       "group": "native-process"
+    },
+    {
+      "file": "tests.js",
+      "root": "RISK repository process: diagnostic driver records generic verification refusals without misclassifying earlier setup failures",
+      "group": "native-process"
     }
   ],
   "processControls": [

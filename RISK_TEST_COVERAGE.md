@@ -2375,3 +2375,4 @@ The pinned Linux x64 reader preserves the raw AT_PAGESZ witness and binds it to 
 
 - RISK repository process: Reduced canvas comparison binds two explicit variants without release qualification
 - RISK repository process: diagnostic observer retains recent actions after a long setup
+- RISK repository process: diagnostic driver records generic verification refusals without misclassifying earlier setup failures
