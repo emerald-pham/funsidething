@@ -46292,6 +46292,7 @@ test('RISK synced scene repaint: unchanged mirrored locations retain storage wit
 
 test('RISK repository process: ordinary task Undo keeps unchanged scenery while separate scene choices repaint and save',async t=>{
  const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});const output=fs.mkdtempSync(path.join(base,'undo-scene-paint-'));
+ const {waitForTruthyProbe}=await import('./scripts/agent-tools/async-probe.mjs');
  const playwright=await import('playwright'),launch=playwright.chromium.launch,{runButtonSafety}=await import('./scripts/button-safety-native.mjs');let probeFailure;const evidence={observations:[]};
  t.after(()=>{playwright.chromium.launch=launch;});
  playwright.chromium.launch=async(...args)=>{const browser=await launch.apply(playwright.chromium,args),newContext=browser.newContext.bind(browser);browser.newContext=async(...args)=>{
@@ -46307,9 +46308,9 @@ test('RISK repository process: ordinary task Undo keeps unchanged scenery while 
    assert.equal(ordinary.undoPresses,10,'ten actual task Undo inputs execute');assert.equal(ordinary.clears,ordinary.before,'ordinary title Undo must not repaint unchanged scenery');
    await page.locator('[data-act="edit"][data-id="synthetic-kept"]').first().click();await page.locator('#etTitle').fill('Task edit before separate scene choice');await page.locator('#modalRoot [data-act="save-edit"]').click();
    await page.locator('#appHeader [data-act="settings"]').click();await page.locator('[data-act="scene-time-settings"]').click();await page.locator('#sceneSeasonInput').selectOption('winter');await page.locator('#sceneTimeInput').fill('23:15');await page.locator('[data-scene-time="lock"]').click();
-   await page.waitForFunction(async()=>JSON.parse((await ScannerDeviceStore.readHead()).payload).settings.scene.time==='23:15');await page.locator('#sceneTimeDialog [data-scene-time="close"]').click();await page.locator('#modalRoot [data-act="close-modal"]').click();
+   await waitForTruthyProbe(async()=>{const saved=await page.evaluate(async()=>JSON.parse((await ScannerDeviceStore.readHead()).payload));return saved.settings.scene.time==='23:15';},{timeoutMs:4000});await page.locator('#sceneTimeDialog [data-scene-time="close"]').click();await page.locator('#modalRoot [data-act="close-modal"]').click();
    const selected=await page.evaluate(()=>({clears:__undoScenePaint.clears,scene:JSON.stringify(state.settings.scene)}));assert.notEqual(selected.scene,ordinary.scene);assert.ok(selected.clears>ordinary.clears,'changed scene paints');
-   await page.locator('#appHeader [data-act="undo"]').click();await page.waitForFunction(async title=>{const saved=JSON.parse((await ScannerDeviceStore.readHead()).payload);return saved.tasks.find(task=>task.id==='synthetic-kept').title===title&&saved.settings.scene.time==='23:15';},JSON.parse(ordinary.tasks).find(task=>task.id==='synthetic-kept').title);
+   await page.locator('#appHeader [data-act="undo"]').click();await waitForTruthyProbe(async()=>{const saved=await page.evaluate(async()=>JSON.parse((await ScannerDeviceStore.readHead()).payload));return saved.tasks.find(task=>task.id==='synthetic-kept').title===JSON.parse(ordinary.tasks).find(task=>task.id==='synthetic-kept').title&&saved.settings.scene.time==='23:15';},{timeoutMs:4000});
    const restored=await page.evaluate(()=>({clears:__undoScenePaint.clears,scene:JSON.stringify(state.settings.scene),tasks:JSON.stringify(state.tasks),time:LivingSky.readSceneTime(localStorage),season:LivingSky.readSceneSeason(localStorage)}));assert.equal(restored.scene,selected.scene,'task Undo cannot absorb a separate scene choice');assert.equal(restored.tasks,ordinary.tasks,'task Undo restores all original task data');assert.equal(restored.time,'23:15');assert.equal(restored.season,'winter');assert.equal(restored.clears,selected.clears,'same-scene task Undo does not repaint');evidence.observations.push({ordinary,selected,restored});
   }}catch(error){probeFailure=error;}finally{await close(...args);}};return context;};return browser;};
  let result;try{result=await runButtonSafety({repo:__dirname,engine:'chromium',port:Number(process.env.CHAIN_NATIVE_PORT||0),outputDir:output,scenarioFilter:'rapid Undo consumes ten actual saved edit frames'});}finally{playwright.chromium.launch=launch;evidence.probeFailure=probeFailure?.stack;fs.writeFileSync(path.join(output,'scene-paint-observation.json'),JSON.stringify(evidence,null,2)+'\n');}
@@ -46387,4 +46388,56 @@ test('RISK scenery backdrop cache: first unchanged lighting timer reuses actual 
  assert.equal(initial.paintedSlot,initial.slot,'The initial pixels record their actual lighting slot');assert.equal(evidence.before.bankPending,true);assert.match(evidence.bank.status,/Human written/);assert.equal(evidence.bank.back,initial.back,'Newly loaded copy retains the exact same fixed-time backdrop');
  assert.notEqual(evidence.changed.before.slot,evidence.changed.after.slot,'Positive control advances the real lighting slot');assert.equal(evidence.changed.after.backgrounds,evidence.changed.before.backgrounds+1,'A genuinely changed slot must repaint');assert.equal(evidence.changed.after.paintedSlot,evidence.changed.after.slot);assert.equal(evidence.changed.fresh.backgrounds,evidence.changed.after.backgrounds+1,'Independent full refresh actually repaints');assert.equal(evidence.changed.after.back,evidence.changed.fresh.back,'Changed-slot pixels equal a complete refresh at the same instant, even when window states hold across slots');
  t.diagnostic('Nonqualifying deterministic rendered consumer: '+directory);
+});
+
+test('RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh',async t=>{
+ for(const [motion,change] of [['reduced',false],['normal',false],['reduced',true]])await t.test(motion+(change?' pending scene change':' unchanged scene'),async t=>{
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});const directory=fs.mkdtempSync(path.join(base,'late-copy-'));
+ const playwright=await import('playwright'),launch=playwright.webkit.launch,{runButtonSafety}=await import('./scripts/button-safety-native.mjs');
+ const evidence={kind:'nonqualifying-deterministic-renderer-consumer',route:[],limits:['Local uncapped emulated mobile rendering and exact pixel/source preservation; no hosted memory/timing or physical-device claim.']},finished=Error('Causal late-copy probe complete; not native acceptance');let releaseBank,probeError;
+ const gate=new Promise(resolve=>{releaseBank=resolve;});
+ t.after(()=>{releaseBank();playwright.webkit.launch=launch;});
+ playwright.webkit.launch=async(...args)=>{
+  const browser=await launch.apply(playwright.webkit,args),newContext=browser.newContext.bind(browser);browser.newContext=async(...args)=>{
+   const context=await newContext(...args),newPage=context.newPage.bind(context);context.newPage=async(...args)=>{
+    const page=await newPage(...args),goto=page.goto.bind(page);await page.addInitScript(()=>{const NativeDate=Date;globalThis.__paintedSlotAt=Date.parse('2026-10-06T03:23:42.125Z');globalThis.Date=class extends NativeDate{constructor(...args){super(...(args.length?args:[globalThis.__paintedSlotAt]));}static now(){return globalThis.__paintedSlotAt;}};});
+    await page.route('**/HUMAN_WRITTEN_HOURLY_TAGS.md',async route=>{await gate;const response=await route.fetch(),original=await response.text(),body=original+'\n## Any time of day\n- Controlled scenery text\n## Skywriters\n- HELLO\n';const hash=value=>createHash('sha256').update(value).digest('hex');evidence.bankRoute={originalSha256:hash(original),fixtureSha256:hash(body)};await route.fulfill({response,body});});
+    await page.route('**/landscape.js',async route=>{
+     const response=await route.fetch();assert.equal(response.status(),200);let body=await response.text();const hash=value=>createHash('sha256').update(value).digest('hex');assert.equal(hash(body),hash(fs.readFileSync(path.join(__dirname,'landscape.js'))));
+     const anchor="  window.addEventListener('pageshow'",ready="  document.dispatchEvent(new CustomEvent('landscape-scene-time-ready'));";assert.ok(body.includes(anchor)&&body.includes(ready));
+     const instrumentation=`
+      const cacheProbe={backgrounds:0,lives:0,paints:[]};globalThis.paintedSlotProbe=cacheProbe;
+      const paintBackdrop=paintBackground,paintVisitors=paintLife;paintBackground=(...args)=>{const result=paintBackdrop(...args);cacheProbe.backgrounds++;if(cacheProbe.paints.length<12)cacheProbe.paints.push({stack:new Error().stack,skyDate:+sky.date,slot:sceneSnapshot.windowsSlot,pixels:back.toDataURL()});return result;};paintLife=(...args)=>{const result=paintVisitors(...args);cacheProbe.lives++;return result;};
+      cacheProbe.read=()=>({backgrounds:cacheProbe.backgrounds,lives:cacheProbe.lives,paints:cacheProbe.paints,slot:sceneSnapshot.windowsSlot,paintedSlot:lastCitySlot,back:back.toDataURL(),status:status.textContent,skyDate:+sky.date,signatureBytes:new TextEncoder().encode(JSON.stringify([sky,p,sceneSeason,sceneSnapshot.gardens,lastCitySlot,W,H,dpr])).length,visitors:JSON.parse(JSON.stringify(world.events)),scene:JSON.parse(JSON.stringify(sceneSnapshot))});
+      cacheProbe.stop=stop;cacheProbe.advance=()=>{advanceRooftopParty(1);return cacheProbe.read();};cacheProbe.repaint=()=>{refreshSky();return cacheProbe.read();};
+     `;
+     const sourceSha256=hash(body);body=body.replace(anchor,instrumentation+'\n'+anchor).replace(ready,"  paintedSlotProbe.initial=paintedSlotProbe.read();paintedSlotProbe.unchanged=paintedSlotProbe.advance();\n"+ready);
+     evidence.route.push({sourceSha256,injectedSha256:hash(body),bytes:Buffer.byteLength(body)});await route.fulfill({response,body});
+    });
+    page.goto=async(url,...args)=>{
+     const response=await goto(url,...args);if(url.endsWith('__button-observer'))return response;
+     try{
+      await page.waitForFunction(()=>window.paintedSlotProbe?.unchanged&&document.documentElement.dataset.appReady==='true'&&window.CloudSync?.ready,null,{polling:100});
+      evidence.before=await page.evaluate(change=>{const p=paintedSlotProbe;window.dispatchEvent(new PageTransitionEvent('pageshow'));p.stop();const before=p.read();if(change){globalThis.__paintedSlotAt+=3600000;LivingLocation.applySynced({latitude:51.5074,longitude:-.1278,timezone:'Europe/London',label:'Controlled London',enabled:true});paintedSlotProbe.stop();globalThis.__paintedSlotAt+=60000;}return{initial:p.initial,unchanged:p.unchanged,taskCount:state.tasks.length,bankPending:before.status==='',before,pending:p.read()};},change);
+      releaseBank();await page.waitForFunction(()=>document.getElementById('sceneStatus').textContent.includes('Human written'),null,{polling:100});evidence.bank=await page.evaluate(()=>paintedSlotProbe.read());
+      evidence.fresh=await page.evaluate(()=>paintedSlotProbe.repaint());
+      evidence.stored=await page.evaluate(async()=>{const head=await ScannerDeviceStore.readHead(),saved=JSON.parse(head.payload);return{durableTasks:saved.tasks.length,retainedSources:await Promise.all((await ScannerDeviceStore.listBackups()).filter(row=>row.id.startsWith('gate-retained-')).sort((a,b)=>a.id.localeCompare(b.id)).map(async row=>({id:row.id,payloadHash:await ChainStorageV2.hashPayload(row.payload)}))),unknownBytes:saved.futurePopulated.opaque.length};});
+     }catch(error){probeError=error;}finally{releaseBank();}throw finished;
+    };return page;
+   };return context;
+  };return browser;
+ };
+ try{await assert.rejects(()=>runButtonSafety({repo:__dirname,engine:'webkit',port:Number(process.env.CHAIN_NATIVE_PORT),outputDir:directory,mobileYesMotion:motion}),error=>error===finished);}
+ finally{releaseBank();playwright.webkit.launch=launch;evidence.probeError=probeError?.stack;const files=fs.readdirSync(directory).filter(name=>/^button-safety-webkit-.*\.json$/.test(name));if(files.length===1){const native=JSON.parse(fs.readFileSync(path.join(directory,files[0])));evidence.nativeReportPath=path.join(directory,files[0]);evidence.cleanup=native.cleanup;evidence.preparedSources=native.retainedSources[0].bootstrap.retainedSources.map(({id,payloadHash})=>({id,payloadHash}));}
+  fs.writeFileSync(path.join(directory,'late-copy-observation.json'),JSON.stringify(evidence,null,2)+'\n');}
+ if(probeError)throw probeError;
+ for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(evidence.cleanup?.[key],true);
+ const {initial,before,pending}=evidence.before;assert.equal(evidence.before.taskCount,400);assert.equal(evidence.stored.durableTasks,400);assert.equal(evidence.stored.unknownBytes,1048576);assert.equal(evidence.stored.retainedSources.length,2);assert.deepEqual(evidence.stored.retainedSources,evidence.preparedSources,'Both protected source payloads remain byte exact');
+ assert.equal(initial.backgrounds,1,'Initial full backdrop still paints once');assert.equal(before.backgrounds,1,'Unchanged native pageshow and initial hourly copy must reuse the initial backdrop');assert.equal(evidence.before.bankPending,true);assert.match(evidence.bank.status,/Controlled scenery text.*Human written/);assert.equal(evidence.bank.lives,pending.lives+1,'Loading the bank still paints current visitors once');
+ if(change){assert.ok(pending.backgrounds>before.backgrounds,'Public location change while the bank is pending performs a full scene refresh');assert.notEqual(pending.back,before.back,'Changed location and time actually change rendered pixels');assert.equal(evidence.bank.backgrounds,pending.backgrounds+1,'A further changed minute while pending still paints its fresh sky');assert.notEqual(evidence.bank.skyDate,pending.skyDate,'Delayed response uses the current effective scene date');}
+ else{assert.equal(evidence.bank.back,before.back,'New text preserves the exact already rendered backdrop');assert.equal(evidence.bank.backgrounds,before.backgrounds,'Loading only new text must not repaint an identical backdrop');assert.deepEqual(evidence.bank.scene,before.scene,'Text loading cannot move the shared scene at a fixed instant');}
+ assert.equal(evidence.fresh.backgrounds,evidence.bank.backgrounds+1,'Independent full refresh actually repaints');assert.equal(evidence.fresh.back,evidence.bank.back,'Bank response pixels equal an independent complete current-scene refresh');assert.equal(evidence.fresh.status,evidence.bank.status,'Bank response copy equals an independent complete current-scene refresh');assert.deepEqual(evidence.fresh.visitors,evidence.bank.visitors,'Bank response keeps current-flight reconciliation equivalent to a complete refresh');
+ const flight=sharedSkywriterConsumer(false,true);flight.context.LandscapeMood.setHumanText('## Skywriters\n- HELLO');flight.context.syncScene(123000);assert.equal(flight.context.world.events[0].skywriterWord,'HELLO','Actual current-flight consumer adopts the newly loaded bank');
+ t.diagnostic('Nonqualifying deterministic late-copy consumer: '+directory);
+ });
 });

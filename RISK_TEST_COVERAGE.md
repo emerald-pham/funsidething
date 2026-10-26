@@ -2372,3 +2372,6 @@ The pinned Linux x64 reader preserves the raw AT_PAGESZ witness and binds it to 
 - RISK Undo scene guidance: FAQ and Changelog explain task Undo keeps scene choices
 
 - RISK scenery backdrop cache: first unchanged lighting timer reuses actual pixels while changed slots and loaded copy still paint
+
+- RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh
+  - Actual held-bank mobile WebKit consumer in Normal/Reduced preserves initial/full pixels, changed pending time/location, current copy and visitor reconciliation, 400 durable tasks, both retained source hashes and cleanup. Local uncapped deterministic rendering only; no hosted 1GB or physical-device claim.

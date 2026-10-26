@@ -24,7 +24,7 @@
   LandscapeMood.configureHistory(storage);
   LandscapeMood.setPersonalHourlyQuotes(window.getScannerHourlyQuotes?.()||{});
   window.addEventListener('scanner-hourly-quotes-change',event=>{
-    LandscapeMood.setPersonalHourlyQuotes(event.detail||{});refreshSky();
+    LandscapeMood.setPersonalHourlyQuotes(event.detail||{});refreshSky(true);
   });
   let currentEntry=null,visibleBanners=[];
   function sceneTextVisible(element){
@@ -1440,7 +1440,10 @@
   }
   new MutationObserver(updateChrome).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
   themeQuery.addEventListener('change',updateChrome);
-  function refreshSky(){
+  function refreshSky(reuseBackground=false){
+    // Copy loading and a same-size restart still reconcile the current sky and
+    // visitors. Reuse static pixels only when every painted input is unchanged.
+    const previousBackground=reuseBackground?JSON.stringify([sky,p,sceneSeason,sceneSnapshot?.gardens,lastCitySlot,W,H,dpr]):null;
     const location=globalThis.LivingLocation?.current();
     sky=S.skyAt(S.sceneDate(new Date(Math.floor(Date.now()/60000)*60000),sceneStorage,location),location);p=S.palette(sky.sun.altitude);
     if(globalThis.LandscapeMood){sceneSeason=LandscapeMood.season(sky.date,location).name;p=LandscapeMood.palette(p,sky.date,location);}
@@ -1450,7 +1453,8 @@
     const entry=LandscapeMood.messageEntry(sky.date,{...location,sunAltitude:sky.sun.altitude},T.random(sceneSeed,'hourly-text',Math.floor(+sky.date/3600000)));
     currentEntry=entry;
     status.textContent=entry.text+(entry.author==='Human'?' · Human written':'');
-    paintBackground();syncScene(Date.now());paintLife(world.elapsed);
+    if(!reuseBackground||previousBackground!==JSON.stringify([sky,p,sceneSeason,sceneSnapshot.gardens,sceneSnapshot.windowsSlot,W,H,dpr]))paintBackground();
+    syncScene(Date.now());paintLife(world.elapsed);
     if(timeDialog.open)refreshSolarTimes();
   }
   function resize(){
@@ -1535,7 +1539,7 @@
   }
   function start(){
     stop();if(document.hidden)return;
-    if(W!==window.innerWidth||H!==window.innerHeight)resize();else refreshSky();
+    if(W!==window.innerWidth||H!==window.innerHeight)resize();else refreshSky(true);
     scheduleSky();if(!reduced)frame=requestAnimationFrame(tick);else partyTimer=setInterval(()=>advanceRooftopParty(1),1000);
   }
   function updateMotion(){
@@ -1671,5 +1675,5 @@
   fetch('./HUMAN_WRITTEN_HOURLY_TAGS.md').then(response=>{
     if(!response.ok)throw new Error('Human text unavailable');
     return response.text();
-  }).then(markdown=>{LandscapeMood.setHumanText(markdown);refreshSky();}).catch(()=>{});
+  }).then(markdown=>{LandscapeMood.setHumanText(markdown);refreshSky(true);}).catch(()=>{});
 })();

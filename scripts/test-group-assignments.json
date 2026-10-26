@@ -13201,6 +13201,11 @@
       "root": "RISK scenery backdrop cache: first unchanged lighting timer reuses actual pixels while changed slots and loaded copy still paint",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [
