@@ -45729,3 +45729,7 @@ test('RISK repository process: current producer reuse requires successful capped
 test('RISK repository process: nonmergeable mobile startup diagnostics preserve strict caps and independent controls',()=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;const result=spawnSync(process.execPath,['--test','scripts/agent-tools/mobile-diagnostic.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:4*1024*1024});assert.equal(result.error,undefined);assert.equal(result.status,0,'The actual diagnostic consumer must preserve cap, branch, app identity, independent cases and nonacceptance boundaries: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# tests 8$/m);assert.match(result.stdout,/^# skipped 0$/m);
 });
+
+test('RISK repository process: diagnostic native timings retain strict failures without changing app promises or burst pacing',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;const result=spawnSync(process.execPath,['--test','scripts/agent-tools/timing-diagnostic.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:4*1024*1024});assert.equal(result.error,undefined);assert.equal(result.status,0,'Existing native failures must retain bounded scalar timing and unchanged app/acceptance semantics: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# tests 7$/m);assert.match(result.stdout,/^# skipped 0$/m);
+});

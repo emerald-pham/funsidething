@@ -2292,3 +2292,5 @@ The command/report consumer rejects missing, duplicate, skipped, cancelled, unre
 - RISK repository process: current producer reuse requires successful capped mobile evidence
 
 - RISK repository process: nonmergeable mobile startup diagnostics preserve strict caps and independent controls — Diagnostic branch admission, seven independent bounded containers, exact31c app bytes, immutable original versus observer-page reuse, raw memory/process telemetry and explicit nonacceptance; no capped-client success inferred from fixtures.
+
+- RISK repository process: diagnostic native timings retain strict failures without changing app promises or burst pacing — Frozen original failure/heartbeat, existing-call phase timing, unchanged app Promise/error identity, bounded scalar buffers and paste bytes, active-controller module loading, independent six-case collection; diagnostic evidence cannot qualify release.

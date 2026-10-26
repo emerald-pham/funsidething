@@ -1,5 +1,5 @@
 # NONMERGEABLE: temporary startup investigation, never release qualification.
-name: NONMERGEABLE WebKit cap diagnosis
+name: NONMERGEABLE WebKit cap and timing diagnosis
 on:
   push:
     branches: [diagnose/webkit-cap-31c]
@@ -30,4 +30,31 @@ jobs:
         with:
           name: NONMERGEABLE-webkit-cap-diagnosis-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/webkit-cap-diagnosis
+          if-no-files-found: error
+
+  ordinary-timing-diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    env:
+      CHAIN_TEST_EVENT_POLICY: outgoing-branch-push-v1
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium webkit
+      - name: Timing process contracts only
+        run: node --test --test-name-pattern='^RISK repository process: diagnostic native timings retain strict failures without changing app promises or burst pacing$' tests.js
+      - name: Six ordinary timing observations with original exits
+        run: node scripts/button-safety-timing-diagnostic.mjs --run --output-dir "$RUNNER_TEMP/webkit-timing-diagnosis"
+      - name: Preserve ordinary failures and timing buffers
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: NONMERGEABLE-webkit-timing-diagnosis-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/webkit-timing-diagnosis
           if-no-files-found: error

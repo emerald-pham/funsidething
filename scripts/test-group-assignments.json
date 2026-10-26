@@ -12986,6 +12986,46 @@
       "root": "actual diagnostic batch retains an OOM case and removes all seven fixture containers",
       "group": "native-process",
       "file": "scripts/agent-tools/mobile-diagnostic.test.mjs"
+    },
+    {
+      "root": "actual failing burst retains the frozen duration and heartbeat before its original assertion",
+      "group": "native-process",
+      "file": "scripts/agent-tools/timing-diagnostic.test.mjs"
+    },
+    {
+      "root": "existing promise phase observation preserves resolved values and original failures",
+      "group": "native-process",
+      "file": "scripts/agent-tools/timing-diagnostic.test.mjs"
+    },
+    {
+      "root": "browser action hooks return the exact app promise without attaching handlers and bound scalar buffers",
+      "group": "native-process",
+      "file": "scripts/agent-tools/timing-diagnostic.test.mjs"
+    },
+    {
+      "root": "timing CLI plans only the six evidence-backed existing cases and rejects local launches",
+      "group": "native-process",
+      "file": "scripts/agent-tools/timing-diagnostic.test.mjs"
+    },
+    {
+      "root": "timing batch keeps all six original exits and raw output before failing overall",
+      "group": "native-process",
+      "file": "scripts/agent-tools/timing-diagnostic.test.mjs"
+    },
+    {
+      "root": "native timing helper can load inside the active cap controller without a top-level await cycle",
+      "group": "native-process",
+      "file": "scripts/agent-tools/timing-diagnostic.test.mjs"
+    },
+    {
+      "root": "actual paste consumer keeps the full data boundary and frame failure while retaining numeric construction evidence",
+      "group": "native-process",
+      "file": "scripts/agent-tools/timing-diagnostic.test.mjs"
+    },
+    {
+      "root": "RISK repository process: diagnostic native timings retain strict failures without changing app promises or burst pacing",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [
