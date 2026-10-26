@@ -2333,3 +2333,7 @@ Failed stress reports require the independently observed mobile context and dura
 - RISK repository process: failed mobile stress primary errors cannot hide unrelated driver failures
 
 The existing immutable stress verifier binds the thrown primary error independently of the page-event inventory. Exact native app-event assertions, attributable crash/closed-target consequences and measured frame/ten-touch assertions remain reportable; a separate driver/transport primary error remains invalid even beside a recorded app error or kernel OOM.
+
+- RISK repository process: mobile kernel page floor requires actual observations and exact requested budgets
+
+The pinned Linux x64 reader preserves the raw AT_PAGESZ witness and binds it to browser, external driver, host membership and image architecture. Only the exact observed downward page floor can satisfy the kernel limit; Docker/requested budgets remain exact. Missing, substituted, unsupported or inflated observations and peaks above the effective cap fail closed. The existing unreadable-source help test preserves approved Copy/Download, accepted unsaved work, originals and partial-archive semantics without obsolete literal wording.

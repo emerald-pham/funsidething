@@ -13081,6 +13081,21 @@
       "root": "mobile budget profiles require attributable primary failures for reported stress",
       "group": "native-process",
       "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "RISK repository process: mobile kernel page floor requires actual observations and exact requested budgets",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "mobile kernel page floor uses actual auxv readback without changing requested budgets",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "mobile kernel page floor actual CLI preserves exact requests and rejects substituted observations",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory-stress-lifecycle.test.mjs"
     }
   ],
   "processControls": [

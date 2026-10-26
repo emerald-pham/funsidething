@@ -14,11 +14,18 @@ const json=file=>JSON.parse(fs.readFileSync(file,'utf8'));
 async function awaitFile(file,{timeout=30000,abort}={}){const began=Date.now();for(;;){if(fs.existsSync(file))return json(file);if(abort)abort();if(Date.now()-began>timeout)throw Error('Owned mobile handoff timed out: '+path.basename(file));await pause(20);}}
 const git=(...args)=>{const r=spawnSync('git',args,{cwd:root,encoding:'utf8',timeout:15000});if(r.status!==0)throw Error('Mobile source identity failed: '+r.stderr);return r.stdout.trim();};
 function identity(){return{candidateCommit:git('rev-parse','HEAD'),candidateTree:git('rev-parse','HEAD^{tree}'),sourceSha:process.env.CHAIN_TEST_SOURCE_SHA||git('rev-parse','HEAD'),repository:process.env.GITHUB_REPOSITORY,runId:process.env.GITHUB_RUN_ID,runAttempt:Number(process.env.GITHUB_RUN_ATTEMPT),eventPolicy:process.env.CHAIN_TEST_EVENT_POLICY};}
-function kernelSnapshot({platform=process.platform,read=file=>fs.readFileSync(file,'utf8'),scope=MOBILE_MEMORY_SCOPE}={}){
+function kernelPageObservation({architecture=process.arch,read=file=>fs.readFileSync(file)}={}){
+ assert.equal(architecture,'x64','Pinned Linux x64 budget runtime required');
+ const auxv=read('/proc/self/auxv');assert.ok(Buffer.isBuffer(auxv)&&auxv.length>0&&auxv.length%16===0,'Actual ELF64 Linux auxv required');const entries=[];
+ for(let offset=0;offset<auxv.length;offset+=16){const type=auxv.readBigUInt64LE(offset);if(type===0n)break;if(type===6n)entries.push(auxv.subarray(offset,offset+16));}
+ assert.equal(entries.length,1,'One kernel AT_PAGESZ observation required');const entry=entries[0],bytes=Number(entry.readBigUInt64LE(8));assert.equal(bytes,4096,'Unsupported pinned x64 kernel page size');
+ return{source:'/proc/self/auxv:AT_PAGESZ',architecture,wordBytes:8,endianness:'LE',entryHex:entry.toString('hex'),bytes};
+}
+function kernelSnapshot({platform=process.platform,architecture=process.arch,read=file=>fs.readFileSync(file),scope=MOBILE_MEMORY_SCOPE}={}){
  if(platform!=='linux')throw Error('Profile budget proof needs Linux cgroup-v2 kernel enforcement; an uncapped mobile functional run is separate.');
- const directory='/sys/fs/cgroup/',number=name=>{const raw=read(directory+name).trim();if(!/^\d+$/.test(raw))throw Error('Unbounded or unreadable cgroup '+name);return Number(raw);};
- const events=Object.fromEntries(read(directory+'memory.events').trim().split('\n').map(line=>{const [key,value]=line.split(/\s+/);return[key,Number(value)];}));
- return{platform,controller:'cgroup-v2',scope,memoryMaxBytes:number('memory.max'),swapMaxBytes:number('memory.swap.max'),swapCurrentBytes:number('memory.swap.current'),currentBytes:number('memory.current'),peakBytes:number('memory.peak'),events,membership:read('/proc/self/cgroup').trim()};
+ const directory='/sys/fs/cgroup/',number=name=>{const raw=read(directory+name).toString().trim();if(!/^\d+$/.test(raw))throw Error('Unbounded or unreadable cgroup '+name);return Number(raw);};
+ const events=Object.fromEntries(read(directory+'memory.events').toString().trim().split('\n').map(line=>{const [key,value]=line.split(/\s+/);return[key,Number(value)];}));
+ return{pageSizeObservation:kernelPageObservation({architecture,read}),platform,controller:'cgroup-v2',scope,memoryMaxBytes:number('memory.max'),swapMaxBytes:number('memory.swap.max'),swapCurrentBytes:number('memory.swap.current'),currentBytes:number('memory.current'),peakBytes:number('memory.peak'),events,membership:read('/proc/self/cgroup').toString().trim()};
 }
 export function readMemoryBoundary(options={}){const result=kernelSnapshot(options);verifyMemoryBoundary(result,options);return result;}
 function processIdentity(pid,{hashExecutable=false}={}){
@@ -135,7 +142,7 @@ export async function runCappedMobile({outputDir,budgetProfile='required-1gb'}){
   const logs=await docker(['logs',id],{allowFailure:true});fs.writeFileSync(path.join(directory,role+'-stdout.txt'),logs.stdout||'');fs.writeFileSync(path.join(directory,role+'-stderr.txt'),logs.stderr||'');
  };
  try{
-  await docker(['pull',MOBILE_IMAGE],{timeout:180000});const image=JSON.parse((await docker(['image','inspect',MOBILE_IMAGE])).stdout)[0];assert.ok(image.RepoDigests.includes(MOBILE_IMAGE));report.imageId=image.Id;write(path.join(output,'image.json'),image);report.imageInspectPath='image.json';report.imageInspectSha256=mobileDigest(fs.readFileSync(path.join(output,'image.json')));
+  await docker(['pull',MOBILE_IMAGE],{timeout:180000});const image=JSON.parse((await docker(['image','inspect',MOBILE_IMAGE])).stdout)[0];assert.ok(image.RepoDigests.includes(MOBILE_IMAGE));assert.equal(image.Architecture,'amd64');assert.equal(image.Os,'linux');report.imageId=image.Id;write(path.join(output,'image.json'),image);report.imageInspectPath='image.json';report.imageInspectSha256=mobileDigest(fs.readFileSync(path.join(output,'image.json')));
   for(const [label,motion,control]of [['negative',null,true],['normal','normal',false],['reduced','reduced',false]]){
    const directory=path.join(output,label);fs.mkdirSync(directory);let browserId,driverId;
    const create=async role=>{
@@ -146,7 +153,7 @@ export async function runCappedMobile({outputDir,budgetProfile='required-1gb'}){
    await docker(['start',browserId]);await awaitFile(path.join(directory,'ready.json'),{abort:()=>{if(interrupted)throw Error('Owned mobile run interrupted: '+interrupted);if(fs.existsSync(path.join(directory,'browser-server.json')))throw Error('Capped browser exited before ready: '+fs.readFileSync(path.join(directory,'browser-server.json'),'utf8'));}});
    const browserStarted=await inspect(browserId);assert.equal(browserStarted.State.Running,true);const browserHost={...processIdentity(browserStarted.State.Pid),containerId:browserId};
    driverId=await create('driver');const driverBefore=await inspect(driverId);verifyMobileContainerConfig(driverBefore,{role:'driver',browserContainerId:browserId,budgetProfile});assert.equal(driverBefore.Image,image.Id);write(path.join(directory,'driver-before.json'),driverBefore);
-   await docker(['start',driverId]);const driverStarted=await inspect(driverId);assert.equal(driverStarted.State.Running,true);const driverHost={...processIdentity(driverStarted.State.Pid),containerId:driverId};assert.notEqual(browserHost.cgroup,driverHost.cgroup);assert.equal(browserHost.namespace,driverHost.namespace);const membership={browser:browserHost,driver:driverHost};write(path.join(directory,'membership.json'),membership);
+   await docker(['start',driverId]);const driverStarted=await inspect(driverId);assert.equal(driverStarted.State.Running,true);const driverHost={...processIdentity(driverStarted.State.Pid),containerId:driverId};assert.notEqual(browserHost.cgroup,driverHost.cgroup);assert.equal(browserHost.namespace,driverHost.namespace);const membership={pageSizeObservation:kernelPageObservation(),browser:browserHost,driver:driverHost};write(path.join(directory,'membership.json'),membership);
    const driverWait=await docker(['wait',driverId],{allowFailure:true,timeout:60000});if(interrupted)throw Error('Owned mobile run interrupted: '+interrupted);const browserWait=await docker(['wait',browserId],{allowFailure:true,timeout:15000});if(interrupted)throw Error('Owned mobile run interrupted: '+interrupted);
    for(const id of [browserId,driverId])await preserve(id,owned.get(id));
    const after=await inspect(browserId),driverAfter=await inspect(driverId);write(path.join(directory,'docker-after.json'),after);write(path.join(directory,'driver-after.json'),driverAfter);

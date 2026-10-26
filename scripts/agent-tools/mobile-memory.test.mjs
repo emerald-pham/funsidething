@@ -39,9 +39,9 @@ test('mobile memory parser rejects waived limits synthetic touch and mismatched 
 });
 test('mobile memory boundary refuses unsupported or unbounded runtimes before native launch',()=>{
  assert.throws(()=>readMemoryBoundary({platform:'darwin',read:()=>assert.fail('Darwin must not invent cgroup evidence')}),/Linux cgroup-v2/);
- const files={'memory.max':'1000000000','memory.swap.max':'0','memory.swap.current':'0','memory.current':'20000000','memory.peak':'30000000','memory.events':'max 0\noom 0\noom_kill 0','/proc/self/cgroup':'0::/'};
- const read=file=>files[file]??files[path.basename(file)];assert.equal(readMemoryBoundary({platform:'linux',read}).memoryMaxBytes,1000000000);
- for(const [key,value]of [['memory.max','max'],['memory.max','1024000000'],['memory.swap.max','max'],['memory.swap.max','512000000']])assert.throws(()=>readMemoryBoundary({platform:'linux',read:file=>path.basename(file)===key?value:read(file)}));
+ const files={'/proc/self/auxv':Buffer.from('0600000000000000001000000000000000000000000000000000000000000000','hex'),'memory.max':'999997440','memory.swap.max':'0','memory.swap.current':'0','memory.current':'20000000','memory.peak':'30000000','memory.events':'max 0\noom 0\noom_kill 0','/proc/self/cgroup':'0::/'};
+ const read=file=>files[file]??files[path.basename(file)];assert.equal(readMemoryBoundary({platform:'linux',architecture:'x64',read}).memoryMaxBytes,999997440);
+ for(const [key,value]of [['memory.max','max'],['memory.max','1024000000'],['memory.swap.max','max'],['memory.swap.max','512000000']])assert.throws(()=>readMemoryBoundary({platform:'linux',architecture:'x64',read:file=>path.basename(file)===key?value:read(file)}));
 });
 test('mobile memory command cannot run a pretend local cap and pins the owned container boundary',t=>{
  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'chain-mobile-refusal-'));t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
@@ -164,4 +164,19 @@ test('mobile budget profiles require attributable primary failures for reported 
   ['late touches plus unrelated primary driver error',late],
  ])await t.test(name,()=>{const b=build();b.native.normal.failure='Error: Controlled unrelated evaluation/transport error';assert.throws(()=>verify(b),name);});
  await t.test('app event cannot conceal an unrelated primary with crash text later in the stack',()=>{const b=make();b.native.normal.errors=['pageerror: Controlled application error'];b.native.normal.failure='Error: Controlled unrelated evaluation/transport error\n    at page.goto: Page crashed';assert.throws(()=>verify(b));});
+});
+
+
+test('mobile kernel page floor uses actual auxv readback without changing requested budgets',async t=>{
+ const auxv=Buffer.from('0600000000000000001000000000000000000000000000000000000000000000','hex'),files={'/proc/self/auxv':auxv,'memory.max':'999997440','memory.swap.max':'0','memory.swap.current':'0','memory.current':'20000000','memory.peak':'30000000','memory.events':'max 0\noom 0\noom_kill 0','/proc/self/cgroup':'0::/'},reads=[];
+ const read=file=>{reads.push(file);if(Object.hasOwn(files,file))return files[file];return files[path.basename(file)];};
+ const actual=readMemoryBoundary({platform:'linux',architecture:'x64',read});assert.equal(actual.memoryMaxBytes,999997440);assert.equal(actual.pageSizeObservation.bytes,4096);assert.equal(actual.pageSizeObservation.entryHex,'06000000000000000010000000000000');assert.ok(reads.includes('/proc/self/auxv'),'The existing kernel reader must actually read the kernel-provided page-size witness');
+ for(const [name,mutate]of [
+  ['round up',f=>f['memory.max']='1000001536'],['unrounded request',f=>f['memory.max']='1000000000'],['inflated cap',f=>f['memory.max']='1000004096'],['arbitrary smaller cap',f=>f['memory.max']='999993344'],['missing observation',f=>delete f['/proc/self/auxv']],['unsupported page',f=>f['/proc/self/auxv']=Buffer.from('0600000000000000002000000000000000000000000000000000000000000000','hex')],
+ ])await t.test(name,()=>{const f={...files};mutate(f);assert.throws(()=>readMemoryBoundary({platform:'linux',architecture:'x64',read:file=>f[file]??f[path.basename(file)]}),name);});
+ assert.throws(()=>readMemoryBoundary({platform:'linux',architecture:'arm64',read}),'The pinned budget runtime is Linux x64 only');
+ const good=fixture(t);assert.equal(verify(good).status,'passed');assert.equal(good.report.requiredStory.memoryBudgetBytes,1000000000);assert.equal(good.report.cases[0].dockerMemoryBytes,1000000000);
+ for(const [name,mutate]of [
+  ['missing witness',b=>delete b.report.cases[0].after.pageSizeObservation],['changed raw page',b=>b.report.cases[0].after.pageSizeObservation.entryHex='06000000000000000020000000000000'],['wrong decoded page',b=>b.report.cases[0].after.pageSizeObservation.bytes=8192],['wrong host witness',b=>b.report.cases[0].membership.pageSizeObservation.bytes=8192],['wrong image architecture',b=>b.imageArchitecture='arm64'],['rounded Docker request',b=>b.report.cases[0].dockerMemoryBytes=999997440],['peak above effective cap',b=>b.report.cases[0].after.peakBytes=999997441],
+ ])await t.test(name,()=>{const b=fixture(t);mutate(b);refreshMobileBundle(b);assert.throws(()=>verify(b),name);});
 });

@@ -21,7 +21,7 @@ import fs from 'node:fs';
 const args=process.argv.slice(2),base=process.env.CHAIN_LIFECYCLE_FIXTURE,mode=process.env.CHAIN_LIFECYCLE_MODE;
 fs.appendFileSync(base+'/trace.jsonl',JSON.stringify({args})+'\n');
 if(args[0]==='pull')process.exit(0);
-if(args[0]==='image'){process.stdout.write(JSON.stringify([{Id:'sha256:'+'8'.repeat(64),RepoDigests:[process.env.CHAIN_LIFECYCLE_IMAGE]}]));process.exit(0);}
+if(args[0]==='image'){process.stdout.write(JSON.stringify([{Id:'sha256:'+'8'.repeat(64),Architecture:'amd64',Os:'linux',RepoDigests:[process.env.CHAIN_LIFECYCLE_IMAGE]}]));process.exit(0);}
 if(args[0]==='create'){
  const name=args[args.indexOf('--name')+1],owner=args[args.indexOf('--label')+1].split('=')[1],value={Id:'7'.repeat(64),name,owner};
  fs.writeFileSync(base+'/create-started.json',JSON.stringify(value));

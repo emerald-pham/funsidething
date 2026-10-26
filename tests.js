@@ -1079,8 +1079,8 @@ test('RISK unreadable device recovery: Quick start and current Changelog explain
  assert.ok(answer,'the extended FAQ covers unreadable missing unsupported and partial device sources');
  assert.match(answer,/one Import action.*choose a JSON file or Paste JSON/i);assert.match(answer,/Export can preserve readable raw sources.*partial archive/i);
  assert.match(answer,/not an empty recovered board/);assert.match(answer,/Cloud recovery stays pending/);
- assert.match(html,/Settings now has one Import and one Export.*separate Download and direct Copy controls/i,'the current changelog describes the consolidated transfer route');
- assert.match(html,/unavailable or changing sources are marked partial.*saved originals remain protected/i,'the current changelog preserves the raw-source recovery limit');
+ assert.match(html,/Settings now has one Import and one Export, with separate Copy and Download choices/i,'the current changelog describes the consolidated transfer route');
+ assert.match(html,/Exports include accepted unsaved edits and readable recovery sources; originals stay protected, and incomplete archives are marked partial/i,'the current changelog preserves accepted work, raw-source protection and the partial archive limit');
 });
 
 test('RISK unreadable device recovery: partial raw rows remain exact while the restored board accepts later local edits',async t=>{
@@ -46082,4 +46082,11 @@ test('RISK repository process: failed mobile stress primary errors cannot hide u
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
  const result=spawnSync(process.execPath,['--test','--test-name-pattern=mobile budget profiles require attributable primary','scripts/agent-tools/mobile-memory.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:10000,maxBuffer:4*1024*1024});
  assert.equal(result.error,undefined);assert.equal(result.status,0,'The actual immutable stress verifier must bind the primary thrown failure as well as page events: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# skipped 0$/m);
+});
+
+
+test('RISK repository process: mobile kernel page floor requires actual observations and exact requested budgets',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-name-pattern=mobile kernel page floor','scripts/agent-tools/mobile-memory.test.mjs','scripts/agent-tools/mobile-memory-stress-lifecycle.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:15000,maxBuffer:4*1024*1024});
+ assert.equal(result.error,undefined);assert.equal(result.status,0,'Actual kernel-reader and immutable CLI consumers require deterministic page flooring: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# skipped 0$/m);
 });
