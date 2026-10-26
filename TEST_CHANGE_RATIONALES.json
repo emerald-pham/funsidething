@@ -1,7 +1,7 @@
 [
   {
     "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
-    "testChangesSha256": "0449d0c327db63b17846e60266dd6f958c9fb80bde46a4f87356ae88ca227bd2",
+    "testChangesSha256": "536299d06db7e8b159272a49e048481568698806a6a16fe74f931ca77cd60e71",
     "reason": "Integrate the user-requested single Import/Export and direct Copy/Download with protected source preservation, WebKit export/paste/preview repairs, fresh-scan WOOP repair, late clipboard-generation guard, and required fail-closed400-task/ten-press native release checks.",
     "previousBehavior": "Settings exposed redundant transfer controls and mounted complete multi-megabyte exports in modal HTML. Native WebKit stalled while rendering export and pasted JSON, and its file byte encoder blocked Preview. An obsolete Copy completion could release a newer transfer. Fresh scan WOOP Next could lose its work-mode state. Existing CI did not require a complete independently enumerated native button/workload matrix.",
     "intendedBehavior": "One Import and one Export remain with retained backups; Copy and Download use identical prepared read-only archive bytes. Large text remains outside DOM; recovery encoding yields with source/consent guards. WOOP and clipboard lifecycle are bound to the correct state. Both Chromium and WebKit must cover every maintained action/state, durable400-task fixture, and ten trusted press attempts within2seconds with independently asserted outcomes, responsiveness and preservation.",
@@ -33,7 +33,9 @@
       "RISK repository process: native button gate cannot omit a required stress scenario",
       "RISK repository process: native button safety requires 400-task and rapid-press evidence",
       "RISK repository process: required button enforcement changes need process coverage",
-      "RISK saved view continuity: repeated selected eligibility retains mounted rows and still refreshes changed views"
+      "RISK saved view continuity: repeated selected eligibility retains mounted rows and still refreshes changed views",
+      "RISK repository process: native paste prepares complete fixture bytes before its consumer frame budget",
+      "RISK repository process: unavailable native attempts reuse one prepared isolated release document"
     ],
     "preservedCoverage": [
       "All existing source-preservation, unknown-field, typed-value, negative-zero, partial-archive, accepted-unsaved-work, guarded file/paste/rating choice, protected backup, cloud consent and durable readback boundaries are retained. Old raw-view and duplicate-format assertions are deliberately migrated to the user-authorized single prepared Copy/Download flow. Existing working-board and raw-source evidence remains in the archive.",
@@ -22459,12 +22461,14 @@
       "All original1000ms frame,2000ms burst,2500ms operation and12000ms expected-state bounds, ten trusted native press receipts/current hit/matched down/zero unrelated clicks, exact complete source bytes/Preview/Cancel and protected recovery outcomes remain required."
     ],
     "replacementTests": [
-      "RISK saved view continuity: repeated selected eligibility retains mounted rows and still refreshes changed views"
+      "RISK saved view continuity: repeated selected eligibility retains mounted rows and still refreshes changed views",
+      "RISK repository process: native paste prepares complete fixture bytes before its consumer frame budget",
+      "RISK repository process: unavailable native attempts reuse one prepared isolated release document"
     ],
     "redEvidence": {
       "command": "Node22 recorder focused RISK saved view continuity and required native fixture process regressions; hosted ordinary runs40276598750,40276593922 and instrumented40282208588.",
-      "failure": "30f0979b: actual onAction sameEligible10presses replaced400task rows10times(expected0) before product repair.9ae0f542: mountedFAQ lacked unchanged row guidance before copy update. Native actual hosted paste1266.5ms with2.9ms app listener and refusal2441/2410ms preserved; no local or hosted success inferred from those failures."
+      "failure": "30f0979b: actual onAction sameEligible10presses replaced400task rows10times(expected0) before product repair.9ae0f542: mountedFAQ lacked unchanged row guidance before copy update. Native actual hosted paste1266.5ms with2.9ms app listener and refusal2441/2410ms preserved; no local or hosted success inferred from those failures. 9fb94994 actual CLI completed the original oversized preview/Cancel scenario but no verified pre-timer complete fixture existed; 66cba120 actual pending recovery CLI completed but no single prepared neutral document existed, before the respective runner changes. e4b91818 paste fixture process GREEN follows staging; exact committed further native matrix remains separate."
     },
-    "testChangesSha256": "580cd20684003b25ffe345dfa7300cb0daba09454ea0e7a38e12230549a6ff9a"
+    "testChangesSha256": "21ca0d17b14c810e5976391113a5979473968d9d47ebdce2c1d15eb5cea5b773"
   }
 ]

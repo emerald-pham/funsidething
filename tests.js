@@ -45629,6 +45629,36 @@ test('RISK repository process: native rapid cloud selection preserves the two-se
  });
 });
 
+test('RISK repository process: native paste prepares complete fixture bytes before its consumer frame budget',t=>{
+ const output=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(output,'Durable allocated native output required');
+ const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine','chromium','--scenario','oversized retained-source export','--output-dir',output,'--port',process.env.CHAIN_NATIVE_PORT||'0'],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:60000,maxBuffer:2*1024*1024});
+ assert.equal(result.status,0,result.stderr);
+ const reportFile=result.stdout.split('\n').map(line=>line.match(/^Button evidence: (.+)$/)?.[1]).find(Boolean);
+ const report=JSON.parse(fs.readFileSync(reportFile,'utf8')),sample=report.inputSamples.find(row=>row.kind==='clipboard-event-boundary'&&row.characters>40000000);
+ assert.ok(sample?.fixturePreparation,'The actual oversized paste must finish exact fixture preparation before measuring consumer frames');
+ assert.equal(sample.fixturePreparation.route,'page-held-copy','The complete previously copied archive stays in its original browser fixture');
+ assert.equal(sample.fixturePreparation.characters,sample.characters);assert.match(sample.fixturePreparation.sha256,/^[a-f0-9]{64}$/);
+ assert.equal(sample.fixturePreparation.verified,true);assert.equal(sample.trusted,false);assert.equal(sample.prevented,true);assert.ok(sample.maxFrameGapMs<1000);
+ assert.equal(report.scenarios[0].status,'passed','Complete Preview and Cancel source-preservation assertions still execute');
+ for(const value of Object.values(report.cleanup))assert.equal(value,true);
+});
+
+test('RISK repository process: unavailable native attempts reuse one prepared isolated release document',t=>{
+ const output=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(output,'Durable allocated native output required');
+ const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine','chromium','--scenario','rapid Settings decision review offers Light and saves it while protecting failures','--output-dir',output,'--port',process.env.CHAIN_NATIVE_PORT||'0'],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:60000,maxBuffer:2*1024*1024});
+ assert.equal(result.status,0,result.stderr);
+ const reportFile=result.stdout.split('\n').map(line=>line.match(/^Button evidence: (.+)$/)?.[1]).find(Boolean),report=JSON.parse(fs.readFileSync(reportFile,'utf8'));
+ assert.equal(report.releaseSurfaces?.length,1,'The actual scenario prepares exactly one neutral document before its timed attempts');
+ const identity=report.releaseSurfaces[0].documentId;assert.ok(identity);assert.equal(report.releaseSurfaces[0].readyState,'complete');
+ let refused=0;
+ for(const row of report.rapidOutcomes)for(const burst of row.bursts){
+  assert.ok(burst.windowMs<=2000);assert.equal(burst.trustedPresses,10);assert.equal(burst.unrelatedClicks,0);
+  for(const attempt of burst.attemptDetails){if(attempt.neutralRelease){refused++;assert.equal(attempt.neutralDocumentId,identity,'Every refused native up stays in the same isolated document');assert.equal(attempt.acceptedClicks,0);}}
+ }
+ assert.ok(refused>=9,'Actual pending recovery controls exercise repeated native refusals');assert.deepEqual(report.errors,[]);
+ for(const value of Object.values(report.cleanup))assert.equal(value,true);
+});
+
 test('RISK repository process: native button gate refuses unallocated local launch before browser startup',t=>{
  const directory=fs.mkdtempSync('/tmp/chain-button-allocation-');t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
  const file=path.join(directory,'ledger.json');fs.writeFileSync(file,JSON.stringify({version:1,scope:'codex-wide',entries:[],reservations:[]}));

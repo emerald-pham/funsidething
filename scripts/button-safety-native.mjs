@@ -141,6 +141,19 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
     if(result.currentTasks===TASK_COUNT&&result.durableTasks===TASK_COUNT)return{...result,fixtureRole:options.fixtureRole||'active'};
     await new Promise(resolve=>setTimeout(resolve,25));
    }throw Error('Independent400-task setup did not reach durable storage');})(),'400-task durable setup',12000);
+   const prepareReleaseSurface=async()=>{
+    const receipt=await bounded(page.evaluate(async identity=>{
+     const sink=document.createElement('iframe');sink.id='__buttonReleaseSink';sink.title='Native test release surface';sink.hidden=true;
+     sink.srcdoc='<!doctype html><style>html,body{margin:0;width:100%;height:100%}</style>';
+     sink.style.cssText='position:fixed;left:0;top:0;width:8px;height:8px;border:0;z-index:2147483647';
+     await new Promise(resolve=>{sink.addEventListener('load',resolve,{once:true});document.body.append(sink);});
+     sink.contentWindow.__buttonReleaseDocumentId=identity;
+     return{documentId:identity,readyState:sink.contentDocument.readyState};
+    },randomUUID()),'prepare neutral release document');
+    assert.equal(receipt.readyState,'complete','The isolated release document is loaded before input');
+    report.releaseSurfaces??=[];report.releaseSurfaces.push({scenario:name,...receipt});
+   };
+   if(!mobileYesMotion)await prepareReleaseSurface();
    if(options.writeFailAfterReady)await page.evaluate(()=>window.__buttonRefuseWrites=true);
    if(options.readFailAfterReady)await page.evaluate(()=>window.__buttonRefuseReads=true);
    if(options.downloadFail)await page.evaluate(()=>{URL.createObjectURL=()=>{throw new DOMException('Synthetic download refused','NotAllowedError');};});
@@ -174,11 +187,26 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
    };
    const pasteBoundary=async(selector,value,expect)=>{
     await expose(selector);const target=page.locator(selector);await bounded(target.focus(),'paste focus');
-    await page.evaluate(()=>{window.__buttonHeartbeat.maxGapMs=0;window.__buttonHeartbeat.at=performance.now();});const started=Date.now();
-    const receipt=await bounded(target.evaluate((box,text)=>{const data=new DataTransfer();data.setData('text/plain',text);const event=new ClipboardEvent('paste',{bubbles:true,cancelable:true,clipboardData:data});box.dispatchEvent(event);return{trusted:event.isTrusted,prevented:event.defaultPrevented,characters:data.getData('text/plain').length};},value),'clipboard event boundary '+selector);
-    assert.equal(receipt.trusted,false,'Isolated clipboard input is explicitly a simulated external boundary');assert.equal(receipt.characters,value.length,'Complete clipboard source reaches the actual consumer');assert.equal(receipt.prevented,true,'Large paste must bypass native multiline insertion');
-    await waitFor(expect,12000,'clipboard paste outcome');await bounded(page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(resolve))),'paste frame');check();
-    const heartbeat=await bounded(page.evaluate(()=>({...window.__buttonHeartbeat})),'paste heartbeat');report.inputSamples??=[];report.inputSamples.push({kind:'clipboard-event-boundary',selector,...receipt,elapsedMs:Date.now()-started,maxFrameGapMs:heartbeat.maxGapMs});assert.ok(heartbeat.maxGapMs<1000,'Native button safety detected blocked paste frame loop: '+heartbeat.maxGapMs+'ms');
+    // Clipboard population is fixture setup, like the existing native file
+    // chooser buffer. Keep full protocol ingress separate from user dispatch.
+    const preparedAt=Date.now(),sha256=digest(value),characters=value.length;
+    const prepare=async route=>page.evaluate(async({sha256,characters,route})=>{
+     const text=route==='page-held-copy'?window.__buttonClipboard?.findLast(raw=>typeof raw==='string'&&raw.length===characters):window.__buttonPasteFixture;
+     if(typeof text!=='string'||text.length!==characters)return null;
+     const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text))),n=>n.toString(16).padStart(2,'0')).join('');
+     if(hash!==sha256)return null;window.__buttonPasteFixture=text;return{route,characters,sha256:hash,verified:true};
+    },{sha256,characters,route});
+    let preparation=await bounded(prepare('page-held-copy'),'clipboard fixture Copy identity');
+    if(!preparation){await bounded(page.evaluate(text=>{window.__buttonPasteFixture=text;},value),'clipboard fixture complete ingress');preparation=await bounded(prepare('staged-complete-text'),'clipboard fixture ingress identity');}
+    assert.ok(preparation,'Complete clipboard fixture must match independently hashed source bytes');
+    preparation.elapsedMs=Date.now()-preparedAt;preparation.boundary='fixture preparation; excluded from consumer frame budget';
+    try{
+     await page.evaluate(()=>{window.__buttonHeartbeat.maxGapMs=0;window.__buttonHeartbeat.at=performance.now();});const started=Date.now();
+     const receipt=await bounded(target.evaluate(box=>{const text=window.__buttonPasteFixture;const data=new DataTransfer();data.setData('text/plain',text);const event=new ClipboardEvent('paste',{bubbles:true,cancelable:true,clipboardData:data});box.dispatchEvent(event);return{trusted:event.isTrusted,prevented:event.defaultPrevented,characters:data.getData('text/plain').length};}),'clipboard event boundary '+selector);
+     assert.equal(receipt.trusted,false,'Isolated clipboard input is explicitly a simulated external boundary');assert.equal(receipt.characters,characters,'Complete clipboard source reaches the actual consumer');assert.equal(receipt.prevented,true,'Large paste must bypass native multiline insertion');
+     await waitFor(expect,12000,'clipboard paste outcome');await bounded(page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(resolve))),'paste frame');check();
+     const heartbeat=await bounded(page.evaluate(()=>({...window.__buttonHeartbeat})),'paste heartbeat');report.inputSamples??=[];report.inputSamples.push({kind:'clipboard-event-boundary',selector,...receipt,fixturePreparation:preparation,elapsedMs:Date.now()-started,maxFrameGapMs:heartbeat.maxGapMs});assert.ok(heartbeat.maxGapMs<1000,'Native button safety detected blocked paste frame loop: '+heartbeat.maxGapMs+'ms');
+    }finally{await bounded(page.evaluate(()=>{delete window.__buttonPasteFixture;}),'clipboard fixture release');}
    };
    const burst=async(actionName,expect,{selector,semantics,expectedAccepted=10,reload=false}={})=>{
     assert.ok(typeof semantics==='string'&&semantics.length>=10,'Explicit independent repeated-effect semantics required');
@@ -215,7 +243,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
       // receive the trusted down on a neutral marker at that same point.
       const marker=document.createElement('span');marker.id='__buttonDisabledAttempt';marker.style.cssText='position:fixed;left:'+(point.x-2)+'px;top:'+(point.y-2)+'px;width:4px;height:4px;z-index:2147483647';(document.querySelector('dialog[open]')||document.body).append(marker);
      },pressPoint),'rapid disabled refusal marker');
-     let down;
+     let down,neutralDocumentId=null;
      if(mobileYesMotion){
       assert.ok(availability.present&&availability.hit&&!availability.disabled,'Mobile Yes must remain an enabled current touch target');
       await bounded(page.touchscreen.tap(pressPoint.x,pressPoint.y),'rapid native touch '+actionName);
@@ -231,14 +259,15 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
      else{
       // Chromium can clamp an outside-viewport release onto the modal backdrop
       // and synthesize a different click. Release in a separate neutral document
-      // instead; the original document still records the trusted attempted down.
-      await bounded(page.evaluate(()=>{if(!document.getElementById('__buttonReleaseSink')){const sink=document.createElement('iframe');sink.id='__buttonReleaseSink';sink.title='Native test release surface';sink.srcdoc='<!doctype html><style>html,body{margin:0;width:100%;height:100%}</style>';sink.style.cssText='position:fixed;left:0;top:0;width:8px;height:8px;border:0;z-index:2147483647';document.body.append(sink);}}),'rapid release surface');
-      await bounded((async()=>{await page.mouse.move(4,4);await page.mouse.up();await page.evaluate(()=>{document.getElementById('__buttonReleaseSink')?.remove();document.getElementById('__buttonDisabledAttempt')?.remove();});})(),'rapid refused press '+actionName);
+      // instead; prepare it once per document, then reveal only for a refused
+      // release. The app still records every trusted attempted down.
+      neutralDocumentId=await bounded(page.evaluate(()=>{const sink=document.getElementById('__buttonReleaseSink');if(!sink?.isConnected||sink.contentDocument?.readyState!=='complete'||!sink.contentWindow.__buttonReleaseDocumentId)throw Error('Prepared neutral release document unavailable');sink.hidden=false;return sink.contentWindow.__buttonReleaseDocumentId;}),'rapid release surface');
+      await bounded((async()=>{await page.mouse.move(4,4);await page.mouse.up();await page.evaluate(()=>{const sink=document.getElementById('__buttonReleaseSink');if(sink)sink.hidden=true;document.getElementById('__buttonDisabledAttempt')?.remove();});})(),'rapid refused press '+actionName);
      }
      }
-     if(reload&&index===0){await bounded(page.waitForFunction(old=>window.__installedFixture?.documentId!==old&&document.documentElement.dataset.appReady==='true',previousDocument),'rapid bounded reload',2000);assert.equal(allowedNavigation.remaining,0,'Exactly one expected rapid reload');allowedNavigation=null;}
+     if(reload&&index===0){await bounded(page.waitForFunction(old=>window.__installedFixture?.documentId!==old&&document.documentElement.dataset.appReady==='true',previousDocument),'rapid bounded reload',2000);assert.equal(allowedNavigation.remaining,0,'Exactly one expected rapid reload');allowedNavigation=null;if(!mobileYesMotion)await prepareReleaseSurface();}
      await bounded(page.evaluate(()=>true),'rapid native receipt');const recentClicks=(report.clicks||[]).slice(before.clicks);const unrelated=recentClicks.filter(row=>row.action!==null&&row.action!==action);assert.deepEqual(unrelated,[],'Rapid attempt activated a different app action');const received={presses:(report.presses||[]).slice(before.presses),clicks:recentClicks.filter(row=>row.action===action)};
-     attempts.push({index,availability,nativeDownAction:down.action,neutralRelease:!availability.present||!availability.hit||availability.disabled||!down.canRelease,trustedPresses:received.presses.length,acceptedClicks:received.clicks.length,classification:received.clicks.length?'accepted':availability.present?'refused':'disappeared',at:received.presses[0]?.at});
+     attempts.push({index,availability,nativeDownAction:down.action,neutralDocumentId,neutralRelease:!availability.present||!availability.hit||availability.disabled||!down.canRelease,trustedPresses:received.presses.length,acceptedClicks:received.clicks.length,classification:received.clicks.length?'accepted':availability.present?'refused':'disappeared',at:received.presses[0]?.at});
     }
     const finished=Date.now();const presses=(report.presses||[]).slice(start.presses);
     assert.equal(presses.length,10,'Ten browser-trusted native press receipts: '+actionName);

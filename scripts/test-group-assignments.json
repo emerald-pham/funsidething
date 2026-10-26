@@ -12946,6 +12946,16 @@
       "root": "RISK saved view continuity: repeated selected eligibility retains mounted rows and still refreshes changed views",
       "group": "core",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: native paste prepares complete fixture bytes before its consumer frame budget",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: unavailable native attempts reuse one prepared isolated release document",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [

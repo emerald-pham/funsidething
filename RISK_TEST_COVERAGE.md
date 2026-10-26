@@ -2292,3 +2292,5 @@ The command/report consumer rejects missing, duplicate, skipped, cancelled, unre
 - RISK repository process: current producer reuse requires successful capped mobile evidence
 
 - RISK saved view continuity: repeated selected eligibility retains mounted rows and still refreshes changed views
+- RISK repository process: native paste prepares complete fixture bytes before its consumer frame budget
+- RISK repository process: unavailable native attempts reuse one prepared isolated release document
