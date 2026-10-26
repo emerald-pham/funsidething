@@ -23,7 +23,7 @@ function kernelSnapshot({platform=process.platform,read=file=>fs.readFileSync(fi
 export function readMemoryBoundary(options={}){const result=kernelSnapshot(options);verifyMemoryBoundary(result);return result;}
 function processIdentity(pid,{hashExecutable=false}={}){
  const base='/proc/'+pid,stat=fs.readFileSync(base+'/stat','utf8'),fields=stat.slice(stat.lastIndexOf(')')+2).split(' '),executable=fs.readlinkSync(base+'/exe');
- return{pid:Number(pid),ppid:Number(fields[1]),startTime:fields[19],cgroup:fs.readFileSync(base+'/cgroup','utf8').trim(),namespace:fs.readlinkSync(base+'/ns/net'),executable,...(hashExecutable?{executableSha256:mobileDigest(fs.readFileSync(base+'/exe'))}:{})};
+ return{pid:Number(pid),ppid:Number(fields[1]),startTime:fields[19],cgroup:fs.readFileSync(base+'/cgroup','utf8').trim(),namespace:fs.readlinkSync(base+'/ns/net'),pidNamespace:fs.readlinkSync(base+'/ns/pid'),executable,...(hashExecutable?{executableSha256:mobileDigest(fs.readFileSync(base+'/exe'))}:{})};
 }
 function browserProcesses(){
  const rows=[];for(const pid of fs.readdirSync('/proc').filter(v=>/^\d+$/.test(v)))try{rows.push(processIdentity(pid));}catch(error){if(!['ENOENT','ESRCH','EACCES'].includes(error.code))throw error;}
@@ -32,7 +32,7 @@ function browserProcesses(){
  return rows.filter(row=>row.pid!==1&&row.pid!==process.pid);
 }
 async function browserServer(output,control){
- fs.mkdirSync(output,{recursive:true});const source=identity(),report={...source,status:'running',role:'browser',scope:MOBILE_MEMORY_SCOPE,nodeVersion:process.version,hostedPolicy:hostedButtonPolicy(),uid:process.getuid(),gid:process.getgid(),namespace:fs.readlinkSync('/proc/self/ns/net'),errors:[],cleanup:{}};
+ fs.mkdirSync(output,{recursive:true});const source=identity(),report={...source,status:'running',role:'browser',scope:MOBILE_MEMORY_SCOPE,nodeVersion:process.version,hostedPolicy:hostedButtonPolicy(),uid:process.getuid(),gid:process.getgid(),namespace:fs.readlinkSync('/proc/self/ns/net'),pidNamespace:fs.readlinkSync('/proc/self/ns/pid'),ownerPid:process.pid,errors:[],cleanup:{}};
  const file=path.join(output,'browser-server.json'),readyFile=path.join(output,'ready.json'),requestFile=path.join(output,'owner-request.json');let server,monitor,monitorError;const seen=new Map();
  try{
   assert.match(process.version,/^v22\./);assert.ok(report.uid>0&&report.gid>0);report.before=readMemoryBoundary();
@@ -42,7 +42,7 @@ async function browserServer(output,control){
   // The Docker kernel cap already exists before launchServer creates any engine process.
   server=await playwright.webkit.launchServer({headless:true,host:'127.0.0.1',port:0});
   const child=server.process(),rootProcess=processIdentity(child.pid,{hashExecutable:true});
-  report.browser={rootPid:child.pid,rootStartTime:rootProcess.startTime,executable,executableSha256:mobileDigest(fs.readFileSync(executable)),playwrightVersion:packageInfo.version,revision,version:null,processes:[]};
+  report.browser={endpointSha256:mobileDigest(server.wsEndpoint()),rootPid:child.pid,rootStartTime:rootProcess.startTime,executable,executableSha256:mobileDigest(fs.readFileSync(executable)),playwrightVersion:packageInfo.version,revision,version:null,processes:[]};
   const capture=()=>{for(const item of browserProcesses()){
    assert.equal(item.cgroup,report.before.membership,'Browser descendant escaped capped membership');assert.equal(item.namespace,report.namespace);
    const key=item.pid+':'+item.startTime;if(!seen.has(key))try{seen.set(key,{...item,executableSha256:mobileDigest(fs.readFileSync('/proc/'+item.pid+'/exe'))});}catch(error){if(!['ENOENT','ESRCH'].includes(error.code))throw error;}
@@ -53,8 +53,8 @@ async function browserServer(output,control){
   const request=await awaitFile(requestFile,{timeout:60000,abort:()=>{if(monitorError)throw monitorError;if(child.exitCode!==null||child.signalCode!==null)throw Error('Owned WebKit exited before closure request');}});assert.equal(request.token,token);assert.equal(request.action,control?'control':'close');
   if(control){
    assert.equal(child.exitCode,null);assert.equal(child.signalCode,null);capture();
-   const allocator=spawnSync(process.execPath,['--input-type=module','-e',"import fs from 'node:fs';fs.writeFileSync('/proc/self/oom_score_adj','1000');process.stdout.write(JSON.stringify({membership:fs.readFileSync('/proc/self/cgroup','utf8').trim()})+'\\n');const committed=[];for(let i=0;i<1024;i++)committed.push(Buffer.alloc(1048576,165));process.stdout.write(String(committed.length));"],{encoding:'utf8',timeout:30000,maxBuffer:1024*1024});
-   report.control={requestedBytes:1073741824,childSignal:allocator.signal,childExitCode:allocator.status,childError:allocator.error?.message||null,membership:JSON.parse(allocator.stdout.split('\n')[0]).membership,browserAlive:true,browserPid:child.pid};
+   const allocator=spawnSync(process.execPath,['--input-type=module','-e',"import fs from 'node:fs';fs.writeFileSync('/proc/self/oom_score_adj','1000');process.stdout.write(JSON.stringify({membership:fs.readFileSync('/proc/self/cgroup','utf8').trim(),pid:process.pid,ppid:process.ppid,pidNamespace:fs.readlinkSync('/proc/self/ns/pid')})+'\\n');const committed=[];for(let i=0;i<1024;i++)committed.push(Buffer.alloc(1048576,165));process.stdout.write(String(committed.length));"],{encoding:'utf8',timeout:30000,maxBuffer:1024*1024});
+   report.control={requestedBytes:1073741824,childSignal:allocator.signal,childExitCode:allocator.status,childError:allocator.error?.message||null,...JSON.parse(allocator.stdout.split('\n')[0]),browserAlive:true,browserPid:child.pid};
    const after=readMemoryBoundary();assert.equal(allocator.signal,'SIGKILL');assert.equal(allocator.status,null);assert.ok(after.events.oom_kill>report.before.events.oom_kill&&after.events.max>report.before.events.max,'Real kernel OOM control required in live browser group');
   }
   if(monitorError)throw monitorError;
@@ -72,7 +72,7 @@ async function driver(output,motion,control){
  fs.mkdirSync(output,{recursive:true});const source=identity(),report={...source,status:'running',role:'external-driver',nodeVersion:process.version,hostedPolicy:hostedButtonPolicy(),errors:[]};const file=path.join(output,'inside.json');let ready,requested=false;
  const closeOwner=async()=>{if(!requested){assert.ok(ready);write(path.join(output,'owner-request.json'),{token:ready.token,action:control?'control':'close'});requested=true;}const result=await awaitFile(path.join(output,'browser-server.json'));assert.equal(result.status,'passed','Browser owner must finish successfully');assert.equal(result.cleanup?.serverClosed,true);assert.equal(result.cleanup.engineExited,true);return result;};
  try{
-  assert.match(process.version,/^v22\./);report.playwrightVersion=json(path.join(path.dirname(fileURLToPath(import.meta.resolve('playwright'))),'package.json')).version;assert.equal(report.playwrightVersion,'1.62.1');report.driver=kernelSnapshot({scope:'external-driver'});assert.equal(report.driver.memoryMaxBytes,MOBILE_DRIVER_BYTES);assert.equal(report.driver.swapMaxBytes,0);assert.equal(report.driver.swapCurrentBytes,0);report.driver.namespace=fs.readlinkSync('/proc/self/ns/net');
+  assert.match(process.version,/^v22\./);report.playwrightVersion=json(path.join(path.dirname(fileURLToPath(import.meta.resolve('playwright'))),'package.json')).version;assert.equal(report.playwrightVersion,'1.62.1');report.driver=kernelSnapshot({scope:'external-driver'});assert.equal(report.driver.memoryMaxBytes,MOBILE_DRIVER_BYTES);assert.equal(report.driver.swapMaxBytes,0);assert.equal(report.driver.swapCurrentBytes,0);report.driver.namespace=fs.readlinkSync('/proc/self/ns/net');report.driver.pidNamespace=fs.readlinkSync('/proc/self/ns/pid');
   ready=await awaitFile(path.join(output,'ready.json'));for(const key of ['candidateCommit','candidateTree'])assert.equal(ready[key],source[key]);assert.deepEqual(ready.hostedPolicy,report.hostedPolicy);assert.equal(ready.namespace,report.driver.namespace);
   if(control){const result=await closeOwner();Object.assign(report,result.control);report.before=result.before;report.after=result.after;}
   else{
@@ -156,7 +156,7 @@ export async function runCappedMobile({outputDir}){
    let id=key;
    if(!/^[a-f0-9]{64}$/.test(id)){
     const recovered=await docker(['inspect',metadata.name],{allowFailure:true});
-    if(recovered.status!==0){if(interrupted)removed=false;else owned.delete(key);continue;}
+    if(recovered.status!==0){if(!interrupted&&!recovered.error&&/No such (?:object|container)/i.test(recovered.stderr))owned.delete(key);else removed=false;continue;}
     const value=JSON.parse(recovered.stdout)[0];if(value.Config?.Labels?.['chain.mobile.owner']!==ownerToken){removed=false;continue;}id=value.Id;
    }
    await preserve(id,metadata);const result=await docker(['rm','--force',id],{allowFailure:true});if(result.error||result.status!==0)removed=false;else owned.delete(key);

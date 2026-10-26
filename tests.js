@@ -45972,6 +45972,8 @@ test('RISK repository process: mobile budget scope cannot relabel whole-containe
   'wrong executable':b=>b.report.cases[0].server.browser.executableSha256='unverified',
   'negative control outside browser group':b=>b.report.negativeControl.server.control.membership='0::/outside',
   'negative control without live browser':b=>b.report.negativeControl.server.control.browserAlive=false,
+  'negative control outside browser PID namespace':b=>b.report.negativeControl.server.control.pidNamespace='pid:[999]',
+  'native browser launched in external driver':b=>b.native.normal.runtime.browserConnection='local-owned',
  };
  for(const [name,mutate]of Object.entries(mutations))await t.test(name,()=>{const b=createMobileBundle(path.join(directory,name.replaceAll(' ','-')));mutate(b);refreshMobileBundle(b);assert.throws(()=>verifyMobileMemoryReport(b.report,{artifactRoot:b.directory}),name);});
 });
