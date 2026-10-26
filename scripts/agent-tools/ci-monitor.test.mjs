@@ -488,9 +488,18 @@ test('binds required parallel topology to actual candidate workflow even when ne
 
 test('parallel workflow observation preserves complete missing skipped canceled and unknown distinctions', async parent => {
   const workflow=await readFile(new URL('../../.github/workflows/data-safety.yml',import.meta.url),'utf8');
-  const required=['validation-context','event-gates','cohort-routing','regression-core','regression-scenery','regression-persistence-recovery','regression-native-process','scanner-tests'];
+  const required=['validation-context','event-gates','cohort-routing','regression-core','regression-scenery','regression-persistence-recovery','regression-native-process','mobile-WebKit-512MB','scanner-tests'];
   const scenarios=[
     ['complete full cohort',()=>{},0,'success'],
+    ['absent mobile job',run=>{run.jobs=run.jobs.filter(job=>job.name!=='mobile-WebKit-512MB');},1,'failure'],
+    ['failed mobile job',run=>{run.jobs.find(job=>job.name==='mobile-WebKit-512MB').conclusion='failure';},1,'failure'],
+    ['skipped mobile job',run=>{run.jobs.find(job=>job.name==='mobile-WebKit-512MB').conclusion='skipped';},1,'failure'],
+    ['canceled mobile job',run=>{run.jobs.find(job=>job.name==='mobile-WebKit-512MB').conclusion='cancelled';},1,'canceled'],
+    ['timed out mobile job',run=>{run.jobs.find(job=>job.name==='mobile-WebKit-512MB').conclusion='timed_out';},1,'failure'],
+    ['unknown mobile outcome',run=>{run.jobs.find(job=>job.name==='mobile-WebKit-512MB').conclusion='unknown';},2,'unresolved'],
+    ['older parallel workflow remains supported',run=>{run.jobs=run.jobs.filter(job=>job.name!=='mobile-WebKit-512MB');},0,'success',workflow.replace(/^  mobile-memory:\n[\s\S]*?(?=^  scanner-tests:)/m,'').replace(', regression, mobile-memory]',', regression]')],
+    ['renamed unknown mobile job policy',()=>{},2,'unresolved',workflow.replace('name: mobile-WebKit-512MB','name: unknown-mobile-job')],
+    ['mobile job absent from scanner dependencies',()=>{},2,'unresolved',workflow.replace(', regression, mobile-memory]',', regression]')],
     ['complete covered cohort',run=>{run.jobs.find(job=>job.name==='scanner-tests').steps=run.jobs.find(job=>job.name==='scanner-tests').steps.filter(step=>!step.name.startsWith('Complete regression')).map(step=>({...step,name:step.name.replace('mode full','mode reuse')}));},0,'success'],
     ['absent verified aggregate marker',run=>{run.jobs.find(job=>job.name==='scanner-tests').steps=[];},1,'failure'],
     ['absent core group',run=>{run.jobs=run.jobs.filter(job=>job.name!=='regression-core');},1,'failure'],

@@ -2282,3 +2282,7 @@ The command/report consumer rejects missing, duplicate, skipped, cancelled, unre
 - RISK repository process: capped mobile reports bind kernel memory distinct touch and durable outcomes
 
 - RISK repository process: intentional Docker OOM control cannot waive capped client failures
+
+- RISK Settings guidance: mounted cleanup and sync FAQs name their current locations
+
+- RISK repository process: CI monitor requires capped mobile job while preserving prior topology

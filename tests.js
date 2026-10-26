@@ -45699,3 +45699,17 @@ test('RISK repository process: every button safety module fails the actual CLI w
 test('RISK repository process: intentional Docker OOM control cannot waive capped client failures',()=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;const result=spawnSync(process.execPath,['--test','--test-name-pattern=^mobile memory intentional OOM control binds the Docker flag while clients reject it$','scripts/agent-tools/mobile-memory.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:10000,maxBuffer:2*1024*1024});assert.equal(result.error,undefined);assert.equal(result.status,0,'The intentional kernel control and actual acceptance clients need distinct Docker OOM semantics: '+result.stdout+'\n'+result.stderr);
 });
+
+test('RISK Settings guidance: mounted cleanup and sync FAQs name their current locations',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();const help=app.shim.document.getElementById('modalRoot').innerHTML;
+ const answer=question=>{const start=help.indexOf('<dt>'+question+'</dt><dd>');assert.ok(start>=0);return help.slice(start+('<dt>'+question+'</dt><dd>').length,help.indexOf('</dd>',start)).replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();};
+ const clear=answer('What does Clear history remove?'),sync=answer('What can I do if a save or sync fails?');
+ const exported=answer('What does Export include?');assert.match(exported,/Settings → Data and backups → Export/);assert.ok(exported.split(/\s+/).length<=130);
+ assert.match(clear,/Settings → Recovery and cleanup → Clear history/);assert.match(sync,/Settings → Recovery and cleanup → Recent sync errors/);assert.match(sync,/Settings → Data and backups → Export/);
+ for(const text of [clear,sync])assert.ok(text.split(/\s+/).length<=130,'Each existing FAQ retains the130word limit');
+ assert.match(clear,/Open evergreen and unfinished tasks remain/);assert.match(clear,/Undo can reverse the clear/);assert.match(sync,/Recorded errors describe failed attempts and can remain after a later successful sync/);assert.match(sync,/Synced requires server acknowledgement of the latest save/);
+});
+
+test('RISK repository process: CI monitor requires capped mobile job while preserving prior topology',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;const result=spawnSync(process.execPath,['--test','--test-name-pattern=^binds required parallel topology to actual candidate workflow even when new jobs are absent$|^parallel workflow observation preserves complete missing skipped canceled and unknown distinctions$','scripts/agent-tools/ci-monitor.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:4*1024*1024});assert.equal(result.error,undefined);assert.equal(result.status,0,'The actual CI monitor must retain prior workflows and fail closed on required mobile outcomes: '+result.stdout+'\n'+result.stderr);
+});

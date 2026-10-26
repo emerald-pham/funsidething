@@ -12901,6 +12901,16 @@
       "root": "mobile memory intentional OOM control binds the Docker flag while clients reject it",
       "group": "native-process",
       "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "RISK Settings guidance: mounted cleanup and sync FAQs name their current locations",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: CI monitor requires capped mobile job while preserving prior topology",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [
