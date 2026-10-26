@@ -34,7 +34,7 @@ function parseArgs(argv) {
   const keyMap = new Map([
     ['--group', 'group'], ['--output-dir', 'outputDir'], ['--repository', 'repository'],
     ['--event-policy', 'eventPolicy'], ['--run-id', 'runId'], ['--run-attempt', 'runAttempt'],
-    ['--source-sha', 'sourceSha'], ['--comparison-base', 'comparisonBase'], ['--results-dir','resultsDir'], ['--needs-json','needsJson'], ['--proof','proof'],
+    ['--source-sha', 'sourceSha'], ['--mobile-report','mobileReport'], ['--comparison-base', 'comparisonBase'], ['--results-dir','resultsDir'], ['--needs-json','needsJson'], ['--proof','proof'],
   ]);
   for (let index = 0; index < argv.length; index++) {
     if (['--describe','--aggregate','--covered'].includes(argv[index])) { values[argv[index].slice(2)] = true; continue; }
@@ -683,6 +683,21 @@ async function aggregateResults({options, outputDir, descriptor, inventory, assi
   if (!options.resultsDir || !options.needsJson) fail('Aggregate requires --results-dir and --needs-json.');
   const needs = readJson(options.needsJson, 'actual workflow predecessor results');
   const issues = [], records = [], allCases = new Set();
+
+  let mobileMemory=null;
+  const mobileInventory=path.join(ROOT,'scripts/button-safety-inventory.json');
+  const mobilePolicy=fs.existsSync(mobileInventory)?readJson(mobileInventory,'mobile story policy').requiredMobileStory:null;
+  if(fs.existsSync(mobileInventory)||descriptor.groups.some(group=>group.roots.includes('RISK repository process: mobile WebKit accepts ten distinct offered tasks using real touch'))){
+    try{const {MOBILE_STORY}=await import('./button-safety-mobile-contract.mjs');if(!mobilePolicy||Object.keys(MOBILE_STORY).some(key=>JSON.stringify(mobilePolicy[key])!==JSON.stringify(MOBILE_STORY[key])))issues.push('Mobile memory policy cannot waive required512MB/motion/Yes workload.');}catch(error){issues.push('Mobile memory policy unavailable: '+error.message);}
+    if(needs['mobile-memory']?.result!=='success')issues.push('Required mobile memory job did not succeed.');
+    if(!options.mobileReport)issues.push('Required capped mobile memory report is missing.');
+    else try{
+      const {verifyMobileMemoryReport}=await import('./button-safety-mobile-contract.mjs');
+      const mobileReport=readJson(options.mobileReport,'capped mobile memory report');
+      verifyMobileMemoryReport(mobileReport,{artifactRoot:path.dirname(path.resolve(options.mobileReport)),candidateCommit:descriptor.resultIdentity.checkoutSha,candidateTree:descriptor.resultIdentity.checkoutTree,sourceSha:options.sourceSha,repository:options.repository,runId:options.runId,runAttempt:options.runAttempt,eventPolicy:options.eventPolicy});
+      mobileMemory={reportSha256:sha256(fs.readFileSync(options.mobileReport)),candidateCommit:mobileReport.candidateCommit,candidateTree:mobileReport.candidateTree,image:mobileReport.image,cases:mobileReport.cases.length,artifactCount:mobileReport.artifacts.length};
+    }catch(error){issues.push('Mobile memory report: '+error.message);}
+  }
   const covered=needs['cohort-routing']?.outputs?.decision==='reuse';
   const freshCoverage=covered?coverageReference(readJson(options.proof,'fresh full-producer proof'),descriptor.resultIdentity):null;
   for (const id of ['validation-context','event-gates','cohort-routing','regression']) {
@@ -776,7 +791,7 @@ async function aggregateResults({options, outputDir, descriptor, inventory, assi
       records.push({group:id,resultSha256:sha256(fs.readFileSync(path.join(root,'result.json'))),cases:cases.length,passed:cases.filter(item=>item.status==='passed').length,skipped:cases.filter(item=>item.status==='skipped').length,artifacts:record.artifacts,identity});
     } catch (error) { issues.push(`${id}: ${error.message}`); }
   }
-  const report = {schemaVersion:1,status:issues.length?'failed':'passed',mode:covered?'covered':'full',resultIdentity:descriptor.resultIdentity,groups:records,caseCount:allCases.size,issues,finishedAt:new Date().toISOString()};
+  const report = {schemaVersion:1,status:issues.length?'failed':'passed',mode:covered?'covered':'full',resultIdentity:descriptor.resultIdentity,mobileMemory,groups:records,caseCount:allCases.size,issues,finishedAt:new Date().toISOString()};
   atomicWrite(path.join(outputDir,'aggregate.json'),report);
   if (issues.length) fail(issues.join('\n'));
   process.stdout.write(`Complete required cohort verified: ${allCases.size} cases.\n`);

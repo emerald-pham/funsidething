@@ -171,8 +171,33 @@ jobs:
           path: ${{ runner.temp }}/group
           if-no-files-found: error
 
+  mobile-memory:
+    name: mobile-WebKit-512MB
+    needs: validation-context
+    runs-on: ubuntu-latest
+    env:
+      CHAIN_TEST_EVENT_POLICY: ${{ needs.validation-context.outputs.policy }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Kernel-capped mobile WebKit Yes with actual OOM negative control
+        run: node scripts/button-safety-mobile-memory.mjs --run --output-dir "$RUNNER_TEMP/mobile-memory"
+      - name: Preserve capped runtime configuration control and native results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-memory-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/mobile-memory
+          if-no-files-found: error
+
   scanner-tests:
-    needs: [validation-context, event-gates, cohort-routing, regression]
+    needs: [validation-context, event-gates, cohort-routing, regression, mobile-memory]
     if: always()
     runs-on: ubuntu-latest
     env:
@@ -214,6 +239,11 @@ jobs:
         with:
           name: regression-${{ github.run_id }}-${{ github.run_attempt }}-native-process
           path: ${{ runner.temp }}/groups/native-process
+      - uses: actions/download-artifact@v4
+        if: always()
+        with:
+          name: mobile-memory-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/mobile-memory
       - name: Recheck covered producer immediately before aggregation
         if: needs.cohort-routing.outputs.decision == 'reuse'
         run: node scripts/agent-tools/ci-routing.mjs --max-wait-ms 0 --descriptor "$RUNNER_TEMP/validation/descriptor/descriptor.json" --comparison-base "$CHAIN_TEST_COMPARISON_BASE" --evidence-dir "$RUNNER_TEMP/final-routing"
@@ -221,7 +251,7 @@ jobs:
         id: aggregate
         if: always()
         run: |
-          npm run test:group -- --aggregate --group core --output-dir "$RUNNER_TEMP/aggregate" --results-dir "$RUNNER_TEMP/groups" --needs-json "$RUNNER_TEMP/needs.json" --proof "$RUNNER_TEMP/final-routing/routing.json" --repository "$GITHUB_REPOSITORY" --event-policy "$CHAIN_TEST_EVENT_POLICY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$CHAIN_TEST_SOURCE_SHA" --comparison-base "$CHAIN_TEST_COMPARISON_BASE"
+          npm run test:group -- --aggregate --group core --output-dir "$RUNNER_TEMP/aggregate" --results-dir "$RUNNER_TEMP/groups" --needs-json "$RUNNER_TEMP/needs.json" --mobile-report "$RUNNER_TEMP/mobile-memory/report.json" --proof "$RUNNER_TEMP/final-routing/routing.json" --repository "$GITHUB_REPOSITORY" --event-policy "$CHAIN_TEST_EVENT_POLICY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$CHAIN_TEST_SOURCE_SHA" --comparison-base "$CHAIN_TEST_COMPARISON_BASE"
       - name: Preserve verified aggregate and final observations
         if: always()
         uses: actions/upload-artifact@v4

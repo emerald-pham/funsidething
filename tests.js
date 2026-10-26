@@ -19687,10 +19687,14 @@ test('RISK button safety guidance: mounted FAQ states required browser checks an
   assert.match(plain,/Chromium and WebKit/i);
   assert.match(plain,/400 saved tasks/i);
   assert.match(plain,/ten rapid presses within two seconds/i);
+  assert.match(plain,/mobile WebKit.equivalent.*ten distinct offered tasks.*Yes.*400.task board.*two seconds.*enforced 512 MB/i,'the separate capped mobile story is explicit');
+  assert.match(plain,/Normal and Reduced motion/i);
+  assert.match(plain,/physical iPhone behavior.*private saved boards/i);
   assert.match(plain,/failed check or missing required coverage blocks release/i);
   assert.match(plain,/cannot prove every device or browser condition/i);
   assert.match(plain,/cannot determine what caused the original physical iOS crash/i);
   assert.match(help,/Required button checks run in Chromium and WebKit.*A failed check or missing coverage blocks release/i,'the Settings changelog names the required release checks');
+  assert.match(help,/separate mobile WebKit.equivalent check.*ten distinct offered tasks.*Yes.*400 saved tasks.*two seconds.*enforced 512 MB/i,'the existing changelog describes the third required check');
   assert.doesNotMatch(plain,/never crash|crash[- ]free/i,'the guidance does not promise universal crash prevention');
 });
 
@@ -45265,6 +45269,16 @@ test('RISK repository process: grouped runner stays covered at the default npm t
  assert.match(result.stdout||'',/^# skipped 0$/m,'The runner contract cannot pass through a skip');
 });
 
+test('RISK repository process: capped mobile reports bind kernel memory distinct touch and durable outcomes',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;const result=spawnSync(process.execPath,['--test','scripts/agent-tools/mobile-memory.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});assert.equal(result.error,undefined);assert.equal(result.status,0,'Kernel-bound report/parser/refusal controls must pass: '+result.stdout+'\n'+result.stderr);
+});
+
+test('RISK repository process: required mobile memory evidence cannot be replaced by passing desktop groups',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-name-pattern=^test group aggregate refuses a declared mobile memory story without a capped runtime report$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
+ assert.equal(result.error,undefined);assert.equal(result.status,0,'The actual four-group aggregate must reject absent required mobile512MB proof: '+result.stdout+'\n'+result.stderr);
+});
+
 test('RISK repository process: required parallel scanner aggregation rejects absent group evidence',()=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
  const result=spawnSync(process.execPath,['--test','--test-name-pattern=^test group workflow scanner command rejects missing parallel group evidence$',path.join(__dirname,'scripts/agent-tools/test-groups.test.mjs')],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
@@ -45563,6 +45577,16 @@ test('RISK repository process: rapid native attempts preserve Add and asynchrono
  });
 });
 
+test('RISK repository process: mobile WebKit accepts ten distinct offered tasks using real touch',async t=>{
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Allocated durable native output required');fs.mkdirSync(base,{recursive:true});const output=fs.mkdtempSync(path.join(base,'mobile-functional-'));
+ const {verifyMobileFunctionalReport}=await import('./scripts/button-safety-mobile-contract.mjs');
+ for(const motion of ['normal','reduced'])await t.test(motion,()=>{
+  const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine','webkit','--mobile-yes','--motion',motion,'--scenario','rapid scanner candidate actions with 400 active tasks','--output-dir',output,'--port',process.env.CHAIN_NATIVE_PORT||'0'],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:45000,maxBuffer:2*1024*1024});
+  assert.equal(result.error,undefined);assert.equal(result.signal,null);assert.equal(result.status,0,'The actual mobile Yes consumer must complete: '+result.stderr);
+  const paths=result.stdout.split('\n').map(line=>line.match(/^Button evidence: (.+)$/)?.[1]).filter(Boolean);assert.equal(paths.length,1);verifyMobileFunctionalReport(JSON.parse(fs.readFileSync(paths[0],'utf8')),{motion});t.diagnostic('Uncapped mobile functional evidence; not512MB proof: '+paths[0]);
+ });
+});
+
 test('RISK repository process: native rapid cloud selection preserves the two-second input burst',async t=>{
  const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});const output=fs.mkdtempSync(path.join(base,'rapid-cloud-'));
  for(const engine of ['chromium','webkit'])await t.test(engine,()=>{
@@ -45654,12 +45678,7 @@ test('RISK repository process: required button enforcement changes need process 
 test('RISK repository process: every button safety module fails the actual CLI without process coverage',async t=>{
  const root=fs.mkdtempSync(path.join('/tmp','chain-button-enforcement-all-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
  const directory=path.join(root,'fixture'),scriptDir=path.join(directory,'scripts');fs.mkdirSync(scriptDir,{recursive:true});
- const modules=[
-  'scripts/button-safety-cloud.mjs','scripts/button-safety-fixture.mjs','scripts/button-safety-rapid-core.mjs',
-  'scripts/button-safety-rapid.mjs','scripts/button-safety-scenarios.mjs','scripts/button-safety-scenes.mjs',
-  'scripts/button-safety-transfer.mjs','scripts/button-safety.mjs','scripts/button-safety-contract.mjs',
-  'scripts/button-safety-native.mjs','scripts/button-safety-inventory.json'
- ];
+ const modules=[...fs.readdirSync(path.join(__dirname,'scripts')).filter(name=>/^button-safety(?:-[a-z0-9-]+)?\.mjs$/.test(name)||name==='button-safety-inventory.json').map(name=>'scripts/'+name),'scripts/button-safety-future-memory-proof.mjs'];
  fs.copyFileSync(path.join(__dirname,'scripts/test-first-gate.mjs'),path.join(scriptDir,'test-first-gate.mjs'));
  for(const file of modules){const target=path.join(directory,file);fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,file.endsWith('.json')?'{}':'export const revision=1;\n');}
  const git=(...args)=>{const result=spawnSync('git',args,{cwd:directory,encoding:'utf8'});assert.equal(result.status,0,result.stderr);return result.stdout.trim();};

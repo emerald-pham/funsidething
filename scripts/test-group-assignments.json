@@ -12856,6 +12856,41 @@
       "root": "RISK cloud source recovery choice: repeating the selected source preserves the mounted review and alternate choices",
       "group": "persistence-recovery",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: required mobile memory evidence cannot be replaced by passing desktop groups",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "test group aggregate refuses a declared mobile memory story without a capped runtime report",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "RISK repository process: mobile WebKit accepts ten distinct offered tasks using real touch",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: capped mobile reports bind kernel memory distinct touch and durable outcomes",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "mobile memory parser rejects waived limits synthetic touch and mismatched durable evidence",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "mobile memory boundary refuses unsupported or unbounded runtimes before native launch",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "mobile memory command cannot run a pretend local cap and pins the owned container boundary",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
     }
   ],
   "processControls": [

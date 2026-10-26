@@ -198,3 +198,36 @@ click credit. Any accepted click on a different app action fails immediately.
 The expected state and exact originals are asserted afterward.
 Missing task readback, hidden ordinary load, missing/skipped rapid families,
 untrusted or incomplete counts, a slower burst, or unreconciled outcomes fails.
+
+## Required capped mobile Yes story
+
+A separate required `mobile-memory` job runs the existing rapid scanner Yes path
+in mobile WebKit with 400 saved tasks. Normal/full motion and Reduced motion each
+use a fresh container, an explicit 390 × 844 viewport/screen, scale factor 3,
+iPhone user agent and real trusted touch input. Each case must accept ten distinct
+actually offered task IDs within two seconds, retain the expected durable chain
+and all 400 tasks, protect unknown fields and retained sources, and finish without
+lifecycle, frame, transport or cleanup failures. Native `maxTouchPoints` is recorded
+without overriding it; actual trusted touch receipts establish the input used.
+This is an emulated mobile WebKit client, not physical iPhone or private-board proof.
+
+The pinned official Playwright image and matching package run a minimal Node 22
+consumer. Linux cgroup v2 must read back exactly **512,000,000 bytes**, with zero
+swap allowance and use. The cap charges the entire container process tree,
+including Node, the isolated fixture/server and every browser descendant. Before
+the two fresh client cases, another fresh container must demonstrate a real kernel
+OOM kill of a child that commits more than the budget. Successful clients must
+have no OOM events and a recorded peak within the budget. Docker configuration,
+kernel readbacks, raw native reports, exact source/tree and run identity, artifact
+hashes and owned-container cleanup all accompany the report.
+
+`scanner-tests` consumes this job and its complete artifact bundle independently
+of the four test groups, including when their full-producer result is reused.
+Missing, failed, incomplete, wrong-source, uncapped or malformed memory proof
+blocks the aggregate. Local `npm test` runs both native mobile motion cases plus
+parser, enforcement-refusal and actual aggregation negative controls; it does not
+claim a local memory-cap pass. A macOS functional run or RSS sample cannot replace
+the Linux gate. Prepush reviews may explicitly report the hosted cap proof pending;
+merge and release still require its actual exact-candidate CI pass. Do not create
+a placeholder receipt to satisfy the prepush sequence. The original complete
+90-scenario Chromium/WebKit button gate remains separately required.

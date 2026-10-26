@@ -1,5 +1,13 @@
 {
   "schemaVersion": 1,
+  "requiredMobileStory": {
+    "savedTasks": 400,
+    "yesCount": 10,
+    "distinctTasks": true,
+    "windowMs": 2000,
+    "memoryBudgetBytes": 512000000,
+    "motions": ["normal", "reduced"]
+  },
   "requiredActions": [
     "act:add",
     "act:add-ctx",

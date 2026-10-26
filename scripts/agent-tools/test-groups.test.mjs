@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
+import {createMobileBundle,refreshMobileBundle} from './mobile-memory-fixture.mjs';
 
 const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const runner = path.join(repository, 'scripts/test-groups.mjs');
@@ -131,6 +132,8 @@ function createFixture(t, options = {}) {
   fs.mkdirSync(path.join(root, 'scripts/agent-tools'), { recursive: true });
   fs.mkdirSync(path.join(root, 'scripts'), { recursive: true });
   fs.copyFileSync(runner, path.join(root, 'scripts/test-groups.mjs'));
+  if(options.mobileStory)fs.copyFileSync(path.join(repository,'scripts/button-safety-mobile-contract.mjs'),path.join(root,'scripts/button-safety-mobile-contract.mjs'));
+  if(options.mobileStory)writeJson(path.join(root,'scripts/button-safety-inventory.json'),{requiredMobileStory:{savedTasks:400,yesCount:10,distinctTasks:true,windowMs:2000,memoryBudgetBytes:512000000,motions:['normal','reduced']}});
   const coreTitle = options.coreTitle || fixtureRoots.core;
   writeJson(path.join(root, 'package.json'), {
     type: 'module',
@@ -546,8 +549,8 @@ test('test group preflight rejects a passing dynamic row added at an unchanged r
 });
 
 
-function aggregateFixture(t) {
-  const fixture=createFixture(t,{nativeTitle:'RISK repository process: required installed-client native outcomes and artifacts execute exactly once',nativeReports:true});
+function aggregateFixture(t, options={}) {
+  const fixture=createFixture(t,{nativeTitle:'RISK repository process: required installed-client native outcomes and artifacts execute exactly once',nativeReports:true,...options});
   fixture.originals=new Map();
   for(const group of groups){const result=invoke(fixture,{group});assert.equal(result.status,0,result.stdout+result.stderr);fixture.originals.set(group,result.outputDir);}
   return fixture;
@@ -559,6 +562,19 @@ function aggregateCopy(t,fixture,mutate=()=>{},args=[]) {
   mutate(collected,needs);
   return invoke(fixture,{args:['--aggregate','--results-dir',collected,'--needs-json',needs,...args]});
 }
+test('test group aggregate refuses a declared mobile memory story without a capped runtime report',async t=>{
+ const fixture=aggregateFixture(t,{mobileStory:true});
+ const missing=aggregateCopy(t,fixture);assert.notEqual(missing.status,0,'Four passing desktop groups cannot waive the independently required mobile512MB story');assert.match(missing.stderr,/mobile.*(?:memory|report|job)|capped/i);
+ const directory=fs.mkdtempSync(path.join(os.tmpdir(),'chain-mobile-aggregate-'));t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const bundle=createMobileBundle(directory,{candidateCommit:fixture.sourceSha,candidateTree:git(fixture.root,'rev-parse','HEAD^{tree}'),sourceSha:fixture.sourceSha});
+ const passJob=(_,needs)=>{const value=JSON.parse(fs.readFileSync(needs,'utf8'));value['mobile-memory']={result:'success'};writeJson(needs,value);};
+ const args=['--mobile-report',path.join(directory,'report.json')];const good=aggregateCopy(t,fixture,passJob,args);assert.equal(good.status,0,good.stdout+good.stderr);assert.equal(JSON.parse(fs.readFileSync(path.join(good.outputDir,'aggregate.json'))).mobileMemory.cases,2);
+ for(const change of ['failed-job','wrong-source','no-oom','unbounded','duplicate-tasks','missing-normal'])await t.test(change,()=>{
+  const variantDir=fs.mkdtempSync(path.join(os.tmpdir(),'chain-mobile-aggregate-mutant-'));t.after(()=>fs.rmSync(variantDir,{recursive:true,force:true}));const altered=createMobileBundle(variantDir,{candidateCommit:fixture.sourceSha,candidateTree:git(fixture.root,'rev-parse','HEAD^{tree}'),sourceSha:fixture.sourceSha});
+  if(change==='wrong-source')altered.report.candidateTree='0'.repeat(40);if(change==='no-oom')altered.report.negativeControl.after.events.oom_kill=0;if(change==='unbounded')altered.report.cases[0].after.memoryMaxBytes=1024000000;if(change==='duplicate-tasks')altered.native.normal.presses[1].offeredTaskId=altered.native.normal.presses[0].offeredTaskId;if(change==='missing-normal')altered.report.cases.shift();refreshMobileBundle(altered);
+  const result=aggregateCopy(t,fixture,(collected,needs)=>{passJob(collected,needs);if(change==='failed-job'){const value=JSON.parse(fs.readFileSync(needs,'utf8'));value['mobile-memory'].result='failure';writeJson(needs,value);}},['--mobile-report',path.join(variantDir,'report.json')]);assert.notEqual(result.status,0,'No malformed mobile proof may qualify the actual aggregate: '+change);assert.match(result.stderr,/mobile|Mobile/);
+ });
+});
 test('test group aggregate verifies the complete actual cohort and native artifacts', t => {
   const fixture=aggregateFixture(t),result=aggregateCopy(t,fixture);
   assert.equal(result.status,0,result.stdout+result.stderr);
@@ -712,10 +728,10 @@ test('test group catalog routes real declarations despite matching quoted fixtur
 });
 
 test('test group aggregate requires both exact native button safety reports',async t=>{
- const fixture=createFixture(t,{nativeTitle:'RISK repository process: required native button actions execute in Chromium and WebKit'});fixture.originals=new Map();
+ const fixture=createFixture(t,{mobileStory:true,nativeTitle:'RISK repository process: required native button actions execute in Chromium and WebKit'});fixture.originals=new Map();
  for(const group of groups){const result=invoke(fixture,{group});assert.equal(result.status,0,result.stdout+result.stderr);fixture.originals.set(group,result.outputDir);}
  const absent=aggregateCopy(t,fixture);assert.notEqual(absent.status,0,'scanner-tests must reject a passing native root that omitted both required button engine artifacts');assert.match(absent.stderr,/Both required distinct native button reports must be present/);
- const manifest={schemaVersion:1,requiredActions:['act:add'],requiredScenarios:['populated','oversized retained-source'],requiredWorkload:{savedTasks:400,rapidAttempts:10,rapidWindowMs:2000},requiredRapidActions:['act:add']},bytes=Buffer.from(JSON.stringify(manifest));
+ const manifest={schemaVersion:1,requiredMobileStory:JSON.parse(fs.readFileSync(path.join(fixture.root,'scripts/button-safety-inventory.json'),'utf8')).requiredMobileStory,requiredActions:['act:add'],requiredScenarios:['populated','oversized retained-source'],requiredWorkload:{savedTasks:400,rapidAttempts:10,rapidWindowMs:2000},requiredRapidActions:['act:add']},bytes=Buffer.from(JSON.stringify(manifest));
  fs.copyFileSync(path.join(repository,'scripts/button-safety-contract.mjs'),path.join(fixture.root,'scripts/button-safety-contract.mjs'));fs.writeFileSync(path.join(fixture.root,'scripts/button-safety-inventory.json'),bytes);
  // Fixture source identity includes the authoritative inventory before producing results.
  git(fixture.root,'add','.');git(fixture.root,'commit','-qm','fixture button inventory');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');
@@ -731,6 +747,10 @@ test('test group aggregate requires both exact native button safety reports',asy
   }
   writeJson(file,result);
  };
- const good=aggregateCopy(t,fixture,root=>inject(root,null));assert.equal(good.status,0,'complete two-engine button evidence accepted: '+good.stderr);
- for(const variant of ['wrong engine','wrong candidate','skip','new uncovered action','missing action','lifecycle','missing stress scenario','skipped stress scenario','missing saved400','missing rapid family','skipped rapid family','slow rapid presses','unrelated rapid action'])await t.test(variant,sub=>{const result=aggregateCopy(sub,fixture,root=>inject(root,variant));assert.notEqual(result.status,0,'aggregate must reject '+variant+' even with recomputed valid artifact hashes');});
+ const identity=JSON.parse(fs.readFileSync(path.join(fixture.originals.get('native-process'),'result.json'),'utf8')).resultIdentity;
+ const mobileDir=fs.mkdtempSync(path.join(os.tmpdir(),'chain-desktop-mobile-proof-'));t.after(()=>fs.rmSync(mobileDir,{recursive:true,force:true}));
+ createMobileBundle(mobileDir,{candidateCommit:identity.checkoutSha,candidateTree:identity.checkoutTree,sourceSha:identity.sourceSha,repository:identity.repository,runId:identity.runId,runAttempt:identity.runAttempt,eventPolicy:identity.eventPolicy});
+ const aggregate=(owner,variant)=>aggregateCopy(owner,fixture,(root,needs)=>{inject(root,variant);const value=JSON.parse(fs.readFileSync(needs,'utf8'));value['mobile-memory']={result:'success'};writeJson(needs,value);},['--mobile-report',path.join(mobileDir,'report.json')]);
+ const good=aggregate(t,null);assert.equal(good.status,0,'complete two-engine button evidence accepted with independently valid mobile proof: '+good.stderr);
+ for(const variant of ['wrong engine','wrong candidate','skip','new uncovered action','missing action','lifecycle','missing stress scenario','skipped stress scenario','missing saved400','missing rapid family','skipped rapid family','slow rapid presses','unrelated rapid action'])await t.test(variant,sub=>{const result=aggregate(sub,variant);assert.notEqual(result.status,0,'aggregate must reject '+variant+' even with recomputed valid artifact hashes and valid independent mobile proof');});
 });

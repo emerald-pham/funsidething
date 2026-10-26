@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {beginMobileYes,finishMobileYes} from './button-safety-mobile-scenario.mjs';
 
 const ten=(ui,action,expected,selector,semantics)=>ui.burst(action,expected,{selector,semantics,expectedAccepted:10});
 const once=(ui,action,expected,selector,semantics)=>ui.burst(action,expected,{selector,semantics,expectedAccepted:1});
@@ -290,14 +291,17 @@ export async function runRapidCoreScenarios(h){
 
   await h.scenario('rapid scanner candidate actions with 400 active tasks',{decorate:scannerBoard},async ui=>{
     await assert400(ui,'Scanner candidates');
-    await once(ui,'start-scan',()=>state.chain.length===1&&!!state.candidateId,'[data-act="start-scan"]',
+    if(ui.mobileYesMotion)await ui.act('start-scan',()=>state.chain.length===1&&!!state.candidateId,'[data-act="start-scan"]');
+    else await once(ui,'start-scan',()=>state.chain.length===1&&!!state.candidateId,'[data-act="start-scan"]',
       'The first Start press creates the initial dot and candidate; scanning controls replace Start.');
+    const mobileBefore=ui.mobileYesMotion?await beginMobileYes(ui):null;
     const yesOutcome=()=>state.chain.length===11&&!!state.candidateId;
     try{await ten(ui,'yes',yesOutcome,'#scan [data-act="yes"]',
       'Ten Yes presses choose ten new offered candidates while 400 tasks keep scanning active.');}
     catch(error){const probe=await ui.page.evaluate(()=>({chain:state.chain.length,candidate:state.candidateId,mode:state.mode,
       intervention:state.interventionActive,snooze:state.snooze,considered:Object.keys(state.considered).length,
       scanText:document.querySelector('#scan')?.innerText}));error.message+='; final scanner state '+JSON.stringify(probe);throw error;}
+    if(ui.mobileYesMotion){await finishMobileYes(ui,mobileBefore);return;}
     await ten(ui,'no',()=>Object.values(state.considered).filter(value=>value==='no').length===10&&!!state.candidateId,
       '#scan [data-act="no"]','Ten No presses skip ten distinct offered candidates; the next candidate remains available.');
     await ten(ui,'cant',()=>Object.values(state.considered).filter(value=>value==='cant').length===10&&!!state.candidateId,

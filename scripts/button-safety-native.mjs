@@ -6,10 +6,12 @@ import {execFileSync} from 'node:child_process';
 import {randomUUID,createHash} from 'node:crypto';
 import {browserInit,appModule,authModule,firestoreModule} from './installed-client-fixture.mjs';
 import {buttonFixture,populateButtonWorkload,TASK_COUNT} from './button-safety-fixture.mjs';
+import {MOBILE_PROFILE,MOBILE_SCENARIO} from './button-safety-mobile-contract.mjs';
 const digest=value=>createHash('sha256').update(value).digest('hex');
 const MIME={'.js':'text/javascript','.html':'text/html','.css':'text/css','.svg':'image/svg+xml','.png':'image/png','.webmanifest':'application/manifest+json'};
-export async function runButtonSafety({repo,engine,outputDir,port=0,control=null,probe=false,scenarioFilter=null}){
+export async function runButtonSafety({repo,engine,outputDir,port=0,control=null,probe=false,scenarioFilter=null,mobileYesMotion=null}){
  assert.ok(['chromium','webkit'].includes(engine),'Explicit supported engine');
+ if(mobileYesMotion){assert.equal(engine,'webkit');assert.ok(['normal','reduced'].includes(mobileYesMotion));assert.ok(scenarioFilter===null||scenarioFilter===MOBILE_SCENARIO);scenarioFilter=MOBILE_SCENARIO;}
  assert.ok(control===null||['pageerror','unhandled','reload','navigation','stall','short-stall','async-pending','async-predicate-false','close','crash','new-action'].includes(control),'Known explicit sensitivity control');
  if(process.env.CI==='true'){
   assert.equal(process.env.CHAIN_TEST_EVENT_POLICY==='push'||process.env.CHAIN_TEST_EVENT_POLICY==='pull_request',true,'Isolated CI requires the explicit grouped fixture policy');
@@ -30,7 +32,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
 
  fs.mkdirSync(outputDir,{recursive:true});
  const git=(...args)=>execFileSync('git',args,{cwd:repo,maxBuffer:32*1024*1024}),candidateCommit=git('rev-parse','HEAD').toString().trim(),candidateTree=git('rev-parse','HEAD^{tree}').toString().trim();
- const report={schemaVersion:1,kind:probe?'button-sensitivity':scenarioFilter?'button-diagnostic':'button-safety',engine,candidateCommit,candidateTree,status:'running',startedAt:new Date().toISOString(),requiredActions:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredActions,requiredScenarios:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredScenarios,requiredWorkload:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredWorkload,requiredRapidActions:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredRapidActions,inventorySha256:digest(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'))),observedActions:[],outcomes:[],errors:[],cleanup:{},limits:['Synthetic isolated browser storage and Firebase/clipboard/geolocation boundaries.','Native desktop engine; no physical iPhone or private-board recovery claim.']};
+ const report={schemaVersion:1,kind:mobileYesMotion?'button-mobile-functional':probe?'button-sensitivity':scenarioFilter?'button-diagnostic':'button-safety',engine,candidateCommit,candidateTree,status:'running',startedAt:new Date().toISOString(),requiredActions:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredActions,requiredScenarios:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredScenarios,requiredWorkload:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredWorkload,requiredRapidActions:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredRapidActions,inventorySha256:digest(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'))),observedActions:[],outcomes:[],errors:[],cleanup:{},limits:['Synthetic isolated browser storage and Firebase/clipboard/geolocation boundaries.',mobileYesMotion?'Emulated mobile WebKit; uncapped functional evidence unless independently bound to a verified Linux cgroup report; no physical iPhone or private-board recovery claim.':'Native desktop engine; no physical iPhone or private-board recovery claim.']};
  const reportPath=path.join(outputDir,'button-safety-'+engine+'-'+randomUUID()+'.json'),save=()=>fs.writeFileSync(reportPath,JSON.stringify(report,null,2)+'\n');save();
  const prefix='/button-'+randomUUID()+'/',sdk='/sdk-'+randomUUID()+'/',sources=new Map();
  for(const file of git('ls-files').toString().trim().split('\n'))if(file!=='tests.js'&&!file.startsWith('scripts/')&&/\.(html|js|css|svg|png|webmanifest)$/.test(file))sources.set(file,fs.readFileSync(path.join(repo,file)));
@@ -49,7 +51,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
    res.writeHead(bytes?200:404,{'Content-Type':module?'text/javascript':MIME[path.extname(name)]||'text/plain','Cache-Control':'no-store'});res.end(bytes||'Not found');
   });await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',resolve);});
   const origin='http://127.0.0.1:'+server.address().port;
-  const playwright=await import('playwright');browser=await playwright[engine].launch({headless:true});browser.on('disconnected',()=>{if(!closing)report.errors.push('browser-disconnected');});report.runtime={engine,version:browser.version(),playwright:'1.62.1'};
+  const playwright=await import('playwright');browser=await playwright[engine].launch({headless:true});browser.on('disconnected',()=>{if(!closing)report.errors.push('browser-disconnected');});report.runtime={engine,version:browser.version(),playwright:'1.62.1',platform:process.platform,nodeVersion:process.version};
   const {runButtonScenarios}=await import('./button-safety-scenarios.mjs');
   const observed=new Set(),outcomes=new Map(),rapidOutcomes=new Map();
   const actionFor=el=>{
@@ -64,7 +66,9 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
   const scenario=async(name,options,execute)=>{
    if(scenarioFilter&&name!==scenarioFilter)return;
    if(context){closing=true;await context.close();closing=false;}
-   context=await browser.newContext({serviceWorkers:'block',viewport:options.viewport||{width:1100,height:850},reducedMotion:'reduce'});
+   const device=mobileYesMotion?playwright.devices['iPhone 13']:null;
+   context=await browser.newContext({...(device?{userAgent:device.userAgent,screen:MOBILE_PROFILE.screen,deviceScaleFactor:3,isMobile:true,hasTouch:true}:{}),serviceWorkers:'block',viewport:mobileYesMotion?MOBILE_PROFILE.viewport:options.viewport||{width:1100,height:850},reducedMotion:mobileYesMotion==='normal'?'no-preference':'reduce'});
+   if(mobileYesMotion)options={...options,retainedCopies:2};
    const board=buttonFixture(options.authMode||'signed-out');
    if(options.board)Object.assign(board,options.board);
    if(options.decorate)options.decorate(board);
@@ -79,7 +83,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
    const dbName='button-'+randomUUID();
    // The neutral pointer-release iframe must never reseed shared browser
    // preferences or app storage while a button burst is in progress.
-   await context.addInitScript({content:'if(window.top===window){('+browserInit.toString()+')('+JSON.stringify({dbName,authMode:options.authMode||'signed-out',sdkBase:origin+sdk})+');}'});
+   await context.addInitScript({content:'if(window.top===window){('+browserInit.toString()+')('+JSON.stringify({dbName,authMode:options.authMode||'signed-out',sdkBase:origin+sdk})+');'+(mobileYesMotion?'localStorage.setItem("fvp:chain-scanner:landscape-motion",JSON.stringify({choice:'+JSON.stringify(mobileYesMotion)+',savedAt:Date.now()}));':'')+'}'});
    await context.addInitScript(({board,clipboardFail,clipboardDeferred,geoFail})=>{
     if(window.top!==window)return;
     if(!localStorage.getItem('fvp:chain-scanner:device-store-v2')&&localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',JSON.stringify(board));
@@ -117,19 +121,19 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
    await page.exposeBinding('__buttonUnidentified',(_,html)=>{report.unidentifiedButtons??=[];if(!report.unidentifiedButtons.includes(html))report.unidentifiedButtons.push(html);});
    await page.exposeBinding('__buttonObserved',(_,keys)=>{for(const key of keys)observed.add(key);});
    await page.exposeBinding('__buttonPressed',(_,receipt)=>{report.presses??=[];report.presses.push({scenario:name,...receipt});});
-   await page.exposeBinding('__buttonClicked',(_,key)=>{report.clicks??=[];report.clicks.push({scenario:name,action:key,at:Date.now()});});
+   await page.exposeBinding('__buttonClicked',(_,receipt)=>{report.clicks??=[];report.clicks.push({scenario:name,...receipt});});
    await page.addInitScript(({keySource})=>{
     if(window.top!==window)return;
     const key=eval('('+keySource+')');
     window.__buttonNativePresses=[];window.__buttonNativeClicks=[];
-    document.addEventListener('pointerdown',event=>{if(event.isTrusted){const target=event.target.closest('button,summary,[data-act],[role="button"]')||document.documentElement;window.__buttonNativeDownTarget=target;const receipt={at:performance.timeOrigin+performance.now(),action:key(target)};window.__buttonNativePresses.push(receipt);void window.__buttonPressed(receipt);}},true);
+    document.addEventListener('pointerdown',event=>{if(event.isTrusted){const target=event.target.closest('button,summary,[data-act],[role="button"]')||document.documentElement;window.__buttonNativeDownTarget=target;const receipt={at:performance.timeOrigin+performance.now(),action:key(target),pointerType:event.pointerType,trusted:true,offeredTaskId:key(target)==='act:yes'?state.candidateId:null};window.__buttonNativePresses.push(receipt);void window.__buttonPressed(receipt);}},true);
     window.__buttonHeartbeat={at:performance.now(),maxGapMs:0,frames:0};const pulse=now=>{const h=window.__buttonHeartbeat;h.maxGapMs=Math.max(h.maxGapMs,now-h.at);h.at=now;h.frames++;if(h.clickAt!==undefined&&h.firstFrameAfterClickMs===undefined)h.firstFrameAfterClickMs=now-h.clickAt;requestAnimationFrame(pulse);};requestAnimationFrame(pulse);
     addEventListener('unhandledrejection',event=>void window.__buttonSafetyFailure('unhandledrejection: '+String(event.reason)));
-    document.addEventListener('click',event=>{const el=event.target.closest('button,summary,[data-act],[role="button"],[data-scene-view],[data-landscape-motion],[data-scene-time],[data-scene-preset],[data-location-action]');if(el&&event.isTrusted){window.__buttonHeartbeat.clickAt=performance.now();delete window.__buttonHeartbeat.firstFrameAfterClickMs;window.__buttonNativeClicks.push({at:performance.now(),action:key(el)});void window.__buttonClicked(key(el));}},true);
+    document.addEventListener('click',event=>{const el=event.target.closest('button,summary,[data-act],[role="button"],[data-scene-view],[data-landscape-motion],[data-scene-time],[data-scene-preset],[data-location-action]');if(el&&event.isTrusted){window.__buttonHeartbeat.clickAt=performance.now();delete window.__buttonHeartbeat.firstFrameAfterClickMs;const receipt={at:performance.timeOrigin+performance.now(),action:key(el),trusted:true,offeredTaskId:key(el)==='act:yes'?state.candidateId:null};window.__buttonNativeClicks.push(receipt);void window.__buttonClicked(receipt);}},true);
     const scan=()=>{if(document.documentElement){const els=[...document.querySelectorAll('button,summary,[data-act],[role="button"],[data-scene-view],[data-landscape-motion],[data-scene-time],[data-scene-preset],[data-location-action]')];void window.__buttonObserved(els.map(key).filter(value=>value!==null));for(const el of els)if(key(el)?.startsWith('button-id:'))void window.__buttonUnidentified(el.outerHTML.slice(0,1000));}};
     addEventListener('DOMContentLoaded',()=>{scan();new MutationObserver(scan).observe(document.documentElement,{childList:true,subtree:true});});
    },{keySource:actionFor.toString()});
-   await page.goto(origin+prefix);await page.waitForFunction(()=>typeof state!=='undefined'&&state&&window.ScannerDeviceStore);await page.waitForFunction(()=>window.CloudSync?.ready);localArmed=true;
+   await page.goto(origin+prefix);await page.waitForFunction(()=>typeof state!=='undefined'&&state&&window.ScannerDeviceStore);await page.waitForFunction(()=>window.CloudSync?.ready);if(mobileYesMotion)await page.waitForFunction(motion=>document.documentElement.dataset.landscapeMotion===motion,mobileYesMotion,{timeout:12000});localArmed=true;
    const setup=await bounded((async()=>{for(let attempt=0;attempt<200;attempt++){
     const result=await page.evaluate(async()=>{const head=await ScannerDeviceStore.readHead();return{currentTasks:state.tasks.length,activeTasks:state.tasks.filter(task=>!task.done).length,durableTasks:head?.payload?JSON.parse(head.payload).tasks.length:0,durableHash:head?.hash};});
     if(result.currentTasks===TASK_COUNT&&result.durableTasks===TASK_COUNT)return{...result,fixtureRole:options.fixtureRole||'active'};
@@ -148,7 +152,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
     await expose(selector);const target=page.locator(selector).first();
     const action=await target.evaluate(actionFor);assert.ok(action,'Passive inert appearance replicas cannot earn action coverage');const before=report.clicks?.length||0;
     await bounded(page.evaluate(()=>{window.__buttonHeartbeat.maxGapMs=0;window.__buttonHeartbeat.at=performance.now();return window.__buttonHeartbeat.frames;}),'preclick heartbeat');const started=Date.now();
-    await bounded(target.click(clickOptions),name+' / '+description);
+    await bounded(mobileYesMotion?target.tap(clickOptions):target.click(clickOptions),name+' / '+description);
     if(expect)await waitFor(expect,control==='async-pending'||control==='async-predicate-false'?2500:12000,'outcome '+description);
     else assert.fail('Every button step requires an independent expected outcome: '+description);
     await bounded(page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>resolve(true)))),'frame '+description);
@@ -209,11 +213,18 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
       // receive the trusted down on a neutral marker at that same point.
       const marker=document.createElement('span');marker.id='__buttonDisabledAttempt';marker.style.cssText='position:fixed;left:'+(point.x-2)+'px;top:'+(point.y-2)+'px;width:4px;height:4px;z-index:2147483647';(document.querySelector('dialog[open]')||document.body).append(marker);
      },pressPoint),'rapid disabled refusal marker');
+     let down;
+     if(mobileYesMotion){
+      assert.ok(availability.present&&availability.hit&&!availability.disabled,'Mobile Yes must remain an enabled current touch target');
+      await bounded(page.touchscreen.tap(pressPoint.x,pressPoint.y),'rapid native touch '+actionName);
+      down=await bounded(page.evaluate(()=>{const receipt=window.__buttonNativePresses.at(-1);return{action:receipt?.action,canRelease:receipt?.pointerType==='touch'&&receipt?.trusted===true};}),'rapid delivered touch');
+      assert.equal(down.action,action,'Actual native touch must reach the requested action');
+     }else{
      await bounded((async()=>{await page.mouse.move(pressPoint.x,pressPoint.y);await page.mouse.down();})(),'rapid native down '+actionName);
      // The browser's delivered down is authoritative. If an asynchronous
      // replacement wins the final coordinate race, release neutrally just as
      // for an already absent control; never click a different app action.
-     const down=await bounded(page.evaluate(({point,action})=>{const el=window.__buttonNativeDownTarget,hit=document.elementFromPoint(point.x,point.y),receipt=window.__buttonNativePresses.at(-1);return{action:receipt?.action,canRelease:receipt?.action===action&&!!el?.isConnected&&(hit===el||el.contains(hit))};},{point:pressPoint,action}),'rapid delivered down');
+     down=await bounded(page.evaluate(({point,action})=>{const el=window.__buttonNativeDownTarget,hit=document.elementFromPoint(point.x,point.y),receipt=window.__buttonNativePresses.at(-1);return{action:receipt?.action,canRelease:receipt?.action===action&&!!el?.isConnected&&(hit===el||el.contains(hit))};},{point:pressPoint,action}),'rapid delivered down');
      if(availability.present&&availability.hit&&!availability.disabled&&down.canRelease)await bounded(page.mouse.up(),'rapid native release '+actionName);
      else{
       // Chromium can clamp an outside-viewport release onto the modal backdrop
@@ -221,6 +232,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
       // instead; the original document still records the trusted attempted down.
       await bounded(page.evaluate(()=>{if(!document.getElementById('__buttonReleaseSink')){const sink=document.createElement('iframe');sink.id='__buttonReleaseSink';sink.title='Native test release surface';sink.srcdoc='<!doctype html><style>html,body{margin:0;width:100%;height:100%}</style>';sink.style.cssText='position:fixed;left:0;top:0;width:8px;height:8px;border:0;z-index:2147483647';document.body.append(sink);}}),'rapid release surface');
       await bounded((async()=>{await page.mouse.move(4,4);await page.mouse.up();await page.evaluate(()=>{document.getElementById('__buttonReleaseSink')?.remove();document.getElementById('__buttonDisabledAttempt')?.remove();});})(),'rapid refused press '+actionName);
+     }
      }
      if(reload&&index===0){await bounded(page.waitForFunction(old=>window.__installedFixture?.documentId!==old&&document.documentElement.dataset.appReady==='true',previousDocument),'rapid bounded reload',2000);assert.equal(allowedNavigation.remaining,0,'Exactly one expected rapid reload');allowedNavigation=null;}
      await bounded(page.evaluate(()=>true),'rapid native receipt');const recentClicks=(report.clicks||[]).slice(before.clicks);const unrelated=recentClicks.filter(row=>row.action!==null&&row.action!==action);assert.deepEqual(unrelated,[],'Rapid attempt activated a different app action');const received={presses:(report.presses||[]).slice(before.presses),clicks:recentClicks.filter(row=>row.action===action)};
@@ -239,7 +251,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
     const normal=outcomes.get(action)||{action,status:'passed',events:['click'],assertions:0,responsive:true,steps:[]};normal.assertions++;normal.steps.push({scenario:name,description:'Rapid '+semantics,elapsedMs:finished-began,maxFrameGapMs:heartbeat.maxGapMs});outcomes.set(action,normal);report.outcomes=[...outcomes.values()];
     delete report.inFlightBurst;return row.bursts.at(-1);
    };
-   const ui={page,click:step,waitFor,burst,pasteBoundary,backdrop:()=>step('.mback',()=>!document.querySelector('#modalRoot .modal'),'Dismiss dialog backdrop',{position:{x:5,y:5}}),expectReload:async action=>{const before=await page.evaluate(()=>window.__installedFixture.documentId);allowedNavigation={url:page.url(),remaining:1,action};const expected=new Function('return window.__installedFixture?.documentId!=='+JSON.stringify(before)+'&&document.documentElement.dataset.appReady==="true"');await step('[data-act="'+action+'"]',expected,action+' bounded reload');assert.equal(allowedNavigation.remaining,0,'exactly one expected same-route reload');allowedNavigation=null;},act:async(action,expect,selector)=>{if(!selector){selector='[data-act="'+action+'"]';if(await page.locator('#modalRoot '+selector).count())selector='#modalRoot '+selector;}return step(selector,expect,action);},fill:(selector,value)=>nativeInput('fill',selector,value),select:(selector,value)=>nativeInput('select',selector,value),expose};
+   const ui={page,mobileYesMotion,recordMobileStory:value=>{report.mobileStory=value;},click:step,waitFor,burst,pasteBoundary,backdrop:()=>step('.mback',()=>!document.querySelector('#modalRoot .modal'),'Dismiss dialog backdrop',{position:{x:5,y:5}}),expectReload:async action=>{const before=await page.evaluate(()=>window.__installedFixture.documentId);allowedNavigation={url:page.url(),remaining:1,action};const expected=new Function('return window.__installedFixture?.documentId!=='+JSON.stringify(before)+'&&document.documentElement.dataset.appReady==="true"');await step('[data-act="'+action+'"]',expected,action+' bounded reload');assert.equal(allowedNavigation.remaining,0,'exactly one expected same-route reload');allowedNavigation=null;},act:async(action,expect,selector)=>{if(!selector){selector='[data-act="'+action+'"]';if(await page.locator('#modalRoot '+selector).count())selector='#modalRoot '+selector;}return step(selector,expect,action);},fill:(selector,value)=>nativeInput('fill',selector,value),select:(selector,value)=>nativeInput('select',selector,value),expose};
    report.scenarios??=[];const record={name,status:'running',setup};report.scenarios.push(record);save();
    if(control==='new-action')await page.evaluate(()=>{const button=document.createElement('button');button.dataset.act='gate-new-untested';button.textContent='New untested button';document.body.append(button);});
    if(control){
@@ -255,7 +267,8 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
    }
    await execute(ui);check();record.status='passed';
   };
-  if(probe)await scenario('detector sensitivity',{},async ui=>{await ui.act('settings',control==='async-predicate-false'?async()=>false:()=>!!document.getElementById('stHorizon'));});
+  if(mobileYesMotion){const {runRapidCoreScenarios}=await import('./button-safety-rapid-core.mjs');await runRapidCoreScenarios({scenario});}
+  else if(probe)await scenario('detector sensitivity',{},async ui=>{await ui.act('settings',control==='async-predicate-false'?async()=>false:()=>!!document.getElementById('stHorizon'));});
   else if(scenarioFilter?.startsWith('rapid ')){const {runRapidScenarios}=await import('./button-safety-rapid.mjs');await runRapidScenarios({scenario});}
   else {await runButtonScenarios({scenario});const {runRapidScenarios}=await import('./button-safety-rapid.mjs');await runRapidScenarios({scenario});}
   if(scenarioFilter)assert.equal(report.scenarios?.length,1,'Exactly one requested diagnostic scenario must execute');

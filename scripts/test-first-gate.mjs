@@ -26,7 +26,7 @@ const processFiles=new Set([
   'scripts/agent-tools/test-groups.test.mjs',
   '.claude/hooks/test-first-guard.sh',
 ]);
-const isProcessFile=file=>processFiles.has(file)||/^\.github\/workflows\/[^/]+\.ya?ml$/.test(file);
+const isProcessFile=file=>/^scripts\/button-safety(?:-[a-z0-9-]+)?\.mjs$/.test(file)||processFiles.has(file)||/^\.github\/workflows\/[^/]+\.ya?ml$/.test(file);
 const isAppFile=file=>{
   if(file==='tests.js')return false;
   if(file==='firestore.rules')return true;

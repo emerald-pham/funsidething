@@ -2274,3 +2274,9 @@ The command/report consumer rejects missing, duplicate, skipped, cancelled, unre
 - RISK repository process: required button enforcement changes need process coverage
 
 - RISK cloud source recovery choice: repeating the selected source preserves the mounted review and alternate choices
+
+- RISK repository process: required mobile memory evidence cannot be replaced by passing desktop groups
+
+- RISK repository process: mobile WebKit accepts ten distinct offered tasks using real touch
+
+- RISK repository process: capped mobile reports bind kernel memory distinct touch and durable outcomes
