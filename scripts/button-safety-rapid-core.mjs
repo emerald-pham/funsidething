@@ -173,8 +173,12 @@ export async function runRapidCoreScenarios(h){
     await ten(ui,'list-eligibility',()=>document.querySelector('#listEligibilityRow [data-act="list-eligibility"][data-id="eligible"]')?.getAttribute('aria-pressed')==='true',
       '#listEligibilityRow [data-act="list-eligibility"][data-id="eligible"]',
       'Ten repeated Eligible selections remain on the same explicitly selected filter.');
-    const continuity=await ui.page.evaluate(()=>{const saved=window.__eligibleMounted,body=document.getElementById('listBody');return{row:saved.row===body.querySelector('[data-act="edit"]')&&saved.row.isConnected,button:saved.button.isConnected,focus:document.activeElement===saved.button,scroll:body.scrollTop===saved.scrollTop};});
-    assert.deepEqual(continuity,{row:true,button:true,focus:true,scroll:true},'Repeated selected eligibility retains actual mounted rows, focus and scroll');
+    const continuity=await ui.page.evaluate(()=>{const saved=window.__eligibleMounted,body=document.getElementById('listBody');return{row:saved.row===body.querySelector('[data-act="edit"]')&&saved.row.isConnected,button:saved.button.isConnected,scroll:body.scrollTop===saved.scrollTop};});
+    assert.deepEqual(continuity,{row:true,button:true,scroll:true},'Repeated selected eligibility retains actual mounted rows, control and scroll');
+    // WebKit may blur a button on native mouse down. Test keyboard focus through
+    // the actual Enter consumer instead of overriding that platform policy.
+    await ui.page.locator(eligibleSelector).focus();await ui.page.locator(eligibleSelector).press('Enter');
+    await ui.waitFor(()=>{const saved=window.__eligibleMounted,body=document.getElementById('listBody');return saved.button.isConnected&&document.activeElement===saved.button&&saved.row===body.querySelector('[data-act="edit"]')&&body.scrollTop===saved.scrollTop;},12000,'Focused native Enter keeps the selected eligibility control and rows mounted');
 
     await ui.fill('#listSearch','rapid no match');
     await once(ui,'clear-list-filters',()=>document.getElementById('listSearch').value===''&&
