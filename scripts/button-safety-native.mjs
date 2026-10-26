@@ -10,7 +10,7 @@ import {MOBILE_PROFILE,MOBILE_SCENARIO} from './button-safety-mobile-contract.mj
 import {hostedButtonPolicy} from './button-safety-ci-policy.mjs';
 const digest=value=>createHash('sha256').update(value).digest('hex');
 const MIME={'.js':'text/javascript','.html':'text/html','.css':'text/css','.svg':'image/svg+xml','.png':'image/png','.webmanifest':'application/manifest+json'};
-export async function runButtonSafety({repo,engine,outputDir,port=0,control=null,probe=false,scenarioFilter=null,mobileYesMotion=null}){
+export async function runButtonSafety({repo,engine,outputDir,port=0,control=null,probe=false,scenarioFilter=null,mobileYesMotion=null,diagnostic=null}){
  assert.ok(['chromium','webkit'].includes(engine),'Explicit supported engine');
  if(mobileYesMotion){assert.equal(engine,'webkit');assert.ok(['normal','reduced'].includes(mobileYesMotion));assert.ok(scenarioFilter===null||scenarioFilter===MOBILE_SCENARIO);scenarioFilter=MOBILE_SCENARIO;}
  assert.ok(control===null||['pageerror','unhandled','reload','navigation','stall','short-stall','async-pending','async-predicate-false','close','crash','new-action'].includes(control),'Known explicit sensitivity control');
@@ -34,7 +34,9 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
 
  fs.mkdirSync(outputDir,{recursive:true});
  const git=(...args)=>execFileSync('git',args,{cwd:repo,maxBuffer:32*1024*1024}),candidateCommit=git('rev-parse','HEAD').toString().trim(),candidateTree=git('rev-parse','HEAD^{tree}').toString().trim();
- const report={schemaVersion:1,kind:mobileYesMotion?'button-mobile-functional':probe?'button-sensitivity':scenarioFilter?'button-diagnostic':'button-safety',engine,candidateCommit,candidateTree,hostedPolicy,status:'running',startedAt:new Date().toISOString(),requiredActions:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredActions,requiredScenarios:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredScenarios,requiredWorkload:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredWorkload,requiredRapidActions:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredRapidActions,inventorySha256:digest(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'))),observedActions:[],outcomes:[],errors:[],cleanup:{},limits:['Synthetic isolated browser storage and Firebase/clipboard/geolocation boundaries.',mobileYesMotion?'Emulated mobile WebKit; uncapped functional evidence unless independently bound to a verified Linux cgroup report; no physical iPhone or private-board recovery claim.':'Native desktop engine; no physical iPhone or private-board recovery claim.']};
+ const report={schemaVersion:1,kind:diagnostic?'button-mobile-diagnostic-native':mobileYesMotion?'button-mobile-functional':probe?'button-sensitivity':scenarioFilter?'button-diagnostic':'button-safety',engine,candidateCommit,candidateTree,hostedPolicy,status:'running',startedAt:new Date().toISOString(),requiredActions:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredActions,requiredScenarios:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredScenarios,requiredWorkload:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredWorkload,requiredRapidActions:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredRapidActions,inventorySha256:digest(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'))),observedActions:[],outcomes:[],errors:[],cleanup:{},limits:['Synthetic isolated browser storage and Firebase/clipboard/geolocation boundaries.',mobileYesMotion?'Emulated mobile WebKit; uncapped functional evidence unless independently bound to a verified Linux cgroup report; no physical iPhone or private-board recovery claim.':'Native desktop engine; no physical iPhone or private-board recovery claim.']};
+ const phase=stage=>diagnostic?.phase(stage);
+ if(diagnostic){assert.ok(mobileYesMotion&&!control&&!probe,'Diagnostics retain the actual mobile scenario');report.acceptanceEligible=false;report.diagnostic={reuseObserverPage:diagnostic.reuseObserverPage===true};}
  const reportPath=path.join(outputDir,'button-safety-'+engine+'-'+randomUUID()+'.json'),save=()=>fs.writeFileSync(reportPath,JSON.stringify(report,null,2)+'\n');save();
  const prefix='/button-'+randomUUID()+'/',sdk='/sdk-'+randomUUID()+'/',sources=new Map();
  for(const file of git('ls-files').toString().trim().split('\n'))if(file!=='tests.js'&&!file.startsWith('scripts/')&&/\.(html|js|css|svg|png|webmanifest)$/.test(file))sources.set(file,fs.readFileSync(path.join(repo,file)));
@@ -53,7 +55,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
    res.writeHead(bytes?200:404,{'Content-Type':module?'text/javascript':MIME[path.extname(name)]||'text/plain','Cache-Control':'no-store'});res.end(bytes||'Not found');
   });await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',resolve);});
   const origin='http://127.0.0.1:'+server.address().port;
-  const playwright=await import('playwright');browser=await playwright[engine].launch({headless:true});browser.on('disconnected',()=>{if(!closing)report.errors.push('browser-disconnected');});report.runtime={engine,version:browser.version(),playwright:'1.62.1',platform:process.platform,nodeVersion:process.version};
+  const playwright=await import('playwright');phase('before-browser-launch');browser=await playwright[engine].launch({headless:true});phase('after-browser-launch');browser.on('disconnected',()=>{if(!closing)report.errors.push('browser-disconnected');});report.runtime={engine,version:browser.version(),playwright:'1.62.1',platform:process.platform,nodeVersion:process.version};
   const {runButtonScenarios}=await import('./button-safety-scenarios.mjs');
   const observed=new Set(),outcomes=new Map(),rapidOutcomes=new Map();
   const actionFor=el=>{
@@ -70,6 +72,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
    if(context){closing=true;await context.close();closing=false;}
    const device=mobileYesMotion?playwright.devices['iPhone 13']:null;
    context=await browser.newContext({...(device?{userAgent:device.userAgent,screen:MOBILE_PROFILE.screen,deviceScaleFactor:3,isMobile:true,hasTouch:true}:{}),serviceWorkers:'block',viewport:mobileYesMotion?MOBILE_PROFILE.viewport:options.viewport||{width:1100,height:850},reducedMotion:mobileYesMotion==='normal'?'no-preference':'reduce'});
+   phase('after-context');let preparedPage=null;
    if(mobileYesMotion)options={...options,retainedCopies:2};
    const board=buttonFixture(options.authMode||'signed-out');
    if(options.board)Object.assign(board,options.board);
@@ -100,17 +103,18 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
     const put=Storage.prototype.setItem;Storage.prototype.setItem=function(key,value){if(window.__buttonRefuseWrites&&key.startsWith('fvp:chain-scanner:'))throw new DOMException('Synthetic browser storage write refused','QuotaExceededError');return put.call(this,key,value);};
    });
    if(options.retainedCopies){
-    const observer=await context.newPage();await observer.goto(origin+prefix+'__button-observer');await observer.addScriptTag({content:sources.get('device-store-v2.js').toString()});
+    phase('before-observer-page');const observer=await context.newPage();phase('before-observer-goto');await observer.goto(origin+prefix+'__button-observer');await observer.addScriptTag({content:sources.get('device-store-v2.js').toString()});phase('before-source-seed');
     report.retainedSources??=[];report.retainedSources.push(await observer.evaluate(async({dbName,board,count})=>{
      const store=ChainStorageV2.createDeviceStore({dbName});await store.open();const raw=JSON.stringify(board);
      const backups=Array.from({length:count},(_,i)=>({id:'gate-retained-'+i,kind:'manual',at:Date.now()-i,day:'2026-10-25',payload:JSON.stringify({...board,futureSourceRole:i})}));
      const result=await store.migrateLegacy({headPayload:raw,account:null,sourceFingerprint:await ChainStorageV2.hashPayload(JSON.stringify([{key:'fvp:chain-scanner:v1',raw}])),backups,opaqueArchives:[{key:'gate-opaque-exact',raw:'opaque exact bytes\u0000retain',futureBytes:new Uint8Array([0,17,255]),futureMinusZero:-0}]});
      if(!result.verified)throw Error('Native retained source fixture failed');const head=await store.readHead();await store.setPendingUpload('gate-owner',{generationId:'gate-pending',payloadHash:head.hash,baseRev:0,updatedAt:7});await store.close();
      return{count,eachPayloadBytes:backups[0].payload.length,ids:backups.map(row=>row.id)};
-    },{dbName,board,count:options.retainedCopies}));await observer.close();
+    },{dbName,board,count:options.retainedCopies}));phase('after-source-seed');
+    if(diagnostic?.reuseObserverPage){preparedPage=observer;phase('observer-retained-for-reuse');}else{await observer.close();phase('after-observer-close');}
    }
    await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
-   page=await context.newPage();page.setDefaultTimeout(4000);let localArmed=false,allowedNavigation=null;
+   phase('before-app-page');page=preparedPage||await context.newPage();phase('after-app-page');page.setDefaultTimeout(4000);let localArmed=false,allowedNavigation=null;
    page.on('pageerror',error=>report.errors.push('pageerror: '+error.message));
    page.on('crash',()=>report.errors.push('page-crash'));
    page.on('close',()=>{if(!closing)report.errors.push('unexpected-close');});
@@ -135,12 +139,13 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
     const scan=()=>{if(document.documentElement){const els=[...document.querySelectorAll('button,summary,[data-act],[role="button"],[data-scene-view],[data-landscape-motion],[data-scene-time],[data-scene-preset],[data-location-action]')];void window.__buttonObserved(els.map(key).filter(value=>value!==null));for(const el of els)if(key(el)?.startsWith('button-id:'))void window.__buttonUnidentified(el.outerHTML.slice(0,1000));}};
     addEventListener('DOMContentLoaded',()=>{scan();new MutationObserver(scan).observe(document.documentElement,{childList:true,subtree:true});});
    },{keySource:actionFor.toString()});
-   await page.goto(origin+prefix);await page.waitForFunction(()=>typeof state!=='undefined'&&state&&window.ScannerDeviceStore);await page.waitForFunction(()=>window.CloudSync?.ready);if(mobileYesMotion)await page.waitForFunction(motion=>document.documentElement.dataset.landscapeMotion===motion,mobileYesMotion,{timeout:12000});localArmed=true;
+   phase('before-app-goto');await page.goto(origin+prefix);phase('after-app-goto');await page.waitForFunction(()=>typeof state!=='undefined'&&state&&window.ScannerDeviceStore);await page.waitForFunction(()=>window.CloudSync?.ready);if(mobileYesMotion)await page.waitForFunction(motion=>document.documentElement.dataset.landscapeMotion===motion,mobileYesMotion,{timeout:12000});phase('after-app-ready');localArmed=true;
    const setup=await bounded((async()=>{for(let attempt=0;attempt<200;attempt++){
     const result=await page.evaluate(async()=>{const head=await ScannerDeviceStore.readHead();return{currentTasks:state.tasks.length,activeTasks:state.tasks.filter(task=>!task.done).length,durableTasks:head?.payload?JSON.parse(head.payload).tasks.length:0,durableHash:head?.hash};});
     if(result.currentTasks===TASK_COUNT&&result.durableTasks===TASK_COUNT)return{...result,fixtureRole:options.fixtureRole||'active'};
     await new Promise(resolve=>setTimeout(resolve,25));
    }throw Error('Independent400-task setup did not reach durable storage');})(),'400-task durable setup',12000);
+   phase('after-durable-400-task-setup');
    if(options.writeFailAfterReady)await page.evaluate(()=>window.__buttonRefuseWrites=true);
    if(options.readFailAfterReady)await page.evaluate(()=>window.__buttonRefuseReads=true);
    if(options.downloadFail)await page.evaluate(()=>{URL.createObjectURL=()=>{throw new DOMException('Synthetic download refused','NotAllowedError');};});
@@ -267,7 +272,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
      if(control==='stall'||control==='short-stall'){const end=Date.now()+(control==='short-stall'?1300:15000);while(Date.now()<end){}}
     },true);},control);
    }
-   await execute(ui);check();record.status='passed';
+   await execute(ui);check();record.status='passed';phase('after-scenario-outcomes');
   };
   if(mobileYesMotion){const {runRapidCoreScenarios}=await import('./button-safety-rapid-core.mjs');await runRapidCoreScenarios({scenario});}
   else if(probe)await scenario('detector sensitivity',{},async ui=>{await ui.act('settings',control==='async-predicate-false'?async()=>false:()=>!!document.getElementById('stHorizon'));});

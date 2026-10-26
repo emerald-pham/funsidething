@@ -2290,3 +2290,5 @@ The command/report consumer rejects missing, duplicate, skipped, cancelled, unre
 - RISK repository process: routed hosted policies reach native consumers without waiving invalid launches
 
 - RISK repository process: current producer reuse requires successful capped mobile evidence
+
+- RISK repository process: nonmergeable mobile startup diagnostics preserve strict caps and independent controls — Diagnostic branch admission, seven independent bounded containers, exact31c app bytes, immutable original versus observer-page reuse, raw memory/process telemetry and explicit nonacceptance; no capped-client success inferred from fixtures.

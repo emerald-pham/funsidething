@@ -1,0 +1,83 @@
+#!/usr/bin/env node
+// NONMERGEABLE diagnostic runner. Its reports can never qualify a release.
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import http from 'node:http';
+import {randomUUID} from 'node:crypto';
+import {spawnSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
+import {containerArgs,readMemoryBoundary} from './button-safety-mobile-memory.mjs';
+import {MOBILE_MEMORY_BYTES,MOBILE_IMAGE,MOBILE_PROFILE,MOBILE_SCENARIO,mobileDigest,verifyMobileFunctionalReport} from './button-safety-mobile-contract.mjs';
+import {hostedButtonPolicy} from './button-safety-ci-policy.mjs';
+import {buttonFixture} from './button-safety-fixture.mjs';
+import {browserInit} from './installed-client-fixture.mjs';
+const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+export const APP_SOURCE='31c98a6e075f180681a49d1647b2462521c7ac5f';
+const BRANCH='refs/heads/diagnose/webkit-cap-31c';
+const write=(file,value)=>fs.writeFileSync(file,JSON.stringify(value,null,2)+'\n');
+function git(repo,...args){const r=spawnSync('git',args,{cwd:repo,encoding:'utf8',timeout:15000,maxBuffer:32*1024*1024});if(r.status!==0)throw Error('Diagnostic Git identity failed: '+r.stderr);return r.stdout.trim();}
+export function diagnosticPlan(){return{kind:'button-mobile-memory-diagnostic',acceptanceEligible:false,appSourceCommit:APP_SOURCE,cases:[
+ ['negative',null,false],['minimal-fresh',null,false],['minimal-handoff',null,false],['original-normal','normal',false],['original-reduced','reduced',false],['reuse-normal','normal',true],['reuse-reduced','reduced',true],
+].map(([id,motion,reuseObserverPage])=>({id,motion,reuseObserverPage,timeoutMs:60000,memoryBytes:MOBILE_MEMORY_BYTES,swapBytes:0}))};}
+export function appBinding(repo=ROOT,source=APP_SOURCE){
+ const assets={};for(const file of git(repo,'ls-tree','-r','--name-only',source).split('\n').filter(f=>f!=='tests.js'&&!f.startsWith('scripts/')&&(/\.(?:html|js|css|svg|png|webmanifest)$/.test(f)||f.startsWith('vendor/')||['HUMAN_WRITTEN_HOURLY_TAGS.md','SPAWN_RATES.md','THIRD_PARTY_NOTICES.md'].includes(f)))){
+  const original=spawnSync('git',['show',source+':'+file],{cwd:repo,maxBuffer:32*1024*1024});assert.equal(original.status,0);const bytes=fs.readFileSync(path.join(repo,file));assert.equal(mobileDigest(bytes),mobileDigest(original.stdout),'App bytes differ from exact source: '+file);assets[file]=mobileDigest(bytes);
+ }
+ return{appSourceCommit:source,appSourceTree:git(repo,'rev-parse',source+'^{tree}'),runnerCommit:git(repo,'rev-parse','HEAD'),runnerTree:git(repo,'rev-parse','HEAD^{tree}'),assets};
+}
+export function diagnosticContainerArgs({caseDefinition,...options}){
+ const args=containerArgs({...options,motion:caseDefinition.motion,control:false});args[args.indexOf('scripts/button-safety-mobile-memory.mjs')]='scripts/button-safety-mobile-diagnostic.mjs';args.splice(args.indexOf(MOBILE_IMAGE),0,'--env','DEBUG=pw:browser');args.push('--case',caseDefinition.id);return args;
+}
+export async function executeDiagnosticCases(cases,runCase){const results=[];for(const c of cases){try{results.push({id:c.id,...await runCase(c)});}catch(error){results.push({id:c.id,status:'failed',error:error.stack||String(error)});}}return results;}
+export function processSnapshot({processes:includeProcesses=true}={}){
+ const cgroup=readMemoryBoundary(),stat=Object.fromEntries(fs.readFileSync('/sys/fs/cgroup/memory.stat','utf8').trim().split('\n').map(line=>{const [key,value]=line.split(/\s+/);return[key,Number(value)];})),processes=[];
+ for(const pid of includeProcesses?fs.readdirSync('/proc').filter(p=>/^\d+$/.test(p)):[]){
+  const row={pid:Number(pid)};try{const status=fs.readFileSync('/proc/'+pid+'/status','utf8'),field=k=>status.match(new RegExp('^'+k+':\\s*(.+)$','m'))?.[1];Object.assign(row,{name:field('Name'),ppid:Number(field('PPid')),rssKiB:parseInt(field('VmRSS')||'0'),command:fs.readFileSync('/proc/'+pid+'/cmdline','utf8').replaceAll('\u0000',' ').slice(0,1000)});try{const pss=fs.readFileSync('/proc/'+pid+'/smaps_rollup','utf8').match(/^Pss:\s+(\d+)/m);row.pssKiB=pss?Number(pss[1]):null;}catch(error){row.pssError=error.code||String(error);}}catch(error){row.observationError=error.code||String(error);}processes.push(row);
+ }
+ return{cgroup:{...cgroup,stat},processes};
+}
+export function createTelemetry(output,{snapshot=processSnapshot,intervalMs=100}={}){
+ const file=path.join(output,'startup.ndjson'),emit=(stage,processes)=>{try{const value=snapshot({processes});if(!processes)delete value.processes;fs.appendFileSync(file,JSON.stringify({at:new Date().toISOString(),stage,snapshot:value})+'\n');}catch(error){fs.appendFileSync(file,JSON.stringify({at:new Date().toISOString(),stage,observationError:error.stack||String(error)})+'\n');}};
+ const timer=intervalMs?setInterval(()=>emit('sample',false),intervalMs):null;
+ return{phase:stage=>emit(stage,true),stop:()=>{if(timer)clearInterval(timer);}};
+}
+async function minimalTouch({output,handoff,phase}){
+ const {webkit,devices}=await import('playwright');let browser,context,server;const report={kind:'button-mobile-minimal-diagnostic',acceptanceEligible:false,status:'running',cleanup:{}};
+ try{
+  const script=fs.readFileSync(path.join(ROOT,'device-store-v2.js'));
+  server=http.createServer((req,res)=>{res.writeHead(200,{'Content-Type':req.url==='/store.js'?'text/javascript':'text/html'});res.end(req.url==='/store.js'?script:'<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><button id="positive">Native touch positive control</button><script>window.receipts=[];document.getElementById("positive").addEventListener("pointerdown",e=>receipts.push({trusted:e.isTrusted,pointerType:e.pointerType}));</script>');});await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const origin='http://127.0.0.1:'+server.address().port;
+  phase('before-browser-launch');browser=await webkit.launch({headless:true});phase('after-browser-launch');const device=devices['iPhone 13'];context=await browser.newContext({userAgent:device.userAgent,screen:MOBILE_PROFILE.screen,deviceScaleFactor:3,isMobile:true,hasTouch:true,serviceWorkers:'block',viewport:MOBILE_PROFILE.viewport,reducedMotion:'no-preference'});phase('after-context');await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+  if(handoff){const board=buttonFixture('signed-out'),dbName='diagnostic-'+randomUUID();await context.addInitScript({content:'if(window.top===window){('+browserInit.toString()+')('+JSON.stringify({dbName,authMode:'signed-out',sdkBase:origin+'/sdk/'})+');}'});const observer=await context.newPage();phase('before-observer-goto');await observer.goto(origin+'/observer');await observer.addScriptTag({content:script.toString()});phase('before-source-seed');report.sources=await observer.evaluate(async({board,dbName})=>{const store=ChainStorageV2.createDeviceStore({dbName});await store.open();const raw=JSON.stringify(board),backups=Array.from({length:2},(_,i)=>({id:'gate-retained-'+i,kind:'manual',at:Date.now()-i,day:'2026-10-25',payload:JSON.stringify({...board,futureSourceRole:i})}));const result=await store.migrateLegacy({headPayload:raw,account:null,sourceFingerprint:await ChainStorageV2.hashPayload(JSON.stringify([{key:'fvp:chain-scanner:v1',raw}])),backups,opaqueArchives:[{key:'gate-opaque-exact',raw:'opaque exact bytes\u0000retain',futureBytes:new Uint8Array([0,17,255]),futureMinusZero:-0}]});if(!result.verified)throw Error('Source fixture verification failed');const head=await store.readHead();await store.setPendingUpload('gate-owner',{generationId:'gate-pending',payloadHash:head.hash,baseRev:0,updatedAt:7});await store.close();return{tasks:board.tasks.length,count:backups.length,eachPayloadBytes:backups[0].payload.length};},{board,dbName});phase('after-source-seed');await observer.close();phase('after-observer-close');}
+  phase('before-new-page');const page=await context.newPage();phase('after-new-page');page.setDefaultTimeout(4000);await page.goto(origin+'/positive');phase('after-minimal-goto');await page.locator('#positive').tap({timeout:2500});report.receipts=await page.evaluate(()=>receipts);assert.deepEqual(report.receipts,[{trusted:true,pointerType:'touch'}]);phase('after-minimal-trusted-touch');report.status='passed';
+ }catch(error){report.status='failed';report.error=error.stack||String(error);throw error;}finally{await context?.close();report.cleanup.contextClosed=true;await browser?.close();report.cleanup.browserClosed=true;if(server)await new Promise(resolve=>server.close(resolve));report.cleanup.serverClosed=true;write(path.join(output,'minimal.json'),report);}
+}
+async function inside({output,id}){
+ fs.mkdirSync(output,{recursive:true});const definition=diagnosticPlan().cases.find(c=>c.id===id);assert.ok(definition,'Known bounded diagnostic case required');const telemetry=createTelemetry(output),report={kind:'button-mobile-diagnostic-case',acceptanceEligible:false,id,status:'running',errors:[]};
+ try{
+  assert.match(process.version,/^v22\./);hostedButtonPolicy();assert.equal(process.env.GITHUB_REF,BRANCH);report.binding=JSON.parse(fs.readFileSync(path.join(output,'binding.json'),'utf8'));assert.equal(report.binding.appSourceCommit,APP_SOURCE);assert.equal(report.binding.runnerCommit,git(ROOT,'rev-parse','HEAD'));assert.equal(report.binding.runnerTree,git(ROOT,'rev-parse','HEAD^{tree}'));telemetry.phase('consumer-start');report.before=readMemoryBoundary();
+  if(id==='negative'){
+   const result=spawnSync(process.execPath,['scripts/button-safety-mobile-memory.mjs','--inside','--control','--output-dir',output],{cwd:ROOT,env:process.env,encoding:'utf8',timeout:30000,maxBuffer:1024*1024});report.controlStdout=result.stdout;report.controlStderr=result.stderr;assert.equal(result.status,0,result.stderr);const control=JSON.parse(fs.readFileSync(path.join(output,'inside.json'),'utf8'));assert.equal(control.childSignal,'SIGKILL');report.control=control;
+  }else if(id.startsWith('minimal-'))await minimalTouch({output,handoff:id==='minimal-handoff',phase:telemetry.phase});
+  else{
+   const {runButtonSafety}=await import('./button-safety-native.mjs');const result=await runButtonSafety({repo:ROOT,engine:'webkit',port:0,outputDir:output,scenarioFilter:MOBILE_SCENARIO,mobileYesMotion:definition.motion,diagnostic:{phase:telemetry.phase,reuseObserverPage:definition.reuseObserverPage}});report.nativeReportPath=path.basename(result.reportPath);report.nativeReportSha256=mobileDigest(fs.readFileSync(result.reportPath));assert.equal(result.report.kind,'button-mobile-diagnostic-native');verifyMobileFunctionalReport({...result.report,kind:'button-mobile-functional'},{candidateCommit:report.binding.runnerCommit,candidateTree:report.binding.runnerTree,motion:definition.motion});
+  }
+  report.after=readMemoryBoundary();if(id!=='negative')for(const key of['oom','oom_kill'])assert.equal(report.after.events[key],report.before.events[key],'Diagnostic client encountered OOM');report.status='passed';
+ }catch(error){report.status='failed';report.errors.push(error.stack||String(error));throw error;}finally{telemetry.phase('consumer-final');telemetry.stop();try{report.after=readMemoryBoundary();}catch{}write(path.join(output,'diagnostic-inside.json'),report);}
+}
+export async function runDiagnostic({outputDir,repo=ROOT}){
+ if(process.platform!=='linux'||process.env.CI!=='true')throw Error('Linux hosted diagnostic runtime required; no local cap proof.');
+ if(process.env.GITHUB_EVENT_NAME!=='push'||process.env.GITHUB_REF!==BRANCH||process.env.CHAIN_TEST_EVENT_POLICY!=='outgoing-branch-push-v1')throw Error('Only the diagnostic-only hosted branch may launch this nonmergeable investigation.');const policy=hostedButtonPolicy(),output=path.resolve(outputDir);if(output===repo||output.startsWith(repo+path.sep))throw Error('Diagnostic output must be outside checkout');fs.mkdirSync(output,{recursive:true});assert.equal(fs.readdirSync(output).length,0,'Diagnostic output must be new and empty');assert.equal(git(repo,'status','--porcelain'),'','Clean diagnostic runner required');const binding=appBinding(repo),report={schemaVersion:1,...diagnosticPlan(),binding,status:'running',results:[],cleanup:{containersRemoved:false}};
+ const docker=(args,timeout=60000)=>spawnSync('docker',args,{encoding:'utf8',timeout,maxBuffer:8*1024*1024}),checked=(args,timeout)=>{const r=docker(args,timeout);if(r.error||r.status!==0)throw Error('Diagnostic Docker command failed: '+(r.error?.message||r.stderr));return r.stdout;};
+ try{
+  checked(['pull',MOBILE_IMAGE],180000);
+  report.results=await executeDiagnosticCases(report.cases,async c=>{const directory=path.join(output,c.id);fs.mkdirSync(directory);write(path.join(directory,'binding.json'),binding);const row={status:'failed',definition:c,cleanup:{containerRemoved:false}};let id;try{
+   id=checked(diagnosticContainerArgs({repo,output:directory,nodeBinary:fs.realpathSync(process.execPath),caseDefinition:c,...policy})).trim();assert.match(id,/^[a-f0-9]{64}$/);row.containerId=id;const inspect=()=>JSON.parse(checked(['inspect',id]))[0],before=inspect();write(path.join(directory,'docker-before.json'),before);assert.equal(before.HostConfig.Memory,MOBILE_MEMORY_BYTES);assert.equal(before.HostConfig.MemorySwap,MOBILE_MEMORY_BYTES);assert.equal(before.Config.Image,MOBILE_IMAGE);
+   const result=docker(['start','--attach',id],c.timeoutMs);fs.writeFileSync(path.join(directory,'stdout.txt'),result.stdout||'');fs.writeFileSync(path.join(directory,'stderr.txt'),result.stderr||'');const after=inspect();write(path.join(directory,'docker-after.json'),after);row.exitCode=result.status;row.signal=result.signal;row.processError=result.error?.message;row.dockerOOMKilled=after.State.OOMKilled;assert.equal(result.error,undefined);assert.equal(result.status,0,result.stderr);assert.equal(after.State.Running,false);const child=JSON.parse(fs.readFileSync(path.join(directory,'diagnostic-inside.json'),'utf8'));assert.equal(child.status,'passed');if(c.id!=='negative')assert.equal(after.State.OOMKilled,false);row.status='passed';
+  }catch(error){row.error=error.stack||String(error);}finally{if(id){const removed=docker(['rm','--force',id]);row.cleanup.containerRemoved=!removed.error&&removed.status===0;}}write(path.join(directory,'case.json'),row);return row;});
+  report.cleanup.containersRemoved=report.results.every(r=>r.cleanup?.containerRemoved===true);assert.equal(report.results.length,7);assert.equal(report.cleanup.containersRemoved,true);report.status='diagnostic-complete';return report;
+ }catch(error){report.status='failed';report.error=error.stack||String(error);throw error;}finally{write(path.join(output,'diagnostic-report.json'),report);}
+}
+if(path.resolve(process.argv[1]||'')===fileURLToPath(import.meta.url)){
+ const args=process.argv.slice(2),value=name=>args[args.indexOf(name)+1];try{if(args.length===1&&args[0]==='--plan')process.stdout.write(JSON.stringify(diagnosticPlan(),null,2)+'\n');else if(args.includes('--inside'))await inside({output:path.resolve(value('--output-dir')),id:value('--case')});else if(args.includes('--run')){await runDiagnostic({outputDir:value('--output-dir')});process.stdout.write('NONMERGEABLE diagnostic observation complete; no release acceptance.\n');}else throw Error('Choose --plan, --inside or --run');}catch(error){process.stderr.write(error.stack+'\n');process.exitCode=1;}
+}
