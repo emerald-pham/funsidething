@@ -27,7 +27,7 @@ export function appBinding(repo=ROOT,source=APP_SOURCE){
  return{appSourceCommit:source,appSourceTree:git(repo,'rev-parse',source+'^{tree}'),runnerCommit:git(repo,'rev-parse','HEAD'),runnerTree:git(repo,'rev-parse','HEAD^{tree}'),assets};
 }
 export function diagnosticContainerArgs({caseDefinition,...options}){
- const args=containerArgs({...options,motion:caseDefinition.motion,control:false});args[args.indexOf('scripts/button-safety-mobile-memory.mjs')]='scripts/button-safety-mobile-diagnostic.mjs';args.splice(args.indexOf(MOBILE_IMAGE),0,'--env','DEBUG=pw:browser');args.push('--case',caseDefinition.id);return args;
+ const args=containerArgs({...options,motion:caseDefinition.motion||'normal',control:false});args[args.indexOf('scripts/button-safety-mobile-memory.mjs')]='scripts/button-safety-mobile-diagnostic.mjs';args.splice(args.indexOf(MOBILE_IMAGE),0,'--env','DEBUG=pw:browser');args.push('--case',caseDefinition.id);return args;
 }
 export async function executeDiagnosticCases(cases,runCase){const results=[];for(const c of cases){try{results.push({id:c.id,...await runCase(c)});}catch(error){results.push({id:c.id,status:'failed',error:error.stack||String(error)});}}return results;}
 export function processSnapshot({processes:includeProcesses=true}={}){

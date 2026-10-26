@@ -12941,6 +12941,51 @@
       "root": "current grouped routing requires the completed capped mobile producer before reuse",
       "group": "native-process",
       "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "diagnostic CLI exposes exactly seven bounded controls without launching a runtime",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-diagnostic.test.mjs"
+    },
+    {
+      "root": "actual diagnostic consumer refuses local and canonical release launches before output mutation",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-diagnostic.test.mjs"
+    },
+    {
+      "root": "diagnostic orchestration preserves failures and still executes every independent fresh case",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-diagnostic.test.mjs"
+    },
+    {
+      "root": "diagnostic outputs cannot satisfy release memory or functional report contracts",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-diagnostic.test.mjs"
+    },
+    {
+      "root": "diagnostic app binding preserves exact31c assets and rejects a changed product byte",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-diagnostic.test.mjs"
+    },
+    {
+      "root": "diagnostic telemetry binds durable stages to raw cgroup and process snapshots",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-diagnostic.test.mjs"
+    },
+    {
+      "root": "diagnostic workflow is branch-only and never publishes canonical acceptance jobs",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-diagnostic.test.mjs"
+    },
+    {
+      "root": "RISK repository process: nonmergeable mobile startup diagnostics preserve strict caps and independent controls",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "actual diagnostic batch retains an OOM case and removes all seven fixture containers",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-diagnostic.test.mjs"
     }
   ],
   "processControls": [
@@ -13055,51 +13100,6 @@
       "group": "core",
       "file": "tests.js",
       "reason": "Issue webkit-button-safety renames this contract around the final unified Import and recovery-archive Export behavior; exact-source, preview, cancellation, partial-state and diagnostics assertions remain."
-    },
-    {
-      "root": "diagnostic CLI exposes exactly seven bounded controls without launching a runtime",
-      "group": "native-process",
-      "file": "scripts/agent-tools/mobile-diagnostic.test.mjs"
-    },
-    {
-      "root": "actual diagnostic consumer refuses local and canonical release launches before output mutation",
-      "group": "native-process",
-      "file": "scripts/agent-tools/mobile-diagnostic.test.mjs"
-    },
-    {
-      "root": "diagnostic orchestration preserves failures and still executes every independent fresh case",
-      "group": "native-process",
-      "file": "scripts/agent-tools/mobile-diagnostic.test.mjs"
-    },
-    {
-      "root": "diagnostic outputs cannot satisfy release memory or functional report contracts",
-      "group": "native-process",
-      "file": "scripts/agent-tools/mobile-diagnostic.test.mjs"
-    },
-    {
-      "root": "diagnostic app binding preserves exact31c assets and rejects a changed product byte",
-      "group": "native-process",
-      "file": "scripts/agent-tools/mobile-diagnostic.test.mjs"
-    },
-    {
-      "root": "diagnostic telemetry binds durable stages to raw cgroup and process snapshots",
-      "group": "native-process",
-      "file": "scripts/agent-tools/mobile-diagnostic.test.mjs"
-    },
-    {
-      "root": "diagnostic workflow is branch-only and never publishes canonical acceptance jobs",
-      "group": "native-process",
-      "file": "scripts/agent-tools/mobile-diagnostic.test.mjs"
-    },
-    {
-      "root": "RISK repository process: nonmergeable mobile startup diagnostics preserve strict caps and independent controls",
-      "group": "native-process",
-      "file": "tests.js"
-    },
-    {
-      "root": "actual diagnostic batch retains an OOM case and removes all seven fixture containers",
-      "group": "native-process",
-      "file": "scripts/agent-tools/mobile-diagnostic.test.mjs"
     }
   ]
 }
