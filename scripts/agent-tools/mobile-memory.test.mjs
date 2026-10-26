@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {verifyMobileMemoryReport,verifyMobileStressReport,MOBILE_IMAGE} from '../button-safety-mobile-contract.mjs';
+import {verifyMobileMemoryReport,verifyMobileStressReport,classifyMobileStressOutcome,MOBILE_IMAGE} from '../button-safety-mobile-contract.mjs';
 import {readMemoryBoundary,containerArgs} from '../button-safety-mobile-memory.mjs';
 import {createMobileBundle,refreshMobileBundle} from './mobile-memory-fixture.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
@@ -179,4 +179,28 @@ test('mobile kernel page floor uses actual auxv readback without changing reques
  for(const [name,mutate]of [
   ['missing witness',b=>delete b.report.cases[0].after.pageSizeObservation],['changed raw page',b=>b.report.cases[0].after.pageSizeObservation.entryHex='06000000000000000020000000000000'],['wrong decoded page',b=>b.report.cases[0].after.pageSizeObservation.bytes=8192],['wrong host witness',b=>b.report.cases[0].membership.pageSizeObservation.bytes=8192],['wrong image architecture',b=>b.imageArchitecture='arm64'],['rounded Docker request',b=>b.report.cases[0].dockerMemoryBytes=999997440],['peak above effective cap',b=>b.report.cases[0].after.peakBytes=999997441],
  ])await t.test(name,()=>{const b=fixture(t);mutate(b);refreshMobileBundle(b);assert.throws(()=>verify(b),name);});
+});
+
+
+test('mobile stress owned engine loss reports the observed waitForFunction Browser closed without hiding driver faults',async t=>{
+ const make=()=>{const directory=fs.mkdtempSync(path.join(os.tmpdir(),'chain-stress-owned-closed-'));t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));const b=createMobileBundle(directory,{},'stress-512mb'),r=b.report.cases[0],n=b.native.normal;b.report.status='failed';r.appOutcome='kernel-oom';r.after.events={max:115,oom:5,oom_kill:3};r.containerExitCode=1;r.containerOOMKilled=true;r.server.status='failed';r.server.errors=['Error: Owned WebKit exited before closure request\n    at awaitFile (browser-owner)','Browser budget OOM: oom','Browser budget OOM: oom_kill'];r.server.engineExit={exitCode:137,signal:null};n.status='failed';n.errors=['unexpected-close'];n.failure='page.waitForFunction: Browser closed\n    at Object.scenario (native-consumer)';delete n.mobileStory;n.scenarios=[];refreshMobileBundle(b);return b;};
+ const verify=b=>{refreshMobileBundle(b);return verifyMobileStressReport(b.report,{artifactRoot:b.directory});};
+ const b=make();assert.equal(verify(b).status,'failed','Observed owned engine SIGKILL and real kernel OOM remain a failed reported stress outcome, without requiring an exact victim claim');assert.throws(()=>verifyMobileMemoryReport(b.report,{artifactRoot:b.directory}),'A failed stress observation never substitutes for required1GB proof');
+ const row=b.report.cases[0],native=b.native.normal,inside={before:row.before,after:row.after};assert.equal(classifyMobileStressOutcome(inside,native,row.server),'kernel-oom','The actual external-driver call shape supplies the already closed owner observation');
+ assert.throws(()=>classifyMobileStressOutcome(inside,native,{...row.server,after:{...row.after,memoryMaxBytes:512004096}}),'A different owner kernel observation cannot attribute the primary failure');
+ const invalids={
+  'no kernel OOM':b=>b.report.cases[0].after.events.oom_kill=0,
+  'no budget pressure':b=>b.report.cases[0].after.events.max=0,
+  'no crash or close event':b=>b.native.normal.errors=[],
+  'clean owner exit':b=>b.report.cases[0].server.engineExit={exitCode:0,signal:null},
+  'other failed owner exit':b=>b.report.cases[0].server.engineExit={exitCode:1,signal:null},
+  'unobserved owner exit':b=>delete b.report.cases[0].server.engineExit,
+  'incomplete owner cleanup':b=>b.report.cases[0].server.cleanup.engineExited=false,
+  'mixed unexpected navigation':b=>b.native.normal.errors.push('unexpected-navigation-or-reload: https://example.invalid'),
+  'unrelated primary driver failure':b=>b.native.normal.failure='Error: Controlled unrelated evaluation/transport error',
+  'waived driver exit':b=>b.report.cases[0].driver.containerExitCode=1,
+  'driver OOM':b=>b.report.cases[0].driver.containerOOMKilled=true,
+ };
+ for(const [name,mutate]of Object.entries(invalids))await t.test(name,()=>{const b=make();mutate(b);assert.throws(()=>verify(b),name);});
+
 });

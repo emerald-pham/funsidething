@@ -131,7 +131,7 @@ export function verifyMobileMemoryReport(report,options={}){return verifyBudgetR
 export function verifyMobileStressReport(report,options={}){return verifyBudgetReport(report,{...options,budgetProfile:'stress-512mb'});}
 // Classify only observed application signals. Transport, driver, source and
 // cleanup faults have no reportable application category and remain failures.
-export function classifyMobileStressOutcome(row,native){
+export function classifyMobileStressOutcome(row,native,server=row.server){
  if(native.status==='passed'){assert.equal(row.after.events.oom_kill,row.before.events.oom_kill);return 'passed';}
  assert.equal(native.status,'failed');
  const oom=row.after.events.oom_kill>row.before.events.oom_kill;assert.ok(Array.isArray(native.errors),'Actual native error inventory required');
@@ -143,7 +143,14 @@ export function classifyMobileStressOutcome(row,native){
  const eventCheck=native.errors.length>0&&assertionHeaders.some(header=>{const exact=header+'Native button safety detected '+native.errors.join(', ');return native.failure===exact||native.failure.startsWith(exact+'\n');});
  const crashEvent=native.errors.some(error=>error==='page-crash'||error==='unexpected-close'||(oom&&error==='browser-disconnected'));
  const crashConsequence=crashEvent&&/^(?:Error: )?(?:(?:page\.(?:goto|evaluate|waitForFunction)|locator\.(?:tap|click|evaluate|scrollIntoViewIfNeeded)|touchscreen\.tap): )?(?:Page crashed|Target crashed|Target page, context or browser has been closed|Browser has been closed)$/.test(primary);
- if(oom){assert.ok(row.after.events.max>row.before.events.max);assert.ok(crashEvent&&(crashConsequence||eventCheck),'Kernel OOM must coincide with an attributable primary crash or engine-loss failure');return 'kernel-oom';}
+ // This observed Playwright wait failure can mean engine loss, but its text
+ // alone is not application evidence. Require the matching kernel snapshots
+ // and the owner's positively observed SIGKILL exit/cleanup as well.
+ const ownedWaitLoss=oom&&crashEvent&&primary==='page.waitForFunction: Browser closed'&&
+  server?.cleanup?.serverClosed===true&&server.cleanup.engineExited===true&&
+  (server.engineExit?.exitCode===137&&server.engineExit.signal===null||server.engineExit?.exitCode===null&&server.engineExit.signal==='SIGKILL')&&
+  JSON.stringify(server.before)===JSON.stringify(row.before)&&JSON.stringify(server.after)===JSON.stringify(row.after);
+ if(oom){assert.ok(row.after.events.max>row.before.events.max);assert.ok(crashEvent&&(crashConsequence||eventCheck||ownedWaitLoss),'Kernel OOM must coincide with an attributable primary crash or engine-loss failure');return 'kernel-oom';}
  if(crashConsequence||eventCheck)return 'app-runtime-failure';
  const frame=primary.match(/^AssertionError(?: \[ERR_ASSERTION\])?: Native button safety detected blocked frame loop: .+ ([0-9]+(?:\.[0-9]+)?)ms$/);
  if(frame&&native.samples?.some(sample=>sample.maxFrameGapMs>=1000&&sample.maxFrameGapMs===Number(frame[1])))return 'app-budget-failure';

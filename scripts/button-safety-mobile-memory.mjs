@@ -93,7 +93,7 @@ async function driver(output,motion,control,budgetProfile='required-1gb'){
    const files=fs.readdirSync(output).filter(name=>/^button-safety-webkit-.*\.json$/.test(name));assert.equal(files.length,1,'One actual native attempt report required');
    report.nativeReportPath=files[0];report.nativeReportSha256=mobileDigest(fs.readFileSync(path.join(output,files[0])));report.motion=motion;
    const native=result?.report||json(path.join(output,files[0])),owned=await closeOwner();report.before=owned.before;report.after=owned.after;
-   if(budgetProfile==='stress-512mb')report.appOutcome=classifyMobileStressOutcome(report,native);
+   if(budgetProfile==='stress-512mb')report.appOutcome=classifyMobileStressOutcome(report,native,owned);
    else{if(appError)throw appError;verifyMobileFunctionalReport(native,{...source,motion});report.appOutcome='passed';}
   }
   report.status='passed';
@@ -160,7 +160,7 @@ export async function runCappedMobile({outputDir,budgetProfile='required-1gb'}){
    assert.equal(driverWait.error,undefined);assert.equal(browserWait.error,undefined);assert.equal(driverWait.status,0);assert.equal(browserWait.status,0);verifyMobileContainerExit(driverAfter.State);
    const result=json(path.join(directory,'inside.json')),server=json(path.join(directory,'browser-server.json'));assert.equal(result.status,'passed');
    let appOutcome='passed';
-   if(!control&&budgetProfile==='stress-512mb')appOutcome=classifyMobileStressOutcome({before:server.before,after:server.after},json(path.join(directory,result.nativeReportPath)));
+   if(!control&&budgetProfile==='stress-512mb')appOutcome=classifyMobileStressOutcome({before:server.before,after:server.after},json(path.join(directory,result.nativeReportPath)),server);
    if(appOutcome==='kernel-oom'){assert.equal(after.State.Running,false);assert.ok([0,1,137].includes(after.State.ExitCode));}else{verifyMobileContainerExit(after.State,{control});assert.equal(server.status,'passed');}
    if(!control)assert.equal(result.appOutcome,appOutcome);
    const raw=name=>({path:label+'/'+name,sha256:mobileDigest(fs.readFileSync(path.join(directory,name)))}),row={...result,appOutcome,containerId:browserId,image:MOBILE_IMAGE,dockerMemoryBytes:before.HostConfig.Memory,dockerMemorySwapBytes:before.HostConfig.MemorySwap,containerExitCode:after.State.ExitCode,containerOOMKilled:after.State.OOMKilled,server,membership,driver:{...result.driver,containerId:driverId,networkMode:driverBefore.HostConfig.NetworkMode,containerExitCode:driverAfter.State.ExitCode,containerOOMKilled:driverAfter.State.OOMKilled}};

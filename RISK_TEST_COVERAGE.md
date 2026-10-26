@@ -2361,3 +2361,5 @@ The pinned Linux x64 reader preserves the raw AT_PAGESZ witness and binds it to 
 - RISK scene receipt Export: a source appended during the real snapshot is preserved as a partial observation
 - RISK synced scene ordinary saves: a fresh current-account scene choice ignores a foreign receipt tip
 - RISK DEVICE STORAGE V2: current attempt refusal fences all mutations and the real capacity retry
+
+- RISK repository process: stress engine loss requires the actual kernel and owned exit evidence

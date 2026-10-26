@@ -13161,6 +13161,21 @@
       "root": "RISK DEVICE STORAGE V2: current attempt refusal fences all mutations and the real capacity retry",
       "group": "core",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: stress engine loss requires the actual kernel and owned exit evidence",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "mobile stress owned engine loss reports the observed waitForFunction Browser closed without hiding driver faults",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "mobile stress CLI retains the observed reduced owned-engine OOM after a failed normal attempt",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory-stress-lifecycle.test.mjs"
     }
   ],
   "processControls": [

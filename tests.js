@@ -46216,8 +46216,15 @@ test('RISK synced scene intent: foreign retirement cannot erase a newer live tab
 
 test('RISK synced scene replay transaction: expiry during the actual store hash cannot replace the saved head',async()=>{
  const {app,sharedStorage,indexedDBProvider,deviceDbName}=await sceneIntentTestFixture(),store=app.shim.window.ScannerDeviceStore,commit=store.commitHead.bind(store),before=await store.readHead();let release;const captureGate=new Promise(resolve=>{release=resolve;});store.commitHead=async options=>{await captureGate;return commit(options);};app.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'23:15',season:'winter'}});await flush();await app.dispose();release();await flush();
- let resume,matching=0;const gate=new Promise(resolve=>{resume=resolve;}),cryptoProvider={randomUUID:()=>webcrypto.randomUUID(),getRandomValues:a=>webcrypto.getRandomValues(a),subtle:{digest:async(...args)=>{if(new TextDecoder().decode(args[1]).includes('"time":"23:15"')&&++matching===2)await gate;return webcrypto.subtle.digest(...args);}}};
- const cold=await loadApp({sharedStorage,indexedDBProvider,deviceDbName,cryptoProvider,deviceOpenTimeoutMs:60});try{const deadline=Date.now()+500;while(!cold.ctx.deviceSaveIssue()&&Date.now()<deadline)await flush();assert.equal(matching,2,'Receipt hashing completed; the actual commitHead payload hash is held');assert.equal(cold.shim.documentElement.getAttribute('data-app-ready'),'true');assert.equal(cold.ctx.state.settings.scene.time,null);}finally{resume();}
+ let resume,matching=0,logicalNow=0;const expiryTimers=new Map(),gate=new Promise(resolve=>{resume=resolve;}),cryptoProvider={randomUUID:()=>webcrypto.randomUUID(),getRandomValues:a=>webcrypto.getRandomValues(a),subtle:{digest:async(...args)=>{if(new TextDecoder().decode(args[1]).includes('\"time\":\"23:15\"')&&++matching===2)await gate;return webcrypto.subtle.digest(...args);}}};
+ const cold=await loadApp({sharedStorage,indexedDBProvider,deviceDbName,cryptoProvider,beforeStateReady(ctx){
+  // Host scheduling cannot spend the operation budget before the intended
+  // actual store hash is reached. Expire the unchanged production deadline
+  // only after that public persistence boundary positively enters.
+  ctx.performance={now:()=>logicalNow};const set=ctx.setTimeout,clear=ctx.clearTimeout;
+  ctx.setTimeout=(fn,ms,...args)=>{if(ms===5000){const id={sceneReplayExpiry:true};expiryTimers.set(id,()=>fn(...args));return id;}return set(fn,ms,...args);};
+  ctx.clearTimeout=id=>{if(!expiryTimers.delete(id))clear(id);};
+ }});try{await fixtureDeadline(async wait=>{while(matching!==2)await wait();},'Receipt hashing completes and the actual commitHead payload hash enters');assert.equal(matching,2);assert.equal(expiryTimers.size,1,'The real replay retains its one default production deadline');logicalNow=5001;for(const expire of [...expiryTimers.values()])expire();await fixtureDeadline(async wait=>{while(!cold.ctx.deviceSaveIssue())await wait();},'Expired replay exposes the original saved board');assert.equal(cold.shim.documentElement.getAttribute('data-app-ready'),'true');assert.equal(cold.ctx.state.settings.scene.time,null);}finally{resume();}
  const deadline=Date.now()+5000;while(vm.runInContext('supportDiagnosticsActivePersistCalls',cold.ctx)>0&&Date.now()<deadline)await flush();assert.equal(vm.runInContext('supportDiagnosticsActivePersistCalls',cold.ctx),0);assert.equal(JSON.stringify(await cold.shim.window.ScannerDeviceStore.readHead()),JSON.stringify(before),'Expired second-store hashing must not replace the durable authoritative head');assert.ok(sceneIntentTestKeys(sharedStorage).length);assert.equal(cold.ctx.state.settings.scene.time,null);
 });
 
@@ -46262,4 +46269,11 @@ test('RISK DEVICE STORAGE V2: current attempt refusal fences all mutations and t
  const port={async commitHead(received){calls++;assert.equal(received,guarded,'The existing capacity retry retains the exact guarded options');if(calls===1){current=false;throw Object.assign(Error('Controlled first-call capacity refusal'),{name:'QuotaExceededError'});}return commit(received);}};
  const retried=await app.shim.window.__chainDeviceWriteCapacity('commitHead',guarded,port);assert.equal(calls,2);assert.equal(retried.code,'stale-attempt');assert.equal(JSON.stringify(await store.readRawExportSnapshot()),original,'The actual retry reaches the real store and refuses an expired attempt without mutation');
  const accepted=await store.commitHead(options);assert.equal(accepted.ok,true,'Unchanged ordinary callers need no optional attempt predicate');assert.equal((await store.readHead()).payload,options.payload);assert.ok((await store.listBackups()).some(row=>row.id==='new-attempt-backup'));assert.equal((await store.listBackups()).some(row=>row.id===options.removeBackupIds[0]),false);
+});
+
+
+test('RISK repository process: stress engine loss requires the actual kernel and owned exit evidence',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-name-pattern=mobile stress owned engine loss','scripts/agent-tools/mobile-memory.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:10000,maxBuffer:4*1024*1024});
+ assert.equal(result.error,undefined);assert.equal(result.status,0,'The actual immutable stress verifier must report observed owned engine loss while refusing unrelated driver faults: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# skipped 0$/m);
 });
