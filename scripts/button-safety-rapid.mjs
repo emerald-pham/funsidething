@@ -33,7 +33,7 @@ export async function runRapidScenarios(h){
  await runCloudScenarios({scenario:async(name,options,execute)=>{
   if(name==='cloud sync signs out and rejects signed-out authentication safely')return;
   await h.scenario('rapid '+name,options,async ui=>{
-   const act=(action,expect,selector)=>ui.burst(action,expect,{selector,semantics:'Repeated '+action+' preserves the reviewed source, choice, and protected failure outcome',expectedAccepted:{min:1,max:10}});
+   const act=(action,expect,selector)=>ui.burst(action,expect,{selector,semantics:'Repeated '+action+' preserves the reviewed source, choice, and protected failure outcome',expectedAccepted:action==='choose-cloud-recovery-source'?10:{min:1,max:10}});
    const expectReload=action=>ui.burst(action,()=>document.documentElement.dataset.appReady==='true',{selector:'#modalRoot [data-act="'+action+'"]',semantics:'The first Reload opens one new usable document; its old dialog cannot reload again',expectedAccepted:1,reload:true});
    await execute({...ui,act,expectReload});
   });
