@@ -2280,3 +2280,5 @@ The command/report consumer rejects missing, duplicate, skipped, cancelled, unre
 - RISK repository process: mobile WebKit accepts ten distinct offered tasks using real touch
 
 - RISK repository process: capped mobile reports bind kernel memory distinct touch and durable outcomes
+
+- RISK repository process: intentional Docker OOM control cannot waive capped client failures

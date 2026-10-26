@@ -49,3 +49,17 @@ test('mobile memory command cannot run a pretend local cap and pins the owned co
  const args=containerArgs({repo:'/synthetic/repo',output:'/synthetic/output',nodeBinary:'/synthetic/node22',motion:'normal',control:false,eventPolicy:'push'});
  for(const name of ['--memory','--memory-swap'])assert.equal(args[args.indexOf(name)+1],'512000000');assert.equal(args[args.indexOf('--network')+1],'none');assert.ok(args.includes(MOBILE_IMAGE));assert.ok(args.includes('/opt/chain-node'));assert.equal(args.includes('--privileged'),false);assert.equal(args.includes('--ipc=host'),false);assert.equal(args.some(value=>value.includes('docker.sock')),false);
 });
+
+test('mobile memory intentional OOM control binds the Docker flag while clients reject it',async t=>{
+ const control=fixture(t);control.report.negativeControl.containerOOMKilled=true;refreshMobileBundle(control);
+ assert.equal(verify(control).status,'passed','A real child OOM may mark Docker OOMKilled while the reporting consumer exits0');
+ for(const motion of ['normal','reduced'])await t.test(motion+' client OOM remains rejected',sub=>{
+  const client=fixture(sub);client.report.negativeControl.containerOOMKilled=true;client.report.cases.find(row=>row.motion===motion).containerOOMKilled=true;refreshMobileBundle(client);assert.throws(()=>verify(client),'An OOM-marked acceptance client must never pass');
+ });
+ await t.test('raw Docker OOM flag cannot differ from envelope',sub=>{
+  const bundle=fixture(sub);bundle.report.negativeControl.containerOOMKilled=true;refreshMobileBundle(bundle);bundle.report.negativeControl.containerOOMKilled=false;assert.throws(()=>verify(bundle));
+ });
+ await t.test('Docker OOM flag alone is not kernel proof',sub=>{
+  const bundle=fixture(sub);bundle.report.negativeControl.containerOOMKilled=true;bundle.report.negativeControl.after.events.oom_kill=0;refreshMobileBundle(bundle);assert.throws(()=>verify(bundle));
+ });
+});

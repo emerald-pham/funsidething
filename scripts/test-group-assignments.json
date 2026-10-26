@@ -12891,6 +12891,16 @@
       "root": "mobile memory command cannot run a pretend local cap and pins the owned container boundary",
       "group": "native-process",
       "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "RISK repository process: intentional Docker OOM control cannot waive capped client failures",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "mobile memory intentional OOM control binds the Docker flag while clients reject it",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
     }
   ],
   "processControls": [

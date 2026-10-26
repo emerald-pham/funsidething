@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {MOBILE_MEMORY_BYTES,MOBILE_IMAGE,MOBILE_SCENARIO,MOBILE_STORY,mobileDigest,mobileArtifactInventory,verifyMemoryBoundary,verifyMobileFunctionalReport,verifyMobileMemoryReport} from './button-safety-mobile-contract.mjs';
+import {MOBILE_MEMORY_BYTES,MOBILE_IMAGE,MOBILE_SCENARIO,MOBILE_STORY,mobileDigest,mobileArtifactInventory,verifyMemoryBoundary,verifyMobileFunctionalReport,verifyMobileMemoryReport,verifyMobileContainerExit} from './button-safety-mobile-contract.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 export function readMemoryBoundary({platform=process.platform,read=file=>fs.readFileSync(file,'utf8')}={}){
  if(platform!=='linux')throw Error('Required512MB proof needs Linux cgroup-v2 kernel enforcement; an uncapped mobile functional run is separate.');
@@ -49,7 +49,7 @@ export async function runCappedMobile({outputDir}){
    const id=docker(containerArgs({repo:root,output:directory,nodeBinary:fs.realpathSync(process.execPath),motion,control,eventPolicy:source.eventPolicy})).stdout.trim();if(!/^[a-f0-9]{64}$/.test(id))throw Error('Exact created container identity required');owned.add(id);
    const before=inspect(id);write(path.join(directory,'docker-before.json'),before);if(before.HostConfig.Memory!==MOBILE_MEMORY_BYTES||before.HostConfig.MemorySwap!==MOBILE_MEMORY_BYTES||before.Config.Image!==MOBILE_IMAGE)throw Error('Docker did not configure exact512MB/no-swap image boundary');
    const run=docker(['start','--attach',id],{allowFailure:true,timeout:60000});fs.writeFileSync(path.join(directory,'stdout.txt'),run.stdout||'');fs.writeFileSync(path.join(directory,'stderr.txt'),run.stderr||'');
-   const after=inspect(id);write(path.join(directory,'docker-after.json'),after);if(run.error||run.status!==0||after.State.Running||after.State.ExitCode!==0||after.State.OOMKilled)throw Error('Capped '+label+' did not finish cleanly: '+(run.error?.message||run.stderr));
+   const after=inspect(id);write(path.join(directory,'docker-after.json'),after);if(run.error||run.status!==0)throw Error('Capped '+label+' did not finish cleanly: '+(run.error?.message||run.stderr));verifyMobileContainerExit(after.State,{control});
    const result=JSON.parse(fs.readFileSync(path.join(directory,'inside.json'),'utf8'));if(result.status!=='passed')throw Error('Capped '+label+' inside consumer did not pass');
    const rawFile=name=>({path:label+'/'+name,sha256:mobileDigest(fs.readFileSync(path.join(directory,name)))}),insideRaw=rawFile('inside.json'),beforeRaw=rawFile('docker-before.json'),afterRaw=rawFile('docker-after.json');
    const row={...result,insidePath:insideRaw.path,insideSha256:insideRaw.sha256,dockerBeforePath:beforeRaw.path,dockerBeforeSha256:beforeRaw.sha256,dockerAfterPath:afterRaw.path,dockerAfterSha256:afterRaw.sha256,containerId:id,image:before.Config.Image,dockerMemoryBytes:before.HostConfig.Memory,dockerMemorySwapBytes:before.HostConfig.MemorySwap,containerExitCode:after.State.ExitCode,containerOOMKilled:after.State.OOMKilled};

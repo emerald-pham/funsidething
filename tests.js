@@ -45695,3 +45695,7 @@ test('RISK repository process: every button safety module fails the actual CLI w
   assert.ok(result.stderr.includes(file),`actual CLI names the uncovered module ${file}: ${result.stderr}`);
  }
 });
+
+test('RISK repository process: intentional Docker OOM control cannot waive capped client failures',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;const result=spawnSync(process.execPath,['--test','--test-name-pattern=^mobile memory intentional OOM control binds the Docker flag while clients reject it$','scripts/agent-tools/mobile-memory.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:10000,maxBuffer:2*1024*1024});assert.equal(result.error,undefined);assert.equal(result.status,0,'The intentional kernel control and actual acceptance clients need distinct Docker OOM semantics: '+result.stdout+'\n'+result.stderr);
+});
