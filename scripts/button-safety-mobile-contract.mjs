@@ -14,7 +14,18 @@ export const MOBILE_PROFILE={name:'iPhone 13 WebKit equivalent, full app viewpor
 export const MOBILE_STORY={savedTasks:400,yesCount:10,distinctTasks:true,windowMs:2000,memoryBudgetBytes:MOBILE_MEMORY_BYTES,motions:['normal','reduced']};
 export const mobileDigest=value=>createHash('sha256').update(value).digest('hex');
 const hash=value=>assert.match(value||'',/^[a-f0-9]{64}$/,'Exact SHA256 required');
+// Startup failures have no completed story. Require the actual browser context
+// and durable fixture readbacks captured before the app navigation independently.
+function verifyMobileAttempt(report,motion){
+ const attempt=report.mobileAttempt;assert.ok(attempt,'Actual pre-attempt mobile setup required');assert.equal(attempt.phase,'before-app-navigation');assert.equal(attempt.scenario,MOBILE_SCENARIO);assert.deepEqual(attempt.profile,MOBILE_PROFILE);assert.ok(MOBILE_STORY.motions.includes(attempt.motion));assert.equal(attempt.motion,motion||attempt.motion);
+ const observed=attempt.observed;assert.equal(observed?.width,390);assert.equal(observed.height,844);assert.equal(observed.screenWidth,390);assert.equal(observed.screenHeight,844);assert.equal(observed.deviceScaleFactor,3);assert.ok(Number.isSafeInteger(observed.maxTouchPoints)&&observed.maxTouchPoints>=0);assert.equal(observed.coarsePointer,true);assert.match(observed.userAgent||'',/iPhone.*AppleWebKit.*Mobile/);assert.equal(observed.reducedMedia,attempt.motion==='reduced');assert.equal(observed.appMotion,attempt.motion);
+ assert.equal(report.retainedSources?.length,1);const retained=report.retainedSources[0],proof=retained.bootstrap;assert.equal(retained.count,2);assert.equal(proof?.delivery,'observer-evaluate-once');hash(proof.headPayloadHash);assert.equal(attempt.headPayloadHash,proof.headPayloadHash);assert.ok(proof.headPayloadBytes>1048576);
+ const workload=proof.workload;assert.equal(workload?.durableTasks,400);assert.equal(workload.activeTasks,400);assert.equal(workload.distinctTaskIds,400);assert.equal(workload.unknownBytes,1048576);hash(workload.taskIdentityHash);hash(workload.unknownSourceHash);
+ assert.deepEqual(workload.opaque,{key:'gate-opaque-exact',rawHash:mobileDigest('opaque exact bytes\0retain'),futureBytes:[0,17,255],futureMinusZero:true});assert.deepEqual(workload.pending,{generationId:'gate-pending',payloadHash:proof.headPayloadHash,baseRev:0,updatedAt:7,account:'gate-owner'});
+ assert.deepEqual(proof.retainedSources?.map(row=>row.id),['gate-retained-0','gate-retained-1']);assert.equal(new Set(proof.retainedSources.map(row=>row.payloadHash)).size,2,'Two exact distinct protected payloads required');for(const row of proof.retainedSources){hash(row.payloadHash);assert.equal(row.durableTasks,400);assert.equal(row.unknownBytes,1048576);}return attempt;
+}
 export function verifyMobileFunctionalReport(report,{candidateCommit,candidateTree,motion}={}){
+ verifyMobileAttempt(report,motion);
  assert.equal(report.kind,'button-mobile-functional','Actual mobile consumer report required');assert.equal(report.status,'passed');assert.equal(report.engine,'webkit');
  const runtimeAssets=JSON.parse(fs.readFileSync(new URL('./button-safety-inventory.json',import.meta.url),'utf8')).requiredRuntimeAssets;
  assert.ok(runtimeAssets&&Object.keys(runtimeAssets).length,'Independent reviewed runtime asset inventory required');
@@ -33,6 +44,7 @@ export function verifyMobileFunctionalReport(report,{candidateCommit,candidateTr
  const ids=presses.map(row=>row.offeredTaskId);assert.equal(new Set(ids).size,10,'Ten distinct actually offered tasks required');assert.ok(ids.every(id=>typeof id==='string'&&id.length>0));
  for(let i=0;i<10;i++){assert.equal(presses[i].pointerType,'touch');assert.equal(presses[i].trusted,true);assert.equal(clicks[i].trusted,true);assert.equal(clicks[i].offeredTaskId,ids[i],'The accepted click must refer to the delivered offered task');const attempt=burst.attemptDetails[i];assert.equal(attempt.acceptedClicks,1);assert.equal(attempt.neutralRelease,false);assert.equal(attempt.nativeDownAction,'act:yes');assert.equal(attempt.availability.disabled,false);assert.equal(attempt.availability.present,true);assert.equal(attempt.availability.hit,true);}
  assert.ok(presses.at(-1).at-presses[0].at<=2000);assert.equal(story.initialChain.length,1);assert.deepEqual(story.acceptedTaskIds,ids);assert.deepEqual(story.finalChain,[...story.initialChain,...ids]);assert.deepEqual(story.durableChain,story.finalChain);assert.equal(new Set(story.finalChain).size,11);
+ for(const key of ['taskIdentityHash','unknownSourceHash'])assert.equal(story.before[key],report.retainedSources[0].bootstrap.workload[key],'Successful story must use the actual prepared fixture');
  assert.equal(story.taskCount,400);assert.equal(story.durableTaskCount,400);assert.equal(story.retainedSourceCount,2);for(const key of ['taskIdentityHash','unknownSourceHash','protectedSourcesHash']){hash(story.before[key]);assert.equal(story.after[key],story.before[key],'Original source preservation: '+key);}hash(story.durableHash);
  assert.deepEqual(report.errors,[]);for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(report.cleanup?.[key],true);return report;
 }
@@ -103,7 +115,7 @@ function verifyBudgetReport(report,{artifactRoot,budgetProfile,...identity}={}){
    assert.equal(native.kind,'button-mobile-functional');assert.equal(native.engine,'webkit');assert.equal(native.status,'failed');
    for(const key of ['candidateCommit','candidateTree'])assert.equal(native[key],report[key],'Failed stress exact source '+key);
    const assets=JSON.parse(fs.readFileSync(new URL('./button-safety-inventory.json',import.meta.url))).requiredRuntimeAssets;for(const [file,hash]of Object.entries(assets))assert.equal(native.assets?.[file],hash);
-   assert.equal(native.retainedSources?.[0]?.bootstrap?.retainedSources?.length,2,'Failed stress still needs the actual prepared protected fixture');
+   verifyMobileAttempt(native,row.motion);
    for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(native.cleanup?.[key],true,'Stress failure must still close '+key);
   }
   assert.equal(native.runtime.platform,'linux');assert.equal(native.runtime.browserConnection,'remote-owned','Native workload must use the capped remote engine');assert.equal(native.runtime.browserEndpointSha256,row.server.browser.endpointSha256,'Native workload must bind the owned capped endpoint');assert.equal(native.cleanup.browserDisconnected,true);assert.equal(native.cleanup.browserServerClosed,true);if(report.hostedPolicy)assert.deepEqual(native.hostedPolicy,report.hostedPolicy,'Native child raw/routed policy binding');assert.match(row.nodeVersion||'',/^v22\./);}
@@ -117,6 +129,8 @@ export function verifyMobileStressReport(report,options={}){return verifyBudgetR
 export function classifyMobileStressOutcome(row,native){
  if(native.status==='passed'){assert.equal(row.after.events.oom_kill,row.before.events.oom_kill);return 'passed';}
  assert.equal(native.status,'failed');
+ const oom=row.after.events.oom_kill>row.before.events.oom_kill;assert.ok(Array.isArray(native.errors),'Actual native error inventory required');
+ assert.ok(native.errors.every(error=>/^(?:page-crash|unexpected-close)$/.test(error)||/^(?:pageerror: |unhandledrejection: )/.test(error)||(oom&&error==='browser-disconnected')),'Invalid stress execution: non-application transport, navigation or control error');
  if(row.after.events.oom_kill>row.before.events.oom_kill){assert.ok(row.after.events.max>row.before.events.max);assert.ok(native.errors?.some(error=>/^(?:page-crash|browser-disconnected|unexpected-close)/.test(error))||/Page crashed|Target page, context or browser has been closed|Browser has been closed/.test(native.failure||''),'Kernel OOM must coincide with an observed app crash or engine loss');return 'kernel-oom';}
  if(native.errors?.some(error=>/^(?:page-crash|pageerror:|unhandledrejection:|unexpected-close)/.test(error)))return 'app-runtime-failure';
  if(native.samples?.some(sample=>sample.maxFrameGapMs>=1000)&&/blocked frame loop:/.test(native.failure||''))return 'app-budget-failure';

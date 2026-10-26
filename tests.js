@@ -19687,16 +19687,11 @@ test('RISK JSON COPY PASTE: Quick start explains the copy button, manual fallbac
   const help=app.shim.document.getElementById('modalRoot').innerHTML;
   const answer=help.match(/<dt>How do I copy and paste JSON\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
   assert.ok(answer,'Quick start includes the JSON copy and paste workflow');
-  assert.match(answer,/Settings.*Export.*choose Copy/i);
-  assert.match(answer,/same recovery archive offered by Download/i);
-  assert.match(answer,/not shown as a large text view/i);
-  assert.match(answer,/Copy and Download stay unavailable while Copy is pending/i);
-  assert.match(answer,/A late result from a closed export cannot change a newer export/i);
-  assert.match(answer,/If clipboard access is unavailable, use Download/i);
-  assert.match(answer,/Import.*Paste JSON.*preview.*confirm/i);
-  assert.match(answer,/accepted unsaved edits/i);
-  assert.match(help,/Large pasted archives stay captured without filling the text box/);
-  assert.doesNotMatch(answer,/Select all.*manually/i);
+  assert.equal(answer,'Choose Settings → Data and backups → Export → Copy. If copying is unavailable, choose Download; use Import → Paste JSON to bring it back.');
+  const paste=help.match(/<dt>How do I paste a saved board\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.ok(paste);
+  assert.match(paste,/complete text.*Cancel and Close keep it.*current board stay protected before preview.*Nothing applies until you confirm Restore/,'The separate paste answer retains saved-data safeguards');
+  assert.doesNotMatch(answer,/late result|pending|accepted unsaved|read-only/,'The direct Copy answer avoids repeated internal export machinery');
+
 });
 
 test('RISK button safety guidance: mounted FAQ states required browser checks and limits',async t=>{
@@ -19707,22 +19702,11 @@ test('RISK button safety guidance: mounted FAQ states required browser checks an
   const answer=help.match(/<dt>How are button crashes checked\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
   assert.ok(answer,'the mounted FAQ explains how required button checks work');
   const plain=answer.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
-  assert.ok(plain.split(/\s+/).filter(Boolean).length<=130,'button safety guidance stays within the FAQ word limit');
-  assert.match(plain,/Chromium and WebKit/i);
-  assert.match(plain,/400 saved tasks/i);
-  assert.match(plain,/ten rapid presses within two seconds/i);
-  assert.match(plain,/mobile WebKit.equivalent.*ten distinct offered tasks.*Yes.*400.task board.*two seconds.*enforced 512 MB/i,'the separate capped mobile story is explicit');
-  assert.match(plain,/Normal and Reduced motion/i);
-  assert.match(plain,/512 MB browser-process budget/i,'The mounted FAQ names the user-selected browser budget');
-  assert.match(plain,/test automation runs separately/i,'The FAQ distinguishes the external workload driver');
-  assert.match(help,/512 MB browser-process budget/i,'The changelog names the same enforced budget scope');
-  assert.match(plain,/physical iPhone behavior.*private saved boards/i);
-  assert.match(plain,/failed check or missing required coverage blocks release/i);
-  assert.match(plain,/cannot prove every device or browser condition/i);
-  assert.match(plain,/cannot determine what caused the original physical iOS crash/i);
-  assert.match(help,/Required button checks run in Chromium and WebKit.*A failed check or missing coverage blocks release/i,'the Settings changelog names the required release checks');
-  assert.match(help,/separate mobile WebKit.equivalent check.*ten distinct offered tasks.*Yes.*400 saved tasks.*two seconds.*enforced 512 MB/i,'the existing changelog describes the third required check');
-  assert.doesNotMatch(plain,/never crash|crash[- ]free/i,'the guidance does not promise universal crash prevention');
+  assert.equal(plain,'Buttons are checked with large boards and rapid presses; failed required checks block release. These checks cannot cover every device.');
+  assert.doesNotMatch(plain,/RAM|\b(?:512|1\s?GB|WebKit|Chromium|protocol|automation)\b/i,'Player help stays focused on the outcome and real limitation');
+  assert.match(help,/Button checks help catch crashes and unresponsive controls before release\./,'Settings changelog states the outcome briefly');
+  assert.doesNotMatch(help,/enforced 512 MB|browser-process budget|separate mobile WebKit.equivalent check/,'Old testing machinery is not public guidance');
+
 });
 
 test('RISK DATABASE REPAIR EXPORT: unified Copy and Download retain exact sources and metadata without writes',async t=>{
@@ -19950,8 +19934,8 @@ test('RISK DATABASE REPAIR EXPORT: a damaged saved source is retained without in
 test('RISK DATABASE REPAIR EXPORT: Help describes direct Copy and partial archive status',async t=>{
   const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();const help=app.shim.document.getElementById('modalRoot').innerHTML;
   const copy=help.match(/<dt>How do I copy and paste JSON\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.ok(copy);
-  assert.match(copy,/Settings.*Export.*choose Copy/i);assert.match(copy,/same recovery archive offered by Download/i);assert.match(copy,/not shown as a large text view/i);
-  assert.match(copy,/If clipboard access is unavailable, use Download/i);assert.match(copy,/Cancel preserves your board and pasted text/i);
+  assert.match(copy,/Settings.*Export.*Copy/i);assert.match(copy,/If copying is unavailable, choose Download/i);assert.match(copy,/Import.*Paste JSON/i);
+  const paste=help.match(/<dt>How do I paste a saved board\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.match(paste,/Cancel and Close keep it.*current board stay protected before preview.*Nothing applies until you confirm Restore/);
   const included=help.match(/<dt>What does Export include\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.ok(included);
   assert.match(included,/accepted current board.*readable app-owned saved sources.*Debug log/i);
   assert.match(included,/unavailable or changing source.*clearly marked partial/i);
@@ -19967,6 +19951,8 @@ test('RISK DATABASE REPAIR EXPORT: reload help routes users to the combined expo
   assert.match(reload,/Settings.*Data and backups.*Export.*Copy or Download/i);
   assert.match(reload,/unavailable sources are labeled partial/i);
   assert.match(reload,/Recovery and cleanup.*View debug log/i);
+  assert.match(reload,/cannot prove what caused a reload/i);assert.ok(reload.split(/\s+/).length<=55,'Reload help stays within the shortest useful routes and limitation');
+  assert.doesNotMatch(reload,/four recent|eight steps|8 KiB|one hour|Other tabs|document;|evict/i,'Technical recording and eviction mechanics remain internal');
 });
 
 test('RISK RECOVERY EXPORT: accepted unsaved board stays in direct Copy when device storage fails',async()=>{
@@ -46081,4 +46067,11 @@ test('RISK repository process: native burst preparation survives remounts withou
   else{assert.ok(failure,'Unavailable and late input must remain failed');assert.equal(report.status,'failed');if(mode==='missing target'){assert.equal(changed,1);assert.match(String(failure),/stalled responsiveness: rapid target scroll|Timeout/);}else{assert.equal(delayed,1);assert.match(String(failure),/Ten native press attempts must finish within two seconds/);assert.equal(report.inFlightBurst.attempts.length,10);assert.ok(report.inFlightBurst.windowMs>2000);}}
   t.diagnostic('Actual native remount/input sensitivity evidence: '+output);
  });
+});
+
+
+test('RISK repository process: failed mobile stress attempts retain actual setup and reject mixed transport faults',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-name-pattern=mobile budget profiles reject failed stress setup','scripts/agent-tools/mobile-memory.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:10000,maxBuffer:4*1024*1024});
+ assert.equal(result.error,undefined);assert.equal(result.status,0,'The actual immutable stress verifier must reject wrong setup and mixed transport faults: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# skipped 0$/m);
 });

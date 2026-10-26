@@ -2325,3 +2325,7 @@ The command/report consumer rejects missing, duplicate, skipped, cancelled, unre
 - RISK repository process: required one GB and reported 512MB stress profiles cannot substitute for each other
 
 - RISK repository process: native burst preparation survives remounts without waiving missing or late input
+
+- RISK repository process: failed mobile stress attempts retain actual setup and reject mixed transport faults
+
+Failed stress reports require the independently observed mobile context and durable pre-navigation fixture, even before app-ready. Synthetic parser controls reject absent or substituted setup, reduced workload and mixed transport/navigation errors while a measured startup kernel OOM remains a failed reportable app outcome. Successful stories additionally bind their task and unknown-source hashes back to that prepared fixture. Mounted button, Copy and reload answers retain useful routes and limitations; separate paste and export answers retain preview, Cancel, protected-original and partial-source guidance.

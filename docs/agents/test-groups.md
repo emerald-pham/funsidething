@@ -243,7 +243,13 @@ kernel OOM control and attempts both motions, even if Normal fails. Its original
 native report keeps any application crash, observed blocked frame or ten-touch
 deadline failure as a failed stress outcome. Such measured app failures are
 nonblocking; missing execution, source/profile mismatch, driver, transport,
-control or cleanup faults remain invalid. Passing stress cannot substitute for
+control or cleanup faults remain invalid. Before app navigation, the actual mobile context
+and durable fixture readbacks bind the scenario, viewport, motion, 400 distinct
+active tasks, 1 MiB unknown field, two exact protected backups, opaque bytes and
+pending record. A startup crash needs that completed setup even without app-ready
+or successful story evidence. Mixed transport or unexpected-navigation errors
+remain invalid alongside an application crash; only a measured kernel OOM admits
+its corresponding engine disconnect. Passing stress cannot substitute for
 required proof. The aggregate requires both independently hashed, exact-source
 bundles; no arbitrary budget input or historical report relabeling is admitted.
 

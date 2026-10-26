@@ -111,3 +111,30 @@ test('mobile budget profiles report authentic stress application failures withou
  };
  for(const [name,mutate]of Object.entries(invalids))await t.test(name,()=>{const b=fail(make(),'kernel-oom');mutate(b);refreshMobileBundle(b);assert.throws(()=>verifyStress(b),name);});
 });
+
+
+test('mobile budget profiles reject failed stress setup substitutions and mixed nonapp errors',async t=>{
+ const make=()=>{const directory=fs.mkdtempSync(path.join(os.tmpdir(),'chain-stress-setup-'));t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));const b=createMobileBundle(directory,{},'stress-512mb');b.report.status='failed';b.report.cases[0].appOutcome='app-runtime-failure';const n=b.native.normal;n.status='failed';n.errors=['page-crash'];n.failure='page.goto: Page crashed';delete n.mobileStory;n.scenarios=[];refreshMobileBundle(b);return b;};
+ const verify=b=>verifyMobileStressReport(b.report,{artifactRoot:b.directory});
+ const good=make();assert.equal(verify(good).status,'failed','Prepared startup crash remains reportable before app-ready and successful story evidence');
+ const mutations={
+  'missing pre-attempt setup':n=>delete n.mobileAttempt,
+  'wrong scenario':n=>n.mobileAttempt.scenario='small board',
+  'desktop profile':n=>n.mobileAttempt.profile.isMobile=false,
+  'wrong actual viewport':n=>n.mobileAttempt.observed.width=1100,
+  'wrong motion':n=>n.mobileAttempt.motion='reduced',
+  'wrong actual motion':n=>n.mobileAttempt.observed.reducedMedia=true,
+  'undersized durable fixture':n=>n.retainedSources[0].bootstrap.workload.durableTasks=64,
+  'undersized unknown data':n=>n.retainedSources[0].bootstrap.workload.unknownBytes=1024,
+  'duplicate tasks':n=>n.retainedSources[0].bootstrap.workload.distinctTaskIds=1,
+  'undersized protected copy':n=>n.retainedSources[0].bootstrap.retainedSources[0].durableTasks=64,
+  'missing opaque original':n=>delete n.retainedSources[0].bootstrap.workload.opaque,
+  'changed pending original':n=>n.retainedSources[0].bootstrap.workload.pending.payloadHash='0'.repeat(64),
+  'different prepared head':n=>n.mobileAttempt.headPayloadHash='0'.repeat(64),
+  'mixed transport loss without OOM':n=>n.errors.push('browser-disconnected'),
+  'mixed unexpected navigation':n=>n.errors.push('unexpected-navigation-or-reload: https://example.invalid'),
+  'mixed unidentified action':n=>n.errors.push('unidentified-button'),
+ };
+ for(const [name,mutate]of Object.entries(mutations))await t.test(name,()=>{const b=make();mutate(b.native.normal);refreshMobileBundle(b);assert.throws(()=>verify(b),name);});
+ await t.test('real kernel OOM admits engine disconnect but never unrelated navigation',()=>{const b=make(),r=b.report.cases[0],n=b.native.normal;r.appOutcome='kernel-oom';r.after.events={max:1,oom:1,oom_kill:1};r.containerOOMKilled=true;r.server.status='failed';r.server.errors=['Browser budget OOM: oom_kill'];n.errors=['page-crash','browser-disconnected','unexpected-close'];refreshMobileBundle(b);assert.equal(verify(b).status,'failed');n.errors.push('unexpected-navigation-or-reload: https://example.invalid');refreshMobileBundle(b);assert.throws(()=>verify(b),'A kernel OOM cannot waive an unrelated navigation fault');});
+});

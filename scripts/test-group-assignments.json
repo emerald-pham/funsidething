@@ -13061,6 +13061,16 @@
       "root": "RISK repository process: native burst preparation survives remounts without waiving missing or late input",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: failed mobile stress attempts retain actual setup and reject mixed transport faults",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "mobile budget profiles reject failed stress setup substitutions and mixed nonapp errors",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
     }
   ],
   "processControls": [
