@@ -2297,3 +2297,5 @@ The command/report consumer rejects missing, duplicate, skipped, cancelled, unre
 
 - RISK repository process: native HTTP serves exact committed runtime Markdown without exposing other files
 - RISK repository process: native report cannot omit or change reviewed runtime asset bytes
+
+- RISK repository process: mobile artifact consumers require reviewed runtime asset hashes

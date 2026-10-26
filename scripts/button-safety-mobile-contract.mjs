@@ -12,6 +12,12 @@ export const mobileDigest=value=>createHash('sha256').update(value).digest('hex'
 const hash=value=>assert.match(value||'',/^[a-f0-9]{64}$/,'Exact SHA256 required');
 export function verifyMobileFunctionalReport(report,{candidateCommit,candidateTree,motion}={}){
  assert.equal(report.kind,'button-mobile-functional','Actual mobile consumer report required');assert.equal(report.status,'passed');assert.equal(report.engine,'webkit');
+ const runtimeAssets=JSON.parse(fs.readFileSync(new URL('./button-safety-inventory.json',import.meta.url),'utf8')).requiredRuntimeAssets;
+ assert.ok(runtimeAssets&&Object.keys(runtimeAssets).length,'Independent reviewed runtime asset inventory required');
+ for(const [file,expected]of Object.entries(runtimeAssets)){
+  assert.match(expected,/^[a-f0-9]{64}$/,'Reviewed runtime asset SHA256 required: '+file);
+  assert.equal(report.assets?.[file],expected,'Mobile runtime asset missing or changed: '+file);
+ }
  for(const [key,value]of Object.entries({candidateCommit,candidateTree}))if(value!==undefined)assert.equal(report[key],value,'Mobile exact source '+key);
  for(const key of ['candidateCommit','candidateTree'])assert.match(report[key]||'',/^[a-f0-9]{40}$/);
  assert.equal(report.scenarios?.length,1);assert.equal(report.scenarios[0].name,MOBILE_SCENARIO);assert.equal(report.scenarios[0].status,'passed');assert.equal(report.scenarios[0].setup.durableTasks,400);

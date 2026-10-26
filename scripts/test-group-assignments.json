@@ -12966,6 +12966,11 @@
       "root": "RISK repository process: native report cannot omit or change reviewed runtime asset bytes",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: mobile artifact consumers require reviewed runtime asset hashes",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [

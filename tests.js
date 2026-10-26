@@ -45736,6 +45736,23 @@ test('RISK repository process: native HTTP serves exact committed runtime Markdo
  assert.equal(report.cleanup.browserClosed,undefined,'no browser launched; HTTP test is not native qualification');
 });
 
+test('RISK repository process: mobile artifact consumers require reviewed runtime asset hashes',async t=>{
+ const {verifyMobileFunctionalReport}=await import('./scripts/button-safety-mobile-contract.mjs'),{createMobileBundle,refreshMobileBundle}=await import('./scripts/agent-tools/mobile-memory-fixture.mjs');
+ const directory=fs.mkdtempSync('/tmp/chain-mobile-assets-');t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const git=(...args)=>spawnSync('git',args,{cwd:__dirname,encoding:'utf8'}).stdout.trim(),identity={candidateCommit:git('rev-parse','HEAD'),candidateTree:git('rev-parse','HEAD^{tree}')};
+ const env={...process.env,GITHUB_REPOSITORY:'example/fixture',GITHUB_RUN_ID:'fixture-run-1',GITHUB_RUN_ATTEMPT:'1',CHAIN_TEST_SOURCE_SHA:identity.candidateCommit,CHAIN_TEST_EVENT_POLICY:'local'};delete env.NODE_TEST_CONTEXT;
+ const verify=bundle=>spawnSync(process.execPath,['scripts/button-safety-mobile-memory.mjs','--verify',path.join(bundle.directory,'report.json')],{cwd:__dirname,env,encoding:'utf8',timeout:5000});
+ const good=createMobileBundle(path.join(directory,'positive'),{...identity,sourceSha:identity.candidateCommit});
+ for(const motion of ['normal','reduced'])assert.equal(verifyMobileFunctionalReport(good.native[motion],{...identity,motion}).status,'passed','full functional fixture remains accepted: '+motion);
+ assert.equal(verify(good).status,0,'full kernel/container/touch/durable controlled fixture accepted; not real cap proof');
+ const mutations={missingMap:r=>delete r.assets,omittedAsset:r=>delete r.assets['SPAWN_RATES.md'],changedHash:r=>r.assets['HUMAN_WRITTEN_HOURLY_TAGS.md']='e'.repeat(64),invalidHash:r=>r.assets['SPAWN_RATES.md']='unverified'};
+ for(const motion of ['normal','reduced'])for(const [name,mutate]of Object.entries(mutations))for(const consumer of ['functional','capped CLI'])await t.test(motion+' '+name+' '+consumer,()=>{
+  const bundle=createMobileBundle(path.join(directory,motion+'-'+name+'-'+consumer.replace(' ','')),{...identity,sourceSha:identity.candidateCommit});mutate(bundle.native[motion]);refreshMobileBundle(bundle);
+  if(consumer==='functional')assert.throws(()=>verifyMobileFunctionalReport(bundle.native[motion],{...identity,motion}),/runtime asset/,'functional acceptance rejects changed or absent reviewed runtime bytes');
+  else{const result=verify(bundle);assert.equal(result.error,undefined);assert.notEqual(result.status,0,'capped artifact acceptance rejects changed or absent reviewed runtime bytes');assert.match(result.stderr,/runtime asset/);}
+ });
+});
+
 test('RISK repository process: native report cannot omit or change reviewed runtime asset bytes',async t=>{
  const directory=fs.mkdtempSync('/tmp/chain-button-assets-');t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
  const requiredRuntimeAssets={'SPAWN_RATES.md':'c'.repeat(64),'HUMAN_WRITTEN_HOURLY_TAGS.md':'d'.repeat(64)};
