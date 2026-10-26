@@ -1655,7 +1655,8 @@
   document.addEventListener('landscape-location-change',()=>{refreshSky();});
   window.addEventListener('pagehide',stop);
   window.addEventListener('pageshow',()=>{preference=S.readMotion(storage);updateMotion();if(preference===null&&!dialog.open)openMotion();});
-  resize();updateMotion();if(preference===null)openMotion();
+  // Hidden startup still needs a scene before saved choices can be adopted.
+  if(document.hidden)resize();updateMotion();if(preference===null)openMotion();
   // Spawn-rate loading can finish after scanner boot. Tell the board when
   // this renderer is ready to receive its synced time and season choice.
   document.dispatchEvent(new CustomEvent('landscape-scene-time-ready'));

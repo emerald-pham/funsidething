@@ -7309,7 +7309,7 @@ test('RISK scenery browser fixture: conditional reloads retain executable probes
  const source=fs.readFileSync(path.join(__dirname,'tests.js'),'utf8');
  const start=source.indexOf("\ntest('RISK shared scenery browser:"),fragment=source.slice(start,source.indexOf("test('RISK list presentation browser:",start));
  const routeBody=fragment.match(/await page\.route\('\*\*\/landscape\.js',async route=>\{([\s\S]*?)\n    \}\);/)[1];
- const anchor='  resize();updateMotion();if(preference===null)openMotion();',requests=[],fulfills=[];
+ const anchor='  if(document.hidden)resize();updateMotion();if(preference===null)openMotion();',requests=[],fulfills=[];
  const route={request:()=>({headers:()=>({'if-modified-since':'Wed, 07 Oct 2026 00:00:00 GMT','if-none-match':'"private-fixture"','accept':'*/*'})}),
   async fetch(options){requests.push(options);const conditional=!options?.headers||options.headers['if-modified-since']||options.headers['if-none-match'];return {status:()=>conditional?304:200,headers:()=>({'content-type':'application/javascript'}),text:async()=>conditional?'':anchor};},async fulfill(value){fulfills.push(value);}};
  await vm.runInNewContext(`(async()=>{${routeBody}})()`,{route,assert,routeEvidence:[],navigation:'native fixture',createHash,Buffer});
@@ -7380,7 +7380,7 @@ test('RISK shared scenery browser: isolated Chrome and WebKit devices reconstruc
     await page.addInitScript(motion=>localStorage.setItem('fvp:chain-scanner:landscape-motion',motion),motion);
     await page.route('**/landscape.js',async route=>{try{
      const headers={...route.request().headers()};delete headers['if-modified-since'];delete headers['if-none-match'];
-     const response=await route.fetch({headers});assert.equal(response.status(),200,'the diagnostic route requires a complete executable response');let body=await response.text();const anchor='  resize();updateMotion();if(preference===null)openMotion();';assert.ok(body.includes(anchor));
+     const response=await route.fetch({headers});assert.equal(response.status(),200,'the diagnostic route requires a complete executable response');let body=await response.text();const anchor='  if(document.hidden)resize();updateMotion();if(preference===null)openMotion();';assert.ok(body.includes(anchor));
      routeEvidence.push({navigation,status:response.status(),headers:response.headers(),originalSha:createHash('sha256').update(body).digest('hex'),originalBytes:Buffer.byteLength(body)});
      body="globalThis.sharedSceneDelivery=true;\n"+body;
      body=body.replace("  const S=globalThis.LivingSky,host=document.getElementById('landscape');","  globalThis.sharedSceneBootstrap={stage:'entered'};const S=globalThis.LivingSky,host=document.getElementById('landscape');globalThis.sharedSceneBootstrap={stage:'guard',hasHost:!!host,hasSky:!!S};");
@@ -7796,7 +7796,7 @@ test('RISK scenery browser: phone fairy lights rain and both firework depths mat
    await page.addInitScript(()=>localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced'));
    await page.route('**/landscape.js',async route=>{
     const response=await route.fetch();let body=await response.text();
-    const anchor='  resize();updateMotion();if(preference===null)openMotion();';assert.ok(body.includes(anchor));
+    const anchor='  if(document.hidden)resize();updateMotion();if(preference===null)openMotion();';assert.ok(body.includes(anchor));
     body=body.replace(anchor,anchor+`
      globalThis.sceneryRegressionProbe=()=>{
       stop();reduced=true;world.events=[];sky.sun.altitude=-20;
@@ -45603,6 +45603,43 @@ test('RISK repository process: rapid native attempts preserve Add and asynchrono
   assert.equal(burst.attemptDetails.length,10);for(const attempt of burst.attemptDetails){assert.equal(attempt.trustedPresses,1);assert.equal(attempt.acceptedClicks,attempt.classification==='accepted'?1:0);if(attempt.acceptedClicks){assert.equal(attempt.availability.disabled,false);assert.equal(attempt.availability.present,true);assert.equal(attempt.availability.hit,true);assert.equal(attempt.nativeDownAction,outcome.action);assert.equal(attempt.neutralRelease,false);}}}
   assert.deepEqual(report.errors,[]);for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(report.cleanup[key],true);
   t.diagnostic('Focused rapid action evidence: '+paths[0]);
+ });
+});
+
+test('RISK scenery startup: native mobile paints once while hidden return saved choices resize and rain preserve the scene',async t=>{
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});const output=fs.mkdtempSync(path.join(base,'scenery-startup-'));
+ const playwright=await import('playwright'),launch=playwright.webkit.launch,{runButtonSafety}=await import('./scripts/button-safety-native.mjs'),{verifyMobileFunctionalReport}=await import('./scripts/button-safety-mobile-contract.mjs');
+ const source=fs.readFileSync(path.join(__dirname,'tests.js'),'utf8'),begin=source.indexOf("\ntest('RISK shared scenery browser:"),fragment=source.slice(begin,source.indexOf("test('RISK list presentation browser:",begin));
+ const pixelProbe=fragment.match(/body=body\.replace\(anchor,anchor\+`([\s\S]*?)`\)/)[1];
+ t.after(()=>{playwright.webkit.launch=launch;});
+ for(const motion of ['normal','reduced'])for(const hidden of [false,true])await t.test(motion+(hidden?' hidden then visible':' visible'),async()=>{
+  const evidence={motion,hidden,route:[],observations:[]},directory=path.join(output,motion+(hidden?'-hidden':'-visible'));fs.mkdirSync(directory,{recursive:true});
+  playwright.webkit.launch=async(...args)=>{
+   const browser=await launch.apply(playwright.webkit,args),newContext=browser.newContext.bind(browser);
+   browser.newContext=async(...args)=>{const context=await newContext(...args),newPage=context.newPage.bind(context),close=context.close.bind(context);
+    await context.addInitScript(hidden=>{
+     const NativeDate=Date,at=Date.parse('2026-10-06T03:23:42.125Z');globalThis.Date=class extends NativeDate{constructor(...args){super(...(args.length?args:[at]));}static now(){return at;}};
+     globalThis.sharedSceneBootstrap={};globalThis.startupHidden=hidden;if(hidden)Object.defineProperty(document,'hidden',{configurable:true,get:()=>globalThis.startupHidden});
+     globalThis.startupScene={background:0,life:0,sameSizeSets:0,sameSizeResetBytes:0,changedSizeSets:0};
+     for(const dimension of ['width','height']){const original=Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype,dimension);Object.defineProperty(HTMLCanvasElement.prototype,dimension,{...original,set(value){const before=original.get.call(this),other=dimension==='width'?this.height:this.width;original.set.call(this,value);const after=original.get.call(this);if(before===after){startupScene.sameSizeSets++;startupScene.sameSizeResetBytes+=after*other*4;}else startupScene.changedSizeSets++;}});}
+    },hidden);
+    context.newPage=async(...args)=>{const page=await newPage(...args);
+     await page.route('**/landscape.js',async route=>{const headers={...route.request().headers()};delete headers['if-modified-since'];delete headers['if-none-match'];const response=await route.fetch({headers});assert.equal(response.status(),200);let body=await response.text();assert.equal(createHash('sha256').update(body).digest('hex'),createHash('sha256').update(fs.readFileSync(path.join(__dirname,'landscape.js'))).digest('hex'));
+      evidence.route.push({status:response.status(),sha256:createHash('sha256').update(body).digest('hex')});
+      const anchor="  window.addEventListener('pageshow'";assert.ok(body.includes(anchor));body=body.replace(anchor,` const background=paintBackground,life=paintLife;paintBackground=(...args)=>{const value=background(...args);startupScene.background++;return value;};paintLife=(...args)=>{const value=life(...args);startupScene.life++;return value;};\n${pixelProbe}\n`+anchor);
+      const ready="  document.dispatchEvent(new CustomEvent('landscape-scene-time-ready'));";assert.ok(body.includes(ready));body=body.replace(ready,"  globalThis.initialScenePaint=JSON.parse(JSON.stringify(startupScene));\n"+ready);await route.fulfill({response,body});});return page;};
+    context.close=async(...args)=>{try{for(const page of context.pages())if(await page.evaluate(()=>typeof sharedSceneProbe==='function')){
+      const original=await page.evaluate(()=>{globalThis.startupHidden=false;document.dispatchEvent(new Event('visibilitychange'));const prepared=sharedScenePrepare(),clear=sharedSceneProbe('clear'),rain=sharedSceneProbe('rain');return {initial:initialScenePaint,prepared,clear,rain,dimensions:{width:innerWidth,height:innerHeight},taskCount:state.tasks.length,motion:document.documentElement.dataset.landscapeMotion};});
+      assert.equal(original.taskCount,400);assert.equal(original.motion,motion);assert.equal(original.prepared.backgroundPaints,1);assert.equal(original.clear.backgroundPaints,0);assert.equal(original.rain.backgroundPaints,0);assert.equal(original.rain.back,original.clear.back,'rain preserves exact cached backdrop');assert.notEqual(original.rain.front,original.clear.front);assert.deepEqual(original.rain.scene,original.clear.scene);
+      await page.setViewportSize({width:421,height:863});await page.waitForFunction(()=>document.querySelector('[data-scenery]').width===Math.floor(421*1.5));const resized=await page.evaluate(()=>sharedScenePrepare());assert.deepEqual(resized.scene,original.clear.scene,'real resize retains UTC objects');assert.notEqual(resized.back,original.clear.back,'real resize repaints changed dimensions');
+      const saved=await page.evaluate(()=>{applySyncedSceneTime('12:00','summer');const result=sharedScenePrepare();return {time:LivingSky.readSceneTime(localStorage),season:LivingSky.readSceneSeason(localStorage),scene:result.scene,period:document.documentElement.dataset.scenePeriod};});assert.equal(saved.time,'12:00');assert.equal(saved.season,'summer');assert.notDeepEqual(saved.scene,original.clear.scene,'saved scene adoption still refreshes selected time and season');
+      evidence.observations.push({initial:original.initial,taskCount:original.taskCount,motion:original.motion,scene:original.clear.scene,clearBackSha256:createHash('sha256').update(original.clear.back).digest('hex'),clearFrontSha256:createHash('sha256').update(original.clear.front).digest('hex'),rainFrontSha256:createHash('sha256').update(original.rain.front).digest('hex'),resizedScene:resized.scene,saved});
+     }}finally{await close(...args);}};return context;};return browser;
+  };
+  try{const result=await runButtonSafety({repo:__dirname,engine:'webkit',port:Number(process.env.CHAIN_NATIVE_PORT),outputDir:directory,mobileYesMotion:motion});verifyMobileFunctionalReport(result.report,{motion});evidence.reportPath=result.reportPath;}
+  finally{playwright.webkit.launch=launch;fs.writeFileSync(path.join(directory,'scenery-observation.json'),JSON.stringify(evidence,null,2)+'\n');}
+  assert.equal(evidence.observations.length,1);assert.equal(evidence.observations[0].initial.background,1,'initial scene completes exactly one background paint');assert.equal(evidence.observations[0].initial.life,1,'initial scene completes exactly one life paint');
+  t.diagnostic('Uncapped native scenery evidence, not512MB proof: '+directory);
  });
 });
 

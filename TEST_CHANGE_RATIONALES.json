@@ -1,7 +1,7 @@
 [
   {
     "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
-    "testChangesSha256": "2d82d54c5aee000030ea963ab45139eb04af0c983b8c3f99b56efb030e0a9f7e",
+    "testChangesSha256": "4c70f8038d24832061abd972c560ef71db64a50d3ef2d6647b3a98c4625b29d9",
     "reason": "Integrate the user-requested single Import/Export and direct Copy/Download with protected source preservation, WebKit export/paste/preview repairs, fresh-scan WOOP repair, late clipboard-generation guard, and required fail-closed400-task/ten-press native release checks.",
     "previousBehavior": "Settings exposed redundant transfer controls and mounted complete multi-megabyte exports in modal HTML. Native WebKit stalled while rendering export and pasted JSON, and its file byte encoder blocked Preview. An obsolete Copy completion could release a newer transfer. Fresh scan WOOP Next could lose its work-mode state. Existing CI did not require a complete independently enumerated native button/workload matrix.",
     "intendedBehavior": "One Import and one Export remain with retained backups; Copy and Download use identical prepared read-only archive bytes. Large text remains outside DOM; recovery encoding yields with source/consent guards. WOOP and clipboard lifecycle are bound to the correct state. Both Chromium and WebKit must cover every maintained action/state, durable400-task fixture, and ten trusted press attempts within2seconds with independently asserted outcomes, responsiveness and preservation.",
@@ -22469,7 +22469,7 @@
       "command": "Node22 recorder focused RISK saved view continuity and required native fixture process regressions; hosted ordinary runs40276598750,40276593922 and instrumented40282208588.",
       "failure": "30f0979b: actual onAction sameEligible10presses replaced400task rows10times(expected0) before product repair.9ae0f542: mountedFAQ lacked unchanged row guidance before copy update. Native actual hosted paste1266.5ms with2.9ms app listener and refusal2441/2410ms preserved; no local or hosted success inferred from those failures. 9fb94994 actual CLI completed the original oversized preview/Cancel scenario but no verified pre-timer complete fixture existed; 66cba120 actual pending recovery CLI completed but no single prepared neutral document existed, before the respective runner changes. e4b91818 paste fixture process GREEN follows staging; exact committed further native matrix remains separate. 26ecfe5b actual mounted-node assertions failed in both native engines despite timing GREEN; detached native HTML normalization repairs the SVG serialization mismatch. Exactfb0939b15e6abf2 Chromium passed, WebKit retained row/control/scroll but its native pointer focus differed. Parent approved preserving native pointer policy and asserting focus via real focused Enter; this is a test-expectation correction, not an app pointer-focus fix."
     },
-    "testChangesSha256": "3839f597baceb5cff8ff2b874ef79afd5ea0f2ac5a117c6cdf0aad4a21d90d97"
+    "testChangesSha256": "775af16d7c7a637fd18add509b9778424394d495f0340d6de96025cf1db5110c"
   },
   {
     "baseCommit": "59b375e92c71db888ed33acc6dbe4272c964b116",
@@ -22487,7 +22487,7 @@
       "command": "Node22 recorder: node --test --test-name-pattern \"RISK repository process: native HTTP serves exact committed\" tests.js; then the corresponding native report cannot omit or change case before contract implementation.",
       "failure": "33bd7f06 on exact59b application observed both actual HTTP requests404 instead of200 before source collection repair.5b738a00 observed actual verify-report CLI incorrectly returning0 for missingAssets, omittedMarkdown, changedBytes and invalidDigest before contract repair.7ffbc185 HTTP GREEN and8c0add7b focused23/23GREEN follow. These browser-free tests deliberately stop before browser launch and provide no native or512MB qualification."
     },
-    "testChangesSha256": "5f5e90d6af9ea42c63061dd75c5e65a8f298e95d80bd000bdf3aee0cdcadf417"
+    "testChangesSha256": "5ecbace437b912c6a0b79ae09f56da76da8c29be984a3756175bb396cdc9d53b"
   },
   {
     "baseCommit": "0902e3b00c1d8a85b8b1b847e9bb041566278eaf",
@@ -22504,6 +22504,23 @@
       "command": "Node22 recorder: node --test --test-name-pattern \"RISK repository process: mobile artifact consumers require reviewed runtime asset hashes\" tests.js before mobile contract implementation.",
       "failure": "3461e398: full positive functional Normal/Reduced and actual capped --verify CLI passed first; all16 invalid consumer cases then failed expected rejection (missing map, omitted asset, changed hash and invalid hash across both motions and both consumers). Capped raw artifact hashes were refreshed before actual CLI verification, so RED isolated missing asset fidelity checks. ed78314a GREEN17/17 follows shared functional verifier repair. Fixtures are controlled parser evidence only, not actual native, kernel or512MB acceptance."
     },
-    "testChangesSha256": "21409d9ff12549c809f2c3e505bd033d1d1c8eda88acfdbea344a53e7b6f72bc"
+    "testChangesSha256": "99006be2d7fbee16e2d8a9e0d67b1e88cf6ffd77a9b7871f225dc0ce5bbe946c"
+  },
+  {
+    "baseCommit": "de1d26480052ffd6335c886a1f76b5de697752cf",
+    "reason": "Remove the observed duplicate complete visible startup scenery paint without changing subsequent refresh, canvas reset, scene, weather or saved-state behavior.",
+    "previousBehavior": "Actual400-task mobile Normal and Reduced startup each completed an initial resize paint and an immediate second start refresh, including twelve same-size canvas dimension resets.",
+    "intendedBehavior": "Visible startup initializes once through updateMotion/start; hidden startup retains its initial resize before scene-ready so saved scene adoption is safe and visible return still refreshes.",
+    "preservedCoverage": [
+      "All full-mobile400task/one-MiB/two-backup/ten-Yes/two-second/512MB requirements and later genuine resize, weather, saved scene, pixel identity and cleanup contracts remain unchanged; this local uncapped repair is not a claimed cap fix."
+    ],
+    "replacementTests": [
+      "RISK scenery startup: native mobile paints once while hidden return saved choices resize and rain preserve the scene"
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder with allocated WebKit and port48842: node --test --test-name-pattern \"^RISK scenery startup:\" tests.js against exactde1 app bytes before renderer edit.",
+      "failure": "cd89fab6 actual native Normal/Reduced visible subcases failed2!==1 complete background paints; both hidden-start/visible-return controls passed full400task ten-touch story, rain pixel preservation, true resize and saved scene adoption. Baseline public setters measured twelve redundant same-size resets/14302080 logical reset-byte operations in the second immediate paint, not measured RAM or OOM causality. Earlier7363f8e5 clock.setFixedTime external setup failure has no behavioral RED credit; external Date boundary setup was corrected beforecd89fab6. Exact clean GREEN and pixel comparisons follow separately."
+    },
+    "testChangesSha256": "d7ad5a753ac5152f259c17380d52bcda1f992cd5ea3312fdf9d5963385cdaa95"
   }
 ]
