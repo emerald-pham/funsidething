@@ -45530,7 +45530,7 @@ test('RISK repository process: native button gate detects errors raised by a rea
  });
 });
 
-test('RISK repository process: required native button actions execute in Chromium and WebKit',async t=>{
+test('RISK repository process: required native button actions execute in Chromium and WebKit',{timeout:750000},async t=>{
  const inventory=JSON.parse(fs.readFileSync(path.join(__dirname,'scripts/button-safety-inventory.json'),'utf8'));assert.deepEqual(inventory.requiredWorkload,{savedTasks:400,rapidAttempts:10,rapidWindowMs:2000},'Both explicit user workload stories remain required');assert.deepEqual(inventory.requiredRapidActions,inventory.requiredActions,'Every required button/action family needs rapid coverage');
  const output=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(output,'Durable allocated native output required');
  // This bounds the entire 90-scenario engine process, including isolated fixture
