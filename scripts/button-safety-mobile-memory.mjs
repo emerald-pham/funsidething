@@ -47,24 +47,36 @@ function filesystemSample(data){
   const previous=data.mounts[name];data.mounts[name]={samples:(previous?.samples||0)+1,first:previous?.first||row,last:row,minimumAvailableBytes:Math.min(previous?.minimumAvailableBytes??Infinity,row.availableBytes),minimumFreeInodes:Math.min(previous?.minimumFreeInodes??Infinity,row.freeInodes)};
  }catch(error){data.unavailable[name]={code:error.code||'UNAVAILABLE',at:Date.now()};}
 }
-function runtimeProcessSnapshot(label,previous){
+function runtimeProcessSnapshot(label,previous,{threadsOnly=false}={}){
  const classify=name=>!name||name.startsWith('[')?'anonymous':name.includes('memfd:')?'memfd':name.startsWith('/dev/shm/')?'sharedMemory':name.startsWith('/tmp/')?'temporary':name.startsWith('/dev/')?'device':'other';
- const result={label,at:Date.now(),processes:[],limits:{processes:32,threadsPerProcess:64,fdsPerProcess:512,mapRowsPerProcess:4096},omittedProcesses:0};
+ const result={label,at:Date.now(),threadsOnly,processes:[],limits:{processes:32,threadsPerProcess:64,threadNameCharacters:32,fdsPerProcess:512,mapRowsPerProcess:4096},omittedProcesses:0};
  const processes=[processIdentity(process.pid),...browserProcesses()];result.omittedProcesses=Math.max(0,processes.length-32);
  for(const process of processes.slice(0,32)){
   const row={pid:process.pid,startTime:process.startTime,owner:process.pid===globalThis.process.pid,fdBackingCounts:{},mapBacking:{},threads:[],unavailable:{}};result.processes.push(row);const base='/proc/'+process.pid;
-  try{const names=fs.readdirSync(base+'/fd');row.omittedFds=Math.max(0,names.length-512);for(const name of names.slice(0,512))try{const key=classify(fs.readlinkSync(base+'/fd/'+name));row.fdBackingCounts[key]=(row.fdBackingCounts[key]||0)+1;}catch(error){row.unavailable.fd=error.code||'UNAVAILABLE';}}catch(error){row.unavailable.fds=error.code||'UNAVAILABLE';}
-  try{const lines=fs.readFileSync(base+'/maps','utf8').trim().split('\n');row.omittedMapRows=Math.max(0,lines.length-4096);for(const line of lines.slice(0,4096)){const fields=line.trim().split(/\s+/),[start,end]=fields[0].split('-').map(value=>parseInt(value,16)),key=classify(fields.slice(5).join(' ')),entry=row.mapBacking[key]??={mappings:0,virtualBytes:0};entry.mappings++;entry.virtualBytes+=end-start;}}catch(error){row.unavailable.maps=error.code||'UNAVAILABLE';}
+  if(!threadsOnly){
+   try{const names=fs.readdirSync(base+'/fd');row.omittedFds=Math.max(0,names.length-512);for(const name of names.slice(0,512))try{const key=classify(fs.readlinkSync(base+'/fd/'+name));row.fdBackingCounts[key]=(row.fdBackingCounts[key]||0)+1;}catch(error){row.unavailable.fd=error.code||'UNAVAILABLE';}}catch(error){row.unavailable.fds=error.code||'UNAVAILABLE';}
+   try{const lines=fs.readFileSync(base+'/maps','utf8').trim().split('\n');row.omittedMapRows=Math.max(0,lines.length-4096);for(const line of lines.slice(0,4096)){const fields=line.trim().split(/\s+/),[start,end]=fields[0].split('-').map(value=>parseInt(value,16)),key=classify(fields.slice(5).join(' ')),entry=row.mapBacking[key]??={mappings:0,virtualBytes:0};entry.mappings++;entry.virtualBytes+=end-start;}}catch(error){row.unavailable.maps=error.code||'UNAVAILABLE';}
+  }
   try{const tids=fs.readdirSync(base+'/task');row.omittedThreads=Math.max(0,tids.length-64);for(const tid of tids.slice(0,64))try{
    const stat=fs.readFileSync(base+'/task/'+tid+'/stat','utf8'),fields=stat.slice(stat.lastIndexOf(')')+2).split(' '),utimeTicks=Number(fields[11]),stimeTicks=Number(fields[12]),prior=previous?.processes.find(item=>item.pid===row.pid&&item.startTime===row.startTime)?.threads.find(item=>item.tid===Number(tid)&&item.startTime===fields[19]);
-   const thread={tid:Number(tid),startTime:fields[19],state:fields[0],utimeTicks,stimeTicks,deltaTicks:prior?utimeTicks+stimeTicks-prior.utimeTicks-prior.stimeTicks:null};try{const wchan=fs.readFileSync(base+'/task/'+tid+'/wchan','utf8').trim();thread.waitChannel=/^[a-zA-Z0-9_]{1,80}$/.test(wchan)?wchan:null;}catch(error){thread.waitUnavailable=error.code||'UNAVAILABLE';}row.threads.push(thread);
+   const at=Date.now(),name=stat.slice(stat.indexOf('(')+1,stat.lastIndexOf(')')),comparable=prior&&utimeTicks>=prior.utimeTicks&&stimeTicks>=prior.stimeTicks&&at>prior.at;
+   const thread={tid:Number(tid),startTime:fields[19],at,name:/^[a-zA-Z0-9_.:+ -]{1,32}$/.test(name)?name:null,state:fields[0],utimeTicks,stimeTicks,deltaUserTicks:comparable?utimeTicks-prior.utimeTicks:null,deltaSystemTicks:comparable?stimeTicks-prior.stimeTicks:null,deltaTicks:comparable?utimeTicks+stimeTicks-prior.utimeTicks-prior.stimeTicks:null,intervalMs:comparable?at-prior.at:null};try{const wchan=fs.readFileSync(base+'/task/'+tid+'/wchan','utf8').trim();thread.waitChannel=/^[a-zA-Z0-9_]{1,80}$/.test(wchan)?wchan:null;}catch(error){thread.waitUnavailable=error.code||'UNAVAILABLE';}row.threads.push(thread);
   }catch(error){row.unavailable.thread=error.code||'UNAVAILABLE';}}catch(error){row.unavailable.threads=error.code||'UNAVAILABLE';}
- }return result;
+ }result.completedAt=Date.now();return result;
+}
+function sampleRuntimeThreads(data){
+ const now=Date.now();if(data.stopped||now<(data.nextAt??0))return;
+ if(data.snapshots.length===600){data.stopped='snapshot-limit';data.stoppedAt=now;return;}
+ const snapshot=runtimeProcessSnapshot('native-attempt',data.snapshots.at(-1),{threadsOnly:true});
+ // Include conservative nesting/pretty-print overhead in the retained byte cap.
+ const bytes=Buffer.byteLength(JSON.stringify(snapshot,null,2).replace(/^/gm,'        '))+2;
+ if(data.snapshotBytes+bytes>4194304){data.stopped='byte-limit';data.stoppedAt=now;return;}
+ data.snapshotBytes+=bytes;data.maxSampleCostMs=Math.max(data.maxSampleCostMs||0,snapshot.completedAt-snapshot.at);data.snapshots.push(snapshot);data.firstAt??=snapshot.at;data.nextAt=now+100;data.lastAt=snapshot.at;
 }
 async function browserServer(output,control,budgetProfile='required-1gb'){
  const budget=mobileBudgetBytes(budgetProfile);
  fs.mkdirSync(output,{recursive:true});const source=identity(),report={...source,budgetProfile,activationVariant:process.env.CHAIN_DIAGNOSTIC_ACTIVATION,workload:process.env.CHAIN_DIAGNOSTIC_WORKLOAD,rasterVariant:process.env.CHAIN_DIAGNOSTIC_RASTER,status:'running',role:'browser',scope:MOBILE_MEMORY_SCOPE,nodeVersion:process.version,hostedPolicy:hostedButtonPolicy(),uid:process.getuid(),gid:process.getgid(),namespace:fs.readlinkSync('/proc/self/ns/net'),pidNamespace:fs.readlinkSync('/proc/self/ns/pid'),ownerPid:process.pid,errors:[],cleanup:{}};
- report.diagnosticRuntimeResources={kind:'nonqualifying-runtime-resources',filesystem:{cadenceMs:20,samples:0,mounts:{},unavailable:{}},snapshots:[]};
+ report.diagnosticRuntimeResources={kind:'nonqualifying-runtime-resources',filesystem:{cadenceMs:20,samples:0,mounts:{},unavailable:{}},snapshots:[],threadSampling:{kind:'nonqualifying-in-gap-native-threads',clock:'Date.now epoch milliseconds; correlate with native page timeOrigin + frame/task at',cadenceMs:100,maxSnapshots:600,maxSnapshotBytes:4194304,snapshotBytes:0,snapshots:[],stopped:null}};
  const file=path.join(output,'browser-server.json'),readyFile=path.join(output,'ready.json'),requestFile=path.join(output,'owner-request.json');let server,monitor,monitorError;const seen=new Map();let lastSnapshotId=null;const snapshots=report.diagnosticRuntimeResources.snapshots;
  installDiagnosticApiLog(report); // Before importing the real remote Playwright server; process ends after owned cleanup.
  try{
@@ -79,7 +91,7 @@ async function browserServer(output,control,budgetProfile='required-1gb'){
   const capture=()=>{for(const item of browserProcesses()){
    assert.equal(item.cgroup,report.before.membership,'Browser descendant escaped capped membership');assert.equal(item.namespace,report.namespace);
    const key=item.pid+':'+item.startTime;if(!seen.has(key))try{seen.set(key,{...item,executableSha256:mobileDigest(fs.readFileSync('/proc/'+item.pid+'/exe'))});}catch(error){if(!['ENOENT','ESRCH'].includes(error.code))throw error;}
-  }report.browser.processes=[...seen.values()];filesystemSample(report.diagnosticRuntimeResources.filesystem);
+  }report.browser.processes=[...seen.values()];filesystemSample(report.diagnosticRuntimeResources.filesystem);if(!control)sampleRuntimeThreads(report.diagnosticRuntimeResources.threadSampling);
    const requestPath=path.join(output,'diagnostic-snapshot-request.json');if(fs.existsSync(requestPath)){const request=json(requestPath);if(request.id!==lastSnapshotId){assert.equal(request.token,json(readyFile).token);assert.equal(request.label,'native-pre-context-cleanup');assert.match(request.id,/^[a-f0-9-]{36}$/);assert.equal(snapshots.length,1,'One bounded pre-cleanup snapshot request');snapshots.push(runtimeProcessSnapshot(request.label,snapshots.at(-1)));lastSnapshotId=request.id;write(path.join(output,'diagnostic-snapshot-response.json'),{id:request.id,token:request.token,status:'recorded',snapshotIndex:snapshots.length-1,at:Date.now()});}}
   };
   capture();monitor=setInterval(()=>{try{capture();}catch(error){monitorError??=error;}},20);
@@ -98,6 +110,7 @@ async function browserServer(output,control,budgetProfile='required-1gb'){
  }catch(error){report.status='failed';report.errors.push(error.stack||String(error));throw error;}
  finally{
   clearInterval(monitor);
+  const threadSampling=report.diagnosticRuntimeResources.threadSampling;threadSampling.endedAt=Date.now();threadSampling.endReason=threadSampling.stopped||'owner-cleanup';
   if(server)try{const child=server.process();await server.close();report.cleanup.serverClosed=true;report.engineExit={exitCode:child.exitCode,signal:child.signalCode};assert.ok(child.exitCode!==null||child.signalCode!==null,'Owned engine exit must be observed');report.cleanup.engineExited=true;if(budgetProfile!=='stress-512mb'||control){assert.equal(child.exitCode,0,'Owned engine must exit cleanly');assert.equal(child.signalCode,null);}}catch(error){report.status='failed';report.errors.push('owner cleanup: '+String(error));}
   try{report.after=readMemoryBoundary({budgetProfile});}catch(error){report.status='failed';report.errors.push(String(error));}
   if(!control&&report.before&&report.after)for(const key of ['oom','oom_kill'])if(report.after.events[key]!==report.before.events[key]){report.status='failed';report.errors.push('Browser budget OOM: '+key);}

@@ -13214,8 +13214,13 @@
     },
     {
       "file": "tests.js",
-      "root": "RISK repository process: raster diagnostic dispatch binds four Normal arms frozen app and refuses release credit",
+      "root": "RISK repository process: native thread diagnostic dispatch binds one Normal baseline frozen app and refuses release credit",
       "group": "native-process"
+    },
+    {
+      "root": "RISK repository process: bounded in-gap native thread attribution keeps names CPU intervals and reused identities honest",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [
