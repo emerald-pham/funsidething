@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import {installMobileFrameObserver} from './mobile-frame-observer.mjs';
+import {buildRasterOverlay,RASTER_VARIANTS} from './scene-raster-diagnostic.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
@@ -10,7 +12,7 @@ import {MOBILE_PROFILE,MOBILE_SCENARIO} from './button-safety-mobile-contract.mj
 import {hostedButtonPolicy} from './button-safety-ci-policy.mjs';
 const digest=value=>createHash('sha256').update(value).digest('hex');
 const MIME={'.js':'text/javascript','.html':'text/html','.css':'text/css','.svg':'image/svg+xml','.png':'image/png','.webmanifest':'application/manifest+json','.md':'text/markdown; charset=utf-8'};
-export async function runButtonSafety({repo,engine,outputDir,port=0,control=null,probe=false,scenarioFilter=null,mobileYesMotion=null,browserServerEndpoint=null,closeBrowserServer=null}){
+export async function runButtonSafety({repo,engine,outputDir,port=0,control=null,probe=false,scenarioFilter=null,mobileYesMotion=null,browserServerEndpoint=null,closeBrowserServer=null,observeRuntime=null}){
  assert.ok(['chromium','webkit'].includes(engine),'Explicit supported engine');
  if(browserServerEndpoint!==null){assert.equal(engine,'webkit');assert.ok(mobileYesMotion,'Remote launch is only admitted for the capped mobile consumer');assert.match(browserServerEndpoint,/^ws:\/\/127\.0\.0\.1:[1-9][0-9]*\/[a-zA-Z0-9_-]+$/);assert.equal(typeof closeBrowserServer,'function','Remote browser requires owner-confirmed closure');}
  if(mobileYesMotion){assert.equal(engine,'webkit');assert.ok(['normal','reduced'].includes(mobileYesMotion));assert.ok(scenarioFilter===null||scenarioFilter===MOBILE_SCENARIO);scenarioFilter=MOBILE_SCENARIO;}
@@ -45,9 +47,15 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
  for(const [file,hash]of Object.entries(runtimeAssets))assert.equal(report.assets[file],hash,'Reviewed runtime asset missing or changed: '+file);
  const {verifyButtonInventorySource}=await import('./button-safety-contract.mjs');verifyButtonInventorySource([...sources].filter(([file])=>/\.(?:js|html)$/.test(file)).map(([,bytes])=>bytes.toString()).join('\n'),JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')));
  for(const [file,bytes]of sources)assert.equal(digest(bytes),digest(git('show','HEAD:'+file)),'Button run requires exact committed app bytes: '+file);
+ const activationVariant=process.env.CHAIN_DIAGNOSTIC_ACTIVATION;assert.equal(activationVariant,'baseline','Raster comparison fixes native activation');assert.equal(mobileYesMotion,'normal','Raster comparison fixes the actually failing Normal motion');
+ const rasterVariant=process.env.CHAIN_DIAGNOSTIC_RASTER;assert.ok(RASTER_VARIANTS.includes(rasterVariant),'Explicit raster diagnostic arm required');assert.equal(process.env.CHAIN_DIAGNOSTIC_WORKLOAD,'full-app');
+ const raster=buildRasterOverlay(sources.get('landscape.js').toString(),rasterVariant);report.diagnosticRasterOverlay=raster.receipt;sources.set('landscape.js',Buffer.from(raster.body));if(rasterVariant!=='baseline')report.kind='button-mobile-raster-control';
+ report.diagnosticNativeActivation={kind:'nonqualifying-native-view-lifecycle-diagnostic',variant:activationVariant,activationCount:0,boundary:'after-newPage-before-first-app-navigation',observerClosed:false};
  let server,browser,context,page,armed=false,closing=false;
  const check=()=>{assert.equal(report.errors.length,0,'Native button safety detected '+report.errors.join(', '));};
- const bounded=async(work,label,timeoutMs=2500)=>{let timer;try{return await Promise.race([work,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Native button safety detected stalled responsiveness: '+label)),timeoutMs);})]);}finally{clearTimeout(timer);}};
+ report.diagnosticControllerPhases={kind:'diagnostic-controller-wall',timeOrigin:performance.timeOrigin,aggregates:{},slowOperations:[],unretainedLabels:0,limits:{aggregateLabels:32,slowOperations:32}};
+ const controllerPhase=(label,start,end)=>{const data=report.diagnosticControllerPhases,ms=end-start;let row=data.aggregates[label];if(!row&&Object.keys(data.aggregates).length<32)row=data.aggregates[label]={count:0,totalMs:0,maxMs:0};if(row){row.count++;row.totalMs+=ms;row.maxMs=Math.max(row.maxMs,ms);}else data.unretainedLabels++;if(data.slowOperations.length<32||ms>data.slowOperations.at(-1).ms){data.slowOperations.push({label,start,end,ms});data.slowOperations.sort((a,b)=>b.ms-a.ms);data.slowOperations.length=Math.min(32,data.slowOperations.length);}};
+ const bounded=async(work,label,timeoutMs=2500)=>{const start=performance.timeOrigin+performance.now();let timer;try{return await Promise.race([work,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Native button safety detected stalled responsiveness: '+label)),timeoutMs);})]);}finally{clearTimeout(timer);controllerPhase(label,start,performance.timeOrigin+performance.now());}};
  try{
   server=http.createServer((req,res)=>{
    const pathname=new URL(req.url,'http://127.0.0.1').pathname;
@@ -74,6 +82,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
    if(context){closing=true;await context.close();closing=false;}
    const device=mobileYesMotion?playwright.devices['iPhone 13']:null;
    context=await browser.newContext({...(device?{userAgent:device.userAgent,screen:MOBILE_PROFILE.screen,deviceScaleFactor:3,isMobile:true,hasTouch:true}:{}),serviceWorkers:'block',viewport:mobileYesMotion?MOBILE_PROFILE.viewport:options.viewport||{width:1100,height:850},reducedMotion:mobileYesMotion==='normal'?'no-preference':'reduce'});
+   await context.addInitScript(installMobileFrameObserver);
    if(mobileYesMotion)options={...options,retainedCopies:2};
    const board=buttonFixture(options.authMode||'signed-out');
    if(options.board)Object.assign(board,options.board);
@@ -131,10 +140,11 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
      const observed=await observer.evaluate(()=>({width:innerWidth,height:innerHeight,screenWidth:screen.width,screenHeight:screen.height,deviceScaleFactor:devicePixelRatio,maxTouchPoints:navigator.maxTouchPoints,coarsePointer:matchMedia('(pointer:coarse)').matches,userAgent:navigator.userAgent,reducedMedia:matchMedia('(prefers-reduced-motion:reduce)').matches,appMotion:JSON.parse(localStorage.getItem('fvp:chain-scanner:landscape-motion')).choice}));
      report.mobileAttempt={phase:'before-app-navigation',scenario:name,profile:MOBILE_PROFILE,motion:mobileYesMotion,observed,headPayloadHash:proof.headPayloadHash};save();
     }
-    await observer.close();
+    await observer.close();report.diagnosticNativeActivation.observerClosed=true;report.diagnosticNativeActivation.pagesAfterObserverClose=context.pages().length;
    }
    await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
-   page=await context.newPage();page.setDefaultTimeout(4000);let localArmed=false,allowedNavigation=null;
+   page=await context.newPage();
+   page.setDefaultTimeout(4000);let localArmed=false,allowedNavigation=null;
    page.on('pageerror',error=>report.errors.push('pageerror: '+error.message));
    page.on('crash',()=>report.errors.push('page-crash'));
    page.on('close',()=>{if(!closing)report.errors.push('unexpected-close');});
@@ -159,9 +169,10 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
     const scan=()=>{if(document.documentElement){const els=[...document.querySelectorAll('button,summary,[data-act],[role="button"],[data-scene-view],[data-landscape-motion],[data-scene-time],[data-scene-preset],[data-location-action]')];void window.__buttonObserved(els.map(key).filter(value=>value!==null));for(const el of els)if(key(el)?.startsWith('button-id:'))void window.__buttonUnidentified(el.outerHTML.slice(0,1000));}};
     addEventListener('DOMContentLoaded',()=>{scan();new MutationObserver(scan).observe(document.documentElement,{childList:true,subtree:true});});
    },{keySource:actionFor.toString()});
+   report.diagnosticNativeActivation.pagesBeforeAppNavigation=context.pages().length;report.diagnosticNativeActivation.appNavigationRequestedAt=Date.now();
    await page.goto(origin+prefix);await page.waitForFunction(()=>typeof state!=='undefined'&&state&&window.ScannerDeviceStore);await page.waitForFunction(()=>window.CloudSync?.ready);if(mobileYesMotion)await page.waitForFunction(motion=>document.documentElement.dataset.landscapeMotion===motion,mobileYesMotion,{timeout:12000});localArmed=true;
    const setup=await bounded((async()=>{for(let attempt=0;attempt<200;attempt++){
-    const result=await page.evaluate(async()=>{const head=await ScannerDeviceStore.readHead();return{currentTasks:state.tasks.length,activeTasks:state.tasks.filter(task=>!task.done).length,durableTasks:head?.payload?JSON.parse(head.payload).tasks.length:0,durableHash:head?.hash};});
+    const result=await page.evaluate(async()=>{const head=await ScannerDeviceStore.readHead();return{currentTasks:state.tasks.length,activeTasks:state.tasks.filter(task=>!task.done).length,durableTasks:head?.payload?JSON.parse(head.payload).tasks.length:0,durableHash:head?.hash,lifecycle:{hidden:document.hidden,visibilityState:document.visibilityState,hasFocus:document.hasFocus(),readyState:document.readyState}};});
     if(result.currentTasks===TASK_COUNT&&result.durableTasks===TASK_COUNT)return{...result,fixtureRole:options.fixtureRole||'active'};
     await new Promise(resolve=>setTimeout(resolve,25));
    }throw Error('Independent400-task setup did not reach durable storage');})(),'400-task durable setup',12000);
@@ -201,7 +212,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
     await expose(selector);const target=page.locator(selector).first();
     const action=await target.evaluate(actionFor);assert.ok(action,'Passive inert appearance replicas cannot earn action coverage');const before=report.clicks?.length||0;
     await bounded(page.evaluate(()=>{window.__buttonHeartbeat.maxGapMs=0;window.__buttonHeartbeat.at=performance.now();window.__buttonHeartbeat.inputArmed=true;window.__buttonHeartbeat.inputAt=null;window.__buttonHeartbeat.inputMaxGapMs=0;window.__buttonHeartbeat.preInputMaxGapMs=0;return window.__buttonHeartbeat.frames;}),'preclick heartbeat');const started=Date.now();
-    await bounded(mobileYesMotion?target.tap(clickOptions):target.click(clickOptions),name+' / '+description);
+    const inputStarted=performance.timeOrigin+performance.now();try{await bounded(mobileYesMotion?target.tap(clickOptions):target.click(clickOptions),name+' / '+description);}finally{controllerPhase('input-dispatch:'+description,inputStarted,performance.timeOrigin+performance.now());}
     if(expect)await waitFor(expect,control==='async-pending'||control==='async-predicate-false'?2500:12000,'outcome '+description);
     else assert.fail('Every button step requires an independent expected outcome: '+description);
     await bounded(page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>resolve(true)))),'frame '+description);
@@ -351,6 +362,9 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
   report.status='passed';
  }catch(error){report.status='failed';report.failure=error.stack;try{report.failureObservation=await bounded(page.evaluate(()=>({modal:document.getElementById('modalRoot')?.innerText,toast:document.getElementById('toast')?.innerText,heartbeat:{...window.__buttonHeartbeat},mode:state.mode,chain:state.chain,candidateId:state.candidateId,taskTitles:state.tasks.slice(0,10).map(t=>({id:t.id,title:t.title}))})),'failure observation');}catch(observationError){report.failureObservationError=String(observationError);}throw error;}
  finally{
+  if(context){report.mobilePhaseObservations=[];for(const observedPage of context.pages())try{const observation=await bounded(observedPage.evaluate(()=>window.__mobileFrameObservation?{...window.__mobileFrameObservation,lifecycle:{...window.__mobileFrameObservation.lifecycle,current:{at:performance.now(),hidden:document.hidden,visibilityState:document.visibilityState,hasFocus:document.hasFocus(),readyState:document.readyState}}}:null),'diagnostic phase observation',1000);if(observation)report.mobilePhaseObservations.push(observation);}catch(error){report.mobilePhaseObservationError=String(error);}}
+  if(page)try{report.diagnosticRasterObservation=await bounded(page.evaluate(()=>window.__sceneRasterDiagnostic?.snapshot()||null),'post-attempt raster observation',1000);}catch(error){report.diagnosticRasterObservationError=String(error);}
+  if(observeRuntime)try{report.diagnosticRuntimeSnapshot=await bounded(observeRuntime(),'pre-cleanup runtime snapshot',1000);}catch(error){report.diagnosticRuntimeSnapshotError=String(error);}
   closing=true;
   let cleanupError;
   const close=async work=>{try{await work();}catch(error){cleanupError??=error;report.status='failed';report.errors.push('cleanup: '+String(error));}};

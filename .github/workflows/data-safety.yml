@@ -1,313 +1,53 @@
-name: Data safety
-
+name: Diagnostic scoped raster submission comparison (nonmergeable)
 on:
   push:
-  pull_request:
-    types: [opened, synchronize, reopened, edited]
-
-env:
-  CHAIN_CI_TOPOLOGY: four-groups-v1
-  CHAIN_TEST_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-
+    branches: [diagnose/webkit-raster-submission]
+permissions:
+  contents: read
 jobs:
-  validation-context:
+  diagnostic-mobile-startup:
+    name: diagnostic-required-1GB-normal-${{ matrix.variant }}
     runs-on: ubuntu-latest
-    outputs:
-      base: ${{ steps.diff-base.outputs.sha }}
-      context: ${{ steps.plan.outputs.context }}
-      policy: ${{ steps.plan.outputs.policy }}
-      tree: ${{ steps.plan.outputs.tree }}
-      workflow-blob: ${{ steps.plan.outputs.workflow-blob }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Resolve comparison base
-        id: diff-base
-        shell: bash
-        env:
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
-          PUSH_BEFORE_SHA: ${{ github.event.before || '' }}
-          HEAD_SHA: ${{ github.sha }}
-        run: |
-          if [[ -n "$PR_BASE_SHA" ]]; then
-            base="$PR_BASE_SHA"
-          elif [[ -z "$PUSH_BEFORE_SHA" || "$PUSH_BEFORE_SHA" =~ ^0+$ ]]; then
-            git fetch --no-tags origin main
-            base="$(git merge-base origin/main "$HEAD_SHA")"
-          else
-            base="$PUSH_BEFORE_SHA"
-          fi
-          if [[ ! "$base" =~ ^[0-9a-f]{40}$ ]] || ! git cat-file -e "$base^{commit}"; then
-            echo "Could not resolve a commit to compare against." >&2
-            exit 1
-          fi
-          echo "sha=$base" >> "$GITHUB_OUTPUT"
-      - name: Describe required cohort
-        run: npm run test:group -- --describe --group core --output-dir "$RUNNER_TEMP/descriptor" --repository "$GITHUB_REPOSITORY" --event-policy "$GITHUB_EVENT_NAME" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$CHAIN_TEST_SOURCE_SHA" --comparison-base "${{ steps.diff-base.outputs.sha }}"
-      - name: Bind exact validation context
-        id: plan
-        run: node scripts/agent-tools/ci-routing.mjs --plan-only 1 --descriptor "$RUNNER_TEMP/descriptor/descriptor.json" --comparison-base "${{ steps.diff-base.outputs.sha }}" --evidence-dir "$RUNNER_TEMP/context"
-      - name: Actual checkout ${{ github.sha }} tree ${{ steps.plan.outputs.tree }}
-        run: git rev-parse HEAD
-      - name: Validation source ${{ env.CHAIN_TEST_SOURCE_SHA }} base ${{ steps.diff-base.outputs.sha }}
-        run: git cat-file -e "$CHAIN_TEST_SOURCE_SHA^{commit}"
-      - name: Workflow blob ${{ steps.plan.outputs.workflow-blob }} policy four-groups-v1
-        run: git rev-parse HEAD:.github/workflows/data-safety.yml
-      - name: Announce regression context ${{ steps.plan.outputs.context }}
-        run: echo "Bound source, checkout, comparison and complete cohort before execution"
-      - name: Preserve validation context
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: validation-context-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            ${{ runner.temp }}/descriptor
-            ${{ runner.temp }}/context
-          if-no-files-found: error
-
-  event-gates:
-    needs: validation-context
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
-      - run: npm ci
-      - run: node scripts/test-first-gate.mjs "${{ needs.validation-context.outputs.base }}"
-      - run: npm run test:rules
-      - name: Backward compatibility
-        env:
-          COMPATIBILITY_BASE_SHA: ${{ needs.validation-context.outputs.base }}
-        run: npm run test:compatibility
-
-  cohort-routing:
-    needs: validation-context
-    runs-on: ubuntu-latest
-    outputs:
-      decision: ${{ steps.route.outputs.decision }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - uses: actions/download-artifact@v4
-        with:
-          name: validation-context-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/validation
-      - name: Resolve complete cohort coverage
-        id: route
-        run: node scripts/agent-tools/ci-routing.mjs --descriptor "$RUNNER_TEMP/validation/descriptor/descriptor.json" --comparison-base "${{ needs.validation-context.outputs.base }}" --evidence-dir "$RUNNER_TEMP/ci-routing"
-      - name: Preserve routing observations
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ci-routing-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/ci-routing
-          if-no-files-found: error
-
-  regression:
-    name: regression-${{ matrix.group }}
-    needs: [validation-context, cohort-routing]
-    if: always() && needs.validation-context.result == 'success' && needs.cohort-routing.result == 'success'
-    runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        group: [core, scenery, persistence-recovery, native-process]
+        variant: [baseline, backdrop-raster-off, foreground-raster-off, both-raster-off]
     env:
-      CHAIN_TEST_EVENT_POLICY: ${{ needs.validation-context.outputs.policy }}
-      CHAIN_TEST_COMPARISON_BASE: ${{ needs.validation-context.outputs.base }}
+      CHAIN_TEST_EVENT_POLICY: outgoing-branch-push-v1
+      CHAIN_TEST_SOURCE_SHA: ${{ github.sha }}
+      CHAIN_DIAGNOSTIC_MOTION: normal
+      CHAIN_DIAGNOSTIC_ACTIVATION: baseline
+      CHAIN_DIAGNOSTIC_WORKLOAD: full-app
+      CHAIN_DIAGNOSTIC_RASTER: ${{ matrix.variant }}
+      FROZEN_APP_COMMIT: 'b176026825e4f9539780f745fe60e09cf348d288'
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: npm
-      - uses: actions/setup-java@v4
-        if: needs.cohort-routing.outputs.decision == 'full'
-        with:
-          distribution: temurin
-          java-version: '21'
-      - run: npm ci
-        if: needs.cohort-routing.outputs.decision == 'full'
-      - name: Install matching native Chromium
-        if: needs.cohort-routing.outputs.decision == 'full'
-        run: npx --no-install playwright install --with-deps chromium
-      - name: Install matching required native WebKit
-        if: needs.cohort-routing.outputs.decision == 'full' && matrix.group == 'native-process'
-        run: npx --no-install playwright install --with-deps webkit
-      - uses: actions/download-artifact@v4
-        if: needs.cohort-routing.outputs.decision == 'reuse'
-        with:
-          name: ci-routing-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/ci-routing
-      - name: Execute complete assigned group
-        if: needs.cohort-routing.outputs.decision == 'full'
-        run: npm run test:group -- --group "${{ matrix.group }}" --output-dir "$RUNNER_TEMP/group" --repository "$GITHUB_REPOSITORY" --event-policy "$CHAIN_TEST_EVENT_POLICY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$CHAIN_TEST_SOURCE_SHA" --comparison-base "$CHAIN_TEST_COMPARISON_BASE"
-      - name: Record verified full-producer coverage reference
-        if: needs.cohort-routing.outputs.decision == 'reuse'
-        run: npm run test:group -- --covered --proof "$RUNNER_TEMP/ci-routing/routing.json" --group "${{ matrix.group }}" --output-dir "$RUNNER_TEMP/group" --repository "$GITHUB_REPOSITORY" --event-policy "$CHAIN_TEST_EVENT_POLICY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$CHAIN_TEST_SOURCE_SHA" --comparison-base "$CHAIN_TEST_COMPARISON_BASE"
-      - name: Preserve actual group results and native evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: regression-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}
-          path: ${{ runner.temp }}/group
-          if-no-files-found: error
-
-  mobile-memory:
-    name: mobile-WebKit-1GB-and-512MB-stress
-    needs: validation-context
-    runs-on: ubuntu-latest
-    env:
-      CHAIN_TEST_EVENT_POLICY: ${{ needs.validation-context.outputs.policy }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
+          node-version: '22.23.3'
           cache: npm
       - run: npm ci
-      - name: Required 1GB browser family with external driver and live-WebKit OOM control
-        run: node scripts/button-safety-mobile-memory.mjs --run --profile required-1gb --output-dir "$RUNNER_TEMP/mobile-memory/required"
-      - name: Report 512MB stress outcomes with full execution integrity
-        if: always()
-        run: node scripts/button-safety-mobile-memory.mjs --run --profile stress-512mb --output-dir "$RUNNER_TEMP/mobile-memory/stress"
-      - name: Preserve capped runtime configuration control and native results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: mobile-memory-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/mobile-memory
-          if-no-files-found: error
-
-  scanner-tests:
-    needs: [validation-context, event-gates, cohort-routing, regression, mobile-memory]
-    if: always()
-    runs-on: ubuntu-latest
-    env:
-      CHAIN_TEST_EVENT_POLICY: ${{ needs.validation-context.outputs.policy }}
-      CHAIN_TEST_COMPARISON_BASE: ${{ needs.validation-context.outputs.base }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Retain actual predecessor outcomes
-        env:
-          NEEDS_JSON: ${{ toJSON(needs) }}
-        run: node -e 'require("node:fs").writeFileSync(process.env.RUNNER_TEMP+"/needs.json",process.env.NEEDS_JSON)'
-      - uses: actions/download-artifact@v4
-        if: always()
-        with:
-          name: validation-context-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/validation
-      - uses: actions/download-artifact@v4
-        if: always()
-        with:
-          name: regression-${{ github.run_id }}-${{ github.run_attempt }}-core
-          path: ${{ runner.temp }}/groups/core
-      - uses: actions/download-artifact@v4
-        if: always()
-        with:
-          name: regression-${{ github.run_id }}-${{ github.run_attempt }}-scenery
-          path: ${{ runner.temp }}/groups/scenery
-      - uses: actions/download-artifact@v4
-        if: always()
-        with:
-          name: regression-${{ github.run_id }}-${{ github.run_attempt }}-persistence-recovery
-          path: ${{ runner.temp }}/groups/persistence-recovery
-      - uses: actions/download-artifact@v4
-        if: always()
-        with:
-          name: regression-${{ github.run_id }}-${{ github.run_attempt }}-native-process
-          path: ${{ runner.temp }}/groups/native-process
-      - uses: actions/download-artifact@v4
-        if: always()
-        with:
-          name: mobile-memory-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/mobile-memory
-      - name: Recheck covered producer immediately before aggregation
-        if: needs.cohort-routing.outputs.decision == 'reuse'
-        run: node scripts/agent-tools/ci-routing.mjs --max-wait-ms 0 --descriptor "$RUNNER_TEMP/validation/descriptor/descriptor.json" --comparison-base "$CHAIN_TEST_COMPARISON_BASE" --evidence-dir "$RUNNER_TEMP/final-routing"
-      - name: Verify complete required cohort
-        id: aggregate
-        if: always()
+      - name: Bind frozen app bytes and separate diagnostic runner identity
         run: |
-          npm run test:group -- --aggregate --group core --output-dir "$RUNNER_TEMP/aggregate" --results-dir "$RUNNER_TEMP/groups" --needs-json "$RUNNER_TEMP/needs.json" --mobile-report "$RUNNER_TEMP/mobile-memory/required/report.json" --mobile-stress-report "$RUNNER_TEMP/mobile-memory/stress/report.json" --proof "$RUNNER_TEMP/final-routing/routing.json" --repository "$GITHUB_REPOSITORY" --event-policy "$CHAIN_TEST_EVENT_POLICY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$CHAIN_TEST_SOURCE_SHA" --comparison-base "$CHAIN_TEST_COMPARISON_BASE"
-      - name: Preserve verified aggregate and final observations
+          node --input-type=module <<'JS'
+          import {buildRasterOverlay} from './scripts/scene-raster-diagnostic.mjs';
+          import fs from 'node:fs';import{execFileSync}from'node:child_process';import{createHash}from'node:crypto';import assert from'node:assert/strict';
+          const git=(...args)=>execFileSync('git',args,{maxBuffer:32*1024*1024}),hash=bytes=>createHash('sha256').update(bytes).digest('hex'),base=process.env.FROZEN_APP_COMMIT,inventory=JSON.parse(fs.readFileSync('scripts/button-safety-inventory.json'));
+          const assets=git('ls-files').toString().trim().split('\n').filter(file=>file!=='tests.js'&&!file.startsWith('scripts/')&&(/\.(html|js|css|svg|png|webmanifest)$/.test(file)||Object.hasOwn(inventory.requiredRuntimeAssets,file)));
+          const rows=assets.map(file=>{const expected=hash(git('show',base+':'+file)),actual=hash(fs.readFileSync(file));assert.equal(actual,expected,'Frozen application asset '+file);return{file,sha256:actual};});
+          const raster=buildRasterOverlay(fs.readFileSync('landscape.js','utf8'),process.env.CHAIN_DIAGNOSTIC_RASTER);
+          const report={rasterOverlay:raster.receipt,kind:'diagnostic-only-source-binding',frozenAppCommit:base,diagnosticCommit:git('rev-parse','HEAD').toString().trim(),diagnosticTree:git('rev-parse','HEAD^{tree}').toString().trim(),workflowBlob:git('rev-parse','HEAD:.github/workflows/data-safety.yml').toString().trim(),motion:process.env.CHAIN_DIAGNOSTIC_MOTION,activationVariant:process.env.CHAIN_DIAGNOSTIC_ACTIVATION,workload:process.env.CHAIN_DIAGNOSTIC_WORKLOAD,rasterVariant:process.env.CHAIN_DIAGNOSTIC_RASTER,assets:rows,originalUninstrumentedControl:{runId:'40405886643',sourceSha:'b176026825e4f9539780f745fe60e09cf348d288',mergeSha:'0e60b3605d2d5b709733a6401bd793acad0aca81',tree:'27e293d0fa9aae62a906b36dc984bd0ef184f956',requiredNormalGapMs:2490,requiredNormalPeakBytes:889114624,oomKills:0}};
+          fs.mkdirSync(process.env.RUNNER_TEMP+'/mobile-startup',{recursive:true});fs.writeFileSync(process.env.RUNNER_TEMP+'/mobile-startup/served-landscape.js',raster.body);fs.writeFileSync(process.env.RUNNER_TEMP+'/mobile-startup/source-binding.json',JSON.stringify(report,null,2)+'\n');
+          JS
+      - name: Fresh capped owner and selected raster arm with original input gates
+        run: node scripts/button-safety-mobile-memory.mjs --run --profile required-1gb --output-dir "$RUNNER_TEMP/mobile-startup/capped"
+      - name: Preserve actual outcome and owned cleanup without canonical aggregation
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: scanner-aggregate-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            ${{ runner.temp }}/aggregate
-            ${{ runner.temp }}/final-routing
+          name: diagnostic-mobile-raster-${{ matrix.variant }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/mobile-startup
           if-no-files-found: error
-      - name: Verified complete cohort ${{ needs.validation-context.outputs.context }} report ${{ steps.aggregate.outputs.report }} mode ${{ needs.cohort-routing.outputs.decision }}
-        if: success()
-        run: echo "Required current execution or original producer coverage verified"
-      - name: Complete regression context ${{ needs.validation-context.outputs.context }} report ${{ steps.aggregate.outputs.report }}
-        if: success() && needs.cohort-routing.outputs.decision == 'full'
-        run: echo "Every required group, outcome, raw hash, native report and gate reconciled"
-
-  release-evidence:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: read
-      statuses: read
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Verify exact-SHA risk-based review evidence for the deployed commit
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node scripts/release-evidence.mjs verify-deployment "${{ github.sha }}" "${{ github.event.before }}"
-
-  deploy-pages:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [scanner-tests, release-evidence]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
-      - run: mkdir site
-      - run: git archive HEAD | tar -x -C site
-      - uses: actions/upload-pages-artifact@v4
-        with:
-          path: site
-      - id: deployment
-        uses: actions/deploy-pages@v4

@@ -46441,3 +46441,68 @@ test('RISK scenery text loading: delayed bank reuses identical backdrop while cu
  t.diagnostic('Nonqualifying deterministic late-copy consumer: '+directory);
  });
 });
+
+async function observeRasterSubmissionConsumer(variant,{inactive=false,mutate=false}={}){
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Allocated durable native output required');fs.mkdirSync(base,{recursive:true});const directory=fs.mkdtempSync(path.join(base,'raster-consumer-'));
+ const playwright=await import('playwright'),launch=playwright.webkit.launch,{runButtonSafety}=await import('./scripts/button-safety-native.mjs');
+ const keys=['CHAIN_DIAGNOSTIC_RASTER','CHAIN_DIAGNOSTIC_MOTION','CHAIN_DIAGNOSTIC_ACTIVATION','CHAIN_DIAGNOSTIC_WORKLOAD'],previous=Object.fromEntries(keys.map(key=>[key,process.env[key]]));
+ Object.assign(process.env,{CHAIN_DIAGNOSTIC_RASTER:variant,CHAIN_DIAGNOSTIC_MOTION:'normal',CHAIN_DIAGNOSTIC_ACTIVATION:'baseline',CHAIN_DIAGNOSTIC_WORKLOAD:'full-app'});
+ const evidence={variant,inactive,mutate,routes:[]},finished=Error('Nonqualifying fixed-time raster consumer complete');let releaseBank,probeError;
+ const bank=new Promise(resolve=>{releaseBank=resolve;});
+ playwright.webkit.launch=async(...args)=>{
+  const browser=await launch.apply(playwright.webkit,args),newContext=browser.newContext.bind(browser);browser.newContext=async(...args)=>{
+   const context=await newContext(...args),newPage=context.newPage.bind(context);context.newPage=async(...args)=>{
+    const page=await newPage(...args),goto=page.goto.bind(page);
+    await page.addInitScript(()=>{
+     const NativeDate=Date;globalThis.Date=class extends NativeDate{constructor(...args){super(...(args.length?args:[Date.parse('2026-10-06T03:23:42.125Z')]));}static now(){return Date.parse('2026-10-06T03:23:42.125Z');}};
+     const data=globalThis.rasterConsumer={phase:null,calls:{},stateCalls:{}};
+     for(const name of ['fill','stroke','fillRect','strokeRect','clearRect','drawImage','fillText','strokeText','putImageData']){const original=CanvasRenderingContext2D.prototype[name];CanvasRenderingContext2D.prototype[name]=function(...args){if(data.phase){const key=data.phase+':'+name;data.calls[key]=(data.calls[key]||0)+1;}return original.apply(this,args);};}
+     for(const name of ['beginPath','lineTo','setTransform','clip','measureText','save','restore']){const original=CanvasRenderingContext2D.prototype[name];CanvasRenderingContext2D.prototype[name]=function(...args){if(data.phase){const key=data.phase+':'+name;data.stateCalls[key]=(data.stateCalls[key]||0)+1;}return original.apply(this,args);};}
+     for(const name of ['texImage2D','drawArrays']){const original=globalThis.WebGLRenderingContext?.prototype[name];if(original)WebGLRenderingContext.prototype[name]=function(...args){if(data.phase){const key=data.phase+':webgl:'+name;data.calls[key]=(data.calls[key]||0)+1;}return original.apply(this,args);};}
+    });
+    await page.route('**/HUMAN_WRITTEN_HOURLY_TAGS.md',async route=>{await bank;const response=await route.fetch();await route.fulfill({response,body:(await response.text())+'\n## Any time of day\n- Controlled scenery text\n## Skywriters\n- HELLO\n'});});
+    await page.route('**/landscape.js',async route=>{
+     const response=await route.fetch();let body=await response.text();const receivedSha256=createHash('sha256').update(body).digest('hex');
+     if(inactive){const before=body;body=body.replace(/\/\* chain-raster-diagnostic:start \*\/[\s\S]*?\/\* chain-raster-diagnostic:end \*\//,'');assert.notEqual(body,before,'Inactive sensitivity actually removes the installed overlay');}
+     const anchor="  window.addEventListener('pageshow'";assert.ok(body.includes(anchor));
+     const probe=`
+      const wrapRasterConsumer=(phase,original)=>function(...args){const prior=rasterConsumer.phase;rasterConsumer.phase=phase;try{return original.apply(this,args);}finally{rasterConsumer.phase=prior;${mutate?'if(phase==="foreground")world.elapsed+=1;':''}}};
+      paintBackground=wrapRasterConsumer('backdrop',paintBackground);paintLife=wrapRasterConsumer('foreground',paintLife);
+      rasterConsumer.stop=stop;rasterConsumer.read=()=>({model:JSON.parse(JSON.stringify({treeOrigins,rooftopRoofs,gardens:cityLights.gardens,paintedSlot:lastCitySlot,world,sceneSnapshot,currentEntry,visibleBanners,status:status.textContent,weather:document.documentElement.dataset.sceneWeather})),calls:{...rasterConsumer.calls},stateCalls:{...rasterConsumer.stateCalls},overlay:window.__sceneRasterDiagnostic?.snapshot()});
+     `;
+     body=body.replace(anchor,probe+'\n'+anchor).replace('LandscapeMood.setHumanText(markdown);refreshSky(true);','LandscapeMood.setHumanText(markdown);refreshSky(true);rasterConsumer.bankDone=true;');
+     evidence.routes.push({receivedSha256,injectedSha256:createHash('sha256').update(body).digest('hex')});await route.fulfill({response,body});
+    });
+    page.goto=async(url,...args)=>{const response=await goto(url,...args);if(url.endsWith('__button-observer'))return response;
+     try{await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&typeof rasterConsumer.stop==='function',null,{polling:100});await page.evaluate(()=>rasterConsumer.stop());releaseBank();await page.waitForFunction(()=>rasterConsumer.bankDone===true,null,{polling:100});evidence.observed=await page.evaluate(()=>rasterConsumer.read());evidence.stored=await page.evaluate(async()=>{const head=await ScannerDeviceStore.readHead(),saved=JSON.parse(head.payload);return{headHash:head.hash,tasks:state.tasks.length,durableTasks:saved.tasks.length,unknownBytes:saved.futurePopulated.opaque.length,retained:await Promise.all((await ScannerDeviceStore.listBackups()).filter(row=>row.id.startsWith('gate-retained-')).sort((a,b)=>a.id.localeCompare(b.id)).map(async row=>({id:row.id,payloadHash:await ChainStorageV2.hashPayload(row.payload)})))};});}catch(error){probeError=error;}finally{releaseBank();}throw finished;
+    };return page;
+   };return context;
+  };return browser;
+ };
+ try{await assert.rejects(()=>runButtonSafety({repo:__dirname,engine:'webkit',port:Number(process.env.CHAIN_NATIVE_PORT),outputDir:directory,mobileYesMotion:'normal'}),error=>error===finished);}
+ finally{releaseBank();playwright.webkit.launch=launch;for(const key of keys)if(previous[key]===undefined)delete process.env[key];else process.env[key]=previous[key];evidence.probeError=probeError?.stack;const files=fs.readdirSync(directory).filter(name=>/^button-safety-webkit-.*\.json$/.test(name));if(files.length===1){evidence.native=JSON.parse(fs.readFileSync(path.join(directory,files[0])));evidence.preparedSources=evidence.native.retainedSources[0].bootstrap.retainedSources.map(({id,payloadHash})=>({id,payloadHash}));}fs.writeFileSync(path.join(directory,'raster-consumer.json'),JSON.stringify(evidence,null,2)+'\n');}
+ if(probeError)throw probeError;assert.deepEqual(evidence.native.errors,[]);for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(evidence.native.cleanup[key],true);assert.equal(evidence.stored.tasks,400);assert.equal(evidence.stored.durableTasks,400);assert.equal(evidence.stored.unknownBytes,1048576);assert.deepEqual(evidence.stored.retained,evidence.preparedSources);return evidence;
+}
+
+test('RISK repository process: scoped raster controls suppress only submissions while original scene bodies data and current copy survive',async()=>{
+ const results=[];for(const variant of ['baseline','both-raster-off','backdrop-raster-off','foreground-raster-off'])results.push(await observeRasterSubmissionConsumer(variant));
+ const count=(result,phase)=>Object.entries(result.observed.calls).filter(([key])=>key.startsWith(phase+':')).reduce((sum,[,value])=>sum+value,0),baseline=results[0];
+ assert.ok(count(baseline,'backdrop')>0&&count(baseline,'foreground')>0,'Positive baseline actually submits both render phases');assert.match(baseline.observed.model.status,/Controlled scenery text.*Human written/);
+ for(const result of results.slice(1)){
+  for(const phase of ['backdrop','foreground']){const suppressed=result.variant==='both-raster-off'||result.variant===phase+'-raster-off';if(suppressed)assert.equal(count(result,phase),0,'Requested '+phase+' raster submissions must be suppressed');else assert.ok(count(result,phase)>0,'Unselected phase must continue actual raster submission');assert.ok(Object.keys(result.observed.stateCalls).some(key=>key.startsWith(phase+':')),'Original paths transforms and measurement still execute');}
+  assert.deepEqual(result.observed.model,baseline.observed.model,'Original geometry timeline visitor memoization and current copy must remain exact');assert.deepEqual(result.stored,baseline.stored,'Original durable task and protected source state must remain exact');
+ }
+ const {verifyRasterObservation}=await import('./scripts/scene-raster-diagnostic.mjs'),{verifyMobileFunctionalReport}=await import('./scripts/button-safety-mobile-contract.mjs');
+ for(const result of results){verifyRasterObservation(result.observed.overlay,{variant:result.variant});if(result.variant!=='baseline')assert.throws(()=>verifyMobileFunctionalReport(result.native,{candidateCommit:result.native.candidateCommit,candidateTree:result.native.candidateTree,motion:'normal'}),error=>error.actual==='button-mobile-raster-control'&&error.expected==='button-mobile-functional','Canonical consumer must refuse every control kind');}
+ const inactive=await observeRasterSubmissionConsumer('both-raster-off',{inactive:true});assert.ok(count(inactive,'backdrop')>0&&count(inactive,'foreground')>0);assert.throws(()=>verifyRasterObservation(inactive.observed.overlay,{variant:'both-raster-off'}),'Missing/inactive overlay cannot claim a control result');
+ const changed=await observeRasterSubmissionConsumer('both-raster-off',{mutate:true});assert.throws(()=>assert.deepEqual(changed.observed.model,baseline.observed.model),'Independent consumer must detect unrelated model side effects');
+});
+
+test('RISK repository process: raster diagnostic dispatch binds four Normal arms frozen app and refuses release credit',async t=>{
+ const {parse}=await import('yaml'),workflow=parse(fs.readFileSync(path.join(__dirname,'.github/workflows/data-safety.yml'),'utf8'));
+ assert.deepEqual(workflow.on,{push:{branches:['diagnose/webkit-raster-submission']}},'Only the dedicated nonmergeable raster branch may dispatch this comparison');assert.deepEqual(workflow.permissions,{contents:'read'});assert.deepEqual(Object.keys(workflow.jobs),['diagnostic-mobile-startup']);
+ const job=workflow.jobs['diagnostic-mobile-startup'];assert.equal(job['timeout-minutes'],15);assert.deepEqual(job.strategy,{'fail-fast':false,matrix:{variant:['baseline','backdrop-raster-off','foreground-raster-off','both-raster-off']}});
+ assert.equal(job.env.CHAIN_DIAGNOSTIC_MOTION,'normal');assert.equal(job.env.CHAIN_DIAGNOSTIC_ACTIVATION,'baseline');assert.equal(job.env.CHAIN_DIAGNOSTIC_WORKLOAD,'full-app');assert.equal(job.env.CHAIN_DIAGNOSTIC_RASTER,'${{ matrix.variant }}');assert.equal(job.env.FROZEN_APP_COMMIT,'b176026825e4f9539780f745fe60e09cf348d288');
+ assert.ok(job.steps.some(step=>step.run==='node scripts/button-safety-mobile-memory.mjs --run --profile required-1gb --output-dir "$RUNNER_TEMP/mobile-startup/capped"'));assert.equal(job.steps.at(-1).if,'always()');assert.equal(job.steps.at(-1).with['if-no-files-found'],'error');assert.ok(job.steps.every(step=>!String(step.uses||step.run||'').match(/deploy-pages|release:publish|--aggregate/)));
+ const {tmpdir}=await import('node:os'),{createMobileBundle}=await import('./scripts/agent-tools/mobile-memory-fixture.mjs'),{verifyMobileMemoryReport}=await import('./scripts/button-safety-mobile-contract.mjs');const directory=fs.mkdtempSync(path.join(tmpdir(),'chain-raster-contract-'));t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));const bundle=createMobileBundle(directory);verifyMobileMemoryReport(bundle.report,{artifactRoot:directory});bundle.report.kind='button-mobile-memory-diagnostic';assert.throws(()=>verifyMobileMemoryReport(bundle.report,{artifactRoot:directory}),'Outer diagnostic can never qualify as canonical memory acceptance');
+});

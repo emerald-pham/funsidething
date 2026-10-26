@@ -2375,3 +2375,8 @@ The pinned Linux x64 reader preserves the raw AT_PAGESZ witness and binds it to 
 
 - RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh
   - Actual held-bank mobile WebKit consumer in Normal/Reduced preserves initial/full pixels, changed pending time/location, current copy and visitor reconciliation, 400 durable tasks, both retained source hashes and cleanup. Local uncapped deterministic rendering only; no hosted 1GB or physical-device claim.
+
+- RISK repository process: scoped raster controls suppress only submissions while original scene bodies data and current copy survive
+  - Nonmergeable four-arm fixed-time actual WebKit consumer: independent submitted-command and retained state/path counters; both original scene bodies, geometry, timeline, visitor memoization, newly loaded text and400durable/protected data remain equivalent. Inactive overlay and unrelated model mutation are separate sensitivity controls; GL errors and exact control kind refusal stay fail closed. Not hosted timing or physical-device qualification.
+- RISK repository process: raster diagnostic dispatch binds four Normal arms frozen app and refuses release credit
+  - Dedicated diagnostic branch only; four Normal arms share frozenb176app and original1GB launcher. Original canonical full memory fixture still passes; outer diagnostic kind always refuses canonical release acceptance. No cap, input deadline, readiness, model or application bytes changed.

@@ -13206,6 +13206,16 @@
       "root": "RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "file": "tests.js",
+      "root": "RISK repository process: scoped raster controls suppress only submissions while original scene bodies data and current copy survive",
+      "group": "native-process"
+    },
+    {
+      "file": "tests.js",
+      "root": "RISK repository process: raster diagnostic dispatch binds four Normal arms frozen app and refuses release credit",
+      "group": "native-process"
     }
   ],
   "processControls": [
