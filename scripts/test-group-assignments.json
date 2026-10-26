@@ -2143,7 +2143,7 @@
       "file": "tests.js"
     },
     {
-      "root": "Landscape browser: scene time presets persist and return to live without changing tasks",
+      "root": "RISK scenery scene time readiness: loading controls look unavailable before native presets save reload and return to live",
       "group": "core",
       "file": "tests.js"
     },
@@ -4138,7 +4138,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK backup and Restore consolidation: Settings keeps one guarded action with all formats",
+      "root": "RISK Settings transfer consolidation: one Import, one Export and direct Copy",
       "group": "core",
       "file": "tests.js"
     },
@@ -4253,7 +4253,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK backup format safety: raw-source qualification remains outside the native selector",
+      "root": "RISK backup export safety: unreadable originals stay byte-exact without a raw-data view",
       "group": "core",
       "file": "tests.js"
     },
@@ -7763,7 +7763,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK LOCAL BACKUPS: unreadable old copy is visible with exact raw recovery and targeted removal",
+      "root": "RISK LOCAL BACKUPS: unreadable old copy stays visible and byte-exact in unified Export",
       "group": "core",
       "file": "tests.js"
     },
@@ -7818,7 +7818,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK MANUAL JSON EXPORT: unreadable, unsupported and hydration-placeholder sources stop without a file",
+      "root": "RISK MANUAL JSON EXPORT: unavailable and unsupported sources are explicit partial exports",
       "group": "core",
       "file": "tests.js"
     },
@@ -8214,6 +8214,11 @@
     },
     {
       "root": "RISK overdue scanner layout: enlarged candidate title chips and decision footer wrap without clipping choices",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK overdue WOOP: a newly started scan keeps Next usable and the saved plan through reopening",
       "group": "core",
       "file": "tests.js"
     },
@@ -9073,7 +9078,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK RECOVERY EXPORT: an unsaved in-memory board remains copyable without device storage",
+      "root": "RISK RECOVERY EXPORT: accepted unsaved board stays in direct Copy when device storage fails",
       "group": "core",
       "file": "tests.js"
     },
@@ -10403,7 +10408,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK support diagnostics: Settings names the existing board export for its contents",
+      "root": "RISK support diagnostics: Settings points to the single archive Export",
       "group": "core",
       "file": "tests.js"
     },
@@ -12688,7 +12693,22 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK JSON COPY PASTE: the current-board viewer copies its exact displayed JSON without saving",
+      "root": "RISK JSON COPY PASTE: large native paste retains full draft without rendering the archive",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK JSON COPY PASTE: closing a large paste during encoding stops before backup writes",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK JSON COPY PASTE: stale clipboard completion cannot release a newer export transfer",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK JSON COPY PASTE: Copy and Download round-trip seeded pending archives without replaying sources",
       "group": "core",
       "file": "tests.js"
     },
@@ -12698,17 +12718,17 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK DATABASE REPAIR EXPORT: the Settings copy includes exact saved sources and repair metadata without writes",
+      "root": "RISK DATABASE REPAIR EXPORT: unified Copy and Download retain exact sources and metadata without writes",
       "group": "core",
       "file": "tests.js"
     },
     {
-      "root": "RISK DATABASE REPAIR EXPORT: unreadable storage produces a labeled partial package with available board and diagnostics",
+      "root": "RISK DATABASE REPAIR EXPORT: unreadable sources are labeled partial and never shown as an empty database",
       "group": "core",
       "file": "tests.js"
     },
     {
-      "root": "RISK DATABASE REPAIR EXPORT: visible Debug log controls use the combined repair export",
+      "root": "RISK DATABASE REPAIR EXPORT: Debug log points to the combined archive without duplicate export controls",
       "group": "core",
       "file": "tests.js"
     },
@@ -12723,7 +12743,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK DATABASE REPAIR EXPORT: a cancelled capture cannot replace a newer pasted draft",
+      "root": "RISK DATABASE REPAIR EXPORT: canceled capture keeps the pasted draft and concurrent capture is bounded",
       "group": "core",
       "file": "tests.js"
     },
@@ -12733,13 +12753,458 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK DATABASE REPAIR EXPORT: FAQ explains the included database, diagnostics and partial-report limits",
+      "root": "RISK DATABASE REPAIR EXPORT: Help describes direct Copy and partial archive status",
       "group": "core",
       "file": "tests.js"
     },
     {
       "root": "RISK DATABASE REPAIR EXPORT: reload help routes users to the combined export after standalone log exporters are removed",
       "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: button safety rejects incomplete native action evidence",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: button safety rejects false passes and newly untested actions",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: native button gate detects errors raised by a real click",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: required native button actions execute in Chromium and WebKit",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: rapid native attempts preserve Add and asynchronous dialog outcomes",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: native rapid cloud selection preserves the two-second input burst",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: native button gate refuses unallocated local launch before browser startup",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: new and duplicate source buttons require native coverage inventory",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "test group aggregate requires both exact native button safety reports",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "RISK repository process: native button gate awaits an asynchronous false outcome",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: native button gate cannot omit a required stress scenario",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK Settings transfer sections: cleanup controls stay outside the focused backup section",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: native button safety requires 400-task and rapid-press evidence",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: required button enforcement changes need process coverage",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK button safety guidance: mounted FAQ states required browser checks and limits",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK DATABASE REPAIR EXPORT: held capture preserves exact before and after sources and rejects partial restore",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK DATABASE REPAIR EXPORT: asynchronous snapshot rejection stays partial and unavailable",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: every button safety module fails the actual CLI without process coverage",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud source recovery choice: repeating the selected source preserves the mounted review and alternate choices",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: required mobile memory evidence cannot be replaced by passing desktop groups",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "test group aggregate refuses a declared mobile memory story without a capped runtime report",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "RISK repository process: mobile WebKit accepts ten distinct offered tasks using real touch",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: capped mobile reports bind kernel memory distinct touch and durable outcomes",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "mobile memory parser rejects waived limits synthetic touch and mismatched durable evidence",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "mobile memory boundary refuses unsupported or unbounded runtimes before native launch",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "mobile memory command cannot run a pretend local cap and pins the owned container boundary",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "RISK repository process: intentional Docker OOM control cannot waive capped client failures",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "mobile memory intentional OOM control binds the Docker flag while clients reject it",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "RISK Settings guidance: mounted cleanup and sync FAQs name their current locations",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: CI monitor requires capped mobile job while preserving prior topology",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: routed hosted policies reach native consumers without waiving invalid launches",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: current producer reuse requires successful capped mobile evidence",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "hosted button consumers admit routed event policies before their runtime boundary",
+      "group": "native-process",
+      "file": "scripts/agent-tools/button-ci-policy.test.mjs"
+    },
+    {
+      "root": "hosted button consumers reject invalid missing mismatched and local launches",
+      "group": "native-process",
+      "file": "scripts/agent-tools/button-ci-policy.test.mjs"
+    },
+    {
+      "root": "hosted child and memory artifacts preserve raw policy and distinct source checkout identity",
+      "group": "native-process",
+      "file": "scripts/agent-tools/button-ci-policy.test.mjs"
+    },
+    {
+      "root": "current grouped routing requires the completed capped mobile producer before reuse",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "RISK saved view continuity: repeated selected eligibility retains mounted rows and still refreshes changed views",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: native paste prepares complete fixture bytes before its consumer frame budget",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: unavailable native attempts reuse one prepared isolated release document",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: native HTTP serves exact committed runtime Markdown without exposing other files",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: native report cannot omit or change reviewed runtime asset bytes",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: mobile artifact consumers require reviewed runtime asset hashes",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK scenery startup: native mobile paints once while hidden return saved choices resize and rain preserve the scene",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK synced scene durability: native retained boards keep immediate scene locks through reload without changing tasks or sources",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: retained native sources seed once without a persistent board bootstrap",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: mobile budget planner caps browsers before launch and isolates the external driver",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: mobile budget scope cannot relabel whole-container evidence or disconnected browsers",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: remote mobile consumer waits for browser owner exit after disconnect",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "mobile memory parser rejects changed final browser or driver container isolation",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "RISK repository process: pending mobile creates retain ownership until daemon completion and owned removal",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "mobile budget CLI preserves uncertain create ownership and cleans confirmed objects",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory-lifecycle.test.mjs"
+    },
+    {
+      "root": "RISK repository process: expected native reload retries only its navigation context loss",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: hosted direct native callers retain ephemeral listener defaults",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK scenery FAQ: mounted help names scene time without implementation details",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: required one GB and reported 512MB stress profiles cannot substitute for each other",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "mobile budget profiles require one decimal GB without accepting the reported stress limit",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "mobile budget profiles report authentic stress application failures without waiving execution integrity",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "mobile stress CLI preserves a failed normal app attempt and executes reduced before complete cleanup",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory-stress-lifecycle.test.mjs"
+    },
+    {
+      "root": "test group aggregate requires independently bound required and reported stress profiles",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "RISK repository process: native burst preparation survives remounts without waiving missing or late input",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: failed mobile stress attempts retain actual setup and reject mixed transport faults",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "mobile budget profiles reject failed stress setup substitutions and mixed nonapp errors",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "RISK repository process: failed mobile stress primary errors cannot hide unrelated driver failures",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "mobile budget profiles require attributable primary failures for reported stress",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "RISK repository process: mobile kernel page floor requires actual observations and exact requested budgets",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "mobile kernel page floor uses actual auxv readback without changing requested budgets",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "mobile kernel page floor actual CLI preserves exact requests and rejects substituted observations",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory-stress-lifecycle.test.mjs"
+    },
+    {
+      "root": "RISK repository process: refused native releases avoid drag round trips while preserving ten real attempts",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK synced scene intent: rapid choices survive interrupted device hashing without changing protected sources",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK task action history: Undo refreshes ranks once after projecting its immutable cancellation",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK synced scene intent: exact own-prefix commits replay only the missing rapid choice suffix",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK synced scene intent: storage refusal bounds and foreign heads preserve originals and existing Export",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK synced scene intent: interrupted replay and two tab originals never lose pending facts",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK synced scene intent: bounded replay exposes the saved board and rejects a late hash completion",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK synced scene intent: foreign retirement cannot erase a newer live tab choice generation",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK synced scene replay transaction: expiry during the actual store hash cannot replace the saved head",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK synced scene ordinary saves: held receipt sources never block unrelated durable task edits",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK scene receipt Export: a source appended during the real snapshot is preserved as a partial observation",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK synced scene ordinary saves: a fresh current-account scene choice ignores a foreign receipt tip",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK DEVICE STORAGE V2: current attempt refusal fences all mutations and the real capacity retry",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: stress engine loss requires the actual kernel and owned exit evidence",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "mobile stress owned engine loss reports the observed waitForFunction Browser closed without hiding driver faults",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "mobile stress CLI retains the observed reduced owned-engine OOM after a failed normal attempt",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory-stress-lifecycle.test.mjs"
+    },
+    {
+      "file": "tests.js",
+      "root": "RISK synced scene repaint: unchanged mirrored locations retain storage without announcing another scene",
+      "group": "core"
+    },
+    {
+      "file": "tests.js",
+      "root": "RISK repository process: ordinary task Undo keeps unchanged scenery while separate scene choices repaint and save",
+      "group": "native-process"
+    },
+    {
+      "file": "tests.js",
+      "root": "RISK repository process: native frame accounting separates pre-input and post-input stalls without waiving either",
+      "group": "native-process"
+    },
+    {
+      "file": "tests.js",
+      "root": "RISK Undo scene guidance: FAQ and Changelog explain task Undo keeps scene choices",
+      "group": "core"
+    },
+    {
+      "root": "RISK scenery backdrop cache: first unchanged lighting timer reuses actual pixels while changed slots and loaded copy still paint",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh",
+      "group": "native-process",
       "file": "tests.js"
     }
   ],
@@ -12807,6 +13272,62 @@
       "group": "core",
       "file": "tests.js",
       "reason": "The user authorized automatic useful offline recovery. Preserve pre-hydration no-read/no-adoption, exact current-head repair, full raw originals, manual/protected copies and remote authority; replace obsolete unusable-placeholder expectations with the proven supported local workspace. Fresh cloud reads may follow verified local recovery; source-bound tests measure the actual ordering."
+    },
+    {
+      "baselineRoot": "RISK backup and Restore consolidation: Settings keeps one guarded action with all formats",
+      "currentRoot": "RISK Settings transfer consolidation: one Import, one Export and direct Copy",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "Issue webkit-button-safety renames this contract around the final unified Import and recovery-archive Export behavior; exact-source, preview, cancellation, partial-state and diagnostics assertions remain."
+    },
+    {
+      "baselineRoot": "RISK backup format safety: raw-source qualification remains outside the native selector",
+      "currentRoot": "RISK backup export safety: unreadable originals stay byte-exact without a raw-data view",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "Issue webkit-button-safety renames this contract around the final unified Import and recovery-archive Export behavior; exact-source, preview, cancellation, partial-state and diagnostics assertions remain."
+    },
+    {
+      "baselineRoot": "RISK LOCAL BACKUPS: unreadable old copy is visible with exact raw recovery and targeted removal",
+      "currentRoot": "RISK LOCAL BACKUPS: unreadable old copy stays visible and byte-exact in unified Export",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "Issue webkit-button-safety renames this contract around the final unified Import and recovery-archive Export behavior; exact-source, preview, cancellation, partial-state and diagnostics assertions remain."
+    },
+    {
+      "baselineRoot": "RISK RECOVERY EXPORT: an unsaved in-memory board remains copyable without device storage",
+      "currentRoot": "RISK RECOVERY EXPORT: accepted unsaved board stays in direct Copy when device storage fails",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "Issue webkit-button-safety renames this contract around the final unified Import and recovery-archive Export behavior; exact-source, preview, cancellation, partial-state and diagnostics assertions remain."
+    },
+    {
+      "baselineRoot": "RISK MANUAL JSON EXPORT: unreadable, unsupported and hydration-placeholder sources stop without a file",
+      "currentRoot": "RISK MANUAL JSON EXPORT: unavailable and unsupported sources are explicit partial exports",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "Issue webkit-button-safety renames this contract around the final unified Import and recovery-archive Export behavior; exact-source, preview, cancellation, partial-state and diagnostics assertions remain."
+    },
+    {
+      "baselineRoot": "RISK support diagnostics: Settings names the existing board export for its contents",
+      "currentRoot": "RISK support diagnostics: Settings points to the single archive Export",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "Issue webkit-button-safety renames this contract around the final unified Import and recovery-archive Export behavior; exact-source, preview, cancellation, partial-state and diagnostics assertions remain."
+    },
+    {
+      "baselineRoot": "Landscape browser: scene time presets persist and return to live without changing tasks",
+      "currentRoot": "RISK scenery scene time readiness: loading controls look unavailable before native presets save reload and return to live",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "Preserve the complete native scene-time preset/save/reload/live consumer while adding the observed renderer-loading readiness transition before its trusted click."
     }
   ]
 }

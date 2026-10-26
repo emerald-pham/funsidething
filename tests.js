@@ -347,7 +347,7 @@ test('RISK offline repair guidance: help distinguishes a working workspace cloud
  assert.match(help,/original sources remain protected/i,'a new workspace is not described as a recovered empty board');
  assert.match(help,/repair a damaged cloud board from complete retained cloud copies/i);
  assert.match(help,/does not confirm edits still waiting on this device/i,'server repair and local edit acknowledgement remain separate');
- assert.match(help,/one Restore action: choose a JSON file or Paste JSON/i,'automatic repair retains the established deliberate Restore route');
+ assert.match(help,/one Import action: choose a JSON file or Paste JSON/i,'automatic repair retains the established deliberate Import route');
 });
 
 test('RISK offline device recovery: an exact retained local copy repairs damaged current bytes without cloud',async t=>{
@@ -820,8 +820,8 @@ test('RISK unreadable device recovery: an unsupported original remains protected
  assert.equal((await store.getRecoveryCloudHold()).workspace,'new-work');
  assert.ok((await store.listOpaqueArchives()).some(row=>row.raw.includes('futureAuthority')&&row.raw.includes('opaque')),'the complete unsupported original is protected before a new-work head is selected');
  const sources=await store.readRawExportSnapshot();assert.ok(sources.stores.snapshots.values.some(row=>row?.payload===raw),'the exact unknown original bytes remain retained');
- ctx.openSettings();ctx.onAction('view-current-board',{});
- assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/id="currentBoardData"/,'a placeholder is never exported as a recovered board');
+ ctx.openSettings();await ctx.onAction('export-backup',{isConnected:true});
+ assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/id="currentBoardData"|<textarea\b/,'a placeholder is never exported as a recovered board or full JSON viewer');
 });
 
 test('RISK unreadable device recovery: native Paste previews and restores a supported board while preserving unreadable originals',async t=>{
@@ -906,18 +906,14 @@ test('RISK unreadable device recovery: raw source export excludes the placeholde
  shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();ctx.Blob=class{constructor(parts){this.text=parts.join('');}};
  ctx.URL={createObjectURL(value){blob=value;return 'blob:source-only';},revokeObjectURL(){}};
  ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
- const download=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Download backup\s*<\/button>/);
- assert.ok(download,'the unavailable-board view exposes the shared Download backup action');
- assert.equal((settings.match(/data-act="download-backup"/g)||[]).length,1,'raw evidence stays within the one board-data download action');
- assert.match(settings,/value="raw-device-sources"/,'the unaccepted source is offered as a source-only archive');
- const selectedFormat=makeFakeElement();selectedFormat.value='raw-device-sources';
- const originalGet=shim.document.getElementById.bind(shim.document);
- shim.document.getElementById=id=>id==='backupDownloadFormat'?selectedFormat:originalGet(id);
- await ctx.onAction('download-current-board',{});assert.equal(downloads.length,0,'the shell cannot be exported as an accepted board');
- assert.equal(await ctx.onAction(download[1],{}),true,'the native Settings action downloads readable exact evidence');
- const archive=JSON.parse(downloads[0]);assert.equal(archive.currentBoard,null);assert.equal(archive.manifest.sources.currentBoard.status,'unavailable');
+ assert.equal((settings.match(/data-act="export-backup"/g)||[]).length,1,'unreadable sources use the single Export action');
+ assert.doesNotMatch(settings,/backupDownloadFormat|value="raw-device-sources"|view-current-board/);
+ assert.equal(await ctx.onAction('export-backup',{isConnected:true}),true,'the source-only export opens its safe transfer controls');
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/Partial recovery archive/);
+ const copied=await copyPreparedExport(ctx),archive=JSON.parse(copied);
+ assert.equal(archive.currentBoard,null);assert.equal(archive.manifest.sources.currentBoard.status,'unavailable');
  for(const [key,raw]of [[SYNC_STORE_KEY,original],[LOCAL_HEAD_KEY,'different broken head'],[LOCAL_BACKUPS_KEY,'{broken backup index']])assert.equal(archive.appSources.localStorage.find(row=>row.key===key).raw,raw);
- assert.throws(()=>ctx.decodeBackupFileBoard(downloads[0]),/incomplete|supported/,'source-only evidence cannot become an empty imported board');
+ assert.throws(()=>ctx.decodeBackupFileBoard(copied),/incomplete|supported/,'source-only evidence cannot become an empty imported board');
  assert.deepEqual(await store.readRawExportSnapshot(),before,'raw evidence export never writes or prunes device data');
 });
 
@@ -1081,10 +1077,10 @@ test('RISK unreadable device recovery: Quick start and current Changelog explain
  const {ctx,shim}=await loadApp();ctx.openHelp();
  const help=shim.document.getElementById('modalRoot').innerHTML,answer=help.match(/<dt>What if my saved device source cannot be read\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
  assert.ok(answer,'the extended FAQ covers unreadable missing unsupported and partial device sources');
- assert.match(answer,/one Restore action.*choose a JSON file or Paste JSON/i);assert.match(answer,/Download backup offers Raw device sources/i);
+ assert.match(answer,/one Import action.*choose a JSON file or Paste JSON/i);assert.match(answer,/Export can preserve readable raw sources.*partial archive/i);
  assert.match(answer,/not an empty recovered board/);assert.match(answer,/Cloud recovery stays pending/);
- assert.match(html,/one guarded Restore action for a file or pasted JSON/,'the current changelog describes the consolidated restore route');
- assert.match(html,/unreadable device data offers a source-only archive/,'the current changelog preserves the raw-source recovery limit');
+ assert.match(html,/Settings now has one Import and one Export, with separate Copy and Download choices/i,'the current changelog describes the consolidated transfer route');
+ assert.match(html,/Exports include accepted unsaved edits and readable recovery sources; originals stay protected, and incomplete archives are marked partial/i,'the current changelog preserves accepted work, raw-source protection and the partial archive limit');
 });
 
 test('RISK unreadable device recovery: partial raw rows remain exact while the restored board accepts later local edits',async t=>{
@@ -7313,7 +7309,7 @@ test('RISK scenery browser fixture: conditional reloads retain executable probes
  const source=fs.readFileSync(path.join(__dirname,'tests.js'),'utf8');
  const start=source.indexOf("\ntest('RISK shared scenery browser:"),fragment=source.slice(start,source.indexOf("test('RISK list presentation browser:",start));
  const routeBody=fragment.match(/await page\.route\('\*\*\/landscape\.js',async route=>\{([\s\S]*?)\n    \}\);/)[1];
- const anchor='  resize();updateMotion();if(preference===null)openMotion();',requests=[],fulfills=[];
+ const anchor='  if(document.hidden)resize();updateMotion();if(preference===null)openMotion();',requests=[],fulfills=[];
  const route={request:()=>({headers:()=>({'if-modified-since':'Wed, 07 Oct 2026 00:00:00 GMT','if-none-match':'"private-fixture"','accept':'*/*'})}),
   async fetch(options){requests.push(options);const conditional=!options?.headers||options.headers['if-modified-since']||options.headers['if-none-match'];return {status:()=>conditional?304:200,headers:()=>({'content-type':'application/javascript'}),text:async()=>conditional?'':anchor};},async fulfill(value){fulfills.push(value);}};
  await vm.runInNewContext(`(async()=>{${routeBody}})()`,{route,assert,routeEvidence:[],navigation:'native fixture',createHash,Buffer});
@@ -7384,7 +7380,7 @@ test('RISK shared scenery browser: isolated Chrome and WebKit devices reconstruc
     await page.addInitScript(motion=>localStorage.setItem('fvp:chain-scanner:landscape-motion',motion),motion);
     await page.route('**/landscape.js',async route=>{try{
      const headers={...route.request().headers()};delete headers['if-modified-since'];delete headers['if-none-match'];
-     const response=await route.fetch({headers});assert.equal(response.status(),200,'the diagnostic route requires a complete executable response');let body=await response.text();const anchor='  resize();updateMotion();if(preference===null)openMotion();';assert.ok(body.includes(anchor));
+     const response=await route.fetch({headers});assert.equal(response.status(),200,'the diagnostic route requires a complete executable response');let body=await response.text();const anchor='  if(document.hidden)resize();updateMotion();if(preference===null)openMotion();';assert.ok(body.includes(anchor));
      routeEvidence.push({navigation,status:response.status(),headers:response.headers(),originalSha:createHash('sha256').update(body).digest('hex'),originalBytes:Buffer.byteLength(body)});
      body="globalThis.sharedSceneDelivery=true;\n"+body;
      body=body.replace("  const S=globalThis.LivingSky,host=document.getElementById('landscape');","  globalThis.sharedSceneBootstrap={stage:'entered'};const S=globalThis.LivingSky,host=document.getElementById('landscape');globalThis.sharedSceneBootstrap={stage:'guard',hasHost:!!host,hasSky:!!S};");
@@ -7800,7 +7796,7 @@ test('RISK scenery browser: phone fairy lights rain and both firework depths mat
    await page.addInitScript(()=>localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced'));
    await page.route('**/landscape.js',async route=>{
     const response=await route.fetch();let body=await response.text();
-    const anchor='  resize();updateMotion();if(preference===null)openMotion();';assert.ok(body.includes(anchor));
+    const anchor='  if(document.hidden)resize();updateMotion();if(preference===null)openMotion();';assert.ok(body.includes(anchor));
     body=body.replace(anchor,anchor+`
      globalThis.sceneryRegressionProbe=()=>{
       stop();reduced=true;world.events=[];sky.sun.altitude=-20;
@@ -9087,6 +9083,15 @@ function extractAppScript(src) {
 }
 const appSrc = extractAppScript(html);
 
+async function copyPreparedExport(ctx) {
+  let copied;
+  ctx.navigator = { clipboard: { writeText(value) { copied = value; return Promise.resolve(); } } };
+  const result = await ctx.onAction("copy-export", {});
+  assert.equal(result, true, "the prepared Export payload copies through the actual clipboard action");
+  assert.equal(typeof copied, "string", "Copy sends the complete prepared payload directly");
+  return copied;
+}
+
 function makeFakeElement() {
   const el = {
     innerHTML: "", textContent: "", value: "", hidden: false, scrollTop: 0, children: [],
@@ -9152,6 +9157,8 @@ function makeDomShim({ prefersDark = false, sharedStorage = null } = {}) {
     documentElement,
   };
   const localStorage = sharedStorage || {
+    get length() { return localStorageMap.size; },
+    key(index) { return [...localStorageMap.keys()][index] ?? null; },
     getItem(k) { return localStorageMap.has(k) ? localStorageMap.get(k) : null; },
     setItem(k, v) { localStorageMap.set(k, String(v)); },
     removeItem(k) { localStorageMap.delete(k); },
@@ -9544,7 +9551,7 @@ test('RISK apology release identity: malformed continuation fails closed at the 
 
 test('RISK apology notice: continuation preserves expiry dismissal manual reopen and separate Stable',async()=>{
  const startsAt=Date.parse('2026-10-20T19:42:33.722Z'),day=86400000,values=new Map();
- const storage={getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,String(value)),removeItem:key=>values.delete(key)};
+ const storage={get length(){return values.size;},key:index=>[...values.keys()][index]??null,getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,String(value)),removeItem:key=>values.delete(key)};
  const setup=async(channel,at,uid)=>{
   const envelope=channelReleaseEnvelope(channel,channel==='beta'?startsAt:at-day/24,channel==='beta'?startsAt+day:at-day/24);
   if(channel==='beta')envelope.notices[APOLOGY_NOTICE_ID].continuation=publishedBetaContinuation();
@@ -10607,34 +10614,75 @@ test("RISK rating bounds: hydration and frozen chance opponents normalize extrem
   assert.ok(loser.sigma >= sigmaFloor && loser.sigma <= sigmaLimit);
 });
 
-test("RISK backup and Restore consolidation: Settings keeps one guarded action with all formats", async () => {
+test("RISK Settings transfer consolidation: one Import, one Export and direct Copy", async () => {
   const { ctx, shim } = await loadApp();
+  assert.ok(await ctx.saveDurableBackup("manual", JSON.stringify(ctx.state)));
   ctx.openSettings();
-  const panel = shim.document.getElementById("modalRoot").innerHTML;
-  assert.match(panel, /<h3>Current-board view and copy<\/h3>/);
-  assert.match(panel, /<h3>Debug log<\/h3>/);
-  assert.match(panel, /data-act="view-current-board"/);
-  assert.equal((panel.match(/data-act="download-backup"/g) || []).length, 1, "the board-data area has one Download backup action");
-  assert.equal((panel.match(/data-act="restore-backup"/g) || []).length, 1, "the board-data area has one guarded Restore action");
-  assert.match(panel, /id="backupDownloadFormat"[\s\S]*?value="current-board"[\s\S]*?value="recovery-archive"/);
-  assert.match(panel, /id="backupRestoreSource"[\s\S]*?value="file"[\s\S]*?value="paste"/);
-  assert.doesNotMatch(panel, /data-act="download-current-board"|data-act="download-recovery-archive"/);
-  assert.doesNotMatch(panel, /data-act="choose-backup-file"|data-act="open-paste-recovery"/);
-  assert.doesNotMatch(panel, /Current board recovery/i);
-  assert.match(html, /use View \/ copy current board in Settings before closing it/);
-  assert.match(html, /use View \/ copy current board in Settings before choosing whether to delete an older backup/);
-  assert.doesNotMatch(html, /Current board recovery/);
+  const settings = shim.document.getElementById("modalRoot").innerHTML;
+  assert.equal((settings.match(/data-act="import-backup"/g) || []).length, 1);
+  assert.equal((settings.match(/data-act="export-backup"/g) || []).length, 1);
+  assert.match(settings, /id="backupRestoreSource"[\s\S]*?value="file"[\s\S]*?value="paste"/);
+  assert.match(settings, /data-act="make-manual-backup"/);
+  assert.match(settings, /data-act="restore-local-backup"[\s\S]*?data-act="delete-local-backup"/);
+  assert.doesNotMatch(settings, /data-act="(?:view-current-board|view-database-repair|download-backup|download-current-board|download-recovery-archive|view-raw-backups|download-raw-backups)"/);
+  assert.doesNotMatch(settings, /backupDownloadFormat|Current-board view and copy/);
+
+  assert.equal(await ctx.onAction("export-backup", { isConnected: true }), true);
+  const transfer = shim.document.getElementById("modalRoot").innerHTML;
+  assert.match(transfer, /id="exportTransferDialog"/);
+  assert.equal((transfer.match(/data-act="download-export"/g) || []).length, 1);
+  assert.equal((transfer.match(/data-act="copy-export"/g) || []).length, 1);
+  assert.match(transfer, /id="exportTransferStatus"[^>]*role="status"/);
+  assert.doesNotMatch(transfer, /<textarea\b|databaseRepairData|currentBoardData|rawBackupData/);
+  for (const alias of ["view-current-board", "copy-current-board", "select-current-board", "view-database-repair", "copy-database-repair", "select-database-repair", "view-raw-backups", "download-raw-backups", "download-backup", "download-current-board", "download-recovery-archive", "download-raw-device-sources"]) {
+    ctx.openSettings();
+    assert.equal(await ctx.onAction(alias, { isConnected: true }), true, `${alias} routes to the safe transfer dialog for already-open tabs`);
+    const legacyMarkup = shim.document.getElementById("modalRoot").innerHTML;
+    assert.match(legacyMarkup, /id="exportTransferDialog"/);
+    assert.doesNotMatch(legacyMarkup, /<textarea\b|currentBoardData|databaseRepairData|rawBackupData/);
+  }
 });
 
-test('RISK backup format safety: raw-source qualification remains outside the native selector',async t=>{
+test("RISK Settings transfer sections: cleanup controls stay outside the focused backup section", async t => {
+  const app = await loadApp();
+  t.after(() => app.dispose());
+  const { ctx, shim } = app;
+  const cleanupTask = ctx.addTask("Cleanup fixture", false);
+  ctx.completeTask(cleanupTask);
+  assert.ok(await ctx.saveDurableBackup("manual", JSON.stringify(ctx.state)));
+  ctx.openSettings();
+  const markup = shim.document.getElementById("modalRoot").innerHTML;
+  const dataSection = markup.match(/<details class="settings-section"><summary>Data and backups<\/summary>([\s\S]*?)<\/details>/)?.[1];
+  assert.ok(dataSection, "Settings mounts the Data and backups section");
+  assert.equal((dataSection.match(/data-act="import-backup"/g) || []).length, 1);
+  assert.equal((dataSection.match(/data-act="export-backup"/g) || []).length, 1);
+  assert.match(dataSection, /data-act="make-manual-backup"/);
+  assert.match(dataSection, /data-act="restore-local-backup"[\s\S]*?data-act="delete-local-backup"/);
+  assert.doesNotMatch(dataSection, /data-act="(?:review-decision-recovery|clear-done|wipe|view-support-diagnostics)"|id="syncErrorLog"|Recent sync errors|<h3>Debug log<\/h3>/,
+    "decision review, cleanup, and diagnostics do not crowd the transfer and backup controls");
+  const cleanupSection = markup.match(/<details class="settings-section"><summary>Recovery and cleanup<\/summary>([\s\S]*?)<\/details>/)?.[1];
+  assert.ok(cleanupSection, "the existing cleanup and diagnostic tools remain in their own collapsed section");
+  for (const action of ["review-decision-recovery", "clear-done", "wipe", "view-support-diagnostics"])
+    assert.match(cleanupSection, new RegExp(`data-act="${action}"`), `${action} remains available`);
+  assert.match(cleanupSection, /id="syncErrorLog"/);
+  assert.match(markup, /<details class="settings-section"><summary>Recovery and cleanup<\/summary>/,
+    "the recovery and cleanup section is collapsed by default");
+});
+
+test('RISK backup export safety: unreadable originals stay byte-exact without a raw-data view',async t=>{
  const {IDBFactory}=await import('fake-indexeddb'),original='{unreadable original backup source';
  const app=await loadApp({indexedDBProvider:new IDBFactory(),deviceDbName:'raw-format-safety-'+Math.random(),seedStorage:{[SYNC_STORE_KEY]:original,[LOCAL_HEAD_KEY]:'different protected original'}}),{ctx,shim}=app;
- t.after(()=>closeLegacyApp173(app));const before=await ctx.window.ScannerDeviceStore.readRawExportSnapshot();
+ t.after(()=>closeLegacyApp173(app));const store=ctx.window.ScannerDeviceStore,before=await store.readRawExportSnapshot();
  ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
- const format=settings.match(/<select\b[^>]*id="backupDownloadFormat"[^>]*>[\s\S]*?<\/select>/)?.[0];assert.ok(format);
- assert.match(settings.replace(/<select\b[^>]*>[\s\S]*?<\/select>/g,''),/Raw device sources are not a board and cannot be restored as one\./,'the safety qualification is readable text outside the potentially truncated native option');
- const describedBy=format.match(/aria-describedby="([^"]+)"/)?.[1];assert.ok(describedBy,'the native format control names its visible safety explanation');assert.ok(settings.includes('id="'+describedBy+'"'));
- assert.deepEqual(await ctx.window.ScannerDeviceStore.readRawExportSnapshot(),before);assert.equal(shim.localStorage.getItem(SYNC_STORE_KEY),original);
+ assert.equal((settings.match(/data-act="import-backup"/g)||[]).length,1);assert.equal((settings.match(/data-act="export-backup"/g)||[]).length,1);
+ assert.doesNotMatch(settings,/backupDownloadFormat|raw-device-sources|data-act="view-raw-backups"/);
+ assert.equal(await ctx.onAction('export-backup',{isConnected:true}),true);
+ const markup=shim.document.getElementById('modalRoot').innerHTML;assert.match(markup,/Partial recovery archive/);assert.doesNotMatch(markup,/<textarea\b/);
+ const archive=JSON.parse(await copyPreparedExport(ctx));assert.equal(archive.currentBoard,null);
+ assert.equal(archive.manifest.sources.currentBoard.status,'unavailable');
+ assert.equal(archive.appSources.localStorage.find(row=>row.key===SYNC_STORE_KEY).raw,original);
+ assert.equal(archive.appSources.localStorage.find(row=>row.key===LOCAL_HEAD_KEY).raw,'different protected original');
+ assert.deepEqual(await store.readRawExportSnapshot(),before);assert.equal(shim.localStorage.getItem(SYNC_STORE_KEY),original);
 });
 
 test('RISK backup format browser: enlarged unreadable Settings keeps native selectors and safety text readable',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
@@ -10650,16 +10698,15 @@ test('RISK backup format browser: enlarged unreadable Settings keeps native sele
    await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&window.ScannerDeviceStore);
    const motion=page.locator('#motionDialog [data-landscape-motion="reduced"]');if(await motion.isVisible())await motion.click();await resolveExpectedFirstRunHelp(page);
    assert.equal(await page.evaluate(()=>liveBoardAccepted),false);
-   await page.locator('[data-act="settings"]').first().click();const section=page.locator('#modalRoot details').filter({has:page.locator('#backupDownloadFormat')});if(!await section.evaluate(e=>e.open))await section.locator(':scope > summary').click();
+   await page.locator('[data-act="settings"]').first().click();const section=page.locator('#modalRoot details').filter({has:page.locator('#backupRestoreSource')});if(!await section.evaluate(e=>e.open))await section.locator(':scope > summary').click();
    const before=await page.evaluate(()=>ScannerDeviceStore.readRawExportSnapshot());
-   await page.addStyleTag({content:'#backupDownloadFormat,#backupRestoreSource,#stDateFormat{font-size:22.5px!important} #modalRoot .modal .kv{font-size:20.25px!important}'});
-   await page.evaluate(()=>document.fonts.ready);await page.locator('#backupDownloadFormat').scrollIntoViewIfNeeded();
-   assert.deepEqual(await page.locator('#backupDownloadFormat option').evaluateAll(es=>es.map(e=>e.value)),['raw-device-sources']);
-   const geometry=await page.locator('#backupDownloadFormat,#backupRestoreSource').evaluateAll(es=>es.map(e=>{const r=e.getBoundingClientRect(),p=e.parentElement.getBoundingClientRect(),s=getComputedStyle(e),probe=document.createElement('select'),option=document.createElement('option');option.textContent=e.selectedOptions[0].textContent;probe.appendChild(option);probe.style.cssText='position:fixed;visibility:hidden;width:max-content;max-width:none;min-width:0;';probe.style.font=s.font;probe.style.padding=s.padding;probe.style.border=s.border;probe.style.appearance=s.appearance;document.body.appendChild(probe);const nativeIntrinsicWidth=probe.getBoundingClientRect().width;probe.remove();return{id:e.id,left:r.left,right:r.right,width:r.width,parentLeft:p.left,parentRight:p.right,fontSize:s.fontSize,text:e.selectedOptions[0].textContent,nativeIntrinsicWidth,appearance:s.appearance};}));
-   if(evidence)await page.screenshot({path:path.join(evidence,theme+'-raw-format.png')});t.diagnostic(JSON.stringify({theme,geometry}));
+   await page.addStyleTag({content:'#backupRestoreSource,#stDateFormat{font-size:22.5px!important} #modalRoot .modal .kv{font-size:20.25px!important}'});
+   await page.evaluate(()=>document.fonts.ready);await page.locator('#backupRestoreSource').scrollIntoViewIfNeeded();
+   assert.deepEqual(await page.locator('#backupRestoreSource option').evaluateAll(es=>es.map(e=>e.value)),['file','paste']);
+   assert.equal(await page.locator('#modalRoot [data-act="import-backup"]').count(),1);assert.equal(await page.locator('#modalRoot [data-act="export-backup"]').count(),1);
+   const geometry=await page.locator('#backupRestoreSource,#stDateFormat').evaluateAll(es=>es.map(e=>{const r=e.getBoundingClientRect(),p=e.parentElement.getBoundingClientRect(),s=getComputedStyle(e),probe=document.createElement('select'),option=document.createElement('option');option.textContent=e.selectedOptions[0].textContent;probe.appendChild(option);probe.style.cssText='position:fixed;visibility:hidden;width:max-content;max-width:none;min-width:0;';probe.style.font=s.font;probe.style.padding=s.padding;probe.style.border=s.border;probe.style.appearance=s.appearance;document.body.appendChild(probe);const nativeIntrinsicWidth=probe.getBoundingClientRect().width;probe.remove();return{id:e.id,left:r.left,right:r.right,width:r.width,parentLeft:p.left,parentRight:p.right,fontSize:s.fontSize,text:e.selectedOptions[0].textContent,nativeIntrinsicWidth,appearance:s.appearance};}));
+   if(evidence)await page.screenshot({path:path.join(evidence,theme+'-transfer-controls.png')});t.diagnostic(JSON.stringify({theme,geometry}));
    for(const r of geometry){assert.equal(r.fontSize,'22.5px');assert.ok(r.left>=r.parentLeft-1&&r.right<=r.parentRight+1,r.id+' must remain inside its real Settings row');assert.ok(r.nativeIntrinsicWidth<=r.width+1,r.id+' leaves room for its complete label and native arrow compared with an unconstrained native reference');assert.notEqual(r.appearance,'none');}
-   const help=page.getByText('Raw device sources are not a board and cannot be restored as one.',{exact:true});assert.equal(await help.isVisible(),true);assert.equal(await page.locator('#backupDownloadFormat').getAttribute('aria-describedby'),await help.getAttribute('id'));
-   assert.equal(await help.evaluate(e=>e.scrollWidth<=e.clientWidth+1),true);
    await page.locator('#backupRestoreSource').selectOption('paste');assert.equal(await page.locator('#backupRestoreSource').inputValue(),'paste');assert.deepEqual(await page.evaluate(()=>ScannerDeviceStore.readRawExportSnapshot()),before);assert.equal(await page.evaluate(()=>liveBoardAccepted),false);
   }finally{await context.close();}
  });}finally{await browser.close();}
@@ -14320,7 +14367,7 @@ test("UI: 'Return as candidate' stays disabled for an ordinary task with an orph
 });
 
 test("UI: unavailable Return as candidate has a grey button style", () => {
-  assert.match(styleSrc, /\.btn\.subtle:disabled\{[^}]*background:[^;}]*;[^}]*color:[^;}]*;[^}]*cursor:not-allowed/);
+  assert.match(styleSrc, /\.btn\.subtle:disabled(?:,[^{]+)?\{[^}]*background:light-dark\(#e8e8eb,#343840\);[^}]*color:light-dark\(#777b83,#9ba0aa\);[^}]*cursor:not-allowed/);
 });
 
 test("UI: 'Return as candidate' appears when the task is marked 'cant'", async () => {
@@ -15484,6 +15531,30 @@ test('RISK saved view account boundary: an All Tasks filter is cleared when the 
  assert.equal(shim.document.getElementById('listCount').textContent,'(1)','the new account must not inherit the prior account filter');
 });
 
+test('RISK saved view continuity: repeated selected eligibility retains mounted rows and still refreshes changed views',async()=>{
+ const board=syncState({tasks:Array.from({length:400},(_,i)=>syncTask('repeat-eligible-'+i,'Eligible task '+i)),
+  contexts:[{id:'selected-context',name:'Selected context',active:true}],listOpen:true,seenQuickStart:true});
+ const {ctx,shim}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(board)}});
+ const select=id=>ctx.onAction('list-eligibility',{dataset:{id}}),body=shim.document.getElementById('listBody');
+ select('eligible');const before=JSON.stringify(ctx.state);let markup=body.innerHTML,replacements=0;
+ Object.defineProperty(body,'innerHTML',{configurable:true,get:()=>markup,set:value=>{markup=value;replacements++;}});
+ body.scrollTop=340;
+ for(let i=0;i<10;i++)select('eligible');
+ assert.equal(replacements,0,'reselecting the same Eligible view must preserve its mounted task rows');
+ assert.equal(body.scrollTop,340);assert.equal(JSON.stringify(ctx.state),before,'view choices never mutate the saved board');
+ ctx.setListQuery('no matching task');assert.match(markup,/No tasks match/);
+ select('eligible');assert.equal((markup.match(/data-act="edit"/g)||[]).length,400,'the same selection still clears a real search');
+ ctx.onAction('list-tag',{dataset:{id:'c:selected-context'}});assert.match(markup,/No tasks match/);
+ select('eligible');assert.equal((markup.match(/data-act="edit"/g)||[]).length,400,'the same selection still clears a real tag');
+ ctx.state.tasks[0].title='Changed by a current board update';select('eligible');assert.match(markup,/Changed by a current board update/,'in-place board edits are not hidden by idempotence');
+ ctx.replaceState({...ctx.state,tasks:[...ctx.state.tasks,syncTask('new-current-board','New current board task')]});
+ select('eligible');assert.match(markup,/New current board task/,'replacement board content is freshly projected');
+ shim.window.CloudSync={user:'next-view-owner'};select('eligible');
+ assert.equal(JSON.parse(shim.localStorage.getItem('fvp:chain-scanner:saved-view:v1')).account,'next-view-owner','owner changes refresh this device view');
+ select('ineligible');assert.equal((markup.match(/data-act="edit"/g)||[]).length,0,'a different filter still changes the rendered membership');
+ ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/Repeatedly selecting the same eligibility filter keeps unchanged rows in place/);
+});
+
 test('RISK saved view restoration: the eligibility filter remains selected after reopening All Tasks',async()=>{
  const board=syncState({tasks:[syncTask('eligibility-view','Eligibility view task')],listOpen:true,seenQuickStart:true});
  const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(board)}),first=await loadApp({sharedStorage:storage});
@@ -16400,6 +16471,8 @@ const HOUR = 3600000;
 function sharedScannerStorage(initial = {}) {
   const values = new Map(Object.entries(initial));
   return {
+    get length() { return values.size; },
+    key: index => [...values.keys()][index] ?? null,
     getItem: key => values.has(key) ? values.get(key) : null,
     setItem: (key, value) => values.set(key, String(value)),
     removeItem: key => values.delete(key),
@@ -18126,6 +18199,7 @@ test('RISK LOCAL BACKUPS: lossless compaction frees protected archive quota with
  const values=new Map(),used=()=>[...values].reduce((sum,[key,value])=>sum+key.length+value.length,0);
  let quota=Infinity;
  const storage={
+  get length(){return values.size;},key:index=>[...values.keys()][index]??null,
   getItem:key=>values.get(key)??null,
   removeItem:key=>values.delete(key),
   setItem(key,value){
@@ -18162,6 +18236,7 @@ test('RISK LOCAL BACKUPS: Undo compacts retained recovery before growing the gua
  const values=new Map(),used=()=>[...values].reduce((sum,[key,value])=>sum+key.length+value.length,0);
  let quota=Infinity;
  const storage={
+  get length(){return values.size;},key:index=>[...values.keys()][index]??null,
   getItem:key=>values.get(key)??null,
   removeItem:key=>values.delete(key),
   setItem(key,value){
@@ -18265,12 +18340,16 @@ test('RISK LOCAL BACKUPS: packed view download and delete preserve decoded recov
  assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),legacyBefore,'the old shell cannot overwrite the packed recovery bytes');
  const {ctx,shim}=await loadApp({sharedStorage:storage});
  assert.equal(ctx.backupRecoveryText(storage.getItem(LOCAL_BACKUPS_KEY)),plain);
- ctx.viewRawBackups();assert.match(shim.document.getElementById('modalRoot').innerHTML,/First packed recovery/);
+ ctx.openSettings();assert.equal(await ctx.onAction('export-backup',{isConnected:true}),true);
+ const copied=await copyPreparedExport(ctx),archive=JSON.parse(copied);
+ const exportedPacked=archive.appSources.localStorage.find(row=>row.key===LOCAL_BACKUPS_KEY)?.raw;
+ assert.equal(exportedPacked,legacyBefore,'the unified archive retains the exact packed original');
+ assert.equal(ctx.backupRecoveryText(exportedPacked),plain,'decoded recovery bytes remain complete without a raw-data view');
  let download=null;const link=makeFakeElement();link.remove=()=>{};link.click=()=>{download={...download,name:link.download};};
  shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();
  ctx.Blob=class Blob{constructor(parts,options){this.text=parts.join('');this.type=options.type;}};
  ctx.URL={createObjectURL(blob){download={blob};return 'blob:packed-backups';},revokeObjectURL(){}};
- ctx.downloadRawBackups();assert.equal(download.name,'chain-scanner-raw-local-backups.json');assert.equal(download.blob.text,plain);
+ assert.equal(await ctx.onAction('download-export',{}),true);assert.equal(download.name,'chain-scanner-recovery-archive.json');assert.equal(download.blob.text,copied,'unified Download and Copy retain identical complete archive bytes');
  ctx.openSettings();ctx.onAction('delete-local-backup',{dataset:{id:'one'}});
  const stored=storage.getItem(LOCAL_BACKUPS_KEY),decoded=ctx.backupRecoveryText(stored),remaining=ctx.parseBackupIndex(stored);
  assert.equal(remaining.length,1);assert.equal(remaining[0].id,'two');assert.equal(remaining[0].payload,rows[1].payload);
@@ -18309,6 +18388,7 @@ test('RISK CLOUD BACKUP: mandatory adoption backup compacts protected recovery a
  const values=new Map(),used=()=>[...values].reduce((sum,[key,value])=>sum+key.length+value.length,0);
  let quota=Infinity;
  const storage={
+  get length(){return values.size;},key:index=>[...values.keys()][index]??null,
   getItem:key=>values.get(key)??null,
   removeItem:key=>values.delete(key),
   setItem(key,value){
@@ -18611,6 +18691,7 @@ test('RISK CLOUD BACKUP: clean adoption frees automatic history for the next ord
  const values=new Map(),used=()=>[...values].reduce((sum,[key,value])=>sum+key.length+value.length,0);
  let quota=Infinity;
  const storage={
+  get length(){return values.size;},key:index=>[...values.keys()][index]??null,
   getItem:key=>values.get(key)??null,
   removeItem:key=>values.delete(key),
   setItem(key,value){
@@ -18766,6 +18847,7 @@ test('RISK LOCAL STORAGE: a full iOS store still opens its readable primary boar
  const used=()=>[...values].reduce((sum,[key,value])=>sum+key.length+value.length,0);
  const quota=used();
  const storage={
+  get length(){return values.size;},key:index=>[...values.keys()][index]??null,
   getItem:key=>values.has(key)?values.get(key):null,
   removeItem:key=>values.delete(key),
   setItem(key,value){
@@ -18863,6 +18945,7 @@ test('RISK LOCAL BACKUPS: single-device Undo frees old automatic history for its
  const values=new Map();let quota=Infinity;
  const used=()=>[...values].reduce((sum,[key,value])=>sum+key.length+value.length,0);
  const storage={
+  get length(){return values.size;},key:index=>[...values.keys()][index]??null,
   getItem:key=>values.has(key)?values.get(key):null,
   removeItem:key=>values.delete(key),
   setItem(key,value){
@@ -18939,7 +19022,10 @@ test('RISK LOCAL DIAGNOSTICS: ordinary edits and Undo identify the exact device 
  assert.equal(JSON.stringify(ctx.deviceSaveIssue()),JSON.stringify({stage:'primary-write',code:'quota-exhausted'}));
  assert.match(shim.document.getElementById('toast').textContent,/device-save:primary-write\/quota-exhausted/);
  ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/primary-write\/quota-exhausted/);
- assert.match(shim.document.getElementById('modalRoot').innerHTML,/View \/ copy current board/);
+ assert.equal((shim.document.getElementById('modalRoot').innerHTML.match(/data-act="export-backup"/g)||[]).length,1);
+ assert.equal(await ctx.onAction('export-backup',{isConnected:true}),true);
+ const exported=JSON.parse(await copyPreparedExport(ctx));
+ assert.equal(exported.currentBoard.tasks.find(row=>row.id===task.id).title,original,'Export retains the accepted Undo edit even when its save failed');
  blockOriginal=false;assert.equal(await ctx.persist(),true);assert.equal(ctx.deviceSaveIssue(),null,'a successful retry clears the stale diagnosis');
 
  const missing=await loadApp();
@@ -18968,6 +19054,7 @@ test('RISK LOCAL BACKUPS: full optional history cannot block an ordinary edit th
  const values=new Map(),used=()=>[...values].reduce((sum,[key,value])=>sum+key.length+value.length,0);
  let quota=Infinity;
  const storage={
+  get length(){return values.size;},key:index=>[...values.keys()][index]??null,
   getItem:key=>values.get(key)??null,
   setItem:(key,value)=>{
    const next=String(value),prior=values.get(key)||'';
@@ -19004,6 +19091,7 @@ test('RISK LOCAL BACKUPS: quota during Restore keeps the immediate pre-restore b
  let appCtx=null;
  const used=()=>[...values].reduce((sum,[key,value])=>sum+key.length+value.length,0);
  const storage={
+  get length(){return values.size;},key:index=>[...values.keys()][index]??null,
   getItem:key=>values.has(key)?values.get(key):null,
   removeItem:key=>values.delete(key),
   setItem(key,value){
@@ -19333,7 +19421,7 @@ test('RISK LOCAL BACKUPS: deleting one visible copy preserves hidden unreadable 
     'the unreadable row remains byte-for-byte available in the raw index');
 });
 
-test('RISK LOCAL BACKUPS: unreadable old copy is visible with exact raw recovery and targeted removal',async()=>{
+test('RISK LOCAL BACKUPS: unreadable old copy stays visible and byte-exact in unified Export',async()=>{
   const storage=sharedScannerStorage();
   const {ctx,shim}=await loadApp({sharedStorage:storage});
   const bad={id:'old-unreadable',day:'2020-01-01',at:Date.parse('2020-01-01T12:00:00Z'),kind:'daily',payload:'unreadable'};
@@ -19344,12 +19432,13 @@ test('RISK LOCAL BACKUPS: unreadable old copy is visible with exact raw recovery
   let view=shim.document.getElementById('modalRoot').innerHTML;
   assert.match(view,/old-unreadable/);
   assert.match(view,/Unreadable backup/);
-  assert.match(view,/data-act="view-raw-backups"/);
-  assert.match(view,/data-act="download-raw-backups"/);
+  assert.equal((view.match(/data-act="export-backup"/g)||[]).length,1);
+  assert.doesNotMatch(view,/data-act="view-raw-backups"|data-act="download-raw-backups"|rawBackupData/);
   assert.match(view,/data-act="restore-local-backup"[^>]*disabled/);
-  ctx.onAction('view-raw-backups',{});
-  view=shim.document.getElementById('modalRoot').innerHTML;
-  assert.ok(view.includes(ctx.esc(raw)),'the raw viewer contains every original byte for recovery');
+  assert.equal(await ctx.onAction('export-backup',{isConnected:true}),true);
+  const archive=JSON.parse(await copyPreparedExport(ctx));
+  assert.equal(archive.appSources.localStorage.find(row=>row.key===LOCAL_BACKUPS_KEY).raw,raw,
+    'the unified read-only archive retains every unreadable backup byte exactly');
   ctx.openSettings();
   ctx.onAction('delete-local-backup',{dataset:{id:'old-unreadable'}});
   assert.deepEqual(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)),[good]);
@@ -19374,8 +19463,9 @@ test('RISK LOCAL BACKUPS: duplicate IDs and malformed root never permit ambiguou
   assert.match(shim.document.getElementById('modalRoot').innerHTML,/Backup list cannot be read/);
   ctx.onAction('delete-local-backup',{dataset:{id:'partial'}});
   assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),malformed);
-  ctx.onAction('view-raw-backups',{});
-  assert.ok(shim.document.getElementById('modalRoot').innerHTML.includes(ctx.esc(malformed)));
+  assert.equal(await ctx.onAction('export-backup',{isConnected:true}),true);
+  const archive=JSON.parse(await copyPreparedExport(ctx));
+  assert.equal(archive.appSources.localStorage.find(row=>row.key===LOCAL_BACKUPS_KEY).raw,malformed);
 });
 
 test('RISK LOCAL BACKUPS: a stale Settings click cannot delete a row rewritten by another tab',async()=>{
@@ -19434,64 +19524,174 @@ test('SETTINGS: manual local backups replace visible JSON import and export cont
   assert.match(html,/title="Settings, contexts, and backups"/);
 });
 
-test('RISK JSON COPY PASTE: the current-board viewer copies its exact displayed JSON without saving',async t=>{
-  const storage=sharedScannerStorage(),app=await loadApp({sharedStorage:storage}),{ctx,shim}=app;
+test('RISK JSON COPY PASTE: large native paste retains full draft without rendering the archive',async t=>{
+  const {IDBFactory}=await import('fake-indexeddb');
+  const app=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'large-paste-'+Date.now()}),{ctx,shim}=app;
+  ctx.btoa=globalThis.btoa; // Real platform encoder; the remaining suite retains the portable fallback.
+  t.after(()=>app.dispose());ctx.addTask('Original remains until confirmation',false);await prepareBackupFileFixtureSource(app);
+  const original=JSON.stringify(ctx.state),head=await ctx.window.ScannerDeviceStore.readHead();
+  const source=JSON.parse(ctx.currentBoardExportPayload());source.futureLargePaste='retain 🌿\n'.repeat(40000);
+  const raw=JSON.stringify(source,null,2);ctx.openSettings();shim.document.getElementById('backupRestoreSource').value='paste';await ctx.onAction('import-backup',{});
+  const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value='replace this selected draft';box.selectionStart=0;box.selectionEnd=box.value.length;
+  let prevented=false;shim.document.dispatchEvent({type:'paste',target:box,clipboardData:{getData:()=>raw},preventDefault(){prevented=true;}});
+  assert.equal(prevented,true,'large clipboard data bypasses the native multiline editor insertion');
+  assert.ok(box.value.length<1024,'the editor never mounts the entire large archive');
+  assert.match(shim.document.getElementById('pasteDraftStatus').textContent,/complete text/i);
+  assert.equal(await ctx.onAction('preview-pasted-recovery',{}),true,'the complete captured draft reaches protected preview');
+  const rows=await ctx.window.ScannerDeviceStore.listBackups();assert.ok(rows.some(row=>row.kind==='restore-file-source'&&Buffer.from(row.restoreFile?.bytesBase64||'','base64').toString('utf8')===raw),'the exact complete source is protected');
+  assert.equal(JSON.stringify(ctx.state),original);assert.equal((await ctx.window.ScannerDeviceStore.readHead()).hash,head.hash);
+  await ctx.onAction('cancel-file-restore',{});assert.ok(shim.document.getElementById('jsonBox').value.length<1024,'Cancel restores a bounded editor');
+  await ctx.onAction('close-paste-recovery',{});await ctx.onAction('open-paste-recovery',{});
+  assert.match(shim.document.getElementById('pasteDraftStatus').textContent,/complete text/i);
+  assert.equal(await ctx.onAction('preview-pasted-recovery',{}),true,'closing and reopening preserves the complete draft');
+  assert.equal(await ctx.onAction('confirm-file-restore',{}),true);
+  assert.equal(ctx.state.futureLargePaste,source.futureLargePaste,'confirmed import preserves every unknown-field character');
+  assert.equal(JSON.parse((await ctx.window.ScannerDeviceStore.readHead()).payload).futureLargePaste,source.futureLargePaste);
+  assert.ok((await ctx.window.ScannerDeviceStore.listBackups()).some(row=>row.payload===original),'the original board stays protected');
+
+  await ctx.onAction('open-paste-recovery',{});const replacement=shim.document.getElementById('jsonBox');replacement.id='jsonBox';replacement.value='';replacement.selectionStart=0;replacement.selectionEnd=0;
+  shim.document.dispatchEvent({type:'paste',target:replacement,clipboardData:{getData:()=>raw},preventDefault(){}});
+  const small=JSON.stringify({...source,futureLargePaste:'deliberate replacement'});let smallPrevented=false;
+  shim.document.dispatchEvent({type:'paste',target:replacement,clipboardData:{getData:()=>small},preventDefault(){smallPrevented=true;}});
+  assert.equal(smallPrevented,false,'ordinary replacement paste retains native editing');
+  replacement.value=small;shim.document.dispatchEvent({type:'input',target:replacement});
+  assert.equal(await ctx.onAction('preview-pasted-recovery',{}),true);await ctx.onAction('confirm-file-restore',{});
+  assert.equal(ctx.state.futureLargePaste,'deliberate replacement','a new draft replaces the buffered source explicitly');
+  for(const remainder of [0,1,2]){
+    const bytes=Uint8Array.from({length:49152+remainder},(_,i)=>i%256),before=JSON.stringify(ctx.state);
+    assert.equal(await ctx.handleRestoreBackupFileChange({files:[{name:'binary-original-'+remainder,type:'application/octet-stream',arrayBuffer:async()=>bytes.buffer}]}),false,'invalid UTF-8 is protected without adoption');
+    assert.ok((await ctx.window.ScannerDeviceStore.listBackups()).some(row=>row.restoreFile?.bytesBase64===Buffer.from(bytes).toString('base64')),'every binary byte and Base64 padding remainder survives file protection');
+    assert.equal(JSON.stringify(ctx.state),before);
+  }
+});
+
+test('RISK JSON COPY PASTE: closing a large paste during encoding stops before backup writes',async t=>{
+  const keepAlive=setTimeout(()=>{},10000);t.after(()=>clearTimeout(keepAlive)); // App fixture timers are intentionally unrefed.
+  const {IDBFactory}=await import('fake-indexeddb');
+  const app=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'large-paste-close-'+Date.now()}),{ctx,shim}=app;
+  t.after(()=>app.dispose());ctx.addTask('Keep original during encoding',false);await prepareBackupFileFixtureSource(app);
+  const source=JSON.parse(ctx.currentBoardExportPayload());source.largeUnknown='x'.repeat(2*1024*1024);
+  const raw=JSON.stringify(source),original=JSON.stringify(ctx.state),store=ctx.window.ScannerDeviceStore,head=await store.readHead();
+  await ctx.onAction('open-paste-recovery',{});const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value='';box.selectionStart=0;box.selectionEnd=0;
+  shim.document.dispatchEvent({type:'paste',target:box,clipboardData:{getData:()=>raw},preventDefault(){}});
+  const protectedWrites=[],put=store.putBackup.bind(store);store.putBackup=async options=>{if(['before-file-restore','restore-file-source'].includes(options?.backup?.kind))protectedWrites.push(options.backup.kind);return put(options);};
+  let scheduled=false,closed=false;ctx.btoa=bytes=>{if(!scheduled){scheduled=true;setTimeout(()=>{ctx.onAction('close-paste-recovery',{});closed=true;},0);}return globalThis.btoa(bytes);};
+  assert.equal(await ctx.onAction('preview-pasted-recovery',{}),false);
+  assert.equal(closed,true,'the UI receives Close while a large source is being encoded');
+  assert.deepEqual(protectedWrites,[],'revoked preview consent cannot start protection writes after a yielded encoding chunk');
+  assert.equal(JSON.stringify(ctx.state),original);assert.equal((await store.readHead()).hash,head.hash);
+  assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/confirm-file-restore/);
+  ctx.btoa=globalThis.btoa;await ctx.onAction('open-paste-recovery',{});
+  assert.equal(await ctx.onAction('preview-pasted-recovery',{}),true,'the complete retained draft can be previewed again');
+  assert.ok((await store.listBackups()).some(row=>row.restoreFile?.bytesBase64===Buffer.from(raw).toString('base64')));
+});
+
+test('RISK JSON COPY PASTE: stale clipboard completion cannot release a newer export transfer',async t=>{
+  for(const outcome of ['resolve','reject'])await t.test(outcome,async t=>{
+    const pending=[],{IDBFactory}=await import('fake-indexeddb');
+    const app=await loadApp({indexedDBProvider:new IDBFactory(),deviceDbName:'clipboard-generation-'+outcome+'-'+Date.now()}),{ctx,shim}=app;
+    t.after(()=>app.dispose());
+    ctx.addTask('Keep the new transfer pending');await ctx.persist();
+    ctx.navigator={clipboard:{writeText(raw){return new Promise((resolve,reject)=>pending.push({raw,resolve,reject}));}}};
+    const original=shim.document.getElementById.bind(shim.document);let controls;
+    shim.document.getElementById=id=>controls?.[id]||original(id);
+    async function openExport(){
+      ctx.openSettings();assert.equal(await ctx.onAction('export-backup',{isConnected:true}),true);
+      controls=Object.fromEntries(['copyExportButton','downloadExportButton','exportTransferStatus'].map(id=>[id,makeFakeElement()]));
+    }
+    await openExport();const first=ctx.onAction('copy-export',{});
+    assert.equal(pending.length,1);ctx.closeModal();
+    await openExport();const second=ctx.onAction('copy-export',{});
+    assert.equal(pending.length,2);assert.equal(controls.copyExportButton.disabled,true);
+    const waiting=controls.exportTransferStatus.textContent;
+    pending[0][outcome](outcome==='reject'?Error('late clipboard refusal'):undefined);await first;
+    assert.equal(controls.copyExportButton.disabled,true,'the earlier transfer cannot release the pending Copy');
+    assert.equal(controls.downloadExportButton.disabled,true,'the newer transfer remains guarded');
+    assert.equal(controls.exportTransferStatus.textContent,waiting,'only the active clipboard request may change its status');
+    assert.equal(await ctx.onAction('copy-export',{}),false,'another press stays refused while the new request is pending');
+    assert.equal(pending.length,2);
+    pending[1].resolve();assert.equal(await second,true);
+    assert.equal(controls.copyExportButton.disabled,false);assert.equal(controls.downloadExportButton.disabled,false);
+    assert.match(controls.exportTransferStatus.textContent,/Copied/);
+    assert.equal(JSON.parse(pending[1].raw).currentBoard.tasks.length,1);
+  });
+});
+
+test('RISK JSON COPY PASTE: Copy and Download round-trip seeded pending archives without replaying sources',async t=>{
+  const {IDBFactory}=await import('fake-indexeddb'),storage=sharedScannerStorage();
+  const app=await loadApp({sharedStorage:storage,indexedDBProvider:new IDBFactory(),deviceDbName:'direct-copy-export-'+Date.now()}),{ctx,shim}=app;
   t.after(()=>app.dispose());
   const task=ctx.addTask('Copy <board> & keep 🌿');await ctx.persist();
-  task.futureCopyField={keep:'unknown value'};ctx.state.futureCopyBoardField={retain:true};
-  const before=JSON.stringify(ctx.state),saved=storage.getItem(SYNC_STORE_KEY),writes=[];
+  task.futureCopyField={keep:'unknown value'};ctx.state.futureCopyBoardField={retain:true};ctx.state.syncDirty=true;
+  const pendingAccount='repair-copy@example.test',pending={generationId:'repair-pending-not-replayed',payloadHash:'b'.repeat(64),baseRev:4,updatedAt:1},pendingStored={...pending,account:pendingAccount};
+  const sourceStore=ctx.window.ScannerDeviceStore;assert.equal((await sourceStore.setPendingUpload(pendingAccount,pending)).ok,true);
+  assert.deepEqual(await sourceStore.getPendingUpload(pendingAccount),pendingStored,'the source really has pending work before archive capture');
+  const before=JSON.stringify(ctx.state),saved=storage.getItem(SYNC_STORE_KEY),sourceBefore=await sourceStore.readRawExportSnapshot(),writes=[];
   const set=storage.setItem.bind(storage);storage.setItem=(key,value)=>{writes.push(key);return set(key,value);};
-  ctx.openSettings();await ctx.onAction('view-current-board',{});
+  ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
+  assert.equal((settings.match(/data-act="import-backup"/g)||[]).length,1);
+  assert.equal((settings.match(/data-act="export-backup"/g)||[]).length,1);
+  assert.doesNotMatch(settings,/currentBoardData|databaseRepairData|rawBackupData|<textarea\b/);
+  assert.equal(await ctx.onAction('export-backup',{isConnected:true}),true);
   const markup=shim.document.getElementById('modalRoot').innerHTML;
-  const copy=markup.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>Copy JSON<\/button>/);
-  assert.ok(copy,'the actual current-board viewer offers a clipboard Copy JSON action');
-  const shown=markup.match(/<textarea\b[^>]*id="currentBoardData"[^>]*>([\s\S]*?)<\/textarea>/)?.[1];
-  assert.ok(shown,'the complete readonly JSON remains visible');
-  const raw=shown.replaceAll('&quot;','"').replaceAll('&#39;',"'").replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&amp;','&');
-  shim.document.getElementById('currentBoardData').value=raw;
-  let copied=null;ctx.navigator={clipboard:{async writeText(value){copied=value;}}};
-  assert.equal(await ctx.onAction(copy[1],{}),true);
-  assert.equal(copied,raw,'the copy gesture uses the visible snapshot');
-  const board=JSON.parse(copied);
-  assert.equal(board.tasks.find(row=>row.id===task.id).futureCopyField.keep,'unknown value');
-  assert.equal(board.futureCopyBoardField.retain,true);
+  assert.match(markup,/id="exportTransferDialog"/);assert.doesNotMatch(markup,/<textarea\b|currentBoardData|databaseRepairData/);
+  const copied=await copyPreparedExport(ctx),archive=JSON.parse(copied);
+  assert.equal(archive.format,'chain-scanner.recovery-archive');assert.equal(archive.manifest.status,'complete');
+  assert.equal(archive.currentBoard.tasks.find(row=>row.id===task.id).futureCopyField.keep,'unknown value');
+  assert.equal(archive.currentBoard.futureCopyBoardField.retain,true);
+  const pendingRow=archive.appSources.indexedDB.stores.meta.find(row=>decodeManualArchiveTypedValue(row.key)==='pending:'+pendingAccount);
+  assert.ok(pendingRow,'the seeded pending row is included in the exact archived device sources');
+  assert.deepEqual(decodeManualArchiveTypedValue(pendingRow.value),pendingStored,'archive encoding preserves the complete pending object');
   assert.equal(JSON.stringify(ctx.state),before,'copy leaves accepted unsaved fields untouched');
   assert.equal(storage.getItem(SYNC_STORE_KEY),saved,'copy does not save accepted unsaved fields');
-  assert.deepEqual(writes,[],'copy does not write browser storage');
-  const area=shim.document.getElementById('currentBoardData');let selected=0;
-  area.select=()=>selected++;
-  for(const clipboard of [undefined,{async writeText(){throw Error('denied');}}]){
-    ctx.navigator={clipboard};
-    assert.equal(await ctx.onAction(copy[1],{}),false,'unavailable clipboard access is recoverable');
-    assert.equal(area.value,raw,'the exact snapshot remains available for manual copying');
-    assert.match(shim.document.getElementById('modalRoot').innerHTML,/currentBoardData/);
-    assert.match(shim.document.getElementById('toast').textContent,/select.*copy/i);
-  }
-  assert.equal(selected,2,'both denied and missing clipboard APIs select the visible JSON');
-  assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(writes,[]);
-  const {IDBFactory}=await import('fake-indexeddb');
+
+  let blob=null;const downloads=[],link=makeFakeElement();link.remove=()=>{};link.click=()=>downloads.push({name:link.download,blob});
+  shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();
+  ctx.Blob=class{constructor(parts,options){this.text=parts.join('');this.type=options.type;}};
+  ctx.URL={createObjectURL(value){blob=value;return 'blob:direct-copy';},revokeObjectURL(){}};
+  assert.equal(await ctx.onAction('download-export',{}),true);
+  assert.equal(downloads.length,1);assert.equal(downloads[0].name,'chain-scanner-recovery-archive.json');
+  assert.equal(downloads[0].blob.text,copied,'the Download action saves the exact string copied to the clipboard');
+
+  const status=makeFakeElement(),originalGet=shim.document.getElementById.bind(shim.document);
+  shim.document.getElementById=id=>id==='exportTransferStatus'?status:originalGet(id);
+  ctx.navigator={clipboard:{writeText(){return Promise.reject(Error('denied'));}}};
+  assert.equal(await ctx.onAction('copy-export',{}),false,'clipboard errors remain visible and recoverable');
+  assert.equal(downloads.length,1,'clipboard failure does not trigger a second download');
+  assert.match(status.textContent,/Clipboard access failed/i);
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="download-export"/);
+  assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/<textarea\b|currentBoardData|databaseRepairData|rawBackupData/);
+  assert.equal(JSON.stringify(ctx.state),before);assert.equal(storage.getItem(SYNC_STORE_KEY),saved);assert.deepEqual(writes,[]);
+  assert.deepEqual(await ctx.window.ScannerDeviceStore.readRawExportSnapshot(),sourceBefore,'Export performs no device-store write');
+
   const destination=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'json-copy-paste-'+Date.now()});
   t.after(()=>destination.dispose());
   const target=destination.ctx,dom=destination.shim;
   target.addTask('Board before pasted restore',false);await prepareBackupFileFixtureSource(destination);
   const original=JSON.stringify(target.state),originalHead=await target.window.ScannerDeviceStore.readHead();
-  target.openSettings();dom.document.getElementById('backupRestoreSource').value='paste';
-  await target.onAction('restore-backup',{});
+  target.openSettings();dom.document.getElementById('backupRestoreSource').value='paste';await target.onAction('import-backup',{});
   const pasted=dom.document.getElementById('jsonBox');pasted.id='jsonBox';pasted.value=copied;
   dom.document.dispatchEvent({type:'input',target:pasted});
   assert.equal(await target.onAction('preview-pasted-recovery',{}),true,dom.document.getElementById('toast').textContent);
   assert.match(dom.document.getElementById('modalRoot').innerHTML,/confirm-file-restore/);
-  assert.equal(JSON.stringify(target.state),original,'pasting reaches a preview without replacing the board');
+  assert.equal(JSON.stringify(target.state),original,'pasting reaches preview without replacing the board');
   assert.equal((await target.window.ScannerDeviceStore.readHead()).hash,originalHead.hash);
+  const previewBackups=await target.window.ScannerDeviceStore.listBackups(),previewSource=previewBackups.find(row=>row.kind==='restore-file-source');
+  assert.equal(previewSource?.restoreFile?.bytesBase64,Buffer.from(copied).toString('base64'),'the complete original archive bytes are durably protected before restore');
   await target.onAction('cancel-file-restore',{});
   assert.equal(dom.document.getElementById('jsonBox').value,copied,'Cancel retains the exact copied text');
   assert.equal(JSON.stringify(target.state),original);
   assert.equal(await target.onAction('preview-pasted-recovery',{}),true);
   assert.equal(await target.onAction('confirm-file-restore',{}),true);
   assert.equal(target.state.tasks.find(row=>row.id===task.id).futureCopyField.keep,'unknown value');
-  const durable=JSON.parse((await target.window.ScannerDeviceStore.readHead()).payload);
-  assert.equal(durable.futureCopyBoardField.retain,true,'confirmed round-trip retains unknown board data durably');
-  assert.ok((await target.window.ScannerDeviceStore.listBackups()).some(row=>row.payload===original),'the displaced board remains protected');
+  assert.equal(target.state.futureCopyBoardField.retain,true);
+  assert.equal(await target.window.ScannerDeviceStore.getPendingUpload(pendingAccount),null,'the seeded archived pending generation is not replayed to the destination');
+  const durableReadback=await target.window.ScannerDeviceStore.readHead(),durableBoard=JSON.parse(durableReadback.payload);
+  assert.equal(durableBoard.tasks.find(row=>row.id===task.id).futureCopyField.keep,'unknown value','unknown task fields survive durable save and readback');
+  assert.deepEqual(durableBoard.futureCopyBoardField,{retain:true},'unknown board fields survive durable save and readback');
+  const retained=(await target.window.ScannerDeviceStore.listBackups());
+  assert.ok(retained.some(row=>row.kind==='before-file-restore'&&row.payload===original),'the exact displaced board bytes remain protected');
+  assert.ok(retained.some(row=>row.kind==='restore-file-source'&&row.restoreFile?.bytesBase64===Buffer.from(copied).toString('base64')),'the complete original archive bytes remain protected after confirmation');
 });
 
 test('RISK JSON COPY PASTE: Quick start explains the copy button, manual fallback and guarded paste',async t=>{
@@ -19499,15 +19699,29 @@ test('RISK JSON COPY PASTE: Quick start explains the copy button, manual fallbac
   const help=app.shim.document.getElementById('modalRoot').innerHTML;
   const answer=help.match(/<dt>How do I copy and paste JSON\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
   assert.ok(answer,'Quick start includes the JSON copy and paste workflow');
-  assert.match(answer,/View \/ copy current board.*Copy JSON/);
-  assert.match(answer,/does not copy local backups or recovery sources/i);
-  assert.match(answer,/Select all.*manually/i);
-  assert.match(answer,/Restore.*Paste JSON.*preview.*confirm/i);
-  assert.match(answer,/accepted.*unsaved|may not have saved/i);
-  assert.match(answer,/not.*Debug log/i);
+  assert.equal(answer,'Choose Settings → Data and backups → Export → Copy. If copying is unavailable, choose Download; use Import → Paste JSON to bring it back.');
+  const paste=help.match(/<dt>How do I paste a saved board\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.ok(paste);
+  assert.match(paste,/complete text.*Cancel and Close keep it.*current board stay protected before preview.*Nothing applies until you confirm Restore/,'The separate paste answer retains saved-data safeguards');
+  assert.doesNotMatch(answer,/late result|pending|accepted unsaved|read-only/,'The direct Copy answer avoids repeated internal export machinery');
+
 });
 
-test('RISK DATABASE REPAIR EXPORT: the Settings copy includes exact saved sources and repair metadata without writes',async t=>{
+test('RISK button safety guidance: mounted FAQ states required browser checks and limits',async t=>{
+  const app=await loadApp();t.after(()=>app.dispose());
+  for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+  app.ctx.openHelp();
+  const help=app.shim.document.getElementById('modalRoot').innerHTML;
+  const answer=help.match(/<dt>How are button crashes checked\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
+  assert.ok(answer,'the mounted FAQ explains how required button checks work');
+  const plain=answer.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
+  assert.equal(plain,'Buttons are checked with large boards and rapid presses; failed required checks block release. These checks cannot cover every device.');
+  assert.doesNotMatch(plain,/RAM|\b(?:512|1\s?GB|WebKit|Chromium|protocol|automation)\b/i,'Player help stays focused on the outcome and real limitation');
+  assert.match(help,/Button checks help catch crashes and unresponsive controls before release\./,'Settings changelog states the outcome briefly');
+  assert.doesNotMatch(help,/enforced 512 MB|browser-process budget|separate mobile WebKit.equivalent check/,'Old testing machinery is not public guidance');
+
+});
+
+test('RISK DATABASE REPAIR EXPORT: unified Copy and Download retain exact sources and metadata without writes',async t=>{
   const {IDBFactory}=await import('fake-indexeddb');
   const dbName='database-repair-copy-'+Date.now(),app=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:dbName}),{ctx,shim}=app;
   t.after(()=>app.dispose());ctx.addTask('Database repair task',false);await prepareBackupFileFixtureSource(app);
@@ -19515,36 +19729,34 @@ test('RISK DATABASE REPAIR EXPORT: the Settings copy includes exact saved source
   const store=ctx.window.ScannerDeviceStore,account='repair-copy@example.test';
   await store.setPendingUpload(account,{generationId:'repair-pending-not-replayed',payloadHash:'b'.repeat(64),baseRev:4,updatedAt:1});
   const head=await store.readHead();await store.putBackup({expectedHash:head.hash,backup:{id:'repair-manual-original',kind:'manual',day:'2026-10-25',at:1,payload:'{"unknownOriginal":"keep exact"}'}});
-  const before=JSON.stringify(await store.readRawExportSnapshot()),boardBefore=JSON.stringify(ctx.state);
-  ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
-  const view=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>View \/ copy database for repair<\/button>/);
-  assert.ok(view,'Settings exposes one combined database and repair export');
-  assert.equal(await ctx.onAction(view[1],{}),true);
-  const markup=shim.document.getElementById('modalRoot').innerHTML;
-  const shown=markup.match(/<textarea\b[^>]*id="databaseRepairData"[^>]*>([\s\S]*?)<\/textarea>/)?.[1];assert.ok(shown);
-  const raw=shown.replaceAll('&quot;','"').replaceAll('&#39;',"'").replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&amp;','&');
-  shim.document.getElementById('databaseRepairData').value=raw;
-  const copy=markup.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>Copy JSON<\/button>/);assert.ok(copy);
-  let copied=null;ctx.navigator={clipboard:{async writeText(value){copied=value;}}};assert.equal(await ctx.onAction(copy[1],{}),true);assert.equal(copied,raw);
-  const exported=JSON.parse(copied);assert.equal(exported.format,'chain-scanner.recovery-archive');assert.equal(exported.formatVersion,1);assert.equal(exported.manifest.status,'complete');
+  const before=JSON.stringify(await store.readRawExportSnapshot()),boardBefore=JSON.stringify(ctx.state),writes=[];
+  const local=shim.localStorage,originalSet=local.setItem.bind(local),originalRemove=local.removeItem.bind(local);
+  local.setItem=(...args)=>{writes.push(['set',args[0]]);return originalSet(...args);};local.removeItem=key=>{writes.push(['remove',key]);return originalRemove(key);};
+  ctx.openSettings();let settings=shim.document.getElementById('modalRoot').innerHTML;
+  assert.equal((settings.match(/data-act="export-backup"/g)||[]).length,1);
+  assert.equal((settings.match(/data-act="import-backup"/g)||[]).length,1);
+  assert.doesNotMatch(settings,/view-current-board|view-database-repair|download-backup|currentBoardData|databaseRepairData|rawBackupData/);
+  assert.equal(await ctx.onAction('export-backup',{isConnected:true}),true);
+  let markup=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(markup,/id="exportTransferDialog"/);assert.doesNotMatch(markup,/<textarea\b|currentBoardData|databaseRepairData|rawBackupData/);
+  const copied=await copyPreparedExport(ctx),exported=JSON.parse(copied);
+  assert.equal(exported.format,'chain-scanner.recovery-archive');assert.equal(exported.formatVersion,1);assert.equal(exported.manifest.status,'complete');
   assert.equal(exported.currentBoard.tasks[0].futureRepairField.keep,'unknown 🌿');
-  assert.ok(copied.includes('repair-pending-not-replayed')&&copied.includes('repair-manual-original'),'the database sources accompany the open board');
+  assert.ok(copied.includes('repair-pending-not-replayed')&&copied.includes('repair-manual-original'),'pending and saved recovery sources accompany the open board');
   assert.equal(exported.appSources.indexedDB.stores.meta.find(row=>decodeManualArchiveTypedValue(row.key)==='head').value.type,'object');
   const log=exported.repairInfo.debugLog;assert.equal(log.schema,'funsidething.support-diagnostics');assert.equal(log.metadataOnly,true);assert.equal(log.boardDataIncluded,false);
   assert.match(copied,/appFingerprint|fingerprint|cacheName|build/i,'the package includes available build and worker observations');
   assert.equal(exported.appSources.indexedDB.database,dbName);assert.equal(exported.manifest.sources.indexedDB.schemaVersion,2);
-  assert.equal(JSON.stringify(await store.readRawExportSnapshot()),before);assert.equal(JSON.stringify(ctx.state),boardBefore,'repair export is read-only');
-  const {ctx:target,shim:dom,...destination}=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'repair-copy-restore-'+Date.now()});
-  t.after(()=>destination.dispose());target.addTask('Before repair-file restore',false);await prepareBackupFileFixtureSource(target);
-  const original=JSON.stringify(target.state);target.openSettings();dom.document.getElementById('backupRestoreSource').value='paste';await target.onAction('restore-backup',{});
-  const box=dom.document.getElementById('jsonBox');box.id='jsonBox';box.value=copied;dom.document.dispatchEvent({type:'input',target:box});
-  assert.equal(await target.onAction('preview-pasted-recovery',{}),true,dom.document.getElementById('toast').textContent);assert.equal(JSON.stringify(target.state),original);
-  assert.equal(await target.onAction('confirm-file-restore',{}),true);assert.equal(target.state.tasks[0].futureRepairField.keep,'unknown 🌿');
-  assert.equal(await target.window.ScannerDeviceStore.getPendingUpload(account),null,'restoring the current board never replays archived pending work');
-  assert.ok((await target.window.ScannerDeviceStore.listBackups()).some(row=>row.kind==='restore-file-source'&&Buffer.from(row.restoreFile?.bytesBase64||'','base64').toString('utf8')===copied),'the exact package remains protected for repair');
+  assert.equal(JSON.stringify(await store.readRawExportSnapshot()),before,'the exact serialized snapshot source stays unchanged');assert.equal(JSON.stringify(ctx.state),boardBefore,'Export is read-only');
+  assert.deepEqual(writes,[],'Export never modifies browser storage');
+  const link=makeFakeElement();let blob=null;link.remove=()=>{};link.click=()=>{};shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();
+  ctx.Blob=class{constructor(parts,options){this.text=parts.join('');this.type=options.type;}};
+  ctx.URL={createObjectURL(value){blob=value;return 'blob:repair-export';},revokeObjectURL(){}};
+  await ctx.onAction('download-export',{});assert.equal(blob.text,copied,'Download uses the exact bytes already sent to Copy');
+  assert.equal(JSON.stringify(await store.readRawExportSnapshot()),before);assert.equal(JSON.stringify(ctx.state),boardBefore);assert.deepEqual(writes,[]);
 });
 
-test('RISK DATABASE REPAIR EXPORT: unreadable storage produces a labeled partial package with available board and diagnostics',async t=>{
+test('RISK DATABASE REPAIR EXPORT: unreadable sources are labeled partial and never shown as an empty database',async t=>{
   const {IDBFactory,IDBDatabase}=await import('fake-indexeddb');
   for(const failure of ['no device database','database read failure','one local source unreadable'])await t.test(failure,async subtest=>{
     const storage=sharedScannerStorage(),dbName='partial-repair-'+failure+'-'+Date.now();
@@ -19554,37 +19766,125 @@ test('RISK DATABASE REPAIR EXPORT: unreadable storage produces a labeled partial
     if(failure==='database read failure')IDBDatabase.prototype.transaction=function(names,mode,...args){if(this.name===dbName&&mode==='readonly')throw Object.assign(Error('private-os-error-not-for-export'),{name:'UnknownError'});return transaction.call(this,names,mode,...args);};
     if(failure==='one local source unreadable')storage.getItem=key=>{if(key==='fvp:chain-scanner:daily-backups:v1')throw Error('private-local-error-not-for-export');return get(key);};
     try{
-      ctx.openSettings();assert.equal(await ctx.onAction('view-database-repair',{}),true,'the repair export stays usable when a database source cannot be read');
-      const markup=shim.document.getElementById('modalRoot').innerHTML;assert.match(markup,/partial repair export/i);
-      const shown=markup.match(/<textarea\b[^>]*id="databaseRepairData"[^>]*>([\s\S]*?)<\/textarea>/)?.[1];assert.ok(shown);
-      const raw=shown.replaceAll('&quot;','"').replaceAll('&#39;',"'").replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&amp;','&');
-      const report=JSON.parse(raw);assert.equal(report.manifest.status,'partial');assert.ok(report.manifest.failures.length);
+      ctx.openSettings();assert.equal(await ctx.onAction('export-backup',{isConnected:true}),true);
+      const markup=shim.document.getElementById('modalRoot').innerHTML;assert.match(markup,/Partial recovery archive/i);assert.doesNotMatch(markup,/<textarea\b/);
+      const raw=await copyPreparedExport(ctx),report=JSON.parse(raw);
+      assert.equal(report.manifest.status,'partial');assert.ok(report.manifest.failures.length);
       assert.equal(report.currentBoard.tasks[0].title,'Available accepted repair board');assert.equal(report.repairInfo.debugLog.metadataOnly,true);
-      assert.ok(report.appSources.localStorage.some(row=>row.status==='present'&&typeof row.raw==='string'),'other readable local sources are retained');
+      assert.ok(report.appSources.localStorage.some(row=>row.status==='present'&&typeof row.raw==='string'));
       if(failure==='one local source unreadable')assert.equal(report.manifest.sources.localStorage['fvp:chain-scanner:daily-backups:v1'].status,'unavailable');
       else{assert.equal(report.manifest.sources.indexedDB.status,'unavailable');assert.equal(report.appSources.indexedDB.stores,null,'unreadable storage is never represented as an empty database');}
-      assert.doesNotMatch(raw,/private-(?:os|local)-error-not-for-export/,'arbitrary exception text is excluded from repair diagnostics');
-      assert.equal(JSON.stringify(ctx.state),before,'an incomplete export cannot replace accepted work');
+      assert.doesNotMatch(raw,/private-(?:os|local)-error-not-for-export/,'private platform exception text is excluded');
+      assert.equal(JSON.stringify(ctx.state),before,'partial capture cannot replace accepted work');
       IDBDatabase.prototype.transaction=transaction;storage.getItem=get;
-      shim.document.getElementById('databaseRepairData').value=raw;let copied;ctx.navigator={clipboard:{async writeText(value){copied=value;}}};
-      assert.equal(await ctx.onAction('copy-database-repair',{}),true);assert.equal(copied,raw);
-      ctx.openSettings();shim.document.getElementById('backupRestoreSource').value='paste';await ctx.onAction('restore-backup',{});
-      const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=copied;shim.document.dispatchEvent({type:'input',target:box});
-      assert.equal(await ctx.onAction('preview-pasted-recovery',{}),false,'a partial diagnostic package cannot be restored as a complete backup');
+      ctx.openSettings();await ctx.onAction('import-backup',{});const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=raw;
+      shim.document.dispatchEvent({type:'input',target:box});
+      assert.equal(await ctx.onAction('preview-pasted-recovery',{}),false,'a partial archive cannot be restored as a complete backup');
       assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="confirm-file-restore"/);assert.equal(JSON.stringify(ctx.state),before);
     }finally{IDBDatabase.prototype.transaction=transaction;storage.getItem=get;}
   });
 });
 
-test('RISK DATABASE REPAIR EXPORT: visible Debug log controls use the combined repair export',async t=>{
+test('RISK DATABASE REPAIR EXPORT: held capture preserves exact before and after sources and rejects partial restore',async t=>{
+  const {IDBFactory}=await import('fake-indexeddb');
+  const app=await loadBackupFileFixtureApp({sharedStorage:sharedScannerStorage(),indexedDBProvider:new IDBFactory(),deviceDbName:'held-partial-export-'+Date.now()}),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+  t.after(()=>app.dispose());ctx.addTask('Stable board before held capture',false);await prepareBackupFileFixtureSource(app);
+  const local=shim.localStorage,originalSet=local.setItem.bind(local),originalRemove=local.removeItem.bind(local),localKey=SYNC_STORE_KEY;
+  const localBeforeRaw='{"fixture":"source before held capture","unknown":"🌿"}',localAfterRaw='{"fixture":"source changed during held capture","unknown":"🧭"}';
+  originalSet(localKey,localBeforeRaw);
+  const boardBefore=ctx.currentBoardExportPayload(),stateBefore=JSON.stringify(ctx.state),headBefore=await store.readHead(),snapshotBefore=await store.readRawExportSnapshot(),writes=[];
+  local.setItem=(key,value)=>{writes.push(['set',key]);return originalSet(key,value);};
+  local.removeItem=key=>{writes.push(['remove',key]);return originalRemove(key);};
+  const originalRead=store.readRawExportSnapshot.bind(store);let release,enteredResolve;
+  const entered=new Promise(resolve=>{enteredResolve=resolve;});
+  store.readRawExportSnapshot=async()=>{const snapshot=await originalRead();enteredResolve(snapshot);await new Promise(resolve=>{release=resolve;});return snapshot;};
+  t.after(()=>{release?.();store.readRawExportSnapshot=originalRead;local.setItem=originalSet;local.removeItem=originalRemove;});
+  ctx.openSettings();const capture=ctx.onAction('export-backup',{isConnected:true}),capturedSnapshot=await entered;
+  assert.deepEqual(capturedSnapshot,snapshotBefore,'the real read-only device snapshot is held after its source transaction completes');
+  originalSet(localKey,localAfterRaw);
+  ctx.state.futureCaptureRaceField={changedDuringCapture:'keep the live value'};
+  const stateAfter=JSON.stringify(ctx.state),boardAfter=ctx.currentBoardExportPayload();
+  assert.notEqual(boardAfter,boardBefore,'the live accepted board changes while capture is waiting');
+  release();assert.equal(await capture,true,'the held operation completes into an honest partial archive');store.readRawExportSnapshot=originalRead;
+  const raw=await copyPreparedExport(ctx),archive=JSON.parse(raw);
+  assert.equal(archive.manifest.status,'partial');assert.equal(archive.manifest.consistency,'partial-readonly-observations');
+  assert.deepEqual(archive.currentBoard,JSON.parse(boardBefore),'partial archive retains the exact accepted board observed before capture');
+  assert.ok(archive.manifest.failures.some(row=>row.source==='localStorage'&&row.key===localKey&&row.code==='changed-during-capture'),'local source change is named precisely');
+  assert.ok(archive.manifest.failures.some(row=>row.source==='currentBoard'&&row.code==='changed-during-capture'),'live board change is named precisely');
+  assert.equal(archive.appSources.localStorage.find(row=>row.key===localKey).raw,localBeforeRaw,'archive source observations retain the exact before bytes');
+  assert.equal(archive.repairInfo.localStorageAfter.find(row=>row.key===localKey).raw,localAfterRaw,'partial diagnostics retain the exact after bytes');
+  assert.deepEqual(await originalRead(),snapshotBefore,'partial export does not change any saved device source');
+  assert.deepEqual(await store.readHead(),headBefore,'partial export leaves the durable head unchanged');
+  assert.equal(JSON.stringify(ctx.state),stateAfter,'partial export leaves the changed live board untouched');
+  assert.equal(local.getItem(localKey),localAfterRaw,'partial export preserves the changed browser source');assert.deepEqual(writes,[],'capture and Copy do not write browser storage');
+
+  ctx.openSettings();shim.document.getElementById('backupRestoreSource').value='paste';await ctx.onAction('import-backup',{});
+  const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=raw;shim.document.dispatchEvent({type:'input',target:box});
+  assert.equal(await ctx.onAction('preview-pasted-recovery',{}),false,'partial changing-source evidence cannot become a complete import');
+  assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="confirm-file-restore"/);
+  assert.equal(JSON.stringify(ctx.state),stateAfter,'rejected partial preview keeps the changed live board');
+  assert.deepEqual(await store.readHead(),headBefore,'rejected partial preview keeps the durable board');
+  const rejectedSnapshot=await originalRead();
+  for(const name of ['meta','opaque'])assert.deepEqual(rejectedSnapshot.stores[name],snapshotBefore.stores[name],`rejected partial preview leaves ${name} sources unchanged`);
+  for(let index=0;index<snapshotBefore.stores.snapshots.keys.length;index++){
+    const key=snapshotBefore.stores.snapshots.keys[index],afterIndex=rejectedSnapshot.stores.snapshots.keys.indexOf(key);
+    assert.notEqual(afterIndex,-1,'every original complete snapshot remains present');
+    assert.deepEqual(rejectedSnapshot.stores.snapshots.values[afterIndex],snapshotBefore.stores.snapshots.values[index],'existing snapshot bytes stay exact');
+  }
+  const newSnapshotKeys=rejectedSnapshot.stores.snapshots.keys.filter(key=>!snapshotBefore.stores.snapshots.keys.includes(key));
+  assert.equal(newSnapshotKeys.length,1,'partial import refusal stores one deliberate current-board protection snapshot');
+  const protectedSnapshot=rejectedSnapshot.stores.snapshots.values[rejectedSnapshot.stores.snapshots.keys.indexOf(newSnapshotKeys[0])];
+  assert.deepEqual(JSON.parse(protectedSnapshot.payload),JSON.parse(stateAfter),'the only added snapshot preserves the complete current local state');
+  assert.equal(protectedSnapshot.hash,createHash('sha256').update(protectedSnapshot.payload).digest('hex'));
+  const oldBackupKeys=new Set(snapshotBefore.stores.backups.keys);
+  for(let index=0;index<snapshotBefore.stores.backups.keys.length;index++){
+    const key=snapshotBefore.stores.backups.keys[index],afterIndex=rejectedSnapshot.stores.backups.keys.indexOf(key);
+    assert.notEqual(afterIndex,-1,'every existing backup source remains present');
+    assert.deepEqual(rejectedSnapshot.stores.backups.values[afterIndex],snapshotBefore.stores.backups.values[index],'existing backup metadata and hashes stay exact');
+  }
+  const newProtectionKeys=rejectedSnapshot.stores.backups.keys.filter(key=>!oldBackupKeys.has(key));
+  assert.equal(newProtectionKeys.length,2,'refusing the pasted source adds only the expected current-board and exact-source protection records');
+  const refusedImportProtection=await store.listBackups();
+  assert.ok(refusedImportProtection.some(row=>row.kind==='before-file-restore'&&row.payload===stateAfter),'the current accepted board remains exactly available as a protected copy');
+  assert.ok(refusedImportProtection.some(row=>row.kind==='restore-file-source'&&row.restoreFile?.bytesBase64===Buffer.from(raw).toString('base64')),'the refused partial archive remains exactly available as a protected copy');
+  assert.equal(local.getItem(localKey),localAfterRaw,'rejected partial preview keeps the exact after source');assert.deepEqual(writes,[]);
+});
+
+test('RISK DATABASE REPAIR EXPORT: asynchronous snapshot rejection stays partial and unavailable',async t=>{
+  const {IDBFactory}=await import('fake-indexeddb');
+  const app=await loadBackupFileFixtureApp({sharedStorage:sharedScannerStorage(),indexedDBProvider:new IDBFactory(),deviceDbName:'rejected-partial-export-'+Date.now()}),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+  t.after(()=>app.dispose());ctx.addTask('Accepted board with a rejected source read',false);await prepareBackupFileFixtureSource(app);
+  const local=shim.localStorage,originalSet=local.setItem.bind(local),originalRemove=local.removeItem.bind(local),localKey=SYNC_STORE_KEY;
+  const localRaw='{"fixture":"preserve exact source on rejected read","unknown":"🌿"}';originalSet(localKey,localRaw);
+  const boardBefore=ctx.currentBoardExportPayload(),stateBefore=JSON.stringify(ctx.state),headBefore=await store.readHead(),originalRead=store.readRawExportSnapshot.bind(store),snapshotBefore=await originalRead(),writes=[];
+  local.setItem=(key,value)=>{writes.push(['set',key]);return originalSet(key,value);};local.removeItem=key=>{writes.push(['remove',key]);return originalRemove(key);};
+  store.readRawExportSnapshot=async()=>{await Promise.resolve();throw Error('private snapshot failure must not enter the archive');};
+  t.after(()=>{store.readRawExportSnapshot=originalRead;local.setItem=originalSet;local.removeItem=originalRemove;});
+  try{
+    ctx.openSettings();assert.equal(await ctx.onAction('export-backup',{isConnected:true}),true);
+    const raw=await copyPreparedExport(ctx),archive=JSON.parse(raw);
+    assert.equal(archive.manifest.status,'partial','an asynchronous read rejection cannot appear complete');
+    assert.ok(archive.manifest.failures.some(row=>row.source==='indexedDB'&&row.code==='read-failed'));
+    assert.equal(archive.manifest.sources.indexedDB.status,'unavailable');
+    assert.equal(archive.appSources.indexedDB.stores,null,'rejected storage is unavailable rather than an empty database');
+    assert.deepEqual(archive.currentBoard,JSON.parse(boardBefore),'the accepted board remains available despite the rejected source read');
+    assert.equal(archive.appSources.localStorage.find(row=>row.key===localKey).raw,localRaw,'the other original source stays exact');
+    assert.doesNotMatch(raw,/private snapshot failure must not enter the archive/,'private exception text is excluded');
+    assert.equal(JSON.stringify(ctx.state),stateBefore);assert.deepEqual(await store.readHead(),headBefore);
+    assert.deepEqual(await originalRead(),snapshotBefore,'the rejected export leaves the physical sources unchanged');
+    assert.equal(local.getItem(localKey),localRaw);assert.deepEqual(writes,[],'rejected capture remains read-only');
+  }finally{store.readRawExportSnapshot=originalRead;}
+});
+
+test('RISK DATABASE REPAIR EXPORT: Debug log points to the combined archive without duplicate export controls',async t=>{
   const app=await loadApp();t.after(()=>app.dispose());const {ctx,shim}=app;
   ctx.openSettings();let markup=shim.document.getElementById('modalRoot').innerHTML;
-  assert.match(markup,/data-act="view-database-repair"/);
-  assert.doesNotMatch(markup,/data-act="(?:copy|download)-support-diagnostics"/,'Settings has no redundant standalone Debug log exporters');
+  assert.equal((markup.match(/data-act="export-backup"/g)||[]).length,1);
+  assert.doesNotMatch(markup,/data-act="(?:copy|download)-support-diagnostics"|view-database-repair/);
   await ctx.onAction('view-support-diagnostics',{});markup=shim.document.getElementById('modalRoot').innerHTML;
-  assert.match(markup,/data-act="view-database-repair"/,'quick log inspection links to the same combined exporter');
-  assert.doesNotMatch(markup,/data-act="(?:copy|download)-support-diagnostics"/);
-  assert.match(markup,/data-act="select-support-diagnostics"/,'the log remains manually selectable for quick inspection');
+  assert.match(markup,/data-act="export-backup"[^>]*data-export-scope="repair"/);
+  assert.doesNotMatch(markup,/data-act="(?:copy|download)-support-diagnostics"|view-database-repair/);
+  assert.match(markup,/data-act="select-support-diagnostics"/,'the small metadata log remains selectable for quick inspection');
 });
 
 test('RISK DATABASE REPAIR EXPORT: readonly capture keeps original diagnostic storage even when old entries expire',async t=>{
@@ -19592,104 +19892,99 @@ test('RISK DATABASE REPAIR EXPORT: readonly capture keeps original diagnostic st
   ctx.addTask('Read-only repair capture',false);await ctx.persist();ctx.openSettings();
   const key='fvp:chain-scanner:restart-diagnostics:v1',original=JSON.stringify({version:1,documents:[{document:'1234567890abcdef',navigationType:'reload',events:[{at:Date.now()-2*60*60*1000,stage:'boot'}]}]});
   storage.setItem(key,original);const writes=[],set=storage.setItem.bind(storage),remove=storage.removeItem.bind(storage);
-  storage.setItem=(...args)=>{writes.push(['set',args[0]]);return set(...args);};storage.removeItem=(...args)=>{writes.push(['remove',args[0]]);return remove(...args);};
-  assert.equal(await ctx.onAction('view-database-repair',{}),true);
-  assert.equal(storage.getItem(key),original,'diagnostic retention filtering must not rewrite original storage during database export');
+  storage.setItem=(...args)=>{writes.push(['set',args[0]]);return set(...args);};storage.removeItem=key=>{writes.push(['remove',key]);return remove(key);};
+  assert.equal(await ctx.onAction('export-backup',{isConnected:true}),true);
+  const archive=JSON.parse(await copyPreparedExport(ctx));
+  assert.equal(archive.repairInfo.debugLog.schema,'funsidething.support-diagnostics');
+  assert.equal(storage.getItem(key),original,'diagnostic retention filtering must not rewrite original storage during archive export');
   assert.deepEqual(writes,[],'repair capture performs no browser-storage writes');
-  assert.match(shim.document.getElementById('modalRoot').innerHTML,/databaseRepairData/);
+  assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/<textarea\b/);
 });
-
 test('RISK DATABASE REPAIR EXPORT: available worker and cache identities are captured without diagnostic writes',async t=>{
   const {MessageChannel}=await import('node:worker_threads'),storage=sharedScannerStorage(),fingerprint='c'.repeat(64),worker={postMessage(message,ports){ports[0].postMessage({type:message.type,cacheName:'chain-scanner-shell-'+fingerprint});}};
-  const app=await loadApp({sharedStorage:storage,navigatorProvider:{serviceWorker:{controller:worker,addEventListener(){},async register(){return {active:worker,addEventListener(){}};},async getRegistration(){return {active:worker};}}}}),{ctx,shim}=app;t.after(()=>app.dispose());
+  const app=await loadApp({sharedStorage:storage,navigatorProvider:{serviceWorker:{controller:worker,addEventListener(){},async register(){return {active:worker,addEventListener(){}};},async getRegistration(){return {active:worker};}}}}),{ctx}=app;t.after(()=>app.dispose());
   ctx.MessageChannel=MessageChannel;ctx.caches={async keys(){return ['chain-scanner-shell-'+fingerprint];}};
-  ctx.openSettings();const writes=[],set=storage.setItem.bind(storage),remove=storage.removeItem.bind(storage);
-  storage.setItem=(...args)=>{writes.push(['set',args[0]]);return set(...args);};storage.removeItem=(...args)=>{writes.push(['remove',args[0]]);return remove(...args);};
-  assert.equal(await ctx.onAction('view-database-repair',{}),true);
-  const shown=shim.document.getElementById('modalRoot').innerHTML.match(/<textarea\b[^>]*id="databaseRepairData"[^>]*>([\s\S]*?)<\/textarea>/)?.[1];assert.ok(shown);
-  const report=JSON.parse(shown.replaceAll('&quot;','"').replaceAll('&#39;',"'").replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&amp;','&'));
-  assert.equal(report.repairInfo.debugLog.serviceWorker.active.value,fingerprint,'the combined export captures available worker identity without first opening Debug log');
+  const writes=[],set=storage.setItem.bind(storage),remove=storage.removeItem.bind(storage);
+  storage.setItem=(...args)=>{writes.push(['set',args[0]]);return set(...args);};storage.removeItem=key=>{writes.push(['remove',key]);return remove(key);};
+  ctx.openSettings();await ctx.onAction('export-backup',{isConnected:true});const report=JSON.parse(await copyPreparedExport(ctx));
+  assert.equal(report.repairInfo.debugLog.serviceWorker.active.value,fingerprint,'the archive captures the available worker identity');
   assert.ok(report.repairInfo.debugLog.serviceWorker.cacheShellKeys.value.includes(fingerprint));
   assert.deepEqual(writes,[],'repair observations do not append diagnostic events to storage');
 });
 
-test('RISK DATABASE REPAIR EXPORT: a cancelled capture cannot replace a newer pasted draft',async t=>{
+test('RISK DATABASE REPAIR EXPORT: canceled capture keeps the pasted draft and concurrent capture is bounded',async t=>{
   const {IDBFactory}=await import('fake-indexeddb');
   const app=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'repair-capture-cancel-'+Date.now()}),{ctx,shim}=app;t.after(()=>app.dispose());
   ctx.addTask('Retained during repair capture',false);await prepareBackupFileFixtureSource(app);const before=JSON.stringify(ctx.state);
   ctx.openSettings();const source=makeFakeElement();source.isConnected=true;
-  const operation=ctx.onAction('view-database-repair',source);
-  await ctx.onAction('close-modal',{});source.isConnected=false;ctx.openSettings();await ctx.onAction('open-paste-recovery',{});
-  const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value='newer unfinished pasted JSON';shim.document.dispatchEvent({type:'input',target:box});
+  const operation=ctx.onAction('export-backup',source);await ctx.onAction('close-modal',{});source.isConnected=false;
+  ctx.openSettings();shim.document.getElementById('backupRestoreSource').value='paste';await ctx.onAction('import-backup',{});const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value='newer unfinished pasted JSON';shim.document.dispatchEvent({type:'input',target:box});
   assert.equal(await operation,false,'leaving the initiating view cancels its late continuation');
   assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="jsonBox"/);assert.equal(box.value,'newer unfinished pasted JSON');assert.equal(JSON.stringify(ctx.state),before);
   await ctx.onAction('close-paste-recovery',{});ctx.openSettings();
-  const live=makeFakeElement();live.isConnected=true;
-  const older=ctx.onAction('view-database-repair',live),newer=ctx.onAction('view-database-repair',live);
-  assert.deepEqual(await Promise.all([older,newer]),[false,true],'only the latest overlapping export may install its viewer');
-  assert.match(shim.document.getElementById('modalRoot').innerHTML,/databaseRepairData/);assert.equal(JSON.stringify(ctx.state),before);
+  const store=ctx.window.ScannerDeviceStore,read=store.readRawExportSnapshot.bind(store);let release,startedResolve;
+  const started=new Promise(resolve=>{startedResolve=resolve;});store.readRawExportSnapshot=async()=>{startedResolve();await new Promise(resolve=>{release=resolve;});return read();};
+  const firstSource=makeFakeElement();firstSource.isConnected=true;
+  const first=ctx.onAction('export-backup',firstSource);await started;
+  const second=await ctx.onAction('export-backup',firstSource);assert.equal(second,false,'rapid repeat cannot start a second full source capture');
+  release();assert.equal(await first,true);assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="exportTransferDialog"/);
+  assert.equal(JSON.stringify(ctx.state),before);
 });
 
 test('RISK DATABASE REPAIR EXPORT: a damaged saved source is retained without inventing a current board',async t=>{
   const {IDBFactory}=await import('fake-indexeddb'),original='{"tasks":[{"id":"broken-repair-original"}';
   const app=await loadApp({indexedDBProvider:new IDBFactory(),deviceDbName:'repair-no-board-'+Date.now(),seedStorage:{[SYNC_STORE_KEY]:original}}),{ctx,shim}=app;t.after(()=>app.dispose());
   const store=ctx.window.ScannerDeviceStore,before=JSON.stringify(await store.readRawExportSnapshot());ctx.openSettings();
-  assert.equal(await ctx.onAction('view-database-repair',{}),true);
-  const markup=shim.document.getElementById('modalRoot').innerHTML,shown=markup.match(/<textarea\b[^>]*id="databaseRepairData"[^>]*>([\s\S]*?)<\/textarea>/)?.[1];assert.ok(shown);
-  const report=JSON.parse(shown.replaceAll('&quot;','"').replaceAll('&#39;',"'").replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&amp;','&'));
+  assert.equal(await ctx.onAction('export-backup',{isConnected:true}),true);
+  const markup=shim.document.getElementById('modalRoot').innerHTML;assert.match(markup,/Partial recovery archive/);assert.doesNotMatch(markup,/<textarea\b/);
+  const report=JSON.parse(await copyPreparedExport(ctx));
   assert.equal(report.manifest.status,'partial');assert.equal(report.currentBoard,null);assert.equal(report.manifest.sources.currentBoard.status,'unavailable');
   assert.ok(report.appSources.localStorage.some(row=>row.raw===original),'the exact damaged original remains available for repair');
-  assert.equal(JSON.stringify(await store.readRawExportSnapshot()),before,'source-only repair export changes no saved database row');
+  assert.equal(JSON.stringify(await store.readRawExportSnapshot()),before,'source-only recovery archive changes no saved database row');
 });
 
-test('RISK DATABASE REPAIR EXPORT: FAQ explains the included database, diagnostics and partial-report limits',async t=>{
-  const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();const help=app.shim.document.getElementById('modalRoot').innerHTML;
-  const answer=help.match(/<dt>What does the database repair export contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.ok(answer);
-  assert.match(answer,/current board.*saved.*sources.*Debug log/i);assert.match(answer,/build.*storage|storage.*build/i);
-  assert.match(answer,/partial.*cannot.*restore/i);assert.match(answer,/only.*current board.*pending.*never replayed/i);
-  assert.match(answer,/read.only|never saves or syncs/i);assert.match(answer,/Select all/);
-  const log=help.match(/<dt>What does the debug log contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
-  assert.doesNotMatch(log,/copy, or download the report/,'the FAQ no longer advertises removed standalone exporters');
-  assert.match(log,/Database repair export/);
+test('RISK DATABASE REPAIR EXPORT: Help describes direct Copy and partial archive status',async t=>{
+  const app=await loadApp();t.after(()=>app.dispose());for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];app.ctx.openHelp();const help=app.shim.document.getElementById('modalRoot').innerHTML;
+  const transfer=help.match(/<li>(Settings now has one Import.*?)<\/li>/)?.[1];assert.equal(transfer,'Settings now has one Import and one Export, with separate Copy and Download choices. Exports include accepted unsaved edits and readable recovery sources; originals stay protected, and incomplete archives are marked partial.','The mounted changelog gives the transfer outcome without late-Copy or draft-rendering mechanics');
+  const copy=help.match(/<dt>How do I copy and paste JSON\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.ok(copy);
+  assert.match(copy,/Settings.*Export.*Copy/i);assert.match(copy,/If copying is unavailable, choose Download/i);assert.match(copy,/Import.*Paste JSON/i);
+  const paste=help.match(/<dt>How do I paste a saved board\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.match(paste,/Cancel and Close keep it.*current board stay protected before preview.*Nothing applies until you confirm Restore/);
+  const included=help.match(/<dt>What does Export include\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.ok(included);
+  assert.match(included,/accepted current board.*readable app-owned saved sources.*Debug log/i);
+  assert.match(included,/unavailable or changing source.*clearly marked partial/i);
+  assert.match(included,/pending work is never replayed.*original sources stay protected/i);
+  const log=help.match(/<dt>What does the debug log contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.match(log,/recovery archive includes this bounded metadata/i);
+  assert.doesNotMatch(help,/View \/ copy database for repair|Current-board view and copy|backupDownloadFormat/);
 });
 
 test('RISK DATABASE REPAIR EXPORT: reload help routes users to the combined export after standalone log exporters are removed',async t=>{
   const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();const help=app.shim.document.getElementById('modalRoot').innerHTML;
-  assert.doesNotMatch(help,/Copy debug log|Download debug log/,'no FAQ advertises a removed standalone export control');
+  assert.doesNotMatch(help,/Copy debug log|Download debug log/,'no FAQ advertises a removed standalone log exporter');
   const reload=help.match(/<dt>Why did the app reload\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.ok(reload);
-  assert.match(reload,/View \/ copy database for repair/);assert.match(reload,/partial|unreadable/i);
+  assert.match(reload,/Settings.*Data and backups.*Export.*Copy or Download/i);
+  assert.match(reload,/unavailable sources are labeled partial/i);
+  assert.match(reload,/Recovery and cleanup.*View debug log/i);
+  assert.match(reload,/cannot prove what caused a reload/i);assert.ok(reload.split(/\s+/).length<=55,'Reload help stays within the shortest useful routes and limitation');
+  assert.doesNotMatch(reload,/four recent|eight steps|8 KiB|one hour|Other tabs|document;|evict/i,'Technical recording and eviction mechanics remain internal');
 });
 
-test('RISK RECOVERY EXPORT: an unsaved in-memory board remains copyable without device storage',async()=>{
-  const storage=sharedScannerStorage();
-  const {ctx,shim}=await loadApp({sharedStorage:storage});
+test('RISK RECOVERY EXPORT: accepted unsaved board stays in direct Copy when device storage fails',async()=>{
+  const storage=sharedScannerStorage(),{ctx,shim}=await loadApp({sharedStorage:storage});
   const originalSet=storage.setItem;
-  storage.setItem=(key,value)=>{if(key===SYNC_STORE_KEY||key===SYNC_HEAD_KEY)throw Error('quota');originalSet(key,value);};
-  ctx.addTask('Only in this open tab');
-  ctx.state.syncDirty=true;
-  ctx.state.protectedBackupIds=['device-only-recovery-id'];
-  ctx.openSettings();
-  const settings=shim.document.getElementById('modalRoot').innerHTML;
-  assert.match(settings,/data-act="view-current-board"/);
-  assert.match(settings,/data-act="download-backup"/);
-  assert.doesNotMatch(settings,/data-act="import-json"|id="jsonBox"/,'bulk import stays out of Settings');
-  ctx.onAction('view-current-board',{});
-  const recovery=shim.document.getElementById('modalRoot').innerHTML;
-  assert.match(recovery,/Current board data/);
-  assert.match(recovery,/Only in this open tab/);
-  assert.doesNotMatch(recovery,/syncDirty|protectedBackupIds|device-only-recovery-id/,'device-only sync bookkeeping stays out of exports');
-  let download=null;
-  const link=makeFakeElement();link.remove=()=>{};link.click=()=>{download={...download,href:link.href,name:link.download};};
-  shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();
-  ctx.Blob=class Blob{constructor(parts,options){this.text=parts.join('');this.type=options.type;}};
-  ctx.URL={createObjectURL(blob){download={blob};return 'blob:current-board';},revokeObjectURL(){}};
-  ctx.onAction('settings',{});
-  const selectedFormat=makeFakeElement();selectedFormat.value='current-board';
-  const originalGet=shim.document.getElementById.bind(shim.document);
-  shim.document.getElementById=id=>id==='backupDownloadFormat'?selectedFormat:originalGet(id);
-  ctx.onAction('download-backup',{});
-  assert.equal(download.name,'chain-scanner-current-board.json');assert.equal(download.href,'blob:current-board');
-  assert.match(download.blob.text,/Only in this open tab/);assert.doesNotMatch(download.blob.text,/device-only-recovery-id/);
+  storage.setItem=(key,value)=>{if(key===SYNC_STORE_KEY||key===SYNC_HEAD_KEY)throw Error('quota');return originalSet(key,value);};
+  ctx.addTask('Only in this open tab');ctx.state.syncDirty=true;ctx.state.protectedBackupIds=['device-only-recovery-id'];
+  ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
+  assert.equal((settings.match(/data-act="export-backup"/g)||[]).length,1);
+  assert.equal((settings.match(/data-act="import-backup"/g)||[]).length,1);
+  assert.equal(await ctx.onAction('export-backup',{isConnected:true}),true);
+  const copied=await copyPreparedExport(ctx),archive=JSON.parse(copied);
+  assert.equal(archive.currentBoard.tasks.some(row=>row.title==='Only in this open tab'),true,'the accepted open board remains exportable despite storage failure');
+  assert.doesNotMatch(copied,/syncDirty|protectedBackupIds|device-only-recovery-id/,'device-only sync bookkeeping stays out of the archive');
+  assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/<textarea\b|currentBoardData|databaseRepairData/);
+  let blob=null;const link=makeFakeElement();link.remove=()=>{};link.click=()=>{};
+  shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();ctx.Blob=class{constructor(parts){this.text=parts.join('');}};
+  ctx.URL={createObjectURL(value){blob=value;return 'blob:accepted-unsaved';},revokeObjectURL(){}};
+  await ctx.onAction('download-export',{});assert.equal(blob.text,copied,'the download stays the same complete payload as Copy');
 });
 
 function decodeManualArchiveTypedValue(node){
@@ -19775,40 +20070,30 @@ test('RISK MANUAL JSON EXPORT: the actual Settings actions download current boar
 
   ctx.openSettings();
   const settings=shim.document.getElementById('modalRoot').innerHTML;
-  const downloadControl=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Download backup\s*<\/button>/);
-  assert.ok(downloadControl,'Settings exposes one Download backup action');
-  assert.equal((settings.match(/data-act="download-backup"/g)||[]).length,1,'Settings has exactly one board-data download action');
-  assert.match(settings,/id="backupDownloadFormat"[\s\S]*?value="current-board"[\s\S]*?value="recovery-archive"/,'the action offers ordinary board JSON and the complete recovery archive');
-  assert.doesNotMatch(settings,/data-act="download-current-board"|data-act="download-recovery-archive"/,'format choices are routed through the single Settings action');
-  assert.match(settings,/not an ordinary board[- ]import file/i,'Settings explains that the recovery archive is not a normal board import');
-  assert.match(settings,/pending|recovery source/i,'Settings explains the archive recovery contents');
-
-  const selectedFormat=makeFakeElement();selectedFormat.value='current-board';
-  const originalGetForFormat=shim.document.getElementById.bind(shim.document);
-  shim.document.getElementById=id=>id==='backupDownloadFormat'?selectedFormat:originalGetForFormat(id);
-
-  await ctx.onAction(downloadControl[1],{});
-  for(let attempt=0;attempt<100&&downloads.length<1;attempt++)await flush();
-  assert.equal(downloads.length,1,'the current-board Settings action reaches the real download consumer');
-  assert.equal(downloads[0].name,'chain-scanner-current-board.json');
-  assert.equal(downloads[0].blob.type,'application/json');
-  const board=JSON.parse(downloads[0].blob.text);
-  assert.equal(board.tasks.find(task=>task.title==='Accepted unsaved manual-export task')?.futureManualExportField?.keep,'opaque-value');
-  assert.deepEqual(board.futureManualExportBoardField,{keep:true});
-  assert.doesNotMatch(downloads[0].blob.text,/Unsubmitted DOM draft must stay out of exports/);
-
-  selectedFormat.value='recovery-archive';
-  await ctx.onAction(downloadControl[1],{});
-  for(let attempt=0;attempt<100&&downloads.length<2;attempt++)await flush();
-  assert.equal(downloads.length,2,'the recovery-archive Settings action reaches the real download consumer');
-  assert.equal(downloads[1].name,'chain-scanner-recovery-archive.json');
-  assert.equal(downloads[1].blob.type,'application/json');
-  const archive=JSON.parse(downloads[1].blob.text);
+  assert.equal((settings.match(/data-act="export-backup"/g)||[]).length,1,"Settings exposes exactly one complete recovery Export");
+  assert.equal((settings.match(/data-act="import-backup"/g)||[]).length,1,"Settings exposes exactly one protected Import action");
+  assert.doesNotMatch(settings,/backupDownloadFormat|data-act="(?:view-current-board|view-database-repair|download-backup|download-current-board|download-recovery-archive)"/);
+  assert.match(settings,/read-only recovery archive/i);
+  assert.match(settings,/pending recovery source/i);
+  await ctx.onAction('export-backup',{isConnected:true});
+  const dialog=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(dialog,/id="exportTransferDialog"/);
+  assert.equal((dialog.match(/data-act="download-export"/g)||[]).length,1);
+  assert.equal((dialog.match(/data-act="copy-export"/g)||[]).length,1);
+  assert.doesNotMatch(dialog,/<textarea\b|currentBoardData|databaseRepairData|rawBackupData/);
+  const copied=await copyPreparedExport(ctx),archive=JSON.parse(copied),board=archive.currentBoard;
   assert.equal(archive.format,'chain-scanner.recovery-archive');
   assert.equal(archive.formatVersion,1);
   assert.equal(archive.manifest.status,'complete','the isolated readable fixture is labelled complete');
   assert.equal(archive.manifest.sources.currentBoard.status,'included');
-  assert.deepEqual(archive.currentBoard,board,'the archive embeds the ordinary current-board object without changing its format');
+  assert.equal(board.tasks.find(task=>task.title==='Accepted unsaved manual-export task')?.futureManualExportField?.keep,'opaque-value');
+  assert.deepEqual(board.futureManualExportBoardField,{keep:true});
+  assert.doesNotMatch(copied,/Unsubmitted DOM draft must stay out of exports/);
+  assert.equal(await ctx.onAction('download-export',{}),true);
+  assert.equal(downloads.length,1,'the prepared transfer dialog downloads the archive');
+  assert.equal(downloads[0].name,'chain-scanner-recovery-archive.json');
+  assert.equal(downloads[0].blob.type,'application/json');
+  assert.equal(downloads[0].blob.text,copied,'Download and Copy use identical complete JSON bytes');
   for(const name of ['meta','snapshots','backups','opaque'])
     assert.equal(archive.manifest.sources.indexedDB.stores[name].status,'included',`${name} source is represented in the manifest`);
   assert.deepEqual(archive.manifest.sources.localStorage['fvp:chain-scanner:protected:v1'],{status:'absent'});
@@ -19817,7 +20102,7 @@ test('RISK MANUAL JSON EXPORT: the actual Settings actions download current boar
   assert.deepEqual(localSourceRows.map(row=>row.key),['fvp:chain-scanner:v1','fvp:chain-scanner:protected:v1','fvp:chain-scanner:daily-backups:v1','fvp:chain-scanner:device-store-v2']);
   assert.deepEqual(localSourceRows,localStorageBefore,'every present local source remains byte-for-byte unchanged');
   assert.equal(localSourceRows.find(row=>row.key==='fvp:chain-scanner:device-store-v2').raw,'1','the exact authority marker value is retained');
-  assert.doesNotMatch(downloads[1].blob.text,/synthetic-auth-token|firebase:authUser/,'unrelated SDK auth storage is excluded');
+  assert.doesNotMatch(copied,/synthetic-auth-token|firebase:authUser/,'unrelated SDK auth storage is excluded');
   assert.match(JSON.stringify(archive),/export-pending-generation-190/);
   assert.match(JSON.stringify(archive),/export-manual-backup-190/);
   assert.match(JSON.stringify(archive),/Accepted unsaved manual-export task/);
@@ -19841,38 +20126,35 @@ test('RISK MANUAL JSON EXPORT: the actual Settings actions download current boar
   assert.deepEqual(Array.from(new Uint8Array(decoded.typedView.buffer)),[91,92,93,94,95,96,97,98]);assert.equal(decoded.typedView.byteOffset,2);assert.equal(decoded.typedView.length,2);
   assert.equal(decoded.map.get('k').opaque,true);assert.deepEqual(Array.from(decoded.set),['a','b']);
 
-  const originalGetId=shim.document.getElementById.bind(shim.document),selection={};
-  const currentTextArea=makeFakeElement();currentTextArea.focus=()=>{selection.currentFocus=true;};currentTextArea.select=()=>{selection.currentSelect=true;};
-  const archiveTextArea=makeFakeElement();archiveTextArea.focus=()=>{selection.archiveFocus=true;};archiveTextArea.select=()=>{selection.archiveSelect=true;};
-  ctx.URL={createObjectURL(){throw new Error('fixture download unavailable');},revokeObjectURL(){}};
-  selectedFormat.value='current-board';
-  await ctx.onAction(downloadControl[1],{});assert.match(shim.document.getElementById('modalRoot').innerHTML,/currentBoardData/);
-  shim.document.getElementById=id=>id==='currentBoardData'?currentTextArea:id==='recoveryArchiveData'?archiveTextArea:originalGetId(id);
-  ctx.onAction('select-current-board',{});assert.equal(selection.currentFocus,true);assert.equal(selection.currentSelect,true);
-  selectedFormat.value='recovery-archive';
-  await ctx.onAction(downloadControl[1],{});assert.match(shim.document.getElementById('modalRoot').innerHTML,/recoveryArchiveData/);
-  assert.match(shim.document.getElementById('modalRoot').innerHTML,/chain-scanner\.recovery-archive/);
-  ctx.onAction('select-recovery-archive',{});assert.equal(selection.archiveFocus,true);assert.equal(selection.archiveSelect,true);
+  const status=makeFakeElement(),originalGetId=shim.document.getElementById.bind(shim.document);
+  shim.document.getElementById=id=>id==='exportTransferStatus'?status:originalGetId(id);
+  ctx.navigator={clipboard:{writeText(){return Promise.reject(new Error('clipboard denied'));}}};
+  assert.equal(await ctx.onAction('copy-export',{}),false,'clipboard denial is reported without changing the prepared archive');
+  assert.equal(downloads.length,1,'Copy failure never triggers a fallback download');
+  const failedCopyMarkup=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(status.textContent,/Clipboard access failed/i);
+  assert.match(failedCopyMarkup,/data-act="download-export"/);
+  assert.doesNotMatch(failedCopyMarkup,/<textarea\b|currentBoardData|databaseRepairData|rawBackupData/);
   ctx.URL={createObjectURL(blob){createdBlob=blob;return 'blob:manual-export-restored';},revokeObjectURL(){}};
 
   const roundTrip=await loadApp({sharedStorage:sharedScannerStorage()}),jsonBox=makeFakeElement();
-  jsonBox.value=downloads[0].blob.text;
+  jsonBox.value=JSON.stringify(board);
   const originalGet=roundTrip.shim.document.getElementById.bind(roundTrip.shim.document);
   roundTrip.shim.document.getElementById=id=>id==='jsonBox'?jsonBox:originalGet(id);
   await roundTrip.ctx.onAction('import-json',{});
   assert.equal(roundTrip.ctx.state.tasks.find(task=>task.title==='Accepted unsaved manual-export task')?.futureManualExportField?.keep,'opaque-value','ordinary board JSON round-trips through the existing guarded import consumer');
-  const roundTripBefore=JSON.stringify(roundTrip.ctx.state);jsonBox.value=downloads[1].blob.text;await roundTrip.ctx.onAction('import-json',{});
+  const roundTripBefore=JSON.stringify(roundTrip.ctx.state);jsonBox.value=copied;await roundTrip.ctx.onAction('import-json',{});
   assert.equal(JSON.stringify(roundTrip.ctx.state),roundTripBefore,'the versioned archive is rejected by the ordinary board importer without changing the board');
 
   ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
-  const exportFaq=help.match(/<dt>What does Download backup contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
-  assert.ok(exportFaq,'the extended FAQ explains the single Download backup action');
+  const exportFaq=help.match(/<dt>What does Export include\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
+  assert.ok(exportFaq,'the extended FAQ explains the single Export action');
   assert.ok(exportFaq.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the export FAQ keeps the existing answer word limit');
-  assert.match(exportFaq,/Current board JSON.*ordinary board data.*accepted edits that may not have saved/i);
-  assert.match(exportFaq,/Full recovery archive.*local backup, pending.*recovery sources/i);
-  assert.match(exportFaq,/not an ordinary board-import file.*pending work is never replayed/i);
-  assert.match(exportFaq,/Raw device sources only.*cannot be imported as a board/i);
-  assert.match(exportFaq,/If a source changes.*no recovery archive is made/i);
+  assert.match(exportFaq,/one read-only recovery archive.*accepted current board/i);
+  assert.match(exportFaq,/Copy sends the prepared archive straight to the clipboard.*Download saves the same bytes/i);
+  assert.match(exportFaq,/pending work is never replayed.*original sources stay protected/i);
+  assert.match(exportFaq,/not rendered in the page/i);
+  assert.match(exportFaq,/clearly marked partial archive/i);
 
   assert.equal(JSON.stringify(ctx.state),memoryBefore,'export leaves the accepted in-memory board untouched');
   assert.deepEqual(deviceWrites,[],'export performs no device-store write');
@@ -19880,76 +20162,52 @@ test('RISK MANUAL JSON EXPORT: the actual Settings actions download current boar
   assert.equal(inspect({head:await store.readHead(),backups:await store.listBackups(),opaque:await store.listOpaqueArchives(),pending:await store.getPendingUpload(account)},{depth:null,sorted:true,maxArrayLength:null,maxStringLength:null}),storedBefore,'export leaves every seeded device-store source unchanged');
 });
 
-test('RISK MANUAL JSON EXPORT: unreadable, unsupported and hydration-placeholder sources stop without a file',async t=>{
+test('RISK MANUAL JSON EXPORT: unavailable and unsupported sources are explicit partial exports',async t=>{
   const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),dbName='chain-scanner-manual-export-failure-'+Date.now()+'-'+Math.random();
-  const storage=sharedScannerStorage();storage.setItem('fvp:chain-scanner:v1','{"tasks":[{"id":"broken","title":"corrupt"}');
+  const storage=sharedScannerStorage();storage.setItem(SYNC_STORE_KEY,'{"tasks":[{"id":"broken","title":"corrupt"}');
   const app=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName:dbName}),{ctx,shim}=app;
   const store=ctx.window.ScannerDeviceStore;assert.ok(store);t.after(async()=>{await store.close();});
   const downloads=[],link=makeFakeElement();link.remove=()=>{};link.click=()=>downloads.push(link.download);
-  shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();ctx.Blob=class ExportBlob{constructor(parts,options){this.text=parts.join('');this.type=options.type;}};ctx.URL={createObjectURL(){return 'blob:unexpected';},revokeObjectURL(){}};
-  ctx.openSettings();let settings=shim.document.getElementById('modalRoot').innerHTML;
-  const download=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Download backup\s*<\/button>/);
-  assert.ok(download,'the unaccepted-source recovery view still exposes one Download backup action');
-  assert.match(settings,/value="raw-device-sources"/,'only the source-only recovery export is offered without an accepted board');
-  assert.doesNotMatch(settings,/value="current-board"|value="recovery-archive"/,'an unaccepted source is not presented as an ordinary board or complete archive');
-  await ctx.onAction('download-current-board',{});await ctx.onAction('download-recovery-archive',{});await flush();
-  assert.deepEqual(downloads,[],'a hydration placeholder never becomes a complete export');
+  shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();ctx.Blob=class{constructor(parts,options){this.text=parts.join('');this.type=options.type;}};ctx.URL={createObjectURL(){return 'blob:explicit-partial';},revokeObjectURL(){}};
+  ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
+  assert.equal((settings.match(/data-act="export-backup"/g)||[]).length,1);
+  assert.doesNotMatch(settings,/backupDownloadFormat|raw-device-sources|currentBoardData|databaseRepairData/);
+  assert.equal(await ctx.onAction('export-backup',{isConnected:true}),true);
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/Partial recovery archive/);
+  assert.deepEqual(downloads,[],'preparing a partial archive never downloads without an explicit choice');
+  const sourceOnly=await copyPreparedExport(ctx),sourceReport=JSON.parse(sourceOnly);
+  assert.equal(sourceReport.manifest.status,'partial');assert.equal(sourceReport.currentBoard,null);
+  assert.equal(sourceReport.appSources.localStorage.find(row=>row.key===SYNC_STORE_KEY).raw,'{"tasks":[{"id":"broken","title":"corrupt"}');
+  assert.throws(()=>ctx.decodeBackupFileBoard(sourceOnly),/incomplete|supported/i,'source-only evidence is not accepted as an empty board');
 
-  const valid=await loadApp({sharedStorage:sharedScannerStorage(),indexedDBProvider:new IDBFactory(),deviceDbName:dbName+'-unsupported'});
-  const validStore=valid.ctx.window.ScannerDeviceStore;assert.ok(validStore);t.after(async()=>{await validStore.close();});
-  const shownErrors=[];valid.ctx.toast=message=>shownErrors.push(String(message));
-  const rawSnapshot=validStore.readRawExportSnapshot.bind(validStore);
-  validStore.readRawExportSnapshot=async()=>{const snapshot=await rawSnapshot();snapshot.stores.opaque.keys.push('unsupported-export-fixture-190');snapshot.stores.opaque.values.push(/unsupported/);return snapshot;};
-  const validDownloads=[],validLink=makeFakeElement();validLink.remove=()=>{};validLink.click=()=>validDownloads.push(validLink.download);
-  valid.shim.document.createElement=tag=>tag==='a'?validLink:makeFakeElement();valid.ctx.Blob=ctx.Blob;valid.ctx.URL=ctx.URL;valid.ctx.openSettings();
-  const validSettings=valid.shim.document.getElementById('modalRoot').innerHTML,validArchive=validSettings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Download backup\s*<\/button>/);
-  assert.ok(validArchive,'the accepted board has one archive path through Download backup');
-  const selectedFormat=makeFakeElement();selectedFormat.value='recovery-archive';
-  const originalGet=valid.shim.document.getElementById.bind(valid.shim.document);
-  valid.shim.document.getElementById=id=>id==='backupDownloadFormat'?selectedFormat:originalGet(id);
-  await valid.ctx.onAction(validArchive[1],{});await flush();
-  assert.deepEqual(validDownloads,[],'a structured-clone type without a lossless representation stops the archive');
-  assert.ok(shownErrors.some(message=>/IndexedDB opaque key.*unsupported RegExp/i.test(message)),'the failure names its exact app-owned source and unsupported type');
-  const cycle={};cycle.self=cycle;
-  validStore.readRawExportSnapshot=async()=>{const snapshot=await rawSnapshot();snapshot.stores.opaque.keys.push('cycle-export-fixture-190');snapshot.stores.opaque.values.push(cycle);return snapshot;};
-  await valid.ctx.onAction(validArchive[1],{});await flush();
-  assert.deepEqual(validDownloads,[],'a cyclic raw source cannot become a falsely complete archive');
-  assert.ok(shownErrors.some(message=>/cycle-export-fixture-190.*repeated reference or cycle/i.test(message)),'the cycle report identifies its source');
-  const sharedNested={future:true},repeated={first:sharedNested,second:sharedNested};
-  validStore.readRawExportSnapshot=async()=>{const snapshot=await rawSnapshot();snapshot.stores.opaque.keys.push('repeated-export-fixture-190');snapshot.stores.opaque.values.push(repeated);return snapshot;};
-  await valid.ctx.onAction(validArchive[1],{});await flush();
-  assert.deepEqual(validDownloads,[],'repeated references that cannot be represented exactly stop the archive');
-  assert.ok(shownErrors.some(message=>/repeated-export-fixture-190.*repeated reference or cycle/i.test(message)),'the repeated-reference report identifies its source');
-  let releaseSnapshot,startedSnapshot;
-  const snapshotStarted=new Promise(resolve=>{startedSnapshot=resolve;});
-  validStore.readRawExportSnapshot=async()=>{startedSnapshot();await new Promise(resolve=>{releaseSnapshot=resolve;});return rawSnapshot();};
-  const raced=valid.ctx.onAction(validArchive[1],{});await snapshotStarted;
-  valid.shim.localStorage.setItem('fvp:chain-scanner:protected:v1','{"changedDuringExport":true}');releaseSnapshot();await raced;
-  assert.deepEqual(validDownloads,[],'a changed app-owned local source aborts the whole archive');
-  assert.ok(shownErrors.some(message=>/localStorage key fvp:chain-scanner:protected:v1 changed/i.test(message)),'a raced source is named for retry');
-  validStore.readRawExportSnapshot=async()=>{throw new Error('fixture readonly transaction aborted');};
-  await valid.ctx.onAction(validArchive[1],{});await flush();
-  assert.deepEqual(validDownloads,[],'an aborted readonly snapshot stops without a partial file');
+  for(const [key,value,description] of [
+    ['unsupported-export-fixture-190',/unsupported/,'unsupported structured-clone values'],
+    ['cycle-export-fixture-190',(()=>{const cycle={};cycle.self=cycle;return cycle;})(),'cycles'],
+    ['repeated-export-fixture-190',(()=>{const shared={future:true};return {first:shared,second:shared};})(),'repeated references'],
+  ]){
+    const valid=await loadApp({sharedStorage:sharedScannerStorage(),indexedDBProvider:new IDBFactory(),deviceDbName:dbName+'-unsupported-'+Math.random()});
+    t.after(()=>valid.dispose());valid.ctx.addTask('Accepted board for unsupported source fixture',false);await valid.ctx.persist();
+    const validStore=valid.ctx.window.ScannerDeviceStore;assert.ok(validStore);const rawSnapshot=validStore.readRawExportSnapshot.bind(validStore);
+    validStore.readRawExportSnapshot=async()=>{const snapshot=await rawSnapshot();snapshot.stores.opaque.keys.push(key);snapshot.stores.opaque.values.push(value);return snapshot;};
+    valid.ctx.openSettings();assert.equal(await valid.ctx.onAction('export-backup',{isConnected:true}),true,`${description} captures from an accepted board`);
+    assert.match(valid.shim.document.getElementById('modalRoot').innerHTML,/Partial recovery archive/,`${description} are not presented as complete`);
+    const copied=await copyPreparedExport(valid.ctx),report=JSON.parse(copied);
+    assert.equal(report.manifest.status,'partial');assert.equal(report.appSources.indexedDB.stores,null);
+    assert.ok(report.manifest.failures.some(row=>row.source==='indexedDB'));
+    const leakedFixture=copied.search(/unsupported-export-fixture|cycle-export-fixture|repeated-export-fixture/);assert.ok(leakedFixture<0,`unsupported source details leaked near ${copied.slice(Math.max(0,leakedFixture-120),leakedFixture+180)}`);
+  }
+
 });
 
 test('RISK BACKUP FILE RESTORE: current decisions survive file selection and cross-account transfer',async t=>{
  const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb');
  function downloadCurrentFile(app,name){
-  let download=null;const link=makeFakeElement();link.remove=()=>{};link.click=()=>{download={name:link.download,href:link.href,...download};};
-  app.shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();
-  app.ctx.Blob=class Blob{constructor(parts,options){this.text=parts.join('');this.type=options.type;}};
-  app.ctx.URL={createObjectURL(blob){download={blob};return 'blob:current-board-fixture';},revokeObjectURL(){}};
-  app.ctx.openSettings();assert.match(app.shim.document.getElementById('modalRoot').innerHTML,/data-act="download-backup"/);
-  const selectedFormat=makeFakeElement();selectedFormat.value='current-board';
-  const originalGet=app.shim.document.getElementById.bind(app.shim.document);
-  app.shim.document.getElementById=id=>id==='backupDownloadFormat'?selectedFormat:originalGet(id);
-  app.ctx.onAction('download-backup',{});assert.ok(download?.blob,'the actual Settings download produced a board file');
-  assert.equal(download.name,'chain-scanner-current-board.json');
-  return new File([download.blob.text],name,{type:'application/json'});
+  const bytes=app.ctx.cloudPayload();
+  return new File([bytes],name,{type:'application/json'});
  }
  async function selectFile(app,file){
   app.ctx.openSettings();const settings=app.shim.document.getElementById('modalRoot').innerHTML;
-  const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
+  const action=settings.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);
   assert.ok(action,'the actual Settings file action is available');
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
   const originalGet=app.shim.document.getElementById.bind(app.shim.document);
@@ -20050,7 +20308,7 @@ test('RISK BACKUP FILE RESTORE: irreversible preview shows Restore and close as 
  const file=new File([JSON.stringify(source)],'selected-recovery.json',{type:'application/json'});
  ctx.openSettings();
  const settings=shim.document.getElementById('modalRoot').innerHTML;
- const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
+ const action=settings.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);
  assert.ok(action,'the real Settings restore-file control is available');
  const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
  const originalGet=shim.document.getElementById.bind(shim.document);
@@ -20159,9 +20417,9 @@ test('RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exac
 
   ctx.openSettings();
   const settings=shim.document.getElementById('modalRoot').innerHTML;
-  const restoreAction=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
+  const restoreAction=settings.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);
   assert.ok(restoreAction,'Settings exposes the single guarded Restore action');
-  assert.equal((settings.match(/data-act="restore-backup"/g)||[]).length,1,'the board-data area has exactly one Restore action');
+  assert.equal((settings.match(/data-act="import-backup"/g)||[]).length,1,'the board-data area has exactly one Import action');
   assert.match(settings,/id="backupRestoreSource"[\s\S]*?value="file"[\s\S]*?value="paste"/,'the Restore action routes either a native file or paste source');
   assert.doesNotMatch(settings,/data-act="choose-backup-file"|data-act="open-paste-recovery"/,'the board-data area has no competing file or paste action');
   assert.match(settings,/<input\b(?=[^>]*type="file")(?=[^>]*id="restoreBackupFile")[^>]*>/,'the action uses a native JSON file input');
@@ -20237,7 +20495,7 @@ test('RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exac
 
   reopened.ctx.openSettings();
   const reopenedSettings=reopened.shim.document.getElementById('modalRoot').innerHTML;
-  const reopenedAction=reopenedSettings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
+  const reopenedAction=reopenedSettings.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);
   assert.ok(reopenedAction,'the same Settings control remains available after reopen');
   const archiveInput=makeFakeElement();archiveInput.id='restoreBackupFile';archiveInput.files=[];archiveInput.matches=()=>false;
   const reopenedGet=reopened.shim.document.getElementById.bind(reopened.shim.document);
@@ -20306,7 +20564,7 @@ test('RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exac
   t.after(async()=>{await reopened.ctx.window.ScannerDeviceStore.close();});
   reopened.ctx.openHelp();
   const help=reopened.shim.document.getElementById('modalRoot').innerHTML;
-  const restoreFaq=help.match(/<dt>How do backups and Restore work\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
+  const restoreFaq=help.match(/<dt>How do backups, Import, and Restore work\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
   assert.ok(restoreFaq,'the extended FAQ explains file restore');
   assert.ok(restoreFaq.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the Restore FAQ keeps its word limit');
   assert.match(restoreFaq,/exact bytes.*current board.*preview/);
@@ -20329,7 +20587,7 @@ test('RISK BACKUP FILE RESTORE: compact settings and unknown board fields stay i
   incoming[longBoardFieldName]={keep:'full preview value'};
   const file=new File([JSON.stringify(incoming)],'compact-preview.json',{type:'application/json'});
   ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
-  const restoreAction=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
+  const restoreAction=settings.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);
   assert.ok(restoreAction,'the actual Settings file restore action is available');
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
   const originalGet=shim.document.getElementById.bind(shim.document);
@@ -20379,7 +20637,7 @@ test('RISK BACKUP FILE RESTORE: a signed-in file waits for explicit CAS and exac
   const file=new File([JSON.stringify(selected)],'account-board.json',{type:'application/json'});
   ctx.openSettings();
   const settings=shim.document.getElementById('modalRoot').innerHTML;
-  const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
+  const action=settings.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);
   assert.ok(action,'the account-bound route begins at the actual Settings control');
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;
   const originalGet=shim.document.getElementById.bind(shim.document);
@@ -20443,7 +20701,7 @@ test('RISK BACKUP FILE RESTORE: account-bound files stay protected while cloud i
   const selected=JSON.parse(sourceRaw);selected.tasks[0].title='Offline prospective account board';
   const file=new File([JSON.stringify(selected)],'offline-account-board.json',{type:'application/json'});
   ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
-  const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
+  const action=settings.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);
   assert.ok(action);
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
   const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
@@ -20476,7 +20734,7 @@ test('RISK BACKUP FILE RESTORE: IDB authority does not hide changed legacy board
     const file=new File([JSON.stringify(next)],'legacy-race.json',{type:'application/json'}),writes=[],commit=store.commitHead.bind(store);
     store.commitHead=options=>{writes.push(options);return commit(options);};
     ctx.openSettings();const markup=shim.document.getElementById('modalRoot').innerHTML;
-    const action=markup.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
+    const action=markup.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);
     assert.ok(action,'the race starts from the real Settings control');
     const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
     const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
@@ -20507,7 +20765,7 @@ test('RISK BACKUP FILE RESTORE: source changes during final awaited copy readbac
   const file=new File([JSON.stringify(next)],'final-readback-race.json',{type:'application/json'}),writes=[],commit=store.commitHead.bind(store);
   store.commitHead=options=>{writes.push(options);return commit(options);};
   ctx.openSettings();const markup=shim.document.getElementById('modalRoot').innerHTML;
-  const action=markup.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
+  const action=markup.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);
   assert.ok(action,'the race starts from the real Settings control');
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
   const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
@@ -20544,7 +20802,7 @@ test('RISK BACKUP FILE RESTORE: state, device-head, and draft-only changes expir
     const file=new File([JSON.stringify(prospective)],'stale-source.json',{type:'application/json'}),writes=[],commit=store.commitHead.bind(store);
     store.commitHead=options=>{writes.push(options);return commit(options);};
     ctx.openSettings();const markup=shim.document.getElementById('modalRoot').innerHTML;
-    const action=markup.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
+    const action=markup.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);
     assert.ok(action,'the case begins from the Settings backup-file action');
     const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
     const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
@@ -20581,7 +20839,7 @@ test('RISK BACKUP FILE RESTORE: cancel and file reselection bind confirmation to
   const firstFile=new File([JSON.stringify(first)],'cancelled-first.json',{type:'application/json'});
   const secondFile=new File([JSON.stringify(second)],'confirmed-second.json',{type:'application/json'});
   ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
-  const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
+  const action=settings.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);
   assert.ok(action);
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
   const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
@@ -20591,7 +20849,7 @@ test('RISK BACKUP FILE RESTORE: cancel and file reselection bind confirmation to
   await ctx.onAction('confirm-file-restore',{});
   assert.equal(ctx.state.tasks[0].title,'Current before reselection','a detached confirmation after Cancel cannot use its former preview');
   ctx.openSettings();const reopened=shim.document.getElementById('modalRoot').innerHTML;
-  const secondAction=reopened.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);assert.ok(secondAction);
+  const secondAction=reopened.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);assert.ok(secondAction);
   await ctx.onAction(secondAction[1],{});assert.match(await select(secondFile),/confirmed-second\.json/);
   await ctx.onAction('confirm-file-restore',{});
   assert.equal(ctx.state.tasks[0].title,'Confirmed second file','only the current selection is adopted after explicit confirmation');
@@ -20613,7 +20871,7 @@ test('RISK BACKUP FILE RESTORE: closing the preview cancels an in-flight source 
   const cloudPushes=[],originalPush=ctx.window.CloudSync?.push?.bind(ctx.window.CloudSync);
   if(originalPush)ctx.window.CloudSync.push=(...args)=>{cloudPushes.push(args);return originalPush(...args);};
   ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
-  const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
+  const action=settings.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);
   assert.ok(action,'the test enters through the actual Settings restore action');
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
   const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
@@ -20658,7 +20916,7 @@ test('RISK BACKUP FILE RESTORE: backdrop and Escape cancel a pending source chec
     const cloudPushes=[],originalPush=ctx.window.CloudSync?.push?.bind(ctx.window.CloudSync);
     if(originalPush)ctx.window.CloudSync.push=(...args)=>{cloudPushes.push(args);return originalPush(...args);};
     ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
-    const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
+    const action=settings.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);
     assert.ok(action,'the generic close case begins at the real Settings restore action');
     const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
     const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
@@ -20704,7 +20962,7 @@ test('RISK BACKUP FILE RESTORE: in-progress primary save blocks Cancel and modal
   const next=JSON.parse(JSON.stringify(ctx.state));next.tasks[0].title='Selected board after protected save';
   const file=new File([JSON.stringify(next)],'commit-inflight.json',{type:'application/json'});
   ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
-  const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
+  const action=settings.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);
   assert.ok(action,'the test enters through the real Settings file action');
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
   const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
@@ -20761,7 +21019,7 @@ test('RISK BACKUP FILE RESTORE: in-progress cloud publication blocks Cancel and 
   const next=JSON.parse(JSON.stringify(ctx.state));next.tasks[0].title='Cloud file after protected publication';
   const file=new File([JSON.stringify(next)],'cloud-commit-inflight.json',{type:'application/json'});
   ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
-  const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
+  const action=settings.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);
   assert.ok(action,'the bound case starts through the real Settings file control');
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
   const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
@@ -20824,7 +21082,7 @@ test('RISK BACKUP FILE RESTORE: backup CAS abort and readback failure keep the a
       return list(...args);
     };
     ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
-    const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);assert.ok(action);
+    const action=settings.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);assert.ok(action);
     const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
     const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
     const toastBefore=shim.document.getElementById('toast').textContent;
@@ -20868,13 +21126,13 @@ test('RISK BACKUP FILE RESTORE: unsupported and ambiguous selected files stop wi
   ];
   const writes=[],commit=store.commitHead.bind(store);store.commitHead=options=>{writes.push(options);return commit(options);};
   ctx.openSettings();let settings=shim.document.getElementById('modalRoot').innerHTML;
-  let action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);assert.ok(action);
+  let action=settings.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);assert.ok(action);
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
   const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
   for(const [name,bytes] of cases){
     shim.document.getElementById('toast').textContent='';
-    if(!shim.document.getElementById('modalRoot').innerHTML.includes('data-act="restore-backup"'))ctx.openSettings();
-    settings=shim.document.getElementById('modalRoot').innerHTML;action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);assert.ok(action,`Settings can retry ${name}`);
+    if(!shim.document.getElementById('modalRoot').innerHTML.includes('data-act="import-backup"'))ctx.openSettings();
+    settings=shim.document.getElementById('modalRoot').innerHTML;action=settings.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);assert.ok(action,`Settings can retry ${name}`);
     const file=new File([bytes],name,{type:'application/json'});await ctx.onAction(action[1],{});input.files=[file];shim.document.dispatchEvent({type:'change',target:input});
     for(let attempt=0;attempt<100&&shim.document.getElementById('toast').textContent==='';attempt++)await flush();
     assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="confirm-file-restore"/,`${name} cannot create a restore confirmation`);
@@ -20905,7 +21163,7 @@ test('RISK BACKUP FILE RESTORE: account, auth epoch, pending evidence, and cloud
     const file=new File([JSON.stringify(next)],'cloud-source.json',{type:'application/json'}),writes=[],commit=store.commitHead.bind(store);
     store.commitHead=options=>{writes.push(options);return commit(options);};
     ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
-    const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);assert.ok(action);
+    const action=settings.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);assert.ok(action);
     const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
     const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
     await ctx.onAction(action[1],{});input.files=[file];shim.document.dispatchEvent({type:'change',target:input});
@@ -20957,7 +21215,7 @@ test('RISK BACKUP FILE RESTORE: a released old client wins CAS before the prospe
   const file=new File([JSON.stringify(selected)],'old-client-cas.json',{type:'application/json'});
   const primaryWrites=[],commit=store.commitHead.bind(store);store.commitHead=options=>{primaryWrites.push(options);return commit(options);};
   current.ctx.openSettings();const settings=current.shim.document.getElementById('modalRoot').innerHTML;
-  const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);assert.ok(action);
+  const action=settings.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);assert.ok(action);
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
   const originalGet=current.shim.document.getElementById.bind(current.shim.document);current.shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
   await current.ctx.onAction(action[1],{});input.files=[file];current.shim.document.dispatchEvent({type:'change',target:input});
@@ -21030,7 +21288,7 @@ test('RISK BACKUP FILE RESTORE: replacement preserves completion, History, ratin
   assert.equal(ctx.conflictingDecisionEvidence(next,ctx.state),false,'the replacement does not collide with a different decision event');
   const file=new File([JSON.stringify(next)],'lifecycle-replacement.json',{type:'application/json'});
   ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
-  const action=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);assert.ok(action);
+  const action=settings.match(/<button\b[^>]*data-act="(import-backup)"[^>]*>\s*Import\s*<\/button>/);assert.ok(action);
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
   const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
   await ctx.onAction(action[1],{});input.files=[file];shim.document.dispatchEvent({type:'change',target:input});
@@ -24866,14 +25124,16 @@ test('Landscape messages: every hour has five distinct short, season-independent
  }
 });
 
-test('Landscape browser: scene time presets persist and return to live without changing tasks',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+test('RISK scenery scene time readiness: loading controls look unavailable before native presets save reload and return to live',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
  const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT),browser=await chromium.launch({channel:'chrome'});
- try{
+ let releaseRates=()=>{};try{
   const page=await browser.newPage({viewport:{width:390,height:844},timezoneId:'America/New_York'});
-  await page.addInitScript(()=>localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()})));
-  await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.locator('#modalRoot [data-act="close-modal"]').click();
+  await page.addInitScript(()=>{localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));globalThis.sceneryControlClicks=[];document.addEventListener('click',event=>{const button=event.target.closest('[data-act="scene-settings"], [data-act="scene-time-settings"], [data-scene-view]');if(button&&sceneryControlClicks.length<8)sceneryControlClicks.push({key:button.id||button.dataset.act,trusted:event.isTrusted,ready:typeof applySyncedSceneTime});},true);});
+  const ratesHeld=new Promise(resolve=>{releaseRates=resolve;});await page.route('**/SPAWN_RATES.md',async route=>{const response=await route.fetch();assert.equal(response.status(),200);assert.equal(createHash('sha256').update(await response.body()).digest('hex'),createHash('sha256').update(fs.readFileSync(path.join(__dirname,'SPAWN_RATES.md'))).digest('hex'));await ratesHeld;await route.fulfill({response});});
+  await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.locator('#modalRoot [data-act="ok-quickstart"]').click();
   const tasks=await page.evaluate(()=>JSON.stringify(state.tasks));
-  await page.evaluate(()=>openSettings());await page.locator('[data-act="scene-time-settings"]').click();
+  for(const selector of ['#motionButton','#viewScene','#exitScene'])assert.equal(await page.locator(selector).isDisabled(),true,'static scenery controls wait for their shared real handler: '+selector);
+  await page.locator('#appHeader [data-act="settings"]').click();assert.equal(await page.locator('#modalRoot [data-act="scene-settings"]').isDisabled(),true,'Settings Motion waits for the shared real handler');const waitingMotion=await page.locator('#modalRoot [data-act="scene-settings"]').elementHandle();assert.equal(await page.locator('[data-act="scene-time-settings"]').isDisabled(),true,'Scene Time cannot silently drop a click before its real renderer is ready');assert.match(await page.locator('#settingsSceneTimeStatus').innerText(),/scenery.*loading/i);const waitingControl=await page.locator('[data-act="scene-time-settings"]').elementHandle();const disabledPaint=await page.evaluate(()=>{const paint=selector=>{const c=getComputedStyle(document.querySelector(selector));return [c.backgroundColor,c.color,c.borderTopColor,c.cursor];};return {time:paint('[data-act="scene-time-settings"]'),motion:paint('#modalRoot [data-act="scene-settings"]')};});assert.deepEqual(disabledPaint.time,disabledPaint.motion,'loading Scene Time uses the same visibly unavailable palette as neighboring Motion');const loadingEntryPaint=await page.evaluate(()=>['#motionButton','#viewScene'].map(selector=>{const c=getComputedStyle(document.querySelector(selector));return{selector,paint:[c.backgroundColor,c.color,c.borderTopColor,c.cursor]};}));for(const row of loadingEntryPaint)assert.deepEqual(row.paint,disabledPaint.motion,'loading entry uses the established unavailable palette: '+row.selector);const waitingFocus=await page.locator('#modalRoot [data-act="location-settings"]').elementHandle();await waitingFocus.focus();releaseRates();await page.waitForFunction(()=>typeof applySyncedSceneTime==='function'&&!document.querySelector('[data-act="scene-time-settings"]').disabled);assert.equal(await waitingControl.evaluate(el=>el.isConnected&&!el.disabled),true,'ready enables the same mounted control');assert.equal(await waitingMotion.evaluate(el=>el.isConnected&&!el.disabled),true,'ready enables mounted Settings Motion without replacing the form');assert.equal(await waitingFocus.evaluate(el=>el===document.activeElement),true,'ready retains focus in the same mounted Settings form');for(const row of loadingEntryPaint){assert.equal(await page.locator(row.selector).isDisabled(),false);const paint=await page.locator(row.selector).evaluate(el=>{const c=getComputedStyle(el);return[c.backgroundColor,c.color,c.borderTopColor,c.cursor];});assert.notDeepEqual(paint,row.paint,'ready entry returns to its active palette: '+row.selector);}await page.locator('#modalRoot [data-act="scene-settings"]').click();await page.locator('#motionDialog').waitFor({state:'visible'});await page.locator('#motionDialog [data-landscape-motion="reduced"]').click();await page.locator('#modalRoot [data-act="close-modal"]').click();await page.locator('#motionButton').click();await page.locator('#motionDialog').waitFor({state:'visible'});await page.locator('#motionDialog [data-landscape-motion="reduced"]').click();await page.locator('#viewScene').click();assert.equal(await page.evaluate(()=>document.documentElement.classList.contains('viewing-scene')),true);await page.locator('#exitScene').click();assert.equal(await page.evaluate(()=>document.documentElement.classList.contains('viewing-scene')),false);await page.locator('#appHeader [data-act="settings"]').click();await page.locator('[data-act="scene-time-settings"]').click();await page.locator('#sceneTimeDialog').waitFor({state:'visible'});const receipts=await page.evaluate(()=>sceneryControlClicks);for(const key of ['motionButton','viewScene','exitScene','scene-settings','scene-time-settings'])assert.ok(receipts.some(row=>row.key===key&&row.trusted&&row.ready==='function'),'ready control receives its native trusted action: '+key);t.diagnostic('Native ready-control receipts: '+JSON.stringify(receipts));
   assert.equal(await page.locator('#sceneTimeDialog').evaluate(e=>e.scrollHeight>e.clientHeight),false,'time controls fit a typical phone without hiding Close');
   const timeBox=await page.locator('#sceneTimeInput').boundingBox(),seasonLabel=await page.locator('[for="sceneSeasonInput"]').boundingBox();assert.ok(seasonLabel.y>=timeBox.y+timeBox.height+8,'Season has its own clearly separated field');
   await page.locator('[data-scene-preset="00:00"]').click();assert.equal(await page.locator('#sceneTimeInput').inputValue(),'00:00');assert.equal(await page.evaluate(()=>document.documentElement.dataset.scenePeriod),'night');
@@ -24881,10 +25141,10 @@ test('Landscape browser: scene time presets persist and return to live without c
   await page.locator('[data-scene-preset="sunrise"]').click();await page.locator('[data-scene-preset="sunset"]').click();assert.equal(await page.evaluate(()=>LivingSky.readSceneTime(localStorage)),'sunset');
   await page.locator('#sceneSeasonInput').selectOption('winter');await page.locator('#sceneTimeInput').fill('23:15');await page.locator('[data-scene-time="lock"]').click();
   await page.reload();assert.equal(await page.evaluate(()=>LivingSky.readSceneSeason(localStorage)),'winter');assert.equal(await page.evaluate(()=>LivingSky.readSceneTime(localStorage)),'23:15');assert.equal(await page.evaluate(()=>document.documentElement.dataset.scenePeriod),'night');
-  await page.evaluate(()=>openSettings());await page.locator('[data-act="scene-time-settings"]').click();await page.locator('[data-scene-time="live"]').click();
+  await page.locator('#appHeader [data-act="settings"]').click();await page.locator('[data-act="scene-time-settings"]').click();await page.locator('[data-scene-time="live"]').click();
   assert.equal(await page.evaluate(()=>LivingSky.readSceneSeason(localStorage)),null);assert.equal(await page.evaluate(()=>LivingSky.readSceneTime(localStorage)),null);assert.equal(await page.evaluate(()=>JSON.stringify(state.tasks)),tasks);
   await page.locator('[data-scene-time="close"]').click();assert.equal(await page.locator('[data-act="scene-time-settings"]').evaluate(e=>e===document.activeElement),true);await page.locator('#modalRoot [data-act="close-modal"]').click();await page.locator('#appHeader [data-act="help"]').click();await page.locator('[data-help-changelog] > summary').click();assert.ok(await page.getByText('Cyclists pedal with connected hips and naturally bending knees.').isVisible());
- }finally{await browser.close();}
+ }finally{releaseRates();await browser.close();}
 });
 
 test('Landscape comments explicitly name their hour and the intro has no location caption',()=>{
@@ -26684,7 +26944,7 @@ test('Hourly prompts: 5:30 AM and every other hour require human copy, without d
  assert.equal(mood.message(new Date('2026-09-14T09:30:00Z'),'America/New_York',0),'My dawn line');
  assert.equal(mood.message(new Date('2026-09-14T10:00:00Z'),'America/New_York',0),'');
  assert.equal(mood.skywriterMessage(0),'SKY');
- assert.match(html,/<span id="sceneStatus"><\/span>/,'no AI placeholder before human text loads');
+ assert.match(html,/<span id="sceneStatus">(?:Scenery is loading\.)?<\/span>/,'no AI placeholder before human text loads');
 });
 
 test('Rail service: both lines run regularly in every season, even at night',()=>{
@@ -29972,7 +30232,7 @@ test('RISK RESET SAFETY: backup failure aborts reset before state or primary sto
 
 test('RISK RESET SAFETY: quota compaction makes room for the mandatory copy without deleting retained rows',async()=>{
  const values=new Map(),used=()=>[...values].reduce((sum,[key,value])=>sum+key.length+value.length,0);let quota=Infinity;
- const storage={getItem:key=>values.get(key)??null,removeItem:key=>values.delete(key),setItem(key,value){
+ const storage={get length(){return values.size;},key:index=>[...values.keys()][index]??null,getItem:key=>values.get(key)??null,removeItem:key=>values.delete(key),setItem(key,value){
   const next=String(value),prior=values.get(key)||'';
   if(used()-prior.length+next.length>quota){const error=Error('aggregate quota');error.name='QuotaExceededError';throw error;}
   values.set(key,next);
@@ -31006,6 +31266,7 @@ test('RISK SCALABLE LOCAL BOARD: a multi-megabyte legacy board migrates without 
  assert.ok(Buffer.byteLength(raw,'utf8')>1048576,'production fixture exceeds Firestore and common localStorage headroom');
  const values=new Map([[LOCAL_HEAD_KEY,raw],[SYNC_STORE_KEY,raw],[LOCAL_BACKUPS_KEY,'opaque legacy archive bytes']]);
  const storage={
+  get length(){return values.size;},key:index=>[...values.keys()][index]??null,
   getItem:key=>values.has(key)?values.get(key):null,
   setItem(key,value){value=String(value);if(value.length>300000)throw Object.assign(Error('quota'),{name:'QuotaExceededError'});values.set(key,value);},
   removeItem:key=>values.delete(key),
@@ -31045,6 +31306,7 @@ test('RISK SCALABLE RECOVERY: cloud replacement awaits an IndexedDB safety copy 
  local.futureBoardData={blob:'L'.repeat(1150000)};
  const localRaw=JSON.stringify(local),values=new Map([[LOCAL_HEAD_KEY,localRaw],[SYNC_STORE_KEY,localRaw]]);
  const storage={
+  get length(){return values.size;},key:index=>[...values.keys()][index]??null,
   getItem:key=>values.has(key)?values.get(key):null,
   setItem(key,value){value=String(value);if(value.length>350000)throw Object.assign(Error('quota'),{name:'QuotaExceededError'});values.set(key,value);},
   removeItem:key=>values.delete(key),
@@ -31995,8 +32257,12 @@ test('RISK SYNC ERROR LOG: backend failures remain under Settings diagnostics af
  app.ctx.openSettings();
  const rendered=app.shim.document.getElementById('modalRoot').innerHTML;
  assert.match(rendered,/Recent sync errors/);
- assert.ok(rendered.indexOf('Recent sync errors')>rendered.indexOf('Current-board view and copy'));
- assert.ok(rendered.indexOf('Recent sync errors')<rendered.indexOf('Daily local backups'));
+ const dataSection=rendered.match(/<details class="settings-section"><summary>Data and backups<\/summary>([\s\S]*?)<\/details>/)?.[1];
+ const cleanupSection=rendered.match(/<details class="settings-section"><summary>Recovery and cleanup<\/summary>([\s\S]*?)<\/details>/)?.[1];
+ assert.ok(dataSection&&cleanupSection,'transfer/backups and recovery diagnostics remain available in separate sections');
+ assert.doesNotMatch(dataSection,/Recent sync errors|id="syncErrorLog"/);
+ assert.match(cleanupSection,/Recent sync errors[\s\S]*id="syncErrorLog"/);
+ assert.ok(rendered.indexOf('Recent sync errors')>rendered.indexOf('Daily local backups'));
  assert.match(rendered,/push.*unavailable/);
  assert.match(rendered,/<time datetime="[^"]+"/);
  assert.doesNotMatch(rendered,/private task and token detail/);
@@ -32882,9 +33148,13 @@ test('RISK completion lifecycle FAQ: expired rest and saved-chain return match t
  assert.match(help,/Done itself does not change preference ratings/i);
 });
 
-test('RISK completion boundaries FAQ: Retry explains an uncertain cloud acknowledgement',async()=>{
- const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(help,/After a lost reply, Retry sync checks the current saved cloud board before trying again/i);
+test('RISK completion boundaries FAQ: Retry explains an uncertain cloud acknowledgement',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();const help=app.shim.document.getElementById('modalRoot').innerHTML;
+ const answer=help.match(/<dt>What can I do if a save or sync fails\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.ok(answer,'mounted sync-failure FAQ remains present');
+ assert.match(answer,/After a lost reply, Retry sync checks the (?:current )?saved cloud board before (?:trying again|retrying)/i);
+ assert.match(answer,/an error alone does not confirm (?:the save|saving)/i);
+ assert.match(answer,/Synced requires server acknowledgement of the latest save/i);
+ assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the existing FAQ stays bounded');
 });
 
 test('RISK completion boundaries: delayed stale cloud adoption retains Done and concurrent task edit before exact retry acknowledgement',async t=>{
@@ -35387,8 +35657,8 @@ test('RISK backup help: expiry, protected-copy deletion, and archive limits rema
  };
  const countdown=answer('What do the countdown tags mean?');
  const taskHelp=answer('Can I undo, restore, or remove a task?');
- const backups=answer('How do backups and Restore work?');
- const exports=answer('What does Download backup contain?');
+ const backups=answer('How do backups, Import, and Restore work?');
+ const exports=answer('What does Export include?');
  const worked=answer('What does Worked on it mean?');
  assert.match(countdown,/Start clears expired.*before building.*eligible pool/,'expired holds clear before the next eligible pool is built');
  assert.match(taskHelp,/Backup deletion asks for confirmation and keeps the current board/);
@@ -35401,13 +35671,14 @@ test('RISK backup help: expiry, protected-copy deletion, and archive limits rema
  assert.match(backups,/Manual and protected recovery copies remain/);
  assert.match(backups,/Matching duplicate backups appear once/);
  assert.match(backups,/Long before-and-after values wrap inside the preview\./);
- assert.match(exports,/one Download backup action/i);
- assert.match(exports,/Current board JSON for ordinary board data/);
- assert.match(exports,/Full recovery archive.*local backup, pending/i);
- assert.match(exports,/Raw device sources only.*cannot be imported as a board/i);
- assert.match(exports,/versioned recovery archive is not an ordinary board-import file/);
+ assert.match(exports,/one read-only recovery archive.*accepted current board.*readable app-owned saved sources/i);
+ assert.match(exports,/Copy sends.*straight to the clipboard.*Download saves the same bytes/i);
+ assert.match(exports,/full JSON is not rendered/i);
+ assert.match(exports,/unavailable or changing source.*clearly marked partial archive/i);
+ assert.match(exports,/Import previews and applies only an archive.*current board after confirmation/i);
  assert.match(exports,/pending work is never replayed/);
- assert.match(exports,/File restore keeps supported recorded choices and protects displaced decisions\./);
+ assert.match(exports,/original sources stay protected/);
+ assert.match(answer('How do I paste a saved board?'),/choose saved or recorded ratings when they differ/);
  assert.match(worked,/It leaves the dotted chain and stays off it through saving and syncing\./);
  assert.match(backups,/File restore protects exact bytes and the current board in Settings backups/);
  assert.match(backups,/Cancel or close during source checks stops before adoption/);
@@ -37698,7 +37969,7 @@ test('RISK Postpone: scan surfaces match neighboring decision button sizing with
  for(const woop of [false,true]){const {ctx,shim}=await loadApp({seed:998});ctx.state.settings.showPostpone=true;const t=ctx.addTask('Only remaining task',true);ctx.state.settings.lastTaskWoop=woop;ctx.state.mode='work';ctx.render();assertNeighbors(shim.elements.get('scan').innerHTML,'bench-postpone','bench-done',t.id);}
  const source=fs.readFileSync(new URL('./index.html',import.meta.url),'utf8');
  assert.match(source,/\.btn\.subtle\{background:var\(--surface\);color:var\(--ink\);border:1px solid var\(--line\);box-shadow:none;font-weight:600\}/,'unrelated Edit palette stays intact');
- assert.match(source,/\.btn\.subtle:disabled\{/,'shared disabled treatment remains available');
+ assert.match(source,/\.btn\.subtle:disabled(?:,[^{]+)?\{/,'shared disabled treatment remains available');
 });
 
 test('RISK Postpone: day paint stays white and night paint matches Edit on both scanner surfaces',async()=>{
@@ -37709,7 +37980,7 @@ test('RISK Postpone: day paint stays white and night paint matches Edit on both 
   assert.ok(classes?.includes('subtle')&&classes.includes('postpone'),'both mounted Postpone surfaces use their scoped theme treatment');
  }
  assert.match(html,/\.btn\.subtle\.postpone\{background:light-dark\(#fff,var\(--surface\)\);color:light-dark\(#20242b,var\(--ink\)\)\}/,'day paint remains white while night fill and ink reuse Edit theme tokens without overriding component geometry');
- assert.ok(html.indexOf('.btn.subtle.postpone{')<html.indexOf('.btn.subtle:disabled{'),'shared disabled palette still takes precedence');
+ assert.ok(html.indexOf('.btn.subtle.postpone{')<html.indexOf('.btn.subtle:disabled'),'shared disabled palette still takes precedence');
 });
 
 test('RISK Postpone layout: mounted duration field uses the bounded numeric Settings width',async()=>{
@@ -38883,6 +39154,32 @@ function overdueWoopControl(app){
  const tag=html.match(/<button[^>]*data-act="run-woop"[^>]*>/)?.[0];assert.ok(tag,'overdue offered task must expose Run WOOP');
  return {dataset:Object.fromEntries([...tag.matchAll(/data-([a-z]+)="([^"]*)"/g)].map(m=>[m[1],m[2]]))};
 }
+test('RISK overdue WOOP: a newly started scan keeps Next usable and the saved plan through reopening',async t=>{
+ const app=await loadApp({seed:971}),{ctx,shim}=app;t.after(()=>app.dispose());
+ for(let i=0;i<2;i++)ctx.addTask('Overdue walkthrough task '+i,false,[],{due:'2000-01-01'});
+ ctx.onAction('start-scan',{dataset:{}});
+ const candidate=ctx.state.candidateId,benchmarkId=ctx.state.chain.at(-1);
+ assert.ok(candidate&&benchmarkId&&candidate!==benchmarkId,'Start scanning offers an overdue candidate against its automatic first dot');
+ ctx.onAction('run-woop',overdueWoopControl(app));
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/Step 1 of 3/);
+ woopStep(app,'Finish the overdue task');
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/Step 2 of 3/,'Next must advance the newly started scan walkthrough instead of closing it as stale');
+ assert.equal(ctx.state.mode,'work','Run WOOP deliberately pauses scanning while working this task');
+ woopStep(app,'Getting distracted');woopStep(app,'If distracted, then return to the first step');
+ const task=ctx.state.tasks.find(row=>row.id===candidate);
+ assert.equal(task.woopPlan.plan,'If distracted, then return to the first step');
+ assert.equal(ctx.state.chain.filter(id=>id===candidate).length,1,'WOOP chooses its task exactly once');
+ assert.equal(ctx.taskComparisonEligible(task),true,'the chosen task receives the explicit dot even against a neutral automatic benchmark');
+ const saved=await ctx.persist();assert.notEqual(saved,false);
+ const reload=await loadApp({seedStorage:{[STORE_KEY]:JSON.stringify(ctx.state)}});t.after(()=>reload.dispose());
+ assert.equal(reload.ctx.state.mode,'work');
+ assert.equal(reload.ctx.state.tasks.find(row=>row.id===candidate).woopPlan.plan,'If distracted, then return to the first step');
+ assert.ok(reload.ctx.state.chain.includes(benchmarkId),'the automatic benchmark remains in the chain');
+ ctx.undo();ctx.undo();
+ assert.equal(ctx.state.mode,'scan','Undo restores the previous scanner mode together with the explicit dot');
+ assert.equal(ctx.state.chain.includes(candidate),false);
+ assert.equal(ctx.state.chain.at(-1),benchmarkId);
+});
 test('RISK overdue WOOP: offered action dots through existing comparison and saves with Last task WOOP off',async()=>{
  const app=await overdueWoopFixture(),{ctx,shim,task,base}=app;
  assert.equal(ctx.state.settings.lastTaskWoop,false);const control=overdueWoopControl(app);
@@ -39737,11 +40034,11 @@ test('RISK motion safety: export clicks do not renew consent while actual choice
  vm.runInContext(update+listener,c);
  assert.equal(typeof handler,'function','the extracted production document listener is registered');
  const click=node=>handler({target:node});
- click(element('BUTTON',{act:'download-backup'},body));
- click(element('BUTTON',{act:'download-current-board'},body));
- click(element('BUTTON',{act:'download-recovery-archive'},body));
- click(element('A',{download:'chain-scanner-current-board.json'},body));
- assert.equal(storage.getItem(motionKey),originalRaw,'Settings export actions and their programmatic download click leave the exact timed consent bytes and expiry unchanged');
+ click(element('BUTTON',{act:'export-backup'},body));
+ click(element('BUTTON',{act:'download-export'},body));
+ click(element('BUTTON',{act:'copy-export'},body));
+ click(element('A',{download:'chain-scanner-recovery-archive.json'},body));
+ assert.equal(storage.getItem(motionKey),originalRaw,'Settings Export, Copy, Download and their programmatic download click leave the exact timed consent bytes and expiry unchanged');
  assert.deepEqual(saves,[],'ordinary downloads do not renew motion consent');
  assert.equal(starts,0,'ordinary downloads do not restart the landscape');
  click(normalChoice);
@@ -41500,10 +41797,10 @@ test('RISK device save warning browser: actual held Add keeps every text line on
    await page.locator('[data-act="settings"]').click();
    await poll(page,()=>!document.querySelector('#toast.show'),null,'natural warning expiry');
    const data=page.locator('#modalRoot details').filter({has:page.locator('[data-act="make-manual-backup"]')});for(const panel of await data.all())if(await panel.getAttribute('open')===null)await panel.locator(':scope > summary').click();
-   assert.equal(await page.locator('[data-act="make-manual-backup"]').isVisible(),true);assert.match(await page.locator('#modalRoot').innerText(),/Current-board view and copy/);
+   assert.equal(await page.locator('[data-act="make-manual-backup"]').isVisible(),true);assert.match(await page.locator('#modalRoot').innerText(),/Data and backups[\s\S]*Export/);
    const issue=page.locator('#modalRoot .kv').filter({hasText:'Last device save issue:'});await issue.scrollIntoViewIfNeeded();assert.equal(await issue.isVisible(),true);assert.match(await issue.innerText(),/Last device save issue:.*device-save:completion-upgrade\/ambiguous-legacy-completion/s);
    row.details=await issue.evaluate(el=>{const b=el.getBoundingClientRect(),code=el.querySelector('code'),r=code.getBoundingClientRect();return {text:el.textContent,rect:{x:b.x,y:b.y,w:b.width,h:b.height},code:{x:r.x,y:r.y,w:r.width,h:r.height},scrollWidth:el.scrollWidth,clientWidth:el.clientWidth};});assert.ok(row.details.scrollWidth<=row.details.clientWidth+1);assert.ok(row.details.code.x>=row.details.rect.x&&row.details.code.x+row.details.code.w<=row.details.rect.x+row.details.rect.w+1);
-   await page.evaluate(()=>document.fonts.ready);fonts.details=await platformFonts('#modalRoot p.kv:has(code)');for(const act of ['view-current-board','download-backup'])fonts[act]=await platformFonts('#modalRoot [data-act="'+act+'"]');await session.detach();
+   await page.evaluate(()=>document.fonts.ready);fonts.details=await platformFonts('#modalRoot p.kv:has(code)');fonts.export=await platformFonts('#modalRoot [data-act="export-backup"]');fonts.import=await platformFonts('#modalRoot [data-act="import-backup"]');await session.detach();
    if(evidence){fs.writeFileSync(path.join(evidence,theme+'-'+scale+'.json'),JSON.stringify(row,null,2));await page.screenshot({path:path.join(evidence,theme+'-'+scale+'-details.png')});
     if(process.env.TOAST_REVIEW_PAUSE==='1'){const ack=path.join(evidence,theme+'-'+scale+'-details-inspected');const end=Date.now()+180000;while(!fs.existsSync(ack)&&Date.now()<end)await new Promise(r=>setTimeout(r,100));assert.ok(fs.existsSync(ack),'owner inspected actual native details before closing its context');}}
    assert.equal(await page.evaluate(()=>localStorage.getItem('fvp:chain-scanner:v1')),exactOldDevice);assert.equal(await page.evaluate(()=>localStorage.getItem('fvp:chain-scanner:protected:v1')),exactOldDevice);
@@ -42403,8 +42700,8 @@ test('RISK pasted recovery UI: Settings opens an editable protected preview and 
  assert.match(html,/<button class="ghost" data-act="settings"/,'the header exposes the Settings button that opens this route');
  dispatch('settings');
  const settings=root.innerHTML;assert.match(settings,/<h2>Settings<\/h2>/,'the visible header Settings action opens Settings');
- const restoreButton=settings.match(/<button\b(?=[^>]*data-act="restore-backup")[^>]*>\s*Restore\s*<\/button>/);
- assert.ok(restoreButton,'Settings exposes one guarded Restore action');
+ const restoreButton=settings.match(/<button\b(?=[^>]*data-act="import-backup")[^>]*>\s*Import\s*<\/button>/);
+ assert.ok(restoreButton,'Settings exposes one guarded Import action');
  assert.match(settings,/id="backupRestoreSource"[\s\S]*?value="file"[\s\S]*?value="paste"/,'the same Restore action offers native file and paste sources');
  assert.doesNotMatch(settings,/data-act="choose-backup-file"|data-act="open-paste-recovery"/,'file and paste are choices, not competing Settings actions');
  assert.doesNotMatch(settings,/id="jsonBox"/,'the editable paste area stays in its own dialog');
@@ -42420,7 +42717,7 @@ test('RISK pasted recovery UI: Settings opens an editable protected preview and 
   assert.equal((markup.match(/class="modal" role="dialog"/g)||[]).length,1,message+' keeps one dialog');
   return markup;
  };
- click('restore-backup');
+ click('import-backup');
  assert.match(oneDialog('Opening paste recovery'),/id="jsonBox"/,'the visible Settings route opens an editable text area');
  const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=raw;shim.document.dispatchEvent({type:'input',target:box});
  const waitForPreview=async()=>{
@@ -42559,8 +42856,8 @@ test('RISK pasted recovery UI: archive and raw backup text use the visible Setti
   shim.document.getElementById=id=>id==='jsonBox'&&!root.innerHTML.includes('id="jsonBox"')?null:id==='backupRestoreSource'?restoreSource:getElementById(id);
   const dispatch=action=>{const target=makeFakeElement();target.dataset={act:action};target.closest=selector=>selector==='[data-act]'?target:null;shim.document.dispatchEvent({type:'click',target,detail:1});};
   dispatch('settings');assert.match(shim.document.getElementById('modalRoot').innerHTML,/<h2>Settings<\/h2>/,'pasting starts from the visible Settings control');
-  assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="restore-backup"/);
-  dispatch('restore-backup');const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=raw;shim.document.dispatchEvent({type:'input',target:box});
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="import-backup"/);
+  dispatch('import-backup');const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=raw;shim.document.dispatchEvent({type:'input',target:box});
   assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="preview-pasted-recovery"/);
   dispatch('preview-pasted-recovery');
   const expectedChoice=format==='raw'?'fileRestoreBackupChoice':'fileRestoreLearningChoice';
@@ -42586,7 +42883,7 @@ test('RISK pasted recovery UI: archive and raw backup text use the visible Setti
  const help=source.shim.document.getElementById('modalRoot').innerHTML,faq=help.match(/<dt>How do I paste a saved board\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
  assert.ok(faq,'the extended Data and backups FAQ explains pasted recovery');
  assert.ok(faq.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the pasted-recovery FAQ keeps its word limit');
- assert.match(faq,/Settings → Data and backups → Restore.*choose Paste JSON.*select Restore/,'the FAQ names the consolidated Settings route');
+ assert.match(faq,/Settings → Data and backups → Import.*choose Paste JSON.*select Import/,'the FAQ names the consolidated Settings route');
  assert.match(faq,/separate from Review saved decisions.*combines device and cloud choices/,'the FAQ distinguishes snapshot restore from held-cloud choice merging');
 });
 
@@ -43003,6 +43300,27 @@ async function divergentCloudSourceApp187(t,options={}){
  assert.equal((await backend.CS.pull()).code,'corrupt-generation');
  return app;
 }
+
+test('RISK cloud source recovery choice: repeating the selected source preserves the mounted review and alternate choices',async t=>{
+ const app=await divergentCloudSourceApp187(t),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);
+ const modal=shim.document.getElementById('modalRoot'),local=JSON.stringify(ctx.state),head=await store.readHead(),cloud=JSON.stringify([...backend.docs]),writes=backend.writes.length;
+ const backups=await store.listBackups(),opaque=await store.listOpaqueArchives(),pending=await store.getPendingUpload('owner');
+ let html=modal.innerHTML,replacements=0;Object.defineProperty(modal,'innerHTML',{configurable:true,get:()=>html,set:value=>{html=value;replacements++;}});
+ const choose=value=>ctx.onAction('choose-cloud-recovery-source',{dataset:{value}});
+ assert.equal(await choose('device'),true);assert.equal(replacements,1,'first selection renders its effects');
+ const selected=modal.innerHTML;assert.match(selected,/data-value="device" aria-pressed="true"/);
+ for(let index=0;index<10;index++)assert.equal(await choose('device'),true,'same eligible source remains an accepted choice');
+ assert.equal(replacements,1,'an unchanged selection keeps the mounted review instead of rebuilding all source facts and layout');assert.equal(modal.innerHTML,selected);
+ const previous='generation:'+originalRoot.previousGeneration;
+ assert.equal(await choose(previous),true);assert.equal(replacements,2,'a different eligible source still renders its own effects');assert.notEqual(modal.innerHTML,selected);assert.ok(modal.innerHTML.includes('data-value="'+previous+'" aria-pressed="true"'));
+ assert.equal(await choose('device'),true);assert.equal(replacements,3,'returning to the device source remains a real change');assert.equal(modal.innerHTML,selected);
+ assert.equal(await choose('unreviewed-source'),false);assert.equal(replacements,3,'unknown source never earns the same-choice fast path');
+ assert.equal(JSON.stringify(ctx.state),local);assert.equal((await store.readHead()).payload,head.payload);assert.deepEqual(await store.listBackups(),backups);assert.deepEqual(await store.listOpaqueArchives(),opaque);assert.deepEqual(await store.getPendingUpload('owner'),pending);assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal(backend.writes.length,writes,'choosing never applies or publishes a source');
+ ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML,faq=help.match(/<dt>How are recovery sources and pending choices protected\?<\/dt><dd>(.*?)<\/dd>/)[1];assert.match(faq,/Repeating the selected source keeps your review, focus and scroll position/);assert.ok(faq.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130);
+ assert.match(fs.readFileSync(path.join(__dirname,'index.html'),'utf8').match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1],/Repeatedly selecting the same recovery source keeps the review responsive/);
+
+});
 
 test('RISK cloud source recovery: native explicit source choice publishes a complete generation with exact originals and durable reopen',async t=>{
  for(const selected of ['device','previous'])await t.test(selected,async sub=>{
@@ -43448,12 +43766,13 @@ test('RISK recovery identity consumers: verified cloud adoption rebases independ
 });
 
 
-test('RISK support diagnostics: Settings names the existing board export for its contents',async t=>{
+test('RISK support diagnostics: Settings points to the single archive Export',async t=>{
  const app=await loadApp();t.after(()=>app.dispose());app.ctx.openSettings();
  const settings=app.shim.document.getElementById('modalRoot').innerHTML;
- assert.match(settings,/Current-board view and copy/i,'the existing current-board view remains distinct from the download chooser');
- assert.match(settings,/data-act="view-current-board"/,'the existing board view/copy action remains available');
- assert.match(settings,/data-act="download-backup"/,'the one consolidated board download action remains available');
+ assert.equal((settings.match(/data-act="export-backup"/g)||[]).length,1,'Settings has exactly one complete archive Export');
+ assert.equal((settings.match(/data-act="import-backup"/g)||[]).length,1,'Settings retains one protected Import action');
+ assert.doesNotMatch(settings,/Current-board view and copy|data-act="(?:view-current-board|view-database-repair|download-backup)"|currentBoardData|databaseRepairData/);
+ assert.match(settings,/Copy and Download use the same archive/i);
  app.ctx.openHelp();const help=app.shim.document.getElementById('modalRoot').innerHTML;
  const faq=help.match(/<dt>What does the debug log contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
  assert.ok(faq,'the extended FAQ describes the separate report');
@@ -43622,9 +43941,10 @@ test('RISK debug log: the replacement screen copies a unified log without a down
  let copied=null;const app=await loadApp({navigatorProvider:{clipboard:{async writeText(text){copied=text;}}}}),{ctx,shim}=app;t.after(()=>app.dispose());
  ctx.openSettings();let modal=shim.document.getElementById('modalRoot').innerHTML;
  assert.match(modal,/<h3>Debug log<\/h3>/,'Settings replaces the old debugger with the unified log');
- assert.doesNotMatch(modal,/<h3>Support diagnostics<\/h3>/);assert.match(modal,/View \/ copy database for repair/);
+ assert.doesNotMatch(modal,/<h3>Support diagnostics<\/h3>/);assert.match(modal,/data-act="export-backup"/);
  assert.equal(await ctx.onAction('view-support-diagnostics',{}),true);modal=shim.document.getElementById('modalRoot').innerHTML;
  assert.match(modal,/<h2>Debug log<\/h2>/);assert.match(modal,/readonly aria-label="Debug log"/,'manual copy remains available without a clipboard API');
+ assert.match(modal,/data-act="export-backup"[^>]*data-export-scope="repair"[^>]*>Export recovery archive/,'Debug log routes comprehensive data recovery through the same Export');
  assert.equal(await ctx.onAction('copy-support-diagnostics',{}),true);assert.ok(JSON.parse(copied).restartDiagnostics);
  assert.equal(JSON.parse(copied).boardDataIncluded,false);assert.match(modal,/not a board backup/);
  const fallback=await loadApp();t.after(()=>fallback.dispose());assert.equal(await fallback.ctx.onAction('copy-support-diagnostics',{}),false);
@@ -43693,7 +44013,7 @@ test('RISK support diagnostics: local report stays redacted, bounded, and separa
  const beforeState=JSON.stringify(app.ctx.state),beforeStorage=[SYNC_STORE_KEY,LOCAL_HEAD_KEY,'fvp:chain-scanner:sync-error-log:v1'].map(key=>app.shim.localStorage.getItem(key));
  app.ctx.openSettings();const settings=app.shim.document.getElementById('modalRoot').innerHTML;
  assert.match(settings,/Debug log/i,'Settings offers a separate support report');
- assert.match(settings,/data-act="view-support-diagnostics"/);assert.match(settings,/data-act="view-database-repair"/);assert.doesNotMatch(settings,/data-act="copy-support-diagnostics"/);assert.doesNotMatch(settings,/data-act="download-support-diagnostics"/);
+ assert.match(settings,/data-act="view-support-diagnostics"/);assert.match(settings,/data-act="export-backup"/);assert.doesNotMatch(settings,/data-act="view-database-repair"|data-act="copy-support-diagnostics"|data-act="download-support-diagnostics"/);
  assert.match(settings,/metadata report.*not a board backup/i,'the local report cannot be mistaken for restorable board data');
  app.ctx.onAction('view-support-diagnostics',{});
  let report=app.ctx.buildSupportDiagnosticsReport();
@@ -44983,6 +45303,16 @@ test('RISK repository process: grouped runner stays covered at the default npm t
  assert.match(result.stdout||'',/^# skipped 0$/m,'The runner contract cannot pass through a skip');
 });
 
+test('RISK repository process: capped mobile reports bind kernel memory distinct touch and durable outcomes',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;const result=spawnSync(process.execPath,['--test','scripts/agent-tools/mobile-memory.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});assert.equal(result.error,undefined);assert.equal(result.status,0,'Kernel-bound report/parser/refusal controls must pass: '+result.stdout+'\n'+result.stderr);
+});
+
+test('RISK repository process: required mobile memory evidence cannot be replaced by passing desktop groups',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-name-pattern=^test group aggregate refuses a declared mobile memory story without a capped runtime report$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
+ assert.equal(result.error,undefined);assert.equal(result.status,0,'The actual four-group aggregate must reject absent required1GB and reported512MB proof: '+result.stdout+'\n'+result.stderr);
+});
+
 test('RISK repository process: required parallel scanner aggregation rejects absent group evidence',()=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
  const result=spawnSync(process.execPath,['--test','--test-name-pattern=^test group workflow scanner command rejects missing parallel group evidence$',path.join(__dirname,'scripts/agent-tools/test-groups.test.mjs')],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
@@ -45210,4 +45540,904 @@ test('RISK independent cloud boot authority: source-only preflight waits for bou
  const remote=await backend.CS.pull();assert.equal(typeof remote.payload,'string','the real decoder confirms independent cloud repair after bounded unavailable startup');assert.ok(remote.rev>seed.originalRoot.rev);
  assert.equal(JSON.stringify(ctx.state),local);assert.equal(shim.document.getElementById('addInput').value,'Draft after unavailable boot');assert.equal(ctx.state.syncDirty,true);
  assert.equal(JSON.parse(remote.payload).tasks.some(row=>row.title==='Accepted after bounded unavailable boot'),false,'server-only repair never uploads unobserved accepted local work');
+});
+
+test('RISK repository process: button safety rejects incomplete native action evidence',t=>{
+ const directory=fs.mkdtempSync('/tmp/chain-button-process-');t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const report={schemaVersion:1,kind:'button-safety',engine:'webkit',status:'passed',candidateCommit:'a'.repeat(40),candidateTree:'b'.repeat(40),inventorySha256:'c'.repeat(64),requiredActions:['act:add','act:settings'],outcomes:[{action:'act:add',status:'passed',events:['click'],assertions:1,responsive:true}],errors:[],cleanup:{contextClosed:true,browserClosed:true,serverClosed:true}};
+ const file=path.join(directory,'report.json'),inventory=path.join(directory,'inventory.json');fs.writeFileSync(file,JSON.stringify(report));fs.writeFileSync(inventory,JSON.stringify({schemaVersion:1,requiredActions:['act:add','act:settings']}));report.inventorySha256=createHash('sha256').update(fs.readFileSync(inventory)).digest('hex');fs.writeFileSync(file,JSON.stringify(report));
+ const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--verify-report',file,'--inventory',inventory],{cwd:__dirname,encoding:'utf8'});
+ assert.equal(result.error,undefined);assert.notEqual(result.status,0,'required native safety gate must reject a passing report missing the Settings click');
+ assert.match(result.stderr,/Missing required button action: act:settings/);
+});
+
+test('RISK repository process: button safety rejects false passes and newly untested actions',async t=>{
+ const directory=fs.mkdtempSync('/tmp/chain-button-contract-');t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const manifest={schemaVersion:1,requiredActions:['act:add','act:settings']},inventory=path.join(directory,'inventory.json');fs.writeFileSync(inventory,JSON.stringify(manifest));
+ const good={schemaVersion:1,kind:'button-safety',engine:'webkit',status:'passed',candidateCommit:'a'.repeat(40),candidateTree:'b'.repeat(40),inventorySha256:createHash('sha256').update(fs.readFileSync(inventory)).digest('hex'),requiredActions:manifest.requiredActions,outcomes:manifest.requiredActions.map(action=>({action,status:'passed',events:['click'],assertions:1,responsive:true})),errors:[],observedActions:manifest.requiredActions,cleanup:{contextClosed:true,browserClosed:true,serverClosed:true}};
+ const variants={
+  duplicate:r=>r.outcomes.push(r.outcomes[0]), skipped:r=>r.outcomes[0].status='skipped', cancelled:r=>r.outcomes[0].status='cancelled', noClick:r=>r.outcomes[0].events=[], noAssertion:r=>r.outcomes[0].assertions=0, stalled:r=>r.outcomes[0].responsive=false,
+  crash:r=>r.errors.push('page-crash'), close:r=>r.errors.push('unexpected-close'), reload:r=>r.errors.push('unexpected-reload'), navigation:r=>r.errors.push('unexpected-navigation'), pageerror:r=>r.errors.push('pageerror'), unhandled:r=>r.errors.push('unhandledrejection'), unavailable:r=>r.status='unavailable', newAction:r=>r.observedActions.push('act:new-untested'), selfWaived:r=>{r.requiredActions.pop();r.outcomes.pop();}, wrongInventory:r=>r.inventorySha256='d'.repeat(64), cleanup:r=>r.cleanup.browserClosed=false
+ };
+ const invoke=report=>{const file=path.join(directory,'report.json');fs.writeFileSync(file,JSON.stringify(report));return spawnSync(process.execPath,['scripts/button-safety.mjs','--verify-report',file,'--inventory',inventory],{cwd:__dirname,encoding:'utf8'});};
+ assert.equal(invoke(good).status,0,'complete controlled evidence accepted before negative controls');
+ const unbound=spawnSync(process.execPath,['scripts/button-safety.mjs','--verify-report',path.join(directory,'report.json')],{cwd:__dirname,encoding:'utf8'});assert.equal(unbound.error,undefined);assert.notEqual(unbound.status,0,'standalone report cannot self-declare a shorter required action inventory');assert.match(unbound.stderr,/Independent button inventory required/);
+ for(const [name,mutate]of Object.entries(variants))await t.test(name,()=>{const report=structuredClone(good);mutate(report);const result=invoke(report);assert.equal(result.error,undefined);assert.notEqual(result.status,0,'native gate must reject '+name+' false pass');assert.doesNotMatch(result.stderr,/SyntaxError|ERR_MODULE_NOT_FOUND/);});
+});
+
+test('RISK repository process: native button gate detects errors raised by a real click',async t=>{
+ const output=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(output,'Durable allocated native output required');fs.mkdirSync(output,{recursive:true});
+ const controls={pageerror:/pageerror/,unhandled:/unhandledrejection/,close:/unexpected-close/,crash:/page-crash/,reload:/unexpected-navigation-or-reload/,navigation:/unexpected-navigation-or-reload/,stall:/stalled responsiveness|blocked frame loop/,'async-pending':/stalled responsiveness/,'new-action':/New untested button action/};
+ const cases=Object.entries(controls).map(([control,signal])=>({engine:'chromium',control,signal}));cases.push({engine:'webkit',control:'pageerror',signal:/pageerror/},{engine:'webkit',control:'unhandled',signal:/unhandledrejection/},{engine:'webkit',control:'short-stall',signal:/blocked frame loop/});
+ for(const {engine,control,signal}of cases)await t.test(engine+' '+control,()=>{
+  const before=new Set(fs.readdirSync(output));
+  const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine',engine,'--output-dir',output,'--port',process.env.CHAIN_NATIVE_PORT||'0','--probe','--control',control],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:45000,maxBuffer:8*1024*1024});
+  assert.equal(result.error,undefined);assert.equal(result.signal,null);assert.notEqual(result.status,0,'actual native Settings click must reject '+control);
+  const reports=fs.readdirSync(output).filter(file=>!before.has(file)&&file.startsWith('button-safety-'+engine+'-')&&file.endsWith('.json'));assert.equal(reports.length,1,'one preserved real native sensitivity artifact');
+  const report=JSON.parse(fs.readFileSync(path.join(output,reports[0]),'utf8'));assert.equal(report.kind,'button-sensitivity');assert.equal(report.status,'failed');assert.match(JSON.stringify({errors:report.errors,failure:report.failure}),signal,'actual detector must catch '+control);t.diagnostic('Button sensitivity: '+path.join(output,reports[0]));
+ });
+});
+
+test('RISK repository process: required native button actions execute in Chromium and WebKit',{timeout:750000},async t=>{
+ const inventory=JSON.parse(fs.readFileSync(path.join(__dirname,'scripts/button-safety-inventory.json'),'utf8'));assert.deepEqual(inventory.requiredWorkload,{savedTasks:400,rapidAttempts:10,rapidWindowMs:2000},'Both explicit user workload stories remain required');assert.deepEqual(inventory.requiredRapidActions,inventory.requiredActions,'Every required button/action family needs rapid coverage');
+ const output=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(output,'Durable allocated native output required');
+ // This bounds the entire 90-scenario engine process, including isolated fixture
+ // setup and 173 ten-press bursts. Measured WebKit exceeded five minutes while
+ // individual action bounds still passed; those native bounds remain unchanged.
+ for(const engine of ['chromium','webkit'])await t.test(engine,()=>{
+  const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine',engine,'--output-dir',output,'--port',process.env.CHAIN_NATIVE_PORT||'0'],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:360000,maxBuffer:16*1024*1024});
+  assert.equal(result.error,undefined,'Named engine must be available: '+(result.error?.message||result.stderr));assert.equal(result.signal,null);assert.equal(result.status,0,'Every required native button scenario must pass: '+result.stderr);
+  const paths=result.stdout.split('\n').map(line=>line.match(/^Button evidence: (.+)$/)?.[1]).filter(Boolean);assert.equal(paths.length,1,'One exact native button report per engine');
+  const verified=spawnSync(process.execPath,['scripts/button-safety.mjs','--verify-report',paths[0],'--inventory','scripts/button-safety-inventory.json'],{cwd:__dirname,encoding:'utf8'});
+  assert.equal(verified.status,0,'Actual native report must cover the independent required action inventory: '+verified.stderr);t.diagnostic('Button evidence: '+paths[0]);
+ });
+});
+
+test('RISK repository process: rapid native attempts preserve Add and asynchronous dialog outcomes',async t=>{
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});
+ const output=fs.mkdtempSync(path.join(base,'rapid-actions-'));
+ const scenarios=['rapid All Tasks and bulk editing with 400 saved tasks','rapid Add and context actions with 400 saved tasks','rapid reset confirms once and retains the 400-task backup','rapid motion settings open and both choices respond','rapid Settings decision review offers Light and saves it while protecting failures','rapid prepared Export Copy and Download retain exact sources'];
+ for(const engine of ['chromium','webkit'])for(const scenario of scenarios)await t.test(engine+' '+scenario,()=>{
+  const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine',engine,'--output-dir',output,'--port',process.env.CHAIN_NATIVE_PORT||'0','--scenario',scenario],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:45000,maxBuffer:1024*1024});
+  assert.equal(result.error,undefined);assert.equal(result.signal,null);assert.equal(result.status,0,'Rapid actions must preserve their independent outcome and reconcile ten native attempts: '+result.stderr);
+  const paths=result.stdout.split('\n').map(line=>line.match(/^Button evidence: (.+)$/)?.[1]).filter(Boolean);assert.equal(paths.length,1);
+  const report=JSON.parse(fs.readFileSync(paths[0],'utf8'));assert.equal(report.status,'passed');assert.equal(report.scenarios.length,1);assert.equal(report.scenarios[0].name,scenario);
+  assert.equal(report.scenarios[0].status,'passed');assert.equal(report.scenarios[0].setup.currentTasks,400);assert.equal(report.scenarios[0].setup.durableTasks,400);assert.equal(report.scenarios[0].setup.activeTasks,400);
+  if(scenario==='rapid All Tasks and bulk editing with 400 saved tasks')assert.equal(report.clicks.filter(row=>row.action==='act:list-eligibility'&&row.trusted===true).length,12,'First real selection, ten native mouse repeats and one trusted focused Enter all execute');
+  assert.ok(report.rapidOutcomes.length>0);for(const outcome of report.rapidOutcomes)for(const burst of outcome.bursts){assert.equal(burst.attempts,10);assert.equal(burst.trustedPresses,10);assert.ok(burst.windowMs<=2000);assert.equal(burst.unrelatedClicks,0);
+  assert.ok(burst.acceptedClicks>=1&&burst.acceptedClicks<=10);assert.equal(burst.acceptedClicks+burst.refused+burst.disappeared,10);
+  assert.equal(burst.attemptDetails.length,10);for(const attempt of burst.attemptDetails){assert.equal(attempt.trustedPresses,1);assert.equal(attempt.acceptedClicks,attempt.classification==='accepted'?1:0);if(attempt.acceptedClicks){assert.equal(attempt.availability.disabled,false);assert.equal(attempt.availability.present,true);assert.equal(attempt.availability.hit,true);assert.equal(attempt.nativeDownAction,outcome.action);assert.equal(attempt.neutralRelease,false);}}}
+  assert.deepEqual(report.errors,[]);for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(report.cleanup[key],true);
+  t.diagnostic('Focused rapid action evidence: '+paths[0]);
+ });
+});
+
+test('RISK repository process: retained native sources seed once without a persistent board bootstrap',async t=>{
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});const output=fs.mkdtempSync(path.join(base,'observer-bootstrap-'));
+ const playwright=await import('playwright'),launch=playwright.webkit.launch,{runButtonSafety}=await import('./scripts/button-safety-native.mjs'),{verifyMobileFunctionalReport}=await import('./scripts/button-safety-mobile-contract.mjs');t.after(()=>{playwright.webkit.launch=launch;});
+ for(const mode of ['normal','reduced','ordinary'])await t.test(mode,async()=>{
+  const persistent=[],guards=[],directory=path.join(output,mode);fs.mkdirSync(directory,{recursive:true});
+  playwright.webkit.launch=async(...args)=>{const browser=await launch.apply(playwright.webkit,args),newContext=browser.newContext.bind(browser);
+   browser.newContext=async(...args)=>{const context=await newContext(...args),add=context.addInitScript.bind(context),newPage=context.newPage.bind(context);
+    context.addInitScript=async(script,arg)=>{if(arg&&Object.hasOwn(arg,'board'))persistent.push({bytes:Buffer.byteLength(JSON.stringify(arg.board)),sha256:createHash('sha256').update(JSON.stringify(arg.board)).digest('hex')});return add(script,arg);};
+    context.newPage=async(...args)=>{const page=await newPage(...args),evaluate=page.evaluate.bind(page);page.evaluate=async(fn,arg)=>{
+     const result=await evaluate(fn,arg);
+     if(arg?.board&&arg?.count&&result?.bootstrap){
+      const prior=await evaluate(()=>({legacy:localStorage.getItem('fvp:chain-scanner:v1'),marker:localStorage.getItem('fvp:chain-scanner:device-store-v2')}));
+      try{for(const kind of ['existing legacy','existing device marker']){
+       await evaluate(({kind,legacy})=>{localStorage.removeItem('fvp:chain-scanner:device-store-v2');localStorage.removeItem('fvp:chain-scanner:v1');if(kind==='existing legacy')localStorage.setItem('fvp:chain-scanner:v1',legacy);else localStorage.setItem('fvp:chain-scanner:device-store-v2','guard-marker');},{kind,legacy:JSON.stringify({...arg.board,guardedOriginal:true})});
+       const before=await evaluate(()=>localStorage.getItem('fvp:chain-scanner:v1')),dbName=arg.dbName+'-'+kind.replaceAll(' ','-'),proof=await evaluate(fn,{...arg,dbName});
+       assert.equal(proof.bootstrap.legacySeeded,false,'existing legacy/marker must decline new seed');assert.equal(await evaluate(()=>localStorage.getItem('fvp:chain-scanner:v1')),before,'guarded exact legacy bytes remain untouched');guards.push({kind,legacySeeded:proof.bootstrap.legacySeeded,headPayloadHash:proof.bootstrap.headPayloadHash});
+       await evaluate(dbName=>new Promise((resolve,reject)=>{const request=indexedDB.deleteDatabase(dbName);request.onsuccess=()=>resolve();request.onerror=()=>reject(request.error);}),dbName);
+      }}finally{await evaluate(prior=>{for(const [key,value]of [['fvp:chain-scanner:v1',prior.legacy],['fvp:chain-scanner:device-store-v2',prior.marker]])if(value===null)localStorage.removeItem(key);else localStorage.setItem(key,value);},prior);}
+     }
+     return result;
+    };return page;};return context;};return browser;};
+  let result;try{result=await runButtonSafety({repo:__dirname,engine:'webkit',port:Number(process.env.CHAIN_NATIVE_PORT||0),outputDir:directory,...(mode==='ordinary'?{probe:true}:{mobileYesMotion:mode})});}
+  finally{playwright.webkit.launch=launch;fs.writeFileSync(path.join(directory,'bootstrap-observation.json'),JSON.stringify({mode,persistent,guards},null,2)+'\n');}
+  if(mode==='ordinary'){assert.equal(result.report.status,'passed');assert.equal(persistent.length,1,'nonretained setup retains its guarded persistent board seed');assert.ok(persistent[0].bytes>1048576);}
+  else{verifyMobileFunctionalReport(result.report,{motion:mode});assert.deepEqual(persistent,[],'retained-copy native consumer must not serialize a full board into persistent context initialization');assert.equal(guards.length,2);const proof=result.report.retainedSources[0].bootstrap;assert.equal(proof.delivery,'observer-evaluate-once');assert.equal(proof.legacySeeded,true);assert.equal(proof.legacyBeforeHash,null);assert.equal(proof.legacyPayloadHash,proof.headPayloadHash);assert.ok(proof.headPayloadBytes>1048576);assert.equal(proof.retainedSources.length,2);}
+  t.diagnostic('Uncapped actual native bootstrap and guarded source readbacks: '+directory);
+ });
+});
+
+test('RISK synced scene durability: native retained boards keep immediate scene locks through reload without changing tasks or sources',async t=>{
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});const output=fs.mkdtempSync(path.join(base,'scene-durability-'));
+ const playwright=await import('playwright'),launch=playwright.webkit.launch,{runButtonSafety}=await import('./scripts/button-safety-native.mjs'),{verifyMobileFunctionalReport}=await import('./scripts/button-safety-mobile-contract.mjs');t.after(()=>{playwright.webkit.launch=launch;});
+ for(const motion of ['normal','reduced'])await t.test(motion,async()=>{
+  const directory=path.join(output,motion);fs.mkdirSync(directory,{recursive:true});const evidence={motion,receipts:[]};let probeFailure;
+  playwright.webkit.launch=async(...args)=>{const browser=await launch.apply(playwright.webkit,args),newContext=browser.newContext.bind(browser);browser.newContext=async(...args)=>{const context=await newContext(...args),close=context.close.bind(context);context.close=async(...args)=>{try{
+   const original=context.pages().find(page=>page.url().includes('/button-')&&!page.url().includes('__button-observer'));assert.ok(original);const page=await context.newPage();page.on('console',message=>{if(message.text().startsWith('Scene lock receipt:')&&evidence.receipts.length<4)evidence.receipts.push(JSON.parse(message.text().slice('Scene lock receipt:'.length)));});await page.addInitScript(()=>document.addEventListener('click',event=>{if(event.target.closest('[data-scene-time="lock"]'))console.debug('Scene lock receipt:'+JSON.stringify({trusted:event.isTrusted}));},true));await page.goto(original.url());await page.locator('#appHeader').waitFor({state:'visible'});await page.waitForFunction(()=>typeof applySyncedSceneTime==='function');
+   const snapshot=()=>page.evaluate(async()=>{const head=await ScannerDeviceStore.readHead(),board=JSON.parse(head.payload);return{tasks:JSON.stringify(state.tasks),storedTasks:JSON.stringify(board.tasks),scene:board.settings.scene,visibleScene:state.settings.scene,backups:JSON.stringify((await ScannerDeviceStore.listBackups()).filter(row=>row.id.startsWith('gate-retained-')).sort((a,b)=>a.id.localeCompare(b.id))),opaque:JSON.stringify(await ScannerDeviceStore.listOpaqueArchives()),pending:JSON.stringify(await ScannerDeviceStore.getPendingUpload('gate-owner')),headHash:head.hash,payloadBytes:new TextEncoder().encode(head.payload).byteLength};});
+   evidence.before=await snapshot();assert.equal(JSON.parse(evidence.before.tasks).length,400);assert.ok(evidence.before.payloadBytes>1048576);assert.equal(JSON.parse(evidence.before.backups).length,2);
+   await page.locator('#appHeader [data-act="settings"]').click();await page.locator('[data-act="scene-time-settings"]').click();await page.locator('#sceneSeasonInput').selectOption('winter');await page.locator('#sceneTimeInput').fill('23:15');await page.locator('[data-scene-time="lock"]').click();await page.reload();await page.locator('#appHeader').waitFor({state:'visible'});await page.waitForFunction(()=>typeof applySyncedSceneTime==='function');evidence.after=await snapshot();assert.deepEqual(evidence.receipts,[{trusted:true}]);assert.equal(evidence.after.scene.time,'23:15','immediate reload keeps the scene lock in the authoritative board');assert.equal(evidence.after.scene.season,'winter');assert.deepEqual(evidence.after.visibleScene,evidence.after.scene);for(const key of ['tasks','storedTasks','backups','opaque','pending'])assert.equal(evidence.after[key],evidence.before[key],'immediate scene reload preserves exact '+key);
+  }catch(error){probeFailure=error;}finally{await close(...args);}};return context;};return browser;};
+  let result;try{result=await runButtonSafety({repo:__dirname,engine:'webkit',port:Number(process.env.CHAIN_NATIVE_PORT||0),outputDir:directory,mobileYesMotion:motion});verifyMobileFunctionalReport(result.report,{motion});evidence.reportPath=result.reportPath;}
+  finally{playwright.webkit.launch=launch;evidence.failure=probeFailure?.stack;fs.writeFileSync(path.join(directory,'scene-durability-observation.json'),JSON.stringify(evidence,null,2)+'\n');}
+  if(probeFailure)throw probeFailure;t.diagnostic('Uncapped actual native retained-board immediate scene reload: '+directory);
+ });
+});
+
+test('RISK scenery startup: native mobile paints once while hidden return saved choices resize and rain preserve the scene',async t=>{
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});const output=fs.mkdtempSync(path.join(base,'scenery-startup-'));
+ const playwright=await import('playwright'),launch=playwright.webkit.launch,{runButtonSafety}=await import('./scripts/button-safety-native.mjs'),{verifyMobileFunctionalReport}=await import('./scripts/button-safety-mobile-contract.mjs');
+ const source=fs.readFileSync(path.join(__dirname,'tests.js'),'utf8'),begin=source.indexOf("\ntest('RISK shared scenery browser:"),fragment=source.slice(begin,source.indexOf("test('RISK list presentation browser:",begin));
+ const pixelProbe=fragment.match(/body=body\.replace\(anchor,anchor\+`([\s\S]*?)`\)/)[1];
+ t.after(()=>{playwright.webkit.launch=launch;});
+ for(const {motion,hidden,failProbe}of [...['normal','reduced'].flatMap(motion=>[false,true].map(hidden=>({motion,hidden,failProbe:false}))),{motion:'reduced',hidden:false,failProbe:true}])await t.test(failProbe?'controlled failing probe cleanup':motion+(hidden?' hidden then visible':' visible'),async()=>{
+  const evidence={motion,hidden,route:[],observations:[]},directory=path.join(output,failProbe?'controlled-failure':motion+(hidden?'-hidden':'-visible'));fs.mkdirSync(directory,{recursive:true});
+  let ownedServer,ownedBrowser,probeFailure,runFailure;const http=(await import('node:http')).default,createServer=http.createServer;http.createServer=(...args)=>{ownedServer=createServer(...args);return ownedServer;};
+  playwright.webkit.launch=async(...args)=>{
+   const browser=await launch.apply(playwright.webkit,args);ownedBrowser=browser;const newContext=browser.newContext.bind(browser);
+   browser.newContext=async(...args)=>{const context=await newContext(...args),newPage=context.newPage.bind(context),close=context.close.bind(context);
+    await context.addInitScript(hidden=>{
+     const NativeDate=Date,at=Date.parse('2026-10-06T03:23:42.125Z');globalThis.Date=class extends NativeDate{constructor(...args){super(...(args.length?args:[at]));}static now(){return at;}};
+     globalThis.sharedSceneBootstrap={};globalThis.startupHidden=hidden;if(hidden)Object.defineProperty(document,'hidden',{configurable:true,get:()=>globalThis.startupHidden});
+     globalThis.startupScene={background:0,life:0,sameSizeSets:0,sameSizeResetBytes:0,changedSizeSets:0};
+     for(const dimension of ['width','height']){const original=Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype,dimension);Object.defineProperty(HTMLCanvasElement.prototype,dimension,{...original,set(value){const before=original.get.call(this),other=dimension==='width'?this.height:this.width;original.set.call(this,value);const after=original.get.call(this);if(before===after){startupScene.sameSizeSets++;startupScene.sameSizeResetBytes+=after*other*4;}else startupScene.changedSizeSets++;}});}
+    },hidden);
+    context.newPage=async(...args)=>{const page=await newPage(...args);
+     await page.route('**/landscape.js',async route=>{const headers={...route.request().headers()};delete headers['if-modified-since'];delete headers['if-none-match'];const response=await route.fetch({headers});assert.equal(response.status(),200);let body=await response.text();assert.equal(createHash('sha256').update(body).digest('hex'),createHash('sha256').update(fs.readFileSync(path.join(__dirname,'landscape.js'))).digest('hex'));
+      evidence.route.push({status:response.status(),sha256:createHash('sha256').update(body).digest('hex')});
+      const anchor="  window.addEventListener('pageshow'";assert.ok(body.includes(anchor));body=body.replace(anchor,` const background=paintBackground,life=paintLife;paintBackground=(...args)=>{const value=background(...args);startupScene.background++;return value;};paintLife=(...args)=>{const value=life(...args);startupScene.life++;return value;};\n${pixelProbe}\n`+anchor);
+      const ready="  document.dispatchEvent(new CustomEvent('landscape-scene-time-ready'));";assert.ok(body.includes(ready));body=body.replace(ready,"  globalThis.initialScenePaint=JSON.parse(JSON.stringify(startupScene));\n"+ready);await route.fulfill({response,body});});return page;};
+    context.close=async(...args)=>{try{if(failProbe)throw Error('Controlled scenery probe failure retained');for(const page of context.pages())if(await page.evaluate(()=>typeof sharedSceneProbe==='function')){
+      const original=await page.evaluate(()=>{globalThis.startupHidden=false;document.dispatchEvent(new Event('visibilitychange'));const prepared=sharedScenePrepare(),clear=sharedSceneProbe('clear'),rain=sharedSceneProbe('rain');return {initial:initialScenePaint,prepared,clear,rain,dimensions:{width:innerWidth,height:innerHeight},taskCount:state.tasks.length,motion:document.documentElement.dataset.landscapeMotion};});
+      assert.equal(original.taskCount,400);assert.equal(original.motion,motion);assert.equal(original.prepared.backgroundPaints,1);assert.equal(original.clear.backgroundPaints,0);assert.equal(original.rain.backgroundPaints,0);assert.equal(original.rain.back,original.clear.back,'rain preserves exact cached backdrop');assert.notEqual(original.rain.front,original.clear.front);assert.deepEqual(original.rain.scene,original.clear.scene);
+      await page.setViewportSize({width:421,height:863});await page.waitForFunction(()=>document.querySelector('[data-scenery]').width===Math.floor(421*1.5));const resized=await page.evaluate(()=>sharedScenePrepare());assert.deepEqual(resized.scene,original.clear.scene,'real resize retains UTC objects');assert.notEqual(resized.back,original.clear.back,'real resize repaints changed dimensions');
+      const saved=await page.evaluate(()=>{applySyncedSceneTime('12:00','summer');const result=sharedScenePrepare();return {time:LivingSky.readSceneTime(localStorage),season:LivingSky.readSceneSeason(localStorage),scene:result.scene,period:document.documentElement.dataset.scenePeriod};});assert.equal(saved.time,'12:00');assert.equal(saved.season,'summer');assert.notDeepEqual(saved.scene,original.clear.scene,'saved scene adoption still refreshes selected time and season');
+      evidence.observations.push({initial:original.initial,taskCount:original.taskCount,motion:original.motion,scene:original.clear.scene,clearBackSha256:createHash('sha256').update(original.clear.back).digest('hex'),clearFrontSha256:createHash('sha256').update(original.clear.front).digest('hex'),rainFrontSha256:createHash('sha256').update(original.rain.front).digest('hex'),resizedScene:resized.scene,saved});
+     }}catch(error){probeFailure=error;}finally{await close(...args);}};return context;};return browser;
+  };
+  let result;try{result=await runButtonSafety({repo:__dirname,engine:'webkit',port:Number(process.env.CHAIN_NATIVE_PORT||0),outputDir:directory,mobileYesMotion:motion});verifyMobileFunctionalReport(result.report,{motion});evidence.reportPath=result.reportPath;}
+  catch(error){runFailure=error;}finally{http.createServer=createServer;evidence.nativeCleanupBeforeFallback={browserConnected:ownedBrowser?.isConnected()===true,serverListening:ownedServer?.listening===true};if(ownedBrowser?.isConnected())await ownedBrowser.close();if(ownedServer?.listening)await new Promise(resolve=>ownedServer.close(resolve));playwright.webkit.launch=launch;evidence.probeFailure=probeFailure?.stack;evidence.runFailure=runFailure?.stack;fs.writeFileSync(path.join(directory,'scenery-observation.json'),JSON.stringify(evidence,null,2)+'\n');}
+  if(failProbe){assert.deepEqual(evidence.nativeCleanupBeforeFallback,{browserConnected:false,serverListening:false},'Native runner closes its actual browser and listener before the external fallback');assert.match(probeFailure?.message||'',/^Controlled scenery probe failure retained$/);assert.equal(runFailure,undefined,'Probe failure must not interrupt native cleanup and persisted report');const report=JSON.parse(fs.readFileSync(result.reportPath));for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(report.cleanup[key],true,'Failed probe still requires '+key);assert.throws(()=>{throw probeFailure;},error=>error===probeFailure,'Original probe error is retained for failure after cleanup');return;}
+  if(runFailure)throw runFailure;if(probeFailure)throw probeFailure;assert.equal(evidence.observations.length,1);assert.equal(evidence.observations[0].initial.background,1,'initial scene completes exactly one background paint');assert.equal(evidence.observations[0].initial.life,1,'initial scene completes exactly one life paint');
+  t.diagnostic('Uncapped native scenery evidence, not512MB proof: '+directory);
+ });
+});
+
+test('RISK repository process: mobile WebKit accepts ten distinct offered tasks using real touch',async t=>{
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Allocated durable native output required');fs.mkdirSync(base,{recursive:true});const output=fs.mkdtempSync(path.join(base,'mobile-functional-'));
+ const {verifyMobileFunctionalReport}=await import('./scripts/button-safety-mobile-contract.mjs');
+ for(const motion of ['normal','reduced'])await t.test(motion,()=>{
+  const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine','webkit','--mobile-yes','--motion',motion,'--scenario','rapid scanner candidate actions with 400 active tasks','--output-dir',output,'--port',process.env.CHAIN_NATIVE_PORT||'0'],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:45000,maxBuffer:2*1024*1024});
+  assert.equal(result.error,undefined);assert.equal(result.signal,null);assert.equal(result.status,0,'The actual mobile Yes consumer must complete: '+result.stderr);
+  const paths=result.stdout.split('\n').map(line=>line.match(/^Button evidence: (.+)$/)?.[1]).filter(Boolean);assert.equal(paths.length,1);verifyMobileFunctionalReport(JSON.parse(fs.readFileSync(paths[0],'utf8')),{motion});t.diagnostic('Uncapped mobile functional evidence; not512MB proof: '+paths[0]);
+ });
+});
+
+test('RISK repository process: native rapid cloud selection preserves the two-second input burst',async t=>{
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});const output=fs.mkdtempSync(path.join(base,'rapid-cloud-'));
+ for(const engine of ['chromium','webkit'])await t.test(engine,()=>{
+  const scenario='rapid cloud recovery reviews, protects, and applies a source with read and write failures';
+  const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine',engine,'--output-dir',output,'--port',process.env.CHAIN_NATIVE_PORT||'0','--scenario',scenario],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:45000,maxBuffer:1024*1024});
+  assert.equal(result.error,undefined);assert.equal(result.signal,null);assert.equal(result.status,0,'Native cloud source choices must retain real rapid input and protected failure outcomes: '+result.stderr);
+  const paths=result.stdout.split('\n').map(line=>line.match(/^Button evidence: (.+)$/)?.[1]).filter(Boolean);assert.equal(paths.length,1);const report=JSON.parse(fs.readFileSync(paths[0],'utf8'));
+  assert.equal(report.status,'passed');assert.equal(report.scenarios.length,1);assert.equal(report.scenarios[0].name,scenario);assert.equal(report.scenarios[0].setup.durableTasks,400);
+  const choices=report.rapidOutcomes.find(row=>row.action==='act:choose-cloud-recovery-source');assert.equal(choices.bursts.length,2);
+  for(const burst of choices.bursts){assert.equal(burst.acceptedClicks,10);assert.equal(burst.trustedPresses,10);assert.equal(burst.attempts,10);assert.ok(burst.windowMs<=2000);assert.equal(burst.unrelatedClicks,0);assert.equal(burst.refused,0);assert.equal(burst.disappeared,0);}
+  assert.deepEqual(report.errors,[]);for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(report.cleanup[key],true);t.diagnostic('Rapid cloud evidence: '+paths[0]);
+ });
+});
+
+test('RISK repository process: native paste prepares complete fixture bytes before its consumer frame budget',async t=>{
+ const output=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(output,'Durable allocated native output required');
+ const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine','chromium','--scenario','oversized retained-source export','--output-dir',output,'--port',process.env.CHAIN_NATIVE_PORT||'0'],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:60000,maxBuffer:2*1024*1024});
+ assert.equal(result.status,0,result.stderr);
+ const reportFile=result.stdout.split('\n').map(line=>line.match(/^Button evidence: (.+)$/)?.[1]).find(Boolean);
+ const report=JSON.parse(fs.readFileSync(reportFile,'utf8')),sample=report.inputSamples.find(row=>row.kind==='clipboard-event-boundary'&&row.characters>40000000);
+ assert.ok(sample?.fixturePreparation,'The actual oversized paste must finish exact fixture preparation before measuring consumer frames');
+ assert.equal(sample.fixturePreparation.route,'page-held-copy','The complete previously copied archive stays in its original browser fixture');
+ assert.equal(sample.fixturePreparation.characters,sample.characters);assert.match(sample.fixturePreparation.sha256,/^[a-f0-9]{64}$/);
+ assert.equal(sample.fixturePreparation.verified,true);assert.equal(sample.trusted,false);assert.equal(sample.prevented,true);assert.ok(sample.maxFrameGapMs<1000);
+ assert.equal(report.scenarios[0].status,'passed','Complete Preview and Cancel source-preservation assertions still execute');
+ await t.test('all sixteen exact retained source IDs and hash readbacks',()=>{const proof=report.retainedSources[0].bootstrap;assert.equal(proof.retainedSources.length,16);assert.deepEqual(proof.retainedSources.map(row=>row.id).sort(),Array.from({length:16},(_,i)=>'gate-retained-'+i).sort());for(const row of proof.retainedSources)assert.match(row.payloadHash,/^[a-f0-9]{64}$/);});
+ for(const value of Object.values(report.cleanup))assert.equal(value,true);
+});
+
+test('RISK repository process: unavailable native attempts reuse one prepared isolated release document',t=>{
+ const output=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(output,'Durable allocated native output required');
+ const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine','chromium','--scenario','rapid Settings decision review offers Light and saves it while protecting failures','--output-dir',output,'--port',process.env.CHAIN_NATIVE_PORT||'0'],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:60000,maxBuffer:2*1024*1024});
+ assert.equal(result.status,0,result.stderr);
+ const reportFile=result.stdout.split('\n').map(line=>line.match(/^Button evidence: (.+)$/)?.[1]).find(Boolean),report=JSON.parse(fs.readFileSync(reportFile,'utf8'));
+ assert.equal(report.releaseSurfaces?.length,1,'The actual scenario prepares exactly one neutral document before its timed attempts');
+ const identity=report.releaseSurfaces[0].documentId;assert.ok(identity);assert.equal(report.releaseSurfaces[0].readyState,'complete');
+ let refused=0;
+ for(const row of report.rapidOutcomes)for(const burst of row.bursts){
+  assert.ok(burst.windowMs<=2000);assert.equal(burst.trustedPresses,10);assert.equal(burst.unrelatedClicks,0);
+  for(const attempt of burst.attemptDetails){if(attempt.neutralRelease){refused++;assert.equal(attempt.neutralDocumentId,identity,'Every refused native up stays in the same isolated document');assert.equal(attempt.acceptedClicks,0);}}
+ }
+ assert.ok(refused>=9,'Actual pending recovery controls exercise repeated native refusals');assert.deepEqual(report.errors,[]);
+ for(const value of Object.values(report.cleanup))assert.equal(value,true);
+});
+
+test('RISK repository process: native button gate refuses unallocated local launch before browser startup',t=>{
+ const directory=fs.mkdtempSync('/tmp/chain-button-allocation-');t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const file=path.join(directory,'ledger.json');fs.writeFileSync(file,JSON.stringify({version:1,scope:'codex-wide',entries:[],reservations:[]}));
+ const healthy={id:'gate-fixture',worktree:__dirname,status:'active',lease:{state:'healthy',expiresAt:new Date(Date.now()+60000).toISOString(),ownerConfirmationRequired:false},resources:['browser-runtime:playwright-chromium','loopback:127.0.0.1:48820']};
+ const cases=[
+  {entries:[],signal:/Active worktree allocation required/},
+  {entries:[{...healthy,status:'parked'}],signal:/Active worktree allocation required/},
+  {entries:[{...healthy,worktree:directory}],signal:/Active worktree allocation required/},
+  {entries:[{...healthy,lease:{...healthy.lease,expiresAt:'2000-01-01T00:00:00Z'}}],signal:/Current healthy worktree lease required/},
+  {entries:[{...healthy,lease:{...healthy.lease,ownerConfirmationRequired:true}}],signal:/Current healthy worktree lease required/},
+  {entries:[{...healthy,resources:['loopback:127.0.0.1:48820']}],signal:/Local named-engine allocation missing/},
+  {entries:[healthy,{...healthy,id:'foreign',worktree:directory,status:'parked'}],signal:/Conflicting local native allocation/},
+ ];
+ for(const {entries,signal}of cases){
+  fs.writeFileSync(file,JSON.stringify({version:1,scope:'codex-wide',entries,reservations:[]}));
+  const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine','chromium','--output-dir',path.join(directory,'native'),'--port','48820','--probe'],{cwd:__dirname,env:{...process.env,CI:'false',CODEX_COORDINATION_FILE:file},encoding:'utf8'});
+  assert.equal(result.error,undefined);assert.notEqual(result.status,0);assert.match(result.stderr,signal);assert.equal(fs.existsSync(path.join(directory,'native')),false,'refusal precedes native report/runtime creation');
+ }
+});
+
+test('RISK repository process: new and duplicate source buttons require native coverage inventory',async t=>{
+ const directory=fs.mkdtempSync('/tmp/chain-button-source-');t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const tag='<button data-act="add">',manifest=path.join(directory,'inventory.json'),source=path.join(directory,'index.html');
+ fs.writeFileSync(manifest,JSON.stringify({schemaVersion:1,sourceTemplates:{[createHash('sha256').update(tag).digest('hex')]:1},requiredActions:['act:add']}));
+ const invoke=html=>{fs.writeFileSync(source,html);return spawnSync(process.execPath,['scripts/button-safety.mjs','--check-inventory','--source',source,'--inventory',manifest],{cwd:__dirname,encoding:'utf8'});};
+ assert.equal(invoke(tag+'Add</button>').status,0,'reviewed source button template accepted');
+ for(const [name,html]of [['new action',tag+'Add</button><button data-act="new-untested">New</button>'],['duplicate route',tag+'Add</button>'+tag+'Add again</button>'],['nonbutton action consumer',tag+'Add</button><span role="button" data-act="new-untested">New</span>']])await t.test(name,()=>{
+  const result=invoke(html);assert.equal(result.error,undefined);assert.notEqual(result.status,0,'native coverage inventory must fail closed for '+name);assert.match(result.stderr,/Source button templates differ from reviewed native inventory/);
+ });
+});
+
+test('RISK repository process: native button gate awaits an asynchronous false outcome',t=>{
+ const output=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(output,'Durable allocated native output required');
+ const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine','chromium','--output-dir',output,'--port',process.env.CHAIN_NATIVE_PORT||'0','--probe','--control','async-predicate-false'],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:45000});
+ assert.equal(result.error,undefined);assert.equal(result.signal,null);assert.notEqual(result.status,0,'Promise(false) must not be mistaken for a completed expected native button outcome');assert.match(result.stderr,/stalled responsiveness: outcome settings/);
+});
+
+
+test('RISK repository process: native HTTP serves exact committed runtime Markdown without exposing other files',async t=>{
+ const http=(await import('node:http')).default,crypto=(await import('node:crypto')).default,{syncBuiltinESMExports}=await import('node:module');
+ const directory=fs.mkdtempSync('/tmp/chain-button-http-');t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const reservation=http.createServer();await new Promise(resolve=>reservation.listen(0,'127.0.0.1',resolve));
+ const port=reservation.address().port;await new Promise(resolve=>reservation.close(resolve));
+ const ledger=path.join(directory,'ledger.json');fs.writeFileSync(ledger,JSON.stringify({entries:[{status:'active',worktree:__dirname,lease:{state:'healthy',expiresAt:new Date(Date.now()+60000).toISOString()},resources:['browser-runtime:playwright-chromium','loopback:127.0.0.1:'+port]}]}));
+ const envKeys=['CI','CODEX_COORDINATION_FILE','DOW_EMULATOR_COORDINATION_FILE'],before=Object.fromEntries(envKeys.map(key=>[key,process.env[key]]));
+ delete process.env.CI;delete process.env.DOW_EMULATOR_COORDINATION_FILE;process.env.CODEX_COORDINATION_FILE=ledger;
+ t.after(()=>{for(const key of envKeys)if(before[key]===undefined)delete process.env[key];else process.env[key]=before[key];});
+ // Observe external randomness unchanged so the test discovers the server's private URL without a production helper.
+ const ids=[],uuid=crypto.randomUUID;crypto.randomUUID=(...args)=>{const id=uuid(...args);ids.push(id);return id;};syncBuiltinESMExports();
+ t.after(()=>{crypto.randomUUID=uuid;syncBuiltinESMExports();});
+ const request=urlPath=>new Promise((resolve,reject)=>{const req=http.get({hostname:'127.0.0.1',port,path:urlPath},res=>{const chunks=[];res.on('data',chunk=>chunks.push(chunk));res.on('end',()=>resolve({status:res.statusCode,headers:res.headers,bytes:Buffer.concat(chunks)}));});req.on('error',reject);req.setTimeout(4000,()=>req.destroy(Error('HTTP fixture stalled')));});
+ const playwright=await import('playwright'),launch=playwright.chromium.launch,stop=Error('HTTP-only fixture stops before native launch');
+ t.after(()=>{playwright.chromium.launch=launch;});
+ playwright.chromium.launch=async()=>{
+  let prefix;for(const id of ids){const candidate='/button-'+id+'/',response=await request(candidate+'index.html');if(response.status===200){assert.deepEqual(response.bytes,fs.readFileSync(path.join(__dirname,'index.html')));prefix=candidate;break;}}
+  assert.ok(prefix,'real HTTP response discovers the isolated native route');
+  const files=['SPAWN_RATES.md','HUMAN_WRITTEN_HOURLY_TAGS.md'],responses=await Promise.all(files.map(file=>request(prefix+file)));
+  assert.deepEqual(responses.map(response=>response.status),[200,200],'both Markdown files fetched by landscape must be available');
+  for(const [index,file]of files.entries()){
+   const expected=fs.readFileSync(path.join(__dirname,file)),response=responses[index];
+   assert.deepEqual(response.bytes,expected,'full committed runtime bytes: '+file);
+   assert.equal(createHash('sha256').update(response.bytes).digest('hex'),createHash('sha256').update(expected).digest('hex'),'independent runtime source digest: '+file);
+   assert.match(response.headers['content-type'],/^text\/markdown/);assert.equal(response.headers['cache-control'],'no-store');
+   t.diagnostic('HTTP runtime asset '+JSON.stringify({file,status:response.status,bytes:response.bytes.length,sha256:createHash('sha256').update(response.bytes).digest('hex')}));
+  }
+  for(const route of [prefix+'not-a-runtime.js',prefix+'CLAUDE.md',prefix+'../SPAWN_RATES.md',prefix+'%2e%2e/SPAWN_RATES.md','/SPAWN_RATES.md'])assert.equal((await request(route)).status,404,'unknown/outside/path traversal request stays unavailable: '+route);
+  throw stop;
+ };
+ const {runButtonSafety}=await import('./scripts/button-safety-native.mjs');
+ await assert.rejects(runButtonSafety({repo:__dirname,engine:'chromium',outputDir:directory,port}),error=>{if(error!==stop)throw error;return true;});
+ const report=JSON.parse(fs.readFileSync(path.join(directory,fs.readdirSync(directory).find(file=>file.startsWith('button-safety-')))));
+ for(const file of ['SPAWN_RATES.md','HUMAN_WRITTEN_HOURLY_TAGS.md'])assert.equal(report.assets[file],createHash('sha256').update(fs.readFileSync(path.join(__dirname,file))).digest('hex'));
+ assert.equal(report.cleanup.serverClosed,true,'actual HTTP listener closes after the deliberate prelaunch stop');
+ assert.equal(report.cleanup.browserClosed,undefined,'no browser launched; HTTP test is not native qualification');
+});
+
+test('RISK repository process: mobile artifact consumers require reviewed runtime asset hashes',async t=>{
+ const {verifyMobileFunctionalReport}=await import('./scripts/button-safety-mobile-contract.mjs'),{createMobileBundle,refreshMobileBundle}=await import('./scripts/agent-tools/mobile-memory-fixture.mjs');
+ const directory=fs.mkdtempSync('/tmp/chain-mobile-assets-');t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const git=(...args)=>spawnSync('git',args,{cwd:__dirname,encoding:'utf8'}).stdout.trim(),identity={candidateCommit:git('rev-parse','HEAD'),candidateTree:git('rev-parse','HEAD^{tree}')};
+ const env={...process.env,GITHUB_REPOSITORY:'example/fixture',GITHUB_RUN_ID:'fixture-run-1',GITHUB_RUN_ATTEMPT:'1',CHAIN_TEST_SOURCE_SHA:identity.candidateCommit,CHAIN_TEST_EVENT_POLICY:'local'};delete env.NODE_TEST_CONTEXT;
+ const verify=bundle=>spawnSync(process.execPath,['scripts/button-safety-mobile-memory.mjs','--verify',path.join(bundle.directory,'report.json')],{cwd:__dirname,env,encoding:'utf8',timeout:5000});
+ const good=createMobileBundle(path.join(directory,'positive'),{...identity,sourceSha:identity.candidateCommit});
+ for(const motion of ['normal','reduced'])assert.equal(verifyMobileFunctionalReport(good.native[motion],{...identity,motion}).status,'passed','full functional fixture remains accepted: '+motion);
+ assert.equal(verify(good).status,0,'full kernel/container/touch/durable controlled fixture accepted; not real cap proof');
+ const mutations={missingMap:r=>delete r.assets,omittedAsset:r=>delete r.assets['SPAWN_RATES.md'],changedHash:r=>r.assets['HUMAN_WRITTEN_HOURLY_TAGS.md']='e'.repeat(64),invalidHash:r=>r.assets['SPAWN_RATES.md']='unverified'};
+ for(const motion of ['normal','reduced'])for(const [name,mutate]of Object.entries(mutations))for(const consumer of ['functional','capped CLI'])await t.test(motion+' '+name+' '+consumer,()=>{
+  const bundle=createMobileBundle(path.join(directory,motion+'-'+name+'-'+consumer.replace(' ','')),{...identity,sourceSha:identity.candidateCommit});mutate(bundle.native[motion]);refreshMobileBundle(bundle);
+  if(consumer==='functional')assert.throws(()=>verifyMobileFunctionalReport(bundle.native[motion],{...identity,motion}),/runtime asset/,'functional acceptance rejects changed or absent reviewed runtime bytes');
+  else{const result=verify(bundle);assert.equal(result.error,undefined);assert.notEqual(result.status,0,'capped artifact acceptance rejects changed or absent reviewed runtime bytes');assert.match(result.stderr,/runtime asset/);}
+ });
+});
+
+test('RISK repository process: native report cannot omit or change reviewed runtime asset bytes',async t=>{
+ const directory=fs.mkdtempSync('/tmp/chain-button-assets-');t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const requiredRuntimeAssets={'SPAWN_RATES.md':'c'.repeat(64),'HUMAN_WRITTEN_HOURLY_TAGS.md':'d'.repeat(64)};
+ const manifest={schemaVersion:1,requiredActions:['act:add'],requiredRuntimeAssets},inventory=path.join(directory,'inventory.json');fs.writeFileSync(inventory,JSON.stringify(manifest));
+ const good={schemaVersion:1,kind:'button-safety',engine:'webkit',status:'passed',candidateCommit:'a'.repeat(40),candidateTree:'b'.repeat(40),inventorySha256:createHash('sha256').update(fs.readFileSync(inventory)).digest('hex'),assets:{...requiredRuntimeAssets},requiredActions:['act:add'],observedActions:['act:add'],outcomes:[{action:'act:add',status:'passed',events:['click'],assertions:1,responsive:true}],errors:[],cleanup:{contextClosed:true,browserClosed:true,serverClosed:true}};
+ const invoke=report=>{const file=path.join(directory,'report.json');fs.writeFileSync(file,JSON.stringify(report));return spawnSync(process.execPath,['scripts/button-safety.mjs','--verify-report',file,'--inventory',inventory],{cwd:__dirname,encoding:'utf8'});};
+ assert.equal(invoke(good).status,0,'complete independently reviewed asset evidence accepted');
+ for(const [name,mutate]of Object.entries({missingAssets:r=>delete r.assets,omittedMarkdown:r=>delete r.assets['SPAWN_RATES.md'],changedBytes:r=>r.assets['HUMAN_WRITTEN_HOURLY_TAGS.md']='e'.repeat(64),invalidDigest:r=>r.assets['SPAWN_RATES.md']='unverified'}))await t.test(name,()=>{
+  const report=structuredClone(good);mutate(report);const result=invoke(report);assert.equal(result.error,undefined);assert.notEqual(result.status,0,'reviewed runtime asset coverage cannot be waived: '+name);assert.match(result.stderr,/runtime asset/);
+ });
+});
+
+test('RISK repository process: native button gate cannot omit a required stress scenario',t=>{
+ const directory=fs.mkdtempSync('/tmp/chain-button-scenarios-');t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const manifest={schemaVersion:1,requiredActions:['act:add'],requiredScenarios:['populated Add','oversized export and retained paste']};
+ const inventory=path.join(directory,'inventory.json');fs.writeFileSync(inventory,JSON.stringify(manifest));
+ const good={schemaVersion:1,kind:'button-safety',engine:'webkit',status:'passed',candidateCommit:'a'.repeat(40),candidateTree:'b'.repeat(40),inventorySha256:createHash('sha256').update(fs.readFileSync(inventory)).digest('hex'),requiredActions:manifest.requiredActions,requiredScenarios:manifest.requiredScenarios,scenarios:manifest.requiredScenarios.map(name=>({name,status:'passed'})),observedActions:['act:add'],outcomes:[{action:'act:add',status:'passed',events:['click'],assertions:1,responsive:true}],errors:[],cleanup:{contextClosed:true,browserClosed:true,serverClosed:true}};
+ const invoke=report=>{const file=path.join(directory,'report.json');fs.writeFileSync(file,JSON.stringify(report));return spawnSync(process.execPath,['scripts/button-safety.mjs','--verify-report',file,'--inventory',inventory],{cwd:__dirname,encoding:'utf8'});};
+ assert.equal(invoke(good).status,0,'complete controlled action and scenario evidence accepted');
+ for(const mutate of [r=>r.scenarios.pop(),r=>r.scenarios[1].status='skipped',r=>r.scenarios.push(r.scenarios[1]),r=>{r.requiredScenarios.pop();r.scenarios.pop();}]){
+  const report=structuredClone(good);mutate(report);const result=invoke(report);assert.equal(result.error,undefined);assert.notEqual(result.status,0,'all action families covered cannot conceal an omitted, skipped, duplicated or self-waived stress scenario');assert.doesNotMatch(result.stderr,/SyntaxError|ERR_MODULE_NOT_FOUND/);
+ }
+});
+
+test('RISK repository process: native button safety requires 400-task and rapid-press evidence',async t=>{
+ const directory=fs.mkdtempSync('/tmp/chain-button-workloads-');t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const manifest={schemaVersion:1,requiredActions:['act:add','act:settings'],requiredScenarios:['populated400'],requiredWorkload:{savedTasks:400,rapidAttempts:10,rapidWindowMs:2000},requiredRapidActions:['act:add','act:settings']};
+ const inventory=path.join(directory,'inventory.json');fs.writeFileSync(inventory,JSON.stringify(manifest));
+ const good={schemaVersion:1,kind:'button-safety',engine:'webkit',status:'passed',candidateCommit:'a'.repeat(40),candidateTree:'b'.repeat(40),inventorySha256:createHash('sha256').update(fs.readFileSync(inventory)).digest('hex'),requiredActions:manifest.requiredActions,requiredScenarios:manifest.requiredScenarios,scenarios:[{name:'populated400',status:'passed',setup:{currentTasks:400,durableTasks:400,activeTasks:400,durableHash:'e'.repeat(64),fixtureRole:'active'}}],requiredWorkload:manifest.requiredWorkload,requiredRapidActions:manifest.requiredRapidActions,rapidOutcomes:manifest.requiredRapidActions.map(action=>({action,status:'passed',assertions:1,responsive:true,bursts:[{attempts:10,windowMs:1900,trustedPresses:10,unrelatedClicks:0,acceptedClicks:1,refused:9,disappeared:0,semantics:'first action opens its protected dialog'}]})),observedActions:manifest.requiredActions,outcomes:manifest.requiredActions.map(action=>({action,status:'passed',events:['click'],assertions:1,responsive:true})),errors:[],cleanup:{contextClosed:true,browserClosed:true,serverClosed:true}};
+ const invoke=report=>{const file=path.join(directory,'report.json');fs.writeFileSync(file,JSON.stringify(report));return spawnSync(process.execPath,['scripts/button-safety.mjs','--verify-report',file,'--inventory',inventory],{cwd:__dirname,encoding:'utf8'});};
+ assert.equal(invoke(good).status,0,'complete controlled400-task and rapid-action evidence accepted');
+ const variants={missing400:r=>delete r.scenarios[0].setup,unsaved400:r=>r.scenarios[0].setup.durableTasks=399,hiddenOrdinary:r=>r.scenarios[0].setup.activeTasks=8,omittedRapid:r=>r.rapidOutcomes.pop(),skippedRapid:r=>r.rapidOutcomes[0].status='skipped',slowRapid:r=>r.rapidOutcomes[0].bursts[0].windowMs=2001,fewerPresses:r=>r.rapidOutcomes[0].bursts[0].attempts=9,untrusted:r=>r.rapidOutcomes[0].bursts[0].trustedPresses=0,unreconciled:r=>r.rapidOutcomes[0].bursts[0].refused=0,unrelatedAction:r=>r.rapidOutcomes[0].bursts[0].unrelatedClicks=1,selfWaived:r=>r.requiredRapidActions.pop()};
+ for(const [name,mutate]of Object.entries(variants))await t.test(name,()=>{const report=structuredClone(good);mutate(report);const result=invoke(report);assert.equal(result.error,undefined);assert.notEqual(result.status,0,'required native gate must reject '+name+' workload evidence');assert.doesNotMatch(result.stderr,/SyntaxError|ERR_MODULE_NOT_FOUND/);});
+});
+
+test('RISK repository process: required button enforcement changes need process coverage',async t=>{
+ const root=fs.mkdtempSync('/tmp/chain-button-enforcement-');t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ for(const name of ['button-safety.mjs','button-safety-contract.mjs','button-safety-native.mjs','button-safety-inventory.json'])await t.test(name,()=>{
+  const directory=path.join(root,name);fs.mkdirSync(path.join(directory,'scripts'),{recursive:true});
+  const git=(...args)=>{const result=spawnSync('git',args,{cwd:directory,encoding:'utf8'});assert.equal(result.status,0,result.stderr);return result.stdout.trim();};
+  fs.copyFileSync(path.join(__dirname,'scripts/test-first-gate.mjs'),path.join(directory,'scripts/test-first-gate.mjs'));
+  fs.writeFileSync(path.join(directory,'scripts',name),name.endsWith('.json')?'{}':'export const revision=1;');fs.writeFileSync(path.join(directory,'tests.js'),"test('baseline',()=>{});\n");fs.writeFileSync(path.join(directory,'TEST_CHANGE_RATIONALES.json'),'[]');
+  git('init','-q','--initial-branch=fixture');git('add','.');git('-c','user.name=Button gate fixture','-c','user.email=gate@example.invalid','commit','-qm','baseline');const base=git('rev-parse','HEAD');
+  fs.writeFileSync(path.join(directory,'scripts',name),name.endsWith('.json')?'{"weakened":true}':'export const revision=2;');git('add','.');git('-c','user.name=Button gate fixture','-c','user.email=gate@example.invalid','commit','-qm','uncovered gate edit');
+  const result=spawnSync(process.execPath,['scripts/test-first-gate.mjs',base],{cwd:directory,encoding:'utf8'});assert.equal(result.error,undefined);assert.notEqual(result.status,0,'actual test-first CLI cannot accept uncovered required native gate edits');assert.match(result.stderr,/Test-first enforcement changed.*without tests.js process coverage/);
+ });
+});
+
+test('RISK repository process: every button safety module fails the actual CLI without process coverage',async t=>{
+ const root=fs.mkdtempSync(path.join('/tmp','chain-button-enforcement-all-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const directory=path.join(root,'fixture'),scriptDir=path.join(directory,'scripts');fs.mkdirSync(scriptDir,{recursive:true});
+ const modules=[...fs.readdirSync(path.join(__dirname,'scripts')).filter(name=>/^button-safety(?:-[a-z0-9-]+)?\.mjs$/.test(name)||name==='button-safety-inventory.json').map(name=>'scripts/'+name),'scripts/button-safety-future-memory-proof.mjs'];
+ fs.copyFileSync(path.join(__dirname,'scripts/test-first-gate.mjs'),path.join(scriptDir,'test-first-gate.mjs'));
+ for(const file of modules){const target=path.join(directory,file);fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,file.endsWith('.json')?'{}':'export const revision=1;\n');}
+ const git=(...args)=>{const result=spawnSync('git',args,{cwd:directory,encoding:'utf8'});assert.equal(result.status,0,result.stderr);return result.stdout.trim();};
+ git('init','-q','--initial-branch=fixture');git('add','.');git('-c','user.name=Button gate fixture','-c','user.email=gate@example.invalid','commit','-qm','baseline');
+ const base=git('rev-parse','HEAD');
+ for(const file of modules){
+  git('reset','--hard',base);
+  const target=path.join(directory,file),source=fs.readFileSync(target,'utf8');
+  fs.writeFileSync(target,source+(file.endsWith('.json')?'\n':'// changed implementation behavior\n'));
+  git('add',file);git('-c','user.name=Button gate fixture','-c','user.email=gate@example.invalid','commit','-qm','uncovered gate module edit');
+  const result=spawnSync(process.execPath,['scripts/test-first-gate.mjs',base],{cwd:directory,encoding:'utf8'});
+  assert.equal(result.error,undefined);assert.notEqual(result.status,0,`actual test-first CLI must reject uncovered module ${file}`);
+  assert.match(result.stderr,/Test-first enforcement changed.*without tests\.js process coverage/);
+  assert.ok(result.stderr.includes(file),`actual CLI names the uncovered module ${file}: ${result.stderr}`);
+ }
+});
+
+test('RISK repository process: intentional Docker OOM control cannot waive capped client failures',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;const result=spawnSync(process.execPath,['--test','--test-name-pattern=^mobile memory intentional OOM control binds the Docker flag while clients reject it$','scripts/agent-tools/mobile-memory.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:10000,maxBuffer:2*1024*1024});assert.equal(result.error,undefined);assert.equal(result.status,0,'The intentional kernel control and actual acceptance clients need distinct Docker OOM semantics: '+result.stdout+'\n'+result.stderr);
+});
+
+test('RISK Settings guidance: mounted cleanup and sync FAQs name their current locations',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();const help=app.shim.document.getElementById('modalRoot').innerHTML;
+ const answer=question=>{const start=help.indexOf('<dt>'+question+'</dt><dd>');assert.ok(start>=0);return help.slice(start+('<dt>'+question+'</dt><dd>').length,help.indexOf('</dd>',start)).replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();};
+ const clear=answer('What does Clear history remove?'),sync=answer('What can I do if a save or sync fails?');
+ const exported=answer('What does Export include?');assert.match(exported,/Settings → Data and backups → Export/);assert.ok(exported.split(/\s+/).length<=130);
+ assert.match(clear,/Settings → Recovery and cleanup → Clear history/);assert.match(sync,/Settings → Recovery and cleanup → Recent sync errors/);assert.match(sync,/Settings → Data and backups → Export/);
+ for(const text of [clear,sync])assert.ok(text.split(/\s+/).length<=130,'Each existing FAQ retains the130word limit');
+ assert.match(clear,/Open evergreen and unfinished tasks remain/);assert.match(clear,/Undo can reverse the clear/);assert.match(sync,/Recorded errors describe failed attempts and can remain after a later successful sync/);assert.match(sync,/Synced requires server acknowledgement of the latest save/);
+});
+
+test('RISK repository process: CI monitor requires capped mobile job while preserving prior topology',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;const result=spawnSync(process.execPath,['--test','--test-name-pattern=^binds required parallel topology to actual candidate workflow even when new jobs are absent$|^parallel workflow observation preserves complete missing skipped canceled and unknown distinctions$','scripts/agent-tools/ci-monitor.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:4*1024*1024});assert.equal(result.error,undefined);assert.equal(result.status,0,'The actual CI monitor must retain prior workflows and fail closed on required mobile outcomes: '+result.stdout+'\n'+result.stderr);
+});
+
+test('RISK repository process: routed hosted policies reach native consumers without waiving invalid launches',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;const result=spawnSync(process.execPath,['--test','scripts/agent-tools/button-ci-policy.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:4*1024*1024});assert.equal(result.error,undefined);assert.equal(result.status,0,'Actual native/capped admission must retain raw events and routed policies: '+result.stdout+'\n'+result.stderr);
+});
+
+test('RISK repository process: current producer reuse requires successful capped mobile evidence',t=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;const result=spawnSync(process.execPath,['--test','--test-name-pattern=^current grouped routing requires the completed capped mobile producer before reuse$','scripts/agent-tools/ci-routing.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:4*1024*1024});assert.equal(result.error,undefined);assert.equal(result.status,0,'The actual routing consumer must require the exact current mobile producer: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# tests 16$/m,'All required current producer acceptance and ambiguity controls must execute');assert.match(result.stdout,/^# skipped 0$/m);t.diagnostic('Executed current producer positive and ambiguous-row rejection controls through the actual routing command.');
+});
+
+test('RISK repository process: mobile budget planner caps browsers before launch and isolates the external driver',async()=>{
+ const {containerArgs}=await import('./scripts/button-safety-mobile-memory.mjs');
+ const common={repo:'/synthetic/repo',output:'/synthetic/evidence',nodeBinary:'/synthetic/node22',motion:'normal',control:false,eventPolicy:'push',eventName:'push',eventRef:'refs/heads/fixture'},id='7'.repeat(64);
+ const browser=containerArgs({...common,role:'browser'}),driver=containerArgs({...common,role:'driver',browserContainerId:id});
+ assert.equal(driver[driver.indexOf('--network')+1],'container:'+id,'Actual workload driver must share only the exact capped browser namespace');
+ assert.equal(browser[browser.indexOf('--network')+1],'none');
+ for(const flag of ['--memory','--memory-swap']){assert.equal(browser[browser.indexOf(flag)+1],'1000000000');assert.equal(driver[driver.indexOf(flag)+1],'2147483648','Driver is separately bounded outside the browser budget');}
+ assert.ok(browser.includes('--browser-server'));assert.ok(driver.includes('--driver'));
+ for(const args of [browser,driver]){assert.ok(args.includes('--read-only'));assert.equal(args[args.indexOf('--cap-drop')+1],'ALL');assert.match(args[args.indexOf('--user')+1],/^[1-9]\d*:[1-9]\d*$/);assert.equal(args.some(arg=>/docker\.sock|--privileged|--publish|--network=host|--ipc=host/.test(arg)),false);}
+ assert.throws(()=>containerArgs({...common,role:'driver',browserContainerId:'another-owner'}),/container identity/i);
+ const owned=containerArgs({...common,role:'browser',containerName:'chain-mobile-owned-fixture',ownershipToken:'owned-fixture-token'});assert.equal(owned[owned.indexOf('--name')+1],'chain-mobile-owned-fixture','A create interrupted before its ID returns must remain discoverable by an owner-specific name');assert.ok(owned.includes('chain.mobile.owner=owned-fixture-token'));
+});
+
+test('RISK repository process: mobile budget scope cannot relabel whole-container evidence or disconnected browsers',async t=>{
+ const {createMobileBundle,refreshMobileBundle}=await import('./scripts/agent-tools/mobile-memory-fixture.mjs');
+ const {verifyMobileMemoryReport}=await import('./scripts/button-safety-mobile-contract.mjs');
+ const directory=fs.mkdtempSync('/tmp/chain-mobile-browser-budget-');t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const old=createMobileBundle(path.join(directory,'legacy'));old.report.schemaVersion=1;refreshMobileBundle(old);
+ assert.throws(()=>verifyMobileMemoryReport(old.report,{artifactRoot:old.directory}),/schema|scope|version/i,'Old combined driver/browser evidence cannot be relabeled as the new scope');
+ const good=createMobileBundle(path.join(directory,'new'));assert.equal(verifyMobileMemoryReport(good.report,{artifactRoot:good.directory}).status,'passed','Controlled parser fixture, not hosted proof');
+ const mutations={
+  'driver charged to browser group':b=>b.report.cases[0].driver.containerId=b.report.cases[0].containerId,
+  'driver has external network':b=>b.report.cases[0].driver.networkMode='bridge',
+  'wrong scope':b=>b.report.cases[0].after.scope='entire-container-process-tree',
+  'missing engine membership':b=>b.report.cases[0].server.browser.processes=[],
+  'engine escaped cgroup':b=>b.report.cases[0].server.browser.processes[0].cgroup='0::/escape',
+  'different driver namespace':b=>b.report.cases[0].driver.namespace='net:[999]',
+  'disconnect without engine exit':b=>b.report.cases[0].server.cleanup.engineExited=false,
+  'no server owner closure':b=>b.report.cases[0].server.cleanup.serverClosed=false,
+  'unbounded driver':b=>b.report.cases[0].driver.memoryMaxBytes=0,
+  'wrong executable':b=>b.report.cases[0].server.browser.executableSha256='unverified',
+  'negative control outside browser group':b=>b.report.negativeControl.server.control.membership='0::/outside',
+  'negative control without live browser':b=>b.report.negativeControl.server.control.browserAlive=false,
+  'negative control outside browser PID namespace':b=>b.report.negativeControl.server.control.pidNamespace='pid:[999]',
+  'native browser launched in external driver':b=>b.native.normal.runtime.browserConnection='local-owned',
+ };
+ for(const [name,mutate]of Object.entries(mutations))await t.test(name,()=>{const b=createMobileBundle(path.join(directory,name.replaceAll(' ','-')));mutate(b);refreshMobileBundle(b);assert.throws(()=>verifyMobileMemoryReport(b.report,{artifactRoot:b.directory}),name);});
+});
+
+test('RISK repository process: remote mobile consumer waits for browser owner exit after disconnect',async t=>{
+ const http=(await import('node:http')).default,playwright=await import('playwright'),{runButtonSafety}=await import('./scripts/button-safety-native.mjs');
+ const directory=fs.mkdtempSync('/tmp/chain-remote-owner-');t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const listener=http.createServer();await new Promise(resolve=>listener.listen(0,'127.0.0.1',resolve));const port=listener.address().port;await new Promise(resolve=>listener.close(resolve));
+ const ledger=path.join(directory,'ledger.json');fs.writeFileSync(ledger,JSON.stringify({entries:[{status:'active',worktree:__dirname,lease:{state:'healthy',expiresAt:new Date(Date.now()+60000).toISOString()},resources:['browser-runtime:playwright-webkit','loopback:127.0.0.1:'+port]}]}));
+ const env={CI:process.env.CI,CODEX_COORDINATION_FILE:process.env.CODEX_COORDINATION_FILE,DOW_EMULATOR_COORDINATION_FILE:process.env.DOW_EMULATOR_COORDINATION_FILE},launch=playwright.webkit.launch,connect=playwright.webkit.connect;
+ t.after(()=>{playwright.webkit.launch=launch;playwright.webkit.connect=connect;for(const [k,v]of Object.entries(env))if(v===undefined)delete process.env[k];else process.env[k]=v;});
+ delete process.env.CI;delete process.env.DOW_EMULATOR_COORDINATION_FILE;process.env.CODEX_COORDINATION_FILE=ledger;
+ const events=[],stop=Error('Controlled fixture stops before any native context');
+ playwright.webkit.launch=async()=>{events.push('local-launch');throw stop;};
+ playwright.webkit.connect=async endpoint=>{assert.equal(endpoint,'ws://127.0.0.1:1234/owned');events.push('connect');return{on(){},version:()=> '26.5',newContext:async()=>{events.push('newContext');throw stop;},close:async()=>events.push('disconnect')};};
+ await assert.rejects(runButtonSafety({repo:__dirname,engine:'webkit',outputDir:directory,port,mobileYesMotion:'normal',browserServerEndpoint:'ws://127.0.0.1:1234/owned',closeBrowserServer:async()=>{events.push('owner-exit');return{serverClosed:true,engineExited:true};}}),error=>error===stop);
+ assert.deepEqual(events,['connect','newContext','disconnect','owner-exit'],'Remote disconnect must be followed by owner-confirmed engine exit; no local engine may launch');
+ const report=JSON.parse(fs.readFileSync(path.join(directory,fs.readdirSync(directory).find(file=>file.startsWith('button-safety-')))));assert.equal(report.cleanup.browserDisconnected,true);assert.equal(report.cleanup.browserServerClosed,true);assert.equal(report.cleanup.browserClosed,true);assert.equal(report.cleanup.serverClosed,true);
+ events.length=0;const failed=path.join(directory,'refused');await assert.rejects(runButtonSafety({repo:__dirname,engine:'webkit',outputDir:failed,port,mobileYesMotion:'normal',browserServerEndpoint:'ws://127.0.0.1:1234/owned',closeBrowserServer:async()=>{throw Error('Owner exit not observed');}}),/Owner exit not observed/);
+ const partial=JSON.parse(fs.readFileSync(path.join(failed,fs.readdirSync(failed).find(file=>file.startsWith('button-safety-')))));assert.notEqual(partial.cleanup.browserClosed,true);assert.equal(partial.cleanup.serverClosed,true,'An owner-close failure still closes HTTP and persists the failed report');assert.equal(partial.status,'failed');
+});
+
+test('RISK repository process: pending mobile creates retain ownership until daemon completion and owned removal',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','scripts/agent-tools/mobile-memory-lifecycle.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:20000,maxBuffer:4*1024*1024});
+ assert.equal(result.error,undefined);assert.equal(result.status,0,'Actual mobile CLI must retain unresolved late create ownership and clean positively identified objects: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# tests 5$/m);assert.match(result.stdout,/^# skipped 0$/m);
+});
+
+
+test('RISK repository process: expected native reload retries only its navigation context loss',async t=>{
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Allocated durable native output required');fs.mkdirSync(base,{recursive:true});
+ const playwright=await import('playwright'),launch=playwright.chromium.launch,{runButtonSafety}=await import('./scripts/button-safety-native.mjs');t.after(()=>{playwright.chromium.launch=launch;});
+ for(const mode of ['expected context loss','unrelated evaluation error','unexpected navigation'])await t.test(mode,async()=>{
+  const output=fs.mkdtempSync(path.join(base,'reload-observer-'));let injected=0;
+  // The real app click/reload and durable assertions run unchanged. At the
+  // automation boundary, deliver the context-loss race once deterministically.
+  playwright.chromium.launch=async(...args)=>{const browser=await launch.apply(playwright.chromium,args),newContext=browser.newContext.bind(browser);
+   browser.newContext=async(...args)=>{const context=await newContext(...args),newPage=context.newPage.bind(context);
+    context.newPage=async(...args)=>{const page=await newPage(...args),evaluate=page.evaluate.bind(page);
+     page.evaluate=async(fn,arg)=>{if(!injected&&typeof fn==='function'&&fn.toString().includes('window.__installedFixture?.documentId!==')){
+      injected++;if(mode==='unexpected navigation')await page.goto(new URL('/unexpected-observer-navigation',page.url()).href);
+      throw Error(mode==='unrelated evaluation error'?'Controlled unrelated evaluation error':'page.evaluate: Execution context was destroyed, most likely because of a navigation');
+     }return evaluate(fn,arg);};return page;};return context;};return browser;};
+  let result,failure;try{result=await runButtonSafety({repo:__dirname,engine:'chromium',outputDir:output,port:Number(process.env.CHAIN_NATIVE_PORT||0),scenarioFilter:'cloud retry, reload, and sign out preserve the device board during read failures'});}catch(error){failure=error;}finally{playwright.chromium.launch=launch;}
+  assert.equal(injected,1,'The controlled driver race reached the real expected-reload consumer');
+  const report=JSON.parse(fs.readFileSync(path.join(output,fs.readdirSync(output).find(name=>name.startsWith('button-safety-')))));
+  for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(report.cleanup[key],true,'Each outcome closes '+key);
+  if(mode==='expected context loss'){
+   assert.equal(failure,undefined,'One allowed reload must survive its transient automation context loss: '+failure);
+   assert.equal(result.report.status,'passed');assert.deepEqual(result.report.errors,[]);assert.equal(result.report.allowedNavigations.length,1);
+   assert.equal(result.report.scenarios[0].setup.currentTasks,400);assert.equal(result.report.scenarios[0].setup.durableTasks,400);
+  }else{assert.ok(failure,'Other evaluation failures and unexpected navigation still fail');assert.match(String(failure),mode==='unrelated evaluation error'?/Controlled unrelated evaluation error/:/unexpected-navigation-or-reload/);assert.equal(report.status,'failed');}
+  t.diagnostic('Actual cloud-read-failure reload consumer with controlled automation race: '+output);
+ });
+});
+
+
+test('RISK repository process: hosted direct native callers retain ephemeral listener defaults',()=>{
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable caller evidence required');fs.mkdirSync(base,{recursive:true});const output=fs.mkdtempSync(path.join(base,'ephemeral-caller-'));
+ // This subprocess tests the hosted-policy boundary; it is not hosted proof.
+ const env={...process.env,CI:'true',CHAIN_TEST_EVENT_POLICY:'canonical-pr-merge-v1',GITHUB_EVENT_NAME:'pull_request',GITHUB_REF:'refs/pull/1/merge',CHAIN_NATIVE_OUTPUT:output};delete env.CHAIN_NATIVE_PORT;delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-name-pattern=^(RISK repository process: retained native sources seed once without a persistent board bootstrap|RISK synced scene durability: native retained boards keep immediate scene locks through reload without changing tasks or sources|RISK scenery startup: native mobile paints once while hidden return saved choices resize and rain preserve the scene)$','tests.js'],{cwd:__dirname,env,encoding:'utf8',timeout:180000,maxBuffer:4*1024*1024});
+ assert.equal(result.error,undefined);assert.equal(result.signal,null);assert.equal(result.status,0,'Actual direct callers must pass an ephemeral port when the hosted environment has no local allocation: '+result.stdout+'\n'+result.stderr);
+ assert.match(result.stdout,/^# tests 13$/m);assert.match(result.stdout,/^# skipped 0$/m);
+});
+
+
+test('RISK scenery FAQ: mounted help names scene time without implementation details',async()=>{
+ const {ctx,shim}=await loadApp();await ctx.onAction('help',{});const mounted=shim.elements.get('modalRoot').innerHTML;
+ const answer=mounted.match(/<dt>How do I change the scenery\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.ok(answer,'Actual Quick start help contains the scenery answer');
+ assert.match(answer,/Settings.*motion.*scene time.*season.*sky location/);
+ assert.doesNotMatch(answer,/Opening avoids|repeated redraw/,'Help explains user controls without implementation work');
+ assert.match(answer,/Motion stays in this browser/);assert.match(answer,/task dates stay live/);assert.match(answer,/Reduced motion keeps scenery still/);
+});
+
+
+test('RISK repository process: required one GB and reported 512MB stress profiles cannot substitute for each other',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-name-pattern=mobile budget profiles|mobile stress CLI','scripts/agent-tools/mobile-memory.test.mjs','scripts/agent-tools/mobile-memory-stress-lifecycle.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:10000,maxBuffer:4*1024*1024});
+ assert.equal(result.error,undefined);assert.equal(result.status,0,'Actual public profile planners and immutable validators preserve required versus stress policy: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# skipped 0$/m);
+});
+
+
+test('RISK repository process: native burst preparation survives remounts without waiving missing or late input',async t=>{
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});
+ const playwright=await import('playwright'),launch=playwright.webkit.launch,{runButtonSafety}=await import('./scripts/button-safety-native.mjs');t.after(()=>{playwright.webkit.launch=launch;});
+ for(const mode of ['replaced target','missing target','late native input'])await t.test(mode,async()=>{
+  const output=fs.mkdtempSync(path.join(base,'burst-remount-'));let changed=0,delayed=0;
+  playwright.webkit.launch=async(...args)=>{const browser=await launch.apply(playwright.webkit,args),newContext=browser.newContext.bind(browser);
+   browser.newContext=async(...args)=>{const context=await newContext(...args),newPage=context.newPage.bind(context);
+    context.newPage=async(...args)=>{const page=await newPage(...args),locator=page.locator.bind(page),wrapped=new WeakSet();
+     const wrap=target=>{if(wrapped.has(target))return target;wrapped.add(target);const first=target.first.bind(target),scroll=target.scrollIntoViewIfNeeded.bind(target);
+      target.first=()=>wrap(first());target.scrollIntoViewIfNeeded=async(...args)=>{
+       if(mode!=='late native input'&&!changed){changed++;const old=await target.elementHandle();await target.evaluate((el,remove)=>{if(remove)el.remove();else el.replaceWith(el.cloneNode(true));},mode==='missing target');
+        // This is the actual Playwright stale-handle error after a real DOM
+        // replacement, not a synthesized failure string.
+        return old.scrollIntoViewIfNeeded(...args);
+       }return scroll(...args);
+      };return target;};page.locator=(...args)=>wrap(locator(...args));
+     const up=page.mouse.up.bind(page.mouse);page.mouse.up=async(...args)=>{if(mode==='late native input'&&!delayed){delayed++;await new Promise(resolve=>setTimeout(resolve,2100));}return up(...args);};return page;
+    };return context;};return browser;};
+  let result,failure;try{result=await runButtonSafety({repo:__dirname,engine:'webkit',port:Number(process.env.CHAIN_NATIVE_PORT||0),outputDir:output,scenarioFilter:'rapid motion settings open and both choices respond'});}catch(error){failure=error;}finally{playwright.webkit.launch=launch;}
+  const report=JSON.parse(fs.readFileSync(path.join(output,fs.readdirSync(output).find(name=>name.startsWith('button-safety-')))));for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(report.cleanup[key],true);
+  if(mode==='replaced target'){assert.equal(changed,1);assert.equal(failure,undefined,'A fresh mounted locator must survive the real preparation remount: '+failure);assert.equal(result.report.status,'passed');for(const row of report.rapidOutcomes)for(const burst of row.bursts){assert.equal(burst.trustedPresses,10);assert.ok(burst.windowMs<=2000);}}
+  else{assert.ok(failure,'Unavailable and late input must remain failed');assert.equal(report.status,'failed');if(mode==='missing target'){assert.equal(changed,1);assert.match(String(failure),/stalled responsiveness: rapid target scroll|Timeout/);}else{assert.equal(delayed,1);assert.match(String(failure),/Ten native press attempts must finish within two seconds/);assert.equal(report.inFlightBurst.attempts.length,10);assert.ok(report.inFlightBurst.windowMs>2000);}}
+  t.diagnostic('Actual native remount/input sensitivity evidence: '+output);
+ });
+});
+
+
+test('RISK repository process: failed mobile stress attempts retain actual setup and reject mixed transport faults',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-name-pattern=mobile budget profiles reject failed stress setup','scripts/agent-tools/mobile-memory.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:10000,maxBuffer:4*1024*1024});
+ assert.equal(result.error,undefined);assert.equal(result.status,0,'The actual immutable stress verifier must reject wrong setup and mixed transport faults: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# skipped 0$/m);
+});
+
+
+test('RISK repository process: failed mobile stress primary errors cannot hide unrelated driver failures',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-name-pattern=mobile budget profiles require attributable primary','scripts/agent-tools/mobile-memory.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:10000,maxBuffer:4*1024*1024});
+ assert.equal(result.error,undefined);assert.equal(result.status,0,'The actual immutable stress verifier must bind the primary thrown failure as well as page events: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# skipped 0$/m);
+});
+
+
+test('RISK repository process: mobile kernel page floor requires actual observations and exact requested budgets',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-name-pattern=mobile kernel page floor','scripts/agent-tools/mobile-memory.test.mjs','scripts/agent-tools/mobile-memory-stress-lifecycle.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:15000,maxBuffer:4*1024*1024});
+ assert.equal(result.error,undefined);assert.equal(result.status,0,'Actual kernel-reader and immutable CLI consumers require deterministic page flooring: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# skipped 0$/m);
+});
+
+
+test('RISK repository process: refused native releases avoid drag round trips while preserving ten real attempts',async t=>{
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});const playwright=await import('playwright'),{runButtonSafety}=await import('./scripts/button-safety-native.mjs');
+ for(const engine of ['chromium','webkit'])await t.test(engine,async()=>{
+  const output=fs.mkdtempSync(path.join(base,'neutral-release-')),launch=playwright[engine].launch;let heldMoves=0;
+  playwright[engine].launch=async(...args)=>{const browser=await launch.apply(playwright[engine],args),newContext=browser.newContext.bind(browser);browser.newContext=async(...args)=>{const context=await newContext(...args),newPage=context.newPage.bind(context);context.newPage=async(...args)=>{const page=await newPage(...args),move=page.mouse.move.bind(page.mouse),down=page.mouse.down.bind(page.mouse),up=page.mouse.up.bind(page.mouse);let held=false;
+   page.mouse.down=async(...args)=>{await down(...args);held=true;};page.mouse.up=async(...args)=>{try{return await up(...args);}finally{held=false;}};
+   // Model the observed cross-frame drag-controller round trips, not app work.
+   // A neutral release should require no drag; actual native up remains awaited.
+   page.mouse.move=async(...args)=>{if(held){heldMoves++;await new Promise(resolve=>setTimeout(resolve,250));}return move(...args);};return page;};return context;};return browser;};
+  let result,failure;try{result=await runButtonSafety({repo:__dirname,engine,port:Number(process.env.CHAIN_NATIVE_PORT||0),outputDir:output,scenarioFilter:'rapid motion settings open and both choices respond'});}catch(error){failure=error;}finally{playwright[engine].launch=launch;}
+  assert.equal(failure,undefined,'Refused presses must meet the original deadline without cross-frame native drag work: '+failure);assert.equal(heldMoves,0);assert.equal(result.report.status,'passed');let refused=0;
+  for(const row of result.report.rapidOutcomes)for(const burst of row.bursts){assert.equal(burst.trustedPresses,10);assert.equal(burst.attempts,10);assert.ok(burst.windowMs<=2000);assert.equal(burst.unrelatedClicks,0);for(const attempt of burst.attemptDetails)if(attempt.neutralRelease){refused++;assert.equal(attempt.acceptedClicks,0);assert.equal(attempt.neutralDocumentId,result.report.releaseSurfaces[0].documentId);}}
+  assert.ok(refused>=9);assert.deepEqual(result.report.errors,[]);for(const value of Object.values(result.report.cleanup))assert.equal(value,true);t.diagnostic('Actual native neutral release and controller-latency evidence: '+output);
+ });
+});
+
+
+test('RISK synced scene intent: rapid choices survive interrupted device hashing without changing protected sources',async()=>{
+ const {indexedDB}=await import('fake-indexeddb'),{buttonFixture}=await import('./scripts/button-safety-fixture.mjs'),storage=makeDomShim().localStorage,deviceDbName='scene-intent-'+Date.now(),board=buttonFixture('signed-out');let armed=false,release;const gate=new Promise(resolve=>{release=resolve;});let delayed=0;
+ const cryptoProvider={randomUUID:()=>webcrypto.randomUUID(),getRandomValues:a=>webcrypto.getRandomValues(a),subtle:{digest:async(...args)=>{if(armed){delayed++;await gate;}return webcrypto.subtle.digest(...args);}}};
+ const first=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName,cryptoProvider,seedStorage:{'fvp:chain-scanner:v1':JSON.stringify(board)}}),store=first.shim.window.ScannerDeviceStore;assert.equal(await first.ctx.persist(true),true);
+ for(let i=0;i<2;i++)assert.equal((await store.putBackup({expectedHash:(await store.readHead()).hash,backup:{id:'scene-protected-'+i,kind:'manual',day:'2026-10-26',at:i+1,payload:JSON.stringify({...board,futureProtected:i})}})).ok,true);
+ const pending={generationId:'scene-pending',payload:JSON.stringify(board)};await store.setPendingUpload('scene-owner',pending);
+ const before={head:await store.readHead(),backups:JSON.stringify(await store.listBackups()),opaque:JSON.stringify(await store.listOpaqueArchives()),pending:JSON.stringify(await store.getPendingUpload('scene-owner'))};armed=true;
+ first.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'23:15',season:'winter'}});
+ first.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'07:10',season:'summer'}});
+ assert.equal(first.ctx.state.settings.scene.time,'07:10');await flush();assert.ok(delayed,'The actual device save is awaiting its real digest boundary');await first.dispose();armed=false;release();await flush();
+ const reopened=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName});const deadline=Date.now()+5000;while([...Array(storage.length)].some((_,i)=>storage.key(i).startsWith('fvp:chain-scanner:pending-scene-choice:v1:'))&&Date.now()<deadline)await flush();const after=await reopened.shim.window.ScannerDeviceStore.readHead(),saved=JSON.parse(after.payload);
+ assert.equal(saved.settings.scene?.time,'07:10','Immediate reopen durably retains the latest accepted scene choice');assert.equal(saved.settings.scene.season,'summer');assert.equal(reopened.ctx.state.settings.scene.time,'07:10');
+ assert.equal(JSON.stringify(saved.tasks),JSON.stringify(JSON.parse(before.head.payload).tasks));assert.equal(JSON.stringify(saved.futurePopulated),JSON.stringify(board.futurePopulated));assert.equal(JSON.stringify(await reopened.shim.window.ScannerDeviceStore.listBackups()),before.backups);assert.equal(JSON.stringify(await reopened.shim.window.ScannerDeviceStore.listOpaqueArchives()),before.opaque);assert.equal(JSON.stringify(await reopened.shim.window.ScannerDeviceStore.getPendingUpload('scene-owner')),before.pending);
+ assert.equal([...Array(storage.length)].map((_,i)=>storage.key(i)).filter(key=>key.startsWith('fvp:chain-scanner:pending-scene-choice:v1:')).length,0,'Only exact durable fact readback retires the scene intent');
+});
+
+
+test('RISK task action history: Undo refreshes ranks once after projecting its immutable cancellation',async()=>{
+ const {ctx,shim,a,b}=await ratingHistoryFixture(791);ctx.state.chain=[a.id];ctx.state.candidateId=b.id;ctx.onAction('yes',{dataset:{candidate:b.id,benchmark:a.id}});assert.equal(ctx.state.chain.at(-1),b.id);
+ // Count the real sampling boundary while the existing Undo consumer projects
+ // its cancellation. Duplicate rank distributions needlessly consume the rapid
+ // native budget; the final distribution and observation must still be fresh.
+ vm.runInContext('this.undoRankSamples=0;this.originalUndoRankStats=rankStats;rankStats=(...args)=>{undoRankSamples++;return originalUndoRankStats(...args);}',ctx);
+ assert.equal(ctx.onAction('undo',{}),true);assert.equal(ctx.undoRankSamples,1,'One Undo must sample one final rank distribution, after projecting cancellation');assert.equal(ctx.state.chain.includes(b.id),false);
+ const cancellations=ctx.state.decisionEvents.filter(row=>row.kind==='undo');assert.equal(cancellations.length,1);assert.equal(cancellations[0].targetEventIds.length,1);assert.equal(ctx.state.tasks.length,3);assert.ok(ctx.state.tasks.every(row=>Number.isFinite(row.mu)&&Number.isFinite(row.sigma)));
+ assert.match(shim.elements.get('scan').innerHTML,/data-act="yes"/);assert.equal(await ctx.persist(),true);
+});
+
+
+const sceneIntentTestKeys=storage=>[...Array(storage.length)].map((_,i)=>storage.key(i)).filter(key=>key.startsWith('fvp:chain-scanner:pending-scene-choice:v1:'));
+async function sceneIntentTestFixture(){
+ const {IDBFactory}=await import('fake-indexeddb'),{buttonFixture}=await import('./scripts/button-safety-fixture.mjs'),indexedDBProvider=new IDBFactory(),deviceDbName='scene-edge-'+webcrypto.randomUUID(),sharedStorage=makeDomShim().localStorage;
+ const app=await loadApp({sharedStorage,indexedDBProvider,deviceDbName,seedStorage:{'fvp:chain-scanner:v1':JSON.stringify(buttonFixture('signed-out'))}});assert.equal(await app.ctx.persist(true),true);
+ return {app,sharedStorage,indexedDBProvider,deviceDbName};
+}
+async function waitSceneIntentBoot(app,storage){const deadline=Date.now()+5000;while(sceneIntentTestKeys(storage).length&&!app.ctx.deviceSaveIssue()&&Date.now()<deadline)await flush();}
+
+test('RISK synced scene intent: exact own-prefix commits replay only the missing rapid choice suffix',async()=>{
+ const fixture=await sceneIntentTestFixture(),{app,sharedStorage,indexedDBProvider,deviceDbName}=fixture,store=app.shim.window.ScannerDeviceStore,commit=store.commitHead.bind(store);let release,entered;const gate=new Promise(resolve=>{release=resolve;}),firstCommitted=new Promise(resolve=>{entered=resolve;});
+ store.commitHead=async options=>{const time=JSON.parse(options.payload).settings.scene.time;if(time==='07:10'){await gate;return commit(options);}const result=await commit(options);if(time==='23:15'){entered();await gate;}return result;};
+ app.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'23:15',season:'winter'}});await firstCommitted;
+ app.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'07:10',season:'summer'}});await flush();const prefix=await store.readHead(),keys=sceneIntentTestKeys(sharedStorage),receipts=keys.map(key=>JSON.parse(sharedStorage.getItem(key)));assert.ok(keys.length>=2);const receipt=receipts.find(row=>row.events.length===4&&row.heads.some(head=>head.hash===prefix.hash));assert.ok(receipt.heads.some(row=>row.hash===prefix.hash&&row.count===2));assert.equal(receipt.events.length,4);const priorTasks=JSON.stringify(JSON.parse(prefix.payload).tasks);
+ await app.dispose();release();await flush();const reopened=await loadApp({sharedStorage,indexedDBProvider,deviceDbName});await waitSceneIntentBoot(reopened,sharedStorage);const head=await reopened.shim.window.ScannerDeviceStore.readHead(),board=JSON.parse(head.payload);
+ assert.equal(board.settings.scene.time,'07:10');assert.equal(board.settings.scene.season,'summer');assert.equal(JSON.stringify(board.tasks),priorTasks);assert.equal(board.decisionEvents.filter(row=>receipt.events.some(event=>event.id===row.id)).length,4);assert.deepEqual(sceneIntentTestKeys(sharedStorage),[]);
+});
+
+test('RISK synced scene intent: storage refusal bounds and foreign heads preserve originals and existing Export',async t=>{
+ for(const mode of ['storage refusal','receipt bound','changed head','changed account','malformed receipt'])await t.test(mode,async()=>{
+  const {app,sharedStorage,indexedDBProvider,deviceDbName}=await sceneIntentTestFixture(),store=app.shim.window.ScannerDeviceStore,before=await store.readHead(),beforeScene=JSON.stringify(app.ctx.state.settings.scene),write=sharedStorage.setItem.bind(sharedStorage),commit=store.commitHead.bind(store);let release;const gate=new Promise(resolve=>{release=resolve;});store.commitHead=async options=>{await gate;return commit(options);};
+  if(mode==='storage refusal')sharedStorage.setItem=(key,value)=>{if(key.startsWith('fvp:chain-scanner:pending-scene-choice:v1:'))throw new DOMException('Controlled full local receipt store','QuotaExceededError');return write(key,value);};
+  if(mode==='receipt bound')for(let i=0;i<128;i++)write('fvp:chain-scanner:pending-scene-choice:v1:retained-'+i,'unreadable original '+i);
+  app.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'23:15',season:'winter'}});await flush();
+  if(mode==='storage refusal'||mode==='receipt bound'){assert.equal(JSON.stringify(app.ctx.state.settings.scene),beforeScene,'Refused intent cannot claim a new accepted scene choice');assert.equal((await store.readHead()).hash,before.hash);assert.equal(app.ctx.deviceSaveIssue().stage,'scene-choice');sharedStorage.setItem=write;await app.dispose();release();return;}
+  const key=sceneIntentTestKeys(sharedStorage)[0];assert.ok(key);
+  if(mode==='changed head'||mode==='changed account'){const board=JSON.parse(before.payload);board.futurePeer={keep:'new authoritative peer bytes'};if(mode==='changed account'){board.syncAccount='other@example.test';board.syncIdentity='other-identity';}const result=await commit({expectedHash:before.hash,payload:JSON.stringify(board),account:board.syncAccount??null});assert.equal(result.ok,true);}
+  if(mode==='malformed receipt')write(key,'{unreadable exact scene original');const raw=sharedStorage.getItem(key),protectedHead=await store.readHead();await app.dispose();release();await flush();const reopened=await loadApp({sharedStorage,indexedDBProvider,deviceDbName});await waitSceneIntentBoot(reopened,sharedStorage);
+  assert.equal((await reopened.shim.window.ScannerDeviceStore.readHead()).hash,protectedHead.hash);assert.equal(sharedStorage.getItem(key),raw);assert.equal(reopened.ctx.deviceSaveIssue().stage,'scene-choice');reopened.ctx.openSettings();assert.equal(await reopened.ctx.onAction('export-backup',{isConnected:true}),true);const exported=await copyPreparedExport(reopened.ctx);assert.ok(exported.includes(raw.replaceAll('"','\\"'))||exported.includes(raw),'Existing Export preserves the unresolved exact local scene source');
+ });
+});
+
+test('RISK synced scene intent: interrupted replay and two tab originals never lose pending facts',async t=>{
+ await t.test('interrupted replay later succeeds',async()=>{
+  const {app,sharedStorage,indexedDBProvider,deviceDbName}=await sceneIntentTestFixture(),store=app.shim.window.ScannerDeviceStore,commit=store.commitHead.bind(store);let release;const gate=new Promise(resolve=>{release=resolve;});store.commitHead=async options=>{await gate;return commit(options);};app.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'23:15',season:'winter'}});await flush();await app.dispose();release();await flush();
+  let resume,delayed=0;const replayGate=new Promise(resolve=>{resume=resolve;}),cryptoProvider={randomUUID:()=>webcrypto.randomUUID(),getRandomValues:a=>webcrypto.getRandomValues(a),subtle:{digest:async(...args)=>{if(new TextDecoder().decode(args[1]).includes('"time":"23:15"')){delayed++;await replayGate;}return webcrypto.subtle.digest(...args);}}};
+  const interrupted=await loadApp({sharedStorage,indexedDBProvider,deviceDbName,cryptoProvider});const deadline=Date.now()+5000;while(!delayed&&Date.now()<deadline)await flush();assert.ok(delayed);assert.notEqual(interrupted.shim.documentElement.getAttribute('data-app-ready'),'true');const key=sceneIntentTestKeys(sharedStorage)[0],raw=sharedStorage.getItem(key);await interrupted.dispose();resume();await flush();assert.deepEqual(JSON.parse(sharedStorage.getItem(key)).events,JSON.parse(raw).events);assert.equal(JSON.parse(sharedStorage.getItem(key)).heads[0].hash,JSON.parse(raw).heads[0].hash);
+  const reopened=await loadApp({sharedStorage,indexedDBProvider,deviceDbName});await waitSceneIntentBoot(reopened,sharedStorage);assert.equal(JSON.parse((await reopened.shim.window.ScannerDeviceStore.readHead()).payload).settings.scene.time,'23:15');assert.deepEqual(sceneIntentTestKeys(sharedStorage),[]);
+ });
+ await t.test('two tabs retain distinct unresolved originals',async()=>{
+  const {app,sharedStorage,indexedDBProvider,deviceDbName}=await sceneIntentTestFixture(),second=await loadApp({sharedStorage,indexedDBProvider,deviceDbName});let release;const gate=new Promise(resolve=>{release=resolve;});for(const tab of [app,second]){const store=tab.shim.window.ScannerDeviceStore,commit=store.commitHead.bind(store);store.commitHead=async options=>{await gate;return commit(options);};}
+  const before=await app.shim.window.ScannerDeviceStore.readHead();app.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'23:15',season:'winter'}});second.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'07:10',season:'summer'}});await flush();const keys=sceneIntentTestKeys(sharedStorage),raws=keys.map(key=>sharedStorage.getItem(key));assert.ok(keys.length>=2);assert.equal(new Set(raws.flatMap(raw=>JSON.parse(raw).events.map(event=>event.actionId))).size,2);assert.notEqual(raws[0],raws[1]);await app.dispose();await second.dispose();release();await flush();const settledRaws=keys.map(key=>sharedStorage.getItem(key));for(let i=0;i<keys.length;i++)assert.deepEqual(JSON.parse(settledRaws[i]).events,JSON.parse(raws[i]).events);
+  const reopened=await loadApp({sharedStorage,indexedDBProvider,deviceDbName});await waitSceneIntentBoot(reopened,sharedStorage);assert.equal((await reopened.shim.window.ScannerDeviceStore.readHead()).hash,before.hash);assert.deepEqual(keys.map(key=>sharedStorage.getItem(key)),settledRaws);assert.equal(reopened.ctx.deviceSaveIssue().stage,'scene-choice');reopened.ctx.openSettings();assert.equal(await reopened.ctx.onAction('export-backup',{isConnected:true}),true);const exported=await copyPreparedExport(reopened.ctx);for(const key of keys)assert.ok(exported.includes(key));
+ });
+});
+
+
+test('RISK synced scene intent: bounded replay exposes the saved board and rejects a late hash completion',async()=>{
+ const {app,sharedStorage,indexedDBProvider,deviceDbName}=await sceneIntentTestFixture(),store=app.shim.window.ScannerDeviceStore,commit=store.commitHead.bind(store),before=await store.readHead();let release;const gate=new Promise(resolve=>{release=resolve;});store.commitHead=async options=>{await gate;return commit(options);};app.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'23:15',season:'winter'}});await flush();await app.dispose();release();await flush();
+ let resume;const delayed=new Promise(resolve=>{resume=resolve;}),cryptoProvider={randomUUID:()=>webcrypto.randomUUID(),getRandomValues:a=>webcrypto.getRandomValues(a),subtle:{digest:async(...args)=>{if(new TextDecoder().decode(args[1]).includes('"time":"23:15"'))await delayed;return webcrypto.subtle.digest(...args);}}};
+ const cold=await loadApp({sharedStorage,indexedDBProvider,deviceDbName,cryptoProvider,deviceOpenTimeoutMs:60});try{const deadline=Date.now()+300;while(!cold.ctx.deviceSaveIssue()&&Date.now()<deadline)await flush();assert.equal(cold.shim.documentElement.getAttribute('data-app-ready'),'true','A timed-out scene replay must expose the unchanged saved board, not wait indefinitely');assert.equal(cold.ctx.state.settings.scene.time,null);assert.equal(cold.ctx.deviceSaveIssue().stage,'scene-choice');}finally{resume();await flush();}
+ assert.equal((await cold.shim.window.ScannerDeviceStore.readHead()).hash,before.hash,'Expired replay cannot commit after a late real digest resolves');assert.ok(sceneIntentTestKeys(sharedStorage).length>=1);
+});
+
+
+test('RISK synced scene intent: foreign retirement cannot erase a newer live tab choice generation',async()=>{
+ const {app,sharedStorage,indexedDBProvider,deviceDbName}=await sceneIntentTestFixture(),store=app.shim.window.ScannerDeviceStore,commit=store.commitHead.bind(store);let release,entered;const gate=new Promise(resolve=>{release=resolve;}),committed=new Promise(resolve=>{entered=resolve;});store.commitHead=async options=>{const time=JSON.parse(options.payload).settings.scene.time;if(time==='07:10'){await gate;return commit(options);}const result=await commit(options);entered();await gate;return result;};
+ app.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'23:15',season:'winter'}});await committed;const remove=sharedStorage.removeItem.bind(sharedStorage);let overlap=0;
+ sharedStorage.removeItem=key=>{if(key.startsWith('fvp:chain-scanner:pending-scene-choice:v1:')&&!overlap++){app.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'07:10',season:'summer'}});}return remove(key);};
+ let other;try{other=await loadApp({sharedStorage,indexedDBProvider,deviceDbName});await waitSceneIntentBoot(other,sharedStorage);assert.ok(overlap);assert.equal(app.ctx.state.settings.scene.time,'07:10');const keys=sceneIntentTestKeys(sharedStorage);const durable=JSON.parse((await other.shim.window.ScannerDeviceStore.readHead()).payload);assert.ok(keys.some(key=>JSON.parse(sharedStorage.getItem(key)).events.some(event=>event.value==='07:10'))||durable.settings.scene.time==='07:10'&&durable.decisionEvents.some(event=>event.kind==='current-choice'&&event.target.type==='scene'&&event.value==='07:10'),'Retiring a read-back old generation must retain or durably confirm the new accepted live-tab scene original');}finally{sharedStorage.removeItem=remove;await app.dispose();await other?.dispose();release();await flush();}
+});
+
+
+test('RISK synced scene replay transaction: expiry during the actual store hash cannot replace the saved head',async()=>{
+ const {app,sharedStorage,indexedDBProvider,deviceDbName}=await sceneIntentTestFixture(),store=app.shim.window.ScannerDeviceStore,commit=store.commitHead.bind(store),before=await store.readHead();let release;const captureGate=new Promise(resolve=>{release=resolve;});store.commitHead=async options=>{await captureGate;return commit(options);};app.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'23:15',season:'winter'}});await flush();await app.dispose();release();await flush();
+ let resume,matching=0,logicalNow=0;const expiryTimers=new Map(),gate=new Promise(resolve=>{resume=resolve;}),cryptoProvider={randomUUID:()=>webcrypto.randomUUID(),getRandomValues:a=>webcrypto.getRandomValues(a),subtle:{digest:async(...args)=>{if(new TextDecoder().decode(args[1]).includes('\"time\":\"23:15\"')&&++matching===2)await gate;return webcrypto.subtle.digest(...args);}}};
+ const cold=await loadApp({sharedStorage,indexedDBProvider,deviceDbName,cryptoProvider,beforeStateReady(ctx){
+  // Host scheduling cannot spend the operation budget before the intended
+  // actual store hash is reached. Expire the unchanged production deadline
+  // only after that public persistence boundary positively enters.
+  ctx.performance={now:()=>logicalNow};const set=ctx.setTimeout,clear=ctx.clearTimeout;
+  ctx.setTimeout=(fn,ms,...args)=>{if(ms===5000){const id={sceneReplayExpiry:true};expiryTimers.set(id,()=>fn(...args));return id;}return set(fn,ms,...args);};
+  ctx.clearTimeout=id=>{if(!expiryTimers.delete(id))clear(id);};
+ }});try{await fixtureDeadline(async wait=>{while(matching!==2)await wait();},'Receipt hashing completes and the actual commitHead payload hash enters');assert.equal(matching,2);assert.equal(expiryTimers.size,1,'The real replay retains its one default production deadline');logicalNow=5001;for(const expire of [...expiryTimers.values()])expire();await fixtureDeadline(async wait=>{while(!cold.ctx.deviceSaveIssue())await wait();},'Expired replay exposes the original saved board');assert.equal(cold.shim.documentElement.getAttribute('data-app-ready'),'true');assert.equal(cold.ctx.state.settings.scene.time,null);}finally{resume();}
+ const deadline=Date.now()+5000;while(vm.runInContext('supportDiagnosticsActivePersistCalls',cold.ctx)>0&&Date.now()<deadline)await flush();assert.equal(vm.runInContext('supportDiagnosticsActivePersistCalls',cold.ctx),0);assert.equal(JSON.stringify(await cold.shim.window.ScannerDeviceStore.readHead()),JSON.stringify(before),'Expired second-store hashing must not replace the durable authoritative head');assert.ok(sceneIntentTestKeys(sharedStorage).length);assert.equal(cold.ctx.state.settings.scene.time,null);
+});
+
+
+test('RISK synced scene ordinary saves: held receipt sources never block unrelated durable task edits',async t=>{
+ for(const mode of ['malformed','sibling','unmatched','foreign','cleanup refusal'])await t.test(mode,async()=>{
+  const {app,sharedStorage,indexedDBProvider,deviceDbName}=await sceneIntentTestFixture(),store=app.shim.window.ScannerDeviceStore,commit=store.commitHead.bind(store),second=mode==='sibling'?await loadApp({sharedStorage,indexedDBProvider,deviceDbName}):null;let release;const gate=new Promise(resolve=>{release=resolve;});
+  store.commitHead=async options=>{if(mode==='cleanup refusal'){const result=await commit(options);await gate;return result;}await gate;return commit(options);};
+  if(second){const other=second.shim.window.ScannerDeviceStore,write=other.commitHead.bind(other);other.commitHead=async options=>{await gate;return write(options);};}
+  const initial=await store.readHead();app.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'23:15',season:'winter'}});if(second)second.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'07:10',season:'summer'}});await flush();
+  if(mode==='cleanup refusal'){const deadline=Date.now()+5000;while((await store.readHead()).hash===initial.hash&&Date.now()<deadline)await flush();assert.notEqual((await store.readHead()).hash,initial.hash);}
+  if(mode==='unmatched'||mode==='foreign'){const board=JSON.parse(initial.payload);board.futureNewHead={keep:'exact unrelated authoritative head'};if(mode==='foreign'){board.syncAccount='other@example.test';board.syncIdentity='other-current-identity';}assert.equal((await commit({expectedHash:initial.hash,payload:JSON.stringify(board),account:board.syncAccount??null})).ok,true);}
+  const keys=sceneIntentTestKeys(sharedStorage);assert.ok(keys.length);if(mode==='malformed')sharedStorage.setItem(keys[0],'{sole unreadable scene original');const remove=sharedStorage.removeItem.bind(sharedStorage);if(mode==='cleanup refusal')sharedStorage.removeItem=key=>{if(key.startsWith('fvp:chain-scanner:pending-scene-choice:v1:'))throw new DOMException('Controlled receipt cleanup refusal','SecurityError');return remove(key);};
+  const before=await store.readHead();await app.dispose();await second?.dispose();release();await flush();const originals=sceneIntentTestKeys(sharedStorage).map(key=>({key,raw:sharedStorage.getItem(key)}));
+  const cold=await loadApp({sharedStorage,indexedDBProvider,deviceDbName});await waitSceneIntentBoot(cold,sharedStorage);assert.ok(cold.ctx.deviceSaveIssue());cold.shim.document.getElementById('addInput').value='Useful new task beside held '+mode;await cold.ctx.onAction('add',{});assert.equal(await cold.ctx.persist(true),true,'An ordinary accepted task edit remains durably saveable beside '+mode+' scene originals');const head=await cold.shim.window.ScannerDeviceStore.readHead(),saved=JSON.parse(head.payload),prior=JSON.parse(before.payload);
+  assert.equal(saved.tasks.length,prior.tasks.length+1);assert.ok(saved.tasks.some(row=>row.title==='Useful new task beside held '+mode));assert.equal(JSON.stringify(saved.tasks.filter(row=>prior.tasks.some(old=>old.id===row.id))),JSON.stringify(prior.tasks));assert.equal(JSON.stringify(saved.settings.scene),JSON.stringify(prior.settings.scene));assert.equal(JSON.stringify(saved.futurePopulated),JSON.stringify(prior.futurePopulated));assert.deepEqual(sceneIntentTestKeys(sharedStorage).map(key=>({key,raw:sharedStorage.getItem(key)})),originals);await cold.dispose();
+  const reopened=await loadApp({sharedStorage,indexedDBProvider,deviceDbName});await waitSceneIntentBoot(reopened,sharedStorage);assert.ok(reopened.ctx.state.tasks.some(row=>row.title==='Useful new task beside held '+mode));assert.equal(JSON.stringify(reopened.ctx.state.settings.scene),JSON.stringify(prior.settings.scene));assert.deepEqual(sceneIntentTestKeys(sharedStorage).map(key=>({key,raw:sharedStorage.getItem(key)})),originals);sharedStorage.removeItem=remove;
+ });
+});
+
+
+test('RISK scene receipt Export: a source appended during the real snapshot is preserved as a partial observation',async()=>{
+ const {app,sharedStorage,indexedDBProvider,deviceDbName}=await sceneIntentTestFixture(),second=await loadApp({sharedStorage,indexedDBProvider,deviceDbName}),store=app.shim.window.ScannerDeviceStore,otherStore=second.shim.window.ScannerDeviceStore,read=store.readRawExportSnapshot.bind(store),commit=otherStore.commitHead.bind(otherStore),head=await store.readHead();let releaseRead,releaseWrite,entered,writeEntered=false;const readGate=new Promise(resolve=>{releaseRead=resolve;}),writeGate=new Promise(resolve=>{releaseWrite=resolve;}),started=new Promise(resolve=>{entered=resolve;});
+ store.readRawExportSnapshot=async()=>{const snapshot=await read();entered();await readGate;return snapshot;};otherStore.commitHead=async options=>{writeEntered=true;await writeGate;return commit(options);};
+ try{app.ctx.openSettings();const capture=app.ctx.onAction('export-backup',{isConnected:true});await started;assert.deepEqual(sceneIntentTestKeys(sharedStorage),[]);second.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'23:15',season:'winter'}});const deadline=Date.now()+5000;while(!writeEntered&&Date.now()<deadline)await flush();assert.equal(writeEntered,true);const originals=sceneIntentTestKeys(sharedStorage).map(key=>({key,raw:sharedStorage.getItem(key)}));assert.ok(originals.length,'The other live tab stages a real scene receipt during the held source read');releaseRead();assert.equal(await capture,true);const archive=JSON.parse(await copyPreparedExport(app.ctx));assert.equal(archive.manifest.status,'partial','A newly added source cannot be omitted from a complete archive');for(const row of originals){assert.ok(archive.manifest.failures.some(failure=>failure.source==='localStorage'&&failure.key===row.key&&failure.code==='changed-during-capture'));assert.equal(archive.repairInfo.localStorageAfter.find(after=>after.key===row.key)?.raw,row.raw,'The exact newly observed source remains in the established after-observation accounting');}assert.equal((await store.readHead()).hash,head.hash);assert.deepEqual(sceneIntentTestKeys(sharedStorage).map(key=>({key,raw:sharedStorage.getItem(key)})),originals);}finally{releaseRead();await app.dispose();await second.dispose();releaseWrite();await flush();}
+});
+
+
+test('RISK synced scene ordinary saves: a fresh current-account scene choice ignores a foreign receipt tip',async()=>{
+ const {app,sharedStorage,indexedDBProvider,deviceDbName}=await sceneIntentTestFixture(),store=app.shim.window.ScannerDeviceStore,commit=store.commitHead.bind(store),before=await store.readHead();let release;const gate=new Promise(resolve=>{release=resolve;});store.commitHead=async options=>{await gate;return commit(options);};app.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'23:15',season:'winter'}});await flush();const board=JSON.parse(before.payload);board.syncAccount='current@example.test';board.syncIdentity='current-identity';assert.equal((await commit({expectedHash:before.hash,payload:JSON.stringify(board),account:board.syncAccount})).ok,true);await app.dispose();release();await flush();const originals=sceneIntentTestKeys(sharedStorage).map(key=>({key,raw:sharedStorage.getItem(key)}));
+ const cold=await loadApp({sharedStorage,indexedDBProvider,deviceDbName});await waitSceneIntentBoot(cold,sharedStorage);cold.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'07:10',season:'summer'}});assert.equal(cold.ctx.state.settings.scene.time,'07:10');assert.equal(await cold.ctx.persist(true),true,'The applicable current-account scene proof cannot be rejected by a foreign account tip');const head=JSON.parse((await cold.shim.window.ScannerDeviceStore.readHead()).payload);assert.equal(head.syncAccount,'current@example.test');assert.equal(head.settings.scene.time,'07:10');for(const row of originals)assert.equal(sharedStorage.getItem(row.key),row.raw);
+});
+
+
+test('RISK DEVICE STORAGE V2: current attempt refusal fences all mutations and the real capacity retry',async t=>{
+ const {app}=await sceneIntentTestFixture(),store=app.shim.window.ScannerDeviceStore,before=await store.readHead();assert.equal((await store.putBackup({expectedHash:before.hash,backup:{id:'existing-attempt-backup',payload:'existing exact backup',kind:'manual'}})).ok,true);const original=JSON.stringify(await store.readRawExportSnapshot()),board=JSON.parse(before.payload);board.futureAttempt={keep:'new guarded bytes'};
+ const options={expectedHash:before.hash,payload:JSON.stringify(board),account:before.account,backup:{id:'new-attempt-backup',payload:'new exact backup',kind:'manual'},removeBackupIds:[(await store.listBackups())[0].id]};
+ for(const isCurrent of [()=>false,()=>{throw Error('Controlled revoked attempt');},()=>Promise.resolve(true)]){
+  const result=await store.commitHead({...options,isCurrent});assert.equal(result.code,'stale-attempt');assert.equal(JSON.stringify(await store.readRawExportSnapshot()),original,'A false, throwing or asynchronous predicate cannot mutate the head, backup graph or originals');
+ }
+ let current=true,calls=0;const commit=store.commitHead.bind(store),guarded={...options,isCurrent:()=>current};app.shim.localStorage.setItem('fvp:chain-scanner:restart-diagnostics:v1','expendable capacity record');
+ const port={async commitHead(received){calls++;assert.equal(received,guarded,'The existing capacity retry retains the exact guarded options');if(calls===1){current=false;throw Object.assign(Error('Controlled first-call capacity refusal'),{name:'QuotaExceededError'});}return commit(received);}};
+ const retried=await app.shim.window.__chainDeviceWriteCapacity('commitHead',guarded,port);assert.equal(calls,2);assert.equal(retried.code,'stale-attempt');assert.equal(JSON.stringify(await store.readRawExportSnapshot()),original,'The actual retry reaches the real store and refuses an expired attempt without mutation');
+ const accepted=await store.commitHead(options);assert.equal(accepted.ok,true,'Unchanged ordinary callers need no optional attempt predicate');assert.equal((await store.readHead()).payload,options.payload);assert.ok((await store.listBackups()).some(row=>row.id==='new-attempt-backup'));assert.equal((await store.listBackups()).some(row=>row.id===options.removeBackupIds[0]),false);
+});
+
+
+test('RISK repository process: stress engine loss requires the actual kernel and owned exit evidence',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-name-pattern=mobile stress owned engine loss','scripts/agent-tools/mobile-memory.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:10000,maxBuffer:4*1024*1024});
+ assert.equal(result.error,undefined);assert.equal(result.status,0,'The actual immutable stress verifier must report observed owned engine loss while refusing unrelated driver faults: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# skipped 0$/m);
+});
+
+test('RISK synced scene repaint: unchanged mirrored locations retain storage without announcing another scene',()=>{
+ const runtime=livingLocation();runtime.location.init();
+ const tokyo={latitude:35.6762,longitude:139.6503,timezone:'Asia/Tokyo',label:'Studio',enabled:true};
+ runtime.location.applySynced(tokyo);assert.equal(runtime.events.length,1);
+ runtime.values.set('fvp:chain-scanner:location','stale mirror');runtime.location.applySynced({...tokyo});
+ assert.deepEqual(JSON.parse(runtime.values.get('fvp:chain-scanner:location')),tokyo,'same scene repairs its exact storage mirror');
+ assert.equal(runtime.events.length,1,'an unchanged effective scene must not request another sky repaint');
+ runtime.location.applySynced({...tokyo,label:'Renamed'});assert.equal(runtime.events.length,2,'an actual location label change is announced');
+ runtime.location.applySynced(null);assert.equal(runtime.events.length,3,'returning to the default sky is announced');assert.equal(runtime.values.has('fvp:chain-scanner:location'),false);
+ runtime.values.set('fvp:chain-scanner:location','stale mirror');runtime.location.applySynced(null);assert.equal(runtime.events.length,3);assert.equal(runtime.values.has('fvp:chain-scanner:location'),false);
+});
+
+test('RISK repository process: ordinary task Undo keeps unchanged scenery while separate scene choices repaint and save',async t=>{
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});const output=fs.mkdtempSync(path.join(base,'undo-scene-paint-'));
+ const {waitForTruthyProbe}=await import('./scripts/agent-tools/async-probe.mjs');
+ const playwright=await import('playwright'),launch=playwright.chromium.launch,{runButtonSafety}=await import('./scripts/button-safety-native.mjs');let probeFailure;const evidence={observations:[]};
+ t.after(()=>{playwright.chromium.launch=launch;});
+ playwright.chromium.launch=async(...args)=>{const browser=await launch.apply(playwright.chromium,args),newContext=browser.newContext.bind(browser);browser.newContext=async(...args)=>{
+  const context=await newContext(...args),close=context.close.bind(context);
+  await context.addInitScript(()=>{
+   const NativeDate=Date,at=Date.parse('2026-10-06T03:23:42.125Z');globalThis.Date=class extends NativeDate{constructor(...args){super(...(args.length?args:[at]));}static now(){return at;}};
+   window.__undoScenePaint={clears:0,undoPresses:0,before:null};const clear=CanvasRenderingContext2D.prototype.clearRect;
+   CanvasRenderingContext2D.prototype.clearRect=function(...args){if(this.canvas.matches('[data-life],[data-scenery]'))__undoScenePaint.clears++;return clear.apply(this,args);};
+   document.addEventListener('pointerdown',event=>{if(event.isTrusted&&event.target.closest('[data-act="undo"]')){if(__undoScenePaint.undoPresses===0)__undoScenePaint.before=__undoScenePaint.clears;__undoScenePaint.undoPresses++;}},true);
+  });
+  context.close=async(...args)=>{try{for(const page of context.pages())if(await page.evaluate(()=>window.__undoScenePaint?.undoPresses===10)){
+   const ordinary=await page.evaluate(()=>({...__undoScenePaint,scene:JSON.stringify(state.settings.scene),tasks:JSON.stringify(state.tasks)}));
+   assert.equal(ordinary.undoPresses,10,'ten actual task Undo inputs execute');assert.equal(ordinary.clears,ordinary.before,'ordinary title Undo must not repaint unchanged scenery');
+   await page.locator('[data-act="edit"][data-id="synthetic-kept"]').first().click();await page.locator('#etTitle').fill('Task edit before separate scene choice');await page.locator('#modalRoot [data-act="save-edit"]').click();
+   await page.locator('#appHeader [data-act="settings"]').click();await page.locator('[data-act="scene-time-settings"]').click();await page.locator('#sceneSeasonInput').selectOption('winter');await page.locator('#sceneTimeInput').fill('23:15');await page.locator('[data-scene-time="lock"]').click();
+   await waitForTruthyProbe(async()=>{const saved=await page.evaluate(async()=>JSON.parse((await ScannerDeviceStore.readHead()).payload));return saved.settings.scene.time==='23:15';},{timeoutMs:4000});await page.locator('#sceneTimeDialog [data-scene-time="close"]').click();await page.locator('#modalRoot [data-act="close-modal"]').click();
+   const selected=await page.evaluate(()=>({clears:__undoScenePaint.clears,scene:JSON.stringify(state.settings.scene)}));assert.notEqual(selected.scene,ordinary.scene);assert.ok(selected.clears>ordinary.clears,'changed scene paints');
+   await page.locator('#appHeader [data-act="undo"]').click();await waitForTruthyProbe(async()=>{const saved=await page.evaluate(async()=>JSON.parse((await ScannerDeviceStore.readHead()).payload));return saved.tasks.find(task=>task.id==='synthetic-kept').title===JSON.parse(ordinary.tasks).find(task=>task.id==='synthetic-kept').title&&saved.settings.scene.time==='23:15';},{timeoutMs:4000});
+   const restored=await page.evaluate(()=>({clears:__undoScenePaint.clears,scene:JSON.stringify(state.settings.scene),tasks:JSON.stringify(state.tasks),time:LivingSky.readSceneTime(localStorage),season:LivingSky.readSceneSeason(localStorage)}));assert.equal(restored.scene,selected.scene,'task Undo cannot absorb a separate scene choice');assert.equal(restored.tasks,ordinary.tasks,'task Undo restores all original task data');assert.equal(restored.time,'23:15');assert.equal(restored.season,'winter');assert.equal(restored.clears,selected.clears,'same-scene task Undo does not repaint');evidence.observations.push({ordinary,selected,restored});
+  }}catch(error){probeFailure=error;}finally{await close(...args);}};return context;};return browser;};
+ let result;try{result=await runButtonSafety({repo:__dirname,engine:'chromium',port:Number(process.env.CHAIN_NATIVE_PORT||0),outputDir:output,scenarioFilter:'rapid Undo consumes ten actual saved edit frames'});}finally{playwright.chromium.launch=launch;evidence.probeFailure=probeFailure?.stack;fs.writeFileSync(path.join(output,'scene-paint-observation.json'),JSON.stringify(evidence,null,2)+'\n');}
+ for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(result.report.cleanup[key],true);if(probeFailure)throw probeFailure;assert.equal(evidence.observations.length,1);t.diagnostic('Real task and scene Undo paint evidence: '+output);
+});
+
+test('RISK repository process: native frame accounting separates pre-input and post-input stalls without waiving either',async t=>{
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});const output=fs.mkdtempSync(path.join(base,'native-frame-phases-'));
+ const playwright=await import('playwright'),launch=playwright.chromium.launch,{runButtonSafety}=await import('./scripts/button-safety-native.mjs');t.after(()=>{playwright.chromium.launch=launch;});
+ for(const phase of ['pre-input','post-input'])await t.test(phase,async()=>{
+  const directory=path.join(output,phase);let failure;
+  if(phase==='pre-input')playwright.chromium.launch=async(...args)=>{const browser=await launch.apply(playwright.chromium,args),newContext=browser.newContext.bind(browser);browser.newContext=async(...args)=>{const context=await newContext(...args),newPage=context.newPage.bind(context);context.newPage=async(...args)=>{
+   const page=await newPage(...args),locator=page.locator.bind(page),wrapped=new WeakSet();let injected=false;
+   const wrap=target=>{if(wrapped.has(target))return target;wrapped.add(target);const first=target.first.bind(target),click=target.click.bind(target);target.first=(...args)=>wrap(first(...args));target.click=async(...args)=>{if(!injected){injected=true;await page.evaluate(()=>{const until=performance.now()+1300;while(performance.now()<until){}});}return click(...args);};return target;};page.locator=(...args)=>wrap(locator(...args));return page;
+  };return context;};return browser;};
+  try{await runButtonSafety({repo:__dirname,engine:'chromium',port:Number(process.env.CHAIN_NATIVE_PORT||0),outputDir:directory,probe:true,control:phase==='post-input'?'short-stall':null});}catch(error){failure=error;}finally{playwright.chromium.launch=launch;}
+  assert.ok(failure,'the actual 1300ms stall remains blocking');const files=fs.readdirSync(directory).filter(name=>/^button-safety-.*\.json$/.test(name));assert.equal(files.length,1);const report=JSON.parse(fs.readFileSync(path.join(directory,files[0])));
+  assert.equal(report.status,'failed');assert.deepEqual(report.errors,[]);assert.ok(report.clicks.some(row=>row.trusted&&row.action==='act:settings'),'actual trusted input still reaches Settings');assert.equal(report.samples.length,1);
+  const sample=report.samples[0];assert.ok(sample.maxFrameGapMs>=1000,'the original complete-step frame measure still blocks');
+  if(phase==='pre-input'){assert.ok(sample.preInputMaxFrameGapMs>=1000,'the observed stall predates input');assert.ok(Number.isFinite(sample.inputMaxFrameGapMs)&&sample.inputMaxFrameGapMs<1000,'healthy actual input is measured separately');assert.match(report.failure,/blocked frame loop: pre-input \/ /);}
+  else{assert.ok(sample.inputMaxFrameGapMs>=1000,'actual post-input stall remains attributed to input');assert.match(report.failure,/blocked frame loop/);}
+  for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(report.cleanup[key],true);t.diagnostic('Failed detector report retained: '+path.join(directory,files[0]));
+ });
+});
+
+
+test('RISK Undo scene guidance: FAQ and Changelog explain task Undo keeps scene choices',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'index.html'),'utf8'),faq=source.match(/<dt>Can I undo, restore, or remove a task\?<\/dt><dd>(.*?)<\/dd>/s)?.[1],changelog=source.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1];
+ assert.match(faq||'',/Task Undo keeps scene choices\./);assert.match(changelog||'',/Task Undo responds faster while keeping your scene choices\./);
+});
+
+test('RISK scenery backdrop cache: first unchanged lighting timer reuses actual pixels while changed slots and loaded copy still paint',async t=>{
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});const directory=fs.mkdtempSync(path.join(base,'painted-slot-'));
+ const playwright=await import('playwright'),launch=playwright.webkit.launch,{runButtonSafety}=await import('./scripts/button-safety-native.mjs');
+ const evidence={kind:'nonqualifying-deterministic-renderer-consumer',route:[],limits:['Local uncapped emulated mobile rendering and exact pixel/source preservation; no hosted memory/timing or physical-device claim.']},finished=Error('Causal painted-slot probe complete; not native acceptance');let releaseBank,probeError;
+ const gate=new Promise(resolve=>{releaseBank=resolve;});
+ t.after(()=>{releaseBank();playwright.webkit.launch=launch;});
+ playwright.webkit.launch=async(...args)=>{
+  const browser=await launch.apply(playwright.webkit,args),newContext=browser.newContext.bind(browser);browser.newContext=async(...args)=>{
+   const context=await newContext(...args),newPage=context.newPage.bind(context);context.newPage=async(...args)=>{
+    const page=await newPage(...args),goto=page.goto.bind(page);await page.addInitScript(()=>{const NativeDate=Date;globalThis.__paintedSlotAt=Date.parse('2026-10-06T03:23:42.125Z');globalThis.Date=class extends NativeDate{constructor(...args){super(...(args.length?args:[globalThis.__paintedSlotAt]));}static now(){return globalThis.__paintedSlotAt;}};});
+    await page.route('**/HUMAN_WRITTEN_HOURLY_TAGS.md',async route=>{await gate;const response=await route.fetch(),original=await response.text(),body=original+'\n## Any time of day\n- Controlled scenery text\n## Skywriters\n- HELLO\n';const hash=value=>createHash('sha256').update(value).digest('hex');evidence.bankRoute={originalSha256:hash(original),fixtureSha256:hash(body)};await route.fulfill({response,body});});
+    await page.route('**/landscape.js',async route=>{
+     const response=await route.fetch();assert.equal(response.status(),200);let body=await response.text();const hash=value=>createHash('sha256').update(value).digest('hex');assert.equal(hash(body),hash(fs.readFileSync(path.join(__dirname,'landscape.js'))));
+     const anchor="  window.addEventListener('pageshow'",ready="  document.dispatchEvent(new CustomEvent('landscape-scene-time-ready'));";assert.ok(body.includes(anchor)&&body.includes(ready));
+     const instrumentation=`
+      const cacheProbe={backgrounds:0,lives:0};globalThis.paintedSlotProbe=cacheProbe;
+      const paintBackdrop=paintBackground,paintVisitors=paintLife;paintBackground=(...args)=>{const result=paintBackdrop(...args);cacheProbe.backgrounds++;return result;};paintLife=(...args)=>{const result=paintVisitors(...args);cacheProbe.lives++;return result;};
+      cacheProbe.read=()=>({backgrounds:cacheProbe.backgrounds,lives:cacheProbe.lives,slot:sceneSnapshot.windowsSlot,paintedSlot:lastCitySlot,back:back.toDataURL(),status:status.textContent,scene:JSON.parse(JSON.stringify(sceneSnapshot))});
+      cacheProbe.advance=()=>{advanceRooftopParty(1);return cacheProbe.read();};cacheProbe.repaint=()=>{refreshSky();return cacheProbe.read();};
+     `;
+     const sourceSha256=hash(body);body=body.replace(anchor,instrumentation+'\n'+anchor).replace(ready,"  paintedSlotProbe.initial=paintedSlotProbe.read();paintedSlotProbe.unchanged=paintedSlotProbe.advance();\n"+ready);
+     evidence.route.push({sourceSha256,injectedSha256:hash(body),bytes:Buffer.byteLength(body)});await route.fulfill({response,body});
+    });
+    page.goto=async(url,...args)=>{
+     const response=await goto(url,...args);if(url.endsWith('__button-observer'))return response;
+     try{
+      await page.waitForFunction(()=>window.paintedSlotProbe?.unchanged&&document.documentElement.dataset.appReady==='true'&&window.CloudSync?.ready,null,{polling:100});
+      evidence.before=await page.evaluate(()=>{const p=paintedSlotProbe;return{initial:p.initial,unchanged:p.unchanged,taskCount:state.tasks.length,bankPending:p.read().status===''};});
+      releaseBank();await page.waitForFunction(()=>document.getElementById('sceneStatus').textContent.includes('Human written'),null,{polling:100});evidence.bank=await page.evaluate(()=>paintedSlotProbe.read());
+      evidence.changed=await page.evaluate(()=>{const before=paintedSlotProbe.read();globalThis.__paintedSlotAt+=8000;const after=paintedSlotProbe.advance(),fresh=paintedSlotProbe.repaint();return{before,after,fresh};});
+      evidence.stored=await page.evaluate(async()=>{const head=await ScannerDeviceStore.readHead(),saved=JSON.parse(head.payload);return{durableTasks:saved.tasks.length,retainedSources:await Promise.all((await ScannerDeviceStore.listBackups()).filter(row=>row.id.startsWith('gate-retained-')).sort((a,b)=>a.id.localeCompare(b.id)).map(async row=>({id:row.id,payloadHash:await ChainStorageV2.hashPayload(row.payload)}))),unknownBytes:saved.futurePopulated.opaque.length};});
+     }catch(error){probeError=error;}finally{releaseBank();}throw finished;
+    };return page;
+   };return context;
+  };return browser;
+ };
+ try{await assert.rejects(()=>runButtonSafety({repo:__dirname,engine:'webkit',port:Number(process.env.CHAIN_NATIVE_PORT),outputDir:directory,mobileYesMotion:'reduced'}),error=>error===finished);}
+ finally{releaseBank();playwright.webkit.launch=launch;evidence.probeError=probeError?.stack;const files=fs.readdirSync(directory).filter(name=>/^button-safety-webkit-.*\.json$/.test(name));if(files.length===1){const native=JSON.parse(fs.readFileSync(path.join(directory,files[0])));evidence.nativeReportPath=path.join(directory,files[0]);evidence.cleanup=native.cleanup;evidence.preparedSources=native.retainedSources[0].bootstrap.retainedSources.map(({id,payloadHash})=>({id,payloadHash}));}
+  fs.writeFileSync(path.join(directory,'painted-slot-observation.json'),JSON.stringify(evidence,null,2)+'\n');}
+ if(probeError)throw probeError;
+ for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(evidence.cleanup?.[key],true);
+ const {initial,unchanged}=evidence.before;assert.equal(evidence.before.taskCount,400);assert.equal(evidence.stored.durableTasks,400);assert.equal(evidence.stored.unknownBytes,1048576);assert.equal(evidence.stored.retainedSources.length,2);assert.deepEqual(evidence.stored.retainedSources,evidence.preparedSources,'Both protected source payloads remain byte exact');
+ assert.equal(initial.backgrounds,1,'Initial full backdrop still paints once');assert.equal(unchanged.backgrounds,initial.backgrounds,'First unchanged lighting timer must reuse the backdrop already painted');assert.equal(unchanged.lives,initial.lives,'Unchanged Reduced membership must not redraw life');assert.equal(unchanged.back,initial.back,'The cached actual raster bytes remain exact');assert.deepEqual(unchanged.scene,initial.scene);
+ assert.equal(initial.paintedSlot,initial.slot,'The initial pixels record their actual lighting slot');assert.equal(evidence.before.bankPending,true);assert.match(evidence.bank.status,/Human written/);assert.equal(evidence.bank.back,initial.back,'Newly loaded copy retains the exact same fixed-time backdrop');
+ assert.notEqual(evidence.changed.before.slot,evidence.changed.after.slot,'Positive control advances the real lighting slot');assert.equal(evidence.changed.after.backgrounds,evidence.changed.before.backgrounds+1,'A genuinely changed slot must repaint');assert.equal(evidence.changed.after.paintedSlot,evidence.changed.after.slot);assert.equal(evidence.changed.fresh.backgrounds,evidence.changed.after.backgrounds+1,'Independent full refresh actually repaints');assert.equal(evidence.changed.after.back,evidence.changed.fresh.back,'Changed-slot pixels equal a complete refresh at the same instant, even when window states hold across slots');
+ t.diagnostic('Nonqualifying deterministic rendered consumer: '+directory);
+});
+
+test('RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh',async t=>{
+ for(const [motion,change] of [['reduced',false],['normal',false],['reduced',true]])await t.test(motion+(change?' pending scene change':' unchanged scene'),async t=>{
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});const directory=fs.mkdtempSync(path.join(base,'late-copy-'));
+ const playwright=await import('playwright'),launch=playwright.webkit.launch,{runButtonSafety}=await import('./scripts/button-safety-native.mjs');
+ const evidence={kind:'nonqualifying-deterministic-renderer-consumer',route:[],limits:['Local uncapped emulated mobile rendering and exact pixel/source preservation; no hosted memory/timing or physical-device claim.']},finished=Error('Causal late-copy probe complete; not native acceptance');let releaseBank,probeError;
+ const gate=new Promise(resolve=>{releaseBank=resolve;});
+ t.after(()=>{releaseBank();playwright.webkit.launch=launch;});
+ playwright.webkit.launch=async(...args)=>{
+  const browser=await launch.apply(playwright.webkit,args),newContext=browser.newContext.bind(browser);browser.newContext=async(...args)=>{
+   const context=await newContext(...args),newPage=context.newPage.bind(context);context.newPage=async(...args)=>{
+    const page=await newPage(...args),goto=page.goto.bind(page);await page.addInitScript(()=>{const NativeDate=Date;globalThis.__paintedSlotAt=Date.parse('2026-10-06T03:23:42.125Z');globalThis.Date=class extends NativeDate{constructor(...args){super(...(args.length?args:[globalThis.__paintedSlotAt]));}static now(){return globalThis.__paintedSlotAt;}};});
+    await page.route('**/HUMAN_WRITTEN_HOURLY_TAGS.md',async route=>{await gate;const response=await route.fetch(),original=await response.text(),body=original+'\n## Any time of day\n- Controlled scenery text\n## Skywriters\n- HELLO\n';const hash=value=>createHash('sha256').update(value).digest('hex');evidence.bankRoute={originalSha256:hash(original),fixtureSha256:hash(body)};await route.fulfill({response,body});});
+    await page.route('**/landscape.js',async route=>{
+     const response=await route.fetch();assert.equal(response.status(),200);let body=await response.text();const hash=value=>createHash('sha256').update(value).digest('hex');assert.equal(hash(body),hash(fs.readFileSync(path.join(__dirname,'landscape.js'))));
+     const anchor="  window.addEventListener('pageshow'",ready="  document.dispatchEvent(new CustomEvent('landscape-scene-time-ready'));";assert.ok(body.includes(anchor)&&body.includes(ready));
+     const instrumentation=`
+      const cacheProbe={backgrounds:0,lives:0,paints:[]};globalThis.paintedSlotProbe=cacheProbe;
+      const paintBackdrop=paintBackground,paintVisitors=paintLife;paintBackground=(...args)=>{const result=paintBackdrop(...args);cacheProbe.backgrounds++;if(cacheProbe.paints.length<12)cacheProbe.paints.push({stack:new Error().stack,skyDate:+sky.date,slot:sceneSnapshot.windowsSlot,pixels:back.toDataURL()});return result;};paintLife=(...args)=>{const result=paintVisitors(...args);cacheProbe.lives++;return result;};
+      cacheProbe.read=()=>({backgrounds:cacheProbe.backgrounds,lives:cacheProbe.lives,paints:cacheProbe.paints,slot:sceneSnapshot.windowsSlot,paintedSlot:lastCitySlot,back:back.toDataURL(),status:status.textContent,skyDate:+sky.date,signatureBytes:new TextEncoder().encode(JSON.stringify([sky,p,sceneSeason,sceneSnapshot.gardens,lastCitySlot,W,H,dpr])).length,visitors:JSON.parse(JSON.stringify(world.events)),scene:JSON.parse(JSON.stringify(sceneSnapshot))});
+      cacheProbe.stop=stop;cacheProbe.advance=()=>{advanceRooftopParty(1);return cacheProbe.read();};cacheProbe.repaint=()=>{refreshSky();return cacheProbe.read();};
+     `;
+     const sourceSha256=hash(body);body=body.replace(anchor,instrumentation+'\n'+anchor).replace(ready,"  paintedSlotProbe.initial=paintedSlotProbe.read();paintedSlotProbe.unchanged=paintedSlotProbe.advance();\n"+ready);
+     evidence.route.push({sourceSha256,injectedSha256:hash(body),bytes:Buffer.byteLength(body)});await route.fulfill({response,body});
+    });
+    page.goto=async(url,...args)=>{
+     const response=await goto(url,...args);if(url.endsWith('__button-observer'))return response;
+     try{
+      await page.waitForFunction(()=>window.paintedSlotProbe?.unchanged&&document.documentElement.dataset.appReady==='true'&&window.CloudSync?.ready,null,{polling:100});
+      evidence.before=await page.evaluate(change=>{const p=paintedSlotProbe;window.dispatchEvent(new PageTransitionEvent('pageshow'));p.stop();const before=p.read();if(change){globalThis.__paintedSlotAt+=3600000;LivingLocation.applySynced({latitude:51.5074,longitude:-.1278,timezone:'Europe/London',label:'Controlled London',enabled:true});paintedSlotProbe.stop();globalThis.__paintedSlotAt+=60000;}return{initial:p.initial,unchanged:p.unchanged,taskCount:state.tasks.length,bankPending:before.status==='',before,pending:p.read()};},change);
+      releaseBank();await page.waitForFunction(()=>document.getElementById('sceneStatus').textContent.includes('Human written'),null,{polling:100});evidence.bank=await page.evaluate(()=>paintedSlotProbe.read());
+      evidence.fresh=await page.evaluate(()=>paintedSlotProbe.repaint());
+      evidence.stored=await page.evaluate(async()=>{const head=await ScannerDeviceStore.readHead(),saved=JSON.parse(head.payload);return{durableTasks:saved.tasks.length,retainedSources:await Promise.all((await ScannerDeviceStore.listBackups()).filter(row=>row.id.startsWith('gate-retained-')).sort((a,b)=>a.id.localeCompare(b.id)).map(async row=>({id:row.id,payloadHash:await ChainStorageV2.hashPayload(row.payload)}))),unknownBytes:saved.futurePopulated.opaque.length};});
+     }catch(error){probeError=error;}finally{releaseBank();}throw finished;
+    };return page;
+   };return context;
+  };return browser;
+ };
+ try{await assert.rejects(()=>runButtonSafety({repo:__dirname,engine:'webkit',port:Number(process.env.CHAIN_NATIVE_PORT),outputDir:directory,mobileYesMotion:motion}),error=>error===finished);}
+ finally{releaseBank();playwright.webkit.launch=launch;evidence.probeError=probeError?.stack;const files=fs.readdirSync(directory).filter(name=>/^button-safety-webkit-.*\.json$/.test(name));if(files.length===1){const native=JSON.parse(fs.readFileSync(path.join(directory,files[0])));evidence.nativeReportPath=path.join(directory,files[0]);evidence.cleanup=native.cleanup;evidence.preparedSources=native.retainedSources[0].bootstrap.retainedSources.map(({id,payloadHash})=>({id,payloadHash}));}
+  fs.writeFileSync(path.join(directory,'late-copy-observation.json'),JSON.stringify(evidence,null,2)+'\n');}
+ if(probeError)throw probeError;
+ for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(evidence.cleanup?.[key],true);
+ const {initial,before,pending}=evidence.before;assert.equal(evidence.before.taskCount,400);assert.equal(evidence.stored.durableTasks,400);assert.equal(evidence.stored.unknownBytes,1048576);assert.equal(evidence.stored.retainedSources.length,2);assert.deepEqual(evidence.stored.retainedSources,evidence.preparedSources,'Both protected source payloads remain byte exact');
+ assert.equal(initial.backgrounds,1,'Initial full backdrop still paints once');assert.equal(before.backgrounds,1,'Unchanged native pageshow and initial hourly copy must reuse the initial backdrop');assert.equal(evidence.before.bankPending,true);assert.match(evidence.bank.status,/Controlled scenery text.*Human written/);assert.equal(evidence.bank.lives,pending.lives+1,'Loading the bank still paints current visitors once');
+ if(change){assert.ok(pending.backgrounds>before.backgrounds,'Public location change while the bank is pending performs a full scene refresh');assert.notEqual(pending.back,before.back,'Changed location and time actually change rendered pixels');assert.equal(evidence.bank.backgrounds,pending.backgrounds+1,'A further changed minute while pending still paints its fresh sky');assert.notEqual(evidence.bank.skyDate,pending.skyDate,'Delayed response uses the current effective scene date');}
+ else{assert.equal(evidence.bank.back,before.back,'New text preserves the exact already rendered backdrop');assert.equal(evidence.bank.backgrounds,before.backgrounds,'Loading only new text must not repaint an identical backdrop');assert.deepEqual(evidence.bank.scene,before.scene,'Text loading cannot move the shared scene at a fixed instant');}
+ assert.equal(evidence.fresh.backgrounds,evidence.bank.backgrounds+1,'Independent full refresh actually repaints');assert.equal(evidence.fresh.back,evidence.bank.back,'Bank response pixels equal an independent complete current-scene refresh');assert.equal(evidence.fresh.status,evidence.bank.status,'Bank response copy equals an independent complete current-scene refresh');assert.deepEqual(evidence.fresh.visitors,evidence.bank.visitors,'Bank response keeps current-flight reconciliation equivalent to a complete refresh');
+ const flight=sharedSkywriterConsumer(false,true);flight.context.LandscapeMood.setHumanText('## Skywriters\n- HELLO');flight.context.syncScene(123000);assert.equal(flight.context.world.events[0].skywriterWord,'HELLO','Actual current-flight consumer adopts the newly loaded bank');
+ t.diagnostic('Nonqualifying deterministic late-copy consumer: '+directory);
+ });
 });

@@ -25,6 +25,7 @@ function fixture(t, grouped=false) {
   writeFileSync(path.join(source, 'package.json'), JSON.stringify({ private: true, scripts: { test: 'node --test tests.js' } }));
   writeFileSync(path.join(source, 'tests.js'), "import { test } from 'node:test';test('isolated routing fixture',()=>{});\n");
   if(grouped){for(const file of ['.github/workflows/data-safety.yml','scripts/test-group-inventory.json','scripts/test-group-assignments.json','scripts/test-groups.mjs','scripts/agent-tools/ci-routing.mjs']){mkdirSync(path.dirname(path.join(source,file)),{recursive:true});writeFileSync(path.join(source,file),'fixture '+file+'\n');}}
+  if(grouped==='mobile')writeFileSync(path.join(source,'.github/workflows/data-safety.yml'),readFileSync(path.join(repo,'.github/workflows/data-safety.yml')));
   git(source, 'add', '.'); git(source, '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'fixture base');
   const base = git(source, 'rev-parse', 'HEAD');
   writeFileSync(path.join(source, 'candidate.txt'), 'isolated candidate\n');
@@ -357,4 +358,31 @@ test('metadata edits continue past verified covered runs to the original full pr
   github.jobsByRun={'71':github.jobs,'72':covered};github.runs.unshift({...github.runs[0],id:72,run_attempt:1});writeFileSync(f.external,JSON.stringify(github));
   const edited=invoke(f,{event:'pull_request',checkout:f.merge,action:'edited',changes:{title:{from:'earlier title'}},environment:descriptorFor(f,f.merge)});
   assert.equal(edited.status,0,edited.stderr);assert.equal(edited.record.decision,'reuse',edited.stdout);assert.equal(edited.record.coveredBy.runId,'71');assert.equal(edited.record.coveredBy.runAttempt,'2');assert.equal(executions(f).length,1);
+});
+
+
+test('current grouped routing requires the completed capped mobile producer before reuse',async parent=>{
+ const scenarios=[
+  ['complete current producer',()=>{},'reuse'],
+  ['missing mobile',x=>{x.jobs=x.jobs.filter(job=>job.name!=='mobile-WebKit-1GB-and-512MB-stress');},'full'],
+  ['failed mobile',x=>{x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress').conclusion='failure';},'full'],
+  ['skipped mobile',x=>{x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress').conclusion='skipped';},'full'],
+  ['canceled mobile',x=>{x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress').conclusion='cancelled';},'full'],
+  ['running mobile',x=>{x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress').status='in_progress';},'full'],
+  ['wrong mobile attempt',x=>{x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress').run_attempt=1;},'full'],
+  ['wrong mobile source',x=>{x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress').head_sha='0'.repeat(40);},'full'],
+  ['duplicate mobile',x=>{x.jobs.push({...x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress')});},'full'],
+  ['valid mobile plus failed duplicate',x=>{x.jobs.push({...x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress'),conclusion:'failure'});},'full'],
+  ['valid mobile plus running duplicate',x=>{x.jobs.push({...x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress'),status:'in_progress'});},'full'],
+  ['valid mobile plus wrong-run duplicate',x=>{x.jobs.push({...x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress'),run_id:72});},'full'],
+  ['valid mobile plus wrong-attempt duplicate',x=>{x.jobs.push({...x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress'),run_attempt:1});},'full'],
+  ['valid mobile plus wrong-source duplicate',x=>{x.jobs.push({...x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress'),head_sha:'0'.repeat(40)});},'full'],
+  ['valid core plus failed duplicate',x=>{x.jobs.push({...x.jobs.find(job=>job.name==='regression-core'),conclusion:'failure'});},'full'],
+ ];
+ for(const [name,mutate,decision]of scenarios)await parent.test(name,t=>{
+  const f=fixture(t,'mobile'),first=invoke(f,{event:'pull_request',ref:'refs/pull/17/merge',checkout:f.merge,environment:descriptorFor(f,f.merge)});assert.equal(first.status,0,first.stderr);
+  const github=publishedGroups(f,first.record);github.jobs.push({...github.jobs.find(job=>job.name==='regression-core'),name:'mobile-WebKit-1GB-and-512MB-stress'});mutate(github);writeFileSync(f.external,JSON.stringify(github));
+  const second=invoke(f,{environment:descriptorFor(f,f.head)});assert.equal(second.status,0,second.stderr);assert.equal(second.record?.decision,decision,'Actual current workflow producer policy: '+second.stdout+second.stderr);
+  if(decision==='reuse'){assert.equal(second.record.coveredBy.runId,'71');assert.equal(second.record.coveredBy.runAttempt,'2');assert.equal(second.record.coveredBy.checkoutSha,f.merge);assert.equal(second.record.validationContext.sourceSha,f.head);assert.equal(second.record.validationContext.checkoutSha,f.head);assert.equal(second.record.cohortContext.checkoutSha,f.merge);assert.equal(executions(f).length,1);}
+ });
 });

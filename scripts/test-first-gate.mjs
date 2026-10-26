@@ -12,10 +12,21 @@ const processFiles=new Set([
   'scripts/release-evidence.mjs',
   'scripts/install-release-hook.mjs',
   'scripts/test-groups.mjs',
+  'scripts/button-safety.mjs',
+  'scripts/button-safety-cloud.mjs',
+  'scripts/button-safety-contract.mjs',
+  'scripts/button-safety-fixture.mjs',
+  'scripts/button-safety-native.mjs',
+  'scripts/button-safety-rapid-core.mjs',
+  'scripts/button-safety-rapid.mjs',
+  'scripts/button-safety-scenarios.mjs',
+  'scripts/button-safety-scenes.mjs',
+  'scripts/button-safety-transfer.mjs',
+  'scripts/button-safety-inventory.json',
   'scripts/agent-tools/test-groups.test.mjs',
   '.claude/hooks/test-first-guard.sh',
 ]);
-const isProcessFile=file=>processFiles.has(file)||/^\.github\/workflows\/[^/]+\.ya?ml$/.test(file);
+const isProcessFile=file=>/^scripts\/button-safety(?:-[a-z0-9-]+)?\.mjs$/.test(file)||processFiles.has(file)||/^\.github\/workflows\/[^/]+\.ya?ml$/.test(file);
 const isAppFile=file=>{
   if(file==='tests.js')return false;
   if(file==='firestore.rules')return true;

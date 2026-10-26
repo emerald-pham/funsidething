@@ -156,10 +156,16 @@ async function bindWorkflowPolicy(run, logs, state) {
   const ids=[...text.matchAll(/^  ([a-z][a-z0-9-]*):\s*$/gm)].map(match=>match[1]).filter(id=>!['push','pull_request'].includes(id));
   const legacy=['scanner-tests','release-evidence','deploy-pages'];
   const parallel=['validation-context','event-gates','cohort-routing','regression',...legacy];
+  const mobileParallel=['validation-context','event-gates','cohort-routing','regression','mobile-memory',...legacy];
   let topology,required;
   if(/^  CHAIN_CI_TOPOLOGY: four-groups-v1$/m.test(text)) {
-    if(JSON.stringify(ids)!==JSON.stringify(parallel)||!text.includes('name: regression-${{ matrix.group }}')||!text.includes('group: ['+GROUP_IDS.join(', ')+']')||!text.includes('needs: [scanner-tests, release-evidence]'))throw new Error('Unknown parallel workflow topology.');
-    topology='four-groups-v1';required=['validation-context','event-gates','cohort-routing',...GROUP_IDS.map(id=>'regression-'+id),'scanner-tests'];
+    const hasMobile=JSON.stringify(ids)===JSON.stringify(mobileParallel);
+    if((!hasMobile&&JSON.stringify(ids)!==JSON.stringify(parallel))||!text.includes('name: regression-${{ matrix.group }}')||!text.includes('group: ['+GROUP_IDS.join(', ')+']')||!text.includes('needs: [scanner-tests, release-evidence]'))throw new Error('Unknown parallel workflow topology.');
+    if(hasMobile){
+      const job=id=>text.split(new RegExp('^  '+id+':\\s*$','m'))[1]?.split(/^  [a-z][a-z0-9-]*:\s*$/m)[0]||'';
+      if(!/^    name: mobile-WebKit-1GB-and-512MB-stress$/m.test(job('mobile-memory'))||!/^    needs: \[validation-context, event-gates, cohort-routing, regression, mobile-memory\]$/m.test(job('scanner-tests')))throw new Error('Unknown required mobile workflow policy.');
+    }
+    topology='four-groups-v1';required=['validation-context','event-gates','cohort-routing',...GROUP_IDS.map(id=>'regression-'+id),...(hasMobile?['mobile-WebKit-1GB-and-512MB-stress']:[]),'scanner-tests'];
   } else if(JSON.stringify(ids)===JSON.stringify(legacy)&&!text.includes('CHAIN_CI_TOPOLOGY')) {topology='legacy-serial';required=['scanner-tests'];}
   else throw new Error('Unknown actual candidate workflow topology.');
   const binding={topology,checkoutSha,checkoutTree:commit.tree.sha,comparisonBase:run.event==='pull_request'?commit.parents[0].sha:null,workflowBlob:blob,runId:String(run.databaseId),runAttempt:run.attempt,required,known:[...required,'release-evidence','deploy-pages']};

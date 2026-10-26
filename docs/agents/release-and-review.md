@@ -172,6 +172,12 @@ earlier draft review does not approve the final commit.
 
 ## Independent FAQ coverage release check
 
+Keep each FAQ answer as short as possible: only the action, outcome or limitation
+a user needs to understand. Preserve essential saved-data safety instructions.
+Prefer one or two short sentences; require a concrete user need for more. Treat
+repetition and avoidable technical detail as review findings. Keep testing,
+implementation and release evidence in internal reports.
+
 Independent FAQ coverage review is required for every product release. The
 reviewer must be distinct from the implementation owner, code reviewer, and
 state/sync specialist. Review the exact candidate against the Settings-aligned
