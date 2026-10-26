@@ -175,6 +175,21 @@ export async function runCloudScenarios(h){
       return choice?.getAttribute('aria-pressed')==='true'&&modal.querySelector('[data-act="apply-cloud-source-recovery"]')?.disabled===false;
     },'#modalRoot [data-act="choose-cloud-recovery-source"][data-value="device"]');
     await assertCurrentAndStoredFixtureBoard(ui,'Selected device cloud source');
+    // Repeated consent to the same eligible source must leave its mounted review
+    // intact, including keyboard focus and the user's place in the long facts.
+    await ui.page.evaluate(()=>{
+      const modal=document.querySelector('#modalRoot .modal'),button=modal.querySelector('[data-act="choose-cloud-recovery-source"][data-value="device"]');
+      button.focus();button.scrollIntoView({block:'center',behavior:'instant'});
+      window.__selectedSourceReview={modal,button,scrollTop:modal.scrollTop};
+    });
+    await ui.click('#modalRoot [data-act="choose-cloud-recovery-source"][data-value="device"]',()=>{
+      const saved=window.__selectedSourceReview;
+      return saved.modal===document.querySelector('#modalRoot .modal')&&saved.button.isConnected&&document.activeElement===saved.button&&saved.modal.scrollTop===saved.scrollTop&&saved.button.getAttribute('aria-pressed')==='true';
+    },'Repeated selected cloud source retains mounted facts, focus and scroll');
+    await ui.click('#modalRoot [data-act="choose-cloud-recovery-source"][data-value="generation:gate-valid-previous"]',()=>document.querySelector('#modalRoot [data-value="generation:gate-valid-previous"]')?.getAttribute('aria-pressed')==='true'&&document.querySelector('#modalRoot [data-value="device"]')?.getAttribute('aria-pressed')==='false','An alternate cloud source still changes the selection');
+    await ui.click('#modalRoot [data-act="choose-cloud-recovery-source"][data-value="device"]',()=>document.querySelector('#modalRoot [data-value="device"]')?.getAttribute('aria-pressed')==='true','Returning to the device source still changes the selection');
+
+
 
     const rootBeforeFailure=structuredClone(cloudOptions.remote.get(MANIFEST));
     cloudOptions.cloudWriteFail=true;

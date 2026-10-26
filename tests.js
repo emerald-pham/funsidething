@@ -43263,6 +43263,27 @@ async function divergentCloudSourceApp187(t,options={}){
  return app;
 }
 
+test('RISK cloud source recovery choice: repeating the selected source preserves the mounted review and alternate choices',async t=>{
+ const app=await divergentCloudSourceApp187(t),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);
+ const modal=shim.document.getElementById('modalRoot'),local=JSON.stringify(ctx.state),head=await store.readHead(),cloud=JSON.stringify([...backend.docs]),writes=backend.writes.length;
+ const backups=await store.listBackups(),opaque=await store.listOpaqueArchives(),pending=await store.getPendingUpload('owner');
+ let html=modal.innerHTML,replacements=0;Object.defineProperty(modal,'innerHTML',{configurable:true,get:()=>html,set:value=>{html=value;replacements++;}});
+ const choose=value=>ctx.onAction('choose-cloud-recovery-source',{dataset:{value}});
+ assert.equal(await choose('device'),true);assert.equal(replacements,1,'first selection renders its effects');
+ const selected=modal.innerHTML;assert.match(selected,/data-value="device" aria-pressed="true"/);
+ for(let index=0;index<10;index++)assert.equal(await choose('device'),true,'same eligible source remains an accepted choice');
+ assert.equal(replacements,1,'an unchanged selection keeps the mounted review instead of rebuilding all source facts and layout');assert.equal(modal.innerHTML,selected);
+ const previous='generation:'+originalRoot.previousGeneration;
+ assert.equal(await choose(previous),true);assert.equal(replacements,2,'a different eligible source still renders its own effects');assert.notEqual(modal.innerHTML,selected);assert.ok(modal.innerHTML.includes('data-value="'+previous+'" aria-pressed="true"'));
+ assert.equal(await choose('device'),true);assert.equal(replacements,3,'returning to the device source remains a real change');assert.equal(modal.innerHTML,selected);
+ assert.equal(await choose('unreviewed-source'),false);assert.equal(replacements,3,'unknown source never earns the same-choice fast path');
+ assert.equal(JSON.stringify(ctx.state),local);assert.equal((await store.readHead()).payload,head.payload);assert.deepEqual(await store.listBackups(),backups);assert.deepEqual(await store.listOpaqueArchives(),opaque);assert.deepEqual(await store.getPendingUpload('owner'),pending);assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal(backend.writes.length,writes,'choosing never applies or publishes a source');
+ ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML,faq=help.match(/<dt>How are recovery sources and pending choices protected\?<\/dt><dd>(.*?)<\/dd>/)[1];assert.match(faq,/Repeating the selected source keeps your review, focus and scroll position/);assert.ok(faq.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130);
+ assert.match(fs.readFileSync(path.join(__dirname,'index.html'),'utf8').match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1],/Repeatedly selecting the same recovery source keeps the review responsive/);
+
+});
+
 test('RISK cloud source recovery: native explicit source choice publishes a complete generation with exact originals and durable reopen',async t=>{
  for(const selected of ['device','previous'])await t.test(selected,async sub=>{
   const app=await divergentCloudSourceApp187(sub),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
@@ -45536,6 +45557,20 @@ test('RISK repository process: rapid native attempts preserve Add and asynchrono
   assert.equal(burst.attemptDetails.length,10);for(const attempt of burst.attemptDetails){assert.equal(attempt.trustedPresses,1);assert.equal(attempt.acceptedClicks,attempt.classification==='accepted'?1:0);if(attempt.acceptedClicks){assert.equal(attempt.availability.disabled,false);assert.equal(attempt.availability.present,true);assert.equal(attempt.availability.hit,true);assert.equal(attempt.nativeDownAction,outcome.action);assert.equal(attempt.neutralRelease,false);}}}
   assert.deepEqual(report.errors,[]);for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(report.cleanup[key],true);
   t.diagnostic('Focused rapid action evidence: '+paths[0]);
+ });
+});
+
+test('RISK repository process: native rapid cloud selection preserves the two-second input burst',async t=>{
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});const output=fs.mkdtempSync(path.join(base,'rapid-cloud-'));
+ for(const engine of ['chromium','webkit'])await t.test(engine,()=>{
+  const scenario='rapid cloud recovery reviews, protects, and applies a source with read and write failures';
+  const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine',engine,'--output-dir',output,'--port',process.env.CHAIN_NATIVE_PORT||'0','--scenario',scenario],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:45000,maxBuffer:1024*1024});
+  assert.equal(result.error,undefined);assert.equal(result.signal,null);assert.equal(result.status,0,'Native cloud source choices must retain real rapid input and protected failure outcomes: '+result.stderr);
+  const paths=result.stdout.split('\n').map(line=>line.match(/^Button evidence: (.+)$/)?.[1]).filter(Boolean);assert.equal(paths.length,1);const report=JSON.parse(fs.readFileSync(paths[0],'utf8'));
+  assert.equal(report.status,'passed');assert.equal(report.scenarios.length,1);assert.equal(report.scenarios[0].name,scenario);assert.equal(report.scenarios[0].setup.durableTasks,400);
+  const choices=report.rapidOutcomes.find(row=>row.action==='act:choose-cloud-recovery-source');assert.equal(choices.bursts.length,2);
+  for(const burst of choices.bursts){assert.equal(burst.acceptedClicks,10);assert.equal(burst.trustedPresses,10);assert.equal(burst.attempts,10);assert.ok(burst.windowMs<=2000);assert.equal(burst.unrelatedClicks,0);assert.equal(burst.refused,0);assert.equal(burst.disappeared,0);}
+  assert.deepEqual(report.errors,[]);for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(report.cleanup[key],true);t.diagnostic('Rapid cloud evidence: '+paths[0]);
  });
 });
 

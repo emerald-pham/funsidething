@@ -12788,6 +12788,11 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK repository process: native rapid cloud selection preserves the two-second input burst",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK repository process: native button gate refuses unallocated local launch before browser startup",
       "group": "native-process",
       "file": "tests.js"
@@ -12845,6 +12850,11 @@
     {
       "root": "RISK repository process: every button safety module fails the actual CLI without process coverage",
       "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud source recovery choice: repeating the selected source preserves the mounted review and alternate choices",
+      "group": "persistence-recovery",
       "file": "tests.js"
     }
   ],

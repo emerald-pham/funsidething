@@ -187,20 +187,18 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
      // burst bound. It lets normal button styling settle between real presses.
      const cadenceDelay=began+index*100-Date.now();if(cadenceDelay>0)await new Promise(resolve=>setTimeout(resolve,cadenceDelay));
      let availability={present:false,disabled:false,hit:false},box=originalBox;
-     const snapshot=await bounded(target.evaluateAll(async(els,backdrop)=>{
+     const snapshot=await bounded(target.evaluateAll((els,backdrop)=>{
       const el=els[0];if(!el)return null;let r=el.getBoundingClientRect();
       if(r.width&&r.height&&(r.y<0||r.x<0||r.bottom>innerHeight||r.right>innerWidth)&&!el.closest('[inert]')){el.scrollIntoView({block:'center',inline:'nearest',behavior:'instant'});r=el.getBoundingClientRect();}
-      const before={x:r.x,y:r.y,width:r.width,height:r.height};
-      // Source reads can replace or resize an asynchronous modal between
-      // measuring its old button and delivering native input. Observe this
-      // same connected target across two frames before accepting its point.
-      if(r.width&&r.height)await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+      // Do not force a complete paint between rapid presses. The independent
+      // continuous heartbeat and post-burst frame check measure responsiveness;
+      // current hit testing plus the actual delivered down bind each press.
       if(!el.isConnected)return null;r=el.getBoundingClientRect();
-      const box={x:r.x,y:r.y,width:r.width,height:r.height},stable=Object.keys(box).every(key=>box[key]===before[key]);
+      const box={x:r.x,y:r.y,width:r.width,height:r.height};
       const hit=document.elementFromPoint(r.x+(backdrop?5:r.width/2),r.y+(backdrop?5:r.height/2));
       // A harmless subpixel width transition is not an unavailable button.
       // Current hit testing and the delivered-down check decide eligibility.
-      return{box,present:!!(r.width&&r.height),disabled:el.matches(':disabled'),stable,hit:!!hit&&(el===hit||el.contains(hit))};
+      return{box,present:!!(r.width&&r.height),disabled:el.matches(':disabled'),hit:!!hit&&(el===hit||el.contains(hit))};
      },action==='act:mback'),'rapid target availability');
      if(snapshot){availability=snapshot;if(snapshot.present)box=snapshot.box;}
      const before={clicks:report.clicks?.length||0,presses:report.presses?.length||0};
