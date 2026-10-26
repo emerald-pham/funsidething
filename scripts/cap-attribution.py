@@ -344,13 +344,13 @@ def collect(args):
       if 'oom-kill:' not in body:continue
       match=re.search(r'oom-kill:constraint=(CONSTRAINT_MEMCG),.*?oom_memcg=([^,]+),task_memcg=([^,]+),task=(.*),pid=(\d+),uid=(\d+)',body)
       if not match:continue
-      constraint,oomcg,taskcg,comm,pid,uid=match.groups();owned=next((c for c in known.values() if c['cgroup']==oomcg==taskcg),None)
-      if not owned:
+      constraint,oomcg,taskcg,comm,pid,uid=match.groups();matched_container=next((c for c in known.values() if c['cgroup']==oomcg==taskcg),None)
+      if not matched_container:
        # A lifecycle race can only be resolved by revalidating exact mounts/image/cap.
        cid=re.search(r'([a-f0-9]{64})',taskcg)
-       if cid:discover(cid[1]);owned=next((c for c in known.values() if c['cgroup']==oomcg==taskcg),None)
-      if not owned:raw['ignoredForeignVictims']+=1;continue
-      context={'mono':stamp/1000000,'sequence':seq,'containerId':owned['id'],'oomMemcg':oomcg,'taskMemcg':taskcg,'pid':int(pid),'comm':comm[:32],'uid':int(uid),'constraint':constraint}
+       if cid:discover(cid[1]);matched_container=next((c for c in known.values() if c['cgroup']==oomcg==taskcg),None)
+      if not matched_container:raw['ignoredForeignVictims']+=1;continue
+      context={'mono':stamp/1000000,'sequence':seq,'containerId':matched_container['id'],'oomMemcg':oomcg,'taskMemcg':taskcg,'pid':int(pid),'comm':comm[:32],'uid':int(uid),'constraint':constraint}
       contexts.append(context);emit('kernel-context',context)
       if len(contexts)>32:raise ValueError('Owned kernel context bound exceeded')
     except BlockingIOError:pass

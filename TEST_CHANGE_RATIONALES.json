@@ -22743,5 +22743,62 @@
       "command": "Node22 recorder --purpose preimplementation-red -- node --test --test-name-pattern=\"^collected observer cannot publish live container evidence after cancellation$\" scripts/agent-tools/cap-attribution.test.mjs; corresponding container-publication RISK root",
       "failure": "Actual pre-edit0b97c9cb-7ab0-4b9d-a487-d327c0b03b03 failed all3 daemon-writer subcases on3c: observer collected, separate writer alive/advancing, but no stable cleanup handoff. Actual RISK RED8522a543-d4b1-477e-ad18-0154e88ff47d precedes implementation and retains the settled-canonical positive control. Subsequent fa8af256 is a macOS /var vs /private/var fixture-path mismatch;6abda1a8 is a fixture quoting infrastructure failure;d1a50b43 catches inconsistent removal-success inventory-failure fixture modeling. All retained as intermediate attempts, not new product RED. Focused actual process GREEN follows corrected fixture. Evidence under canonical-cap-fe42-attribution/container-publication-repair/runs; no browser/Docker/hosted/cap runtime."
     }
+  },
+  {
+    "baseCommit": "23f65d606a40f26c8b528182ff43af02751f6b63",
+    "testChangesSha256": "2d743685117e5a6ee49fcc6fca02ddd0ee1ebed77587c3956ebf40ff506598e0",
+    "reason": "Repair ATTR-CODE-03: real kernel context processing reused the durable owned-object map variable for a matched sampled container or null, corrupting later create and finally cleanup.",
+    "previousBehavior": "Summary/parser fixtures did not execute collect event processing. An owned context replaced the object ledger with one sampled container; a foreign context replaced it with None. Later create or final cleanup then failed and could skip owned trace removal.",
+    "intendedBehavior": "A separate matched_container local holds the context lookup while the durable owned map remains intact through owned/foreign contexts, lifecycle revalidation, later created objects and owned-only daemon/trace cleanup.",
+    "replacementTests": [
+      "RISK repository process: collector kernel context cannot replace owned cleanup ledger"
+    ],
+    "preservedCoverage": [
+      "Frozen fe42 app and complete canonical tests prefix, every native/mobile/fixture/policy/validator byte, strict512000000/no-swap whole-container cap,400tasks/full1MiB source/two backups/both motion consumers/ten distinct trustedYes/2s and every existing action/frame/outcome bound remain unchanged. No host/browser/Docker/cap run or release acceptance.",
+      "The real collect/register/discover/sample/kernel parsing/correlation/finally/cleanup paths execute with only external trace/kmsg/Docker/proc/OS adapters replaced. Owned and foreign CONSTRAINT_MEMCG records plus a later create preserve all exact owned IDs, filter foreign process reads, preserve foreign objects and close trace/lifecycle resources.",
+      "Existing root/pidfd shutdown, publication writer quiescence, unknown in-flight create, source inventory, negative control, PID reuse/loss/privacy checks remain unchanged. The production fix only renames the matched context variable."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder --purpose preimplementation-red -- node --test --test-name-pattern=\"^real collector keeps its owned object ledger across owned and foreign kernel contexts$\" scripts/agent-tools/cap-attribution.test.mjs; corresponding actual process RISK consumer",
+      "failure": "Actual collector RED49efaf74-e522-462f-a18c-b063a4bcfff5 consumes each kernel record and later create before failing with TypeError from the container-shaped ledger (owned) or None.values AttributeError (foreign), leaving trace cleanup incomplete. Final uninstrumented RISK RED256bad90-0a81-4260-abb6-ac2a9e3464f8 precedes the minimal rename. GREEN6e78eb48-420a-4b65-81d7-e7f3e4cff1bd follows it. Earlier ac0a8974/2ae86ea4/52125eda/2db69c33 are retained fixture bring-up failures before kernel-event processing (Python Path adapter), not product RED. Evidence under canonical-cap-fe42-attribution/collector-collision-repair/runs."
+    }
+  },
+  {
+    "baseCommit": "fe42f57e880c5edafc26b01af954bfe3205e1d22",
+    "testChangesSha256": "1b70cd3e17273912cf263398ab9194e1932159afa0d165ca251cf8f6e71c84b0",
+    "reason": "Repair ATTR-CODE-03: real kernel context processing reused the durable owned-object map variable for a matched sampled container or null, corrupting later create and finally cleanup.",
+    "previousBehavior": "Summary/parser fixtures did not execute collect event processing. An owned context replaced the object ledger with one sampled container; a foreign context replaced it with None. Later create or final cleanup then failed and could skip owned trace removal.",
+    "intendedBehavior": "A separate matched_container local holds the context lookup while the durable owned map remains intact through owned/foreign contexts, lifecycle revalidation, later created objects and owned-only daemon/trace cleanup.",
+    "replacementTests": [
+      "RISK repository process: collector kernel context cannot replace owned cleanup ledger"
+    ],
+    "preservedCoverage": [
+      "Frozen fe42 app and complete canonical tests prefix, every native/mobile/fixture/policy/validator byte, strict512000000/no-swap whole-container cap,400tasks/full1MiB source/two backups/both motion consumers/ten distinct trustedYes/2s and every existing action/frame/outcome bound remain unchanged. No host/browser/Docker/cap run or release acceptance.",
+      "The real collect/register/discover/sample/kernel parsing/correlation/finally/cleanup paths execute with only external trace/kmsg/Docker/proc/OS adapters replaced. Owned and foreign CONSTRAINT_MEMCG records plus a later create preserve all exact owned IDs, filter foreign process reads, preserve foreign objects and close trace/lifecycle resources.",
+      "Existing root/pidfd shutdown, publication writer quiescence, unknown in-flight create, source inventory, negative control, PID reuse/loss/privacy checks remain unchanged. The production fix only renames the matched context variable."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder --purpose preimplementation-red -- node --test --test-name-pattern=\"^real collector keeps its owned object ledger across owned and foreign kernel contexts$\" scripts/agent-tools/cap-attribution.test.mjs; corresponding actual process RISK consumer",
+      "failure": "Actual collector RED49efaf74-e522-462f-a18c-b063a4bcfff5 consumes each kernel record and later create before failing with TypeError from the container-shaped ledger (owned) or None.values AttributeError (foreign), leaving trace cleanup incomplete. Final uninstrumented RISK RED256bad90-0a81-4260-abb6-ac2a9e3464f8 precedes the minimal rename. GREEN6e78eb48-420a-4b65-81d7-e7f3e4cff1bd follows it. Earlier ac0a8974/2ae86ea4/52125eda/2db69c33 are retained fixture bring-up failures before kernel-event processing (Python Path adapter), not product RED. Evidence under canonical-cap-fe42-attribution/collector-collision-repair/runs."
+    }
+  },
+  {
+    "baseCommit": "b6e83899240d9546cab1bf481aa1b99de0a121f5",
+    "testChangesSha256": "cfc8e40b1604af821fc518853591fdbfc23bedde5d52f88840902d8cbe33a262",
+    "reason": "Repair ATTR-CODE-03: real kernel context processing reused the durable owned-object map variable for a matched sampled container or null, corrupting later create and finally cleanup.",
+    "previousBehavior": "Summary/parser fixtures did not execute collect event processing. An owned context replaced the object ledger with one sampled container; a foreign context replaced it with None. Later create or final cleanup then failed and could skip owned trace removal.",
+    "intendedBehavior": "A separate matched_container local holds the context lookup while the durable owned map remains intact through owned/foreign contexts, lifecycle revalidation, later created objects and owned-only daemon/trace cleanup.",
+    "replacementTests": [
+      "RISK repository process: collector kernel context cannot replace owned cleanup ledger"
+    ],
+    "preservedCoverage": [
+      "Frozen fe42 app and complete canonical tests prefix, every native/mobile/fixture/policy/validator byte, strict512000000/no-swap whole-container cap,400tasks/full1MiB source/two backups/both motion consumers/ten distinct trustedYes/2s and every existing action/frame/outcome bound remain unchanged. No host/browser/Docker/cap run or release acceptance.",
+      "The real collect/register/discover/sample/kernel parsing/correlation/finally/cleanup paths execute with only external trace/kmsg/Docker/proc/OS adapters replaced. Owned and foreign CONSTRAINT_MEMCG records plus a later create preserve all exact owned IDs, filter foreign process reads, preserve foreign objects and close trace/lifecycle resources.",
+      "Existing root/pidfd shutdown, publication writer quiescence, unknown in-flight create, source inventory, negative control, PID reuse/loss/privacy checks remain unchanged. The production fix only renames the matched context variable."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder --purpose preimplementation-red -- node --test --test-name-pattern=\"^real collector keeps its owned object ledger across owned and foreign kernel contexts$\" scripts/agent-tools/cap-attribution.test.mjs; corresponding actual process RISK consumer",
+      "failure": "Actual collector RED49efaf74-e522-462f-a18c-b063a4bcfff5 consumes each kernel record and later create before failing with TypeError from the container-shaped ledger (owned) or None.values AttributeError (foreign), leaving trace cleanup incomplete. Final uninstrumented RISK RED256bad90-0a81-4260-abb6-ac2a9e3464f8 precedes the minimal rename. GREEN6e78eb48-420a-4b65-81d7-e7f3e4cff1bd follows it. Earlier ac0a8974/2ae86ea4/52125eda/2db69c33 are retained fixture bring-up failures before kernel-event processing (Python Path adapter), not product RED. Evidence under canonical-cap-fe42-attribution/collector-collision-repair/runs."
+    }
   }
 ]

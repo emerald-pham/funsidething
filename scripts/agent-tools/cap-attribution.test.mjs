@@ -307,3 +307,100 @@ print(json.dumps(results))
 `;
  const r=spawnSync('python3',['-c',code,observer,directory],{encoding:'utf8',timeout:5000});assert.equal(r.status,0,r.stderr);assert.deepEqual(JSON.parse(r.stdout),{valid:{status:'signalled',signals:[15]},reused:{status:'refused',signals:[]},namespace:{status:'refused',signals:[]},'wrong-nonce':{status:'refused',signals:[]}});
 });
+
+test('real collector keeps its owned object ledger across owned and foreign kernel contexts',async t=>{
+ for(const kind of ['owned','foreign'])await t.test(kind,t=>{
+  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'cap-collector-'));t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+  const code=String.raw`import runpy,sys,pathlib,os,json,types,threading,time,subprocess,signal,select,http.client,shutil
+module=runpy.run_path(sys.argv[1]);NativePath=type(pathlib.Path());root=NativePath(sys.argv[2]).resolve();kind=sys.argv[3];host=root/'host';output=root/'evidence';repo=root/'repo';canonical=output/'canonical';output.mkdir();repo.mkdir();canonical.mkdir()
+ids=['a'*64,'b'*64,'f'*64];cgroups={cid:'/system.slice/docker-'+cid+'.scope' for cid in ids};foreign_reads=[];instances=[];closed=threading.Event();initial_queued=threading.Event();late_gate=threading.Event();late_queued=threading.Event();state={};removed=[];read_contexts=[]
+def proc(pid,cgroup):
+ p=host/'proc'/str(pid);p.mkdir(parents=True,exist_ok=True);fields=['S','1']+['0']*17+['155']+['0']*4
+ for name,value in {'cgroup':'0::'+cgroup,'stat':str(pid)+' (chain-node) '+' '.join(fields),'status':'NSpid:\t'+str(pid)+'\nVmRSS: 100 kB\n','oom_score_adj':'1000','smaps_rollup':'Pss: 100 kB\nPss_Anon: 80 kB\n'}.items():(p/name).write_text(value)
+proc(os.getpid(),'/fixture-observer');proc(501,cgroups[ids[0]])
+(host/'proc/self').mkdir();(host/'proc/self/cgroup').write_text('0::/fixture-observer');(host/'proc/sys/kernel/random').mkdir(parents=True);(host/'proc/sys/kernel/random/boot_id').write_text('fixture-boot')
+p=host/'sys/fs/cgroup'/cgroups[ids[0]].lstrip('/');p.mkdir(parents=True)
+for name,value in {'memory.max':'512000000','memory.swap.max':'0','memory.swap.current':'0','memory.current':'1000','memory.peak':'2000','memory.events':'max 1\noom 1\noom_kill 1\n','memory.stat':'anon 900\nfile 100\nshmem 0\n','cgroup.procs':'501'}.items():(p/name).write_text(value)
+class HostPath(NativePath):
+ def __new__(cls,*args):return object.__new__(cls)
+ def __init__(self,*args):
+  path=NativePath(*args);s=str(path)
+  if s.startswith('/proc/') or s=='/proc' or s.startswith('/sys/'):path=host/s.lstrip('/')
+  super().__init__(path)
+ def read_text(self,*args,**kwargs):
+  if '/proc/999/' in str(self):foreign_reads.append(str(self))
+  if self.name=='trace_clock':return '[mono]'
+  return super().read_text(*args,**kwargs)
+ def mkdir(self,*args,**kwargs):
+  super().mkdir(*args,**kwargs)
+  if self.name.startswith('chain-cap-'):
+   instances.append(str(self));(self/'events/oom/mark_victim').mkdir(parents=True);(self/'events/oom/mark_victim/format').write_text('field:int pid;');(self/'per_cpu/cpu0').mkdir(parents=True);(self/'per_cpu/cpu0/stats').write_text('overrun: 0\ncommit overrun: 0\ndropped events: 0\n')
+ def rmdir(self):
+  if self.name.startswith('chain-cap-'):shutil.rmtree(self)
+  else:super().rmdir()
+(host/'sys/kernel/tracing/instances').mkdir(parents=True)
+image=module['IMAGE']
+def container(cid,pid,label):return {'Id':cid,'Pid':pid,'Memory':512000000,'MemorySwap':512000000,'Image':image,'Mounts':[{'Destination':'/repo','Source':str(repo),'RW':False},{'Destination':'/evidence','Source':str(canonical/label) if cid!=ids[2] else '/foreign/evidence'}]}
+state[ids[0]]=container(ids[0],501,'negative');state[ids[2]]=container(ids[2],999,'normal')
+def docker(args,**kwargs):
+ a=args[1:];stdout='';stderr='';rc=0
+ if a[0]=='ps':stdout='\n'.join(state)
+ elif a[0]=='rm':removed.append(a[-1]);state.pop(a[-1],None);stdout=a[-1]
+ elif a[-1] not in state:rc=1;stderr='No such object'
+ else:
+  c=state[a[-1]];fmt=a[a.index('--format')+1];values=[c['Id']]+([c['Pid']] if '.State.Pid' in fmt else [])+[c['Memory'],c['MemorySwap'],c['Image'],c['Mounts']];stdout='|'.join(json.dumps(x) for x in values)
+ return types.SimpleNamespace(returncode=rc,stdout=stdout,stderr=stderr)
+class Sock:
+ def settimeout(self,*args):pass
+ def shutdown(self,*args):closed.set()
+class Response:
+ status=200
+ def __init__(self):self.count=0
+ def readline(self,*args):
+  if self.count<2:
+   action=['create','start'][self.count];self.count+=1;return (json.dumps({'Action':action,'Actor':{'ID':ids[0]}})+'\n').encode()
+  if self.count==2:
+   initial_queued.set();late_gate.wait(2);state[ids[1]]=container(ids[1],0,'normal');self.count+=1;return (json.dumps({'Action':'create','Actor':{'ID':ids[1]}})+'\n').encode()
+  late_queued.set();closed.wait(2);return b''
+ def close(self):closed.set()
+response=Response()
+class HTTP:
+ def __init__(self,*args,**kwargs):self.sock=Sock()
+ def request(self,*args,**kwargs):pass
+ def getresponse(self):return response
+ def close(self):closed.set()
+real_open=os.open;real_read=os.read;real_close=os.close;real_seek=os.lseek;fds={};reads={}
+def opened(path,*args,**kwargs):
+ name=str(path)
+ if name=='/dev/kmsg' or name.endswith('/trace_pipe'):
+  fd=real_open(os.devnull,os.O_RDONLY);fds[fd]='kmsg' if name=='/dev/kmsg' else 'trace';return fd
+ return real_open(path,*args,**kwargs)
+def read(fd,size):
+ if fd==sys.stdin.fileno():return b''
+ if fd not in fds:return real_read(fd,size)
+ if reads.get(fd,0):raise BlockingIOError()
+ reads[fd]=1
+ if fds[fd]=='kmsg':
+  read_contexts.append(kind);cg=cgroups[ids[0] if kind=='owned' else ids[2]];pid=501 if kind=='owned' else 999
+  return ('6,1,1000000,-;oom-kill:constraint=CONSTRAINT_MEMCG,oom_memcg='+cg+',task_memcg='+cg+',task=chain-node,pid='+str(pid)+',uid=1000\n').encode()
+ return b' fixture [000] 1.001: mark_victim: pid=501\n' if kind=='owned' else b''
+def close(fd):fds.pop(fd,None);return real_close(fd)
+stage=0
+def poll(*args):
+ global stage
+ if stage==0:
+  assert initial_queued.wait(2);stage=1;return [fd for fd in fds],[],[]
+ if stage==1:
+  late_gate.set();assert late_queued.wait(2);stage=2;return [],[],[]
+ return [sys.stdin.fileno()],[],[]
+pathlib.Path=HostPath;sys.platform='linux';os.geteuid=lambda:0;os.uname=lambda:types.SimpleNamespace(release='fixture-kernel',version='fixture');os.pidfd_open=lambda *args:real_open(os.devnull,os.O_RDONLY);signal.pidfd_send_signal=lambda *args:None;os.open=opened;os.read=read;os.close=close;os.lseek=lambda fd,*args:0 if fd in fds else real_seek(fd,*args);subprocess.run=docker;http.client.HTTPConnection=HTTP;select.select=poll
+failure=None
+try:module['collect'](types.SimpleNamespace(output=output,repo=repo,canonical=canonical))
+except Exception as error:failure=type(error).__name__+': '+str(error)
+finally:closed.set()
+raw=json.loads((output/'observer.json').read_text()) if (output/'observer.json').exists() else None
+print(json.dumps({'failure':failure,'raw':raw,'readContexts':read_contexts,'lateCreateDelivered':late_queued.is_set(),'traceRemoved':bool(instances) and not NativePath(instances[0]).exists(),'removed':removed,'remaining':list(state),'foreignProcReads':foreign_reads}))
+`;
+  const r=spawnSync('python3',['-c',code,observer,directory,kind],{encoding:'utf8',timeout:8000});assert.equal(r.status,0,r.stderr);const result=JSON.parse(r.stdout.trim().split('\n').at(-1));assert.deepEqual(result.readContexts,[kind],'The actual collector must consume the supplied external kernel record: '+JSON.stringify(result));assert.equal(result.lateCreateDelivered,true);assert.equal(result.failure,null,'Kernel context matching must not replace the durable owned-object ledger');assert.ok(result.raw);assert.deepEqual(result.raw.ownedObjects.map(c=>c.id).sort(),['a'.repeat(64),'b'.repeat(64)]);assert.deepEqual(result.removed.sort(),['a'.repeat(64),'b'.repeat(64)]);assert.deepEqual(result.remaining,['f'.repeat(64)]);assert.equal(result.traceRemoved,true);assert.deepEqual(result.raw.cleanup,{traceRemoved:true,childrenClosed:true});assert.equal(result.raw.ownedContainersRemoved,true);assert.deepEqual(result.foreignProcReads,[]);assert.equal(result.raw.ignoredForeignVictims,kind==='foreign'?1:0);assert.equal(result.raw.victims.length,kind==='owned'?1:0);if(kind==='owned')assert.equal(result.raw.victims[0].kernelContext.containerId,'a'.repeat(64));
+ });
+});

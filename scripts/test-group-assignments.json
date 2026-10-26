@@ -13126,6 +13126,16 @@
       "root": "RISK repository process: container writers require positive quiescence before publication",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "real collector keeps its owned object ledger across owned and foreign kernel contexts",
+      "group": "native-process",
+      "file": "scripts/agent-tools/cap-attribution.test.mjs"
+    },
+    {
+      "root": "RISK repository process: collector kernel context cannot replace owned cleanup ledger",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [
