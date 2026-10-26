@@ -12911,6 +12911,36 @@
       "root": "RISK repository process: CI monitor requires capped mobile job while preserving prior topology",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: routed hosted policies reach native consumers without waiving invalid launches",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: current producer reuse requires successful capped mobile evidence",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "hosted button consumers admit routed event policies before their runtime boundary",
+      "group": "native-process",
+      "file": "scripts/agent-tools/button-ci-policy.test.mjs"
+    },
+    {
+      "root": "hosted button consumers reject invalid missing mismatched and local launches",
+      "group": "native-process",
+      "file": "scripts/agent-tools/button-ci-policy.test.mjs"
+    },
+    {
+      "root": "hosted child and memory artifacts preserve raw policy and distinct source checkout identity",
+      "group": "native-process",
+      "file": "scripts/agent-tools/button-ci-policy.test.mjs"
+    },
+    {
+      "root": "current grouped routing requires the completed capped mobile producer before reuse",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
     }
   ],
   "processControls": [

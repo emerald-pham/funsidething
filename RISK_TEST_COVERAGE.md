@@ -2286,3 +2286,7 @@ The command/report consumer rejects missing, duplicate, skipped, cancelled, unre
 - RISK Settings guidance: mounted cleanup and sync FAQs name their current locations
 
 - RISK repository process: CI monitor requires capped mobile job while preserving prior topology
+
+- RISK repository process: routed hosted policies reach native consumers without waiving invalid launches
+
+- RISK repository process: current producer reuse requires successful capped mobile evidence

@@ -4,6 +4,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {MOBILE_MEMORY_BYTES,MOBILE_IMAGE,MOBILE_SCENARIO,MOBILE_STORY,mobileDigest,mobileArtifactInventory,verifyMemoryBoundary,verifyMobileFunctionalReport,verifyMobileMemoryReport,verifyMobileContainerExit} from './button-safety-mobile-contract.mjs';
+import {hostedButtonPolicy} from './button-safety-ci-policy.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 export function readMemoryBoundary({platform=process.platform,read=file=>fs.readFileSync(file,'utf8')}={}){
  if(platform!=='linux')throw Error('Required512MB proof needs Linux cgroup-v2 kernel enforcement; an uncapped mobile functional run is separate.');
@@ -16,7 +17,7 @@ const git=(...args)=>{const r=spawnSync('git',args,{cwd:root,encoding:'utf8',tim
 function identity(){return{candidateCommit:git('rev-parse','HEAD'),candidateTree:git('rev-parse','HEAD^{tree}'),sourceSha:process.env.CHAIN_TEST_SOURCE_SHA||git('rev-parse','HEAD'),repository:process.env.GITHUB_REPOSITORY,runId:process.env.GITHUB_RUN_ID,runAttempt:Number(process.env.GITHUB_RUN_ATTEMPT),eventPolicy:process.env.CHAIN_TEST_EVENT_POLICY};}
 async function inside(output,motion,control){
  fs.mkdirSync(output,{recursive:true});const report={status:'running',nodeVersion:process.version,errors:[]};try{
-  report.before=readMemoryBoundary();if(!/^v22\./.test(process.version))throw Error('The minimal consumer must use Node22.');
+  report.hostedPolicy=hostedButtonPolicy();report.before=readMemoryBoundary();if(!/^v22\./.test(process.version))throw Error('The minimal consumer must use Node22.');
   if(control){
    report.requestedBytes=1024*1024*1024;
    const child=spawnSync(process.execPath,['--input-type=module','-e',"import fs from 'node:fs';fs.writeFileSync('/proc/self/oom_score_adj','1000');const committed=[];for(let i=0;i<1024;i++)committed.push(Buffer.alloc(1048576,165));process.stdout.write(String(committed.length));"],{encoding:'utf8',timeout:30000,maxBuffer:1024*1024});
@@ -31,22 +32,23 @@ async function inside(output,motion,control){
  }catch(error){report.status='failed';report.errors.push(error.stack||String(error));try{report.after=readMemoryBoundary();}catch{}throw error;}
  finally{write(path.join(output,'inside.json'),report);}
 }
-export function containerArgs({repo,output,nodeBinary,motion,control,eventPolicy}){
- const args=['create','--init','--network','none','--cap-drop','ALL','--read-only','--memory',String(MOBILE_MEMORY_BYTES),'--memory-swap',String(MOBILE_MEMORY_BYTES),'--shm-size','67108864','--tmpfs','/tmp:rw,nosuid,size=67108864','--user',String(process.getuid())+':'+String(process.getgid()),'--workdir','/repo','--mount','type=bind,src='+repo+',dst=/repo,readonly','--mount','type=bind,src='+output+',dst=/evidence','--mount','type=bind,src='+nodeBinary+',dst=/opt/chain-node,readonly','--env','HOME=/tmp','--env','CI=true','--env','CHAIN_TEST_EVENT_POLICY='+eventPolicy,'--env','GIT_CONFIG_COUNT=1','--env','GIT_CONFIG_KEY_0=safe.directory','--env','GIT_CONFIG_VALUE_0=/repo',MOBILE_IMAGE,'/opt/chain-node','scripts/button-safety-mobile-memory.mjs','--inside','--output-dir','/evidence'];
+export function containerArgs({repo,output,nodeBinary,motion,control,eventPolicy,eventName,eventRef}){
+ const args=['create','--init','--network','none','--cap-drop','ALL','--read-only','--memory',String(MOBILE_MEMORY_BYTES),'--memory-swap',String(MOBILE_MEMORY_BYTES),'--shm-size','67108864','--tmpfs','/tmp:rw,nosuid,size=67108864','--user',String(process.getuid())+':'+String(process.getgid()),'--workdir','/repo','--mount','type=bind,src='+repo+',dst=/repo,readonly','--mount','type=bind,src='+output+',dst=/evidence','--mount','type=bind,src='+nodeBinary+',dst=/opt/chain-node,readonly','--env','HOME=/tmp','--env','CI=true','--env','CHAIN_TEST_EVENT_POLICY='+eventPolicy,'--env','GITHUB_EVENT_NAME='+eventName,'--env','GITHUB_REF='+eventRef,'--env','GIT_CONFIG_COUNT=1','--env','GIT_CONFIG_KEY_0=safe.directory','--env','GIT_CONFIG_VALUE_0=/repo',MOBILE_IMAGE,'/opt/chain-node','scripts/button-safety-mobile-memory.mjs','--inside','--output-dir','/evidence'];
  if(control)args.push('--control');else args.push('--motion',motion);return args;
 }
 export async function runCappedMobile({outputDir}){
- if(process.platform!=='linux'||process.env.CI!=='true'||!['push','pull_request'].includes(process.env.CHAIN_TEST_EVENT_POLICY))throw Error('Capped mobile acceptance requires the isolated hosted Linux push/pull-request runtime; local functional evidence cannot waive it.');
+ if(process.platform!=='linux'||process.env.CI!=='true')throw Error('Capped mobile acceptance requires the isolated hosted Linux push/pull-request runtime; local functional evidence cannot waive it.');
+ const hostedPolicy=hostedButtonPolicy();
  const output=path.resolve(outputDir);if(output===root||output.startsWith(root+path.sep))throw Error('Capped mobile evidence must be outside the checkout');fs.mkdirSync(output,{recursive:true});if(fs.readdirSync(output).length)throw Error('Capped mobile output must be new and empty');
  const source=identity();if(git('status','--porcelain=v1'))throw Error('Capped mobile requires exact clean committed source');
- const report={schemaVersion:1,kind:'button-mobile-memory',status:'running',requiredStory:MOBILE_STORY,image:MOBILE_IMAGE,...source,cases:[],errors:[],cleanup:{containersRemoved:false}},owned=new Set();
+ const report={schemaVersion:1,kind:'button-mobile-memory',status:'running',requiredStory:MOBILE_STORY,image:MOBILE_IMAGE,...source,hostedPolicy,cases:[],errors:[],cleanup:{containersRemoved:false}},owned=new Set();
  const docker=(args,{allowFailure=false,timeout=60000}={})=>{const r=spawnSync('docker',args,{encoding:'utf8',timeout,maxBuffer:8*1024*1024});if(!allowFailure&&(r.error||r.status!==0))throw Error('Owned mobile container command failed: '+(r.error?.message||r.stderr));return r;};
  const inspect=id=>JSON.parse(docker(['inspect',id]).stdout)[0];
  try{
   docker(['pull',MOBILE_IMAGE],{timeout:180000});
   for(const [label,motion,control]of [['negative',null,true],['normal','normal',false],['reduced','reduced',false]]){
    const directory=path.join(output,label);fs.mkdirSync(directory);
-   const id=docker(containerArgs({repo:root,output:directory,nodeBinary:fs.realpathSync(process.execPath),motion,control,eventPolicy:source.eventPolicy})).stdout.trim();if(!/^[a-f0-9]{64}$/.test(id))throw Error('Exact created container identity required');owned.add(id);
+   const id=docker(containerArgs({repo:root,output:directory,nodeBinary:fs.realpathSync(process.execPath),motion,control,...hostedPolicy})).stdout.trim();if(!/^[a-f0-9]{64}$/.test(id))throw Error('Exact created container identity required');owned.add(id);
    const before=inspect(id);write(path.join(directory,'docker-before.json'),before);if(before.HostConfig.Memory!==MOBILE_MEMORY_BYTES||before.HostConfig.MemorySwap!==MOBILE_MEMORY_BYTES||before.Config.Image!==MOBILE_IMAGE)throw Error('Docker did not configure exact512MB/no-swap image boundary');
    const run=docker(['start','--attach',id],{allowFailure:true,timeout:60000});fs.writeFileSync(path.join(directory,'stdout.txt'),run.stdout||'');fs.writeFileSync(path.join(directory,'stderr.txt'),run.stderr||'');
    const after=inspect(id);write(path.join(directory,'docker-after.json'),after);if(run.error||run.status!==0)throw Error('Capped '+label+' did not finish cleanly: '+(run.error?.message||run.stderr));verifyMobileContainerExit(after.State,{control});

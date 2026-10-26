@@ -54,12 +54,20 @@ async function main() {
   if (!sha(sourceTree) || !sha(checkoutTree) || git('status', '--porcelain', '--untracked-files=no')) throw new Error('Routing requires a clean exact committed checkout.');
   const isMain = eventName === 'push' && process.env.GITHUB_REF === 'refs/heads/main';
   let cohort = null;
+  let mobileProducer = false;
   if (args.descriptor) {
     const descriptor = JSON.parse(readFileSync(args.descriptor,'utf8')), identity=descriptor.resultIdentity;
     for (const [key,value] of Object.entries({repository,sourceSha,sourceTree,checkoutSha,checkoutTree,comparisonBase:args['comparison-base'],runId:process.env.GITHUB_RUN_ID})) {
       if (identity?.[key] !== value) throw new Error(`Descriptor identity mismatch: ${key}.`);
     }
     if (String(identity.runAttempt)!==process.env.GITHUB_RUN_ATTEMPT || identity.checkoutDirty || !/^[a-f0-9]{64}$/.test(identity.cohortDigestSha256) || JSON.stringify(identity.expectedGroups)!==JSON.stringify(['core','scenery','persistence-recovery','native-process'])) throw new Error('Invalid complete cohort descriptor.');
+    const workflow=git('show',`${checkoutSha}:${workflowPath}`);
+    if(/^  mobile-memory:\s*$/m.test(workflow)){
+      const jobs=[...workflow.matchAll(/^  ([a-z][a-z0-9-]*):\s*$/gm)].map(match=>match[1]).filter(id=>!['push','pull_request'].includes(id));
+      const job=id=>workflow.split(new RegExp('^  '+id+':\\s*$','m'))[1]?.split(/^  [a-z][a-z0-9-]*:\s*$/m)[0]||'';
+      if(JSON.stringify(jobs)!==JSON.stringify(['validation-context','event-gates','cohort-routing','regression','mobile-memory','scanner-tests','release-evidence','deploy-pages'])||!/^    name: mobile-WebKit-512MB$/m.test(job('mobile-memory'))||!/^    needs: \[validation-context, event-gates, cohort-routing, regression, mobile-memory\]$/m.test(job('scanner-tests')))throw new Error('Unknown required mobile producer topology.');
+      mobileProducer=true;
+    }
     cohort={requiredCohort:'four-groups-v1',cohortDigestSha256:identity.cohortDigestSha256,inventorySha256:identity.inventorySha256,assignmentsSha256:identity.assignmentsSha256,expectedGroups:identity.expectedGroups,workflowBlob:git('rev-parse',`${checkoutSha}:${workflowPath}`)};
   }
   const boundContext = (...values) => ({...context(...values),...(cohort||{})});
@@ -145,7 +153,7 @@ async function main() {
           record.decision = 'fail'; record.reason = `Exact producer ${run.id}/${run.run_attempt} concluded ${run.conclusion}.`; break;
         }
         if(cohort){
-          const required=['validation-context','event-gates','cohort-routing',...cohort.expectedGroups.map(id=>'regression-'+id),'scanner-tests'];
+          const required=['validation-context','event-gates','cohort-routing',...cohort.expectedGroups.map(id=>'regression-'+id),...(mobileProducer?['mobile-WebKit-512MB']:[]),'scanner-tests'];
           if(required.some(name=>result.jobs.filter(job=>job.name===name&&job.status==='completed'&&job.conclusion==='success'&&String(job.run_id)===String(run.id)&&String(job.run_attempt)===String(run.run_attempt)&&job.head_sha===sourceSha).length!==1))throw new Error('Producer required topology is incomplete.');
           if(result.jobs.some(job=>!required.includes(job.name)&&!['release-evidence','deploy-pages'].includes(job.name)))throw new Error('Producer topology is unknown.');
         }

@@ -45717,3 +45717,11 @@ test('RISK Settings guidance: mounted cleanup and sync FAQs name their current l
 test('RISK repository process: CI monitor requires capped mobile job while preserving prior topology',()=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;const result=spawnSync(process.execPath,['--test','--test-name-pattern=^binds required parallel topology to actual candidate workflow even when new jobs are absent$|^parallel workflow observation preserves complete missing skipped canceled and unknown distinctions$','scripts/agent-tools/ci-monitor.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:4*1024*1024});assert.equal(result.error,undefined);assert.equal(result.status,0,'The actual CI monitor must retain prior workflows and fail closed on required mobile outcomes: '+result.stdout+'\n'+result.stderr);
 });
+
+test('RISK repository process: routed hosted policies reach native consumers without waiving invalid launches',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;const result=spawnSync(process.execPath,['--test','scripts/agent-tools/button-ci-policy.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:4*1024*1024});assert.equal(result.error,undefined);assert.equal(result.status,0,'Actual native/capped admission must retain raw events and routed policies: '+result.stdout+'\n'+result.stderr);
+});
+
+test('RISK repository process: current producer reuse requires successful capped mobile evidence',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;const result=spawnSync(process.execPath,['--test','--test-name-pattern=^current grouped routing requires the completed capped mobile producer before reuse$','scripts/agent-tools/ci-routing.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:4*1024*1024});assert.equal(result.error,undefined);assert.equal(result.status,0,'The actual routing consumer must require the exact current mobile producer: '+result.stdout+'\n'+result.stderr);
+});

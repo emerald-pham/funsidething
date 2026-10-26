@@ -19,7 +19,7 @@ export function refreshMobileBundle({directory,report,native}){
  const write=(relative,value)=>{const file=path.join(directory,relative);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,JSON.stringify(value,null,2)+'\n');return mobileDigest(fs.readFileSync(file));};
  for(const row of [report.negativeControl,...report.cases]){
   const label=row.label;if(row.motion)row.nativeReportSha256=write(row.nativeReportPath,native[row.motion]);
-  const raw={status:row.status,nodeVersion:row.nodeVersion,errors:row.errors,before:row.before,after:row.after,...(row.motion?{motion:row.motion,nativeReportPath:path.basename(row.nativeReportPath),nativeReportSha256:row.nativeReportSha256}:{childSignal:row.childSignal,childExitCode:row.childExitCode,requestedBytes:row.requestedBytes})};
+  const raw={status:row.status,nodeVersion:row.nodeVersion,errors:row.errors,...(row.hostedPolicy?{hostedPolicy:row.hostedPolicy}:{}),before:row.before,after:row.after,...(row.motion?{motion:row.motion,nativeReportPath:path.basename(row.nativeReportPath),nativeReportSha256:row.nativeReportSha256}:{childSignal:row.childSignal,childExitCode:row.childExitCode,requestedBytes:row.requestedBytes})};
   for(const [key,file,value]of [['inside','inside.json',raw],['dockerBefore','docker-before.json',{Id:row.containerId,Config:{Image:row.image},HostConfig:{Memory:row.dockerMemoryBytes,MemorySwap:row.dockerMemorySwapBytes}}],['dockerAfter','docker-after.json',{Id:row.containerId,State:{Running:false,ExitCode:row.containerExitCode,OOMKilled:row.containerOOMKilled}}]]){row[key+'Path']=label+'/'+file;row[key+'Sha256']=write(row[key+'Path'],value);}
  }
  report.artifacts=mobileArtifactInventory(directory);write('report.json',report);

@@ -132,7 +132,7 @@ function createFixture(t, options = {}) {
   fs.mkdirSync(path.join(root, 'scripts/agent-tools'), { recursive: true });
   fs.mkdirSync(path.join(root, 'scripts'), { recursive: true });
   fs.copyFileSync(runner, path.join(root, 'scripts/test-groups.mjs'));
-  if(options.mobileStory)fs.copyFileSync(path.join(repository,'scripts/button-safety-mobile-contract.mjs'),path.join(root,'scripts/button-safety-mobile-contract.mjs'));
+  if(options.mobileStory)for(const name of ['button-safety-mobile-contract.mjs','button-safety-ci-policy.mjs'])fs.copyFileSync(path.join(repository,'scripts',name),path.join(root,'scripts',name));
   if(options.mobileStory)writeJson(path.join(root,'scripts/button-safety-inventory.json'),{requiredMobileStory:{savedTasks:400,yesCount:10,distinctTasks:true,windowMs:2000,memoryBudgetBytes:512000000,motions:['normal','reduced']}});
   const coreTitle = options.coreTitle || fixtureRoots.core;
   writeJson(path.join(root, 'package.json'), {

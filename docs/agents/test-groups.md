@@ -231,3 +231,15 @@ the Linux gate. Prepush reviews may explicitly report the hosted cap proof pendi
 merge and release still require its actual exact-candidate CI pass. Do not create
 a placeholder receipt to satisfy the prepush sequence. The original complete
 90-scenario Chromium/WebKit button gate remains separately required.
+
+Hosted button admission preserves `GITHUB_EVENT_NAME`/`GITHUB_REF` separately from
+`CHAIN_TEST_EVENT_POLICY`. Routing emits `canonical-pr-merge-v1`,
+`outgoing-branch-push-v1` or `exact-main-push-v1`; these labels remain in report and
+aggregate identity. Native desktop and capped mobile consumers share the same
+explicit event/ref check, and the capped child receives all three values. Raw
+`push`/`pull_request` fixture labels remain supported only with matching hosted
+context. Invalid/missing/local admission cannot waive resource or kernel limits.
+For the current workflow, complete-producer reuse also requires the exact successful
+`mobile-WebKit-512MB` job from the producer run/attempt/source; absent, incomplete,
+failed or ambiguous evidence falls back to a fresh complete cohort. Local
+admission/artifact fixtures never establish an actual hosted cap pass.
