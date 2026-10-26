@@ -25262,5 +25262,46 @@
       "command": "Actual recorder59b99280: node --test --test-name-pattern=\"^RISK repository process: native activation comparison preserves\" tests.js against2de with only updated process contract before overlay implementation; qualification/activation-carrier-root/runs. Native actual delivery RED3e2caa5a is separately bound in the activation-probe-2de package.",
       "failure": "59b99280 fails because old diagnose/webkit-startup-phases trigger does not equal required diagnose/webkit-native-activation. After the four-file runtime/workflow overlay,57ae273e passes7 roots/14 TAP cases, including unchanged recent-action retention and actual canonical verifier refusals. Native3e2caa5a independently observes zero actual activation calls instead of one;8111b69b native-active anddcdbca13 baseline pass unchanged full local story. Neither local result proves hosted causality."
     }
+  },
+  {
+    "baseCommit": "6c5e6f7fd74dadf62937e2da96274385a2f1d432",
+    "testChangesSha256": "e52c4aa590c1e2aaa8541f86bc9bc3d938634145e7fac20acf6d78ab26f471a4",
+    "reason": "Replace the negative activation comparison with one paired full-app versus independent minimal rendering control without changing app acceptance or memory limits.",
+    "previousBehavior": "The prior diagnostic varied native activation with the full app. Both hosted variants stalled before input, so those observations cannot distinguish an app-workload trigger from a minimal browser rendering failure.",
+    "intendedBehavior": "Only diagnose/webkit-minimal-rendering launches fresh Reduced full-app and minimal-frame-control jobs. Both use the same 1 GB zero-swap launcher and baseline activation. The full app retains original gates; the separate minimal document begins trusted input immediately with a concurrent predefined six-second frame/timer observation and independent exact source preservation. Neither a control result nor a partial diagnostic can qualify release.",
+    "replacementTests": [
+      "RISK repository process: minimal rendering comparison preserves the full app and cannot qualify release"
+    ],
+    "preservedCoverage": [
+      "Full-app original 400 saved tasks, 1 MiB unknown field, two exact protected sources, full rendering, durable facts and ten distinct accepted trusted-touch Yes within two seconds remain unchanged.",
+      "Required whole-browser-family 1 GB cap, zero swap, separate 2 GiB driver, actual OOM control, original 1000 ms frame and 2500 ms step thresholds, source/profile/process binding and owned cleanup remain unchanged.",
+      "Canonical verification still rejects diagnostic kinds and partial motion matrices. The new independent minimal control is never app functional acceptance; no aggregation or deployment job is present.",
+      "Bounded resource observations are shared by both workloads and add no acceptance credit. All earlier canonical tests, recent-action retention, original data protections, failed hosted artifacts and exact historical rationale entries remain preserved."
+    ],
+    "redEvidence": {
+      "command": "Actual recorder ac1f10c8: node --test --test-name-pattern=\"^RISK repository process: minimal rendering comparison preserves\" tests.js on frozen 6c5e6f7 with only the revised process contract before runtime/workflow overlay implementation. Raw output and source identity are in qualification/minimal-carrier-root/runs. Actual native consumer RED 978802f6 is separately bound by the implementation owner.",
+      "failure": "ac1f10c8 fails because old diagnose/webkit-native-activation trigger differs from the required dedicated minimal rendering branch. Native 978802f6 separately requests the minimal control and rejects the frozen full-app HTML before execution. These are actual preimplementation failures; no hosted causal or release result is inferred."
+    }
+  },
+  {
+    "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
+    "testChangesSha256": "851c9043d524b9242ac92ccd98cf04a3fde28e508a859cd1b41894fcb5809de7",
+    "reason": "Replace the negative activation comparison with one paired full-app versus independent minimal rendering control without changing app acceptance or memory limits.",
+    "previousBehavior": "The prior diagnostic varied native activation with the full app. Both hosted variants stalled before input, so those observations cannot distinguish an app-workload trigger from a minimal browser rendering failure.",
+    "intendedBehavior": "Only diagnose/webkit-minimal-rendering launches fresh Reduced full-app and minimal-frame-control jobs. Both use the same 1 GB zero-swap launcher and baseline activation. The full app retains original gates; the separate minimal document begins trusted input immediately with a concurrent predefined six-second frame/timer observation and independent exact source preservation. Neither a control result nor a partial diagnostic can qualify release.",
+    "replacementTests": [
+      "RISK repository process: minimal rendering comparison preserves the full app and cannot qualify release",
+      "RISK repository process: diagnostic observer retains recent actions after a long setup"
+    ],
+    "preservedCoverage": [
+      "Full-app original 400 saved tasks, 1 MiB unknown field, two exact protected sources, full rendering, durable facts and ten distinct accepted trusted-touch Yes within two seconds remain unchanged.",
+      "Required whole-browser-family 1 GB cap, zero swap, separate 2 GiB driver, actual OOM control, original 1000 ms frame and 2500 ms step thresholds, source/profile/process binding and owned cleanup remain unchanged.",
+      "Canonical verification still rejects diagnostic kinds and partial motion matrices. The new independent minimal control is never app functional acceptance; no aggregation or deployment job is present.",
+      "Bounded resource observations are shared by both workloads and add no acceptance credit. All earlier canonical tests, recent-action retention, original data protections, failed hosted artifacts and exact historical rationale entries remain preserved."
+    ],
+    "redEvidence": {
+      "command": "Actual recorder ac1f10c8: node --test --test-name-pattern=\"^RISK repository process: minimal rendering comparison preserves\" tests.js on frozen 6c5e6f7 with only the revised process contract before runtime/workflow overlay implementation. Raw output and source identity are in qualification/minimal-carrier-root/runs. Actual native consumer RED 978802f6 is separately bound by the implementation owner.",
+      "failure": "ac1f10c8 fails because old diagnose/webkit-native-activation trigger differs from the required dedicated minimal rendering branch. Native 978802f6 separately requests the minimal control and rejects the frozen full-app HTML before execution. These are actual preimplementation failures; no hosted causal or release result is inferred."
+    }
   }
 ]

@@ -13199,7 +13199,7 @@
     },
     {
       "file": "tests.js",
-      "root": "RISK repository process: native activation comparison preserves full rendering and original gates",
+      "root": "RISK repository process: minimal rendering comparison preserves the full app and cannot qualify release",
       "group": "native-process"
     },
     {

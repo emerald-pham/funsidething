@@ -39,10 +39,32 @@ function browserProcesses(){
  // Include reparented/daemonized helpers too; ancestry alone can lose them.
  return rows.filter(row=>row.pid!==1&&row.pid!==process.pid);
 }
+// Nonqualifying bounded observations. No file contents or fd/map paths are retained.
+function filesystemSample(data){
+ data.samples++;for(const [name,mount]of [['sharedMemory','/dev/shm'],['temporary','/tmp']])try{
+  const stat=fs.statfsSync(mount),row={at:Date.now(),totalBytes:stat.blocks*stat.bsize,availableBytes:stat.bavail*stat.bsize,totalInodes:stat.files,freeInodes:stat.ffree};
+  const previous=data.mounts[name];data.mounts[name]={samples:(previous?.samples||0)+1,first:previous?.first||row,last:row,minimumAvailableBytes:Math.min(previous?.minimumAvailableBytes??Infinity,row.availableBytes),minimumFreeInodes:Math.min(previous?.minimumFreeInodes??Infinity,row.freeInodes)};
+ }catch(error){data.unavailable[name]={code:error.code||'UNAVAILABLE',at:Date.now()};}
+}
+function runtimeProcessSnapshot(label,previous){
+ const classify=name=>!name||name.startsWith('[')?'anonymous':name.includes('memfd:')?'memfd':name.startsWith('/dev/shm/')?'sharedMemory':name.startsWith('/tmp/')?'temporary':name.startsWith('/dev/')?'device':'other';
+ const result={label,at:Date.now(),processes:[],limits:{processes:32,threadsPerProcess:64,fdsPerProcess:512,mapRowsPerProcess:4096},omittedProcesses:0};
+ const processes=[processIdentity(process.pid),...browserProcesses()];result.omittedProcesses=Math.max(0,processes.length-32);
+ for(const process of processes.slice(0,32)){
+  const row={pid:process.pid,startTime:process.startTime,owner:process.pid===globalThis.process.pid,fdBackingCounts:{},mapBacking:{},threads:[],unavailable:{}};result.processes.push(row);const base='/proc/'+process.pid;
+  try{const names=fs.readdirSync(base+'/fd');row.omittedFds=Math.max(0,names.length-512);for(const name of names.slice(0,512))try{const key=classify(fs.readlinkSync(base+'/fd/'+name));row.fdBackingCounts[key]=(row.fdBackingCounts[key]||0)+1;}catch(error){row.unavailable.fd=error.code||'UNAVAILABLE';}}catch(error){row.unavailable.fds=error.code||'UNAVAILABLE';}
+  try{const lines=fs.readFileSync(base+'/maps','utf8').trim().split('\n');row.omittedMapRows=Math.max(0,lines.length-4096);for(const line of lines.slice(0,4096)){const fields=line.trim().split(/\s+/),[start,end]=fields[0].split('-').map(value=>parseInt(value,16)),key=classify(fields.slice(5).join(' ')),entry=row.mapBacking[key]??={mappings:0,virtualBytes:0};entry.mappings++;entry.virtualBytes+=end-start;}}catch(error){row.unavailable.maps=error.code||'UNAVAILABLE';}
+  try{const tids=fs.readdirSync(base+'/task');row.omittedThreads=Math.max(0,tids.length-64);for(const tid of tids.slice(0,64))try{
+   const stat=fs.readFileSync(base+'/task/'+tid+'/stat','utf8'),fields=stat.slice(stat.lastIndexOf(')')+2).split(' '),utimeTicks=Number(fields[11]),stimeTicks=Number(fields[12]),prior=previous?.processes.find(item=>item.pid===row.pid&&item.startTime===row.startTime)?.threads.find(item=>item.tid===Number(tid)&&item.startTime===fields[19]);
+   const thread={tid:Number(tid),startTime:fields[19],state:fields[0],utimeTicks,stimeTicks,deltaTicks:prior?utimeTicks+stimeTicks-prior.utimeTicks-prior.stimeTicks:null};try{const wchan=fs.readFileSync(base+'/task/'+tid+'/wchan','utf8').trim();thread.waitChannel=/^[a-zA-Z0-9_]{1,80}$/.test(wchan)?wchan:null;}catch(error){thread.waitUnavailable=error.code||'UNAVAILABLE';}row.threads.push(thread);
+  }catch(error){row.unavailable.thread=error.code||'UNAVAILABLE';}}catch(error){row.unavailable.threads=error.code||'UNAVAILABLE';}
+ }return result;
+}
 async function browserServer(output,control,budgetProfile='required-1gb'){
  const budget=mobileBudgetBytes(budgetProfile);
- fs.mkdirSync(output,{recursive:true});const source=identity(),report={...source,budgetProfile,activationVariant:process.env.CHAIN_DIAGNOSTIC_ACTIVATION,status:'running',role:'browser',scope:MOBILE_MEMORY_SCOPE,nodeVersion:process.version,hostedPolicy:hostedButtonPolicy(),uid:process.getuid(),gid:process.getgid(),namespace:fs.readlinkSync('/proc/self/ns/net'),pidNamespace:fs.readlinkSync('/proc/self/ns/pid'),ownerPid:process.pid,errors:[],cleanup:{}};
- const file=path.join(output,'browser-server.json'),readyFile=path.join(output,'ready.json'),requestFile=path.join(output,'owner-request.json');let server,monitor,monitorError;const seen=new Map();
+ fs.mkdirSync(output,{recursive:true});const source=identity(),report={...source,budgetProfile,activationVariant:process.env.CHAIN_DIAGNOSTIC_ACTIVATION,workload:process.env.CHAIN_DIAGNOSTIC_WORKLOAD,status:'running',role:'browser',scope:MOBILE_MEMORY_SCOPE,nodeVersion:process.version,hostedPolicy:hostedButtonPolicy(),uid:process.getuid(),gid:process.getgid(),namespace:fs.readlinkSync('/proc/self/ns/net'),pidNamespace:fs.readlinkSync('/proc/self/ns/pid'),ownerPid:process.pid,errors:[],cleanup:{}};
+ report.diagnosticRuntimeResources={kind:'nonqualifying-runtime-resources',filesystem:{cadenceMs:20,samples:0,mounts:{},unavailable:{}},snapshots:[]};
+ const file=path.join(output,'browser-server.json'),readyFile=path.join(output,'ready.json'),requestFile=path.join(output,'owner-request.json');let server,monitor,monitorError;const seen=new Map();let lastSnapshotId=null;const snapshots=report.diagnosticRuntimeResources.snapshots;
  installDiagnosticApiLog(report); // Before importing the real remote Playwright server; process ends after owned cleanup.
  try{
   assert.match(process.version,/^v22\./);assert.ok(report.uid>0&&report.gid>0);report.before=readMemoryBoundary({budgetProfile});
@@ -56,11 +78,14 @@ async function browserServer(output,control,budgetProfile='required-1gb'){
   const capture=()=>{for(const item of browserProcesses()){
    assert.equal(item.cgroup,report.before.membership,'Browser descendant escaped capped membership');assert.equal(item.namespace,report.namespace);
    const key=item.pid+':'+item.startTime;if(!seen.has(key))try{seen.set(key,{...item,executableSha256:mobileDigest(fs.readFileSync('/proc/'+item.pid+'/exe'))});}catch(error){if(!['ENOENT','ESRCH'].includes(error.code))throw error;}
-  }report.browser.processes=[...seen.values()];};
+  }report.browser.processes=[...seen.values()];filesystemSample(report.diagnosticRuntimeResources.filesystem);
+   const requestPath=path.join(output,'diagnostic-snapshot-request.json');if(fs.existsSync(requestPath)){const request=json(requestPath);if(request.id!==lastSnapshotId){assert.equal(request.token,json(readyFile).token);assert.equal(request.label,'native-pre-context-cleanup');assert.match(request.id,/^[a-f0-9-]{36}$/);assert.equal(snapshots.length,1,'One bounded pre-cleanup snapshot request');snapshots.push(runtimeProcessSnapshot(request.label,snapshots.at(-1)));lastSnapshotId=request.id;write(path.join(output,'diagnostic-snapshot-response.json'),{id:request.id,token:request.token,status:'recorded',snapshotIndex:snapshots.length-1,at:Date.now()});}}
+  };
   capture();monitor=setInterval(()=>{try{capture();}catch(error){monitorError??=error;}},20);
   const connection=await playwright.webkit.connect(server.wsEndpoint());report.browser.version=connection.version();await connection.close();assert.ok(child.exitCode===null&&child.signalCode===null,'Disconnect must leave owned browser live');
-  const token=randomUUID();write(readyFile,{status:'ready',budgetProfile,activationVariant:process.env.CHAIN_DIAGNOSTIC_ACTIVATION,...source,hostedPolicy:report.hostedPolicy,endpoint:server.wsEndpoint(),token,namespace:report.namespace,browser:report.browser});
-  const request=await awaitFile(requestFile,{timeout:60000,abort:()=>{if(monitorError)throw monitorError;if(child.exitCode!==null||child.signalCode!==null)throw Error('Owned WebKit exited before closure request');}});assert.equal(request.token,token);assert.equal(request.action,control?'control':'close');
+  snapshots.push(runtimeProcessSnapshot('owner-ready'));
+  const token=randomUUID();write(readyFile,{status:'ready',budgetProfile,activationVariant:process.env.CHAIN_DIAGNOSTIC_ACTIVATION,workload:process.env.CHAIN_DIAGNOSTIC_WORKLOAD,...source,hostedPolicy:report.hostedPolicy,endpoint:server.wsEndpoint(),token,namespace:report.namespace,browser:report.browser});
+  const request=await awaitFile(requestFile,{timeout:60000,abort:()=>{if(monitorError)throw monitorError;if(child.exitCode!==null||child.signalCode!==null)throw Error('Owned WebKit exited before closure request');}});assert.equal(request.token,token);assert.equal(request.action,control?'control':'close');snapshots.push(runtimeProcessSnapshot('owner-close-request',snapshots.at(-1)));
   if(control){
    assert.equal(child.exitCode,null);assert.equal(child.signalCode,null);capture();
    const allocator=spawnSync(process.execPath,['--input-type=module','-e',"import fs from 'node:fs';fs.writeFileSync('/proc/self/oom_score_adj','1000');process.stdout.write(JSON.stringify({membership:fs.readFileSync('/proc/self/cgroup','utf8').trim(),pid:process.pid,ppid:process.ppid,pidNamespace:fs.readlinkSync('/proc/self/ns/pid')})+'\\n');const committed=[];for(let i=0;i<"+Math.ceil(2*budget/1048576)+";i++)committed.push(Buffer.alloc(1048576,165));process.stdout.write(String(committed.length));"],{encoding:'utf8',timeout:30000,maxBuffer:1024*1024});
@@ -80,7 +105,7 @@ async function browserServer(output,control,budgetProfile='required-1gb'){
 }
 async function driver(output,motion,control,budgetProfile='required-1gb'){
  mobileBudgetBytes(budgetProfile);
- fs.mkdirSync(output,{recursive:true});const source=identity(),report={...source,budgetProfile,activationVariant:process.env.CHAIN_DIAGNOSTIC_ACTIVATION,status:'running',role:'external-driver',nodeVersion:process.version,hostedPolicy:hostedButtonPolicy(),errors:[]};const file=path.join(output,'inside.json');let ready,requested=false;
+ fs.mkdirSync(output,{recursive:true});const source=identity(),report={...source,budgetProfile,activationVariant:process.env.CHAIN_DIAGNOSTIC_ACTIVATION,workload:process.env.CHAIN_DIAGNOSTIC_WORKLOAD,status:'running',role:'external-driver',nodeVersion:process.version,hostedPolicy:hostedButtonPolicy(),errors:[]};const file=path.join(output,'inside.json');let ready,requested=false;
  const closeOwner=async()=>{if(!requested){assert.ok(ready);write(path.join(output,'owner-request.json'),{token:ready.token,action:control?'control':'close'});requested=true;}const result=await awaitFile(path.join(output,'browser-server.json'));if(budgetProfile!=='stress-512mb'||control)assert.equal(result.status,'passed','Browser owner must finish successfully');assert.equal(result.cleanup?.serverClosed,true);assert.equal(result.cleanup.engineExited,true);return result;};
  try{
   assert.match(process.version,/^v22\./);report.playwrightVersion=json(path.join(path.dirname(fileURLToPath(import.meta.resolve('playwright'))),'package.json')).version;assert.equal(report.playwrightVersion,'1.62.1');report.driver=kernelSnapshot({scope:'external-driver'});assert.equal(report.driver.memoryMaxBytes,MOBILE_DRIVER_BYTES);assert.equal(report.driver.swapMaxBytes,0);assert.equal(report.driver.swapCurrentBytes,0);report.driver.namespace=fs.readlinkSync('/proc/self/ns/net');report.driver.pidNamespace=fs.readlinkSync('/proc/self/ns/pid');
@@ -89,14 +114,14 @@ async function driver(output,motion,control,budgetProfile='required-1gb'){
   else{
    assert.ok(MOBILE_STORY.motions.includes(motion));const {runButtonSafety}=await import('./button-safety-native.mjs');
    let result,appError;
-   try{result=await runButtonSafety({repo:root,engine:'webkit',port:0,outputDir:output,scenarioFilter:MOBILE_SCENARIO,mobileYesMotion:motion,browserServerEndpoint:ready.endpoint,closeBrowserServer:async()=>{const owned=await closeOwner();return owned.cleanup;}});}catch(error){appError=error;}
+   try{result=await runButtonSafety({repo:root,engine:'webkit',port:0,outputDir:output,scenarioFilter:MOBILE_SCENARIO,mobileYesMotion:motion,browserServerEndpoint:ready.endpoint,closeBrowserServer:async()=>{const owned=await closeOwner();return owned.cleanup;},observeRuntime:async()=>{const id=randomUUID();write(path.join(output,'diagnostic-snapshot-request.json'),{id,token:ready.token,label:'native-pre-context-cleanup'});const ack=await awaitFile(path.join(output,'diagnostic-snapshot-response.json'),{timeout:750});assert.equal(ack.id,id);assert.equal(ack.token,ready.token);assert.equal(ack.status,'recorded');return{id,status:ack.status,snapshotIndex:ack.snapshotIndex,at:ack.at};}});}catch(error){appError=error;}
    // Persist the original native failure and audit it separately from driver
    // execution. A failed application is never rewritten as a functional pass.
    const files=fs.readdirSync(output).filter(name=>/^button-safety-webkit-.*\.json$/.test(name));assert.equal(files.length,1,'One actual native attempt report required');
    report.nativeReportPath=files[0];report.nativeReportSha256=mobileDigest(fs.readFileSync(path.join(output,files[0])));report.motion=motion;
    const native=result?.report||json(path.join(output,files[0])),owned=await closeOwner();report.before=owned.before;report.after=owned.after;
    if(budgetProfile==='stress-512mb')report.appOutcome=classifyMobileStressOutcome(report,native,owned);
-   else{if(appError)throw appError;verifyMobileFunctionalReport(native,{...source,motion});report.appOutcome='passed';}
+   else{report.nativeOutcome={kind:native.kind,status:native.status};if(appError)throw appError;try{verifyMobileFunctionalReport(native,{...source,motion});}catch(error){report.diagnosticVerificationRefusal={code:error.code||null,message:error.message};throw error;}report.appOutcome='passed';}
   }
   report.status='passed';
  }catch(error){report.status='failed';report.errors.push(error.stack||String(error));throw error;}
@@ -114,16 +139,16 @@ export function containerArgs({repo,output,nodeBinary,motion,control,eventPolicy
  const memory=role==='browser'?budget:MOBILE_DRIVER_BYTES;
  const args=['create','--init','--network',role==='browser'?'none':'container:'+browserContainerId,'--cap-drop','ALL','--security-opt','no-new-privileges','--read-only','--memory',String(memory),'--memory-swap',String(memory),'--shm-size','67108864','--tmpfs','/tmp:rw,nosuid,size=67108864','--user',String(process.getuid())+':'+String(process.getgid()),'--workdir','/repo','--mount','type=bind,src='+repo+',dst=/repo,readonly','--mount','type=bind,src='+output+',dst=/evidence','--mount','type=bind,src='+nodeBinary+',dst=/opt/chain-node,readonly','--env','HOME=/tmp','--env','CI=true','--env','CHAIN_TEST_EVENT_POLICY='+eventPolicy,'--env','GITHUB_EVENT_NAME='+eventName,'--env','GITHUB_REF='+eventRef,'--env','GIT_CONFIG_COUNT=1','--env','GIT_CONFIG_KEY_0=safe.directory','--env','GIT_CONFIG_VALUE_0=/repo',MOBILE_IMAGE,'/opt/chain-node','scripts/button-safety-mobile-memory.mjs',role==='browser'?'--browser-server':'--driver','--output-dir','/evidence','--profile',budgetProfile];
  if(containerName||ownershipToken){assert.match(containerName||'',/^chain-mobile-[a-zA-Z0-9-]+$/);assert.match(ownershipToken||'',/^[a-zA-Z0-9-]{10,64}$/);args.splice(1,0,'--name',containerName,'--label','chain.mobile.owner='+ownershipToken);}
- for(const key of ['GITHUB_REPOSITORY','GITHUB_RUN_ID','GITHUB_RUN_ATTEMPT','CHAIN_TEST_SOURCE_SHA','CHAIN_DIAGNOSTIC_ACTIVATION'])if(process.env[key])args.splice(args.indexOf(MOBILE_IMAGE),0,'--env',key+'='+process.env[key]);
+ for(const key of ['GITHUB_REPOSITORY','GITHUB_RUN_ID','GITHUB_RUN_ATTEMPT','CHAIN_TEST_SOURCE_SHA','CHAIN_DIAGNOSTIC_ACTIVATION','CHAIN_DIAGNOSTIC_WORKLOAD'])if(process.env[key])args.splice(args.indexOf(MOBILE_IMAGE),0,'--env',key+'='+process.env[key]);
  if(control)args.push('--control');else args.push('--motion',motion);return args;
 }
 export async function runCappedMobile({outputDir,budgetProfile='required-1gb'}){
  mobileBudgetBytes(budgetProfile);
  if(process.platform!=='linux'||process.env.CI!=='true')throw Error('Capped mobile acceptance requires the isolated hosted Linux push/pull-request runtime; local functional evidence cannot waive it.');
- const diagnosticMotion=process.env.CHAIN_DIAGNOSTIC_MOTION,activationVariant=process.env.CHAIN_DIAGNOSTIC_ACTIVATION;assert.equal(diagnosticMotion,'reduced','Native-activation comparison fixes Reduced motion');assert.ok(['baseline','native-active'].includes(activationVariant),'Explicit native-activation diagnostic variant required');assert.equal(budgetProfile,'required-1gb','This diagnostic cannot change the required budget');
+ const diagnosticMotion=process.env.CHAIN_DIAGNOSTIC_MOTION,activationVariant=process.env.CHAIN_DIAGNOSTIC_ACTIVATION;assert.equal(diagnosticMotion,'reduced','Native-activation comparison fixes Reduced motion');assert.equal(activationVariant,'baseline','Workload comparison fixes native activation');const workload=process.env.CHAIN_DIAGNOSTIC_WORKLOAD;assert.ok(['full-app','minimal-frame-control'].includes(workload),'Explicit diagnostic workload required');assert.equal(budgetProfile,'required-1gb','This diagnostic cannot change the required budget');
  const hostedPolicy=hostedButtonPolicy(),output=path.resolve(outputDir);if(output===root||output.startsWith(root+path.sep))throw Error('Capped mobile evidence must be outside the checkout');fs.mkdirSync(output,{recursive:true});if(fs.readdirSync(output).length)throw Error('Capped mobile output must be new and empty');
  const source=identity();if(git('status','--porcelain=v1'))throw Error('Capped mobile requires exact clean committed source');
- const ownerToken=randomUUID(),report={schemaVersion:3,budgetProfile,kind:'button-mobile-memory-diagnostic',activationVariant,scope:MOBILE_MEMORY_SCOPE,status:'running',requiredStory:{...MOBILE_STORY,memoryBudgetBytes:mobileBudgetBytes(budgetProfile)},image:MOBILE_IMAGE,ownerToken,...source,hostedPolicy,cases:[],errors:[],cleanup:{containersRemoved:false}},owned=new Map(),commands=new Set();let interrupted=null,cleaning=false;
+ const ownerToken=randomUUID(),report={schemaVersion:3,budgetProfile,kind:'button-mobile-memory-diagnostic',activationVariant,workload,scope:MOBILE_MEMORY_SCOPE,status:'running',requiredStory:{...MOBILE_STORY,memoryBudgetBytes:mobileBudgetBytes(budgetProfile)},image:MOBILE_IMAGE,ownerToken,...source,hostedPolicy,cases:[],errors:[],cleanup:{containersRemoved:false}},owned=new Map(),commands=new Set();let interrupted=null,cleaning=false;
  const persistOwnership=()=>write(path.join(output,'ownership.json'),{ownerToken,...source,objects:[...owned].map(([identity,metadata])=>({identity,...metadata}))});
  const onSignal=signal=>{interrupted??=signal;if(!cleaning)for(const child of commands)child.kill('SIGTERM');};
  const handlers=Object.fromEntries(['SIGINT','SIGTERM'].map(signal=>[signal,()=>onSignal(signal)]));for(const [signal,handler]of Object.entries(handlers))process.on(signal,handler);

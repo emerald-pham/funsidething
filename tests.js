@@ -46342,24 +46342,25 @@ test('RISK Undo scene guidance: FAQ and Changelog explain task Undo keeps scene 
 });
 
 
-test('RISK repository process: native activation comparison preserves full rendering and original gates',async t=>{
+test('RISK repository process: minimal rendering comparison preserves the full app and cannot qualify release',async t=>{
  const {parse}=await import('yaml'),workflow=parse(fs.readFileSync(path.join(__dirname,'.github/workflows/data-safety.yml'),'utf8'));
- assert.deepEqual(workflow.on,{push:{branches:['diagnose/webkit-native-activation']}},'Only the dedicated nonmergeable activation branch may run this diagnostic');
+ assert.deepEqual(workflow.on,{push:{branches:['diagnose/webkit-minimal-rendering']}},'Only the dedicated nonmergeable minimal rendering branch may run this diagnostic');
  assert.deepEqual(workflow.permissions,{contents:'read'});
  assert.deepEqual(Object.keys(workflow.jobs),['diagnostic-mobile-startup']);
  const job=workflow.jobs['diagnostic-mobile-startup'];
- assert.equal(job['timeout-minutes'],15);assert.deepEqual(job.strategy,{'fail-fast':false,matrix:{variant:['baseline','native-active']}});
- assert.equal(job.env.CHAIN_DIAGNOSTIC_MOTION,'reduced');assert.equal(job.env.CHAIN_DIAGNOSTIC_ACTIVATION,'${{ matrix.variant }}');
+ assert.equal(job['timeout-minutes'],15);assert.deepEqual(job.strategy,{'fail-fast':false,matrix:{workload:['full-app','minimal-frame-control']}});
+ assert.equal(job.env.CHAIN_DIAGNOSTIC_MOTION,'reduced');assert.equal(job.env.CHAIN_DIAGNOSTIC_ACTIVATION,'baseline');assert.equal(job.env.CHAIN_DIAGNOSTIC_WORKLOAD,'${{ matrix.workload }}');
  assert.equal(job.env.FROZEN_APP_COMMIT,'6dde63c21525c5c792bc84ff4c24158fdf446943');
  for(const value of Object.values(job.env))assert.doesNotMatch(String(value),/\$\{\{\s*runner\b/,'Runner expressions require a step context');
  assert.equal(job.steps.at(-1).if,'always()');assert.equal(job.steps.at(-1).with['if-no-files-found'],'error');
  assert.ok(job.steps.every(step=>!String(step.uses||step.run||'').match(/deploy-pages|release:publish|test:group.*--aggregate/)),'Diagnostic results cannot deploy or aggregate release acceptance');
- assert.ok(job.steps.some(step=>step.run==='node scripts/button-safety-mobile-memory.mjs --run --profile required-1gb --output-dir "$RUNNER_TEMP/mobile-startup/capped"'),'Real capped control and original full story remain on the pinned launcher');
+ assert.ok(job.steps.some(step=>step.run==='node scripts/button-safety-mobile-memory.mjs --run --profile required-1gb --output-dir "$RUNNER_TEMP/mobile-startup/capped"'),'Both workloads use the original capped launcher');
  const {tmpdir}=await import('node:os'),{createMobileBundle,refreshMobileBundle}=await import('./scripts/agent-tools/mobile-memory-fixture.mjs'),{verifyMobileMemoryReport}=await import('./scripts/button-safety-mobile-contract.mjs');
  const directory=fs.mkdtempSync(path.join(tmpdir(),'chain-startup-diagnostic-contract-'));t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
  const bundle=createMobileBundle(directory),verify=()=>verifyMobileMemoryReport(bundle.report,{artifactRoot:directory});
  assert.equal(verify().status,'passed','Synthetic positive parser control supplies no runtime acceptance');
  bundle.report.kind='button-mobile-memory-diagnostic';assert.throws(verify,'Diagnostic report kind cannot qualify release');
+ bundle.report.kind='button-mobile-minimal-frame-control';assert.throws(verify,'A successful minimal rendering control cannot qualify the full app');
  bundle.report.kind='button-mobile-memory';bundle.report.cases=bundle.report.cases.slice(0,1);refreshMobileBundle(bundle);assert.throws(verify,'Relabeling a partial motion matrix cannot qualify release');
 });
 
