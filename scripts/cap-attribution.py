@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """External diagnostic attribution; never a mobile acceptance receipt."""
 import argparse,json,pathlib
-import sys
+import sys,stat,shutil
 
 def summarize(directory):
  raw=json.loads((directory/'observer.json').read_text())
@@ -93,31 +93,102 @@ def categories(processes):
    seen.add(ancestor['pid']);ancestor=bypid.get(ancestor.get('ppid'))
  return processes
 
+def inspect_scoped_container(cid,repo,canonical):
+ if not re.fullmatch('[a-f0-9]{64}',cid):raise ValueError('Invalid container identity')
+ template='{{json .Id}}|{{json .HostConfig.Memory}}|{{json .HostConfig.MemorySwap}}|{{json .Config.Image}}|{{json .Mounts}}'
+ result=subprocess.run(['docker','inspect','--format',template,cid],capture_output=True,text=True,timeout=2)
+ if result.returncode:
+  if 'No such object' in result.stderr or 'No such container' in result.stderr:return {'id':cid,'missing':True}
+  raise ValueError('Docker identity query failed')
+ ident,memory,swap,image,mounts=[json.loads(v) for v in result.stdout.strip().split('|')];mounts={m['Destination']:m for m in mounts}
+ evidence=mounts.get('/evidence',{}).get('Source');labels={str(canonical/label):label for label in ['negative','normal','reduced']}
+ if ident!=cid or image!=IMAGE or mounts.get('/repo',{}).get('Source')!=str(repo) or evidence not in labels:return None
+ return {'id':cid,'label':labels[evidence],'validBoundary':memory==swap==512000000 and mounts['/repo'].get('RW') is False}
+
+def scoped_inventory(repo,canonical):
+ result=subprocess.run(['docker','ps','--all','--no-trunc','--format','{{.ID}}'],capture_output=True,text=True,timeout=2)
+ if result.returncode:raise ValueError('Docker inventory unavailable')
+ ids=result.stdout.split();
+ if len(ids)>128:raise ValueError('Docker inventory bound exceeded')
+ owned=[]
+ for cid in ids:
+  c=inspect_scoped_container(cid,repo,canonical)
+  if c and not c.get('missing'):owned.append(c)
+ return owned
+
 def cleanup_owned_containers(containers,repo,canonical):
- receipt={'removed':[],'alreadyRemoved':[],'unresolved':[]}
- for c in containers:
-  cid=c['id']
-  try:
-   template='{{json .Id}}|{{json .HostConfig.Memory}}|{{json .HostConfig.MemorySwap}}|{{json .Config.Image}}|{{json .Mounts}}'
-   result=subprocess.run(['docker','inspect','--format',template,cid],capture_output=True,text=True,timeout=2)
-   if result.returncode:
-    if 'No such object' in result.stderr or 'No such container' in result.stderr:receipt['alreadyRemoved'].append(cid)
-    else:receipt['unresolved'].append(cid)
-    continue
-   ident,memory,swap,image,mounts=[json.loads(v) for v in result.stdout.strip().split('|')];mounts={m['Destination']:m for m in mounts}
-   if ident!=cid or memory!=swap or memory!=512000000 or image!=IMAGE or mounts.get('/repo',{}).get('Source')!=str(repo) or mounts.get('/evidence',{}).get('Source')!=str(canonical/c['label']):
-    receipt['unresolved'].append(cid);continue
-   removed=subprocess.run(['docker','rm','--force',cid],capture_output=True,text=True,timeout=2)
-   check=subprocess.run(['docker','inspect','--format','{{.Id}}',cid],capture_output=True,text=True,timeout=2)
-   if removed.returncode==0 and check.returncode and ('No such object' in check.stderr or 'No such container' in check.stderr):receipt['removed'].append(cid)
-   else:receipt['unresolved'].append(cid)
-  except Exception:receipt['unresolved'].append(cid)
+ receipt={'removed':[],'alreadyRemoved':[],'unresolved':[],'inventoryComplete':True};pending={c['id']:c for c in containers}
+ # Cancellation may interrupt create before any start/cgroup exists. Reconcile
+ # daemon objects as well as event-tracked IDs, including one creation race.
+ for attempt in range(2):
+  try:pending.update({c['id']:c for c in scoped_inventory(repo,canonical)})
+  except Exception:receipt['inventoryComplete']=False
+  for cid in list(pending):
+   try:
+    c=inspect_scoped_container(cid,repo,canonical)
+    if c and c.get('missing'):
+     if cid not in receipt['alreadyRemoved']:receipt['alreadyRemoved'].append(cid)
+     pending.pop(cid);continue
+    if not c or not c['validBoundary']:continue
+    removed=subprocess.run(['docker','rm','--force',cid],capture_output=True,text=True,timeout=2)
+    after=inspect_scoped_container(cid,repo,canonical)
+    if removed.returncode==0 and after and after.get('missing'):
+     receipt['removed'].append(cid);pending.pop(cid)
+   except Exception:continue
+ try:
+  for c in scoped_inventory(repo,canonical):pending[c['id']]=c
+ except Exception:receipt['inventoryComplete']=False
+ receipt['unresolved']=list(pending)
  return receipt
+
+OWNER_KEYS=('pid','startTime','namespacePids','bootId','nonce','output','source')
+
+def stop_observer(control,expected,proc=pathlib.Path('/proc')):
+ descriptor=None;pidfd=None
+ try:
+  if sys.platform!='linux' or os.geteuid()!=0:raise ValueError('Root Linux shutdown required')
+  descriptor=os.open(control,os.O_RDONLY|os.O_NOFOLLOW);metadata=os.fstat(descriptor)
+  if not stat.S_ISREG(metadata.st_mode) or metadata.st_uid!=0 or metadata.st_nlink!=1 or metadata.st_size>8192 or metadata.st_mode&0o022:raise ValueError('Untrusted observer identity record')
+  owner=json.loads(os.read(descriptor,8193));os.close(descriptor);descriptor=None
+  if owner!=expected or set(owner)!=set(OWNER_KEYS) or pathlib.Path(owner['output'])!=control.parent.resolve() or owner['source']!=SOURCE or not re.fullmatch('[a-f0-9]{32}',owner['nonce']):raise ValueError('Observer identity mismatch')
+  if owner['bootId']!=(proc/'sys/kernel/random/boot_id').read_text().strip() or not isinstance(owner['pid'],int) or owner['pid']<=1:raise ValueError('Observer host identity mismatch')
+  # Bind the signal to a kernel process handle, never a check-then-kill PID.
+  pidfd=os.pidfd_open(owner['pid'],0)
+  directory=proc/str(owner['pid']);rawstat=(directory/'stat').read_text();fields=rawstat[rawstat.rindex(')')+2:].split()
+  if int(fields[19])!=owner['startTime']:raise ValueError('Observer PID was reused')
+  ns=re.search(r'^NSpid:\s*(.*)$',(directory/'status').read_text(),re.M)
+  if not ns or [int(v) for v in ns[1].split()]!=owner['namespacePids']:raise ValueError('Observer namespace identity mismatch')
+  signal.pidfd_send_signal(pidfd,signal.SIGTERM,None,0)
+  return {'status':'signalled','pid':owner['pid'],'startTime':owner['startTime']}
+ except ProcessLookupError:return {'status':'already-exited'}
+ except Exception:return {'status':'refused','reason':'Observer identity or pidfd shutdown capability unavailable'}
+ finally:
+  if descriptor is not None:os.close(descriptor)
+  if pidfd is not None:os.close(pidfd)
+
+def publish_evidence(output,result):
+ published=output.with_name(output.name+'-published')
+ if published.exists():raise ValueError('Publication path already exists')
+ if result['cleanup']['observerClosed']:
+  # Collected process: no privileged writer can still mutate these files.
+  for entry in output.rglob('*'):
+   if entry.is_symlink() or not (entry.is_dir() or entry.is_file()):raise ValueError('Unsafe evidence entry')
+  shutil.copytree(output,published)
+ else:
+  # Never read/copy mutable observer files. This handoff is stable even if a
+  # verified observer could not be collected; it confers no cleanup credit.
+  published.mkdir()
+  for name in ['source.json','command.json']:
+   file=output/name
+   if file.is_file() and not file.is_symlink():shutil.copyfile(file,published/name)
+  handoff={'kind':'unresolved-owned-observer-cleanup','acceptanceEligible':False,'status':'unresolved','liveEvidence':str(output),'owner':result.get('observerIdentity'),'stop':result.get('observerStop'),'canonicalChildClosed':result['cleanup']['canonicalChildClosed'],'observerClosed':False,'mutableEvidenceExcluded':True}
+  (published/'cleanup-unresolved.json').write_text(json.dumps(handoff,indent=2)+'\n')
+ return published
 
 def collect(args):
  output=args.output;output.mkdir(parents=True,exist_ok=True)
  raw={'source':SOURCE,'capability':{'available':False},'cleanup':{'traceRemoved':False,'childrenClosed':False},'lostEvents':None,'kernelLogLost':None,'errors':[],'containers':[],'victims':[],'ignoredForeignVictims':0,'intervalSeconds':INTERVAL,'observerOutsideCap':True}
- instance=None;created=False;events=None;response=None;event_thread=None;event_queue=queue.Queue(maxsize=256);thread_stop=threading.Event();tracefd=None;stream=None;stop=False;pending=b'';lost=0;kmsg=None;kseq=None;contexts=[];traces=[];used_contexts=set();known={};started=time.monotonic()
+ instance=None;created=False;events=None;response=None;event_thread=None;event_queue=queue.Queue(maxsize=256);thread_stop=threading.Event();tracefd=None;stream=None;stop=False;pending=b'';lost=0;kmsg=None;kseq=None;contexts=[];traces=[];used_contexts=set();known={};owned={};ready_sent=False;started=time.monotonic()
  def emit(kind,data):
   stream.write(json.dumps({'kind':kind,'mono':time.monotonic(),'data':data})+'\n');stream.flush()
   if stream.tell()>32*1024*1024:raise ValueError('Bounded observation inventory exceeded')
@@ -130,6 +201,12 @@ def collect(args):
  try:
   stream=(output/'observations.ndjson').open('w')
   if os.geteuid()!=0 or sys.platform!='linux':raise ValueError('Root Linux host required')
+  own=process_identity(pathlib.Path('/proc'),os.getpid(),pathlib.Path('/proc/self/cgroup').read_text().strip().split('::',1)[1],False)
+  owner={key:own[key] for key in ['pid','startTime','namespacePids']};owner.update(bootId=pathlib.Path('/proc/sys/kernel/random/boot_id').read_text().strip(),nonce=uuid.uuid4().hex,output=str(output.resolve()),source=SOURCE)
+  pidfd=os.pidfd_open(os.getpid(),0);os.close(pidfd)
+  if not hasattr(signal,'pidfd_send_signal'):raise ValueError('Identity-bound shutdown unavailable')
+  fd=os.open(output/'observer-owner.json',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o644)
+  with os.fdopen(fd,'w') as record:os.fchmod(record.fileno(),0o644);record.write(json.dumps(owner));record.flush();os.fsync(record.fileno())
   # Create only our unique instance; never mount tracefs or modify global tracing.
   raw['capability']['phase']='tracefs-instance'
   instance=pathlib.Path('/sys/kernel/tracing/instances')/('chain-cap-'+uuid.uuid4().hex)
@@ -152,7 +229,7 @@ def collect(args):
    def connect(self):
     self.sock=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM);self.sock.settimeout(5);self.sock.connect('/var/run/docker.sock')
   events=DockerHTTP('localhost',timeout=5)
-  filters=json.dumps({'type':['container'],'event':['start','die','destroy']})
+  filters=json.dumps({'type':['container'],'event':['create','start','die','destroy']})
   events.request('GET','/events?'+urllib.parse.urlencode({'filters':filters}));response=events.getresponse()
   if response.status!=200:raise ValueError('Docker event subscription refused')
   events.sock.settimeout(None)
@@ -168,10 +245,19 @@ def collect(args):
   event_thread=threading.Thread(target=read_events,daemon=True);event_thread.start();raw['capability']['dockerEventsSubscribed']=True
   emit('lifecycle-subscription',{'confirmed':True})
   # A ready handshake precedes the unchanged canonical command, not its burst.
-  print(json.dumps({'ready':True,'pid':os.getpid(),'startTime':process_identity(pathlib.Path('/proc'),os.getpid(),(pathlib.Path('/proc/self/cgroup').read_text().strip().split('::',1)[1]),False)['startTime']}),flush=True)
+  ready_sent=True
+  print(json.dumps({'ready':True,**owner}),flush=True)
   deadline=time.monotonic()+480;lastsample=0
+  def register(cid):
+   scoped=inspect_scoped_container(cid,args.repo,args.canonical)
+   if scoped and not scoped.get('missing'):
+    owned[cid]=scoped
+    if not scoped['validBoundary']:raise ValueError('Owned Docker boundary mismatch')
+   return scoped
   def discover(cid):
    if not re.fullmatch('[a-f0-9]{64}',cid) or cid in known:return
+   scoped=register(cid)
+   if not scoped or scoped.get('missing'):return
    # Project only nonpayload configuration fields; never request Config.Cmd/Env.
    template='{{json .Id}}|{{json .State.Pid}}|{{json .HostConfig.Memory}}|{{json .HostConfig.MemorySwap}}|{{json .Config.Image}}|{{json .Mounts}}'
    r=subprocess.run(['docker','inspect','--format',template,cid],capture_output=True,text=True,timeout=2)
@@ -209,7 +295,8 @@ def collect(args):
    if sys.stdin.fileno() in readable and os.read(sys.stdin.fileno(),1024)==b'':stop=True
    while not event_queue.empty():
     event=event_queue.get_nowait();cid=event.get('Actor',{}).get('ID','')
-    if event.get('Action')=='start':discover(cid)
+    if event.get('Action')=='create':register(cid)
+    elif event.get('Action')=='start':discover(cid)
    if kmsg in readable:
     try:
      while True:
@@ -273,7 +360,9 @@ def collect(args):
     events.close();raw['cleanup']['childrenClosed']=True
    else:raw['errors'].append('Owned lifecycle reader did not close')
   else:raw['cleanup']['childrenClosed']=True
-  raw['containerCleanup']=cleanup_owned_containers(list(known.values()),args.repo,args.canonical);raw['ownedContainersRemoved']=not raw['containerCleanup']['unresolved']
+  raw['ownedObjects']=list(owned.values())
+  raw['containerCleanup']=cleanup_owned_containers(list(owned.values()),args.repo,args.canonical) if ready_sent else {'removed':[],'alreadyRemoved':[],'unresolved':[],'inventoryComplete':True}
+  raw['ownedContainersRemoved']=raw['containerCleanup']['inventoryComplete'] and not raw['containerCleanup']['unresolved']
   if raw['containerCleanup']['removed']:raw['errors'].append('Canonical command left owned containers; diagnostic cleanup collected them')
   if not raw['ownedContainersRemoved']:raw['errors'].append('Owned container cleanup unresolved')
   if not created:raw['cleanup']['traceRemoved']=True
@@ -308,7 +397,7 @@ def collect(args):
 
 def run(args):
  output=args.output.resolve();repo=args.repo.resolve()
- if output.exists():raise ValueError('New external evidence directory required')
+ if output.exists() or output.with_name(output.name+'-published').exists():raise ValueError('New external evidence and publication directories required')
  if output==repo or repo in output.parents:raise ValueError('Evidence must be outside checkout')
  output.mkdir(parents=True);canonical=output/'canonical'
  child=None;worker=None;result={'kind':'nonmergeable-cap-attribution-command','acceptanceEligible':False,'canonicalExit':None,'observerExit':None,'cleanup':{'canonicalChildClosed':True,'observerClosed':True},'errors':[]}
@@ -340,17 +429,27 @@ def run(args):
    try:os.killpg(child.pid,signal.SIGTERM)
    except ProcessLookupError:pass
    try:child.wait(timeout=3)
-   except subprocess.TimeoutExpired:os.killpg(child.pid,signal.SIGKILL);child.wait(timeout=3)
+   except subprocess.TimeoutExpired:
+    try:os.killpg(child.pid,signal.SIGKILL)
+    except ProcessLookupError:pass
+    child.wait(timeout=3)
   if worker:
-   worker.stdin.close()
+   try:worker.stdin.close()
+   except (BrokenPipeError,OSError):pass
    try:worker.wait(timeout=30)
    except subprocess.TimeoutExpired:
-    # Root worker has its own480s deadline. Do not signal an unverified root PID.
-    result['errors'].append('Owned observer did not close promptly; root worker remains bounded by its own deadline')
+    expected={key:result.get('observerIdentity',{}).get(key) for key in OWNER_KEYS}
+    try:
+     stopped=subprocess.run(['sudo','-n',sys.executable,str(pathlib.Path(__file__).resolve()),'--stop-observer','--control-path',str(output/'observer-owner.json'),'--expected-owner',json.dumps(expected)],capture_output=True,text=True,timeout=5)
+     result['observerStop']=json.loads(stopped.stdout)
+    except Exception:result['observerStop']={'status':'refused','reason':'Identity-bound shutdown command failed'}
+    try:worker.wait(timeout=30)
+    except subprocess.TimeoutExpired:result['errors'].append('Privileged observer remains unresolved; only a stable cleanup handoff will be published')
    result['observerExit']=worker.poll();result['cleanup']['observerClosed']=worker.poll() is not None
   result['cleanup']['canonicalChildClosed']=child is None or child.poll() is not None
   (output/'command.json').write_text(json.dumps(result,indent=2)+'\n')
-  summary=safe_summary(output)
+  summary=safe_summary(output) if result['cleanup']['observerClosed'] else None
+  publish_evidence(output,result)
  return 0 if result['canonicalExit']==0 and result['observerExit']==0 and summary and summary['status']=='complete' and not result['errors'] else 1
 
 def safe_summary(directory):
@@ -360,10 +459,12 @@ def safe_summary(directory):
   (directory/'attribution.json').write_text(json.dumps(result,indent=2)+'\n');return result
 
 if __name__=='__main__':
- p=argparse.ArgumentParser();mode=p.add_mutually_exclusive_group(required=True);mode.add_argument('--summarize',type=pathlib.Path);mode.add_argument('--observe',action='store_true');mode.add_argument('--run',action='store_true');p.add_argument('--repo',type=pathlib.Path);p.add_argument('--output',type=pathlib.Path);p.add_argument('--canonical',type=pathlib.Path);a=p.parse_args()
+ p=argparse.ArgumentParser();mode=p.add_mutually_exclusive_group(required=True);mode.add_argument('--summarize',type=pathlib.Path);mode.add_argument('--observe',action='store_true');mode.add_argument('--run',action='store_true');mode.add_argument('--stop-observer',action='store_true');p.add_argument('--control-path',type=pathlib.Path);p.add_argument('--expected-owner');p.add_argument('--repo',type=pathlib.Path);p.add_argument('--output',type=pathlib.Path);p.add_argument('--canonical',type=pathlib.Path);a=p.parse_args()
  try:
   if a.summarize:
    r=safe_summary(a.summarize);code=0 if r['status']=='complete' else 1
+  elif a.stop_observer:
+   result=stop_observer(a.control_path,json.loads(a.expected_owner));print(json.dumps(result));code=0 if result['status']!='refused' else 1
   elif a.observe:
    if not a.repo or not a.output or not a.canonical:p.error('Observer paths required')
    code=collect(a)

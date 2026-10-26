@@ -2309,3 +2309,5 @@ The command/report consumer rejects missing, duplicate, skipped, cancelled, unre
 - RISK synced scene durability: native retained boards keep immediate scene locks through reload without changing tasks or sources
 
 - RISK repository process: capped attribution requires owned kernel victims and complete canonical evidence — One unchanged frozen fe42 canonical command, strict cap and full story run after an external host observer is ready. Actual kernel memcg/victim correlation, format/loss/PID boundaries, Node/browser scalar separation, cleanup and complete source/inventories fail closed. Process fixtures and diagnostic CI confer no release acceptance.
+
+- RISK repository process: observer cleanup publication never races a privileged writer — Cancellation reconciles exact owned created/stopped Docker objects independently of a running PID. Identity-bound pidfd shutdown collects the privileged observer before publishing a settled snapshot; unresolved shutdown publishes only stable metadata and never mutable evidence or cleanup credit. Foreign objects/PIDs remain untouched.

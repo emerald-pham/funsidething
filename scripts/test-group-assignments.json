@@ -13081,6 +13081,36 @@
       "root": "control startup may progress from inherited score zero to its deliberate final score",
       "group": "native-process",
       "file": "scripts/agent-tools/cap-attribution.test.mjs"
+    },
+    {
+      "root": "RISK repository process: observer cleanup publication never races a privileged writer",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "cancellation reconciles a created unstarted owned object while preserving a foreign object",
+      "group": "native-process",
+      "file": "scripts/agent-tools/cap-attribution.test.mjs"
+    },
+    {
+      "root": "cancellation collects an EOF-ignoring observer before returning on signals and deadlines",
+      "group": "native-process",
+      "file": "scripts/agent-tools/cap-attribution.test.mjs"
+    },
+    {
+      "root": "cancellation publishes only a stable unresolved handoff when observer shutdown is refused",
+      "group": "native-process",
+      "file": "scripts/agent-tools/cap-attribution.test.mjs"
+    },
+    {
+      "root": "privileged shutdown refuses a missing root identity record instead of claiming observer exit",
+      "group": "native-process",
+      "file": "scripts/agent-tools/cap-attribution.test.mjs"
+    },
+    {
+      "root": "privileged shutdown binds the root record PID start time namespace and pidfd before signalling",
+      "group": "native-process",
+      "file": "scripts/agent-tools/cap-attribution.test.mjs"
     }
   ],
   "processControls": [

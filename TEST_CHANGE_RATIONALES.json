@@ -22629,5 +22629,62 @@
       "command": "Node22 recorder --purpose preimplementation-red -- node --test scripts/agent-tools/cap-attribution.test.mjs",
       "failure": "Actual runnable consumer REDb415da64 preceded initial implementation; control discrimination RED372371c2 preceded its guard. Parsed old configuration RED630f27c0 preceded one-source workflow. Parent-identified post-kill /proc defect has actual short-lived SIGKILL/reaped-child RED9673be65 before direct kernel memcg-context repair (GREENce4e6e4d). Missing receipt RED68b9095b precedes safe incomplete preservation; actual cleanup REDf0935696 and clock REDa863e067 precede guards. All chronology under canonical-cap-fe42-attribution/runs, including c024 unexpected pass (fixed overcoupled fixture before actual20f235b3 RED), fa62 path-alias fixture correction and retained earlier REDs. Latest complete focused GREEN103a7f3f. No hosted run occurred."
     }
+  },
+  {
+    "baseCommit": "5c366f7112e5803866345426f3f96a07d2ab966c",
+    "testChangesSha256": "607c545ae94e50984010056d5bf1eb30ebdfbdfc27420f25a71dca8e655a2df8",
+    "reason": "Repair both independent cleanup findings ATTR-CODE-01/P1 and ATTR-CODE-02/P2 in one bounded diagnostic-only batch, retaining the exact canonical source and every acceptance constraint.",
+    "previousBehavior": "Only started containers with live cgroups entered cleanup, so cancellation after create leaked a daemon object. The wrapper could return after its first grace while the privileged observer still wrote files that the next workflow step uploaded.",
+    "intendedBehavior": "Create events and bounded final daemon inventory reconcile every exact-owned object even at PID0, with image/caps/read-only repo/evidence mounts revalidated before deletion. Root-owned nonce/PID/start-time/namespace/boot identity and pidfd bind shutdown; wrapper collects the observer or publishes only a stable unresolved metadata handoff. Artifact guard/upload consume only settled publication, never the live writer directory.",
+    "replacementTests": [
+      "RISK repository process: observer cleanup publication never races a privileged writer"
+    ],
+    "preservedCoverage": [
+      "Frozen fe42 app, full canonical tests prefix, all native/mobile/fixture/policy/validator bytes and original whole-container512000000/no-swap400tasks/1MiB/two backups/both motions/ten distinct trustedYes/2s remain unchanged. No product or hosted acceptance follows from process fixtures.",
+      "Existing kernel-context/control/loss/PID reuse/privacy/source/inventory/canonical exit checks remain. Actual wrapper cancellation keeps a created unstarted owned daemon object until the real cleanup adapter reconciles it, preserves a foreign object, and exercises signal and deadline paths using bounded external time/OS fixtures.",
+      "Root shutdown refuses missing/untrusted/reused/namespace-mismatched identity before signalling; no bare PID kill fallback. If verified shutdown cannot collect, only stable source/command/unresolved metadata are uploaded, with observerClosed=false and no mutable process/trace snapshot or cleanup credit."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder --purpose preimplementation-red -- node --test --test-name-pattern=\"^cancellation \" scripts/agent-tools/cap-attribution.test.mjs; corresponding observer-publication RISK root",
+      "failure": "Actual a0fe69cb-be64-4798-9333-b17b4e286573 on clean5c plus new tests observed all4 cancellation assertions fail before implementation: owned PID0 object persisted and EOF-ignoring observer remained alive at wrapper return for both signal/deadline. Actual af83a29b-2899-4125-88f5-8cd3be4f4d9c rejected original live upload path before workflow change. ATTR01 targeted GREEN8ac32aaa follows inventory repair; both cancellation seams GREEN8132a928 and publication RISK GREENe6c4e9f0 follow identity shutdown/stable publication. Additional missing-root-record REDb83ff2e3 precedes truthful refusal. Full focused GREEN08d6144c has38passes/0skips. f718 and568 are retained intermediate failures: P2 exposed the fixture cleanup grace and then a Python fixture quoting defect, corrected before green. Evidence under canonical-cap-fe42-attribution/cleanup-repair/runs; no Docker/native/hosted runtime occurred."
+    }
+  },
+  {
+    "baseCommit": "fe42f57e880c5edafc26b01af954bfe3205e1d22",
+    "testChangesSha256": "b08c38c5de33547a4267d3ffd57f0fb20d2235211041b57e3e3f114bad944d2f",
+    "reason": "Repair both independent cleanup findings ATTR-CODE-01/P1 and ATTR-CODE-02/P2 in one bounded diagnostic-only batch, retaining the exact canonical source and every acceptance constraint.",
+    "previousBehavior": "Only started containers with live cgroups entered cleanup, so cancellation after create leaked a daemon object. The wrapper could return after its first grace while the privileged observer still wrote files that the next workflow step uploaded.",
+    "intendedBehavior": "Create events and bounded final daemon inventory reconcile every exact-owned object even at PID0, with image/caps/read-only repo/evidence mounts revalidated before deletion. Root-owned nonce/PID/start-time/namespace/boot identity and pidfd bind shutdown; wrapper collects the observer or publishes only a stable unresolved metadata handoff. Artifact guard/upload consume only settled publication, never the live writer directory.",
+    "replacementTests": [
+      "RISK repository process: observer cleanup publication never races a privileged writer"
+    ],
+    "preservedCoverage": [
+      "Frozen fe42 app, full canonical tests prefix, all native/mobile/fixture/policy/validator bytes and original whole-container512000000/no-swap400tasks/1MiB/two backups/both motions/ten distinct trustedYes/2s remain unchanged. No product or hosted acceptance follows from process fixtures.",
+      "Existing kernel-context/control/loss/PID reuse/privacy/source/inventory/canonical exit checks remain. Actual wrapper cancellation keeps a created unstarted owned daemon object until the real cleanup adapter reconciles it, preserves a foreign object, and exercises signal and deadline paths using bounded external time/OS fixtures.",
+      "Root shutdown refuses missing/untrusted/reused/namespace-mismatched identity before signalling; no bare PID kill fallback. If verified shutdown cannot collect, only stable source/command/unresolved metadata are uploaded, with observerClosed=false and no mutable process/trace snapshot or cleanup credit."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder --purpose preimplementation-red -- node --test --test-name-pattern=\"^cancellation \" scripts/agent-tools/cap-attribution.test.mjs; corresponding observer-publication RISK root",
+      "failure": "Actual a0fe69cb-be64-4798-9333-b17b4e286573 on clean5c plus new tests observed all4 cancellation assertions fail before implementation: owned PID0 object persisted and EOF-ignoring observer remained alive at wrapper return for both signal/deadline. Actual af83a29b-2899-4125-88f5-8cd3be4f4d9c rejected original live upload path before workflow change. ATTR01 targeted GREEN8ac32aaa follows inventory repair; both cancellation seams GREEN8132a928 and publication RISK GREENe6c4e9f0 follow identity shutdown/stable publication. Additional missing-root-record REDb83ff2e3 precedes truthful refusal. Full focused GREEN08d6144c has38passes/0skips. f718 and568 are retained intermediate failures: P2 exposed the fixture cleanup grace and then a Python fixture quoting defect, corrected before green. Evidence under canonical-cap-fe42-attribution/cleanup-repair/runs; no Docker/native/hosted runtime occurred."
+    }
+  },
+  {
+    "baseCommit": "b6e83899240d9546cab1bf481aa1b99de0a121f5",
+    "testChangesSha256": "fa7eeb2b7402598aa2784fb2cf7107689edbf99f0e9dce7271cd1f6512c07f05",
+    "reason": "Repair both independent cleanup findings ATTR-CODE-01/P1 and ATTR-CODE-02/P2 in one bounded diagnostic-only batch, retaining the exact canonical source and every acceptance constraint.",
+    "previousBehavior": "Only started containers with live cgroups entered cleanup, so cancellation after create leaked a daemon object. The wrapper could return after its first grace while the privileged observer still wrote files that the next workflow step uploaded.",
+    "intendedBehavior": "Create events and bounded final daemon inventory reconcile every exact-owned object even at PID0, with image/caps/read-only repo/evidence mounts revalidated before deletion. Root-owned nonce/PID/start-time/namespace/boot identity and pidfd bind shutdown; wrapper collects the observer or publishes only a stable unresolved metadata handoff. Artifact guard/upload consume only settled publication, never the live writer directory.",
+    "replacementTests": [
+      "RISK repository process: observer cleanup publication never races a privileged writer"
+    ],
+    "preservedCoverage": [
+      "Frozen fe42 app, full canonical tests prefix, all native/mobile/fixture/policy/validator bytes and original whole-container512000000/no-swap400tasks/1MiB/two backups/both motions/ten distinct trustedYes/2s remain unchanged. No product or hosted acceptance follows from process fixtures.",
+      "Existing kernel-context/control/loss/PID reuse/privacy/source/inventory/canonical exit checks remain. Actual wrapper cancellation keeps a created unstarted owned daemon object until the real cleanup adapter reconciles it, preserves a foreign object, and exercises signal and deadline paths using bounded external time/OS fixtures.",
+      "Root shutdown refuses missing/untrusted/reused/namespace-mismatched identity before signalling; no bare PID kill fallback. If verified shutdown cannot collect, only stable source/command/unresolved metadata are uploaded, with observerClosed=false and no mutable process/trace snapshot or cleanup credit."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder --purpose preimplementation-red -- node --test --test-name-pattern=\"^cancellation \" scripts/agent-tools/cap-attribution.test.mjs; corresponding observer-publication RISK root",
+      "failure": "Actual a0fe69cb-be64-4798-9333-b17b4e286573 on clean5c plus new tests observed all4 cancellation assertions fail before implementation: owned PID0 object persisted and EOF-ignoring observer remained alive at wrapper return for both signal/deadline. Actual af83a29b-2899-4125-88f5-8cd3be4f4d9c rejected original live upload path before workflow change. ATTR01 targeted GREEN8ac32aaa follows inventory repair; both cancellation seams GREEN8132a928 and publication RISK GREENe6c4e9f0 follow identity shutdown/stable publication. Additional missing-root-record REDb83ff2e3 precedes truthful refusal. Full focused GREEN08d6144c has38passes/0skips. f718 and568 are retained intermediate failures: P2 exposed the fixture cleanup grace and then a Python fixture quoting defect, corrected before green. Evidence under canonical-cap-fe42-attribution/cleanup-repair/runs; no Docker/native/hosted runtime occurred."
+    }
   }
 ]

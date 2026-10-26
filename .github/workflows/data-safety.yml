@@ -49,9 +49,10 @@ jobs:
           import {createHash} from 'node:crypto';
           import {execFileSync} from 'node:child_process';
           import {pathToFileURL} from 'node:url';
-          const env=process.env,output=path.join(env.RUNNER_TEMP,'mobile-cap-attribution');fs.mkdirSync(output,{recursive:true});
+          const env=process.env,output=path.join(env.RUNNER_TEMP,'mobile-cap-attribution-published');fs.mkdirSync(output,{recursive:true});
           const check={kind:'nonmergeable-cap-attribution-artifact-check',acceptanceEligible:false,status:'incomplete',errors:[]};
           try{
+            assert.equal(fs.existsSync(path.join(output,'cleanup-unresolved.json')),false,'Unresolved privileged cleanup cannot qualify or expose mutable evidence');
             const read=name=>JSON.parse(fs.readFileSync(path.join(output,name),'utf8')),source=read('source.json'),command=read('command.json'),attribution=read('attribution.json');
             const git=(repo,...args)=>execFileSync('git',['-C',repo,...args],{encoding:'utf8'}).trim(),repo=path.join(env.GITHUB_WORKSPACE,'candidate'),runner=path.join(env.GITHUB_WORKSPACE,'observer');
             assert.equal(env.CI,'true');assert.equal(env.GITHUB_EVENT_NAME,'push');assert.equal(env.GITHUB_REF,'refs/heads/diagnose/webkit-cap-canonical-startup');assert.equal(env.CHAIN_TEST_EVENT_POLICY,'outgoing-branch-push-v1');
@@ -75,5 +76,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: NONMERGEABLE-cap-attribution-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/mobile-cap-attribution
+          path: ${{ runner.temp }}/mobile-cap-attribution-published
           if-no-files-found: error

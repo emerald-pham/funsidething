@@ -45939,3 +45939,7 @@ test('RISK repository process: current producer reuse requires successful capped
 test('RISK repository process: capped attribution requires owned kernel victims and complete canonical evidence',()=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;const result=spawnSync(process.execPath,['--test','scripts/agent-tools/cap-attribution.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:4*1024*1024});assert.equal(result.error,undefined);assert.equal(result.status,0,'Attribution public CLI must reject missing, ambiguous and lost observations without changing canonical acceptance: '+result.stdout+'\n'+result.stderr);
 });
+
+test('RISK repository process: observer cleanup publication never races a privileged writer',async()=>{
+ const yaml=(await import('js-yaml')).default,w=yaml.load(fs.readFileSync(path.join(__dirname,'.github/workflows/data-safety.yml'),'utf8')),j=w.jobs['cap-attribution'],guard=j.steps.find(s=>s.id==='artifact-completeness'),upload=j.steps.find(s=>s.uses==='actions/upload-artifact@v4');assert.equal(upload.with.path,'${{ runner.temp }}/mobile-cap-attribution-published','Only a settled snapshot or stable unresolved handoff may be uploaded');assert.match(guard.run,/mobile-cap-attribution-published/);assert.match(guard.run,/cleanup-unresolved\.json/,'The guard must refuse unresolved cleanup without reading live files');assert.equal(upload.if,'always()');
+});
