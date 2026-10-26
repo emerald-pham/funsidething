@@ -2363,3 +2363,10 @@ The pinned Linux x64 reader preserves the raw AT_PAGESZ witness and binds it to 
 - RISK DEVICE STORAGE V2: current attempt refusal fences all mutations and the real capacity retry
 
 - RISK repository process: stress engine loss requires the actual kernel and owned exit evidence
+
+## Scene repaint and native input attribution
+
+- RISK synced scene repaint: unchanged mirrored locations retain storage without announcing another scene
+- RISK repository process: ordinary task Undo keeps unchanged scenery while separate scene choices repaint and save
+- RISK repository process: native frame accounting separates pre-input and post-input stalls without waiving either
+- RISK Undo scene guidance: FAQ and Changelog explain task Undo keeps scene choices

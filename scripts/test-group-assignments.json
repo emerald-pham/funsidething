@@ -13176,6 +13176,26 @@
       "root": "mobile stress CLI retains the observed reduced owned-engine OOM after a failed normal attempt",
       "group": "native-process",
       "file": "scripts/agent-tools/mobile-memory-stress-lifecycle.test.mjs"
+    },
+    {
+      "file": "tests.js",
+      "root": "RISK synced scene repaint: unchanged mirrored locations retain storage without announcing another scene",
+      "group": "core"
+    },
+    {
+      "file": "tests.js",
+      "root": "RISK repository process: ordinary task Undo keeps unchanged scenery while separate scene choices repaint and save",
+      "group": "native-process"
+    },
+    {
+      "file": "tests.js",
+      "root": "RISK repository process: native frame accounting separates pre-input and post-input stalls without waiving either",
+      "group": "native-process"
+    },
+    {
+      "file": "tests.js",
+      "root": "RISK Undo scene guidance: FAQ and Changelog explain task Undo keeps scene choices",
+      "group": "core"
     }
   ],
   "processControls": [

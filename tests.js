@@ -46277,3 +46277,66 @@ test('RISK repository process: stress engine loss requires the actual kernel and
  const result=spawnSync(process.execPath,['--test','--test-name-pattern=mobile stress owned engine loss','scripts/agent-tools/mobile-memory.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:10000,maxBuffer:4*1024*1024});
  assert.equal(result.error,undefined);assert.equal(result.status,0,'The actual immutable stress verifier must report observed owned engine loss while refusing unrelated driver faults: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# skipped 0$/m);
 });
+
+test('RISK synced scene repaint: unchanged mirrored locations retain storage without announcing another scene',()=>{
+ const runtime=livingLocation();runtime.location.init();
+ const tokyo={latitude:35.6762,longitude:139.6503,timezone:'Asia/Tokyo',label:'Studio',enabled:true};
+ runtime.location.applySynced(tokyo);assert.equal(runtime.events.length,1);
+ runtime.values.set('fvp:chain-scanner:location','stale mirror');runtime.location.applySynced({...tokyo});
+ assert.deepEqual(JSON.parse(runtime.values.get('fvp:chain-scanner:location')),tokyo,'same scene repairs its exact storage mirror');
+ assert.equal(runtime.events.length,1,'an unchanged effective scene must not request another sky repaint');
+ runtime.location.applySynced({...tokyo,label:'Renamed'});assert.equal(runtime.events.length,2,'an actual location label change is announced');
+ runtime.location.applySynced(null);assert.equal(runtime.events.length,3,'returning to the default sky is announced');assert.equal(runtime.values.has('fvp:chain-scanner:location'),false);
+ runtime.values.set('fvp:chain-scanner:location','stale mirror');runtime.location.applySynced(null);assert.equal(runtime.events.length,3);assert.equal(runtime.values.has('fvp:chain-scanner:location'),false);
+});
+
+test('RISK repository process: ordinary task Undo keeps unchanged scenery while separate scene choices repaint and save',async t=>{
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});const output=fs.mkdtempSync(path.join(base,'undo-scene-paint-'));
+ const playwright=await import('playwright'),launch=playwright.chromium.launch,{runButtonSafety}=await import('./scripts/button-safety-native.mjs');let probeFailure;const evidence={observations:[]};
+ t.after(()=>{playwright.chromium.launch=launch;});
+ playwright.chromium.launch=async(...args)=>{const browser=await launch.apply(playwright.chromium,args),newContext=browser.newContext.bind(browser);browser.newContext=async(...args)=>{
+  const context=await newContext(...args),close=context.close.bind(context);
+  await context.addInitScript(()=>{
+   const NativeDate=Date,at=Date.parse('2026-10-06T03:23:42.125Z');globalThis.Date=class extends NativeDate{constructor(...args){super(...(args.length?args:[at]));}static now(){return at;}};
+   window.__undoScenePaint={clears:0,undoPresses:0,before:null};const clear=CanvasRenderingContext2D.prototype.clearRect;
+   CanvasRenderingContext2D.prototype.clearRect=function(...args){if(this.canvas.matches('[data-life],[data-scenery]'))__undoScenePaint.clears++;return clear.apply(this,args);};
+   document.addEventListener('pointerdown',event=>{if(event.isTrusted&&event.target.closest('[data-act="undo"]')){if(__undoScenePaint.undoPresses===0)__undoScenePaint.before=__undoScenePaint.clears;__undoScenePaint.undoPresses++;}},true);
+  });
+  context.close=async(...args)=>{try{for(const page of context.pages())if(await page.evaluate(()=>window.__undoScenePaint?.undoPresses===10)){
+   const ordinary=await page.evaluate(()=>({...__undoScenePaint,scene:JSON.stringify(state.settings.scene),tasks:JSON.stringify(state.tasks)}));
+   assert.equal(ordinary.undoPresses,10,'ten actual task Undo inputs execute');assert.equal(ordinary.clears,ordinary.before,'ordinary title Undo must not repaint unchanged scenery');
+   await page.locator('[data-act="edit"][data-id="synthetic-kept"]').first().click();await page.locator('#etTitle').fill('Task edit before separate scene choice');await page.locator('#modalRoot [data-act="save-edit"]').click();
+   await page.locator('#appHeader [data-act="settings"]').click();await page.locator('[data-act="scene-time-settings"]').click();await page.locator('#sceneSeasonInput').selectOption('winter');await page.locator('#sceneTimeInput').fill('23:15');await page.locator('[data-scene-time="lock"]').click();
+   await page.waitForFunction(async()=>JSON.parse((await ScannerDeviceStore.readHead()).payload).settings.scene.time==='23:15');await page.locator('#sceneTimeDialog [data-scene-time="close"]').click();await page.locator('#modalRoot [data-act="close-modal"]').click();
+   const selected=await page.evaluate(()=>({clears:__undoScenePaint.clears,scene:JSON.stringify(state.settings.scene)}));assert.notEqual(selected.scene,ordinary.scene);assert.ok(selected.clears>ordinary.clears,'changed scene paints');
+   await page.locator('#appHeader [data-act="undo"]').click();await page.waitForFunction(async title=>{const saved=JSON.parse((await ScannerDeviceStore.readHead()).payload);return saved.tasks.find(task=>task.id==='synthetic-kept').title===title&&saved.settings.scene.time==='23:15';},JSON.parse(ordinary.tasks).find(task=>task.id==='synthetic-kept').title);
+   const restored=await page.evaluate(()=>({clears:__undoScenePaint.clears,scene:JSON.stringify(state.settings.scene),tasks:JSON.stringify(state.tasks),time:LivingSky.readSceneTime(localStorage),season:LivingSky.readSceneSeason(localStorage)}));assert.equal(restored.scene,selected.scene,'task Undo cannot absorb a separate scene choice');assert.equal(restored.tasks,ordinary.tasks,'task Undo restores all original task data');assert.equal(restored.time,'23:15');assert.equal(restored.season,'winter');assert.equal(restored.clears,selected.clears,'same-scene task Undo does not repaint');evidence.observations.push({ordinary,selected,restored});
+  }}catch(error){probeFailure=error;}finally{await close(...args);}};return context;};return browser;};
+ let result;try{result=await runButtonSafety({repo:__dirname,engine:'chromium',port:Number(process.env.CHAIN_NATIVE_PORT||0),outputDir:output,scenarioFilter:'rapid Undo consumes ten actual saved edit frames'});}finally{playwright.chromium.launch=launch;evidence.probeFailure=probeFailure?.stack;fs.writeFileSync(path.join(output,'scene-paint-observation.json'),JSON.stringify(evidence,null,2)+'\n');}
+ for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(result.report.cleanup[key],true);if(probeFailure)throw probeFailure;assert.equal(evidence.observations.length,1);t.diagnostic('Real task and scene Undo paint evidence: '+output);
+});
+
+test('RISK repository process: native frame accounting separates pre-input and post-input stalls without waiving either',async t=>{
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});const output=fs.mkdtempSync(path.join(base,'native-frame-phases-'));
+ const playwright=await import('playwright'),launch=playwright.chromium.launch,{runButtonSafety}=await import('./scripts/button-safety-native.mjs');t.after(()=>{playwright.chromium.launch=launch;});
+ for(const phase of ['pre-input','post-input'])await t.test(phase,async()=>{
+  const directory=path.join(output,phase);let failure;
+  if(phase==='pre-input')playwright.chromium.launch=async(...args)=>{const browser=await launch.apply(playwright.chromium,args),newContext=browser.newContext.bind(browser);browser.newContext=async(...args)=>{const context=await newContext(...args),newPage=context.newPage.bind(context);context.newPage=async(...args)=>{
+   const page=await newPage(...args),locator=page.locator.bind(page),wrapped=new WeakSet();let injected=false;
+   const wrap=target=>{if(wrapped.has(target))return target;wrapped.add(target);const first=target.first.bind(target),click=target.click.bind(target);target.first=(...args)=>wrap(first(...args));target.click=async(...args)=>{if(!injected){injected=true;await page.evaluate(()=>{const until=performance.now()+1300;while(performance.now()<until){}});}return click(...args);};return target;};page.locator=(...args)=>wrap(locator(...args));return page;
+  };return context;};return browser;};
+  try{await runButtonSafety({repo:__dirname,engine:'chromium',port:Number(process.env.CHAIN_NATIVE_PORT||0),outputDir:directory,probe:true,control:phase==='post-input'?'short-stall':null});}catch(error){failure=error;}finally{playwright.chromium.launch=launch;}
+  assert.ok(failure,'the actual 1300ms stall remains blocking');const files=fs.readdirSync(directory).filter(name=>/^button-safety-.*\.json$/.test(name));assert.equal(files.length,1);const report=JSON.parse(fs.readFileSync(path.join(directory,files[0])));
+  assert.equal(report.status,'failed');assert.deepEqual(report.errors,[]);assert.ok(report.clicks.some(row=>row.trusted&&row.action==='act:settings'),'actual trusted input still reaches Settings');assert.equal(report.samples.length,1);
+  const sample=report.samples[0];assert.ok(sample.maxFrameGapMs>=1000,'the original complete-step frame measure still blocks');
+  if(phase==='pre-input'){assert.ok(sample.preInputMaxFrameGapMs>=1000,'the observed stall predates input');assert.ok(Number.isFinite(sample.inputMaxFrameGapMs)&&sample.inputMaxFrameGapMs<1000,'healthy actual input is measured separately');assert.match(report.failure,/blocked frame loop: pre-input \/ /);}
+  else{assert.ok(sample.inputMaxFrameGapMs>=1000,'actual post-input stall remains attributed to input');assert.match(report.failure,/blocked frame loop/);}
+  for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(report.cleanup[key],true);t.diagnostic('Failed detector report retained: '+path.join(directory,files[0]));
+ });
+});
+
+
+test('RISK Undo scene guidance: FAQ and Changelog explain task Undo keeps scene choices',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'index.html'),'utf8'),faq=source.match(/<dt>Can I undo, restore, or remove a task\?<\/dt><dd>(.*?)<\/dd>/s)?.[1],changelog=source.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1];
+ assert.match(faq||'',/Task Undo keeps scene choices\./);assert.match(changelog||'',/Task Undo responds faster while keeping your scene choices\./);
+});

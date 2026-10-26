@@ -1591,10 +1591,14 @@
     // A board adoption mirrors the shared choice into the offline sky keys.
     // Memory also holds it when browser storage rejects writes. Repaint
     // without emitting a user edit back into cloud sync.
+    const beforeTime=S.readSceneTime(sceneStorage),beforeSeason=S.readSceneSeason(sceneStorage);
     sceneStorage.applySynced(time,season);
     renderSceneTimeChoice();
     if(timeDialog.open){seasonInput.value=season||'';refreshSolarTimes();}
-    refreshSky();
+    // Device mirrors and controls still refresh on every adoption. The minute
+    // clock already keeps an unchanged scene current; ordinary task Undo does
+    // not need another complete scenery paint.
+    if(beforeTime!==S.readSceneTime(sceneStorage)||beforeSeason!==S.readSceneSeason(sceneStorage))refreshSky();
   };
   seasonInput.addEventListener('change',refreshSolarTimes);
   document.addEventListener('click',event=>{

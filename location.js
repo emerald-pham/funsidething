@@ -153,10 +153,13 @@
     // A cloud adoption, Undo, or account switch has already chosen the board
     // value. Repaint immediately even when browser storage refuses a mirror;
     // the board remains the source for the next successful load.
-    state=value&&value.enabled===true?normalize(value):clone(DEFAULT);
-    lastError=null;
+    const next=value&&value.enabled===true?normalize(value):clone(DEFAULT);
+    const changed=JSON.stringify(state)!==JSON.stringify(next);
+    state=next;lastError=null;
     if(state.enabled)persist(state);else removeSaved();
-    emit();render();return current();
+    // A task-only Undo still repairs the device mirror and clears its status,
+    // but it must not rebuild the same sky through a synthetic location change.
+    if(changed)emit();render();return current();
   }
 
   function byAction(action){
