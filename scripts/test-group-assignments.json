@@ -13196,6 +13196,11 @@
       "file": "tests.js",
       "root": "RISK Undo scene guidance: FAQ and Changelog explain task Undo keeps scene choices",
       "group": "core"
+    },
+    {
+      "root": "RISK scenery backdrop cache: first unchanged lighting timer reuses actual pixels while changed slots and loaded copy still paint",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [

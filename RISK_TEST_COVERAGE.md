@@ -2370,3 +2370,5 @@ The pinned Linux x64 reader preserves the raw AT_PAGESZ witness and binds it to 
 - RISK repository process: ordinary task Undo keeps unchanged scenery while separate scene choices repaint and save
 - RISK repository process: native frame accounting separates pre-input and post-input stalls without waiving either
 - RISK Undo scene guidance: FAQ and Changelog explain task Undo keeps scene choices
+
+- RISK scenery backdrop cache: first unchanged lighting timer reuses actual pixels while changed slots and loaded copy still paint

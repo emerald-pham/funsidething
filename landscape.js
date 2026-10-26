@@ -519,6 +519,8 @@
       for(const t of planted.filter(t=>geometry.depthBand(t.x,t.y)===band).sort((a,b)=>a.y-b.y))tree(b,t.x,t.y,t.size,S.mixHex(p.front,'#183d32',.25),t.variant);
     }
     const vignette=b.createLinearGradient(0,hy,0,H);vignette.addColorStop(0,'rgba(5,25,27,0)');vignette.addColorStop(1,'rgba(5,25,27,.035)');b.fillStyle=vignette;b.fillRect(0,hy,W,H-hy);
+    // Cache the slot only after its complete backdrop is painted.
+    lastCitySlot=sceneSnapshot.windowsSlot;
   }
   function cloud(x,y,size,opacity,weather){
     if(weather?.status==='rain'||weather?.status==='thunderstorm'){
@@ -1470,7 +1472,7 @@
     nextPaint+=1000/30;
     if(nextPaint<=now)nextPaint=now+1000/30;
     last=now;syncScene(Date.now());
-    if(lastCitySlot!==sceneSnapshot.windowsSlot){lastCitySlot=sceneSnapshot.windowsSlot;paintBackground();}
+    if(lastCitySlot!==sceneSnapshot.windowsSlot)paintBackground();
     paintLife(world.elapsed);
   }
   function scenePose(e,firework=false){return reduced?{...e,age:firework===true?(e.type==='festival'?e.duration:Math.min(e.duration,60))*.5:e.duration*.5,...(firework===true?{fireworkDeckAge:e.duration*.5,fireworkActive:e.age<(e.type==='festival'?e.duration:60)}:{})}:e;}
@@ -1518,7 +1520,7 @@
     // barge crossing, without turning reduced motion into continuous animation.
     const before=JSON.stringify([(reduced?visits.forPaint(world.events,geometry,true,{membershipOnly:true}):world.events).map(e=>[e.id,e.type==='festival'&&e.age<e.duration]),woodland.events.map(e=>e.id),rooftopParty.active?.roofIndex,clocktowerVisit.active,lastCitySlot]);
     syncScene(Date.now());
-    if(lastCitySlot!==sceneSnapshot.windowsSlot){lastCitySlot=sceneSnapshot.windowsSlot;paintBackground();}
+    if(lastCitySlot!==sceneSnapshot.windowsSlot)paintBackground();
     const after=JSON.stringify([(reduced?visits.forPaint(world.events,geometry,true,{membershipOnly:true}):world.events).map(e=>[e.id,e.type==='festival'&&e.age<e.duration]),woodland.events.map(e=>e.id),rooftopParty.active?.roofIndex,clocktowerVisit.active,lastCitySlot]);
     if(reduced&&before!==after)paintLife(world.elapsed);
   }
