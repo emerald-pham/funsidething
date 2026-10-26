@@ -195,10 +195,13 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK JSON COPY PASTE: large native paste retains full draft without rendering the archive
 - RISK JSON COPY PASTE: closing a large paste during encoding stops before backup writes
 - RISK JSON COPY PASTE: stale clipboard completion cannot release a newer export transfer
-- RISK JSON COPY PASTE: Copy and Download send the same full archive without a JSON view or writes
+- RISK JSON COPY PASTE: Copy and Download round-trip seeded pending archives without replaying sources
 - RISK JSON COPY PASTE: Quick start explains the copy button, manual fallback and guarded paste
+- RISK button safety guidance: mounted FAQ states required browser checks and limits
 - RISK DATABASE REPAIR EXPORT: unified Copy and Download retain exact sources and metadata without writes
 - RISK DATABASE REPAIR EXPORT: unreadable sources are labeled partial and never shown as an empty database
+- RISK DATABASE REPAIR EXPORT: held capture preserves exact before and after sources and rejects partial restore
+- RISK DATABASE REPAIR EXPORT: asynchronous snapshot rejection stays partial and unavailable
 - RISK DATABASE REPAIR EXPORT: Debug log points to the combined archive without duplicate export controls
 - RISK DATABASE REPAIR EXPORT: readonly capture keeps original diagnostic storage even when old entries expire
 - RISK DATABASE REPAIR EXPORT: available worker and cache identities are captured without diagnostic writes
@@ -2262,6 +2265,7 @@ The command/report consumer rejects missing, duplicate, skipped, cancelled, unre
 
 - RISK repository process: native button gate awaits an asynchronous false outcome
 - RISK repository process: native button gate cannot omit a required stress scenario
+- RISK repository process: every button safety module fails the actual CLI without process coverage
 
 - RISK repository process: native button safety requires 400-task and rapid-press evidence
 
