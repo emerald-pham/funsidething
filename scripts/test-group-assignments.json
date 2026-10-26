@@ -13001,6 +13001,11 @@
       "root": "RISK repository process: remote mobile consumer waits for browser owner exit after disconnect",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "mobile memory parser rejects changed final browser or driver container isolation",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
     }
   ],
   "processControls": [

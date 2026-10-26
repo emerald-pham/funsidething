@@ -45949,6 +45949,7 @@ test('RISK repository process: mobile budget planner caps browsers before launch
  assert.ok(browser.includes('--browser-server'));assert.ok(driver.includes('--driver'));
  for(const args of [browser,driver]){assert.ok(args.includes('--read-only'));assert.equal(args[args.indexOf('--cap-drop')+1],'ALL');assert.match(args[args.indexOf('--user')+1],/^[1-9]\d*:[1-9]\d*$/);assert.equal(args.some(arg=>/docker\.sock|--privileged|--publish|--network=host|--ipc=host/.test(arg)),false);}
  assert.throws(()=>containerArgs({...common,role:'driver',browserContainerId:'another-owner'}),/container identity/i);
+ const owned=containerArgs({...common,role:'browser',containerName:'chain-mobile-owned-fixture',ownershipToken:'owned-fixture-token'});assert.equal(owned[owned.indexOf('--name')+1],'chain-mobile-owned-fixture','A create interrupted before its ID returns must remain discoverable by an owner-specific name');assert.ok(owned.includes('chain.mobile.owner=owned-fixture-token'));
 });
 
 test('RISK repository process: mobile budget scope cannot relabel whole-container evidence or disconnected browsers',async t=>{

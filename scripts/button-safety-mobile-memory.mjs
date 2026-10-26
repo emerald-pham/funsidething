@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import {spawnSync} from 'node:child_process';
+import {spawn,spawnSync} from 'node:child_process';
 import {randomUUID} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {MOBILE_MEMORY_BYTES,MOBILE_DRIVER_BYTES,MOBILE_MEMORY_SCOPE,MOBILE_IMAGE,MOBILE_SCENARIO,MOBILE_STORY,mobileDigest,mobileArtifactInventory,verifyMemoryBoundary,verifyMobileFunctionalReport,verifyMobileMemoryReport,verifyMobileContainerExit,verifyMobileContainerConfig} from './button-safety-mobile-contract.mjs';
@@ -89,12 +89,13 @@ async function driver(output,motion,control){
   write(file,report);if(report.status!=='passed')process.exitCode=1;
  }
 }
-export function containerArgs({repo,output,nodeBinary,motion,control,eventPolicy,eventName,eventRef,role='browser',browserContainerId}){
+export function containerArgs({repo,output,nodeBinary,motion,control,eventPolicy,eventName,eventRef,role='browser',browserContainerId,containerName,ownershipToken}){
  if(!['browser','driver'].includes(role))throw Error('Explicit supported mobile container role required');
  if(role==='driver'&&!/^[a-f0-9]{64}$/.test(browserContainerId||''))throw Error('Exact browser container identity required');
  if(!process.getuid?.()||!process.getgid?.())throw Error('Mobile containers require a nonroot owner UID and GID');
  const memory=role==='browser'?MOBILE_MEMORY_BYTES:MOBILE_DRIVER_BYTES;
  const args=['create','--init','--network',role==='browser'?'none':'container:'+browserContainerId,'--cap-drop','ALL','--security-opt','no-new-privileges','--read-only','--memory',String(memory),'--memory-swap',String(memory),'--shm-size','67108864','--tmpfs','/tmp:rw,nosuid,size=67108864','--user',String(process.getuid())+':'+String(process.getgid()),'--workdir','/repo','--mount','type=bind,src='+repo+',dst=/repo,readonly','--mount','type=bind,src='+output+',dst=/evidence','--mount','type=bind,src='+nodeBinary+',dst=/opt/chain-node,readonly','--env','HOME=/tmp','--env','CI=true','--env','CHAIN_TEST_EVENT_POLICY='+eventPolicy,'--env','GITHUB_EVENT_NAME='+eventName,'--env','GITHUB_REF='+eventRef,'--env','GIT_CONFIG_COUNT=1','--env','GIT_CONFIG_KEY_0=safe.directory','--env','GIT_CONFIG_VALUE_0=/repo',MOBILE_IMAGE,'/opt/chain-node','scripts/button-safety-mobile-memory.mjs',role==='browser'?'--browser-server':'--driver','--output-dir','/evidence'];
+ if(containerName||ownershipToken){assert.match(containerName||'',/^chain-mobile-[a-zA-Z0-9-]+$/);assert.match(ownershipToken||'',/^[a-zA-Z0-9-]{10,64}$/);args.splice(1,0,'--name',containerName,'--label','chain.mobile.owner='+ownershipToken);}
  for(const key of ['GITHUB_REPOSITORY','GITHUB_RUN_ID','GITHUB_RUN_ATTEMPT','CHAIN_TEST_SOURCE_SHA'])if(process.env[key])args.splice(args.indexOf(MOBILE_IMAGE),0,'--env',key+'='+process.env[key]);
  if(control)args.push('--control');else args.push('--motion',motion);return args;
 }
@@ -102,36 +103,66 @@ export async function runCappedMobile({outputDir}){
  if(process.platform!=='linux'||process.env.CI!=='true')throw Error('Capped mobile acceptance requires the isolated hosted Linux push/pull-request runtime; local functional evidence cannot waive it.');
  const hostedPolicy=hostedButtonPolicy(),output=path.resolve(outputDir);if(output===root||output.startsWith(root+path.sep))throw Error('Capped mobile evidence must be outside the checkout');fs.mkdirSync(output,{recursive:true});if(fs.readdirSync(output).length)throw Error('Capped mobile output must be new and empty');
  const source=identity();if(git('status','--porcelain=v1'))throw Error('Capped mobile requires exact clean committed source');
- const report={schemaVersion:2,kind:'button-mobile-memory',scope:MOBILE_MEMORY_SCOPE,status:'running',requiredStory:MOBILE_STORY,image:MOBILE_IMAGE,...source,hostedPolicy,cases:[],errors:[],cleanup:{containersRemoved:false}},owned=new Map();
- const docker=(args,{allowFailure=false,timeout=60000}={})=>{const r=spawnSync('docker',args,{encoding:'utf8',timeout,maxBuffer:8*1024*1024});if(!allowFailure&&(r.error||r.status!==0))throw Error('Owned mobile container command failed: '+(r.error?.message||r.stderr));return r;};
- const inspect=id=>JSON.parse(docker(['inspect',id]).stdout)[0];
- const preserve=(id,{directory,role})=>{const snapshot=docker(['inspect',id],{allowFailure:true});if(snapshot.status===0)fs.writeFileSync(path.join(directory,role+'-partial-inspect.json'),snapshot.stdout);const logs=docker(['logs',id],{allowFailure:true});fs.writeFileSync(path.join(directory,role+'-stdout.txt'),logs.stdout||'');fs.writeFileSync(path.join(directory,role+'-stderr.txt'),logs.stderr||'');};
+ const ownerToken=randomUUID(),report={schemaVersion:2,kind:'button-mobile-memory',scope:MOBILE_MEMORY_SCOPE,status:'running',requiredStory:MOBILE_STORY,image:MOBILE_IMAGE,ownerToken,...source,hostedPolicy,cases:[],errors:[],cleanup:{containersRemoved:false}},owned=new Map(),commands=new Set();let interrupted=null,cleaning=false;
+ const persistOwnership=()=>write(path.join(output,'ownership.json'),{ownerToken,...source,objects:[...owned].map(([identity,metadata])=>({identity,...metadata}))});
+ const onSignal=signal=>{interrupted??=signal;if(!cleaning)for(const child of commands)child.kill('SIGTERM');};
+ const handlers=Object.fromEntries(['SIGINT','SIGTERM'].map(signal=>[signal,()=>onSignal(signal)]));for(const [signal,handler]of Object.entries(handlers))process.on(signal,handler);
+ // Await Docker without blocking signal delivery. Container cleanup belongs to
+ // this owner even if create succeeded but start/connect never happened.
+ const docker=async(args,{allowFailure=false,timeout=60000}={})=>{
+  if(interrupted&&!allowFailure)throw Error('Owned mobile run interrupted: '+interrupted);
+  const result=await new Promise(resolve=>{
+   const child=spawn('docker',args,{stdio:['ignore','pipe','pipe']}),chunks={stdout:[],stderr:[]};let failure,bytes=0;
+   commands.add(child);const timer=setTimeout(()=>{failure=Error('Docker command timed out');child.kill('SIGKILL');},timeout);
+   for(const stream of ['stdout','stderr'])child[stream].on('data',chunk=>{bytes+=chunk.length;if(bytes>8*1024*1024){failure=Error('Docker output exceeded its bound');child.kill('SIGKILL');}else chunks[stream].push(chunk);});
+   child.on('error',error=>failure=error);child.on('close',(status,signal)=>{clearTimeout(timer);commands.delete(child);resolve({status,signal,error:failure,stdout:Buffer.concat(chunks.stdout).toString(),stderr:Buffer.concat(chunks.stderr).toString()});});
+  });
+  if(!allowFailure&&(interrupted||result.error||result.status!==0))throw Error('Owned mobile container command failed: '+(interrupted||result.error?.message||result.stderr));return result;
+ };
+ const inspect=async id=>JSON.parse((await docker(['inspect',id])).stdout)[0];
+ const preserve=async(id,{directory,role})=>{
+  const snapshot=await docker(['inspect',id],{allowFailure:true});if(snapshot.status===0)fs.writeFileSync(path.join(directory,role+'-partial-inspect.json'),snapshot.stdout);
+  const logs=await docker(['logs',id],{allowFailure:true});fs.writeFileSync(path.join(directory,role+'-stdout.txt'),logs.stdout||'');fs.writeFileSync(path.join(directory,role+'-stderr.txt'),logs.stderr||'');
+ };
  try{
-  docker(['pull',MOBILE_IMAGE],{timeout:180000});const image=JSON.parse(docker(['image','inspect',MOBILE_IMAGE]).stdout)[0];assert.ok(image.RepoDigests.includes(MOBILE_IMAGE));report.imageId=image.Id;write(path.join(output,'image.json'),image);report.imageInspectPath='image.json';report.imageInspectSha256=mobileDigest(fs.readFileSync(path.join(output,'image.json')));
+  await docker(['pull',MOBILE_IMAGE],{timeout:180000});const image=JSON.parse((await docker(['image','inspect',MOBILE_IMAGE])).stdout)[0];assert.ok(image.RepoDigests.includes(MOBILE_IMAGE));report.imageId=image.Id;write(path.join(output,'image.json'),image);report.imageInspectPath='image.json';report.imageInspectSha256=mobileDigest(fs.readFileSync(path.join(output,'image.json')));
   for(const [label,motion,control]of [['negative',null,true],['normal','normal',false],['reduced','reduced',false]]){
    const directory=path.join(output,label);fs.mkdirSync(directory);let browserId,driverId;
-   const create=role=>{const id=docker(containerArgs({repo:root,output:directory,nodeBinary:fs.realpathSync(process.execPath),motion,control,...hostedPolicy,role,browserContainerId:browserId})).stdout.trim();assert.match(id,/^[a-f0-9]{64}$/);owned.set(id,{directory,role});return id;};
-   browserId=create('browser');const before=inspect(browserId);verifyMobileContainerConfig(before,{role:'browser'});assert.equal(before.Image,image.Id);write(path.join(directory,'docker-before.json'),before);
-   docker(['start',browserId]);await awaitFile(path.join(directory,'ready.json'),{abort:()=>{if(fs.existsSync(path.join(directory,'browser-server.json')))throw Error('Capped browser exited before ready: '+fs.readFileSync(path.join(directory,'browser-server.json'),'utf8'));}});
-   const browserStarted=inspect(browserId);assert.equal(browserStarted.State.Running,true);const browserHost={...processIdentity(browserStarted.State.Pid),containerId:browserId};
-   driverId=create('driver');const driverBefore=inspect(driverId);verifyMobileContainerConfig(driverBefore,{role:'driver',browserContainerId:browserId});assert.equal(driverBefore.Image,image.Id);write(path.join(directory,'driver-before.json'),driverBefore);docker(['start',driverId]);const driverStarted=inspect(driverId);assert.equal(driverStarted.State.Running,true);const driverHost={...processIdentity(driverStarted.State.Pid),containerId:driverId};assert.notEqual(browserHost.cgroup,driverHost.cgroup);assert.equal(browserHost.namespace,driverHost.namespace);const membership={browser:browserHost,driver:driverHost};write(path.join(directory,'membership.json'),membership);
-   const driverWait=docker(['wait',driverId],{allowFailure:true,timeout:60000}),browserWait=docker(['wait',browserId],{allowFailure:true,timeout:15000});
-   for(const id of [browserId,driverId])preserve(id,owned.get(id));
-   const after=inspect(browserId),driverAfter=inspect(driverId);write(path.join(directory,'docker-after.json'),after);write(path.join(directory,'driver-after.json'),driverAfter);
+   const create=async role=>{
+    const name='chain-mobile-'+randomUUID(),metadata={directory,role,name};owned.set(name,metadata);persistOwnership();
+    const id=(await docker(containerArgs({repo:root,output:directory,nodeBinary:fs.realpathSync(process.execPath),motion,control,...hostedPolicy,role,browserContainerId:browserId,containerName:name,ownershipToken:ownerToken}))).stdout.trim();assert.match(id,/^[a-f0-9]{64}$/);owned.delete(name);owned.set(id,metadata);persistOwnership();return id;
+   };
+   browserId=await create('browser');const before=await inspect(browserId);verifyMobileContainerConfig(before,{role:'browser'});assert.equal(before.Image,image.Id);write(path.join(directory,'docker-before.json'),before);
+   await docker(['start',browserId]);await awaitFile(path.join(directory,'ready.json'),{abort:()=>{if(interrupted)throw Error('Owned mobile run interrupted: '+interrupted);if(fs.existsSync(path.join(directory,'browser-server.json')))throw Error('Capped browser exited before ready: '+fs.readFileSync(path.join(directory,'browser-server.json'),'utf8'));}});
+   const browserStarted=await inspect(browserId);assert.equal(browserStarted.State.Running,true);const browserHost={...processIdentity(browserStarted.State.Pid),containerId:browserId};
+   driverId=await create('driver');const driverBefore=await inspect(driverId);verifyMobileContainerConfig(driverBefore,{role:'driver',browserContainerId:browserId});assert.equal(driverBefore.Image,image.Id);write(path.join(directory,'driver-before.json'),driverBefore);
+   await docker(['start',driverId]);const driverStarted=await inspect(driverId);assert.equal(driverStarted.State.Running,true);const driverHost={...processIdentity(driverStarted.State.Pid),containerId:driverId};assert.notEqual(browserHost.cgroup,driverHost.cgroup);assert.equal(browserHost.namespace,driverHost.namespace);const membership={browser:browserHost,driver:driverHost};write(path.join(directory,'membership.json'),membership);
+   const driverWait=await docker(['wait',driverId],{allowFailure:true,timeout:60000});if(interrupted)throw Error('Owned mobile run interrupted: '+interrupted);const browserWait=await docker(['wait',browserId],{allowFailure:true,timeout:15000});if(interrupted)throw Error('Owned mobile run interrupted: '+interrupted);
+   for(const id of [browserId,driverId])await preserve(id,owned.get(id));
+   const after=await inspect(browserId),driverAfter=await inspect(driverId);write(path.join(directory,'docker-after.json'),after);write(path.join(directory,'driver-after.json'),driverAfter);
    assert.equal(driverWait.error,undefined);assert.equal(browserWait.error,undefined);assert.equal(driverWait.status,0);assert.equal(browserWait.status,0);verifyMobileContainerExit(after.State,{control});verifyMobileContainerExit(driverAfter.State);
    const result=json(path.join(directory,'inside.json')),server=json(path.join(directory,'browser-server.json'));assert.equal(result.status,'passed');assert.equal(server.status,'passed');
-   const raw=(name,base=directory)=>({path:path.relative(output,path.join(base,name)).split(path.sep).join('/'),sha256:mobileDigest(fs.readFileSync(path.join(base,name)))}),row={...result,containerId:browserId,image:MOBILE_IMAGE,dockerMemoryBytes:before.HostConfig.Memory,dockerMemorySwapBytes:before.HostConfig.MemorySwap,containerExitCode:after.State.ExitCode,containerOOMKilled:after.State.OOMKilled,server,membership,driver:{...result.driver,containerId:driverId,networkMode:driverBefore.HostConfig.NetworkMode,containerExitCode:driverAfter.State.ExitCode,containerOOMKilled:driverAfter.State.OOMKilled}};
+   const raw=name=>({path:label+'/'+name,sha256:mobileDigest(fs.readFileSync(path.join(directory,name)))}),row={...result,containerId:browserId,image:MOBILE_IMAGE,dockerMemoryBytes:before.HostConfig.Memory,dockerMemorySwapBytes:before.HostConfig.MemorySwap,containerExitCode:after.State.ExitCode,containerOOMKilled:after.State.OOMKilled,server,membership,driver:{...result.driver,containerId:driverId,networkMode:driverBefore.HostConfig.NetworkMode,containerExitCode:driverAfter.State.ExitCode,containerOOMKilled:driverAfter.State.OOMKilled}};
    for(const [key,name]of [['inside','inside.json'],['browserServer','browser-server.json'],['membership','membership.json'],['dockerBefore','docker-before.json'],['dockerAfter','docker-after.json']]){const artifact=raw(name);row[key+'Path']=artifact.path;row[key+'Sha256']=artifact.sha256;}
    for(const [key,name]of [['dockerBefore','driver-before.json'],['dockerAfter','driver-after.json']]){const artifact=raw(name);row.driver[key+'Path']=artifact.path;row.driver[key+'Sha256']=artifact.sha256;}
    if(control)report.negativeControl=row;else{row.nativeReportPath=label+'/'+row.nativeReportPath;report.cases.push(row);}
-   // Remove the joined driver first; only then remove its network namespace anchor.
-   for(const id of [driverId,browserId]){docker(['rm',id]);owned.delete(id);}write(path.join(output,'report.json'),report);
+   for(const id of [driverId,browserId]){await docker(['rm',id]);owned.delete(id);persistOwnership();}write(path.join(output,'report.json'),report);
   }
   report.cleanup.containersRemoved=true;report.status='passed';report.artifacts=mobileArtifactInventory(output);verifyMobileMemoryReport(report,{artifactRoot:output,...source});return report;
  }catch(error){report.status='failed';report.errors.push(error.stack||String(error));throw error;}
  finally{
-  let removed=true;for(const [id,metadata]of [...owned].sort((a,b)=>a[1].role==='driver'?-1:b[1].role==='driver'?1:0)){preserve(id,metadata);const r=docker(['rm','--force',id],{allowFailure:true});if(r.error||r.status!==0)removed=false;else owned.delete(id);}
-  report.cleanup.containersRemoved=removed;report.artifacts=mobileArtifactInventory(output);write(path.join(output,'report.json'),report);
+  cleaning=true;let removed=true;
+  for(const [key,metadata]of [...owned].sort((a,b)=>a[1].role==='driver'?-1:b[1].role==='driver'?1:0)){
+   let id=key;
+   if(!/^[a-f0-9]{64}$/.test(id)){
+    const recovered=await docker(['inspect',metadata.name],{allowFailure:true});
+    if(recovered.status!==0){if(interrupted)removed=false;else owned.delete(key);continue;}
+    const value=JSON.parse(recovered.stdout)[0];if(value.Config?.Labels?.['chain.mobile.owner']!==ownerToken){removed=false;continue;}id=value.Id;
+   }
+   await preserve(id,metadata);const result=await docker(['rm','--force',id],{allowFailure:true});if(result.error||result.status!==0)removed=false;else owned.delete(key);
+  }
+  if(interrupted){report.status='failed';report.interruptionSignal=interrupted;}persistOwnership();report.cleanup.containersRemoved=removed;report.artifacts=mobileArtifactInventory(output);write(path.join(output,'report.json'),report);
+  for(const [signal,handler]of Object.entries(handlers))process.off(signal,handler);
  }
 }
 if(path.resolve(process.argv[1]||'')===fileURLToPath(import.meta.url)){

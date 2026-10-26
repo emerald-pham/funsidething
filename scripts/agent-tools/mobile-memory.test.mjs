@@ -63,3 +63,12 @@ test('mobile memory intentional OOM control binds the Docker flag while clients 
   const bundle=fixture(sub);bundle.report.negativeControl.containerOOMKilled=true;bundle.report.negativeControl.after.events.oom_kill=0;refreshMobileBundle(bundle);assert.throws(()=>verify(bundle));
  });
 });
+
+test('mobile memory parser rejects changed final browser or driver container isolation',async t=>{
+ for(const role of ['browser','driver'])await t.test(role,async sub=>{
+  const bundle=fixture(sub),row=role==='browser'?bundle.report.cases[0]:bundle.report.cases[0].driver,file=path.join(bundle.directory,row.dockerAfterPath),after=JSON.parse(fs.readFileSync(file,'utf8'));
+  after.HostConfig={...(after.HostConfig||{}),Memory:1024000000};fs.writeFileSync(file,JSON.stringify(after));
+  row.dockerAfterSha256=(await import('../button-safety-mobile-contract.mjs')).mobileDigest(fs.readFileSync(file));bundle.report.artifacts=(await import('../button-safety-mobile-contract.mjs')).mobileArtifactInventory(bundle.directory);
+  assert.throws(()=>verify(bundle),'Rehashed post-run Docker configuration cannot relax the observed budget/isolation');
+ });
+});
