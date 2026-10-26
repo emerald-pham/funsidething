@@ -24513,5 +24513,23 @@
       "command": "Actual recorders under /Users/emeraldpham/.codex/task-artifacts/webkit-button-safety-20261025/qualification/mobile-frame-3781/runs:191bcb21 node --test --test-name-pattern=^RISK repository process: stress engine loss requires tests.js;02f70e74 actual controlled outer launcher;6b127301 Settings changelog fingerprint. Exact hosted40356760855 core/mobile raw original failures remain in qualification/ci-3781d21-{core,mobile}. Earlier migrations retain prior unchanged rationale entries.",
       "failure": "191bcb21: Kernel OOM must coincide with an attributable primary crash or engine-loss failure for actual observed page.waitForFunction: Browser closed.02f70e74: actual outer CLI fails the same attribution until its caller supplies the existing owner report.6b127301: App changed: add a dated changelog entry and refresh its app fingerprint. Hosted core: Receipt hashing completed/actual hash held expected2 actual0; repaired logical clock preserves the substantive original deadline/assertions. GREEN dc402235 passes109 parser/lifecycle cases;3383fd86 actual repaired consumer;efc0d47b both mechanical fingerprints. No app-performance fix or release qualification is claimed."
     }
+  },
+  {
+    "baseCommit": "937975d4bc09d3e539f796621b4d8e00f4a91408",
+    "testChangesSha256": "e26f039cc39cf9245a7c069bca12c24c6ef422d2cbb3191caec227690bb1cea0",
+    "reason": "Dedicated nonmergeable diagnostic carrier must have a bounded read-only branch route and cannot provide canonical full-matrix release evidence.",
+    "previousBehavior": "The canonical full release workflow responds to every push and selected PR events; it does not provide a branch-confined partial phase experiment with explicit15-minute job bounds.",
+    "intendedBehavior": "Only diagnose/webkit-action-phases runs two selected-motion1GB diagnostic jobs plus one focused existing-consumer job. Repository permission is read-only, each job is bounded15minutes, failures retain artifacts, and no aggregate/deployment exists. The existing real verifier rejects both diagnostic report kind and relabeled single-motion output.",
+    "replacementTests": [
+      "RISK repository process: diagnostic phase workflow is bounded and cannot qualify a partial mobile matrix"
+    ],
+    "preservedCoverage": [
+      "All preexisting tests and their assertions remain. Original full application workload, saved originals, cap, two-second/frame limits, actual OOM control and cleanup retain their exact canonical definitions.",
+      "This branch is nonmergeable and no canonical full-suite or release acceptance is claimed; original failed hosted40356760855 remains immutable."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder b442f72b at qualification/phase-carrier-root/runs: node --test --test-name-pattern=\"^RISK repository process: diagnostic phase workflow\" tests.js before applying any workflow/runner package.",
+      "failure": "Meaningful process RED: the existing parsed workflow routes all pushes and pull_request events instead of the sole authorized diagnostic branch; explicit expected branch routing assertion failed."
+    }
   }
 ]

@@ -46277,3 +46277,26 @@ test('RISK repository process: stress engine loss requires the actual kernel and
  const result=spawnSync(process.execPath,['--test','--test-name-pattern=mobile stress owned engine loss','scripts/agent-tools/mobile-memory.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:10000,maxBuffer:4*1024*1024});
  assert.equal(result.error,undefined);assert.equal(result.status,0,'The actual immutable stress verifier must report observed owned engine loss while refusing unrelated driver faults: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# skipped 0$/m);
 });
+
+test('RISK repository process: diagnostic phase workflow is bounded and cannot qualify a partial mobile matrix',async t=>{
+ const {parse}=await import('yaml'),workflow=parse(fs.readFileSync(path.join(__dirname,'.github/workflows/data-safety.yml'),'utf8'));
+ assert.deepEqual(workflow.on,{push:{branches:['diagnose/webkit-action-phases']}},'The diagnostic must run only for its dedicated nonmergeable branch');
+ assert.deepEqual(workflow.permissions,{contents:'read'},'Diagnostic work needs no repository write permission');
+ assert.deepEqual(Object.keys(workflow.jobs).sort(),['diagnostic-mobile-frame','diagnostic-native-focused']);
+ const mobile=workflow.jobs['diagnostic-mobile-frame'],native=workflow.jobs['diagnostic-native-focused'];
+ assert.deepEqual(mobile.strategy,{ 'fail-fast':false,matrix:{motion:['normal','reduced']}});
+ for(const job of [mobile,native]){
+  assert.equal(job['timeout-minutes'],15,'Every diagnostic job has an explicit wall-clock bound');
+  assert.equal(job.env.FROZEN_APP_COMMIT,'937975d4bc09d3e539f796621b4d8e00f4a91408');
+  assert.equal(job.steps.at(-1).if,'always()','Failed diagnostic outcomes still retain their evidence');
+  assert.equal(job.steps.at(-1).with['if-no-files-found'],'error');
+  assert.ok(job.steps.every(step=>!String(step.uses||step.run||'').match(/deploy-pages|release:publish|test:group.*--aggregate/)),'No diagnostic job can deploy or aggregate release acceptance');
+ }
+ assert.ok(mobile.steps.some(step=>step.run==='node scripts/button-safety-mobile-memory.mjs --run --profile required-1gb --output-dir "$RUNNER_TEMP/mobile-frame/capped"'),'The pinned launcher still owns the real capped control and original story');
+ const {tmpdir}=await import('node:os'),{createMobileBundle,refreshMobileBundle}=await import('./scripts/agent-tools/mobile-memory-fixture.mjs'),{verifyMobileMemoryReport}=await import('./scripts/button-safety-mobile-contract.mjs');
+ const directory=fs.mkdtempSync(path.join(tmpdir(),'chain-phase-diagnostic-contract-'));t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const bundle=createMobileBundle(directory),verify=()=>verifyMobileMemoryReport(bundle.report,{artifactRoot:directory});
+ assert.equal(verify().status,'passed','Positive parser control is synthetic, not runtime acceptance');
+ bundle.report.kind='button-mobile-memory-diagnostic';assert.throws(verify,'A diagnostic report cannot satisfy the canonical verifier');
+ bundle.report.kind='button-mobile-memory';bundle.report.cases=bundle.report.cases.slice(0,1);refreshMobileBundle(bundle);assert.throws(verify,'Relabeling a selected-motion report cannot satisfy the required full matrix');
+});

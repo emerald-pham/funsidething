@@ -13176,6 +13176,11 @@
       "root": "mobile stress CLI retains the observed reduced owned-engine OOM after a failed normal attempt",
       "group": "native-process",
       "file": "scripts/agent-tools/mobile-memory-stress-lifecycle.test.mjs"
+    },
+    {
+      "root": "RISK repository process: diagnostic phase workflow is bounded and cannot qualify a partial mobile matrix",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [
