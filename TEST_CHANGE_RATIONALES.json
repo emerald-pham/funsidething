@@ -1,7 +1,7 @@
 [
   {
     "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
-    "testChangesSha256": "536299d06db7e8b159272a49e048481568698806a6a16fe74f931ca77cd60e71",
+    "testChangesSha256": "4c39714e4adb60983046ef66f43376391733363b7556c597b2c314db3fea347d",
     "reason": "Integrate the user-requested single Import/Export and direct Copy/Download with protected source preservation, WebKit export/paste/preview repairs, fresh-scan WOOP repair, late clipboard-generation guard, and required fail-closed400-task/ten-press native release checks.",
     "previousBehavior": "Settings exposed redundant transfer controls and mounted complete multi-megabyte exports in modal HTML. Native WebKit stalled while rendering export and pasted JSON, and its file byte encoder blocked Preview. An obsolete Copy completion could release a newer transfer. Fresh scan WOOP Next could lose its work-mode state. Existing CI did not require a complete independently enumerated native button/workload matrix.",
     "intendedBehavior": "One Import and one Export remain with retained backups; Copy and Download use identical prepared read-only archive bytes. Large text remains outside DOM; recovery encoding yields with source/consent guards. WOOP and clipboard lifecycle are bound to the correct state. Both Chromium and WebKit must cover every maintained action/state, durable400-task fixture, and ten trusted press attempts within2seconds with independently asserted outcomes, responsiveness and preservation.",
@@ -13,7 +13,7 @@
       "RISK JSON COPY PASTE: large native paste retains full draft without rendering the archive",
       "RISK JSON COPY PASTE: closing a large paste during encoding stops before backup writes",
       "RISK JSON COPY PASTE: stale clipboard completion cannot release a newer export transfer",
-      "RISK JSON COPY PASTE: Copy and Download send the same full archive without a JSON view or writes",
+      "RISK JSON COPY PASTE: Copy and Download round-trip seeded pending archives without replaying sources",
       "RISK DATABASE REPAIR EXPORT: unified Copy and Download retain exact sources and metadata without writes",
       "RISK DATABASE REPAIR EXPORT: unreadable sources are labeled partial and never shown as an empty database",
       "RISK DATABASE REPAIR EXPORT: Debug log points to the combined archive without duplicate export controls",
@@ -22469,6 +22469,6 @@
       "command": "Node22 recorder focused RISK saved view continuity and required native fixture process regressions; hosted ordinary runs40276598750,40276593922 and instrumented40282208588.",
       "failure": "30f0979b: actual onAction sameEligible10presses replaced400task rows10times(expected0) before product repair.9ae0f542: mountedFAQ lacked unchanged row guidance before copy update. Native actual hosted paste1266.5ms with2.9ms app listener and refusal2441/2410ms preserved; no local or hosted success inferred from those failures. 9fb94994 actual CLI completed the original oversized preview/Cancel scenario but no verified pre-timer complete fixture existed; 66cba120 actual pending recovery CLI completed but no single prepared neutral document existed, before the respective runner changes. e4b91818 paste fixture process GREEN follows staging; exact committed further native matrix remains separate."
     },
-    "testChangesSha256": "21ca0d17b14c810e5976391113a5979473968d9d47ebdce2c1d15eb5cea5b773"
+    "testChangesSha256": "a03d627df90fb106ee0152256189627933134b9daa8c72e8ec5119c4eabc85d2"
   }
 ]

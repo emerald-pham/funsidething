@@ -45590,7 +45590,7 @@ test('RISK repository process: required native button actions execute in Chromiu
 test('RISK repository process: rapid native attempts preserve Add and asynchronous dialog outcomes',async t=>{
  const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});
  const output=fs.mkdtempSync(path.join(base,'rapid-actions-'));
- const scenarios=['rapid Add and context actions with 400 saved tasks','rapid reset confirms once and retains the 400-task backup','rapid motion settings open and both choices respond','rapid Settings decision review offers Light and saves it while protecting failures','rapid prepared Export Copy and Download retain exact sources'];
+ const scenarios=['rapid All Tasks and bulk editing with 400 saved tasks','rapid Add and context actions with 400 saved tasks','rapid reset confirms once and retains the 400-task backup','rapid motion settings open and both choices respond','rapid Settings decision review offers Light and saves it while protecting failures','rapid prepared Export Copy and Download retain exact sources'];
  for(const engine of ['chromium','webkit'])for(const scenario of scenarios)await t.test(engine+' '+scenario,()=>{
   const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine',engine,'--output-dir',output,'--port',process.env.CHAIN_NATIVE_PORT||'0','--scenario',scenario],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:45000,maxBuffer:1024*1024});
   assert.equal(result.error,undefined);assert.equal(result.signal,null);assert.equal(result.status,0,'Rapid actions must preserve their independent outcome and reconcile ten native attempts: '+result.stderr);

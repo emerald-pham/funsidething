@@ -166,9 +166,16 @@ export async function runRapidCoreScenarios(h){
       '#listWrap [data-act="toggle-list"]','Ten All Tasks toggles return the list to its initially open state.');
     await ten(ui,'list-tag',()=>document.querySelector('#listTagRow [data-act="list-tag"][data-id="c:rapid-context"]')?.getAttribute('aria-pressed')==='false',
       '#listTagRow [data-act="list-tag"][data-id="c:rapid-context"]','Ten repeated context filters return the tag filter to its initial unselected state.');
+    const eligibleSelector='#listEligibilityRow [data-act="list-eligibility"][data-id="eligible"]';
+    await ui.act('list-eligibility',()=>document.querySelector('#listEligibilityRow [data-id="eligible"]')?.getAttribute('aria-pressed')==='true',eligibleSelector);
+    await ui.page.locator(eligibleSelector).focus();
+    await ui.page.evaluate(()=>{const body=document.getElementById('listBody');body.scrollTop=180;window.__eligibleMounted={row:body.querySelector('[data-act="edit"]'),button:document.activeElement,scrollTop:body.scrollTop};});
     await ten(ui,'list-eligibility',()=>document.querySelector('#listEligibilityRow [data-act="list-eligibility"][data-id="eligible"]')?.getAttribute('aria-pressed')==='true',
       '#listEligibilityRow [data-act="list-eligibility"][data-id="eligible"]',
       'Ten repeated Eligible selections remain on the same explicitly selected filter.');
+    const continuity=await ui.page.evaluate(()=>{const saved=window.__eligibleMounted,body=document.getElementById('listBody');return{row:saved.row===body.querySelector('[data-act="edit"]')&&saved.row.isConnected,button:saved.button.isConnected,focus:document.activeElement===saved.button,scroll:body.scrollTop===saved.scrollTop};});
+    assert.deepEqual(continuity,{row:true,button:true,focus:true,scroll:true},'Repeated selected eligibility retains actual mounted rows, focus and scroll');
+
     await ui.fill('#listSearch','rapid no match');
     await once(ui,'clear-list-filters',()=>document.getElementById('listSearch').value===''&&
       !document.querySelector('#listTagRow [aria-pressed="true"]')&&
