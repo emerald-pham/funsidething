@@ -12783,6 +12783,11 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK repository process: rapid native attempts preserve outcomes across completion and moving dialogs",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK repository process: native button gate refuses unallocated local launch before browser startup",
       "group": "native-process",
       "file": "tests.js"

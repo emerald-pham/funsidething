@@ -2260,6 +2260,7 @@ The command/report consumer rejects missing, duplicate, skipped, cancelled, unre
 - RISK repository process: button safety rejects false passes and newly untested actions
 - RISK repository process: native button gate detects errors raised by a real click
 - RISK repository process: required native button actions execute in Chromium and WebKit
+- RISK repository process: rapid native attempts preserve outcomes across completion and moving dialogs
 - RISK repository process: native button gate refuses unallocated local launch before browser startup
 - RISK repository process: new and duplicate source buttons require native coverage inventory
 

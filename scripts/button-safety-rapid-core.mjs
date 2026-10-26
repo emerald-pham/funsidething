@@ -457,14 +457,15 @@ export async function runRapidCoreScenarios(h){
     await once(ui,'wipe',()=>document.querySelector('#modalRoot h2')?.textContent==='Confirm reset'&&
       !!document.querySelector('#modalRoot [data-act="confirm-wipe"]'),
       '#modalRoot [data-act="wipe"]','The first Reset press opens confirmation; later attempts are covered by the dialog.');
-    await ten(ui,'confirm-wipe',async()=>{
-      const head=await window.ScannerDeviceStore.readHead(),stored=head?.payload?JSON.parse(head.payload):null;
-      const backups=await window.ScannerDeviceStore.listBackups();
-      const beforeReset=backups.filter(row=>row.kind==='before-reset');
-      return state.tasks.length===0&&stored?.tasks?.length===0&&
-        beforeReset.length===1&&JSON.parse(beforeReset[0].payload).tasks.length===400;
-    },'#modalRoot [data-act="confirm-wipe"]',
-    'Ten trusted confirmations reach one reset action; its in-flight guard suppresses duplicate effects and retains exactly one complete 400-task safety copy.');
+    const sourceHash=await ui.page.evaluate(()=>ChainStorageV2.hashPayload(JSON.stringify(state)));
+    const resetRetainsSource=new Function('return async()=>{'+
+      'const head=await window.ScannerDeviceStore.readHead(),stored=head?.payload?JSON.parse(head.payload):null;'+
+      'const backups=await window.ScannerDeviceStore.listBackups(),beforeReset=backups.filter(row=>row.kind==="before-reset");'+
+      'return state.tasks.length===0&&stored?.tasks?.length===0&&beforeReset.length===1&&'+
+      'JSON.parse(beforeReset[0].payload).tasks.length===400&&'+
+      '(await ChainStorageV2.hashPayload(beforeReset[0].payload))==='+JSON.stringify(sourceHash)+'}')();
+    await bounded(ui,'confirm-wipe',resetRetainsSource,'#modalRoot [data-act="confirm-wipe"]',
+      'Ten trusted attempts start one reset; its in-flight guard suppresses duplicate effects, the completed dialog disappears, and exactly one byte-identical 400-task safety copy remains.');
   });
 
   await h.scenario('rapid Debug log and Help actions with 400 saved tasks',{decorate:activeBoard},async ui=>{

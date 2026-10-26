@@ -77,14 +77,18 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
     throw Error('Unexpected cloud write in button fixture');
    });
    const dbName='button-'+randomUUID();
-   await context.addInitScript(browserInit,{dbName,authMode:options.authMode||'signed-out',sdkBase:origin+sdk});
+   // The neutral pointer-release iframe must never reseed shared browser
+   // preferences or app storage while a button burst is in progress.
+   await context.addInitScript({content:'if(window.top===window){('+browserInit.toString()+')('+JSON.stringify({dbName,authMode:options.authMode||'signed-out',sdkBase:origin+sdk})+');}'});
    await context.addInitScript(({board,clipboardFail,clipboardDeferred,geoFail})=>{
+    if(window.top!==window)return;
     if(!localStorage.getItem('fvp:chain-scanner:device-store-v2')&&localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',JSON.stringify(board));
     window.__buttonClipboard=[];window.__buttonClipboardPending=[];
     Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{if(clipboardFail)throw new DOMException('Synthetic clipboard permission refused','NotAllowedError');window.__buttonClipboard.push(text);if(clipboardDeferred)await new Promise((resolve,reject)=>window.__buttonClipboardPending.push({resolve,reject}));}}});
     Object.defineProperty(navigator,'geolocation',{configurable:true,value:{getCurrentPosition:(success,failure)=>geoFail?failure?.({code:1,message:'Synthetic location refused'}):success({coords:{latitude:40.7,longitude:-74,accuracy:20}})}});
    },{board,clipboardFail:options.clipboardFail,clipboardDeferred:options.clipboardDeferred,geoFail:options.geoFail});
    await context.addInitScript(()=>{
+    if(window.top!==window)return;
     window.__buttonRefuseWrites=false;window.__buttonRefuseReads=false;
     const tx=IDBDatabase.prototype.transaction;IDBDatabase.prototype.transaction=function(stores,mode,...rest){if(mode==='readonly'&&window.__buttonRefuseReads)throw new DOMException('Synthetic saved source read refused','UnknownError');if(mode==='readwrite'&&window.__buttonRefuseWrites)throw new DOMException('Synthetic saved source write refused','QuotaExceededError');return tx.call(this,stores,mode,...rest);};
     const put=Storage.prototype.setItem;Storage.prototype.setItem=function(key,value){if(window.__buttonRefuseWrites&&key.startsWith('fvp:chain-scanner:'))throw new DOMException('Synthetic browser storage write refused','QuotaExceededError');return put.call(this,key,value);};
@@ -115,9 +119,10 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
    await page.exposeBinding('__buttonPressed',(_,receipt)=>{report.presses??=[];report.presses.push({scenario:name,...receipt});});
    await page.exposeBinding('__buttonClicked',(_,key)=>{report.clicks??=[];report.clicks.push({scenario:name,action:key,at:Date.now()});});
    await page.addInitScript(({keySource})=>{
+    if(window.top!==window)return;
     const key=eval('('+keySource+')');
     window.__buttonNativePresses=[];window.__buttonNativeClicks=[];
-    document.addEventListener('pointerdown',event=>{if(event.isTrusted){const receipt={at:performance.timeOrigin+performance.now(),action:key(event.target.closest('button,summary,[data-act],[role="button"]')||document.documentElement)};window.__buttonNativePresses.push(receipt);void window.__buttonPressed(receipt);}},true);
+    document.addEventListener('pointerdown',event=>{if(event.isTrusted){const target=event.target.closest('button,summary,[data-act],[role="button"]')||document.documentElement;window.__buttonNativeDownTarget=target;const receipt={at:performance.timeOrigin+performance.now(),action:key(target)};window.__buttonNativePresses.push(receipt);void window.__buttonPressed(receipt);}},true);
     window.__buttonHeartbeat={at:performance.now(),maxGapMs:0,frames:0};const pulse=now=>{const h=window.__buttonHeartbeat;h.maxGapMs=Math.max(h.maxGapMs,now-h.at);h.at=now;h.frames++;if(h.clickAt!==undefined&&h.firstFrameAfterClickMs===undefined)h.firstFrameAfterClickMs=now-h.clickAt;requestAnimationFrame(pulse);};requestAnimationFrame(pulse);
     addEventListener('unhandledrejection',event=>void window.__buttonSafetyFailure('unhandledrejection: '+String(event.reason)));
     document.addEventListener('click',event=>{const el=event.target.closest('button,summary,[data-act],[role="button"],[data-scene-view],[data-landscape-motion],[data-scene-time],[data-scene-preset],[data-location-action]');if(el&&event.isTrusted){window.__buttonHeartbeat.clickAt=performance.now();delete window.__buttonHeartbeat.firstFrameAfterClickMs;window.__buttonNativeClicks.push({at:performance.now(),action:key(el)});void window.__buttonClicked(key(el));}},true);
@@ -176,23 +181,47 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
     const action=await target.evaluate(actionFor);assert.ok(action===actionName||action==='act:'+actionName,'Rapid target action must match independent family');
     await page.evaluate(()=>{window.__buttonHeartbeat.maxGapMs=0;window.__buttonHeartbeat.at=performance.now();});const start={presses:report.presses?.length||0,clicks:report.clicks?.length||0};
     const previousDocument=reload?await page.evaluate(()=>window.__installedFixture.documentId):null;if(reload)allowedNavigation={url:page.url(),remaining:1,action};
-    const attempts=[];const began=Date.now();
+    const attempts=[];report.inFlightBurst={scenario:name,action,attempts};const began=Date.now();
     for(let index=0;index<10;index++){
      let availability={present:false,disabled:false,hit:false},box=originalBox;
-     const snapshot=await bounded(target.evaluateAll((els,backdrop)=>{const el=els[0];if(!el)return null;let r=el.getBoundingClientRect();if(r.width&&r.height&&(r.y<0||r.x<0||r.bottom>innerHeight||r.right>innerWidth)&&!el.closest('[inert]')){el.scrollIntoView({block:'center',inline:'nearest',behavior:'instant'});r=el.getBoundingClientRect();}const hit=document.elementFromPoint(r.x+(backdrop?5:r.width/2),r.y+(backdrop?5:r.height/2));return{box:{x:r.x,y:r.y,width:r.width,height:r.height},present:!!(r.width&&r.height),disabled:el.matches(':disabled'),hit:!!hit&&(el===hit||el.contains(hit))};},action==='act:mback'),'rapid target availability');
+     const snapshot=await bounded(target.evaluateAll(async(els,backdrop)=>{
+      const el=els[0];if(!el)return null;let r=el.getBoundingClientRect();
+      if(r.width&&r.height&&(r.y<0||r.x<0||r.bottom>innerHeight||r.right>innerWidth)&&!el.closest('[inert]')){el.scrollIntoView({block:'center',inline:'nearest',behavior:'instant'});r=el.getBoundingClientRect();}
+      const before={x:r.x,y:r.y,width:r.width,height:r.height};
+      // Source reads can replace or resize an asynchronous modal between
+      // measuring its old button and delivering native input. Observe this
+      // same connected target across two frames before accepting its point.
+      if(r.width&&r.height)await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+      if(!el.isConnected)return null;r=el.getBoundingClientRect();
+      const box={x:r.x,y:r.y,width:r.width,height:r.height},stable=Object.keys(box).every(key=>box[key]===before[key]);
+      const hit=document.elementFromPoint(r.x+(backdrop?5:r.width/2),r.y+(backdrop?5:r.height/2));
+      return{box,present:!!(r.width&&r.height),disabled:el.matches(':disabled'),stable,hit:stable&&!!hit&&(el===hit||el.contains(hit))};
+     },action==='act:mback'),'rapid target availability');
      if(snapshot){availability=snapshot;if(snapshot.present)box=snapshot.box;}
      const before={clicks:report.clicks?.length||0,presses:report.presses?.length||0};
-     if(availability.present&&availability.hit)await bounded(page.mouse.click(box.x+(action==='act:mback'?5:box.width/2),box.y+(action==='act:mback'?5:box.height/2)),'rapid native press '+actionName);
+     const pressPoint=availability.present&&availability.hit?{x:box.x+(action==='act:mback'?5:box.width/2),y:box.y+(action==='act:mback'?5:box.height/2)}:{x:originalBox.x+originalBox.width/2,y:originalBox.y+originalBox.height/2};
+     if(availability.disabled)await bounded(page.evaluate(point=>{
+      // WebKit can suppress even a captured pointerdown on a disabled button.
+      // An independently observed disabled target earns only a refused attempt:
+      // receive the trusted down on a neutral marker at that same point.
+      const marker=document.createElement('span');marker.id='__buttonDisabledAttempt';marker.style.cssText='position:fixed;left:'+(point.x-2)+'px;top:'+(point.y-2)+'px;width:4px;height:4px;z-index:2147483647';(document.querySelector('dialog[open]')||document.body).append(marker);
+     },pressPoint),'rapid disabled refusal marker');
+     await bounded((async()=>{await page.mouse.move(pressPoint.x,pressPoint.y);await page.mouse.down();})(),'rapid native down '+actionName);
+     // The browser's delivered down is authoritative. If an asynchronous
+     // replacement wins the final coordinate race, release neutrally just as
+     // for an already absent control; never click a different app action.
+     const down=await bounded(page.evaluate(({point,action})=>{const el=window.__buttonNativeDownTarget,hit=document.elementFromPoint(point.x,point.y),receipt=window.__buttonNativePresses.at(-1);return{action:receipt?.action,canRelease:receipt?.action===action&&!!el?.isConnected&&(hit===el||el.contains(hit))};},{point:pressPoint,action}),'rapid delivered down');
+     if(availability.present&&availability.hit&&!availability.disabled&&down.canRelease)await bounded(page.mouse.up(),'rapid native release '+actionName);
      else{
       // Chromium can clamp an outside-viewport release onto the modal backdrop
       // and synthesize a different click. Release in a separate neutral document
       // instead; the original document still records the trusted attempted down.
       await bounded(page.evaluate(()=>{if(!document.getElementById('__buttonReleaseSink')){const sink=document.createElement('iframe');sink.id='__buttonReleaseSink';sink.title='Native test release surface';sink.srcdoc='<!doctype html><style>html,body{margin:0;width:100%;height:100%}</style>';sink.style.cssText='position:fixed;left:0;top:0;width:8px;height:8px;border:0;z-index:2147483647';document.body.append(sink);}}),'rapid release surface');
-      await bounded((async()=>{await page.mouse.move(originalBox.x+originalBox.width/2,originalBox.y+originalBox.height/2);await page.mouse.down();await page.mouse.move(4,4);await page.mouse.up();await page.evaluate(()=>document.getElementById('__buttonReleaseSink')?.remove());})(),'rapid refused press '+actionName);
+      await bounded((async()=>{await page.mouse.move(4,4);await page.mouse.up();await page.evaluate(()=>{document.getElementById('__buttonReleaseSink')?.remove();document.getElementById('__buttonDisabledAttempt')?.remove();});})(),'rapid refused press '+actionName);
      }
      if(reload&&index===0){await bounded(page.waitForFunction(old=>window.__installedFixture?.documentId!==old&&document.documentElement.dataset.appReady==='true',previousDocument),'rapid bounded reload',2000);assert.equal(allowedNavigation.remaining,0,'Exactly one expected rapid reload');allowedNavigation=null;}
      await bounded(page.evaluate(()=>true),'rapid native receipt');const recentClicks=(report.clicks||[]).slice(before.clicks);const unrelated=recentClicks.filter(row=>row.action!==null&&row.action!==action);assert.deepEqual(unrelated,[],'Rapid attempt activated a different app action');const received={presses:(report.presses||[]).slice(before.presses),clicks:recentClicks.filter(row=>row.action===action)};
-     attempts.push({index,availability,trustedPresses:received.presses.length,acceptedClicks:received.clicks.length,classification:received.clicks.length?'accepted':availability.present?'refused':'disappeared',at:received.presses[0]?.at});
+     attempts.push({index,availability,nativeDownAction:down.action,neutralRelease:!availability.present||!availability.hit||availability.disabled||!down.canRelease,trustedPresses:received.presses.length,acceptedClicks:received.clicks.length,classification:received.clicks.length?'accepted':availability.present?'refused':'disappeared',at:received.presses[0]?.at});
     }
     const finished=Date.now();const presses=(report.presses||[]).slice(start.presses);
     assert.equal(presses.length,10,'Ten browser-trusted native press receipts: '+actionName);
@@ -205,7 +234,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
     const row=rapidOutcomes.get(action)||{action,status:'passed',responsive:true,assertions:0,bursts:[]};row.assertions++;
     row.bursts.push({scenario:name,attempts:10,trustedPresses:presses.length,unrelatedClicks:0,windowMs:finished-began,browserWindowMs:presses.at(-1).at-presses[0].at,acceptedClicks,refused,disappeared,semantics,maxFrameGapMs:heartbeat.maxGapMs,attemptDetails:attempts});rapidOutcomes.set(action,row);report.rapidOutcomes=[...rapidOutcomes.values()];
     const normal=outcomes.get(action)||{action,status:'passed',events:['click'],assertions:0,responsive:true,steps:[]};normal.assertions++;normal.steps.push({scenario:name,description:'Rapid '+semantics,elapsedMs:finished-began,maxFrameGapMs:heartbeat.maxGapMs});outcomes.set(action,normal);report.outcomes=[...outcomes.values()];
-    return row.bursts.at(-1);
+    delete report.inFlightBurst;return row.bursts.at(-1);
    };
    const ui={page,click:step,waitFor,burst,pasteBoundary,backdrop:()=>step('.mback',()=>!document.querySelector('#modalRoot .modal'),'Dismiss dialog backdrop',{position:{x:5,y:5}}),expectReload:async action=>{const before=await page.evaluate(()=>window.__installedFixture.documentId);allowedNavigation={url:page.url(),remaining:1,action};const expected=new Function('return window.__installedFixture?.documentId!=='+JSON.stringify(before)+'&&document.documentElement.dataset.appReady==="true"');await step('[data-act="'+action+'"]',expected,action+' bounded reload');assert.equal(allowedNavigation.remaining,0,'exactly one expected same-route reload');allowedNavigation=null;},act:async(action,expect,selector)=>{if(!selector){selector='[data-act="'+action+'"]';if(await page.locator('#modalRoot '+selector).count())selector='#modalRoot '+selector;}return step(selector,expect,action);},fill:(selector,value)=>nativeInput('fill',selector,value),select:(selector,value)=>nativeInput('select',selector,value),expose};
    report.scenarios??=[];const record={name,status:'running',setup};report.scenarios.push(record);save();
