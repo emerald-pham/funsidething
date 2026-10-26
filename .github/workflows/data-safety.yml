@@ -21,7 +21,8 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Diagnostic process contracts only
-        run: node --test --test-name-pattern='^RISK repository process: nonmergeable mobile startup diagnostics preserve strict caps and independent controls$' tests.js
+        run: |
+          node --test --test-name-pattern='^RISK repository process: nonmergeable mobile startup diagnostics preserve strict caps and independent controls$' tests.js
       - name: Seven capped observations, never acceptance
         run: node scripts/button-safety-mobile-diagnostic.mjs --run --output-dir "$RUNNER_TEMP/webkit-cap-diagnosis"
       - name: Preserve every observed failure and phase
@@ -48,7 +49,8 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium webkit
       - name: Timing process contracts only
-        run: node --test --test-name-pattern='^RISK repository process: diagnostic native timings retain strict failures without changing app promises or burst pacing$' tests.js
+        run: |
+          node --test --test-name-pattern='^RISK repository process: diagnostic native timings retain strict failures without changing app promises or burst pacing$' tests.js
       - name: Six ordinary timing observations with original exits
         run: node scripts/button-safety-timing-diagnostic.mjs --run --output-dir "$RUNNER_TEMP/webkit-timing-diagnosis"
       - name: Preserve ordinary failures and timing buffers

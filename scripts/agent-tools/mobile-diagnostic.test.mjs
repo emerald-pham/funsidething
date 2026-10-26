@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
+import yaml from 'js-yaml';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 const modulePath='../button-safety-mobile-diagnostic.mjs';
 const hosted={CI:'true',CHAIN_TEST_EVENT_POLICY:'outgoing-branch-push-v1',GITHUB_EVENT_NAME:'push',GITHUB_REF:'refs/heads/diagnose/webkit-cap-31c'};
@@ -45,6 +46,15 @@ test('diagnostic telemetry binds durable stages to raw cgroup and process snapsh
 });
 test('diagnostic workflow is branch-only and never publishes canonical acceptance jobs',()=>{
  const workflow=fs.readFileSync(path.join(root,'.github/workflows/data-safety.yml'),'utf8');assert.match(workflow,/branches: \[diagnose\/webkit-cap-31c\]/);assert.doesNotMatch(workflow,/pull_request:|scanner-tests:|mobile-memory:/);assert.match(workflow,/NONMERGEABLE/);assert.match(workflow,/button-safety-mobile-diagnostic\.mjs --run/);assert.match(workflow,/if: always\(\)/);assert.match(workflow,/timeout-minutes: 12/);
+ const parsed=yaml.load(workflow);assert.deepEqual(parsed.on,{push:{branches:['diagnose/webkit-cap-31c']}});assert.deepEqual(Object.keys(parsed.jobs),['diagnostic-only','ordinary-timing-diagnostic']);
+ const commands=[
+  parsed.jobs['diagnostic-only'].steps.find(step=>step.name==='Diagnostic process contracts only').run,
+  parsed.jobs['ordinary-timing-diagnostic'].steps.find(step=>step.name==='Timing process contracts only').run,
+ ];assert.deepEqual(commands,[
+  "node --test --test-name-pattern='^RISK repository process: nonmergeable mobile startup diagnostics preserve strict caps and independent controls$' tests.js\n",
+  "node --test --test-name-pattern='^RISK repository process: diagnostic native timings retain strict failures without changing app promises or burst pacing$' tests.js\n",
+ ],'Both parsed shell commands must retain their exact test consumers');
+ for(const command of commands){const malformed=workflow.replace('        run: |\n          '+command.trimEnd(),'        run: '+command.trimEnd());assert.notEqual(malformed,workflow);assert.throws(()=>yaml.load(malformed),/bad indentation of a mapping entry/,'Each original unquoted process-colon command must independently fail parsing');}
 });
 
 test('actual diagnostic batch retains an OOM case and removes all seven fixture containers',async t=>{
