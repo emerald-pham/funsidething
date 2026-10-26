@@ -13026,6 +13026,21 @@
       "root": "RISK repository process: diagnostic native timings retain strict failures without changing app promises or burst pacing",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "startup-only native consumer omits dependent page observation and stops before the Yes story",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-diagnostic.test.mjs"
+    },
+    {
+      "root": "startup source verification rejects changed protected bytes and records actual mobile rendering",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-diagnostic.test.mjs"
+    },
+    {
+      "root": "RISK repository process: startup-only mobile diagnostics cannot satisfy the Yes story",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [

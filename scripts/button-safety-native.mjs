@@ -11,8 +11,38 @@ import {hostedButtonPolicy} from './button-safety-ci-policy.mjs';
 const digest=value=>createHash('sha256').update(value).digest('hex');
 const MIME={'.js':'text/javascript','.html':'text/html','.css':'text/css','.svg':'image/svg+xml','.png':'image/png','.webmanifest':'application/manifest+json'};
 import {recordExistingPhase,captureBurstTiming,browserTimingInit,resetBrowserTiming,installActionTiming,drainBrowserTiming} from './button-safety-timing-diagnostic.mjs';
+// Diagnostic-only observation after unchanged app readiness. No storage writes or button input.
+export async function verifyDiagnosticStartup({page,board,motion}){
+ const observation=await page.evaluate(async()=>{
+  const store=window.ScannerDeviceStore,head=await store.readHead(),saved=JSON.parse(head.payload);
+  const normalize=(_,value)=>typeof value==='number'&&Object.is(value,-0)?{minusZero:true}:ArrayBuffer.isView(value)?{type:value.constructor.name,values:Array.from(value)}:value;
+  const hash=value=>ChainStorageV2.hashPayload(JSON.stringify(value,normalize));
+  const identity=value=>value.tasks.map(row=>({id:row.id,title:row.title,createdAt:row.createdAt}));
+  const unknown=value=>({board:value.futureBoard,populated:value.futurePopulated,tasks:value.tasks.map(row=>({id:row.id,future:row.futureTask}))});
+  const retained=(await store.listBackups()).filter(row=>row.id.startsWith('gate-retained-')).sort((a,b)=>a.id.localeCompare(b.id));
+  const retainedSources=[];for(const row of retained)retainedSources.push({id:row.id,payloadHash:await ChainStorageV2.hashPayload(row.payload)});
+  return{taskCount:state.tasks.length,durableTaskCount:saved.tasks.length,unknownBytes:state.futurePopulated?.opaque?.length,durableUnknownBytes:saved.futurePopulated?.opaque?.length,
+   chain:[...state.chain],durableChain:[...saved.chain],taskIdentityHash:await hash(identity(state)),durableTaskIdentityHash:await hash(identity(saved)),unknownSourceHash:await hash(unknown(state)),durableUnknownSourceHash:await hash(unknown(saved)),retainedSources,
+   opaqueHash:await hash(await store.listOpaqueArchives()),pendingHash:await hash(await store.getPendingUpload('gate-owner')),
+   observed:{width:innerWidth,height:innerHeight,screenWidth:screen.width,screenHeight:screen.height,deviceScaleFactor:devicePixelRatio,maxTouchPoints:navigator.maxTouchPoints,coarsePointer:matchMedia('(pointer:coarse)').matches,userAgent:navigator.userAgent,reducedMedia:matchMedia('(prefers-reduced-motion:reduce)').matches,appMotion:JSON.parse(localStorage.getItem('fvp:chain-scanner:landscape-motion')).choice,appliedMotion:document.documentElement.dataset.landscapeMotion,canvasSizes:[...document.querySelectorAll('#landscape canvas')].map(el=>({width:el.width,height:el.height}))}};
+ });
+ const normalize=(_,value)=>typeof value==='number'&&Object.is(value,-0)?{minusZero:true}:ArrayBuffer.isView(value)?{type:value.constructor.name,values:Array.from(value)}:value,hash=value=>digest(JSON.stringify(value,normalize));
+ const identity=board.tasks.map(row=>({id:row.id,title:row.title,createdAt:row.createdAt})),unknown={board:board.futureBoard,populated:board.futurePopulated,tasks:board.tasks.map(row=>({id:row.id,future:row.futureTask}))};
+ assert.equal(observation.taskCount,TASK_COUNT);assert.equal(observation.durableTaskCount,TASK_COUNT);assert.equal(observation.unknownBytes,1048576);assert.equal(observation.durableUnknownBytes,1048576);
+ for(const key of ['taskIdentityHash','durableTaskIdentityHash'])assert.equal(observation[key],hash(identity),'Startup retains exact task identities');
+ for(const key of ['unknownSourceHash','durableUnknownSourceHash'])assert.equal(observation[key],hash(unknown),'Startup retains exact unknown source bytes');
+ assert.deepEqual(observation.chain,[],'Startup-only probe performs no scanner decisions');assert.deepEqual(observation.durableChain,[]);
+ assert.deepEqual(observation.retainedSources,[0,1].map(i=>({id:'gate-retained-'+i,payloadHash:digest(JSON.stringify({...board,futureSourceRole:i}))})),'Both retained payloads remain exact');
+ assert.equal(observation.opaqueHash,hash([{key:'gate-opaque-exact',raw:'opaque exact bytes\u0000retain',futureBytes:new Uint8Array([0,17,255]),futureMinusZero:-0}]),'Opaque typed source remains exact');
+ assert.equal(observation.pendingHash,hash({generationId:'gate-pending',payloadHash:digest(JSON.stringify(board)),baseRev:0,updatedAt:7,account:'gate-owner'}),'Pending source remains exact');
+ const observed=observation.observed;for(const [key,value]of Object.entries({width:390,height:844,screenWidth:390,screenHeight:844,deviceScaleFactor:3}))assert.equal(observed[key],value);
+ assert.ok(Number.isSafeInteger(observed.maxTouchPoints)&&observed.maxTouchPoints>=0);assert.equal(observed.coarsePointer,true);assert.match(observed.userAgent,/iPhone.*AppleWebKit.*Mobile/);assert.equal(observed.reducedMedia,motion==='reduced');assert.equal(observed.appMotion,motion);assert.equal(observed.appliedMotion,motion);
+ assert.equal(observed.canvasSizes.length,2);assert.ok(observed.canvasSizes.every(row=>row.width>0&&row.height>0),'Full landscape remains mounted');return observation;
+}
 export async function runButtonSafety({repo,engine,outputDir,port=0,control=null,probe=false,scenarioFilter=null,mobileYesMotion=null,diagnostic=null}){
- const timingEnabled=process.env.CHAIN_BUTTON_DIAGNOSTIC_TIMINGS==='1';
+ const timingEnabled=process.env.CHAIN_BUTTON_DIAGNOSTIC_TIMINGS==='1',startupOnly=diagnostic?.startupOnly===true;
+ assert.equal(diagnostic?.minimalPageObservation===true,startupOnly,'Minimal page observation is exclusively a startup-only diagnostic');
+ assert.ok(!startupOnly||!timingEnabled,'Startup and timing diagnostics cannot be mixed');
  assert.ok(['chromium','webkit'].includes(engine),'Explicit supported engine');
  if(mobileYesMotion){assert.equal(engine,'webkit');assert.ok(['normal','reduced'].includes(mobileYesMotion));assert.ok(scenarioFilter===null||scenarioFilter===MOBILE_SCENARIO);scenarioFilter=MOBILE_SCENARIO;}
  assert.ok(control===null||['pageerror','unhandled','reload','navigation','stall','short-stall','async-pending','async-predicate-false','close','crash','new-action'].includes(control),'Known explicit sensitivity control');
@@ -36,10 +66,10 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
 
  fs.mkdirSync(outputDir,{recursive:true});
  const git=(...args)=>execFileSync('git',args,{cwd:repo,maxBuffer:32*1024*1024}),candidateCommit=git('rev-parse','HEAD').toString().trim(),candidateTree=git('rev-parse','HEAD^{tree}').toString().trim();
- const report={schemaVersion:1,kind:timingEnabled?'button-timing-diagnostic':diagnostic?'button-mobile-diagnostic-native':mobileYesMotion?'button-mobile-functional':probe?'button-sensitivity':scenarioFilter?'button-diagnostic':'button-safety',engine,candidateCommit,candidateTree,hostedPolicy,status:'running',startedAt:new Date().toISOString(),requiredActions:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredActions,requiredScenarios:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredScenarios,requiredWorkload:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredWorkload,requiredRapidActions:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredRapidActions,inventorySha256:digest(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'))),observedActions:[],outcomes:[],errors:[],cleanup:{},limits:['Synthetic isolated browser storage and Firebase/clipboard/geolocation boundaries.',mobileYesMotion?'Emulated mobile WebKit; uncapped functional evidence unless independently bound to a verified Linux cgroup report; no physical iPhone or private-board recovery claim.':'Native desktop engine; no physical iPhone or private-board recovery claim.']};
+ const report={schemaVersion:1,kind:startupOnly?'button-mobile-startup-diagnostic':timingEnabled?'button-timing-diagnostic':diagnostic?'button-mobile-diagnostic-native':mobileYesMotion?'button-mobile-functional':probe?'button-sensitivity':scenarioFilter?'button-diagnostic':'button-safety',engine,candidateCommit,candidateTree,hostedPolicy,status:'running',startedAt:new Date().toISOString(),requiredActions:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredActions,requiredScenarios:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredScenarios,requiredWorkload:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredWorkload,requiredRapidActions:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredRapidActions,inventorySha256:digest(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'))),observedActions:[],outcomes:[],errors:[],cleanup:{},limits:['Synthetic isolated browser storage and Firebase/clipboard/geolocation boundaries.',mobileYesMotion?'Emulated mobile WebKit; uncapped functional evidence unless independently bound to a verified Linux cgroup report; no physical iPhone or private-board recovery claim.':'Native desktop engine; no physical iPhone or private-board recovery claim.']};
  const phase=stage=>diagnostic?.phase(stage);
  if(timingEnabled){report.acceptanceEligible=false;report.diagnosticTiming={schemaVersion:1,clock:{node:'performance.now; burst phase startMs relative to nodeOriginMs, paste endpoints absolute monotonic',browser:'performance.timeOrigin + performance.now; no cross-clock subtraction'},bursts:[],paste:[],limits:['Node phase durations include driver, protocol and browser work; they are not pure app durations.','onAction measures synchronous return only; asynchronous completion remains governed by the existing independent outcome.','Paste keeps the full argument/construct/dispatch/readback boundary; browser dispatch includes all listeners. No cross-clock subtraction or ingress attribution is inferred.','Diagnostic collection is outside the frozen burst window and cannot waive any original assertion.']};}
- if(diagnostic){assert.ok(mobileYesMotion&&!control&&!probe,'Diagnostics retain the actual mobile scenario');report.acceptanceEligible=false;report.diagnostic={reuseObserverPage:diagnostic.reuseObserverPage===true};}
+ if(diagnostic){assert.ok(mobileYesMotion&&!control&&!probe,'Diagnostics retain the actual mobile scenario');report.acceptanceEligible=false;report.diagnostic={reuseObserverPage:diagnostic.reuseObserverPage===true,startupOnly,minimalPageObservation:startupOnly};if(startupOnly){assert.ok(!diagnostic.reuseObserverPage,'Startup observation uses the original observer-close/new-page handoff');report.omittedAssertions=['Ten distinct offered-task Yes inputs and trusted touch/click receipts','Two-second input burst, per-action transport and outcomes','Continuous frame heartbeat and one-second frame budget','DOM census and unknown-action coverage'];}}
  const reportPath=path.join(outputDir,'button-safety-'+engine+'-'+randomUUID()+'.json'),save=()=>fs.writeFileSync(reportPath,JSON.stringify(report,null,2)+'\n');save();
  const prefix='/button-'+randomUUID()+'/',sdk='/sdk-'+randomUUID()+'/',sources=new Map();
  for(const file of git('ls-files').toString().trim().split('\n'))if(file!=='tests.js'&&!file.startsWith('scripts/')&&/\.(html|js|css|svg|png|webmanifest)$/.test(file))sources.set(file,fs.readFileSync(path.join(repo,file)));
@@ -125,6 +155,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
    page.on('popup',popup=>report.errors.push('unexpected-popup: '+popup.url()));
    if(options.importRaw)page.on('filechooser',chooser=>chooser.setFiles({name:'gate-board.json',mimeType:'application/json',buffer:Buffer.from(options.importRaw)}));
    page.on('dialog',dialog=>dialog.accept(dialog.type()==='prompt'?'Safety gate context':undefined));
+   if(!startupOnly){
    await page.exposeBinding('__buttonFault',async()=>{if(control==='close')await page.close();if(control==='crash'){const session=await context.newCDPSession(page);void session.send('Page.crash').catch(()=>{});}});
    await page.exposeBinding('__buttonSafetyFailure',(_,message)=>report.errors.push(message));
    await page.exposeBinding('__buttonUnidentified',(_,html)=>{report.unidentifiedButtons??=[];if(!report.unidentifiedButtons.includes(html))report.unidentifiedButtons.push(html);});
@@ -143,6 +174,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
     const scan=()=>{const d=window.__buttonDiagnostic,started=d&&(d.active||d.pasteActive)?performance.now():null;try{if(document.documentElement){const els=[...document.querySelectorAll('button,summary,[data-act],[role="button"],[data-scene-view],[data-landscape-motion],[data-scene-time],[data-scene-preset],[data-location-action]')];const bindingStarted=started===null?null:performance.now();void window.__buttonObserved(els.map(key).filter(value=>value!==null));if(bindingStarted!==null)d.scan.bindingCallMs+=performance.now()-bindingStarted;for(const el of els)if(key(el)?.startsWith('button-id:'))void window.__buttonUnidentified(el.outerHTML.slice(0,1000));}}finally{if(started!==null){const elapsed=performance.now()-started;d.scan.calls++;d.scan.totalMs+=elapsed;d.scan.maxMs=Math.max(d.scan.maxMs,elapsed);}}};
     addEventListener('DOMContentLoaded',()=>{scan();new MutationObserver(scan).observe(document.documentElement,{childList:true,subtree:true});});
    },{keySource:actionFor.toString()});
+   }
    phase('before-app-goto');await page.goto(origin+prefix);phase('after-app-goto');await page.waitForFunction(()=>typeof state!=='undefined'&&state&&window.ScannerDeviceStore);await page.waitForFunction(()=>window.CloudSync?.ready);if(mobileYesMotion)await page.waitForFunction(motion=>document.documentElement.dataset.landscapeMotion===motion,mobileYesMotion,{timeout:12000});phase('after-app-ready');localArmed=true;
    const setup=await bounded((async()=>{for(let attempt=0;attempt<200;attempt++){
     const result=await page.evaluate(async()=>{const head=await ScannerDeviceStore.readHead();return{currentTasks:state.tasks.length,activeTasks:state.tasks.filter(task=>!task.done).length,durableTasks:head?.payload?JSON.parse(head.payload).tasks.length:0,durableHash:head?.hash};});
@@ -150,6 +182,11 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
     await new Promise(resolve=>setTimeout(resolve,25));
    }throw Error('Independent400-task setup did not reach durable storage');})(),'400-task durable setup',12000);
    phase('after-durable-400-task-setup');
+   if(startupOnly){
+    report.startup={status:'running',setup};save();
+    report.startup.observation=await bounded(verifyDiagnosticStartup({page,board,motion:mobileYesMotion}),'startup read-only exact source verification',12000);
+    check();report.startup.status='passed';phase('after-startup-source-verification');return;
+   }
    if(timingEnabled)await page.evaluate(installActionTiming);
    if(options.writeFailAfterReady)await page.evaluate(()=>window.__buttonRefuseWrites=true);
    if(options.readFailAfterReady)await page.evaluate(()=>window.__buttonRefuseReads=true);
@@ -299,9 +336,10 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
   else if(probe)await scenario('detector sensitivity',{},async ui=>{await ui.act('settings',control==='async-predicate-false'?async()=>false:()=>!!document.getElementById('stHorizon'));});
   else if(scenarioFilter?.startsWith('rapid ')){const {runRapidScenarios}=await import('./button-safety-rapid.mjs');await runRapidScenarios({scenario});}
   else {await runButtonScenarios({scenario});const {runRapidScenarios}=await import('./button-safety-rapid.mjs');await runRapidScenarios({scenario});}
-  if(scenarioFilter)assert.equal(report.scenarios?.length,1,'Exactly one requested diagnostic scenario must execute');
+  if(startupOnly)assert.equal(report.startup?.status,'passed','Startup diagnostic must finish durable source verification');
+  else if(scenarioFilter)assert.equal(report.scenarios?.length,1,'Exactly one requested diagnostic scenario must execute');
   for(const action of observed)assert.ok(report.requiredActions.includes(action),'New untested button action: '+action);
-  report.observedActions=[...observed].sort();report.outcomes=[...outcomes.values()];report.rapidOutcomes=[...rapidOutcomes.values()];if(scenarioFilter)report.scope='focused-diagnostic';
+  report.observedActions=[...observed].sort();report.outcomes=[...outcomes.values()];report.rapidOutcomes=[...rapidOutcomes.values()];if(scenarioFilter)report.scope=startupOnly?'startup-only-diagnostic':'focused-diagnostic';
   report.status='passed';
  }catch(error){report.status='failed';report.failure=error.stack;try{report.failureObservation=await bounded(page.evaluate(()=>({modal:document.getElementById('modalRoot')?.innerText,toast:document.getElementById('toast')?.innerText,mode:state.mode,chain:state.chain,candidateId:state.candidateId,taskTitles:state.tasks.slice(0,10).map(t=>({id:t.id,title:t.title}))})),'failure observation');}catch(observationError){report.failureObservationError=String(observationError);}throw error;}
  finally{
