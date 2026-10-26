@@ -56,7 +56,6 @@ jobs:
       CHAIN_TEST_SOURCE_SHA: ${{ github.sha }}
       CHAIN_DIAGNOSTIC_MOTION: uncapped-focused
       FROZEN_APP_COMMIT: '937975d4bc09d3e539f796621b4d8e00f4a91408'
-      CHAIN_DIAGNOSTIC_OUTPUT: ${{ runner.temp }}/mobile-frame/native-focused
     steps:
       - uses: actions/checkout@v4
         with:
@@ -79,6 +78,8 @@ jobs:
           fs.mkdirSync(process.env.RUNNER_TEMP+'/mobile-frame',{recursive:true});fs.writeFileSync(process.env.RUNNER_TEMP+'/mobile-frame/source-binding.json',JSON.stringify(report,null,2)+'\n');
           JS
       - name: Diagnose only the four existing failed consumers with original assertions
+        env:
+          CHAIN_DIAGNOSTIC_OUTPUT: ${{ runner.temp }}/mobile-frame/native-focused
         run: node scripts/diagnostic-native-phases.mjs
       - name: Preserve original native outcomes and bounded protocol phases
         if: always()

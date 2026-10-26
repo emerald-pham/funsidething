@@ -24662,5 +24662,44 @@
       "command": "Recorderd8d1bbc6 before primary-failure guard: node --test --test-name-pattern=\"^RISK repository process: expected diagnostic pageerror\" tests.js. Earlier cleanup RED616e7c9a, workflow REDb442f72b and ring RED5949d993 remain immutable.",
       "failure": "Primary unrelated/absent failure matrix returned [true,true,true,true] instead of [false,false,false,false]. GREEN9d8ff2a4 then passes all3 process tests, including reported and caught primary failures. Actual historical raw native report and caught failure still pass the new assessment without reclassifying or rerunning their original scope."
     }
+  },
+  {
+    "baseCommit": "937975d4bc09d3e539f796621b4d8e00f4a91408",
+    "testChangesSha256": "47c40be0a32c3630719bcd9bb8e89ab37d8914b3527ca5a6614c61c495f2beda",
+    "reason": "Repair a real GitHub Actions workflow rejection before any jobs could start; runner context is unavailable in a job-level env mapping.",
+    "previousBehavior": "Hosted run40370530435 rejected workflow line59 col32 with Unrecognized named-value: runner. It created zero jobs and no browser result because CHAIN_DIAGNOSTIC_OUTPUT used runner.temp at job scope.",
+    "intendedBehavior": "Resolve the same private diagnostic output directory in the actual native step env, where runner context is supported; retain branch-only routing, read-only permission,15-minute bounds, original commands and artifact path.",
+    "replacementTests": [
+      "RISK repository process: diagnostic phase workflow is bounded and cannot qualify a partial mobile matrix",
+      "RISK repository process: diagnostic observer retains recent actions after a long setup",
+      "RISK repository process: expected diagnostic pageerror never hides failed cleanup or unrelated errors",
+      "RISK repository process: diagnostic runner paths resolve only after the runner starts"
+    ],
+    "preservedCoverage": [
+      "All existing canonical and diagnostic assertions remain. Application/observer/driver/assessment bytes, workloads, cap, failure thresholds and original negative controls are unchanged.",
+      "The rejected hosted run is preserved as a configuration failure, never an app/runtime outcome. Only this materially repaired workflow is authorized for the replacement diagnostic push."
+    ],
+    "redEvidence": {
+      "command": "Actual hosted40370530435 at exact66351f0 rejected before jobs. Then recorder0560b1c5: node --test --test-name-pattern=\"^RISK repository process: diagnostic runner paths\" tests.js before moving env scope. Official context availability: https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#context-availability",
+      "failure": "Job-level environment cannot use runner context before allocation: actual ${{ runner.temp }}/mobile-frame/native-focused. GREEN15d74b4c passes all4processchecks after moving the same path to the diagnostic native step environment."
+    }
+  },
+  {
+    "baseCommit": "66351f06cea83fc4fa197950abe00af23f4df16e",
+    "testChangesSha256": "f4a31369f2410c3ad711582a12d88c3ff1f41aac1c6e4daa969c31891009e2c4",
+    "reason": "Repair a real GitHub Actions workflow rejection before any jobs could start; runner context is unavailable in a job-level env mapping.",
+    "previousBehavior": "Hosted run40370530435 rejected workflow line59 col32 with Unrecognized named-value: runner. It created zero jobs and no browser result because CHAIN_DIAGNOSTIC_OUTPUT used runner.temp at job scope.",
+    "intendedBehavior": "Resolve the same private diagnostic output directory in the actual native step env, where runner context is supported; retain branch-only routing, read-only permission,15-minute bounds, original commands and artifact path.",
+    "replacementTests": [
+      "RISK repository process: diagnostic runner paths resolve only after the runner starts"
+    ],
+    "preservedCoverage": [
+      "All existing canonical and diagnostic assertions remain. Application/observer/driver/assessment bytes, workloads, cap, failure thresholds and original negative controls are unchanged.",
+      "The rejected hosted run is preserved as a configuration failure, never an app/runtime outcome. Only this materially repaired workflow is authorized for the replacement diagnostic push."
+    ],
+    "redEvidence": {
+      "command": "Actual hosted40370530435 at exact66351f0 rejected before jobs. Then recorder0560b1c5: node --test --test-name-pattern=\"^RISK repository process: diagnostic runner paths\" tests.js before moving env scope. Official context availability: https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#context-availability",
+      "failure": "Job-level environment cannot use runner context before allocation: actual ${{ runner.temp }}/mobile-frame/native-focused. GREEN15d74b4c passes all4processchecks after moving the same path to the diagnostic native step environment."
+    }
   }
 ]

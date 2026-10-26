@@ -46345,3 +46345,12 @@ test('RISK repository process: expected diagnostic pageerror never hides failed 
  const thrownResults=primaryFaults.map(failure=>assessPageerrorControl(clean(),failure).detectorPassed);
  assert.deepEqual(thrownResults,[false,false,false,false],'The wrapper must retain and check its actual caught failure as well as the report');
 });
+
+test('RISK repository process: diagnostic runner paths resolve only after the runner starts',async()=>{
+ const {parse}=await import('yaml'),workflow=parse(fs.readFileSync(path.join(__dirname,'.github/workflows/data-safety.yml'),'utf8'));
+ // GitHub context availability forbids runner in jobs.<job_id>.env; the real
+ // hosted parser rejected this carrier before creating any jobs.
+ for(const job of Object.values(workflow.jobs))for(const value of Object.values(job.env||{}))assert.doesNotMatch(String(value),/\$\{\{\s*runner\b/,'Job-level environment cannot use runner context before allocation');
+ const step=workflow.jobs['diagnostic-native-focused'].steps.find(step=>step.run==='node scripts/diagnostic-native-phases.mjs');
+ assert.equal(step.env.CHAIN_DIAGNOSTIC_OUTPUT,'${{ runner.temp }}/mobile-frame/native-focused','The native output path is resolved in the supported step environment');
+});

@@ -2369,3 +2369,4 @@ The pinned Linux x64 reader preserves the raw AT_PAGESZ witness and binds it to 
 - RISK repository process: diagnostic phase workflow is bounded and cannot qualify a partial mobile matrix
 - RISK repository process: diagnostic observer retains recent actions after a long setup
 - RISK repository process: expected diagnostic pageerror never hides failed cleanup or unrelated errors
+- RISK repository process: diagnostic runner paths resolve only after the runner starts

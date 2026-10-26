@@ -13191,6 +13191,11 @@
       "root": "RISK repository process: expected diagnostic pageerror never hides failed cleanup or unrelated errors",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: diagnostic runner paths resolve only after the runner starts",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [
