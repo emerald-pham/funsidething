@@ -20153,5 +20153,28 @@
       "command": "Immutable recorder attempts in .git/agent-test-runs/issue-283/runs use node --test --test-name-pattern for each RISK JSON COPY PASTE or RISK DATABASE REPAIR EXPORT vertical consumer slice; exact commands, times, source identities and stdout/stderr are retained.",
       "failure": "Before each corresponding implementation: current-board control899563d6; board FAQdfa883d8; combined Settings control2210b578; unavailable/failed IDB and local sourcee2b8c485 (all3 false vs true); duplicate-control10ec7d35; expired diagnostic-original98fd9ee7 (null vs original); cancelled-view73507e40 (true vs false); repair FAQ0a2bee63. Worker attempt4711f3fb had an incomplete service-worker fixture and is not feature RED. Provisional worker capture was tried then withdrawn; corrected later-baseline-sensitivityf11abde0 observed null vs worker identity before final bounded read-only capture. This is not claimed as original RED; combined export original RED remains2210b578. GREENdd5b5fa1 passed combined consumers afterward. Earlier archive-only draft results are development evidence and its code/tests were discarded. Extended round-tripff4051ad and database fixture3611ae89 failures were fixture corrections, not product failures; corrected8c0614c0 and2e9aa016 passed without importer/runtime repairs. Independent Standards review found adjacent reload help still advertised removed Copy debug log. New mounted FAQ REDd5060f2e preceded the copy repair; GREEN60f7bb18 passed the new check and unchanged FAQ brevity gate. The old reload facts, retention limits, privacy, save-priority and no-crash-inference boundaries remain."
     }
+  },
+  {
+    "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3",
+    "testChangesSha256": "1709ce4d4b76dd3b17ec319594cbed5b4932674b1af9b685a50538ac5d89c439",
+    "reason": "The user reports that the installed iPhone app opens a broken board with an alarming recovery-pending badge before the board appears. A synthetic real-consumer RED shows that startup status presents a durable recovery hold before board hydration; rendered consumers also found a stale cached status and clipped enlarged syncing text.",
+    "previousBehavior": "Before board hydration, renderSync displayed recovery pending even while the saved board was still being opened. A saved inert appearance kept its old syncing label after a live cloud initialization error, and its fixed-width busy badge clipped enlarged text.",
+    "intendedBehavior": "Before hydration, configured non-error cloud status says disabled syncing with an explicit board-opening and unconfirmed-cloud title. Real errors remain visible. The saved appearance mirrors live status while remaining inert and hidden from assistive navigation; a genuine post-hydration recovery hold remains visible. At 18px, status text fits within the viewport beside Settings. Help distinguishes board opening, cloud confirmation and genuine warnings.",
+    "replacementTests": [
+      "RISK AUTH HYDRATION: a broken device board stays quiet until protected local recovery is visible",
+      "RISK saved view broken-board startup: prior appearance stays inert until the recovered board opens",
+      "RISK saved view broken-board status: configured cloud changes remain visible in the saved appearance and after recovery",
+      "RISK saved view broken-board guidance: opening status does not imply cloud confirmation or erase recovery warnings"
+    ],
+    "preservedCoverage": [
+      "The existing device recovery preserves its exact malformed source, durable hold, and supported recovered board; the browser fixture validates separate readable local sources, exact preserved copies, and actual hydration before accepting the recovered tasks.",
+      "A genuine earlier recovery-pending appearance is seeded through protected local recovery. Its hold is cleared only with expected-head and expected-hold compare-and-set inside the isolated test database before a second independent broken-head recovery.",
+      "The saved preview remains inert and aria-hidden through live status mirroring; account-switch masking, missing-appearance fallback, safe recovery authority, real error controls, and post-hydration hold assertions remain.",
+      "The configured synthetic browser matrix covers Chromium and WebKit, light and dark themes, narrow and wide viewports, natural startup status before manual events, enlarged 18px labels, and neighboring Settings bounds. No private board, account, production storage, or physical iPhone is used."
+    ],
+    "redEvidence": {
+      "command": "Recorder-backed node --test focused RISK consumer attempts in /Users/emeraldpham/Documents/GitHub/funsidething/.git/agent-test-runs/quiet-board-startup; original Node RED c45a9f5c-04b6-42a1-8afb-e885177a9b01, later status RED 2026-10-26T23-24-58-643Z-f8199d26-8906-4779-8277-db009f78a736, enlarged-text RED 2026-10-26T23-29-18-278Z-514da5b9-27a7-4e49-bc2a-cb83e6219756, FAQ RED 2026-10-26T23-33-23-531Z-10561260-d608-433a-b16a-48a189094e84.",
+      "failure": "The original real consumer returned recovery pending instead of syncing while state was null. The later rendered baseline showed a genuine cloud init error in the live header but stale syncing in the cached appearance. At 390px and 18px, the busy label needed 95px but had 86px. The new FAQ assertion failed because Help did not distinguish opening status from cloud confirmation or preserve warning expectations. Recorder outputs preserve these assertion-level failures; later rendered status and Help checks passed."
+    }
   }
 ]

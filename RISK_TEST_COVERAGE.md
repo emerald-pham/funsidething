@@ -145,6 +145,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK AUTH RESTORE: configured startup stays syncing until Firebase resolves the actual session
 - RISK AUTH RESTORE: remembered boards show syncing in header and Settings while restoration is pending
 - RISK AUTH HYDRATION: real Auth and native resume wait for the durable board, then reconcile once
+- RISK AUTH HYDRATION: a broken device board stays quiet until protected local recovery is visible
 - RISK AUTH HYDRATION: a corrupt device-head read protects exact originals before supported local recovery releases hydration
 - RISK AUTH HYDRATION: extended FAQ and current Changelog explain the saved-board wait
 
@@ -1269,6 +1270,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK saved view invisible fallback: corrupt oversized untrusted and blocked projections never become board authority
 - RISK saved view guidance: Quick start and Changelog describe this-device restoration and current dates
 - RISK saved view guidance qualification: FAQ and current release note promise an appearance only when available
+- RISK saved view broken-board guidance: opening status does not imply cloud confirmation or erase recovery warnings
 - RISK bulk toolbar guidance: extended FAQ describes frozen controls and rank-slot selection
 - RISK repository process boundary: actual visual tests compare every changed control with neighboring controls and scrolled states
 

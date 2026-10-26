@@ -1083,8 +1083,14 @@ test('RISK unreadable device recovery: Quick start and current Changelog explain
  assert.ok(answer,'the extended FAQ covers unreadable missing unsupported and partial device sources');
  assert.match(answer,/one Restore action.*choose a JSON file or Paste JSON/i);assert.match(answer,/Download backup offers Raw device sources/i);
  assert.match(answer,/not an empty recovered board/);assert.match(answer,/Cloud recovery stays pending/);
+ assert.match(answer,/While the saved board is opening, the header says syncing and stays disabled unless a real cloud error needs attention\./);
+ assert.match(answer,/recovery hold remains until a validated source choice confirms cloud saving/);
  assert.match(html,/one guarded Restore action for a file or pasted JSON/,'the current changelog describes the consolidated restore route');
  assert.match(html,/unreadable device data offers a source-only archive/,'the current changelog preserves the raw-source recovery limit');
+ const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1]||'';
+ assert.match(current,/A recovered board now opens before the header shows recovery pending/);
+ assert.match(current,/Real cloud errors stay visible/);
+ assert.match(current,/saved-source hold remains until a validated source choice confirms cloud saving/);
 });
 
 test('RISK unreadable device recovery: partial raw rows remain exact while the restored board accepts later local edits',async t=>{
@@ -7962,6 +7968,41 @@ test('RISK AUTH RESTORE: remembered boards show syncing in header and Settings w
   ctx.openSettings();assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/sign in from the header/);
   CS.ready=true;ctx.renderSync();assert.equal(button.textContent,'☁ sign in');assert.equal(button.disabled,false);
   CS.status='error';CS.errorStage='auth-storage';ctx.renderSync();assert.equal(button.textContent,'☁ error','real auth failures remain visible');
+});
+
+test('RISK AUTH HYDRATION: a broken device board stays quiet until protected local recovery is visible',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),factory=new IDBFactory(),deviceDbName='broken-board-hydration-'+Date.now()+'-'+Math.random(),broken='{broken saved device board',
+  board=syncState({tasks:[syncTask('recovered-phone-board','Saved iPhone board')],futureSaved:{keep:['exact',31]}}),raw=JSON.stringify(board),
+  storage=sharedScannerStorage({[DEVICE_AUTHORITY_KEY]:'1',[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}),seed=loadStorageV2({indexedDB:factory}).createDeviceStore({indexedDB:factory,crypto:webcrypto,dbName:deviceDbName});
+ await seed.open();assert.equal((await seed.commitHead({expectedHash:null,payload:broken,account:null})).ok,true);const before=await seed.readRawExportSnapshot();await seed.close();
+ const control={};let holdReads=0;control.afterHoldRead=()=>{if(++holdReads===2)control.stallRawRead=true;};
+ let app,ctx,shim;const loading=loadApp({sharedStorage:storage,indexedDBProvider:deviceFaultProvider187(factory,control),deviceDbName,navigatorProvider:{onLine:false},
+  cloudSyncFactory:()=>({configured:true,ready:false,user:null,status:'syncing',errorStage:null,errorCode:null}),
+  beforeStateReady(context,host){ctx=context;shim=host;}}).then(value=>app=value);
+ t.after(async()=>{control.releaseRawRead?.();try{await loading;}finally{await app?.dispose();await seed.close();}});
+ const deadline=Date.now()+4000;while(!control.releaseRawRead&&Date.now()<deadline)await new Promise(resolve=>setTimeout(resolve,2));
+ assert.ok(control.releaseRawRead,'startup reaches the existing raw IndexedDB verification read after committing recovery');
+ assert.equal(holdReads,2,'the hold has been durably reread before verification pauses');
+ assert.equal(ctx.state,null,'the recovered board is not hydrated yet');
+ assert.equal(ctx.window.ScannerDeviceRecoveryHold?.reason,'device-source-recovery','startup has a genuine durable recovery hold');
+ const button=shim.document.getElementById('syncBtn');ctx.renderSync();const directStatus=button.textContent;shim.window.dispatchEvent({type:'cloudsync'});
+ assert.deepEqual({directStatus,eventStatus:button.textContent},{directStatus:'☁ syncing',eventStatus:'☁ syncing'},'the recovery badge waits for hydration regardless of event order');
+ assert.equal(button.disabled,true,'cloud actions remain unavailable while the board is opening');
+ const cloud=shim.window.CloudSync;cloud.status='error';cloud.errorStage='init';cloud.errorCode='unavailable';shim.window.dispatchEvent({type:'cloudsync'});
+ assert.equal(button.textContent,'☁ error','a real cloud initialization error remains visible during board hydration');
+ control.releaseRawRead();await loading;
+ assert.deepEqual(Array.from(ctx.state.tasks,row=>row.id),['recovered-phone-board']);assert.deepEqual(JSON.parse(JSON.stringify(ctx.state.futureSaved)),{keep:['exact',31]});
+ assert.equal(ctx.window.ScannerDeviceRecoveryHold?.reason,'device-source-recovery','hydration does not clear the genuine recovery hold');
+ assert.equal(button.textContent,'☁ error','the real cloud error remains visible after the board loads');
+ cloud.status='syncing';shim.window.dispatchEvent({type:'cloudsync'});
+ assert.equal(button.textContent,'☁ recovery pending','the genuine hold becomes visible once the recovered board is ready');
+ assert.equal(storage.getItem(SYNC_STORE_KEY),raw,'the source browser copy stays byte-for-byte unchanged');
+ assert.equal(storage.getItem(LOCAL_HEAD_KEY),raw,'the source browser head stays byte-for-byte unchanged');
+ const head=await app.ctx.window.ScannerDeviceStore.readHead();assert.equal(head.payload,JSON.stringify(ctx.state),'only the supported recovered board becomes the durable working head');
+ const hold=await app.ctx.window.ScannerDeviceStore.getRecoveryCloudHold(),archive=(await app.ctx.window.ScannerDeviceStore.listOpaqueArchives()).find(row=>row.key===hold.originalKey);
+ assert.ok(archive);const captured=JSON.parse(archive.raw).indexedDB,brokenHash=await app.ctx.window.ChainStorageV2.hashPayload(broken),
+  protectedSnapshot=captured.snapshots.find(row=>decodeManualArchiveTypedValue(row.key)===brokenHash);
+ assert.equal(decodeManualArchiveTypedValue(protectedSnapshot?.value)?.payload,broken,'the malformed original remains protected exactly');
 });
 
 test('RISK AUTH HYDRATION: real Auth and native resume wait for the durable board, then reconcile once',async()=>{
@@ -15681,6 +15722,17 @@ test('RISK saved view guidance qualification: FAQ and current release note promi
  });
 });
 
+test('RISK saved view broken-board guidance: opening status does not imply cloud confirmation or erase recovery warnings',async()=>{
+ const {ctx,shim}=await loadApp();for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ const answer=help.split('<dt>What does All Tasks remember when I reopen?</dt><dd>')[1]?.split('</dd>')[0]||'';
+ assert.match(answer,/An earlier saved appearance can remain visible, but it is read-only until a supported saved board opens\./i);
+ assert.match(answer,/The temporary “syncing” label means the board is still opening; it does not confirm cloud saving\./i);
+ assert.match(answer,/Real cloud errors and recovery warnings remain visible\./i);
+ const chapter=help.split('<details class="help-faq" data-help-changelog>')[1]?.split('</details>')[0]||'';
+ assert.ok(chapter.includes('<h3>October 26, 2026</h3>'),'the current dated release note is visible in Help');
+ assert.ok(chapter.includes('<li>When a saved board needs recovery, its earlier appearance can remain visible while the app checks preserved local copies. The temporary syncing label means the board is still opening, not that cloud saving is confirmed; genuine errors and recovery warnings remain visible.</li>'),'the changelog distinguishes opening status, cloud confirmation and real recovery warnings');
+});
+
 async function delayedLocalBoardBrowser(viewport={width:390,height:844},dispatchResizeDuringLoad=false,theme='system'){
  const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||process.env.LANDSCAPE_PLAYWRIGHT||'playwright');
  const browser=await chromium.launch({headless:true,channel:process.env.LANDSCAPE_BROWSER_CHANNEL||'chrome'});
@@ -15740,12 +15792,20 @@ async function delayedLocalBoardBrowser(viewport={width:390,height:844},dispatch
  return {browser,context,page,early,ready,errors};
 }
 
-async function invisibleSavedViewBrowser(theme='light',delayAppearanceAsset=false,keepHeader=false,viewport={width:390,height:844},activeScanner=false){
- const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||process.env.LANDSCAPE_PLAYWRIGHT||'playwright');
- const browser=await chromium.launch({headless:true,channel:process.env.LANDSCAPE_BROWSER_CHANNEL||'chrome'});
+async function invisibleSavedViewBrowser(theme='light',delayAppearanceAsset=false,keepHeader=false,viewport={width:390,height:844},activeScanner=false,startupOptions={}){
+ const {chromium,webkit}=await import(process.env.PLAYWRIGHT_MODULE||process.env.LANDSCAPE_PLAYWRIGHT||'playwright');
+ const engineName=startupOptions.browserEngine==='webkit'?'webkit':'chromium',engine=engineName==='webkit'?webkit:chromium,
+  evidencePrefix=startupOptions.brokenDeviceBoard?`broken-board-${engineName}-${theme}-${viewport.width}-${startupOptions.retainAppearance===false?'without-appearance':'with-appearance'}`:`invisible-${theme}`;
+ const browser=await engine.launch(engineName==='webkit'?{headless:true}:{headless:true,channel:process.env.LANDSCAPE_BROWSER_CHANNEL||'chrome'});
+ try{
  const context=await browser.newContext({viewport,serviceWorkers:'block',reducedMotion:'reduce'});
  const origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
  await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+ if(startupOptions.syntheticCloud)await context.addInitScript(()=>{
+  let cloud={configured:true,ready:false,user:null,status:'syncing',errorStage:null,errorCode:null,
+   signIn(){},signOut(){},async pull(){return{error:true};},async push(){return{error:true};}};
+  Object.defineProperty(window,'CloudSync',{configurable:true,enumerable:true,get:()=>cloud,set:value=>{if(value?.configured!==false)cloud=value;}});
+ });
  if(delayAppearanceAsset)await context.route('**/saved-appearance.js',async route=>{await new Promise(resolve=>setTimeout(resolve,600));await route.continue();});
  await context.addInitScript(theme=>{
   Object.defineProperty(window,'FIREBASE_CONFIG',{value:null,writable:false});
@@ -15759,9 +15819,11 @@ async function invisibleSavedViewBrowser(theme='light',delayAppearanceAsset=fals
    Object.defineProperty(request,'onsuccess',{configurable:true,get:()=>listener,set:fn=>{listener=fn;success.set.call(request,event=>setTimeout(()=>{window.__actualLocalRead.settled=true;fn?.call(request,event);},1800));}});return request;};
  },theme);
  const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
- await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
- await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true');
- await page.evaluate(async()=>{document.getElementById('motionDialog')?.close();closeModal();state.seenQuickStart=true;state.addOpen=false;state.histOpen=false;state.settings.theme=localStorage.getItem('fvp:chain-scanner:theme');
+ await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded',timeout:10000});
+ await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true',null,{timeout:10000});
+ await page.waitForFunction(()=>!!document.querySelector('#modalRoot [data-act="ok-quickstart"]'),null,{timeout:10000});
+ await page.locator('#modalRoot [data-act="ok-quickstart"]').click();
+ await page.evaluate(async()=>{document.getElementById('motionDialog')?.close();state.addOpen=false;state.histOpen=false;state.settings.theme=localStorage.getItem('fvp:chain-scanner:theme');
   for(let i=0;i<65;i++)addTask('Saved appearance task '+String(i).padStart(2,'0'));
   addTask('Unmatched control task');save();await persist();render();});
  if(activeScanner)await page.locator('[data-act="start-scan"]').first().click();
@@ -15771,15 +15833,67 @@ async function invisibleSavedViewBrowser(theme='light',delayAppearanceAsset=fals
  await page.locator('[data-act="list-eligibility"][data-id="all"]').click();
  await page.locator('#listSearch').fill('Saved appearance');
  await page.locator('#listBody').evaluate(e=>{e.scrollTop=420;e.dispatchEvent(new Event('scroll'));});
- await page.evaluate(()=>{window.scrollTo(0,220);window.dispatchEvent(new Event('pagehide'));localStorage.setItem('__delayLocalRead','true');});
- if(process.env.SAVED_VIEW_ARTIFACT_DIR)await page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`invisible-before-${theme}.png`)});
- const before=await page.evaluate(()=>({query:document.getElementById('listSearch').value,scroll:document.getElementById('listBody').scrollTop,pageY:scrollY,geometry:(()=>{const rect=id=>{const r=document.getElementById(id).getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height};};return{scan:rect('scan'),list:rect('listWrap'),body:rect('listBody'),separators:document.querySelectorAll('#scan hr.sep').length};})(),visibleTitles:(()=>{const body=document.getElementById('listBody'),r=body.getBoundingClientRect();return[...body.querySelectorAll('.trow')].filter(e=>{const b=e.getBoundingClientRect();return b.bottom>r.top&&b.top<Math.min(r.bottom,innerHeight);}).map(e=>e.querySelector('.tt')?.textContent);})(),header:(()=>{const r=document.getElementById('appHeader').getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height};})(),tasks:JSON.stringify(state.tasks),cache:localStorage.getItem('fvp:chain-scanner:appearance:v1')}));
+ const startup=await page.evaluate(async({brokenDeviceBoard,retainAppearance,topOfPage,seedPriorRecoveryAppearance})=>{
+  window.scrollTo(0,topOfPage?0:220);window.dispatchEvent(new Event('pagehide'));
+  let brokenPayload=null;
+  if(brokenDeviceBoard){
+   brokenPayload='{broken durable device board';
+   const sourceBoard=JSON.parse(JSON.stringify(state));
+   if(sourceBoard.settings?.theme==null)sourceBoard.settings.theme='system';
+   const source=JSON.stringify(sourceBoard);
+   const checked=cloudSourceRecoveryBoard(source,state.syncAccount??null);
+   window.__brokenBoardSourceCheck={account:state.syncAccount??null,hasSyncAccount:Object.hasOwn(state,'syncAccount'),hasSyncIdentity:Object.hasOwn(state,'syncIdentity'),
+    board:!!checked.board,sourceIssue:checked.issue||null,automaticIssue:checked.board?automaticRecoveryBoardIssue(checked.board,state.syncAccount??null):null,
+    projectionIssue:checked.board?decisionProjectionIssue(checked.board):null,taskCount:sourceBoard.tasks.length};
+   localStorage.setItem('fvp:chain-scanner:v1',source);
+   localStorage.setItem('fvp:chain-scanner:protected:v1',source);
+   const deadline=promise=>Promise.race([promise,new Promise((_,reject)=>setTimeout(()=>reject(Error('Fixture device-store operation exceeded five seconds')),5000))]);
+   const head=await deadline(window.ScannerDeviceStore.readHead());
+   const committed=await deadline(window.ScannerDeviceStore.commitHead({expectedHash:head.hash,payload:brokenPayload,account:null}));
+   if(!committed.ok)throw Error('Could not seed the malformed durable board');
+  }
+  if(!retainAppearance){localStorage.removeItem('fvp:chain-scanner:appearance:v1');localStorage.removeItem('fvp:chain-scanner:saved-view:v1');}
+  if(!seedPriorRecoveryAppearance)localStorage.setItem('__delayLocalRead','true');
+  return{brokenPayload,sourceCheck:window.__brokenBoardSourceCheck||null};
+ },{brokenDeviceBoard:startupOptions.brokenDeviceBoard===true,retainAppearance:startupOptions.retainAppearance!==false,topOfPage:startupOptions.topOfPage===true,seedPriorRecoveryAppearance:startupOptions.seedPriorRecoveryAppearance===true});
+ if(startupOptions.retainAppearance===false)await page.addInitScript(()=>{localStorage.removeItem('fvp:chain-scanner:appearance:v1');localStorage.removeItem('fvp:chain-scanner:saved-view:v1');});
+ if(startupOptions.seedPriorRecoveryAppearance){
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true',null,{timeout:15000});
+  await page.waitForFunction(()=>{
+   const record=JSON.parse(localStorage.getItem('fvp:chain-scanner:appearance:v1')||'null'),find=node=>{if(!node||typeof node!=='object')return null;if(node.t==='button'&&typeof node.c==='string'&&node.c.split(/\s+/).includes('syncbtn'))return node;for(const child of node.n||[]){const found=find(child);if(found)return found;}return null;},button=find(record?.tree);
+   return button?.c?.split(/\s+/).includes('err')&&button?.n?.some(child=>child==='☁ recovery pending');
+  },null,{timeout:8000});
+  const priorRecovery=await page.evaluate(async()=>{
+   const hold=await window.ScannerDeviceStore?.getRecoveryCloudHold?.(),record=JSON.parse(localStorage.getItem('fvp:chain-scanner:appearance:v1')||'null'),find=node=>{
+    if(!node||typeof node!=='object')return null;if(node.t==='button'&&typeof node.c==='string'&&node.c.split(/\s+/).includes('syncbtn'))return node;
+    for(const child of node.n||[]){const found=find(child);if(found)return found;}return null;
+   },button=find(record?.tree);
+   return{hold,ready:document.documentElement.dataset.appReady==='true',status:document.getElementById('syncBtn')?.textContent||null,
+    taskCount:state?.tasks?.length||0,appearanceStatus:button?.n?.filter(child=>typeof child==='string').join('')||null,
+    appearanceDisabled:button?.d??false,appearanceClass:button?.c||null,appearanceVisible:!!record};
+  });
+  const priorHoldCleared=await page.evaluate(async malformed=>{
+   const head=await window.ScannerDeviceStore.readHead(),hold=await window.ScannerDeviceStore.getRecoveryCloudHold();
+   if(!hold||hold.reason!=='device-source-recovery')throw Error('The prior recovery hold is unavailable for the isolated second-startup fixture');
+   const cleared=await window.ScannerDeviceStore.clearRecoveryCloudHold({expectedHeadHash:head.hash,expectedHold:hold});
+   if(!cleared)throw Error('Could not safely close the prior fixture recovery hold before seeding a new damaged head');
+   const result=await window.ScannerDeviceStore.commitHead({expectedHash:head.hash,payload:malformed,account:null});
+   if(!result.ok)throw Error('Could not reseed the malformed durable board after capturing the prior recovery hold');
+   localStorage.setItem('__delayLocalRead','true');window.dispatchEvent(new Event('pagehide'));
+   return true;
+  },startup.brokenPayload);
+  startup.priorRecovery={...priorRecovery,fixtureHoldSafelyCleared:priorHoldCleared};
+ }
+ if(process.env.SAVED_VIEW_ARTIFACT_DIR)await page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`${evidencePrefix}-before.png`)});
+ const before=await page.evaluate(()=>({query:document.getElementById('listSearch').value,scroll:document.getElementById('listBody').scrollTop,pageY:scrollY,geometry:(()=>{const rect=id=>{const r=document.getElementById(id).getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height};};return{scan:rect('scan'),list:rect('listWrap'),body:rect('listBody'),separators:document.querySelectorAll('#scan hr.sep').length};})(),visibleTitles:(()=>{const body=document.getElementById('listBody'),r=body.getBoundingClientRect();return[...body.querySelectorAll('.trow')].filter(e=>{const b=e.getBoundingClientRect();return b.bottom>r.top&&b.top<Math.min(r.bottom,innerHeight);}).map(e=>e.querySelector('.tt')?.textContent);})(),header:(()=>{const r=document.getElementById('appHeader').getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height};})(),tasks:JSON.stringify(state.tasks),sourceCopies:{legacy:localStorage.getItem('fvp:chain-scanner:v1'),localHead:localStorage.getItem('fvp:chain-scanner:protected:v1')},cache:localStorage.getItem('fvp:chain-scanner:appearance:v1')}));
  await page.reload({waitUntil:'domcontentloaded'});
- await page.waitForFunction(()=>window.__actualLocalRead?.started);
- const early=await page.evaluate(()=>{const preview=document.querySelector('[data-saved-preview]'),list=preview?.querySelector('[data-preview-id="listBody"]'),search=preview?.querySelector('[data-preview-id="listSearch"]');return{settled:window.__actualLocalRead.settled,ready:document.documentElement.dataset.appReady,previewVisible:!!preview&&getComputedStyle(preview).visibility==='visible',rows:[...(list?.querySelectorAll('.trow')||[])].map(e=>e.textContent),query:search?.value,listScroll:list?.scrollTop,pageY:scrollY,geometry:(()=>{const rect=id=>{const r=preview?.querySelector('[data-preview-id="'+id+'"]')?.getBoundingClientRect();return r?{x:r.x,y:r.y,width:r.width,height:r.height}:null;};return{scan:rect('scan'),list:rect('listWrap'),body:rect('listBody'),separators:preview?.querySelectorAll('hr.sep').length||0};})(),visibleTitles:(()=>{if(!list)return[];const r=list.getBoundingClientRect();return[...list.querySelectorAll('.trow')].filter(e=>{const b=e.getBoundingClientRect();return b.bottom>r.top&&b.top<Math.min(r.bottom,innerHeight);}).map(e=>e.querySelector('.tt')?.textContent);})(),header:(()=>{const r=preview?.querySelector('[data-preview-id="appHeader"]')?.getBoundingClientRect();return r?{x:r.x,y:r.y,width:r.width,height:r.height}:null;})(),status:document.getElementById('startupStatus')?.textContent||null,theme:document.documentElement.dataset.theme,colorScheme:getComputedStyle(document.documentElement).colorScheme,duplicateIds:[...document.querySelectorAll('[id]')].map(e=>e.id).filter((id,i,all)=>all.indexOf(id)!==i),activeActions:preview?.querySelectorAll('[data-act],[href],[onclick],[onerror]').length||0};});
- if(process.env.SAVED_VIEW_ARTIFACT_DIR)await page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`invisible-early-${theme}.png`)});
- if(process.env.SAVED_VIEW_ARTIFACT_DIR)fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`probe-${theme}.json`),JSON.stringify({before:{...before,cache:JSON.parse(before.cache||'null')},early},null,2));
- return {browser,context,page,errors,before,early};
+ await page.waitForFunction(()=>window.__actualLocalRead?.started,null,{timeout:10000});
+ const early=await page.evaluate(()=>{const preview=document.querySelector('[data-saved-preview]'),list=preview?.querySelector('[data-preview-id="listBody"]'),search=preview?.querySelector('[data-preview-id="listSearch"]'),status=(button)=>{if(!button)return null;const box=button.getBoundingClientRect(),style=getComputedStyle(button);return{text:button.textContent,disabled:button.disabled,hidden:button.hidden,visibility:style.visibility,fontSize:style.fontSize,clientWidth:button.clientWidth,scrollWidth:button.scrollWidth,box:{x:box.x,y:box.y,width:box.width,height:box.height}};},liveSync=document.getElementById('syncBtn'),projectedSync=preview?.querySelector('.syncbtn'),liveSettings=document.querySelector('#appHeader [data-act="settings"]'),projectedSettings=preview?.querySelector('.topbtns .ghost:last-child');return{settled:window.__actualLocalRead.settled,ready:document.documentElement.dataset.appReady==='true',shellVisibility:getComputedStyle(document.querySelector('.wrap')).visibility,previewVisible:!!preview&&getComputedStyle(preview).visibility==='visible',rows:[...(list?.querySelectorAll('.trow')||[])].map(e=>e.textContent),query:search?.value,listScroll:list?.scrollTop,pageY:scrollY,geometry:(()=>{const rect=id=>{const r=preview?.querySelector('[data-preview-id="'+id+'"]')?.getBoundingClientRect();return r?{x:r.x,y:r.y,width:r.width,height:r.height}:null;};return{scan:rect('scan'),list:rect('listWrap'),body:rect('listBody'),separators:preview?.querySelectorAll('hr.sep').length||0};})(),visibleTitles:(()=>{if(!list)return[];const r=list.getBoundingClientRect();return[...list.querySelectorAll('.trow')].filter(e=>{const b=e.getBoundingClientRect();return b.bottom>r.top&&b.top<Math.min(r.bottom,innerHeight);}).map(e=>e.querySelector('.tt')?.textContent);})(),header:(()=>{const r=preview?.querySelector('[data-preview-id="appHeader"]')?.getBoundingClientRect();return r?{x:r.x,y:r.y,width:r.width,height:r.height}:null;})(),sync:{live:status(liveSync),projection:status(projectedSync),settings:status(liveSettings),projectionSettings:status(projectedSettings)},status:document.getElementById('startupStatus')?.textContent||null,theme:document.documentElement.dataset.theme,colorScheme:getComputedStyle(document.documentElement).colorScheme,duplicateIds:[...document.querySelectorAll('[id]')].map(e=>e.id).filter((id,i,all)=>all.indexOf(id)!==i),activeActions:preview?.querySelectorAll('[data-act],[href],[onclick],[onerror]').length||0};});
+ if(process.env.SAVED_VIEW_ARTIFACT_DIR)await page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`${evidencePrefix}-early.png`)});
+ if(process.env.SAVED_VIEW_ARTIFACT_DIR)fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`${evidencePrefix}-probe.json`),JSON.stringify({before:{...before,cache:JSON.parse(before.cache||'null')},early},null,2));
+ return {browser,context,page,errors,before,early,startup};
+ }catch(error){await browser.close();throw error;}
 }
 
 test('RISK saved view invisible startup: real IndexedDB reload paints the prior populated search and position without loading chrome',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
@@ -15801,10 +15915,139 @@ test('RISK saved view invisible startup: real IndexedDB reload paints the prior 
    await view.page.keyboard.press('Delete');await view.page.keyboard.press('y');
    await view.page.locator('[data-saved-preview]').dispatchEvent('click');
    if(process.env.SAVED_VIEW_ARTIFACT_DIR){fs.mkdirSync(process.env.SAVED_VIEW_ARTIFACT_DIR,{recursive:true});await view.page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`invisible-pending-${theme}.png`)});}
-   await view.page.waitForFunction(()=>document.documentElement.dataset.appReady==='true');
+   await view.page.waitForFunction(()=>document.documentElement.dataset.appReady==='true',null,{timeout:10000});
    const ready=await view.page.evaluate(()=>({query:document.getElementById('listSearch').value,scroll:document.getElementById('listBody').scrollTop,pageY:scrollY,rows:document.querySelectorAll('#listBody .trow').length,tasks:JSON.stringify(state.tasks),preview:!!document.querySelector('[data-saved-preview]')}));
    assert.equal(ready.query,'Saved appearance');assert.equal(ready.rows,65);assert.equal(ready.tasks,view.before.tasks,'early clicks and shortcuts cannot mutate the pending board');assert.equal(ready.preview,false);
    assert.ok(Math.abs(ready.scroll-view.before.scroll)<2);assert.ok(Math.abs(ready.pageY-view.before.pageY)<2);
+   assert.deepEqual(view.errors,[]);
+  }finally{await view.browser.close();}
+ }
+});
+
+test('RISK saved view broken-board startup: prior appearance stays inert until the recovered board opens',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ for(const retainAppearance of [true,false]){
+  const view=await invisibleSavedViewBrowser('light',false,false,{width:390,height:844},false,{brokenDeviceBoard:true,retainAppearance});
+  try{
+   assert.ok(view.startup.brokenPayload,'the real durable device head was replaced with a malformed board fixture');
+   assert.equal(view.startup.sourceCheck?.board,true,'the retained local board independently passes the app recovery-source validator; '+JSON.stringify(view.startup.sourceCheck));
+   assert.deepEqual(Object.values(view.before.sourceCopies).map(raw=>JSON.parse(raw).tasks.length),[66,66],'two distinct supported browser sources retain the prior working board independently of the appearance');
+   assert.equal(view.early.settled,false,'the real device-store open is still pending when startup is inspected');
+   assert.equal(view.early.ready,false,'the application has not declared the broken board open yet');
+   assert.equal(view.early.status,null,'no recovery or cloud claim is made before the source is read');
+   if(retainAppearance){
+    assert.equal(view.early.previewVisible,true,'an existing saved appearance remains visible while the broken durable head is being checked');
+    assert.ok(view.early.rows.length>0&&view.early.rows.every(text=>text.includes('Saved appearance task')),'the visible projection contains only the previous task appearance');
+    assert.equal(view.early.activeActions,0,'the cached projection remains inert and cannot act as recovered board authority');
+   }else{
+    assert.equal(view.early.previewVisible,false,'a missing saved appearance is not invented');
+    assert.equal(view.early.shellVisibility,'hidden','the normal empty shell stays hidden until the supported local source opens');
+   }
+   await view.page.waitForFunction(()=>document.documentElement.dataset.appReady==='true');
+   const ready=await view.page.evaluate(async()=>({rows:document.querySelectorAll('#listBody .trow').length,taskCount:state.tasks.length,taskIds:state.tasks.map(task=>task.id),query:document.getElementById('listSearch').value,listOpen:!document.getElementById('listBody').hidden,tasks:JSON.stringify(state.tasks),preview:!!document.querySelector('[data-saved-preview]'),recoveryHold:await window.ScannerDeviceStore?.getRecoveryCloudHold?.()||null,head:await window.ScannerDeviceStore?.readHead?.()||null,sourceCopies:{legacy:localStorage.getItem('fvp:chain-scanner:v1'),localHead:localStorage.getItem('fvp:chain-scanner:protected:v1')}}));
+   if(process.env.SAVED_VIEW_ARTIFACT_DIR){
+    fs.mkdirSync(process.env.SAVED_VIEW_ARTIFACT_DIR,{recursive:true});
+    await view.page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`broken-board-ready-${retainAppearance?'with-appearance':'without-appearance'}.png`)});
+    fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`broken-board-ready-${retainAppearance?'with-appearance':'without-appearance'}.json`),JSON.stringify({startup:view.startup,early:view.early,ready:{...ready,tasks:JSON.parse(ready.tasks),sourceCopies:Object.fromEntries(Object.entries(ready.sourceCopies).map(([key,value])=>[key,value===null?null:JSON.parse(value)]))}},null,2)+'\n');
+   }
+   assert.equal(ready.tasks,view.before.tasks,'the actual recovered browser board matches the retained readable local source; '+JSON.stringify({taskCount:ready.taskCount,taskIds:ready.taskIds,hold:ready.recoveryHold}));
+   assert.equal(ready.rows,retainAppearance?65:66,'the actual recovered browser board replaces the projection and uses its saved or default list view; '+JSON.stringify({taskCount:ready.taskCount,query:ready.query,listOpen:ready.listOpen,hold:ready.recoveryHold}));
+   assert.equal(ready.query,retainAppearance?'Saved appearance':'','the recovered board restores its view when available and otherwise uses the normal list view');
+   assert.equal(ready.preview,false,'hydration removes the non-authoritative projection');
+   assert.equal(ready.recoveryHold?.reason,'device-source-recovery','opening the recovered board does not clear its genuine hold');
+   assert.deepEqual(ready.sourceCopies,view.before.sourceCopies,'the separate working-board sources remain byte-for-byte protected through hydration');
+   assert.deepEqual(view.errors,[]);
+  }finally{await view.browser.close();}
+ }
+});
+
+test('RISK saved view broken-board status: configured cloud changes remain visible in the saved appearance and after recovery',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ for(const browserEngine of ['chromium','webkit'])for(const theme of ['light','dark'])for(const viewport of [{width:390,height:844},{width:1100,height:900}]){
+  const view=await invisibleSavedViewBrowser(theme,false,false,viewport,false,{brokenDeviceBoard:true,retainAppearance:true,syntheticCloud:true,topOfPage:true,browserEngine,seedPriorRecoveryAppearance:true});
+  try{
+   assert.equal(view.startup.priorRecovery?.hold?.reason,'device-source-recovery','the cached recovery-pending label comes from a real completed protected local recovery');
+   assert.equal(view.startup.priorRecovery?.fixtureHoldSafelyCleared,true,'the isolated second broken head starts a separate recovery instead of reusing the prior hold');
+   assert.equal(view.startup.priorRecovery?.status,'☁ recovery pending');
+   assert.equal(view.startup.priorRecovery?.appearanceStatus,'☁ recovery pending');
+   assert.equal(view.startup.priorRecovery?.appearanceDisabled,false);
+   await view.page.addStyleTag({content:'.syncbtn{font-size:18px!important}.topbtns [data-act="settings"]{font-size:19.5px!important}'});
+   const prefix=`broken-board-status-${browserEngine}-${theme}-${viewport.width}`;
+   const snapshot=()=>view.page.evaluate(()=>{
+    const preview=document.querySelector('[data-saved-preview]'),read=button=>{if(!button)return null;const rect=button.getBoundingClientRect(),style=getComputedStyle(button);return{text:button.textContent,title:button.title,disabled:button.disabled,hidden:button.hidden,visibility:style.visibility,fontSize:style.fontSize,clientWidth:button.clientWidth,scrollWidth:button.scrollWidth,left:rect.left,right:rect.right,top:rect.top,bottom:rect.bottom,width:rect.width,height:rect.height};};
+    return{ready:document.documentElement.dataset.appReady==='true',settled:window.__actualLocalRead.settled,previewVisible:!!preview&&getComputedStyle(preview).visibility==='visible',previewInert:!!preview?.inert,
+     projection:read(preview?.querySelector('.syncbtn')),live:read(document.getElementById('syncBtn')),settings:read(preview?.querySelector('.topbtns .ghost:last-child')),
+     header:(()=>{const rect=preview?.querySelector('[data-preview-id="appHeader"]')?.getBoundingClientRect();return rect?{left:rect.left,right:rect.right,top:rect.top,bottom:rect.bottom,width:rect.width,height:rect.height}:null;})(),
+     theme:document.documentElement.dataset.theme,colorScheme:getComputedStyle(document.documentElement).colorScheme,viewport:{width:innerWidth,height:innerHeight}};
+   });
+   const opening=await snapshot();
+   if(process.env.SAVED_VIEW_ARTIFACT_DIR){fs.mkdirSync(process.env.SAVED_VIEW_ARTIFACT_DIR,{recursive:true});await view.page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`${prefix}-syncing.png`)});fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`${prefix}-syncing.json`),JSON.stringify(opening,null,2)+'\n');}
+   assert.equal(opening.ready,false,'the malformed device board has not hydrated while the saved appearance is shown');
+   assert.equal(opening.settled,false,'the real device-store read remains held');
+   assert.equal(opening.previewVisible,true,'the safe saved appearance stays visible while recovery opens');
+   assert.equal(opening.previewInert,true,'status updates do not authorize the cached appearance');
+   assert.equal(opening.projection?.text,'☁ syncing','the current pre-hydration state is rendered in the visible projection');
+   assert.equal(opening.projection?.disabled,true,'syncing remains disabled while board authority is unavailable');
+   assert.equal(opening.projection?.fontSize,'18px','the status is checked with enlarged text');
+   assert.ok(opening.projection.scrollWidth<=opening.projection.clientWidth+1,'the enlarged syncing label fits without clipping: '+JSON.stringify(opening.projection));
+   assert.equal(opening.settings?.text,'⚙','the adjacent Settings control remains in the saved header');
+   assert.equal(opening.settings?.disabled,false,'the adjacent Settings control retains its saved enabled appearance');
+   assert.ok(opening.projection.left>=0&&opening.projection.right<=viewport.width,'the syncing badge stays within the viewport');
+   assert.ok(opening.settings.left>=0&&opening.settings.right<=viewport.width,'the neighboring Settings control stays within the viewport');
+   assert.equal(opening.projection.right>opening.settings.left&&opening.settings.right>opening.projection.left&&opening.projection.bottom>opening.settings.top&&opening.settings.bottom>opening.projection.top,false,'the enlarged syncing badge does not overlap the adjacent Settings control');
+   assert.ok(opening.header.left>=0&&opening.header.right<=viewport.width,'the saved header stays within the selected viewport');
+   assert.equal(opening.theme,theme);assert.ok(opening.colorScheme.includes(theme));
+   assert.deepEqual(opening.viewport,viewport);
+   const changed=await view.page.evaluate(()=>{
+    const cloud=window.CloudSync;cloud.status='error';cloud.errorStage='init';cloud.errorCode='unavailable';window.dispatchEvent(new Event('cloudsync'));
+    const preview=document.querySelector('[data-saved-preview]'),read=button=>{if(!button)return null;const rect=button.getBoundingClientRect(),style=getComputedStyle(button);return{text:button.textContent,title:button.title,disabled:button.disabled,hidden:button.hidden,visibility:style.visibility,fontSize:style.fontSize,clientWidth:button.clientWidth,scrollWidth:button.scrollWidth,left:rect.left,right:rect.right,top:rect.top,bottom:rect.bottom,width:rect.width,height:rect.height};};
+    return{ready:document.documentElement.dataset.appReady==='true',settled:window.__actualLocalRead.settled,previewVisible:!!preview&&getComputedStyle(preview).visibility==='visible',previewInert:!!preview?.inert,
+     projection:read(preview?.querySelector('.syncbtn')),live:read(document.getElementById('syncBtn')),settings:read(preview?.querySelector('.topbtns .ghost:last-child'))};
+   });
+   if(process.env.SAVED_VIEW_ARTIFACT_DIR){await view.page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`${prefix}-error.png`)});fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`${prefix}-error.json`),JSON.stringify({opening,changed},null,2)+'\n');}
+   assert.equal(changed.ready,false,'a cloud event does not make the broken board authoritative');
+   assert.equal(changed.settled,false,'the durable read is still pending when the genuine error appears');
+   assert.equal(changed.previewVisible,true);assert.equal(changed.previewInert,true);
+   assert.equal(changed.live?.text,'☁ error','the authoritative status registers the real cloud error');
+   assert.equal(changed.projection?.text,'☁ error','the real cloud initialization error stays visible in the saved appearance');
+   assert.match(changed.projection?.title,/Cloud setup failed \(unavailable\)/,'the mirrored title retains the real failure details');
+   assert.equal(changed.projection?.disabled,false,'the visible error keeps the ordinary enabled appearance while the inert root still blocks actions');
+   assert.equal(changed.settings?.text,'⚙','the neighboring Settings control remains beside the changed badge');
+   assert.equal(changed.settings?.disabled,false);
+   assert.ok(changed.projection.scrollWidth<=changed.projection.clientWidth+1,'the enlarged error label fits without clipping: '+JSON.stringify(changed.projection));
+   await view.page.evaluate(()=>{window.CloudSync.status='syncing';window.CloudSync.errorStage=null;window.CloudSync.errorCode=null;window.dispatchEvent(new Event('cloudsync'));});
+   await view.page.waitForFunction(()=>document.documentElement.dataset.appReady==='true',null,{timeout:10000});
+   const ready=await view.page.evaluate(async()=>({status:(()=>{const el=document.getElementById('syncBtn'),rect=el.getBoundingClientRect(),style=getComputedStyle(el);return{text:el.textContent,disabled:el.disabled,hidden:el.hidden,fontSize:style.fontSize,clientWidth:el.clientWidth,scrollWidth:el.scrollWidth,left:rect.left,right:rect.right,top:rect.top,bottom:rect.bottom,width:rect.width,height:rect.height};})(),hold:await window.ScannerDeviceStore?.getRecoveryCloudHold?.(),taskCount:state.tasks.length,preview:!!document.querySelector('[data-saved-preview]'),shellVisibility:getComputedStyle(document.querySelector('.wrap')).visibility,settings:(()=>{const el=document.querySelector('.topbtns [data-act="settings"]');if(!el)return null;const rect=el.getBoundingClientRect();return{text:el.textContent,left:rect.left,right:rect.right,top:rect.top,bottom:rect.bottom};})(),viewport:{width:innerWidth,height:innerHeight}}));
+   if(process.env.SAVED_VIEW_ARTIFACT_DIR){await view.page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`${prefix}-recovery-pending.png`)});fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`${prefix}-recovery-pending.json`),JSON.stringify(ready,null,2)+'\n');}
+   assert.equal(ready.preview,false,'the projection is removed when the supported board opens');
+   assert.equal(ready.shellVisibility,'visible');assert.equal(ready.taskCount,66);
+   assert.equal(ready.status.text,'☁ recovery pending','the genuine saved-source hold is visible after hydration');
+   assert.equal(ready.status.disabled,false,'cloud actions remain held by the existing source recovery control');
+   assert.equal(ready.hold?.reason,'device-source-recovery','the genuine durable recovery hold remains active');
+   assert.equal(ready.status.fontSize,'18px');
+   assert.ok(ready.status.scrollWidth<=ready.status.clientWidth+1,'the enlarged post-hydration hold remains readable: '+JSON.stringify(ready.status));
+   assert.ok(ready.status.left>=0&&ready.status.right<=viewport.width,'the post-hydration recovery badge stays within the viewport');
+   assert.ok(ready.settings.left>=0&&ready.settings.right<=viewport.width,'the post-hydration neighboring Settings control stays within the viewport');
+   assert.equal(ready.status.right>ready.settings.left&&ready.settings.right>ready.status.left&&ready.status.bottom>ready.settings.top&&ready.settings.bottom>ready.status.top,false,'the post-hydration recovery badge does not overlap Settings');
+   const postError=await view.page.evaluate(async()=>{
+    window.CloudSync.status='error';window.CloudSync.errorStage='init';window.CloudSync.errorCode='unavailable';window.dispatchEvent(new Event('cloudsync'));
+    const el=document.getElementById('syncBtn'),rect=el.getBoundingClientRect(),style=getComputedStyle(el),settings=document.querySelector('.topbtns [data-act="settings"]'),other=settings.getBoundingClientRect();
+    return{ready:document.documentElement.dataset.appReady==='true',preview:!!document.querySelector('[data-saved-preview]'),text:el.textContent,title:el.title,disabled:el.disabled,hidden:el.hidden,fontSize:style.fontSize,clientWidth:el.clientWidth,scrollWidth:el.scrollWidth,left:rect.left,right:rect.right,top:rect.top,bottom:rect.bottom,settings:{left:other.left,right:other.right,top:other.top,bottom:other.bottom},hold:await window.ScannerDeviceStore?.getRecoveryCloudHold?.(),taskCount:state.tasks.length,viewport:{width:innerWidth,height:innerHeight}};
+   });
+   if(process.env.SAVED_VIEW_ARTIFACT_DIR){await view.page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`${prefix}-post-hydration-error.png`)});fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`${prefix}-post-hydration-error.json`),JSON.stringify(postError,null,2)+'\n');}
+   assert.equal(postError.ready,true);assert.equal(postError.preview,false);assert.equal(postError.taskCount,66);
+   assert.equal(postError.text,'☁ error','a post-hydration cloud setup failure remains visible over the genuine recovery hold');
+   assert.match(postError.title,/Cloud setup failed \(unavailable\)/);
+   assert.equal(postError.disabled,false);assert.equal(postError.hidden,false);assert.equal(postError.fontSize,'18px');
+   assert.ok(postError.scrollWidth<=postError.clientWidth+1,'the enlarged post-hydration cloud error remains readable: '+JSON.stringify(postError));
+   assert.ok(postError.left>=0&&postError.right<=viewport.width,'the post-hydration error badge stays within the viewport');
+   assert.ok(postError.settings.left>=0&&postError.settings.right<=viewport.width,'Settings stays within the viewport beside the post-hydration error');
+   assert.equal(postError.right>postError.settings.left&&postError.settings.right>postError.left&&postError.bottom>postError.settings.top&&postError.settings.bottom>postError.top,false,'the enlarged post-hydration error does not overlap Settings');
+   assert.equal(postError.hold?.reason,'device-source-recovery','a real cloud error does not clear the durable recovery hold');
+   const postRecovery=await view.page.evaluate(async()=>{window.CloudSync.status='syncing';window.CloudSync.errorStage=null;window.CloudSync.errorCode=null;window.dispatchEvent(new Event('cloudsync'));const el=document.getElementById('syncBtn'),rect=el.getBoundingClientRect(),style=getComputedStyle(el);return{text:el.textContent,disabled:el.disabled,hidden:el.hidden,fontSize:style.fontSize,clientWidth:el.clientWidth,scrollWidth:el.scrollWidth,left:rect.left,right:rect.right,hold:await window.ScannerDeviceStore?.getRecoveryCloudHold?.()};});
+   if(process.env.SAVED_VIEW_ARTIFACT_DIR){await view.page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`${prefix}-post-hydration-recovery-pending.png`)});fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`${prefix}-post-hydration-recovery-pending.json`),JSON.stringify(postRecovery,null,2)+'\n');}
+   assert.equal(postRecovery.text,'☁ recovery pending','after the transient cloud error clears, the genuine recovery hold remains visible');
+   assert.equal(postRecovery.disabled,false);assert.equal(postRecovery.hidden,false);assert.equal(postRecovery.fontSize,'18px');
+   assert.ok(postRecovery.scrollWidth<=postRecovery.clientWidth+1,'the enlarged post-hydration recovery label remains readable after the error clears: '+JSON.stringify(postRecovery));
+   assert.equal(postRecovery.hold?.reason,'device-source-recovery');
    assert.deepEqual(view.errors,[]);
   }finally{await view.browser.close();}
  }
