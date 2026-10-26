@@ -25221,5 +25221,46 @@
       "command": "Recorded f381bed6: node --test --test-name-pattern=\"^RISK repository process: startup diagnostic is bounded\" tests.js on frozen6dde with only the new test added; exact raw record in qualification/startup-carrier-root/runs. Also5c83ed51 reuses the original96ee observer consumer against the proposed package before repair.",
       "failure": "Actual assertion failed: Only the dedicated nonmergeable startup branch may run this diagnostic. Canonical push and pull_request triggers did not equal the required dedicated startup branch. After the five-file overlay, c5ac4d39 passes3/3 including actual canonical verifier rejection and unchanged coverage/catalog consumers.5c83ed51 fails Long setup cannot displace the recent failing action:1 instead of17. The same prior96ee ring/counter repair restores the recent64 with explicit omission count; original package bytes/evidence stay retained."
     }
+  },
+  {
+    "baseCommit": "2de770251526dcf0a749699bf787cd4aa59fc72f",
+    "testChangesSha256": "aece875fa399532df074fa12d00c54baa5c21c82c93b18bd2bff5e102a152eee",
+    "reason": "Replace the dedicated startup-motion diagnostic contract with a single Reduced baseline versus hidden-canvas causal comparison; retain all prior canonical protections and original failed evidence.",
+    "previousBehavior": "The previous diagnostic workflow selected Normal and Reduced with identical rendered app bytes and did not propagate a rendering variant. It cannot isolate canvas composition from the observed post-ready frame pause.",
+    "intendedBehavior": "Only the dedicated canvas-composition branch launches fresh baseline and canvas-hidden Reduced cases with the unchanged1GB cap, OOM control,400task full story and original time bounds. Both container roles receive the explicit variant; hidden served CSS bytes and original frozen assets stay separately identified and hidden output cannot qualify release.",
+    "replacementTests": [
+      "RISK repository process: Reduced canvas comparison binds two explicit variants without release qualification"
+    ],
+    "preservedCoverage": [
+      "Original400durabletasks,1MiB unknown field,two protected originals,ten distinct trusted accepted Yes within2000ms and exact durable outcomes remain unchanged.",
+      "Required effective999997440-byte whole-browser/server cap,zeroswap,separate2GiBdriver,actualOOMcontrol,original1000ms frame and2500ms transport limits,source/config/process membership and completecleanup remain unchanged.",
+      "Canonical verifier rejects diagnostic envelope and relabeled partial matrix. Hidden native kind is independently nonqualifying; its measured story outcome and expected kind refusal remain distinct.",
+      "Latest64 trusted-action ring,callback error/return channels,all31frozen applicationassets and all previous protected assertions remain."
+    ],
+    "redEvidence": {
+      "command": "Recorder a2e6943a on2de with only replacement process test modified: node --test --test-name-pattern=\"^RISK repository process: Reduced canvas comparison\" tests.js. Worker native consumer d5e76ce1 precedes overlay implementation; exact artifacts under qualification/startup-rendering-repair.",
+      "failure": "Actual process assertion fails because oldstartup branch differs from requiredcanvas-composition branch. Native consumer d5e76ce1 observes requested hidden variant still visible onold2de before CSS/variant implementation; GREEN2bd50a7d and38ee4f99 respectively observe hidden and baseline with full unchanged native story. Later tests do not rewrite chronology."
+    }
+  },
+  {
+    "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
+    "testChangesSha256": "b1809cb75d39f390d0142401bac9bfdbc3a935952b98cba02667d9fc413e0822",
+    "reason": "Replace the dedicated startup-motion diagnostic contract with a single Reduced baseline versus hidden-canvas causal comparison; retain all prior canonical protections and original failed evidence.",
+    "previousBehavior": "The previous diagnostic workflow selected Normal and Reduced with identical rendered app bytes and did not propagate a rendering variant. It cannot isolate canvas composition from the observed post-ready frame pause.",
+    "intendedBehavior": "Only the dedicated canvas-composition branch launches fresh baseline and canvas-hidden Reduced cases with the unchanged1GB cap, OOM control,400task full story and original time bounds. Both container roles receive the explicit variant; hidden served CSS bytes and original frozen assets stay separately identified and hidden output cannot qualify release.",
+    "replacementTests": [
+      "RISK repository process: Reduced canvas comparison binds two explicit variants without release qualification",
+      "RISK repository process: diagnostic observer retains recent actions after a long setup"
+    ],
+    "preservedCoverage": [
+      "Original400durabletasks,1MiB unknown field,two protected originals,ten distinct trusted accepted Yes within2000ms and exact durable outcomes remain unchanged.",
+      "Required effective999997440-byte whole-browser/server cap,zeroswap,separate2GiBdriver,actualOOMcontrol,original1000ms frame and2500ms transport limits,source/config/process membership and completecleanup remain unchanged.",
+      "Canonical verifier rejects diagnostic envelope and relabeled partial matrix. Hidden native kind is independently nonqualifying; its measured story outcome and expected kind refusal remain distinct.",
+      "Latest64 trusted-action ring,callback error/return channels,all31frozen applicationassets and all previous protected assertions remain."
+    ],
+    "redEvidence": {
+      "command": "Recorder a2e6943a on2de with only replacement process test modified: node --test --test-name-pattern=\"^RISK repository process: Reduced canvas comparison\" tests.js. Worker native consumer d5e76ce1 precedes overlay implementation; exact artifacts under qualification/startup-rendering-repair.",
+      "failure": "Actual process assertion fails because oldstartup branch differs from requiredcanvas-composition branch. Native consumer d5e76ce1 observes requested hidden variant still visible onold2de before CSS/variant implementation; GREEN2bd50a7d and38ee4f99 respectively observe hidden and baseline with full unchanged native story. Later tests do not rewrite chronology."
+    }
   }
 ]

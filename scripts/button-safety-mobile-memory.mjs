@@ -96,7 +96,16 @@ async function driver(output,motion,control,budgetProfile='required-1gb'){
    report.nativeReportPath=files[0];report.nativeReportSha256=mobileDigest(fs.readFileSync(path.join(output,files[0])));report.motion=motion;
    const native=result?.report||json(path.join(output,files[0])),owned=await closeOwner();report.before=owned.before;report.after=owned.after;
    if(budgetProfile==='stress-512mb')report.appOutcome=classifyMobileStressOutcome(report,native,owned);
-   else{if(appError)throw appError;verifyMobileFunctionalReport(native,{...source,motion});report.appOutcome='passed';}
+   else{
+    if(native.diagnosticCanvasVariant)report.diagnosticNativeOutcome={variant:native.diagnosticCanvasVariant.variant,kind:native.kind,status:native.status,fullStoryCompleted:!!native.mobileStory,qualifiesAcceptance:false};
+    if(appError)throw appError;
+    try{verifyMobileFunctionalReport(native,{...source,motion});}
+    catch(error){
+     if(native.kind==='button-mobile-rendering-diagnostic'&&native.status==='passed'&&native.diagnosticCanvasVariant?.variant==='canvas-hidden')report.diagnosticKindRefusal={expected:true,code:error.code,message:error.message};
+     throw error;
+    }
+    report.appOutcome='passed';
+   }
   }
   report.status='passed';
  }catch(error){report.status='failed';report.errors.push(error.stack||String(error));throw error;}
@@ -114,16 +123,16 @@ export function containerArgs({repo,output,nodeBinary,motion,control,eventPolicy
  const memory=role==='browser'?budget:MOBILE_DRIVER_BYTES;
  const args=['create','--init','--network',role==='browser'?'none':'container:'+browserContainerId,'--cap-drop','ALL','--security-opt','no-new-privileges','--read-only','--memory',String(memory),'--memory-swap',String(memory),'--shm-size','67108864','--tmpfs','/tmp:rw,nosuid,size=67108864','--user',String(process.getuid())+':'+String(process.getgid()),'--workdir','/repo','--mount','type=bind,src='+repo+',dst=/repo,readonly','--mount','type=bind,src='+output+',dst=/evidence','--mount','type=bind,src='+nodeBinary+',dst=/opt/chain-node,readonly','--env','HOME=/tmp','--env','CI=true','--env','CHAIN_TEST_EVENT_POLICY='+eventPolicy,'--env','GITHUB_EVENT_NAME='+eventName,'--env','GITHUB_REF='+eventRef,'--env','GIT_CONFIG_COUNT=1','--env','GIT_CONFIG_KEY_0=safe.directory','--env','GIT_CONFIG_VALUE_0=/repo',MOBILE_IMAGE,'/opt/chain-node','scripts/button-safety-mobile-memory.mjs',role==='browser'?'--browser-server':'--driver','--output-dir','/evidence','--profile',budgetProfile];
  if(containerName||ownershipToken){assert.match(containerName||'',/^chain-mobile-[a-zA-Z0-9-]+$/);assert.match(ownershipToken||'',/^[a-zA-Z0-9-]{10,64}$/);args.splice(1,0,'--name',containerName,'--label','chain.mobile.owner='+ownershipToken);}
- for(const key of ['GITHUB_REPOSITORY','GITHUB_RUN_ID','GITHUB_RUN_ATTEMPT','CHAIN_TEST_SOURCE_SHA'])if(process.env[key])args.splice(args.indexOf(MOBILE_IMAGE),0,'--env',key+'='+process.env[key]);
+ for(const key of ['GITHUB_REPOSITORY','GITHUB_RUN_ID','GITHUB_RUN_ATTEMPT','CHAIN_TEST_SOURCE_SHA','CHAIN_DIAGNOSTIC_RENDER_VARIANT'])if(process.env[key])args.splice(args.indexOf(MOBILE_IMAGE),0,'--env',key+'='+process.env[key]);
  if(control)args.push('--control');else args.push('--motion',motion);return args;
 }
 export async function runCappedMobile({outputDir,budgetProfile='required-1gb'}){
  mobileBudgetBytes(budgetProfile);
  if(process.platform!=='linux'||process.env.CI!=='true')throw Error('Capped mobile acceptance requires the isolated hosted Linux push/pull-request runtime; local functional evidence cannot waive it.');
- const diagnosticMotion=process.env.CHAIN_DIAGNOSTIC_MOTION;assert.ok(['normal','reduced'].includes(diagnosticMotion),'Diagnostic carrier requires one explicit motion');assert.equal(budgetProfile,'required-1gb','This diagnostic cannot change the required budget');
+ const diagnosticMotion=process.env.CHAIN_DIAGNOSTIC_MOTION,diagnosticVariant=process.env.CHAIN_DIAGNOSTIC_RENDER_VARIANT;assert.equal(diagnosticMotion,'reduced','Canvas causal comparison fixes Reduced motion');assert.ok(['baseline','canvas-hidden'].includes(diagnosticVariant),'Explicit canvas diagnostic variant required');assert.equal(budgetProfile,'required-1gb','This diagnostic cannot change the required budget');
  const hostedPolicy=hostedButtonPolicy(),output=path.resolve(outputDir);if(output===root||output.startsWith(root+path.sep))throw Error('Capped mobile evidence must be outside the checkout');fs.mkdirSync(output,{recursive:true});if(fs.readdirSync(output).length)throw Error('Capped mobile output must be new and empty');
  const source=identity();if(git('status','--porcelain=v1'))throw Error('Capped mobile requires exact clean committed source');
- const ownerToken=randomUUID(),report={schemaVersion:3,budgetProfile,kind:'button-mobile-memory-diagnostic',scope:MOBILE_MEMORY_SCOPE,status:'running',requiredStory:{...MOBILE_STORY,memoryBudgetBytes:mobileBudgetBytes(budgetProfile)},image:MOBILE_IMAGE,ownerToken,...source,hostedPolicy,cases:[],errors:[],cleanup:{containersRemoved:false}},owned=new Map(),commands=new Set();let interrupted=null,cleaning=false;
+ const ownerToken=randomUUID(),report={schemaVersion:3,budgetProfile,kind:'button-mobile-memory-diagnostic',diagnosticVariant,scope:MOBILE_MEMORY_SCOPE,status:'running',requiredStory:{...MOBILE_STORY,memoryBudgetBytes:mobileBudgetBytes(budgetProfile)},image:MOBILE_IMAGE,ownerToken,...source,hostedPolicy,cases:[],errors:[],cleanup:{containersRemoved:false}},owned=new Map(),commands=new Set();let interrupted=null,cleaning=false;
  const persistOwnership=()=>write(path.join(output,'ownership.json'),{ownerToken,...source,objects:[...owned].map(([identity,metadata])=>({identity,...metadata}))});
  const onSignal=signal=>{interrupted??=signal;if(!cleaning)for(const child of commands)child.kill('SIGTERM');};
  const handlers=Object.fromEntries(['SIGINT','SIGTERM'].map(signal=>[signal,()=>onSignal(signal)]));for(const [signal,handler]of Object.entries(handlers))process.on(signal,handler);

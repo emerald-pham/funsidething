@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {diagnosticCanvasVariant,installDiagnosticCanvasObserver} from './diagnostic-canvas-variant.mjs';
 import {installMobileFrameObserver} from './mobile-frame-observer.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -46,6 +47,9 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
  for(const [file,hash]of Object.entries(runtimeAssets))assert.equal(report.assets[file],hash,'Reviewed runtime asset missing or changed: '+file);
  const {verifyButtonInventorySource}=await import('./button-safety-contract.mjs');verifyButtonInventorySource([...sources].filter(([file])=>/\.(?:js|html)$/.test(file)).map(([,bytes])=>bytes.toString()).join('\n'),JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')));
  for(const [file,bytes]of sources)assert.equal(digest(bytes),digest(git('show','HEAD:'+file)),'Button run requires exact committed app bytes: '+file);
+ const canvasVariant=diagnosticCanvasVariant(sources.get('landscape.css'),{variant:process.env.CHAIN_DIAGNOSTIC_RENDER_VARIANT,motion:mobileYesMotion});
+ report.diagnosticCanvasVariant=canvasVariant.receipt;report.servedAssets={...report.assets,'landscape.css':canvasVariant.receipt.servedCssSha256};
+ if(canvasVariant.receipt.variant==='canvas-hidden'){report.kind='button-mobile-rendering-diagnostic';report.limits.push('Hidden canvas output is a diagnostic intervention and cannot qualify release acceptance.');}
  let server,browser,context,page,armed=false,closing=false;
  const check=()=>{assert.equal(report.errors.length,0,'Native button safety detected '+report.errors.join(', '));};
  report.diagnosticControllerPhases={kind:'diagnostic-controller-wall',timeOrigin:performance.timeOrigin,aggregates:{},slowOperations:[],unretainedLabels:0,limits:{aggregateLabels:32,slowOperations:32}};
@@ -56,7 +60,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
    const pathname=new URL(req.url,'http://127.0.0.1').pathname;
    const name=pathname.slice(prefix.length)||'index.html',module=pathname.startsWith(sdk)?pathname.slice(sdk.length):null;
    const observer=pathname===prefix+'__button-observer';
-   const bytes=observer?'<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Isolated storage fixture</title>':module?{'firebase-app.js':appModule,'firebase-auth.js':authModule,'firebase-firestore.js':firestoreModule.replace('const rpc=(kind,args)=>window.__installedRPC(kind,args)',"const rpc=async(kind,args)=>{const result=await window.__installedRPC(kind,args);if(result?.fixtureFailure)throw Object.assign(Error('Synthetic external SDK refusal'),{code:result.fixtureFailure});return result;}")}[module]:pathname.startsWith(prefix)&&!name.includes('..')?sources.get(name):null;
+   const bytes=observer?'<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Isolated storage fixture</title>':module?{'firebase-app.js':appModule,'firebase-auth.js':authModule,'firebase-firestore.js':firestoreModule.replace('const rpc=(kind,args)=>window.__installedRPC(kind,args)',"const rpc=async(kind,args)=>{const result=await window.__installedRPC(kind,args);if(result?.fixtureFailure)throw Object.assign(Error('Synthetic external SDK refusal'),{code:result.fixtureFailure});return result;}")}[module]:pathname.startsWith(prefix)&&!name.includes('..')?(name==='landscape.css'?canvasVariant.served:sources.get(name)):null;
    res.writeHead(bytes?200:404,{'Content-Type':observer?'text/html':module?'text/javascript':MIME[path.extname(name)]||'text/plain','Cache-Control':'no-store'});res.end(bytes||'Not found');
   });await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',resolve);});
   const origin='http://127.0.0.1:'+server.address().port;
@@ -78,6 +82,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
    const device=mobileYesMotion?playwright.devices['iPhone 13']:null;
    context=await browser.newContext({...(device?{userAgent:device.userAgent,screen:MOBILE_PROFILE.screen,deviceScaleFactor:3,isMobile:true,hasTouch:true}:{}),serviceWorkers:'block',viewport:mobileYesMotion?MOBILE_PROFILE.viewport:options.viewport||{width:1100,height:850},reducedMotion:mobileYesMotion==='normal'?'no-preference':'reduce'});
    await context.addInitScript(installMobileFrameObserver);
+   await context.addInitScript(installDiagnosticCanvasObserver,canvasVariant.receipt.variant);
    if(mobileYesMotion)options={...options,retainedCopies:2};
    const board=buttonFixture(options.authMode||'signed-out');
    if(options.board)Object.assign(board,options.board);
@@ -165,7 +170,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
    },{keySource:actionFor.toString()});
    await page.goto(origin+prefix);await page.waitForFunction(()=>typeof state!=='undefined'&&state&&window.ScannerDeviceStore);await page.waitForFunction(()=>window.CloudSync?.ready);if(mobileYesMotion)await page.waitForFunction(motion=>document.documentElement.dataset.landscapeMotion===motion,mobileYesMotion,{timeout:12000});localArmed=true;
    const setup=await bounded((async()=>{for(let attempt=0;attempt<200;attempt++){
-    const result=await page.evaluate(async()=>{const head=await ScannerDeviceStore.readHead();return{currentTasks:state.tasks.length,activeTasks:state.tasks.filter(task=>!task.done).length,durableTasks:head?.payload?JSON.parse(head.payload).tasks.length:0,durableHash:head?.hash};});
+    const result=await page.evaluate(async()=>{const head=await ScannerDeviceStore.readHead();return{currentTasks:state.tasks.length,activeTasks:state.tasks.filter(task=>!task.done).length,durableTasks:head?.payload?JSON.parse(head.payload).tasks.length:0,durableHash:head?.hash,diagnosticCanvas:window.__readDiagnosticCanvas()};});
     if(result.currentTasks===TASK_COUNT&&result.durableTasks===TASK_COUNT)return{...result,fixtureRole:options.fixtureRole||'active'};
     await new Promise(resolve=>setTimeout(resolve,25));
    }throw Error('Independent400-task setup did not reach durable storage');})(),'400-task durable setup',12000);
@@ -355,7 +360,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
   report.status='passed';
  }catch(error){report.status='failed';report.failure=error.stack;try{report.failureObservation=await bounded(page.evaluate(()=>({modal:document.getElementById('modalRoot')?.innerText,toast:document.getElementById('toast')?.innerText,heartbeat:{...window.__buttonHeartbeat},mode:state.mode,chain:state.chain,candidateId:state.candidateId,taskTitles:state.tasks.slice(0,10).map(t=>({id:t.id,title:t.title}))})),'failure observation');}catch(observationError){report.failureObservationError=String(observationError);}throw error;}
  finally{
-  if(context){report.mobilePhaseObservations=[];for(const observedPage of context.pages())try{const observation=await bounded(observedPage.evaluate(()=>window.__mobileFrameObservation),'diagnostic phase observation',1000);if(observation)report.mobilePhaseObservations.push(observation);}catch(error){report.mobilePhaseObservationError=String(error);}}
+  if(context){report.mobilePhaseObservations=[];for(const observedPage of context.pages())try{const observation=await bounded(observedPage.evaluate(()=>window.__mobileFrameObservation?{...window.__mobileFrameObservation,canvas:window.__readDiagnosticCanvas?.()}:null),'diagnostic phase observation',1000);if(observation)report.mobilePhaseObservations.push(observation);}catch(error){report.mobilePhaseObservationError=String(error);}}
   closing=true;
   let cleanupError;
   const close=async work=>{try{await work();}catch(error){cleanupError??=error;report.status='failed';report.errors.push('cleanup: '+String(error));}};

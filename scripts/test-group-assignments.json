@@ -13199,7 +13199,7 @@
     },
     {
       "file": "tests.js",
-      "root": "RISK repository process: startup diagnostic is bounded and cannot qualify the release matrix",
+      "root": "RISK repository process: Reduced canvas comparison binds two explicit variants without release qualification",
       "group": "native-process"
     },
     {

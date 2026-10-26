@@ -1,22 +1,23 @@
-name: Diagnostic startup task and frame phases (nonmergeable)
+name: Diagnostic canvas composition comparison (nonmergeable)
 on:
   push:
-    branches: [diagnose/webkit-startup-phases]
+    branches: [diagnose/webkit-canvas-composition]
 permissions:
   contents: read
 jobs:
   diagnostic-mobile-startup:
-    name: diagnostic-required-1GB-${{ matrix.motion }}
+    name: diagnostic-required-1GB-reduced-${{ matrix.variant }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        motion: [normal, reduced]
+        variant: [baseline, canvas-hidden]
     env:
       CHAIN_TEST_EVENT_POLICY: outgoing-branch-push-v1
       CHAIN_TEST_SOURCE_SHA: ${{ github.sha }}
-      CHAIN_DIAGNOSTIC_MOTION: ${{ matrix.motion }}
+      CHAIN_DIAGNOSTIC_MOTION: reduced
+      CHAIN_DIAGNOSTIC_RENDER_VARIANT: ${{ matrix.variant }}
       FROZEN_APP_COMMIT: '6dde63c21525c5c792bc84ff4c24158fdf446943'
     steps:
       - uses: actions/checkout@v4
@@ -34,7 +35,7 @@ jobs:
           const git=(...args)=>execFileSync('git',args,{maxBuffer:32*1024*1024}),hash=bytes=>createHash('sha256').update(bytes).digest('hex'),base=process.env.FROZEN_APP_COMMIT,inventory=JSON.parse(fs.readFileSync('scripts/button-safety-inventory.json'));
           const assets=git('ls-files').toString().trim().split('\n').filter(file=>file!=='tests.js'&&!file.startsWith('scripts/')&&(/\.(html|js|css|svg|png|webmanifest)$/.test(file)||Object.hasOwn(inventory.requiredRuntimeAssets,file)));
           const rows=assets.map(file=>{const expected=hash(git('show',base+':'+file)),actual=hash(fs.readFileSync(file));assert.equal(actual,expected,'Frozen application asset '+file);return{file,sha256:actual};});
-          const report={kind:'diagnostic-only-source-binding',frozenAppCommit:base,diagnosticCommit:git('rev-parse','HEAD').toString().trim(),diagnosticTree:git('rev-parse','HEAD^{tree}').toString().trim(),workflowBlob:git('rev-parse','HEAD:.github/workflows/data-safety.yml').toString().trim(),motion:process.env.CHAIN_DIAGNOSTIC_MOTION,assets:rows,originalUninstrumentedControl:{runId:'40356760855',sourceSha:'3781d21b3e2592d0942ca80eeabbebea44557809',tree:'651a52d185175417b8e403ae2cf36e24af96c620',requiredNormalGapMs:1431,requiredNormalPeakBytes:913702912,oomKills:0}};
+          const report={kind:'diagnostic-only-source-binding',frozenAppCommit:base,diagnosticCommit:git('rev-parse','HEAD').toString().trim(),diagnosticTree:git('rev-parse','HEAD^{tree}').toString().trim(),workflowBlob:git('rev-parse','HEAD:.github/workflows/data-safety.yml').toString().trim(),motion:process.env.CHAIN_DIAGNOSTIC_MOTION,variant:process.env.CHAIN_DIAGNOSTIC_RENDER_VARIANT,assets:rows,originalUninstrumentedControl:{runId:'40356760855',sourceSha:'3781d21b3e2592d0942ca80eeabbebea44557809',tree:'651a52d185175417b8e403ae2cf36e24af96c620',requiredNormalGapMs:1431,requiredNormalPeakBytes:913702912,oomKills:0}};
           fs.mkdirSync(process.env.RUNNER_TEMP+'/mobile-startup',{recursive:true});fs.writeFileSync(process.env.RUNNER_TEMP+'/mobile-startup/source-binding.json',JSON.stringify(report,null,2)+'\n');
           JS
       - name: Fresh real capped control and original full story with bounded phase observer
@@ -43,6 +44,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: diagnostic-mobile-startup-${{ matrix.motion }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: diagnostic-mobile-canvas-${{ matrix.variant }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/mobile-startup
           if-no-files-found: error
