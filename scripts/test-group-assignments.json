@@ -12978,6 +12978,11 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK synced scene durability: native retained boards keep immediate scene locks through reload without changing tasks or sources",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK repository process: retained native sources seed once without a persistent board bootstrap",
       "group": "native-process",
       "file": "tests.js"

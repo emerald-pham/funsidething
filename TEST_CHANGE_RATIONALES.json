@@ -1,7 +1,7 @@
 [
   {
     "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
-    "testChangesSha256": "8140c50be89bd60e68fbefcd48379b980cb070f96ac79314f33c10d38a1f784a",
+    "testChangesSha256": "57025d7bee618509bf31ca0758fd3e72619cd86f2db0e90ee78300dae7b5bcd1",
     "reason": "Integrate the user-requested single Import/Export and direct Copy/Download with protected source preservation, WebKit export/paste/preview repairs, fresh-scan WOOP repair, late clipboard-generation guard, and required fail-closed400-task/ten-press native release checks.",
     "previousBehavior": "Settings exposed redundant transfer controls and mounted complete multi-megabyte exports in modal HTML. Native WebKit stalled while rendering export and pasted JSON, and its file byte encoder blocked Preview. An obsolete Copy completion could release a newer transfer. Fresh scan WOOP Next could lose its work-mode state. Existing CI did not require a complete independently enumerated native button/workload matrix.",
     "intendedBehavior": "One Import and one Export remain with retained backups; Copy and Download use identical prepared read-only archive bytes. Large text remains outside DOM; recovery encoding yields with source/consent guards. WOOP and clipboard lifecycle are bound to the correct state. Both Chromium and WebKit must cover every maintained action/state, durable400-task fixture, and ten trusted press attempts within2seconds with independently asserted outcomes, responsiveness and preservation.",
@@ -22469,7 +22469,7 @@
       "command": "Node22 recorder focused RISK saved view continuity and required native fixture process regressions; hosted ordinary runs40276598750,40276593922 and instrumented40282208588.",
       "failure": "30f0979b: actual onAction sameEligible10presses replaced400task rows10times(expected0) before product repair.9ae0f542: mountedFAQ lacked unchanged row guidance before copy update. Native actual hosted paste1266.5ms with2.9ms app listener and refusal2441/2410ms preserved; no local or hosted success inferred from those failures. 9fb94994 actual CLI completed the original oversized preview/Cancel scenario but no verified pre-timer complete fixture existed; 66cba120 actual pending recovery CLI completed but no single prepared neutral document existed, before the respective runner changes. e4b91818 paste fixture process GREEN follows staging; exact committed further native matrix remains separate. 26ecfe5b actual mounted-node assertions failed in both native engines despite timing GREEN; detached native HTML normalization repairs the SVG serialization mismatch. Exactfb0939b15e6abf2 Chromium passed, WebKit retained row/control/scroll but its native pointer focus differed. Parent approved preserving native pointer policy and asserting focus via real focused Enter; this is a test-expectation correction, not an app pointer-focus fix."
     },
-    "testChangesSha256": "2ec5dd1581d8677bf566644d2a2cd5a6cff244c60fc3e2142bc46f9d28e5e83f"
+    "testChangesSha256": "7336e9289e4348cc6d938d031107838ada8b0e31bee25ad125774d345c323d93"
   },
   {
     "baseCommit": "59b375e92c71db888ed33acc6dbe4272c964b116",
@@ -22487,7 +22487,7 @@
       "command": "Node22 recorder: node --test --test-name-pattern \"RISK repository process: native HTTP serves exact committed\" tests.js; then the corresponding native report cannot omit or change case before contract implementation.",
       "failure": "33bd7f06 on exact59b application observed both actual HTTP requests404 instead of200 before source collection repair.5b738a00 observed actual verify-report CLI incorrectly returning0 for missingAssets, omittedMarkdown, changedBytes and invalidDigest before contract repair.7ffbc185 HTTP GREEN and8c0add7b focused23/23GREEN follow. These browser-free tests deliberately stop before browser launch and provide no native or512MB qualification."
     },
-    "testChangesSha256": "a54269d1ca7c73cca1fe919bd468e2d05d1c428e24bbd8f9ba4e0983324cd70c"
+    "testChangesSha256": "46aa2ed879a9a0d6dbe89f729e28eef638fafeb7f2689eddbf10ae1fe8ffed08"
   },
   {
     "baseCommit": "0902e3b00c1d8a85b8b1b847e9bb041566278eaf",
@@ -22504,7 +22504,7 @@
       "command": "Node22 recorder: node --test --test-name-pattern \"RISK repository process: mobile artifact consumers require reviewed runtime asset hashes\" tests.js before mobile contract implementation.",
       "failure": "3461e398: full positive functional Normal/Reduced and actual capped --verify CLI passed first; all16 invalid consumer cases then failed expected rejection (missing map, omitted asset, changed hash and invalid hash across both motions and both consumers). Capped raw artifact hashes were refreshed before actual CLI verification, so RED isolated missing asset fidelity checks. ed78314a GREEN17/17 follows shared functional verifier repair. Fixtures are controlled parser evidence only, not actual native, kernel or512MB acceptance."
     },
-    "testChangesSha256": "b8de340f18dff7b33f2f47c2df28d74204adc62a2c3280096fde39956970368d"
+    "testChangesSha256": "60d0fef3c1ade18b66667ed899ed0ae404d7a854b76cc53e9689bc6070c91531"
   },
   {
     "baseCommit": "de1d26480052ffd6335c886a1f76b5de697752cf",
@@ -22521,7 +22521,7 @@
       "command": "Node22 recorder with allocated WebKit and port48842: node --test --test-name-pattern \"^RISK scenery startup:\" tests.js against exactde1 app bytes before renderer edit.",
       "failure": "cd89fab6 actual native Normal/Reduced visible subcases failed2!==1 complete background paints; both hidden-start/visible-return controls passed full400task ten-touch story, rain pixel preservation, true resize and saved scene adoption. Baseline public setters measured twelve redundant same-size resets/14302080 logical reset-byte operations in the second immediate paint, not measured RAM or OOM causality. Earlier7363f8e5 clock.setFixedTime external setup failure has no behavioral RED credit; external Date boundary setup was corrected beforecd89fab6. Exact clean GREEN and pixel comparisons follow separately."
     },
-    "testChangesSha256": "91a47d9c280c80bd9ac309c84d5b17af9e43bef0697050c9b7a3eee8780a22fb"
+    "testChangesSha256": "05eed7e3364ca478939d77ff56cd10cf4418eacab5703b93bf380c6ed04ca599"
   },
   {
     "baseCommit": "99be43e7baade70c3bd7acbcf6778d6d7fd2ed54",
@@ -22538,7 +22538,7 @@
       "command": "Allocated Node22 recorder: node --test --test-name-pattern \"^RISK repository process: retained native sources seed once\" tests.js before canonical native producer edit.",
       "failure": "9b5bb400: actual Normal and Reduced full mobile stories completed but failed persistent full-board argument expectation (1183359bytes versus none); ordinary nonretained control passed before repair.9657b639 GREEN4/4 follows repair, including both real observer no-overwrite guards and exact protected readbacks. Actual Linux pre-navigation savings belong to separate CAP11 diagnostic evidence and are not a capped product pass."
     },
-    "testChangesSha256": "57f5e35f6d8cf35630484150158cca01f9b88d817b5449f22b956313d8c54694"
+    "testChangesSha256": "92b1e36ef9c9447e016b039027baa7f0ba8b5463e2018d40d05307fe0d77118a"
   },
   {
     "baseCommit": "e5acc05ed853d836ff3d0aa80513d84797680d00",
@@ -22556,6 +22556,23 @@
       "command": "Recorder actual WebKit --scenario oversized retained-source export on e5; controlled actual native failing-probe case; held-real-response existing native scene-time consumer before readiness changes.",
       "failure": "f67821fd: actual16-copy CLI failed exact retained source readback order before Export.8829b220: controlled original probe failure skipped native cleanup and persisted completion, while external fallback safely closed owned browser/server; after repair d77eefc8 passes8/8 including actual Chromium full oversized and failure retention/real closure before fallback.8e277d53: held real200/hash Markdown leaves Scene Time enabled before its handler.0f985428: related static Motion/View controls remain enabled. Immutable de1/current held observations record trusted early click with undefined handler and no dialog even after release; related footer/Settings Motion/View clicks likewise no-op.6f9d740e full ready native actions/preset/save/reload/live GREEN follows shared readiness. Added motion test initially used a broad selector matching html and button (1ee77a26 setup failure); corrected to actual dialog button. Reload fixture CloseX intentionally did not acknowledge Quick Start; native header click exposed the expected help overlay (cb87396d/c4de80e0). Using existing nativeOK plus actual header entry corrects that fixture, not product behavior. No capped-memory acceptance claimed. Rendered aa20 loading captures exposed Scene Time retaining its active green palette despite native disabled. Existing consumer extended with actual computed paint against neighboring disabled Motion:4e3d657e actual pre-edit RED,6ebe4420 GREEN after one Scene Time-specific disabled palette selector; no unrelated selection/recovery paint changed."
     },
-    "testChangesSha256": "4c1d0dfdd41412ddf36c177bfe3fbda77a95f8ad2d63157b0c63ad351dcd6992"
+    "testChangesSha256": "d10b6bb08f8eadd6bb1bb0a144be60d8d2497c689b2d2169c4b5276f1738f226"
+  },
+  {
+    "baseCommit": "b14890882610fb6a3f5a6eec99cfdcc57b75a378",
+    "reason": "Preserve scene choices through immediate reload of an existing authoritative board after the extended actual native scene consumer exposed a real debounce loss.",
+    "previousBehavior": "The renderer mirrored a selected time/season immediately but the board save remained behind the ordinary350ms debounce; immediate reload adopted its older authoritative scene and cleared the new mirror.",
+    "intendedBehavior": "Only scene preference edits request immediate dispatch through the existing guarded persistence path; all other save calls retain their ordinary debounce and source authority rules.",
+    "preservedCoverage": [
+      "The original full400task/one-MiB/two-backup/ten distinct Yes/two-second/motion and cap workload remains unchanged. Separate trusted scene lock and immediate reload use the same retained isolated context and verify exact400tasks, both protected copies, opaque source and pending reference. Original browser preset/save/reload/live and all startup, cleanup and16-copy checks remain."
+    ],
+    "replacementTests": [
+      "RISK synced scene durability: native retained boards keep immediate scene locks through reload without changing tasks or sources"
+    ],
+    "redEvidence": {
+      "command": "Allocated Node22 recorder: node --test --test-name-pattern \"^RISK synced scene durability:\" tests.js before the scene save-path change, and immutable de1 proof-page comparison through the same consumer.",
+      "failure": "d377aa09 actual b148 Normal/Reduced retained native consumers both failed authoritative scene null versus23:15 after an immediate reload; original full mobile reports passed and cleanup completed. da5e7d9d repeats both failures while the separate proof page serves immutable de1 bytes with96 hashed response deliveries; this is current fixture plus immutable baseline app, not clean de1 native qualification. Earlier fresh legacy-only comparisons passed without authoritative heads and do not contradict this durable reproduction. fda0b355 separately captured winter/23:15 mirrors while app hidden, then null/null after older head adoption. No readiness wait fixes this loss, no source is promoted from mirror, and no real cap acceptance is inferred."
+    },
+    "testChangesSha256": "3e45f2e475db219c5fdfe915c83e492d3802050da6df630b190fb2cafb2ba76e"
   }
 ]

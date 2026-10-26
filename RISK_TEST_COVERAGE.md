@@ -2305,3 +2305,5 @@ The command/report consumer rejects missing, duplicate, skipped, cancelled, unre
 - RISK repository process: retained native sources seed once without a persistent board bootstrap
 
 - RISK scenery scene time readiness: loading controls wait before native presets save reload and return to live
+
+- RISK synced scene durability: native retained boards keep immediate scene locks through reload without changing tasks or sources
