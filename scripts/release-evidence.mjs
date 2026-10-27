@@ -155,7 +155,7 @@ const riskDocumentationPath = /(?:release.?gate|test.?first|risk.?test|memory|cl
 
 function isReleaseProcessPath(file) {
   const normalized = file.toLowerCase().replaceAll('\\', '/');
-  return policyFiles.has(file) || /^\.github\/workflows\//.test(normalized) || /^\.claude\/hooks\//.test(normalized) ||
+  return policyFiles.has(file) || /^docs\/agents\/[^/]+\.md$/.test(normalized) || /^\.github\/workflows\//.test(normalized) || /^\.claude\/hooks\//.test(normalized) ||
     /(?:release.?gate|test.?first|release.?evidence|install-release-hook)/.test(normalized);
 }
 
@@ -235,7 +235,7 @@ function commentOnlyDiff(repoRoot, baseSha, commitSha, file) {
 function isDocumentationOnlyPath(file) {
   const normalized = file.replaceAll('\\', '/');
   if (!documentationExtensions.test(normalized)) return false;
-  if (policyFiles.has(normalized)) return false;
+  if (policyFiles.has(normalized) || isReleaseProcessPath(normalized)) return false;
   return !riskDocumentationPath.test(normalized);
 }
 
@@ -273,6 +273,48 @@ function reviewDomainsFromDiff(repoRoot, baseSha, commitSha, file) {
   return [...domains].sort();
 }
 
+// This is intentionally a language subset, not a natural-language risk guess.
+// Unknown rewrites keep the ordinary plan. Paragraph boundaries, instruction
+// tokens and link destinations remain exact; only reflow and named synonyms
+// in navigation instructions are accepted.
+function policyParagraph(value) {
+  if (value.split(/\r?\n/).some(line => /^\s|^[#>*+\-]|^\d+[.)]/.test(line)) || /[`<>\t\u0000-\u0008]/.test(value)) return null;
+  return value.replace(/\[([^\]\n]+)\]\(([^)\s]+)\)/g, (_, label, target) =>
+    '[' + label.replace(/ (?:guide|guidance)$/, '') + '](' + target + ')')
+    .replace(/\bConsult (?=\[)/g, 'Read ').replace(/\s+/g, ' ').trim();
+}
+
+export function derivePolicyProseImpact(repoRoot, sourceSha, baseSha) {
+  const sourceTree = candidateTree(repoRoot, sourceSha), baseTree = candidateTree(repoRoot, baseSha);
+  assertAncestor(repoRoot, baseSha, sourceSha);
+  const inventory = sha => gitRaw(repoRoot, ['ls-tree', '-r', '-z', '--full-tree', sha]).split('\0').filter(Boolean).sort();
+  const before = inventory(baseSha), after = inventory(sourceSha);
+  const entries = lines => new Map(lines.map(line => { const tab = line.indexOf('\t'); return [line.slice(tab + 1), line.slice(0, tab)]; }));
+  const oldEntries = entries(before), newEntries = entries(after);
+  const changedFiles = [...new Set([...oldEntries.keys(), ...newEntries.keys()])].filter(file => oldEntries.get(file) !== newEntries.get(file)).sort();
+  if (!changedFiles.length) return null;
+  const files = [];
+  for (const file of changedFiles) {
+    if (!(policyFiles.has(file) && file.endsWith('.md') || /^docs\/agents\/[^/]+\.md$/.test(file))) return null;
+    const oldEntry = oldEntries.get(file), newEntry = newEntries.get(file);
+    if (!/^100644 blob [a-f0-9]{40}$/.test(oldEntry || '') || !/^100644 blob [a-f0-9]{40}$/.test(newEntry || '')) return null;
+    const oldText = gitShow(repoRoot, baseSha, file), newText = gitShow(repoRoot, sourceSha, file);
+    const oldParts = oldText.split(/\r?\n[ \t]*\r?\n/), newParts = newText.split(/\r?\n[ \t]*\r?\n/);
+    if (oldParts.length !== newParts.length) return null;
+    for (let index = 0; index < oldParts.length; index++) {
+      if (oldParts[index] === newParts[index]) continue;
+      const normalized = policyParagraph(oldParts[index]);
+      if (normalized === null || normalized !== policyParagraph(newParts[index])) return null;
+    }
+    files.push({path: file, baseBlob: oldEntry.slice(-40), sourceBlob: newEntry.slice(-40)});
+  }
+  const frozen = before.filter(line => !changedFiles.includes(line.slice(line.indexOf('\t') + 1)));
+  const current = after.filter(line => !changedFiles.includes(line.slice(line.indexOf('\t') + 1)));
+  if (canonicalJson(frozen) !== canonicalJson(current)) return null;
+  return {schemaVersion: 1, semantics: 'instruction-preserving-markdown-v1', baseSha, baseTree, sourceSha, sourceTree,
+    frozenInventorySha256: sha256(Buffer.from(canonicalJson(frozen))), frozenPathCount: frozen.length, files};
+}
+
 export function deriveReleaseReviewPlan(repoRoot, commitSha, baseSha, options = {}) {
   candidateTree(repoRoot, commitSha);
   assertAncestor(repoRoot, baseSha, commitSha);
@@ -284,9 +326,11 @@ export function deriveReleaseReviewPlan(repoRoot, commitSha, baseSha, options = 
     : [];
   const changedFiles = gitRaw(repoRoot, ['diff', '--name-only', '--no-renames', '-z', baseSha, commitSha, '--'])
     .split('\0').filter(Boolean).sort();
+  const policyProse = derivePolicyProseImpact(repoRoot, commitSha, baseSha);
   let requiresCodeReview = false;
   const specialistDomains = new Set();
   for (const file of changedFiles) {
+    if (policyProse) { specialistDomains.add('release-process'); continue; }
     const documentationOnly = isDocumentationOnlyPath(file);
     const commentsOnly = commentOnlyDiff(repoRoot, baseSha, commitSha, file);
     if (!documentationOnly && !commentsOnly) requiresCodeReview = true;
@@ -303,6 +347,7 @@ export function deriveReleaseReviewPlan(repoRoot, commitSha, baseSha, options = 
     requiresSpecialistReview ? 'specialist-review' : 'owner-self-review';
   return {
     schemaVersion: 1,
+    ...(policyProse ? {policyProse} : {}),
     changedFiles,
     mode,
     requiresCodeReview,
@@ -421,6 +466,44 @@ function validatedMemorySources(sources, field, verifyNow) {
   });
 }
 
+function inheritedProductEvidence(repoRoot, plan, input, directory = null) {
+  if (!plan.policyProse) {
+    if (input) throw new Error('Product evidence inheritance is restricted to proven policy prose.');
+    return null;
+  }
+  if (!input || !SHA1.test(input.reviewedSha || '') || !SHA256.test(input.receiptSha256 || '')) throw new Error('Policy prose requires exact inherited product review evidence.');
+  const baselinePath = directory ? path.join(directory, 'inherited-receipt.json') : path.join(receiptDirectory(repoRoot, input.reviewedSha), 'receipt.json');
+  const baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
+  // A full product receipt is the origin; policy-only receipts cannot form a
+  // chain that silently extends the scope or freshness of an earlier review.
+  if (baseline.schemaVersion !== 2 || !baseline.reviewPlan?.requiresFaqReview || baseline.reviewPlan.policyProse || baseline.policyInheritance || baseline.receiptSha256 !== input.receiptSha256 || baseline.candidate?.treeSha !== plan.policyProse.baseTree) {
+    throw new Error('Inherited product receipt must be a full FAQ-reviewed exact-base tree.');
+  }
+  const checked = verifyRiskBasedReceipt(repoRoot, input.reviewedSha, baseline, baselinePath, directory ? 'inherited-' : '');
+  if (!checked.ok) throw new Error('Inherited product receipt is invalid: ' + checked.errors.join(' '));
+  const renderedBytes = directory ? fs.readFileSync(path.join(directory, 'inherited-rendered.json')) : evidenceFile(repoRoot, input.renderedEvidencePath, input.renderedEvidenceSha256, 'Inherited rendered review');
+  const renderedHash = sha256(renderedBytes), rendered = JSON.parse(renderedBytes);
+  if (renderedHash !== input.renderedEvidenceSha256 || rendered.schemaVersion !== 1 || rendered.outcome !== 'approved' || rendered.reviewedSha !== input.reviewedSha || rendered.treeSha !== plan.policyProse.baseTree || typeof rendered.summary !== 'string' || rendered.summary.trim().length < 20) {
+    throw new Error('Inherited rendered review must bind approved evidence to the exact unchanged product tree.');
+  }
+  if (taskId(rendered.task, 'Inherited rendered reviewer') === baseline.ownerReview.task || !Array.isArray(rendered.artifacts) || rendered.artifacts.length === 0) throw new Error('Inherited rendered review needs an independent reviewer and fingerprinted artifacts.');
+  const renderedArtifacts = rendered.artifacts.map((artifact, index) => {
+    const name = `inherited-rendered-artifact-${index}`;
+    const bytes = directory ? fs.readFileSync(path.join(directory, name)) : evidenceFile(repoRoot, artifact.evidencePath, artifact.sha256, 'Inherited rendered artifact');
+    if (sha256(bytes) !== artifact.sha256) throw new Error('Inherited rendered artifact fingerprint mismatch.');
+    return {name, bytes};
+  });
+  const record = {reviewedSha: input.reviewedSha, receiptSha256: baseline.receiptSha256,
+    faqEvidenceSha256: baseline.faqReview.evidence.sha256, renderedEvidenceSha256: renderedHash,
+    frozenInventorySha256: plan.policyProse.frozenInventorySha256};
+  if (directory && canonicalJson(input) !== canonicalJson(record)) throw new Error('Inherited product evidence record does not match its current source inventory.');
+  const files = [...renderedArtifacts, {name:'inherited-receipt.json', bytes:Buffer.from(JSON.stringify(baseline, null, 2) + '\n')}, {name:'inherited-rendered.json',bytes:renderedBytes}];
+  if (!directory) for (const review of ['ownerReview','independentReview','specialistReview','faqReview']) {
+    if (baseline[review]) files.push({name:'inherited-'+baseline[review].evidence.file, bytes:fs.readFileSync(path.join(path.dirname(baselinePath), baseline[review].evidence.file))});
+  }
+  return {record, files};
+}
+
 function validateRiskBasedInput(repoRoot, input) {
   if (!input || typeof input !== 'object' || Array.isArray(input) || input.schemaVersion !== 2) {
     throw new Error('Risk-based release evidence input must use schemaVersion 2.');
@@ -435,6 +518,7 @@ function validateRiskBasedInput(repoRoot, input) {
     ? normalizeAdditionalSpecialistDomains(input.additionalSpecialistDomains)
     : [];
   const reviewPlan = deriveReleaseReviewPlan(repoRoot, commitSha, baseSha, { additionalSpecialistDomains });
+  const inheritance = inheritedProductEvidence(repoRoot, reviewPlan, input.policyInheritance);
   const owner = input.ownerReview;
   const ownerTask = taskId(owner?.task, 'ownerReview.task');
   if (owner?.outcome !== 'approved') throw new Error('Owner exact-diff review must be approved.');
@@ -525,6 +609,7 @@ function validateRiskBasedInput(repoRoot, input) {
     candidate: { commitSha, treeSha, baseSha },
     additionalSpecialistDomains,
     reviewPlan,
+    ...(inheritance ? {policyInheritance:inheritance.record} : {}),
     ownerReview: {
       task: ownerTask,
       outcome: 'approved',
@@ -541,6 +626,7 @@ function validateRiskBasedInput(repoRoot, input) {
   return {
     receipt,
     evidenceFiles: [
+      ...(inheritance?.files || []),
       { name: 'owner-review.md', bytes: ownerBytes },
       ...(independentBytes ? [{ name: 'independent-review.md', bytes: independentBytes }] : []),
       ...(specialistBytes ? [{ name: 'specialist-review.md', bytes: specialistBytes }] : []),
@@ -587,7 +673,7 @@ export function recordReleaseEvidence(repoRoot, input) {
   }
 }
 
-function verifyRiskBasedReceipt(repoRoot, commitSha, receipt, receiptPath) {
+function verifyRiskBasedReceipt(repoRoot, commitSha, receipt, receiptPath, evidencePrefix = '') {
   const errors = [];
   if (receipt?.candidate?.commitSha !== commitSha) errors.push('Release receipt is stale or names a different candidate SHA.');
   if (receipt?.candidate?.commitSha && SHA1.test(receipt.candidate.commitSha)) {
@@ -611,6 +697,10 @@ function verifyRiskBasedReceipt(repoRoot, commitSha, receipt, receiptPath) {
     errors.push('Could not verify the exact-diff review plan: ' + error.message);
   }
   const plan = expectedPlan;
+  if (plan) {
+    try { inheritedProductEvidence(repoRoot, plan, receipt.policyInheritance, path.dirname(receiptPath)); }
+    catch (error) { errors.push('Product evidence inheritance: ' + error.message); }
+  }
   const owner = receipt?.ownerReview;
   try {
     taskId(owner?.task, 'Owner exact-diff review task');
@@ -723,7 +813,7 @@ function verifyRiskBasedReceipt(repoRoot, commitSha, receipt, receiptPath) {
       continue;
     }
     try {
-      if (hashFile(path.join(path.dirname(receiptPath), file)) !== evidence.sha256) errors.push(key + ' evidence SHA-256 does not match its copied bytes.');
+      if (hashFile(path.join(path.dirname(receiptPath), evidencePrefix + file)) !== evidence.sha256) errors.push(key + ' evidence SHA-256 does not match its copied bytes.');
     } catch {
       errors.push(key + ' evidence file is missing.');
     }
@@ -843,6 +933,20 @@ export function validatePrePushUpdates(repoRoot, updates) {
   return errors;
 }
 
+export function validatePolicyProseStatuses(repoRoot, sourceSha, baseSha, statuses) {
+  const plan = deriveReleaseReviewPlan(repoRoot, sourceSha, baseSha);
+  if (!plan.policyProse) throw new Error('Current source is not instruction-preserving policy prose.');
+  const prefix = sha256(Buffer.from(canonicalJson(plan))).slice(0, 12), latest = latestByContext(statuses);
+  let receiptSha256;
+  for (const context of RELEASE_STATUS_CONTEXTS) {
+    const status = latest.get(context)?.status;
+    const match = status?.description?.match(/^r=([0-9a-f]{64});b=([0-9a-f]{40});p=([0-9a-f]{12});c=0;s=1;v=4$/);
+    if (status?.state !== 'success' || !match || match[2] !== baseSha || match[3] !== prefix || receiptSha256 && receiptSha256 !== match[1]) throw new Error('Current policy review statuses do not bind the exact source, base, inherited evidence and derived plan.');
+    receiptSha256 = match[1];
+  }
+  return {sourceSha, baseSha, receiptSha256, reviewPlanPrefix:prefix};
+}
+
 export async function publishReleaseStatuses(repoRoot, commitSha, postStatus) {
   const result = verifyReleaseEvidence(repoRoot, commitSha);
   if (!result.ok) throw new Error('Cannot publish release statuses without a valid exact-SHA receipt: ' + result.errors.join(' '));
@@ -852,7 +956,7 @@ export async function publishReleaseStatuses(repoRoot, commitSha, postStatus) {
     ? 'r=' + result.receipt.receiptSha256 + ';b=' + result.receipt.candidate.baseSha +
       ';p=' + sha256(Buffer.from(canonicalJson(result.receipt.reviewPlan))).slice(0, 12) +
       ';c=' + (result.receipt.reviewPlan.requiresCodeReview ? '1' : '0') +
-      ';s=' + (result.receipt.reviewPlan.requiresSpecialistReview ? '1' : '0') + (result.receipt.reviewPlan.requiresFaqReview ? ';v=3' : ';v=2')
+      ';s=' + (result.receipt.reviewPlan.requiresSpecialistReview ? '1' : '0') + (result.receipt.reviewPlan.policyProse && !result.receipt.additionalSpecialistDomains.length ? ';v=4' : result.receipt.reviewPlan.requiresFaqReview ? ';v=3' : ';v=2')
     : 'receipt-sha256=' + result.receipt.receiptSha256 + ';base=' + result.receipt.candidate.baseSha;
   const targetUrl = 'https://github.com/' + git(repoRoot, ['remote', 'get-url', 'origin']).replace(/^.*github\.com[:/]/, '').replace(/\.git$/, '') + '/commit/' + commitSha;
   const base = result.receipt.candidate.baseSha;
@@ -937,6 +1041,11 @@ export async function verifyDeploymentEvidence({ repository, deployedSha, before
     const riskBasedDescription = latest.get('funsidething/specialist-review')?.status?.description ||
       latest.get('funsidething/independent-review')?.status?.description || '';
     if(faqPolicy&&!/;v=3$/.test(riskBasedDescription))throw new Error('FAQ coverage policy requires FAQ-approved exact-head deployment evidence.');
+    if (/;v=4$/.test(riskBasedDescription)) {
+      if (!localHead) throw new Error('Policy inheritance requires the exact reviewed source locally.');
+      const policy = validatePolicyProseStatuses(repoRoot, headSha, baseSha, statuses);
+      return {ok:true, errors:[], deployedSha, reviewedSha:headSha, treeSha, baseSha, ...policy};
+    }
     if (/;v=[23]$/.test(riskBasedDescription)) {
       const statusPlan = new Map();
       for (const context of RISK_BASED_RELEASE_STATUS_CONTEXTS) {

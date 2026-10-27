@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { derivePolicyProseImpact, validatePolicyProseStatuses } from '../release-evidence.mjs';
 
 const sha = value => typeof value === 'string' && /^[a-f0-9]{40}$/.test(value);
 const decimal = value => /^[1-9][0-9]*$/.test(String(value));
@@ -109,8 +110,51 @@ async function main() {
     }
     return { pull, cohort: boundContext(repository, sourceSha, sourceTree, merge.sha, merge.tree.sha, pull.base.sha, 'canonical-pr-merge-v1') };
   }
+  // Prove the complete unchanged inventory before looking for inherited
+  // execution. Current policy reviews are never inherited from the producer.
+  if (!args['plan-only'] && cohort) {
+    try {
+      const impact = derivePolicyProseImpact(process.cwd(), sourceSha, args['comparison-base']);
+      if (impact) {
+        if (checkoutTree !== sourceTree) throw new Error('Policy checkout and reviewed source trees differ.');
+        let reviewedSha = sourceSha;
+        if (isMain) {
+          const pulls = readApi(`commits/${sourceSha}/pulls?per_page=100`);
+          const merged = Array.isArray(pulls) ? pulls.filter(pull => pull.merge_commit_sha === sourceSha && pull.merged_at && pull.base?.ref === 'main' && sha(pull.head?.sha)) : [];
+          if (merged.length !== 1 || git('rev-parse', `${merged[0].head.sha}^{tree}`) !== sourceTree) throw new Error('Policy main has no unique exact reviewed tree.');
+          reviewedSha = merged[0].head.sha;
+        }
+        const policyStatuses = readApi(`commits/${reviewedSha}/statuses?per_page=100`);
+        const review = validatePolicyProseStatuses(process.cwd(), reviewedSha, args['comparison-base'], policyStatuses);
+        const base = args['comparison-base'], baseTree = git('rev-parse', `${base}^{tree}`), parent = git('rev-parse', `${base}^`);
+        const producerContext = boundContext(repository, base, baseTree, base, baseTree, parent, 'exact-main-push-v1');
+        const expected = hash(producerContext);
+        const response = readApi(`actions/workflows/data-safety.yml/runs?head_sha=${base}&event=push&branch=main&per_page=20`);
+        if (!Array.isArray(response.workflow_runs) || response.total_count !== response.workflow_runs.length) throw new Error('Policy base producer inventory is incomplete.');
+        const runs = response.workflow_runs.filter(run => run.event === 'push' && run.head_branch === 'main' && run.head_sha === base && run.name === 'Data safety' && run.path === workflowPath && run.repository?.full_name === repository && run.head_repository?.full_name === repository).sort((a,b)=>Number(b.id)-Number(a.id));
+        const run = runs[0];
+        if (!run || !decimal(run.id) || !decimal(run.run_attempt) || run.status !== 'completed' || run.conclusion !== 'success') throw new Error('No successful current full exact-base producer.');
+        const result = readApi(`actions/runs/${run.id}/attempts/${run.run_attempt}/jobs?per_page=100`);
+        const required = ['validation-context','event-gates','cohort-routing',...cohort.expectedGroups.map(id=>'regression-'+id),'scanner-tests'];
+        if (!Array.isArray(result.jobs) || result.total_count !== result.jobs.length || required.some(name => result.jobs.filter(job=>job.name===name && job.status==='completed' && job.conclusion==='success' && String(job.run_id)===String(run.id) && String(job.run_attempt)===String(run.run_attempt) && job.head_sha===base).length!==1) || result.jobs.some(job=>!required.includes(job.name) && !['release-evidence','deploy-pages'].includes(job.name))) throw new Error('Policy base full topology is incomplete.');
+        const completed = name => result.jobs.find(job=>job.name===name)?.steps?.filter(step=>step.status==='completed' && step.conclusion==='success') || [];
+        for (const name of [`Announce regression context ${expected}`,`Actual checkout ${base} tree ${baseTree}`,`Validation source ${base} base ${parent}`,`Workflow blob ${cohort.workflowBlob} policy four-groups-v1`]) if (completed('validation-context').filter(step=>step.name===name).length!==1) throw new Error('Policy base context does not match the frozen complete cohort.');
+        for (const gate of ['Run npm run test:rules','Backward compatibility']) if (completed('event-gates').filter(step=>step.name===gate).length!==1) throw new Error('Policy base rules or compatibility execution is absent.');
+        for (const group of cohort.expectedGroups) if (completed('regression-'+group).filter(step=>step.name==='Execute complete assigned group').length!==1) throw new Error('Policy base producer did not execute every group.');
+        const markers = completed('scanner-tests').filter(step=>new RegExp(`^Complete regression context ${expected} report [a-f0-9]{64}$`).test(step.name));
+        if (markers.length !== 1) throw new Error('Policy base full reconciliation attestation is absent.');
+        // Re-read current statuses: changed or revoked evidence cannot be hidden
+        // behind an earlier successful base execution observation.
+        const currentReview = validatePolicyProseStatuses(process.cwd(), reviewedSha, base, readApi(`commits/${reviewedSha}/statuses?per_page=100`));
+        if (JSON.stringify(review) !== JSON.stringify(currentReview)) throw new Error('Policy review changed during inheritance validation.');
+        record.decision='policy-reuse'; record.reason='Instruction-preserving policy prose; unchanged product/FAQ/rendered evidence and full base execution verified.';
+        record.policyImpact=impact; record.policyReview=review; record.policyStatuses=policyStatuses; record.cohortContext=producerContext; record.contextSha256=expected;
+        record.coveredBy={runId:String(run.id),runAttempt:String(run.run_attempt),checkoutSha:base,checkoutTree:baseTree,comparisonBase:parent,reportSha256:markers[0].name.split(' report ')[1]};
+      }
+    } catch (error) { record.reason=`${error.message} Executing the actual checkout's complete cohort.`; }
+  }
   const metadataEdit = eventName === 'pull_request' && event.action === 'edited' && !event.changes?.base;
-  if (!args['plan-only'] && ((eventName === 'push' && !isMain) || metadataEdit)) {
+  if (record.decision === 'full' && !args['plan-only'] && ((eventName === 'push' && !isMain) || metadataEdit)) {
     try {
       const canonical = canonicalPull();
       if (metadataEdit && (canonical.cohort.checkoutSha !== checkoutSha || canonical.cohort.checkoutTree !== checkoutTree || canonical.cohort.comparisonBase !== args['comparison-base'])) throw new Error('Edited PR has a different actual merge context.');

@@ -70,7 +70,7 @@ jobs:
           if-no-files-found: error
 
   event-gates:
-    needs: validation-context
+    needs: [validation-context, cohort-routing]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -81,13 +81,17 @@ jobs:
           node-version: '22'
           cache: npm
       - uses: actions/setup-java@v4
+        if: needs.cohort-routing.outputs.decision != 'policy-reuse'
         with:
           distribution: temurin
           java-version: '21'
       - run: npm ci
+        if: needs.cohort-routing.outputs.decision != 'policy-reuse'
       - run: node scripts/test-first-gate.mjs "${{ needs.validation-context.outputs.base }}"
       - run: npm run test:rules
+        if: needs.cohort-routing.outputs.decision != 'policy-reuse'
       - name: Backward compatibility
+        if: needs.cohort-routing.outputs.decision != 'policy-reuse'
         env:
           COMPATIBILITY_BASE_SHA: ${{ needs.validation-context.outputs.base }}
         run: npm run test:compatibility
@@ -150,7 +154,7 @@ jobs:
         if: needs.cohort-routing.outputs.decision == 'full'
         run: npx --no-install playwright install --with-deps chromium
       - uses: actions/download-artifact@v4
-        if: needs.cohort-routing.outputs.decision == 'reuse'
+        if: contains(fromJSON('["reuse","policy-reuse"]'), needs.cohort-routing.outputs.decision)
         with:
           name: ci-routing-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/ci-routing
@@ -158,7 +162,7 @@ jobs:
         if: needs.cohort-routing.outputs.decision == 'full'
         run: npm run test:group -- --group "${{ matrix.group }}" --output-dir "$RUNNER_TEMP/group" --repository "$GITHUB_REPOSITORY" --event-policy "$CHAIN_TEST_EVENT_POLICY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$CHAIN_TEST_SOURCE_SHA" --comparison-base "$CHAIN_TEST_COMPARISON_BASE"
       - name: Record verified full-producer coverage reference
-        if: needs.cohort-routing.outputs.decision == 'reuse'
+        if: contains(fromJSON('["reuse","policy-reuse"]'), needs.cohort-routing.outputs.decision)
         run: npm run test:group -- --covered --proof "$RUNNER_TEMP/ci-routing/routing.json" --group "${{ matrix.group }}" --output-dir "$RUNNER_TEMP/group" --repository "$GITHUB_REPOSITORY" --event-policy "$CHAIN_TEST_EVENT_POLICY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$CHAIN_TEST_SOURCE_SHA" --comparison-base "$CHAIN_TEST_COMPARISON_BASE"
       - name: Preserve actual group results and native evidence
         if: always()
@@ -212,7 +216,7 @@ jobs:
           name: regression-${{ github.run_id }}-${{ github.run_attempt }}-native-process
           path: ${{ runner.temp }}/groups/native-process
       - name: Recheck covered producer immediately before aggregation
-        if: needs.cohort-routing.outputs.decision == 'reuse'
+        if: contains(fromJSON('["reuse","policy-reuse"]'), needs.cohort-routing.outputs.decision)
         run: node scripts/agent-tools/ci-routing.mjs --max-wait-ms 0 --descriptor "$RUNNER_TEMP/validation/descriptor/descriptor.json" --comparison-base "$CHAIN_TEST_COMPARISON_BASE" --evidence-dir "$RUNNER_TEMP/final-routing"
       - name: Verify complete required cohort
         id: aggregate

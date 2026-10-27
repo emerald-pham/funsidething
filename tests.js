@@ -45211,3 +45211,92 @@ test('RISK independent cloud boot authority: source-only preflight waits for bou
  assert.equal(JSON.stringify(ctx.state),local);assert.equal(shim.document.getElementById('addInput').value,'Draft after unavailable boot');assert.equal(ctx.state.syncDirty,true);
  assert.equal(JSON.parse(remote.payload).tasks.some(row=>row.title==='Accepted after bounded unavailable boot'),false,'server-only repair never uploads unobserved accepted local work');
 });
+
+
+test('RISK repository process: policy prose receipts inherit only identical product evidence',async()=>{
+ const root=fs.mkdtempSync(path.join(process.env.TMPDIR||'/tmp','chain-policy-prose-')),repo=path.join(root,'repo');
+ fs.mkdirSync(repo);releaseGateGit(repo,['init','-q']);releaseGateGit(repo,['config','user.name','Policy fixture']);releaseGateGit(repo,['config','user.email','policy@example.invalid']);
+ const policy='Read [release and review](docs/agents/release-and-review.md) before release.\nIndependent FAQ coverage review is required for every product release.\n';
+ fs.writeFileSync(path.join(repo,'AGENTS.md'),policy);fs.writeFileSync(path.join(repo,'index.html'),'<p>Version one</p>\n');
+ releaseGateGit(repo,['add','.']);releaseGateGit(repo,['commit','-qm','Initial product']);const initial=releaseGateGit(repo,['rev-parse','HEAD']);
+ fs.writeFileSync(path.join(repo,'index.html'),'<p>Version two</p>\n');releaseGateGit(repo,['add','.']);releaseGateGit(repo,['commit','-qm','Reviewed product']);
+ const base=releaseGateGit(repo,['rev-parse','HEAD']),baseTree=releaseGateGit(repo,['rev-parse','HEAD^{tree}']);
+ const fixture={root,repo,candidateSha:base,baseSha:initial,treeSha:baseTree,sourcePath:path.join(root,'source.md')};fs.writeFileSync(fixture.sourcePath,'Fixture source for inherited product review.\n');
+ for(const [key,name] of [['ownerEvidencePath','owner'],['codeEvidencePath','code'],['faqEvidencePath','faq'],['specialistEvidencePath','specialist']]){fixture[key]=path.join(root,name+'.md');fs.writeFileSync(fixture[key],'Exact source fixture '+name+' review inspected its scope and all applicable evidence.\n');}
+ const cli=(command,...args)=>spawnSync(process.execPath,[path.join(__dirname,'scripts/release-evidence.mjs'),command,...args],{cwd:repo,encoding:'utf8',timeout:15000});
+ const inputPath=path.join(root,'input.json');
+ const product=riskBasedReleaseInput(fixture,{specialistReview:false});
+ product.faqReview={...product.independentReview,task:'/root/policy-fixture-faq',evidencePath:fixture.faqEvidencePath,evidenceSha256:releaseGateHash(fixture.faqEvidencePath)};
+ fs.writeFileSync(inputPath,JSON.stringify(product));
+ try{
+  const prior=cli('record',inputPath);assert.equal(prior.status,0,prior.stdout+prior.stderr);
+  const priorPath=path.join(repo,'.git/funsidething-release-evidence',base,'receipt.json'),priorReceipt=JSON.parse(fs.readFileSync(priorPath));
+  const rendered=path.join(root,'rendered.json'),capture=path.join(root,'capture.txt');fs.writeFileSync(capture,'Bounded synthetic rendered artifact; no real rendering claimed.\n');fs.writeFileSync(rendered,JSON.stringify({schemaVersion:1,reviewedSha:base,treeSha:baseTree,outcome:'approved',task:'/root/independent-rendered-fixture',artifacts:[{evidencePath:capture,sha256:releaseGateHash(capture)}],summary:'Independent rendered review inspected the exact product source and retained evidence.'}));
+  fs.writeFileSync(path.join(repo,'AGENTS.md'),policy.replace('Read [release and review]','Consult [release and review guidance]').replace(' before release.','\nbefore release.'));
+  releaseGateGit(repo,['add','.']);releaseGateGit(repo,['commit','-qm','Instruction preserving policy reflow']);
+  fixture.candidateSha=releaseGateGit(repo,['rev-parse','HEAD']);fixture.treeSha=releaseGateGit(repo,['rev-parse','HEAD^{tree}']);fixture.baseSha=base;
+  const input=riskBasedReleaseInput(fixture,{codeReview:false,domains:['release-process']});
+  input.policyInheritance={reviewedSha:base,receiptSha256:priorReceipt.receiptSha256,renderedEvidencePath:rendered,renderedEvidenceSha256:releaseGateHash(rendered)};
+  fs.writeFileSync(inputPath,JSON.stringify({...input,policyInheritance:undefined}));assert.notEqual(cli('record',inputPath).status,0,'missing inherited evidence fails closed');
+  fs.writeFileSync(inputPath,JSON.stringify({...input,specialistReview:undefined}));assert.notEqual(cli('record',inputPath).status,0,'current policy review remains independent and mandatory');
+  const completeRendered=fs.readFileSync(rendered);fs.writeFileSync(rendered,JSON.stringify({...JSON.parse(completeRendered),artifacts:[]}));
+  const incomplete={...input,policyInheritance:{...input.policyInheritance,renderedEvidenceSha256:releaseGateHash(rendered)}};fs.writeFileSync(inputPath,JSON.stringify(incomplete));
+  assert.notEqual(cli('record',inputPath).status,0,'a rendered approval without fingerprinted source artifacts must not authorize inheritance');
+  fs.writeFileSync(rendered,completeRendered);fs.writeFileSync(inputPath,JSON.stringify(input));
+  const recorded=cli('record',inputPath);
+  assert.equal(recorded.status,0,'The public recorder must retain policy specialist review while inheriting unchanged product/FAQ/rendered evidence:\n'+recorded.stdout+recorded.stderr);
+  const currentPath=path.join(repo,'.git/funsidething-release-evidence',fixture.candidateSha,'receipt.json'),receipt=JSON.parse(fs.readFileSync(currentPath));
+  assert.equal(receipt.reviewPlan.requiresCodeReview,false);assert.equal(Boolean(receipt.reviewPlan.requiresFaqReview),false);assert.deepEqual(receipt.reviewPlan.specialistDomains,['release-process']);
+  assert.equal(receipt.reviewPlan.policyProse.baseSha,base);assert.equal(receipt.reviewPlan.policyProse.sourceSha,fixture.candidateSha);assert.equal(receipt.policyInheritance.reviewedSha,base);
+  assert.equal(receipt.policyInheritance.receiptSha256,priorReceipt.receiptSha256);assert.equal(receipt.policyInheritance.faqEvidenceSha256,priorReceipt.faqReview.evidence.sha256);
+  assert.equal(cli('verify',fixture.candidateSha).status,0,'a fresh process must rederive classification and inherited evidence');
+  const {publishReleaseStatuses,validatePolicyProseStatuses}=await import('./scripts/release-evidence.mjs');
+  releaseGateGit(repo,['remote','add','origin','https://github.com/fixture/repo.git']);
+  const statuses=[];await publishReleaseStatuses(repo,fixture.candidateSha,async status=>statuses.push({...status,created_at:new Date().toISOString()}));
+  assert.equal(statuses.length,3,'all existing status contexts remain published');assert.ok(statuses.every(status=>status.description.endsWith(';v=4')));
+  assert.equal(validatePolicyProseStatuses(repo,fixture.candidateSha,base,statuses).receiptSha256,receipt.receiptSha256);
+  const {verifyDeploymentEvidence}=await import('./scripts/release-evidence.mjs');
+  const main=releaseGateGit(repo,['commit-tree',fixture.treeSha,'-p',base,'-p',fixture.candidateSha,'-m','Policy fixture main merge']);
+  const deploy=values=>verifyDeploymentEvidence({repoRoot:repo,repository:'fixture/repo',deployedSha:main,beforeSha:base,token:'fixture-read-token',fetchImpl:async url=>{
+   const pathname=new URL(url).pathname;let body;
+   if(pathname.endsWith('/commits/'+main+'/pulls'))body=[{number:17,merged_at:new Date().toISOString(),merge_commit_sha:main,head:{sha:fixture.candidateSha},base:{ref:'main'}}];
+   else if(pathname.endsWith('/commits/'+main))body={parents:[{sha:base}],commit:{tree:{sha:fixture.treeSha}}};
+   else if(pathname.endsWith('/commits/'+fixture.candidateSha))body={commit:{tree:{sha:fixture.treeSha}}};
+   else if(pathname.endsWith('/compare/'+base+'...'+fixture.candidateSha))body={status:'ahead'};
+   else if(pathname.endsWith('/commits/'+fixture.candidateSha+'/statuses'))body=values;
+   else throw new Error('Unexpected policy deployment request '+pathname);
+   return {ok:true,json:async()=>body};
+  }});
+  const deployed=await deploy(statuses);assert.equal(deployed.ok,true,deployed.errors.join('; '));assert.equal(deployed.reviewedSha,fixture.candidateSha);
+  assert.equal((await deploy(statuses.slice(1))).ok,false,'policy deployment retains every required current context');
+
+  const faqCopy=path.join(path.dirname(currentPath),'inherited-faq-review.md'),faqBytes=fs.readFileSync(faqCopy);fs.writeFileSync(faqCopy,'tampered');assert.notEqual(cli('verify',fixture.candidateSha).status,0,'inherited FAQ bytes remain fingerprinted');fs.writeFileSync(faqCopy,faqBytes);
+  fs.writeFileSync(path.join(path.dirname(currentPath),'inherited-rendered.json'),'tampered');
+  const changed=cli('verify',fixture.candidateSha);assert.notEqual(changed.status,0,'inherited rendered bytes remain fingerprinted');
+  fs.rmSync(path.dirname(currentPath),{recursive:true,force:true});
+  const escalated={...input,additionalSpecialistDomains:['security-deployment'],specialistReview:{...input.specialistReview,domains:['release-process','security-deployment']}};fs.writeFileSync(inputPath,JSON.stringify(escalated));
+  const escalatedRecorded=cli('record',inputPath);assert.equal(escalatedRecorded.status,0,escalatedRecorded.stdout+escalatedRecorded.stderr);
+  const escalatedStatuses=[];await publishReleaseStatuses(repo,fixture.candidateSha,async status=>escalatedStatuses.push({...status,created_at:new Date().toISOString()}));
+  assert.ok(escalatedStatuses.every(status=>status.description.endsWith(';v=2')),'additional specialist escalation retains full CI routing rather than issuing an unsupported narrow status');
+  assert.equal((await deploy(escalatedStatuses)).ok,true,'stronger review roles remain deployable through full validation');
+
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+
+test('RISK repository process: policy prose false exemptions retain full applicable review',async()=>{
+ const {deriveReleaseReviewPlan,derivePolicyProseImpact}=await import('./scripts/release-evidence.mjs');
+ const cases=[
+  ['authorization','AGENTS.md','The owner must approve publication.\n','Any contributor may approve publication.\n'],
+  ['gate weakening','AGENTS.md','Run all required tests before release.\n','Skip required tests before release.\n'],
+  ['new policy obligation','AGENTS.md','Read [release](guide.md) before release.\n','Read [release](guide.md) before release.\nSkip review when convenient.\n'],
+  ['changed destination','AGENTS.md','Read [release](guide.md) before release.\n','Read [release](other.md) before release.\n'],
+  ['configuration','package.json','{"scripts":{"test":"node --test"}}\n','{"scripts":{"test":"true"}}\n'],
+  ['executable policy comments','scripts/release-evidence.mjs','// Old gate description\n','// New gate description\n'],
+  ['workflow','AGENTS.yml','jobs: full\n','jobs: skipped\n'],
+  ['ambiguous instruction','docs/agents/release.md','Review every candidate.\n','Review selected candidates.\n'],
+  ['Markdown code boundary','AGENTS.md','Read [release](guide.md) before release.\n','    Read [release](guide.md) before release.\n'],
+ ];
+ for(const [name,changedPath,baseText,candidateText]of cases){const f=makeReleaseGateFixture({changedPath,baseText,candidateText});try{const plan=deriveReleaseReviewPlan(f.repo,f.candidateSha,f.baseSha);assert.equal(plan.policyProse,undefined,name+' must not inherit product evidence');assert.equal(plan.requiresCodeReview,true,name+' retains independent code review');assert.equal(derivePolicyProseImpact(f.repo,f.candidateSha,f.baseSha),null);}finally{cleanupReleaseGateFixture(f);}}
+ const mixed=makeReleaseGateFixture({changedPath:'AGENTS.md',baseText:'Read [release](guide.md) before release.\n',candidateText:'Consult [release guidance](guide.md) before release.\n'});
+ try{fs.writeFileSync(path.join(mixed.repo,'new-runtime.js'),'export const enabled = true;\n');releaseGateGit(mixed.repo,['add','.']);releaseGateGit(mixed.repo,['commit','-qm','Mixed functional change']);const sha=releaseGateGit(mixed.repo,['rev-parse','HEAD']);const plan=deriveReleaseReviewPlan(mixed.repo,sha,mixed.baseSha);assert.equal(plan.policyProse,undefined);assert.equal(plan.requiresCodeReview,true);assert.ok(plan.specialistDomains.includes('release-process'));}finally{cleanupReleaseGateFixture(mixed);}
+});

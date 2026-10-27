@@ -2242,3 +2242,10 @@ Protect actual automatic recovery, manual source review, exact protected copies 
 - RISK support diagnostics: event retention and malformed observer input stay bounded and redacted
 
 The real Sync → Review action and Copy debug log consumer distinguish failed pending-upload, recovery-hold and head reads, fixed exception categories and temporary connection aliases. Repeated failures still stop after the existing one recheck. Exact device/cloud originals, unfinished drafts, source-selection guards and the 24 KiB report/512-byte event limits stay intact. Arbitrary error messages, paths, account identifiers, out-of-range aliases, extra fields and changing/throwing getters cannot enter the copied report. The current physical-phone failure remains unreproduced; these diagnostics do not repair data or establish its cause.
+
+## Policy prose release evidence inheritance
+
+- RISK repository process: policy prose receipts inherit only identical product evidence
+- RISK repository process: policy prose false exemptions retain full applicable review
+
+Public recording and fresh verification preserve full source/base/tree inventories, current independent policy review, immutable product/FAQ/rendered reports and all three required statuses. Instruction-preserving prose reuses only unchanged product evidence; authorization, gate weakening, executable/configuration/test, mixed and ambiguous changes keep full applicable review. Public CI routing and covered/aggregate command cohorts retain exact producer execution, rules/compatibility, current statuses and zero claimed current test outcomes. Hosted proof remains a separate release requirement.
