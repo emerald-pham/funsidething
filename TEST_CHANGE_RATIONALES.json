@@ -20264,5 +20264,24 @@
       "command": "node --test --test-name-pattern=\"diagnostic recorder refuses missing\" scripts/agent-tools/checkpoint-progress.test.mjs",
       "failure": "Contemporaneous /Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/286/red-missing-state.txt: no diagnostic child may start without durable authorization, true !== false. Early raw logs preserve chronology but lack per-stage dirty-source snapshots. Fully fingerprinted subsequent RED/GREEN: approval-authority-red/2026-10-27T03-25-20-748Z-a9de3a35-75c6-42c6-8a3e-665809804f09.json observed caller-authored approval accepted (0); approval-authority-green/2026-10-27T03-25-52-793Z-60cb8c21-1b93-4b8d-960c-34943ce080e8.json passes. Unknown-option red-admission.txt is infrastructure and confers no RED credit."
     }
+  },
+  {
+    "baseCommit": "0e4fefb5eaebcd2007406ae95f2ce69904e0e27d",
+    "testChangesSha256": "8ec2e9227909c728c9c46dd619d314cf011832c22a8dacf9335454a88ac734bd",
+    "reason": "Carry #324's existing public preflight failure cases into the required test-group and process-risk cohort; require the actual stale-FAQ and unassigned-root outcomes exactly once.",
+    "previousBehavior": "Candidates could retain a stale unreadable-device FAQ assertion, and newly added roots could remain unassigned until a later hosted gate; focused preflight did not run these checks early.",
+    "intendedBehavior": "The public local preflight runs the existing FAQ contract when recovery guidance changes and validates current group registrations before expensive qualification; the process-risk root ensures both discriminating failure contracts remain in the default suite.",
+    "replacementTests": [
+      "RISK repository process: local preflight rejects stale FAQ and unassigned roots before qualification"
+    ],
+    "preservedCoverage": [
+      "Existing default-sky, FAQ-brevity, comparison/upstream and test-first contracts remain intact; the new process test runs only the existing preflight fixture parent and its named stale-FAQ and unassigned-root subtests.",
+      "The process wrapper clears NODE_TEST_CONTEXT and requires one completed TAP outcome for each named case plus three passing, zero skipped, zero failed outcomes; it does not launch a full suite or claim hosted or release proof."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='preflight reports the existing FAQ length failure before full regression' scripts/agent-tools/preflight.test.mjs",
+      "failure": "Original preimplementation RED on 779c7df is preserved at /Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/324/runs/2026-10-27T03-33-17-927Z-3390405c-b714-4c84-9d1e-6d2710db503b.json and its stdout file. The stale-FAQ and newly unassigned-root fixture processes each returned 0 and printed Preflight passed, so the expected exit-1 assertions failed with 0 !== 1; the recorder retains source/test fingerprints and actual timestamps. The tests.js process-RISK wrapper was added later as integration coverage and is not presented as the original RED."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/324"
   }
 ]
