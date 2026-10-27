@@ -9,14 +9,16 @@ npm run agent:validate-workflows
 ```
 
 Setup verifies the upstream release archive SHA-256 and stores the executable
-under the ignored, checkout-local `node_modules/.cache` directory. Validation
-never downloads or installs tools. If the pinned executable is absent or
-invalid, validation fails with the exact setup command. To preserve a JSON
-validation receipt, pass `--evidence-file <path>` to `agent:validate-workflows`;
-without that option it prints a bounded source hash and validator result and
-writes no files.
+and extracted executable SHA-256 values and stores it under the ignored,
+checkout-local `node_modules/.cache` directory. Validation never downloads or
+installs tools. Its optional external ShellCheck and Pyflakes integrations are
+explicitly disabled so their presence on `PATH` cannot change the result. If
+the pinned executable is absent or invalid, validation fails with the exact
+setup command. To preserve a JSON validation receipt, pass `--evidence-file
+<path>` to `agent:validate-workflows`; without that option it prints a bounded
+source hash and validator result and writes no files.
 
-From the repository root, run this before shell packaging and the expensive final regression:
+From the repository root, run this before shell packaging and the expensive final regression. It first validates the current `.github/workflows` bytes with the pinned actionlint setup, then runs the focused copy checks, current test-group registration checks, and test-first/rationale checks. Missing or invalid actionlint setup stops preflight before any test child starts. The validator prints the sorted workflow content hash and writes no files unless an evidence path is explicitly supplied to its standalone command.
 
 ```sh
 node scripts/agent-tools/preflight.mjs [--base <ref>]
@@ -30,4 +32,4 @@ It also checks the current branch's published upstream tip when configured. Iden
 
 All comparisons use the existing local ref snapshot. Preflight performs no fetch, write, checkout or branch/configuration change. It does not launch the full suite, group suites, browsers, servers, or emulators. Follow the existing start-of-work `git fetch origin --prune` prerequisite in [cleanup](cleanup.md) before relying on those refs; preflight cannot establish that a remote has not changed since the fetch.
 
-A preflight pass covers only the selected focused copy checks, current group registration metadata, and test-first/rationale validation. It is focused evidence, not release proof. Continue the required full suite, rules, compatibility, CI, exact-release, deployment, and live checks under the [workflow](workflow.md) and [release gates](release-and-review.md).
+A preflight pass covers only pinned static workflow validation, the selected focused copy checks, current group registration metadata, and test-first/rationale validation. It is focused evidence, not release proof. Continue the required full suite, rules, compatibility, CI, exact-release, deployment, and live checks under the [workflow](workflow.md) and [release gates](release-and-review.md).

@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
-import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
+import { ACTIONLINT_VERSION } from './workflow-validator.mjs';
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const preflight = path.join(repositoryRoot, 'scripts/agent-tools/preflight.mjs');
@@ -82,6 +83,25 @@ function childEnvironment() {
   return env;
 }
 
+async function seedWorkflowValidation(fixtureRoot) {
+  const workflowFile = '.github/workflows/data-safety.yml';
+  const helperFile = 'scripts/agent-tools/workflow-validator.mjs';
+  for (const file of [workflowFile, helperFile]) {
+    const target = path.join(fixtureRoot, file);
+    await mkdir(path.dirname(target), { recursive: true });
+    await copyFile(path.join(repositoryRoot, file), target);
+  }
+  const cacheRelative = path.join('node_modules', '.cache', 'funsidething', 'actionlint', `v${ACTIONLINT_VERSION}`, `${process.platform}-${process.arch}`);
+  const fixtureCache = path.join(fixtureRoot, cacheRelative);
+  const sourceCache = path.join(repositoryRoot, cacheRelative);
+  await mkdir(fixtureCache, { recursive: true });
+  await Promise.all([
+    copyFile(path.join(sourceCache, 'actionlint'), path.join(fixtureCache, 'actionlint')),
+    copyFile(path.join(sourceCache, 'manifest.json'), path.join(fixtureCache, 'manifest.json')),
+  ]);
+  await chmod(path.join(fixtureCache, 'actionlint'), 0o755);
+}
+
 async function createAppFixture(t, suffix) {
   const fixtureRoot = await mkdtemp(path.join(os.tmpdir(), `chain-preflight-${suffix}-`));
   t.after(() => rm(fixtureRoot, { recursive: true, force: true }));
@@ -89,13 +109,15 @@ async function createAppFixture(t, suffix) {
     'tests.js', 'index.html', 'app-release.js', 'location.js', 'vendor/lz-string-1.5.0.min.js',
     'package.json', 'scripts/test-first-gate.mjs', 'scripts/test-groups.mjs',
     'scripts/release-evidence.mjs', 'scripts/test-group-inventory.json', 'scripts/test-group-assignments.json',
-    'scripts/agent-tools/preflight.fixture.test.mjs',
+    'scripts/agent-tools/preflight.fixture.test.mjs', 'scripts/agent-tools/workflow-validator.mjs',
+    '.github/workflows/data-safety.yml',
   ];
-  for (const relative of fixtureFiles.filter(file => file !== 'scripts/agent-tools/preflight.fixture.test.mjs')) {
+  for (const relative of fixtureFiles.filter(file => !['scripts/agent-tools/preflight.fixture.test.mjs', 'scripts/agent-tools/workflow-validator.mjs', '.github/workflows/data-safety.yml'].includes(file))) {
     const target = path.join(fixtureRoot, relative);
     await mkdir(path.dirname(target), { recursive: true });
     await copyFile(path.join(repositoryRoot, relative), target);
   }
+  await seedWorkflowValidation(fixtureRoot);
   await writeFile(path.join(fixtureRoot, 'TEST_CHANGE_RATIONALES.json'), '[]\n');
   const testsPath = path.join(fixtureRoot, 'tests.js');
   await writeFile(testsPath, `${await readFile(testsPath, 'utf8')}\ntest('UNSELECTED FULL SUITE SENTINEL', () => { process.stdout.write('PREFLIGHT_FULL_SUITE_CHILD_SENTINEL\\n'); });\n`);
@@ -205,6 +227,7 @@ async function runPreflight(fixture, evidenceName) {
 test('preflight stops after a failed focused check instead of launching the full test suite', async t => {
   const fixtureRoot = await mkdtemp(path.join(os.tmpdir(), 'chain-preflight-fail-fast-'));
   t.after(() => rm(fixtureRoot, { recursive: true, force: true }));
+  await seedWorkflowValidation(fixtureRoot);
   await writeFile(path.join(fixtureRoot, 'tests.js'), `
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -233,6 +256,7 @@ test('UNSELECTED FULL SUITE SENTINEL', () => {
 test('preflight reports the existing rationale validator failure after focused checks pass', async t => {
   const fixtureRoot = await mkdtemp(path.join(os.tmpdir(), 'chain-preflight-rationale-'));
   t.after(() => rm(fixtureRoot, { recursive: true, force: true }));
+  await seedWorkflowValidation(fixtureRoot);
   await mkdir(path.join(fixtureRoot, 'scripts'), { recursive: true });
   await copyFile(path.join(repositoryRoot, 'scripts/test-first-gate.mjs'), path.join(fixtureRoot, 'scripts/test-first-gate.mjs'));
   await writeFile(path.join(fixtureRoot, 'TEST_CHANGE_RATIONALES.json'), '[]\n');
@@ -290,6 +314,38 @@ test('preflight fails closed when a selected existing contract is missing', asyn
   });
 });
 
+test('preflight rejects a workflow expression unavailable at job scope before full qualification', async t => {
+  const fixture = await createAppFixture(t, 'invalid-workflow-context');
+  await writeFile(path.join(fixture.fixtureRoot, '.github/workflows/data-safety.yml'), `name: Workflow fixture
+on: push
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: \${{ runner.temp }}/playwright-browsers
+    steps:
+      - run: echo valid step
+`);
+  runGit(fixture.fixtureRoot, ['add', '.github/workflows/data-safety.yml']);
+  runGit(fixture.fixtureRoot, ['commit', '-m', 'add invalid job-scope runner context']);
+  fixture.base = runGit(fixture.fixtureRoot, ['rev-parse', 'HEAD']);
+
+  const { result, output } = await runPreflight(fixture, 'invalid-workflow-context');
+  assert.equal(result.status, 1, output);
+  assert.match(output, /Preflight: pinned workflow validation/);
+  assert.doesNotMatch(output, /Preflight: existing help and copy contracts/);
+  assert.match(output, /workflow|actionlint|runner/i);
+  assert.doesNotMatch(output, /PREFLIGHT_FULL_SUITE_CHILD_SENTINEL/);
+
+  const missingFixture = await createAppFixture(t, 'missing-workflow-validator-setup');
+  await rm(path.join(missingFixture.fixtureRoot, 'node_modules'), { recursive: true, force: true });
+  const missingSetup = await runPreflight(missingFixture, 'missing-workflow-validator-setup');
+  assert.equal(missingSetup.result.status, 2, missingSetup.output);
+  assert.match(missingSetup.output, /Pinned actionlint v1\.7\.12 is not set up in this repository/);
+  assert.match(missingSetup.output, /npm run agent:setup-workflow-validator/);
+  assert.doesNotMatch(missingSetup.output, /Preflight: existing help and copy contracts|PREFLIGHT_FULL_SUITE_CHILD_SENTINEL/);
+});
+
 test('preflight passes the existing wording, FAQ, and rationale contracts on a valid isolated repository', async t => {
   const fixture = await createAppFixture(t, 'valid-app');
   const registeredRoot = 'Preflight fixture: valid newly assigned root';
@@ -303,7 +359,7 @@ test('preflight passes the existing wording, FAQ, and rationale contracts on a v
   assert.ok(output.includes('✔ ' + unreadableDeviceFaqTest));
   assert.match(output, /Test-first diff gate passed\./);
   assert.match(output, /Current group registrations passed: \d+ assigned roots, 1 recognized process control, 1 newly assigned root\./);
-  assert.match(output, /Preflight passed: focused help\/copy, group-registration, and test-first\/rationale validation/);
+  assert.match(output, /Preflight passed: pinned workflow, focused help\/copy, group-registration, and test-first\/rationale validation/);
   assert.doesNotMatch(output, /PREFLIGHT_FULL_SUITE_SENTINEL/);
 });
 
