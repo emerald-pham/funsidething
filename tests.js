@@ -29260,6 +29260,8 @@ test('RISK repository process: release recording classifies the tail of a comple
    'release:verify':'node scripts/release-evidence.mjs verify'
   }}));
   fs.copyFileSync(path.join(__dirname,'scripts/release-evidence.mjs'),path.join(fixture.repo,'scripts/release-evidence.mjs'));
+  fs.mkdirSync(path.join(fixture.repo,'scripts/agent-tools'),{recursive:true});
+  fs.copyFileSync(path.join(__dirname,'scripts/agent-tools/checkpoint-progress.mjs'),path.join(fixture.repo,'scripts/agent-tools/checkpoint-progress.mjs'));
   const inputPath=path.join(fixture.root,'release-input.json');
   fs.writeFileSync(inputPath,JSON.stringify(riskBasedReleaseInput(fixture,{domains:['security-deployment']}),null,2)+'\n');
   return { ...fixture,inputPath,receiptPath:path.join(fixture.repo,'.git','funsidething-release-evidence',fixture.candidateSha,'receipt.json') };
@@ -45320,6 +45322,25 @@ test('RISK repository process: diagnostic checkpoints retain finite authority ac
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
  const result=spawnSync(process.execPath,['--test','--test-reporter=tap',path.join(__dirname,'scripts/agent-tools/checkpoint-progress.test.mjs')],{encoding:'utf8',timeout:30000,env});
  assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
- assert.match(result.stdout,/^# tests 13$/m,'the actual thirteen process contracts must execute, rather than an empty child pass');
- assert.match(result.stdout,/^# pass 13$/m);assert.match(result.stdout,/^# skipped 0$/m);
+ assert.match(result.stdout,/^# tests 15$/m,'the actual fifteen process contracts must execute, rather than an empty child pass');
+ assert.match(result.stdout,/^# pass 15$/m);assert.match(result.stdout,/^# skipped 0$/m);
+});
+
+test('RISK repository process: known frozen diagnostic source derives narrow eligibility from exact content',()=>{
+ const result=spawnSync(process.execPath,[path.join(__dirname,'scripts/release-evidence.mjs'),'diagnostic-plan','c899e5e983cd756152c1d0c8057ffe8455e80956','b176026825e4f9539780f745fe60e09cf348d288'],{cwd:__dirname,encoding:'utf8',timeout:20000});
+ assert.equal(result.status,0,result.stderr);const plan=JSON.parse(result.stdout);assert.equal(plan.eligible,true,'the exact canonical observer preserves frozen product and dependency bytes');assert.equal(plan.kind,'nonqualifying-diagnostic-plan');
+});
+
+test('RISK repository process: diagnostic source cannot acquire product receipts through ordinary record',async()=>{
+ const f=makeReleaseGateFixture({changedPath:'README.md',baseText:'Frozen documentation\n',candidateText:'Clarified documentation\n'});
+ try{fs.writeFileSync(path.join(f.repo,'.diagnostic-task.json'),JSON.stringify({schemaVersion:1,mode:'diagnostic-only',task:286,repository:'emerald-pham/funsidething',publicKey:'fixture-key'}));releaseGateGit(f.repo,['add','.diagnostic-task.json']);releaseGateGit(f.repo,['commit','-qm','Mark nonqualifying source']);f.candidateSha=releaseGateGit(f.repo,['rev-parse','HEAD']);f.treeSha=releaseGateGit(f.repo,['rev-parse','HEAD^{tree}']);
+ const input=path.join(f.root,'product-input.json');fs.writeFileSync(input,JSON.stringify(riskBasedReleaseInput(f,{domains:(await import('./scripts/release-evidence.mjs')).deriveReleaseReviewPlan(f.repo,f.candidateSha,f.baseSha).specialistDomains})));const result=spawnSync(process.execPath,[path.join(__dirname,'scripts/release-evidence.mjs'),'record',input],{cwd:f.repo,encoding:'utf8',timeout:20000});assert.notEqual(result.status,0,'ordinary record cannot turn diagnostic-only source into product approval');assert.match(result.stderr,/Diagnostic|diagnostic/);
+ }finally{cleanupReleaseGateFixture(f);}
+});
+
+
+test('RISK repository process: distributed diagnostic admission binds actual terminal failure without product qualification',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=terminal consumption uses|concurrent fresh launch|actual pre-push permits',path.join(__dirname,'scripts/agent-tools/diagnostic-receipt.test.mjs')],{encoding:'utf8',timeout:90000,env});
+ assert.equal(result.status,0,result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# tests 3$/m,'all three actual process boundary contracts must execute');assert.match(result.stdout,/^# pass 3$/m);assert.match(result.stdout,/^# skipped 0$/m);
 });

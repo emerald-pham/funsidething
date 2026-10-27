@@ -249,7 +249,38 @@ function verifyApprovalComment(repository, approval, expectedBody) {
     body: comment.body,
   };
 }
-function verifyAuthority(repo, state, portable = false) {
+function exactApprovalAppend(previous, current, approvalComment) {
+  const withoutComments = (issue) =>
+    Object.fromEntries(
+      Object.entries(issue).filter(
+        ([key]) => !["comments", "updatedAt"].includes(key),
+      ),
+    );
+  if (
+    JSON.stringify(withoutComments(previous)) !==
+      JSON.stringify(withoutComments(current)) ||
+    current.comments.length !== previous.comments.length + 1 ||
+    previous.comments.some(
+      (comment, index) =>
+        JSON.stringify(comment) !== JSON.stringify(current.comments[index]),
+    )
+  )
+    return false;
+  const last = current.comments.at(-1);
+  return (
+    last.id === approvalComment.id &&
+    last.html_url === approvalComment.url &&
+    last.body === approvalComment.body &&
+    last.user?.login === approvalComment.approvedBy &&
+    last.author_association === "OWNER"
+  );
+}
+function verifyAuthority(
+  repo,
+  state,
+  portable = false,
+  approvalComment = null,
+) {
   for (const event of state.events ?? []) {
     if (
       event.type === "explicit-extension" &&
@@ -274,14 +305,30 @@ function verifyAuthority(repo, state, portable = false) {
         event.approvalComment.body,
       );
   const current = authority(repo, state.task);
+  const taskSame = current.task.fingerprint === state.taskIssue.fingerprint,
+    parentSame = current.parent.fingerprint === state.sourceIssue.fingerprint;
+  const authorizedAppend =
+    approvalComment &&
+    ((taskSame &&
+      exactApprovalAppend(
+        state.sourceIssue.issue,
+        current.parent.issue,
+        approvalComment,
+      )) ||
+      (parentSame &&
+        exactApprovalAppend(
+          state.taskIssue.issue,
+          current.task.issue,
+          approvalComment,
+        )));
   if (
     current.repository !== state.repository ||
-    current.task.fingerprint !== state.taskIssue.fingerprint ||
-    current.parent.fingerprint !== state.sourceIssue.fingerprint
+    (!(taskSame && parentSame) && !authorizedAppend)
   )
     throw Error(
       "Diagnostic source issue changed or stale; preserve state and reconcile the changed authority before admission.",
     );
+  return current;
 }
 function source(repo, base, paths) {
   const commit = git(repo, "rev-parse", "HEAD^{commit}"),
@@ -466,7 +513,8 @@ export function verifyDiagnosticCI(repo, commit, input) {
   if (
     state.task !== marker.task ||
     state.repository !== marker.repository ||
-    state.sourceIssue.fingerprint !== marker.sourceIssueFingerprint ||
+    (state.startingSourceIssueFingerprint ?? state.sourceIssue.fingerprint) !==
+      marker.sourceIssueFingerprint ||
     !attempt ||
     attempt.consumed ||
     attempt.result ||
@@ -483,7 +531,7 @@ export function verifyDiagnosticCI(repo, commit, input) {
     );
   verifyAuthority(repo, state, true);
   const actual = source(repo, state.source.base, state.sourcePaths);
-  if (actual.inputFingerprint !== state.source.inputFingerprint)
+  if (actual.commit !== commit || actual.tree !== state.source.tree || actual.inputFingerprint !== state.source.inputFingerprint)
     throw Error("Diagnostic CI actual inputs changed.");
   return {
     task: state.task,
@@ -633,6 +681,7 @@ export async function progressCommand(operation, options) {
         ),
         taskIssue: auth.task,
         sourceIssue: auth.parent,
+        startingSourceIssueFingerprint: auth.parent.fingerprint,
         source: source(repo, plan.base, plan.sourcePaths),
         ...Object.fromEntries(
           [
@@ -661,16 +710,18 @@ export async function progressCommand(operation, options) {
       throw Error("Diagnostic task identity mismatch.");
     if (operation === "inspect")
       return { ...summary(state), journalDigest: head.digest };
-    if (operation === "export") {
+    if (operation === "export" || operation === "export-public") {
       verifyAuthority(repo, state);
       verifySource(repo, state);
       const attempt = state.attempts.find((a) => a.id === options.attempt);
       if (!attempt || attempt.result || attempt.consumed)
         throw Error("Diagnostic export needs an admitted unfinished attempt.");
+      const publicState={task:state.task,repository:state.repository,owner:state.owner,source:state.source,sourcePaths:state.sourcePaths,gate:state.gate,status:state.status,allowance:state.allowance,taskIssue:{fingerprint:state.taskIssue.fingerprint},sourceIssue:{fingerprint:state.sourceIssue.fingerprint},startingSourceIssueFingerprint:state.startingSourceIssueFingerprint??state.sourceIssue.fingerprint,attempts:state.attempts.map(a=>({id:a.id,source:a.source,consumed:a.consumed})),events:state.events.filter(e=>e.type==='explicit-extension').map(e=>({type:e.type,approvalComment:e.approvalComment,approvedBy:e.approvedBy}))};
       const body = {
         schemaVersion: 1,
+        ...(operation==='export-public'?{public:true}:{}),
         journalDigest: head.digest,
-        state,
+        state:operation==='export-public'?publicState:state,
         attemptId: attempt.id,
       };
       const signature = sign(
@@ -686,7 +737,6 @@ export async function progressCommand(operation, options) {
       };
     }
     if (operation === "extend") {
-      verifyAuthority(repo, state);
       const approvalPath = path.resolve(options.approval),
         raw = read(approvalPath),
         approval = JSON.parse(raw);
@@ -718,6 +768,26 @@ export async function progressCommand(operation, options) {
         approval,
         read(path.resolve(evidence.path)),
       );
+      const currentAuthority = verifyAuthority(
+        repo,
+        state,
+        false,
+        approvalComment,
+      );
+      if (
+        currentAuthority.task.fingerprint !== state.taskIssue.fingerprint ||
+        currentAuthority.parent.fingerprint !== state.sourceIssue.fingerprint
+      ) {
+        state.events.push({
+          type: "approved-authority-append",
+          previousTaskIssue: state.taskIssue,
+          previousSourceIssue: state.sourceIssue,
+          approvalComment,
+          at: new Date().toISOString(),
+        });
+        state.taskIssue = currentAuthority.task;
+        state.sourceIssue = currentAuthority.parent;
+      }
       state.allowance += approval.additionalAttempts;
       state.events.push({
         type: "explicit-extension",
@@ -957,6 +1027,22 @@ export async function finishDiagnosticAttempt(repo, admission) {
     if (record.state !== "complete" && record.state !== "incomplete")
       throw Error("Diagnostic result did not reach a terminal state.");
     attempt.result = { path: attempt.resultPath, sha256: digest(raw) };
+    save(dir, state, head);
+  });
+}
+
+// Only the independently verified hosted terminal consumer calls this seam.
+// The local journal retains the same predeclared result path and allowance.
+export async function recordDiagnosticCIResult(repo, attemptId, record) {
+  return locked(repo, (dir) => {
+    const {state, head} = load(dir);
+    verifyAuthority(repo, state);
+    verifySource(repo, state);
+    const attempt = state.attempts.find(a => a.id === attemptId);
+    if (!attempt || attempt.result || attempt.consumed || record.git?.commit !== attempt.source.commit || record.state !== 'complete' || record.kind !== 'nonqualifying-diagnostic-ci-result')
+      throw Error('Diagnostic hosted terminal result is missing, stale or already recorded.');
+    immutable(attempt.resultPath, record);
+    attempt.result = {path: attempt.resultPath, sha256: digest(read(attempt.resultPath))};
     save(dir, state, head);
   });
 }

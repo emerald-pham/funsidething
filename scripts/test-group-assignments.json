@@ -12861,6 +12861,111 @@
       "root": "source prerequisites include paginated comments beyond the issue summary",
       "group": "native-process",
       "file": "scripts/agent-tools/checkpoint-progress.test.mjs"
+    },
+    {
+      "root": "an owner extension comment appended to the bound issue updates only that explicit authority append",
+      "group": "native-process",
+      "file": "scripts/agent-tools/checkpoint-progress.test.mjs"
+    },
+    {
+      "root": "public diagnostic receipt records frozen reviewed source with its admitted finite attempt",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "public diagnostic receipt transports no private journal bodies or local result pointers",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "a canonical atomic diagnostic permit dispatches once and a fresh duplicate only observes",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "independent CI claims the canonical permit once for exact run attempt one",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "the real isolated diagnostic consumer starts only for the winning CI claim and retains a missing attribution failure",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "terminal consumption uses same-run monitor logs and remote artifact digest while retaining the failed required gate",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "CI claim rejects a different actual GitHub source before any publication or runtime",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "portable verifier revalidates inherited full review bytes rather than trusting the local signing owner",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "actual pre-push permits only the admitted exact diagnostic destination and rejects promotion",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "portable authorization rejects observer-only HEAD drift even when selected inputs are unchanged",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "diagnostic eligibility and receipt rejection matrix performs zero publication and launch side effects",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "concurrent fresh launch processes publish one canonical permit and dispatch once",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "an interrupted canonical reservation stays unresolved without objects dispatch or renewed allowance",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "fresh checkout verifies portable frozen reviews and admitted attempt without local private journal or repeated review",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "terminal tamper missing logs and wrong run identity cannot consume or renew an admitted attempt",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "RISK repository process: known frozen diagnostic source derives narrow eligibility from exact content",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: diagnostic source cannot acquire product receipts through ordinary record",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: distributed diagnostic admission binds actual terminal failure without product qualification",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "an owner approval append cannot hide an unrelated task scope change",
+      "group": "native-process",
+      "file": "scripts/agent-tools/checkpoint-progress.test.mjs"
+    },
+    {
+      "root": "actual product verify publication and deployment gates reject diagnostic identity before outgoing statuses",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
     }
   ],
   "processControls": [

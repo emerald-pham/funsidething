@@ -2258,3 +2258,11 @@ Public recording and fresh verification preserve full source/base/tree inventori
 - RISK repository process: diagnostic checkpoints retain finite authority across fresh process and CI boundaries
 
 The existing checkpoint and recorder commands exercise disposable Git repositories, actual child processes, independent expected observations, concurrent admission, full source-issue refresh, finite budgets, immutable failed results, repository-owner approval and a separately cloned CI verifier. Diagnostic source cannot receive product release receipts. The unlanded WebKit consumer patch is retained separately until its owner integrates it; this contract does not establish hosted execution, physical-device recovery or private-board proof.
+
+## Nonqualifying source-bound diagnostic authority
+
+- `RISK repository process: known frozen diagnostic source derives narrow eligibility from exact content`
+- `RISK repository process: diagnostic source cannot acquire product receipts through ordinary record`
+- `RISK repository process: distributed diagnostic admission binds actual terminal failure without product qualification`
+
+The existing checkpoint process contract now includes an API-consistent owner approval append and rejection of an unrelated concurrent scope change. Narrow diagnostic tests use disposable repositories and a bounded fake external GitHub CLI; they prove local command/ref/process behavior, not hosted execution, native attribution, product qualification or physical-device repair.

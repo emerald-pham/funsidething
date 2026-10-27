@@ -613,3 +613,71 @@ test("source prerequisites include paginated comments beyond the issue summary",
     "the complete comment source must be bound even when the summary omits comments",
   );
 });
+
+test("an owner extension comment appended to the bound issue updates only that explicit authority append", (t) => {
+  const f = fixture(t);
+  assert.equal(f.start().status, 0);
+  const state = JSON.parse(f.inspect().stdout),
+    authorization = {
+      task: 286,
+      repository: "fixture/diagnostic",
+      priorDigest: state.journalDigest,
+      sourceCommit: state.source.commit,
+      additionalAttempts: 1,
+      reason: "One exact bounded additional diagnostic attempt is authorized",
+    };
+  const body = JSON.stringify(authorization),
+    evidence = path.join(f.root, "owner-comment.txt");
+  writeFileSync(evidence, body);
+  const comment = {
+    id: 124,
+    html_url:
+      "https://github.com/fixture/diagnostic/issues/286#issuecomment-124",
+    user: { login: "fixture" },
+    author_association: "OWNER",
+    body,
+  };
+  writeFileSync(
+    path.join(f.root, "github-approval.json"),
+    JSON.stringify(comment),
+  );
+  const issues = JSON.parse(readFileSync(f.issues));
+  issues[286].comments.push(comment);
+  issues[286].updatedAt = "2026-10-27T00:01:00Z";
+  writeFileSync(f.issues, JSON.stringify(issues));
+  const approval = path.join(f.root, "owner-approval.json");
+  writeFileSync(
+    approval,
+    JSON.stringify({
+      ...authorization,
+      approvedBy: "fixture",
+      commentUrl: comment.html_url,
+      authorizationEvidence: {
+        path: evidence,
+        sha256: awaitHash(readFileSync(evidence)),
+      },
+    }),
+  );
+  const extended = command(f, "extend", ["--approval", approval]);
+  assert.equal(extended.status, 0, extended.stderr);
+  assert.equal(
+    JSON.parse(f.inspect().stdout).remaining,
+    3,
+    "the explicit comment adds exactly its bounded allowance",
+  );
+  assert.equal(
+    f.launch().status,
+    1,
+    "a new context can launch using the coherently updated source authority",
+  );
+});
+
+test('an owner approval append cannot hide an unrelated task scope change', (t) => {
+  const f=fixture(t);assert.equal(f.start().status,0);const state=JSON.parse(f.inspect().stdout);
+  const authorized={task:286,repository:'fixture/diagnostic',priorDigest:state.journalDigest,sourceCommit:state.source.commit,additionalAttempts:1,reason:'One exact bounded additional diagnostic attempt is authorized'};
+  const body=JSON.stringify(authorized),evidence=path.join(f.root,'scope-comment.txt');writeFileSync(evidence,body);
+  const comment={id:125,html_url:'https://github.com/fixture/diagnostic/issues/286#issuecomment-125',user:{login:'fixture'},author_association:'OWNER',body};writeFileSync(path.join(f.root,'github-approval.json'),JSON.stringify(comment));
+  const issues=JSON.parse(readFileSync(f.issues));issues[286].comments.push(comment);issues[286].body+='\nUnrelated changed diagnostic scope';writeFileSync(f.issues,JSON.stringify(issues));
+  const approval=path.join(f.root,'scope-approval.json');writeFileSync(approval,JSON.stringify({...authorized,approvedBy:'fixture',commentUrl:comment.html_url,authorizationEvidence:{path:evidence,sha256:awaitHash(readFileSync(evidence))}}));
+  const result=command(f,'extend',['--approval',approval]);assert.notEqual(result.status,0);assert.match(result.stderr,/source issue changed|stale/);assert.equal(JSON.parse(f.inspect().stdout).remaining,2,'unrelated scope cannot acquire allowance through a real owner comment');
+});
