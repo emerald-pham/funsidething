@@ -20881,5 +20881,24 @@
       "command": "Original #323: node --test source consumer command is retained verbatim in artifacts323/consumer-red/2026-10-27T05-42-09-934Z-b93ca325-6bd3-4667-8b6c-e5161c4c33a3.json; original #289 governance: node --test --test-name-pattern=independently reviewed protected governance scripts/agent-tools/diagnostic-receipt.test.mjs, exact argv in artifacts289/governance-receipt-red/2026-10-27T05-01-19-431Z-42d618c8-d50d-4abe-9883-cfb87650dd42.json; each separate channel/native/concurrency RED remains in artifacts289/PROOF-INDEX.json.",
       "failure": "Original #323 consumer exited successfully while all six targeted browser consumers skipped; original #289 assertions observed missing governance binding, source-headed dispatch/claim, env-only admission, absent native capture and missing retained concurrent child identity. This merge-only metadata retains those distinct observed failures and does not manufacture a combined preimplementation RED."
     }
+  },
+  {
+    "baseCommit": "139ac15f847996c94ab4b53cdbf6f05e9ff4e43f",
+    "testChangesSha256": "c64d51879883d7a3f210ec9b2d55515f2b56bc276246ceada36688d00e468bb1",
+    "reason": "Integration metadata only: #323 inserts earlier test declarations and shifts the line-addressed #289 fingerprint relative to the current integration base. The unchanged #289 tests and implementation retain their original source-bound RED/GREEN; this record does not claim a new behavioral failure.",
+    "previousBehavior": "The separate parent and diagnostic candidates each carried their own executable process tests and original source-bound rationale, while no record yet identified their combined origin/main diff.",
+    "intendedBehavior": "The combined candidate retains the complete ordinary group and Chromium no_change/receipt contract alongside protected distinct-governance diagnostic admission, exact one-use descendant channel and nonqualifying native boundaries.",
+    "replacementTests": [
+      "RISK repository process: protected diagnostic governance remains distinct from frozen app source",
+      "RISK repository process: native diagnostic captures remain bounded and missing attribution never qualifies a repair"
+    ],
+    "preservedCoverage": [
+      "All 818 parent rationale records and all prior #289 records remain unchanged. Ordinary groups still execute every assigned case; #323 preflight never substitutes for ordinary execution.",
+      "Original frozen diagnostic app, dependencies, isolation, caps, timing, input and readiness remain unchanged. Native attribution remains partial/unavailable and never confers product release or physical-device qualification."
+    ],
+    "redEvidence": {
+      "command": "Original #323: node --test source consumer command is retained verbatim in artifacts323/consumer-red/2026-10-27T05-42-09-934Z-b93ca325-6bd3-4667-8b6c-e5161c4c33a3.json; original #289 governance: node --test --test-name-pattern=independently reviewed protected governance scripts/agent-tools/diagnostic-receipt.test.mjs, exact argv in artifacts289/governance-receipt-red/2026-10-27T05-01-19-431Z-42d618c8-d50d-4abe-9883-cfb87650dd42.json; each separate channel/native/concurrency RED remains in artifacts289/PROOF-INDEX.json.",
+      "failure": "Original #323 consumer exited successfully while all six targeted browser consumers skipped; original #289 assertions observed missing governance binding, source-headed dispatch/claim, env-only admission, absent native capture and missing retained concurrent child identity. This merge-only metadata retains those distinct observed failures and does not manufacture a combined preimplementation RED."
+    }
   }
 ]
