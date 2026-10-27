@@ -80,6 +80,43 @@ Changes to installed-client delivery also cross the required native command
 in [TDD and regression gates](tdd-and-regression.md#installed-client-regression).
 Use those existing consumers before introducing another harness or process.
 
+## Visible acceptance and owner brief
+
+For a reported visible symptom, keep one current owner brief that records the
+symptom, confirmed environment, expected visible before/after state, and safety
+boundary together. Label user-confirmed facts, owner assumptions, and later
+scope additions separately. Honor holds and resume from the corrected brief;
+existing authorization and agreed seams stay in force.
+
+Before candidate freeze, the owner and existing specification reviewer reconcile
+each agreed clause with executed evidence from its actual consumer, or record the
+specific gap and next action. A passing status badge or consumer does not prove
+that a board is fully visible. A material clarification updates the same brief,
+invalidates only affected acceptance evidence, and leaves unchanged producer
+proof attributable to its source. Use the existing
+[#245 checkpoint contract](checkpoints.md) for source-bound evidence and the
+single next action; do not add a parallel tracker or schema. Ask the user only
+for a genuinely missing product decision and continue independent work while it
+is pending. Do not ask for routine confirmation or code review, and do not infer
+intent with a classifier.
+
+For example, a report of “recovery pending” before a broken board, followed by
+confirmation that the board appears after about a second in the installed iPhone
+app, records the symptom, timing, environment, and broken-board context; the
+explicit hold remains in force until work resumes. It does not settle whether
+the complete board must appear while no appearance cache survives. The
+configured-module first-paint RED/GREEN records and rendered-status matrix check
+neutral opening status and real cloud errors, including after hydration;
+saved-view startup consumers check optional cached appearance. The later
+explicit request for the full familiar board, including with no appearance
+cache, adds a separate clause: the cold-start board consumer checks complete
+supported tasks and History with appearance hints absent, while preserving
+protected sources and read-only display. Keep genuine post-opening
+recovery/cloud errors as their own visible outcome. These synthetic consumers
+do not prove the private board or physical iPhone. If a user asks only to replace
+a confusing loading label while the correct board is already visible, keep
+acceptance status-only and do not infer a full-board rewrite.
+
 ## Browser choice
 
 Prefer the supported ChatGPT/Codex built-in browser (`@Browser`, the in-app
