@@ -14,6 +14,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK repository process: required parallel scanner aggregation rejects absent group evidence
 - RISK repository process: grouped catalog binds real declarations rather than quoted fixtures
 - RISK repository process: nested native fixture output stays isolated at the command boundary
+- RISK repository process: document query fixtures stay selector scoped and preserve shim results
 
 - RISK cloud recovery device connection: a failed handle is reopened within the same protected review
 - RISK cloud recovery reconnect guidance: mounted help explains reconnecting without replacing saved data
@@ -1600,6 +1601,8 @@ The actual intervention Yes records deliberate current-pass Scan intent even whe
 Preflight comparison coverage:
 - `RISK repository process: preflight catches outgoing upstream rationale gaps after the selected base passes`
   exercises the public command with a real published local Git branch, a passing selected comparison and a missing outgoing rationale. It preserves the existing gate, focused copy checks, refs, HEAD, tracked files and configuration.
+- `RISK repository process: local preflight rejects stale FAQ and unassigned roots before qualification`
+  runs the existing public preflight fixture through a fresh Node process and requires one completed outcome for the stale FAQ assertion, one for a newly unassigned root, and one for their parent case. The fixtures confirm each failure exits before the qualification sentinel; they do not stand in for hosted or release checks.
 
 The required npm test entry point surfaces a failing isolated agent-tool cohort with a nonzero result and its assertion output. Group-runner identity evidence preserves the independently captured TAP-escaped inventory while reporting canonical runtime titles, and native-child registration checks distinguish executable declarations from quoted fixture text while rejecting missing and duplicate controls.
 

@@ -9,6 +9,66 @@ import { test } from 'node:test';
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const preflight = path.join(repositoryRoot, 'scripts/agent-tools/preflight.mjs');
+const quickStartTest = 'RISK Quick start content: essential steps stay brief and detailed help remains user-facing in existing sections';
+const unreadableDeviceFaqTest = 'RISK unreadable device recovery: Quick start and current Changelog explain preserved sources and local pending recovery';
+const processControlOwner = 'Preflight fixture: explicit process-control owner';
+const processControlChild = 'Preflight fixture: recognized explicit process control';
+
+function fixtureInventory() {
+  const roots = [
+    { id: 'Landscape location: visible default-sky copy does not name Orlando', group: 'core', file: 'tests.js' },
+    { id: quickStartTest, group: 'core', file: 'tests.js' },
+    { id: unreadableDeviceFaqTest, group: 'persistence-recovery', file: 'tests.js' },
+    { id: 'Preflight fixture: scenery root', group: 'scenery', file: 'tests.js' },
+    { id: processControlOwner, group: 'native-process', file: 'scripts/agent-tools/preflight.fixture.test.mjs' },
+  ];
+  const groupIds = ['core', 'scenery', 'persistence-recovery', 'native-process'];
+  const counts = Object.fromEntries(groupIds.map(id => [id, roots.filter(root => root.group === id).length]));
+  return {
+    schemaVersion: 1,
+    baseline: {
+      repository: 'emerald-pham/funsidething', runId: 'preflight-fixture', eventPolicy: 'push',
+      sourceSha: '0'.repeat(40), sourceTree: '0'.repeat(40), checkoutSha: '0'.repeat(40),
+      checkoutTree: '0'.repeat(40), comparisonBase: '0'.repeat(40),
+      caseCount: roots.length, passed: roots.length, skipped: 0, failed: 0,
+    },
+    rootTests: roots.map(({ id }) => ({ id, durationMs: 1 })),
+    requiredCases: roots.map(({ id }) => ({ id, root: id })),
+    acceptedSkipCaseIds: [],
+    fixtureGroups: counts,
+  };
+}
+
+function fixtureAssignments(inventory) {
+  const roots = [
+    { root: 'Landscape location: visible default-sky copy does not name Orlando', group: 'core', file: 'tests.js' },
+    { root: quickStartTest, group: 'core', file: 'tests.js' },
+    { root: unreadableDeviceFaqTest, group: 'persistence-recovery', file: 'tests.js' },
+    { root: 'Preflight fixture: scenery root', group: 'scenery', file: 'tests.js' },
+    { root: processControlOwner, group: 'native-process', file: 'scripts/agent-tools/preflight.fixture.test.mjs' },
+  ];
+  return {
+    schemaVersion: 1,
+    assignmentMethod: 'Fixture roots model the validated four-group registration contract.',
+    groups: ['core', 'scenery', 'persistence-recovery', 'native-process'].map(id => ({
+      id,
+      description: `Fixture ${id} registration cohort.`,
+      resourcePolicy: 'isolated-process',
+      withinGroupConcurrency: 1,
+      baselineRootCount: inventory.fixtureGroups[id],
+      baselineEstimatedDurationMs: inventory.fixtureGroups[id],
+    })),
+    rootAssignments: roots,
+    rootReplacements: [],
+    processControls: [{
+      id: processControlChild,
+      group: 'native-process',
+      file: 'scripts/agent-tools/preflight.fixture.test.mjs',
+      ownerRoot: processControlOwner,
+      expectedExecutions: 1,
+    }],
+  };
+}
 
 function runGit(cwd, args) {
   const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
@@ -27,9 +87,11 @@ async function createAppFixture(t, suffix) {
   t.after(() => rm(fixtureRoot, { recursive: true, force: true }));
   const fixtureFiles = [
     'tests.js', 'index.html', 'app-release.js', 'location.js', 'vendor/lz-string-1.5.0.min.js',
-    'scripts/test-first-gate.mjs',
+    'package.json', 'scripts/test-first-gate.mjs', 'scripts/test-groups.mjs',
+    'scripts/release-evidence.mjs', 'scripts/test-group-inventory.json', 'scripts/test-group-assignments.json',
+    'scripts/agent-tools/preflight.fixture.test.mjs',
   ];
-  for (const relative of fixtureFiles) {
+  for (const relative of fixtureFiles.filter(file => file !== 'scripts/agent-tools/preflight.fixture.test.mjs')) {
     const target = path.join(fixtureRoot, relative);
     await mkdir(path.dirname(target), { recursive: true });
     await copyFile(path.join(repositoryRoot, relative), target);
@@ -37,12 +99,63 @@ async function createAppFixture(t, suffix) {
   await writeFile(path.join(fixtureRoot, 'TEST_CHANGE_RATIONALES.json'), '[]\n');
   const testsPath = path.join(fixtureRoot, 'tests.js');
   await writeFile(testsPath, `${await readFile(testsPath, 'utf8')}\ntest('UNSELECTED FULL SUITE SENTINEL', () => { process.stdout.write('PREFLIGHT_FULL_SUITE_CHILD_SENTINEL\\n'); });\n`);
+  await writeFile(path.join(fixtureRoot, 'package.json'), JSON.stringify({
+    scripts: { test: 'node --test tests.js scripts/agent-tools/*.test.mjs' },
+  }, null, 2) + '\n');
+  const fixtureHelper = path.join(fixtureRoot, 'scripts/agent-tools/preflight.fixture.test.mjs');
+  await mkdir(path.dirname(fixtureHelper), { recursive: true });
+  await writeFile(fixtureHelper, `import { test } from 'node:test';\ntest(${JSON.stringify(processControlOwner)}, () => {});\n`);
+  const inventoryPath = path.join(fixtureRoot, 'scripts/test-group-inventory.json');
+  const inventory = fixtureInventory();
+  await writeFile(inventoryPath, JSON.stringify(inventory, null, 2) + '\n');
+  await writeFile(path.join(fixtureRoot, 'scripts/test-group-assignments.json'), JSON.stringify(fixtureAssignments(inventory), null, 2) + '\n');
   runGit(fixtureRoot, ['init', '-b', 'main']);
   runGit(fixtureRoot, ['config', 'user.email', 'preflight-fixture@example.invalid']);
   runGit(fixtureRoot, ['config', 'user.name', 'Preflight fixture']);
   runGit(fixtureRoot, ['add', ...fixtureFiles, 'TEST_CHANGE_RATIONALES.json']);
-  runGit(fixtureRoot, ['commit', '-m', 'preflight valid fixture']);
+  runGit(fixtureRoot, ['commit', '-m', 'preflight inventory baseline fixture']);
+  const inventoryBase = runGit(fixtureRoot, ['rev-parse', 'HEAD']);
+  const inventoryTree = runGit(fixtureRoot, ['rev-parse', 'HEAD^{tree}']);
+  inventory.baseline.sourceSha = inventoryBase;
+  inventory.baseline.sourceTree = inventoryTree;
+  inventory.baseline.checkoutSha = inventoryBase;
+  inventory.baseline.checkoutTree = inventoryTree;
+  inventory.baseline.comparisonBase = inventoryBase;
+  await writeFile(inventoryPath, JSON.stringify(inventory, null, 2) + '\n');
+  await writeFile(fixtureHelper, `import { test } from 'node:test';\ntest(${JSON.stringify(processControlOwner)}, () => {});\ntest(${JSON.stringify(processControlChild)}, () => {});\n`);
+  runGit(fixtureRoot, ['add', 'scripts/test-group-inventory.json', 'scripts/agent-tools/preflight.fixture.test.mjs']);
+  runGit(fixtureRoot, ['commit', '-m', 'bind current registration fixture']);
   return { fixtureRoot, base: runGit(fixtureRoot, ['rev-parse', 'HEAD']), fixtureFiles: [...fixtureFiles, 'TEST_CHANGE_RATIONALES.json'] };
+}
+
+async function addFixtureRoot(fixture, title, { assigned = false, filename = 'scripts/agent-tools/added.test.mjs' } = {}) {
+  const rootPath = path.join(fixture.fixtureRoot, filename);
+  await mkdir(path.dirname(rootPath), { recursive: true });
+  await writeFile(rootPath, `import { test } from 'node:test';\ntest(${JSON.stringify(title)}, () => {});\n`);
+  fixture.fixtureFiles.push(filename);
+  if (assigned) {
+    const assignmentsPath = path.join(fixture.fixtureRoot, 'scripts/test-group-assignments.json');
+    const assignments = JSON.parse(await readFile(assignmentsPath, 'utf8'));
+    assignments.rootAssignments.push({ root: title, group: 'native-process', file: filename });
+    await writeFile(assignmentsPath, JSON.stringify(assignments, null, 2) + '\n');
+  }
+}
+
+async function changeUnreadableRecoveryGuidance(fixture) {
+  const indexPath = path.join(fixture.fixtureRoot, 'index.html');
+  const original = await readFile(indexPath, 'utf8');
+  const expected = 'Cloud recovery stays pending';
+  assert.ok(original.includes(expected), 'the existing unreadable-device answer contains its pending-cloud contract');
+  await writeFile(indexPath, original.replace(expected, 'Cloud recovery can wait'));
+}
+
+function removeTopLevelTest(source, title) {
+  const marker = `test('${title}',`;
+  const start = source.indexOf(marker);
+  assert.notEqual(start, -1, `fixture contains ${title}`);
+  let end = source.indexOf('\ntest(', start + marker.length);
+  if (end === -1) end = source.length;
+  return source.slice(0, start) + source.slice(end + 1);
 }
 
 async function runPreflight(fixture, evidenceName) {
@@ -153,42 +266,45 @@ test('UNSELECTED FULL SUITE SENTINEL', () => { process.stdout.write('PREFLIGHT_F
 });
 
 test('preflight fails closed when a selected existing contract is missing', async t => {
-  const fixtureRoot = await mkdtemp(path.join(os.tmpdir(), 'chain-preflight-missing-check-'));
-  t.after(() => rm(fixtureRoot, { recursive: true, force: true }));
-  await mkdir(path.join(fixtureRoot, 'scripts'), { recursive: true });
-  await copyFile(path.join(repositoryRoot, 'scripts/test-first-gate.mjs'), path.join(fixtureRoot, 'scripts/test-first-gate.mjs'));
-  await writeFile(path.join(fixtureRoot, 'TEST_CHANGE_RATIONALES.json'), '[]\n');
-  await writeFile(path.join(fixtureRoot, 'tests.js'), `
-import { test } from 'node:test';
-test('UNSELECTED FULL SUITE SENTINEL', () => { process.stdout.write('PREFLIGHT_FULL_SUITE_CHILD_SENTINEL\\n'); });
-`);
-  runGit(fixtureRoot, ['init', '-b', 'main']);
-  runGit(fixtureRoot, ['config', 'user.email', 'preflight-fixture@example.invalid']);
-  runGit(fixtureRoot, ['config', 'user.name', 'Preflight fixture']);
-  runGit(fixtureRoot, ['add', 'scripts/test-first-gate.mjs', 'TEST_CHANGE_RATIONALES.json', 'tests.js']);
-  runGit(fixtureRoot, ['commit', '-m', 'fixture without focused checks']);
-  const base = runGit(fixtureRoot, ['rev-parse', 'HEAD']);
-
-  const result = spawnSync(process.execPath, [preflight, '--base', base], {
-    cwd: fixtureRoot,
-    encoding: 'utf8',
-    maxBuffer: 16 * 1024 * 1024,
-    env: childEnvironment(),
+  for (const scenario of ['missing', 'renamed', 'skipped', 'duplicated']) await t.test(scenario, async t => {
+    const fixture = await createAppFixture(t, 'missing-check-' + scenario);
+    const testsPath = path.join(fixture.fixtureRoot, 'tests.js');
+    let tests = await readFile(testsPath, 'utf8');
+    if (scenario === 'duplicated') {
+      const indexPath = path.join(fixture.fixtureRoot, 'index.html');
+      await writeFile(indexPath, (await readFile(indexPath, 'utf8')) + '\n<!-- select the recovery FAQ check -->\n');
+    } else await changeUnreadableRecoveryGuidance(fixture);
+    if (scenario === 'missing') tests = removeTopLevelTest(tests, unreadableDeviceFaqTest);
+    if (scenario === 'renamed') tests = tests.replace("test('" + unreadableDeviceFaqTest + "',", "test('" + unreadableDeviceFaqTest + " renamed',");
+    if (scenario === 'skipped') tests = tests.replace(
+      "test('" + unreadableDeviceFaqTest + "',async()=>",
+      "test('" + unreadableDeviceFaqTest + "',{skip:true},async()=>",
+    );
+    if (scenario === 'duplicated') tests += `\ntest(${JSON.stringify(unreadableDeviceFaqTest)}, () => {});\n`;
+    await writeFile(testsPath, tests);
+    const { result, output } = await runPreflight(fixture, 'required-check-' + scenario);
+    assert.equal(result.status, 1, output);
+    assert.match(output, /each selected check must report exactly one passing result/i);
+    assert.match(output, /no unique passing result was reported for[\s\S]*Quick start and current Changelog explain preserved sources and local pending recovery/i);
+    assert.doesNotMatch(output, /PREFLIGHT_FULL_SUITE_SENTINEL/);
   });
-  assert.equal(result.status, 1, result.stderr || result.stdout);
-  assert.match(result.stdout + result.stderr, /expected 2 named help\/copy checks to run/i);
-  assert.doesNotMatch(result.stdout + result.stderr, /PREFLIGHT_FULL_SUITE_CHILD_SENTINEL/);
 });
 
 test('preflight passes the existing wording, FAQ, and rationale contracts on a valid isolated repository', async t => {
   const fixture = await createAppFixture(t, 'valid-app');
+  const registeredRoot = 'Preflight fixture: valid newly assigned root';
+  await addFixtureRoot(fixture, registeredRoot, { assigned: true });
+  const indexPath = path.join(fixture.fixtureRoot, 'index.html');
+  await writeFile(indexPath, (await readFile(indexPath, 'utf8')) + '\n<!-- a valid help-source edit selects the recovery FAQ contract -->\n');
   const { result, output } = await runPreflight(fixture, 'valid-app');
   assert.equal(result.status, 0, output);
   assert.match(output, /✔ Landscape location: visible default-sky copy does not name Orlando/);
-  assert.match(output, /✔ RISK Quick start content: essential steps stay brief and detailed help remains user-facing in existing sections/);
+  assert.ok(output.includes('✔ ' + quickStartTest));
+  assert.ok(output.includes('✔ ' + unreadableDeviceFaqTest));
   assert.match(output, /Test-first diff gate passed\./);
-  assert.match(output, /Preflight passed: focused help\/copy checks and test-first\/rationale validation/);
-  assert.doesNotMatch(output, /PREFLIGHT_FULL_SUITE_CHILD_SENTINEL/);
+  assert.match(output, /Current group registrations passed: \d+ assigned roots, 1 recognized process control, 1 newly assigned root\./);
+  assert.match(output, /Preflight passed: focused help\/copy, group-registration, and test-first\/rationale validation/);
+  assert.doesNotMatch(output, /PREFLIGHT_FULL_SUITE_SENTINEL/);
 });
 
 test('preflight reports the existing default-location wording failure before full regression', async t => {
@@ -208,12 +324,35 @@ test('preflight reports the existing FAQ length failure before full regression',
   const original = await readFile(htmlPath, 'utf8');
   const marker = '<dt>How do I change the scenery?</dt><dd>';
   assert.ok(original.includes(marker), 'the fixture has the existing rendered scenery FAQ answer');
-  await writeFile(htmlPath, original.replace(marker, `${marker}${'extra '.repeat(140)}`));
+  await writeFile(htmlPath, original.replace(marker, marker + 'extra '.repeat(140)));
   const { result, output } = await runPreflight(fixture, 'faq-length-failure');
   assert.equal(result.status, 1, output);
   assert.match(output, /✖ RISK Quick start content: essential steps stay brief and detailed help remains user-facing in existing sections/);
-  assert.doesNotMatch(output, /PREFLIGHT_FULL_SUITE_CHILD_SENTINEL/);
+  assert.doesNotMatch(output, /PREFLIGHT_FULL_SUITE_SENTINEL/);
   assert.doesNotMatch(output, /test-first\/rationale validator/);
+
+  await t.test('stale unreadable-device FAQ assertion', async t => {
+    const staleFixture = await createAppFixture(t, 'stale-unreadable-device-faq');
+    await changeUnreadableRecoveryGuidance(staleFixture);
+    const stale = await runPreflight(staleFixture, 'stale-unreadable-device-faq');
+    assert.equal(stale.result.status, 1, stale.output);
+    assert.ok(stale.output.includes('✖ ' + unreadableDeviceFaqTest));
+    assert.match(stale.output, /Cloud recovery stays pending/);
+    assert.doesNotMatch(stale.output, /PREFLIGHT_FULL_SUITE_SENTINEL/);
+    assert.doesNotMatch(stale.output, /test-first\/rationale validator/);
+  });
+
+  await t.test('new unassigned root', async t => {
+    const unassignedFixture = await createAppFixture(t, 'unassigned-root');
+    const rootTitle = 'Preflight fixture: newly added root without an assignment';
+    await addFixtureRoot(unassignedFixture, rootTitle);
+    const unassigned = await runPreflight(unassignedFixture, 'unassigned-root');
+    assert.equal(unassigned.result.status, 1, unassigned.output);
+    assert.match(unassigned.output, /test-group registration validation/i);
+    assert.ok(unassigned.output.includes(rootTitle));
+    assert.match(unassigned.output, /no explicit group assignment or process-control declaration/);
+    assert.doesNotMatch(unassigned.output, /Preflight passed|PREFLIGHT_FULL_SUITE_SENTINEL/);
+  });
 });
 
 test('preflight launches each selected child once and launches none for help or invalid input', async t => {

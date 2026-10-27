@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
+import { validateCurrentRegistrations } from '../test-groups.mjs';
 
 const focusedChecks = [
   'Landscape location: visible default-sky copy does not name Orlando',
   'RISK Quick start content: essential steps stay brief and detailed help remains user-facing in existing sections',
 ];
-const testNamePattern = `^(?:${focusedChecks.map(escapeRegExp).join('|')})$`;
+const unreadableDeviceFaqCheck = 'RISK unreadable device recovery: Quick start and current Changelog explain preserved sources and local pending recovery';
 const repositoryRoot = process.cwd();
 
 function escapeRegExp(value) {
@@ -50,6 +51,18 @@ function resolveBase(requestedBase) {
   }
   const hint = requestedBase ? `from ${requestedBase}` : 'from origin/main, main, or master';
   throw new Error(`Could not resolve the test-first comparison base ${hint}; pass --base <ref>.`);
+}
+
+function comparisonChangesIndexHtml(comparison) {
+  const result = spawnSync('git', ['diff', '--no-ext-diff', '--name-only', comparison.sha, '--', 'index.html'], {
+    cwd: repositoryRoot,
+    encoding: 'utf8',
+    maxBuffer: 1024 * 1024,
+  });
+  if (result.error || result.signal || result.status !== 0) {
+    throw new Error(`Could not check index.html against ${comparison.label} (${comparison.sha}): ${result.error?.message || result.stderr?.trim() || result.signal || `Git exited ${result.status}`}`);
+  }
+  return result.stdout.split('\n').some(file => file.trim() === 'index.html');
 }
 
 function resolveUpstream() {
@@ -118,9 +131,28 @@ function runNode(args) {
   });
 }
 
+function runFocusedChecks(checks, label) {
+  const pattern = `^(?:${checks.map(escapeRegExp).join('|')})$`;
+  const result = runNode(['--test', `--test-name-pattern=${pattern}`, '--test-reporter=spec', 'tests.js']);
+  const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
+  const exitCode = failForResult(label, result);
+  if (exitCode !== 0) return exitCode;
+
+  const invalidChecks = checks.filter(check => {
+    const resultLines = output.split('\n').filter(line => line.includes(`${check} (`));
+    return resultLines.length !== 1 || !resultLines[0].startsWith('✔ ');
+  });
+  if (invalidChecks.length > 0) {
+    process.stderr.write(`Preflight failed: each selected check must report exactly one passing result; no unique passing result was reported for:\n`);
+    for (const check of invalidChecks) process.stderr.write(`- ${check}\n`);
+    return 1;
+  }
+  return 0;
+}
+
 function printUsage() {
   process.stdout.write('Usage: node scripts/agent-tools/preflight.mjs [--base <ref>]\n');
-  process.stdout.write('Runs the existing visible default-sky and Quick start FAQ contracts, then scripts/test-first-gate.mjs.\n');
+  process.stdout.write('Runs focused visible-copy contracts, current test-group registration validation, then scripts/test-first-gate.mjs.\n');
 }
 
 async function main() {
@@ -140,23 +172,8 @@ async function main() {
   process.stdout.write('Preflight: existing help and copy contracts\n');
   for (const check of focusedChecks) process.stdout.write(`- ${check}\n`);
   process.stdout.write('Focused checks only; this command never launches the full test suite.\n\n');
-
-  const tests = runNode([
-    '--test',
-    `--test-name-pattern=${testNamePattern}`,
-    '--test-reporter=spec',
-    'tests.js',
-  ]);
-  const testOutput = `${tests.stdout ?? ''}\n${tests.stderr ?? ''}`;
-  const missingChecks = focusedChecks.filter(check =>
-    !new RegExp(`^[✔✖] ${escapeRegExp(check)} \\(`, 'm').test(testOutput));
-  const testExit = failForResult('focused help/copy tests', tests);
-  if (missingChecks.length > 0) {
-    process.stderr.write(`Preflight failed: expected ${focusedChecks.length} named help/copy checks to run; no result was reported for:\n`);
-    for (const check of missingChecks) process.stderr.write(`- ${check}\n`);
-    return testExit === 0 ? 1 : testExit;
-  }
-  if (testExit !== 0) return testExit;
+  const focusedExit = runFocusedChecks(focusedChecks, 'focused help/copy tests');
+  if (focusedExit !== 0) return focusedExit;
 
   let comparisons;
   try {
@@ -168,6 +185,21 @@ async function main() {
     process.stderr.write(`${error.message}\n`);
     return 2;
   }
+
+  let recoveryFaqComparisons;
+  try {
+    recoveryFaqComparisons = comparisons.filter(comparisonChangesIndexHtml);
+  } catch (error) {
+    process.stderr.write(`${error.message}\n`);
+    return 2;
+  }
+  if (recoveryFaqComparisons.length > 0) {
+    process.stdout.write(`\nPreflight: index.html differs from ${recoveryFaqComparisons.map(({ label }) => label).join(' and ')}; selecting the unreadable-device FAQ contract\n`);
+    process.stdout.write(`- ${unreadableDeviceFaqCheck}\n`);
+    const recoveryFaqExit = runFocusedChecks([unreadableDeviceFaqCheck], 'required unreadable-device recovery FAQ test');
+    if (recoveryFaqExit !== 0) return recoveryFaqExit;
+  }
+
   for (const comparison of comparisons) {
     const label = `test-first/rationale validator (${comparison.label}, base ${comparison.sha})`;
     process.stdout.write(`\nPreflight: existing ${label}\n`);
@@ -176,7 +208,16 @@ async function main() {
     if (rationaleExit !== 0) return rationaleExit;
   }
 
-  process.stdout.write('Preflight passed: focused help/copy checks and test-first/rationale validation.\n');
+  let registrationSummary;
+  try {
+    registrationSummary = validateCurrentRegistrations({ root: repositoryRoot });
+  } catch (error) {
+    process.stderr.write(`Preflight failed: current test-group registration validation: ${error.message}\n`);
+    return 1;
+  }
+  process.stdout.write(`Current group registrations passed: ${registrationSummary.assignedRootCount} assigned roots, ${registrationSummary.processControlCount} recognized process control${registrationSummary.processControlCount === 1 ? '' : 's'}, ${registrationSummary.addedRootTitles.length} newly assigned root${registrationSummary.addedRootTitles.length === 1 ? '' : 's'}.\n`);
+
+  process.stdout.write('Preflight passed: focused help/copy, group-registration, and test-first/rationale validation.\n');
   process.stdout.write('This does not report full-suite, rules, compatibility, CI, release, or live results.\n');
   return 0;
 }
