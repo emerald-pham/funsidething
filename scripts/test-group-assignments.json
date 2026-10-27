@@ -13271,6 +13271,26 @@
       "root": "workflow metadata aggregate rejects pending cancelled unresolved and stale successful routing proofs",
       "group": "native-process",
       "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "test group browser runtime preflight runs exactly the newly assigned roots in a scrubbed child",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "test group browser runtime preflight records an explicit no-change cohort without launching an engine",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "test group browser runtime preflight fails closed for skipped, duplicated, and missing-engine outcomes",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "RISK repository process: newly registered startup browser roots require an isolated Chromium receipt",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [
