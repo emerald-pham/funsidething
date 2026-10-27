@@ -45202,12 +45202,15 @@ test('RISK repository process: grouped catalog binds real declarations rather th
  assert.match(result.stdout||'',/^# tests 1$/m);assert.match(result.stdout||'',/^# skipped 0$/m);
 });
 
-test('RISK repository process: newly registered startup browser roots require an isolated Chromium receipt',t=>{
+test('RISK repository process: newly registered startup browser roots require an isolated Chromium receipt',async t=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
  const names=[
   'test group browser runtime preflight runs exactly the newly assigned roots in a scrubbed child',
   'test group browser runtime preflight records an explicit no-change cohort without launching an engine',
   'test group browser runtime preflight fails closed for skipped, duplicated, and missing-engine outcomes',
+  'test group workflow consumer forbids duplicate execution for a verified input pass',
+  'reconciled covered group verifies current early evidence without repeating any root',
+  'reconciled fresh group consumes the explicit browser preflight before its cohort',
  ];
  const pattern=`^(?:${names.join('|')})$`;
  const child=spawnSync(process.execPath,['--test','--test-reporter=tap',`--test-name-pattern=${pattern}`,'scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:90000,maxBuffer:8*1024*1024});
@@ -45215,16 +45218,44 @@ test('RISK repository process: newly registered startup browser roots require an
  assert.equal(child.error,undefined,'The browser-runtime process contract must start: '+output);
  assert.equal(child.signal,null,'The browser-runtime process contract must finish: '+output);
  assert.equal(child.status,0,'Newly assigned browser roots must require an actual isolated Chromium result: '+output);
- assert.match(child.stdout||'',/^# tests 3$/m);
- assert.match(child.stdout||'',/^# pass 3$/m);assert.match(child.stdout||'',/^# fail 0$/m);assert.match(child.stdout||'',/^# skipped 0$/m);
- for(const name of names)assert.ok(child.stdout.includes('# Subtest: '+name),name+' must execute through the public test boundary');
+ const {parseTap}=await import('./scripts/test-groups.mjs'),cases=parseTap(child.stdout);
+ assert.deepEqual(cases.map(row=>row.id).sort(),[...names].sort(),'All three original browser contracts and all three enforcing CI consumers must execute exactly once');
+ assert.ok(cases.every(row=>row.id===row.root&&row.status==='passed'&&row.skipReason===null),'Every browser/preflight/covered contract must complete successfully');
+ for(const [summary,count]of Object.entries({tests:6,suites:0,pass:6,fail:0,cancelled:0,skipped:0,todo:0}))assert.match(child.stdout,new RegExp('^# '+summary+' '+count+'$','m'),'Exact child TAP summary: '+summary);
  const workflow=fs.readFileSync(path.join(__dirname,'.github/workflows/data-safety.yml'),'utf8').split(/^  regression:/m)[1].split(/^  scanner-tests:/m)[0];
  assert.match(workflow,/PLAYWRIGHT_BROWSERS_PATH:\s*\$\{\{ runner\.temp \}\}\/playwright-browsers/,'the regression install must use its explicit isolated browser directory');
- assert.match(workflow,/playwright install --with-deps chromium/,'the regression install must provide Chromium only');
- assert.match(workflow,/--browser-runtime-preflight[^\n]*--browser-path "\$PLAYWRIGHT_BROWSERS_PATH"/,'the browser preflight must receive that exact installation path');
- assert.match(workflow,/--browser-runtime-receipt "\$RUNNER_TEMP\/browser-runtime-preflight\/result\.json"/,'the ordinary group must consume the preflight receipt');
- assert.ok(workflow.indexOf('Preflight newly assigned startup browser roots')<workflow.indexOf('Execute complete assigned group'),'preflight must precede the complete ordinary group');
- assert.match(workflow,/Preserve browser runtime preflight evidence/,'the raw preflight record must be uploaded separately');
+ const install=workflow.match(/      - name: Install matching native Chromium\n        if: ([^\n]+)\n        run: \|\n((?:          [^\n]*\n|\n)*)/);
+ assert.ok(install,'The actual conditional workflow install command must remain present');
+ const guard="steps.selected.outputs.decision == 'full' && !contains(fromJSON(steps.selected.outputs.reused), matrix.group)";
+ assert.equal(install[1],guard,'Covered groups must skip browser installation');
+ assert.ok(workflow.indexOf('Select coverage for this runner')<workflow.indexOf('Install matching native Chromium'),'Current runtime coverage selection must precede browser setup');
+ assert.match(workflow,/uses: actions\/setup-java@v4\n\s+if: steps\.selected\.outputs\.decision == 'full' && !contains\(fromJSON\(steps\.selected\.outputs\.reused\), matrix\.group\)/,'Covered groups must skip Java setup');
+ assert.match(workflow,/- run: npm ci\n\s+if: steps\.selected\.outputs\.decision == 'full' && !contains\(fromJSON\(steps\.selected\.outputs\.reused\), matrix\.group\)/,'Covered groups must skip dependency installation');
+ const command=install[2].split('\n').map(line=>line.startsWith('          ')?line.slice(10):line).join('\n');
+ const os=await import('node:os'),directory=fs.mkdtempSync(path.join(os.tmpdir(),'chain-workflow-browser-install-'));t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const journal=path.join(directory,'external-npx.jsonl'),browserPath=path.join(directory,'isolated-engines');
+ const engineCases=[
+  ['core','full',['chromium']],['core','reuse',['chromium']],['core','policy-reuse',['chromium']],
+  ['scenery','full',['chromium']],['scenery','reuse',['chromium']],['scenery','policy-reuse',['chromium']],
+  ['persistence-recovery','full',['chromium']],['persistence-recovery','reuse',['chromium']],['persistence-recovery','policy-reuse',['chromium']],
+  ['native-process','full',['chromium']],['native-process','reuse',['chromium','webkit']],['native-process','policy-reuse',['chromium']],
+ ];
+ for(const [group,early,engines]of engineCases)for(const [decision,reused,expected]of [['full',[],engines],['full',[group],null],['reuse',[],null],['policy-reuse',[],null]]){
+  fs.rmSync(journal,{force:true});
+  const admitted=vm.runInNewContext(install[1],{steps:{selected:{outputs:{decision,reused:JSON.stringify(reused)}}},matrix:{group},contains:(values,value)=>values.includes(value),fromJSON:JSON.parse});
+  const actualCommand=command.replaceAll('${{ matrix.group }}',group).replaceAll('${{ steps.selected.outputs.early-decision }}',early);
+  const shell='npx(){ printf "%s\\n" "$PLAYWRIGHT_BROWSERS_PATH" "$@" >> "$CHAIN_INSTALL_JOURNAL"; }\nif [[ "$CHAIN_INSTALL_ADMITTED" == 1 ]]; then\n'+actualCommand+'\nfi';
+  const result=spawnSync('bash',['-euo','pipefail','-c',shell],{cwd:__dirname,env:{...env,PLAYWRIGHT_BROWSERS_PATH:browserPath,CHAIN_INSTALL_JOURNAL:journal,CHAIN_INSTALL_ADMITTED:admitted?'1':'0'},encoding:'utf8',timeout:5000});
+  const context=JSON.stringify({group,early,decision,reused});
+  assert.equal(result.error,undefined,'Actual browser install shell must start: '+context);
+  assert.equal(result.status,0,'Actual browser install shell must complete: '+context+' '+result.stderr);
+  const actual=fs.existsSync(journal)?fs.readFileSync(journal,'utf8').trim().split('\n'):[];
+  assert.deepEqual(actual,expected?[browserPath,'--no-install','playwright','install','--with-deps',...expected]:[],'Exact external install calls: persistence remains Chromium-only; only fresh native with reused early needs WebKit; covered setup launches zero calls: '+context);
+ }
+ assert.match(workflow,/group_args\+=\(--browser-path "\$PLAYWRIGHT_BROWSERS_PATH"\)/,'The enforcing group consumer must receive the exact isolated browser installation');
+ assert.match(workflow,/node scripts\/agent-tools\/ci-pass-reuse\.mjs run-group "\$\{group_args\[@\]\}" --proof "\$RUNNER_TEMP\/selected-routing\/routing\.json"/,'The selected per-gate consumer owns preflight admission and retained receipt consumption');
+ assert.match(workflow,/name: Preserve actual group results and native evidence[\s\S]*path: \$\{\{ runner\.temp \}\}\/group/,'The complete group evidence, including its retained raw browser preflight, must be uploaded');
+ t.diagnostic('Actual workflow install shell passed 48 fresh/covered controls; external npx only was journaled, with no dependency or browser launch. Six public process contracts retain exact-source isolated Chromium preflight, preflight-before-cohort receipt consumption and zero covered workload.');
 });
 
 test('RISK repository process: nested native fixture output stays isolated at the command boundary',t=>{
@@ -45532,12 +45563,39 @@ test('RISK repository process: policy prose false exemptions retain full applica
  try{fs.writeFileSync(path.join(mixed.repo,'new-runtime.js'),'export const enabled = true;\n');releaseGateGit(mixed.repo,['add','.']);releaseGateGit(mixed.repo,['commit','-qm','Mixed functional change']);const sha=releaseGateGit(mixed.repo,['rev-parse','HEAD']);const plan=deriveReleaseReviewPlan(mixed.repo,sha,mixed.baseSha);assert.equal(plan.policyProse,undefined);assert.equal(plan.requiresCodeReview,true);assert.ok(plan.specialistDomains.includes('release-process'));}finally{cleanupReleaseGateFixture(mixed);}
 });
 
-test('RISK repository process: diagnostic checkpoints retain finite authority across fresh process and CI boundaries',()=>{
+test('RISK repository process: diagnostic checkpoints retain finite authority across fresh process and CI boundaries',async t=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
  const result=spawnSync(process.execPath,['--test','--test-reporter=tap',path.join(__dirname,'scripts/agent-tools/checkpoint-progress.test.mjs')],{encoding:'utf8',timeout:30000,env});
- assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
- assert.match(result.stdout,/^# tests 15$/m,'the actual fifteen process contracts must execute, rather than an empty child pass');
- assert.match(result.stdout,/^# pass 15$/m);assert.match(result.stdout,/^# skipped 0$/m);
+ const output=[result.stdout,result.stderr].filter(Boolean).join('\n');t.diagnostic(output);
+ assert.equal(result.error,undefined,'The finite-authority process contracts must start and finish within the original thirty-second timeout: '+output);
+ assert.equal(result.signal,null,'The finite-authority process contracts must finish without cancellation: '+output);
+ assert.equal(result.status,0,output);
+ const originalRoots=[
+  'diagnostic recorder refuses missing durable state before starting a child',
+  'diagnostic recorder rejects tampered state without launching',
+  'a fresh process given only the task fetches complete parent authority and admissions consume the same durable allowance',
+  'an active failed investigation prevents caller-asserted completed release checkpoints',
+  'consumption derives failed observations from actual output and a finite allowance survives branch and observer commits',
+  'stale authority dirty source and changed result bytes refuse without further children',
+  'two fresh concurrent public recorder processes admit exactly one identical request',
+  'independently consumed passing output completes only the actual current source',
+  'a predicted diagnostic failure cannot pay an unresolved required gate',
+  'portable CI independently verifies a signed admitted attempt in a separate clone and refuses tampering retry and missing manifest',
+  'bounded extension requires exact source and current journal authorization evidence and retains failures',
+  'a caller-authored approval file cannot impersonate the repository approval authority',
+  'source prerequisites include paginated comments beyond the issue summary',
+  'an owner extension comment appended to the bound issue updates only that explicit authority append',
+  'an owner approval append cannot hide an unrelated task scope change',
+ ];
+ const addedRoots=[
+  'reconciled checkpoint retains six routing decisions and originals without renewing diagnostics',
+  'reconciled authorized issue refresh preserves original snapshots failures and finite allowance',
+ ];
+ const {parseTap}=await import('./scripts/test-groups.mjs'),cases=parseTap(result.stdout),expected=[...originalRoots,...addedRoots];
+ assert.equal(originalRoots.length,15,'All fifteen original finite diagnostic authority contracts remain required');
+ assert.deepEqual(cases.map(row=>row.id).sort(),[...expected].sort(),'The exact original fifteen plus two accepted routing/source-authority identities must execute once, with no missing, duplicate or substitute child');
+ assert.ok(cases.every(row=>row.id===row.root&&row.status==='passed'&&row.skipReason===null),'Every required finite-authority root must complete successfully without skip, TODO, failure or extra nested outcomes');
+ for(const [summary,count]of Object.entries({tests:17,suites:0,pass:17,fail:0,cancelled:0,skipped:0,todo:0}))assert.match(result.stdout,new RegExp('^# '+summary+' '+count+'$','m'),'Exact child TAP summary: '+summary);
 });
 
 test('RISK repository process: known frozen diagnostic source derives narrow eligibility from exact content',()=>{
