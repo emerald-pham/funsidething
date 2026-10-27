@@ -1593,6 +1593,7 @@ The actual intervention Yes records deliberate current-pass Scan intent even whe
 ## Agent evidence command wiring (#152)
 
 - `RISK repository process: npm test fails when an agent-tool cohort assertion fails`
+- `RISK repository process: coordination rejects misspelled resource options before side effects`
 - `RISK repository process: grouped runner stays covered at the default npm test boundary`
 - `RISK test group runner preserves hash identities and counts only executable controlled registrations`
 
@@ -1601,6 +1602,8 @@ Preflight comparison coverage:
   exercises the public command with a real published local Git branch, a passing selected comparison and a missing outgoing rationale. It preserves the existing gate, focused copy checks, refs, HEAD, tracked files and configuration.
 
 The required npm test entry point surfaces a failing isolated agent-tool cohort with a nonzero result and its assertion output. Group-runner identity evidence preserves the independently captured TAP-escaped inventory while reporting canonical runtime titles, and native-child registration checks distinguish executable declarations from quoted fixture text while rejecting missing and duplicate controls.
+
+The coordination process risk launches the CLI test in a fresh Node process. Synthetic Git projects and ledgers verify command-specific option rejection, byte-for-byte preservation, no Git child for rejected `begin` arguments, and canonical output for repeated scope, claim and plural resource controls. Existing competing-resource ownership coverage remains in `scripts/agent-tools/coordination.test.mjs`; neither test uses the host ledger.
 
 ## Deletion membership authority after log pruning (#171)
 

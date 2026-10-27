@@ -20153,5 +20153,25 @@
       "command": "Immutable recorder attempts in .git/agent-test-runs/issue-283/runs use node --test --test-name-pattern for each RISK JSON COPY PASTE or RISK DATABASE REPAIR EXPORT vertical consumer slice; exact commands, times, source identities and stdout/stderr are retained.",
       "failure": "Before each corresponding implementation: current-board control899563d6; board FAQdfa883d8; combined Settings control2210b578; unavailable/failed IDB and local sourcee2b8c485 (all3 false vs true); duplicate-control10ec7d35; expired diagnostic-original98fd9ee7 (null vs original); cancelled-view73507e40 (true vs false); repair FAQ0a2bee63. Worker attempt4711f3fb had an incomplete service-worker fixture and is not feature RED. Provisional worker capture was tried then withdrawn; corrected later-baseline-sensitivityf11abde0 observed null vs worker identity before final bounded read-only capture. This is not claimed as original RED; combined export original RED remains2210b578. GREENdd5b5fa1 passed combined consumers afterward. Earlier archive-only draft results are development evidence and its code/tests were discarded. Extended round-tripff4051ad and database fixture3611ae89 failures were fixture corrections, not product failures; corrected8c0614c0 and2e9aa016 passed without importer/runtime repairs. Independent Standards review found adjacent reload help still advertised removed Copy debug log. New mounted FAQ REDd5060f2e preceded the copy repair; GREEN60f7bb18 passed the new check and unchanged FAQ brevity gate. The old reload facts, retention limits, privacy, save-priority and no-crash-inference boundaries remain."
     }
+  },
+  {
+    "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
+    "testChangesSha256": "94df805cd65b678c0f66b4e6df3d05892dc144266b6c24445efc50bc6fef273f",
+    "reason": "Ticket #287 requires the host-coordination CLI to reject malformed option contracts before it can mutate ownership or start command work.",
+    "previousBehavior": "The parser ignored unknown names, so begin accepted --resource beside a valid claim, omitted the requested resource, wrote a new ledger entry, and launched Git.",
+    "intendedBehavior": "Every command rejects unknown, incomplete, duplicate-singleton, and incompatible options before command side effects. Fresh child-process tests use synthetic ledgers, preserve exact rejection bytes, and require valid repeated aliases and plural resources to echo the effective allocation.",
+    "replacementTests": [
+      "RISK repository process: coordination rejects misspelled resource options before side effects"
+    ],
+    "preservedCoverage": [
+      "The existing competing-resource ownership test still blocks a second project and preserves foreign entries, reservations, and configurations.",
+      "Existing begin, claim, heartbeat, release-claim, park, and resume lifecycle tests remain unchanged and continue to use fixture ledgers.",
+      "No player-facing application behavior, saved board, public FAQ, version, live host ledger, or resource allocation guard is replaced."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='^RISK repository process: coordination rejects misspelled resource options before side effects$' tests.js",
+      "failure": "On baseline 6c67fb0c9988d3e578579c7bb23a8ed0731aac3f, the exact fresh-process CLI test returned status 0 for --resource with --claims, emitted a successful entry with resources [], changed the isolated ledger bytes, and launched the Git child. The test expected status 2 and failed before implementation. Raw output: /Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/287/red-process-risk.txt."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/287"
   }
 ]
