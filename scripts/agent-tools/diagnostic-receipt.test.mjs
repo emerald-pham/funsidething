@@ -199,6 +199,12 @@ function fixture(t) {
     `#!${process.execPath}\nrequire(${JSON.stringify(path.join(repository, "scripts/agent-tools/diagnostic-gh-fixture.cjs"))});`,
   );
   fs.chmodSync(gh, 0o700);
+  const npm = path.join(bin, "npm");
+  fs.writeFileSync(
+    npm,
+    `#!${process.execPath}\nrequire('fs').appendFileSync(${JSON.stringify(path.join(root, "dependency-installs.txt"))},JSON.stringify(process.argv.slice(2))+'\\n');`,
+  );
+  fs.chmodSync(npm, 0o700);
   const env = {
     PATH: bin + path.delimiter + process.env.PATH,
     DIAGNOSTIC_FAKE_STATE: remoteFile,
@@ -1011,4 +1017,223 @@ test("actual product verify publication and deployment gates reject diagnostic i
   const remote = JSON.parse(fs.readFileSync(f.remoteFile));
   assert.equal(remote.publications, 0);
   assert.equal(remote.dispatches.length, 0);
+});
+
+test("a signed portable admission without a finite budget is denied before publication", (t) => {
+  const f = fixture(t),
+    bundle = JSON.parse(fs.readFileSync(f.bundle));
+  delete bundle.body.state.allowance;
+  bundle.signature = sign(
+    null,
+    Buffer.from(JSON.stringify(bundle.body)),
+    fs.readFileSync(
+      path.join(f.repo, ".git", "diagnostic-progress", "signing-key.pem"),
+    ),
+  ).toString("base64");
+  fs.writeFileSync(f.bundle, JSON.stringify(bundle));
+  f.input.admissionSha256 = hash(fs.readFileSync(f.bundle));
+  fs.writeFileSync(f.inputPath, JSON.stringify(f.input));
+  const result = command(f, "diagnostic-record", f.inputPath);
+  assert.notEqual(
+    result.status,
+    0,
+    "a signature cannot substitute for an explicit positive finite allowance",
+  );
+  assert.equal(JSON.parse(fs.readFileSync(f.remoteFile)).publications, 0);
+});
+
+test("a symlinked runtime output into the checkout is denied before claim publication", (t) => {
+  const f = fixture(t);
+  assert.equal(command(f, "diagnostic-record", f.inputPath).status, 0);
+  const launch = JSON.parse(command(f, "diagnostic-launch", f.source).stdout);
+  seedRun(f, "7001");
+  const hidden = path.join(f.repo, ".git", "unsafe-runtime");
+  fs.mkdirSync(hidden);
+  const output = path.join(f.root, "output-link");
+  fs.symlinkSync(hidden, output);
+  const before = JSON.parse(fs.readFileSync(f.remoteFile)).publications;
+  command(
+    f,
+    "diagnostic-ci-run",
+    launch.permit,
+    launch.permitObject,
+    f.source,
+    "7001",
+    "1",
+    output,
+  );
+  assert.equal(
+    JSON.parse(fs.readFileSync(f.remoteFile)).publications,
+    before,
+    "invalid evidence destination must fail before creating canonical claim objects",
+  );
+  assert.deepEqual(fs.readdirSync(hidden), []);
+});
+
+test("the winning diagnostic runtime installs pinned dependencies once before the actual consumer", (t) => {
+  const f = fixture(t),
+    count = path.join(f.root, "dependency-installs.txt"),
+    npm = path.join(f.root, "bin", "npm");
+  fs.writeFileSync(
+    npm,
+    `#!${process.execPath}\nrequire('fs').appendFileSync(${JSON.stringify(count)},JSON.stringify(process.argv.slice(2))+'\\n');`,
+  );
+  fs.chmodSync(npm, 0o700);
+  assert.equal(command(f, "diagnostic-record", f.inputPath).status, 0);
+  const launch = JSON.parse(command(f, "diagnostic-launch", f.source).stdout);
+  seedRun(f, "8001");
+  const output = path.join(f.root, "dependency-runtime");
+  command(
+    f,
+    "diagnostic-ci-run",
+    launch.permit,
+    launch.permitObject,
+    f.source,
+    "8001",
+    "1",
+    output,
+  );
+  assert.equal(
+    fs.existsSync(count),
+    true,
+    "the actual supported entrypoint must prepare the frozen lockfile dependencies",
+  );
+  assert.equal(fs.readFileSync(count, "utf8"), '["ci","--ignore-scripts"]\n');
+  command(
+    f,
+    "diagnostic-ci-run",
+    launch.permit,
+    launch.permitObject,
+    f.source,
+    "8001",
+    "1",
+    output,
+  );
+  assert.equal(
+    fs.readFileSync(count, "utf8"),
+    '["ci","--ignore-scripts"]\n',
+    "a duplicate claim must start no installer or consumer",
+  );
+});
+
+test("ordinary governance source with a standalone diagnostic workflow retains full product receipt and publication authority", async (t) => {
+  const root = fs.mkdtempSync(
+      path.join(os.tmpdir(), "ordinary-diagnostic-governance-"),
+    ),
+    repo = path.join(root, "repo");
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  git(repository, "clone", "-q", "--shared", repository, repo);
+  git(repo, "config", "user.name", "Fixture");
+  git(repo, "config", "user.email", "fixture@example.test");
+  git(
+    repo,
+    "remote",
+    "set-url",
+    "origin",
+    "https://github.com/emerald-pham/funsidething.git",
+  );
+  // Use the exact ordinary marker-rejection command shape without depending on
+  // an unlanded owner's commit being available in a fresh CI clone.
+  const workflow = fs
+    .readFileSync(path.join(repo, ".github/workflows/data-safety.yml"), "utf8")
+    .replace(
+      "      - uses: actions/setup-node@v4",
+      `      - name: Reject nonqualifying diagnostic source
+        shell: bash
+        run: |
+          if git cat-file -e HEAD:.diagnostic-task.json 2>/dev/null; then
+            echo "nonqualifying diagnostic source: ordinary product qualification is unavailable; use supported diagnostic workflow" >&2
+            exit 1
+          fi
+      - uses: actions/setup-node@v4`,
+    );
+  fs.writeFileSync(
+    path.join(repo, ".github/workflows/data-safety.yml"),
+    workflow,
+  );
+  git(repo, "add", ".");
+  git(
+    repo,
+    "commit",
+    "-qm",
+    "Ordinary governance rejects marked diagnostic sources",
+  );
+  const source = git(repo, "rev-parse", "HEAD"),
+    base = "e282f51dbea5fe07aac7673c92f6171f8f59d175",
+    plan = deriveReleaseReviewPlan(repo, source, base),
+    report = path.join(root, "synthetic-review.txt");
+  fs.writeFileSync(
+    report,
+    "Synthetic ordinary enforcement review fixture, not an actual release approval.",
+  );
+  const now = new Date().toISOString(),
+    review = (task) => ({
+      task,
+      reviewedSha: source,
+      outcome: "approved",
+      completedAt: now,
+      summary:
+        "Synthetic independent full enforcement review for ordinary governance compatibility.",
+      scope: {
+        fullDiff: true,
+        relevantTests: true,
+        userVisibleAndDataSafety: true,
+      },
+      evidencePath: report,
+      evidenceSha256: hash(fs.readFileSync(report)),
+    });
+  const input = {
+    schemaVersion: 2,
+    candidate: {
+      commitSha: source,
+      treeSha: git(repo, "rev-parse", "HEAD^{tree}"),
+      baseSha: base,
+    },
+    ownerReview: {
+      ...review("ordinary-owner"),
+      scope: {
+        fullDiff: true,
+        rationale:
+          "Synthetic fixture reviews every ordinary governance source change.",
+      },
+    },
+    independentReview: review("ordinary-code"),
+    faqReview: review("ordinary-faq"),
+    specialistReview: {
+      ...review("ordinary-risk"),
+      domains: plan.specialistDomains,
+      memoryScope: Object.fromEntries(
+        ["memory", "cloud", "sync"].map((domain) => [
+          domain,
+          {
+            affected: false,
+            rationale:
+              "Synthetic governance fixture preserves frozen product behavior and persisted state.",
+            tests:
+              domain === "memory" ? ["ordinary full receipt preservation"] : [],
+          },
+        ]),
+      ),
+      sources: [{ path: report, sha256: hash(fs.readFileSync(report)) }],
+    },
+  };
+  const inputPath = path.join(root, "input.json");
+  fs.writeFileSync(inputPath, JSON.stringify(input));
+  const recorded = command({ repo, env: {} }, "record", inputPath);
+  assert.equal(recorded.status, 0, recorded.stderr);
+  assert.equal(command({ repo, env: {} }, "verify", source).status, 0);
+  const { publishReleaseStatuses } = await import("../release-evidence.mjs"),
+    statuses = [];
+  await publishReleaseStatuses(repo, source, async (status) =>
+    statuses.push(status),
+  );
+  assert.ok(
+    statuses.length >= 3,
+    "ordinary full source retains all required publication statuses",
+  );
+  assert.ok(
+    statuses.every(
+      (status) => status.state === "success" || status.description,
+    ),
+  );
 });

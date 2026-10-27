@@ -12976,6 +12976,26 @@
       "root": "actual product verify publication and deployment gates reject diagnostic identity before outgoing statuses",
       "group": "native-process",
       "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "a signed portable admission without a finite budget is denied before publication",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "a symlinked runtime output into the checkout is denied before claim publication",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "the winning diagnostic runtime installs pinned dependencies once before the actual consumer",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "ordinary governance source with a standalone diagnostic workflow retains full product receipt and publication authority",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
     }
   ],
   "processControls": [

@@ -1016,6 +1016,23 @@ export async function runDiagnosticCI(
   outputPath,
 ) {
   const output = path.resolve(outputPath);
+  let ancestor = output;
+  while (!fs.existsSync(ancestor)) ancestor = path.dirname(ancestor);
+  const projected = path.resolve(
+      fs.realpathSync(ancestor),
+      path.relative(ancestor, output),
+    ),
+    realRepo = fs.realpathSync(repo);
+  if (
+    projected === realRepo ||
+    projected.startsWith(realRepo + path.sep) ||
+    (fs.existsSync(output) &&
+      (!fs.lstatSync(output).isDirectory() ||
+        fs.lstatSync(output).isSymbolicLink()))
+  )
+    throw Error(
+      "Diagnostic runtime evidence must be a real directory outside the checkout.",
+    );
   if (output === repo || output.startsWith(path.resolve(repo) + path.sep))
     throw Error(
       "Diagnostic runtime evidence must be a new directory outside the checkout.",
@@ -1078,21 +1095,39 @@ export async function runDiagnosticCI(
     14 * 60 * 1000,
   );
   deadline.unref();
-  let result;
+  let result,
+    phase = "dependencies";
   try {
-    result = await executeRecordedCommand(
-      process.execPath,
-      [
-        "scripts/button-safety-mobile-memory.mjs",
-        "--run",
-        "--profile",
-        "required-1gb",
-        "--output-dir",
-        path.join(output, "capped"),
-      ],
+    const installation = await executeRecordedCommand(
+      "npm",
+      ["ci", "--ignore-scripts"],
       repo,
       { env },
     );
+    if (
+      installation.exitCode !== 0 ||
+      installation.signal ||
+      installation.launchError
+    )
+      result = installation;
+    else {
+      phase = "capped-runtime";
+      result = await executeRecordedCommand(
+        process.execPath,
+        [
+          "scripts/button-safety-mobile-memory.mjs",
+          "--run",
+          "--profile",
+          "required-1gb",
+          "--output-dir",
+          path.join(output, "capped"),
+        ],
+        repo,
+        { env },
+      );
+      result.stdout = (installation.stdout ?? "") + (result.stdout ?? "");
+      result.stderr = (installation.stderr ?? "") + (result.stderr ?? "");
+    }
   } finally {
     clearTimeout(deadline);
   }
@@ -1125,6 +1160,7 @@ export async function runDiagnosticCI(
     runId,
     runAttempt: 1,
     execution: {
+      phase,
       started: !result.launchError,
       exitCode: result.exitCode,
       signal: result.signal,

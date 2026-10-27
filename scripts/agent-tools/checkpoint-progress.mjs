@@ -511,6 +511,12 @@ export function verifyDiagnosticCI(repo, commit, input) {
   const { state, attemptId } = bundle.body,
     attempt = state?.attempts?.find((a) => a.id === attemptId);
   if (
+    !Number.isSafeInteger(state.allowance) ||
+    state.allowance < 1 ||
+    state.attempts.length > state.allowance ||
+    state.status !== "open" ||
+    state.attempts.at(-1)?.id !== attemptId ||
+    state.attempts.slice(0, -1).some((a) => !a.consumed) ||
     state.task !== marker.task ||
     state.repository !== marker.repository ||
     (state.startingSourceIssueFingerprint ?? state.sourceIssue.fingerprint) !==
@@ -531,7 +537,11 @@ export function verifyDiagnosticCI(repo, commit, input) {
     );
   verifyAuthority(repo, state, true);
   const actual = source(repo, state.source.base, state.sourcePaths);
-  if (actual.commit !== commit || actual.tree !== state.source.tree || actual.inputFingerprint !== state.source.inputFingerprint)
+  if (
+    actual.commit !== commit ||
+    actual.tree !== state.source.tree ||
+    actual.inputFingerprint !== state.source.inputFingerprint
+  )
     throw Error("Diagnostic CI actual inputs changed.");
   return {
     task: state.task,
@@ -716,12 +726,37 @@ export async function progressCommand(operation, options) {
       const attempt = state.attempts.find((a) => a.id === options.attempt);
       if (!attempt || attempt.result || attempt.consumed)
         throw Error("Diagnostic export needs an admitted unfinished attempt.");
-      const publicState={task:state.task,repository:state.repository,owner:state.owner,source:state.source,sourcePaths:state.sourcePaths,gate:state.gate,status:state.status,allowance:state.allowance,taskIssue:{fingerprint:state.taskIssue.fingerprint},sourceIssue:{fingerprint:state.sourceIssue.fingerprint},startingSourceIssueFingerprint:state.startingSourceIssueFingerprint??state.sourceIssue.fingerprint,attempts:state.attempts.map(a=>({id:a.id,source:a.source,consumed:a.consumed})),events:state.events.filter(e=>e.type==='explicit-extension').map(e=>({type:e.type,approvalComment:e.approvalComment,approvedBy:e.approvedBy}))};
+      const publicState = {
+        task: state.task,
+        repository: state.repository,
+        owner: state.owner,
+        source: state.source,
+        sourcePaths: state.sourcePaths,
+        gate: state.gate,
+        status: state.status,
+        allowance: state.allowance,
+        taskIssue: { fingerprint: state.taskIssue.fingerprint },
+        sourceIssue: { fingerprint: state.sourceIssue.fingerprint },
+        startingSourceIssueFingerprint:
+          state.startingSourceIssueFingerprint ?? state.sourceIssue.fingerprint,
+        attempts: state.attempts.map((a) => ({
+          id: a.id,
+          source: a.source,
+          consumed: a.consumed,
+        })),
+        events: state.events
+          .filter((e) => e.type === "explicit-extension")
+          .map((e) => ({
+            type: e.type,
+            approvalComment: e.approvalComment,
+            approvedBy: e.approvedBy,
+          })),
+      };
       const body = {
         schemaVersion: 1,
-        ...(operation==='export-public'?{public:true}:{}),
+        ...(operation === "export-public" ? { public: true } : {}),
         journalDigest: head.digest,
-        state:operation==='export-public'?publicState:state,
+        state: operation === "export-public" ? publicState : state,
         attemptId: attempt.id,
       };
       const signature = sign(
@@ -1035,14 +1070,26 @@ export async function finishDiagnosticAttempt(repo, admission) {
 // The local journal retains the same predeclared result path and allowance.
 export async function recordDiagnosticCIResult(repo, attemptId, record) {
   return locked(repo, (dir) => {
-    const {state, head} = load(dir);
+    const { state, head } = load(dir);
     verifyAuthority(repo, state);
     verifySource(repo, state);
-    const attempt = state.attempts.find(a => a.id === attemptId);
-    if (!attempt || attempt.result || attempt.consumed || record.git?.commit !== attempt.source.commit || record.state !== 'complete' || record.kind !== 'nonqualifying-diagnostic-ci-result')
-      throw Error('Diagnostic hosted terminal result is missing, stale or already recorded.');
+    const attempt = state.attempts.find((a) => a.id === attemptId);
+    if (
+      !attempt ||
+      attempt.result ||
+      attempt.consumed ||
+      record.git?.commit !== attempt.source.commit ||
+      record.state !== "complete" ||
+      record.kind !== "nonqualifying-diagnostic-ci-result"
+    )
+      throw Error(
+        "Diagnostic hosted terminal result is missing, stale or already recorded.",
+      );
     immutable(attempt.resultPath, record);
-    attempt.result = {path: attempt.resultPath, sha256: digest(read(attempt.resultPath))};
+    attempt.result = {
+      path: attempt.resultPath,
+      sha256: digest(read(attempt.resultPath)),
+    };
     save(dir, state, head);
   });
 }

@@ -20362,5 +20362,43 @@
       "command": "node scripts/agent-tools/record-run.mjs --repo <retro-288 worktree> --evidence-dir <288 stage> --purpose preimplementation-red -- node --test --test-name-pattern=<stage> scripts/agent-tools/diagnostic-receipt.test.mjs",
       "failure": "Contemporaneous recorder artifacts under /Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/288: eligibility-red/393f3d56; promotion-record-qualified-red/73b64a79 actual ordinary record accepted; receipt-red/7fa1152a false != true; public-permit-red/e2d3b84c private source leaked; dispatch-red/d9cbe1aa no dispatch; claim-red/79825b1a not claimed; runtime-red/20a82f86 no actual terminal; consume-red/054e9f2e false != true; claim-identity-red/bed21845 publication count20 !=15; portable-review-red/fdea2a39 invalid inherited review accepted; outgoing-red/54e877b1 exact diagnostic push refused; actual-head-red/6f8f68d2 unadmitted observer HEAD accepted. Each corresponding green directory preserves command, times and exact dirty source/test fingerprints. Earlier fixture/unknown-option or missing-module failures are infrastructure, not RED credit."
     }
+  },
+  {
+    "baseCommit": "e282f51dbea5fe07aac7673c92f6171f8f59d175",
+    "testChangesSha256": "ae6acbd5790b6579234178ae1067e855052b14d5d5e5cf2d91d9f81838c2d138",
+    "reason": "Carry #324's existing public preflight failure cases into the required test-group and process-risk cohort; require the actual stale-FAQ and unassigned-root outcomes exactly once. Reconcile actual integration #324/#325 roots and retain their prior rationale/evidence; do not infer new RED from integration.",
+    "previousBehavior": "Candidates could retain a stale unreadable-device FAQ assertion, and newly added roots could remain unassigned until a later hosted gate; focused preflight did not run these checks early.",
+    "intendedBehavior": "The public local preflight runs the existing FAQ contract when recovery guidance changes and validates current group registrations before expensive qualification; the process-risk root ensures both discriminating failure contracts remain in the default suite.",
+    "replacementTests": [
+      "RISK repository process: local preflight rejects stale FAQ and unassigned roots before qualification"
+    ],
+    "preservedCoverage": [
+      "Existing default-sky, FAQ-brevity, comparison/upstream and test-first contracts remain intact; the new process test runs only the existing preflight fixture parent and its named stale-FAQ and unassigned-root subtests.",
+      "The process wrapper clears NODE_TEST_CONTEXT and requires one completed TAP outcome for each named case plus three passing, zero skipped, zero failed outcomes; it does not launch a full suite or claim hosted or release proof."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='preflight reports the existing FAQ length failure before full regression' scripts/agent-tools/preflight.test.mjs",
+      "failure": "Original preimplementation RED on 779c7df is preserved at /Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/324/runs/2026-10-27T03-33-17-927Z-3390405c-b714-4c84-9d1e-6d2710db503b.json and its stdout file. The stale-FAQ and newly unassigned-root fixture processes each returned 0 and printed Preflight passed, so the expected exit-1 assertions failed with 0 !== 1; the recorder retains source/test fingerprints and actual timestamps. The tests.js process-RISK wrapper was added later as integration coverage and is not presented as the original RED. Final self-review RED/GREEN stages: finite-budget-red17267ee9→green3d76e51b, runtime-path-redc28a1faf→green3a919123, dependency-runtime-red8dad401d→green0a1c6341. All preserve full recorder source provenance. One initial17-case regression had an accidental undefined attemptId diagnostic (infrastructure) and was repaired; its product-promotion control passes afterward."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/324"
+  },
+  {
+    "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
+    "testChangesSha256": "521e7a2575c322252a11d02876d0876d8c3d9c81cf1acca11c81f136d521fb64",
+    "reason": "Carry #324's existing public preflight failure cases into the required test-group and process-risk cohort; require the actual stale-FAQ and unassigned-root outcomes exactly once. Reconcile actual integration #324/#325 roots and retain their prior rationale/evidence; do not infer new RED from integration.",
+    "previousBehavior": "Candidates could retain a stale unreadable-device FAQ assertion, and newly added roots could remain unassigned until a later hosted gate; focused preflight did not run these checks early.",
+    "intendedBehavior": "The public local preflight runs the existing FAQ contract when recovery guidance changes and validates current group registrations before expensive qualification; the process-risk root ensures both discriminating failure contracts remain in the default suite.",
+    "replacementTests": [
+      "RISK repository process: local preflight rejects stale FAQ and unassigned roots before qualification"
+    ],
+    "preservedCoverage": [
+      "Existing default-sky, FAQ-brevity, comparison/upstream and test-first contracts remain intact; the new process test runs only the existing preflight fixture parent and its named stale-FAQ and unassigned-root subtests.",
+      "The process wrapper clears NODE_TEST_CONTEXT and requires one completed TAP outcome for each named case plus three passing, zero skipped, zero failed outcomes; it does not launch a full suite or claim hosted or release proof."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='preflight reports the existing FAQ length failure before full regression' scripts/agent-tools/preflight.test.mjs",
+      "failure": "Original preimplementation RED on 779c7df is preserved at /Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/324/runs/2026-10-27T03-33-17-927Z-3390405c-b714-4c84-9d1e-6d2710db503b.json and its stdout file. The stale-FAQ and newly unassigned-root fixture processes each returned 0 and printed Preflight passed, so the expected exit-1 assertions failed with 0 !== 1; the recorder retains source/test fingerprints and actual timestamps. The tests.js process-RISK wrapper was added later as integration coverage and is not presented as the original RED. Final self-review RED/GREEN stages: finite-budget-red17267ee9→green3d76e51b, runtime-path-redc28a1faf→green3a919123, dependency-runtime-red8dad401d→green0a1c6341. All preserve full recorder source provenance. One initial17-case regression had an accidental undefined attemptId diagnostic (infrastructure) and was repaired; its product-promotion control passes afterward."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/324"
   }
 ]
