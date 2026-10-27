@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { chmodSync, copyFileSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { recordReleaseEvidence } from '../release-evidence.mjs';
@@ -1182,6 +1182,164 @@ test('begin blocks a second project resource owner and retains both projects in 
     assert.deepEqual(finalState.entries.map((entry) => entry.id), ['existing-project-entry', projectAEntry.id]);
     assert.equal(finalState.reservations[0].id, 'resource-reservation');
     assert.equal(finalState.configurations[0].id, 'resource-configuration');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+test('begin rejects the singular resource typo before launching git or mutating ledger bytes', () => {
+  const fixture = realpathSync(mkdtempSync(join(tmpdir(), 'chain-coordination-options-')));
+  try {
+    const project = createProject(join(fixture, 'project'), 'work/options');
+    const foreignWorktree = join(fixture, 'foreign-project');
+    mkdirSync(foreignWorktree);
+    const ledgerPath = join(fixture, 'host-ledger.json');
+    const foreignEntry = {
+      id: 'foreign-active-owner',
+      status: 'active',
+      worktree: foreignWorktree,
+      branchName: 'work/foreign',
+      claims: ['foreign:claim'],
+      resources: ['foreign-runtime'],
+      retainedMetadata: { project: 'other', untouched: true },
+    };
+    const seededState = {
+      version: 1,
+      scope: 'codex-wide',
+      retainedHeader: { owner: 'another project' },
+      entries: [foreignEntry],
+      reservations: [{ id: 'foreign-reservation', worktree: foreignWorktree, pid: process.pid, slot: 4, retained: true }],
+      configurations: [{ id: 'foreign-configuration', worktree: foreignWorktree, slot: 4, retained: true }],
+    };
+    const original = `${JSON.stringify(seededState, null, 2)}\n`;
+    writeFileSync(ledgerPath, original);
+
+    const bin = join(fixture, 'bin');
+    mkdirSync(bin);
+    const realGit = execFileSync('which', ['git'], { encoding: 'utf8' }).trim();
+    const gitLog = join(fixture, 'git-child.log');
+    const wrapper = join(bin, 'git');
+    writeFileSync(wrapper, `#!/usr/bin/env node
+import { appendFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+appendFileSync(process.env.COORDINATION_GIT_LOG, 'git invoked\\n');
+const result = spawnSync(${JSON.stringify(realGit)}, process.argv.slice(2), { stdio: 'inherit' });
+if (result.error) throw result.error;
+process.exit(result.status ?? 1);
+`);
+    chmodSync(wrapper, 0o755);
+    const trackedGit = {
+      PATH: [bin, process.env.PATH].filter(Boolean).join(delimiter),
+      COORDINATION_GIT_LOG: gitLog,
+    };
+
+    const misspelledResource = command([
+      'begin', '--file', ledgerPath, '--work-type', 'tooling', '--claims', 'valid:claim',
+      '--resource', 'browser-runtime',
+    ], project, trackedGit);
+    const misspelledLedgerUnchanged = readFileSync(ledgerPath, 'utf8') === original;
+    assert.equal(misspelledResource.status, 2,
+      `--resource must fail instead of silently omitting the requested allocation; ledger unchanged=${misspelledLedgerUnchanged}; git child launched=${existsSync(gitLog)}; stdout=${misspelledResource.stdout}; stderr=${misspelledResource.stderr}`);
+    assert.match(misspelledResource.stderr, /unknown option --resource.*--resources/i);
+    assert.equal(readFileSync(ledgerPath, 'utf8'), original, 'a rejected typo must preserve every ledger byte');
+    assert.equal(existsSync(gitLog), false, 'a rejected option must not launch Git as a child');
+
+    const invalidWorkType = command([
+      'begin', '--file', ledgerPath, '--work-type', 'not-a-work-type',
+    ], project, trackedGit);
+    assert.equal(invalidWorkType.status, 2);
+    assert.match(invalidWorkType.stderr, /work-type/);
+    assert.equal(readFileSync(ledgerPath, 'utf8'), original);
+    assert.equal(existsSync(gitLog), false, 'invalid enum values must be rejected before Git starts');
+
+    const invalidScope = command([
+      'begin', '--file', ledgerPath, '--work-type', 'tooling', '--scope', '../private',
+    ], project, trackedGit);
+    assert.equal(invalidScope.status, 2);
+    assert.match(invalidScope.stderr, /Invalid repository-relative scope/);
+    assert.equal(readFileSync(ledgerPath, 'utf8'), original);
+    assert.equal(existsSync(gitLog), false, 'invalid scope values must be rejected before Git starts');
+
+    const valid = command([
+      'begin', '--file', ledgerPath, '--work-type', 'tooling',
+      '--scope', 'docs/first.md', '--scopes', 'docs/second.md',
+      '--claim', 'Task:First', '--claims', 'Task:Second',
+      '--resources', 'runtime-a', '--resources', 'runtime-b',
+    ], project);
+    assert.equal(valid.status, 0, valid.stderr);
+    const effective = JSON.parse(valid.stdout);
+    assert.deepEqual(effective.scopes, ['docs/first.md', 'docs/second.md']);
+    assert.deepEqual(effective.claims, ['task:first', 'task:second']);
+    assert.deepEqual(effective.requestedClaims, effective.claims);
+    assert.deepEqual(effective.resources, ['runtime-a', 'runtime-b']);
+
+    const finalState = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+    assert.deepEqual(finalState.entries[0], foreignEntry, 'valid options must retain the foreign owner');
+    assert.deepEqual(finalState.reservations, seededState.reservations);
+    assert.deepEqual(finalState.configurations, seededState.configurations);
+    assert.deepEqual(finalState.entries[1].resources, ['runtime-a', 'runtime-b']);
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+test('coordination validates command option schemas, missing values, duplicates, and incompatible combinations', () => {
+  const fixture = realpathSync(mkdtempSync(join(tmpdir(), 'chain-coordination-option-schemas-')));
+  try {
+    const project = createProject(join(fixture, 'project'), 'work/options');
+    const ledgerPath = join(fixture, 'host-ledger.json');
+    const sourceBytes = `${JSON.stringify({
+      version: 1, scope: 'codex-wide', entries: [], reservations: [], configurations: [], retained: true,
+    }, null, 2)}\n`;
+    writeFileSync(ledgerPath, sourceBytes);
+    const target = join(fixture, 'persistent', 'coordination.json');
+    const backup = join(fixture, 'backup');
+    const digest = createHash('sha256').update(sourceBytes).digest('hex');
+    const invocations = [
+      ['discover', '--file', ledgerPath],
+      ['export-env', '--file', ledgerPath],
+      ['status', '--file', ledgerPath],
+      ['begin', '--file', ledgerPath],
+      ['heartbeat', '--file', ledgerPath],
+      ['claim', '--file', ledgerPath],
+      ['release-claim', '--file', ledgerPath],
+      ['park', '--file', ledgerPath],
+      ['resume', '--file', ledgerPath],
+      ['finish', '--file', ledgerPath],
+      ['install', '--to', join(fixture, 'installed', 'coordination.mjs')],
+      ['migrate', '--file', ledgerPath, '--to', target, '--backup-dir', backup, '--expected-sha256', digest],
+    ];
+    for (const args of invocations) {
+      const result = command([...args, '--unrecognized-option', 'value'], project);
+      assert.equal(result.status, 2, `${args[0]} must reject options outside its schema: ${result.stdout} ${result.stderr}`);
+      assert.match(result.stderr, /unknown option --unrecognized-option/i, `${args[0]} should name the invalid option`);
+      assert.equal(readFileSync(ledgerPath, 'utf8'), sourceBytes, `${args[0]} must leave the fixture ledger unchanged`);
+    }
+
+    const missingValue = command(['heartbeat', '--file', ledgerPath, '--id'], project);
+    assert.equal(missingValue.status, 2);
+    assert.match(missingValue.stderr, /Missing value for --id/);
+
+    const duplicateSingleton = command(['heartbeat', '--file', ledgerPath, '--id', 'one', '--id', 'two'], project);
+    assert.equal(duplicateSingleton.status, 2);
+    assert.match(duplicateSingleton.stderr, /Option --id can be provided only once/);
+
+    const missingPreserveRef = command([
+      'finish', '--file', ledgerPath, '--id', 'missing-entry', '--adapter', 'chain-scanner', '--outcome', 'preserved',
+    ], project);
+    assert.equal(missingPreserveRef.status, 2);
+    assert.match(missingPreserveRef.stderr, /--preserve-ref is required/);
+
+    const missingDiscardReason = command([
+      'finish', '--file', ledgerPath, '--id', 'missing-entry', '--adapter', 'chain-scanner', '--outcome', 'discarded',
+    ], project);
+    assert.equal(missingDiscardReason.status, 2);
+    assert.match(missingDiscardReason.stderr, /--reason is required/);
+
+    assert.equal(readFileSync(ledgerPath, 'utf8'), sourceBytes, 'invalid command contracts must preserve exact ledger bytes');
+    assert.equal(existsSync(target), false, 'rejected migration options must not publish a target');
+    assert.equal(existsSync(backup), false, 'rejected migration options must not create a backup');
+    assert.equal(existsSync(join(fixture, 'installed', 'coordination.mjs')), false, 'rejected install options must not write a helper');
   } finally {
     rmSync(fixture, { recursive: true, force: true });
   }
