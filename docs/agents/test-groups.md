@@ -122,7 +122,20 @@ merge checkout/tree, base and aggregate report digest. The aggregate re-observes
 that producer immediately before accepting all four references; a changed or
 missing proof fails. A covered run cannot become a new full producer.
 
-Test-first, Firestore rules and compatibility gates always run for the actual
-event checkout and comparison base, including covered branch pushes. Main
-always executes its own full cohort. Pages still requires both `scanner-tests`
-and `release-evidence`; same-run artifact reads add no token permissions.
+Ordinary full and same-source covered runs retain actual event-checkout
+test-first, Firestore rules and compatibility execution. Main executes its own
+full cohort unless the narrow policy-prose inheritance path below is proven.
+Pages still requires both `scanner-tests` and `release-evidence`; same-run
+artifact reads add no token permissions.
+
+For instruction-preserving policy prose, `policy-reuse` keeps the current
+source/base/tree and review evidence separate from the exact base's original
+full execution. All four `--covered` records have zero current cases,
+artifacts or child execution. The aggregate rederives the frozen inventory,
+validates current policy statuses, re-observes the full producer, and reports
+`policy-covered` with zero current case count. Rules and compatibility are
+inherited only after their original successful execution steps are verified;
+the current test-first diff gate still runs. A policy-covered run cannot become
+a full producer. Uncertain classification or evidence retains the full current
+cohort. The [release procedure](../../RELEASE_GATES.md#policy-prose-inheritance)
+owns product/FAQ/rendered receipt inheritance and its limits.
