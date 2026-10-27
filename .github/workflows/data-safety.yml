@@ -148,6 +148,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Admit immutable saved scenery fixture object
+        if: needs.cohort-routing.outputs.decision == 'full'
+        run: |
+          git cat-file -e 'b176026825e4f9539780f745fe60e09cf348d288^{commit}' || git fetch --no-tags origin b176026825e4f9539780f745fe60e09cf348d288
+          test "$(git rev-parse 'b176026825e4f9539780f745fe60e09cf348d288^{tree}')" = 27e293d0fa9aae62a906b36dc984bd0ef184f956
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -224,6 +229,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Admit immutable saved scenery fixture object
+        if: needs.cohort-routing.outputs.decision == 'full'
+        run: |
+          git cat-file -e 'b176026825e4f9539780f745fe60e09cf348d288^{commit}' || git fetch --no-tags origin b176026825e4f9539780f745fe60e09cf348d288
+          test "$(git rev-parse 'b176026825e4f9539780f745fe60e09cf348d288^{tree}')" = 27e293d0fa9aae62a906b36dc984bd0ef184f956
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -287,6 +297,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Admit immutable saved scenery fixture object
+        if: needs.cohort-routing.outputs.decision == 'full'
+        run: |
+          git cat-file -e 'b176026825e4f9539780f745fe60e09cf348d288^{commit}' || git fetch --no-tags origin b176026825e4f9539780f745fe60e09cf348d288
+          test "$(git rev-parse 'b176026825e4f9539780f745fe60e09cf348d288^{tree}')" = 27e293d0fa9aae62a906b36dc984bd0ef184f956
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

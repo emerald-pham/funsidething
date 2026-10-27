@@ -73,8 +73,8 @@
       "gitBlob": "af91a33a6af193fd5582255b7eb09361bb9cc6f1",
       "sha256": "99781010cea67b0157fdb757162ff05a99ef62da77cec62b070bbbcbe5f8d9de",
       "preservedOriginalPath": "scripts/source-snapshots/issue-290/button-safety-native-9b5bc1c.mjs.txt",
-      "effectiveSha256": "8054674a9fbb0101970e113317f9d1b13fb3a9ceabd9b759e37c8d8df7575035",
-      "adaptation": "Explicit canonical source-profile hook for only original mobile story and confirmed modal release; original full inventory guard retained. Local owner lookup canonicalizes the existing repo once, skips only unavailable other paths, rejects ambiguous own allocations, and retains all foreign entries for conflict checks."
+      "effectiveSha256": "12588c8eddebfa42c3ace38f05332478e222d05bf5ad380470b997d209c4e5f1",
+      "adaptation": "Explicit canonical source-profile hook for only original mobile story and confirmed modal release; original full inventory guard retained. Local owner lookup canonicalizes the existing repo once, skips only unavailable other paths, rejects ambiguous own allocations, and retains all foreign entries for conflict checks. The two saved scenery consumers may serve only the explicit immutable b176 fixture; native output separates saved app bytes from current tooling and cannot pay current mobile acceptance. Exact limited-profile offered action IDs are recognized separately from actual executed outcomes; unknown IDs and full catalog remain guarded."
     },
     {
       "path": "scripts/button-safety-rapid-core.mjs",
@@ -116,12 +116,18 @@
     {
       "name": "RISK scenery backdrop cache: first unchanged lighting timer reuses actual pixels while changed slots and loaded copy still paint",
       "sha256": "583784e402c8d9f381aba9add5c3c507013132997aa69316c89866f078f7fef4",
-      "sourceStartLine": 46345
+      "sourceStartLine": 46345,
+      "preservedOriginalPath": "scripts/source-snapshots/issue-290/scenery-1-9b5bc1c.source.txt",
+      "effectiveSha256": "970b86ece3cf5d3fe42882489115b3b61ba1015e73a95324c513b0c497e4ba10",
+      "adaptation": "Only the explicit saved-scenery-b176 app fixture, its routed landscape hash and native source binding differ; all original causal paint, copy, pixels, data-preservation and cleanup assertions remain executable."
     },
     {
       "name": "RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh",
       "sha256": "ea24953f6e8f3a1cf0e69ed9e136d9d7c25eb02d1416206da8466f96818db40b",
-      "sourceStartLine": 46393
+      "sourceStartLine": 46393,
+      "preservedOriginalPath": "scripts/source-snapshots/issue-290/scenery-2-9b5bc1c.source.txt",
+      "effectiveSha256": "a19ae113df25d524555e82a42675ed9aea267ce9efa75c4281a901816e2bb713",
+      "adaptation": "Only the explicit saved-scenery-b176 app fixture, its routed landscape hash and native source binding differ; all original causal paint, copy, pixels, data-preservation and cleanup assertions remain executable."
     },
     {
       "name": "RISK repository process: scenery consumers use allocated fallback ports and preserve early native failures",
@@ -131,7 +137,10 @@
     {
       "name": "RISK repository process: native scene-time bursts cannot activate controls behind a refused top-layer release",
       "sha256": "bd68d0178600acdd77c68166978cddf62d86703f54d650d4d02addeadaf61f5a",
-      "sourceStartLine": 46458
+      "sourceStartLine": 46458,
+      "preservedOriginalPath": "scripts/source-snapshots/issue-290/modal-release-9b5bc1c.source.txt",
+      "effectiveSha256": "54e8c76fcd00a096cf367df7b0ad48e8f2bfed254f8c52491329754b09213784",
+      "adaptation": "Original modal current-candidate scenario and all assertions retained; adds offered download-backup recognition versus non-execution assertions for the exact canonical limited profile."
     },
     {
       "name": "RISK repository process: required native button actions execute in Chromium and WebKit",
@@ -162,11 +171,16 @@
   "sourceParent": "b176026825e4f9539780f745fe60e09cf348d288",
   "canonicalLimitedProfile": {
     "path": "scripts/mobile-source-profile.json",
-    "sha256": "88e7582220ce4364a420208f44dbcb596a73bffc52ea7ea2a14bacdded0bc67d",
+    "sha256": "1a3e61edc692e9050f9224ad2bd2bccde9075561a84b6f03c363dfaab5c0afd5",
     "scopes": [
       "required-mobile-story",
       "confirmed-modal-release"
     ],
     "limits": "Exact canonical applicability only; original full native catalog unchanged; no actual runtime qualification supplied."
+  },
+  "sceneryFixture": {
+    "path": "scripts/scenery-source-fixture.json",
+    "sha256": "3040b66a3a7680e922033689f5d5f42106900ee3f39473e16eb47614cdd7e194",
+    "scope": "Only two saved scenery consumers; current tooling plus immutable b176 app; no current-app or mobile-story credit."
   }
 }

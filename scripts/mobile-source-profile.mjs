@@ -31,7 +31,7 @@ export function checkProfile({repo,source,assets,engine,motion,scenario,control=
  const scope=scopes.find(row=>row.engine===engine&&row.scenario===scenario&&row.motions.includes(motion));
  assert.ok(scope,'Only the original mobile story and confirmed modal harness may use this source profile');
  const bytes=fs.readFileSync(profileFile),profile=JSON.parse(bytes);
- assert.deepEqual(Object.keys(profile).sort(),['allowedScopes','applicationAssets','id','originalInventorySha256','schemaVersion','sourceBaselineSha','sourceSha256','sourceTemplates'].sort(),'Unknown or omitted profile fields');
+ assert.deepEqual(Object.keys(profile).sort(),['allowedScopes','applicationAssets','id','originalInventorySha256','schemaVersion','sourceBaselineSha','sourceSha256','sourceTemplates','recognizedActions'].sort(),'Unknown or omitted profile fields');
  assert.equal(profile.schemaVersion,1);assert.equal(profile.id,'canonical-mobile-modal-source-v1');
  assert.match(profile.sourceBaselineSha,/^[a-f0-9]{40}$/);
  assert.deepEqual(profile.allowedScopes,scopes,'A data profile cannot expand admitted consumer scopes');
@@ -43,11 +43,14 @@ export function checkProfile({repo,source,assets,engine,motion,scenario,control=
  assert.deepEqual(sourceButtonTemplates(source),profile.sourceTemplates,'Canonical source templates drifted');
  const inventoryBytes=fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'));
  assert.equal(digest(inventoryBytes),profile.originalInventorySha256,'Saved full native inventory must remain unchanged');
- return {schemaVersion:1,profileId:profile.id,profileSha256:digest(bytes),applicationAssetsSha256:objectDigest(profile.applicationAssets),sourceSha256:profile.sourceSha256,originalInventorySha256:profile.originalInventorySha256,scope:scope.id,engine,scenario,motion,coverage:'limited consumer only; no full native action coverage'};
+ const recognized=[...new Set([...JSON.parse(inventoryBytes).requiredActions,...[...source.matchAll(/data-act=[\"']([a-z0-9-]+)[\"']/g)].map(match=>'act:'+match[1])])].sort();
+ assert.deepEqual(profile.recognizedActions,recognized,'Only exact canonical literal IDs and the unchanged reviewed catalog may be recognized');
+ return {schemaVersion:1,profileId:profile.id,profileSha256:digest(bytes),applicationAssetsSha256:objectDigest(profile.applicationAssets),sourceSha256:profile.sourceSha256,originalInventorySha256:profile.originalInventorySha256,scope:scope.id,engine,scenario,motion,recognizedActions:profile.recognizedActions,coverage:'limited consumer only; no full native action coverage'};
 }
 
 export function verifyProfiledNativeReport(report,{repo=root,candidateCommit,candidateTree}={}){
  for(const [key,value]of Object.entries({candidateCommit,candidateTree}))if(value!==undefined)assert.equal(report[key],value,'Limited source report actual checkout '+key);
+ assert.equal(report.appFixture,undefined,'Saved scenery fixtures cannot qualify current application consumers');
  const binding=report.sourceProfile;assert.ok(binding,'Actual native source-profile admission evidence is required');
  assert.ok(['required-mobile-story','confirmed-modal-release'].includes(binding.scope));
  assert.equal(report.kind,binding.scope==='required-mobile-story'?'button-mobile-functional':'button-diagnostic','Source profile cannot qualify full native action coverage');
@@ -56,6 +59,9 @@ export function verifyProfiledNativeReport(report,{repo=root,candidateCommit,can
  const actual=currentApplication(repo);
  const expected=checkProfile({repo,source:actual.source,assets:report.assets,engine:report.engine,motion:binding.motion,scenario:binding.scenario});
  assert.deepEqual(binding,expected,'Raw native profile identity or scope mismatch');
+ const offered=[...new Set(report.observedActions||[])].sort(),executed=[...new Set([...(report.outcomes||[]),...(report.rapidOutcomes||[])].filter(row=>row.status==='passed').map(row=>row.action))].sort();
+ for(const action of [...offered,...executed])assert.ok(binding.recognizedActions.includes(action),'Unknown action outside exact limited source profile: '+action);
+ assert.deepEqual(report.actionObservation,{recognizedOffered:offered,executed,coverage:'Offered IDs are recognized, not credited as executed; limited consumer only'},'Recognition and executed coverage must remain distinct');
  if(report.status==='passed'){assert.equal(report.scenarios?.length,1);assert.equal(report.scenarios[0].name,binding.scenario);}
  return binding;
 }

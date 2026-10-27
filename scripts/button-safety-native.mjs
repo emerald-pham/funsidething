@@ -10,8 +10,9 @@ import {MOBILE_PROFILE,MOBILE_SCENARIO} from './button-safety-mobile-contract.mj
 import {hostedButtonPolicy} from './button-safety-ci-policy.mjs';
 const digest=value=>createHash('sha256').update(value).digest('hex');
 const MIME={'.js':'text/javascript','.html':'text/html','.css':'text/css','.svg':'image/svg+xml','.png':'image/png','.webmanifest':'application/manifest+json','.md':'text/markdown; charset=utf-8'};
-export async function runButtonSafety({repo,engine,outputDir,port=0,control=null,probe=false,scenarioFilter=null,mobileYesMotion=null,browserServerEndpoint=null,closeBrowserServer=null}){
+export async function runButtonSafety({repo,engine,outputDir,port=0,control=null,probe=false,scenarioFilter=null,mobileYesMotion=null,browserServerEndpoint=null,closeBrowserServer=null,appFixture=null}){
  assert.ok(['chromium','webkit'].includes(engine),'Explicit supported engine');
+ if(appFixture!==null){assert.equal(appFixture,'saved-scenery-b176','Only the fixed saved scenery fixture is supported');assert.equal(engine,'webkit');assert.ok(['normal','reduced'].includes(mobileYesMotion),'Saved scenery requires the original isolated mobile setup');assert.equal(scenarioFilter,null);assert.equal(control,null);assert.equal(probe,false);assert.equal(browserServerEndpoint,null,'Saved scenery cannot qualify the capped remote mobile story');}
  if(browserServerEndpoint!==null){assert.equal(engine,'webkit');assert.ok(mobileYesMotion,'Remote launch is only admitted for the capped mobile consumer');assert.match(browserServerEndpoint,/^ws:\/\/127\.0\.0\.1:[1-9][0-9]*\/[a-zA-Z0-9_-]+$/);assert.equal(typeof closeBrowserServer,'function','Remote browser requires owner-confirmed closure');}
  if(mobileYesMotion){assert.equal(engine,'webkit');assert.ok(['normal','reduced'].includes(mobileYesMotion));assert.ok(scenarioFilter===null||scenarioFilter===MOBILE_SCENARIO);scenarioFilter=MOBILE_SCENARIO;}
  assert.ok(control===null||['pageerror','unhandled','reload','navigation','stall','short-stall','async-pending','async-predicate-false','close','crash','new-action'].includes(control),'Known explicit sensitivity control');
@@ -48,18 +49,20 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
  const prefix='/button-'+randomUUID()+'/',sdk='/sdk-'+randomUUID()+'/',sources=new Map();
  const runtimeAssets=JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredRuntimeAssets;
  // Only reviewed runtime Markdown joins the existing asset types; repository guidance stays private.
- for(const file of git('ls-files').toString().trim().split('\n'))if(file!=='tests.js'&&!file.startsWith('scripts/')&&(/\.(html|js|css|svg|png|webmanifest)$/.test(file)||Object.hasOwn(runtimeAssets,file)))sources.set(file,fs.readFileSync(path.join(repo,file)));
+ if(appFixture){const {savedSceneryApplication}=await import('./scenery-source-fixture.mjs');const fixture=savedSceneryApplication(repo);for(const [file,bytes]of fixture.sources)sources.set(file,bytes);report.kind='button-scenery-fixture';report.appFixture=fixture.binding;report.limits.push('Harness-only immutable saved scenery app; current candidate tooling, no current-app paint or required mobile-story credit.');}
+ else for(const file of git('ls-files').toString().trim().split('\n'))if(file!=='tests.js'&&!file.startsWith('scripts/')&&(/\.(html|js|css|svg|png|webmanifest)$/.test(file)||Object.hasOwn(runtimeAssets,file)))sources.set(file,fs.readFileSync(path.join(repo,file)));
  report.assets=Object.fromEntries([...sources].map(([file,bytes])=>[file,digest(bytes)]));
  for(const [file,hash]of Object.entries(runtimeAssets))assert.equal(report.assets[file],hash,'Reviewed runtime asset missing or changed: '+file);
  const {verifyButtonInventorySource}=await import('./button-safety-contract.mjs');
  const inventorySource=[...sources].filter(([file])=>/\.(?:js|html)$/.test(file)).map(([,bytes])=>bytes.toString()).join('\n');
  // These two fixed consumers have independent reviewed canonical applicability.
  // Every full run and every other scenario retains the saved full catalog guard.
- if(mobileYesMotion||(!control&&!probe&&engine==='chromium'&&scenarioFilter==='rapid scene time presets, lock, live time, and close')){
+ if(appFixture){assert.equal(report.appFixture.id,appFixture);}
+ else if(mobileYesMotion||(!control&&!probe&&engine==='chromium'&&scenarioFilter==='rapid scene time presets, lock, live time, and close')){
   const {checkProfile}=await import('./mobile-source-profile.mjs');
   report.sourceProfile=checkProfile({repo,source:inventorySource,assets:report.assets,engine,motion:mobileYesMotion,scenario:scenarioFilter,control,probe});
  }else verifyButtonInventorySource(inventorySource,JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')));
- for(const [file,bytes]of sources)assert.equal(digest(bytes),digest(git('show','HEAD:'+file)),'Button run requires exact committed app bytes: '+file);
+ for(const [file,bytes]of sources)assert.equal(digest(bytes),digest(git('show',(appFixture?report.appFixture.commit:'HEAD')+':'+file)),'Button run requires exact committed app bytes: '+file);
  let server,browser,context,page,armed=false,closing=false;
  const check=()=>{assert.equal(report.errors.length,0,'Native button safety detected '+report.errors.join(', '));};
  const bounded=async(work,label,timeoutMs=2500)=>{let timer;try{return await Promise.race([work,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Native button safety detected stalled responsiveness: '+label)),timeoutMs);})]);}finally{clearTimeout(timer);}};
@@ -363,7 +366,9 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
   else if(scenarioFilter?.startsWith('rapid ')){const {runRapidScenarios}=await import('./button-safety-rapid.mjs');await runRapidScenarios({scenario});}
   else {await runButtonScenarios({scenario});const {runRapidScenarios}=await import('./button-safety-rapid.mjs');await runRapidScenarios({scenario});}
   if(scenarioFilter)assert.equal(report.scenarios?.length,1,'Exactly one requested diagnostic scenario must execute');
-  for(const action of observed)assert.ok(report.requiredActions.includes(action),'New untested button action: '+action);
+  const recognized=report.sourceProfile?.recognizedActions||report.requiredActions;
+  for(const action of observed)assert.ok(recognized.includes(action),'New untested button action: '+action);
+  if(report.sourceProfile)report.actionObservation={recognizedOffered:[...observed].sort(),executed:[...new Set([...outcomes.values(),...rapidOutcomes.values()].filter(row=>row.status==='passed').map(row=>row.action))].sort(),coverage:'Offered IDs are recognized, not credited as executed; limited consumer only'};
   report.observedActions=[...observed].sort();report.outcomes=[...outcomes.values()];report.rapidOutcomes=[...rapidOutcomes.values()];if(scenarioFilter)report.scope='focused-diagnostic';
   report.status='passed';
  }catch(error){report.status='failed';report.failure=error.stack;try{report.failureObservation=await bounded(page.evaluate(()=>({modal:document.getElementById('modalRoot')?.innerText,toast:document.getElementById('toast')?.innerText,heartbeat:{...window.__buttonHeartbeat},mode:state.mode,chain:state.chain,candidateId:state.candidateId,taskTitles:state.tasks.slice(0,10).map(t=>({id:t.id,title:t.title}))})),'failure observation');}catch(observationError){report.failureObservationError=String(observationError);}throw error;}

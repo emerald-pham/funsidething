@@ -54,13 +54,20 @@ before pushing. The worker launches no live runtime or hosted workflow.
    compatibility. The separate stress job must preserve its actual application
    outcome and pass execution integrity. The required aggregate must independently
    verify all bytes and current predecessor outcomes before release/deployment.
-3. If current application source fails the exact limited profile, renderer contract
-   or mobile story, preserve the exact failure and stop release. This change
-   intentionally imports no PR285 product patch; successful current
-   mobile execution remains a required acceptance/release gate. A controlled
-   fixture pass cannot replace it. Integrate any separately owned product repair
-   only with its owner's actual source/review evidence and renewed exact candidate
-   qualification.
+3. The two saved scenery consumers retain their original paint/copy/data assertions
+   against the exact immutable `b176026825e4f9539780f745fe60e09cf348d288` app
+   (tree `27e293d0fa9aae62a906b36dc984bd0ef184f956`), using current tooling.
+   Their native artifacts separately bind both sources and all served assets;
+   this is harness-only proof and earns no current-app paint or mobile credit.
+   The modal consumer stays on the actual current candidate with exact limited
+   profile action recognition; offered IDs are not executed coverage. Preserve
+   the earlier canonical paint/action failures with their original identities.
+   If the current candidate fails its exact profile or required 400-task Normal/
+   Reduced 1 GB mobile story, preserve that failure and stop release. No saved
+   fixture can replace that mandatory current-source gate or the full current
+   regressions. This change imports no PR285 product patch. Integrate separately
+   owned product repairs only with owner source/review evidence and renewed exact
+   candidate qualification.
 4. For reuse checks, retain one original successful full producer and prove that
    missing/skipped early or stress jobs and missing receipt attestation force full
    execution. Complete same-source and policy-prose reuse preserve original run,

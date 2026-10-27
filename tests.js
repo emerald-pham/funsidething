@@ -45543,7 +45543,7 @@ test('RISK scenery backdrop cache: first unchanged lighting timer reuses actual 
     const page=await newPage(...args),goto=page.goto.bind(page);await page.addInitScript(()=>{const NativeDate=Date;globalThis.__paintedSlotAt=Date.parse('2026-10-06T03:23:42.125Z');globalThis.Date=class extends NativeDate{constructor(...args){super(...(args.length?args:[globalThis.__paintedSlotAt]));}static now(){return globalThis.__paintedSlotAt;}};});
     await page.route('**/HUMAN_WRITTEN_HOURLY_TAGS.md',async route=>{await gate;const response=await route.fetch(),original=await response.text(),body=original+'\n## Any time of day\n- Controlled scenery text\n## Skywriters\n- HELLO\n';const hash=value=>createHash('sha256').update(value).digest('hex');evidence.bankRoute={originalSha256:hash(original),fixtureSha256:hash(body)};await route.fulfill({response,body});});
     await page.route('**/landscape.js',async route=>{
-     const response=await route.fetch();assert.equal(response.status(),200);let body=await response.text();const hash=value=>createHash('sha256').update(value).digest('hex');assert.equal(hash(body),hash(fs.readFileSync(path.join(__dirname,'landscape.js'))));
+     const response=await route.fetch();assert.equal(response.status(),200);let body=await response.text();const hash=value=>createHash('sha256').update(value).digest('hex');assert.equal(hash(body),hash(spawnSync('git',['show','b176026825e4f9539780f745fe60e09cf348d288:landscape.js'],{cwd:__dirname}).stdout));
      const anchor="  window.addEventListener('pageshow'",ready="  document.dispatchEvent(new CustomEvent('landscape-scene-time-ready'));";assert.ok(body.includes(anchor)&&body.includes(ready));
      const instrumentation=`
       const cacheProbe={backgrounds:0,lives:0};globalThis.paintedSlotProbe=cacheProbe;
@@ -45567,8 +45567,8 @@ test('RISK scenery backdrop cache: first unchanged lighting timer reuses actual 
    };return context;
   };return browser;
  };
- try{try{await runButtonSafety({repo:__dirname,engine:'webkit',port:Number(process.env.CHAIN_NATIVE_PORT||process.env.CHAIN_NATIVE_SMOKE_PORT||0),outputDir:directory,mobileYesMotion:'reduced'});assert.fail('Expected scenery probe completion');}catch(error){if(error!==finished)throw error;}}
- finally{releaseBank();playwright.webkit.launch=launch;evidence.probeError=probeError?.stack;const files=fs.readdirSync(directory).filter(name=>/^button-safety-webkit-.*\.json$/.test(name));if(files.length===1){const native=JSON.parse(fs.readFileSync(path.join(directory,files[0])));evidence.nativeReportPath=path.join(directory,files[0]);evidence.cleanup=native.cleanup;evidence.preparedSources=native.retainedSources?.[0]?.bootstrap?.retainedSources?.map(({id,payloadHash})=>({id,payloadHash}));}
+ try{try{await runButtonSafety({repo:__dirname,engine:'webkit',port:Number(process.env.CHAIN_NATIVE_PORT||process.env.CHAIN_NATIVE_SMOKE_PORT||0),outputDir:directory,mobileYesMotion:'reduced',appFixture:'saved-scenery-b176'});assert.fail('Expected scenery probe completion');}catch(error){if(error!==finished)throw error;}}
+ finally{releaseBank();playwright.webkit.launch=launch;evidence.probeError=probeError?.stack;const files=fs.readdirSync(directory).filter(name=>/^button-safety-webkit-.*\.json$/.test(name));if(files.length===1){const native=JSON.parse(fs.readFileSync(path.join(directory,files[0])));evidence.nativeReportPath=path.join(directory,files[0]);evidence.appFixture=native.appFixture;evidence.cleanup=native.cleanup;evidence.preparedSources=native.retainedSources?.[0]?.bootstrap?.retainedSources?.map(({id,payloadHash})=>({id,payloadHash}));}
   fs.writeFileSync(path.join(directory,'painted-slot-observation.json'),JSON.stringify(evidence,null,2)+'\n');}
  if(probeError)throw probeError;
  for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(evidence.cleanup?.[key],true);
@@ -45578,7 +45578,6 @@ test('RISK scenery backdrop cache: first unchanged lighting timer reuses actual 
  assert.notEqual(evidence.changed.before.slot,evidence.changed.after.slot,'Positive control advances the real lighting slot');assert.equal(evidence.changed.after.backgrounds,evidence.changed.before.backgrounds+1,'A genuinely changed slot must repaint');assert.equal(evidence.changed.after.paintedSlot,evidence.changed.after.slot);assert.equal(evidence.changed.fresh.backgrounds,evidence.changed.after.backgrounds+1,'Independent full refresh actually repaints');assert.equal(evidence.changed.after.back,evidence.changed.fresh.back,'Changed-slot pixels equal a complete refresh at the same instant, even when window states hold across slots');
  t.diagnostic('Nonqualifying deterministic rendered consumer: '+directory);
 });
-
 test('RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh',async t=>{
  for(const [motion,change] of [['reduced',false],['normal',false],['reduced',true]])await t.test(motion+(change?' pending scene change':' unchanged scene'),async t=>{
  const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});const directory=fs.mkdtempSync(path.join(base,'late-copy-'));
@@ -45592,7 +45591,7 @@ test('RISK scenery text loading: delayed bank reuses identical backdrop while cu
     const page=await newPage(...args),goto=page.goto.bind(page);await page.addInitScript(()=>{const NativeDate=Date;globalThis.__paintedSlotAt=Date.parse('2026-10-06T03:23:42.125Z');globalThis.Date=class extends NativeDate{constructor(...args){super(...(args.length?args:[globalThis.__paintedSlotAt]));}static now(){return globalThis.__paintedSlotAt;}};});
     await page.route('**/HUMAN_WRITTEN_HOURLY_TAGS.md',async route=>{await gate;const response=await route.fetch(),original=await response.text(),body=original+'\n## Any time of day\n- Controlled scenery text\n## Skywriters\n- HELLO\n';const hash=value=>createHash('sha256').update(value).digest('hex');evidence.bankRoute={originalSha256:hash(original),fixtureSha256:hash(body)};await route.fulfill({response,body});});
     await page.route('**/landscape.js',async route=>{
-     const response=await route.fetch();assert.equal(response.status(),200);let body=await response.text();const hash=value=>createHash('sha256').update(value).digest('hex');assert.equal(hash(body),hash(fs.readFileSync(path.join(__dirname,'landscape.js'))));
+     const response=await route.fetch();assert.equal(response.status(),200);let body=await response.text();const hash=value=>createHash('sha256').update(value).digest('hex');assert.equal(hash(body),hash(spawnSync('git',['show','b176026825e4f9539780f745fe60e09cf348d288:landscape.js'],{cwd:__dirname}).stdout));
      const anchor="  window.addEventListener('pageshow'",ready="  document.dispatchEvent(new CustomEvent('landscape-scene-time-ready'));";assert.ok(body.includes(anchor)&&body.includes(ready));
      const instrumentation=`
       const cacheProbe={backgrounds:0,lives:0,paints:[]};globalThis.paintedSlotProbe=cacheProbe;
@@ -45616,8 +45615,8 @@ test('RISK scenery text loading: delayed bank reuses identical backdrop while cu
    };return context;
   };return browser;
  };
- try{try{await runButtonSafety({repo:__dirname,engine:'webkit',port:Number(process.env.CHAIN_NATIVE_PORT||process.env.CHAIN_NATIVE_SMOKE_PORT||0),outputDir:directory,mobileYesMotion:motion});assert.fail('Expected scenery probe completion');}catch(error){if(error!==finished)throw error;}}
- finally{releaseBank();playwright.webkit.launch=launch;evidence.probeError=probeError?.stack;const files=fs.readdirSync(directory).filter(name=>/^button-safety-webkit-.*\.json$/.test(name));if(files.length===1){const native=JSON.parse(fs.readFileSync(path.join(directory,files[0])));evidence.nativeReportPath=path.join(directory,files[0]);evidence.cleanup=native.cleanup;evidence.preparedSources=native.retainedSources?.[0]?.bootstrap?.retainedSources?.map(({id,payloadHash})=>({id,payloadHash}));}
+ try{try{await runButtonSafety({repo:__dirname,engine:'webkit',port:Number(process.env.CHAIN_NATIVE_PORT||process.env.CHAIN_NATIVE_SMOKE_PORT||0),outputDir:directory,mobileYesMotion:motion,appFixture:'saved-scenery-b176'});assert.fail('Expected scenery probe completion');}catch(error){if(error!==finished)throw error;}}
+ finally{releaseBank();playwright.webkit.launch=launch;evidence.probeError=probeError?.stack;const files=fs.readdirSync(directory).filter(name=>/^button-safety-webkit-.*\.json$/.test(name));if(files.length===1){const native=JSON.parse(fs.readFileSync(path.join(directory,files[0])));evidence.nativeReportPath=path.join(directory,files[0]);evidence.appFixture=native.appFixture;evidence.cleanup=native.cleanup;evidence.preparedSources=native.retainedSources?.[0]?.bootstrap?.retainedSources?.map(({id,payloadHash})=>({id,payloadHash}));}
   fs.writeFileSync(path.join(directory,'late-copy-observation.json'),JSON.stringify(evidence,null,2)+'\n');}
  if(probeError)throw probeError;
  for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(evidence.cleanup?.[key],true);
@@ -45630,7 +45629,6 @@ test('RISK scenery text loading: delayed bank reuses identical backdrop while cu
  t.diagnostic('Nonqualifying deterministic late-copy consumer: '+directory);
  });
 });
-
 test('RISK repository process: scenery consumers use allocated fallback ports and preserve early native failures',async t=>{
  const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});const directory=fs.mkdtempSync(path.join(base,'scenery-harness-'));
  const env={...process.env,CHAIN_NATIVE_OUTPUT:path.join(directory,'native'),CHAIN_NATIVE_SMOKE_PORT:process.env.CHAIN_NATIVE_PORT||process.env.CHAIN_NATIVE_SMOKE_PORT||''};delete env.CHAIN_NATIVE_PORT;delete env.NODE_TEST_CONTEXT;
@@ -45652,6 +45650,7 @@ test('RISK repository process: native scene-time bursts cannot activate controls
   page.mouse.down=async(...args)=>{point=await page.evaluate(()=>{const el=document.querySelector('[data-act="scene-time-settings"]');if(!el)return null;const r=el.getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2};});return down(...args);};
   page.mouse.up=async(...args)=>{const result=await up(...args);if(point&&!geometry)geometry=await page.evaluate(point=>{const dialog=document.querySelector('#sceneTimeDialog[open]'),preset=dialog?.querySelector('[data-scene-preset="first-light"]');if(!preset)return null;preset.style.cssText='position:fixed;left:'+(point.x-20)+'px;top:'+(point.y-10)+'px;width:40px;height:20px;margin:0;z-index:2147483647';return{point,hit:document.elementFromPoint(point.x,point.y)===preset,open:dialog.open};},point);return result;};return page;};return context;};return browser;};
  let result;try{result=await runButtonSafety({repo:__dirname,engine:'chromium',port:Number(process.env.CHAIN_NATIVE_PORT||0),outputDir:directory,scenarioFilter:'rapid scene time presets, lock, live time, and close'});}finally{playwright.chromium.launch=launch;fs.writeFileSync(path.join(directory,'top-layer-geometry.json'),JSON.stringify(geometry,null,2)+'\n');}assert.equal(geometry?.open,true,'The actual scene dialog opens in the controlled overlap fixture');assert.equal(result.report.status,'passed');
+ assert.ok(result.report.actionObservation.recognizedOffered.includes('act:download-backup'),'Canonical offered backup action is recognized by the limited profile');assert.ok(!result.report.actionObservation.executed.includes('act:download-backup'),'Offering a backup button cannot credit execution');
  const opened=result.report.rapidOutcomes.find(row=>row.action==='act:scene-time-settings').bursts[0];assert.equal(opened.attempts,10);assert.equal(opened.trustedPresses,10);assert.equal(opened.unrelatedClicks,0);assert.equal(opened.acceptedClicks,1);assert.ok(opened.windowMs<=2000);assert.ok(opened.attemptDetails.slice(1).every(row=>row.nativeDownAction==='scene-preset:first-light'&&row.neutralRelease&&row.acceptedClicks===0&&row.neutralDocumentId===result.report.releaseSurfaces[0].documentId));
  for(const value of Object.values(result.report.cleanup))assert.equal(value,true);t.diagnostic('Actual scene dialog burst evidence: '+directory);
 });
@@ -45663,7 +45662,7 @@ test('RISK repository process: CI monitor preserves early startup and stress pre
  assert.match(child.stdout,/# Subtest: parallel workflow observation preserves complete missing skipped canceled and unknown distinctions/,'Required actual observer assertions must execute');
 });
 
-test('RISK repository process: canonical limited source profiles preserve original mobile acceptance',()=>{
+test('RISK repository process: canonical limited source profiles preserve original mobile acceptance',{concurrency:false},()=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
  const child=spawnSync(process.execPath,['--test','--test-reporter=tap','scripts/agent-tools/mobile-source-profile.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:120000});
  assert.equal(child.status,0,'Limited canonical source admission must preserve exact original contracts: '+child.stdout+child.stderr);
