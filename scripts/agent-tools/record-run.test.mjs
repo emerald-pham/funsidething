@@ -1291,6 +1291,101 @@ test('reconciles nested token and ordinary cases and keeps corrected redacted ev
   }
 });
 
+test('preserves passed, skipped, TODO, and failed TAP cases with their bounded summary totals', async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'record-tap-terminal-statuses-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(temp);
+  const evidence = path.join(temp, 'evidence');
+  const secret = 'RECORDER-STATUS-SECRET-913e';
+  const testFile = path.join(repo, 'terminal-statuses.test.mjs');
+  await writeFile(testFile, `import { test } from 'node:test';\nimport assert from 'node:assert/strict';\ntest('token passing case', () => {});\ntest('accepted optional case', { skip: 'accepted fixture skip' }, () => {});\ntest('required case remains skipped', { skip: 'forbidden required skip' }, () => {});\ntest.todo('TODO case remains distinct');\ntest('required failing case', () => assert.fail('password=${secret}'));\n`);
+
+  const result = invokeRecorder({
+    repo,
+    evidence,
+    purpose: 'green',
+    command: node,
+    args: ['--test', '--test-reporter=tap', testFile],
+    extraOptions: ['--summary'],
+  });
+
+  assert.equal(result.status, 1, result.stderr);
+  assert.ok(Buffer.byteLength(result.stdout) < 2048, 'console summary remains bounded');
+  const summary = summaryFrom(result);
+  assert.equal(summary.status, 'failed');
+  assert.equal(summary.outcome, 'assertion-failure');
+  assert.deepEqual(summary.child, { exitCode: 1, signal: null });
+  const recordBytes = await readFile(summary.evidence.metadataPath);
+  const record = JSON.parse(recordBytes.toString('utf8'));
+  const tap = await readFile(summary.evidence.stdoutPath, 'utf8');
+  const cases = parseTap(tap).map(({ id, root, status, skipReason }) => ({ id, root, status, skipReason }));
+  assert.deepEqual(cases, [
+    { id: 'token passing case', root: 'token passing case', status: 'passed', skipReason: null },
+    { id: 'accepted optional case', root: 'accepted optional case', status: 'skipped', skipReason: 'accepted fixture skip' },
+    { id: 'required case remains skipped', root: 'required case remains skipped', status: 'skipped', skipReason: 'forbidden required skip' },
+    { id: 'TODO case remains distinct', root: 'TODO case remains distinct', status: 'todo', skipReason: null },
+    { id: 'required failing case', root: 'required failing case', status: 'failed', skipReason: null },
+  ]);
+  assert.match(tap, /^# tests 5$/m);
+  assert.match(tap, /^# pass 1$/m);
+  assert.match(tap, /^# fail 1$/m);
+  assert.match(tap, /^# skipped 2$/m);
+  assert.match(tap, /^# todo 1$/m);
+  assert.equal(record.execution.outcome, 'assertion-failure');
+  assert.equal(record.execution.exitCode, 1);
+  assert.equal(record.execution.output.stdout, tap);
+  assert.equal(record.execution.output.stderr.includes(secret), false);
+  assert.equal(recordBytes.includes(secret), false);
+  assert.equal(tap.includes(secret), false);
+  assert.equal(JSON.stringify(summary).includes(secret), false);
+});
+
+test('keeps a cancelled child non-successful when only partial TAP was retained', async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'record-tap-cancelled-child-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(temp);
+  const evidence = path.join(temp, 'evidence');
+  const secret = 'RECORDER-CANCELLED-SECRET-a41d';
+  const partialTap = [
+    'TAP version 13',
+    '# Subtest: interrupted after one case',
+    'ok 1 - interrupted after one case',
+    `# "password": "${secret}"`,
+    '',
+  ].join('\n');
+  const child = `process.stdout.write(${JSON.stringify(partialTap)}, () => process.kill(process.pid, 'SIGTERM'));`;
+
+  const result = invokeRecorder({
+    repo,
+    evidence,
+    purpose: 'green',
+    command: node,
+    args: ['-e', child],
+    extraOptions: ['--summary'],
+  });
+
+  assert.equal(result.status, 143, result.stderr);
+  assert.ok(Buffer.byteLength(result.stdout) < 2048, 'interruption summary remains bounded');
+  const summary = summaryFrom(result);
+  assert.equal(summary.status, 'interrupted');
+  assert.equal(summary.outcome, 'interrupted');
+  assert.deepEqual(summary.child, { exitCode: null, signal: 'SIGTERM' });
+  assert.equal(summary.wrapperExitCode, 143);
+  const recordBytes = await readFile(summary.evidence.metadataPath);
+  const record = JSON.parse(recordBytes.toString('utf8'));
+  const tap = await readFile(summary.evidence.stdoutPath, 'utf8');
+  assert.deepEqual(parseTap(tap).map(({ id, root, status }) => ({ id, root, status })), [
+    { id: 'interrupted after one case', root: 'interrupted after one case', status: 'passed' },
+  ]);
+  assert.equal(/^# (?:tests|pass|fail)\b/m.test(tap), false, 'partial cases do not acquire a fabricated complete summary');
+  assert.equal(record.state, 'incomplete');
+  assert.equal(record.execution.outcome, 'interrupted');
+  assert.equal(record.execution.signal, 'SIGTERM');
+  assert.equal(recordBytes.includes(secret), false);
+  assert.equal(tap.includes(secret), false);
+  assert.equal(JSON.stringify(summary).includes(secret), false);
+});
+
 test('opaque identity never exposes deleted binary or renamed sensitive diff payloads', async (t) => {
   const temp = await mkdtemp(path.join(os.tmpdir(), 'record-opaque-diffs-'));
   t.after(() => rm(temp, { recursive: true, force: true }));
