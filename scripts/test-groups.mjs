@@ -669,11 +669,11 @@ function artifactInventory(nativeDir) {
   return artifacts;
 }
 
-function coverageReference(proof, identity) {
+function coverageReference(proof, identity, execution=true) {
   if (proof?.inputPasses?.[identity.selectedGroup]) {
     if (!['full','reuse'].includes(proof.decision) || String(proof.runId)!==String(identity.runId) || String(proof.runAttempt)!==String(identity.runAttempt)) fail('Input coverage requires current-run routing proof.');
     for (const key of ['repository','sourceSha','sourceTree','checkoutSha','checkoutTree','comparisonBase']) if(proof.validationContext?.[key]!==identity[key])fail(`Input coverage validation mismatch: ${key}.`);
-    return validateInputPass(proof.inputPasses[identity.selectedGroup],identity);
+    return validateInputPass(proof.inputPasses[identity.selectedGroup],identity,{execution});
   }
   if (proof?.decision!=='reuse' || String(proof.runId)!==String(identity.runId) || String(proof.runAttempt)!==String(identity.runAttempt)) fail('Covered mode requires a verified current-run routing proof.');
   for (const key of ['repository','sourceSha','sourceTree','checkoutSha','checkoutTree','comparisonBase']) if(proof.validationContext?.[key]!==identity[key])fail(`Coverage validation context mismatch: ${key}.`);
@@ -694,7 +694,7 @@ function aggregateResults({options, outputDir, descriptor, inventory, assignment
   if(!Array.isArray(reused)||new Set(reused).size!==reused.length||reused.some(id=>!GROUP_IDS.includes(id)&&!['rules','compatibility'].includes(id)))fail('Invalid reused-gate inventory.');
   const freshProof=covered||reused.length?readJson(options.proof,'fresh original-producer proof'):null;
   const freshCoverage=covered?coverageReference(freshProof,descriptor.resultIdentity):null;
-  for(const gate of reused.filter(id=>!GROUP_IDS.includes(id)))coverageReference(freshProof,{...descriptor.resultIdentity,selectedGroup:gate});
+  for(const gate of reused.filter(id=>!GROUP_IDS.includes(id)))coverageReference(freshProof,{...descriptor.resultIdentity,selectedGroup:gate},false);
   for (const id of ['validation-context','event-gates','cohort-routing','regression']) {
     if (needs[id]?.result !== 'success') issues.push(`Required job ${id} did not succeed: ${needs[id]?.result || 'missing'}.`);
   }
@@ -715,7 +715,7 @@ function aggregateResults({options, outputDir, descriptor, inventory, assignment
       const root = path.resolve(options.resultsDir,id);
       if (fs.lstatSync(root).isSymbolicLink()) fail('Group evidence must be a real directory.');
       const record = readJson(path.join(root,'result.json'),`required result for ${id}`);
-      const inputCovered=!covered&&reused.includes(id);
+      const inputCovered=!covered&&reused.includes(id)&&record.status==='covered';
       if (record.status !== (covered||inputCovered?'covered':'passed') || record.issues?.length || !Array.isArray(record.issues)) fail(`Required group ${id} did not pass.`);
       const identity = record.resultIdentity;
       for (const [key,value] of Object.entries(descriptor.resultIdentity)) {
@@ -724,7 +724,7 @@ function aggregateResults({options, outputDir, descriptor, inventory, assignment
       }
       if (identity?.selectedGroup !== id || identity.checkoutDirty) fail(`Wrong or dirty group identity: ${id}.`);
       if(covered||inputCovered){
-        const expectedCoverage=inputCovered?coverageReference(freshProof,{...descriptor.resultIdentity,selectedGroup:id}):freshCoverage;
+        const expectedCoverage=inputCovered?coverageReference(freshProof,{...descriptor.resultIdentity,selectedGroup:id},false):freshCoverage;
         if(record.cases?.length!==0||record.artifacts?.length!==0||record.process!==null||JSON.stringify(record.coverage)!==JSON.stringify(expectedCoverage))fail('Covered records are mixed, incomplete or claim current execution.');
         records.push({group:id,mode:'covered',identity,coverage:record.coverage});continue;
       }

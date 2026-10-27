@@ -37,6 +37,10 @@
     }
   ],
   "rootAssignments": [
+    {"root": "workflow input reuse orders actual gate executions across rerun IDs", "group": "native-process", "file": "scripts/agent-tools/ci-routing.test.mjs"},
+    {"root": "workflow input reuse requires readable retained original result and native artifacts", "group": "native-process", "file": "scripts/agent-tools/ci-routing.test.mjs"},
+    {"root": "workflow mandatory input policy rejects legacy coverage without original gate artifacts", "group": "native-process", "file": "scripts/agent-tools/ci-routing.test.mjs"},
+    {"root": "test group aggregate admits a fresh execution after consumer runtime changes", "group": "native-process", "file": "scripts/agent-tools/test-groups.test.mjs"},
     {"root": "RISK repository process: unchanged CI inputs reuse an original successful gate across events", "group": "core", "file": "tests.js"},
     {"root": "RISK repository process: CI admission enforces reuse before repeating a passed test child", "group": "core", "file": "tests.js"},
     {"root": "workflow reuses an independently passed gate on main for the same complete inputs", "group": "native-process", "file": "scripts/agent-tools/ci-routing.test.mjs"},

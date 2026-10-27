@@ -83,32 +83,35 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - uses: actions/setup-java@v4
-        if: ${{ !contains(fromJSON(needs.cohort-routing.outputs.reused), 'rules') || !contains(fromJSON(needs.cohort-routing.outputs.reused), 'compatibility') }}
-        with:
-          distribution: temurin
-          java-version: '21'
-      - run: npm ci
-        if: ${{ !contains(fromJSON(needs.cohort-routing.outputs.reused), 'rules') || !contains(fromJSON(needs.cohort-routing.outputs.reused), 'compatibility') }}
-      - run: node scripts/test-first-gate.mjs "${{ needs.validation-context.outputs.base }}"
       - uses: actions/download-artifact@v4
         with:
           name: ci-routing-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/ci-routing
-      - name: Execute CI gate rules input ${{ fromJSON(needs.validation-context.outputs.input-keys).rules }}
-        if: ${{ !contains(fromJSON(needs.cohort-routing.outputs.reused), 'rules') }}
+      - name: Select coverage for this runner
+        id: selected
+        run: node scripts/agent-tools/ci-pass-reuse.mjs select --proof "$RUNNER_TEMP/ci-routing/routing.json" --output-file "$RUNNER_TEMP/selected-routing/routing.json"
+      - uses: actions/setup-java@v4
+        if: ${{ !contains(fromJSON(steps.selected.outputs.reused), 'rules') || !contains(fromJSON(steps.selected.outputs.reused), 'compatibility') }}
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci
+        if: ${{ !contains(fromJSON(steps.selected.outputs.reused), 'rules') || !contains(fromJSON(steps.selected.outputs.reused), 'compatibility') }}
+      - run: node scripts/test-first-gate.mjs "${{ needs.validation-context.outputs.base }}"
+      - name: Execute CI gate rules input ${{ fromJSON(steps.selected.outputs.input-keys).rules }}
+        if: ${{ !contains(fromJSON(steps.selected.outputs.reused), 'rules') }}
         run: echo "Executing previously uncovered rules inputs"
       - name: Firestore rules or verified original pass
         id: rules
-        run: node scripts/agent-tools/ci-pass-reuse.mjs run-gate --gate rules --proof "$RUNNER_TEMP/ci-routing/routing.json" --output-dir "$RUNNER_TEMP/emulator-gates/rules" --comparison-base "${{ needs.validation-context.outputs.base }}"
-      - name: Execute CI gate compatibility input ${{ fromJSON(needs.validation-context.outputs.input-keys).compatibility }}
-        if: ${{ !contains(fromJSON(needs.cohort-routing.outputs.reused), 'compatibility') }}
+        run: node scripts/agent-tools/ci-pass-reuse.mjs run-gate --gate rules --proof "$RUNNER_TEMP/selected-routing/routing.json" --output-dir "$RUNNER_TEMP/emulator-gates/rules" --comparison-base "${{ needs.validation-context.outputs.base }}"
+      - name: Execute CI gate compatibility input ${{ fromJSON(steps.selected.outputs.input-keys).compatibility }}
+        if: ${{ !contains(fromJSON(steps.selected.outputs.reused), 'compatibility') }}
         run: echo "Executing previously uncovered compatibility inputs"
       - name: Backward compatibility
         id: compatibility
         env:
           COMPATIBILITY_BASE_SHA: ${{ needs.validation-context.outputs.base }}
-        run: node scripts/agent-tools/ci-pass-reuse.mjs run-gate --gate compatibility --proof "$RUNNER_TEMP/ci-routing/routing.json" --output-dir "$RUNNER_TEMP/emulator-gates/compatibility" --comparison-base "${{ needs.validation-context.outputs.base }}"
+        run: node scripts/agent-tools/ci-pass-reuse.mjs run-gate --gate compatibility --proof "$RUNNER_TEMP/selected-routing/routing.json" --output-dir "$RUNNER_TEMP/emulator-gates/compatibility" --comparison-base "${{ needs.validation-context.outputs.base }}"
       - name: Preserve emulator gate evidence
         id: upload
         if: always()
@@ -148,7 +151,7 @@ jobs:
         id: route
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node scripts/agent-tools/ci-routing.mjs --descriptor "$RUNNER_TEMP/validation/descriptor/descriptor.json" --comparison-base "${{ needs.validation-context.outputs.base }}" --evidence-dir "$RUNNER_TEMP/ci-routing"
+        run: node scripts/agent-tools/ci-routing.mjs --require-input-passes 1 --descriptor "$RUNNER_TEMP/validation/descriptor/descriptor.json" --comparison-base "${{ needs.validation-context.outputs.base }}" --evidence-dir "$RUNNER_TEMP/ci-routing"
       - name: Preserve routing observations
         if: always()
         uses: actions/upload-artifact@v4
@@ -177,26 +180,29 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - uses: actions/setup-java@v4
-        if: needs.cohort-routing.outputs.decision == 'full' && !contains(fromJSON(needs.cohort-routing.outputs.reused), matrix.group)
-        with:
-          distribution: temurin
-          java-version: '21'
-      - run: npm ci
-        if: needs.cohort-routing.outputs.decision == 'full' && !contains(fromJSON(needs.cohort-routing.outputs.reused), matrix.group)
-      - name: Install matching native Chromium
-        if: needs.cohort-routing.outputs.decision == 'full' && !contains(fromJSON(needs.cohort-routing.outputs.reused), matrix.group)
-        run: npx --no-install playwright install --with-deps chromium
       - uses: actions/download-artifact@v4
         with:
           name: ci-routing-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/ci-routing
-      - name: Execute CI gate ${{ matrix.group }} input ${{ fromJSON(needs.validation-context.outputs.input-keys)[matrix.group] }}
-        if: needs.cohort-routing.outputs.decision == 'full' && !contains(fromJSON(needs.cohort-routing.outputs.reused), matrix.group)
+      - name: Select coverage for this runner
+        id: selected
+        run: node scripts/agent-tools/ci-pass-reuse.mjs select --proof "$RUNNER_TEMP/ci-routing/routing.json" --output-file "$RUNNER_TEMP/selected-routing/routing.json"
+      - uses: actions/setup-java@v4
+        if: steps.selected.outputs.decision == 'full' && !contains(fromJSON(steps.selected.outputs.reused), matrix.group)
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci
+        if: steps.selected.outputs.decision == 'full' && !contains(fromJSON(steps.selected.outputs.reused), matrix.group)
+      - name: Install matching native Chromium
+        if: steps.selected.outputs.decision == 'full' && !contains(fromJSON(steps.selected.outputs.reused), matrix.group)
+        run: npx --no-install playwright install --with-deps chromium
+      - name: Execute CI gate ${{ matrix.group }} input ${{ fromJSON(steps.selected.outputs.input-keys)[matrix.group] }}
+        if: steps.selected.outputs.decision == 'full' && !contains(fromJSON(steps.selected.outputs.reused), matrix.group)
         run: echo "Executing previously uncovered group inputs"
       - name: Execute or reuse assigned group
         id: group
-        run: node scripts/agent-tools/ci-pass-reuse.mjs run-group --proof "$RUNNER_TEMP/ci-routing/routing.json" --group "${{ matrix.group }}" --output-dir "$RUNNER_TEMP/group" --repository "$GITHUB_REPOSITORY" --event-policy "$CHAIN_TEST_EVENT_POLICY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$CHAIN_TEST_SOURCE_SHA" --comparison-base "$CHAIN_TEST_COMPARISON_BASE"
+        run: node scripts/agent-tools/ci-pass-reuse.mjs run-group --proof "$RUNNER_TEMP/selected-routing/routing.json" --group "${{ matrix.group }}" --output-dir "$RUNNER_TEMP/group" --repository "$GITHUB_REPOSITORY" --event-policy "$CHAIN_TEST_EVENT_POLICY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$CHAIN_TEST_SOURCE_SHA" --comparison-base "$CHAIN_TEST_COMPARISON_BASE"
       - name: Preserve actual group results and native evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -254,11 +260,15 @@ jobs:
         with:
           name: regression-${{ github.run_id }}-${{ github.run_attempt }}-native-process
           path: ${{ runner.temp }}/groups/native-process
+      - uses: actions/download-artifact@v4
+        with:
+          name: ci-routing-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ci-routing
       - name: Recheck covered producer immediately before aggregation
         if: needs.cohort-routing.outputs.decision == 'reuse' || needs.cohort-routing.outputs.reused != '[]'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node scripts/agent-tools/ci-routing.mjs --max-wait-ms 0 --descriptor "$RUNNER_TEMP/validation/descriptor/descriptor.json" --comparison-base "$CHAIN_TEST_COMPARISON_BASE" --evidence-dir "$RUNNER_TEMP/final-routing"
+        run: node scripts/agent-tools/ci-routing.mjs --require-input-passes 1 --input-proof "$RUNNER_TEMP/ci-routing/routing.json" --max-wait-ms 0 --descriptor "$RUNNER_TEMP/validation/descriptor/descriptor.json" --comparison-base "$CHAIN_TEST_COMPARISON_BASE" --evidence-dir "$RUNNER_TEMP/final-routing"
       - name: Verify complete required cohort
         id: aggregate
         if: always()

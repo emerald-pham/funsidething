@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { CI_GATES, ciInputContext, ciInputKey, findInputPasses } from './ci-pass-reuse.mjs';
+import { originalArtifactVerifier } from './ci-pass-artifacts.mjs';
 
 const sha = value => typeof value === 'string' && /^[a-f0-9]{40}$/.test(value);
 const decimal = value => /^[1-9][0-9]*$/.test(String(value));
@@ -15,7 +16,7 @@ function options(args) {
   const result = {};
   for (let i = 0; i < args.length; i += 2) {
     const key = args[i]?.slice(2), value = args[i + 1];
-    if (!['comparison-base', 'evidence-dir', 'max-wait-ms', 'poll-interval-ms', 'descriptor', 'plan-only'].includes(key) || !value || result[key]) throw new Error('Pass --comparison-base SHA --evidence-dir NEW_DIRECTORY.');
+    if (!['comparison-base', 'evidence-dir', 'max-wait-ms', 'poll-interval-ms', 'descriptor', 'plan-only', 'require-input-passes', 'input-proof'].includes(key) || !value || result[key]) throw new Error('Pass --comparison-base SHA --evidence-dir NEW_DIRECTORY.');
     result[key] = value;
   }
   if (!sha(result['comparison-base']) || !result['evidence-dir']) throw new Error('An exact comparison base and fresh evidence directory are required.');
@@ -72,18 +73,28 @@ async function main() {
   record.inputContext = ciInputContext(validationContext);
   record.inputKeys = Object.fromEntries(CI_GATES.map(gate => [gate, ciInputKey(record.inputContext, gate)]));
   record.inputPasses = {};
+  if(args['input-proof']){
+    const original=JSON.parse(readFileSync(args['input-proof'],'utf8'));
+    if(String(original.runId)!==record.runId||String(original.runAttempt)!==record.runAttempt)throw new Error('Original routing run/attempt changed.');
+    for(const key of ['repository','sourceSha','sourceTree','checkoutSha','checkoutTree','comparisonBase'])if(original.validationContext?.[key]!==validationContext[key])throw new Error('Original routing context changed: '+key);
+    const inputs={...ciInputContext(validationContext),runtime:original.inputContext?.runtime};
+    if(JSON.stringify(inputs)!==JSON.stringify(original.inputContext)||!inputs.runtime)throw new Error('Original routing input identity is incomplete.');
+    record.inputContext=inputs;record.inputKeys=Object.fromEntries(CI_GATES.map(gate=>[gate,ciInputKey(inputs,gate)]));
+  }
   let apiReads = 0;
-  function readApi(suffix) {
-    if (++apiReads > 40) throw new Error('Public observation request budget exhausted.');
+  function readApi(suffix, archive=false) {
+    if (++apiReads > 96) throw new Error('Public observation request budget exhausted.');
     const url = `https://api.github.com/repos/${repository}/${suffix}`;
-    const response = spawnSync('curl', ['--disable', '--fail', '--silent', '--show-error', '--max-time', '10', '--connect-timeout', '5',
+    const response = spawnSync('curl', ['--disable', '--fail', '--silent', '--show-error', '--max-time', archive?'45':'10', '--connect-timeout', '5',
+      ...(archive?['--location','--proto','=https','--proto-redir','=https','--max-filesize','134217728']:[]),
       ...(process.env.GITHUB_TOKEN?['--header','Authorization: Bearer '+process.env.GITHUB_TOKEN]:[]),
       '--header', 'Accept: application/vnd.github+json', '--header', 'User-Agent: chain-scanner-ci-routing', url],
-    { encoding: 'utf8', timeout: 11000, maxBuffer: 8 * 1024 * 1024 });
-    const evidence = `observation-${apiReads}.json`;
+    { encoding: archive?undefined:'utf8', timeout: archive?46000:11000, maxBuffer: (archive?128:8) * 1024 * 1024 });
+    const evidence = `observation-${apiReads}.${archive?'zip':'json'}`;
     writeFileSync(path.join(directory, evidence), response.stdout || response.stderr || response.error?.message || '', { mode: 0o600 });
     record.observations.push({ url, evidence, exitCode: response.status, observedAt: new Date().toISOString() });
     if (response.status !== 0 || response.error) throw new Error('Public GitHub observation unavailable.');
+    if(archive)return {path:path.join(directory,evidence),sha256:createHash('sha256').update(response.stdout).digest('hex')};
     return JSON.parse(response.stdout);
   }
   function canonicalPull() {
@@ -175,8 +186,12 @@ async function main() {
       record.decision = 'full'; record.reason = `${error.message} Executing the actual checkout's complete cohort.`;
     }
   }
+  if(!args['plan-only']&&args['require-input-passes']==='1'){
+    record.reason='Required gates use verified retained original input passes; uncovered gates execute.';
+    record.decision='full';record.coveredBy=null;record.cohortContext=validationContext;record.contextSha256=hash(validationContext);
+  }
   if (!args['plan-only'] && record.decision === 'full') {
-    try { record.inputPasses = findInputPasses(record, readApi); }
+    try { record.inputPasses = findInputPasses(record, readApi,originalArtifactVerifier(readApi)); }
     catch (error) { record.inputReuseReason = `${error.message} Unverified gates require execution.`; }
   }
   writeFileSync(path.join(directory, 'routing.json'), JSON.stringify(record, null, 2) + '\n', { mode: 0o600 });

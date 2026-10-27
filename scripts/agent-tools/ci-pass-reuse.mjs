@@ -21,24 +21,26 @@ export function ciInputContext(validationContext) {
 
 export const ciInputKey = (inputs, gate) => digest({ ...inputs, gate });
 
-export function validateInputPass(pass, identity) {
-  const expected = ciInputContext({ ...identity, runtime: { node: process.versions.node, platform: process.platform, arch: process.arch } });
+export function validateInputPass(pass, identity, { execution = true } = {}) {
+  const expected = ciInputContext({ ...identity, runtime: execution ? { node: process.versions.node, platform: process.platform, arch: process.arch } : pass?.inputs?.runtime });
+  if(!execution){expected.runtime=pass?.inputs?.runtime;if(!['node','platform','arch','imageOS','imageVersion'].every(key=>typeof expected.runtime?.[key]==='string'&&expected.runtime[key]))throw new Error('Original execution runtime is incomplete.');}
   if (identity.checkoutDirty || !expected.runtime.imageOS || !expected.runtime.imageVersion || pass?.kind !== 'ci-input-pass-v1' ||
     pass.gate !== identity.selectedGroup || !CI_GATES.includes(pass.gate) || JSON.stringify(pass.inputs) !== JSON.stringify(expected) || pass.inputKey !== ciInputKey(expected,pass.gate)) throw new Error('Input pass does not match the complete current group inputs/runtime.');
   const producer = pass.coveredBy;
   if (!['runId','runAttempt','jobId'].every(key => decimal(producer?.[key])) || !['sourceSha','checkoutSha'].every(key => sha(producer?.[key])) ||
-    producer.checkoutTree !== identity.checkoutTree || producer.comparisonBase !== identity.comparisonBase || !/^[a-f0-9]{64}$/.test(producer.resultSha256)) throw new Error('Original input-pass producer identity is incomplete.');
+    producer.checkoutTree !== identity.checkoutTree || producer.comparisonBase !== identity.comparisonBase || !/^[a-f0-9]{64}$/.test(producer.resultSha256) ||
+    !decimal(producer.artifactId)||!/^[a-f0-9]{64}$/.test(producer.artifactSha256)||typeof producer.artifactName!=='string'||!(Date.parse(producer.artifactExpiresAt)>Date.now())) throw new Error('Original input-pass producer identity is incomplete.');
   return pass;
 }
 
 // Only original executed jobs publish this marker. Reused jobs preserve the
 // original reference and never extend the chain of authority.
-export function findInputPasses(record, readApi) {
+export function findInputPasses(record, readApi, verifyArtifact) {
   const inputs = record.inputContext;
   if (!inputs.runtime.imageOS || !inputs.runtime.imageVersion) return {};
   const response = readApi('actions/workflows/data-safety.yml/runs?per_page=20');
   if (!Array.isArray(response.workflow_runs) || !Number.isInteger(response.total_count)) throw new Error('CI producer inventory is unavailable.');
-  const passes = {}, observed = new Set();
+  const passes = {}, observations = Object.fromEntries(CI_GATES.map(gate => [gate, []]));
   const eligible = run => decimal(run?.id) && decimal(run?.run_attempt) && sha(run?.head_sha) &&
     ['push', 'pull_request'].includes(run.event) && ['completed','in_progress'].includes(run.status) &&
     run.path === '.github/workflows/data-safety.yml' && run.name === 'Data safety' &&
@@ -51,8 +53,8 @@ export function findInputPasses(record, readApi) {
   for (let run of runs) {
     if(run.priorAttempt){
       const id=run.id,attempt=run.priorAttempt;
-      try{run=readApi(`actions/runs/${id}/attempts/${attempt}`);}catch{return passes;}
-      if(!eligible(run)||String(run.id)!==String(id)||Number(run.run_attempt)!==attempt) return passes;
+      run=readApi(`actions/runs/${id}/attempts/${attempt}`);
+      if(!eligible(run)||String(run.id)!==String(id)||Number(run.run_attempt)!==attempt) throw new Error('Prior attempt identity is unavailable.');
     }
     const result = readApi(`actions/runs/${run.id}/attempts/${run.run_attempt}/jobs?per_page=100`);
     if (!Array.isArray(result.jobs) || result.total_count !== result.jobs.length) throw new Error('CI producer job inventory is incomplete.');
@@ -63,7 +65,7 @@ export function findInputPasses(record, readApi) {
     const checkouts = steps.filter(successful).map(step => step.name.match(/^Actual checkout ([a-f0-9]{40}) tree ([a-f0-9]{40})$/)).filter(Boolean);
     const sources = steps.filter(successful).map(step => step.name.match(/^Validation source ([a-f0-9]{40}) base ([a-f0-9]{40})$/)).filter(Boolean);
     if (checkouts.length !== 1 || sources.length !== 1 || checkouts[0][2] !== inputs.checkoutTree || sources[0][1] !== run.head_sha || sources[0][2] !== inputs.comparisonBase) continue;
-    const matched = CI_GATES.filter(gate => !observed.has(gate) && result.jobs.some(job => belongs(job) && job.name === (['rules','compatibility'].includes(gate) ? 'event-gates' : 'regression-' + gate) &&
+    const matched = CI_GATES.filter(gate => result.jobs.some(job => belongs(job) && job.name === (['rules','compatibility'].includes(gate) ? 'event-gates' : 'regression-' + gate) &&
       (job.steps || []).some(step => successful(step) && step.name === `Execute CI gate ${gate} input ${record.inputKeys[gate]}`)));
     if (!matched.length) continue;
     const checkoutSha = checkouts[0][1];
@@ -71,18 +73,38 @@ export function findInputPasses(record, readApi) {
     if (commit.sha !== checkoutSha || commit.tree?.sha !== inputs.checkoutTree ||
       (run.event === 'push' ? checkoutSha !== run.head_sha : commit.parents?.length !== 2 || commit.parents[0]?.sha !== inputs.comparisonBase || commit.parents[1]?.sha !== run.head_sha)) continue;
     for (const gate of matched) {
-      observed.add(gate);
       const jobs = result.jobs.filter(job => belongs(job) && job.name === (['rules','compatibility'].includes(gate) ? 'event-gates' : 'regression-' + gate));
+      const observation = {start: NaN, end: NaN};
+      observations[gate].push(observation);
+      if(jobs.length !== 1) continue;
+      const admissions=(jobs[0].steps||[]).filter(step=>successful(step)&&step.name===`Execute CI gate ${gate} input ${record.inputKeys[gate]}`);
+      if(admissions.length !== 1) continue;
+      const timestamp=value=>typeof value==='string'&&/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z$/.test(value)?Date.parse(value):NaN;
+      const jobStart=timestamp(jobs[0].started_at),jobEnd=timestamp(jobs[0].completed_at);
+      observation.start=timestamp(admissions[0].completed_at);observation.end=jobEnd;
+      if(!(jobStart<=observation.start&&observation.start<=jobEnd)) {observation.start=NaN;continue;}
       const gatePassedJob=jobs.length===1&&(jobs[0].conclusion==='success'||(['rules','compatibility'].includes(gate)&&jobs[0].conclusion==='failure'));
       if (!gatePassedJob || !decimal(jobs[0].id) || jobs[0].status !== 'completed') continue;
-      if((jobs[0].steps||[]).filter(step=>successful(step)&&step.name===`Execute CI gate ${gate} input ${record.inputKeys[gate]}`).length!==1)continue;
       const markers = (jobs[0].steps || []).filter(step => successful(step) && new RegExp(`^Completed CI gate ${gate} input ${record.inputKeys[gate]} result [a-f0-9]{64}$`).test(step.name));
       if (markers.length !== 1) continue;
-      passes[gate] = { kind: 'ci-input-pass-v1', inputs, inputKey: record.inputKeys[gate], gate,
+      const completion=timestamp(markers[0].completed_at);
+      if(!(observation.start<=completion&&completion<=jobEnd))continue;
+      observation.end=completion;observation.job=jobs[0];
+      observation.pass = { kind: 'ci-input-pass-v1', inputs, inputKey: record.inputKeys[gate], gate,
         coveredBy: { runId: String(run.id), runAttempt: String(run.run_attempt), jobId: String(jobs[0].id), sourceSha: run.head_sha,
           checkoutSha, checkoutTree: inputs.checkoutTree, comparisonBase: inputs.comparisonBase, resultSha256: markers[0].name.split(' result ')[1] } };
     }
-    if (CI_GATES.every(gate => passes[gate])) break;
+  }
+  // Run IDs describe creation order. An old run can be retried after a newer
+  // pass; only a successful execution strictly after every failure is reusable.
+  for(const gate of CI_GATES){
+    const known=observations[gate];
+    if(known.some(item=>!Number.isFinite(item.start)||!Number.isFinite(item.end)))continue;
+    const candidate=known.filter(item=>item.pass).sort((a,b)=>b.end-a.end)[0];
+    if(candidate&&known.every(item=>item.pass||item.end<candidate.start)){
+      try{Object.assign(candidate.pass.coveredBy,verifyArtifact(candidate.pass,candidate.job));passes[gate]=candidate.pass;}
+      catch{/* Unretained or unreadable original proof requires execution. */}
+    }
   }
   return passes;
 }
@@ -99,10 +121,18 @@ function flags(argv) {
 
 function main() {
   const [command,...argv]=process.argv.slice(2),options=flags(argv);
+  if(command==='select'){
+    const proof=selectRuntime(JSON.parse(readFileSync(options['--proof'],'utf8')));
+    const target=path.resolve(options['--output-file']||'');
+    if(!options['--output-file']||target.startsWith(process.cwd()+path.sep))throw new Error('Selected routing requires an output file outside the checkout.');
+    mkdirSync(path.dirname(target),{recursive:true,mode:0o700});writeFileSync(target,JSON.stringify(proof,null,2)+'\n',{flag:'wx',mode:0o600});
+    const output=`decision=${proof.decision}\nreused=${JSON.stringify(Object.keys(proof.inputPasses||{}))}\ninput-keys=${JSON.stringify(proof.inputKeys)}\n`;
+    if(process.env.GITHUB_OUTPUT)appendFileSync(process.env.GITHUB_OUTPUT,output);process.stdout.write(output);return;
+  }
   if(command==='run-gate')return runGate(options);
   if(command!=='run-group')throw new Error('Expected run-group.');
   if(!options['--proof']||!CI_GATES.slice(0,4).includes(options['--group']))throw new Error('run-group requires a routing proof and stable group.');
-  const proof=JSON.parse(readFileSync(options['--proof'],'utf8'));
+  const proof=selectRuntime(JSON.parse(readFileSync(options['--proof'],'utf8')));
   if(!['full','reuse'].includes(proof.decision))throw new Error('Routing did not admit required execution or verified coverage.');
   const covered=proof.decision==='reuse'||Boolean(proof.inputPasses?.[options['--group']]);
   const args=argv.filter((_value,index)=>!(!covered&&(argv[index]==='--proof'||argv[index-1]==='--proof')));
@@ -123,6 +153,15 @@ function main() {
   }
 }
 
+function selectRuntime(proof){
+  if(!['full','reuse'].includes(proof.decision))throw new Error('Routing did not admit execution or coverage.');
+  const inputs=ciInputContext({...proof.validationContext,runtime:{node:process.versions.node,platform:process.platform,arch:process.arch}});
+  if(JSON.stringify(inputs.runtime)!==JSON.stringify(proof.inputContext?.runtime)||!inputs.runtime.imageOS||!inputs.runtime.imageVersion){
+    proof={...proof,decision:'full',inputContext:inputs,inputKeys:Object.fromEntries(CI_GATES.map(gate=>[gate,ciInputKey(inputs,gate)])),inputPasses:{},runtimeMiss:'The consuming runtime differs or is unknown; execute required gates.'};
+  }
+  return proof;
+}
+
 function runGate(options) {
   const gate=options['--gate'];
   if(!['rules','compatibility'].includes(gate)||!options['--proof']||!options['--output-dir']||!sha(options['--comparison-base']))throw new Error('run-gate requires rules|compatibility, routing proof, output directory and exact comparison base.');
@@ -130,7 +169,7 @@ function runGate(options) {
     const result=spawnSync('git',args,{encoding:'utf8',maxBuffer:1024*1024});
     if(result.status!==0||result.error)throw new Error('Cannot bind emulator gate checkout.');return result.stdout.trim();
   };
-  const proof=JSON.parse(readFileSync(options['--proof'],'utf8'));
+  const proof=selectRuntime(JSON.parse(readFileSync(options['--proof'],'utf8')));
   const identity={repository:process.env.GITHUB_REPOSITORY,runId:process.env.GITHUB_RUN_ID,runAttempt:process.env.GITHUB_RUN_ATTEMPT,
     sourceSha:process.env.CHAIN_TEST_SOURCE_SHA||process.env.GITHUB_SHA,checkoutSha:git('rev-parse','HEAD'),checkoutTree:git('rev-parse','HEAD^{tree}'),comparisonBase:options['--comparison-base'],selectedGroup:gate,checkoutDirty:Boolean(git('status','--porcelain'))};
   identity.sourceTree=git('rev-parse',`${identity.sourceSha}^{tree}`);
