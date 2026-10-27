@@ -45802,3 +45802,4 @@ test('RISK repository process: rendered diagnostic comparisons enforce declared 
  const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^named diagnostic comparisons','scripts/agent-tools/rendered-evidence.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:15000});
  assert.equal(child.status,0,'Named diagnostic enlargement must meet its declared factor for changed and reference targets: '+child.stdout+child.stderr);assert.match(child.stdout,/# tests 1$/m);assert.match(child.stdout,/# skipped 0$/m);
 });
+// Disposable hosted early-failure control: .waitForFunction(async
