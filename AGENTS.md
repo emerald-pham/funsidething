@@ -40,6 +40,7 @@ After a task fails, increase effort when a higher supported, permitted level
 exists. Repeated or looping failures require bounded diagnosis and model
 escalation to a task-appropriate stronger permitted route, recording the actual
 supported model/effort selection and reason. Do not assume a Terra/Sol ranking.
-At max, or when no stronger approved route is available, halt the loop, preserve
-evidence and report the blocker rather than claim escalation. Preserve existing
-halt/retro/fix/resume requirements and select actors by actual risk.
+At the highest supported, permitted effort, or when no stronger approved route
+is available, halt the loop, preserve evidence and report the blocker rather
+than claim escalation. Preserve existing halt/retro/fix/resume requirements and
+select actors by actual risk.
