@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn } from 'node:child_process';
+import { assertDiagnosticLaunchAllowed, admitDiagnosticAttempt, finishDiagnosticAttempt } from './checkpoint-progress.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 import { lstat, mkdir, open, readFile, readlink, realpath, rename, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
@@ -34,7 +35,7 @@ function parseArguments(argv) {
     const value = argv[index + 1];
     if (value === undefined || value.startsWith('--')) throw new Error(`Missing value for ${name}.`);
     const key = name.slice(2);
-    if (!['repo', 'evidence-dir', 'purpose', 'redact-pattern', 'correction-of', 'correction-note'].includes(key)) throw new Error(`Unknown option: ${name}`);
+    if (!['repo', 'evidence-dir', 'purpose', 'redact-pattern', 'correction-of', 'correction-note', 'diagnostic-request', 'diagnostic-task'].includes(key)) throw new Error(`Unknown option: ${name}`);
     if (key === 'redact-pattern') options[key] = [...(options[key] ?? []), value];
     else options[key] = value;
     index += 1;
@@ -598,6 +599,7 @@ async function main(argv) {
   const prepared = new Date();
   const id = `${prepared.toISOString().replace(/[:.]/g, '-')}-${randomUUID()}`;
   const repo = path.resolve(options.repo);
+  assertDiagnosticLaunchAllowed(repo,{task:options['diagnostic-task'],command,args:commandArgs});
   const evidenceDirectory = path.resolve(options['evidence-dir']);
   const recordPath = path.join(evidenceDirectory, `${id}.json`);
   const stdoutPath = options.summary ? path.join(evidenceDirectory, `${id}.stdout.txt`) : undefined;
@@ -698,6 +700,8 @@ async function main(argv) {
   }
   if (!options.summary) process.stderr.write(`record-run: evidence=${evidencePaths.metadataPath}\n`);
 
+  const diagnostic = await admitDiagnosticAttempt(repo, {task:options['diagnostic-task'],request:options['diagnostic-request'],command,args:commandArgs,resultPath:recordPath});
+  if(diagnostic?.observed){process.stdout.write(JSON.stringify(diagnostic)+'\n');return;}
   const result = await execute(command, commandArgs, repo);
   const signalNumber = { SIGINT: 2, SIGKILL: 9, SIGTERM: 15 }[result.interruption?.signal ?? result.signal];
   const wrapperExitCode = result.interruption || result.signal
@@ -763,6 +767,7 @@ async function main(argv) {
       if (finalWrapperExitCode === 0) finalWrapperExitCode = evidenceFailureExitCode;
       record.execution.wrapperExitCode = finalWrapperExitCode;
     }
+    await finishDiagnosticAttempt(repo,diagnostic);
     emitSummary({
       status: summaryStatus(result, record.evidence.status),
       outcome: record.execution.outcome,
@@ -778,6 +783,7 @@ async function main(argv) {
     return;
   }
   await writeRecord(recordPath, record);
+  await finishDiagnosticAttempt(repo,diagnostic);
   process.stdout.write(output.stdout);
   process.stderr.write(output.stderr);
   process.stderr.write(`record-run: purpose=${options.purpose} outcome=${record.execution.outcome} exit=${wrapperExitCode} childExit=${result.exitCode}\n`);

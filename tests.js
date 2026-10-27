@@ -45315,3 +45315,11 @@ test('RISK repository process: policy prose false exemptions retain full applica
  const mixed=makeReleaseGateFixture({changedPath:'AGENTS.md',baseText:'Read [release](guide.md) before release.\n',candidateText:'Consult [release guidance](guide.md) before release.\n'});
  try{fs.writeFileSync(path.join(mixed.repo,'new-runtime.js'),'export const enabled = true;\n');releaseGateGit(mixed.repo,['add','.']);releaseGateGit(mixed.repo,['commit','-qm','Mixed functional change']);const sha=releaseGateGit(mixed.repo,['rev-parse','HEAD']);const plan=deriveReleaseReviewPlan(mixed.repo,sha,mixed.baseSha);assert.equal(plan.policyProse,undefined);assert.equal(plan.requiresCodeReview,true);assert.ok(plan.specialistDomains.includes('release-process'));}finally{cleanupReleaseGateFixture(mixed);}
 });
+
+test('RISK repository process: diagnostic checkpoints retain finite authority across fresh process and CI boundaries',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap',path.join(__dirname,'scripts/agent-tools/checkpoint-progress.test.mjs')],{encoding:'utf8',timeout:30000,env});
+ assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
+ assert.match(result.stdout,/^# tests 13$/m,'the actual thirteen process contracts must execute, rather than an empty child pass');
+ assert.match(result.stdout,/^# pass 13$/m);assert.match(result.stdout,/^# skipped 0$/m);
+});
