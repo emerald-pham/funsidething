@@ -27229,13 +27229,16 @@ test('Consistency repair: cloud adoption waits for an edit and retains a history
  const now=Date.now(),remote=cloudState(now),h=makeSyncHarness({remote,rev:9});remote.syncRev=9;
  const {ctx,shim}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(remote)},cloudSyncFactory:h.factory});await ctx.cloudPull();
  const id=ctx.state.tasks[0].id;ctx.openEdit(id);fillEditPane(ctx,shim,{title:'Saved draft'});
- let editing=true;shim.document.querySelector=selector=>selector.includes('.mback')&&editing?{}:null;
- const newer=JSON.parse(ctx.cloudPayload());newer.tasks=newer.tasks.filter(t=>t.id!==id);newer.chain=newer.chain.filter(t=>t!==id);h.writeBehindBack(newer);
- await ctx.cloudPull();assert.ok(ctx.state.tasks.some(t=>t.id===id));
- ctx.cloudPushNow();await syncSettle(20);assert.equal(h.remoteState().tasks.some(t=>t.id===id),false,'deferred reconciliation cannot overwrite a remote change during editing');
- editing=false;ctx.onAction('save-edit',{dataset:{id}});await syncSettle(40);
- assert.equal(ctx.state.tasks.some(t=>t.id===id),true,'absence without explicit deletion cannot discard the task');
- assert.equal(ctx.state.tasks.find(t=>t.id===id).title,'Saved draft');
+ const originalQuery=shim.document.querySelector,delegateQuery=originalQuery.bind(shim.document);
+ shim.document.querySelector=selector=>selector==='.mback, dialog[open]'&&shim.document.getElementById('modalRoot').innerHTML?{}:delegateQuery(selector);
+ try{
+  const newer=JSON.parse(ctx.cloudPayload());newer.tasks=newer.tasks.filter(t=>t.id!==id);newer.chain=newer.chain.filter(t=>t!==id);h.writeBehindBack(newer);
+  await ctx.cloudPull();assert.ok(ctx.state.tasks.some(t=>t.id===id));
+  ctx.cloudPushNow();await syncSettle(20);assert.equal(h.remoteState().tasks.some(t=>t.id===id),false,'deferred reconciliation cannot overwrite a remote change during editing');
+  ctx.onAction('save-edit',{dataset:{id}});await syncSettle(40);
+  assert.equal(ctx.state.tasks.some(t=>t.id===id),true,'absence without explicit deletion cannot discard the task');
+  assert.equal(ctx.state.tasks.find(t=>t.id===id).title,'Saved draft');
+ }finally{shim.document.querySelector=originalQuery;}
 });
 test('Consistency repair: Add and dot establishes the 2 AM clock and honors single-mode preference',async()=>{
  const {ctx}=await loadApp();const at=new Date(2026,8,16,1).getTime();setFakeTime(ctx,at);ctx.addTask('Candidate');ctx.addTask('Urgent',true);ctx.state.snooze=100;
@@ -27541,12 +27544,20 @@ test('Update toast: fresh install is quiet, changed release notifies once and re
 test('Update toast: waits for visible app and closed editor, then survives blocked storage',async()=>{
  const {ctx,shim}=await loadApp({seedStorage:{[updateNoticeKey]:'old-release'},beforeStateReady(c,s){prepareReleaseNotice(c,s);s.document.hidden=true;}});
  assert.equal(shim.localStorage.getItem(updateNoticeKey),'old-release');
- shim.document.hidden=false;shim.document.querySelector=()=>({});ctx.showAppUpdateNotice();
+ const task=ctx.addTask('Update notice editor');ctx.openEdit(task.id);const title=shim.document.getElementById('etTitle');title.value='Unsaved editor draft';
+ const originalQuery=shim.document.querySelector,delegateQuery=originalQuery.bind(shim.document),savedViewStatus='[data-saved-preview] .syncbtn';
+ assert.equal(delegateQuery(savedViewStatus),null,'the shim has no saved-view status node');
+ shim.document.querySelector=selector=>selector==='.mback, dialog[open]'&&shim.document.getElementById('modalRoot').innerHTML?{}:delegateQuery(selector);
+ shim.document.hidden=false;ctx.showAppUpdateNotice();
  assert.equal(shim.localStorage.getItem(updateNoticeKey),'old-release');
- shim.document.querySelector=()=>null;shim.localStorage.setItem=()=>{throw Error('blocked');};
+ assert.equal(shim.document.querySelector(savedViewStatus),null,'unrelated saved-view selector delegates to the original shim result');
+ assert.equal(title.value,'Unsaved editor draft','the real update-notice consumer leaves the editor draft untouched');
+ shim.localStorage.setItem=()=>{throw Error('blocked');};
+ ctx.closeModal();shim.document.querySelector=originalQuery;
  assert.doesNotThrow(()=>ctx.showAppUpdateNotice());
  assert.match(shim.elements.get('toast').textContent,/App updated/);
  shim.elements.get('toast').textContent='other';ctx.showAppUpdateNotice();assert.equal(shim.elements.get('toast').textContent,'other');
+ assert.strictEqual(shim.document.querySelector,originalQuery,'the update-notice selector is restored after the simulated editor');
 });
 test('Update toast: existing installations without release tracking get the first announcement',async()=>{
  const old=await loadApp();const saved=JSON.stringify(old.ctx.state);
@@ -28525,16 +28536,23 @@ test('RISK synced scene: an open editor defers another tab scene adoption until 
  const storage=sharedScannerStorage();
  const first=await loadApp({withSceneModules:true,sharedStorage:storage});
  const second=await loadApp({withSceneModules:true,sharedStorage:storage});
+ const task=second.ctx.addTask('Scene adoption editor');second.ctx.openEdit(task.id);
+ const draft=second.shim.document.getElementById('etTitle');draft.value='Keep the editor open';
+ const originalQuery=second.shim.document.querySelector,delegateQuery=originalQuery.bind(second.shim.document);
+ second.shim.document.querySelector=selector=>selector==='.mback, dialog[open]'&&second.shim.document.getElementById('modalRoot').innerHTML?{}:delegateQuery(selector);
+ try{
  first.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'sunrise',season:'winter'}});
  await first.ctx.persist();
- second.shim.document.querySelector=()=>({}); // an active dialog or edit form
  second.shim.window.dispatchEvent({type:'storage',key:SYNC_STORE_KEY,newValue:storage.getItem(SYNC_STORE_KEY)});
  assert.equal(second.ctx.state.settings.scene.time,null,'do not replace a board underneath an editor');
- second.shim.document.querySelector=()=>null;
+ assert.equal(draft.value,'Keep the editor open','scene adoption cannot replace the active editor draft');
+ assert.equal(second.shim.document.querySelector('[data-saved-preview] .syncbtn'),null,'an unrelated selector keeps the shim result');
+ second.ctx.closeModal();
  second.shim.document.dispatchEvent({type:'focusout'});
  await flush();
  assert.equal(second.ctx.state.settings.scene.time,'sunrise');
  assert.equal(second.shim.localStorage.getItem('fvp:chain-scanner:scene-season'),'winter');
+ }finally{second.shim.document.querySelector=originalQuery;}
 });
 
 test('RISK synced scene: a legacy cloud board adopts existing device choices before publishing',async()=>{
@@ -28871,6 +28889,76 @@ test('RISK landscape water browser: GPU distortion preserves contact and sharp p
   assert.equal(result.orientation,true,'GPU upload preserves top and bottom');
   assert.equal(result.frozen,true);assert.deepEqual(result.resized,[568,132]);
  }finally{await browser.close();}
+});
+
+// Deliberately narrow source check for the known mechanical fixture error:
+// direct document query assignments whose simple single-parameter
+// arrow/function callback returns an object, array, null, or an identifier
+// without using its selector parameter. It does not parse arbitrary JavaScript
+// control flow, aliases, or computed assignments, does not tokenize comments
+// and strings, and cannot prove delegation/restoration; fixtures check those.
+function findSelectorBlindDocumentQueries(source,sourceName){
+ const assignment=/(?:\b[$A-Z_a-z][$\w]*\.)*\bdocument\.(querySelectorAll|querySelector)\s*=\s*/g,findings=[];
+ for(const match of source.matchAll(assignment)){
+  const callback=source.slice(match.index+match[0].length);
+  const arrow=callback.match(/^(?:\(\s*([$A-Z_a-z][$\w]*)?\s*\)|([$A-Z_a-z][$\w]*))\s*=>/);
+  const fn=arrow?null:callback.match(/^function(?:\s+[$A-Z_a-z][$\w]*)?\s*\(\s*([$A-Z_a-z][$\w]*)?\s*\)\s*\{/);
+  if(!arrow&&!fn)continue;
+  const parameter=arrow?(arrow[1]||arrow[2]||null):(fn[1]||null),body=callback.slice(arrow?arrow[0].length:fn[0].length);
+  const block=body.match(/^\s*\{\s*return\s+([^;\n]+)\s*;?\s*\}/);
+  const returned=fn?body.match(/^\s*return\s+([^;\n]+)\s*;?\s*\}/):null;
+  const expression=block?.[1]||returned?.[1]||body.match(/^\s*\(?\s*(null\b|\{[^;\n]*\}|\[[^\]\n]*\]|[$A-Z_a-z][$\w]*)\s*\)?\s*(?=[;,\n]|$)/)?.[1];
+  const value=expression?.trim().replace(/^\((.*)\)$/,'$1').trim();
+  const blind=!!value&&(/^(?:null\b|\{[^\n]*\}|\[[^\]\n]*\])/.test(value)||
+    /^[$A-Z_a-z][$\w]*$/.test(value)&&value!==parameter);
+  if(blind){
+   const line=source.slice(0,match.index).split('\n').length;
+   findings.push(`${sourceName}:${line}: document.${match[1]} has a selector-blind object, array, null, or identifier result`);
+  }
+ }
+ return findings;
+}
+
+test('RISK repository process: document query fixtures stay selector scoped and preserve shim results',async()=>{
+ const assignment=(method,callback)=>['shim.document.',method,'=',callback,';'].join('');
+ const blind=[
+  assignment('querySelector','()=>({nodeType:1})'),
+  assignment('querySelector','(selector)=>null'),
+  assignment('querySelector','selector=>cachedModal'),
+  assignment('querySelectorAll','function(selector){return [button];}')
+ ];
+ for(const source of blind)assert.equal(findSelectorBlindDocumentQueries(source,'fixture').length,1,`known selector-blind object, null, identifier, and list stubs are detected: ${source}`);
+ const scoped=['const original=shim.document.querySelector.bind(shim.document);','shim.document.','querySelector','=','selector=>selector===".mback"?{}:original(selector);'].join('');
+ assert.deepEqual(findSelectorBlindDocumentQueries(scoped,'fixture'),[],'a selector-specific override that delegates other selectors is allowed');
+ assert.deepEqual(findSelectorBlindDocumentQueries(assignment('querySelector','selector=>selector'),'fixture'),[],'a callback that returns the requested selector is not a constant fixture');
+
+ const root=path.dirname(fileURLToPath(import.meta.url)),toolTests=fs.readdirSync(path.join(root,'scripts/agent-tools')).filter(name=>name.endsWith('.test.mjs')).sort();
+ const maintainedTests=['tests.js',...toolTests.map(name=>`scripts/agent-tools/${name}`)];
+ const findings=maintainedTests.flatMap(file=>findSelectorBlindDocumentQueries(fs.readFileSync(path.join(root,file),'utf8'),file));
+ assert.deepEqual(findings,[],`maintained test sources contain selector-blind document query stubs:\n${findings.join('\n')}`);
+
+ const {ctx,shim}=await loadApp({seedStorage:{[updateNoticeKey]:'old-release'},beforeStateReady(c,s){prepareReleaseNotice(c,s);s.document.hidden=true;}});
+ const task=ctx.addTask('Selector fixture draft');ctx.openEdit(task.id);
+ const title=shim.document.getElementById('etTitle');title.value='Keep this editor draft';
+ const originalQuery=shim.document.querySelector,delegateQuery=originalQuery.bind(shim.document),originalQueryAll=shim.document.querySelectorAll,delegateQueryAll=originalQueryAll.bind(shim.document);
+ const unrelated='[data-saved-preview] .syncbtn',underlying=delegateQuery(unrelated),underlyingAll=delegateQueryAll('[data-selector-contract-unrelated]'),modal={nodeType:1};
+ assert.equal(underlying,null,'the lightweight app shim has no unrelated saved-view status node');
+ shim.document.querySelector=selector=>selector==='.mback, dialog[open]'&&shim.document.getElementById('modalRoot').innerHTML?modal:delegateQuery(selector);
+ shim.document.querySelectorAll=selector=>selector==='[data-selector-contract-picked]'?[modal]:delegateQueryAll(selector);
+ try{
+  shim.document.hidden=false;ctx.showAppUpdateNotice();
+  assert.equal(shim.localStorage.getItem(updateNoticeKey),'old-release','the real app consumer defers its announcement under the editor');
+  assert.equal(shim.document.querySelector(unrelated),underlying,'an unrelated selector keeps the shim result, including null');
+  assert.equal(title.value,'Keep this editor draft','the real consumer cannot replace the active editor draft');
+  assert.deepEqual(shim.document.querySelectorAll('[data-selector-contract-unrelated]'),underlyingAll,'an unrelated list selector keeps its shim result');
+  assert.strictEqual(shim.document.querySelectorAll('[data-selector-contract-picked]')[0],modal);
+ }finally{
+  shim.document.querySelector=originalQuery;shim.document.querySelectorAll=originalQueryAll;
+ }
+ assert.strictEqual(shim.document.querySelector,originalQuery,'the saved document selector is restored after the simulated modal');
+ assert.strictEqual(shim.document.querySelectorAll,originalQueryAll,'the saved document list selector is restored after the simulated modal');
+ assert.equal(shim.document.querySelector(unrelated),underlying,'restoration returns to the exact original selector behavior');
+ assert.equal(title.value,'Keep this editor draft');
 });
 
 test('RISK repository process: npm test fails when an agent-tool cohort assertion fails',async t=>{
@@ -32299,16 +32387,24 @@ test('RISK PWA SYNC RESUME: restoration preserves editor drafts and sign-out whi
  await fixtureDeadline(async wait=>{while(vm.runInContext('automaticCloudFallbackBootCapturePending',app.ctx))await wait();},'durable startup completes before the wake/editor gesture');
  const h=await loadCloudBackendV2({runtimeWindow:app.ctx.window,rootData:null,timeoutMs:200});
  app.shim.window.CloudSync=h.CS;
+ const task=app.ctx.addTask('Wake editor');app.ctx.openEdit(task.id);
+ const draft=app.shim.document.getElementById('etTitle');draft.value='Keep this wake-time draft';
+ const originalQuery=app.shim.document.querySelector,delegateQuery=originalQuery.bind(app.shim.document);
+ app.shim.document.querySelector=selector=>selector==='.mback, dialog[open]'&&app.shim.document.getElementById('modalRoot').innerHTML?{}:delegateQuery(selector);
+ try{
  app.shim.document.hidden=true;app.shim.window.dispatchEvent({type:'pagehide'});
- app.shim.document.hidden=false;app.shim.document.querySelector=()=>({});
+ app.shim.document.hidden=false;
  app.shim.window.dispatchEvent({type:'pageshow',persisted:true});await syncSettle(20);
  assert.equal(h.network.filter(row=>row.startsWith('server:')).length,0,'open drafts defer cloud adoption');
- app.shim.document.querySelector=()=>null;app.shim.document.dispatchEvent({type:'focusout'});await syncSettle(20);
+ assert.equal(draft.value,'Keep this wake-time draft','wake does not replace an active editor draft');
+ assert.equal(app.shim.document.querySelector('[data-saved-preview] .syncbtn'),null,'an unrelated selector keeps the shim result');
+ app.ctx.closeModal();app.shim.document.dispatchEvent({type:'focusout'});await syncSettle(20);
  assert.ok(h.network.some(row=>row==='server:users/owner'),'closing the editor releases reconciliation');
  app.shim.document.hidden=true;app.shim.window.dispatchEvent({type:'pagehide'});
  h.auth.currentUser=null;h.CS.user=null;h.CS.status='signed-out';
  app.shim.document.hidden=false;app.shim.window.dispatchEvent({type:'pageshow',persisted:true});await syncSettle(20);
  assert.equal(h.CS.status,'signed-out','wake never revives a previous account');
+ }finally{app.shim.document.querySelector=originalQuery;}
 });
 
 
@@ -33244,7 +33340,10 @@ async function exerciseCompletionEditorBoundaries(t,nativeOnly=false,holdAcknowl
  const pending=ctx.cloudPull();await readStarted;
  const paintsBeforeEditorPull=paints.length,scanBeforeEditorPull=scan.innerHTML,chainBeforeEditorPull=[...ctx.state.chain];
  hydrateUnchangedEditorDraft(app,peerId);const title=shim.document.getElementById('etTitle'),due=shim.document.getElementById('etDue');
- shim.document.querySelector=()=>({}); // The lightweight DOM does not derive .mback from modal markup.
+ const originalQuery=shim.document.querySelector,delegateQuery=originalQuery.bind(shim.document),savedViewStatus='[data-saved-preview] .syncbtn';
+ t.after(()=>{shim.document.querySelector=originalQuery;});
+ assert.equal(delegateQuery(savedViewStatus),null,'the fixture has no saved-view status node until its startup consumer adds one');
+ shim.document.querySelector=selector=>selector==='.mback, dialog[open]'&&shim.document.getElementById('modalRoot').innerHTML?{}:delegateQuery(selector);
  title.value='Editor draft during delayed recovery';due.value='2026-11-02';
  releaseRead();await pending;CS.pull=basePull;
  assert.equal(shim.document.getElementById('etTitle').value,'Editor draft during delayed recovery','the editor draft remains open when the stale response arrives');
@@ -33253,8 +33352,9 @@ async function exerciseCompletionEditorBoundaries(t,nativeOnly=false,holdAcknowl
  assert.equal(scan.innerHTML,scanBeforeEditorPull,'the scanner remains exactly as shown before the held read');
  assert.equal(ctx.state.tasks.find(row=>row.id===peerId).title,'Independent peer task','cloud content cannot replace the active editor under its draft');
  assert.equal(vm.runInContext('deferredCloudPull',ctx),true,'the cloud adoption waits for the editor close boundary');
+ assert.equal(shim.document.querySelector(savedViewStatus),null,'an unrelated saved-view selector preserves the original shim result');
  if(nativeOnly){await oldEntered.promise;const pendingHead=await store.readHead();assert.equal(pendingHead.payload,nativeSource,'the held real native save already protects the original Done and theme before editor Save');}
- shim.document.querySelector=()=>null;
+ shim.document.querySelector=originalQuery;
  phase='editor-save-and-deferred-adoption';
  const schedule=ctx.setTimeout;
  // Observe the real Save callback and its persistence result. Let the native

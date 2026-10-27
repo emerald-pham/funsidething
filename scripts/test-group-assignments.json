@@ -12408,6 +12408,11 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK repository process: document query fixtures stay selector scoped and preserve shim results",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK device database repair guidance: mounted FAQ distinguishes offline exact-copy repair from protected unresolved sources",
       "group": "core",
       "file": "tests.js"
