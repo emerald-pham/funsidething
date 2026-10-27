@@ -37,6 +37,8 @@
     }
   ],
   "rootAssignments": [
+    {"root": "workflow input reuse retains large original native evidence and rejects changed bytes", "group": "native-process", "file": "scripts/agent-tools/ci-routing.test.mjs"},
+    {"root": "RISK repository process: large original CI artifacts retain verified coverage without buffering native reports", "group": "native-process", "file": "tests.js"},
     {"root": "test group aggregate preserves observer protocol across emulator coverage and fresh fallback", "group": "native-process", "file": "scripts/agent-tools/test-groups.test.mjs"},
     {"root": "RISK repository process: CI observer keeps honest reuse and fresh emulator fallback outcomes", "group": "native-process", "file": "tests.js"},
     {"root": "migration accepts a live token lock released during ownership inspection", "group": "native-process", "file": "scripts/agent-tools/coordination.test.mjs"},

@@ -12,6 +12,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 - RISK repository process: event routing retains exact merge validation before avoiding a duplicate cohort
 - RISK repository process: unchanged CI inputs reuse an original successful gate across events
+- RISK repository process: large original CI artifacts retain verified coverage without buffering native reports
 - RISK repository process: released host locks cannot cause spurious CI migration failures
 - RISK repository process: CI admission enforces reuse before repeating a passed test child
 - RISK repository process: CI observer keeps honest reuse and fresh emulator fallback outcomes

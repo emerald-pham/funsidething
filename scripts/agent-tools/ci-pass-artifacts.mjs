@@ -4,6 +4,28 @@ import { spawnSync } from 'node:child_process';
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 const safePath=value=>typeof value==='string'&&/^[A-Za-z0-9_./-]+$/.test(value)&&!value.startsWith('/')&&!value.split('/').some(part=>!part||part==='.'||part==='..');
 
+// Native reports can exceed spawnSync's buffered-read limit. Hash their full
+// stream in an isolated verifier, stopping immediately above the declared size.
+const memberStreamVerifier=`
+import {createHash} from 'node:crypto';
+import {spawn} from 'node:child_process';
+const [archive,entry,expectedText]=process.argv.slice(1),expected=Number(expectedText);
+const digest=createHash('sha256');let bytes=0,overflow=false;
+const child=spawn('unzip',['-p',archive,entry],{stdio:['ignore','pipe','ignore']});
+const timer=setTimeout(()=>child.kill('SIGKILL'),10000);
+child.stdout.on('data',chunk=>{bytes+=chunk.length;if(bytes>expected){overflow=true;child.kill('SIGKILL');}else digest.update(chunk);});
+child.on('error',()=>{process.exitCode=1;});
+child.on('close',(code,signal)=>{clearTimeout(timer);if(code!==0||signal||overflow||bytes!==expected){process.exitCode=1;return;}process.stdout.write(JSON.stringify({bytes,sha256:digest.digest('hex')}));});
+`;
+
+function verifyStream(archive,entry,expected,bytes){
+  if(!Number.isSafeInteger(bytes)||bytes<0||!/^[a-f0-9]{64}$/.test(expected||''))throw new Error('Original member identity is incomplete.');
+  const result=spawnSync(process.execPath,['--input-type=module','-e',memberStreamVerifier,archive,entry,String(bytes)],{encoding:'utf8',maxBuffer:4096,timeout:12000});
+  if(result.status!==0||result.error)throw new Error('Original evidence stream could not be verified.');
+  const observed=JSON.parse(result.stdout);
+  if(observed.bytes!==bytes||observed.sha256!==expected)throw new Error('Original evidence member hash or size changed.');
+}
+
 // Read immutable original uploads, never extract their paths into the checkout.
 // The callback retains API observations and archives in the caller's evidence.
 export function originalArtifactVerifier(readApi){
@@ -47,7 +69,10 @@ export function originalArtifactVerifier(readApi){
       if(report.issues?.length!==0||!Array.isArray(report.cases)||!report.cases.length||!Array.isArray(report.artifacts))throw new Error('Original group cohort is incomplete.');
       for(const output of [report.process.stdout,report.process.stderr])read(output?.path,output?.sha256);
       for(const observed of report.unclassifiedRootGuard?.files||[])for(const output of [observed.stdout,observed.stderr,observed.summary])read(output?.path,output?.sha256);
-      for(const member of report.artifacts)read(member.path,member.sha256,member.bytes);
+      for(const member of report.artifacts){
+        if(!safePath(member.path)||!archive.files.has(member.path))throw new Error('Original evidence member is unavailable.');
+        verifyStream(archive.path,member.path,member.sha256,member.bytes);
+      }
     }
     return {artifactId:String(artifact.id),artifactName:name,artifactSha256:archive.sha256,artifactExpiresAt:artifact.expires_at};
   };
