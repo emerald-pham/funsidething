@@ -692,9 +692,13 @@ function aggregateResults({options, outputDir, descriptor, inventory, assignment
   const covered=needs['cohort-routing']?.outputs?.decision==='reuse';
   const reused=JSON.parse(needs['cohort-routing']?.outputs?.reused||'[]');
   if(!Array.isArray(reused)||new Set(reused).size!==reused.length||reused.some(id=>!GROUP_IDS.includes(id)&&!['rules','compatibility'].includes(id)))fail('Invalid reused-gate inventory.');
+  const emulatorModes=needs['event-gates']?.outputs;
+  if(emulatorModes&&['rules','compatibility'].some(gate=>!['executed','covered'].includes(emulatorModes[gate])))fail('Required emulator gate outcomes are missing or unknown.');
+  const reusedEmulators=emulatorModes?['rules','compatibility'].filter(gate=>emulatorModes[gate]==='covered'):reused.filter(id=>!GROUP_IDS.includes(id));
+  if(reusedEmulators.some(gate=>!reused.includes(gate)))fail('Emulator coverage was not admitted by the original routing proof.');
   const freshProof=covered||reused.length?readJson(options.proof,'fresh original-producer proof'):null;
   const freshCoverage=covered?coverageReference(freshProof,descriptor.resultIdentity):null;
-  for(const gate of reused.filter(id=>!GROUP_IDS.includes(id)))coverageReference(freshProof,{...descriptor.resultIdentity,selectedGroup:gate},false);
+  const emulatorCoverage=Object.fromEntries(reusedEmulators.map(gate=>[gate,coverageReference(freshProof,{...descriptor.resultIdentity,selectedGroup:gate},false)]));
   for (const id of ['validation-context','event-gates','cohort-routing','regression']) {
     if (needs[id]?.result !== 'success') issues.push(`Required job ${id} did not succeed: ${needs[id]?.result || 'missing'}.`);
   }
@@ -777,11 +781,12 @@ function aggregateResults({options, outputDir, descriptor, inventory, assignment
     } catch (error) { issues.push(`${id}: ${error.message}`); }
   }
   const coveredCount=records.filter(record=>record.mode==='covered').length;
-  const report = {schemaVersion:1,status:issues.length?'failed':'passed',mode:coveredCount===GROUP_IDS.length?'covered':coveredCount?'mixed':'full',resultIdentity:descriptor.resultIdentity,groups:records,caseCount:allCases.size,issues,finishedAt:new Date().toISOString()};
+  const original=coveredCount===0&&reusedEmulators.length===0;
+  const report = {schemaVersion:1,status:issues.length?'failed':'passed',mode:coveredCount===GROUP_IDS.length?'covered':coveredCount?'mixed':'full',resultIdentity:descriptor.resultIdentity,groups:records,emulatorCoverage,caseCount:allCases.size,issues,finishedAt:new Date().toISOString()};
   atomicWrite(path.join(outputDir,'aggregate.json'),report);
   if (issues.length) fail(issues.join('\n'));
   process.stdout.write(`Complete required cohort verified: ${allCases.size} cases.\n`);
-  if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT,`report=${sha256(fs.readFileSync(path.join(outputDir,'aggregate.json')))}\nmode=${report.mode}\n`);
+  if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT,`report=${sha256(fs.readFileSync(path.join(outputDir,'aggregate.json')))}\nmode=${report.mode}\nattestation-mode=${original?'full':'reuse'}\noriginal=${original}\n`);
   return 0;
 }
 

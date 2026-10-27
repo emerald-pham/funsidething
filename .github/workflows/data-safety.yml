@@ -27,7 +27,7 @@ jobs:
         with:
           node-version: '22'
       - name: Enforce CI reuse contract
-        run: node --test --test-name-pattern='^test group workflow consumer forbids duplicate execution for a verified input pass$|^workflow emulator gate reuses a verified pass and executes an uncovered gate$|^workflow reuses an independently passed gate on main for the same complete inputs$|^workflow partial retries preserve successful gates and invalidate a later failed execution$' scripts/agent-tools/test-groups.test.mjs scripts/agent-tools/ci-routing.test.mjs
+        run: node --test --test-name-pattern='^test group workflow consumer forbids duplicate execution for a verified input pass$|^workflow emulator gate reuses a verified pass and executes an uncovered gate$|^workflow reuses an independently passed gate on main for the same complete inputs$|^workflow partial retries preserve successful gates and invalidate a later failed execution$|^test group aggregate preserves observer protocol across emulator coverage and fresh fallback$' scripts/agent-tools/test-groups.test.mjs scripts/agent-tools/ci-routing.test.mjs
       - name: Resolve comparison base
         id: diff-base
         shell: bash
@@ -75,6 +75,9 @@ jobs:
   event-gates:
     needs: [validation-context, cohort-routing]
     runs-on: ubuntu-latest
+    outputs:
+      rules: ${{ steps.rules.outputs.mode }}
+      compatibility: ${{ steps.compatibility.outputs.mode }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -283,11 +286,11 @@ jobs:
             ${{ runner.temp }}/aggregate
             ${{ runner.temp }}/final-routing
           if-no-files-found: error
-      - name: Verified complete cohort ${{ needs.validation-context.outputs.context }} report ${{ steps.aggregate.outputs.report }} mode ${{ needs.cohort-routing.outputs.decision == 'reuse' && 'reuse' || steps.aggregate.outputs.mode }}
+      - name: Verified complete cohort ${{ needs.validation-context.outputs.context }} report ${{ steps.aggregate.outputs.report }} mode ${{ steps.aggregate.outputs.attestation-mode }}
         if: success()
         run: echo "Required current execution or original producer coverage verified"
       - name: Complete regression context ${{ needs.validation-context.outputs.context }} report ${{ steps.aggregate.outputs.report }}
-        if: success() && needs.cohort-routing.outputs.decision == 'full' && needs.cohort-routing.outputs.reused == '[]'
+        if: success() && steps.aggregate.outputs.original == 'true'
         run: echo "Every required group, outcome, raw hash, native report and gate reconciled"
 
   release-evidence:

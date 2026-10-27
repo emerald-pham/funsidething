@@ -44997,6 +44997,12 @@ test('RISK repository process: CI admission enforces reuse before repeating a pa
  assert.match(result.stdout||'',/^# tests 1$/m);assert.match(result.stdout||'',/^# skipped 0$/m);
 });
 
+test('RISK repository process: CI observer keeps honest reuse and fresh emulator fallback outcomes',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group aggregate preserves observer protocol across emulator coverage and fresh fallback$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
+ assert.equal(result.status,0,result.stdout+result.stderr);assert.match(result.stdout||'',/^# tests 4$/m);assert.match(result.stdout||'',/^# skipped 0$/m);
+});
+
 test('RISK repository process: grouped runner stays covered at the default npm test boundary',t=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
  const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group runner (executes a complete isolated group with bound identity|keeps oversized group selections below the portable argument limit|binds native tests to the actual checkout commit and tree|reconciles a renamed root and preserves baseline case identities)$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});

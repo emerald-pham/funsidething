@@ -37,6 +37,8 @@
     }
   ],
   "rootAssignments": [
+    {"root": "test group aggregate preserves observer protocol across emulator coverage and fresh fallback", "group": "native-process", "file": "scripts/agent-tools/test-groups.test.mjs"},
+    {"root": "RISK repository process: CI observer keeps honest reuse and fresh emulator fallback outcomes", "group": "native-process", "file": "tests.js"},
     {"root": "migration accepts a live token lock released during ownership inspection", "group": "native-process", "file": "scripts/agent-tools/coordination.test.mjs"},
     {"root": "RISK repository process: released host locks cannot cause spurious CI migration failures", "group": "native-process", "file": "tests.js"},
     {"root": "workflow partial retries preserve successful gates and invalidate a later failed execution", "group": "native-process", "file": "scripts/agent-tools/ci-routing.test.mjs"},

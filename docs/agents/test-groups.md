@@ -165,6 +165,11 @@ Reused group records claim zero current cases, artifacts or test-child execution
 The aggregate accepts a mixture of original coverage and actual current groups,
 reobserves original proof immediately before acceptance, and counts only current
 execution as current cases. Changed or missing final proof fails the aggregate.
+Actual emulator consumer outcomes decide whether retained emulator proof is still
+needed after a runtime fallback. The observer keeps its existing `full`/`reuse`
+attestation protocol; the report separately retains precise group modes and
+original emulator references. Only an entirely executed cohort can publish the
+original full-producer marker.
 The hosted workflow requires these input passes; legacy completion markers alone
 cannot bypass retained-proof checks. The legacy command API retains its existing
 complete canonical-producer validation for compatibility.
