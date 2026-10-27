@@ -152,7 +152,7 @@ function runFocusedChecks(checks, label) {
 
 function printUsage() {
   process.stdout.write('Usage: node scripts/agent-tools/preflight.mjs [--base <ref>]\n');
-  process.stdout.write('Runs focused visible-copy contracts, current test-group registration validation, then scripts/test-first-gate.mjs.\n');
+  process.stdout.write('Runs pinned workflow validation, focused visible-copy contracts, current test-group registration validation, then scripts/test-first-gate.mjs.\n');
 }
 
 async function main() {
@@ -168,6 +168,11 @@ async function main() {
     printUsage();
     return 0;
   }
+
+  process.stdout.write('Preflight: pinned workflow validation\n');
+  const workflows = runNode(['scripts/agent-tools/workflow-validator.mjs', 'validate', '--source-label', 'preflight working tree']);
+  const workflowExit = failForResult('pinned workflow validation', workflows);
+  if (workflowExit !== 0) return workflowExit;
 
   process.stdout.write('Preflight: existing help and copy contracts\n');
   for (const check of focusedChecks) process.stdout.write(`- ${check}\n`);
@@ -217,7 +222,7 @@ async function main() {
   }
   process.stdout.write(`Current group registrations passed: ${registrationSummary.assignedRootCount} assigned roots, ${registrationSummary.processControlCount} recognized process control${registrationSummary.processControlCount === 1 ? '' : 's'}, ${registrationSummary.addedRootTitles.length} newly assigned root${registrationSummary.addedRootTitles.length === 1 ? '' : 's'}.\n`);
 
-  process.stdout.write('Preflight passed: focused help/copy, group-registration, and test-first/rationale validation.\n');
+  process.stdout.write('Preflight passed: pinned workflow, focused help/copy, group-registration, and test-first/rationale validation.\n');
   process.stdout.write('This does not report full-suite, rules, compatibility, CI, release, or live results.\n');
   return 0;
 }

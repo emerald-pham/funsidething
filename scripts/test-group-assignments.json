@@ -13652,6 +13652,21 @@
       "root": "RISK repository process: workflow browser paths resolve only in supported runner contexts",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: managed pre-push validates the exact outgoing workflow commit",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "preflight rejects a workflow expression unavailable at job scope before full qualification",
+      "group": "native-process",
+      "file": "scripts/agent-tools/preflight.test.mjs"
+    },
+    {
+      "root": "workflow validator command contracts are pinned and source-bound",
+      "group": "native-process",
+      "file": "scripts/agent-tools/workflow-validator.test.mjs"
     }
   ],
   "processControls": [

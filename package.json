@@ -13,6 +13,8 @@
     "agent:browser-audit": "node scripts/agent-tools/browser-audit.mjs",
     "agent:ci-monitor": "node scripts/agent-tools/ci-monitor.mjs",
     "agent:pr-body-update": "node scripts/agent-tools/pr-body-update.mjs",
+    "agent:setup-workflow-validator": "node scripts/agent-tools/workflow-validator.mjs setup",
+    "agent:validate-workflows": "node scripts/agent-tools/workflow-validator.mjs validate",
     "test:rules": "firebase emulators:exec --only firestore --project demo-chain-scanner-data-safety \"node --test --test-name-pattern='Firestore rules:' tests.js\"",
     "test:compatibility": "firebase emulators:exec --only firestore --project demo-backward-compatibility \"node scripts/backward-compatibility.mjs\"",
     "release:install-hook": "node scripts/install-release-hook.mjs",
