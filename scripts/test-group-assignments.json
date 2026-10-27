@@ -13386,22 +13386,6 @@
       "root": "RISK repository process: newly registered startup browser roots require an isolated Chromium receipt",
       "group": "native-process",
       "file": "tests.js"
-    }
-  ],
-  "processControls": [
-    {
-      "id": "RISK native installed-client delivery: signed-out",
-      "group": "native-process",
-      "file": "tests.js",
-      "ownerRoot": "RISK repository process: required installed-client native outcomes and artifacts execute exactly once",
-      "expectedExecutions": 1
-    },
-    {
-      "id": "RISK native installed-client delivery: reconcile-held",
-      "group": "native-process",
-      "file": "tests.js",
-      "ownerRoot": "RISK repository process: required installed-client native outcomes and artifacts execute exactly once",
-      "expectedExecutions": 1
     },
     {
       "root": "RISK repository process: canonical early admission retains mixed owners and fresh durable verification",
@@ -13447,6 +13431,22 @@
       "root": "standalone diagnostic command refuses small positive growth below its declared scale",
       "group": "native-process",
       "file": "scripts/agent-tools/rendered-evidence.test.mjs"
+    }
+  ],
+  "processControls": [
+    {
+      "id": "RISK native installed-client delivery: signed-out",
+      "group": "native-process",
+      "file": "tests.js",
+      "ownerRoot": "RISK repository process: required installed-client native outcomes and artifacts execute exactly once",
+      "expectedExecutions": 1
+    },
+    {
+      "id": "RISK native installed-client delivery: reconcile-held",
+      "group": "native-process",
+      "file": "tests.js",
+      "ownerRoot": "RISK repository process: required installed-client native outcomes and artifacts execute exactly once",
+      "expectedExecutions": 1
     }
   ],
   "rootReplacements": [
