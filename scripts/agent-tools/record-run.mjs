@@ -494,7 +494,7 @@ function summarizeEvidenceError(error, redaction, location) {
 
 export async function execute(command, args, cwd, options = {}) {
   return new Promise((resolveResult) => {
-    const child = spawn(command, args, { cwd, env: options.env ?? process.env, stdio: ['inherit', 'pipe', 'pipe'], detached: process.platform !== 'win32' });
+    const child = spawn(command, args, { cwd, env: options.env ?? process.env, stdio: options.diagnosticAuthorization ? ['inherit', 'pipe', 'pipe', 'pipe'] : ['inherit', 'pipe', 'pipe'], detached: process.platform !== 'win32' });
     const stdout = [];
     const stderr = [];
     let launchError;
@@ -549,6 +549,7 @@ export async function execute(command, args, cwd, options = {}) {
     child.stderr.on('data', (chunk) => stderr.push(Buffer.from(chunk)));
     child.on('error', (error) => { launchError = error; });
     child.once('spawn', () => {
+      if(options.diagnosticAuthorization){try{child.stdio[3].on('error',()=>{});child.stdio[3].end(JSON.stringify(options.diagnosticAuthorization(child.pid)));}catch(error){launchError=error;sendOwnedSignal('SIGTERM');}}
       if (wrapperSignal && !cleanup.signalSent) cleanup.signalSent = sendOwnedSignal(wrapperSignal);
     });
     child.on('close', (code, signal) => {

@@ -45669,3 +45669,13 @@ test('RISK repository process: metadata observation preserves bound producer out
  assert.equal(aggregate.status,0,'Literal workflow aggregate must preserve incomplete and stale evidence: '+aggregate.stdout+aggregate.stderr);assert.match(aggregate.stdout,/ok [0-9]+ - workflow metadata aggregate rejects pending cancelled unresolved and stale successful routing proofs/);assert.match(aggregate.stdout,/# fail 0/);assert.match(aggregate.stdout,/# cancelled 0/);assert.match(aggregate.stdout,/# skipped 0/);
 
 });
+
+test('RISK repository process: protected diagnostic governance remains distinct from frozen app source',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=independently reviewed protected governance',path.join(__dirname,'scripts/agent-tools/diagnostic-receipt.test.mjs')],{encoding:'utf8',timeout:45000,env});assert.equal(result.status,0,result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# tests 1$/m);assert.match(result.stdout,/^# pass 1$/m);assert.match(result.stdout,/^# skipped 0$/m);
+});
+
+test('RISK repository process: native diagnostic captures remain bounded and missing attribution never qualifies a repair',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap',path.join(__dirname,'scripts/agent-tools/native-attribution.test.mjs')],{encoding:'utf8',timeout:30000,env});assert.equal(result.status,0,result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# tests 4$/m);assert.match(result.stdout,/^# pass 4$/m);assert.match(result.stdout,/^# skipped 0$/m);
+});

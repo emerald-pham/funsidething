@@ -5,6 +5,8 @@ import path from "node:path";
 import { createHash, sign, verify } from "node:crypto";
 import {
   diagnosticDirectory,
+  diagnosticChannelPayload,
+  rejectDiagnosticNodeInjection,
   verifyDiagnosticCI,
   progressCommand,
   recordDiagnosticCIResult,
@@ -12,6 +14,7 @@ import {
 import {
   verifyReleaseEvidence,
   verifyReleaseEvidenceDirectory,
+  verifyDeploymentEvidence,
 } from "../release-evidence.mjs";
 import { execute as executeRecordedCommand } from "./record-run.mjs";
 import { spawnSync } from "node:child_process";
@@ -22,12 +25,16 @@ const toolRoot = path.resolve(
 );
 const FROZEN = "b176026825e4f9539780f745fe60e09cf348d288";
 const OBSERVER = "c899e5e983cd756152c1d0c8057ffe8455e80956";
-const TEMPLATE = "webkit-stall-thread-v1";
+const TEMPLATE = "webkit-native-attribution-v1";
 const markerPath = ".diagnostic-task.json";
 const governance = [
   "scripts/release-evidence.mjs",
   "scripts/agent-tools/diagnostic-receipt.mjs",
   "scripts/agent-tools/diagnostic-hosted-policy.mjs",
+  "scripts/agent-tools/native-attribution.mjs",
+  "scripts/agent-tools/native-toolchain.json",
+  "scripts/agent-tools/native-known-control.json",
+  "scripts/agent-tools/build-native-known-control.py",
   "scripts/agent-tools/checkpoint-progress.mjs",
   "scripts/agent-tools/checkpoint.mjs",
   "scripts/agent-tools/record-run.mjs",
@@ -85,7 +92,7 @@ function entry(bytes) {
       .digest("hex")
   );
 }
-function guardedMobile(repo) {
+export function diagnosticMobileSource(repo) {
   return blob(repo, OBSERVER, "scripts/button-safety-mobile-memory.mjs")
     .toString()
     .replace(
@@ -94,15 +101,39 @@ function guardedMobile(repo) {
     )
     .replace(
       "'CHAIN_TEST_SOURCE_SHA','CHAIN_DIAGNOSTIC_ACTIVATION'",
-      "'CHAIN_TEST_SOURCE_SHA','CHAIN_DIAGNOSTIC_CLAIM','CHAIN_DIAGNOSTIC_SOURCE','CHAIN_DIAGNOSTIC_AUTHORIZATION','CHAIN_DIAGNOSTIC_ACTIVATION'",
+      "'CHAIN_TEST_SOURCE_SHA','GITHUB_SHA','CHAIN_DIAGNOSTIC_GOVERNANCE','CHAIN_DIAGNOSTIC_SOURCE_REF','CHAIN_DIAGNOSTIC_CLAIM','CHAIN_DIAGNOSTIC_SOURCE','CHAIN_DIAGNOSTIC_AUTHORIZATION','CHAIN_DIAGNOSTIC_ACTIVATION'",
     )
     .replace(
       "import assert from 'node:assert/strict';",
-      "import assert from 'node:assert/strict';\nimport {assertDiagnosticRuntimeAllowed} from './agent-tools/checkpoint-progress.mjs';",
+      "import assert from 'node:assert/strict';\nimport {assertDiagnosticRuntimeAllowed} from './agent-tools/checkpoint-progress.mjs';\nimport {startBrowserNative,runNativeControl} from './agent-tools/native-attribution.mjs';",
     )
     .replace(
       "export async function runCappedMobile({outputDir,budgetProfile='required-1gb'}){",
       "export async function runCappedMobile({outputDir,budgetProfile='required-1gb'}){\n assertDiagnosticRuntimeAllowed(root,git('rev-parse','HEAD'),process.env.CHAIN_DIAGNOSTIC_BUNDLE);",
+    )
+    .replace(
+      "let server,monitor,monitorError;",
+      "let server,monitor,monitorError,nativeObserver;",
+    )
+    .replace(
+      "  server=await playwright.webkit.launchServer",
+      "  if(control)report.nativeKnownControl=await runNativeControl(path.join(output,'known-native-control'));\n  server=await playwright.webkit.launchServer",
+    )
+    .replace(
+      "  const capture=()=>",
+      "  if(!control)nativeObserver=startBrowserNative({output,pids:browserProcesses().map(p=>p.pid),identity:source,membership:report.before.membership});\n  const capture=()=>",
+    )
+    .replace(
+      "lastSnapshotId=request.id;write",
+      "lastSnapshotId=request.id;nativeObserver?.trigger(request.label);write",
+    )
+    .replace(
+      "  clearInterval(monitor);",
+      "  clearInterval(monitor);\n  if(nativeObserver)try{report.nativeAttribution=await nativeObserver.finish();}catch(error){report.nativeAttribution={status:'incomplete',error:String(error),completeAttribution:false};report.errors.push('native observation: '+String(error));}",
+    )
+    .replace(
+      " if(containerName||ownershipToken)",
+      " if(role==='browser'){const tools=process.env.CHAIN_DIAGNOSTIC_TOOLS;assert.ok(tools&&path.isAbsolute(tools),'Reviewed generated native tool artifact required');args.splice(args.indexOf(MOBILE_IMAGE),0,'--mount','type=bind,src='+tools+',dst=/opt/chain-native-tools,readonly','--env','CHAIN_DIAGNOSTIC_TOOLS=/opt/chain-native-tools');}\n if(containerName||ownershipToken)",
     );
 }
 export function deriveDiagnosticImpact(repo, source, frozen) {
@@ -135,7 +166,7 @@ export function deriveDiagnosticImpact(repo, source, frozen) {
       continue;
     if (
       file === "scripts/button-safety-mobile-memory.mjs" &&
-      actual === entry(Buffer.from(guardedMobile(repo)))
+      actual === entry(Buffer.from(diagnosticMobileSource(repo)))
     )
       continue;
     if (actual !== canonical.get(file))
@@ -155,7 +186,7 @@ export function deriveDiagnosticImpact(repo, source, frozen) {
       ready = false;
   if (
     candidate.get("scripts/button-safety-mobile-memory.mjs") !==
-    entry(Buffer.from(guardedMobile(repo)))
+    entry(Buffer.from(diagnosticMobileSource(repo)))
   )
     ready = false;
   const frozenRows = [...original]
@@ -350,7 +381,7 @@ function frozenEvidence(repo, input, impact, files) {
     renderedSha256: hash(renderedBytes),
   };
 }
-export function recordDiagnosticReceipt(repo, input) {
+export async function recordDiagnosticReceipt(repo, input) {
   if (input.kind !== "nonqualifying-diagnostic" || input.schemaVersion !== 1)
     throw Error("Explicit nonqualifying diagnostic input required.");
   const source = input.candidate?.commitSha,
@@ -386,6 +417,11 @@ export function recordDiagnosticReceipt(repo, input) {
     throw Error(
       "Diagnostic finite durable authorization is missing or inconsistent.",
     );
+  const governanceBinding = await verifyGovernance(
+    repo,
+    state.repository,
+    input.governance,
+  );
   const files = { "admission.json": admissionBytes.toString("base64") },
     inheritance = frozenEvidence(repo, input.frozen, impact, files),
     code = validateReview(
@@ -424,6 +460,7 @@ export function recordDiagnosticReceipt(repo, input) {
     schemaVersion: 1,
     kind: "nonqualifying-diagnostic",
     candidate: input.candidate,
+    governance: governanceBinding,
     impact,
     repository: state.repository,
     task: state.task,
@@ -619,20 +656,30 @@ function validatePortableReceipt(repo, receipt, source) {
   }
   return body;
 }
-export function verifyDiagnosticReceipt(repo, source) {
+export async function verifyDiagnosticReceipt(
+  repo,
+  source,
+  { requireCurrent = true } = {},
+) {
   const receipt = JSON.parse(fs.readFileSync(receiptPath(repo, source)));
+  await verifyGovernance(
+    repo,
+    receipt.body.repository,
+    receipt.body.governance,
+    requireCurrent,
+  );
   return {
     receipt,
     body: validatePortableReceipt(repo, receipt, source),
     receiptSha256: hash(canonical(receipt)),
   };
 }
-export function verifyDiagnosticOutgoing(repo, source, update) {
+export async function verifyDiagnosticOutgoing(repo, source, update) {
   const exists =
     spawnSync("git", ["-C", repo, "cat-file", "-e", source + ":" + markerPath])
       .status === 0;
   if (!exists) return false;
-  const { body } = verifyDiagnosticReceipt(repo, source);
+  const { body } = await verifyDiagnosticReceipt(repo, source);
   if (
     git(repo, "rev-parse", "HEAD") !== source ||
     body.outgoing.localRef !== update.localRef ||
@@ -673,6 +720,87 @@ function gh(repository, endpoint, method = "GET", input) {
   } catch {
     return r.stdout;
   }
+}
+async function verifyGovernance(
+  repo,
+  repository,
+  requested,
+  requireCurrent = true,
+) {
+  if (!/^[a-f0-9]{40}$/.test(requested?.commitSha ?? ""))
+    throw Error("Diagnostic protected governance commit is required.");
+  if (
+    fs.realpathSync(repo) === fs.realpathSync(toolRoot) ||
+    git(toolRoot, "rev-parse", "HEAD") !== requested.commitSha ||
+    git(toolRoot, "status", "--porcelain", "--untracked-files=all")
+  )
+    throw Error(
+      "Diagnostic bootstrap must execute a distinct clean immutable governance checkout.",
+    );
+  const metadata = gh(repository, ""),
+    defaultRef = "refs/heads/" + metadata.default_branch;
+  if (defaultRef !== "refs/heads/main")
+    throw Error(
+      "Diagnostic governance requires the existing protected main default branch.",
+    );
+  const branch = gh(repository, "/branches/" + metadata.default_branch);
+  if (
+    branch.protected !== true ||
+    (requireCurrent && branch.commit?.sha !== requested.commitSha)
+  )
+    throw Error(
+      "Diagnostic protected default governance head moved or is unprotected; no runtime or renewed allowance.",
+    );
+  const commit = gh(repository, "/commits/" + requested.commitSha),
+    before = commit.parents?.[0]?.sha;
+  if (
+    commit.sha !== requested.commitSha ||
+    commit.commit?.tree?.sha !== git(toolRoot, "rev-parse", "HEAD^{tree}") ||
+    !/^[a-f0-9]{40}$/.test(before ?? "")
+  )
+    throw Error(
+      "Diagnostic actual governance commit/tree/base is inconsistent.",
+    );
+  const api = "https://api.github.com/repos/" + repository;
+  const validation = await verifyDeploymentEvidence({
+    repository,
+    deployedSha: requested.commitSha,
+    beforeSha: before,
+    token: "authenticated-gh-cli-boundary",
+    repoRoot: toolRoot,
+    fetchImpl: async (url) => {
+      if (!url.startsWith(api + "/"))
+        throw Error("Unexpected governance verification endpoint.");
+      const value = gh(repository, url.slice(api.length));
+      return { ok: true, json: async () => value };
+    },
+  });
+  if (!validation.ok)
+    throw Error(
+      "Diagnostic governance ordinary release proof invalid: " +
+        validation.errors.join(" "),
+    );
+  const derived = {
+    commitSha: requested.commitSha,
+    treeSha: commit.commit.tree.sha,
+    workflowBlobSha: git(
+      toolRoot,
+      "rev-parse",
+      "HEAD:.github/workflows/diagnostic.yml",
+    ),
+    defaultRef,
+    reviewedSha: validation.reviewedSha,
+    baseSha: validation.baseSha,
+    receiptSha256: validation.receiptSha256,
+  };
+  if (
+    Object.keys(requested).length > 1 &&
+    canonical(requested) !== canonical(derived)
+  )
+    throw Error(
+      "Diagnostic signed governance binding differs from actual approved source.",
+    );
+  return derived;
 }
 function readRef(repository, ref) {
   try {
@@ -808,8 +936,8 @@ function validatePublishedPermit(
     throw Error("Diagnostic immutable permit binding inconsistent.");
   return { body, receipt, receiptSha256: graph.payload.receiptSha256 };
 }
-export function launchDiagnostic(repo, source) {
-  const checked = verifyDiagnosticReceipt(repo, source),
+export async function launchDiagnostic(repo, source) {
+  const checked = await verifyDiagnosticReceipt(repo, source),
     { body, receipt, receiptSha256 } = checked,
     repository = body.repository,
     base = namespace(body),
@@ -896,7 +1024,7 @@ export function launchDiagnostic(repo, source) {
       "--repo",
       repository,
       "--ref",
-      body.outgoing.remoteRef.slice("refs/heads/".length),
+      body.governance.defaultRef.slice("refs/heads/".length),
       "-f",
       "permit=" + permit,
       "-f",
@@ -920,7 +1048,7 @@ export function launchDiagnostic(repo, source) {
     attempt: body.attempt,
   };
 }
-export function claimDiagnostic(
+export async function claimDiagnostic(
   repo,
   permit,
   permitObject,
@@ -958,11 +1086,21 @@ export function claimDiagnostic(
     claimRef = base + "/claim",
     existing = readRef(repository, claimRef),
     reserved = readRef(repository, reservation);
+  await verifyGovernance(repo, repository, body.governance);
   const run = gh(repository, "/actions/runs/" + runId);
   if (
     String(run.id) !== runId ||
-    run.head_sha !== source ||
-    run.head_branch !== body.outgoing.remoteRef.slice(11) ||
+    run.head_sha !== body.governance.commitSha ||
+    run.head_branch !== body.governance.defaultRef.slice(11) ||
+    (process.env.GITHUB_SHA &&
+      process.env.GITHUB_SHA !== body.governance.commitSha) ||
+    (process.env.GITHUB_WORKFLOW_SHA &&
+      process.env.GITHUB_WORKFLOW_SHA !== body.governance.commitSha) ||
+    (process.env.GITHUB_WORKFLOW_REF &&
+      process.env.GITHUB_WORKFLOW_REF !==
+        repository +
+          "/.github/workflows/diagnostic.yml@" +
+          body.governance.defaultRef) ||
     run.run_attempt !== 1 ||
     run.event !== "workflow_dispatch" ||
     run.path !== ".github/workflows/diagnostic.yml" ||
@@ -973,7 +1111,7 @@ export function claimDiagnostic(
     (process.env.GITHUB_EVENT_NAME &&
       process.env.GITHUB_EVENT_NAME !== "workflow_dispatch") ||
     (process.env.GITHUB_REF &&
-      process.env.GITHUB_REF !== body.outgoing.remoteRef)
+      process.env.GITHUB_REF !== body.governance.defaultRef)
   )
     throw Error(
       "Diagnostic actual GitHub run/source/workflow identity is inconsistent.",
@@ -986,6 +1124,11 @@ export function claimDiagnostic(
       claim.runId !== runId ||
       claim.runAttempt !== 1 ||
       claim.source !== source ||
+      claim.governance !== body.governance.commitSha ||
+      claim.sourceTree !== body.candidate.treeSha ||
+      claim.task !== body.task ||
+      claim.ordinal !== body.ordinal ||
+      claim.attempt !== body.attempt ||
       claim.permitObject !== permitObject ||
       claim.permit !== permit
     )
@@ -1001,6 +1144,7 @@ export function claimDiagnostic(
       permit,
       permitObject,
       source,
+      governance: body.governance.commitSha,
       runId,
       runAttempt: 1,
       body,
@@ -1018,6 +1162,7 @@ export function claimDiagnostic(
       permit,
       permitObject,
       source,
+      governance: body.governance.commitSha,
       runId,
       runAttempt: 1,
     };
@@ -1035,6 +1180,7 @@ export function claimDiagnostic(
       permit,
       permitObject,
       source,
+      governance: body.governance.commitSha,
       runId,
       runAttempt: 1,
     };
@@ -1047,6 +1193,7 @@ export function claimDiagnostic(
       permit,
       permitObject,
       source,
+      governance: body.governance.commitSha,
       sourceTree: body.candidate.treeSha,
       runId,
       runAttempt: 1,
@@ -1062,6 +1209,7 @@ export function claimDiagnostic(
     permit,
     permitObject,
     source,
+    governance: body.governance.commitSha,
     runId,
     runAttempt: 1,
     body,
@@ -1076,7 +1224,9 @@ export async function runDiagnosticCI(
   runId,
   runAttempt,
   outputPath,
+  nativeToolMode,
 ) {
+  rejectDiagnosticNodeInjection();
   const output = path.resolve(outputPath);
   let ancestor = output;
   while (!fs.existsSync(ancestor)) ancestor = path.dirname(ancestor);
@@ -1099,7 +1249,7 @@ export async function runDiagnosticCI(
     throw Error(
       "Diagnostic runtime evidence must be a new directory outside the checkout.",
     );
-  const claimed = claimDiagnostic(
+  const claimed = await claimDiagnostic(
     repo,
     permit,
     permitObject,
@@ -1120,21 +1270,45 @@ export async function runDiagnosticCI(
     Buffer.from(claimed.body.files["admission.json"], "base64"),
     { flag: "wx", mode: 0o600 },
   );
+  const cleanEnvironment = Object.fromEntries(
+    Object.entries(process.env).filter(
+      ([name]) =>
+        !/(TOKEN|PASSWORD|SECRET|CREDENTIAL|AUTH|(?:^|_)KEY(?:_|$)|ASKPASS|^GIT_|^SSH_|^NODE_|NPM_CONFIG_)/i.test(
+          name,
+        ),
+    ),
+  );
+  const noAuth = path.join(output, "no-publication-auth");
+  fs.mkdirSync(noAuth);
+  fs.writeFileSync(path.join(noAuth, "user.npmrc"), "");
+  fs.writeFileSync(path.join(noAuth, "global.npmrc"), "");
   const env = {
-    ...process.env,
+    ...cleanEnvironment,
     CI: "true",
     GITHUB_REPOSITORY: claimed.body.repository,
     GITHUB_RUN_ID: runId,
     GITHUB_RUN_ATTEMPT: "1",
     GITHUB_EVENT_NAME: process.env.GITHUB_EVENT_NAME || "workflow_dispatch",
-    GITHUB_REF: process.env.GITHUB_REF || claimed.body.outgoing.remoteRef,
+    GITHUB_REF: process.env.GITHUB_REF || claimed.body.governance.defaultRef,
+    GITHUB_SHA: process.env.GITHUB_SHA || claimed.body.governance.commitSha,
+    GH_CONFIG_DIR: noAuth,
+    GIT_CONFIG_GLOBAL: path.join(noAuth, "user.npmrc"),
+    GIT_CONFIG_SYSTEM: path.join(noAuth, "global.npmrc"),
+    GIT_CONFIG_NOSYSTEM: "1",
+    GIT_TERMINAL_PROMPT: "0",
+    NPM_CONFIG_USERCONFIG: path.join(noAuth, "user.npmrc"),
+    NPM_CONFIG_GLOBALCONFIG: path.join(noAuth, "global.npmrc"),
     CHAIN_TEST_SOURCE_SHA: source,
     CHAIN_TEST_EVENT_POLICY: "diagnostic-workflow-dispatch-v1",
     CHAIN_DIAGNOSTIC_BUNDLE: admissionPath,
     CHAIN_DIAGNOSTIC_CLAIM: claimed.claimObject,
     CHAIN_DIAGNOSTIC_SOURCE: source,
+    CHAIN_DIAGNOSTIC_SOURCE_REF: claimed.body.outgoing.remoteRef,
+    CHAIN_DIAGNOSTIC_GOVERNANCE: claimed.body.governance.commitSha,
     CHAIN_DIAGNOSTIC_AUTHORIZATION: [
+      claimed.body.governance.commitSha,
       source,
+      claimed.body.outgoing.remoteRef,
       runId,
       "1",
       claimed.claimObject,
@@ -1145,7 +1319,7 @@ export async function runDiagnosticCI(
     CHAIN_DIAGNOSTIC_RASTER: "baseline",
   };
   process.stdout.write(
-    `Diagnostic source ${source} tree ${claimed.body.candidate.treeSha} run ${runId} attempt 1 claim ${claimed.claimObject}\n`,
+    `Diagnostic governance ${claimed.body.governance.commitSha} tree ${claimed.body.governance.treeSha} source ${source} tree ${claimed.body.candidate.treeSha} run ${runId} attempt 1 claim ${claimed.claimObject}\n`,
   );
   const startedAt = new Date().toISOString();
   let deadlineExceeded = false;
@@ -1157,38 +1331,104 @@ export async function runDiagnosticCI(
     14 * 60 * 1000,
   );
   deadline.unref();
-  let result,
-    phase = "dependencies";
-  try {
-    const installation = await executeRecordedCommand(
-      "npm",
-      ["ci", "--ignore-scripts"],
-      repo,
-      { env },
+  const authorization = (childPid) =>
+    diagnosticChannelPayload(
+      {
+        governance: claimed.body.governance.commitSha,
+        source,
+        sourceRef: claimed.body.outgoing.remoteRef,
+        claim: claimed.claimObject,
+        runId,
+        runAttempt: 1,
+        governanceRoot: toolRoot,
+      },
+      childPid,
     );
-    if (
-      installation.exitCode !== 0 ||
-      installation.signal ||
-      installation.launchError
-    )
-      result = installation;
+  let result,
+    phase = "environment-verification",
+    environment = null,
+    runtimeStarted = false;
+  try {
+    const probe = await executeRecordedCommand(
+      process.execPath,
+      [
+        "--input-type=module",
+        "-e",
+        "import {hostedButtonPolicy} from './scripts/agent-tools/diagnostic-hosted-policy.mjs';import {assertDiagnosticRuntimeAllowed} from './scripts/agent-tools/checkpoint-progress.mjs';const admitted=assertDiagnosticRuntimeAllowed(process.cwd(),process.env.CHAIN_TEST_SOURCE_SHA,process.env.CHAIN_DIAGNOSTIC_BUNDLE);let replayDenied=false;try{assertDiagnosticRuntimeAllowed(process.cwd(),process.env.CHAIN_TEST_SOURCE_SHA,process.env.CHAIN_DIAGNOSTIC_BUNDLE);}catch(error){if(!/already consumed/.test(error.message))throw error;replayDenied=true;}if(!replayDenied)throw Error('Diagnostic channel replay unexpectedly admitted');console.log(JSON.stringify({replayDenied,channel:admitted.descendant.channel,policy:hostedButtonPolicy(),credentialKeys:Object.keys(process.env).filter(name=>/(TOKEN|PASSWORD|SECRET|CREDENTIAL|AUTH|(?:^|_)KEY(?:_|$)|ASKPASS)/i.test(name)&&!name.startsWith('CHAIN_DIAGNOSTIC_'))}));",
+      ],
+      repo,
+      { env, diagnosticAuthorization: authorization },
+    );
+    if (probe.exitCode !== 0 || probe.signal || probe.launchError)
+      result = probe;
     else {
-      phase = "capped-runtime";
-      result = await executeRecordedCommand(
-        process.execPath,
-        [
-          "scripts/button-safety-mobile-memory.mjs",
-          "--run",
-          "--profile",
-          "required-1gb",
-          "--output-dir",
-          path.join(output, "capped"),
-        ],
+      environment = JSON.parse(probe.stdout);
+      if (environment.credentialKeys.length)
+        throw Error("Publication credentials reached diagnostic descendant.");
+      phase = "dependencies";
+      const installation = await executeRecordedCommand(
+        "npm",
+        ["ci", "--ignore-scripts"],
         repo,
         { env },
       );
-      result.stdout = (installation.stdout ?? "") + (result.stdout ?? "");
-      result.stderr = (installation.stderr ?? "") + (result.stderr ?? "");
+      if (
+        installation.exitCode !== 0 ||
+        installation.signal ||
+        installation.launchError
+      )
+        result = installation;
+      else {
+        phase = "native-tool-delivery";
+        if (nativeToolMode !== "prepare-reviewed-native-tools")
+          result = {
+            exitCode: 1,
+            signal: null,
+            launchError: null,
+            stdout: "",
+            stderr:
+              "Reviewed native-tool preparation request missing; winning claim remains used and runtime unavailable.",
+          };
+        else {
+          const tools = path.join(output, "native-tools");
+          const prepared = await executeRecordedCommand(
+            process.execPath,
+            [
+              path.join(toolRoot, "scripts/release-evidence.mjs"),
+              "diagnostic-native-toolchain-prepare",
+              tools,
+            ],
+            toolRoot,
+            { env },
+          );
+          if (
+            prepared.exitCode !== 0 ||
+            prepared.signal ||
+            prepared.launchError
+          )
+            result = prepared;
+          else {
+            env.CHAIN_DIAGNOSTIC_TOOLS = tools;
+            phase = "capped-runtime";
+            result = await executeRecordedCommand(
+              process.execPath,
+              [
+                "scripts/button-safety-mobile-memory.mjs",
+                "--run",
+                "--profile",
+                "required-1gb",
+                "--output-dir",
+                path.join(output, "capped"),
+              ],
+              repo,
+              { env, diagnosticAuthorization: authorization },
+            );
+            runtimeStarted = !result.launchError;
+            result.stdout = (installation.stdout ?? "") + (result.stdout ?? "");
+            result.stderr = (installation.stderr ?? "") + (result.stderr ?? "");
+          }
+        }
+      }
     }
   } finally {
     clearTimeout(deadline);
@@ -1197,8 +1437,7 @@ export async function runDiagnosticCI(
     stderr = Buffer.from(result.stderr ?? "");
   fs.writeFileSync(path.join(output, "stdout.txt"), stdout, { flag: "wx" });
   fs.writeFileSync(path.join(output, "stderr.txt"), stderr, { flag: "wx" });
-  // The current canonical template observes threads but does not prove native
-  // attribution. A successful child remains an unpaid required gate until a
+  // Native capture is diagnostic evidence; it cannot qualify a product fix. A successful child remains an unpaid required gate until a
   // separately reviewed template supplies that actual distinguishing evidence.
   const reportPath = path.join(output, "capped", "report.json"),
     report = fs.existsSync(reportPath)
@@ -1207,9 +1446,47 @@ export async function runDiagnosticCI(
           sha256: hash(fs.readFileSync(reportPath)),
         }
       : null;
+  let nativeAttribution = null;
+  const nativePath = path.join(
+    output,
+    "capped/normal/native-attribution/native-attribution.json",
+  );
+  if (fs.existsSync(nativePath)) {
+    const { verifyNativeAttribution } = await import(
+      "./native-attribution.mjs"
+    );
+    try {
+      const observed = verifyNativeAttribution(nativePath, {
+        candidateCommit: source,
+        candidateTree: claimed.body.candidate.treeSha,
+        sourceSha: source,
+        repository: claimed.body.repository,
+        runId,
+        runAttempt: 1,
+        eventPolicy: "diagnostic-workflow-dispatch-v1",
+      });
+      nativeAttribution = {
+        path: "capped/normal/native-attribution/native-attribution.json",
+        sha256: hash(fs.readFileSync(nativePath)),
+        ...observed,
+      };
+    } catch (error) {
+      nativeAttribution = {
+        path: "capped/normal/native-attribution/native-attribution.json",
+        sha256: hash(fs.readFileSync(nativePath)),
+        ok: false,
+        status: "incomplete",
+        error: error.message,
+        completeAttribution: false,
+        productQualification: false,
+      };
+    }
+  }
   const terminal = {
     schemaVersion: 1,
     kind: "nonqualifying-diagnostic-terminal",
+    governance: claimed.body.governance,
+    environment,
     source,
     sourceTree: claimed.body.candidate.treeSha,
     task: claimed.body.task,
@@ -1223,7 +1500,7 @@ export async function runDiagnosticCI(
     runAttempt: 1,
     execution: {
       phase,
-      started: !result.launchError,
+      started: runtimeStarted,
       exitCode: result.exitCode,
       signal: result.signal,
       interruption: result.interruption,
@@ -1234,10 +1511,11 @@ export async function runDiagnosticCI(
       stderrSha256: hash(stderr),
     },
     report,
+    nativeAttribution,
     requiredGate: claimed.body.requiredGate,
     requiredGateStatus: "failed",
     missingEvidence:
-      "Native attribution remains unproved by canonical webkit-stall-thread-v1.",
+      "Native startup attribution remains unavailable or partial; the original failed product gate remains unpaid.",
     productQualification: false,
   };
   fs.writeFileSync(
@@ -1272,7 +1550,9 @@ function zipEntry(archive, name) {
   return result.stdout;
 }
 export async function consumeDiagnostic(repo, source, input) {
-  const { body } = verifyDiagnosticReceipt(repo, source),
+  const { body } = await verifyDiagnosticReceipt(repo, source, {
+      requireCurrent: false,
+    }),
     repository = body.repository;
   const summaryBytes = readEvidence(
       repo,
@@ -1283,7 +1563,7 @@ export async function consumeDiagnostic(repo, source, input) {
     runId = String(summary.runId);
   if (
     summary.repo !== repository ||
-    summary.commit !== source ||
+    summary.commit !== body.governance.commitSha ||
     summary.runAttempt !== 1 ||
     summary.status !== "completed" ||
     summary.logsState !== "saved" ||
@@ -1309,8 +1589,8 @@ export async function consumeDiagnostic(repo, source, input) {
     jobs = jobsResponse.jobs;
   if (
     String(run.id) !== runId ||
-    run.head_sha !== source ||
-    run.head_branch !== body.outgoing.remoteRef.slice(11) ||
+    run.head_sha !== body.governance.commitSha ||
+    run.head_branch !== body.governance.defaultRef.slice(11) ||
     run.run_attempt !== 1 ||
     run.event !== "workflow_dispatch" ||
     run.path !== ".github/workflows/diagnostic.yml" ||
@@ -1366,6 +1646,7 @@ export async function consumeDiagnostic(repo, source, input) {
     published.body.attempt !== body.attempt ||
     claim.kind !== "nonqualifying-diagnostic-claim" ||
     claim.source !== source ||
+    claim.governance !== body.governance.commitSha ||
     claim.sourceTree !== body.candidate.treeSha ||
     claim.runId !== runId ||
     claim.runAttempt !== 1 ||
@@ -1376,7 +1657,7 @@ export async function consumeDiagnostic(repo, source, input) {
     claim.permitObject !== permitObject
   )
     throw Error("Diagnostic terminal claim does not bind the actual run.");
-  const header = `Diagnostic source ${source} tree ${body.candidate.treeSha} run ${runId} attempt 1 claim ${claimObject}`;
+  const header = `Diagnostic governance ${body.governance.commitSha} tree ${body.governance.treeSha} source ${source} tree ${body.candidate.treeSha} run ${runId} attempt 1 claim ${claimObject}`;
   if (!logs.toString("utf8").includes(header))
     throw Error(
       "Diagnostic raw monitor logs do not bind this exact source and claim.",
@@ -1392,7 +1673,7 @@ export async function consumeDiagnostic(repo, source, input) {
   if (
     artifact.name !== `nonqualifying-diagnostic-${runId}-1` ||
     artifact.expired !== false ||
-    artifact.workflow_run?.head_sha !== source ||
+    artifact.workflow_run?.head_sha !== body.governance.commitSha ||
     !Number.isSafeInteger(artifact.id) ||
     !/^sha256:[a-f0-9]{64}$/.test(artifact.digest ?? "")
   )
@@ -1435,6 +1716,7 @@ export async function consumeDiagnostic(repo, source, input) {
     if (
       terminal.schemaVersion !== 1 ||
       terminal.kind !== "nonqualifying-diagnostic-terminal" ||
+      canonical(terminal.governance) !== canonical(body.governance) ||
       terminal.source !== source ||
       terminal.sourceTree !== body.candidate.treeSha ||
       terminal.task !== body.task ||
@@ -1464,6 +1746,58 @@ export async function consumeDiagnostic(repo, source, input) {
           terminal.report.sha256)
     )
       throw Error("Diagnostic capped report fingerprint changed.");
+    if (terminal.nativeAttribution) {
+      const native = terminal.nativeAttribution;
+      if (
+        native.path !==
+          "capped/normal/native-attribution/native-attribution.json" ||
+        !names.includes(native.path)
+      )
+        throw Error("Native terminal artifact path unavailable.");
+      const bytes = zipEntry(archive, native.path);
+      if (hash(bytes) !== native.sha256)
+        throw Error("Native terminal artifact fingerprint changed.");
+      const parsed = JSON.parse(bytes),
+        nativeDir = path.join(temp, "native");
+      fs.mkdirSync(nativeDir);
+      fs.writeFileSync(path.join(nativeDir, "native-attribution.json"), bytes);
+      for (const row of Object.values(parsed.files ?? {})) {
+        if (!/^(?:perf\.data(?:\.[0-9]+)?|stacks\.txt)$/.test(row.path))
+          throw Error("Unknown native retained file path.");
+        const archivePath = "capped/normal/native-attribution/" + row.path;
+        if (!names.includes(archivePath))
+          throw Error("Actual native stack file missing.");
+        fs.writeFileSync(
+          path.join(nativeDir, row.path),
+          zipEntry(archive, archivePath),
+        );
+      }
+      const { verifyNativeAttribution } = await import(
+        "./native-attribution.mjs"
+      );
+      const observed = verifyNativeAttribution(
+        path.join(nativeDir, "native-attribution.json"),
+        {
+          candidateCommit: source,
+          candidateTree: body.candidate.treeSha,
+          sourceSha: source,
+          repository,
+          runId,
+          runAttempt: 1,
+          eventPolicy: "diagnostic-workflow-dispatch-v1",
+        },
+      );
+      if (
+        native.ok !== true ||
+        native.status !== observed.status ||
+        native.nativeStacksCaptured !== observed.nativeStacksCaptured ||
+        native.completeAttribution !== false ||
+        native.productQualification !== false
+      )
+        throw Error(
+          "Native terminal interpretation differs from independently retained evidence.",
+        );
+    }
   } finally {
     fs.rmSync(temp, { recursive: true, force: true });
   }
@@ -1532,6 +1866,29 @@ function publicClaim(value) {
   return result;
 }
 export async function diagnosticCommand(repo, command, args) {
+  if (command === "diagnostic-native-toolchain-verify") {
+    const { verifyNativeToolchain } = await import("./native-attribution.mjs");
+    return verifyNativeToolchain(args[0]);
+  }
+  if (command === "diagnostic-native-toolchain-prepare") {
+    const { prepareNativeToolchain } = await import("./native-attribution.mjs");
+    return prepareNativeToolchain(args[0]);
+  }
+  if (command === "diagnostic-native-control") {
+    const { runNativeControl } = await import("./native-attribution.mjs");
+    return runNativeControl(args[0]);
+  }
+  if (command === "diagnostic-native-verify") {
+    const { verifyNativeAttribution } = await import(
+      "./native-attribution.mjs"
+    );
+    return verifyNativeAttribution(args[0]);
+  }
+  if (args[0] === "--repo") {
+    repo = fs.realpathSync(args[1]);
+    args = args.slice(2);
+  } else if (command.startsWith("diagnostic-ci-"))
+    throw Error("Diagnostic CI requires an explicit separate --repo checkout.");
   if (command === "diagnostic-plan")
     return deriveDiagnosticImpact(repo, args[0], args[1]);
   if (command === "diagnostic-launch") return launchDiagnostic(repo, args[0]);
@@ -1543,11 +1900,11 @@ export async function diagnosticCommand(repo, command, args) {
     );
   if (command === "diagnostic-ci-run") return runDiagnosticCI(repo, ...args);
   if (command === "diagnostic-ci-claim")
-    return publicClaim(claimDiagnostic(repo, ...args));
+    return publicClaim(await claimDiagnostic(repo, ...args));
   if (command === "diagnostic-record")
     return recordDiagnosticReceipt(repo, JSON.parse(fs.readFileSync(args[0])));
   if (command === "diagnostic-verify") {
-    const result = verifyDiagnosticReceipt(repo, args[0]);
+    const result = await verifyDiagnosticReceipt(repo, args[0]);
     return {
       verified: true,
       kind: result.body.kind,

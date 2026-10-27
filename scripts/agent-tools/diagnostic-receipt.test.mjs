@@ -1,3 +1,4 @@
+import { diagnosticMobileSource } from "./diagnostic-receipt.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -31,8 +32,8 @@ function seedRun(f, runId) {
   const state = JSON.parse(fs.readFileSync(f.remoteFile));
   state.run = {
     id: Number(runId),
-    head_sha: f.source,
-    head_branch: "diagnose/fixture",
+    head_sha: f.governance ?? f.source,
+    head_branch: f.governance ? "main" : "diagnose/fixture",
     run_attempt: 1,
     status: "in_progress",
     conclusion: null,
@@ -43,13 +44,18 @@ function seedRun(f, runId) {
   fs.writeFileSync(f.remoteFile, JSON.stringify(state));
 }
 function command(f, op, ...args) {
-  return spawnSync(process.execPath, [cli, op, ...args], {
-    cwd: f.repo,
-    env: { ...process.env, ...f.env },
-    encoding: "utf8",
-    timeout: 30000,
-    maxBuffer: 8 * 1024 * 1024,
-  });
+  if (op.startsWith("diagnostic-ci-")) args = ["--repo", f.repo, ...args];
+  return spawnSync(
+    f.pathNode ? "node" : process.execPath,
+    [f.cli ?? cli, op, ...args],
+    {
+      cwd: f.repo,
+      env: { ...process.env, ...f.env },
+      encoding: "utf8",
+      timeout: 30000,
+      maxBuffer: 8 * 1024 * 1024,
+    },
+  );
 }
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "diagnostic-receipt-")),
@@ -129,6 +135,10 @@ function fixture(t) {
     "scripts/release-evidence.mjs",
     "scripts/agent-tools/diagnostic-receipt.mjs",
     "scripts/agent-tools/diagnostic-hosted-policy.mjs",
+    "scripts/agent-tools/native-attribution.mjs",
+    "scripts/agent-tools/native-toolchain.json",
+    "scripts/agent-tools/native-known-control.json",
+    "scripts/agent-tools/build-native-known-control.py",
     "scripts/agent-tools/checkpoint-progress.mjs",
     "scripts/agent-tools/checkpoint.mjs",
     "scripts/agent-tools/record-run.mjs",
@@ -140,27 +150,7 @@ function fixture(t) {
     fs.copyFileSync(path.join(repository, file), path.join(repo, file));
   }
   const mobile = path.join(repo, "scripts/button-safety-mobile-memory.mjs");
-  fs.writeFileSync(
-    mobile,
-    fs
-      .readFileSync(mobile, "utf8")
-      .replace(
-        "import {hostedButtonPolicy} from './button-safety-ci-policy.mjs';",
-        "import {hostedButtonPolicy} from './agent-tools/diagnostic-hosted-policy.mjs';",
-      )
-      .replace(
-        "'CHAIN_TEST_SOURCE_SHA','CHAIN_DIAGNOSTIC_ACTIVATION'",
-        "'CHAIN_TEST_SOURCE_SHA','CHAIN_DIAGNOSTIC_CLAIM','CHAIN_DIAGNOSTIC_SOURCE','CHAIN_DIAGNOSTIC_AUTHORIZATION','CHAIN_DIAGNOSTIC_ACTIVATION'",
-      )
-      .replace(
-        "import assert from 'node:assert/strict';",
-        "import assert from 'node:assert/strict';\nimport {assertDiagnosticRuntimeAllowed} from './agent-tools/checkpoint-progress.mjs';",
-      )
-      .replace(
-        "export async function runCappedMobile({outputDir,budgetProfile='required-1gb'}){",
-        "export async function runCappedMobile({outputDir,budgetProfile='required-1gb'}){\n assertDiagnosticRuntimeAllowed(root,git('rev-parse','HEAD'),process.env.CHAIN_DIAGNOSTIC_BUNDLE);",
-      ),
-  );
+  fs.writeFileSync(mobile, diagnosticMobileSource(repo));
   const bin = path.join(root, "bin");
   fs.mkdirSync(bin);
   const issues = {
@@ -213,6 +203,9 @@ function fixture(t) {
     GITHUB_EVENT_NAME: "",
     GITHUB_REF: "",
     GITHUB_REPOSITORY: "",
+    GITHUB_SHA: "",
+    GITHUB_WORKFLOW_SHA: "",
+    GITHUB_WORKFLOW_REF: "",
   };
   const cp = (op, ...args) =>
     spawnSync(
@@ -338,7 +331,7 @@ function fixture(t) {
   };
   const inputPath = path.join(root, "input.json");
   fs.writeFileSync(inputPath, JSON.stringify(input));
-  return {
+  return addGovernanceFixture({
     root,
     repo,
     env,
@@ -350,7 +343,7 @@ function fixture(t) {
     attempt,
     cp,
     remoteFile,
-  };
+  });
 }
 test("public diagnostic receipt records frozen reviewed source with its admitted finite attempt", (t) => {
   const f = fixture(t),
@@ -495,7 +488,11 @@ test("the real isolated diagnostic consumer starts only for the winning CI claim
     "failed",
     "missing native attribution cannot pay the required gate",
   );
-  assert.equal(terminal.execution.started, true);
+  assert.equal(
+    terminal.execution.started,
+    false,
+    "missing reviewed tooling request starts no runtime child",
+  );
   assert.notEqual(run.status, 0);
   const bytes = fs.readFileSync(path.join(output, "terminal.json"));
   const again = command(
@@ -544,8 +541,8 @@ function terminalFixture(f) {
   const remote = JSON.parse(fs.readFileSync(f.remoteFile));
   remote.run = {
     id: 3001,
-    head_sha: f.source,
-    head_branch: "diagnose/fixture",
+    head_sha: f.governance ?? f.source,
+    head_branch: f.governance ? "main" : "diagnose/fixture",
     run_attempt: 1,
     status: "completed",
     conclusion: "failure",
@@ -570,14 +567,14 @@ function terminalFixture(f) {
       ],
     },
   ];
-  remote.logs = `Diagnostic source ${f.source} tree ${f.tree} run 3001 attempt 1 claim ${terminal.claimObject}\nNonqualifying required gate failed: native attribution missing\n`;
+  remote.logs = run.stdout + run.stderr;
   remote.artifacts = [
     {
       id: 501,
       name: "nonqualifying-diagnostic-3001-1",
       expired: false,
       digest: "sha256:" + hash(fs.readFileSync(archive)),
-      workflow_run: { head_sha: f.source },
+      workflow_run: { head_sha: f.governance },
     },
   ];
   remote.artifactZip = fs.readFileSync(archive).toString("base64");
@@ -592,7 +589,7 @@ function terminalFixture(f) {
       "--run-id",
       "3001",
       "--commit",
-      f.source,
+      f.governance,
       "--evidence-dir",
       monitorDir,
       "--max-polls",
@@ -722,7 +719,7 @@ test("actual pre-push permits only the admitted exact diagnostic destination and
   const f = fixture(t);
   assert.equal(command(f, "diagnostic-record", f.inputPath).status, 0);
   const push = (ref, sha = "0".repeat(40)) =>
-    spawnSync(process.execPath, [cli, "pre-push"], {
+    spawnSync(process.execPath, [f.cli ?? cli, "pre-push"], {
       cwd: f.repo,
       env: { ...process.env, ...f.env },
       input: `refs/heads/diagnose/fixture ${f.source} ${ref} ${sha}\n`,
@@ -842,7 +839,7 @@ test("diagnostic eligibility and receipt rejection matrix performs zero publicat
 });
 function asyncCommand(f, op, ...args) {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [cli, op, ...args], {
+    const child = spawn(process.execPath, [f.cli ?? cli, op, ...args], {
       cwd: f.repo,
       env: { ...process.env, ...f.env },
     });
@@ -1303,4 +1300,645 @@ test("independent CI restores nested immutable proof artifacts through actual re
     ),
     "the independent verifier must request complete recursive tree entries",
   );
+});
+
+function addGovernanceFixture(f) {
+  const gov = path.join(f.root, "governance");
+  git(repository, "clone", "-q", "--shared", repository, gov);
+  git(gov, "config", "user.name", "Fixture");
+  git(gov, "config", "user.email", "fixture@example.test");
+  git(
+    gov,
+    "remote",
+    "set-url",
+    "origin",
+    "https://github.com/emerald-pham/funsidething.git",
+  );
+  const base = git(gov, "rev-parse", "HEAD");
+  for (const file of [
+    "scripts/release-evidence.mjs",
+    "scripts/agent-tools/diagnostic-receipt.mjs",
+    "scripts/agent-tools/diagnostic-hosted-policy.mjs",
+    "scripts/agent-tools/native-attribution.mjs",
+    "scripts/agent-tools/native-toolchain.json",
+    "scripts/agent-tools/native-known-control.json",
+    "scripts/agent-tools/build-native-known-control.py",
+    "scripts/agent-tools/checkpoint-progress.mjs",
+    "scripts/agent-tools/checkpoint.mjs",
+    "scripts/agent-tools/record-run.mjs",
+    ".github/workflows/data-safety.yml",
+    ".github/workflows/diagnostic.yml",
+  ])
+    fs.copyFileSync(path.join(repository, file), path.join(gov, file));
+  fs.writeFileSync(
+    path.join(gov, "scripts/agent-tools/governance-fixture.mjs"),
+    "export const syntheticGovernanceFixture = true;\n",
+  );
+  git(gov, "add", ".");
+  git(
+    gov,
+    "commit",
+    "--allow-empty",
+    "-qm",
+    "Normally reviewed governance fixture",
+  );
+  const reviewed = git(gov, "rev-parse", "HEAD"),
+    tree = git(gov, "rev-parse", "HEAD^{tree}"),
+    main = git(
+      gov,
+      "commit-tree",
+      tree,
+      "-p",
+      base,
+      "-p",
+      reviewed,
+      "-m",
+      "Normal merged governance fixture",
+    );
+  git(gov, "checkout", "-q", main);
+  const report = path.join(f.root, "governance-review.txt");
+  fs.writeFileSync(
+    report,
+    "Synthetic governance full review; no actual production approval.",
+  );
+  const now = new Date().toISOString(),
+    review = (task) => ({
+      task,
+      reviewedSha: reviewed,
+      outcome: "approved",
+      completedAt: now,
+      summary:
+        "Synthetic exact full governance review and publication control.",
+      scope: {
+        fullDiff: true,
+        relevantTests: true,
+        userVisibleAndDataSafety: true,
+      },
+      evidencePath: report,
+      evidenceSha256: hash(fs.readFileSync(report)),
+    }),
+    plan = deriveReleaseReviewPlan(gov, reviewed, base);
+  recordReleaseEvidence(gov, {
+    schemaVersion: 2,
+    candidate: { commitSha: reviewed, treeSha: tree, baseSha: base },
+    ownerReview: {
+      ...review("gov-owner"),
+      scope: {
+        fullDiff: true,
+        rationale: "Synthetic fixture reviews every governance source change.",
+      },
+    },
+    independentReview: review("gov-code"),
+    faqReview: review("gov-faq"),
+    specialistReview: plan.requiresSpecialistReview
+      ? {
+          ...review("gov-risk"),
+          domains: plan.specialistDomains,
+          memoryScope: Object.fromEntries(
+            ["memory", "cloud", "sync"].map((domain) => [
+              domain,
+              {
+                affected: false,
+                rationale:
+                  "Governance fixture preserves unchanged product and saved state.",
+                tests: domain === "memory" ? ["source preservation"] : [],
+              },
+            ]),
+          ),
+          sources: [{ path: report, sha256: hash(fs.readFileSync(report)) }],
+        }
+      : undefined,
+  });
+  const remote = JSON.parse(fs.readFileSync(f.remoteFile));
+  remote.http = {
+    "/": { default_branch: "main" },
+    "/branches/main": { name: "main", protected: true, commit: { sha: main } },
+    ["/commits/" + main]: {
+      sha: main,
+      parents: [{ sha: base }, { sha: reviewed }],
+      commit: { tree: { sha: tree } },
+    },
+    ["/commits/" + main + "/pulls?per_page=100"]: [
+      {
+        number: 22,
+        merge_commit_sha: main,
+        merged_at: now,
+        base: { ref: "main" },
+        head: { sha: reviewed },
+      },
+    ],
+    ["/commits/" + reviewed]: {
+      sha: reviewed,
+      commit: { tree: { sha: tree } },
+    },
+    ["/compare/" + base + "..." + reviewed]: { status: "ahead" },
+  };
+  fs.writeFileSync(f.remoteFile, JSON.stringify(remote));
+  const govCLI = fs.realpathSync(
+      path.join(gov, "scripts/release-evidence.mjs"),
+    ),
+    published = spawnSync(process.execPath, [govCLI, "publish", reviewed], {
+      cwd: gov,
+      env: { ...process.env, ...f.env },
+      encoding: "utf8",
+    });
+  assert.equal(published.status, 0, published.stderr);
+  const withStatuses = JSON.parse(fs.readFileSync(f.remoteFile));
+  assert.ok(
+    withStatuses.normalStatuses,
+    JSON.stringify({
+      published: published.stdout,
+      requests: withStatuses.requests,
+    }),
+  );
+  withStatuses.http["/commits/" + reviewed + "/statuses?per_page=100"] =
+    withStatuses.normalStatuses[reviewed];
+  withStatuses.publications = 0;
+  withStatuses.requests = [];
+  fs.writeFileSync(f.remoteFile, JSON.stringify(withStatuses));
+  f.input.governance = { commitSha: main };
+  fs.writeFileSync(f.inputPath, JSON.stringify(f.input));
+  return {
+    ...f,
+    cli: govCLI,
+    governanceRepo: gov,
+    governance: main,
+    governanceTree: tree,
+  };
+}
+test("a nonqualifying receipt binds independently reviewed protected governance separately from diagnostic source", (t) => {
+  const f = fixture(t),
+    result = command(f, "diagnostic-record", f.inputPath);
+  assert.equal(result.status, 0, result.stderr);
+  const receipt = JSON.parse(
+    fs.readFileSync(JSON.parse(result.stdout).receiptPath),
+  );
+  assert.equal(
+    receipt.body.governance?.commitSha,
+    f.governance,
+    "the signed receipt must bind the actual protected default governance head",
+  );
+  assert.notEqual(f.governance, f.source);
+  assert.equal(receipt.body.governance.defaultRef, "refs/heads/main");
+  assert.equal(receipt.body.governance.treeSha, f.governanceTree);
+  assert.equal(JSON.parse(fs.readFileSync(f.remoteFile)).publications, 0);
+});
+
+test("diagnostic dispatch selects the protected governance default ref and rejects a moved head before any write", (t) => {
+  const f = fixture(t);
+  assert.equal(command(f, "diagnostic-record", f.inputPath).status, 0);
+  const launched = command(f, "diagnostic-launch", f.source);
+  assert.equal(launched.status, 0, launched.stderr);
+  const remote = JSON.parse(fs.readFileSync(f.remoteFile)),
+    args = remote.dispatches[0];
+  assert.equal(
+    args[args.indexOf("--ref") + 1],
+    "main",
+    "workflow dispatch must execute approved default governance rather than candidate-selected code",
+  );
+});
+test("a changed protected default head cannot publish any diagnostic reservation objects or dispatch", (t) => {
+  const f = fixture(t);
+  assert.equal(command(f, "diagnostic-record", f.inputPath).status, 0);
+  const remote = JSON.parse(fs.readFileSync(f.remoteFile));
+  remote.http["/branches/main"].commit.sha = "1".repeat(40);
+  fs.writeFileSync(f.remoteFile, JSON.stringify(remote));
+  const result = command(f, "diagnostic-launch", f.source);
+  assert.notEqual(
+    result.status,
+    0,
+    "moved default head must stop before publication",
+  );
+  const actual = JSON.parse(fs.readFileSync(f.remoteFile));
+  assert.equal(actual.publications, 0);
+  assert.equal(actual.dispatches.length, 0);
+  assert.equal(
+    JSON.parse(f.cp("inspect").stdout).remaining,
+    1,
+    "the reserved diagnostic allowance is neither reset nor renewed",
+  );
+});
+
+test("independent CI claim binds actual main governance run while retaining distinct diagnostic source", (t) => {
+  const f = fixture(t);
+  assert.equal(command(f, "diagnostic-record", f.inputPath).status, 0);
+  const launch = JSON.parse(command(f, "diagnostic-launch", f.source).stdout);
+  seedRun(f, "9101");
+  const remote = JSON.parse(fs.readFileSync(f.remoteFile));
+  remote.run.head_sha = f.governance;
+  remote.run.head_branch = "main";
+  fs.writeFileSync(f.remoteFile, JSON.stringify(remote));
+  f.env.GITHUB_SHA = f.governance;
+  f.env.GITHUB_REF = "refs/heads/main";
+  f.env.GITHUB_EVENT_NAME = "workflow_dispatch";
+  const result = command(
+    f,
+    "diagnostic-ci-claim",
+    launch.permit,
+    launch.permitObject,
+    f.source,
+    "9101",
+    "1",
+  );
+  assert.equal(
+    result.status,
+    0,
+    "actual governance run must authorize separately bound source: " +
+      result.stderr,
+  );
+  const claim = JSON.parse(result.stdout);
+  assert.equal(claim.claimed, true);
+  assert.equal(claim.source, f.source);
+  assert.equal(claim.governance, f.governance);
+});
+test("a source-headed diagnostic workflow cannot impersonate protected main governance or write a claim", (t) => {
+  const f = fixture(t);
+  assert.equal(command(f, "diagnostic-record", f.inputPath).status, 0);
+  const launch = JSON.parse(command(f, "diagnostic-launch", f.source).stdout);
+  seedRun(f, "9102");
+  const oldRun = JSON.parse(fs.readFileSync(f.remoteFile));
+  oldRun.run.head_sha = f.source;
+  oldRun.run.head_branch = "diagnose/fixture";
+  fs.writeFileSync(f.remoteFile, JSON.stringify(oldRun));
+  const before = JSON.parse(fs.readFileSync(f.remoteFile)).publications;
+  const result = command(
+    f,
+    "diagnostic-ci-claim",
+    launch.permit,
+    launch.permitObject,
+    f.source,
+    "9102",
+    "1",
+  );
+  assert.notEqual(
+    result.status,
+    0,
+    "source workflow head cannot stand in for governance",
+  );
+  assert.equal(JSON.parse(fs.readFileSync(f.remoteFile)).publications, before);
+});
+
+test("actual diagnostic descendant retains truthful governance metadata and receives no publication credentials", (t) => {
+  const f = fixture(t);
+  assert.equal(command(f, "diagnostic-record", f.inputPath).status, 0);
+  const launch = JSON.parse(command(f, "diagnostic-launch", f.source).stdout);
+  seedRun(f, "9201");
+  f.env.GITHUB_SHA = f.governance;
+  f.env.GITHUB_REF = "refs/heads/main";
+  f.env.GITHUB_EVENT_NAME = "workflow_dispatch";
+  f.env.GH_TOKEN = "synthetic-publication-canary";
+  f.env.GITHUB_TOKEN = "synthetic-publication-canary";
+  const output = path.join(f.root, "truthful-runtime");
+  command(
+    f,
+    "diagnostic-ci-run",
+    launch.permit,
+    launch.permitObject,
+    f.source,
+    "9201",
+    "1",
+    output,
+  );
+  const terminal = JSON.parse(
+    fs.readFileSync(path.join(output, "terminal.json")),
+  );
+  assert.equal(
+    terminal.governance?.commitSha,
+    f.governance,
+    "terminal must retain the actual workflow governance head",
+  );
+  assert.equal(terminal.source, f.source);
+  assert.equal(terminal.environment?.policy.eventRef, "refs/heads/main");
+  assert.equal(
+    terminal.environment?.policy.sourceRef,
+    "refs/heads/diagnose/fixture",
+  );
+  assert.deepEqual(
+    terminal.environment?.credentialKeys,
+    [],
+    "actual descendant process environment must omit publication credentials",
+  );
+  assert.equal(terminal.execution.phase, "native-tool-delivery");
+  assert.equal(terminal.execution.started, false);
+});
+test("terminal consumption binds governance run and artifact head separately from admitted app source", (t) => {
+  const f = terminalFixture(fixture(t)),
+    result = command(f, "diagnostic-consume", f.source, f.consumeInput);
+  assert.equal(
+    result.status,
+    0,
+    "real governed run head and separate app source must consume without substitution: " +
+      result.stderr,
+  );
+  assert.equal(JSON.parse(result.stdout).consumed, true);
+  assert.equal(JSON.parse(f.cp("inspect").stdout).remaining, 1);
+  assert.equal(JSON.parse(f.cp("inspect").stdout).status, "open");
+});
+
+test("environment-only diagnostic descendant forgery cannot launch through the public source host guard", (t) => {
+  const f = fixture(t),
+    claim = "a".repeat(40),
+    env = {
+      ...f.env,
+      CI: "true",
+      CHAIN_TEST_EVENT_POLICY: "diagnostic-workflow-dispatch-v1",
+      GITHUB_EVENT_NAME: "workflow_dispatch",
+      GITHUB_REF: "refs/heads/main",
+      GITHUB_SHA: f.governance,
+      GITHUB_RUN_ID: "9301",
+      GITHUB_RUN_ATTEMPT: "1",
+      CHAIN_DIAGNOSTIC_GOVERNANCE: f.governance,
+      CHAIN_DIAGNOSTIC_SOURCE: f.source,
+      CHAIN_TEST_SOURCE_SHA: f.source,
+      CHAIN_DIAGNOSTIC_SOURCE_REF: "refs/heads/diagnose/fixture",
+      CHAIN_DIAGNOSTIC_CLAIM: claim,
+      CHAIN_DIAGNOSTIC_AUTHORIZATION: [
+        f.governance,
+        f.source,
+        "refs/heads/diagnose/fixture",
+        "9301",
+        "1",
+        claim,
+      ].join(":"),
+    };
+  const result = spawnSync(
+    process.execPath,
+    [
+      "--input-type=module",
+      "-e",
+      `import {assertDiagnosticRuntimeAllowed} from './scripts/agent-tools/checkpoint-progress.mjs';assertDiagnosticRuntimeAllowed(process.cwd(),${JSON.stringify(f.source)},${JSON.stringify(f.input.admissionPath)});console.log('RUNTIME_ADMITTED');`,
+    ],
+    { cwd: f.repo, env: { ...process.env, ...env }, encoding: "utf8" },
+  );
+  assert.notEqual(
+    result.status,
+    0,
+    "copied public metadata and signed admission cannot replace a fresh parent-issued one-use channel",
+  );
+  assert.doesNotMatch(result.stdout, /RUNTIME_ADMITTED/);
+  assert.equal(JSON.parse(fs.readFileSync(f.remoteFile)).publications, 0);
+});
+
+test("a verified child consumes its inherited authorization once and cannot replay it", (t) => {
+  const f = fixture(t);
+  assert.equal(command(f, "diagnostic-record", f.inputPath).status, 0);
+  const launch = JSON.parse(command(f, "diagnostic-launch", f.source).stdout);
+  seedRun(f, "9401");
+  const output = path.join(f.root, "replay-control");
+  command(
+    f,
+    "diagnostic-ci-run",
+    launch.permit,
+    launch.permitObject,
+    f.source,
+    "9401",
+    "1",
+    output,
+  );
+  const terminal = JSON.parse(
+    fs.readFileSync(path.join(output, "terminal.json")),
+  );
+  assert.equal(
+    terminal.environment?.replayDenied,
+    true,
+    "the actual authorized child must reject a second consumption in the same process",
+  );
+});
+
+test("actual inherited channels reject wrong stale and non-governance parent contexts before runtime", async (t) => {
+  const f = fixture(t),
+    { diagnosticChannelPayload } = await import("./checkpoint-progress.mjs"),
+    claim = "b".repeat(40),
+    context = {
+      governance: f.governance,
+      source: f.source,
+      sourceRef: "refs/heads/diagnose/fixture",
+      claim,
+      runId: "9501",
+      runAttempt: 1,
+    },
+    env = {
+      ...process.env,
+      ...f.env,
+      CI: "true",
+      CHAIN_TEST_EVENT_POLICY: "diagnostic-workflow-dispatch-v1",
+      GITHUB_EVENT_NAME: "workflow_dispatch",
+      GITHUB_REF: "refs/heads/main",
+      GITHUB_SHA: f.governance,
+      GITHUB_RUN_ID: "9501",
+      GITHUB_RUN_ATTEMPT: "1",
+      CHAIN_DIAGNOSTIC_GOVERNANCE: f.governance,
+      CHAIN_DIAGNOSTIC_SOURCE: f.source,
+      CHAIN_TEST_SOURCE_SHA: f.source,
+      CHAIN_DIAGNOSTIC_SOURCE_REF: context.sourceRef,
+      CHAIN_DIAGNOSTIC_CLAIM: claim,
+      CHAIN_DIAGNOSTIC_AUTHORIZATION: [
+        f.governance,
+        f.source,
+        context.sourceRef,
+        "9501",
+        "1",
+        claim,
+      ].join(":"),
+    };
+  for (const [mode, expected] of [
+    ["wrong", /context mismatch/],
+    ["stale", /stale or malformed/],
+    ["foreign", /not the bound immutable governance invocation/],
+  ]) {
+    const child = spawn(
+      process.execPath,
+      [
+        "--input-type=module",
+        "-e",
+        `import {assertDiagnosticRuntimeAllowed} from './scripts/agent-tools/checkpoint-progress.mjs';assertDiagnosticRuntimeAllowed(process.cwd(),${JSON.stringify(f.source)},${JSON.stringify(f.bundle)});console.log('RUNTIME_ADMITTED');`,
+      ],
+      { cwd: f.repo, env, stdio: ["ignore", "pipe", "pipe", "pipe"] },
+    );
+    let stdout = "",
+      stderr = "";
+    child.stdout.on("data", (b) => (stdout += b));
+    child.stderr.on("data", (b) => (stderr += b));
+    const exited = new Promise((resolve) => child.on("close", resolve));
+    const payload = diagnosticChannelPayload(
+      { ...context, governanceRoot: f.governanceRepo },
+      child.pid,
+    );
+    if (mode === "wrong") payload.claim = "c".repeat(40);
+    if (mode === "stale") {
+      payload.issuedAt -= 10000;
+      payload.expiresAt -= 10000;
+    }
+    child.stdio[3].on("error", () => {});
+    child.stdio[3].end(JSON.stringify(payload));
+    assert.notEqual(await exited, 0);
+    assert.match(stderr, expected, stderr);
+    assert.doesNotMatch(stdout, /RUNTIME_ADMITTED/);
+  }
+  assert.equal(JSON.parse(fs.readFileSync(f.remoteFile)).publications, 0);
+});
+test("Node injection configuration cannot publish a claim or start a diagnostic descendant", (t) => {
+  const f = fixture(t);
+  assert.equal(command(f, "diagnostic-record", f.inputPath).status, 0);
+  const launch = JSON.parse(command(f, "diagnostic-launch", f.source).stdout);
+  seedRun(f, "9502");
+  const before = JSON.parse(fs.readFileSync(f.remoteFile)).publications;
+  f.env.NODE_PATH = "/untrusted-diagnostic-injection";
+  const output = path.join(f.root, "injection-control"),
+    result = command(
+      f,
+      "diagnostic-ci-run",
+      launch.permit,
+      launch.permitObject,
+      f.source,
+      "9502",
+      "1",
+      output,
+    );
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /preload or module-path injection/);
+  assert.equal(JSON.parse(fs.readFileSync(f.remoteFile)).publications, before);
+  assert.equal(fs.existsSync(output), false);
+  assert.equal(
+    fs.existsSync(path.join(f.root, "dependency-installs.txt")),
+    false,
+  );
+});
+
+test("the literal workflow node invocation retains a valid kernel-bound parent channel", (t) => {
+  const f = fixture(t);
+  assert.equal(command(f, "diagnostic-record", f.inputPath).status, 0);
+  const launch = JSON.parse(command(f, "diagnostic-launch", f.source).stdout);
+  seedRun(f, "9601");
+  const workflow = fs.readFileSync(
+    path.join(repository, ".github/workflows/diagnostic.yml"),
+    "utf8",
+  );
+  assert.match(
+    workflow,
+    /run: node "\$GITHUB_WORKSPACE\/governance\/scripts\/release-evidence\.mjs" diagnostic-ci-run --repo "\$GITHUB_WORKSPACE\/diagnostic-source"/,
+  );
+  assert.match(
+    workflow,
+    /"\$RUNNER_TEMP\/nonqualifying-diagnostic" prepare-reviewed-native-tools/,
+  );
+  assert.equal((workflow.match(/persist-credentials: false/g) ?? []).length, 2);
+  f.pathNode = true;
+  const output = path.join(f.root, "path-node-control");
+  command(
+    f,
+    "diagnostic-ci-run",
+    launch.permit,
+    launch.permitObject,
+    f.source,
+    "9601",
+    "1",
+    output,
+  );
+  const terminal = JSON.parse(
+    fs.readFileSync(path.join(output, "terminal.json")),
+  );
+  assert.equal(
+    terminal.environment?.replayDenied,
+    true,
+    "the real shell-selected node executable may have argv0=node while retaining the exact kernel executable: " +
+      fs.readFileSync(path.join(output, "stderr.txt"), "utf8"),
+  );
+  assert.equal(terminal.execution.phase, "native-tool-delivery");
+});
+
+test("concurrent winning CI runners retain one actual authorized child identity and no duplicate runtime", async (t) => {
+  const f = fixture(t);
+  assert.equal(command(f, "diagnostic-record", f.inputPath).status, 0);
+  const launch = JSON.parse(command(f, "diagnostic-launch", f.source).stdout);
+  seedRun(f, "9701");
+  const output = path.join(f.root, "concurrent-runtime"),
+    children = [],
+    results = [];
+  for (let i = 0; i < 2; i++) {
+    const child = spawn(
+      process.execPath,
+      [
+        f.cli,
+        "diagnostic-ci-run",
+        "--repo",
+        f.repo,
+        launch.permit,
+        launch.permitObject,
+        f.source,
+        "9701",
+        "1",
+        output,
+      ],
+      {
+        cwd: f.repo,
+        env: { ...process.env, ...f.env },
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
+    let stdout = "",
+      stderr = "";
+    child.stdout.on("data", (b) => (stdout += b));
+    child.stderr.on("data", (b) => (stderr += b));
+    children.push(child);
+    results.push(
+      new Promise((resolve) =>
+        child.on("close", (code) => resolve({ code, stdout, stderr })),
+      ),
+    );
+  }
+  const parents = new Set(children.map((c) => c.pid)),
+    observed = new Set();
+  let finished = false;
+  const all = Promise.all(results).then((r) => {
+    finished = true;
+    return r;
+  });
+  while (!finished) {
+    const ps = spawnSync("/bin/ps", ["-axo", "pid=,ppid=,args="], {
+      encoding: "utf8",
+      timeout: 1000,
+      maxBuffer: 4 * 1024 * 1024,
+    });
+    assert.equal(ps.status, 0);
+    for (const line of ps.stdout.split("\n")) {
+      const row = line.match(/^\s*(\d+)\s+(\d+)\s+(.*)$/);
+      if (
+        row &&
+        parents.has(Number(row[2])) &&
+        row[3].includes("let replayDenied=false")
+      )
+        observed.add(Number(row[1]));
+    }
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  const exits = await all;
+  assert.equal(
+    exits.filter((r) => r.code === 1).length,
+    1,
+    JSON.stringify(exits),
+  );
+  assert.equal(
+    exits.filter((r) => r.code === 0).length,
+    1,
+    JSON.stringify(exits),
+  );
+  assert.equal(
+    observed.size,
+    1,
+    "kernel-observed child process census sees one authorized source guard",
+  );
+  const terminal = JSON.parse(
+    fs.readFileSync(path.join(output, "terminal.json")),
+  );
+  assert.equal(
+    terminal.environment?.channel?.childPid,
+    [...observed][0],
+    "durable environment evidence binds the actual independently observed authorized child PID",
+  );
+  assert.equal(terminal.execution.started, false);
+  assert.equal(JSON.parse(fs.readFileSync(f.remoteFile)).dispatches.length, 1);
+  const refs = Object.keys(JSON.parse(fs.readFileSync(f.remoteFile)).refs);
+  assert.equal(refs.filter((r) => r.endsWith("/claim")).length, 1);
+  assert.equal(refs.filter((r) => r.endsWith("/claim-reservation")).length, 1);
 });

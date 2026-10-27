@@ -14,16 +14,30 @@ on:
 permissions:
   contents: write
   actions: read
+  issues: read
+  pull-requests: read
+  statuses: read
 jobs:
   diagnostic:
     name: Nonqualifying diagnostic attempt
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout immutable protected governance
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: governance
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Checkout distinct diagnostic source
+        uses: actions/checkout@v4
         with:
           ref: ${{ inputs.source }}
+          path: diagnostic-source
           fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: '22.23.3'
@@ -33,7 +47,7 @@ jobs:
           PERMIT: ${{ inputs.permit }}
           PERMIT_OBJECT: ${{ inputs.permit-object }}
           SOURCE_SHA: ${{ inputs.source }}
-        run: node scripts/release-evidence.mjs diagnostic-ci-run "$PERMIT" "$PERMIT_OBJECT" "$SOURCE_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$RUNNER_TEMP/nonqualifying-diagnostic"
+        run: node "$GITHUB_WORKSPACE/governance/scripts/release-evidence.mjs" diagnostic-ci-run --repo "$GITHUB_WORKSPACE/diagnostic-source" "$PERMIT" "$PERMIT_OBJECT" "$SOURCE_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$RUNNER_TEMP/nonqualifying-diagnostic" prepare-reviewed-native-tools
       - name: Retain diagnostic evidence without product qualification
         if: always()
         uses: actions/upload-artifact@v4

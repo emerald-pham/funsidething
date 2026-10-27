@@ -2298,3 +2298,10 @@ The existing checkpoint process contract now includes an API-consistent owner ap
 - RISK repository process: metadata observation preserves bound producer outcomes without duplicate execution
 
 The actual routing CLI binds complete source/checkout/tree/base/policy/cohort/runtime identity and original full-producer admission before retaining pending, failure, cancellation or unresolved evidence. Fresh-process resumption pins that producer despite newer successful history and restores saved nonsecret inputs after interruption. Literal workflow routing/admission commands under the controlled external scheduler count real isolated npm callbacks once; the literal required aggregate accepts honest coverage references and rejects pending/cancelled/unresolved or stale proof. The wrapper clears NODE_TEST_CONTEXT and requires named successful TAP outcomes. Hosted GitHub event/scheduler and final qualification remain separate parent-owned proof.
+
+## Protected diagnostic governance and bounded native observation
+
+- `RISK repository process: protected diagnostic governance remains distinct from frozen app source`
+- `RISK repository process: native diagnostic captures remain bounded and missing attribution never qualifies a repair`
+
+Protected default governance, separate diagnostic source, actual run/artifact identity and one-use inherited parent channels remain distinct. Public process controls cover stale/forged/replayed contexts, Node injection, finite duplicate admission and ordinary release compatibility. Native controls use an actual fixed native workload, real macOS sampler and fresh retained-artifact verification; Linux control/tool delivery is prepared with pinned source, ELF bytes and dependency closure. Missing Linux capability, symbols, samples or coverage remains unavailable or partial within the same attempt; local controls establish no hosted WebKit, product repair or physical-device result.
