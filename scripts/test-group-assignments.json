@@ -13652,6 +13652,11 @@
       "root": "RISK repository process: workflow browser paths resolve only in supported runner contexts",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "workflow validator command contracts are pinned and source-bound",
+      "group": "native-process",
+      "file": "scripts/agent-tools/workflow-validator.test.mjs"
     }
   ],
   "processControls": [

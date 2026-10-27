@@ -18,6 +18,12 @@ const ASSET_SHA256 = Object.freeze({
   'linux-x64': '8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8',
   'linux-arm64': '325e971b6ba9bfa504672e29be93c24981eeb1c07576d730e9f7c8805afff0c6',
 });
+const EXECUTABLE_SHA256 = Object.freeze({
+  'darwin-x64': 'd1f7cee75ae2873609bd9567b4600bebc5315a5e733e73202987a44fafdd53b2',
+  'darwin-arm64': '8db11704dc296f096216db4db65d86cd7f0ebfdf4c38453a1da276b137b88388',
+  'linux-x64': 'c872d6db8c6bf83a8eaa704fc93999f027d55dffbc63b8a6abdccb47df5f4cd4',
+  'linux-arm64': 'ac0323433c2853ec3fb978c611430c5b3dc5d43c58d1a1ec031b00ab572beb60',
+});
 
 function sha256(bytes) {
   return createHash('sha256').update(bytes).digest('hex');
@@ -40,6 +46,7 @@ export function pinnedActionlintAsset(platform = process.platform, arch = proces
     filename,
     url: `https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${filename}`,
     sha256: ASSET_SHA256[key],
+    binarySha256: EXECUTABLE_SHA256[key],
   });
 }
 
@@ -83,7 +90,8 @@ async function readPinnedInstallation(repositoryRoot) {
     || manifest.arch !== process.arch
     || manifest.archive !== asset.filename
     || manifest.archiveSha256 !== asset.sha256
-    || manifest.executableSha256 !== sha256(executableBytes)) {
+    || manifest.executableSha256 !== asset.binarySha256
+    || sha256(executableBytes) !== asset.binarySha256) {
     throw actionableSetupError(`Pinned actionlint v${ACTIONLINT_VERSION} setup is missing or invalid: cached identity or checksum does not match the repository pin.`);
   }
 
@@ -140,6 +148,9 @@ export async function setupPinnedActionlint(repositoryRoot = process.cwd(), { fe
 
   const executableBytes = await extractActionlint(archiveBytes, tarPath);
   const executableSha256 = sha256(executableBytes);
+  if (executableSha256 !== asset.binarySha256) {
+    throw new Error(`Pinned actionlint executable checksum mismatch for ${asset.filename}: expected ${asset.binarySha256}, received ${executableSha256}.`);
+  }
   const paths = cachePaths(root);
   const staging = `${paths.directory}.install-${randomUUID()}`;
   await mkdir(dirname(paths.directory), { recursive: true });
