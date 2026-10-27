@@ -354,3 +354,26 @@ baseline, skip allowance, test assertion or product byte changes. The failed
 CI logs remain under the task's external `ci/push` and `ci/pr` evidence.
 This is registration repair, not a new product RED. Final grouped descriptor
 and regression gates, exact successor review and qualification remain required.
+
+
+The clean descriptor-only successor `27301a1` was never pushed. Read-only
+inspection (also independently found by Standards) showed that its six new
+browser roots would skip without an external URL, while the grouped gate
+correctly rejects new unaccepted skips. The in-progress full record
+`final-ci-candidate/full-suite/2026-10-27T02-30-10-586Z-a76824ec-c3fa-44fb-8bb9-910995027aa9.json`
+was safely interrupted as superseded; it is not a pass. The fixture repair
+self-hosts an isolated static origin using the allocated native port locally
+and an ephemeral port in CI, executes actual bundled Chromium, closes its own
+listener and restores the prior environment after each consumer. Explicit
+external browser QA retains the original Chromium/WebKit matrix. Six roots
+now run by default with every source/privacy/visibility assertion retained;
+no new skip is accepted and no baseline inventory or group verifier changes.
+Product bytes are unchanged; altered producer tests do not relabel the prior
+234 + 82 rendered artifacts as new executions.
+
+Self-hosted focused record
+`ci-assignment-repair/self-hosted-focused-corrected/2026-10-27T02-36-03-444Z-e0701c3e-811e-461f-be9c-17856ce383ac.json`
+passes all 18 cases with zero skips and no external browser URL. The first
+fixture attempt `1b95a84e` passed 17/18 but its final theme summary still
+expected an unexecuted WebKit result; the correction checks both themes for
+exactly the installed runtime set, retaining all paint assertions.

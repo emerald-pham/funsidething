@@ -8,6 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import { createServer } from "node:http";
 
 // Every top-level test owns its app fixtures. Nested t.test cases inherit the
 // parent scope so a shared fixture remains live until all its consumers finish.
@@ -15797,11 +15798,29 @@ async function delayedLocalBoardBrowser(viewport={width:390,height:844},dispatch
  return {browser,context,page,early,ready,errors};
 }
 
+// New startup consumers run in the default/CI cohort without an external server.
+// Explicit browser QA keeps its configured origin and Chromium/WebKit matrix.
+let openingBoardSelfHosted=false;
+async function openingBoardFixture(t){
+ if(process.env.LANDSCAPE_BROWSER_URL)return;
+ const port=process.env.CI==='true'?0:Number(process.env.CHAIN_NATIVE_PORT);
+ assert.ok(Number.isInteger(port)&&port>=0&&(port>0||process.env.CI==='true'),'allocate CHAIN_NATIVE_PORT for the local startup fixture');
+ const mime={'.html':'text/html','.js':'text/javascript','.json':'application/json','.css':'text/css','.svg':'image/svg+xml','.png':'image/png','.ico':'image/x-icon','.webmanifest':'application/manifest+json'};
+ const server=createServer((request,response)=>{
+  const pathname=decodeURIComponent(new URL(request.url,'http://127.0.0.1').pathname),file=path.resolve(__dirname,'.'+(pathname==='/'?'/index.html':pathname));
+  if(!file.startsWith(__dirname+path.sep)){response.writeHead(403);response.end();return;}
+  fs.readFile(file,(error,bytes)=>{response.writeHead(error?404:200,{'Content-Type':mime[path.extname(file)]||'application/octet-stream','Cache-Control':'no-store'});response.end(error?'Not found':bytes);});
+ });
+ await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',resolve);});
+ const previous=process.env.LANDSCAPE_BROWSER_URL;openingBoardSelfHosted=true;
+ process.env.LANDSCAPE_BROWSER_URL='http://127.0.0.1:'+server.address().port+'/';
+ t.after(async()=>{if(previous===undefined)delete process.env.LANDSCAPE_BROWSER_URL;else process.env.LANDSCAPE_BROWSER_URL=previous;openingBoardSelfHosted=false;await new Promise((resolve,reject)=>server.close(error=>error?reject(error):resolve()));});
+}
 async function invisibleSavedViewBrowser(theme='light',delayAppearanceAsset=false,keepHeader=false,viewport={width:390,height:844},activeScanner=false,startupOptions={}){
  const {chromium,webkit}=await import(process.env.PLAYWRIGHT_MODULE||process.env.LANDSCAPE_PLAYWRIGHT||'playwright');
  const engineName=startupOptions.browserEngine==='webkit'?'webkit':'chromium',engine=engineName==='webkit'?webkit:chromium,
   evidencePrefix=startupOptions.brokenDeviceBoard?`broken-board-${engineName}-${theme}-${viewport.width}-${startupOptions.retainAppearance===false?'without-appearance':'with-appearance'}`:`invisible-${theme}`;
- const browser=await engine.launch(engineName==='webkit'?{headless:true}:{headless:true,channel:process.env.LANDSCAPE_BROWSER_CHANNEL||'chrome'});
+ const browser=await engine.launch(engineName==='webkit'?{headless:true}:{headless:true,channel:process.env.LANDSCAPE_BROWSER_CHANNEL||(openingBoardSelfHosted?undefined:'chrome')});
  let releaseFirebaseImports,resolveFirebaseImportsStarted,firebaseImportCount=0;
  const firebaseImportsStarted=new Promise(resolve=>{resolveFirebaseImportsStarted=resolve;});
  const firebaseImportsReleased=new Promise(resolve=>{releaseFirebaseImports=resolve;});
@@ -15976,7 +15995,8 @@ test('RISK saved view invisible startup: real IndexedDB reload paints the prior 
  }
 });
 
-test('RISK saved view broken-board startup: prior appearance stays inert until the recovered board opens',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+test('RISK saved view broken-board startup: prior appearance stays inert until the recovered board opens',async t=>{
+ await openingBoardFixture(t);
  for(const retainAppearance of [true,false]){
   const view=await invisibleSavedViewBrowser('light',false,false,{width:390,height:844},false,{brokenDeviceBoard:true,retainAppearance});
   try{
@@ -16032,11 +16052,12 @@ test('RISK opening board presentation: shared markup retains released cards cont
  assert.deepEqual(keys.map(key=>current.shim.localStorage.getItem(key)),stored,'pure markup does not write any saved board or backup');
 });
 
-test('RISK saved view broken-board visibility: the complete saved board is readable while durable startup waits',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+test('RISK saved view broken-board visibility: the complete saved board is readable while durable startup waits',async t=>{
+ await openingBoardFixture(t);
  for(const config of [
   {browserEngine:'chromium',theme:'light',scannerState:'active'}, {browserEngine:'chromium',theme:'dark',scannerState:'active'},
   {browserEngine:'webkit',theme:'light',scannerState:'active'}, {browserEngine:'webkit',theme:'dark',scannerState:'active'},
-  {retainAppearance:true,scannerState:'active',historyFixture:true}, {longTitle:true}, {scannerState:'paused'}, {scannerState:'intervention'}]){
+  {retainAppearance:true,scannerState:'active',historyFixture:true}, {longTitle:true}, {scannerState:'paused'}, {scannerState:'intervention'}].filter(config=>!openingBoardSelfHosted||config.browserEngine!=='webkit')){
   const {retainAppearance=false,longTitle=false,browserEngine='chromium',theme='light',scannerState,historyFixture}=config;
   const label=[browserEngine,theme,retainAppearance?'saved-view':'no-appearance',longTitle?'long-title':scannerState||'no-dot'].join('-');
   const view=await invisibleSavedViewBrowser(theme,false,false,{width:390,height:844},false,{brokenDeviceBoard:true,retainAppearance,longTitle,scannerState,historyFixture,browserEngine,syntheticCloud:true,holdConfiguredFirebaseImports:true,openingDelayMs:4000,topOfPage:true});
@@ -16093,7 +16114,8 @@ test('RISK saved view broken-board visibility: the complete saved board is reada
  }
 });
 
-test('RISK saved view full-board filters: opening preserves saved membership controls and cheap task facts',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+test('RISK saved view full-board filters: opening preserves saved membership controls and cheap task facts',async t=>{
+ await openingBoardFixture(t);
  for(const savedFilter of ['ineligible','context','long-query'])await t.test(savedFilter,async()=>{
   const view=await invisibleSavedViewBrowser('light',false,false,{width:390,height:844},false,{brokenDeviceBoard:true,retainAppearance:true,scannerState:'active',longTitle:savedFilter==='long-query',savedFilter,syntheticCloud:true,holdConfiguredFirebaseImports:true,topOfPage:true});
   try{
@@ -16113,7 +16135,8 @@ test('RISK saved view full-board filters: opening preserves saved membership con
  });
 });
 
-test('RISK saved view full-board safety: supported copies and identity masks never grant authority',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+test('RISK saved view full-board safety: supported copies and identity masks never grant authority',async t=>{
+ await openingBoardFixture(t);
  for(const sourceFault of ['malformed-protected','unsupported-protected','divergent','no-valid','early-account','early-identity','late-account','late-identity','late-storage'])await t.test(sourceFault,async()=>{
   const view=await invisibleSavedViewBrowser('light',false,false,{width:390,height:844},false,{brokenDeviceBoard:true,retainAppearance:sourceFault.startsWith('early-'),syntheticCloud:true,holdConfiguredFirebaseImports:true,sourceFault,topOfPage:true});
   try{
@@ -16140,7 +16163,8 @@ test('RISK saved view full-board safety: supported copies and identity masks nev
  });
 });
 
-test('RISK saved view broken-board startup: configured Firebase leaves the prior warning neutral until its first event',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+test('RISK saved view broken-board startup: configured Firebase leaves the prior warning neutral until its first event',async t=>{
+ await openingBoardFixture(t);
  const view=await invisibleSavedViewBrowser('light',false,false,{width:390,height:844},false,{brokenDeviceBoard:true,retainAppearance:true,topOfPage:true,seedPriorRecoveryAppearance:true,syntheticCloud:true,holdConfiguredFirebaseImports:true,browserEngine:'webkit'});
  try{
   assert.equal(view.startup.priorRecovery?.hold?.reason,'device-source-recovery','the remembered warning comes from a real protected local recovery');
@@ -16179,9 +16203,10 @@ test('RISK saved view broken-board startup: configured Firebase leaves the prior
  }finally{view.releaseHeldFirebaseImports();await view.browser.close();}
 });
 
-test('RISK saved view broken-board status: configured cloud changes remain visible in the saved appearance and after recovery',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
- const observedThemePaint=[];
- for(const browserEngine of ['chromium','webkit'])for(const theme of ['light','dark'])for(const viewport of [{width:390,height:844},{width:1100,height:900}]){
+test('RISK saved view broken-board status: configured cloud changes remain visible in the saved appearance and after recovery',async t=>{
+ await openingBoardFixture(t);
+ const observedThemePaint=[],browserEngines=openingBoardSelfHosted?['chromium']:['chromium','webkit'];
+ for(const browserEngine of browserEngines)for(const theme of ['light','dark'])for(const viewport of [{width:390,height:844},{width:1100,height:900}]){
   const view=await invisibleSavedViewBrowser(theme,false,false,viewport,false,{brokenDeviceBoard:true,retainAppearance:true,syntheticCloud:true,topOfPage:true,browserEngine,seedPriorRecoveryAppearance:true,holdConfiguredFirebaseImports:true});
   try{
    const detailedPageErrors=[];view.page.on('pageerror',error=>detailedPageErrors.push(error.stack||error.message));
@@ -16354,7 +16379,7 @@ test('RISK saved view broken-board status: configured cloud changes remain visib
    assert.deepEqual(view.errors,[],JSON.stringify(detailedPageErrors));
   }finally{await view.browser.close();}
  }
- for(const browserEngine of ['chromium','webkit'])for(const width of [390,1100]){
+ for(const browserEngine of browserEngines)for(const width of [390,1100]){
   const light=observedThemePaint.find(item=>item.browserEngine===browserEngine&&item.width===width&&item.theme==='light');
   const dark=observedThemePaint.find(item=>item.browserEngine===browserEngine&&item.width===width&&item.theme==='dark');
   assert.ok(light&&dark,'both themes produce rendered evidence for each browser and viewport');
