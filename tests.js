@@ -28890,6 +28890,19 @@ test('RISK repository process: npm test fails when an agent-tool cohort assertio
  assert.match(output,/synthetic agent-tool cohort assertion failed/);
 });
 
+test('RISK repository process: coordination rejects misspelled resource options before side effects',()=>{
+ const root=path.dirname(fileURLToPath(import.meta.url));
+ const selected='begin rejects the singular resource typo before launching git or mutating ledger bytes';
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap',`--test-name-pattern=^${selected}$`,path.join(root,'scripts/agent-tools/coordination.test.mjs')],{cwd:root,encoding:'utf8',timeout:30000,maxBuffer:4*1024*1024,env});
+ const output=[result.stdout,result.stderr].filter(Boolean).join('\n');
+ assert.equal(result.error,undefined,result.error?.message);
+ assert.equal(result.status,0,output);
+ assert.match(output,/^# Subtest: begin rejects the singular resource typo before launching git or mutating ledger bytes$/m);
+ assert.match(output,/^# pass 1$/m);
+ assert.match(output,/^# fail 0$/m);
+});
+
 test('RISK regression gate: changing existing tests requires a specific reason and replacement coverage',async()=>{
  const {validateRegressionChanges,protectedTestFingerprint}=await import('./scripts/test-first-gate.mjs');
  assert.equal(typeof validateRegressionChanges,'function','CI must protect existing feature tests');
