@@ -1277,6 +1277,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK opening board presentation: shared markup retains released cards contexts task rows and history
 - RISK saved view broken-board visibility: the complete saved board is readable while durable startup waits
 - RISK saved view full-board safety: supported copies and identity masks never grant authority
+- RISK saved view full-board filters: opening preserves saved membership controls and cheap task facts
 - RISK bulk toolbar guidance: extended FAQ describes frozen controls and rank-slot selection
 - RISK repository process boundary: actual visual tests compare every changed control with neighboring controls and scrolled states
 

@@ -15859,6 +15859,16 @@ async function invisibleSavedViewBrowser(theme='light',delayAppearanceAsset=fals
  await page.locator('[data-act="list-eligibility"][data-id="all"]').click();
  await page.locator('#listSearch').fill('Saved appearance');
  await page.locator('#listBody').evaluate(e=>{e.scrollTop=420;e.dispatchEvent(new Event('scroll'));});
+ if(startupOptions.historyFixture)await page.evaluate(async()=>{state.histOpen=true;state.workLog.push({id:'opening-history-fixture',taskId:state.tasks[64].id,title:'Saved earlier work',kind:'worked',at:Date.now()-60000});save();await persist();render();});
+ if(startupOptions.savedFilter)await page.evaluate(async kind=>{
+  if(kind==='context'){
+   const id=state.contexts[0].id;state.tasks.slice(0,60).forEach(task=>{task.ctx=[id];});save();await persist();render();
+   setTaskPrerequisites(state.tasks[5].id,[state.tasks[6].id]);decide('cant');decide('no');await persist();
+   allTasksView.toggleTag('c:'+id);
+  }else if(kind==='ineligible'){allTasksView.setEligibility('ineligible');allTasksView.setQuery('Saved appearance');}
+  else if(kind==='long-query')allTasksView.setQuery('Saved long task text '.repeat(100).slice(0,2048));
+  renderList();window.dispatchEvent(new Event('pagehide'));
+ },startupOptions.savedFilter);
  const startup=await page.evaluate(async({brokenDeviceBoard,retainAppearance,topOfPage,seedPriorRecoveryAppearance,theme})=>{
   window.scrollTo(0,topOfPage?0:220);window.dispatchEvent(new Event('pagehide'));
   let brokenPayload=null;
@@ -15889,7 +15899,7 @@ async function invisibleSavedViewBrowser(theme='light',delayAppearanceAsset=fals
   if(fault==='divergent'){board.tasks[0].title='Distinct supported alternative';localStorage.setItem(protectedKey,JSON.stringify(board));}
   if(fault==='no-valid'){localStorage.setItem(shared,'{unreadable shared source');localStorage.setItem(protectedKey,'{unreadable protected source');}
   if(fault==='early-account')localStorage.setItem('__fullBoardAuth',JSON.stringify({account:'other@example.com',identity:'other-identity'}));
-  if(fault==='early-identity'||fault==='late-identity'){board.syncAccount='fixture@example.com';board.syncIdentity='saved-identity';for(const key of [shared,protectedKey])localStorage.setItem(key,JSON.stringify(board));if(fault==='early-identity')localStorage.setItem('__fullBoardAuth',JSON.stringify({account:'fixture@example.com',identity:'other-identity'}));}
+  if(fault==='early-identity'||fault==='late-identity'){board.syncAccount='fixture@example.com';board.syncIdentity='saved-identity';for(const key of ['fvp:chain-scanner:appearance:v1','fvp:chain-scanner:saved-view:v1']){const raw=localStorage.getItem(key);if(raw){const value=JSON.parse(raw);value.account='fixture@example.com';localStorage.setItem(key,JSON.stringify(value));}}for(const key of [shared,protectedKey])localStorage.setItem(key,JSON.stringify(board));if(fault==='early-identity')localStorage.setItem('__fullBoardAuth',JSON.stringify({account:'fixture@example.com',identity:'other-identity'}));}
   localStorage.setItem('__fullBoardTrace','true');
  },startupOptions.sourceFault);
  if(startupOptions.sourceFault)await page.addInitScript(()=>{
@@ -16012,7 +16022,9 @@ test('RISK opening board presentation: shared markup retains released cards cont
  const options={seed:493,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}};
  const old=await loadApp({...options,appSource:extractAppScript(baseline.stdout)}),current=await loadApp(options);
  for(const app of [old,current]){app.ctx.state.listOpen=true;app.ctx.state.ctxOpen=true;app.ctx.state.histOpen=true;app.ctx.render();}
- for(const id of ['ctxPanel','scan','listBody','histPanel'])assert.equal(current.shim.document.getElementById(id).innerHTML,old.shim.document.getElementById(id).innerHTML,id+' keeps the released markup after sharing its pure formatter');
+ for(const id of ['ctxPanel','scan','listBody','histPanel','listEligibilityRow','listTagRow'])assert.equal(current.shim.document.getElementById(id).innerHTML,old.shim.document.getElementById(id).innerHTML,id+' keeps the released markup after sharing its pure formatter');
+ for(const app of [old,current]){app.ctx.state.chain=[];app.ctx.state.settings.skipOldestFirstDot=false;app.ctx.renderList();}
+ assert.equal(current.shim.document.getElementById('listBody').innerHTML,old.shim.document.getElementById('listBody').innerHTML,'the shared row facts retain next-dot placement');
  const before=JSON.stringify(current.ctx.state),keys=[SYNC_STORE_KEY,LOCAL_HEAD_KEY,LOCAL_BACKUPS_KEY],stored=keys.map(key=>current.shim.localStorage.getItem(key));
  const markup=vm.runInContext(`boardPresentation.card('bench',boardPresentation.escape('<saved>'), '')+boardPresentation.taskRow({task:{id:'x',title:'<img src=x onerror=alert(1)>'},rankColumns:'rank-none'})`,current.ctx);
  assert.match(markup,/&lt;saved&gt;/);assert.doesNotMatch(markup,/<img/);
@@ -16024,17 +16036,17 @@ test('RISK saved view broken-board visibility: the complete saved board is reada
  for(const config of [
   {browserEngine:'chromium',theme:'light',scannerState:'active'}, {browserEngine:'chromium',theme:'dark',scannerState:'active'},
   {browserEngine:'webkit',theme:'light',scannerState:'active'}, {browserEngine:'webkit',theme:'dark',scannerState:'active'},
-  {retainAppearance:true,scannerState:'active'}, {longTitle:true}, {scannerState:'paused'}, {scannerState:'intervention'}]){
-  const {retainAppearance=false,longTitle=false,browserEngine='chromium',theme='light',scannerState}=config;
+  {retainAppearance:true,scannerState:'active',historyFixture:true}, {longTitle:true}, {scannerState:'paused'}, {scannerState:'intervention'}]){
+  const {retainAppearance=false,longTitle=false,browserEngine='chromium',theme='light',scannerState,historyFixture}=config;
   const label=[browserEngine,theme,retainAppearance?'saved-view':'no-appearance',longTitle?'long-title':scannerState||'no-dot'].join('-');
-  const view=await invisibleSavedViewBrowser(theme,false,false,{width:390,height:844},false,{brokenDeviceBoard:true,retainAppearance,longTitle,scannerState,browserEngine,syntheticCloud:true,holdConfiguredFirebaseImports:true,openingDelayMs:4000,topOfPage:true});
+  const view=await invisibleSavedViewBrowser(theme,false,false,{width:390,height:844},false,{brokenDeviceBoard:true,retainAppearance,longTitle,scannerState,historyFixture,browserEngine,syntheticCloud:true,holdConfiguredFirebaseImports:true,openingDelayMs:4000,topOfPage:true});
   try{
    await view.waitForFirebaseImports();
    const opening=await view.page.evaluate(()=>{
     const root=[...document.querySelectorAll('.wrap')].find(e=>getComputedStyle(e).visibility==='visible'&&e.getBoundingClientRect().width>0),list=root?.querySelector('#listBody,[data-preview-id="listBody"]');
     return{ready:document.documentElement.dataset.appReady==='true',stateIsNull:state===null,readSettled:window.__actualLocalRead.settled,
      visible:!!root,inert:root?.inert===true,rows:[...(list?.querySelectorAll('.trow')||[])].map(e=>e.querySelector('.tt')?.textContent||e.textContent),
-     count:root?.querySelector('#listCount,[data-preview-id="listCount"]')?.textContent||'',query:root?.querySelector('[data-preview-id="listSearch"]')?.value,scan:root?.querySelector('[data-preview-id="scan"]')?.textContent,cards:[...root.querySelectorAll('.card .title')].map(e=>e.textContent),sources:{legacy:localStorage.getItem('fvp:chain-scanner:v1'),localHead:localStorage.getItem('fvp:chain-scanner:protected:v1')}};
+     count:root?.querySelector('#listCount,[data-preview-id="listCount"]')?.textContent||'',query:root?.querySelector('[data-preview-id="listSearch"]')?.value,scan:root?.querySelector('[data-preview-id="scan"]')?.textContent,cards:[...root.querySelectorAll('.card .title')].map(e=>e.textContent),themeControl:root.querySelector('.themebtn')?.textContent,passCounter:root.querySelector('.plabel')?.textContent,history:root.querySelector('[data-preview-id="histPanel"]')?.textContent,sources:{legacy:localStorage.getItem('fvp:chain-scanner:v1'),localHead:localStorage.getItem('fvp:chain-scanner:protected:v1')}};
    });
    assert.equal(opening.ready,false);assert.equal(opening.stateIsNull,true,'a displayed local board does not gain authoritative application state');
    assert.equal(opening.readSettled,false,'the actual durable source is still being opened');
@@ -16046,12 +16058,14 @@ test('RISK saved view broken-board visibility: the complete saved board is reada
    assert.ok(opening.rows.some(title=>title.includes('Saved appearance task 64')),'the end of the saved board is present');
    assert.match(opening.count,/66/,'the board retains its complete saved task count');
    assert.deepEqual(opening.sources,view.before.sourceCopies,'displaying the complete board does not rewrite either retained source');
+   assert.match(opening.themeControl,theme==='dark'?/Dark/:/Light/,'the opening theme control has the actual saved label');assert.match(opening.passCounter,/\d+\/\d+/,'the saved pass counter is populated');
    if(scannerState){
     assert.ok(opening.cards.includes('Saved appearance task 01'),'the saved benchmark is visible');
     assert.equal(opening.cards.includes('Saved appearance task 02'),scannerState==='active','the saved candidate respects paused and intervention states');
     if(scannerState==='paused')assert.match(opening.scan,/Scanning paused/);
     if(scannerState==='intervention')assert.match(opening.scan,/Only 23% chance/);
    }
+   if(historyFixture)assert.match(opening.history,/Saved earlier work.*worked on it/,'the saved open History panel contains its complete saved entry');
    const capture=async file=>{if(!process.env.SAVED_VIEW_ARTIFACT_DIR)return;const previous=process.env.PW_TEST_SCREENSHOT_NO_FONTS_READY;process.env.PW_TEST_SCREENSHOT_NO_FONTS_READY='1';try{await view.page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,file)});}finally{if(previous===undefined)delete process.env.PW_TEST_SCREENSHOT_NO_FONTS_READY;else process.env.PW_TEST_SCREENSHOT_NO_FONTS_READY=previous;}};
    const surface=[];
    for(const enlarged of [false,true]){
@@ -16079,9 +16093,29 @@ test('RISK saved view broken-board visibility: the complete saved board is reada
  }
 });
 
+test('RISK saved view full-board filters: opening preserves saved membership controls and cheap task facts',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ for(const savedFilter of ['ineligible','context','long-query'])await t.test(savedFilter,async()=>{
+  const view=await invisibleSavedViewBrowser('light',false,false,{width:390,height:844},false,{brokenDeviceBoard:true,retainAppearance:true,scannerState:'active',longTitle:savedFilter==='long-query',savedFilter,syntheticCloud:true,holdConfiguredFirebaseImports:true,topOfPage:true});
+  try{
+   await view.waitForFirebaseImports();assert.equal(view.startup.sourceCheck.board,true,'the populated saved fixture passes independent complete-source validation');
+   const opening=await view.page.evaluate(()=>{const root=document.querySelector('[data-saved-preview]'),body=root.querySelector('[data-preview-id="listBody"]');return{stateNull:state===null,accepted:liveBoardAccepted,ready:document.documentElement.dataset.appReady==='true',settled:window.__actualLocalRead.settled,query:root.querySelector('[data-preview-id="listSearch"]').value,rows:[...body.querySelectorAll('.trow')].map(row=>({title:row.querySelector('.tt').textContent,dim:row.style.opacity,blockers:row.querySelector('.dependency-blockers')?.textContent,skip:row.querySelector('.skipped')?.textContent})),eligibility:root.querySelector('[data-preview-id="listEligibilityRow"] .on')?.textContent,tags:[...root.querySelectorAll('[data-preview-id="listTagRow"] .on')].map(e=>e.textContent),sources:{legacy:localStorage.getItem('fvp:chain-scanner:v1'),localHead:localStorage.getItem('fvp:chain-scanner:protected:v1')}};});
+   assert.equal(opening.stateNull,true);assert.equal(opening.accepted,false);assert.equal(opening.ready,false);assert.equal(opening.settled,false);assert.deepEqual(opening.sources,view.before.sourceCopies);
+   assert.equal(opening.rows.length,savedFilter==='ineligible'?2:savedFilter==='context'?60:1,'all and only the complete matching tasks remain visible');
+   assert.equal(opening.eligibility,savedFilter==='ineligible'?'Ineligible':'All');
+   assert.equal(opening.query,savedFilter==='long-query'?'Saved long task text '.repeat(100).slice(0,2048):'Saved appearance','valid saved query text including more than1024characters stays exact');
+   if(savedFilter==='context'){
+    assert.ok(opening.tags.length>0,'the saved context filter remains selected');assert.ok(opening.rows.some(row=>row.blockers?.includes('Saved appearance task 06')&&row.dim==='0.45'),'a blocked saved task retains its dependency title and eligibility dimming');
+    assert.ok(opening.rows.some(row=>row.skip?.includes('can’t')),'a saved Can’t mark retains its visible hold label');assert.ok(opening.rows.some(row=>row.skip==='no'),'a saved No mark retains its visible label');
+   }
+   view.releaseHeldFirebaseImports();await view.page.waitForFunction(()=>document.documentElement.dataset.appReady==='true');
+   assert.deepEqual(await view.page.evaluate(()=>[...document.querySelectorAll('#listBody .tt')].map(row=>row.textContent).sort()),opening.rows.map(row=>row.title).sort(),'accepted hydration keeps the same saved membership while computed ranking may reorder it');assert.deepEqual(view.errors,[]);
+  }finally{view.releaseHeldFirebaseImports();await view.browser.close();}
+ });
+});
+
 test('RISK saved view full-board safety: supported copies and identity masks never grant authority',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
  for(const sourceFault of ['malformed-protected','unsupported-protected','divergent','no-valid','early-account','early-identity','late-account','late-identity','late-storage'])await t.test(sourceFault,async()=>{
-  const view=await invisibleSavedViewBrowser('light',false,false,{width:390,height:844},false,{brokenDeviceBoard:true,retainAppearance:false,syntheticCloud:true,holdConfiguredFirebaseImports:true,sourceFault,topOfPage:true});
+  const view=await invisibleSavedViewBrowser('light',false,false,{width:390,height:844},false,{brokenDeviceBoard:true,retainAppearance:sourceFault.startsWith('early-'),syntheticCloud:true,holdConfiguredFirebaseImports:true,sourceFault,topOfPage:true});
   try{
    await view.waitForFirebaseImports();
    const opening=await view.page.evaluate(()=>({stateNull:state===null,accepted:liveBoardAccepted,ready:document.documentElement.dataset.appReady==='true',settled:window.__actualLocalRead.settled,
@@ -16336,7 +16370,7 @@ test('RISK saved view invisible active scanner: a running scan retains scanner a
   try{
    if(process.env.SAVED_VIEW_ARTIFACT_DIR){
     const dir=process.env.SAVED_VIEW_ARTIFACT_DIR;
-    fs.copyFileSync(path.join(dir,'invisible-before-light.png'),path.join(dir,`active-${viewport.width}-before.png`));
+    fs.copyFileSync(path.join(dir,'invisible-light-before.png'),path.join(dir,`active-${viewport.width}-before.png`));
     await view.page.screenshot({path:path.join(dir,`active-${viewport.width}-pending.png`)});
     fs.writeFileSync(path.join(dir,`active-${viewport.width}-geometry.json`),JSON.stringify({before:view.before.geometry,pending:view.early.geometry,storagePending:!view.early.settled,listScroll:view.early.listScroll,pageScroll:view.early.pageY},null,2)+'\n');
    }

@@ -265,3 +265,51 @@ cloud confirmation and genuine post-hydration warnings retain their existing
 owners. This is not faster hydration, physical-iPhone recovery, or crash proof.
 Final exact-candidate qualification, independent affected reviews, CI, Stable
 deployment and live verification remain separate gates; Beta remains paused.
+
+
+## Bounded independent-review repair
+
+Independent Standards and specialist review of `92cb4e5` found the same saved
+filter gap plus missing cheap row facts and uninitialized theme/pass chrome.
+They also found that an already known account/UID mismatch could leave an old
+optional cached appearance visible when the new full display returned early.
+The artifact-only active-scanner consumer requested the old reversed filename.
+The exact `92cb4e5` cohort `2ab635bb-5773-4a78-bb90-a41a422b5c3b` passed
+33/34 checks, including the full status matrix; its sole failure was that
+missing screenshot filename. It is not a completed qualification.
+
+A retained external actual-consumer RED, `34d8cbac-68cf-410e-9cb4-722c61a6b955`,
+observed 66 opening rows despite a saved Ineligible query containing only two
+chain tasks. It ran against clean `92cb4e5` before repair. The retained program
+is `full-board-visibility/filter-red-probe.mjs`, SHA256
+`396242732a093f25e88240ed04c368b8a56759d7a3f6174e76377566151affb4`.
+The permanent missing-chrome and retained-cache privacy controls failed in
+preimplementation record `6f57b656-6a21-4161-a994-9be78fc4963c`: the theme
+label was empty and both early foreign-account/identity cases left a preview.
+
+The repaired shared pure list read model accepts an explicit board and view.
+It preserves query membership (including a valid 2048-character saved query),
+eligibility, context/status tags, selected filter controls, blocked-task titles,
+eligibility dimming, skip/hold labels and next-dot markup. Live owner/selection
+closures and presentation saving remain with allTasksView. Rank/chance sorting
+and sparkline calculations remain deferred until accepted hydration. Membership
+is compared as a set across handoff because computed live ranking can reorder
+that same set; the first filter fixture comparison incorrectly demanded the
+pre-ranking order and is retained as setup evidence (`762bb97a`). Another setup
+attempt expected a query after calling the existing clear-on-eligibility action
+(`be708083`); the fixture now explicitly saves the intended combined query.
+
+Known mismatch removes any old appearance; early same-email UID fixtures also
+bind the cached account to the saved owner so the UID assertion is meaningful.
+Chain membership uses Sets. Explicit read-only chrome facts fill the theme label
+and pass counter; no theme-storage write or pass update occurs. Actual saved
+History appears in the full opening fixture as well. The existing scanner
+artifact copy uses its producer's actual filename and keeps all geometry checks.
+The new consumer roots retain the original source/authority safeguards.
+
+The strengthened same-email UID cache fixture also fails against immutable
+`92cb4e5` in later-baseline-sensitivity `7d4cdd9f-d3a3-4f8e-b006-e4bc2e8d49f6`.
+Its exact served app bytes are recorded separately in
+`full-board-visibility/baseline-92cb-uid-source-binding.json`; the recorder
+identifies the newer producing test source. This later sensitivity is not
+claimed as the original preimplementation RED.
