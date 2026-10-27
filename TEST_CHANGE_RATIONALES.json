@@ -21495,5 +21495,24 @@
     "command": "Node22 scripts/agent-tools/record-run.mjs --summary -- private actionlint1.7.12 -shellcheck= -pyflakes= -no-color -oneline .github/workflows/data-safety.yml; then Node22 --test --test-reporter=tap --test-name-pattern=\"^RISK repository process: workflow browser paths resolve only in supported runner contexts$\" tests.js, all preserved under resume-20261027/workflow-context-repair/runs/",
     "failure": "Actual hosted clean-c9 workflow validation annotated (Line275,Col33) Unrecognized named-value runner in runner.temp, with0 jobs/checks/logs, before repair. Independent private actionlint REDf753f5b6 started20:26:33.627Z and finished20:26:33.810Z on pristine c9, exit1, same forbidden runner context; external shellcheck/pyflakes integration disabled to bound validation. Authored actual-workflow public-consumer REDbe5ec4d9 started20:28:26.745Z and finished20:28:27.108Z before workflow edits, assertion Browser environment cannot evaluate unavailable runner context at this workflow scope, wrapper0pass/1fail. Minimal scope move followed. First GREENd0ed2f2c runs all3 wrappers, while actionlint GREEN108a58ab at20:28:55.114Z\u201320:28:55.155Z validates repaired workflow with no findings. Complete commands, source fingerprints and raw outputs retained; local validation does not establish hosted execution or intended hosted control success."
   }
-}
+},
+  {
+    "baseCommit": "e1ed5c269a0c64b0023483d3fe7dd7c6d2bfb3ed",
+    "testChangesSha256": "b7a1f60b38b1b5d3f8ed87d1552a5133ee3f2b4423d775f8f5c163e6facf7b52",
+    "reason": "Reject an invalid workflow in the exact commit being pushed, so a valid but unrelated current checkout cannot hide outgoing workflow defects before hosted validation.",
+    "previousBehavior": "The managed hook invoked the prior hook and validated exact-SHA receipts, but did not inspect outgoing workflow blobs. A receipt-bearing invalid outgoing commit passed when current HEAD was valid; the observed public hook returned status 0 instead of blocking it.",
+    "intendedBehavior": "The managed hook resolves every distinct non-deletion outgoing commit, reads its tracked root workflow YAML bytes from that commit tree, and calls the shared pinned actionlint validator. It blocks invalid workflows with exact commit/path diagnostics while retaining receipt enforcement, deletion handling, prior-hook input and exit propagation.",
+    "replacementTests": [
+      "RISK repository process: managed pre-push validates the exact outgoing workflow commit"
+    ],
+    "preservedCoverage": [
+      "The existing outgoing-tip receipt and clean-worktree regression remains registered and passing. The new disposable-repository control proves an invalid receipted outgoing SHA is rejected while a different valid HEAD is present, then admits the valid outgoing SHA and ignores a deletion update.",
+      "The managed dispatcher still preserves the prior hook byte-for-byte, passes it the exact original input, invokes it once per attempt, and propagates its exit 23. Removing the valid candidate exact-SHA receipt remains a separate nonzero refusal, and the fixture never contacts a remote.",
+      "Workflow diagnostics identify the exact outgoing commit and .github/workflows/data-safety.yml finding from actionlint v1.7.12; setup resolves the official pinned darwin-arm64 archive and executable hashes locally. This synthetic Git process test is not hosted CI or release qualification."
+    ],
+    "redEvidence": {
+      "command": "Node22 --test --test-reporter=tap --test-name-pattern='^RISK repository process: managed pre-push validates the exact outgoing workflow commit tests.js",
+      "failure": "On baseline ad49bd3070b81e51400788ea0a08710f3d89ac52, the actual managed hook in a disposable Git repository admitted the invalid receipted outgoing workflow while valid HEAD differed; the behavioral assertion expected a nonzero hook status and observed 0. The outer Node test exited 1. Raw TAP: /Users/emeraldpham/.codex/task-artifacts/retro-504-20261027/validator/red-519-outgoing-workflow.tap (sha256 26983ede24e0753bbc6592d52f6060c9b4754fe6b6ba029752ff9b5c375760e6); pre-fix test source sha256 fd7e07efaa31e0c25b7b0a6fd9ab05bf632b54994b86499170d4d944c95f780c. The final version adds post-GREEN commit/path/actionlint diagnostic assertions while retaining the same failing status assertion."
+    }
+  }
 ]

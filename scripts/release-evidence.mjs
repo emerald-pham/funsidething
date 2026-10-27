@@ -1,9 +1,11 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import {assertDiagnosticPublicationAllowed} from './agent-tools/checkpoint-progress.mjs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { validateWorkflows } from './agent-tools/workflow-validator.mjs';
 
 export const RELEASE_STATUS_CONTEXTS = Object.freeze([
   'funsidething/memory-audit',
@@ -14,6 +16,7 @@ export const RISK_BASED_RELEASE_STATUS_CONTEXTS = Object.freeze([...RELEASE_STAT
 
 const SHA1 = /^[0-9a-f]{40}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
+const MAX_PRE_PUSH_DIAGNOSTIC_CHARS = 12_000;
 const receiptRootName = 'funsidething-release-evidence';
 const specialistDomainNames = new Set([
   'data-migration',
@@ -946,6 +949,103 @@ export function validatePrePushUpdates(repoRoot, updates, {diagnosticVerifier} =
   return errors;
 }
 
+function outgoingWorkflowEntries(repoRoot, commitSha) {
+  const tree = spawnSync('git', ['-C', repoRoot, 'ls-tree', '-r', '-z', commitSha, '--', '.github/workflows'], {
+    encoding: 'buffer',
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  if (tree.error || tree.signal || tree.status !== 0) {
+    throw new Error(`Could not read workflow tree for outgoing commit ${commitSha}: ${tree.error?.message || tree.stderr?.toString().trim() || tree.signal || `git exited ${tree.status}`}.`);
+  }
+
+  const prefix = '.github/workflows/';
+  const entries = [];
+  for (const record of tree.stdout.toString('binary').split('\0')) {
+    if (!record) continue;
+    const separator = record.indexOf('\t');
+    if (separator < 0) throw new Error(`Could not parse workflow tree for outgoing commit ${commitSha}.`);
+    const [mode, type, blobSha] = record.slice(0, separator).split(' ');
+    const pathBytes = Buffer.from(record.slice(separator + 1), 'binary');
+    const workflowPath = pathBytes.toString('utf8');
+    if (!Buffer.from(workflowPath, 'utf8').equals(pathBytes)) {
+      throw new Error(`Workflow path in outgoing commit ${commitSha} is not valid UTF-8.`);
+    }
+    if (!workflowPath.startsWith(prefix)) continue;
+    const name = workflowPath.slice(prefix.length);
+    if (name.includes('/')) continue;
+    if (!/\.ya?ml$/i.test(name)) continue;
+    if (type !== 'blob' || !['100644', '100755'].includes(mode) || !SHA1.test(blobSha || '')) {
+      throw new Error(`Outgoing workflow ${workflowPath} in ${commitSha} is not a regular Git blob.`);
+    }
+    entries.push({ path: workflowPath, name, blobSha });
+  }
+  return entries.sort((left, right) => left.path.localeCompare(right.path));
+}
+
+function readGitBlob(repoRoot, blobSha, workflowPath, commitSha) {
+  const result = spawnSync('git', ['-C', repoRoot, 'cat-file', 'blob', blobSha], {
+    encoding: 'buffer',
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  if (result.error || result.signal || result.status !== 0) {
+    throw new Error(`Could not read outgoing workflow ${workflowPath} from ${commitSha}: ${result.error?.message || result.stderr?.toString().trim() || result.signal || `git exited ${result.status}`}.`);
+  }
+  return result.stdout;
+}
+
+function boundedPrePushDiagnostics(errors) {
+  const diagnostic = errors.join('\n');
+  if (diagnostic.length <= MAX_PRE_PUSH_DIAGNOSTIC_CHARS) return diagnostic;
+  return `${diagnostic.slice(0, MAX_PRE_PUSH_DIAGNOSTIC_CHARS)}\n[pre-push validation output truncated]`;
+}
+
+export async function validateOutgoingWorkflowCommits(repoRoot, updates) {
+  const commits = new Set();
+  for (const update of updates) {
+    if (!update || update.localSha === '0'.repeat(40) || !SHA1.test(update.localSha || '')) continue;
+    try {
+      commits.add(git(repoRoot, ['rev-parse', `${update.localSha}^{commit}`]));
+    } catch {
+      // The release-evidence gate reports unresolved/non-commit refs below.
+    }
+  }
+
+  const errors = [];
+  for (const commitSha of commits) {
+    let entries;
+    try {
+      entries = outgoingWorkflowEntries(repoRoot, commitSha);
+    } catch (error) {
+      errors.push(`Release push blocked: ${error.message}`);
+      continue;
+    }
+    if (entries.length === 0) continue;
+
+    const sourceDir = fs.mkdtempSync(path.join(os.tmpdir(), 'funsidething-outgoing-workflows-'));
+    try {
+      for (const entry of entries) {
+        fs.writeFileSync(path.join(sourceDir, entry.name), readGitBlob(repoRoot, entry.blobSha, entry.path, commitSha), { flag: 'wx', mode: 0o600 });
+      }
+      const report = await validateWorkflows({
+        repositoryRoot: repoRoot,
+        sourceDir,
+        sourceLabel: `outgoing commit ${commitSha}`,
+      });
+      if (!report.ok) {
+        let diagnostic = report.error || report.diagnostics || 'actionlint rejected the outgoing workflow set without a diagnostic.';
+        for (const entry of entries) diagnostic = diagnostic.replaceAll(path.join(sourceDir, entry.name), entry.path);
+        const identity = report.validator?.version ? `actionlint v${report.validator.version}` : 'pinned actionlint setup';
+        errors.push(`Release push blocked: outgoing workflow commit ${commitSha} failed ${identity} validation (${entries.map(entry => entry.path).join(', ')}). ${diagnostic}`);
+      }
+    } catch (error) {
+      errors.push(`Release push blocked: could not validate outgoing workflow commit ${commitSha}: ${error.message}`);
+    } finally {
+      fs.rmSync(sourceDir, { recursive: true, force: true });
+    }
+  }
+  return errors;
+}
+
 export function validatePolicyProseStatuses(repoRoot, sourceSha, baseSha, statuses) {
   const plan = deriveReleaseReviewPlan(repoRoot, sourceSha, baseSha);
   if (!plan.policyProse) throw new Error('Current source is not instruction-preserving policy prose.');
@@ -1147,8 +1247,10 @@ async function main() {
     const hasDiagnosticSource=updates.some(update=>SHA1.test(update.localSha)&&spawnSync('git',['-C',repoRoot,'cat-file','-e',update.localSha+':.diagnostic-task.json']).status===0);
     const diagnosticVerifier=hasDiagnosticSource?(await import('./agent-tools/diagnostic-receipt.mjs')).verifyDiagnosticOutgoing:undefined;
     const admitted=new Set();if(diagnosticVerifier)for(const update of updates)if(await diagnosticVerifier(repoRoot,update.localSha,update))admitted.add(update);
-    const errors = validatePrePushUpdates(repoRoot, updates, {diagnosticVerifier:diagnosticVerifier?(_repo,_commit,update)=>admitted.has(update):undefined});
-    if (errors.length) throw new Error(errors.join('\n'));
+    const workflowErrors = await validateOutgoingWorkflowCommits(repoRoot, updates);
+    const receiptErrors = validatePrePushUpdates(repoRoot, updates, {diagnosticVerifier:diagnosticVerifier?(_repo,_commit,update)=>admitted.has(update):undefined});
+    const errors = [...workflowErrors, ...receiptErrors];
+    if (errors.length) throw new Error(boundedPrePushDiagnostics(errors));
     process.stdout.write('Every outgoing commit tip has valid exact-SHA release evidence.\n');
     return;
   }

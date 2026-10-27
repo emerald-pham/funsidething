@@ -447,6 +447,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK repository process: memory receipts require absolute source paths
 - RISK repository process: release evidence rejects future and noncanonical audit timestamps
 - RISK repository process: pre-push checks every outgoing tip and rejects dirty worktrees
+- RISK repository process: managed pre-push validates the exact outgoing workflow commit
 - RISK repository process: status publication needs a valid exact-SHA receipt
 - RISK repository process: main deployment requires the merged reviewed head, full tree parity, and latest statuses
 - RISK repository process: CI makes verified release evidence a deployment prerequisite
@@ -456,6 +457,8 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK test-first gate: release evidence scripts receive edit-time process protection
 
 The release gate derives a review plan from the exact candidate diff: the owner reviews every diff, ordinary behavior changes require one independent code reviewer, and high-risk domains require a specialist. It requires both independent roles only when code behavior and specialist risk are materially affected. Ambiguous auth, state-persistence, and session changes fail closed to relevant specialists; callers may add known specialist domains to raise the plan but cannot replace or remove derived domains. Memory/cloud/sync specialist evidence records source fingerprints, per-domain impact, and rationale. Every affected domain lists focused tests; an all-unaffected assessment still includes at least one focused preservation test across the assessed domains. Schema version 1 receipts remain verifiable under their former two-review rule, and their publisher also emits a third specialist-compatibility status bound to the same receipt so current branch protection can accept them without inventing a new reviewer. The local hook checks each outgoing tip; the main deployment job independently verifies the merged PR head, derived status plan, and latest statuses. Statuses bind receipts but cannot prove that a person actually read or reviewed them.
+
+The managed pre-push process test invokes the real dispatcher in a disposable Git repository, with a valid current `HEAD` and a different outgoing commit containing a job-level `runner.temp` expression. It checks exact workflow-blob validation, multiple refs and deletions, valid workflow admission, prior-hook stdin/exit propagation, and the independent exact-SHA receipt refusal without contacting a remote.
 
 Companion coverage protects the existing local-backup behavior: LOCAL BACKUPS: seven local calendar days, latest save today, and pre-restore safety copy; LOCAL BACKUPS: a manual backup remains restorable after the seven-day window; LOCAL BACKUPS: a failed safety copy blocks restore and leaves the current board untouched; HARD GATE: full backup store blocks browser overwrite and preserves its prior bytes; and HARD GATE: unreadable backup index is preserved instead of overwritten by a save.
 
