@@ -1085,13 +1085,14 @@ test('RISK unreadable device recovery: Quick start and current Changelog explain
  assert.match(answer,/not an empty recovered board/);assert.match(answer,/Cloud recovery stays pending/);
  assert.match(answer,/When cloud sync is configured, the header shows disabled syncing while the board is still opening; this does not confirm cloud saving\./);
  assert.match(answer,/After the board opens, genuine recovery warnings and cloud errors remain visible\./);
- assert.match(answer,/recovery hold remains until a validated source choice confirms cloud saving/);
+ assert.match(answer,/Cloud recovery stays pending until a validated source choice confirms cloud saving/);
  assert.match(html,/one guarded Restore action for a file or pasted JSON/,'the current changelog describes the consolidated restore route');
  assert.match(html,/unreadable device data offers a source-only archive/,'the current changelog preserves the raw-source recovery limit');
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1]||'';
- assert.match(current,/A recovered board now opens before the header shows recovery pending/);
- assert.match(current,/Real cloud errors stay visible/);
- assert.match(current,/saved-source hold remains until a validated source choice confirms cloud saving/);
+ const latest=current.match(/<li>(.*?)<\/li>/)?.[1]||'';
+ assert.match(latest,/saved board needs recovery.*preserved local copies/);
+ assert.match(latest,/syncing label.*board is still opening.*not that cloud saving is confirmed/);
+ assert.match(latest,/genuine errors and recovery warnings remain visible/);
 });
 
 test('RISK unreadable device recovery: partial raw rows remain exact while the restored board accepts later local edits',async t=>{

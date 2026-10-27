@@ -167,3 +167,19 @@ account, or phone storage is used.
 Full-suite and compatibility checks, independent Standards/Spec and
 FAQ/typography reviews, exact-candidate release qualification, CI, and Stable
 live verification remain release gates. Beta mirroring remains paused.
+
+## Existing FAQ regression repair
+
+The first reviewed candidate `5b9a097` and the repaired candidate `d717e140`
+both retained stale sentences in the existing unreadable-device FAQ test.
+The clean `d717e140` reviewer run
+`2026-10-27T00-22-13-456Z-56b2e6ce-da12-4e40-ae14-84ab7377f951.json`
+is preserved under task evidence `reviews/standards-d717-existing-faq/`.
+The test-only repair checks the latest note for preserved-local-copy opening,
+unconfirmed cloud saving, and genuine errors/warnings, and keeps the FAQ's
+validated-source requirement and all unrelated restore/archive safeguards.
+This repair does not change application or service-worker bytes and does not
+create a new product RED claim. The focused repair run
+`2026-10-27T00-27-03-732Z-63eea31f-5771-4db4-9b76-728f05e95854.json`
+passes the existing FAQ, new guidance, hydration, and inventory roots on the
+recorded dirty test delta; final committed qualification remains separate.
