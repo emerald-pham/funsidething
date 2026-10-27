@@ -263,3 +263,7 @@ deletion. Deployment verification fetches the associated merged PR's retained
 `refs/pull/<number>/head` when that exact object is absent, then requires its SHA
 to match GitHub's reviewed head before deriving policy. A missing, invalid, or
 moved ref fails closed; fetching does not replace the deployed checkout.
+
+## Nonqualifying diagnostic receipt
+
+The existing release evidence command has a narrow `diagnostic-*` family; see [checkpoint authorization](docs/agents/checkpoints.md#ci-and-publication-boundaries) for its exact input and trust boundaries. It reuses valid unchanged product/FAQ/rendered reviews from the frozen source, retains failed CI, and requires exact independent instrumentation/security/memory/release-process reviews. Ordinary `record`, `verify`, `publish`, main pre-push and deployment verification reject diagnostic-only identity even when the caller omits a task flag. A diagnostic receipt cannot authorize a repair release. The separately reviewed governance anchor, default-branch workflow registration and actual hosted/native evidence remain prerequisites; local fixture passes do not satisfy them.

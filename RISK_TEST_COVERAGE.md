@@ -2284,3 +2284,11 @@ The canonical profile admits only the original mobile story and the named confir
 - RISK repository process: early-assigned consumers execute once through durable group accounting
 
 Existing catalog assignments mark the five confirmed roots as early execution while retaining their native-process ownership. Real workflow commands consume verified durable early cases before any group child, omit only those already executed roots from the later Node process, and aggregate raw early/ordinary outcomes exactly once. Missing or changed receipts and transfer references fail; the accepted skip inventory is unchanged.
+
+## Nonqualifying source-bound diagnostic authority
+
+- `RISK repository process: known frozen diagnostic source derives narrow eligibility from exact content`
+- `RISK repository process: diagnostic source cannot acquire product receipts through ordinary record`
+- `RISK repository process: distributed diagnostic admission binds actual terminal failure without product qualification`
+
+The existing checkpoint process contract now includes an API-consistent owner approval append and rejection of an unrelated concurrent scope change. Narrow diagnostic tests use disposable repositories and a bounded fake external GitHub CLI; they prove local command/ref/process behavior, not hosted execution, native attribution, product qualification or physical-device repair.

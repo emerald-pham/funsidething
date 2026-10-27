@@ -492,9 +492,9 @@ function summarizeEvidenceError(error, redaction, location) {
   return sanitizeText(message, redaction, location).slice(0, 240);
 }
 
-async function execute(command, args, cwd) {
+export async function execute(command, args, cwd, options = {}) {
   return new Promise((resolveResult) => {
-    const child = spawn(command, args, { cwd, stdio: ['inherit', 'pipe', 'pipe'], detached: process.platform !== 'win32' });
+    const child = spawn(command, args, { cwd, env: options.env ?? process.env, stdio: ['inherit', 'pipe', 'pipe'], detached: process.platform !== 'win32' });
     const stdout = [];
     const stderr = [];
     let launchError;

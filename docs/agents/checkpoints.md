@@ -107,9 +107,10 @@ terminal results fail closed for owner investigation.
 path/SHA-256. The evidence file must contain exactly a repository-owner GitHub
 comment body authorizing `task`, `repository`, `priorDigest`, `sourceCommit`,
 `additionalAttempts` and `reason` as JSON. The command fetches that comment and
-checks its URL, owner identity, association and exact authorized values. Use a
-separate existing approval issue so the authorization does not silently change
-the bound task/parent authority. Retain both local artifacts; later mutation,
+checks its URL, owner identity, association and exact authorized values. An approval in the bound task or parent is accepted only as one exact appended
+verified owner comment; every earlier comment and all other scope fields must
+remain unchanged. The journal preserves the prior full source and the authorized
+append. A separate existing approval issue also remains supported. Retain both local artifacts; later mutation,
 deletion, revocation or replay blocks admission. A caller-authored approval file
 without the source comment grants nothing.
 
@@ -117,7 +118,10 @@ without the source comment grants nothing.
 
 `admit --input <exact-launch.json> --record <future-result-path>` reserves a CI
 launch through the same admission API. `export --attempt <id> --record <bundle>`
-signs its unfinished authorization. `verify-ci --input <bundle> --commit <sha>`
+signs its unfinished private authorization. For publication use `export-public`
+with the same options: it signs only current authority fingerprints, finite
+attempt/source identity and verified extension comment references. It excludes
+private issue snapshots, local result paths and signing material. `verify-ci --input <bundle> --commit <sha>`
 independently verifies that bundle in a separate clone against the committed
 manifest key, exact task/source/tree/input identities, current issue authority
 and first GitHub run attempt. Runtime adapters call
@@ -127,13 +131,54 @@ browser/container. The release adapter calls
 it rejects diagnostic-only source even when the caller omits diagnostic flags,
 and rejects lost manifests on known diagnostic ancestry/workflows.
 
-The verifier API and process controls are exercised locally. The separately owned,
-unlanded WebKit runtime/workflow still needs its preserved integration patch and
-hosted execution; this is an explicit remaining acceptance gap. CI transport must
-supply the exact signed bundle and keep dispatch/run identity separate from the
-actual diagnostic result. A successful dispatch is not a passed required gate.
-The verifier alone does not provide a distributed single-use service across
-independently dispatched hosted runs.
+The nonqualifying path in `scripts/release-evidence.mjs` consumes that public
+admission through the following existing-command extensions:
+
+- `diagnostic-plan <source> <frozen>` derives exact eligibility. The registered
+  `webkit-stall-thread-v1` template fixes reviewed product `b176026825e4f9539780f745fe60e09cf348d288`
+  and canonical observer `c899e5e983cd756152c1d0c8057ffe8455e80956`.
+  The complete app, dependencies, original authorization, caps, deadlines, input
+  and readiness contracts remain byte-identical. Unknown templates or deltas
+  require ordinary review/qualification.
+- `diagnostic-record <input.json>` binds exact source/base/tree, finite attempt,
+  frozen product/FAQ receipt, unchanged rendered artifacts, independent code
+  review and memory/security/release-process review. Valid frozen reviews can
+  belong to a candidate with failed CI; that failure remains unpaid. The input
+  names one exact outgoing `diagnose/` ref and prior remote SHA. The installed
+  pre-push hook permits only that update. All other updates keep their ordinary
+  release requirements, and main/tag promotion is refused.
+- `diagnostic-launch <source>` independently rechecks evidence and fresh full
+  issue authority before remote side effects. A create-only canonical
+  `refs/tags/chain-diagnostics/task-<issue>/attempt-<ordinal>/reservation` ref
+  reserves the existing source before any bundle blob/tree/commit is written.
+  The immutable `permit` ref contains selected review artifacts and a signed
+  public admission. A matching duplicate only observes; a pending reservation
+  after a crash remains unresolved and never auto-redispatches or renews budget.
+- `diagnostic-ci-run <permit-ref> <permit-object> <source> <run-id> 1 <output-dir>`
+  independently verifies the bundle, exact checkout and fresh GitHub workflow
+  run. A create-only `claim-reservation` and immutable `claim` bind one actual
+  run attempt before the capped runtime starts. A duplicate does not start a
+  second child. The generated consumer imports a separate reviewed diagnostic
+  policy adapter: ordinary push/PR policy delegates to the original canonical
+  policy, while the new governed entrypoint accepts actual `workflow_dispatch`
+  only after permit/claim verification. This is a new nonqualifying event policy.
+- Collect the same run with the existing `agent:ci-monitor` command. Then
+  `diagnostic-consume <source> <input.json>` takes `monitorSummaryPath` and
+  `monitorSummarySha256`. It binds saved raw logs, fresh exact run/jobs,
+  immutable permit/claim, remote artifact ZIP digest, terminal source/tree/run
+  and output/report hashes before attaching and consuming the journal result.
+  Missing, stale, ambiguous or tampered evidence stays unresolved. The current
+  thread observer cannot establish native attribution: its required gate stays
+  failed even if the child exits zero. No diagnostic result grants product status.
+
+Hosted prerequisites remain explicit: the normally reviewed enforcement bytes
+need an immutable governance anchor independent of candidate-supplied code, and
+GitHub must register the diagnostic dispatch workflow on the default branch (or
+an existing separately validated transport must be selected). Installed local
+byte equality alone cannot independently authenticate candidate-hosted bootstrap
+code. The isolated integration test applies the concrete guarded consumer patch
+without absorbing or editing the separately owned product branch. No local test
+establishes that these hosted prerequisites have happened.
 
 Local locks/hooks and signed bundles enforce supported paths, not arbitrary
 writer/admin actions. A writer can replace Git metadata, keys, manifests or code;
