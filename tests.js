@@ -45211,3 +45211,11 @@ test('RISK independent cloud boot authority: source-only preflight waits for bou
  assert.equal(JSON.stringify(ctx.state),local);assert.equal(shim.document.getElementById('addInput').value,'Draft after unavailable boot');assert.equal(ctx.state.syncDirty,true);
  assert.equal(JSON.parse(remote.payload).tasks.some(row=>row.title==='Accepted after bounded unavailable boot'),false,'server-only repair never uploads unobserved accepted local work');
 });
+
+test('RISK repository process: diagnostic checkpoints retain finite authority across fresh process and CI boundaries',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap',path.join(__dirname,'scripts/agent-tools/checkpoint-progress.test.mjs')],{encoding:'utf8',timeout:30000,env});
+ assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
+ assert.match(result.stdout,/^# tests 13$/m,'the actual thirteen process contracts must execute, rather than an empty child pass');
+ assert.match(result.stdout,/^# pass 13$/m);assert.match(result.stdout,/^# skipped 0$/m);
+});

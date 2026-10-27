@@ -20153,5 +20153,22 @@
       "command": "Immutable recorder attempts in .git/agent-test-runs/issue-283/runs use node --test --test-name-pattern for each RISK JSON COPY PASTE or RISK DATABASE REPAIR EXPORT vertical consumer slice; exact commands, times, source identities and stdout/stderr are retained.",
       "failure": "Before each corresponding implementation: current-board control899563d6; board FAQdfa883d8; combined Settings control2210b578; unavailable/failed IDB and local sourcee2b8c485 (all3 false vs true); duplicate-control10ec7d35; expired diagnostic-original98fd9ee7 (null vs original); cancelled-view73507e40 (true vs false); repair FAQ0a2bee63. Worker attempt4711f3fb had an incomplete service-worker fixture and is not feature RED. Provisional worker capture was tried then withdrawn; corrected later-baseline-sensitivityf11abde0 observed null vs worker identity before final bounded read-only capture. This is not claimed as original RED; combined export original RED remains2210b578. GREENdd5b5fa1 passed combined consumers afterward. Earlier archive-only draft results are development evidence and its code/tests were discarded. Extended round-tripff4051ad and database fixture3611ae89 failures were fixture corrections, not product failures; corrected8c0614c0 and2e9aa016 passed without importer/runtime repairs. Independent Standards review found adjacent reload help still advertised removed Copy debug log. New mounted FAQ REDd5060f2e preceded the copy repair; GREEN60f7bb18 passed the new check and unchanged FAQ brevity gate. The old reload facts, retention limits, privacy, save-priority and no-crash-inference boundaries remain."
     }
+  },
+  {
+    "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
+    "testChangesSha256": "35cdd33030272a4d9cbdc3ae2108f22f5996424fdd711435a086500d7ec600a7",
+    "reason": "Enforce durable diagnostic authority through the existing checkpoint and recorder public processes across fresh contexts and CI clones.",
+    "previousBehavior": "A diagnostic recorder could spawn children without source-bound durable authorization; caller-marked checkpoint completion could ignore an unresolved diagnostic gate.",
+    "intendedBehavior": "Supported diagnostic launches consume a finite atomic attempt before spawning and retain failures; required incomplete gates and diagnostic-only source block release receipts.",
+    "replacementTests": [
+      "RISK repository process: diagnostic checkpoints retain finite authority across fresh process and CI boundaries"
+    ],
+    "preservedCoverage": [
+      "All existing product, persistence, cloud, installed-client, checkpoint and test-provenance assertions remain intact; the new process cohort uses isolated repositories and no hosted/device claim."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern=\"diagnostic recorder refuses missing\" scripts/agent-tools/checkpoint-progress.test.mjs",
+      "failure": "Contemporaneous /Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/286/red-missing-state.txt: no diagnostic child may start without durable authorization, true !== false. Early raw logs preserve chronology but lack per-stage dirty-source snapshots. Fully fingerprinted subsequent RED/GREEN: approval-authority-red/2026-10-27T03-25-20-748Z-a9de3a35-75c6-42c6-8a3e-665809804f09.json observed caller-authored approval accepted (0); approval-authority-green/2026-10-27T03-25-52-793Z-60cb8c21-1b93-4b8d-960c-34943ce080e8.json passes. Unknown-option red-admission.txt is infrastructure and confers no RED credit."
+    }
   }
 ]

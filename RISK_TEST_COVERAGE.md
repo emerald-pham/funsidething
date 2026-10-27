@@ -2242,3 +2242,9 @@ Protect actual automatic recovery, manual source review, exact protected copies 
 - RISK support diagnostics: event retention and malformed observer input stay bounded and redacted
 
 The real Sync → Review action and Copy debug log consumer distinguish failed pending-upload, recovery-hold and head reads, fixed exception categories and temporary connection aliases. Repeated failures still stop after the existing one recheck. Exact device/cloud originals, unfinished drafts, source-selection guards and the 24 KiB report/512-byte event limits stay intact. Arbitrary error messages, paths, account identifiers, out-of-range aliases, extra fields and changing/throwing getters cannot enter the copied report. The current physical-phone failure remains unreproduced; these diagnostics do not repair data or establish its cause.
+
+## Durable diagnostic progress
+
+- RISK repository process: diagnostic checkpoints retain finite authority across fresh process and CI boundaries
+
+The existing checkpoint and recorder commands exercise disposable Git repositories, actual child processes, independent expected observations, concurrent admission, full source-issue refresh, finite budgets, immutable failed results, repository-owner approval and a separately cloned CI verifier. Diagnostic source cannot receive product release receipts. The unlanded WebKit consumer patch is retained separately until its owner integrates it; this contract does not establish hosted execution, physical-device recovery or private-board proof.
