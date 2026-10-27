@@ -59,16 +59,26 @@ async function main() {
   const eventName = process.env.GITHUB_EVENT_NAME;
   if (!['push', 'pull_request'].includes(eventName)) throw new Error('Unknown workflow event policy.');
   const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
+  const eventRef = process.env.GITHUB_REF;
+  const eventAction = eventName === 'pull_request' ? event.action : null;
+  if (typeof eventRef !== 'string' || !eventRef || (eventName === 'pull_request' &&
+      (!Number.isSafeInteger(event.number) || eventRef !== `refs/pull/${event.number}/merge` || typeof eventAction !== 'string' || !eventAction.trim()))) {
+    throw new Error('Raw workflow event ref or pull request action is unavailable.');
+  }
+  if (event.repository?.full_name && event.repository.full_name !== repository) throw new Error('Raw workflow event repository differs from the current repository.');
   const sourceSha = eventName === 'pull_request' ? event.pull_request?.head?.sha : event.after;
   const checkoutSha = git('rev-parse', 'HEAD');
   if (!sha(sourceSha) || checkoutSha !== process.env.GITHUB_SHA || (eventName === 'push' && sourceSha !== checkoutSha)) throw new Error('Source or actual checkout identity is unavailable or inconsistent.');
+  if (eventName === 'push' && !eventRef.startsWith('refs/heads/')) throw new Error('Raw push ref must name a branch.');
   const sourceTree = git('rev-parse', `${sourceSha}^{tree}`), checkoutTree = git('rev-parse', 'HEAD^{tree}');
   if (!sha(sourceTree) || !sha(checkoutTree) || git('status', '--porcelain', '--untracked-files=no')) throw new Error('Routing requires a clean exact committed checkout.');
-  const isMain = eventName === 'push' && process.env.GITHUB_REF === 'refs/heads/main';
+  const isMain = eventName === 'push' && eventRef === 'refs/heads/main';
+  const eventPolicy = eventName === 'pull_request' ? 'canonical-pr-merge-v1' : isMain ? 'exact-main-push-v1' : 'outgoing-branch-push-v1';
   let cohort = null;
   if (args.descriptor) {
     const descriptor = JSON.parse(readFileSync(args.descriptor,'utf8')), identity=descriptor.resultIdentity;
-    for (const [key,value] of Object.entries({repository,sourceSha,sourceTree,checkoutSha,checkoutTree,comparisonBase:args['comparison-base'],runId:process.env.GITHUB_RUN_ID})) {
+    for (const [key,value] of Object.entries({repository,sourceSha,sourceTree,checkoutSha,checkoutTree,comparisonBase:args['comparison-base'],runId:process.env.GITHUB_RUN_ID,
+      eventPolicy,eventName,eventRef,eventAction})) {
       if (identity?.[key] !== value) throw new Error(`Descriptor identity mismatch: ${key}.`);
     }
     if (String(identity.runAttempt)!==process.env.GITHUB_RUN_ATTEMPT || identity.checkoutDirty || !/^[a-f0-9]{64}$/.test(identity.cohortDigestSha256) || JSON.stringify(identity.expectedGroups)!==JSON.stringify(['core','scenery','persistence-recovery','native-process'])) throw new Error('Invalid complete cohort descriptor.');
@@ -77,9 +87,8 @@ async function main() {
   const earlyRequired=Boolean(cohort&&git('ls-tree','--name-only',checkoutSha,'scripts/early-ci-harness-source.json'));
   if(earlyRequired)cohort.earlyPolicy='saved-harness-required-mobile-v1';
   const boundContext = (...values) => ({...context(...values),...(cohort||{})});
-  const validationContext = boundContext(repository, sourceSha, sourceTree, checkoutSha, checkoutTree, args['comparison-base'],
-    eventName === 'pull_request' ? 'canonical-pr-merge-v1' : isMain ? 'exact-main-push-v1' : 'outgoing-branch-push-v1');
-  const record = { schemaVersion: 1, eventName, runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT,
+  const validationContext = boundContext(repository, sourceSha, sourceTree, checkoutSha, checkoutTree, args['comparison-base'], eventPolicy);
+  const record = { schemaVersion: 1, eventName, eventRef, eventAction, runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT,
     validationContext, cohortContext: validationContext, contextSha256: hash(validationContext), decision: 'full',
     reason: isMain ? 'Exact main requires execution or verified original passes for complete inputs.' : 'No verified equivalent producer.', coveredBy: null, observations: [] };
   // Persist only routing inputs, never PR prose or token-bearing environment.

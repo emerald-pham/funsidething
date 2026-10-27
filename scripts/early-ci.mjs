@@ -37,7 +37,18 @@ function identity(descriptor){
  assert.equal(git('status','--porcelain=v1','--untracked-files=all'),'','Early execution requires clean source');
  assert.equal(id.checkoutSha,git('rev-parse','HEAD'));assert.equal(id.checkoutTree,git('rev-parse','HEAD^{tree}'));assert.equal(id.sourceTree,git('rev-parse',id.sourceSha+'^{tree}'));git('cat-file','-e',id.comparisonBase+'^{commit}');
  for(const [key,value]of Object.entries({repository:process.env.GITHUB_REPOSITORY,sourceSha:process.env.CHAIN_TEST_SOURCE_SHA,eventPolicy:process.env.CHAIN_TEST_EVENT_POLICY,runId:process.env.GITHUB_RUN_ID,runAttempt:Number(process.env.GITHUB_RUN_ATTEMPT)}))assert.equal(id[key],value,'Early descriptor environment '+key);
- return{descriptor:id,workflowBlob:git('rev-parse','HEAD:.github/workflows/data-safety.yml'),harnessSourceSha256:source(),...(process.env.ImageOS&&process.env.ImageVersion?{runtime:ciInputContext({runtime:{node:process.versions.node,platform:process.platform,arch:process.arch}}).runtime}:{}),eventName:process.env.GITHUB_EVENT_NAME||null,eventRef:process.env.GITHUB_REF||null};
+ const eventName=process.env.GITHUB_EVENT_NAME||null,eventRef=process.env.GITHUB_REF||null;
+ let eventAction=null;
+ if(eventName==='pull_request'){
+  assert.ok(process.env.GITHUB_EVENT_PATH,'Raw pull request payload is required by the early consumer');
+  eventAction=json(process.env.GITHUB_EVENT_PATH).action;
+  assert.ok(typeof eventAction==='string'&&eventAction.trim(),'Raw pull request action is required by the early consumer');
+ }
+ for(const [key,value]of Object.entries({eventName,eventRef,eventAction})){
+  if(Object.hasOwn(id,key))assert.equal(id[key],value,'Early descriptor raw event '+key);
+  else assert.equal(value,null,'Early descriptor must retain raw event '+key);
+ }
+ return{descriptor:id,workflowBlob:git('rev-parse','HEAD:.github/workflows/data-safety.yml'),harnessSourceSha256:source(),...(process.env.ImageOS&&process.env.ImageVersion?{runtime:ciInputContext({runtime:{node:process.versions.node,platform:process.platform,arch:process.arch}}).runtime}:{}),eventName,eventRef,eventAction};
 }
 function inventory(directory){
  const rows=[];const visit=dir=>{for(const entry of fs.readdirSync(dir,{withFileTypes:true})){const file=path.join(dir,entry.name);assert.equal(entry.isSymbolicLink(),false);if(entry.isDirectory())visit(file);else{assert.equal(entry.isFile(),true);const relative=path.relative(directory,file).split(path.sep).join('/');if(relative==='receipt.json')continue;const bytes=fs.readFileSync(file);rows.push({path:relative,bytes:bytes.length,sha256:hash(bytes)});}}};visit(directory);return rows.sort((a,b)=>a.path.localeCompare(b.path));

@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { derivePolicyProseImpact, validatePolicyProseStatuses, deriveReleaseReviewPlan } from './release-evidence.mjs';
 import { validateInputPass } from './agent-tools/ci-pass-reuse.mjs';
@@ -38,6 +39,7 @@ function parseArgs(argv) {
   const keyMap = new Map([
     ['--group', 'group'], ['--output-dir', 'outputDir'], ['--repository', 'repository'],
     ['--event-policy', 'eventPolicy'], ['--run-id', 'runId'], ['--run-attempt', 'runAttempt'],
+    ['--descriptor', 'descriptor'],
     ['--source-sha', 'sourceSha'], ['--comparison-base', 'comparisonBase'], ['--results-dir','resultsDir'], ['--needs-json','needsJson'], ['--proof','proof'], ['--early-receipt','earlyReceipt'], ['--mobile-stress-report','mobileStressReport'],
     ['--browser-path', 'browserPath'], ['--native-port', 'nativePort'], ['--browser-runtime-receipt', 'browserRuntimeReceipt'],
   ]);
@@ -115,6 +117,37 @@ function requiredIdentity(options) {
   if (!sha1Pattern.test(options.sourceSha)) fail('Source SHA must be a full lowercase Git commit SHA.');
   if (!sha1Pattern.test(options.comparisonBase)) fail('Comparison base must be a full lowercase Git commit SHA.');
   return { ...options, runAttempt };
+}
+
+function workflowEventIdentity(options) {
+  const eventName = process.env.GITHUB_EVENT_NAME || null;
+  if (!eventName) return { eventName: null, eventRef: null, eventAction: null };
+  if (!['push', 'pull_request'].includes(eventName)) fail('Unknown workflow event policy.');
+  const eventRef = process.env.GITHUB_REF;
+  if (typeof eventRef !== 'string' || !eventRef) fail('The raw workflow event ref is required.');
+  const eventFile = process.env.GITHUB_EVENT_PATH;
+  if (typeof eventFile !== 'string' || !eventFile) fail('The raw workflow event payload is required.');
+  const event = readJson(eventFile, 'raw workflow event payload');
+  if (event.repository?.full_name && event.repository.full_name !== options.repository) fail('Raw workflow repository differs from the requested repository.');
+  let sourceSha, eventAction = null, eventPolicy;
+  if (eventName === 'pull_request') {
+    sourceSha = event.pull_request?.head?.sha;
+    eventAction = event.action;
+    if (!/^refs\/pull\/[1-9][0-9]*\/merge$/.test(eventRef) || typeof eventAction !== 'string' || !eventAction.trim()) fail('Raw pull request action or merge ref is unavailable.');
+    eventPolicy = 'canonical-pr-merge-v1';
+  } else {
+    sourceSha = event.after;
+    if (!/^refs\/heads\/.+/.test(eventRef)) fail('Raw push ref must name a branch.');
+    eventPolicy = eventRef === 'refs/heads/main' ? 'exact-main-push-v1' : 'outgoing-branch-push-v1';
+  }
+  if (sourceSha !== options.sourceSha) fail('Raw workflow event source differs from the requested source SHA.');
+  if (process.env.GITHUB_SHA && git(['rev-parse', 'HEAD']).trim() !== process.env.GITHUB_SHA) fail('Actual checkout differs from the raw workflow SHA.');
+  if (eventName === 'push' && process.env.GITHUB_SHA && sourceSha !== process.env.GITHUB_SHA) fail('Push source differs from its actual checkout.');
+  for (const [label, candidate] of [['argument', options.eventPolicy], ['environment', process.env.CHAIN_TEST_EVENT_POLICY]]) {
+    if (candidate && candidate !== eventPolicy && candidate !== eventName) fail(`${label} event policy disagrees with the raw workflow event.`);
+  }
+  options.eventPolicy = eventPolicy;
+  return { eventName, eventRef, eventAction };
 }
 
 function readJson(file, label) {
@@ -1618,8 +1651,9 @@ async function main() {
   const startedAt = new Date().toISOString();
   try {
     const parsed = parseArgs(process.argv.slice(2));
+    const rawEvent = workflowEventIdentity(parsed);
     outputDir = validateOutputDirectory(parsed.outputDir);
-    options = requiredIdentity({ ...parsed, outputDir });
+    options = requiredIdentity({ ...parsed, ...rawEvent, outputDir });
   } catch (error) {
     if (outputDir) {
       atomicWrite(path.join(outputDir, 'result.json'), {
@@ -1658,6 +1692,9 @@ async function main() {
     result.resultIdentity = {
       repository: options.repository,
       eventPolicy: options.eventPolicy,
+      eventName: options.eventName,
+      eventRef: options.eventRef,
+      eventAction: options.eventAction,
       runId: options.runId,
       runAttempt: options.runAttempt,
       sourceSha: options.sourceSha,
@@ -1698,6 +1735,17 @@ async function main() {
           acceptedSkipCaseIds: [...expectedCasesForGroup(inventory, assignmentIndex, id)].filter(([, baselineId]) => accepted.has(baselineId)).map(([runtimeId]) => runtimeId),
           processControls: assignments.processControls.filter(control => control.group === id).map(control => ({ ...control, ownerRoot: normalizeTapIdentity(control.ownerRoot) })),
         })), baseline: inventory.baseline };
+      if (options.describe && options.descriptor) fail('The descriptor producer cannot consume another descriptor.');
+      if (!options.describe && options.eventName && !options.descriptor) fail('Workflow consumers require the persisted producer --descriptor.');
+      if (options.descriptor) {
+        const persisted = readJson(options.descriptor, 'persisted producer descriptor');
+        if (persisted?.schemaVersion !== 1 || !persisted.resultIdentity || !Array.isArray(persisted.groups)) fail('Persisted producer descriptor is malformed.');
+        const currentIdentity = { ...result.resultIdentity, selectedGroup: null };
+        if (!isDeepStrictEqual(persisted.resultIdentity, currentIdentity)) fail('Persisted producer identity differs from the actual source, checkout, event, run, or attempt.');
+        if (!isDeepStrictEqual(persisted.groups, descriptor.groups) || !isDeepStrictEqual(persisted.baseline, descriptor.baseline)) fail('Persisted producer cohort differs from the actual required group description.');
+        descriptor = persisted;
+        result.resultIdentity = { ...persisted.resultIdentity, selectedGroup: options.aggregate ? null : options.group };
+      }
       if(!options.describe&&!options.aggregate&&assignments.rootAssignments.some(row=>row.executionStage==='early-startup')){
         if(!options.earlyReceipt)fail('Required early predecessor receipt is missing before group execution.');
         const {verifyEarlyReceipt,earlyGroupCoverage}=await import('./early-ci.mjs');
