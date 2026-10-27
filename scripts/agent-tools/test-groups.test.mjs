@@ -830,5 +830,6 @@ test('workflow metadata aggregate rejects pending cancelled unresolved and stale
   assert.equal(result.status===0,decision==='reuse',decision+': '+result.stdout+result.stderr);
   assert.equal(fs.existsSync(sentinel),false,'Required aggregate and coverage references never execute another test child');
   if(decision==='reuse'){const report=JSON.parse(fs.readFileSync(path.join(temporary,'aggregate/aggregate.json')));assert.equal(report.caseCount,0);assert.equal(report.mode,'covered');assert.equal(report.groups.length,4);}
+  if(process.env.CHAIN_METADATA_EVIDENCE){const destination=path.join(process.env.CHAIN_METADATA_EVIDENCE,'aggregate-'+decision);fs.mkdirSync(process.env.CHAIN_METADATA_EVIDENCE,{recursive:true});fs.cpSync(temporary,destination,{recursive:true});fs.writeFileSync(path.join(destination,'consumer.stdout'),result.stdout);fs.writeFileSync(path.join(destination,'consumer.stderr'),result.stderr);}
  });
 });

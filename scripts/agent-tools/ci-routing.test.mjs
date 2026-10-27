@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { deriveReleaseReviewPlan } from '../release-evidence.mjs';
 import { spawn, spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,7 +18,7 @@ const git = (cwd, ...args) => {
 
 function fixture(t, grouped=false, policy=false, early=false) {
   const root = mkdtempSync(path.join(os.tmpdir(), 'chain-ci-routing-'));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
+  t.after(() => { if(process.env.CHAIN_METADATA_EVIDENCE){mkdirSync(process.env.CHAIN_METADATA_EVIDENCE,{recursive:true});cpSync(root,path.join(process.env.CHAIN_METADATA_EVIDENCE,path.basename(root)),{recursive:true});} rmSync(root, { recursive: true, force: true }); });
   const source = path.join(root, 'source'), bin = path.join(root, 'bin');
   mkdirSync(source); mkdirSync(bin);
   git(source, 'init', '-b', 'fixture');
@@ -536,13 +536,14 @@ test('workflow metadata events serialize equivalent admission and run the actual
    const script=route[1].replace('node scripts/agent-tools/ci-routing.mjs',JSON.stringify(process.execPath)+' '+JSON.stringify(command)).replace('${{ needs.validation-context.outputs.base }}','$ROUTING_BASE')+"\n"+`decision="$(node -p "require('$RUNNER_TEMP/ci-routing/routing.json').decision")"\nif [[ "$decision" == "full" ]]; then npm test; elif [[ "$decision" != "reuse" ]]; then exit 1; fi`;
    const env={...process.env,PATH:f.bin+path.delimiter+process.env.PATH,RUNNER_TEMP:output,ROUTING_BASE:f.base,ROUTING_EXECUTIONS:f.journal,ROUTING_GITHUB:f.external,GITHUB_REPOSITORY:'fixture/repo',GITHUB_EVENT_NAME:'pull_request',GITHUB_EVENT_PATH:eventPath,GITHUB_SHA:f.merge,GITHUB_REF:'refs/pull/17/merge',GITHUB_RUN_ID:String(100+f.attempt),GITHUB_RUN_ATTEMPT:'1'};delete env.NODE_TEST_CONTEXT;
    const result=await new Promise(resolve=>{const child=spawn('bash',['-euo','pipefail','-c',script],{cwd:f.source,env});let stdout='',stderr='';child.stdout.on('data',data=>stdout+=data);child.stderr.on('data',data=>stderr+=data);child.on('close',status=>resolve({status,stdout,stderr}));});
+   writeFileSync(path.join(output,'consumer.stdout'),result.stdout);writeFileSync(path.join(output,'consumer.stderr'),result.stderr);writeFileSync(path.join(output,'command.sh'),script);
    assert.equal(result.status,0,result.stdout+result.stderr);const record=JSON.parse(readFileSync(path.join(output,'ci-routing/routing.json')));
    let admitted=false;if(admission){assert.equal(admission[2],"success() && steps.route.outputs.decision == 'full'");if(record.decision==='full'){const step=spawnSync('bash',['-euo','pipefail','-c',admission[3]],{cwd:f.source,env,encoding:'utf8'});assert.equal(step.status,0,step.stderr);admitted=true;}}
    if(record.decision==='full'){const github=publishedGroups(f,record);github.jobs.find(job=>job.name==='cohort-routing').steps=admitted?[{name:admission[1].replace('${{ needs.validation-context.outputs.context }}',record.contextSha256),status:'completed',conclusion:'success'}]:[];github.runs[0].id=Number(record.runId);github.runs[0].run_attempt=Number(record.runAttempt);github.jobs.forEach(job=>{job.run_id=Number(record.runId);job.run_attempt=Number(record.runAttempt);});writeFileSync(f.external,JSON.stringify(github));}
    return record;
   }finally{release();}
  };
- const records=await Promise.all([launch(0),launch(1)]);
+ const settled=await Promise.allSettled([launch(0),launch(1)]);for(const result of settled)assert.equal(result.status,'fulfilled',String(result.reason));const records=settled.map(result=>result.value);
  assert.deepEqual(records.map(record=>record.decision).sort(),['full','reuse'],'Concurrent equivalent metadata events admit exactly one full producer');
  assert.equal(executions(f).length,1,'Count actual npm child callbacks, not successful routing exits');
  assert.equal(new Set(records.map(record=>record.contextSha256)).size,1);
