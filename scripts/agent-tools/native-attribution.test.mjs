@@ -83,6 +83,71 @@ test("fresh native verification rejects invented complete attribution and retain
     assert.notEqual(command("diagnostic-native-verify", reportPath).status, 0);
     return;
   }
+  if (process.platform === "darwin") {
+    const witness = fs.mkdtempSync(
+      path.join(os.tmpdir(), "native-branched-sample-witness-"),
+    );
+    t.after(() => fs.rmSync(witness, { recursive: true, force: true }));
+    for (const key of ["source", "binary"])
+      fs.copyFileSync(
+        path.join(output, original.files[key].path),
+        path.join(witness, original.files[key].path),
+      );
+    const header = fs
+      .readFileSync(path.join(output, original.files.stacks.path), "utf8")
+      .split("Call graph:\n")[0];
+    const retained = (prefix, symbol = "diagnosticKnownHotLoop") => {
+      // Actual sample output split 776 hot-loop samples from one time() sample.
+      // Its documented tree connectors are decoration, not part of a symbol.
+      const stacks = Buffer.from(
+        header +
+          "Call graph:\n" +
+          "    777 Thread_42\n" +
+          "      777 start  (in dyld)\n" +
+          "        776 main  (in known-native)\n" +
+          "        " + prefix + "776 " + symbol + "  (in known-native)\n" +
+          "        1 main  (in known-native)\n" +
+          "          1 time  (in libsystem_c.dylib)\n\n" +
+          "Total number in stack (recursive counted multiple, when >=5):\n\n" +
+          "Sort by top of stack, same collapsed (when >= 5):\n" +
+          "        diagnosticKnownHotLoop  (in known-native)        776\n",
+      );
+      fs.writeFileSync(path.join(witness, "sample.txt"), stacks);
+      fs.writeFileSync(path.join(witness, "native-attribution.json"), JSON.stringify({
+        ...original,
+        status: "partial",
+        nativeStacksCaptured: true,
+        sampleCount: 777,
+        threadIntervals: [{
+          threadId: "42",
+          sampleCount: 777,
+          firstSampleMonotonicNs: null,
+          lastSampleMonotonicNs: null,
+          intervalCoverage: "aggregate-only; individual sample timestamps unavailable",
+        }],
+        symbolizedFunctions: ["start", "main", "diagnosticKnownHotLoop", "time"],
+        files: {
+          ...original.files,
+          stacks: {
+            path: "sample.txt",
+            bytes: stacks.length,
+            sha256: createHash("sha256").update(stacks).digest("hex"),
+          },
+        },
+      }));
+      return command("diagnostic-native-verify", path.join(witness, "native-attribution.json"));
+    };
+    for (const prefix of ["+ ", "| ", ": ", "! ", "| + : ! "]) {
+      const verified = retained(prefix);
+      assert.equal(verified.status, 0,
+        "Fresh verification must retain the sampled hot routine behind " +
+        JSON.stringify(prefix) + " tree decoration: " + verified.stderr);
+      assert.equal(JSON.parse(verified.stdout).nativeStacksCaptured, true);
+    }
+    assert.notEqual(retained("+ ", "???").status, 0,
+      "A hot-routine summary outside the call graph cannot replace a missing sampled symbol");
+    t.diagnostic("Retained macOS branch-format witnesses passed fresh public verification; actual capture and tamper controls remain separate below.");
+  }
   assert.equal(original.nativeStacksCaptured, true, JSON.stringify(original));
   const complete = { ...original, completeAttribution: true };
   fs.writeFileSync(reportPath, JSON.stringify(complete));

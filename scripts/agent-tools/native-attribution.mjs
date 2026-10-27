@@ -46,7 +46,8 @@ function macFrames(raw) {
     }));
   const functions = [
     ...new Set(
-      [...graph.matchAll(/^\s+\d+ ([^\s]+)\s+\(in [^)]+\)/gm)]
+      // sample decorates split call-tree branches with + | : ! connectors.
+      [...graph.matchAll(/^[ \t+|:!]+\d+ ([^\s]+)\s+\(in [^)]+\)/gm)]
         .map((m) => m[1])
         .filter(
           (name) =>
