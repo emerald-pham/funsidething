@@ -7,9 +7,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
+import { parseTap } from '../test-groups.mjs';
 
 const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const runner = path.join(repository, 'scripts/test-groups.mjs');
+const recorder = path.join(repository, 'scripts/agent-tools/record-run.mjs');
 const groups = ['core', 'scenery', 'persistence-recovery', 'native-process'];
 const fixtureRoots = {
   core: 'fixture core baseline root',
@@ -133,6 +135,7 @@ function createFixture(t, options = {}) {
   fs.mkdirSync(path.join(root, 'scripts'), { recursive: true });
   fs.copyFileSync(runner, path.join(root, 'scripts/test-groups.mjs'));
   fs.copyFileSync(path.join(repository,'scripts/release-evidence.mjs'),path.join(root,'scripts/release-evidence.mjs'));
+  fs.copyFileSync(path.join(repository,'scripts/agent-tools/workflow-validator.mjs'),path.join(root,'scripts/agent-tools/workflow-validator.mjs'));
   fs.copyFileSync(path.join(repository,'scripts/agent-tools/checkpoint-progress.mjs'),path.join(root,'scripts/agent-tools/checkpoint-progress.mjs'));
   if(options.policy)fs.writeFileSync(path.join(root,'AGENTS.md'),'Read [release guide](docs/release.md) before release.\n');
   if(options.early){fs.mkdirSync(path.join(root,'.github/workflows'),{recursive:true});fs.writeFileSync(path.join(root,'.github/workflows/data-safety.yml'),'jobs:\n  early-startup:\n    runs-on: controlled-fixture\n');for(const name of ['early-ci.mjs','scenery-source-fixture.mjs','mobile-source-profile.mjs','button-safety-mobile-contract.mjs','button-safety-inventory.json','button-safety-contract.mjs','button-safety-ci-policy.mjs'])fs.copyFileSync(path.join(repository,'scripts',name),path.join(root,'scripts',name));writeJson(path.join(root,'scripts/early-ci-harness-source.json'),{schemaVersion:1,files:[],testExcerpts:[],limits:['Controlled parser fixture, not imported source or actual hosted evidence.']});}
@@ -205,6 +208,209 @@ function createFixture(t, options = {}) {
   return { root, baselineSha, comparisonBase, sourceSha, outputs, coreTitle, groupAssignments };
 }
 
+function addNestedRecorderConsumerCases(fixture) {
+  const ordinaryChild = 'token nested ordinary case';
+  const failingChild = 'token controlled nested failure';
+  const sourcePath = path.join(fixture.root, 'tests.js');
+  let source = fs.readFileSync(sourcePath, 'utf8');
+  const anchor = "  await t.test('fixture accepted environment skip', { skip: 'baseline skip' }, () => {});";
+  assert.ok(source.includes(anchor), 'the descriptor fixture keeps its required accepted-skip case');
+  source = source.replace(anchor, `${anchor}\n  await t.test(${JSON.stringify(ordinaryChild)}, () => {});\n  await t.test(${JSON.stringify(failingChild)}, () => {\n    if (process.env.CHAIN_GROUP_FIXTURE_FAILURE === '1') assert.fail('controlled nested assertion');\n  });`);
+  fs.writeFileSync(sourcePath, source);
+  const inventoryPath = path.join(fixture.root, 'scripts/test-group-inventory.json');
+  const inventory = JSON.parse(fs.readFileSync(inventoryPath, 'utf8'));
+  inventory.requiredCases.push(
+    { id: `${fixture.coreTitle} > ${ordinaryChild}`, root: fixture.coreTitle },
+    { id: `${fixture.coreTitle} > ${failingChild}`, root: fixture.coreTitle },
+  );
+  inventory.baseline.caseCount += 2;
+  inventory.baseline.passed += 2;
+  writeJson(inventoryPath, inventory);
+  git(fixture.root, 'add', 'tests.js', 'scripts/test-group-inventory.json');
+  git(fixture.root, 'commit', '-qm', 'add nested descriptor consumer controls');
+  fixture.sourceSha = git(fixture.root, 'rev-parse', 'HEAD');
+  return { ordinaryChild, failingChild };
+}
+
+function makeRecorderConsumerBoundary(fixture, mode, { redactPattern } = {}) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'chain-recorder-consumer-boundary-'));
+  fixture.outputs.push(root);
+  const hook = path.join(root, 'process-boundary.mjs');
+  const recorderEvidence = path.join(root, 'recorder-evidence');
+  const source = `import fs from 'node:fs';
+import { createRequire, syncBuiltinESMExports } from 'node:module';
+import path from 'node:path';
+const childProcess = createRequire(import.meta.url)('node:child_process');
+const originalSpawn = childProcess.spawn;
+childProcess.spawn = function (file, args, options) {
+  const isGroupRunner = process.argv[1] && fs.realpathSync(process.argv[1]) === fs.realpathSync(process.env.CHAIN_GROUP_RECORDER_BOUNDARY_RUNNER);
+  const isAssignedSuite = file === process.execPath && Array.isArray(args) && args.includes('--test') &&
+    args.some(argument => argument.startsWith('--test-name-pattern='));
+  if (isGroupRunner && isAssignedSuite) {
+    const mode = process.env.CHAIN_GROUP_RECORDER_BOUNDARY_MODE;
+    let childCommand = file;
+    let childArgs = args;
+    if (mode === 'totals-only') {
+      childCommand = process.execPath;
+      childArgs = ['-e', "process.stdout.write('TAP version 13\\\\n1..1\\\\n# tests 1\\\\n# pass 1\\\\n# fail 0\\\\n# cancelled 0\\\\n# skipped 0\\\\n# todo 0\\\\n')"];
+    } else if (mode === 'invalid-tap') {
+      childCommand = process.execPath;
+      childArgs = ['-e', "process.stdout.write('TAP version invalid\\\\n# tests 1\\\\n# pass 1\\\\n# fail 0\\\\n')"];
+    }
+    const recorderArgs = [${JSON.stringify(recorder)}, '--repo', path.resolve(options?.cwd || process.cwd()),
+      '--evidence-dir', process.env.CHAIN_GROUP_RECORDER_BOUNDARY_EVIDENCE, '--purpose', 'green',
+      ...(process.env.CHAIN_GROUP_RECORDER_REDACT_PATTERN ? ['--redact-pattern', process.env.CHAIN_GROUP_RECORDER_REDACT_PATTERN] : []),
+      '--', childCommand, ...childArgs];
+    return originalSpawn.call(childProcess, process.execPath, recorderArgs, options);
+  }
+  return originalSpawn.call(childProcess, file, args, options);
+};
+syncBuiltinESMExports();
+`;
+  fs.writeFileSync(hook, source);
+  return {
+    root,
+    hook,
+    recorderEvidence,
+    env: {
+      NODE_OPTIONS: `${process.env.NODE_OPTIONS || ''} --import=${hook}`.trim(),
+      CHAIN_GROUP_RECORDER_BOUNDARY_RUNNER: path.join(fixture.root, 'scripts/test-groups.mjs'),
+      CHAIN_GROUP_RECORDER_BOUNDARY_MODE: mode,
+      CHAIN_GROUP_RECORDER_BOUNDARY_EVIDENCE: recorderEvidence,
+      ...(redactPattern ? { CHAIN_GROUP_RECORDER_REDACT_PATTERN: redactPattern } : {}),
+    },
+  };
+}
+
+function runPublicDescriptor(fixture, outputDir, evidenceDir) {
+  const args = ['scripts/test-groups.mjs', '--group', 'core', '--output-dir', outputDir,
+    '--repository', 'example/fixture', '--event-policy', 'local', '--run-id', 'fixture-run-1',
+    '--run-attempt', '1', '--source-sha', fixture.sourceSha, '--comparison-base', fixture.comparisonBase, '--describe'];
+  const result = run(process.execPath, [recorder, '--repo', fixture.root, '--evidence-dir', evidenceDir,
+    '--purpose', 'green', '--', process.execPath, ...args], fixture.root);
+  assert.equal(result.status, 0, `public --describe recorder: ${result.stdout}\n${result.stderr}`);
+  return { ...result, outputDir, evidenceDir, descriptorPath: path.join(outputDir, 'descriptor.json') };
+}
+
+function preserveRecorderConsumerEvidence(label, { descriptor, boundary, groupResult, fixture }) {
+  const destinationRoot = process.env.CHAIN_RECORDER_CONSUMER_TEST_EVIDENCE_DIR;
+  if (!destinationRoot) return;
+  const destination = path.join(path.resolve(destinationRoot), label);
+  fs.mkdirSync(destination, { recursive: true });
+  fs.cpSync(descriptor.outputDir, path.join(destination, 'descriptor-producer'), { recursive: true });
+  fs.cpSync(descriptor.evidenceDir, path.join(destination, 'descriptor-recorder'), { recursive: true });
+  fs.cpSync(groupResult.outputDir, path.join(destination, 'group-consumer'), { recursive: true });
+  fs.cpSync(fixture.root, path.join(destination, 'fixture'), { recursive: true });
+  if (fs.existsSync(boundary.recorderEvidence)) {
+    fs.cpSync(boundary.recorderEvidence, path.join(destination, 'recorder-child'), { recursive: true });
+  } else fs.mkdirSync(path.join(destination, 'recorder-child'));
+  fs.copyFileSync(boundary.hook, path.join(destination, 'process-boundary.mjs'));
+  fs.writeFileSync(path.join(destination, 'boundary-env.json'), `${JSON.stringify(boundary.env, null, 2)}\n`);
+  fs.writeFileSync(path.join(destination, 'result.json'), `${JSON.stringify({
+    groupExitCode: groupResult.status,
+    groupStatus: groupResult.evidence?.status,
+    groupIssues: groupResult.evidence?.issues || [],
+    descriptorResultIdentity: JSON.parse(fs.readFileSync(descriptor.descriptorPath, 'utf8')).resultIdentity,
+  }, null, 2)}\n`);
+}
+
+test('public group qualification consumes sanitized recorder TAP against its described required identities', async t => {
+  const fixture = createFixture(t, { coreTitle: 'token results keep their full nonsecret identity' });
+  addNestedRecorderConsumerCases(fixture);
+  const retainedRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'chain-recorder-consumer-public-describe-'));
+  fixture.outputs.push(retainedRoot);
+  const descriptor = runPublicDescriptor(fixture,
+    path.join(retainedRoot, 'descriptor-output'), path.join(retainedRoot, 'descriptor-recorder'));
+  const described = JSON.parse(fs.readFileSync(descriptor.descriptorPath, 'utf8'));
+  const core = described.groups.find(group => group.id === 'core');
+  assert.ok(core, 'the actual public descriptor declares the core group');
+  assert.equal(core.roots.length, 1);
+  assert.match(core.roots[0], /token/);
+  assert.equal(core.requiredCaseIds.length, 4, 'the descriptor includes the root, accepted skip and two nested controls');
+  assert.equal(new Set(core.requiredCaseIds).size, core.requiredCaseIds.length);
+  const failureId = core.requiredCaseIds.find(id => id.includes('controlled nested failure'));
+  const ordinaryNestedId = core.requiredCaseIds.find(id => id.includes('nested ordinary case'));
+  assert.ok(failureId && ordinaryNestedId, 'nested identities come from the persisted descriptor');
+  assert.ok(core.acceptedSkipCaseIds.every(id => core.requiredCaseIds.includes(id)));
+
+  const execute = (mode, { redactPattern, env = {} } = {}) => {
+    const boundary = makeRecorderConsumerBoundary(fixture, mode, { redactPattern });
+    const result = invoke(fixture, {
+      group: 'core',
+      publicCli: true,
+      env: { ...boundary.env, CHAIN_GROUP_FIXTURE_FAILURE: '0', ...env },
+    });
+    preserveRecorderConsumerEvidence(mode, { descriptor, boundary, groupResult: result, fixture });
+    const recorderFiles = fs.existsSync(boundary.recorderEvidence)
+      ? fs.readdirSync(boundary.recorderEvidence).filter(file => file.endsWith('.json'))
+      : [];
+    assert.equal(recorderFiles.length, 1, `${mode}: the assigned real child passed through the actual recorder; group=${result.status} stdout=${result.stdout}\nstderr=${result.stderr}\nevidence=${result.outputDir}`);
+    const record = JSON.parse(fs.readFileSync(path.join(boundary.recorderEvidence, recorderFiles[0]), 'utf8'));
+    const tapPath = path.join(result.outputDir, 'test.tap');
+    const tap = fs.readFileSync(tapPath, 'utf8');
+    assert.equal(tap, record.execution.output.stdout, `${mode}: the group consumer reads the recorder's persisted sanitized stream`);
+    let cases = null;
+    let parseError = null;
+    try { cases = parseTap(tap).map(({ id, root, status, skipReason }) => ({ id, root, status, skipReason })); }
+    catch (error) { parseError = error.message; }
+    return { boundary, result, record, tap, cases, parseError };
+  };
+
+  const passed = execute('actual-pass');
+  assert.equal(passed.result.status, 0, `${passed.result.stdout}\n${passed.result.stderr}`);
+  assert.equal(passed.result.evidence.status, 'passed');
+  assert.deepEqual(passed.result.evidence.resultIdentity, { ...described.resultIdentity, selectedGroup: 'core' });
+  assert.deepEqual(passed.result.evidence.cases.map(item => item.id).sort(), [...core.requiredCaseIds].sort());
+  assert.deepEqual(passed.cases.map(item => ({ id: item.id, status: item.status })).sort((a, b) => a.id.localeCompare(b.id)),
+    core.requiredCaseIds.map(id => ({ id, status: core.acceptedSkipCaseIds.includes(id) ? 'skipped' : 'passed' }))
+      .sort((a, b) => a.id.localeCompare(b.id)));
+  assert.match(passed.tap, /^# tests 4$/m);
+  assert.match(passed.tap, /^# pass 3$/m);
+  assert.match(passed.tap, /^# fail 0$/m);
+  assert.equal(passed.record.execution.exitCode, 0);
+  assert.equal(passed.record.execution.outcome, 'passed');
+
+  const failed = execute('nested-failure', { env: { CHAIN_GROUP_FIXTURE_FAILURE: '1' } });
+  assert.equal(failed.result.status, 1, 'the public consumer rejects the recorded nested failure');
+  assert.equal(failed.result.evidence.status, 'failed');
+  assert.equal(failed.result.evidence.process.exitCode, 1);
+  assert.equal(failed.record.execution.outcome, 'assertion-failure');
+  assert.equal(failed.cases.find(item => item.id === failureId)?.status, 'failed');
+  assert.equal(failed.cases.find(item => item.id === core.roots[0])?.status, 'failed');
+  assert.ok(failed.result.evidence.issues.some(issue => issue.includes(failureId) && issue.includes('failed')));
+  assert.match(failed.tap, /^# tests 4$/m);
+  assert.match(failed.tap, /^# fail 2$/m);
+
+  const totalsOnly = execute('totals-only');
+  assert.equal(totalsOnly.record.execution.outcome, 'passed');
+  assert.equal(totalsOnly.record.execution.exitCode, 0);
+  assert.match(totalsOnly.tap, /^# pass 1$/m, 'the controlled child reports a passing Node summary');
+  assert.deepEqual(totalsOnly.cases, [], 'a passing total without case lines yields no case identities');
+  assert.equal(totalsOnly.result.status, 1, 'the public group consumer must not reconstruct missing cases from totals');
+  assert.equal(totalsOnly.result.evidence.process.exitCode, 0, 'the child itself passed despite missing required proof');
+  assert.ok(totalsOnly.result.evidence.issues.some(issue => issue.includes('Required baseline case') && issue.includes('missing')));
+
+  const unparseable = execute('invalid-tap');
+  assert.equal(unparseable.record.execution.outcome, 'passed');
+  assert.equal(unparseable.record.execution.exitCode, 0);
+  assert.match(unparseable.parseError || '', /did not produce a TAP stream/);
+  assert.equal(unparseable.result.status, 1);
+  assert.ok(unparseable.result.evidence.issues.some(issue => issue.includes('did not produce a TAP stream')),
+    'the public consumer reports unparseable required proof explicitly');
+
+  const redacted = execute('redacted-required-identity', { redactPattern: 'token' });
+  assert.equal(redacted.record.execution.outcome, 'passed');
+  assert.equal(redacted.record.execution.exitCode, 0);
+  assert.match(redacted.tap, /^# pass 3$/m, 'the child summary remains fully passing after safe identity redaction');
+  assert.equal(redacted.tap.includes('token'), false, 'the configured sensitive segment is absent from recorder output');
+  assert.ok(redacted.tap.includes('[REDACTED]'));
+  assert.equal(redacted.result.status, 1, 'the public consumer rejects a redacted required identity even when totals pass');
+  assert.ok(redacted.result.evidence.issues.some(issue => issue.includes('did not execute') && issue.includes(core.roots[0])));
+  assert.ok(redacted.result.evidence.issues.some(issue => issue.includes('Required baseline case') && issue.includes('missing')));
+  assert.ok(!redacted.result.evidence.cases.some(item => core.requiredCaseIds.includes(item.id)),
+    'neither the placeholder nor matching totals restore the required descriptor identity');
+});
+
 function isolatedFixtureNativeOutput(fixture, inheritedEnvironment = process.env) {
   const output = fs.mkdtempSync(path.join(os.tmpdir(), 'chain-test-group-native-fixture-'));
   fixture.outputs.push(output);
@@ -219,7 +425,7 @@ function isolatedFixtureNativeOutput(fixture, inheritedEnvironment = process.env
   };
 }
 
-function invoke(fixture, { group = 'core', env = {}, repository = 'example/fixture', outputDir: requestedOutputDir, args = [], consumer = false, preserveNodeTestContext = false } = {}) {
+function invoke(fixture, { group = 'core', env = {}, repository = 'example/fixture', outputDir: requestedOutputDir, args = [], consumer = false, preserveNodeTestContext = false, publicCli = false } = {}) {
   const outputDir = requestedOutputDir || path.join(os.tmpdir(), `chain-test-group-output-${process.pid}-${++outputSerial}`);
   fixture.outputs.push(outputDir);
   const childEnv = { ...process.env, ...env };
@@ -228,7 +434,8 @@ function invoke(fixture, { group = 'core', env = {}, repository = 'example/fixtu
     '--repository', repository, '--event-policy', 'local', '--run-id', 'fixture-run-1', '--run-attempt', '1',
     '--source-sha', fixture.sourceSha, '--comparison-base', fixture.comparisonBase, ...args];
   const result = consumer ? run(process.execPath,['scripts/agent-tools/ci-pass-reuse.mjs','run-group',...selectedArgs],fixture.root,childEnv)
-    : run('npm',['run','test:group','--',...selectedArgs],fixture.root,childEnv);
+    : publicCli ? run(process.execPath,['scripts/test-groups.mjs',...selectedArgs],fixture.root,childEnv)
+      : run('npm',['run','test:group','--',...selectedArgs],fixture.root,childEnv);
   return { ...result, outputDir, evidencePath: path.join(outputDir, 'result.json'), evidence: readEvidence(outputDir) };
 }
 
