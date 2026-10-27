@@ -194,3 +194,74 @@ application delta requires refreshed shell identities and affected FAQ review;
 startup runtime, status styling, and the 142 earlier header/scroll artifacts
 retain their original producing-test and application identity, with unchanged
 behavior rather than a claim that they were reexecuted on the new commit.
+
+
+## Full-board acceptance added before release
+
+The user then required the full familiar board through broken-board opening,
+including when no optional appearance cache survives. Candidate `912218e` and
+its earlier warning/header approvals do not satisfy this later acceptance.
+Its full run `0a970cf7-dffc-4c46-961a-f9e988698335` was interrupted and
+superseded; it is not a full-suite pass or shipment evidence.
+
+The real Chromium cold-start consumer retained 66 supported tasks in two
+identical browser copies, removed the appearance and presentation hints, and
+held the first actual IndexedDB open plus all three configured Firebase imports.
+With authoritative state null and the device read pending, no populated board
+was visible. This preimplementation RED is
+`full-board-visibility/2026-10-27T00-47-13-770Z-c2852999-f4f6-4a0c-855f-5e919a990b89.json`.
+A later long-title control exposed the cache's 1600-character text limit being
+incorrectly applied to complete supported task content (`61860686-75f0-46af-84d1-111e2e936ade`).
+
+An exploratory temporary-state renderer was discarded. Its apparent GREEN is
+not accepted evidence: live rendering mutates selection closures and schedules
+work even if state is restored. The retained `unsafe-renderer-spike.patch`
+records that abandoned path. The final path never assigns provisional global
+state. It factors narrow shared context, chain/card, task-row and History markup
+and gives the opening renderer an explicitly validated detached board. Live
+bindings, timers, ranking, focus and save owners remain in the live renderer.
+The pure markup parity consumer compares actual output against Stable base
+`6c67fb0c9988d3e578579c7bb23a8ed0731aac3f`.
+
+Complete identical browser copies are parsed once. Each source's validation
+failure is isolated, so an unreadable protected copy cannot hide a separate
+supported source. Divergent supported copies are not arbitrarily chosen.
+Saved filter, panel and scroll hints are retained when safe; the saved-query
+fixture displays all 65 matching tasks out of 66, while the no-hint fixture
+shows all 66. Persistent appearance limits are unchanged. Complete supported
+text is escaped through the shared formatter and stripped of live bindings,
+links and IDs, without imposing cache text/window bounds on the board itself.
+
+The tracked SavedAppearance lifecycle owns the complete inert display and its
+account/identity/storage masking. State remains null, liveBoardAccepted false
+and data-app-ready false until normal acceptance. Nine controls cover malformed
+or unsupported alternate copies, divergent and absent valid sources, and early
+or late account/identity and storage changes; they observe zero saved-board or
+backup writes, zero cloud pushes and exact original source bytes. The display
+never selects a recovery source or provides editing authority.
+
+The preview is removed immediately before the live render in the same
+non-yielding turn. Animation-frame traces check populated display from the
+actual durable-read boundary through accepted handoff and at most one connected
+full board DOM. Initial network/parser frames are retained separately and are
+not claimed to be populated before the main app script is available. An 8s
+fixture hold exceeded the unchanged 5s startup deadline and entered normal
+recovery; failed attempts `aa7a914b` and `9a9aa220` are setup limitations, not
+product REDs. The accepted-handoff fixture uses a 4s hold. A WebKit screenshot
+font-readiness wait while imports were deliberately held (`ae353774`) uses the
+same bounded capture workaround as the existing status matrix; it does not
+change app deadlines or pretend fonts finished loading.
+
+The account-mask fixture's missing CloudSync.pull was independently reproduced
+against immutable `912218e` in later-baseline-sensitivity record
+`7be36656-2985-48ad-8f2b-2a171999482a`. The fixture now supplies a non-writing
+failed-read stub; all masking/source-preservation assertions remain.
+
+Named limits remain: without a complete agreeing same-owner local source, this
+projection cannot invent or choose a board. External storage providers and the
+user's private iPhone source were not available for this proof. Deferred rank,
+chance and sparkline values refresh after accepted hydration; source selection,
+cloud confirmation and genuine post-hydration warnings retain their existing
+owners. This is not faster hydration, physical-iPhone recovery, or crash proof.
+Final exact-candidate qualification, independent affected reviews, CI, Stable
+deployment and live verification remain separate gates; Beta remains paused.
