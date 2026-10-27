@@ -73,8 +73,8 @@
       "gitBlob": "af91a33a6af193fd5582255b7eb09361bb9cc6f1",
       "sha256": "99781010cea67b0157fdb757162ff05a99ef62da77cec62b070bbbcbe5f8d9de",
       "preservedOriginalPath": "scripts/source-snapshots/issue-290/button-safety-native-9b5bc1c.mjs.txt",
-      "effectiveSha256": "12588c8eddebfa42c3ace38f05332478e222d05bf5ad380470b997d209c4e5f1",
-      "adaptation": "Explicit canonical source-profile hook for only original mobile story and confirmed modal release; original full inventory guard retained. Local owner lookup canonicalizes the existing repo once, skips only unavailable other paths, rejects ambiguous own allocations, and retains all foreign entries for conflict checks. The two saved scenery consumers may serve only the explicit immutable b176 fixture; native output separates saved app bytes from current tooling and cannot pay current mobile acceptance. Exact limited-profile offered action IDs are recognized separately from actual executed outcomes; unknown IDs and full catalog remain guarded."
+      "effectiveSha256": "8257f0978ffde817416b76102139083f695653c4198a1a42ca4d7441648ce4de",
+      "adaptation": "Explicit canonical source-profile hook for only original mobile story and confirmed modal release; original full inventory guard retained. Local owner lookup canonicalizes the existing repo once, skips only unavailable other paths, rejects ambiguous own allocations, and retains all foreign entries for conflict checks. The two saved scenery consumers may serve only the explicit immutable b176 fixture; native output separates saved app bytes from current tooling and cannot pay current mobile acceptance. Exact limited-profile offered action IDs are recognized separately from actual executed outcomes; unknown IDs and full catalog remain guarded. Observed IDs and completed action maps are finalized on both success and failure without bypassing strict limited-profile or stress integrity verification."
     },
     {
       "path": "scripts/button-safety-rapid-core.mjs",

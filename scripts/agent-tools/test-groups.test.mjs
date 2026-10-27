@@ -186,6 +186,14 @@ function createFixture(t, options = {}) {
     groupAssignments.rootAssignments.push(...titles.map((title,index)=>({root:title,group:index===0?'core':'native-process',file:'tests.js',executionStage:'early-startup'})));
     writeJson(path.join(root,'scripts/test-group-assignments.json'),groupAssignments);
     fs.writeFileSync(path.join(root,'scripts/button-safety-mobile-memory.mjs'),"import fs from 'node:fs';const args=process.argv.slice(2);fs.cpSync(process.env.EARLY_TRANSFER_SEED,args[args.indexOf('--output-dir')+1],{recursive:true});\n");
+    if(options.profiledStress){
+      const profilePath='scripts/mobile-source-profile.json',profile=JSON.parse(fs.readFileSync(path.join(repository,profilePath)));
+      for(const file of Object.keys(profile.applicationAssets)){const to=path.join(root,file);fs.mkdirSync(path.dirname(to),{recursive:true});fs.copyFileSync(path.join(repository,file),to);}
+      fs.copyFileSync(path.join(repository,profilePath),path.join(root,profilePath));
+      let source=fs.readFileSync(path.join(root,'tests.js'),'utf8');for(const title of titles)source=source.replace('test('+JSON.stringify(title),"test('"+title+"'");fs.writeFileSync(path.join(root,'tests.js'),source);
+      const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
+      writeJson(path.join(root,'scripts/early-ci-harness-source.json'),{schemaVersion:1,files:[],testExcerpts:titles.map(name=>{const start=source.indexOf("test('"+name+"'"),next=source.slice(start+1).search(/^test\(/m),end=next<0?source.length:start+1+next;return{name,sha256:hash(source.slice(start,end).trimEnd()+'\n')};}),canonicalLimitedProfile:{path:profilePath,sha256:hash(fs.readFileSync(path.join(root,profilePath)))},limits:['Controlled raw stress/accounting parser composition; no actual engine, cgroup or hosted acceptance.']});
+    }
     git(root,'add','.');git(root,'commit','-qm','Declare exact early consumers in the existing catalog');sourceSha=git(root,'rev-parse','HEAD');
   }
   const outputs = [];
@@ -995,12 +1003,38 @@ test('group process refuses missing early predecessor before launching any defer
 });
 
 test('group and aggregate retain actual early cases once across fresh group processes',async t=>{
- const {createMobileBundle}=await import('./mobile-memory-fixture.mjs');
- const fixture=createFixture(t,{early:true,earlyTransfer:true,nativeTitle:'RISK repository process: required installed-client native outcomes and artifacts execute exactly once',nativeReports:true});
+ const {runButtonSafety}=await import('../button-safety-native.mjs'),playwright=await import('playwright');
+ const proofBase=process.env.CHAIN_NATIVE_OUTPUT||os.tmpdir();fs.mkdirSync(proofBase,{recursive:true});const proof=fs.mkdtempSync(path.join(proofBase,'failed-accounting-'));if(!process.env.CHAIN_NATIVE_OUTPUT)t.after(()=>fs.rmSync(proof,{recursive:true,force:true}));
+ const port=process.env.CI==='true'?0:Number(process.env.CHAIN_NATIVE_PORT||process.env.CHAIN_NATIVE_SMOKE_PORT||0);assert.ok(process.env.CI==='true'||port>0,'Mock-launch consumer requires the existing allocated local port');
+ const ledger=path.join(proof,'ledger.json'),prior=process.env.CODEX_COORDINATION_FILE,launch=playwright.chromium.launch;
+ writeJson(ledger,{entries:[{status:'active',worktree:repository,lease:{state:'healthy',expiresAt:new Date(Date.now()+60000).toISOString()},resources:['browser-runtime:playwright-chromium','loopback:127.0.0.1:'+port]}]});process.env.CODEX_COORDINATION_FILE=ledger;
+ const stopped=Error('page.goto: Page crashed'),bindings=new Map(),events=new Map();
+ // External browser boundary only: deliver two observed IDs, then a page-crash
+ // signal and primary error before any action executes. No engine is launched.
+ const page={setDefaultTimeout(){},on(name,fn){events.set(name,fn);},async exposeBinding(name,fn){bindings.set(name,fn);},async addInitScript(){},async goto(){bindings.get('__buttonObserved')({},['act:download-backup','act:scene-time-settings']);events.get('crash')();throw stopped;},async evaluate(){throw stopped;}};
+ const context={async exposeBinding(){},async addInitScript(){},async route(){},async newPage(){return page;},async close(){}};
+ playwright.chromium.launch=async()=>({on(){},version:()=> 'external-mock-no-engine',async newContext(){return context;},async close(){}});
+ try{await assert.rejects(runButtonSafety({repo:repository,engine:'chromium',port,outputDir:proof,scenarioFilter:'rapid scene time presets, lock, live time, and close'}),error=>error===stopped);}finally{playwright.chromium.launch=launch;if(prior===undefined)delete process.env.CODEX_COORDINATION_FILE;else process.env.CODEX_COORDINATION_FILE=prior;}
+ const produced=JSON.parse(fs.readFileSync(path.join(proof,fs.readdirSync(proof).find(file=>/^button-safety-chromium-.*\.json$/.test(file)))));
+ assert.deepEqual(produced.observedActions,['act:download-backup','act:scene-time-settings'],'Failed producer must retain the actual offered IDs delivered before the crash');
+ assert.deepEqual(produced.actionObservation,{recognizedOffered:['act:download-backup','act:scene-time-settings'],executed:[],coverage:'Offered IDs are recognized, not credited as executed; limited consumer only'},'Failed attempt must finalize honest offered versus completed action accounting');
+ assert.deepEqual(produced.outcomes,[]);assert.deepEqual(produced.rapidOutcomes,[]);assert.deepEqual(produced.errors,['page-crash']);assert.equal(produced.status,'failed');for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(produced.cleanup[key],true);
+ const {createMobileBundle,refreshMobileBundle}=await import('./mobile-memory-fixture.mjs');
+ const fixture=createFixture(t,{early:true,earlyTransfer:true,profiledStress:true,nativeTitle:'RISK repository process: required installed-client native outcomes and artifacts execute exactly once',nativeReports:true});
  const temp=fs.mkdtempSync(path.join(os.tmpdir(),'chain-early-transfer-'));t.after(()=>fs.rmSync(temp,{recursive:true,force:true}));
  const descriptorRun=invoke(fixture,{args:['--describe']});assert.equal(descriptorRun.status,0,descriptorRun.stderr);const descriptor=path.join(descriptorRun.outputDir,'descriptor.json'),identity=JSON.parse(fs.readFileSync(descriptor)).resultIdentity;
  const nativeIdentity={candidateCommit:identity.checkoutSha,candidateTree:identity.checkoutTree,sourceSha:identity.sourceSha,repository:identity.repository,runId:identity.runId,runAttempt:identity.runAttempt,eventPolicy:identity.eventPolicy};
  const seed=createMobileBundle(path.join(temp,'seed'),nativeIdentity),stress=createMobileBundle(path.join(temp,'stress'),nativeIdentity,'stress-512mb'),journal=path.join(temp,'executions.jsonl');
+ const {currentApplication,checkProfile}=await import('../mobile-source-profile.mjs'),application=currentApplication(fixture.root),coverage='Offered IDs are recognized, not credited as executed; limited consumer only';
+ for(const bundle of [seed,stress])for(const [motion,native]of Object.entries(bundle.native)){
+  native.assets=application.assets;native.sourceProfile=checkProfile({repo:fixture.root,source:application.source,assets:native.assets,engine:'webkit',motion,scenario:'rapid scanner candidate actions with 400 active tasks'});native.observedActions=['act:yes'];native.outcomes=[];for(const row of native.rapidOutcomes)row.status='passed';native.actionObservation={recognizedOffered:['act:yes'],executed:['act:yes'],coverage};
+ }
+ const failed=stress.native.normal;failed.status='failed';failed.errors=produced.errors;failed.failure='page.goto: Page crashed';failed.scenarios=[];failed.presses=[];failed.clicks=[];delete failed.mobileStory;
+ for(const key of ['observedActions','outcomes','rapidOutcomes','actionObservation'])failed[key]=structuredClone(produced[key]);
+ stress.report.status='failed';stress.report.cases[0].appOutcome='app-runtime-failure';
+ writeJson(path.join(seed.directory,'modal-parser-only.json'),{kind:'button-diagnostic',engine:'chromium',candidateCommit:identity.checkoutSha,candidateTree:identity.checkoutTree,status:'passed',assets:application.assets,sourceProfile:checkProfile({repo:fixture.root,source:application.source,assets:application.assets,engine:'chromium',motion:null,scenario:'rapid scene time presets, lock, live time, and close'}),observedActions:[],outcomes:[],rapidOutcomes:[],actionObservation:{recognizedOffered:[],executed:[],coverage},scenarios:[{name:'rapid scene time presets, lock, live time, and close'}]});
+ refreshMobileBundle(seed);refreshMobileBundle(stress);
+ const {verifyMobileStressReport}=await import('../button-safety-mobile-contract.mjs');assert.equal(verifyMobileStressReport(stress.report,{artifactRoot:stress.directory}).cases[0].appOutcome,'app-runtime-failure','Synthetic raw stress classifier accepts the attributable failed app before profile/aggregate composition');
  const env={...process.env,GITHUB_REPOSITORY:identity.repository,CHAIN_TEST_SOURCE_SHA:identity.sourceSha,CHAIN_TEST_EVENT_POLICY:identity.eventPolicy,GITHUB_RUN_ID:identity.runId,GITHUB_RUN_ATTEMPT:String(identity.runAttempt),EARLY_TRANSFER_SEED:seed.directory,EARLY_ROOT_JOURNAL:journal};delete env.NODE_TEST_CONTEXT;delete env.GITHUB_EVENT_NAME;delete env.GITHUB_REF;
  const workflow=fs.readFileSync(path.join(repository,'.github/workflows/data-safety.yml'),'utf8');
  const earlyStep=workflow.match(/      - name: Required saved harness and populated mobile startup\n[\s\S]*?        run: ([^\n]+)/);assert.ok(earlyStep);
@@ -1026,6 +1060,20 @@ test('group and aggregate retain actual early cases once across fresh group proc
  const aggregateStep=workflow.match(/      - name: Verify complete required cohort\n[\s\S]*?        run: \|\n((?:          [^\n]*\n|\n)*)/);assert.ok(aggregateStep);
  const aggregateCommand=aggregateStep[1].split('\n').map(line=>line.startsWith('          ')?line.slice(10):line).join('\n');
  const aggregate=spawnSync('bash',['-euo','pipefail','-c',aggregateCommand],{cwd:fixture.root,env:{...env,RUNNER_TEMP:temp,CHAIN_TEST_COMPARISON_BASE:fixture.comparisonBase},encoding:'utf8',timeout:15000});assert.equal(aggregate.status,0,aggregate.stdout+aggregate.stderr);const report=JSON.parse(fs.readFileSync(path.join(temp,'aggregate/aggregate.json')));assert.equal(report.caseCount,11,'Six actual ordinary fixture cases plus five actual early cases count exactly once');assert.equal(report.groups.find(row=>row.group==='core').earlyCases,1);assert.equal(report.groups.find(row=>row.group==='native-process').earlyCases,4);
+ assert.equal(report.stressEvidence.status,'failed','Actual aggregate must retain the nonblocking failed app status after strict profile accounting');
+ const originalFailed=structuredClone(failed);
+ await t.test('known completed partial action remains accounted without full coverage credit',()=>{const next=structuredClone(originalFailed);next.outcomes=[{action:'act:scene-time-settings',status:'passed'}];next.actionObservation.executed=['act:scene-time-settings'];stress.native.normal=next;refreshMobileBundle(stress);const result=invoke(fixture,{env,args});assert.equal(result.status,0,result.stdout+result.stderr);assert.equal(JSON.parse(fs.readFileSync(path.join(result.outputDir,'aggregate.json'))).stressEvidence.status,'failed');stress.native.normal=structuredClone(originalFailed);refreshMobileBundle(stress);});
+ for(const [name,mutate]of [
+  ['missing accounting',n=>delete n.actionObservation],
+  ['unknown offered ID',n=>{n.observedActions.push('act:gate-new-untested');n.actionObservation.recognizedOffered.push('act:gate-new-untested');}],
+  ['unknown executed ID',n=>{n.outcomes.push({action:'act:gate-new-untested',status:'passed'});n.actionObservation.executed.push('act:gate-new-untested');}],
+  ['profile tamper',n=>n.sourceProfile.profileSha256='0'.repeat(64)],
+  ['source tamper',n=>n.assets['index.html']='0'.repeat(64)],
+  ['transport failure',n=>n.errors.push('driver disconnected')],
+  ['instrumentation failure',n=>n.failure='TypeError: observer binding failed'],
+  ['cleanup failure',n=>n.cleanup.contextClosed=false],
+ ])await t.test('failed stress still refuses '+name,()=>{const next=structuredClone(originalFailed);mutate(next);stress.native.normal=next;refreshMobileBundle(stress);const result=invoke(fixture,{env,args});assert.notEqual(result.status,0,name+' cannot be promoted to nonblocking app stress');stress.native.normal=structuredClone(originalFailed);refreshMobileBundle(stress);});
+ t.diagnostic('Actual failed native producer accounting survives strict public stress and literal aggregate composition; known offered IDs are retained without execution credit. External mocked browser and synthetic cgroup/transport records only; no engine or512MB claim. Producer artifact: '+proof);
  await t.test('changed group transfer reference',()=>{const file=path.join(collected,'native-process/result.json'),original=fs.readFileSync(file),record=JSON.parse(original);record.earlyCoverage.cases.pop();writeJson(file,record);assert.notEqual(invoke(fixture,{env,args}).status,0,'Aggregate must rederive every transferred early outcome');fs.writeFileSync(file,original);});
  await t.test('missing durable predecessor',()=>{fs.unlinkSync(path.join(early,'harness.stdout'));assert.notEqual(invoke(fixture,{group:'native-process',env,args:['--early-receipt',receipt]}).status,0);assert.notEqual(invoke(fixture,{env,args}).status,0);assert.deepEqual(fs.readFileSync(journal,'utf8').trim().split('\n'),first);});
  t.diagnostic(JSON.stringify({scope:'Controlled OS-process transfer only; no native/runtime proof',earlyRootExecutions:first.length,uniqueEarlyRoots:new Set(first).size,ordinaryGroups:groups.length,aggregateCaseCount:report.caseCount}));

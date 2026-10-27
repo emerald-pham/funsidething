@@ -64,6 +64,11 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
  }else verifyButtonInventorySource(inventorySource,JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')));
  for(const [file,bytes]of sources)assert.equal(digest(bytes),digest(git('show',(appFixture?report.appFixture.commit:'HEAD')+':'+file)),'Button run requires exact committed app bytes: '+file);
  let server,browser,context,page,armed=false,closing=false;
+ const observed=new Set(),outcomes=new Map(),rapidOutcomes=new Map();
+ const finalizeActions=()=>{
+  report.observedActions=[...observed].sort();report.outcomes=[...outcomes.values()];report.rapidOutcomes=[...rapidOutcomes.values()];
+  if(report.sourceProfile)report.actionObservation={recognizedOffered:[...report.observedActions],executed:[...new Set([...report.outcomes,...report.rapidOutcomes].filter(row=>row.status==='passed').map(row=>row.action))].sort(),coverage:'Offered IDs are recognized, not credited as executed; limited consumer only'};
+ };
  const check=()=>{assert.equal(report.errors.length,0,'Native button safety detected '+report.errors.join(', '));};
  const bounded=async(work,label,timeoutMs=2500)=>{let timer;try{return await Promise.race([work,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Native button safety detected stalled responsiveness: '+label)),timeoutMs);})]);}finally{clearTimeout(timer);}};
  try{
@@ -77,7 +82,6 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
   const origin='http://127.0.0.1:'+server.address().port;
   const playwright=await import('playwright');browser=browserServerEndpoint?await playwright[engine].connect(browserServerEndpoint,{timeout:15000}):await playwright[engine].launch({headless:true});browser.on('disconnected',()=>{if(!closing)report.errors.push('browser-disconnected');});report.runtime={engine,version:browser.version(),playwright:'1.62.1',platform:process.platform,nodeVersion:process.version,browserConnection:browserServerEndpoint?'remote-owned':'local-owned',...(browserServerEndpoint?{browserEndpointSha256:digest(browserServerEndpoint)}:{})};
   const {runButtonScenarios}=await import('./button-safety-scenarios.mjs');
-  const observed=new Set(),outcomes=new Map(),rapidOutcomes=new Map();
   const actionFor=el=>{
    if(el===document.documentElement)return null; // Landscape uses this root attribute only as rendered state.
    if(el.closest('[data-saved-preview][inert][aria-hidden="true"]'))return null;
@@ -368,8 +372,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
   if(scenarioFilter)assert.equal(report.scenarios?.length,1,'Exactly one requested diagnostic scenario must execute');
   const recognized=report.sourceProfile?.recognizedActions||report.requiredActions;
   for(const action of observed)assert.ok(recognized.includes(action),'New untested button action: '+action);
-  if(report.sourceProfile)report.actionObservation={recognizedOffered:[...observed].sort(),executed:[...new Set([...outcomes.values(),...rapidOutcomes.values()].filter(row=>row.status==='passed').map(row=>row.action))].sort(),coverage:'Offered IDs are recognized, not credited as executed; limited consumer only'};
-  report.observedActions=[...observed].sort();report.outcomes=[...outcomes.values()];report.rapidOutcomes=[...rapidOutcomes.values()];if(scenarioFilter)report.scope='focused-diagnostic';
+  if(scenarioFilter)report.scope='focused-diagnostic';
   report.status='passed';
  }catch(error){report.status='failed';report.failure=error.stack;try{report.failureObservation=await bounded(page.evaluate(()=>({modal:document.getElementById('modalRoot')?.innerText,toast:document.getElementById('toast')?.innerText,heartbeat:{...window.__buttonHeartbeat},mode:state.mode,chain:state.chain,candidateId:state.candidateId,taskTitles:state.tasks.slice(0,10).map(t=>({id:t.id,title:t.title}))})),'failure observation');}catch(observationError){report.failureObservationError=String(observationError);}throw error;}
  finally{
@@ -383,7 +386,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
    report.cleanup.browserClosed=true;
   });
   if(server)await close(async()=>{await new Promise(resolve=>server.close(resolve));report.cleanup.serverClosed=true;});
-  report.finishedAt=new Date().toISOString();save();if(cleanupError)throw cleanupError;
+  finalizeActions();report.finishedAt=new Date().toISOString();save();if(cleanupError)throw cleanupError;
  }
  return{report,reportPath};
 }

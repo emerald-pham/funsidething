@@ -21158,5 +21158,41 @@
       "command": "Node22 recorder public source consumer RED be807b97 at11:48:14Z; actual original Chromium modal root RED65cbd8a1 at11:51:06Z; workflow source-delivery assertion REDa8aad37f at11:53:10Z. Exact commands and raw streams retained under review/source-applicability-repair/runs.",
       "failure": "Before fixture implementation, explicit saved-source consumer returned canonical landscape hash eec5719 instead of b176 a19438f. Before action-recognition implementation, actual modal consumer failed New untested button action: act:download-backup. Original dd6790e paint/action failures remain prior-source evidence, never rewritten. The first pre-assets test TypeError5078a634 and intermediate copy-fixture infrastructure failurea0043b51 are retained without RED credit."
     }
+  },
+  {
+    "testChangesSha256": "de2809dd9df1b04bbfe8b5dd3a147b52ceccc9564a21368bce613b79944c12a9",
+    "reason": "Repair the single final affected #278 stress-accounting finding at producer finalization. Extend the existing serial early-assigned process risk and its public group/stress/aggregate consumer; preserve all837 prior raw records. Comparison 76338e299a08372debfd637bd01fb667cc0697a2.",
+    "previousBehavior": "A real producer failure before successful scenario completion lost observed offered IDs and omitted actionObservation. Strict canonical profile verification then turned a correctly attributable synthetic app-stress failure into aggregate integrity failure.",
+    "intendedBehavior": "Finalize observed offered IDs and completed outcome maps on both success and failure without changing verifier strictness. The actual mocked-browser producer delivers two known offered IDs and crashes before executing actions; its honest accounting composes with canonical profiles and the existing literal public stress/group aggregate. Unknown IDs, source/profile tampering and execution/cleanup faults remain blocking.",
+    "replacementTests": [
+      "RISK repository process: early-assigned consumers execute once through durable group accounting"
+    ],
+    "preservedCoverage": [
+      "All2678 root owners, accepted skips,36 current app assets, dependencies, saved full action inventory, exact source snapshots and prior actual952f1b9 harness proof remain unchanged and attributable to their sources.",
+      "Required current-source400-task1GB Normal/Reduced acceptance, zero swap,2GiB driver, ten distinct trusted Yes decisions/two seconds,1000ms frame bounds, original protected copies/unknown fields and full native coverage remain mandatory and unchanged.",
+      "Public composition retains11 actual controlled fixture outcomes counted once and a truthful failed stress status. Known partial actions may remain accounted, while missing accounting, unknown offered/executed IDs, source/profile tampering, transport, instrumentation and cleanup faults refuse; no actual engine,512MB,cgroup,Linux,hosted or release claim."
+    ],
+    "redEvidence": {
+      "command": "Node22 record-run preimplementation-red1a091bbb at2026-10-27T12:24:26Z on76338e2: --test --test-reporter=tap --test-name-pattern=^group and aggregate retain actual early cases once across fresh group processes$ scripts/agent-tools/test-groups.test.mjs. Exact command/raw output in review/stress-accounting-repair/runs/red.",
+      "failure": "Before producer implementation, actual public runButtonSafety external-browser mock delivered download-backup and scene-time-settings observations then a primary page-crash error. The finalized report returned observedActions[] instead of the two known offered IDs. GREEN23966343 follows finalization repair and proves strict public stress/literal aggregate composition plus eight refusals; these are controlled parser/process fixtures, not actual memory or engine evidence."
+    }
+  },
+  {
+    "testChangesSha256": "3d59a48c7e59417b56a867307d86283133ed35ab18faa270c50957aaf9a90511",
+    "reason": "Repair the single final affected #278 stress-accounting finding at producer finalization. Extend the existing serial early-assigned process risk and its public group/stress/aggregate consumer; preserve all837 prior raw records. Comparison 8b015bd91821a30fcc92f4dba7b1b6376c154a31.",
+    "previousBehavior": "A real producer failure before successful scenario completion lost observed offered IDs and omitted actionObservation. Strict canonical profile verification then turned a correctly attributable synthetic app-stress failure into aggregate integrity failure.",
+    "intendedBehavior": "Finalize observed offered IDs and completed outcome maps on both success and failure without changing verifier strictness. The actual mocked-browser producer delivers two known offered IDs and crashes before executing actions; its honest accounting composes with canonical profiles and the existing literal public stress/group aggregate. Unknown IDs, source/profile tampering and execution/cleanup faults remain blocking.",
+    "replacementTests": [
+      "RISK repository process: early-assigned consumers execute once through durable group accounting"
+    ],
+    "preservedCoverage": [
+      "All2678 root owners, accepted skips,36 current app assets, dependencies, saved full action inventory, exact source snapshots and prior actual952f1b9 harness proof remain unchanged and attributable to their sources.",
+      "Required current-source400-task1GB Normal/Reduced acceptance, zero swap,2GiB driver, ten distinct trusted Yes decisions/two seconds,1000ms frame bounds, original protected copies/unknown fields and full native coverage remain mandatory and unchanged.",
+      "Public composition retains11 actual controlled fixture outcomes counted once and a truthful failed stress status. Known partial actions may remain accounted, while missing accounting, unknown offered/executed IDs, source/profile tampering, transport, instrumentation and cleanup faults refuse; no actual engine,512MB,cgroup,Linux,hosted or release claim."
+    ],
+    "redEvidence": {
+      "command": "Node22 record-run preimplementation-red1a091bbb at2026-10-27T12:24:26Z on76338e2: --test --test-reporter=tap --test-name-pattern=^group and aggregate retain actual early cases once across fresh group processes$ scripts/agent-tools/test-groups.test.mjs. Exact command/raw output in review/stress-accounting-repair/runs/red.",
+      "failure": "Before producer implementation, actual public runButtonSafety external-browser mock delivered download-backup and scene-time-settings observations then a primary page-crash error. The finalized report returned observedActions[] instead of the two known offered IDs. GREEN23966343 follows finalization repair and proves strict public stress/literal aggregate composition plus eight refusals; these are controlled parser/process fixtures, not actual memory or engine evidence."
+    }
   }
 ]
