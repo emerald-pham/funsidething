@@ -45224,7 +45224,7 @@ test('RISK repository process: newly registered startup browser roots require an
  for(const [summary,count]of Object.entries({tests:6,suites:0,pass:6,fail:0,cancelled:0,skipped:0,todo:0}))assert.match(child.stdout,new RegExp('^# '+summary+' '+count+'$','m'),'Exact child TAP summary: '+summary);
  const workflow=fs.readFileSync(path.join(__dirname,'.github/workflows/data-safety.yml'),'utf8').split(/^  regression:/m)[1].split(/^  scanner-tests:/m)[0];
  assert.match(workflow,/PLAYWRIGHT_BROWSERS_PATH:\s*\$\{\{ runner\.temp \}\}\/playwright-browsers/,'the regression install must use its explicit isolated browser directory');
- const install=workflow.match(/      - name: Install matching native Chromium\n        if: ([^\n]+)\n        run: \|\n((?:          [^\n]*\n|\n)*)/);
+ const install=workflow.match(/      - name: Install matching native Chromium\n(?:        env:\n(?:          [^\n]*\n)+)?        if: ([^\n]+)\n        run: \|\n((?:          [^\n]*\n|\n)*)/);
  assert.ok(install,'The actual conditional workflow install command must remain present');
  const guard="steps.selected.outputs.decision == 'full' && !contains(fromJSON(steps.selected.outputs.reused), matrix.group)";
  assert.equal(install[1],guard,'Covered groups must skip browser installation');
@@ -45859,4 +45859,15 @@ test('RISK repository process: rendered diagnostic comparisons enforce declared 
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
  const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^named diagnostic comparisons','scripts/agent-tools/rendered-evidence.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:15000});
  assert.equal(child.status,0,'Named diagnostic enlargement must meet its declared factor for changed and reference targets: '+child.stdout+child.stderr);assert.match(child.stdout,/# tests 1$/m);assert.match(child.stdout,/# skipped 0$/m);
+});
+
+
+test('RISK repository process: workflow browser paths resolve only in supported runner contexts',async t=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group workflow browser path reaches the installer and enforcing persistence consumer$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
+ const output=[child.stdout,child.stderr].filter(Boolean).join('\n');t.diagnostic(output);
+ assert.equal(child.error,undefined,'The public workflow environment consumer must start and finish: '+output);assert.equal(child.signal,null,'The public workflow environment consumer cannot be cancelled: '+output);assert.equal(child.status,0,'The actual workflow must be valid at its environment scope and propagate the exact installed browser path: '+output);
+ const {parseTap}=await import('./scripts/test-groups.mjs'),cases=parseTap(child.stdout);
+ assert.deepEqual(cases.map(row=>[row.id,row.root,row.status,row.skipReason]),[['test group workflow browser path reaches the installer and enforcing persistence consumer','test group workflow browser path reaches the installer and enforcing persistence consumer','passed',null]],'Exactly one successful actual workflow consumer must execute');
+ for(const [summary,count]of Object.entries({tests:1,suites:0,pass:1,fail:0,cancelled:0,skipped:0,todo:0}))assert.match(child.stdout,new RegExp('^# '+summary+' '+count+'$','m'),'Exact workflow consumer TAP summary: '+summary);
 });

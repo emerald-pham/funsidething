@@ -272,7 +272,6 @@ jobs:
     env:
       CHAIN_TEST_EVENT_POLICY: ${{ needs.validation-context.outputs.policy }}
       CHAIN_TEST_COMPARISON_BASE: ${{ needs.validation-context.outputs.base }}
-      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/playwright-browsers
     steps:
       - uses: actions/checkout@v4
         with:
@@ -300,6 +299,8 @@ jobs:
       - run: npm ci
         if: steps.selected.outputs.decision == 'full' && !contains(fromJSON(steps.selected.outputs.reused), matrix.group)
       - name: Install matching native Chromium
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/playwright-browsers
         if: steps.selected.outputs.decision == 'full' && !contains(fromJSON(steps.selected.outputs.reused), matrix.group)
         run: |
           engines=(chromium)
@@ -316,6 +317,8 @@ jobs:
           path: ${{ runner.temp }}/early
       - name: Execute complete assigned group
         id: group
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/playwright-browsers
         run: |
           group_args=(--group "${{ matrix.group }}" --early-receipt "$RUNNER_TEMP/early/receipt.json")
           if [[ "${{ matrix.group }}" == "persistence-recovery" ]]; then
