@@ -136,7 +136,7 @@ function attachInputArtifacts(f,github,jobs){
     const directory=path.join(f.root,name),prefix=emulator?gate+'/':'';mkdirSync(path.join(directory,prefix,'native'),{recursive:true});
     const stdout='TAP version 13\n# tests 24\n# pass 24\n# fail 0\n# cancelled 0\n# skipped 0\n';
     writeFileSync(path.join(directory,prefix,'stdout.tap'),stdout);writeFileSync(path.join(directory,prefix,'stderr.log'),'');
-    const native='{"status":"passed","mode":"original"}\n';writeFileSync(path.join(directory,prefix,'native/original.json'),native);
+    const native=gate==='native-process'&&f.largeNativeEvidence?f.largeNativeEvidence:'{"status":"passed","mode":"original"}\n';writeFileSync(path.join(directory,prefix,'native/original.json'),native);
     const report={status:'passed',resultIdentity:{repository:'fixture/repo',runId:String(job.run_id),runAttempt:emulator?String(job.run_attempt):Number(job.run_attempt),sourceSha:job.head_sha,checkoutSha:f.merge,checkoutTree:f.tree,comparisonBase:f.base,selectedGroup:gate,checkoutDirty:false},
       issues:[],cases:[{id:'original fixture case',status:'passed'}],artifacts:[{path:'native/original.json',bytes:Buffer.byteLength(native),sha256:hash(native)}],process:{exitCode:0,signal:null,spawnError:null,stdout:{path:'stdout.tap',sha256:hash(stdout)},stderr:{path:'stderr.log',sha256:hash('')},stdoutSha256:hash(stdout),stderrSha256:hash('')},tests:24,passed:24};
     const bytes=JSON.stringify(report);writeFileSync(path.join(directory,prefix,'result.json'),bytes);
@@ -312,6 +312,31 @@ test('workflow input reuse requires readable retained original result and native
     const github=publishedInputPass(f,plan.record);mutate(github);writeFileSync(f.external,JSON.stringify(github));
     const main=invoke(f,{ref:'refs/heads/main',checkout:f.merge,source:f.merge});assert.equal(main.status,0,main.stderr);
     assert.equal(main.record.inputPasses.core,undefined,name+' must require current execution');
+  });
+});
+
+test('workflow input reuse retains large original native evidence and rejects changed bytes', async parent=>{
+  for(const scenario of ['retained large original','changed native bytes','wrong declared bytes'])await parent.test(scenario,t=>{
+    const f=fixture(t),plan=invoke(f,{event:'pull_request',ref:'refs/pull/17/merge',checkout:f.merge,planOnly:true});
+    f.largeNativeEvidence=Buffer.concat([Buffer.alloc(33*1024*1024,32),Buffer.from('{"status":"passed"}\n')]);
+    const github=publishedInputPass(f,plan.record,['native-process']);
+    const artifact=github.artifacts.find(a=>a.name.endsWith('-native-process')),directory=artifact.fixturePath.slice(0,-4);
+    if(scenario!=='retained large original'){
+      const reportPath=path.join(directory,'result.json'),report=JSON.parse(readFileSync(reportPath));
+      if(scenario==='changed native bytes'){f.largeNativeEvidence[0]=10;writeFileSync(path.join(directory,'native/original.json'),f.largeNativeEvidence);}
+      else report.artifacts[0].bytes--;
+      const bytes=JSON.stringify(report);writeFileSync(reportPath,bytes);
+      const marker=github.jobs.find(j=>j.name==='regression-native-process').steps.find(s=>s.name.startsWith('Completed CI gate '));
+      marker.name=marker.name.replace(/result [a-f0-9]{64}$/, 'result '+createHash('sha256').update(bytes).digest('hex'));
+      const zip=spawnSync('zip',['-qr',artifact.fixturePath,'.'],{cwd:directory,encoding:'utf8'});assert.equal(zip.status,0,zip.stderr);
+      artifact.digest='sha256:'+createHash('sha256').update(readFileSync(artifact.fixturePath)).digest('hex');
+    }
+    writeFileSync(f.external,JSON.stringify(github));
+    const main=invoke(f,{ref:'refs/heads/main',checkout:f.merge,source:f.merge});assert.equal(main.status,0,main.stderr);
+    if(scenario==='retained large original'){
+      assert.ok(main.record.inputPasses['native-process'],'the actual router must retain a successful native original above the old buffered-read limit');
+      assert.equal(main.record.inputPasses['native-process'].coveredBy.runId,'71');
+    }else{assert.equal(main.record.inputPasses['native-process'],undefined,scenario+' must require current execution');}
   });
 });
 

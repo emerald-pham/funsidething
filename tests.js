@@ -44981,6 +44981,12 @@ test('RISK repository process: unchanged CI inputs reuse an original successful 
  assert.match(result.stdout||'',/^# tests 1$/m);assert.match(result.stdout||'',/^# skipped 0$/m);
 });
 
+test('RISK repository process: large original CI artifacts retain verified coverage without buffering native reports',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^workflow input reuse retains large original native evidence and rejects changed bytes$','scripts/agent-tools/ci-routing.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
+ assert.equal(result.status,0,result.stdout+result.stderr);assert.match(result.stdout||'',/^# tests 4$/m);assert.match(result.stdout||'',/^# skipped 0$/m);
+});
+
 test('RISK repository process: released host locks cannot cause spurious CI migration failures',()=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
  const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^migration accepts a live token lock released during ownership inspection$','scripts/agent-tools/coordination.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});

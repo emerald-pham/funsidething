@@ -20259,5 +20259,23 @@
     "repair": "Route the migration preflight through the same ownership snapshot helper. Only ENOENT is treated as a released lock; replaced inode, unsafe metadata, malformed ownership and changed bytes remain refusals.",
     "green": "46f9303a passed17 migration/related cases. 579cc155 passed the RISK command wrapper with real source and target releases at reads1/2 (preflight) and3/4 (acquisition), preserving exact ledger bytes. This does not claim hosted or live host-ledger migration."
   }
+},
+{
+  "baseCommit": "5b96b6169f723a88d385e4a5b666165542965c55",
+  "testChangesSha256": "9c21a3334354f40f3ef054da483d3a0372b3401dc22a9d643d6538ad06efd33b",
+  "reason": "Preserve complete original native CI evidence while removing the 32 MiB buffered-read ceiling that forced valid native passes to run again.",
+  "previousBehavior": "The first hosted main run reused five gates but rejected the original successful native gate because its 62-65 MB proof members overflowed spawnSync buffering.",
+  "intendedBehavior": "Native members are hashed through a size-bounded stream; exact bytes, original identity, artifact digest and missing/unsafe/expired evidence refusals remain required.",
+  "replacementTests": [
+    "RISK repository process: large original CI artifacts retain verified coverage without buffering native reports"
+  ],
+  "preservedCoverage": [
+    "All existing reuse, failure chronology, runtime, source/tree/base, original archive identity, raw TAP, native hash and zero-child coverage assertions remain unchanged.",
+    "The new actual router fixtures require a valid 33 MiB native original to produce a reusable pass, while altered bytes and an incorrect declared size require execution. Existing duplicate-child admission continues to enforce the consumer boundary."
+  ],
+  "redEvidence": {
+    "command": "record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=^RISK repository process: unchanged CI inputs tests.js",
+    "failure": "Contemporaneous RED403ed4ba rejected the valid large original with the intended original-pass assertion; corrupt bytes and wrong sizes already failed closed. The same assertions were extracted from the existing wrapper into a dedicated named RISK root after GREEN839c5564, retaining the original wrapper unchanged. First follow-up d2c5c3b1 accepted the large native pass but exposed an incorrect fixture assertion equating per-gate admission with whole-cohort mode; it is retained as failed, not passed."
+  }
 }
 ]
