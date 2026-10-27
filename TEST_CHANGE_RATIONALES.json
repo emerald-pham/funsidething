@@ -20703,13 +20703,12 @@
   },
   {
     "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
-    "testChangesSha256": "e1f1072ac538ea1b74a90611df5e6604c91ed1a3e193da628813bbf0af966b85",
+    "testChangesSha256": "0224cf9f4c341c49246e7f9ec39320dc84d9dc87d9a88142ed5a691c0dfa7345",
     "reason": "Reconcile the already integrated #324/#325 protected tests and adapt the actual current-source startup consumer for #326. Require shared capture metrics at the requested screenshot boundary, reject transient theme changes that revert before the bytes return, and bind actual source, served-response, runtime, font, and PNG evidence without importing PR #294 application changes.",
     "previousBehavior": "The existing startup consumer retained its recovery and layout assertions but took requested screenshots directly after before-screenshot paint checks. A theme attribute could change and revert during that interval without a shared capture report; report source identity used a caller label or working-tree fallback and did not bind every actual response body.",
     "intendedBehavior": "When capture output is explicitly requested, the existing actual app consumer calls the shared capture helper for its named pending-status and neighboring Review-control surfaces at the measured viewport and ordinary/enlarged scales. Stable captures pass frame, mutation, paint, theme, viewport, surface, font, and PNG integrity checks; a flip that reverts during capture fails metrics while the retained PNG is independently integrity-checked. The report records observed Git commit/tree plus current test/tool/config/source file hashes and actual browser response-body hashes. Without output, the existing consumer creates no rendered reports or screenshots.",
     "replacementTests": [
-      "RISK integrated automatic recovery native: persisted startup status and neighboring controls remain usable with one browser and isolated contexts",
-      "RISK repository process: local preflight rejects stale FAQ and unassigned roots before qualification",
+        "RISK repository process: local preflight rejects stale FAQ and unassigned roots before qualification",
       "RISK repository process: document query fixtures stay selector scoped and preserve shim results"
     ],
     "preservedCoverage": [
