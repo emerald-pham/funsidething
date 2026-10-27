@@ -277,7 +277,7 @@ export function verifyNativeAttribution(reportPath, expected) {
       expected = { nativeControl: true, knownElfSha256: k.elfSha256 };
     }
     const verified = verifyBrowserNative(report, directory, expected);
-    if (report.control && verified.nativeStacksCaptured && !report.symbolizedFunctions.includes(report.control.symbol))
+    if (report.control && verified.nativeStacksCaptured && !report.symbolizedFunctions.some(symbol => symbol.split("+")[0] === report.control.symbol))
       throw Error("Linux known native control is missing its independently expected hot routine: " + report.control.symbol);
     return verified;
   }

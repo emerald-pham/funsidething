@@ -45721,10 +45721,11 @@ test('RISK repository process: browser preflight interruption cleans its actual 
 });
 
 
-test('RISK repository process: fresh Linux known-control verification requires its independent hot routine',()=>{
+test('RISK repository process: fresh Linux known-control verification requires its independent hot routine',{timeout:20000},()=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
  const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^fresh Linux known-control verification','scripts/agent-tools/native-attribution.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:15000});
  assert.equal(child.status,0,'Fresh durable Linux control verification must distinguish the known hot routine from generic loader symbols: '+child.stdout+child.stderr);assert.match(child.stdout,/# tests 1$/m);assert.match(child.stdout,/# skipped 0$/m);
+ assert.match(child.stdout,/Known native symbol offsets passed fresh verification; loader-only and wrong-symbol witnesses stayed refused/,'The existing public risk consumer must execute its offset-positive and retained negative controls');
 });
 
 

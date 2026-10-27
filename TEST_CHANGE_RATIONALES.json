@@ -20942,5 +20942,41 @@
       "command": "Existing record-run.mjs --purpose preimplementation-red executed focused tests.js process roots separately for 290, 323, 289 and 326; actual command and baseline/source timestamps are in /Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/review/repairs/runs/{290,323,289,326}/.",
       "failure": "Observed on 89dccff before each corresponding functional edit: canonical manifest core/native owner assertion failed; real detached test family survived SIGINT and SIGTERM; fresh CLI accepted self-consistent loader-only stacks; exported named 1.5x comparison accepted 16→16.1 and 20→20.1. Records ea0fbb3a, f52b1588, 537b0d44 and a480df35 are preserved. The known-control raw text is a labelled durable verifier witness, not fabricated actual Linux capture."
     }
+  },
+  {
+    "testChangesSha256": "52efe0a12e7ed7478ba9d5c2d2290bcc6ce72d5ed61085935f62927a2eef3264",
+    "reason": "Repair the newly reviewed Linux known-control offset mismatch at the existing public fresh-verification risk consumer. Preserve all825 prior rationale records as an exact raw prefix. Comparison d635379ebb7913a165f88027828b5a57ef64d4e1.",
+    "previousBehavior": "The actual capture producer admitted diagnosticKnownHotLoop+0x7, but fresh verification rejected that retained known routine through literal symbol equality.",
+    "intendedBehavior": "Fresh verification normalizes the observed symbol exactly as the producer does, accepting the known routine with its offset while refusing loader-only and different-symbol+offset witnesses. The existing risk root requires those controls and adds a20-second outer timeout while retaining its15-second child bound.",
+    "replacementTests": [
+      "RISK repository process: fresh Linux known-control verification requires its independent hot routine"
+    ],
+    "preservedCoverage": [
+      "Exact known source/ELF/build metadata, raw bytes/hash and interpreted-stack agreement, process identity, clock bounds, coverage and cleanup checks remain unchanged.",
+      "Loader-only known-control refusal, different-symbol refusal, ordinary partial app attribution, complete/product/causal false flags and the finite hosted allowance remain protected.",
+      "All2678 existing root assignments, accepted skips,36 application assets, and all prior four-repair RED/GREEN/source evidence are retained."
+    ],
+    "redEvidence": {
+      "command": "Node22.23.3 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node22 --test --test-reporter=tap --test-name-pattern=^RISK repository process: fresh Linux known-control verification tests.js; exact command/source/time in review/native-offset-repair/runs/red/2026-10-27T11-03-27-324Z-c741e23e-5633-48be-9495-fb492cad11e0.json.",
+      "failure": "Observed before verifier change on d635379: the actual fresh public diagnostic-native-verify CLI rejected retained diagnosticKnownHotLoop+0x7, expected exit0 but actual1, with missing independently expected hot routine. This is a labelled controlled durable perf-text witness, not actual Linux capture. GREEN a50668c9 follows the one-line normalization fix; prior source/review records remain immutable."
+    }
+  },
+  {
+    "testChangesSha256": "bca1e9e918952705f81320acbfc3ff43b10e3accabbf98e50064e8d4c660bca4",
+    "reason": "Repair the newly reviewed Linux known-control offset mismatch at the existing public fresh-verification risk consumer. Preserve all825 prior rationale records as an exact raw prefix. Comparison 6c67fb0c9988d3e578579c7bb23a8ed0731aac3f.",
+    "previousBehavior": "The actual capture producer admitted diagnosticKnownHotLoop+0x7, but fresh verification rejected that retained known routine through literal symbol equality.",
+    "intendedBehavior": "Fresh verification normalizes the observed symbol exactly as the producer does, accepting the known routine with its offset while refusing loader-only and different-symbol+offset witnesses. The existing risk root requires those controls and adds a20-second outer timeout while retaining its15-second child bound.",
+    "replacementTests": [
+      "RISK repository process: fresh Linux known-control verification requires its independent hot routine"
+    ],
+    "preservedCoverage": [
+      "Exact known source/ELF/build metadata, raw bytes/hash and interpreted-stack agreement, process identity, clock bounds, coverage and cleanup checks remain unchanged.",
+      "Loader-only known-control refusal, different-symbol refusal, ordinary partial app attribution, complete/product/causal false flags and the finite hosted allowance remain protected.",
+      "All2678 existing root assignments, accepted skips,36 application assets, and all prior four-repair RED/GREEN/source evidence are retained."
+    ],
+    "redEvidence": {
+      "command": "Node22.23.3 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node22 --test --test-reporter=tap --test-name-pattern=^RISK repository process: fresh Linux known-control verification tests.js; exact command/source/time in review/native-offset-repair/runs/red/2026-10-27T11-03-27-324Z-c741e23e-5633-48be-9495-fb492cad11e0.json.",
+      "failure": "Observed before verifier change on d635379: the actual fresh public diagnostic-native-verify CLI rejected retained diagnosticKnownHotLoop+0x7, expected exit0 but actual1, with missing independently expected hot routine. This is a labelled controlled durable perf-text witness, not actual Linux capture. GREEN a50668c9 follows the one-line normalization fix; prior source/review records remain immutable."
+    }
   }
 ]
