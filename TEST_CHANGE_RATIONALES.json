@@ -20176,5 +20176,31 @@
       "command": "Recorder-backed node --test focused RISK consumer attempts in /Users/emeraldpham/Documents/GitHub/funsidething/.git/agent-test-runs/quiet-board-startup; original Node RED c45a9f5c-04b6-42a1-8afb-e885177a9b01, later status RED 2026-10-26T23-24-58-643Z-f8199d26-8906-4779-8277-db009f78a736, enlarged-text RED 2026-10-26T23-29-18-278Z-514da5b9-27a7-4e49-bc2a-cb83e6219756, FAQ RED 2026-10-26T23-33-23-531Z-10561260-d608-433a-b16a-48a189094e84.",
       "failure": "The original real consumer returned recovery pending instead of syncing while state was null. The later rendered baseline showed a genuine cloud init error in the live header but stale syncing in the cached appearance. At 390px and 18px, the busy label needed 95px but had 86px. The new FAQ assertion failed because Help did not distinguish opening status from cloud confirmation or preserve warning expectations. Recorder outputs preserve these assertion-level failures; later rendered status and Help checks passed."
     }
+  },
+  {
+    "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
+    "testChangesSha256": "032d5db057675a6b3a94a68663d638444521b3713811fa8af4d87e886cccf5dc",
+    "reason": "Fix the installed-iPhone broken-board opening: startup showed recovery pending before the supported board appeared. Real-consumer REDs identified premature durable-hold status, a stale saved-appearance badge, and clipped enlarged status text; configured-module REDs also exposed the cached warning before the first CloudSync event.",
+    "previousBehavior": "Before the supported board hydrated, a genuine durable recovery hold could paint as the opening status. A prior cached recovery warning could remain visible while the real configured CloudSync module was initializing, and later live errors could be absent from the saved appearance. The 18px busy badge also overflowed its fixed width beside Settings.",
+    "intendedBehavior": "Before hydration, configured cloud status shows disabled syncing with an explicit board-opening and unconfirmed-cloud title. Actual errors remain visible immediately. The inert saved appearance is normalized before first paint and mirrors subsequent real status without gaining authority or actions. Genuine recovery holds remain visible after supported-board hydration. Enlarged status text fits beside Settings; Help distinguishes opening from cloud confirmation and preserves genuine warnings.",
+    "replacementTests": [
+      "RISK AUTH HYDRATION: a broken device board stays quiet until protected local recovery is visible",
+      "RISK saved view broken-board startup: prior appearance stays inert until the recovered board opens",
+      "RISK saved view broken-board startup: configured Firebase leaves the prior warning neutral until its first event",
+      "RISK saved view broken-board status: configured cloud changes remain visible in the saved appearance and after recovery",
+      "RISK saved view broken-board guidance: opening status does not imply cloud confirmation or erase recovery warnings"
+    ],
+    "preservedCoverage": [
+      "The malformed device head, exact retained sources, durable recovery hold, and independently supported working board remain distinct; the real consumer validates the supported board before hydration.",
+      "The browser setup seeds the remembered recovery warning through protected local recovery, then separately holds real configured Firebase module imports and the first IndexedDB read. The opening assertion observes zero cloud events and no hydrated board.",
+      "Actual initialization errors are shown in both live and saved status. The cached appearance remains inert and aria-hidden, preserves account masking and the missing-appearance fallback, and never authorizes the preview board.",
+      "After hydration, the genuine recovery hold remains visible across cloud error and syncing transitions; exact malformed originals and supported source copies stay protected.",
+      "The rendered matrix covers Chromium and WebKit, light/dark themes, 390x844 and 1100x900 viewports, natural and 18px status beside Settings, theme paint before and after hydration, and populated live-list top/middle/end scrolling. Chromium keyboard focus is captured with its native visible outline. The WebKit Shift+Tab attempt leaves focus on BODY and is a coverage limit, not a pass.",
+      "All fixtures use isolated synthetic storage and browser profiles. No production board, account, installed iPhone, or physical-device behavior is claimed."
+    ],
+    "redEvidence": {
+      "command": "Recorder-backed Node consumers used node scripts/agent-tools/record-run.mjs --repo <task-worktree> --evidence-dir <common-git-task-evidence> --purpose preimplementation-red --summary -- node --test --test-name-pattern=<focused RISK consumer> tests.js. Exact records: initial consumer c45a9f5c-04b6-42a1-8afb-e885177a9b01; configured-module first-paint b91929bd-d950-4431-af29-af44230e6ab7; later saved-status, enlarged-text, and guidance controls f8199d26-8906-4779-8277-db009f78a736, 514da5b9-27a7-4e49-bc2a-cb83e6219756, and 10561260-d608-433a-b16a-48a189094e84.",
+      "failure": "The initial actual consumer showed recovery pending in both direct render and cloudsync event paths while state was null instead of syncing. With the real configured module and initial IndexedDB read held, the prior cached warning still painted before any CloudSync event instead of disabled syncing. A later real cloud error updated only the live header, not the saved appearance. At 390px with 18px text, syncing needed 95px but had 86px available. The Help assertion also failed because it did not explain that opening status is not cloud confirmation or that genuine recovery warnings remain. Each assertion-level RED and output is retained in the named recorder record; the exact-source focused group now passes."
+    }
   }
 ]

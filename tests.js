@@ -1083,7 +1083,8 @@ test('RISK unreadable device recovery: Quick start and current Changelog explain
  assert.ok(answer,'the extended FAQ covers unreadable missing unsupported and partial device sources');
  assert.match(answer,/one Restore action.*choose a JSON file or Paste JSON/i);assert.match(answer,/Download backup offers Raw device sources/i);
  assert.match(answer,/not an empty recovered board/);assert.match(answer,/Cloud recovery stays pending/);
- assert.match(answer,/While the saved board is opening, the header says syncing and stays disabled unless a real cloud error needs attention\./);
+ assert.match(answer,/When cloud sync is configured, the header shows disabled syncing while the board is still opening; this does not confirm cloud saving\./);
+ assert.match(answer,/After the board opens, genuine recovery warnings and cloud errors remain visible\./);
  assert.match(answer,/recovery hold remains until a validated source choice confirms cloud saving/);
  assert.match(html,/one guarded Restore action for a file or pasted JSON/,'the current changelog describes the consolidated restore route');
  assert.match(html,/unreadable device data offers a source-only archive/,'the current changelog preserves the raw-source recovery limit');
@@ -15797,10 +15798,26 @@ async function invisibleSavedViewBrowser(theme='light',delayAppearanceAsset=fals
  const engineName=startupOptions.browserEngine==='webkit'?'webkit':'chromium',engine=engineName==='webkit'?webkit:chromium,
   evidencePrefix=startupOptions.brokenDeviceBoard?`broken-board-${engineName}-${theme}-${viewport.width}-${startupOptions.retainAppearance===false?'without-appearance':'with-appearance'}`:`invisible-${theme}`;
  const browser=await engine.launch(engineName==='webkit'?{headless:true}:{headless:true,channel:process.env.LANDSCAPE_BROWSER_CHANNEL||'chrome'});
+ let releaseFirebaseImports,resolveFirebaseImportsStarted,firebaseImportCount=0;
+ const firebaseImportsStarted=new Promise(resolve=>{resolveFirebaseImportsStarted=resolve;});
+ const firebaseImportsReleased=new Promise(resolve=>{releaseFirebaseImports=resolve;});
+ const releaseHeldFirebaseImports=()=>releaseFirebaseImports?.();
+ const waitForFirebaseImports=async(expected=3)=>{
+  if(firebaseImportCount>=expected)return firebaseImportCount;
+  await Promise.race([firebaseImportsStarted,new Promise((_,reject)=>setTimeout(()=>reject(Error('Configured Firebase imports did not reach the held-module boundary')),8000))]);
+  if(firebaseImportCount<expected)throw Error(`Expected ${expected} held Firebase module imports, observed ${firebaseImportCount}`);
+  return firebaseImportCount;
+ };
  try{
  const context=await browser.newContext({viewport,serviceWorkers:'block',reducedMotion:'reduce'});
  const origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
  await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+ if(startupOptions.holdConfiguredFirebaseImports)await context.route('https://www.gstatic.com/firebasejs/10.12.2/**',async route=>{
+  firebaseImportCount++;
+  if(firebaseImportCount>=3)resolveFirebaseImportsStarted(firebaseImportCount);
+  await firebaseImportsReleased;
+  await route.abort();
+ });
  if(startupOptions.syntheticCloud)await context.addInitScript(()=>{
   let cloud={configured:true,ready:false,user:null,status:'syncing',errorStage:null,errorCode:null,
    signIn(){},signOut(){},async pull(){return{error:true};},async push(){return{error:true};}};
@@ -15808,15 +15825,17 @@ async function invisibleSavedViewBrowser(theme='light',delayAppearanceAsset=fals
  });
  if(delayAppearanceAsset)await context.route('**/saved-appearance.js',async route=>{await new Promise(resolve=>setTimeout(resolve,600));await route.continue();});
  await context.addInitScript(theme=>{
-  Object.defineProperty(window,'FIREBASE_CONFIG',{value:null,writable:false});
+  const configured=localStorage.getItem('__quietStartupConfiguredCloud')==='true';
+  Object.defineProperty(window,'FIREBASE_CONFIG',{value:configured?{apiKey:'quiet-startup-test-only',authDomain:'quiet-startup.invalid',projectId:'quiet-startup-test'}:null,writable:false});
+  window.__cloudsyncEvents=0;window.addEventListener('cloudsync',()=>window.__cloudsyncEvents++);
   localStorage.setItem('fvp:chain-scanner:theme',theme);
   localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
   window.__actualLocalRead={started:false,settled:false};
   window.__firstAppearanceFrames=[];let frames=0;function observe(){if(localStorage.getItem('__delayLocalRead')==='true'&&document.querySelector('.wrap')){const preview=document.querySelector('[data-saved-preview]');window.__firstAppearanceFrames.push({ready:document.documentElement.dataset.appReady==='true',populated:!!preview&&getComputedStyle(preview).visibility==='visible'&&!!preview.querySelector('.trow')});}if(++frames<180)requestAnimationFrame(observe);}requestAnimationFrame(observe);
   const open=indexedDB.open.bind(indexedDB),success=Object.getOwnPropertyDescriptor(IDBRequest.prototype,'onsuccess');
   indexedDB.open=(...args)=>{const request=open(...args);if(localStorage.getItem('__delayLocalRead')!=='true')return request;
-   window.__actualLocalRead.started=true;let listener=null;
-   Object.defineProperty(request,'onsuccess',{configurable:true,get:()=>listener,set:fn=>{listener=fn;success.set.call(request,event=>setTimeout(()=>{window.__actualLocalRead.settled=true;fn?.call(request,event);},1800));}});return request;};
+   window.__actualLocalRead.started=true;let listener=null;const delay=Number(localStorage.getItem('__delayLocalReadMs'))||1800;
+   Object.defineProperty(request,'onsuccess',{configurable:true,get:()=>listener,set:fn=>{listener=fn;success.set.call(request,event=>setTimeout(()=>{window.__actualLocalRead.settled=true;fn?.call(request,event);},delay));}});return request;};
  },theme);
  const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
  await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded',timeout:10000});
@@ -15833,13 +15852,13 @@ async function invisibleSavedViewBrowser(theme='light',delayAppearanceAsset=fals
  await page.locator('[data-act="list-eligibility"][data-id="all"]').click();
  await page.locator('#listSearch').fill('Saved appearance');
  await page.locator('#listBody').evaluate(e=>{e.scrollTop=420;e.dispatchEvent(new Event('scroll'));});
- const startup=await page.evaluate(async({brokenDeviceBoard,retainAppearance,topOfPage,seedPriorRecoveryAppearance})=>{
+ const startup=await page.evaluate(async({brokenDeviceBoard,retainAppearance,topOfPage,seedPriorRecoveryAppearance,theme})=>{
   window.scrollTo(0,topOfPage?0:220);window.dispatchEvent(new Event('pagehide'));
   let brokenPayload=null;
   if(brokenDeviceBoard){
    brokenPayload='{broken durable device board';
    const sourceBoard=JSON.parse(JSON.stringify(state));
-   if(sourceBoard.settings?.theme==null)sourceBoard.settings.theme='system';
+   sourceBoard.settings??={};sourceBoard.settings.theme=theme;
    const source=JSON.stringify(sourceBoard);
    const checked=cloudSourceRecoveryBoard(source,state.syncAccount??null);
    window.__brokenBoardSourceCheck={account:state.syncAccount??null,hasSyncAccount:Object.hasOwn(state,'syncAccount'),hasSyncIdentity:Object.hasOwn(state,'syncIdentity'),
@@ -15855,7 +15874,7 @@ async function invisibleSavedViewBrowser(theme='light',delayAppearanceAsset=fals
   if(!retainAppearance){localStorage.removeItem('fvp:chain-scanner:appearance:v1');localStorage.removeItem('fvp:chain-scanner:saved-view:v1');}
   if(!seedPriorRecoveryAppearance)localStorage.setItem('__delayLocalRead','true');
   return{brokenPayload,sourceCheck:window.__brokenBoardSourceCheck||null};
- },{brokenDeviceBoard:startupOptions.brokenDeviceBoard===true,retainAppearance:startupOptions.retainAppearance!==false,topOfPage:startupOptions.topOfPage===true,seedPriorRecoveryAppearance:startupOptions.seedPriorRecoveryAppearance===true});
+ },{brokenDeviceBoard:startupOptions.brokenDeviceBoard===true,retainAppearance:startupOptions.retainAppearance!==false,topOfPage:startupOptions.topOfPage===true,seedPriorRecoveryAppearance:startupOptions.seedPriorRecoveryAppearance===true,theme});
  if(startupOptions.retainAppearance===false)await page.addInitScript(()=>{localStorage.removeItem('fvp:chain-scanner:appearance:v1');localStorage.removeItem('fvp:chain-scanner:saved-view:v1');});
  if(startupOptions.seedPriorRecoveryAppearance){
   await page.reload({waitUntil:'domcontentloaded'});
@@ -15887,13 +15906,14 @@ async function invisibleSavedViewBrowser(theme='light',delayAppearanceAsset=fals
  }
  if(process.env.SAVED_VIEW_ARTIFACT_DIR)await page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`${evidencePrefix}-before.png`)});
  const before=await page.evaluate(()=>({query:document.getElementById('listSearch').value,scroll:document.getElementById('listBody').scrollTop,pageY:scrollY,geometry:(()=>{const rect=id=>{const r=document.getElementById(id).getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height};};return{scan:rect('scan'),list:rect('listWrap'),body:rect('listBody'),separators:document.querySelectorAll('#scan hr.sep').length};})(),visibleTitles:(()=>{const body=document.getElementById('listBody'),r=body.getBoundingClientRect();return[...body.querySelectorAll('.trow')].filter(e=>{const b=e.getBoundingClientRect();return b.bottom>r.top&&b.top<Math.min(r.bottom,innerHeight);}).map(e=>e.querySelector('.tt')?.textContent);})(),header:(()=>{const r=document.getElementById('appHeader').getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height};})(),tasks:JSON.stringify(state.tasks),sourceCopies:{legacy:localStorage.getItem('fvp:chain-scanner:v1'),localHead:localStorage.getItem('fvp:chain-scanner:protected:v1')},cache:localStorage.getItem('fvp:chain-scanner:appearance:v1')}));
- await page.reload({waitUntil:'domcontentloaded'});
+ if(startupOptions.holdConfiguredFirebaseImports)await page.evaluate(()=>{localStorage.setItem('__quietStartupConfiguredCloud','true');localStorage.setItem('__delayLocalReadMs','4000');});
+ await page.reload({waitUntil:startupOptions.holdConfiguredFirebaseImports?'commit':'domcontentloaded'});
  await page.waitForFunction(()=>window.__actualLocalRead?.started,null,{timeout:10000});
- const early=await page.evaluate(()=>{const preview=document.querySelector('[data-saved-preview]'),list=preview?.querySelector('[data-preview-id="listBody"]'),search=preview?.querySelector('[data-preview-id="listSearch"]'),status=(button)=>{if(!button)return null;const box=button.getBoundingClientRect(),style=getComputedStyle(button);return{text:button.textContent,disabled:button.disabled,hidden:button.hidden,visibility:style.visibility,fontSize:style.fontSize,clientWidth:button.clientWidth,scrollWidth:button.scrollWidth,box:{x:box.x,y:box.y,width:box.width,height:box.height}};},liveSync=document.getElementById('syncBtn'),projectedSync=preview?.querySelector('.syncbtn'),liveSettings=document.querySelector('#appHeader [data-act="settings"]'),projectedSettings=preview?.querySelector('.topbtns .ghost:last-child');return{settled:window.__actualLocalRead.settled,ready:document.documentElement.dataset.appReady==='true',shellVisibility:getComputedStyle(document.querySelector('.wrap')).visibility,previewVisible:!!preview&&getComputedStyle(preview).visibility==='visible',rows:[...(list?.querySelectorAll('.trow')||[])].map(e=>e.textContent),query:search?.value,listScroll:list?.scrollTop,pageY:scrollY,geometry:(()=>{const rect=id=>{const r=preview?.querySelector('[data-preview-id="'+id+'"]')?.getBoundingClientRect();return r?{x:r.x,y:r.y,width:r.width,height:r.height}:null;};return{scan:rect('scan'),list:rect('listWrap'),body:rect('listBody'),separators:preview?.querySelectorAll('hr.sep').length||0};})(),visibleTitles:(()=>{if(!list)return[];const r=list.getBoundingClientRect();return[...list.querySelectorAll('.trow')].filter(e=>{const b=e.getBoundingClientRect();return b.bottom>r.top&&b.top<Math.min(r.bottom,innerHeight);}).map(e=>e.querySelector('.tt')?.textContent);})(),header:(()=>{const r=preview?.querySelector('[data-preview-id="appHeader"]')?.getBoundingClientRect();return r?{x:r.x,y:r.y,width:r.width,height:r.height}:null;})(),sync:{live:status(liveSync),projection:status(projectedSync),settings:status(liveSettings),projectionSettings:status(projectedSettings)},status:document.getElementById('startupStatus')?.textContent||null,theme:document.documentElement.dataset.theme,colorScheme:getComputedStyle(document.documentElement).colorScheme,duplicateIds:[...document.querySelectorAll('[id]')].map(e=>e.id).filter((id,i,all)=>all.indexOf(id)!==i),activeActions:preview?.querySelectorAll('[data-act],[href],[onclick],[onerror]').length||0};});
- if(process.env.SAVED_VIEW_ARTIFACT_DIR)await page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`${evidencePrefix}-early.png`)});
+ const early=await page.evaluate(()=>{const preview=document.querySelector('[data-saved-preview]'),list=preview?.querySelector('[data-preview-id="listBody"]'),search=preview?.querySelector('[data-preview-id="listSearch"]'),status=(button)=>{if(!button)return null;const box=button.getBoundingClientRect(),style=getComputedStyle(button);return{text:button.textContent,disabled:button.disabled,hidden:button.hidden,visibility:style.visibility,fontSize:style.fontSize,clientWidth:button.clientWidth,scrollWidth:button.scrollWidth,box:{x:box.x,y:box.y,width:box.width,height:box.height}};},liveSync=document.getElementById('syncBtn'),projectedSync=preview?.querySelector('.syncbtn'),liveSettings=document.querySelector('#appHeader [data-act="settings"]'),projectedSettings=preview?.querySelector('.topbtns .ghost:last-child');return{settled:window.__actualLocalRead.settled,ready:document.documentElement.dataset.appReady==='true',cloud:window.CloudSync?{configured:window.CloudSync.configured,ready:window.CloudSync.ready,status:window.CloudSync.status,errorStage:window.CloudSync.errorStage,errorCode:window.CloudSync.errorCode,events:window.__cloudsyncEvents}:null,shellVisibility:getComputedStyle(document.querySelector('.wrap')).visibility,previewVisible:!!preview&&getComputedStyle(preview).visibility==='visible',rows:[...(list?.querySelectorAll('.trow')||[])].map(e=>e.textContent),query:search?.value,listScroll:list?.scrollTop,pageY:scrollY,geometry:(()=>{const rect=id=>{const r=preview?.querySelector('[data-preview-id="'+id+'"]')?.getBoundingClientRect();return r?{x:r.x,y:r.y,width:r.width,height:r.height}:null;};return{scan:rect('scan'),list:rect('listWrap'),body:rect('listBody'),separators:preview?.querySelectorAll('hr.sep').length||0};})(),visibleTitles:(()=>{if(!list)return[];const r=list.getBoundingClientRect();return[...list.querySelectorAll('.trow')].filter(e=>{const b=e.getBoundingClientRect();return b.bottom>r.top&&b.top<Math.min(r.bottom,innerHeight);}).map(e=>e.querySelector('.tt')?.textContent);})(),header:(()=>{const r=preview?.querySelector('[data-preview-id="appHeader"]')?.getBoundingClientRect();return r?{x:r.x,y:r.y,width:r.width,height:r.height}:null;})(),sync:{live:status(liveSync),projection:status(projectedSync),settings:status(liveSettings),projectionSettings:status(projectedSettings)},status:document.getElementById('startupStatus')?.textContent||null,theme:document.documentElement.dataset.theme,colorScheme:getComputedStyle(document.documentElement).colorScheme,duplicateIds:[...document.querySelectorAll('[id]')].map(e=>e.id).filter((id,i,all)=>all.indexOf(id)!==i),activeActions:preview?.querySelectorAll('[data-act],[href],[onclick],[onerror]').length||0};});
+ if(process.env.SAVED_VIEW_ARTIFACT_DIR&&!startupOptions.holdConfiguredFirebaseImports)await page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`${evidencePrefix}-early.png`)});
  if(process.env.SAVED_VIEW_ARTIFACT_DIR)fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`${evidencePrefix}-probe.json`),JSON.stringify({before:{...before,cache:JSON.parse(before.cache||'null')},early},null,2));
- return {browser,context,page,errors,before,early,startup};
- }catch(error){await browser.close();throw error;}
+ return {browser,context,page,errors,before,early,startup,waitForFirebaseImports,releaseHeldFirebaseImports,get firebaseImportCount(){return firebaseImportCount;}};
+ }catch(error){releaseHeldFirebaseImports();await browser.close();throw error;}
 }
 
 test('RISK saved view invisible startup: real IndexedDB reload paints the prior populated search and position without loading chrome',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
@@ -15960,33 +15980,111 @@ test('RISK saved view broken-board startup: prior appearance stays inert until t
  }
 });
 
+test('RISK saved view broken-board startup: configured Firebase leaves the prior warning neutral until its first event',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const view=await invisibleSavedViewBrowser('light',false,false,{width:390,height:844},false,{brokenDeviceBoard:true,retainAppearance:true,topOfPage:true,seedPriorRecoveryAppearance:true,syntheticCloud:true,holdConfiguredFirebaseImports:true,browserEngine:'webkit'});
+ try{
+  assert.equal(view.startup.priorRecovery?.hold?.reason,'device-source-recovery','the remembered warning comes from a real protected local recovery');
+  assert.equal(view.startup.priorRecovery?.appearanceStatus,'☁ recovery pending','the initial cache contains the exact prior warning being tested');
+  const heldImports=await view.waitForFirebaseImports();
+  const opening=await view.page.evaluate(()=>({
+   configured:window.CloudSync?.configured===true,ready:window.CloudSync?.ready,status:window.CloudSync?.status,
+   events:window.__cloudsyncEvents,readStarted:window.__actualLocalRead.started,readSettled:window.__actualLocalRead.settled,
+   appReady:document.documentElement.dataset.appReady==='true',previewVisible:getComputedStyle(document.querySelector('[data-saved-preview]')).visibility==='visible',
+   previewInert:document.querySelector('[data-saved-preview]')?.inert,projection:document.querySelector('[data-saved-preview] .syncbtn')?.textContent,
+   projectionDisabled:document.querySelector('[data-saved-preview] .syncbtn')?.disabled,taskCount:document.querySelectorAll('[data-saved-preview] .trow').length,
+   viewport:{width:innerWidth,height:innerHeight}
+  }));
+  if(process.env.SAVED_VIEW_ARTIFACT_DIR){
+   fs.mkdirSync(process.env.SAVED_VIEW_ARTIFACT_DIR,{recursive:true});
+   fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,'configured-cloud-first-paint-before-event.json'),JSON.stringify({heldImports,opening,priorRecovery:view.startup.priorRecovery},null,2)+'\n');
+  }
+  assert.equal(heldImports,3,'all three real Firebase module imports are held before initialization completes');
+  assert.equal(opening.configured,true);assert.equal(opening.status,'syncing');
+  assert.equal(opening.events,0,'the first real cloudsync event has not fired');
+  assert.equal(opening.readStarted,true);assert.equal(opening.readSettled,false,'the durable broken-board read is still pending');
+  assert.equal(opening.appReady,false,'the supported recovered board is not yet authoritative');
+  assert.equal(opening.previewVisible,true);assert.equal(opening.previewInert,true);
+  assert.equal(opening.projection,'☁ syncing','the stale cached recovery warning is neutral before any cloud event');
+  assert.equal(opening.projectionDisabled,true);
+  assert.equal(opening.taskCount>0,true,'the safe cached appearance remains populated while startup waits');
+  view.releaseHeldFirebaseImports();
+  await view.page.waitForFunction(()=>window.CloudSync?.status==='error'&&window.__cloudsyncEvents>0,null,{timeout:8000});
+  const failed=await view.page.evaluate(()=>({status:window.CloudSync?.status,events:window.__cloudsyncEvents,appReady:document.documentElement.dataset.appReady==='true',readSettled:window.__actualLocalRead.settled,projection:document.querySelector('[data-saved-preview] .syncbtn')?.textContent,title:document.querySelector('[data-saved-preview] .syncbtn')?.title,previewInert:document.querySelector('[data-saved-preview]')?.inert}));
+  if(process.env.SAVED_VIEW_ARTIFACT_DIR)fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,'configured-cloud-first-import-error.json'),JSON.stringify(failed,null,2)+'\n');
+  assert.equal(failed.status,'error','an actual configured-module import failure remains visible');
+  assert.equal(failed.events>0,true);assert.equal(failed.appReady,false);assert.equal(failed.readSettled,false);
+  assert.equal(failed.projection,'☁ error','the real initialization failure replaces the neutral opening label');
+  assert.match(failed.title,/Cloud setup failed/);assert.equal(failed.previewInert,true);
+  assert.deepEqual(view.errors,[]);
+ }finally{view.releaseHeldFirebaseImports();await view.browser.close();}
+});
+
 test('RISK saved view broken-board status: configured cloud changes remain visible in the saved appearance and after recovery',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const observedThemePaint=[];
  for(const browserEngine of ['chromium','webkit'])for(const theme of ['light','dark'])for(const viewport of [{width:390,height:844},{width:1100,height:900}]){
-  const view=await invisibleSavedViewBrowser(theme,false,false,viewport,false,{brokenDeviceBoard:true,retainAppearance:true,syntheticCloud:true,topOfPage:true,browserEngine,seedPriorRecoveryAppearance:true});
+  const view=await invisibleSavedViewBrowser(theme,false,false,viewport,false,{brokenDeviceBoard:true,retainAppearance:true,syntheticCloud:true,topOfPage:true,browserEngine,seedPriorRecoveryAppearance:true,holdConfiguredFirebaseImports:true});
   try{
+   const detailedPageErrors=[];view.page.on('pageerror',error=>detailedPageErrors.push(error.stack||error.message));
    assert.equal(view.startup.priorRecovery?.hold?.reason,'device-source-recovery','the cached recovery-pending label comes from a real completed protected local recovery');
    assert.equal(view.startup.priorRecovery?.fixtureHoldSafelyCleared,true,'the isolated second broken head starts a separate recovery instead of reusing the prior hold');
    assert.equal(view.startup.priorRecovery?.status,'☁ recovery pending');
    assert.equal(view.startup.priorRecovery?.appearanceStatus,'☁ recovery pending');
    assert.equal(view.startup.priorRecovery?.appearanceDisabled,false);
-   await view.page.addStyleTag({content:'.syncbtn{font-size:18px!important}.topbtns [data-act="settings"]{font-size:19.5px!important}'});
+   const heldImports=await view.waitForFirebaseImports();
    const prefix=`broken-board-status-${browserEngine}-${theme}-${viewport.width}`;
-   const snapshot=()=>view.page.evaluate(()=>{
-    const preview=document.querySelector('[data-saved-preview]'),read=button=>{if(!button)return null;const rect=button.getBoundingClientRect(),style=getComputedStyle(button);return{text:button.textContent,title:button.title,disabled:button.disabled,hidden:button.hidden,visibility:style.visibility,fontSize:style.fontSize,clientWidth:button.clientWidth,scrollWidth:button.scrollWidth,left:rect.left,right:rect.right,top:rect.top,bottom:rect.bottom,width:rect.width,height:rect.height};};
-    return{ready:document.documentElement.dataset.appReady==='true',settled:window.__actualLocalRead.settled,previewVisible:!!preview&&getComputedStyle(preview).visibility==='visible',previewInert:!!preview?.inert,
-     projection:read(preview?.querySelector('.syncbtn')),live:read(document.getElementById('syncBtn')),settings:read(preview?.querySelector('.topbtns .ghost:last-child')),
-     header:(()=>{const rect=preview?.querySelector('[data-preview-id="appHeader"]')?.getBoundingClientRect();return rect?{left:rect.left,right:rect.right,top:rect.top,bottom:rect.bottom,width:rect.width,height:rect.height}:null;})(),
-     theme:document.documentElement.dataset.theme,colorScheme:getComputedStyle(document.documentElement).colorScheme,viewport:{width:innerWidth,height:innerHeight}};
+   const capture=async suffix=>{
+    if(!process.env.SAVED_VIEW_ARTIFACT_DIR)return;
+    const previous=process.env.PW_TEST_SCREENSHOT_NO_FONTS_READY;process.env.PW_TEST_SCREENSHOT_NO_FONTS_READY='1';
+    try{await view.page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`${prefix}-${suffix}.png`)});}finally{if(previous===undefined)delete process.env.PW_TEST_SCREENSHOT_NO_FONTS_READY;else process.env.PW_TEST_SCREENSHOT_NO_FONTS_READY=previous;}
+   };
+   const snapshot=()=>view.page.evaluate(async()=>{
+    const preview=document.querySelector('[data-saved-preview]'),read=button=>{if(!button)return null;const rect=button.getBoundingClientRect(),style=getComputedStyle(button);return{text:button.textContent,title:button.title,disabled:button.disabled,hidden:button.hidden,visibility:style.visibility,focused:document.activeElement===button,focusVisible:button.matches(':focus-visible'),fontLoaded:document.fonts.check(`${style.fontSize} ${style.fontFamily}`),style:{fontFamily:style.fontFamily,fontSize:style.fontSize,fontWeight:style.fontWeight,lineHeight:style.lineHeight,padding:style.padding,height:style.height,borderWidth:style.borderWidth,borderStyle:style.borderStyle,borderColor:style.borderColor,borderRadius:style.borderRadius,backgroundColor:style.backgroundColor,color:style.color,boxShadow:style.boxShadow,outlineStyle:style.outlineStyle,outlineWidth:style.outlineWidth,outlineOffset:style.outlineOffset,outlineColor:style.outlineColor},clientWidth:button.clientWidth,scrollWidth:button.scrollWidth,left:rect.left,right:rect.right,top:rect.top,bottom:rect.bottom,width:rect.width,height:rect.height};};
+    const panel=preview?.querySelector('[data-preview-id="listWrap"]')||document.getElementById('listWrap');
+    return{ready:document.documentElement.dataset.appReady==='true',settled:window.__actualLocalRead.settled,previewVisible:!!preview&&getComputedStyle(preview).visibility==='visible',previewInert:!!preview?.inert,taskCount:state?.tasks?.length??null,shellVisibility:getComputedStyle(document.querySelector('.wrap')).visibility,hold:await window.ScannerDeviceStore?.getRecoveryCloudHold?.()||null,activeElement:{id:document.activeElement?.id||null,action:document.activeElement?.getAttribute?.('data-act')||null,tag:document.activeElement?.tagName||null},
+     projection:read(preview?.querySelector('.syncbtn')),live:read(document.getElementById('syncBtn')),settings:read(preview?.querySelector('.topbtns .ghost:last-child')||document.querySelector('#appHeader [data-act="settings"]')),
+     header:(()=>{const rect=(preview?.querySelector('[data-preview-id="appHeader"]')||document.getElementById('appHeader'))?.getBoundingClientRect();return rect?{left:rect.left,right:rect.right,top:rect.top,bottom:rect.bottom,width:rect.width,height:rect.height}:null;})(),
+     cloud:{configured:window.CloudSync?.configured,ready:window.CloudSync?.ready,status:window.CloudSync?.status,events:window.__cloudsyncEvents},
+     theme:document.documentElement.dataset.theme,colorScheme:getComputedStyle(document.documentElement).colorScheme,paint:{rootBackground:getComputedStyle(document.documentElement).backgroundColor,bodyBackground:getComputedStyle(document.body).backgroundColor,bodyColor:getComputedStyle(document.body).color,panelBackground:panel?getComputedStyle(panel).backgroundColor:null,panelColor:panel?getComputedStyle(panel).color:null},viewport:{width:innerWidth,height:innerHeight}};
    });
+   const naturalOpening=await snapshot();
+   if(process.env.SAVED_VIEW_ARTIFACT_DIR)await capture('natural-syncing');
+   await view.page.addStyleTag({content:'.syncbtn{font-size:18px!important}.topbtns [data-act="settings"],.topbtns .ghost:last-child{font-size:19.5px!important}'});
    const opening=await snapshot();
-   if(process.env.SAVED_VIEW_ARTIFACT_DIR){fs.mkdirSync(process.env.SAVED_VIEW_ARTIFACT_DIR,{recursive:true});await view.page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`${prefix}-syncing.png`)});fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`${prefix}-syncing.json`),JSON.stringify(opening,null,2)+'\n');}
+   if(process.env.SAVED_VIEW_ARTIFACT_DIR){
+    fs.mkdirSync(process.env.SAVED_VIEW_ARTIFACT_DIR,{recursive:true});
+    await capture('syncing');
+    fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`${prefix}-syncing.json`),JSON.stringify({heldImports,naturalOpening,opening},null,2)+'\n');
+   }
    assert.equal(opening.ready,false,'the malformed device board has not hydrated while the saved appearance is shown');
    assert.equal(opening.settled,false,'the real device-store read remains held');
    assert.equal(opening.previewVisible,true,'the safe saved appearance stays visible while recovery opens');
    assert.equal(opening.previewInert,true,'status updates do not authorize the cached appearance');
+   assert.equal(opening.cloud?.configured,true);assert.equal(opening.cloud?.status,'syncing');assert.equal(opening.cloud?.events,0,'the actual configured module has not fired its first event');
+   assert.equal(naturalOpening.projection?.text,'☁ syncing');assert.equal(naturalOpening.projection?.disabled,true);
+   assert.equal(naturalOpening.projection?.style.fontSize,'12px','the natural system badge is recorded before enlargement');
+   assert.equal(naturalOpening.settings?.style.fontSize,'13px','the existing Settings control records its natural baseline size');
+   assert.equal(opening.projection?.style.fontSize,'18px','the visible badge is checked with enlarged text');
+   assert.equal(opening.settings?.style.fontSize,'19.5px','the saved preview Settings control receives the same enlarged-text check');
+   assert.equal(opening.projection?.style.fontFamily,naturalOpening.projection?.style.fontFamily);
+   assert.equal(opening.projection?.style.fontWeight,naturalOpening.projection?.style.fontWeight);
+   assert.equal(opening.projection?.style.padding,naturalOpening.projection?.style.padding);
+   assert.equal(opening.projection?.style.borderRadius,naturalOpening.projection?.style.borderRadius);
+   assert.equal(opening.projection?.style.borderWidth,naturalOpening.projection?.style.borderWidth);
+   assert.equal(opening.projection?.style.borderStyle,naturalOpening.projection?.style.borderStyle);
+   assert.equal(opening.projection?.style.borderColor,naturalOpening.projection?.style.borderColor);
+   assert.equal(opening.projection?.style.backgroundColor,naturalOpening.projection?.style.backgroundColor);
+   assert.equal(opening.projection?.style.color,naturalOpening.projection?.style.color);
+   assert.equal(opening.projection?.style.boxShadow,naturalOpening.projection?.style.boxShadow);
+   assert.ok(Math.abs(Number.parseFloat(opening.projection?.style.lineHeight)-Number.parseFloat(naturalOpening.projection?.style.lineHeight)*1.5)<0.01);
+   assert.equal(opening.settings?.style.fontFamily,naturalOpening.settings?.style.fontFamily);
+   assert.equal(opening.settings?.style.fontWeight,naturalOpening.settings?.style.fontWeight);
+   assert.equal(opening.settings?.style.padding,naturalOpening.settings?.style.padding);
+   assert.equal(opening.settings?.style.borderRadius,naturalOpening.settings?.style.borderRadius);
+   assert.equal(opening.settings?.style.borderColor,naturalOpening.settings?.style.borderColor);
+   assert.ok(Math.abs(Number.parseFloat(opening.settings?.style.lineHeight)-Number.parseFloat(naturalOpening.settings?.style.lineHeight)*1.5)<0.01);
    assert.equal(opening.projection?.text,'☁ syncing','the current pre-hydration state is rendered in the visible projection');
    assert.equal(opening.projection?.disabled,true,'syncing remains disabled while board authority is unavailable');
-   assert.equal(opening.projection?.fontSize,'18px','the status is checked with enlarged text');
+   assert.equal(opening.projection?.style.fontSize,'18px','the status is checked with enlarged text');
    assert.ok(opening.projection.scrollWidth<=opening.projection.clientWidth+1,'the enlarged syncing label fits without clipping: '+JSON.stringify(opening.projection));
    assert.equal(opening.settings?.text,'⚙','the adjacent Settings control remains in the saved header');
    assert.equal(opening.settings?.disabled,false,'the adjacent Settings control retains its saved enabled appearance');
@@ -15995,62 +16093,115 @@ test('RISK saved view broken-board status: configured cloud changes remain visib
    assert.equal(opening.projection.right>opening.settings.left&&opening.settings.right>opening.projection.left&&opening.projection.bottom>opening.settings.top&&opening.settings.bottom>opening.projection.top,false,'the enlarged syncing badge does not overlap the adjacent Settings control');
    assert.ok(opening.header.left>=0&&opening.header.right<=viewport.width,'the saved header stays within the selected viewport');
    assert.equal(opening.theme,theme);assert.ok(opening.colorScheme.includes(theme));
+   assert.notEqual(opening.paint.rootBackground,'rgba(0, 0, 0, 0)','the selected theme produces a painted page surface');
+   assert.notEqual(opening.paint.panelBackground,'rgba(0, 0, 0, 0)','the visible saved board panel is painted');
+   observedThemePaint.push({browserEngine,width:viewport.width,theme,rootBackground:opening.paint.rootBackground,panelBackground:opening.paint.panelBackground});
    assert.deepEqual(opening.viewport,viewport);
    const changed=await view.page.evaluate(()=>{
-    const cloud=window.CloudSync;cloud.status='error';cloud.errorStage='init';cloud.errorCode='unavailable';window.dispatchEvent(new Event('cloudsync'));
-    const preview=document.querySelector('[data-saved-preview]'),read=button=>{if(!button)return null;const rect=button.getBoundingClientRect(),style=getComputedStyle(button);return{text:button.textContent,title:button.title,disabled:button.disabled,hidden:button.hidden,visibility:style.visibility,fontSize:style.fontSize,clientWidth:button.clientWidth,scrollWidth:button.scrollWidth,left:rect.left,right:rect.right,top:rect.top,bottom:rect.bottom,width:rect.width,height:rect.height};};
+    window.CloudSync.status='error';window.CloudSync.errorStage='init';window.CloudSync.errorCode='unavailable';window.dispatchEvent(new Event('cloudsync'));
+    const preview=document.querySelector('[data-saved-preview]'),read=button=>{if(!button)return null;const rect=button.getBoundingClientRect(),style=getComputedStyle(button);return{text:button.textContent,title:button.title,disabled:button.disabled,hidden:button.hidden,visibility:style.visibility,fontLoaded:document.fonts.check(`${style.fontSize} ${style.fontFamily}`),style:{fontFamily:style.fontFamily,fontSize:style.fontSize,fontWeight:style.fontWeight,lineHeight:style.lineHeight,padding:style.padding,height:style.height,borderWidth:style.borderWidth,borderStyle:style.borderStyle,borderColor:style.borderColor,borderRadius:style.borderRadius,backgroundColor:style.backgroundColor,color:style.color,boxShadow:style.boxShadow,outlineStyle:style.outlineStyle,outlineWidth:style.outlineWidth,outlineColor:style.outlineColor},clientWidth:button.clientWidth,scrollWidth:button.scrollWidth,left:rect.left,right:rect.right,top:rect.top,bottom:rect.bottom,width:rect.width,height:rect.height};};
     return{ready:document.documentElement.dataset.appReady==='true',settled:window.__actualLocalRead.settled,previewVisible:!!preview&&getComputedStyle(preview).visibility==='visible',previewInert:!!preview?.inert,
-     projection:read(preview?.querySelector('.syncbtn')),live:read(document.getElementById('syncBtn')),settings:read(preview?.querySelector('.topbtns .ghost:last-child'))};
+     cloud:{configured:window.CloudSync?.configured,ready:window.CloudSync?.ready,status:window.CloudSync?.status,events:window.__cloudsyncEvents},
+     projection:read(preview?.querySelector('.syncbtn')),live:read(document.getElementById('syncBtn')),settings:read(preview?.querySelector('.topbtns .ghost:last-child')),
+     theme:document.documentElement.dataset.theme,colorScheme:getComputedStyle(document.documentElement).colorScheme,paint:{rootBackground:getComputedStyle(document.documentElement).backgroundColor,bodyBackground:getComputedStyle(document.body).backgroundColor,bodyColor:getComputedStyle(document.body).color,panelBackground:getComputedStyle(preview?.querySelector('[data-preview-id="listWrap"]')||document.getElementById('listWrap'))?.backgroundColor||null,panelColor:getComputedStyle(preview?.querySelector('[data-preview-id="listWrap"]')||document.getElementById('listWrap'))?.color||null}};
    });
-   if(process.env.SAVED_VIEW_ARTIFACT_DIR){await view.page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`${prefix}-error.png`)});fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`${prefix}-error.json`),JSON.stringify({opening,changed},null,2)+'\n');}
+   await capture('error');
+   if(process.env.SAVED_VIEW_ARTIFACT_DIR)fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`${prefix}-error.json`),JSON.stringify({naturalOpening,opening,changed},null,2)+'\n');
    assert.equal(changed.ready,false,'a cloud event does not make the broken board authoritative');
    assert.equal(changed.settled,false,'the durable read is still pending when the genuine error appears');
    assert.equal(changed.previewVisible,true);assert.equal(changed.previewInert,true);
    assert.equal(changed.live?.text,'☁ error','the authoritative status registers the real cloud error');
    assert.equal(changed.projection?.text,'☁ error','the real cloud initialization error stays visible in the saved appearance');
+   assert.equal(changed.cloud?.status,'error');assert.ok(changed.cloud?.events>0,'the actual status event updates both visible controls');
    assert.match(changed.projection?.title,/Cloud setup failed \(unavailable\)/,'the mirrored title retains the real failure details');
    assert.equal(changed.projection?.disabled,false,'the visible error keeps the ordinary enabled appearance while the inert root still blocks actions');
    assert.equal(changed.settings?.text,'⚙','the neighboring Settings control remains beside the changed badge');
    assert.equal(changed.settings?.disabled,false);
+   assert.equal(changed.projection.style.fontSize,'18px');assert.equal(changed.settings.style.fontSize,'19.5px');
    assert.ok(changed.projection.scrollWidth<=changed.projection.clientWidth+1,'the enlarged error label fits without clipping: '+JSON.stringify(changed.projection));
-   await view.page.evaluate(()=>{window.CloudSync.status='syncing';window.CloudSync.errorStage=null;window.CloudSync.errorCode=null;window.dispatchEvent(new Event('cloudsync'));});
+   assert.equal(changed.theme,theme);assert.ok(changed.colorScheme.includes(theme));
+   assert.equal(changed.paint.rootBackground,opening.paint.rootBackground);assert.equal(changed.paint.panelBackground,opening.paint.panelBackground);
+   view.releaseHeldFirebaseImports();
+   await view.page.waitForFunction(()=>window.CloudSync?.ready===true&&window.CloudSync?.status==='error',null,{timeout:8000});
    await view.page.waitForFunction(()=>document.documentElement.dataset.appReady==='true',null,{timeout:10000});
-   const ready=await view.page.evaluate(async()=>({status:(()=>{const el=document.getElementById('syncBtn'),rect=el.getBoundingClientRect(),style=getComputedStyle(el);return{text:el.textContent,disabled:el.disabled,hidden:el.hidden,fontSize:style.fontSize,clientWidth:el.clientWidth,scrollWidth:el.scrollWidth,left:rect.left,right:rect.right,top:rect.top,bottom:rect.bottom,width:rect.width,height:rect.height};})(),hold:await window.ScannerDeviceStore?.getRecoveryCloudHold?.(),taskCount:state.tasks.length,preview:!!document.querySelector('[data-saved-preview]'),shellVisibility:getComputedStyle(document.querySelector('.wrap')).visibility,settings:(()=>{const el=document.querySelector('.topbtns [data-act="settings"]');if(!el)return null;const rect=el.getBoundingClientRect();return{text:el.textContent,left:rect.left,right:rect.right,top:rect.top,bottom:rect.bottom};})(),viewport:{width:innerWidth,height:innerHeight}}));
-   if(process.env.SAVED_VIEW_ARTIFACT_DIR){await view.page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`${prefix}-recovery-pending.png`)});fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`${prefix}-recovery-pending.json`),JSON.stringify(ready,null,2)+'\n');}
-   assert.equal(ready.preview,false,'the projection is removed when the supported board opens');
+   await view.page.evaluate(()=>{window.CloudSync.status='syncing';window.CloudSync.errorStage=null;window.CloudSync.errorCode=null;window.dispatchEvent(new Event('cloudsync'));});
+   const ready=await snapshot();
+   await capture('recovery-pending');
+   if(process.env.SAVED_VIEW_ARTIFACT_DIR)fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`${prefix}-recovery-pending.json`),JSON.stringify(ready,null,2)+'\n');
+   assert.equal(ready.previewVisible,false,'the projection is removed when the supported board opens');
    assert.equal(ready.shellVisibility,'visible');assert.equal(ready.taskCount,66);
-   assert.equal(ready.status.text,'☁ recovery pending','the genuine saved-source hold is visible after hydration');
-   assert.equal(ready.status.disabled,false,'cloud actions remain held by the existing source recovery control');
+   assert.equal(ready.live.text,'☁ recovery pending','the genuine saved-source hold is visible after hydration');
+   assert.equal(ready.live.disabled,false,'cloud actions remain held by the existing source recovery control');
    assert.equal(ready.hold?.reason,'device-source-recovery','the genuine durable recovery hold remains active');
-   assert.equal(ready.status.fontSize,'18px');
-   assert.ok(ready.status.scrollWidth<=ready.status.clientWidth+1,'the enlarged post-hydration hold remains readable: '+JSON.stringify(ready.status));
-   assert.ok(ready.status.left>=0&&ready.status.right<=viewport.width,'the post-hydration recovery badge stays within the viewport');
+   assert.equal(ready.cloud?.status,'syncing');
+   assert.equal(ready.live.style.fontSize,'18px');
+   assert.ok(ready.live.scrollWidth<=ready.live.clientWidth+1,'the enlarged post-hydration hold remains readable: '+JSON.stringify(ready.live));
+   assert.ok(ready.live.left>=0&&ready.live.right<=viewport.width,'the post-hydration recovery badge stays within the viewport');
    assert.ok(ready.settings.left>=0&&ready.settings.right<=viewport.width,'the post-hydration neighboring Settings control stays within the viewport');
-   assert.equal(ready.status.right>ready.settings.left&&ready.settings.right>ready.status.left&&ready.status.bottom>ready.settings.top&&ready.settings.bottom>ready.status.top,false,'the post-hydration recovery badge does not overlap Settings');
-   const postError=await view.page.evaluate(async()=>{
-    window.CloudSync.status='error';window.CloudSync.errorStage='init';window.CloudSync.errorCode='unavailable';window.dispatchEvent(new Event('cloudsync'));
-    const el=document.getElementById('syncBtn'),rect=el.getBoundingClientRect(),style=getComputedStyle(el),settings=document.querySelector('.topbtns [data-act="settings"]'),other=settings.getBoundingClientRect();
-    return{ready:document.documentElement.dataset.appReady==='true',preview:!!document.querySelector('[data-saved-preview]'),text:el.textContent,title:el.title,disabled:el.disabled,hidden:el.hidden,fontSize:style.fontSize,clientWidth:el.clientWidth,scrollWidth:el.scrollWidth,left:rect.left,right:rect.right,top:rect.top,bottom:rect.bottom,settings:{left:other.left,right:other.right,top:other.top,bottom:other.bottom},hold:await window.ScannerDeviceStore?.getRecoveryCloudHold?.(),taskCount:state.tasks.length,viewport:{width:innerWidth,height:innerHeight}};
-   });
-   if(process.env.SAVED_VIEW_ARTIFACT_DIR){await view.page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`${prefix}-post-hydration-error.png`)});fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`${prefix}-post-hydration-error.json`),JSON.stringify(postError,null,2)+'\n');}
-   assert.equal(postError.ready,true);assert.equal(postError.preview,false);assert.equal(postError.taskCount,66);
-   assert.equal(postError.text,'☁ error','a post-hydration cloud setup failure remains visible over the genuine recovery hold');
-   assert.match(postError.title,/Cloud setup failed \(unavailable\)/);
-   assert.equal(postError.disabled,false);assert.equal(postError.hidden,false);assert.equal(postError.fontSize,'18px');
-   assert.ok(postError.scrollWidth<=postError.clientWidth+1,'the enlarged post-hydration cloud error remains readable: '+JSON.stringify(postError));
-   assert.ok(postError.left>=0&&postError.right<=viewport.width,'the post-hydration error badge stays within the viewport');
+   assert.equal(ready.live.right>ready.settings.left&&ready.settings.right>ready.live.left&&ready.live.bottom>ready.settings.top&&ready.settings.bottom>ready.live.top,false,'the post-hydration recovery badge does not overlap Settings');
+   assert.equal(ready.theme,theme,'the recovered board keeps the selected fixture theme');assert.ok(ready.colorScheme.includes(theme));
+   assert.equal(ready.paint.rootBackground,opening.paint.rootBackground,'the selected theme paint stays stable when the recovered board replaces its appearance');
+   assert.equal(ready.paint.panelBackground,opening.paint.panelBackground,'the visible board panel retains the selected paint after hydration');
+   await view.page.evaluate(()=>{window.CloudSync.status='error';window.CloudSync.errorStage='init';window.CloudSync.errorCode='unavailable';window.dispatchEvent(new Event('cloudsync'));});
+   const postErrorSnapshot=await snapshot();
+   const postError=postErrorSnapshot;
+   if(process.env.SAVED_VIEW_ARTIFACT_DIR){await capture('post-hydration-error');fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`${prefix}-post-hydration-error.json`),JSON.stringify(postError,null,2)+'\n');}
+   assert.equal(postError.ready,true);assert.equal(postError.previewVisible,false);assert.equal(postError.taskCount,66);
+   assert.equal(postError.live.text,'☁ error','a post-hydration cloud setup failure remains visible over the genuine recovery hold');
+   assert.match(postError.live.title,/Cloud setup failed \(unavailable\)/);
+   assert.equal(postError.live.disabled,false);assert.equal(postError.live.hidden,false);assert.equal(postError.live.style.fontSize,'18px');
+   assert.ok(postError.live.scrollWidth<=postError.live.clientWidth+1,'the enlarged post-hydration cloud error remains readable: '+JSON.stringify(postError.live));
+   assert.ok(postError.live.left>=0&&postError.live.right<=viewport.width,'the post-hydration error badge stays within the viewport');
    assert.ok(postError.settings.left>=0&&postError.settings.right<=viewport.width,'Settings stays within the viewport beside the post-hydration error');
-   assert.equal(postError.right>postError.settings.left&&postError.settings.right>postError.left&&postError.bottom>postError.settings.top&&postError.settings.bottom>postError.top,false,'the enlarged post-hydration error does not overlap Settings');
+   assert.equal(postError.live.right>postError.settings.left&&postError.settings.right>postError.live.left&&postError.live.bottom>postError.settings.top&&postError.settings.bottom>postError.live.top,false,'the enlarged post-hydration error does not overlap Settings');
    assert.equal(postError.hold?.reason,'device-source-recovery','a real cloud error does not clear the durable recovery hold');
-   const postRecovery=await view.page.evaluate(async()=>{window.CloudSync.status='syncing';window.CloudSync.errorStage=null;window.CloudSync.errorCode=null;window.dispatchEvent(new Event('cloudsync'));const el=document.getElementById('syncBtn'),rect=el.getBoundingClientRect(),style=getComputedStyle(el);return{text:el.textContent,disabled:el.disabled,hidden:el.hidden,fontSize:style.fontSize,clientWidth:el.clientWidth,scrollWidth:el.scrollWidth,left:rect.left,right:rect.right,hold:await window.ScannerDeviceStore?.getRecoveryCloudHold?.()};});
-   if(process.env.SAVED_VIEW_ARTIFACT_DIR){await view.page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`${prefix}-post-hydration-recovery-pending.png`)});fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`${prefix}-post-hydration-recovery-pending.json`),JSON.stringify(postRecovery,null,2)+'\n');}
-   assert.equal(postRecovery.text,'☁ recovery pending','after the transient cloud error clears, the genuine recovery hold remains visible');
-   assert.equal(postRecovery.disabled,false);assert.equal(postRecovery.hidden,false);assert.equal(postRecovery.fontSize,'18px');
-   assert.ok(postRecovery.scrollWidth<=postRecovery.clientWidth+1,'the enlarged post-hydration recovery label remains readable after the error clears: '+JSON.stringify(postRecovery));
+   assert.equal(postError.theme,theme);assert.ok(postError.colorScheme.includes(theme));assert.equal(postError.paint.rootBackground,opening.paint.rootBackground);assert.equal(postError.paint.panelBackground,opening.paint.panelBackground);
+   await view.page.evaluate(()=>{window.CloudSync.status='syncing';window.CloudSync.errorStage=null;window.CloudSync.errorCode=null;window.dispatchEvent(new Event('cloudsync'));});
+   const postRecovery=await snapshot();
+   if(process.env.SAVED_VIEW_ARTIFACT_DIR){await capture('post-hydration-recovery-pending');fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`${prefix}-post-hydration-recovery-pending.json`),JSON.stringify(postRecovery,null,2)+'\n');}
+   assert.equal(postRecovery.live.text,'☁ recovery pending','after the transient cloud error clears, the genuine recovery hold remains visible');
+   assert.equal(postRecovery.live.disabled,false);assert.equal(postRecovery.live.hidden,false);assert.equal(postRecovery.live.style.fontSize,'18px');
+   assert.ok(postRecovery.live.scrollWidth<=postRecovery.live.clientWidth+1,'the enlarged post-hydration recovery label remains readable after the error clears: '+JSON.stringify(postRecovery.live));
    assert.equal(postRecovery.hold?.reason,'device-source-recovery');
-   assert.deepEqual(view.errors,[]);
+   assert.equal(postRecovery.theme,theme);assert.ok(postRecovery.colorScheme.includes(theme));assert.equal(postRecovery.paint.rootBackground,opening.paint.rootBackground);assert.equal(postRecovery.paint.panelBackground,opening.paint.panelBackground);
+   await view.page.locator('#appHeader [data-act="undo"]').focus();
+   await view.page.keyboard.press('Shift+Tab');
+   const keyboardFocus=await snapshot();
+   if(process.env.SAVED_VIEW_ARTIFACT_DIR){await capture('keyboard-focus');fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`${prefix}-keyboard-focus.json`),JSON.stringify({activeElement:keyboardFocus.activeElement,control:keyboardFocus.live},null,2)+'\n');}
+   if(browserEngine==='chromium'){
+    assert.equal(keyboardFocus.live.focused,true,'keyboard traversal reaches the enabled recovery status control');
+    assert.equal(keyboardFocus.live.focusVisible,true,'the focused status control keeps its native visible keyboard focus');
+    assert.equal(keyboardFocus.live.style.outlineStyle,'solid','keyboard focus has a visible outline');
+    assert.equal(keyboardFocus.live.style.outlineWidth,'2px');assert.equal(keyboardFocus.live.style.outlineOffset,'2px');
+   }
+   const liveScroll=[];
+   await view.page.evaluate(()=>{const list=document.getElementById('listBody');window.scrollTo(0,Math.max(0,list.getBoundingClientRect().top+window.scrollY-100));});
+   for(const position of ['top','middle','end']){
+    const state=await view.page.evaluate(async position=>{
+     const list=document.getElementById('listBody'),max=Math.max(0,list.scrollHeight-list.clientHeight);list.scrollTop=position==='top'?0:position==='middle'?Math.round(max/2):max;list.dispatchEvent(new Event('scroll'));
+     await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+     const rect=list.getBoundingClientRect(),visible=[...list.querySelectorAll('.trow')].filter(row=>{const r=row.getBoundingClientRect();return r.bottom>rect.top&&r.top<rect.bottom;}).map(row=>row.querySelector('.tt')?.textContent||row.textContent.trim()),header=document.getElementById('appHeader').getBoundingClientRect(),badge=document.getElementById('syncBtn').getBoundingClientRect(),settings=document.querySelector('#appHeader [data-act="settings"]').getBoundingClientRect();
+     return{position,scrollTop:list.scrollTop,maxScroll:max,clientHeight:list.clientHeight,scrollHeight:list.scrollHeight,visible,rows:list.querySelectorAll('.trow').length,listBounds:{left:rect.left,right:rect.right,top:rect.top,bottom:rect.bottom},headerBounds:{left:header.left,right:header.right,top:header.top,bottom:header.bottom},badgeBounds:{left:badge.left,right:badge.right,top:badge.top,bottom:badge.bottom},settingsBounds:{left:settings.left,right:settings.right,top:settings.top,bottom:settings.bottom},pageScroll:scrollY,viewport:{width:innerWidth,height:innerHeight}};
+    },position);
+    liveScroll.push(state);
+    if(process.env.SAVED_VIEW_ARTIFACT_DIR&&browserEngine==='webkit'&&theme==='dark'&&viewport.width===390)await capture(`live-scroll-${position}`);
+   }
+   if(process.env.SAVED_VIEW_ARTIFACT_DIR)fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`${prefix}-live-scroll.json`),JSON.stringify(liveScroll,null,2)+'\n');
+   assert.ok(liveScroll[0].maxScroll>0&&liveScroll[0].rows>=60,'the recovered board keeps its populated scrollable task list');
+   assert.equal(liveScroll[0].scrollTop,0);assert.ok(liveScroll[1].scrollTop>0&&liveScroll[1].scrollTop<liveScroll[1].maxScroll);assert.equal(liveScroll[2].scrollTop,liveScroll[2].maxScroll);
+   assert.notDeepEqual(liveScroll[0].visible,liveScroll[2].visible,'top and end positions expose distinct recovered rows');
+   assert.ok(liveScroll.every(item=>item.listBounds.left>=0&&item.listBounds.right<=viewport.width&&item.listBounds.top<viewport.height&&item.listBounds.bottom>0&&item.headerBounds.left>=0&&item.headerBounds.right<=viewport.width));
+   assert.deepEqual(view.errors,[],JSON.stringify(detailedPageErrors));
   }finally{await view.browser.close();}
  }
+ for(const browserEngine of ['chromium','webkit'])for(const width of [390,1100]){
+  const light=observedThemePaint.find(item=>item.browserEngine===browserEngine&&item.width===width&&item.theme==='light');
+  const dark=observedThemePaint.find(item=>item.browserEngine===browserEngine&&item.width===width&&item.theme==='dark');
+  assert.ok(light&&dark,'both themes produce rendered evidence for each browser and viewport');
+  assert.notEqual(light.rootBackground,dark.rootBackground,`${browserEngine} ${width}px root paint distinguishes light and dark themes`);
+  assert.notEqual(light.panelBackground,dark.panelBackground,`${browserEngine} ${width}px board-panel paint distinguishes light and dark themes`);
+ }
+ if(process.env.SAVED_VIEW_ARTIFACT_DIR)fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,'final-theme-paint-comparison.json'),JSON.stringify(observedThemePaint,null,2)+'\n');
 });
 
 test('RISK saved view invisible active scanner: a running scan retains scanner and task-list geometry before hydration',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{

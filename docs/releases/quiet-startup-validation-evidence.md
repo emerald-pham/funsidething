@@ -36,17 +36,24 @@ while retaining the genuine recovery hold and malformed source. This confirms
 the status decision in the synthetic app consumer: the code displayed a durable
 recovery hold before a board had hydrated for the opening view.
 
-The rendered saved-appearance consumer exposed a second related issue. It first
-created a real saved recovery-pending appearance from a completed protected
-local recovery, then held a new malformed-head startup with a separate,
-supported local board and two independently readable browser copies. Before any
-manually dispatched cloud event, the opening badge naturally became disabled
-`☁ syncing`; the projection stayed visible and inert, and the actual board was
-not hydrated. When a later synthetic CloudSync initialization error arrived
-through the real `cloudsync` event, the live header changed to `☁ error` but the
-cached appearance still said `☁ syncing`. The inert projection had no live
-status update. After the supported board opened, the new genuine recovery hold
-remained visible.
+The configured-module first-paint consumer confirmed the cached-status cause.
+It created a prior `☁ recovery pending` appearance through protected local
+recovery, then seeded a separate supported board and malformed durable head.
+With all three real Firebase module imports held and the first IndexedDB read
+still pending, `CloudSync` was configured and syncing, no `cloudsync` event had
+fired, but the inert visible projection still painted the cached recovery
+warning. This proves the warning can flash before either the first cloud event
+or board hydration in the controlled WebKit browser. After pre-paint status
+normalization, the same setup showed disabled `☁ syncing`; releasing the held
+imports produced the real initialization error event and changed the projection
+to `☁ error` while it remained inert and the board was still unopened.
+
+A separate rendered status consumer also exposed stale event mirroring. It held
+a broken-board startup and dispatched a real `cloudsync` event for a later
+initialization error; the live header changed but the cached appearance did not.
+The event mirror now updates the visible status without making the projection
+actionable. After the supported board opened, the genuine recovery hold remained
+visible.
 
 The same rendered check found that the 18px busy badge clipped its text: its
 scroll width was 95px while the fixed-width control exposed only 86px of content.
@@ -62,9 +69,11 @@ Ranked alternatives and their predictions:
 2. **The broken board is terminally unrecoverable — rejected for the controlled
    fixture only.** Releasing the existing read opened the separate supported
    board and retained the real hold. The private phone board remains unknown.
-3. **Cached appearance status follows the live header — rejected in the first
-   rendered check.** A real app event changed the live header to `☁ error`, but
-   the visible saved appearance remained `☁ syncing`.
+3. **The saved appearance already reflects current cloud state — rejected.**
+   With the real configured module held before its first event, `CloudSync` was
+   syncing but the appearance still showed the prior recovery warning. The
+   event mirror had a separate gap: a later real `cloudsync` error changed the
+   live header while the cached appearance remained `☁ syncing`.
 4. **Enlarged busy text fits the existing fixed width — rejected.** The
    measured 18px label overflowed the control by 9px in the observed narrow
    render.
@@ -77,11 +86,13 @@ is still opening and cloud status is not confirmed. Once a board is hydrated,
 a genuine recovery hold continues to show `☁ recovery pending`; actual errors
 keep their normal error presentation.
 
-The inert saved appearance now mirrors the live badge's class, text, disabled
-state, visibility, title, and accessible label after each `renderSync()` path.
-The preview remains `inert` and `aria-hidden`; this does not make its board
-authoritative or actionable. The busy badge uses an automatic width with an
-88px minimum so enlarged syncing text fits without overlapping Settings.
+Before appending a cached appearance, synchronous cloud configuration now
+replaces its old badge with disabled `☁ syncing`, or hides it when cloud sync is
+not configured. Once `renderSync()` runs, the inert saved appearance mirrors
+the live badge's class, text, disabled state, visibility, title, and accessible
+label. The preview remains `inert` and `aria-hidden`; this does not make its
+board authoritative or actionable. The busy badge uses an automatic width with
+an 88px minimum so enlarged syncing text fits without overlapping Settings.
 
 - **Original Node RED:** recorder record
   `c45a9f5c-04b6-42a1-8afb-e885177a9b01`; direct render and event both showed
@@ -103,6 +114,15 @@ authoritative or actionable. The busy badge uses an automatic width with an
   visibility before and after hydration, the retained hold, enlarged text fit,
   viewport bounds, and Settings adjacency. Captures and JSON probes are under
   `.git/agent-test-runs/quiet-board-startup/saved-view-rendered/status/`.
+- **Configured-module first-paint RED:** recorder record
+  `2026-10-26T23-57-24-334Z-b91929bd-d950-4431-af29-af44230e6ab7.json` held all
+  three Firebase imports and the initial IndexedDB read. Before the first
+  cloud event, the prior cached warning remained visible as
+  `☁ recovery pending` instead of disabled `☁ syncing`.
+- **Configured-module first-paint GREEN:** recorder record
+  `2026-10-26T23-57-57-987Z-5db11780-0d9c-4ad1-8a3a-d00cd0e29313.json` passes
+  that WebKit consumer. Its paired JSON captures zero events before release,
+  the neutral opening badge, and the actual import-error event afterwards.
 - **Help/changelog RED:**
   `2026-10-26T23-33-23-531Z-10561260-d608-433a-b16a-48a189094e84.json` failed
   because the existing Help text did not distinguish opening status from cloud
@@ -112,6 +132,31 @@ authoritative or actionable. The busy badge uses an automatic width with an
   the new rendered Help and current Changelog contract.
 - Recorder metadata and full stdout/stderr are kept under the common Git
   directory at `.git/agent-test-runs/quiet-board-startup/`.
+
+The exact-byte focused group passed again after refreshing the app and service
+worker fingerprints. Recorder record
+`2026-10-27T00-15-32-910Z-784ed453-420b-4dde-82dd-74f4ac93ada7.json` records
+four broken-board tests, four passed, zero failed, and zero skipped. Its
+rendered matrix captures are in
+`.git/agent-test-runs/quiet-board-startup/final-exact-candidate/visual/` (72
+PNG screenshots and 70 JSON probes). The matrix covers Chromium and WebKit,
+light and dark themes, and 390×844 and 1100×900 viewports. It records actual
+root and board-panel paint before and after hydration, the natural disabled
+opening badge before any injected cloud event, enlarged status and adjacent
+Settings typography and bounds, real error events, the recovered board and
+its retained recovery hold, and populated-list top/middle/end scroll bounds.
+The Chromium keyboard capture focuses the enabled status button with its
+visible 2px outline and 2px offset. In the WebKit run, host-driven Shift+Tab
+left focus on `BODY`; this is recorded as a keyboard-navigation limitation,
+not a WebKit focus pass. WebKit's rendered theme, status, typography and
+geometry evidence remains available in the same matrix.
+
+The earlier broad `npm test` run was interrupted and superseded while review
+repairs were being made. Its original output remains preserved; it is not a
+full-suite pass. Full-suite, compatibility, native, independent review, exact
+candidate release qualification, CI and Stable live verification remain
+separate release gates. Desktop WebKit and Chromium observations do not prove
+the reported behavior on a physical iPhone.
 
 The synthetic fixture creates a previous genuine recovery hold, safely clears
 that hold only inside its isolated test database before starting a second

@@ -1270,6 +1270,9 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK saved view invisible fallback: corrupt oversized untrusted and blocked projections never become board authority
 - RISK saved view guidance: Quick start and Changelog describe this-device restoration and current dates
 - RISK saved view guidance qualification: FAQ and current release note promise an appearance only when available
+- RISK saved view broken-board startup: configured Firebase leaves the prior warning neutral until its first event
+- RISK saved view broken-board startup: prior appearance stays inert until the recovered board opens
+- RISK saved view broken-board status: configured cloud changes remain visible in the saved appearance and after recovery
 - RISK saved view broken-board guidance: opening status does not imply cloud confirmation or erase recovery warnings
 - RISK bulk toolbar guidance: extended FAQ describes frozen controls and rank-slot selection
 - RISK repository process boundary: actual visual tests compare every changed control with neighboring controls and scrolled states
