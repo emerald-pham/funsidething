@@ -9350,7 +9350,8 @@
     {
       "root": "RISK repository process: Playwright waitForFunction predicates are synchronous",
       "group": "core",
-      "file": "tests.js"
+      "file": "tests.js",
+      "executionStage": "early-startup"
     },
     {
       "root": "RISK repository process: pre-push checks every outgoing tip and rejects dirty worktrees",
@@ -12886,6 +12887,210 @@
       "root": "source prerequisites include paginated comments beyond the issue summary",
       "group": "native-process",
       "file": "scripts/agent-tools/checkpoint-progress.test.mjs"
+    },
+    {
+      "root": "RISK repository process: early startup failure blocks costly CI without counting blocked coverage",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: native scene-time bursts cannot activate controls behind a refused top-layer release",
+      "group": "native-process",
+      "file": "tests.js",
+      "executionStage": "early-startup"
+    },
+    {
+      "root": "RISK repository process: scenery consumers use allocated fallback ports and preserve early native failures",
+      "group": "native-process",
+      "file": "tests.js",
+      "executionStage": "early-startup"
+    },
+    {
+      "root": "RISK scenery backdrop cache: first unchanged lighting timer reuses actual pixels while changed slots and loaded copy still paint",
+      "group": "native-process",
+      "file": "tests.js",
+      "executionStage": "early-startup"
+    },
+    {
+      "root": "RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh",
+      "group": "native-process",
+      "file": "tests.js",
+      "executionStage": "early-startup"
+    },
+    {
+      "root": "early CI public command preserves durable predecessor authority and rejects corrupted artifacts",
+      "group": "native-process",
+      "file": "scripts/agent-tools/early-ci.test.mjs"
+    },
+    {
+      "root": "early CI public command refuses failed skipped cancelled and missing mandatory execution",
+      "group": "native-process",
+      "file": "scripts/agent-tools/early-ci.test.mjs"
+    },
+    {
+      "root": "early CI workflow failure blocks every expensive child and deployment",
+      "group": "native-process",
+      "file": "scripts/agent-tools/early-ci.test.mjs"
+    },
+    {
+      "root": "early CI workflow success retains the complete assigned cohort and deployment chain",
+      "group": "native-process",
+      "file": "scripts/agent-tools/early-ci.test.mjs"
+    },
+    {
+      "root": "hosted button consumers admit routed event policies before their runtime boundary",
+      "group": "native-process",
+      "file": "scripts/agent-tools/button-ci-policy.test.mjs"
+    },
+    {
+      "root": "hosted button consumers reject invalid missing mismatched and local launches",
+      "group": "native-process",
+      "file": "scripts/agent-tools/button-ci-policy.test.mjs"
+    },
+    {
+      "root": "hosted child and memory artifacts preserve raw policy and distinct source checkout identity",
+      "group": "native-process",
+      "file": "scripts/agent-tools/button-ci-policy.test.mjs"
+    },
+    {
+      "root": "mobile budget CLI preserves uncertain create ownership and cleans confirmed objects",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory-lifecycle.test.mjs"
+    },
+    {
+      "root": "mobile budget profiles reject failed stress setup substitutions and mixed nonapp errors",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "mobile budget profiles report authentic stress application failures without waiving execution integrity",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "mobile budget profiles require attributable primary failures for reported stress",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "mobile budget profiles require one decimal GB without accepting the reported stress limit",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "mobile kernel page floor actual CLI preserves exact requests and rejects substituted observations",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory-stress-lifecycle.test.mjs"
+    },
+    {
+      "root": "mobile kernel page floor uses actual auxv readback without changing requested budgets",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "mobile memory boundary refuses unsupported or unbounded runtimes before native launch",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "mobile memory command cannot run a pretend local cap and pins the owned container boundary",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "mobile memory intentional OOM control binds the Docker flag while clients reject it",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "mobile memory parser rejects changed final browser or driver container isolation",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "mobile memory parser rejects waived limits synthetic touch and mismatched durable evidence",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "mobile stress CLI preserves a failed normal app attempt and executes reduced before complete cleanup",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory-stress-lifecycle.test.mjs"
+    },
+    {
+      "root": "mobile stress CLI retains the observed reduced owned-engine OOM after a failed normal attempt",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory-stress-lifecycle.test.mjs"
+    },
+    {
+      "root": "mobile stress owned engine loss reports the observed waitForFunction Browser closed without hiding driver faults",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "test group aggregate cannot accept a full cohort without required early predecessor evidence",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "early CI routing retains original full startup and stress proof for ordinary and policy coverage",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "test group aggregate binds successful early execution and separate failed application stress integrity",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "early CI workflow cancelled missing and skipped predecessors never authorize downstream",
+      "group": "native-process",
+      "file": "scripts/agent-tools/early-ci.test.mjs"
+    },
+    {
+      "root": "RISK repository process: CI monitor preserves early startup and stress predecessor failures",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: canonical limited source profiles preserve original mobile acceptance",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "canonical mobile source profile admits exact current app without changing original story or full catalog",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-source-profile.test.mjs"
+    },
+    {
+      "root": "canonical limited profiles reject wrong source profile engine scenario control and full coverage",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-source-profile.test.mjs"
+    },
+    {
+      "root": "confirmed modal source profile admits only its exact existing Chromium consumer",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-source-profile.test.mjs"
+    },
+    {
+      "root": "native report verifier binds the complete actual source and refuses full-action relabeling",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-source-profile.test.mjs"
+    },
+    {
+      "root": "RISK repository process: early-assigned consumers execute once through durable group accounting",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "group process refuses missing early predecessor before launching any deferred root",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "group and aggregate retain actual early cases once across fresh group processes",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
     },
     {
       "root": "an owner extension comment appended to the bound issue updates only that explicit authority append",

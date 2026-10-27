@@ -1,5 +1,269 @@
 [
   {
+    "baseCommit": "5baedb2e237b366bc8fe1f82a36faf9357ae02e8",
+    "testChangesSha256": "e782d728ab6173f5dae4158122df07190c0655e193077489e15247915e207d69",
+    "reason": "Reconcile all five confirmed early consumers through the existing catalog and actual workflow/group/aggregate entry points, counting each real early outcome once while preserving canonical limited source admission and all preexisting main regressions. Combined current #288/#286 integration retains all returned source bodies and prior rationale records unchanged; this record binds the final merged protected-test diff.",
+    "previousBehavior": "The early consumers could execute again in the long native group, and group commands accepted missing early predecessor proof. Saved nested source tests needed explicit inherited TAP output for durable child accounting.",
+    "intendedBehavior": "Five unchanged confirmed roots retain native-process catalog ownership and declare early execution. Every real group verifies the durable receipt before launching a child, excludes only those already executed roots from ordinary TAP, and aggregation rederives actual early cases from original raw streams exactly once. No new inventory, group engine or accepted skip.",
+    "replacementTests": [
+      "RISK repository process: early-assigned consumers execute once through durable group accounting",
+      "RISK repository process: canonical limited source profiles preserve original mobile acceptance",
+      "RISK repository process: early startup failure blocks costly CI without counting blocked coverage",
+      "RISK repository process: CI monitor preserves early startup and stress predecessor failures"
+    ],
+    "preservedCoverage": [
+      "Every preexisting main test body, original required mobile story, budgets, policy, timing, trusted input, durability and saved full action/scenario/rapid catalog remain protected unchanged.",
+      "The original native file and three source-specific full-product test bodies remain byte-identical source snapshots with explicit execution limits. The effective hook is separately hashed; source-only applicability supplies no actual runtime or hosted qualification.",
+      "Public wrong-source/profile/full/engine/scenario/control/probe and raw-report relabeling controls retain refusal, with complete actual asset and profile binding."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <retro290> --evidence-dir <retro278>/290/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern=\"^group process refuses missing early predecessor\" scripts/agent-tools/test-groups.test.mjs",
+      "failure": "Meaningful public group REDf13c9f1c at2026-10-27T04:34:02Z on dab087e exited0 and launched catalog-deferred roots without proof; GREEN7997d291 follows. Literal workflow early/all-four-group/aggregate command GREEN9b5f12da demonstrates all5 fixture roots including the real nested no-port child execute once and contribute5 of11 actual aggregate outcomes. Changed transfer reference and missing predecessor fail without further root callbacks. Reporter integration4fb058cd is setup repair, not behavioral RED. Earlier profile admission RED914bc984/GREEN9aa3b611 and source/ancestry, original topology/aggregate/observer REDs remain retained. Actual native/mobile/hosted proof is parent-owned and unexecuted."
+    }
+  },
+  {
+    "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
+    "testChangesSha256": "0bfbb0d44c3bbe9b914f0135831dd5ec5bec70488c6ea5f60010290612c54ddb",
+    "reason": "Reconcile all five confirmed early consumers through the existing catalog and actual workflow/group/aggregate entry points, counting each real early outcome once while preserving canonical limited source admission and all preexisting main regressions. Combined current #288/#286 integration retains all returned source bodies and prior rationale records unchanged; this record binds the final merged protected-test diff.",
+    "previousBehavior": "The early consumers could execute again in the long native group, and group commands accepted missing early predecessor proof. Saved nested source tests needed explicit inherited TAP output for durable child accounting.",
+    "intendedBehavior": "Five unchanged confirmed roots retain native-process catalog ownership and declare early execution. Every real group verifies the durable receipt before launching a child, excludes only those already executed roots from ordinary TAP, and aggregation rederives actual early cases from original raw streams exactly once. No new inventory, group engine or accepted skip.",
+    "replacementTests": [
+      "RISK repository process: early-assigned consumers execute once through durable group accounting",
+      "RISK repository process: canonical limited source profiles preserve original mobile acceptance",
+      "RISK repository process: early startup failure blocks costly CI without counting blocked coverage",
+      "RISK repository process: CI monitor preserves early startup and stress predecessor failures"
+    ],
+    "preservedCoverage": [
+      "Every preexisting main test body, original required mobile story, budgets, policy, timing, trusted input, durability and saved full action/scenario/rapid catalog remain protected unchanged.",
+      "The original native file and three source-specific full-product test bodies remain byte-identical source snapshots with explicit execution limits. The effective hook is separately hashed; source-only applicability supplies no actual runtime or hosted qualification.",
+      "Public wrong-source/profile/full/engine/scenario/control/probe and raw-report relabeling controls retain refusal, with complete actual asset and profile binding."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <retro290> --evidence-dir <retro278>/290/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern=\"^group process refuses missing early predecessor\" scripts/agent-tools/test-groups.test.mjs",
+      "failure": "Meaningful public group REDf13c9f1c at2026-10-27T04:34:02Z on dab087e exited0 and launched catalog-deferred roots without proof; GREEN7997d291 follows. Literal workflow early/all-four-group/aggregate command GREEN9b5f12da demonstrates all5 fixture roots including the real nested no-port child execute once and contribute5 of11 actual aggregate outcomes. Changed transfer reference and missing predecessor fail without further root callbacks. Reporter integration4fb058cd is setup repair, not behavioral RED. Earlier profile admission RED914bc984/GREEN9aa3b611 and source/ancestry, original topology/aggregate/observer REDs remain retained. Actual native/mobile/hosted proof is parent-owned and unexecuted."
+    }
+  },
+  {
+    "baseCommit": "dab087e6c4dfd2b6baf7ab5f96b9fbd29b8bb4e0",
+    "testChangesSha256": "9b4f29e875f305a6f93338918116d4b7533cb01afa5fc64520c4e977ede35cb1",
+    "reason": "Reconcile all five confirmed early consumers through the existing catalog and actual workflow/group/aggregate entry points, counting each real early outcome once while preserving canonical limited source admission and all preexisting main regressions.",
+    "previousBehavior": "The early consumers could execute again in the long native group, and group commands accepted missing early predecessor proof. Saved nested source tests needed explicit inherited TAP output for durable child accounting.",
+    "intendedBehavior": "Five unchanged confirmed roots retain native-process catalog ownership and declare early execution. Every real group verifies the durable receipt before launching a child, excludes only those already executed roots from ordinary TAP, and aggregation rederives actual early cases from original raw streams exactly once. No new inventory, group engine or accepted skip.",
+    "replacementTests": [
+      "RISK repository process: early-assigned consumers execute once through durable group accounting"
+    ],
+    "preservedCoverage": [
+      "Every preexisting main test body, original required mobile story, budgets, policy, timing, trusted input, durability and saved full action/scenario/rapid catalog remain protected unchanged.",
+      "The original native file and three source-specific full-product test bodies remain byte-identical source snapshots with explicit execution limits. The effective hook is separately hashed; source-only applicability supplies no actual runtime or hosted qualification.",
+      "Public wrong-source/profile/full/engine/scenario/control/probe and raw-report relabeling controls retain refusal, with complete actual asset and profile binding."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <retro290> --evidence-dir <retro278>/290/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern=\"^group process refuses missing early predecessor\" scripts/agent-tools/test-groups.test.mjs",
+      "failure": "Meaningful public group REDf13c9f1c at2026-10-27T04:34:02Z on dab087e exited0 and launched catalog-deferred roots without proof; GREEN7997d291 follows. Literal workflow early/all-four-group/aggregate command GREEN9b5f12da demonstrates all5 fixture roots including the real nested no-port child execute once and contribute5 of11 actual aggregate outcomes. Changed transfer reference and missing predecessor fail without further root callbacks. Reporter integration4fb058cd is setup repair, not behavioral RED. Earlier profile admission RED914bc984/GREEN9aa3b611 and source/ancestry, original topology/aggregate/observer REDs remain retained. Actual native/mobile/hosted proof is parent-owned and unexecuted."
+    }
+  },
+  {
+    "baseCommit": "44782b85463e7c4e39749b1d9c083a722a2c4248",
+    "testChangesSha256": "f1a821b3a5e7af94909ae507b362057605e708490c52c1b382686fff64dd511d",
+    "reason": "Reconcile all five confirmed early consumers through the existing catalog and actual workflow/group/aggregate entry points, counting each real early outcome once while preserving canonical limited source admission and all preexisting main regressions.",
+    "previousBehavior": "The early consumers could execute again in the long native group, and group commands accepted missing early predecessor proof. Saved nested source tests needed explicit inherited TAP output for durable child accounting.",
+    "intendedBehavior": "Five unchanged confirmed roots retain native-process catalog ownership and declare early execution. Every real group verifies the durable receipt before launching a child, excludes only those already executed roots from ordinary TAP, and aggregation rederives actual early cases from original raw streams exactly once. No new inventory, group engine or accepted skip.",
+    "replacementTests": [
+      "RISK repository process: early-assigned consumers execute once through durable group accounting",
+      "RISK repository process: canonical limited source profiles preserve original mobile acceptance"
+    ],
+    "preservedCoverage": [
+      "Every preexisting main test body, original required mobile story, budgets, policy, timing, trusted input, durability and saved full action/scenario/rapid catalog remain protected unchanged.",
+      "The original native file and three source-specific full-product test bodies remain byte-identical source snapshots with explicit execution limits. The effective hook is separately hashed; source-only applicability supplies no actual runtime or hosted qualification.",
+      "Public wrong-source/profile/full/engine/scenario/control/probe and raw-report relabeling controls retain refusal, with complete actual asset and profile binding."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <retro290> --evidence-dir <retro278>/290/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern=\"^group process refuses missing early predecessor\" scripts/agent-tools/test-groups.test.mjs",
+      "failure": "Meaningful public group REDf13c9f1c at2026-10-27T04:34:02Z on dab087e exited0 and launched catalog-deferred roots without proof; GREEN7997d291 follows. Literal workflow early/all-four-group/aggregate command GREEN9b5f12da demonstrates all5 fixture roots including the real nested no-port child execute once and contribute5 of11 actual aggregate outcomes. Changed transfer reference and missing predecessor fail without further root callbacks. Reporter integration4fb058cd is setup repair, not behavioral RED. Earlier profile admission RED914bc984/GREEN9aa3b611 and source/ancestry, original topology/aggregate/observer REDs remain retained. Actual native/mobile/hosted proof is parent-owned and unexecuted."
+    }
+  },
+  {
+    "baseCommit": "e282f51dbea5fe07aac7673c92f6171f8f59d175",
+    "testChangesSha256": "fbab780c80c7b2349d4d082b37f5fb29041713075e24f40fdf24e2de2b1e96a7",
+    "reason": "Reconcile all five confirmed early consumers through the existing catalog and actual workflow/group/aggregate entry points, counting each real early outcome once while preserving canonical limited source admission and all preexisting main regressions.",
+    "previousBehavior": "The early consumers could execute again in the long native group, and group commands accepted missing early predecessor proof. Saved nested source tests needed explicit inherited TAP output for durable child accounting.",
+    "intendedBehavior": "Five unchanged confirmed roots retain native-process catalog ownership and declare early execution. Every real group verifies the durable receipt before launching a child, excludes only those already executed roots from ordinary TAP, and aggregation rederives actual early cases from original raw streams exactly once. No new inventory, group engine or accepted skip.",
+    "replacementTests": [
+      "RISK repository process: early-assigned consumers execute once through durable group accounting",
+      "RISK repository process: canonical limited source profiles preserve original mobile acceptance",
+      "RISK repository process: early startup failure blocks costly CI without counting blocked coverage",
+      "RISK repository process: CI monitor preserves early startup and stress predecessor failures"
+    ],
+    "preservedCoverage": [
+      "Every preexisting main test body, original required mobile story, budgets, policy, timing, trusted input, durability and saved full action/scenario/rapid catalog remain protected unchanged.",
+      "The original native file and three source-specific full-product test bodies remain byte-identical source snapshots with explicit execution limits. The effective hook is separately hashed; source-only applicability supplies no actual runtime or hosted qualification.",
+      "Public wrong-source/profile/full/engine/scenario/control/probe and raw-report relabeling controls retain refusal, with complete actual asset and profile binding."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <retro290> --evidence-dir <retro278>/290/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern=\"^group process refuses missing early predecessor\" scripts/agent-tools/test-groups.test.mjs",
+      "failure": "Meaningful public group REDf13c9f1c at2026-10-27T04:34:02Z on dab087e exited0 and launched catalog-deferred roots without proof; GREEN7997d291 follows. Literal workflow early/all-four-group/aggregate command GREEN9b5f12da demonstrates all5 fixture roots including the real nested no-port child execute once and contribute5 of11 actual aggregate outcomes. Changed transfer reference and missing predecessor fail without further root callbacks. Reporter integration4fb058cd is setup repair, not behavioral RED. Earlier profile admission RED914bc984/GREEN9aa3b611 and source/ancestry, original topology/aggregate/observer REDs remain retained. Actual native/mobile/hosted proof is parent-owned and unexecuted."
+    }
+  },
+  {
+    "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
+    "testChangesSha256": "a2616a75cf3c3ce959745e8a55b463bd48797372a4c29f5431775260669e27b5",
+    "reason": "Reconcile all five confirmed early consumers through the existing catalog and actual workflow/group/aggregate entry points, counting each real early outcome once while preserving canonical limited source admission and all preexisting main regressions.",
+    "previousBehavior": "The early consumers could execute again in the long native group, and group commands accepted missing early predecessor proof. Saved nested source tests needed explicit inherited TAP output for durable child accounting.",
+    "intendedBehavior": "Five unchanged confirmed roots retain native-process catalog ownership and declare early execution. Every real group verifies the durable receipt before launching a child, excludes only those already executed roots from ordinary TAP, and aggregation rederives actual early cases from original raw streams exactly once. No new inventory, group engine or accepted skip.",
+    "replacementTests": [
+      "RISK repository process: early-assigned consumers execute once through durable group accounting",
+      "RISK repository process: canonical limited source profiles preserve original mobile acceptance",
+      "RISK repository process: early startup failure blocks costly CI without counting blocked coverage",
+      "RISK repository process: CI monitor preserves early startup and stress predecessor failures"
+    ],
+    "preservedCoverage": [
+      "Every preexisting main test body, original required mobile story, budgets, policy, timing, trusted input, durability and saved full action/scenario/rapid catalog remain protected unchanged.",
+      "The original native file and three source-specific full-product test bodies remain byte-identical source snapshots with explicit execution limits. The effective hook is separately hashed; source-only applicability supplies no actual runtime or hosted qualification.",
+      "Public wrong-source/profile/full/engine/scenario/control/probe and raw-report relabeling controls retain refusal, with complete actual asset and profile binding."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <retro290> --evidence-dir <retro278>/290/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern=\"^group process refuses missing early predecessor\" scripts/agent-tools/test-groups.test.mjs",
+      "failure": "Meaningful public group REDf13c9f1c at2026-10-27T04:34:02Z on dab087e exited0 and launched catalog-deferred roots without proof; GREEN7997d291 follows. Literal workflow early/all-four-group/aggregate command GREEN9b5f12da demonstrates all5 fixture roots including the real nested no-port child execute once and contribute5 of11 actual aggregate outcomes. Changed transfer reference and missing predecessor fail without further root callbacks. Reporter integration4fb058cd is setup repair, not behavioral RED. Earlier profile admission RED914bc984/GREEN9aa3b611 and source/ancestry, original topology/aggregate/observer REDs remain retained. Actual native/mobile/hosted proof is parent-owned and unexecuted."
+    }
+  },
+  {
+    "baseCommit": "44782b85463e7c4e39749b1d9c083a722a2c4248",
+    "testChangesSha256": "ee4e9653a804eb6d6a528c254ec376b077c86dc6ea8a18cbb5e371e638c81767",
+    "reason": "Apply the parent-authorized canonical source profile to only the original mobile story and confirmed Chromium modal harness. Preserve exact saved originals, full catalogs and preexisting main regressions while binding the separately reviewed effective native hook.",
+    "previousBehavior": "The saved whole-button catalog rejected current canonical source before launch because unrelated export routes/templates differ. Three worker-introduced PR285 full-product tests were outside current-main applicability.",
+    "intendedBehavior": "Two immutable consumer scopes bind complete canonical app assets/templates and raw profile identity. Other full/scenario/control combinations retain the original guard. Five unchanged confirmed harness tests execute; three newly introduced full-product bodies remain exact explicitly unexecuted snapshots. No accepted skip or preexisting main test changes.",
+    "replacementTests": [
+      "RISK repository process: canonical limited source profiles preserve original mobile acceptance"
+    ],
+    "preservedCoverage": [
+      "Every preexisting main test body, original required mobile story, budgets, policy, timing, trusted input, durability and saved full action/scenario/rapid catalog remain protected unchanged.",
+      "The original native file and three source-specific full-product test bodies remain byte-identical source snapshots with explicit execution limits. The effective hook is separately hashed; source-only applicability supplies no actual runtime or hosted qualification.",
+      "Public wrong-source/profile/full/engine/scenario/control/probe and raw-report relabeling controls retain refusal, with complete actual asset and profile binding."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <retro290> --evidence-dir <retro278>/290/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern=\"^canonical mobile source profile admits exact current app\" scripts/agent-tools/mobile-source-profile.test.mjs",
+      "failure": "Meaningful public expected-acceptance RED914bc984 at2026-10-27T04:22:59Z on44782b8 failed the existing inventory assertion before profile implementation; GREEN9aa3b611 followed. Earlier65a2ad7e is admission-drift baseline only, not actual story failure or original profile RED. Parent authorized both exact narrow scopes and moving only the three newly introduced PR285 product cases to unexecuted snapshots. Prior topologyRED6b86f9e2, aggregateRED482219b6 and observerRED507067f5 remain retained with invalid/vacuous attempts explicitly excluded. Actual runtime acceptance remains parent-owned."
+    }
+  },
+  {
+    "baseCommit": "e282f51dbea5fe07aac7673c92f6171f8f59d175",
+    "testChangesSha256": "adbdb7aa85e0f626f4d22d00d24fbc0911359f3d3505ed8950ca9211288b2630",
+    "reason": "Apply the parent-authorized canonical source profile to only the original mobile story and confirmed Chromium modal harness. Preserve exact saved originals, full catalogs and preexisting main regressions while binding the separately reviewed effective native hook.",
+    "previousBehavior": "The saved whole-button catalog rejected current canonical source before launch because unrelated export routes/templates differ. Three worker-introduced PR285 full-product tests were outside current-main applicability.",
+    "intendedBehavior": "Two immutable consumer scopes bind complete canonical app assets/templates and raw profile identity. Other full/scenario/control combinations retain the original guard. Five unchanged confirmed harness tests execute; three newly introduced full-product bodies remain exact explicitly unexecuted snapshots. No accepted skip or preexisting main test changes.",
+    "replacementTests": [
+      "RISK repository process: canonical limited source profiles preserve original mobile acceptance",
+      "RISK repository process: early startup failure blocks costly CI without counting blocked coverage",
+      "RISK repository process: CI monitor preserves early startup and stress predecessor failures"
+    ],
+    "preservedCoverage": [
+      "Every preexisting main test body, original required mobile story, budgets, policy, timing, trusted input, durability and saved full action/scenario/rapid catalog remain protected unchanged.",
+      "The original native file and three source-specific full-product test bodies remain byte-identical source snapshots with explicit execution limits. The effective hook is separately hashed; source-only applicability supplies no actual runtime or hosted qualification.",
+      "Public wrong-source/profile/full/engine/scenario/control/probe and raw-report relabeling controls retain refusal, with complete actual asset and profile binding."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <retro290> --evidence-dir <retro278>/290/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern=\"^canonical mobile source profile admits exact current app\" scripts/agent-tools/mobile-source-profile.test.mjs",
+      "failure": "Meaningful public expected-acceptance RED914bc984 at2026-10-27T04:22:59Z on44782b8 failed the existing inventory assertion before profile implementation; GREEN9aa3b611 followed. Earlier65a2ad7e is admission-drift baseline only, not actual story failure or original profile RED. Parent authorized both exact narrow scopes and moving only the three newly introduced PR285 product cases to unexecuted snapshots. Prior topologyRED6b86f9e2, aggregateRED482219b6 and observerRED507067f5 remain retained with invalid/vacuous attempts explicitly excluded. Actual runtime acceptance remains parent-owned."
+    }
+  },
+  {
+    "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
+    "testChangesSha256": "22a2dd85cb7fda35e2e8f7ddba60422b2cc5324016271c03cc8bb766f59a55d8",
+    "reason": "Apply the parent-authorized canonical source profile to only the original mobile story and confirmed Chromium modal harness. Preserve exact saved originals, full catalogs and preexisting main regressions while binding the separately reviewed effective native hook.",
+    "previousBehavior": "The saved whole-button catalog rejected current canonical source before launch because unrelated export routes/templates differ. Three worker-introduced PR285 full-product tests were outside current-main applicability.",
+    "intendedBehavior": "Two immutable consumer scopes bind complete canonical app assets/templates and raw profile identity. Other full/scenario/control combinations retain the original guard. Five unchanged confirmed harness tests execute; three newly introduced full-product bodies remain exact explicitly unexecuted snapshots. No accepted skip or preexisting main test changes.",
+    "replacementTests": [
+      "RISK repository process: canonical limited source profiles preserve original mobile acceptance",
+      "RISK repository process: early startup failure blocks costly CI without counting blocked coverage",
+      "RISK repository process: CI monitor preserves early startup and stress predecessor failures"
+    ],
+    "preservedCoverage": [
+      "Every preexisting main test body, original required mobile story, budgets, policy, timing, trusted input, durability and saved full action/scenario/rapid catalog remain protected unchanged.",
+      "The original native file and three source-specific full-product test bodies remain byte-identical source snapshots with explicit execution limits. The effective hook is separately hashed; source-only applicability supplies no actual runtime or hosted qualification.",
+      "Public wrong-source/profile/full/engine/scenario/control/probe and raw-report relabeling controls retain refusal, with complete actual asset and profile binding."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <retro290> --evidence-dir <retro278>/290/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern=\"^canonical mobile source profile admits exact current app\" scripts/agent-tools/mobile-source-profile.test.mjs",
+      "failure": "Meaningful public expected-acceptance RED914bc984 at2026-10-27T04:22:59Z on44782b8 failed the existing inventory assertion before profile implementation; GREEN9aa3b611 followed. Earlier65a2ad7e is admission-drift baseline only, not actual story failure or original profile RED. Parent authorized both exact narrow scopes and moving only the three newly introduced PR285 product cases to unexecuted snapshots. Prior topologyRED6b86f9e2, aggregateRED482219b6 and observerRED507067f5 remain retained with invalid/vacuous attempts explicitly excluded. Actual runtime acceptance remains parent-owned."
+    }
+  },
+  {
+    "baseCommit": "e282f51dbea5fe07aac7673c92f6171f8f59d175",
+    "testChangesSha256": "86f957f40b1506b366656cf412711d53c8b72df8551dc69674ef23f913ad88a4",
+    "reason": "Require the existing saved harness and original populated mobile startup story before launching costly CI; preserve imported assertions exactly and reject incomplete predecessor evidence. Reconciled current integration preserves #287/#292/#324/#325 records and assertion bodies unchanged; complete final fingerprint binds the combined diff.",
+    "previousBehavior": "The four long regression groups could launch before the decisive mobile startup failure was observed. Main did not contain the saved required mobile harness repairs.",
+    "intendedBehavior": "The early public process and durable receipt bind exact source, checkout/tree/base, workflow, event and attempt; blocked or incomplete work never counts as passed or executed.",
+    "replacementTests": [
+      "RISK repository process: early startup failure blocks costly CI without counting blocked coverage",
+      "RISK repository process: CI monitor preserves early startup and stress predecessor failures"
+    ],
+    "preservedCoverage": [
+      "All existing product assertions, installed-client native cases, rules, compatibility, full/same-source/policy reuse and release reviews remain protected. No application or runtime asset was changed.",
+      "Saved harness scripts and selected original native regression bodies are imported by exact source/hash without importing separately owned product edits. Actual current-source native acceptance remains required and may fail."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <retro290> --evidence-dir <retro278>/290/runs --purpose preimplementation-red --summary -- node --test scripts/agent-tools/early-ci.test.mjs",
+      "failure": "Observed topology RED6b86f9e2 at2026-10-27T03:57:34Z on0e4fefb: failed early story dispatched expensive children. GREENe51a32c8 after topology. Aggregate public-process RED482219b6 at04:02:21Z accepted complete later cohort without early evidence (exit0); GREENb11877b6 after gate. Initial process receipt run17c08a6c exposed a TAP reporter integration problem and is not behavioral RED. Process GREEN72f8a91b andba904a53 prove two children on pass, one on fail/skip/cancel and rejection of missing artifacts with a fresh verifier. Raw provenance retained outside Git at /Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/290/runs. Additional public observer RED3973b8a6 at04:09:42Z and actual RISK wrapper RED507067f5 at04:10:36Z exposed unknown early topology; GREENaaac6ec5 after observer integration. Earlier wrapper attempt363e893d was vacuous due inherited NODE_TEST_CONTEXT and supplies no RED or qualification credit; wrappers now clear it and assert named TAP execution."
+    }
+  },
+  {
+    "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
+    "testChangesSha256": "500c23d48ee8bdcc62089cd06713a4d44ad2b2075c39a4da088fc913200f5f78",
+    "reason": "Require the existing saved harness and original populated mobile startup story before launching costly CI; preserve imported assertions exactly and reject incomplete predecessor evidence. Reconciled current integration preserves #287/#292/#324/#325 records and assertion bodies unchanged; complete final fingerprint binds the combined diff.",
+    "previousBehavior": "The four long regression groups could launch before the decisive mobile startup failure was observed. Main did not contain the saved required mobile harness repairs.",
+    "intendedBehavior": "The early public process and durable receipt bind exact source, checkout/tree/base, workflow, event and attempt; blocked or incomplete work never counts as passed or executed.",
+    "replacementTests": [
+      "RISK repository process: early startup failure blocks costly CI without counting blocked coverage",
+      "RISK repository process: CI monitor preserves early startup and stress predecessor failures"
+    ],
+    "preservedCoverage": [
+      "All existing product assertions, installed-client native cases, rules, compatibility, full/same-source/policy reuse and release reviews remain protected. No application or runtime asset was changed.",
+      "Saved harness scripts and selected original native regression bodies are imported by exact source/hash without importing separately owned product edits. Actual current-source native acceptance remains required and may fail."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <retro290> --evidence-dir <retro278>/290/runs --purpose preimplementation-red --summary -- node --test scripts/agent-tools/early-ci.test.mjs",
+      "failure": "Observed topology RED6b86f9e2 at2026-10-27T03:57:34Z on0e4fefb: failed early story dispatched expensive children. GREENe51a32c8 after topology. Aggregate public-process RED482219b6 at04:02:21Z accepted complete later cohort without early evidence (exit0); GREENb11877b6 after gate. Initial process receipt run17c08a6c exposed a TAP reporter integration problem and is not behavioral RED. Process GREEN72f8a91b andba904a53 prove two children on pass, one on fail/skip/cancel and rejection of missing artifacts with a fresh verifier. Raw provenance retained outside Git at /Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/290/runs. Additional public observer RED3973b8a6 at04:09:42Z and actual RISK wrapper RED507067f5 at04:10:36Z exposed unknown early topology; GREENaaac6ec5 after observer integration. Earlier wrapper attempt363e893d was vacuous due inherited NODE_TEST_CONTEXT and supplies no RED or qualification credit; wrappers now clear it and assert named TAP execution."
+    }
+  },
+  {
+    "baseCommit": "0e4fefb5eaebcd2007406ae95f2ce69904e0e27d",
+    "testChangesSha256": "33323d0f7e696226c18520888c216fe4bab9df4527dd13fc55059aae492787c8",
+    "reason": "Require the existing saved harness and original populated mobile startup story before launching costly CI; preserve imported assertions exactly and reject incomplete predecessor evidence.",
+    "previousBehavior": "The four long regression groups could launch before the decisive mobile startup failure was observed. Main did not contain the saved required mobile harness repairs.",
+    "intendedBehavior": "The early public process and durable receipt bind exact source, checkout/tree/base, workflow, event and attempt; blocked or incomplete work never counts as passed or executed.",
+    "replacementTests": [
+      "RISK repository process: early startup failure blocks costly CI without counting blocked coverage",
+      "RISK repository process: CI monitor preserves early startup and stress predecessor failures"
+    ],
+    "preservedCoverage": [
+      "All existing product assertions, installed-client native cases, rules, compatibility, full/same-source/policy reuse and release reviews remain protected. No application or runtime asset was changed.",
+      "Saved harness scripts and selected original native regression bodies are imported by exact source/hash without importing separately owned product edits. Actual current-source native acceptance remains required and may fail."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <retro290> --evidence-dir <retro278>/290/runs --purpose preimplementation-red --summary -- node --test scripts/agent-tools/early-ci.test.mjs",
+      "failure": "Observed topology RED6b86f9e2 at2026-10-27T03:57:34Z on0e4fefb: failed early story dispatched expensive children. GREENe51a32c8 after topology. Aggregate public-process RED482219b6 at04:02:21Z accepted complete later cohort without early evidence (exit0); GREENb11877b6 after gate. Initial process receipt run17c08a6c exposed a TAP reporter integration problem and is not behavioral RED. Process GREEN72f8a91b andba904a53 prove two children on pass, one on fail/skip/cancel and rejection of missing artifacts with a fresh verifier. Raw provenance retained outside Git at /Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/290/runs. Additional public observer RED3973b8a6 at04:09:42Z and actual RISK wrapper RED507067f5 at04:10:36Z exposed unknown early topology; GREENaaac6ec5 after observer integration. Earlier wrapper attempt363e893d was vacuous due inherited NODE_TEST_CONTEXT and supplies no RED or qualification credit; wrappers now clear it and assert named TAP execution."
+    }
+  },
+  {
+    "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
+    "testChangesSha256": "bdfdfeb4acb83cfa5ee7b3a1299d49d8b91fa8b43eb8ca36357aae06c40530d7",
+    "reason": "Require the existing saved harness and original populated mobile startup story before launching costly CI; preserve imported assertions exactly and reject incomplete predecessor evidence.",
+    "previousBehavior": "The four long regression groups could launch before the decisive mobile startup failure was observed. Main did not contain the saved required mobile harness repairs.",
+    "intendedBehavior": "The early public process and durable receipt bind exact source, checkout/tree/base, workflow, event and attempt; blocked or incomplete work never counts as passed or executed.",
+    "replacementTests": [
+      "RISK repository process: early startup failure blocks costly CI without counting blocked coverage",
+      "RISK repository process: CI monitor preserves early startup and stress predecessor failures"
+    ],
+    "preservedCoverage": [
+      "All existing product assertions, installed-client native cases, rules, compatibility, full/same-source/policy reuse and release reviews remain protected. No application or runtime asset was changed.",
+      "Saved harness scripts and selected original native regression bodies are imported by exact source/hash without importing separately owned product edits. Actual current-source native acceptance remains required and may fail."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <retro290> --evidence-dir <retro278>/290/runs --purpose preimplementation-red --summary -- node --test scripts/agent-tools/early-ci.test.mjs",
+      "failure": "Observed topology RED6b86f9e2 at2026-10-27T03:57:34Z on0e4fefb: failed early story dispatched expensive children. GREENe51a32c8 after topology. Aggregate public-process RED482219b6 at04:02:21Z accepted complete later cohort without early evidence (exit0); GREENb11877b6 after gate. Initial process receipt run17c08a6c exposed a TAP reporter integration problem and is not behavioral RED. Process GREEN72f8a91b andba904a53 prove two children on pass, one on fail/skip/cancel and rejection of missing artifacts with a fresh verifier. Raw provenance retained outside Git at /Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/290/runs. Additional public observer RED3973b8a6 at04:09:42Z and actual RISK wrapper RED507067f5 at04:10:36Z exposed unknown early topology; GREENaaac6ec5 after observer integration. Earlier wrapper attempt363e893d was vacuous due inherited NODE_TEST_CONTEXT and supplies no RED or qualification credit; wrappers now clear it and assert named TAP execution."
+    }
+  },
+  {
     "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
     "testChangesSha256": "fe4b353ce0242fe7bf234ce0a9ea31616e927667c5e2c5f6c37f5afcb6aa3546",
     "reason": "Classify only provably instruction-preserving policy prose while preserving current release-process review and complete unchanged product evidence. Add command-boundary controls for exact inventories, artifact inheritance, current statuses and forbidden exemptions. Exact integrated frontier rationale retains #287 option-validation assertions and its independent original RED record below.",

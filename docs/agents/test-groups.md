@@ -139,3 +139,49 @@ the current test-first diff gate still runs. A policy-covered run cannot become
 a full producer. Uncertain classification or evidence retains the full current
 cohort. The [release procedure](../../RELEASE_GATES.md#policy-prose-inheritance)
 owns product/FAQ/rendered receipt inheritance and its limits.
+
+## Early populated startup admission
+
+The product workflow runs `scripts/early-ci.mjs` before event gates and all four
+regression groups. It verifies the saved synchronous-predicate, allocated-port,
+primary-error and real modal-release consumers, then the original required
+400-task mobile WebKit story in both motion modes. Its imported contract retains
+the exact 1,000,000,000-byte browser scope, zero swap, ten distinct trusted Yes
+acceptances within two seconds, and original startup/source/durability/frame
+checks. `scripts/early-ci-harness-source.json` binds the harness-only import from
+`9b5bc1c9d5a87fed022a17706bbb0e69e94757b1` (directly after `b176026`). It advances
+no product source or immutable full button inventory. A separately reviewed
+canonical profile admits only the required mobile story and the named confirmed
+Chromium modal-release harness. The saved native consumer remains preserved as a
+source snapshot; its effective profile hook is separately hashed. Five confirmed
+harness regressions remain executable. Three newly imported full PR285 product
+cases remain exact unexecuted source snapshots rather than becoming prerequisites
+for unrelated current-main application routes. Every preexisting main regression
+remains applicable and unchanged.
+
+The early job preserves raw children and artifacts in `early-startup-RUN-ATTEMPT`.
+The aggregate independently verifies that receipt and the separate 512 MB stress
+bundle. Measured application stress failure remains nonblocking; missing,
+corrupt, cancelled, skipped, unbound or incomplete execution fails closed. Blocked
+groups contribute no executed outcomes. Same-source and policy-prose coverage
+require the original full producer's successful early/stress jobs and exact early
+receipt attestation; current covered records launch no native children.
+
+Local process fixtures prove ordering and accounting only. A source mismatch or
+failed startup story remains a failed release gate. See the bounded
+[issue 290 handoff](../releases/issue-290-early-ci.md) for hosted demonstration and
+source limits; previous local harness evidence supplies no hosted qualification.
+
+The five confirmed roots retain their existing `native-process` assignments with
+`executionStage: early-startup`. Early TAP plus the original saved no-port child
+stream establish their actual cases. Each real group command verifies that durable
+receipt before launching a child; its ordinary TAP excludes only those cataloged
+early roots. The aggregate rederives and counts their cases once from the original
+raw streams. Covered records still claim zero current execution. This uses the
+existing groups/catalog and adds no accepted skips or competing inventory.
+
+Both matching engines are installed for the early stage. Its inherited TAP reporter
+keeps the unchanged saved nested source assertions observable. The long regression
+jobs retain their ordinary Chromium setup after early-only WebKit consumers have
+finished; local execution still requires the repository's actual runtime/resource
+allocation, and process fixtures supply no native proof.
