@@ -4,6 +4,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { validateInputPass } from './agent-tools/ci-pass-reuse.mjs';
 
 export const GROUP_IDS = ['core', 'scenery', 'persistence-recovery', 'native-process'];
 const TEST_NAME_PATTERN_ARGUMENT_BUDGET = 64 * 1024;
@@ -669,6 +670,11 @@ function artifactInventory(nativeDir) {
 }
 
 function coverageReference(proof, identity) {
+  if (proof?.inputPasses?.[identity.selectedGroup]) {
+    if (!['full','reuse'].includes(proof.decision) || String(proof.runId)!==String(identity.runId) || String(proof.runAttempt)!==String(identity.runAttempt)) fail('Input coverage requires current-run routing proof.');
+    for (const key of ['repository','sourceSha','sourceTree','checkoutSha','checkoutTree','comparisonBase']) if(proof.validationContext?.[key]!==identity[key])fail(`Input coverage validation mismatch: ${key}.`);
+    return validateInputPass(proof.inputPasses[identity.selectedGroup],identity);
+  }
   if (proof?.decision!=='reuse' || String(proof.runId)!==String(identity.runId) || String(proof.runAttempt)!==String(identity.runAttempt)) fail('Covered mode requires a verified current-run routing proof.');
   for (const key of ['repository','sourceSha','sourceTree','checkoutSha','checkoutTree','comparisonBase']) if(proof.validationContext?.[key]!==identity[key])fail(`Coverage validation context mismatch: ${key}.`);
   const context=proof.cohortContext,producer=proof.coveredBy;
@@ -684,7 +690,11 @@ function aggregateResults({options, outputDir, descriptor, inventory, assignment
   const needs = readJson(options.needsJson, 'actual workflow predecessor results');
   const issues = [], records = [], allCases = new Set();
   const covered=needs['cohort-routing']?.outputs?.decision==='reuse';
-  const freshCoverage=covered?coverageReference(readJson(options.proof,'fresh full-producer proof'),descriptor.resultIdentity):null;
+  const reused=JSON.parse(needs['cohort-routing']?.outputs?.reused||'[]');
+  if(!Array.isArray(reused)||new Set(reused).size!==reused.length||reused.some(id=>!GROUP_IDS.includes(id)&&!['rules','compatibility'].includes(id)))fail('Invalid reused-gate inventory.');
+  const freshProof=covered||reused.length?readJson(options.proof,'fresh original-producer proof'):null;
+  const freshCoverage=covered?coverageReference(freshProof,descriptor.resultIdentity):null;
+  for(const gate of reused.filter(id=>!GROUP_IDS.includes(id)))coverageReference(freshProof,{...descriptor.resultIdentity,selectedGroup:gate});
   for (const id of ['validation-context','event-gates','cohort-routing','regression']) {
     if (needs[id]?.result !== 'success') issues.push(`Required job ${id} did not succeed: ${needs[id]?.result || 'missing'}.`);
   }
@@ -705,15 +715,17 @@ function aggregateResults({options, outputDir, descriptor, inventory, assignment
       const root = path.resolve(options.resultsDir,id);
       if (fs.lstatSync(root).isSymbolicLink()) fail('Group evidence must be a real directory.');
       const record = readJson(path.join(root,'result.json'),`required result for ${id}`);
-      if (record.status !== (covered?'covered':'passed') || record.issues?.length || !Array.isArray(record.issues)) fail(`Required group ${id} did not pass.`);
+      const inputCovered=!covered&&reused.includes(id);
+      if (record.status !== (covered||inputCovered?'covered':'passed') || record.issues?.length || !Array.isArray(record.issues)) fail(`Required group ${id} did not pass.`);
       const identity = record.resultIdentity;
       for (const [key,value] of Object.entries(descriptor.resultIdentity)) {
         if (key === 'selectedGroup') continue;
         if (JSON.stringify(identity?.[key]) !== JSON.stringify(value)) fail(`Required group ${id} identity mismatch: ${key}.`);
       }
       if (identity?.selectedGroup !== id || identity.checkoutDirty) fail(`Wrong or dirty group identity: ${id}.`);
-      if(covered){
-        if(record.cases?.length!==0||record.artifacts?.length!==0||record.process!==null||JSON.stringify(record.coverage)!==JSON.stringify(freshCoverage))fail('Covered records are mixed, incomplete or claim current execution.');
+      if(covered||inputCovered){
+        const expectedCoverage=inputCovered?coverageReference(freshProof,{...descriptor.resultIdentity,selectedGroup:id}):freshCoverage;
+        if(record.cases?.length!==0||record.artifacts?.length!==0||record.process!==null||JSON.stringify(record.coverage)!==JSON.stringify(expectedCoverage))fail('Covered records are mixed, incomplete or claim current execution.');
         records.push({group:id,mode:'covered',identity,coverage:record.coverage});continue;
       }
       if (record.process?.exitCode !== 0 || record.process?.signal || record.process?.spawnError) fail(`Required group ${id} process failed or was canceled.`);
@@ -764,11 +776,12 @@ function aggregateResults({options, outputDir, descriptor, inventory, assignment
       records.push({group:id,resultSha256:sha256(fs.readFileSync(path.join(root,'result.json'))),cases:cases.length,passed:cases.filter(item=>item.status==='passed').length,skipped:cases.filter(item=>item.status==='skipped').length,artifacts:record.artifacts,identity});
     } catch (error) { issues.push(`${id}: ${error.message}`); }
   }
-  const report = {schemaVersion:1,status:issues.length?'failed':'passed',mode:covered?'covered':'full',resultIdentity:descriptor.resultIdentity,groups:records,caseCount:allCases.size,issues,finishedAt:new Date().toISOString()};
+  const coveredCount=records.filter(record=>record.mode==='covered').length;
+  const report = {schemaVersion:1,status:issues.length?'failed':'passed',mode:coveredCount===GROUP_IDS.length?'covered':coveredCount?'mixed':'full',resultIdentity:descriptor.resultIdentity,groups:records,caseCount:allCases.size,issues,finishedAt:new Date().toISOString()};
   atomicWrite(path.join(outputDir,'aggregate.json'),report);
   if (issues.length) fail(issues.join('\n'));
   process.stdout.write(`Complete required cohort verified: ${allCases.size} cases.\n`);
-  if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT,`report=${sha256(fs.readFileSync(path.join(outputDir,'aggregate.json')))}\n`);
+  if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT,`report=${sha256(fs.readFileSync(path.join(outputDir,'aggregate.json')))}\nmode=${report.mode}\n`);
   return 0;
 }
 

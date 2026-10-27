@@ -37,6 +37,18 @@
     }
   ],
   "rootAssignments": [
+    {"root": "RISK repository process: unchanged CI inputs reuse an original successful gate across events", "group": "core", "file": "tests.js"},
+    {"root": "RISK repository process: CI admission enforces reuse before repeating a passed test child", "group": "core", "file": "tests.js"},
+    {"root": "workflow reuses an independently passed gate on main for the same complete inputs", "group": "native-process", "file": "scripts/agent-tools/ci-routing.test.mjs"},
+    {"root": "workflow input reuse keeps a newer failed gate from inheriting an older pass", "group": "native-process", "file": "scripts/agent-tools/ci-routing.test.mjs"},
+    {"root": "workflow emulator gate reuses a verified pass and executes an uncovered gate", "group": "native-process", "file": "scripts/agent-tools/ci-routing.test.mjs"},
+    {"root": "workflow rerun reuses an original successful gate from its own earlier attempt", "group": "native-process", "file": "scripts/agent-tools/ci-routing.test.mjs"},
+    {"root": "workflow input reuse rejects changed inputs and uncertain original evidence", "group": "native-process", "file": "scripts/agent-tools/ci-routing.test.mjs"},
+    {"root": "test group input coverage reuses a passed group without claiming new execution", "group": "native-process", "file": "scripts/agent-tools/test-groups.test.mjs"},
+    {"root": "test group aggregate reconciles reused and executed groups with fresh original proof", "group": "native-process", "file": "scripts/agent-tools/test-groups.test.mjs"},
+    {"root": "test group workflow consumer forbids duplicate execution for a verified input pass", "group": "native-process", "file": "scripts/agent-tools/test-groups.test.mjs"},
+    {"root": "test group workflow publication attests actual execution and never promotes a reused result", "group": "native-process", "file": "scripts/agent-tools/test-groups.test.mjs"},
+    {"root": "test group input aggregation rejects stale missing and fabricated coverage", "group": "native-process", "file": "scripts/agent-tools/test-groups.test.mjs"},
     {
       "root": "18 hours elapsed before the next 02:00 does not recycle scanned tasks",
       "group": "core",

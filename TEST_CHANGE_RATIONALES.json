@@ -20153,5 +20153,25 @@
       "command": "Immutable recorder attempts in .git/agent-test-runs/issue-283/runs use node --test --test-name-pattern for each RISK JSON COPY PASTE or RISK DATABASE REPAIR EXPORT vertical consumer slice; exact commands, times, source identities and stdout/stderr are retained.",
       "failure": "Before each corresponding implementation: current-board control899563d6; board FAQdfa883d8; combined Settings control2210b578; unavailable/failed IDB and local sourcee2b8c485 (all3 false vs true); duplicate-control10ec7d35; expired diagnostic-original98fd9ee7 (null vs original); cancelled-view73507e40 (true vs false); repair FAQ0a2bee63. Worker attempt4711f3fb had an incomplete service-worker fixture and is not feature RED. Provisional worker capture was tried then withdrawn; corrected later-baseline-sensitivityf11abde0 observed null vs worker identity before final bounded read-only capture. This is not claimed as original RED; combined export original RED remains2210b578. GREENdd5b5fa1 passed combined consumers afterward. Earlier archive-only draft results are development evidence and its code/tests were discarded. Extended round-tripff4051ad and database fixture3611ae89 failures were fixture corrections, not product failures; corrected8c0614c0 and2e9aa016 passed without importer/runtime repairs. Independent Standards review found adjacent reload help still advertised removed Copy debug log. New mounted FAQ REDd5060f2e preceded the copy repair; GREEN60f7bb18 passed the new check and unchanged FAQ brevity gate. The old reload facts, retention limits, privacy, save-priority and no-crash-inference boundaries remain."
     }
+  },
+  {
+    "baseCommit": "e16cc6f680fd9c71baaaa309d565751425f25c39",
+    "testChangesSha256": "fbe3fe2ca9e3ae72caf4f6bb14a69081e54725ea35cb0ad308edfb6d361f9a33",
+    "reason": "Enforce the user-requested reuse of already successful CI gates for identical complete inputs across events and attempts, with a permanent admission guard against duplicate child execution.",
+    "previousBehavior": "CI tied reusable coverage to exact event/source identities and always executed main again. Successful individual groups and emulator gates were discarded across events and retries.",
+    "intendedBehavior": "Each original passed gate is keyed to the complete committed tree, exact base and runner/runtime; unchanged gates reuse original provenance, changed or uncertain inputs execute, and mixed aggregation claims only actual current execution. Admission tests fail if workflow edits bypass reuse.",
+    "replacementTests": [
+      "RISK repository process: unchanged CI inputs reuse an original successful gate across events",
+      "RISK repository process: CI admission enforces reuse before repeating a passed test child"
+    ],
+    "preservedCoverage": [
+      "The mandatory compatibility process contract still requires the real Firebase emulator command and fails without an emulator. Its workflow assertion now names the enforcing run-gate consumer; the immutable support floor, zero-skip, round-trip and manual Firestore predeploy assertions remain unchanged.",
+      "Existing legacy canonical-producer, missing-group, raw-TAP/hash, installed-native original-commit/cleanup, process registration, inventory and accepted-skip checks remain intact. New per-group coverage keeps zero current cases/artifacts/children and requires fresh original proof.",
+      "No application module, PWA asset, Firestore rule, package/dependency, product version, public FAQ or production data changes. Local fixtures and fake external APIs do not establish hosted or physical-device proof."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <task-worktree> --evidence-dir <task-artifacts>/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern=<named CI consumer slice> scripts/agent-tools/{ci-routing,test-groups}.test.mjs",
+      "failure": "Contemporaneous RED f6428fa8: main did not retain original successful core pass. RED385bf903: newer failed gate inherited older pass. RED9627d22f: real covered command rejected input-key proof. RED2f7227ec: required aggregate rejected a mixed covered/current cohort. REDf852e0cb: actual workflow dispatch did not consume a verified pass. REDea5e2777: executed group did not publish a complete-input key/result hash. RED67b7621c: actual rules workflow repeated an already passed emulator gate. REDf8f1cfc5: own earlier successful attempt was discarded. RED0484bebb: duplicate execution admission was accepted; the remaining 18 subcases already passed. Each has subsequent GREEN in /Users/emeraldpham/.codex/task-artifacts/ci-pass-reuse-20261027/runs. Initial emulator GREEN8faa4d64 failed only on a missing output parent directory; corrected GREENe44dc0b3 passes. All original records retained."
+    }
   }
 ]

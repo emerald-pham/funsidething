@@ -122,7 +122,44 @@ merge checkout/tree, base and aggregate report digest. The aggregate re-observes
 that producer immediately before accepting all four references; a changed or
 missing proof fails. A covered run cannot become a new full producer.
 
-Test-first, Firestore rules and compatibility gates always run for the actual
-event checkout and comparison base, including covered branch pushes. Main
-always executes its own full cohort. Pages still requires both `scanner-tests`
-and `release-evidence`; same-run artifact reads add no token permissions.
+The test-first diff gate always runs for the actual event checkout and comparison
+base. Pages still requires both `scanner-tests` and `release-evidence`.
+
+## Reusing successful CI inputs
+
+Each regression group, Firestore rules and compatibility uses the enforcing
+`scripts/agent-tools/ci-pass-reuse.mjs` consumer. A verified original pass for
+identical inputs must be reused, including on main and workflow retries. CI
+admission runs the actual workflow consumer regressions before expensive jobs;
+direct suite/group execution bypassing this consumer fails that contract.
+
+Keys bind the repository, complete committed checkout tree, exact comparison
+base, gate, Node version, platform, architecture and hosted runner image. The
+tree includes application code, tests, dependencies, workflow and cohort
+definitions. Commit metadata and event names do not invalidate identical tested
+inputs. Changes to any keyed input require execution. This is deliberately
+conservative: unrelated tracked changes also invalidate the key.
+
+The router observes up to 16 recent workflow runs and eight earlier attempts of
+the current run, within its existing API budget. It accepts repository-local
+push/PR jobs only, independently verifies their Git checkout/tree/base, and pins
+the original run, attempt, job and result digest. A unique successful execution
+admission and completion marker are required. The marker follows result upload;
+covered work cannot publish an original-execution marker. A newer failed gate
+invalidates its older pass. A completed successful gate remains usable when a
+different gate failed. Missing, cancelled, skipped, ambiguous, expired or
+unobservable original proof requires execution at routing time. These bounds
+and GitHub evidence retention can cause safe cache misses.
+
+Reused group records claim zero current cases, artifacts or test-child execution.
+The aggregate accepts a mixture of original coverage and actual current groups,
+reobserves original proof immediately before acceptance, and counts only current
+execution as current cases. Changed or missing final proof fails the aggregate.
+Legacy complete canonical-producer coverage retains its existing validation.
+Only a fully executed run can publish the legacy full-cohort producer marker.
+
+The router and aggregate have read-only Actions access for original-job
+observations. Tokens are not written to evidence. Local `npm test`, exact review
+receipts, the current diff gate, deployment verification and Pages checks retain
+their existing boundaries. Original native reports retain their original commit
+identity; reuse does not claim another native execution for the consumer SHA.

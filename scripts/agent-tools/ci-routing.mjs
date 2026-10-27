@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { CI_GATES, ciInputContext, ciInputKey, findInputPasses } from './ci-pass-reuse.mjs';
 
 const sha = value => typeof value === 'string' && /^[a-f0-9]{40}$/.test(value);
 const decimal = value => /^[1-9][0-9]*$/.test(String(value));
@@ -67,12 +68,16 @@ async function main() {
     eventName === 'pull_request' ? 'canonical-pr-merge-v1' : isMain ? 'exact-main-push-v1' : 'outgoing-branch-push-v1');
   const record = { schemaVersion: 1, eventName, runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT,
     validationContext, cohortContext: validationContext, contextSha256: hash(validationContext), decision: 'full',
-    reason: isMain ? 'Exact main always executes its own complete cohort.' : 'No verified equivalent producer.', coveredBy: null, observations: [] };
+    reason: isMain ? 'Exact main requires execution or verified original passes for complete inputs.' : 'No verified equivalent producer.', coveredBy: null, observations: [] };
+  record.inputContext = ciInputContext(validationContext);
+  record.inputKeys = Object.fromEntries(CI_GATES.map(gate => [gate, ciInputKey(record.inputContext, gate)]));
+  record.inputPasses = {};
   let apiReads = 0;
   function readApi(suffix) {
     if (++apiReads > 40) throw new Error('Public observation request budget exhausted.');
     const url = `https://api.github.com/repos/${repository}/${suffix}`;
     const response = spawnSync('curl', ['--disable', '--fail', '--silent', '--show-error', '--max-time', '10', '--connect-timeout', '5',
+      ...(process.env.GITHUB_TOKEN?['--header','Authorization: Bearer '+process.env.GITHUB_TOKEN]:[]),
       '--header', 'Accept: application/vnd.github+json', '--header', 'User-Agent: chain-scanner-ci-routing', url],
     { encoding: 'utf8', timeout: 11000, maxBuffer: 8 * 1024 * 1024 });
     const evidence = `observation-${apiReads}.json`;
@@ -170,9 +175,13 @@ async function main() {
       record.decision = 'full'; record.reason = `${error.message} Executing the actual checkout's complete cohort.`;
     }
   }
+  if (!args['plan-only'] && record.decision === 'full') {
+    try { record.inputPasses = findInputPasses(record, readApi); }
+    catch (error) { record.inputReuseReason = `${error.message} Unverified gates require execution.`; }
+  }
   writeFileSync(path.join(directory, 'routing.json'), JSON.stringify(record, null, 2) + '\n', { mode: 0o600 });
-  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `decision=${record.decision}\ncontext=${record.contextSha256}\nevent-policy=${validationContext.eventPolicy}\npolicy=${validationContext.eventPolicy}\ntree=${checkoutTree}\nworkflow-blob=${cohort?.workflowBlob||''}\ncohort=${cohort?.cohortDigestSha256||''}\n`);
-  console.log(`CI routing decision=${record.decision} context=${record.contextSha256} source=${sourceSha} actual-checkout=${checkoutSha} producer=${record.coveredBy ? `${record.coveredBy.runId}/${record.coveredBy.runAttempt}` : 'none'} reason=${record.reason}`);
+  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `decision=${record.decision}\ncontext=${record.contextSha256}\nevent-policy=${validationContext.eventPolicy}\npolicy=${validationContext.eventPolicy}\ntree=${checkoutTree}\nworkflow-blob=${cohort?.workflowBlob||''}\ncohort=${cohort?.cohortDigestSha256||''}\ninput-keys=${JSON.stringify(record.inputKeys)}\nreused=${JSON.stringify(Object.keys(record.inputPasses))}\n`);
+  console.log(`CI routing decision=${record.decision} reused-gates=${Object.keys(record.inputPasses).join(',')||'none'} context=${record.contextSha256} source=${sourceSha} actual-checkout=${checkoutSha} producer=${record.coveredBy ? `${record.coveredBy.runId}/${record.coveredBy.runAttempt}` : 'none'} reason=${record.reason}`);
   if (record.decision === 'fail') process.exitCode = 1;
 }
 
