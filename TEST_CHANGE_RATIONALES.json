@@ -20978,5 +20978,59 @@
       "command": "Node22.23.3 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node22 --test --test-reporter=tap --test-name-pattern=^RISK repository process: fresh Linux known-control verification tests.js; exact command/source/time in review/native-offset-repair/runs/red/2026-10-27T11-03-27-324Z-c741e23e-5633-48be-9495-fb492cad11e0.json.",
       "failure": "Observed before verifier change on d635379: the actual fresh public diagnostic-native-verify CLI rejected retained diagnosticKnownHotLoop+0x7, expected exit0 but actual1, with missing independently expected hot routine. This is a labelled controlled durable perf-text witness, not actual Linux capture. GREEN a50668c9 follows the one-line normalization fix; prior source/review records remain immutable."
     }
+  },
+  {
+    "testChangesSha256": "2f4de04836c03d0bc6cfbed7c97ceaf10f3603055f6d3ec29d7ac341472e1bef",
+    "reason": "Remove only the appended byte-identical duplicate of the pre-existing805 early predicate, after actual canonical Node process cardinality RED. Extend the existing canonical public risk consumer; preserve all827 prior rationale records as an exact raw prefix. Comparison b290820341755d632f85a3f57bb906bb8d00bdcf.",
+    "previousBehavior": "The actual early predicate had two identical top-level registrations. Covered source admission found the first and the unique-name catalog concealed the duplicate, while the real Node child executed two outcomes and the required early harness would reject cardinality.",
+    "intendedBehavior": "The pre-existing805 test body and core owner remain byte-identical and execute exactly once. The existing canonical consumer invokes the actual Node predicate command, requires one passed result with zero skips, and still verifies covered admission, fresh durable verification and mixed-owner once-only group accounting. Its125-second outer timeout preserves the120-second child bound.",
+    "replacementTests": [
+      "RISK repository process: canonical early admission retains mixed owners and fresh durable verification"
+    ],
+    "preservedCoverage": [
+      "The original805 synchronous-predicate assertion is byte-identical; all five actual early consumer names remain, with one core and four native-process catalog owners.",
+      "The other four early consumer bodies, manifest/profile/source fingerprints, native caps and source-preservation assertions, all2678 unique owners and accepted skips remain unchanged.",
+      "All prior four repair and native-offset executable behavior/evidence and all827 prior raw rationale records remain preserved; no assertHarness or generic validator was weakened."
+    ],
+    "redEvidence": {
+      "command": "Node22.23.3 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node22 --test --test-reporter=tap --test-name-pattern=^RISK repository process: canonical early admission retains mixed owners tests.js; exact command/source/time in review/early-duplicate-repair/runs/red/2026-10-27T11-10-52-326Z-62674577-cef1-4368-b8ac-9c56600727d6.json.",
+      "failure": "Observed before duplicate removal on b290820: the actual canonical Node predicate command exited0 but printed two same-name passed roots; permanent public-consumer cardinality assertion expected1 and observed2. GREEN follows removal of only the appended byte-identical second body. This is actual predicate execution and controlled source/group accounting, not full early Docker/WebKit or hosted proof."
+    }
+  },
+  {
+    "testChangesSha256": "9ae98000d68079bb540225f71d7016f67c9efa158a9e4a7217a50587f6007296",
+    "reason": "Remove only the appended byte-identical duplicate of the pre-existing805 early predicate, after actual canonical Node process cardinality RED. Extend the existing canonical public risk consumer; preserve all827 prior rationale records as an exact raw prefix. Comparison d635379ebb7913a165f88027828b5a57ef64d4e1.",
+    "previousBehavior": "The actual early predicate had two identical top-level registrations. Covered source admission found the first and the unique-name catalog concealed the duplicate, while the real Node child executed two outcomes and the required early harness would reject cardinality.",
+    "intendedBehavior": "The pre-existing805 test body and core owner remain byte-identical and execute exactly once. The existing canonical consumer invokes the actual Node predicate command, requires one passed result with zero skips, and still verifies covered admission, fresh durable verification and mixed-owner once-only group accounting. Its125-second outer timeout preserves the120-second child bound.",
+    "replacementTests": [
+      "RISK repository process: canonical early admission retains mixed owners and fresh durable verification"
+    ],
+    "preservedCoverage": [
+      "The original805 synchronous-predicate assertion is byte-identical; all five actual early consumer names remain, with one core and four native-process catalog owners.",
+      "The other four early consumer bodies, manifest/profile/source fingerprints, native caps and source-preservation assertions, all2678 unique owners and accepted skips remain unchanged.",
+      "All prior four repair and native-offset executable behavior/evidence and all827 prior raw rationale records remain preserved; no assertHarness or generic validator was weakened."
+    ],
+    "redEvidence": {
+      "command": "Node22.23.3 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node22 --test --test-reporter=tap --test-name-pattern=^RISK repository process: canonical early admission retains mixed owners tests.js; exact command/source/time in review/early-duplicate-repair/runs/red/2026-10-27T11-10-52-326Z-62674577-cef1-4368-b8ac-9c56600727d6.json.",
+      "failure": "Observed before duplicate removal on b290820: the actual canonical Node predicate command exited0 but printed two same-name passed roots; permanent public-consumer cardinality assertion expected1 and observed2. GREEN follows removal of only the appended byte-identical second body. This is actual predicate execution and controlled source/group accounting, not full early Docker/WebKit or hosted proof."
+    }
+  },
+  {
+    "testChangesSha256": "2621708194c0cbd1977f96f9f44e4cdea2705926787adcc7720467fc7324d867",
+    "reason": "Remove only the appended byte-identical duplicate of the pre-existing805 early predicate, after actual canonical Node process cardinality RED. Extend the existing canonical public risk consumer; preserve all827 prior rationale records as an exact raw prefix. Comparison 6c67fb0c9988d3e578579c7bb23a8ed0731aac3f.",
+    "previousBehavior": "The actual early predicate had two identical top-level registrations. Covered source admission found the first and the unique-name catalog concealed the duplicate, while the real Node child executed two outcomes and the required early harness would reject cardinality.",
+    "intendedBehavior": "The pre-existing805 test body and core owner remain byte-identical and execute exactly once. The existing canonical consumer invokes the actual Node predicate command, requires one passed result with zero skips, and still verifies covered admission, fresh durable verification and mixed-owner once-only group accounting. Its125-second outer timeout preserves the120-second child bound.",
+    "replacementTests": [
+      "RISK repository process: canonical early admission retains mixed owners and fresh durable verification"
+    ],
+    "preservedCoverage": [
+      "The original805 synchronous-predicate assertion is byte-identical; all five actual early consumer names remain, with one core and four native-process catalog owners.",
+      "The other four early consumer bodies, manifest/profile/source fingerprints, native caps and source-preservation assertions, all2678 unique owners and accepted skips remain unchanged.",
+      "All prior four repair and native-offset executable behavior/evidence and all827 prior raw rationale records remain preserved; no assertHarness or generic validator was weakened."
+    ],
+    "redEvidence": {
+      "command": "Node22.23.3 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node22 --test --test-reporter=tap --test-name-pattern=^RISK repository process: canonical early admission retains mixed owners tests.js; exact command/source/time in review/early-duplicate-repair/runs/red/2026-10-27T11-10-52-326Z-62674577-cef1-4368-b8ac-9c56600727d6.json.",
+      "failure": "Observed before duplicate removal on b290820: the actual canonical Node predicate command exited0 but printed two same-name passed roots; permanent public-consumer cardinality assertion expected1 and observed2. GREEN follows removal of only the appended byte-identical second body. This is actual predicate execution and controlled source/group accounting, not full early Docker/WebKit or hosted proof."
+    }
   }
 ]

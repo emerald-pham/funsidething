@@ -45530,11 +45530,6 @@ test('RISK repository process: early startup failure blocks costly CI without co
  assert.match(child.stdout,/# Subtest: early CI public command preserves durable predecessor authority/,'Required actual process assertions must execute');
 });
 
-test('RISK repository process: Playwright waitForFunction predicates are synchronous',()=>{
- const source=fs.readFileSync(fileURLToPath(import.meta.url),'utf8');
- const asyncWaitCalls=[...source.matchAll(/\.waitForFunction\s*\(\s*async\b/g)].map(match=>source.slice(0,match.index).split('\n').length);
- assert.deepEqual(asyncWaitCalls,[],'waitForFunction predicates must be synchronous; await storage reads through a bounded Node probe. Found lines: '+asyncWaitCalls.join(', '));
-});
 
 test('RISK scenery backdrop cache: first unchanged lighting timer reuses actual pixels while changed slots and loaded copy still paint',async t=>{
  const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});const directory=fs.mkdtempSync(path.join(base,'painted-slot-'));
@@ -45706,11 +45701,12 @@ test('RISK repository process: native diagnostic captures remain bounded and mis
 });
 
 
-test('RISK repository process: canonical early admission retains mixed owners and fresh durable verification',()=>{
+test('RISK repository process: canonical early admission retains mixed owners and fresh durable verification',{timeout:125000},()=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
  const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^early CI canonical source|^group and aggregate retain actual early','scripts/agent-tools/early-ci.test.mjs','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:120000,maxBuffer:8*1024*1024});
  assert.equal(child.status,0,'Actual canonical admission and owned early accounting must agree: '+child.stdout+child.stderr);
  assert.match(child.stdout,/# tests 4$/m);assert.match(child.stdout,/# skipped 0$/m);
+ assert.match(child.stdout,/Actual canonical Node predicate child completed exactly one required outcome with zero skips/,'The canonical consumer must exercise actual predicate cardinality as well as durable admission and accounting');
 });
 
 
