@@ -123,6 +123,11 @@
       "file": "tests.js"
     },
     {
+      "root": "a reversible theme flip during capture remains visible in bounded mutation and paint evidence",
+      "group": "native-process",
+      "file": "scripts/agent-tools/rendered-evidence.test.mjs"
+    },
+    {
       "root": "a renderer report missing a contracted FAQ surface fails without discarding its original statuses or report",
       "group": "native-process",
       "file": "scripts/agent-tools/browser-audit.test.mjs"
@@ -131,6 +136,11 @@
       "root": "a same-day repeat is caught by the regular sweep, not only when asked",
       "group": "core",
       "file": "tests.js"
+    },
+    {
+      "root": "a saved screenshot is bound to its actual bytes and a stale image fails the hash check",
+      "group": "native-process",
+      "file": "scripts/agent-tools/rendered-evidence.test.mjs"
     },
     {
       "root": "a silent adopt stays silent when there was nothing local to lose",
@@ -816,6 +826,11 @@
       "root": "cant is timestamped and excludes the task from the pool immediately",
       "group": "core",
       "file": "tests.js"
+    },
+    {
+      "root": "capture stop drains queued theme mutations before disconnecting its observer",
+      "group": "native-process",
+      "file": "scripts/agent-tools/rendered-evidence.test.mjs"
     },
     {
       "root": "capture waits for durable native Add acknowledgement before reusing the draft",
