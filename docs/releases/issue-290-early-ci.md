@@ -76,7 +76,7 @@ Stable deployment verification remain required. Beta mirroring stays paused.
 
 ## One actual early execution per confirmed root
 
-The five current executable harness roots keep their native-process catalog owner
+The five current executable harness roots keep their existing core/native-process catalog owners
 and declare early execution. Their early raw streams are verified before each
 ordinary group child and rechecked during aggregation. They are excluded from the
 long child selection and counted exactly once from the early receipt. The existing
