@@ -486,7 +486,7 @@ function inheritedProductEvidence(repoRoot, plan, input, directory = null) {
   if (renderedHash !== input.renderedEvidenceSha256 || rendered.schemaVersion !== 1 || rendered.outcome !== 'approved' || rendered.reviewedSha !== input.reviewedSha || rendered.treeSha !== plan.policyProse.baseTree || typeof rendered.summary !== 'string' || rendered.summary.trim().length < 20) {
     throw new Error('Inherited rendered review must bind approved evidence to the exact unchanged product tree.');
   }
-  if (taskId(rendered.task, 'Inherited rendered reviewer') === baseline.ownerReview.task || !Array.isArray(rendered.artifacts) || rendered.artifacts.length === 0) throw new Error('Inherited rendered review needs an independent reviewer and fingerprinted artifacts.');
+  if (taskId(rendered.task, 'Inherited rendered reviewer').toLocaleLowerCase() === baseline.ownerReview.task.toLocaleLowerCase() || !Array.isArray(rendered.artifacts) || rendered.artifacts.length === 0) throw new Error('Inherited rendered review needs an independent reviewer and fingerprinted artifacts.');
   const renderedArtifacts = rendered.artifacts.map((artifact, index) => {
     const name = `inherited-rendered-artifact-${index}`;
     const bytes = directory ? fs.readFileSync(path.join(directory, name)) : evidenceFile(repoRoot, artifact.evidencePath, artifact.sha256, 'Inherited rendered artifact');
@@ -956,7 +956,7 @@ export async function publishReleaseStatuses(repoRoot, commitSha, postStatus) {
     ? 'r=' + result.receipt.receiptSha256 + ';b=' + result.receipt.candidate.baseSha +
       ';p=' + sha256(Buffer.from(canonicalJson(result.receipt.reviewPlan))).slice(0, 12) +
       ';c=' + (result.receipt.reviewPlan.requiresCodeReview ? '1' : '0') +
-      ';s=' + (result.receipt.reviewPlan.requiresSpecialistReview ? '1' : '0') + (result.receipt.reviewPlan.policyProse && !result.receipt.additionalSpecialistDomains.length ? ';v=4' : result.receipt.reviewPlan.requiresFaqReview ? ';v=3' : ';v=2')
+      ';s=' + (result.receipt.reviewPlan.requiresSpecialistReview ? '1' : '0') + (result.receipt.reviewPlan.policyProse && !(result.receipt.additionalSpecialistDomains || []).length ? ';v=4' : result.receipt.reviewPlan.requiresFaqReview ? ';v=3' : ';v=2')
     : 'receipt-sha256=' + result.receipt.receiptSha256 + ';base=' + result.receipt.candidate.baseSha;
   const targetUrl = 'https://github.com/' + git(repoRoot, ['remote', 'get-url', 'origin']).replace(/^.*github\.com[:/]/, '').replace(/\.git$/, '') + '/commit/' + commitSha;
   const base = result.receipt.candidate.baseSha;

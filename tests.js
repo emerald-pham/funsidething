@@ -45252,7 +45252,9 @@ test('RISK repository process: policy prose receipts inherit only identical prod
   input.policyInheritance={reviewedSha:base,receiptSha256:priorReceipt.receiptSha256,renderedEvidencePath:rendered,renderedEvidenceSha256:releaseGateHash(rendered)};
   fs.writeFileSync(inputPath,JSON.stringify({...input,policyInheritance:undefined}));assert.notEqual(cli('record',inputPath).status,0,'missing inherited evidence fails closed');
   fs.writeFileSync(inputPath,JSON.stringify({...input,specialistReview:undefined}));assert.notEqual(cli('record',inputPath).status,0,'current policy review remains independent and mandatory');
-  const completeRendered=fs.readFileSync(rendered);fs.writeFileSync(rendered,JSON.stringify({...JSON.parse(completeRendered),artifacts:[]}));
+  const completeRendered=fs.readFileSync(rendered);
+  fs.writeFileSync(rendered,JSON.stringify({...JSON.parse(completeRendered),task:product.ownerReview.task.toUpperCase()}));fs.writeFileSync(inputPath,JSON.stringify({...input,policyInheritance:{...input.policyInheritance,renderedEvidenceSha256:releaseGateHash(rendered)}}));assert.notEqual(cli('record',inputPath).status,0,'rendered reviewer must remain independent under case-normalized task identity');
+  fs.writeFileSync(rendered,JSON.stringify({...JSON.parse(completeRendered),artifacts:[]}));
   const incomplete={...input,policyInheritance:{...input.policyInheritance,renderedEvidenceSha256:releaseGateHash(rendered)}};fs.writeFileSync(inputPath,JSON.stringify(incomplete));
   assert.notEqual(cli('record',inputPath).status,0,'a rendered approval without fingerprinted source artifacts must not authorize inheritance');
   fs.writeFileSync(rendered,completeRendered);fs.writeFileSync(inputPath,JSON.stringify(input));
