@@ -41453,6 +41453,28 @@ test('RISK repository process: preflight catches outgoing upstream rationale gap
  assert.deepEqual({refs:git('show-ref'),head:git('rev-parse','HEAD'),status:git('status','--porcelain','--untracked-files=no'),config:git('config','--local','--list')},before,'preflight preserves local refs, HEAD, tracked files and configuration');
 });
 
+test('RISK repository process: local preflight rejects stale FAQ and unassigned roots before qualification',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,[
+  '--test','--test-reporter=tap',
+  '--test-name-pattern=^preflight reports the existing FAQ length failure before full regression$',
+  path.join(__dirname,'scripts/agent-tools/preflight.test.mjs')
+ ],{cwd:__dirname,encoding:'utf8',env,timeout:30000,maxBuffer:8*1024*1024});
+ const output=[result.stdout,result.stderr].filter(Boolean).join('\n');
+ assert.equal(result.error,undefined,output);
+ assert.equal(result.signal,null,output);
+ assert.equal(result.status,0,output);
+ const lines=output.split(/\r?\n/).map(line=>line.trim());
+ const completed=lines.filter(line=>/^ok \d+ - /.test(line));
+ for(const name of [
+  'preflight reports the existing FAQ length failure before full regression',
+  'stale unreadable-device FAQ assertion',
+  'new unassigned root'
+ ])assert.equal(completed.filter(line=>line.endsWith(' - '+name)).length,1,`expected exactly one completed outcome for ${name}:\n${output}`);
+ for(const summary of ['# tests 3','# pass 3','# fail 0','# cancelled 0','# skipped 0'])
+  assert.equal(lines.filter(line=>line===summary).length,1,`required TAP summary ${summary}:\n${output}`);
+});
+
 test('RISK device save warning browser: actual held Add keeps every text line on contrasting toast paint and preserves short notices',
  {skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
  const {exactOldDevice}=await releasedExpiryStartSource173(t),original=JSON.parse(exactOldDevice);
