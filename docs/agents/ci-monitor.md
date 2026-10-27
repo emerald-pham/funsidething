@@ -67,7 +67,9 @@ not substitute the producer's run id or source for the requested push run.
 context separately from the cohort's source, actual merge checkout/tree, PR base,
 event policy and required cohort. A successful producer's original run and attempt
 remain in `coveredBy`; native reports retain that producer's actual candidate SHA.
-Main and PR events execute their own full cohort. Ambiguous, unavailable or changed
+Exact-main and source/base-changing PR events retain fresh validation. Equivalent
+metadata edits use the bound original producer described below. Ambiguous,
+unavailable or changed
 PR/run observations fall back to the actual outgoing checkout's full cohort.
 Routing reads public metadata with existing permissions, caps reads and pending
 waits, and rechecks PR merge/base identity after producer completion. Source-head
@@ -84,9 +86,44 @@ only. Keep CI batching, required review identities, exact-commit evidence,
 compatibility checks, deployment verification, and live behavior checks in
 [`release-and-review.md`](release-and-review.md).
 
-Metadata-only PR `edited` events may reuse an already completed exact canonical
-merge context. A head, base, merge, workflow or cohort change requires full
-validation; pending producers never count as success. Public observation errors
-use the full-cohort fallback or the observer's unresolved exit, as appropriate.
+Metadata-only PR `edited` events compare the complete canonical context: repository,
+source and source tree, actual merge checkout and tree, comparison base, event
+policy, committed workflow/configuration and cohort inventory/assignments, and
+Node/platform runtime. The existing Data safety workflow serializes PR events by
+workflow and PR number with `cancel-in-progress: false`. Branch pushes retain
+separate ref keys and exact-main deployment qualification remains required.
+GitHub may replace queued runs; a cancelled run remains cancelled evidence.
+
+The validation-context announcement binds identity. The separate successful
+`Admit original full producer context ...` step in `cohort-routing` admits only
+`decision=full`; failed/interrupted coverage observers cannot impersonate original
+execution. Successful reuse also requires the original complete topology,
+aggregate/report marker, early startup report and final unchanged PR context.
+Policy-only inheritance retains its existing independently reviewed route.
+
+A bound pending producer returns `pending`/exit 2, a known failure returns
+`fail`/exit 1, cancellation returns `cancelled`/exit 1, and missing final or
+unavailable bound evidence returns `unresolved`/exit 2. None launches another
+cohort. Missing admission or changed/unverifiable context uses fresh validation.
+Raw API reads and prior failures remain in their attempt directories. Compact
+output names one `next` gate and the exact `routing.json` artifact.
+
+Routing saves the producer's run/attempt and complete context before waiting.
+After an interrupted observation, retain the record, adjacent `event.json` and
+`descriptor.json`, then run in the exact checkout:
+
+```sh
+node scripts/agent-tools/ci-routing.mjs \
+  --resume /absolute/path/to/original/routing.json \
+  --evidence-dir /absolute/path/to/new-attempt
+```
+
+The saved nonsecret routing environment, sanitized event identity and descriptor
+restore missing invocation inputs in a fresh process without conversation
+history. Explicit current workflow inputs still must match the complete context.
+Resumption verifies the complete current context and rereads that same producer attempt. A newer success
+cannot hide its failure. Keep the original record and observations unchanged.
+The command only reads GitHub and never dispatches a workflow. The separate
+`ci-monitor` command also observes the explicit run without starting work.
 The handoff meanings remain: exit 0 is verified success, 1 is failure/cancellation
 or identity mismatch, and 2 requires continued observation or investigation.

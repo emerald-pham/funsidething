@@ -812,3 +812,24 @@ test('group and aggregate retain actual early cases once across fresh group proc
  await t.test('missing durable predecessor',()=>{fs.unlinkSync(path.join(early,'harness.stdout'));assert.notEqual(invoke(fixture,{group:'native-process',env,args:['--early-receipt',receipt]}).status,0);assert.notEqual(invoke(fixture,{env,args}).status,0);assert.deepEqual(fs.readFileSync(journal,'utf8').trim().split('\n'),first);});
  t.diagnostic(JSON.stringify({scope:'Controlled OS-process transfer only; no native/runtime proof',earlyRootExecutions:first.length,uniqueEarlyRoots:new Set(first).size,ordinaryGroups:groups.length,aggregateCaseCount:report.caseCount}));
 });
+
+test('workflow metadata aggregate rejects pending cancelled unresolved and stale successful routing proofs', async parent=>{
+ const fixture=createFixture(parent),{file,proof}=fixtureCoverage(fixture),temporary=fs.mkdtempSync(path.join(os.tmpdir(),'chain-metadata-aggregate-'));
+ parent.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));fs.mkdirSync(path.join(temporary,'groups'));fs.mkdirSync(path.join(temporary,'final-routing'));
+ const sentinel=path.join(temporary,'unexpected-test-child'),workflow=fs.readFileSync(path.join(repository,'.github/workflows/data-safety.yml'),'utf8');
+ const step=workflow.match(/      - name: Verify complete required cohort\n[\s\S]*?        run: \|\n((?:          [^\n]*\n|\n)*)/);assert.ok(step);
+ const command=step[1].split('\n').map(line=>line.startsWith('          ')?line.slice(10):line).join('\n');
+ const identity=proof.validationContext,env={...process.env,RUNNER_TEMP:temporary,GITHUB_REPOSITORY:identity.repository,GITHUB_RUN_ID:identity.runId,GITHUB_RUN_ATTEMPT:String(identity.runAttempt),CHAIN_TEST_SOURCE_SHA:identity.sourceSha,CHAIN_TEST_EVENT_POLICY:identity.eventPolicy,CHAIN_TEST_COMPARISON_BASE:identity.comparisonBase,CHAIN_DESCRIPTOR_SENTINEL:sentinel};delete env.NODE_TEST_CONTEXT;
+ for(const group of groups){const result=invoke(fixture,{group,args:['--covered','--proof',file],env:{CHAIN_DESCRIPTOR_SENTINEL:sentinel}});assert.equal(result.status,0,result.stdout+result.stderr);fs.cpSync(result.outputDir,path.join(temporary,'groups',group),{recursive:true});}
+ for(const decision of ['reuse','pending','cancelled','unresolved','fail','stale-success'])await parent.test(decision,()=>{
+  const observed=structuredClone(proof);if(decision==='stale-success')observed.coveredBy.runAttempt='3';else observed.decision=decision;
+  writeJson(path.join(temporary,'final-routing/routing.json'),observed);
+  writeJson(path.join(temporary,'needs.json'),Object.fromEntries(['validation-context','event-gates','cohort-routing','regression'].map(id=>[id,{result:decision==='reuse'||decision==='stale-success'?'success':id==='cohort-routing'?'failure':'skipped',...(id==='cohort-routing'?{outputs:{decision:'reuse'}}:{})}])));
+  fs.rmSync(path.join(temporary,'aggregate'),{recursive:true,force:true});
+  const result=spawnSync('bash',['-euo','pipefail','-c',command],{cwd:fixture.root,env,encoding:'utf8',timeout:15000});
+  assert.equal(result.status===0,decision==='reuse',decision+': '+result.stdout+result.stderr);
+  assert.equal(fs.existsSync(sentinel),false,'Required aggregate and coverage references never execute another test child');
+  if(decision==='reuse'){const report=JSON.parse(fs.readFileSync(path.join(temporary,'aggregate/aggregate.json')));assert.equal(report.caseCount,0);assert.equal(report.mode,'covered');assert.equal(report.groups.length,4);}
+  if(process.env.CHAIN_METADATA_EVIDENCE){const destination=path.join(process.env.CHAIN_METADATA_EVIDENCE,'aggregate-'+decision);fs.mkdirSync(process.env.CHAIN_METADATA_EVIDENCE,{recursive:true});fs.cpSync(temporary,destination,{recursive:true});fs.writeFileSync(path.join(destination,'consumer.stdout'),result.stdout);fs.writeFileSync(path.join(destination,'consumer.stderr'),result.stderr);}
+ });
+});

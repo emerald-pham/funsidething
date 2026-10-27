@@ -1,5 +1,41 @@
 [
   {
+    "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
+    "testChangesSha256": "cf31dbb920ed071d2ecc48cd05d179fb3f228ac8e590a0b7043ee0e98afb6489",
+    "reason": "Issue #291 adds a process RISK at the agreed public routing/observation and actual workflow-command boundaries, preserving complete producer identity and unsuccessful history during metadata-only reuse.",
+    "previousBehavior": "An announced pending producer fell through to another full execution; resumption could hide its failure behind newer success, and failed observers could impersonate original full admission.",
+    "intendedBehavior": "Exact original producer admission plus complete context and final evidence controls reuse. Pending/cancelled/failed/unresolved outcomes remain bound; resumption restores durable nonsecret inputs and launches no workflows. Equivalent metadata event admission serializes and the actual required aggregate fails closed.",
+    "replacementTests": [
+      "RISK repository process: metadata observation preserves bound producer outcomes without duplicate execution"
+    ],
+    "preservedCoverage": [
+      "Existing source/base-changing PR, outgoing branch, exact-main and independently reviewed policy-prose routes remain protected; early/stress/group/raw/native attestations and accepted skip inventory remain intact.",
+      "The Node process wrapper clears NODE_TEST_CONTEXT and requires named completed successful routing, scheduler-boundary and literal aggregate TAP outcomes; no private boards, browser or live service mutation is used."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/retro-291/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/291/runs --purpose preimplementation-red --summary -- node --test --test-reporter=tap --test-name-pattern=\"^RISK repository process: metadata observation preserves bound producer outcomes without duplicate execution$\" tests.js",
+      "failure": "Observed RED4f905967 at2026-10-27T05:06:30Z on07434988 before implementation: actual routing process launched2 cohorts, expected1; GREENafa095ec. Resumption RED6a70cda1 selected reuse instead of saved producer failure; GREEN23a67c7d. Simultaneous literal workflow route/real npm callback RED98896f1d produced full/full; GREENb26264c6 produced full/reuse. Original-admission REDc93de450 bound a cancelled observer instead of original success; GREENd905e3d4. Unknown-conclusion REDba78ae2a and policy observer RED5b9154aa each retained; respective GREEN127ed649 and d7e85da3. Actual SIGTERM interruption/resumption GREEN3d18fdaa. Full raw recorder output and source chronology remain outside Git; hosted event/scheduler proof remains parent-owned."
+    }
+  },
+  {
+    "baseCommit": "07434988a8e7beb3b0603ea2df9ba0d4b3b6b729",
+    "testChangesSha256": "c490db433a23035487b51b49ed53a6a54962ca70db50cb924a24bec62ae66b57",
+    "reason": "Issue #291 adds a process RISK at the agreed public routing/observation and actual workflow-command boundaries, preserving complete producer identity and unsuccessful history during metadata-only reuse.",
+    "previousBehavior": "An announced pending producer fell through to another full execution; resumption could hide its failure behind newer success, and failed observers could impersonate original full admission.",
+    "intendedBehavior": "Exact original producer admission plus complete context and final evidence controls reuse. Pending/cancelled/failed/unresolved outcomes remain bound; resumption restores durable nonsecret inputs and launches no workflows. Equivalent metadata event admission serializes and the actual required aggregate fails closed.",
+    "replacementTests": [
+      "RISK repository process: metadata observation preserves bound producer outcomes without duplicate execution"
+    ],
+    "preservedCoverage": [
+      "Existing source/base-changing PR, outgoing branch, exact-main and independently reviewed policy-prose routes remain protected; early/stress/group/raw/native attestations and accepted skip inventory remain intact.",
+      "The Node process wrapper clears NODE_TEST_CONTEXT and requires named completed successful routing, scheduler-boundary and literal aggregate TAP outcomes; no private boards, browser or live service mutation is used."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/retro-291/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/291/runs --purpose preimplementation-red --summary -- node --test --test-reporter=tap --test-name-pattern=\"^RISK repository process: metadata observation preserves bound producer outcomes without duplicate execution$\" tests.js",
+      "failure": "Observed RED4f905967 at2026-10-27T05:06:30Z on07434988 before implementation: actual routing process launched2 cohorts, expected1; GREENafa095ec. Resumption RED6a70cda1 selected reuse instead of saved producer failure; GREEN23a67c7d. Simultaneous literal workflow route/real npm callback RED98896f1d produced full/full; GREENb26264c6 produced full/reuse. Original-admission REDc93de450 bound a cancelled observer instead of original success; GREENd905e3d4. Unknown-conclusion REDba78ae2a and policy observer RED5b9154aa each retained; respective GREEN127ed649 and d7e85da3. Actual SIGTERM interruption/resumption GREEN3d18fdaa. Full raw recorder output and source chronology remain outside Git; hosted event/scheduler proof remains parent-owned."
+    }
+  },
+  {
     "baseCommit": "5baedb2e237b366bc8fe1f82a36faf9357ae02e8",
     "testChangesSha256": "e782d728ab6173f5dae4158122df07190c0655e193077489e15247915e207d69",
     "reason": "Reconcile all five confirmed early consumers through the existing catalog and actual workflow/group/aggregate entry points, counting each real early outcome once while preserving canonical limited source admission and all preexisting main regressions. Combined current #288/#286 integration retains all returned source bodies and prior rationale records unchanged; this record binds the final merged protected-test diff.",

@@ -45626,3 +45626,16 @@ test('RISK repository process: early-assigned consumers execute once through dur
  assert.equal(child.status,0,'Actual group consumer must preserve one execution and predecessor integrity: '+child.stdout+child.stderr);
  assert.match(child.stdout,/# Subtest: group process refuses missing early predecessor/);
 });
+
+
+test('RISK repository process: metadata observation preserves bound producer outcomes without duplicate execution',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^metadata observation |^workflow metadata events serialize','scripts/agent-tools/ci-routing.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:120000,maxBuffer:8*1024*1024});
+ assert.equal(child.status,0,'Actual routing process must preserve incomplete exact producers: '+child.stdout+child.stderr);
+ assert.match(child.stdout,/ok [0-9]+ - metadata observation retains a bound pending producer without launching another cohort/);
+ assert.match(child.stdout,/# fail 0/);assert.match(child.stdout,/# cancelled 0/);assert.match(child.stdout,/# skipped 0/);
+ for(const name of ['metadata observation preserves cancelled producers and incomplete final evidence','metadata observation resumes the saved producer in a fresh process despite newer equivalent history','workflow metadata events serialize equivalent admission and run the actual routing command once per event','metadata observation recovers after an actual interrupted process using only durable evidence'])assert.ok(child.stdout.includes(' - '+name),name+' must execute');
+ const aggregate=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^workflow metadata aggregate rejects','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:120000,maxBuffer:8*1024*1024});
+ assert.equal(aggregate.status,0,'Literal workflow aggregate must preserve incomplete and stale evidence: '+aggregate.stdout+aggregate.stderr);assert.match(aggregate.stdout,/ok [0-9]+ - workflow metadata aggregate rejects pending cancelled unresolved and stale successful routing proofs/);assert.match(aggregate.stdout,/# fail 0/);assert.match(aggregate.stdout,/# cancelled 0/);assert.match(aggregate.stdout,/# skipped 0/);
+
+});
