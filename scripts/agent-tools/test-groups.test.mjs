@@ -1460,3 +1460,46 @@ test('test group browser runtime interruption finalizes and stops only its owned
   t.diagnostic(JSON.stringify({scope:'Controlled browser-provider fixture, actual OS child/grandchild and listener',signal,viaRecorder,exit:result,ownedFamilyStopped:true,unrelatedProcessPreserved:true,portReleased:true}));
  });
 });
+
+
+test('test group workflow browser path reaches the installer and enforcing persistence consumer',t=>{
+ const fixture=createFixture(t),root='fixture required browser workflow path';
+ addBrowserRuntimeRootFixture(t,fixture,root,'pass',false);
+ const temp=fs.mkdtempSync(path.join(os.tmpdir(),'chain-workflow-browser-path-'));fixture.outputs.push(temp);
+ const runnerTemp=path.join(temp,'runner temp with spaces'),expected=path.join(runnerTemp,'playwright-browsers'),journal=path.join(temp,'install-journal');fs.mkdirSync(runnerTemp);
+ const regression=fs.readFileSync(path.join(repository,'.github/workflows/data-safety.yml'),'utf8').split(/^  regression:/m)[1].split(/^  scanner-tests:/m)[0];
+ const job=regression.split(/^    steps:/m)[0],steps=regression.split(/^      - /m).slice(1).map(text=>'      - '+text);
+ const install=steps.find(text=>text.startsWith('      - name: Install matching native Chromium\n')),group=steps.find(text=>text.startsWith('      - name: Execute complete assigned group\n'));
+ assert.ok(install&&group,'The actual workflow install and enforcing group steps must exist');
+ const resolvePath=(text,contexts,inherited)=>{
+  const value=text.match(/^\s+PLAYWRIGHT_BROWSERS_PATH: (.+)$/m)?.[1];if(value===undefined)return inherited;
+  return value.replace(/\$\{\{\s*([^{}]+?)\s*\}\}/g,(_,expression)=>{
+   const [scope,...properties]=expression.split('.');assert.ok(Object.hasOwn(contexts,scope),'Browser environment cannot evaluate unavailable '+scope+' context at this workflow scope');
+   return properties.reduce((value,key)=>value?.[key],contexts[scope])??'';
+  });
+ };
+ // GitHub's published context table excludes runner from jobs.<id>.env, while
+ // permitting it for steps.env. The independent actionlint control checks the
+ // same source semantics; the real shell/consumer below checks path propagation.
+ const jobPath=resolvePath(job,{},undefined),installPath=resolvePath(install,{runner:{temp:runnerTemp}},jobPath),groupPath=resolvePath(group,{runner:{temp:runnerTemp}},jobPath);
+ assert.equal(installPath,expected,'The installer must resolve the isolated absolute runner-temp path');assert.equal(groupPath,expected,'The enforcing persistence consumer must resolve the same isolated runner-temp path');
+ const command=step=>{const value=step.match(/        run: \|\n((?:          [^\n]*\n|\n)*)/);assert.ok(value,'Actual multi-line workflow command required');return value[1].split('\n').map(line=>line.startsWith('          ')?line.slice(10):line).join('\n').replaceAll('${{ matrix.group }}','persistence-recovery').replaceAll('${{ steps.selected.outputs.early-decision }}','full');};
+ const described=invoke(fixture,{args:['--describe']});assert.equal(described.status,0,described.stderr);const identity=JSON.parse(fs.readFileSync(path.join(described.outputDir,'descriptor.json'))).resultIdentity;
+ const proof=path.join(runnerTemp,'selected-routing/routing.json');fs.mkdirSync(path.dirname(proof),{recursive:true});writeJson(proof,{decision:'full',runId:identity.runId,runAttempt:identity.runAttempt,validationContext:identity,inputPasses:{}});
+ const env={...process.env,CI:'true',RUNNER_TEMP:runnerTemp,GITHUB_REPOSITORY:identity.repository,CHAIN_TEST_SOURCE_SHA:fixture.sourceSha,CHAIN_TEST_COMPARISON_BASE:fixture.comparisonBase,CHAIN_TEST_EVENT_POLICY:identity.eventPolicy,GITHUB_RUN_ID:identity.runId,GITHUB_RUN_ATTEMPT:String(identity.runAttempt),WORKFLOW_INSTALL_JOURNAL:journal};delete env.NODE_TEST_CONTEXT;delete env.PLAYWRIGHT_BROWSERS_PATH;
+ const installer='npx(){ printf "%s\\n" "$PLAYWRIGHT_BROWSERS_PATH" "$@" >> "$WORKFLOW_INSTALL_JOURNAL"; mkdir -p "$PLAYWRIGHT_BROWSERS_PATH/chromium"; printf "%s\\n" "controlled external Chromium provider" > "$PLAYWRIGHT_BROWSERS_PATH/chromium/chrome"; chmod +x "$PLAYWRIGHT_BROWSERS_PATH/chromium/chrome"; }\n'+command(install);
+ const installed=run('bash',['-euo','pipefail','-c',installer],fixture.root,{...env,PLAYWRIGHT_BROWSERS_PATH:installPath});assert.equal(installed.status,0,installed.stdout+installed.stderr);
+ assert.deepEqual(fs.readFileSync(journal,'utf8').trim().split('\n'),[expected,'--no-install','playwright','install','--with-deps','chromium'],'Actual installer invokes external provider exactly once with Chromium and the resolved path');
+ const completed=run('bash',['-euo','pipefail','-c',command(group)],fixture.root,{...env,PLAYWRIGHT_BROWSERS_PATH:groupPath});assert.equal(completed.status,0,completed.stdout+completed.stderr);
+ const record=readEvidence(path.join(runnerTemp,'group'));assert.equal(record.status,'passed');
+ const receipt=JSON.parse(fs.readFileSync(path.join(runnerTemp,'group',record.browserRuntimeReceipt.path)));
+ assert.equal(receipt.status,'passed');assert.equal(receipt.browserRuntime.runtime.browserPath,fs.realpathSync(expected));assert.equal(receipt.browserRuntime.runtime.chromium.available,true);assert.equal(receipt.browserRuntime.runtime.webkit.available,false);
+ assert.deepEqual(receipt.browserRuntime.selectedRoots,[root]);assert.deepEqual(receipt.browserRuntime.outcomes.map(row=>[row.id,row.status]),[[root,'passed']]);assert.equal(record.cases.filter(row=>row.root===root&&row.status==='passed').length,1,'The complete ordinary group still executes the selected browser root');
+ const firstJournal=fs.readFileSync(journal,'utf8');
+ for(const [name,value]of [['missing consumer environment',undefined],['literal unexpanded runner variable','$RUNNER_TEMP/playwright-browsers'],['different empty browser installation',path.join(temp,'wrong-engines')]]){
+  fs.rmSync(path.join(runnerTemp,'group'),{recursive:true,force:true});const changed={...env};if(value!==undefined)changed.PLAYWRIGHT_BROWSERS_PATH=value;
+  const failed=run('bash',['-euo','pipefail','-c',command(group)],fixture.root,changed);assert.notEqual(failed.status,0,name+' must fail through the actual workflow/group consumer');assert.equal(readEvidence(path.join(runnerTemp,'group'))?.status==='passed',false,name+' cannot publish passing group evidence');
+ }
+ assert.equal(fs.readFileSync(journal,'utf8'),firstJournal,'Consumer probes never repeat the external browser installation');
+ t.diagnostic('Actual workflow install and persistence consumer share the same resolved runner-temp path with spaces; controlled external Chromium provider only, WebKit unavailable, retained preflight and full outcomes verified. Three wrong/missing/literal consumer environments fail closed; no real engine or shared port launched.');
+});

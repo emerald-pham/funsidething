@@ -2343,3 +2343,9 @@ Public routing and workflow-consumer controls retain metadata pending, failure a
 Public early execution on synthetic image A retains its complete producing inputs in the raw artifact. Real fresh group and aggregate processes on synthetic image B must accept the intact original source/runtime proof while current-runtime input selection invalidates group reuse. Missing, incomplete or changed producer runtime, source, workflow, complete-input key and retained proof are refused before workload dispatch. Existing covered admission still requires its matching current runtime.
 
 Public aggregate controls cover four fresh groups with inherited emulator evidence, four fresh groups with inherited early evidence, covered groups with fresh emulators and entirely inherited required sources. Durable modes report full, mixed or covered across those actual sources; inherited evidence retains reuse attestation and cannot claim original full-producer authority. Missing or changed original references fail. These controlled OS-process/parser fixtures provide no actual browser, memory-cap, emulator, hosted or deployment proof.
+
+## Supported browser workflow environment scope
+
+- `RISK repository process: workflow browser paths resolve only in supported runner contexts`
+
+The actual workflow installer and enforcing persistence consumer must resolve the same isolated runner-temp browser directory at a supported environment scope. Controlled external Chromium installation feeds the real group preflight and complete outcomes; missing, literal unexpanded or mismatched consumer paths fail closed. This process contract starts no real browser and supplies no hosted qualification.

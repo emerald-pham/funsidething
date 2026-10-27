@@ -13642,6 +13642,17 @@
       "group": "native-process",
       "file": "scripts/agent-tools/checkpoint-progress.test.mjs"
     }
+,
+    {
+      "root": "test group workflow browser path reaches the installer and enforcing persistence consumer",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "RISK repository process: workflow browser paths resolve only in supported runner contexts",
+      "group": "native-process",
+      "file": "tests.js"
+    }
   ],
   "processControls": [
     {
