@@ -339,3 +339,18 @@ styles, service worker and rendered producer helpers remain byte-identical to
 `dbde27a`; prior visuals retain their actual producing tests and candidate.
 The test-only successor still requires its own clean full/native qualification
 and exact renewed review receipts.
+
+
+## CI group registration repair
+
+The first push and PR runs on `9306a59` (40438515810 and 40438532304)
+failed in validation-context before executing regression groups. Nine new
+top-level startup/presentation tests had not been registered in the explicit
+CI group map. Local full/native, compatibility and rules results remain passes
+for that candidate; they did not exercise the group descriptor. The successor
+adds all nine registrations together: two fast presentation/copy contracts in
+core and seven storage/startup consumers in persistence-recovery. No inventory
+baseline, skip allowance, test assertion or product byte changes. The failed
+CI logs remain under the task's external `ci/push` and `ci/pr` evidence.
+This is registration repair, not a new product RED. Final grouped descriptor
+and regression gates, exact successor review and qualification remain required.
