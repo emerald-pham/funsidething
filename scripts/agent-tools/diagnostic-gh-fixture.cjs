@@ -82,10 +82,38 @@ try {
       state.trees[sha] = data;
       state.publications++;
       output = { sha };
-    } else if (endpoint.includes("/git/trees/"))
-      output =
-        state.trees[endpoint.split("/").at(-1)] ?? (fail("HTTP 404"), null);
-    else if (endpoint.endsWith("/git/commits") && method === "POST") {
+    } else if (endpoint.includes("/git/trees/")) {
+      const tree = state.trees[endpoint.split("/").at(-1).split("?")[0]];
+      if (!tree) {
+        fail("HTTP 404");
+        output = null;
+      } else {
+        const directories = [
+          ...new Set(
+            tree.tree.flatMap((row) => {
+              const parts = row.path.split("/");
+              return parts
+                .slice(0, -1)
+                .map((_, index) => parts.slice(0, index + 1).join("/"));
+            }),
+          ),
+        ].map((path) => ({
+          path,
+          mode: "040000",
+          type: "tree",
+          sha: id(path),
+        }));
+        output = {
+          tree: endpoint.includes("?recursive=")
+            ? [...directories, ...tree.tree]
+            : [
+                ...directories.filter((row) => !row.path.includes("/")),
+                ...tree.tree.filter((row) => !row.path.includes("/")),
+              ],
+          truncated: false,
+        };
+      }
+    } else if (endpoint.endsWith("/git/commits") && method === "POST") {
       const sha = id(data);
       state.commits[sha] = data;
       state.publications++;

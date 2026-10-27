@@ -1272,3 +1272,35 @@ test("only named inherited review artifacts are selected and unrelated private f
     false,
   );
 });
+
+test("independent CI restores nested immutable proof artifacts through actual recursive Git tree semantics", (t) => {
+  const f = fixture(t);
+  assert.equal(command(f, "diagnostic-record", f.inputPath).status, 0);
+  const launch = JSON.parse(command(f, "diagnostic-launch", f.source).stdout);
+  seedRun(f, "9001");
+  const claim = command(
+    f,
+    "diagnostic-ci-claim",
+    launch.permit,
+    launch.permitObject,
+    f.source,
+    "9001",
+    "1",
+  );
+  assert.equal(
+    claim.status,
+    0,
+    "GitHub nested review tree must restore before claim: " + claim.stderr,
+  );
+  assert.equal(JSON.parse(claim.stdout).claimed, true);
+  const requests = JSON.parse(fs.readFileSync(f.remoteFile)).requests;
+  assert.ok(
+    requests.some((args) =>
+      args.some(
+        (value) =>
+          value.includes("/git/trees/") && value.includes("?recursive=1"),
+      ),
+    ),
+    "the independent verifier must request complete recursive tree entries",
+  );
+});

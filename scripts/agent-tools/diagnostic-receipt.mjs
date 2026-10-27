@@ -738,12 +738,26 @@ function writeGraph(repository, payload, files, source, createdAt) {
 }
 function readGraph(repository, object) {
   const commit = gh(repository, "/git/commits/" + object),
-    tree = gh(repository, "/git/trees/" + (commit.tree.sha ?? commit.tree));
-  if (tree.truncated || !Array.isArray(tree.tree) || tree.tree.length > 32)
+    tree = gh(
+      repository,
+      "/git/trees/" + (commit.tree.sha ?? commit.tree) + "?recursive=1",
+    );
+  if (tree.truncated || !Array.isArray(tree.tree) || tree.tree.length > 34)
     throw Error("Diagnostic remote artifact tree incomplete.");
   const files = {};
-  let payload;
+  let payload,
+    totalBytes = 0;
+  const paths = new Set();
   for (const row of tree.tree) {
+    if (paths.has(row.path))
+      throw Error("Diagnostic remote artifact tree has duplicate paths.");
+    paths.add(row.path);
+    if (
+      row.type === "tree" &&
+      row.mode === "040000" &&
+      ["proof", "proof/frozen"].includes(row.path)
+    )
+      continue;
     if (
       row.type !== "blob" ||
       row.mode !== "100644" ||
@@ -756,7 +770,8 @@ function readGraph(repository, object) {
     if (value.encoding !== "base64" || typeof value.content !== "string")
       throw Error("Diagnostic remote artifact bytes unavailable.");
     const bytes = Buffer.from(value.content.replace(/\s/g, ""), "base64");
-    if (bytes.length > 32 * 1024 * 1024)
+    totalBytes += bytes.length;
+    if (totalBytes > 32 * 1024 * 1024)
       throw Error("Diagnostic artifact exceeds bound.");
     if (row.path === "permit.json") payload = JSON.parse(bytes);
     else if (row.path.startsWith("proof/"))

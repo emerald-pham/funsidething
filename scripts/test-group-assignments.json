@@ -13001,6 +13001,11 @@
       "root": "only named inherited review artifacts are selected and unrelated private files never enter a public permit",
       "group": "native-process",
       "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "independent CI restores nested immutable proof artifacts through actual recursive Git tree semantics",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
     }
   ],
   "processControls": [
