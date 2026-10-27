@@ -202,6 +202,7 @@ function runGate(options) {
   const bytes=JSON.stringify(report,null,2)+'\n';writeFileSync(path.join(outputDir,'result.json'),bytes);
   if(report.status==='failed')throw new Error('Required emulator gate failed or did not execute its complete zero-skip cohort.');
   let output=`mode=${report.status==='covered'?'covered':'executed'}\n`;
+  if(report.status==='covered')output+=`coverage=${digest(report.coverage)}\n`;
   if(report.status==='passed'&&inputs.runtime.imageOS&&inputs.runtime.imageVersion)output+=`key=${ciInputKey(inputs,gate)}\nresult=${createHash('sha256').update(bytes).digest('hex')}\n`;
   if(process.env.GITHUB_OUTPUT)appendFileSync(process.env.GITHUB_OUTPUT,output);process.stdout.write(output);
 }

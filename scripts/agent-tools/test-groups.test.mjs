@@ -712,10 +712,12 @@ test('test group aggregate preserves observer protocol across emulator coverage 
   const workflow=fs.readFileSync(path.join(repository,'.github/workflows/data-safety.yml'),'utf8');
   assert.match(workflow,/name: Verified complete cohort .* mode \$\{\{ steps\.aggregate\.outputs\.attestation-mode \}\}/,'the actual workflow must publish the observer-compatible aggregate output');
   assert.match(workflow,/if: success\(\) && steps\.aggregate\.outputs\.original == 'true'/,'only actual fully executed cohorts advertise original producer authority');
-  for(const [name,rulesMode,hasProof,accepted,mode]of [['retained rules','covered',true,true,'reuse'],['fresh emulator fallback','executed',false,true,'full'],['missing covered proof','covered',false,false,null]])await parent.test(name,t=>{
-    const {file,proof}=inputCoverage(fixture,'rules');if(!hasProof)proof.inputPasses={};writeJson(file,proof);
+  for(const [name,rulesMode,hasProof,accepted,mode]of [['retained rules','covered',true,true,'reuse'],['fresh emulator fallback','executed',false,true,'full'],['missing covered proof','covered',false,false,null],['changed consumed original','covered',true,false,null]])await parent.test(name,t=>{
+    const {file,proof}=inputCoverage(fixture,'rules'),consumed=createHash('sha256').update(JSON.stringify(proof.inputPasses.rules)).digest('hex');if(!hasProof)proof.inputPasses={};
+    if(name==='changed consumed original'){proof.inputPasses.rules.coveredBy.runId='72';proof.inputPasses.rules.coveredBy.runAttempt='1';proof.inputPasses.rules.coveredBy.resultSha256='9'.repeat(64);}
+    writeJson(file,proof);
     const outputs=path.join(path.dirname(file),'aggregate-outputs');
-    const result=aggregateCopy(t,fixture,(_root,needs)=>{const x=JSON.parse(fs.readFileSync(needs));x['cohort-routing'].outputs={decision:'full',reused:'["rules"]'};x['event-gates'].outputs={rules:rulesMode,compatibility:'executed'};writeJson(needs,x);},['--proof',file],{ImageOS:'ubuntu24',ImageVersion:'20261022.1.0',GITHUB_OUTPUT:outputs});
+    const result=aggregateCopy(t,fixture,(_root,needs)=>{const x=JSON.parse(fs.readFileSync(needs));x['cohort-routing'].outputs={decision:'full',reused:'["rules"]'};x['event-gates'].outputs={rules:rulesMode,compatibility:'executed','rules-coverage':rulesMode==='covered'?consumed:''};writeJson(needs,x);},['--proof',file],{ImageOS:'ubuntu24',ImageVersion:'20261022.1.0',GITHUB_OUTPUT:outputs});
     assert.equal(result.status===0,accepted,result.stdout+result.stderr);
     if(accepted){const text=fs.readFileSync(outputs,'utf8');assert.match(text,new RegExp('^attestation-mode='+mode+'$','m'),'the existing observer must receive a truthful full/reuse attestation');assert.match(text,new RegExp('^original='+(mode==='full')+'$','m'),'only entirely executed cohorts can publish the original full producer marker');}
   });

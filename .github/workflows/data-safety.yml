@@ -78,6 +78,8 @@ jobs:
     outputs:
       rules: ${{ steps.rules.outputs.mode }}
       compatibility: ${{ steps.compatibility.outputs.mode }}
+      rules-coverage: ${{ steps.rules.outputs.coverage }}
+      compatibility-coverage: ${{ steps.compatibility.outputs.coverage }}
     steps:
       - uses: actions/checkout@v4
         with:

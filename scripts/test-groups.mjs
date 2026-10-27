@@ -693,12 +693,17 @@ function aggregateResults({options, outputDir, descriptor, inventory, assignment
   const reused=JSON.parse(needs['cohort-routing']?.outputs?.reused||'[]');
   if(!Array.isArray(reused)||new Set(reused).size!==reused.length||reused.some(id=>!GROUP_IDS.includes(id)&&!['rules','compatibility'].includes(id)))fail('Invalid reused-gate inventory.');
   const emulatorModes=needs['event-gates']?.outputs;
+  if(!emulatorModes&&reused.some(gate=>['rules','compatibility'].includes(gate)))fail('Reused emulator gates require their actual consumer outcomes and original coverage fingerprints.');
   if(emulatorModes&&['rules','compatibility'].some(gate=>!['executed','covered'].includes(emulatorModes[gate])))fail('Required emulator gate outcomes are missing or unknown.');
   const reusedEmulators=emulatorModes?['rules','compatibility'].filter(gate=>emulatorModes[gate]==='covered'):reused.filter(id=>!GROUP_IDS.includes(id));
   if(reusedEmulators.some(gate=>!reused.includes(gate)))fail('Emulator coverage was not admitted by the original routing proof.');
   const freshProof=covered||reused.length?readJson(options.proof,'fresh original-producer proof'):null;
   const freshCoverage=covered?coverageReference(freshProof,descriptor.resultIdentity):null;
-  const emulatorCoverage=Object.fromEntries(reusedEmulators.map(gate=>[gate,coverageReference(freshProof,{...descriptor.resultIdentity,selectedGroup:gate},false)]));
+  const emulatorCoverage=Object.fromEntries(reusedEmulators.map(gate=>{
+    const reference=coverageReference(freshProof,{...descriptor.resultIdentity,selectedGroup:gate},false);
+    if(emulatorModes[gate+'-coverage']!==sha256(JSON.stringify(reference)))fail('Emulator original coverage changed after the consumer: '+gate);
+    return [gate,reference];
+  }));
   for (const id of ['validation-context','event-gates','cohort-routing','regression']) {
     if (needs[id]?.result !== 'success') issues.push(`Required job ${id} did not succeed: ${needs[id]?.result || 'missing'}.`);
   }

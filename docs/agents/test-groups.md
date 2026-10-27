@@ -166,7 +166,10 @@ The aggregate accepts a mixture of original coverage and actual current groups,
 reobserves original proof immediately before acceptance, and counts only current
 execution as current cases. Changed or missing final proof fails the aggregate.
 Actual emulator consumer outcomes decide whether retained emulator proof is still
-needed after a runtime fallback. The observer keeps its existing `full`/`reuse`
+needed after a runtime fallback. Each covered emulator consumer fingerprints its complete original reference;
+the final recheck must match that exact original, including its run/attempt/job,
+result and retained archive. A different successful producer cannot replace it.
+The observer keeps its existing `full`/`reuse`
 attestation protocol; the report separately retains precise group modes and
 original emulator references. Only an entirely executed cohort can publish the
 original full-producer marker.

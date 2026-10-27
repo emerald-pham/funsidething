@@ -196,6 +196,7 @@ test('workflow emulator gate reuses a verified pass and executes an uncovered ga
     assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
     assert.equal(executions(f).length-before,covered?0:1,gate+' must execute only when a verified successful pass is absent');
     assert.ok(selected.includes('run-gate'),'the actual workflow must use the enforcing emulator consumer');
+    if(covered){const report=JSON.parse(readFileSync(path.join(temporary,'emulator-gates',gate,'result.json')));assert.match(readFileSync(env.GITHUB_OUTPUT,'utf8'),new RegExp('^coverage='+createHash('sha256').update(JSON.stringify(report.coverage)).digest('hex')+'$','m'),'the actual consumer must fingerprint the exact original pass it consumed');}
   }
   rmSync(path.join(temporary,'emulator-gates/rules'),{recursive:true,force:true});
   rmSync(path.join(temporary,'selected-routing'),{recursive:true,force:true});
