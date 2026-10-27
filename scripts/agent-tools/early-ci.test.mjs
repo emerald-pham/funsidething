@@ -12,24 +12,24 @@ function dispatch(outcome){
  const workflow=fs.readFileSync(path.join(root,'.github/workflows/data-safety.yml'),'utf8');
  const blocks=[...workflow.matchAll(/^  ([a-z-]+):\n([\s\S]*?)(?=^  [a-z-]+:\n|$(?![\s\S]))/gm)];
  const jobs=new Map(blocks.map(([,id,body])=>[id,{needs:(body.match(/^    needs: (.+)$/m)?.[1]||'').replace(/[\[\]]/g,'').split(/,\s*|\s+/).filter(Boolean),body}]));
- const results={},launched=[];
+ const results={},launched=[],children=[];
  for(const id of ['validation-context','cohort-routing','early-startup','event-gates','regression','mobile-stress','scanner-tests','release-evidence','deploy-pages']){
   if(!jobs.has(id))continue;const job=jobs.get(id),blocked=job.needs.some(dep=>results[dep]!=='success');
   if(blocked&&!/^    if: always\(\)/m.test(job.body)){results[id]='skipped';continue;}
   // Explicit always guards must still require success for every declared need.
   if(blocked&&id==='regression'&&job.needs.some(dep=>!job.body.includes(`needs.${dep}.result == 'success'`))===false){results[id]='skipped';continue;}
   const count=id==='regression'?4:1;
-  for(let i=0;i<count;i++){const child=spawnSync(process.execPath,['-e',"process.stdout.write('dispatched')"],{encoding:'utf8'});assert.equal(child.status,0);launched.push(id);}
+  for(let i=0;i<count;i++){const child=spawnSync(process.execPath,['-e',"process.stdout.write('dispatched')"],{encoding:'utf8'});assert.equal(child.status,0);launched.push(id);children.push({job:id,index:i,pid:child.pid,exitCode:child.status,signal:child.signal,stdout:child.stdout});}
   results[id]=id==='early-startup'?outcome:id==='scanner-tests'&&blocked?'failure':'success';
  }
- return {launched,results};
+ return {launched,results,children};
 }
-test('early CI workflow failure blocks every expensive child and deployment',()=>{
- const observed=dispatch('failure');assert.equal(observed.launched.filter(id=>['regression','event-gates','mobile-stress','deploy-pages'].includes(id)).length,0,'failed early story must dispatch zero expensive or deployment children');
+test('early CI workflow failure blocks every expensive child and deployment',t=>{
+ const observed=dispatch('failure');t.diagnostic(JSON.stringify({scope:'controlled scheduler OS children',...observed}));assert.equal(observed.launched.filter(id=>['regression','event-gates','mobile-stress','deploy-pages'].includes(id)).length,0,'failed early story must dispatch zero expensive or deployment children');
  assert.notEqual(observed.results['scanner-tests'],'success','aggregate cannot pass blocked coverage');
 });
-test('early CI workflow success retains the complete assigned cohort and deployment chain',()=>{
- const observed=dispatch('success');assert.equal(observed.launched.filter(id=>id==='regression').length,4);assert.equal(observed.results['event-gates'],'success');assert.equal(observed.results['scanner-tests'],'success');assert.equal(observed.results['deploy-pages'],'success');
+test('early CI workflow success retains the complete assigned cohort and deployment chain',t=>{
+ const observed=dispatch('success');t.diagnostic(JSON.stringify({scope:'controlled scheduler OS children',...observed}));assert.equal(observed.launched.filter(id=>id==='regression').length,4);assert.equal(observed.results['event-gates'],'success');assert.equal(observed.results['scanner-tests'],'success');assert.equal(observed.results['deploy-pages'],'success');
 });
 
 import {createHash} from 'node:crypto';
@@ -55,7 +55,7 @@ function fixture(t,{mode='pass'}={}){
 }
 import {refreshMobileBundle} from './mobile-memory-fixture.mjs';
 test('early CI public command preserves durable predecessor authority and rejects corrupted artifacts',async t=>{
- const f=fixture(t);refreshMobileBundle(f.bundle);const initial=f.run(['--run','--output-dir',f.out]);assert.equal(initial.status,0,initial.stdout+initial.stderr);assert.deepEqual(f.counts(),['harness','mobile']);
+ const f=fixture(t);refreshMobileBundle(f.bundle);const initial=f.run(['--run','--output-dir',f.out]);assert.equal(initial.status,0,initial.stdout+initial.stderr);assert.deepEqual(f.counts(),['harness','mobile']);t.diagnostic(JSON.stringify({scope:'controlled public process children; no cap/browser proof',journal:f.counts(),receipt:JSON.parse(fs.readFileSync(path.join(f.out,'receipt.json'))).children}));
  const receipt=path.join(f.out,'receipt.json'),verified=f.run(['--verify','--receipt',receipt]);assert.equal(verified.status,0,'Fresh process must accept durable proof alone: '+verified.stderr);assert.deepEqual(f.counts(),['harness','mobile'],'verification launches no workload child');
  const baselineEnv={...f.env},baselineDescriptor=fs.readFileSync(f.descriptor),baselineReceipt=fs.readFileSync(receipt),raw=fs.readFileSync(path.join(f.out,'harness.stdout'));
  const descriptorChange=change=>{const x=JSON.parse(baselineDescriptor);change(x.resultIdentity);fs.writeFileSync(f.descriptor,JSON.stringify(x));};
@@ -70,7 +70,7 @@ test('early CI public command preserves durable predecessor authority and reject
  ])await t.test(name,()=>{Object.assign(f.env,baselineEnv);fs.writeFileSync(f.descriptor,baselineDescriptor);fs.writeFileSync(receipt,baselineReceipt);fs.writeFileSync(path.join(f.out,'harness.stdout'),raw);mutate();const r=f.run(['--verify','--receipt',receipt]);assert.notEqual(r.status,0,name+' cannot authorize downstream');assert.deepEqual(f.counts(),['harness','mobile']);});
 });
 test('early CI public command refuses failed skipped cancelled and missing mandatory execution',async t=>{
- for(const mode of ['fail','skip','cancel','missing'])await t.test(mode,sub=>{const f=fixture(sub,{mode});refreshMobileBundle(f.bundle);const r=f.run(['--run','--output-dir',f.out]);assert.notEqual(r.status,0,'Controlled '+mode+' cannot pass');assert.deepEqual(f.counts(),mode==='missing'?['harness','mobile']:['harness']);const receipt=path.join(f.out,'receipt.json');assert.equal(JSON.parse(fs.readFileSync(receipt)).status,'failed');assert.notEqual(f.run(['--verify','--receipt',receipt]).status,0);});
+ for(const mode of ['fail','skip','cancel','missing'])await t.test(mode,sub=>{const f=fixture(sub,{mode});refreshMobileBundle(f.bundle);const r=f.run(['--run','--output-dir',f.out]);assert.notEqual(r.status,0,'Controlled '+mode+' cannot pass');assert.deepEqual(f.counts(),mode==='missing'?['harness','mobile']:['harness']);const receipt=path.join(f.out,'receipt.json');assert.equal(JSON.parse(fs.readFileSync(receipt)).status,'failed');sub.diagnostic(JSON.stringify({scope:'controlled refusal',mode,journal:f.counts(),receipt:JSON.parse(fs.readFileSync(receipt)).children}));assert.notEqual(f.run(['--verify','--receipt',receipt]).status,0);});
 });
 
 test('early CI workflow cancelled missing and skipped predecessors never authorize downstream',()=>{
