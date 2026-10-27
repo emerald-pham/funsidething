@@ -4,6 +4,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { derivePolicyProseImpact, validatePolicyProseStatuses } from './release-evidence.mjs';
 
 export const GROUP_IDS = ['core', 'scenery', 'persistence-recovery', 'native-process'];
 const TEST_NAME_PATTERN_ARGUMENT_BUDGET = 64 * 1024;
@@ -669,21 +670,30 @@ function artifactInventory(nativeDir) {
 }
 
 function coverageReference(proof, identity) {
-  if (proof?.decision!=='reuse' || String(proof.runId)!==String(identity.runId) || String(proof.runAttempt)!==String(identity.runAttempt)) fail('Covered mode requires a verified current-run routing proof.');
+  if (!['reuse','policy-reuse'].includes(proof?.decision) || String(proof.runId)!==String(identity.runId) || String(proof.runAttempt)!==String(identity.runAttempt)) fail('Covered mode requires a verified current-run routing proof.');
   for (const key of ['repository','sourceSha','sourceTree','checkoutSha','checkoutTree','comparisonBase']) if(proof.validationContext?.[key]!==identity[key])fail(`Coverage validation context mismatch: ${key}.`);
   const context=proof.cohortContext,producer=proof.coveredBy;
-  for(const key of ['repository','sourceSha','sourceTree'])if(context?.[key]!==identity[key])fail(`Coverage producer source context mismatch: ${key}.`);
+  let policyCoverage;
+  if (proof.decision === 'policy-reuse') {
+    const impact = derivePolicyProseImpact(ROOT, identity.sourceSha, identity.comparisonBase);
+    if (!impact || JSON.stringify(impact) !== JSON.stringify(proof.policyImpact) || identity.sourceTree !== impact.sourceTree || identity.checkoutTree !== impact.sourceTree) fail('Policy inheritance inventory does not match the exact current source and checkout.');
+    const review = validatePolicyProseStatuses(ROOT, proof.policyReview?.sourceSha, identity.comparisonBase, proof.policyStatuses);
+    if (JSON.stringify(review) !== JSON.stringify(proof.policyReview) || git(['rev-parse', `${review.sourceSha}^{tree}`]).trim() !== identity.sourceTree) fail('Policy inheritance current review is stale.');
+    if (context?.repository !== identity.repository || context.sourceSha !== identity.comparisonBase || context.sourceTree !== impact.baseTree || context.checkoutSha !== identity.comparisonBase || context.checkoutTree !== impact.baseTree || context.comparisonBase !== git(['rev-parse', `${identity.comparisonBase}^`]).trim()) fail('Policy inheritance producer does not bind the exact unchanged base tree.');
+    policyCoverage = {policyImpact:impact, policyReview:review};
+  } else for(const key of ['repository','sourceSha','sourceTree'])if(context?.[key]!==identity[key])fail(`Coverage producer source context mismatch: ${key}.`);
   if(identity.checkoutDirty || context?.requiredCohort!=='four-groups-v1' || proof.contextSha256!==sha256(JSON.stringify(context)))fail('Coverage context is incomplete or dirty.');
   for(const key of ['cohortDigestSha256','inventorySha256','assignmentsSha256','expectedGroups'])if(JSON.stringify(context[key])!==JSON.stringify(identity[key]))fail(`Coverage cohort mismatch: ${key}.`);
   if(!/^[1-9][0-9]*$/.test(producer?.runId)||!/^[1-9][0-9]*$/.test(producer?.runAttempt)||!/^[a-f0-9]{64}$/.test(producer?.reportSha256)||!['checkoutSha','checkoutTree','comparisonBase'].every(key=>sha1Pattern.test(producer[key])&&producer[key]===context[key]))fail('Original full producer run/attempt/report identity is missing.');
-  return {contextSha256:proof.contextSha256,cohortContext:context,coveredBy:producer};
+  return {contextSha256:proof.contextSha256,cohortContext:context,coveredBy:producer,...(policyCoverage || {})};
 }
 
 function aggregateResults({options, outputDir, descriptor, inventory, assignmentIndex, assignments, files, source}) {
   if (!options.resultsDir || !options.needsJson) fail('Aggregate requires --results-dir and --needs-json.');
   const needs = readJson(options.needsJson, 'actual workflow predecessor results');
   const issues = [], records = [], allCases = new Set();
-  const covered=needs['cohort-routing']?.outputs?.decision==='reuse';
+  const policyCovered=needs['cohort-routing']?.outputs?.decision==='policy-reuse';
+  const covered=policyCovered || needs['cohort-routing']?.outputs?.decision==='reuse';
   const freshCoverage=covered?coverageReference(readJson(options.proof,'fresh full-producer proof'),descriptor.resultIdentity):null;
   for (const id of ['validation-context','event-gates','cohort-routing','regression']) {
     if (needs[id]?.result !== 'success') issues.push(`Required job ${id} did not succeed: ${needs[id]?.result || 'missing'}.`);
@@ -764,7 +774,7 @@ function aggregateResults({options, outputDir, descriptor, inventory, assignment
       records.push({group:id,resultSha256:sha256(fs.readFileSync(path.join(root,'result.json'))),cases:cases.length,passed:cases.filter(item=>item.status==='passed').length,skipped:cases.filter(item=>item.status==='skipped').length,artifacts:record.artifacts,identity});
     } catch (error) { issues.push(`${id}: ${error.message}`); }
   }
-  const report = {schemaVersion:1,status:issues.length?'failed':'passed',mode:covered?'covered':'full',resultIdentity:descriptor.resultIdentity,groups:records,caseCount:allCases.size,issues,finishedAt:new Date().toISOString()};
+  const report = {schemaVersion:1,status:issues.length?'failed':'passed',mode:policyCovered?'policy-covered':covered?'covered':'full',resultIdentity:descriptor.resultIdentity,groups:records,caseCount:allCases.size,issues,finishedAt:new Date().toISOString()};
   atomicWrite(path.join(outputDir,'aggregate.json'),report);
   if (issues.length) fail(issues.join('\n'));
   process.stdout.write(`Complete required cohort verified: ${allCases.size} cases.\n`);

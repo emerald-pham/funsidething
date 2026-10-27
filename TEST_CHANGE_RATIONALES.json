@@ -1,5 +1,45 @@
 [
   {
+    "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
+    "testChangesSha256": "fe4b353ce0242fe7bf234ce0a9ea31616e927667c5e2c5f6c37f5afcb6aa3546",
+    "reason": "Classify only provably instruction-preserving policy prose while preserving current release-process review and complete unchanged product evidence. Add command-boundary controls for exact inventories, artifact inheritance, current statuses and forbidden exemptions. Exact integrated frontier rationale retains #287 option-validation assertions and its independent original RED record below.",
+    "previousBehavior": "Every AGENTS policy edit required product code/FAQ review. Command guides could conversely classify substantive instruction changes as owner-only. No honest base-product cohort inheritance existed in public routing or covered aggregation.",
+    "intendedBehavior": "A conservative complete-diff semantic subset keeps current independent policy review and verified immutable full product FAQ/rendered evidence. All other executable, configuration, test, authorization, weakening, mixed and ambiguous changes retain full applicable review and execution. Required statuses and exact binding remain present.",
+    "replacementTests": [
+      "RISK repository process: policy prose receipts inherit only identical product evidence",
+      "RISK repository process: policy prose false exemptions retain full applicable review"
+    ],
+    "preservedCoverage": [
+      "Existing passing application, release role, large-diff, memory/cloud/sync, independent FAQ, native, CI topology and exact deployment assertions are unchanged. Only process cases are appended to tests.js; independently authored public Git/receipt/routing/group fixtures use no private data.",
+      "Existing ordinary full and same-source reuse keep their execution and result semantics. Policy-covered records contain zero current outcomes and retain exact original producer run/attempt/report identity; missing current evidence returns full execution or refuses release recording.",
+      "Node fixtures and mocked external GitHub API prove process contracts only; hosted policy-only proof, final full/native/rules/compatibility qualification and deployment remain parent-owned release gates."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <retro-292-worktree> --evidence-dir <retro-278-artifacts>/292/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern='^RISK repository process: policy prose receipts inherit only identical product evidence$' tests.js",
+      "failure": "Original meaningful RED96946b97 at2026-10-27T03:11:12Z on6c67fb0 failed public record: independentReview.task must name accountable identity; GREEN79aa8e0a03:12:30Z. First f75be0f3 was a fixture setup TypeError and is not behavioral RED. Additional observed RED1c7466f1 missing rendered artifact proof→GREEN53ff462d; public routing RED3b3709f6→GREENac299de7; covered/aggregate RED2c831fc9→GREENb6c5c9b7; rules/compatibility inheritance RED8c6c277e→GREEN8322d70f; substantive guide policy RED1471d317→GREEN816d62a6; escalation RED2df49175 follows accepted narrow marker then GREEN final. Complete recorder metadata includes actual source/test bytes fingerprints, diffs, command and timestamps; original artifacts retained at /Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/292/runs. Extra case-normalized rendered-review independence RED0f7d4ba0 at03:26:36Z preceded the .toLocaleLowerCase repair; latest focused GREEN follows. Escalation GREEN11ba5080; complete receipt/status/deployment/main routing GREEN49edcd91. Parent owns #286 publication hook integration; no hook credit claimed here."
+    }
+  },
+  {
+    "baseCommit": "779c7df3596c97d0d3a436d74eaa576ebcb23f62",
+    "testChangesSha256": "b28451802a60824b9a74b1c24263d15458881ab15c4643570424ebe3fb0a119d",
+    "reason": "Classify only provably instruction-preserving policy prose while preserving current release-process review and complete unchanged product evidence. Add command-boundary controls for exact inventories, artifact inheritance, current statuses and forbidden exemptions. Exact integrated frontier rationale retains #287 option-validation assertions and its independent original RED record below.",
+    "previousBehavior": "Every AGENTS policy edit required product code/FAQ review. Command guides could conversely classify substantive instruction changes as owner-only. No honest base-product cohort inheritance existed in public routing or covered aggregation.",
+    "intendedBehavior": "A conservative complete-diff semantic subset keeps current independent policy review and verified immutable full product FAQ/rendered evidence. All other executable, configuration, test, authorization, weakening, mixed and ambiguous changes retain full applicable review and execution. Required statuses and exact binding remain present.",
+    "replacementTests": [
+      "RISK repository process: policy prose receipts inherit only identical product evidence",
+      "RISK repository process: policy prose false exemptions retain full applicable review"
+    ],
+    "preservedCoverage": [
+      "Existing passing application, release role, large-diff, memory/cloud/sync, independent FAQ, native, CI topology and exact deployment assertions are unchanged. Only process cases are appended to tests.js; independently authored public Git/receipt/routing/group fixtures use no private data.",
+      "Existing ordinary full and same-source reuse keep their execution and result semantics. Policy-covered records contain zero current outcomes and retain exact original producer run/attempt/report identity; missing current evidence returns full execution or refuses release recording.",
+      "Node fixtures and mocked external GitHub API prove process contracts only; hosted policy-only proof, final full/native/rules/compatibility qualification and deployment remain parent-owned release gates."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <retro-292-worktree> --evidence-dir <retro-278-artifacts>/292/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern='^RISK repository process: policy prose receipts inherit only identical product evidence$' tests.js",
+      "failure": "Original meaningful RED96946b97 at2026-10-27T03:11:12Z on6c67fb0 failed public record: independentReview.task must name accountable identity; GREEN79aa8e0a03:12:30Z. First f75be0f3 was a fixture setup TypeError and is not behavioral RED. Additional observed RED1c7466f1 missing rendered artifact proof→GREEN53ff462d; public routing RED3b3709f6→GREENac299de7; covered/aggregate RED2c831fc9→GREENb6c5c9b7; rules/compatibility inheritance RED8c6c277e→GREEN8322d70f; substantive guide policy RED1471d317→GREEN816d62a6; escalation RED2df49175 follows accepted narrow marker then GREEN final. Complete recorder metadata includes actual source/test bytes fingerprints, diffs, command and timestamps; original artifacts retained at /Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/292/runs. Extra case-normalized rendered-review independence RED0f7d4ba0 at03:26:36Z preceded the .toLocaleLowerCase repair; latest focused GREEN follows. Escalation GREEN11ba5080; complete receipt/status/deployment/main routing GREEN49edcd91. Parent owns #286 publication hook integration; no hook credit claimed here."
+    }
+  },
+  {
     "baseCommit": "7fa87a84ca1c67a43b5fb2d61d6847fc1024e774",
     "testChangesSha256": "e43a2a79d83c575975a63108d6c2d3bc155bf6c818af0c36d70774be4e416938",
     "reason": "Close the failed-connection gap in bounded device-read recovery through the actual Sync and Review consumer. Existing retry tests simulated one request failure, then allowed the same handle to work; the new case keeps that handle unusable until reopened.",
@@ -20156,8 +20196,62 @@
   },
   {
     "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
+    "testChangesSha256": "94df805cd65b678c0f66b4e6df3d05892dc144266b6c24445efc50bc6fef273f",
+    "reason": "Ticket #287 requires the host-coordination CLI to reject malformed option contracts before it can mutate ownership or start command work.",
+    "previousBehavior": "The parser ignored unknown names, so begin accepted --resource beside a valid claim, omitted the requested resource, wrote a new ledger entry, and launched Git.",
+    "intendedBehavior": "Every command rejects unknown, incomplete, duplicate-singleton, and incompatible options before command side effects. Fresh child-process tests use synthetic ledgers, preserve exact rejection bytes, and require valid repeated aliases and plural resources to echo the effective allocation.",
+    "replacementTests": [
+      "RISK repository process: coordination rejects misspelled resource options before side effects"
+    ],
+    "preservedCoverage": [
+      "The existing competing-resource ownership test still blocks a second project and preserves foreign entries, reservations, and configurations.",
+      "Existing begin, claim, heartbeat, release-claim, park, and resume lifecycle tests remain unchanged and continue to use fixture ledgers.",
+      "No player-facing application behavior, saved board, public FAQ, version, live host ledger, or resource allocation guard is replaced."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='^RISK repository process: coordination rejects misspelled resource options before side effects$' tests.js",
+      "failure": "On baseline 6c67fb0c9988d3e578579c7bb23a8ed0731aac3f, the exact fresh-process CLI test returned status 0 for --resource with --claims, emitted a successful entry with resources [], changed the isolated ledger bytes, and launched the Git child. The test expected status 2 and failed before implementation. Raw output: /Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/287/red-process-risk.txt."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/287"
+  },
+  {
+    "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
     "testChangesSha256": "35cdd33030272a4d9cbdc3ae2108f22f5996424fdd711435a086500d7ec600a7",
     "reason": "Enforce durable diagnostic authority through the existing checkpoint and recorder public processes across fresh contexts and CI clones.",
+    "previousBehavior": "A diagnostic recorder could spawn children without source-bound durable authorization; caller-marked checkpoint completion could ignore an unresolved diagnostic gate.",
+    "intendedBehavior": "Supported diagnostic launches consume a finite atomic attempt before spawning and retain failures; required incomplete gates and diagnostic-only source block release receipts.",
+    "replacementTests": [
+      "RISK repository process: diagnostic checkpoints retain finite authority across fresh process and CI boundaries"
+    ],
+    "preservedCoverage": [
+      "All existing product, persistence, cloud, installed-client, checkpoint and test-provenance assertions remain intact; the new process cohort uses isolated repositories and no hosted/device claim."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern=\"diagnostic recorder refuses missing\" scripts/agent-tools/checkpoint-progress.test.mjs",
+      "failure": "Contemporaneous /Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/286/red-missing-state.txt: no diagnostic child may start without durable authorization, true !== false. Early raw logs preserve chronology but lack per-stage dirty-source snapshots. Fully fingerprinted subsequent RED/GREEN: approval-authority-red/2026-10-27T03-25-20-748Z-a9de3a35-75c6-42c6-8a3e-665809804f09.json observed caller-authored approval accepted (0); approval-authority-green/2026-10-27T03-25-52-793Z-60cb8c21-1b93-4b8d-960c-34943ce080e8.json passes. Unknown-option red-admission.txt is infrastructure and confers no RED credit."
+    }
+  },
+  {
+    "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
+    "testChangesSha256": "08c0bde7f19b0c5757825e489e500fbf7e1c0a48e6227585a0dde3606a7f5f2c",
+    "reason": "Reconcile the #286 process root with independently implemented #287/#292 process coverage without deleting or weakening any source assertions. Original RED chronology remains in the referenced artifacts; merging adds no new behavioral RED claim.",
+    "previousBehavior": "A diagnostic recorder could spawn children without source-bound durable authorization; caller-marked checkpoint completion could ignore an unresolved diagnostic gate.",
+    "intendedBehavior": "Supported diagnostic launches consume a finite atomic attempt before spawning and retain failures; required incomplete gates and diagnostic-only source block release receipts.",
+    "replacementTests": [
+      "RISK repository process: diagnostic checkpoints retain finite authority across fresh process and CI boundaries"
+    ],
+    "preservedCoverage": [
+      "All existing product, persistence, cloud, installed-client, checkpoint and test-provenance assertions remain intact; the new process cohort uses isolated repositories and no hosted/device claim."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern=\"diagnostic recorder refuses missing\" scripts/agent-tools/checkpoint-progress.test.mjs",
+      "failure": "Contemporaneous /Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/286/red-missing-state.txt: no diagnostic child may start without durable authorization, true !== false. Early raw logs preserve chronology but lack per-stage dirty-source snapshots. Fully fingerprinted subsequent RED/GREEN: approval-authority-red/2026-10-27T03-25-20-748Z-a9de3a35-75c6-42c6-8a3e-665809804f09.json observed caller-authored approval accepted (0); approval-authority-green/2026-10-27T03-25-52-793Z-60cb8c21-1b93-4b8d-960c-34943ce080e8.json passes. Unknown-option red-admission.txt is infrastructure and confers no RED credit."
+    }
+  },
+  {
+    "baseCommit": "6e6d001ffcf4983edd0547a9d021a3ef645c650e",
+    "testChangesSha256": "6608bf48ee5f57a84de110167a42f43e4fbf3408f11ce9fa56d56f711d7f1c2b",
+    "reason": "Reconcile the #286 process root with independently implemented #287/#292 process coverage without deleting or weakening any source assertions. Original RED chronology remains in the referenced artifacts; merging adds no new behavioral RED claim.",
     "previousBehavior": "A diagnostic recorder could spawn children without source-bound durable authorization; caller-marked checkpoint completion could ignore an unresolved diagnostic gate.",
     "intendedBehavior": "Supported diagnostic launches consume a finite atomic attempt before spawning and retain failures; required incomplete gates and diagnostic-only source block release receipts.",
     "replacementTests": [

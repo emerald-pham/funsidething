@@ -1593,6 +1593,7 @@ The actual intervention Yes records deliberate current-pass Scan intent even whe
 ## Agent evidence command wiring (#152)
 
 - `RISK repository process: npm test fails when an agent-tool cohort assertion fails`
+- `RISK repository process: coordination rejects misspelled resource options before side effects`
 - `RISK repository process: grouped runner stays covered at the default npm test boundary`
 - `RISK test group runner preserves hash identities and counts only executable controlled registrations`
 
@@ -1601,6 +1602,8 @@ Preflight comparison coverage:
   exercises the public command with a real published local Git branch, a passing selected comparison and a missing outgoing rationale. It preserves the existing gate, focused copy checks, refs, HEAD, tracked files and configuration.
 
 The required npm test entry point surfaces a failing isolated agent-tool cohort with a nonzero result and its assertion output. Group-runner identity evidence preserves the independently captured TAP-escaped inventory while reporting canonical runtime titles, and native-child registration checks distinguish executable declarations from quoted fixture text while rejecting missing and duplicate controls.
+
+The coordination process risk launches the CLI test in a fresh Node process. Synthetic Git projects and ledgers verify command-specific option rejection, byte-for-byte preservation, no Git child for rejected `begin` arguments, and canonical output for repeated scope, claim and plural resource controls. Existing competing-resource ownership coverage remains in `scripts/agent-tools/coordination.test.mjs`; neither test uses the host ledger.
 
 ## Deletion membership authority after log pruning (#171)
 
@@ -2242,6 +2245,13 @@ Protect actual automatic recovery, manual source review, exact protected copies 
 - RISK support diagnostics: event retention and malformed observer input stay bounded and redacted
 
 The real Sync → Review action and Copy debug log consumer distinguish failed pending-upload, recovery-hold and head reads, fixed exception categories and temporary connection aliases. Repeated failures still stop after the existing one recheck. Exact device/cloud originals, unfinished drafts, source-selection guards and the 24 KiB report/512-byte event limits stay intact. Arbitrary error messages, paths, account identifiers, out-of-range aliases, extra fields and changing/throwing getters cannot enter the copied report. The current physical-phone failure remains unreproduced; these diagnostics do not repair data or establish its cause.
+
+## Policy prose release evidence inheritance
+
+- RISK repository process: policy prose receipts inherit only identical product evidence
+- RISK repository process: policy prose false exemptions retain full applicable review
+
+Public recording and fresh verification preserve full source/base/tree inventories, current independent policy review, immutable product/FAQ/rendered reports and all three required statuses. Instruction-preserving prose reuses only unchanged product evidence; authorization, gate weakening, executable/configuration/test, mixed and ambiguous changes keep full applicable review. Public CI routing and covered/aggregate command cohorts retain exact producer execution, rules/compatibility, current statuses and zero claimed current test outcomes. Hosted proof remains a separate release requirement.
 
 ## Durable diagnostic progress
 

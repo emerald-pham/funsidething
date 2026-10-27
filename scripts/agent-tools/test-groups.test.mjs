@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {derivePolicyProseImpact,deriveReleaseReviewPlan} from '../release-evidence.mjs';
 import {createHash} from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -131,6 +132,8 @@ function createFixture(t, options = {}) {
   fs.mkdirSync(path.join(root, 'scripts/agent-tools'), { recursive: true });
   fs.mkdirSync(path.join(root, 'scripts'), { recursive: true });
   fs.copyFileSync(runner, path.join(root, 'scripts/test-groups.mjs'));
+  fs.copyFileSync(path.join(repository,'scripts/release-evidence.mjs'),path.join(root,'scripts/release-evidence.mjs'));
+  if(options.policy)fs.writeFileSync(path.join(root,'AGENTS.md'),'Read [release guide](docs/release.md) before release.\n');
   const coreTitle = options.coreTitle || fixtureRoots.core;
   writeJson(path.join(root, 'package.json'), {
     type: 'module',
@@ -709,4 +712,24 @@ test('test group catalog routes real declarations despite matching quoted fixtur
     assert.equal(executed.filter(item => item === title).length, 1, 'execute each actual declaration exactly once');
     assert.equal(native.evidence.cases.filter(item => item.id === title && item.status === 'passed').length, 1);
   }
+});
+
+
+test('policy prose covered groups rederive unchanged product inheritance and aggregate honest references',async parent=>{
+ const fixture=createFixture(parent,{policy:true});
+ fs.writeFileSync(path.join(fixture.root,'AGENTS.md'),'Consult [release guidance](docs/release.md)\nbefore release.\n');git(fixture.root,'add','.');git(fixture.root,'commit','-qm','Policy instruction reflow');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');
+ const {file,proof}=fixtureCoverage(fixture),base=fixture.comparisonBase,baseTree=git(fixture.root,'rev-parse',base+'^{tree}');
+ proof.decision='policy-reuse';proof.policyImpact=derivePolicyProseImpact(fixture.root,fixture.sourceSha,base);
+ Object.assign(proof.cohortContext,{sourceSha:base,sourceTree:baseTree,checkoutSha:base,checkoutTree:baseTree,comparisonBase:git(fixture.root,'rev-parse',base+'^')});
+ proof.contextSha256=createHash('sha256').update(JSON.stringify(proof.cohortContext)).digest('hex');
+ Object.assign(proof.coveredBy,{checkoutSha:base,checkoutTree:baseTree,comparisonBase:proof.cohortContext.comparisonBase});
+ const canonical=value=>Array.isArray(value)?'['+value.map(canonical).join(',')+']':value&&typeof value==='object'?'{'+Object.keys(value).sort().map(key=>JSON.stringify(key)+':'+canonical(value[key])).join(',')+'}':JSON.stringify(value);
+ const plan=deriveReleaseReviewPlan(fixture.root,fixture.sourceSha,base),prefix=createHash('sha256').update(canonical(plan)).digest('hex').slice(0,12);
+ proof.policyReview={sourceSha:fixture.sourceSha,baseSha:base,receiptSha256:'7'.repeat(64),reviewPlanPrefix:prefix};
+ proof.policyStatuses=['funsidething/memory-audit','funsidething/independent-review','funsidething/specialist-review'].map(context=>({context,state:'success',created_at:new Date().toISOString(),description:`r=${'7'.repeat(64)};b=${base};p=${prefix};c=0;s=1;v=4`}));writeJson(file,proof);
+ fixture.originals=new Map();
+ for(const group of groups){const result=invoke(fixture,{group,args:['--covered','--proof',file]});assert.equal(result.status,0,'policy inheritance public covered command must accept proven unchanged inventory:\n'+result.stdout+result.stderr);assert.equal(result.evidence.cases.length,0);fixture.originals.set(group,result.outputDir);}
+ const aggregate=aggregateCopy(parent,fixture,(_root,needs)=>{const x=JSON.parse(fs.readFileSync(needs));x['cohort-routing'].outputs={decision:'policy-reuse'};writeJson(needs,x);},['--proof',file]);
+ assert.equal(aggregate.status,0,aggregate.stdout+aggregate.stderr);const report=JSON.parse(fs.readFileSync(path.join(aggregate.outputDir,'aggregate.json')));assert.equal(report.mode,'policy-covered');assert.equal(report.caseCount,0);
+ for(const [name,mutate]of [['wrong inventory',x=>{x.policyImpact.frozenInventorySha256='0'.repeat(64);}],['stale review',x=>{x.policyStatuses[0].state='failure';}],['wrong producer source',x=>{x.cohortContext.sourceSha=fixture.sourceSha;x.contextSha256=createHash('sha256').update(JSON.stringify(x.cohortContext)).digest('hex');}]])await parent.test(name,()=>{const x=structuredClone(proof);mutate(x);writeJson(file,x);const result=invoke(fixture,{args:['--covered','--proof',file]});assert.notEqual(result.status,0,name+' must retain full execution requirements');});
 });

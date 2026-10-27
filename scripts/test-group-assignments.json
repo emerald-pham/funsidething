@@ -12383,6 +12383,21 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK repository process: coordination rejects misspelled resource options before side effects",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "begin rejects the singular resource typo before launching git or mutating ledger bytes",
+      "group": "native-process",
+      "file": "scripts/agent-tools/coordination.test.mjs"
+    },
+    {
+      "root": "coordination validates command option schemas, missing values, duplicates, and incompatible combinations",
+      "group": "native-process",
+      "file": "scripts/agent-tools/coordination.test.mjs"
+    },
+    {
       "root": "RISK repository process: nested native fixture output stays isolated at the command boundary",
       "group": "native-process",
       "file": "tests.js"
@@ -12741,6 +12756,41 @@
       "root": "RISK DATABASE REPAIR EXPORT: reload help routes users to the combined export after standalone log exporters are removed",
       "group": "core",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: policy prose receipts inherit only identical product evidence",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: policy prose false exemptions retain full applicable review",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "policy prose routing inherits only a successful full exact-base product cohort and current reviews",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "policy prose routing rejects incomplete inherited rule and compatibility execution",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "policy prose routing preserves gates for uncertain base execution and stale current evidence",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "policy prose covered groups rederive unchanged product inheritance and aggregate honest references",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "policy prose exact main routing retains current reviewed head and original base execution",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
     },
     {
       "root": "diagnostic recorder refuses missing durable state before starting a child",

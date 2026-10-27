@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { deriveReleaseReviewPlan } from '../release-evidence.mjs';
 import { spawnSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
@@ -14,7 +16,7 @@ const git = (cwd, ...args) => {
   return result.stdout.trim();
 };
 
-function fixture(t, grouped=false) {
+function fixture(t, grouped=false, policy=false) {
   const root = mkdtempSync(path.join(os.tmpdir(), 'chain-ci-routing-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const source = path.join(root, 'source'), bin = path.join(root, 'bin');
@@ -22,12 +24,15 @@ function fixture(t, grouped=false) {
   git(source, 'init', '-b', 'fixture');
   git(source, 'config', 'user.name', 'Routing fixture');
   git(source, 'config', 'user.email', 'routing@example.invalid');
+  if(policy)git(source,'-c','core.hooksPath=/dev/null','commit','--allow-empty','-qm','prior product');
   writeFileSync(path.join(source, 'package.json'), JSON.stringify({ private: true, scripts: { test: 'node --test tests.js' } }));
   writeFileSync(path.join(source, 'tests.js'), "import { test } from 'node:test';test('isolated routing fixture',()=>{});\n");
   if(grouped){for(const file of ['.github/workflows/data-safety.yml','scripts/test-group-inventory.json','scripts/test-group-assignments.json','scripts/test-groups.mjs','scripts/agent-tools/ci-routing.mjs']){mkdirSync(path.dirname(path.join(source,file)),{recursive:true});writeFileSync(path.join(source,file),'fixture '+file+'\n');}}
+  if(policy)writeFileSync(path.join(source,'AGENTS.md'),'Read [release and review](docs/agents/release-and-review.md) before release.\n');
   git(source, 'add', '.'); git(source, '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'fixture base');
   const base = git(source, 'rev-parse', 'HEAD');
-  writeFileSync(path.join(source, 'candidate.txt'), 'isolated candidate\n');
+  if(policy)writeFileSync(path.join(source,'AGENTS.md'),'Consult [release and review guidance](docs/agents/release-and-review.md)\nbefore release.\n');
+  else writeFileSync(path.join(source, 'candidate.txt'), 'isolated candidate\n');
   git(source, 'add', '.'); git(source, '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'fixture candidate');
   const head = git(source, 'rev-parse', 'HEAD');
   const tree = git(source, 'rev-parse', 'HEAD^{tree}');
@@ -43,7 +48,7 @@ if(url.includes('/runs?')&&x.runSequence?.length){x.runs=x.runSequence.shift();f
 if(url.includes('/pulls?')&&x.pullSequence?.length){x.pulls=x.pullSequence.shift();fs.writeFileSync(process.env.ROUTING_GITHUB,JSON.stringify(x));}
 if(x.error){process.stderr.write('controlled unavailable GitHub');process.exit(22);}
 const jobs=x.jobsByRun?.[url.split('/runs/')[1]?.split('/')[0]]??x.jobs;
-console.log(JSON.stringify(url.includes('/jobs?')?{total_count:jobs.length,jobs}:url.includes('/pulls?')?(x.pulls??[]).map(({mergeable,...listed})=>listed):url.includes('/pulls/')?x.pulls?.[0]:url.includes('/git/commits/')?x.merge:url.includes('/git/trees/')?x.tree:{total_count:x.omitRunTotal?undefined:x.runs.length,workflow_runs:x.runs}));
+console.log(JSON.stringify(url.includes('/statuses?')?x.statuses:url.includes('/jobs?')?{total_count:jobs.length,jobs}:url.includes('/pulls?')?(x.pulls??[]).map(({mergeable,...listed})=>listed):url.includes('/pulls/')?x.pulls?.[0]:url.includes('/git/commits/')?x.merge:url.includes('/git/trees/')?x.tree:{total_count:x.omitRunTotal?undefined:x.runs.length,workflow_runs:x.runs}));
 `);
   writeFileSync(path.join(bin, 'node'), '#!/bin/sh\nif [ "$1" = "-p" ] && [ "$ROUTING_READ_FAILURE" = "1" ]; then exit 1; fi\nexec ' + JSON.stringify(process.execPath) + ' "$@"\n');
   chmodSync(path.join(bin, 'node'), 0o755);
@@ -58,7 +63,7 @@ function cohortShell() {
 if [[ -n "\${ROUTING_DESCRIPTOR:-}" ]]; then set -- "$@" --descriptor "$ROUTING_DESCRIPTOR"; fi
 node "$ROUTING_COMMAND" "$@"
 decision="$(node -p "require('$ROUTING_OUTPUT/ci-routing/routing.json').decision")"
-if [[ "$decision" == "full" ]]; then npm test; elif [[ "$decision" != "reuse" ]]; then exit 1; fi`;
+if [[ "$decision" == "full" ]]; then npm test; elif [[ "$decision" != "reuse" && "$decision" != "policy-reuse" ]]; then exit 1; fi`;
 }
 
 function invoke(f, { event = 'push', ref = 'refs/heads/topic', source = f.head, checkout = f.head, base = f.base, action = 'synchronize', changes = undefined, planOnly = false, environment = {} } = {}) {
@@ -311,9 +316,9 @@ test('workflow routing refuses a descriptor for a different validation candidate
 
 
 const groupedIds=['core','scenery','persistence-recovery','native-process'];
-function descriptorFor(f,checkout) {
+function descriptorFor(f,checkout,source=f.head) {
   const file=path.join(f.root,'descriptor-'+(f.attempt+1)+'.json');
-  writeFileSync(file,JSON.stringify({resultIdentity:{repository:'fixture/repo',sourceSha:f.head,sourceTree:f.tree,checkoutSha:checkout,checkoutTree:git(f.source,'rev-parse',checkout+'^{tree}'),comparisonBase:f.base,runId:String(101+f.attempt),runAttempt:1,checkoutDirty:false,cohortDigestSha256:'1'.repeat(64),inventorySha256:'2'.repeat(64),assignmentsSha256:'3'.repeat(64),expectedGroups:groupedIds}}));
+  writeFileSync(file,JSON.stringify({resultIdentity:{repository:'fixture/repo',sourceSha:source,sourceTree:git(f.source,'rev-parse',source+'^{tree}'),checkoutSha:checkout,checkoutTree:git(f.source,'rev-parse',checkout+'^{tree}'),comparisonBase:f.base,runId:String(101+f.attempt),runAttempt:1,checkoutDirty:false,cohortDigestSha256:'1'.repeat(64),inventorySha256:'2'.repeat(64),assignmentsSha256:'3'.repeat(64),expectedGroups:groupedIds}}));
   return {ROUTING_DESCRIPTOR:file};
 }
 function publishedGroups(f,record) {
@@ -357,4 +362,70 @@ test('metadata edits continue past verified covered runs to the original full pr
   github.jobsByRun={'71':github.jobs,'72':covered};github.runs.unshift({...github.runs[0],id:72,run_attempt:1});writeFileSync(f.external,JSON.stringify(github));
   const edited=invoke(f,{event:'pull_request',checkout:f.merge,action:'edited',changes:{title:{from:'earlier title'}},environment:descriptorFor(f,f.merge)});
   assert.equal(edited.status,0,edited.stderr);assert.equal(edited.record.decision,'reuse',edited.stdout);assert.equal(edited.record.coveredBy.runId,'71');assert.equal(edited.record.coveredBy.runAttempt,'2');assert.equal(executions(f).length,1);
+});
+
+
+function publishedPolicyBase(f) {
+  const baseTree=git(f.source,'rev-parse',f.base+'^{tree}'),baseParent=git(f.source,'rev-parse',f.base+'^');
+  const plan=deriveReleaseReviewPlan(f.source,f.head,f.base);
+  const canonical=value=>Array.isArray(value)?'['+value.map(canonical).join(',')+']':value&&typeof value==='object'?'{'+Object.keys(value).sort().map(key=>JSON.stringify(key)+':'+canonical(value[key])).join(',')+'}':JSON.stringify(value);
+  const prefix=createHash('sha256').update(canonical(plan)).digest('hex').slice(0,12);
+  const description=`r=${'7'.repeat(64)};b=${f.base};p=${prefix};c=0;s=1;v=4`;
+  const context={repository:'fixture/repo',sourceSha:f.base,sourceTree:baseTree,checkoutSha:f.base,checkoutTree:baseTree,comparisonBase:baseParent,eventPolicy:'exact-main-push-v1',requiredCohort:'four-groups-v1',runtime:{node:process.versions.node,platform:process.platform,arch:process.arch},cohortDigestSha256:'1'.repeat(64),inventorySha256:'2'.repeat(64),assignmentsSha256:'3'.repeat(64),expectedGroups:groupedIds,workflowBlob:git(f.source,'rev-parse',f.base+':.github/workflows/data-safety.yml')};
+  const digest=createHash('sha256').update(JSON.stringify(context)).digest('hex');
+  const step=name=>({name,status:'completed',conclusion:'success'});
+  const names=['validation-context','event-gates','cohort-routing',...groupedIds.map(id=>'regression-'+id),'scanner-tests','release-evidence','deploy-pages'];
+  const github={runs:[{id:70,run_attempt:1,status:'completed',conclusion:'success',event:'push',head_branch:'main',head_sha:f.base,name:'Data safety',path:'.github/workflows/data-safety.yml',repository:{full_name:'fixture/repo'},head_repository:{full_name:'fixture/repo'}}],jobs:names.map(name=>({name,status:'completed',conclusion:'success',run_id:70,run_attempt:1,head_sha:f.base,steps:name==='validation-context'?[step(`Announce regression context ${digest}`),step(`Actual checkout ${f.base} tree ${baseTree}`),step(`Validation source ${f.base} base ${baseParent}`),step(`Workflow blob ${context.workflowBlob} policy four-groups-v1`)]:name==='scanner-tests'?[step(`Complete regression context ${digest} report ${'8'.repeat(64)}`)]:name.startsWith('regression-')?[step('Execute complete assigned group')]:name==='event-gates'?[step('Run npm run test:rules'),step('Backward compatibility')]:[]})),statuses:['funsidething/memory-audit','funsidething/independent-review','funsidething/specialist-review'].map(context=>({context,state:'success',description,created_at:new Date().toISOString()}))};
+  writeFileSync(f.external,JSON.stringify(github));return github;
+}
+
+test('policy prose routing inherits only a successful full exact-base product cohort and current reviews', t=>{
+  const f=fixture(t,true,true);
+  // A genuine baseline parent is needed for the full producer's own comparison.
+  // Amend no source after publishing the immutable fixture identities.
+  const github=publishedPolicyBase(f);
+  const result=invoke(f,{event:'pull_request',checkout:f.merge,environment:descriptorFor(f,f.merge)});
+  assert.equal(result.status,0,result.stdout+result.stderr);
+  assert.equal(result.record?.decision,'policy-reuse','unchanged product execution is inherited only after current policy review and authoritative base cohort checks');
+  assert.equal(executions(f).length,0,'the policy route must not claim another current product execution');
+  assert.equal(result.record.coveredBy.runId,'70');assert.equal(result.record.coveredBy.reportSha256,'8'.repeat(64));
+  assert.equal(result.record.policyImpact.sourceSha,f.head);assert.equal(result.record.policyImpact.baseSha,f.base);
+  assert.equal(result.record.cohortContext.sourceSha,f.base);assert.equal(result.record.validationContext.sourceSha,f.head);
+});
+
+
+test('policy prose routing rejects incomplete inherited rule and compatibility execution',t=>{
+ const f=fixture(t,true,true),github=publishedPolicyBase(f);github.jobs.find(job=>job.name==='event-gates').steps=[];writeFileSync(f.external,JSON.stringify(github));
+ const result=invoke(f,{event:'pull_request',checkout:f.merge,environment:descriptorFor(f,f.merge)});
+ assert.equal(result.status,0,result.stdout+result.stderr);assert.equal(result.record.decision,'full','inheriting an aggregate cannot silently skip the original rules/compatibility gates');assert.equal(executions(f).length,1);
+});
+
+test('policy prose routing preserves gates for uncertain base execution and stale current evidence',async parent=>{
+ const scenarios=[
+  ['missing current status',x=>{x.statuses.pop();}],
+  ['revoked current status',x=>{x.statuses[0].state='failure';}],
+  ['stale policy plan',x=>{x.statuses.forEach(status=>status.description=status.description.replace(/;p=[a-f0-9]{12}/,';p='+ '0'.repeat(12)));}],
+  ['wrong receipt',x=>{x.statuses[0].description=x.statuses[0].description.replace(/^r=[a-f0-9]{64}/,'r='+ '0'.repeat(64));}],
+  ['old status schema',x=>{x.statuses.forEach(status=>status.description=status.description.replace(';v=4',';v=2'));}],
+  ['incomplete runs',x=>{x.omitRunTotal=true;}],
+  ['pending base',x=>{x.runs[0].status='in_progress';x.runs[0].conclusion=null;}],
+  ['failed base',x=>{x.runs[0].conclusion='failure';}],
+  ['wrong producer source',x=>{x.runs[0].head_sha='0'.repeat(40);}],
+  ['wrong base branch',x=>{x.runs[0].head_branch='topic';}],
+  ['missing group',x=>{x.jobs=x.jobs.filter(job=>job.name!=='regression-core');}],
+  ['skipped group',x=>{x.jobs.find(job=>job.name==='regression-core').conclusion='skipped';}],
+  ['covered base',x=>{x.jobs.find(job=>job.name==='scanner-tests').steps[0].name=x.jobs.find(job=>job.name==='scanner-tests').steps[0].name.replace('Complete regression context','Verified complete cohort')+' mode reuse';}],
+  ['wrong base attempt',x=>{x.jobs[0].run_attempt=2;}],
+  ['wrong frozen context',x=>{x.jobs.find(job=>job.name==='validation-context').steps[0].name='Announce regression context '+'0'.repeat(64);}],
+  ['missing compatibility',x=>{x.jobs.find(job=>job.name==='event-gates').steps=x.jobs.find(job=>job.name==='event-gates').steps.filter(step=>step.name!=='Backward compatibility');}],
+ ];
+ for(const [name,mutate]of scenarios)await parent.test(name,t=>{const f=fixture(t,true,true),github=publishedPolicyBase(f);mutate(github);writeFileSync(f.external,JSON.stringify(github));const result=invoke(f,{event:'pull_request',checkout:f.merge,environment:descriptorFor(f,f.merge)});assert.equal(result.status,0,result.stdout+result.stderr);assert.equal(result.record.decision,'full',name+' requires full current execution');assert.equal(result.record.coveredBy,null);assert.equal(executions(f).length,1);});
+});
+
+
+test('policy prose exact main routing retains current reviewed head and original base execution',t=>{
+ const f=fixture(t,true,true),github=publishedPolicyBase(f);
+ github.pulls=[{number:17,merged_at:new Date().toISOString(),merge_commit_sha:f.merge,head:{sha:f.head},base:{ref:'main'}}];writeFileSync(f.external,JSON.stringify(github));
+ const result=invoke(f,{event:'push',ref:'refs/heads/main',source:f.merge,checkout:f.merge,environment:descriptorFor(f,f.merge,f.merge)});
+ assert.equal(result.status,0,result.stdout+result.stderr);assert.equal(result.record.decision,'policy-reuse',result.stdout);assert.equal(result.record.policyReview.sourceSha,f.head);assert.equal(result.record.policyImpact.sourceSha,f.merge);assert.equal(result.record.coveredBy.checkoutSha,f.base);assert.equal(executions(f).length,0);
 });
