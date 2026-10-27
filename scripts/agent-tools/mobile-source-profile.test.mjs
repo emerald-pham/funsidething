@@ -25,6 +25,7 @@ test('canonical mobile source profile admits exact current app without changing 
   await assert.rejects(runButtonSafety({repo:root,engine:'webkit',port:fixturePort,outputDir:output,mobileYesMotion:'reduced',appFixture:'saved-scenery-b176'}),error=>error===stopped);
   observed=JSON.parse(fs.readFileSync(path.join(output,fs.readdirSync(output).find(file=>file.endsWith('.json')))));
   assert.equal(observed.assets['landscape.js'],hash(landscape.stdout),'The explicit scenery consumer must serve the immutable saved app, not canonical paint bytes');
+  assert.equal(Object.keys(observed.assets).length,36,'The complete saved app includes its immutable shell and license assets');assert.ok(observed.assets['vendor/HYG-LICENSE']);
   assert.equal(observed.kind,'button-scenery-fixture');assert.equal(observed.appFixture.commit,saved);assert.equal(observed.appFixture.tree,savedTree);assert.equal(observed.appFixture.id,'saved-scenery-b176');assert.equal(observed.appFixture.originalHarnessCommit,'9b5bc1c9d5a87fed022a17706bbb0e69e94757b1');
   assert.equal(observed.appFixture.tooling.commit,spawnSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).stdout.trim());assert.equal(observed.appFixture.tooling.assets['scripts/button-safety-native.mjs'],hash(fs.readFileSync(path.join(root,'scripts/button-safety-native.mjs'))));
   const {verifyProfiledNativeReport}=await import('../mobile-source-profile.mjs'),{verifyMobileFunctionalReport}=await import('../button-safety-mobile-contract.mjs');

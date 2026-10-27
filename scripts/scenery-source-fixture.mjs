@@ -17,7 +17,11 @@ export function savedSceneryApplication(repo){
  assert.deepEqual(Object.keys(manifest).sort(),['schemaVersion','id','commit','tree','originalHarnessCommit','assets'].sort());
  assert.equal(manifest.schemaVersion,1);assert.equal(manifest.id,'saved-scenery-b176');assert.equal(manifest.commit,COMMIT);assert.equal(manifest.tree,TREE);assert.equal(manifest.originalHarnessCommit,'9b5bc1c9d5a87fed022a17706bbb0e69e94757b1');
  const runtime=JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'))).requiredRuntimeAssets;
- const files=git('ls-tree','-r','--name-only',COMMIT).toString().trim().split('\n').filter(file=>file!=='tests.js'&&!file.startsWith('scripts/')&&(/\.(?:html|js|css|svg|png|webmanifest)$/.test(file)||Object.hasOwn(runtime,file)));
+ const worker=git('show',COMMIT+':sw.js').toString(),shell=worker.match(/\.addAll\(\[([\s\S]*?)\]\s*\.map/);assert.ok(shell,'Actual immutable service-worker shell inventory required');
+ const shellFiles=new Set(['sw.js',...[...shell[1].matchAll(/"([^"]+)"/g)].map(match=>match[1]==='./'?'index.html':match[1].replace(/^\.\//,''))]);
+ const tracked=git('ls-tree','-r','--name-only',COMMIT).toString().trim().split('\n');
+ for(const file of shellFiles)assert.ok(tracked.includes(file)&&!file.startsWith('scripts/')&&!file.includes('..'),'Safe complete saved shell asset: '+file);
+ const files=tracked.filter(file=>shellFiles.has(file)||file!=='tests.js'&&!file.startsWith('scripts/')&&(/\.(?:html|js|css|svg|png|webmanifest)$/.test(file)||Object.hasOwn(runtime,file)));
  const sources=new Map(files.map(file=>[file,git('show',COMMIT+':'+file)])),assets=Object.fromEntries([...sources].map(([file,bytes])=>[file,digest(bytes)]));
  assert.deepEqual(assets,manifest.assets,'Complete immutable saved application inventory required');
  const tooling={commit:git('rev-parse','HEAD').toString().trim(),tree:git('rev-parse','HEAD^{tree}').toString().trim(),assets:Object.fromEntries(TOOL_FILES.map(file=>[file,digest(fs.readFileSync(path.join(repo,file)))]))};
