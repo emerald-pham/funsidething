@@ -210,17 +210,230 @@ function isolatedFixtureNativeOutput(fixture, inheritedEnvironment = process.env
   };
 }
 
-function invoke(fixture, { group = 'core', env = {}, repository = 'example/fixture', outputDir: requestedOutputDir, args = [] } = {}) {
+function invoke(fixture, { group = 'core', env = {}, repository = 'example/fixture', outputDir: requestedOutputDir, args = [], preserveNodeTestContext = false } = {}) {
   const outputDir = requestedOutputDir || path.join(os.tmpdir(), `chain-test-group-output-${process.pid}-${++outputSerial}`);
   fixture.outputs.push(outputDir);
   const childEnv = { ...process.env, ...env };
-  delete childEnv.NODE_TEST_CONTEXT;
+  if (!preserveNodeTestContext) delete childEnv.NODE_TEST_CONTEXT;
   const result = run('npm', ['run', 'test:group', '--', '--group', group, '--output-dir', outputDir,
     '--repository', repository, '--event-policy', 'local', '--run-id', 'fixture-run-1', '--run-attempt', '1',
     '--source-sha', fixture.sourceSha, '--comparison-base', fixture.comparisonBase, ...args], fixture.root,
   childEnv);
   return { ...result, outputDir, evidencePath: path.join(outputDir, 'result.json'), evidence: readEvidence(outputDir) };
 }
+
+function addBrowserRuntimeRootFixture(t, fixture, root, mode = 'pass', includeChromium = true) {
+  const declaration = mode === 'skip'
+    ? `test(${JSON.stringify(root)},{skip:'fixture setup absent'},()=>{});`
+    : `test(${JSON.stringify(root)},()=>{});`;
+  const copies = mode === 'duplicate' ? `${declaration}\n${declaration}` : declaration;
+  const registrationFile = mode === 'missing' ? 'scripts/agent-tools/unselected.test.mjs' : 'tests.js';
+  if (mode === 'missing') fs.writeFileSync(path.join(fixture.root, registrationFile), `import { test } from 'node:test';\n${copies}\n`);
+  else fs.appendFileSync(path.join(fixture.root, registrationFile), `\n${copies}\n`);
+  const assignmentFile = mode === 'missing' ? 'scripts/agent-tools/fixture.test.mjs' : 'tests.js';
+  fixture.groupAssignments.rootAssignments.push({ root, group: 'persistence-recovery', file: assignmentFile, browserRuntime: 'ci-chromium' });
+  writeJson(path.join(fixture.root, 'scripts/test-group-assignments.json'), fixture.groupAssignments);
+  writeJson(path.join(fixture.root, 'package.json'), {
+    type: 'module',
+    scripts: { 'test:group': 'node scripts/test-groups.mjs', test: 'node --test tests.js scripts/agent-tools/*.test.mjs' },
+    devDependencies: { playwright: '1.62.1' },
+  });
+  writeJson(path.join(fixture.root, 'package-lock.json'), {
+    name: 'chain-test-group-fixture', version: '1.0.0', lockfileVersion: 3, requires: true,
+    packages: {
+      '': { name: 'chain-test-group-fixture', version: '1.0.0', devDependencies: { playwright: '1.62.1' } },
+      'node_modules/playwright': { version: '1.62.1' },
+    },
+  });
+  const playwrightPackage = path.join(fixture.root, 'node_modules/playwright');
+  fs.mkdirSync(playwrightPackage, { recursive: true });
+  writeJson(path.join(playwrightPackage, 'package.json'), { name: 'playwright', version: '1.62.1', type: 'module', exports: './index.mjs' });
+  fs.writeFileSync(path.join(playwrightPackage, 'index.mjs'), `
+import fs from 'node:fs';import path from 'node:path';
+const executable=(engine)=>path.join(process.env.PLAYWRIGHT_BROWSERS_PATH,engine,engine==='chromium'?'chrome':'pw_run.sh');
+const chromium={executablePath:()=>executable('chromium'),launch:async()=>{if(!fs.existsSync(executable('chromium')))throw Error('Chromium executable does not exist at '+executable('chromium'));return{version:()=> 'fixture-chromium-151',close:async()=>{}};}};
+const webkit={executablePath:()=>executable('webkit'),launch:async()=>{if(!fs.existsSync(executable('webkit')))throw Error('WebKit executable does not exist at '+executable('webkit'));return{version:()=> 'fixture-webkit',close:async()=>{}};}};
+export {chromium,webkit};
+`);
+  const browserFixture = fs.mkdtempSync(path.join(os.tmpdir(), 'chain-browser-runtime-fixture-'));
+  fixture.outputs.push(browserFixture);
+  const browserPath = path.join(browserFixture, 'browser-install');
+  fs.mkdirSync(path.join(browserPath, 'chromium'), { recursive: true });
+  if (includeChromium) {
+    const executable = path.join(browserPath, 'chromium/chrome');
+    fs.writeFileSync(executable, 'fixture chromium executable\n');
+    fs.chmodSync(executable, 0o755);
+  }
+  git(fixture.root, 'add', registrationFile, 'scripts/test-group-assignments.json', 'package.json', 'package-lock.json');
+  git(fixture.root, 'add', '-f', 'node_modules/playwright/package.json', 'node_modules/playwright/index.mjs');
+  git(fixture.root, 'commit', '-qm', 'add required fixture browser root');
+  fixture.sourceSha = git(fixture.root, 'rev-parse', 'HEAD');
+  return browserPath;
+}
+
+test('test group browser runtime preflight runs exactly the newly assigned roots in a scrubbed child', t => {
+  const fixture = createFixture(t);
+  const roots = [
+    'RISK saved view broken-board startup: prior appearance stays inert until the recovered board opens',
+    'RISK saved view broken-board visibility: the complete saved board is readable while durable startup waits',
+    'RISK saved view full-board filters: opening preserves saved membership controls and cheap task facts',
+    'RISK saved view full-board safety: supported copies and identity masks never grant authority',
+    'RISK saved view broken-board startup: configured Firebase leaves the prior warning neutral until its first event',
+    'RISK saved view broken-board status: configured cloud changes remain visible in the saved appearance and after recovery',
+  ];
+  const snapshotExpression = JSON.stringify({
+    browserUrl: 'LANDSCAPE_BROWSER_URL', browserChannel: 'LANDSCAPE_BROWSER_CHANNEL', landscapePlaywright: 'LANDSCAPE_PLAYWRIGHT',
+    playwrightModule: 'PLAYWRIGHT_MODULE', artifactDirectory: 'SAVED_VIEW_ARTIFACT_DIR', nodeTestContext: 'NODE_TEST_CONTEXT',
+    home: 'HOME', browserPath: 'PLAYWRIGHT_BROWSERS_PATH', nativePort: 'CHAIN_NATIVE_PORT', ci: 'CI',
+  });
+  // These roots inspect the actual child environment while retaining the six
+  // source names from the accepted startup-browser consumer set.
+  const declarations = roots.map(root => `test(${JSON.stringify(root)},()=>{fs.writeFileSync(path.join(process.env.CHAIN_GROUP_OUTPUT_DIR,'browser-child-env.json'),JSON.stringify(Object.fromEntries(Object.entries(${snapshotExpression}).map(([key,name])=>[name,process.env[name]??null]))));});`).join('\n');
+  fs.appendFileSync(path.join(fixture.root, 'tests.js'), `\n${declarations}\n`);
+  fixture.groupAssignments.rootAssignments.push(...roots.map(root => ({ root, group: 'persistence-recovery', file: 'tests.js', browserRuntime: 'ci-chromium' })));
+  writeJson(path.join(fixture.root, 'scripts/test-group-assignments.json'), fixture.groupAssignments);
+
+  const browserFixture = fs.mkdtempSync(path.join(os.tmpdir(), 'chain-browser-runtime-fixture-'));
+  fixture.outputs.push(browserFixture);
+  const explicitBrowsers = path.join(browserFixture, 'explicit-browser-install');
+  const hiddenBrowsers = path.join(browserFixture, 'hidden-browser-install');
+  for (const [directory, engines] of [[explicitBrowsers, ['chromium']], [hiddenBrowsers, ['chromium', 'webkit']]]) {
+    for (const engine of engines) {
+      const executable = path.join(directory, engine, engine === 'chromium' ? 'chrome' : 'pw_run.sh');
+      fs.mkdirSync(path.dirname(executable), { recursive: true });
+      fs.writeFileSync(executable, 'fixture browser executable\n');
+      fs.chmodSync(executable, 0o755);
+    }
+  }
+  const playwrightPackage = path.join(fixture.root, 'node_modules/playwright');
+  fs.mkdirSync(playwrightPackage, { recursive: true });
+  writeJson(path.join(playwrightPackage, 'package.json'), { name: 'playwright', version: '1.62.1', type: 'module', exports: './index.mjs' });
+  fs.writeFileSync(path.join(playwrightPackage, 'index.mjs'), `
+import fs from 'node:fs';import path from 'node:path';
+const executable=(engine)=>path.join(process.env.PLAYWRIGHT_BROWSERS_PATH,engine,engine==='chromium'?'chrome':'pw_run.sh');
+const chromium={executablePath:()=>executable('chromium'),launch:async()=>{if(!fs.existsSync(executable('chromium')))throw Error('Chromium executable does not exist');return{version:()=> 'fixture-chromium-151',close:async()=>{}};}};
+const webkit={executablePath:()=>executable('webkit'),launch:async()=>{if(!fs.existsSync(executable('webkit')))throw Error('WebKit executable does not exist at '+executable('webkit'));return{version:()=> 'fixture-webkit',close:async()=>{}};}};
+export {chromium,webkit};
+`);
+  writeJson(path.join(fixture.root, 'package.json'), {
+    type: 'module',
+    scripts: { 'test:group': 'node scripts/test-groups.mjs', test: 'node --test tests.js scripts/agent-tools/*.test.mjs' },
+    devDependencies: { playwright: '1.62.1' },
+  });
+  writeJson(path.join(fixture.root, 'package-lock.json'), {
+    name: 'chain-test-group-fixture', version: '1.0.0', lockfileVersion: 3, requires: true,
+    packages: {
+      '': { name: 'chain-test-group-fixture', version: '1.0.0', devDependencies: { playwright: '1.62.1' } },
+      'node_modules/playwright': { version: '1.62.1' },
+    },
+  });
+  git(fixture.root, 'add', 'tests.js', 'scripts/test-group-assignments.json', 'package.json', 'package-lock.json');
+  git(fixture.root, 'add', '-f', 'node_modules/playwright/package.json', 'node_modules/playwright/index.mjs');
+  git(fixture.root, 'commit', '-qm', 'add six required fixture browser consumers');
+  fixture.sourceSha = git(fixture.root, 'rev-parse', 'HEAD');
+
+  const result = invoke(fixture, {
+    group: 'persistence-recovery',
+    preserveNodeTestContext: true,
+    env: {
+      CI: 'true',
+      NODE_TEST_CONTEXT: 'foreign-parent-context',
+      LANDSCAPE_BROWSER_URL: 'http://127.0.0.1:1/local-preview',
+      LANDSCAPE_BROWSER_CHANNEL: 'chrome',
+      LANDSCAPE_PLAYWRIGHT: '/foreign/playwright.mjs',
+      PLAYWRIGHT_MODULE: '/foreign/playwright.mjs',
+      SAVED_VIEW_ARTIFACT_DIR: '/foreign/browser-artifacts',
+      PLAYWRIGHT_BROWSERS_PATH: hiddenBrowsers,
+      HOME: '/foreign/personal-profile',
+    },
+    args: ['--browser-runtime-preflight', '--browser-path', explicitBrowsers],
+  });
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.equal(result.evidence.status, 'passed');
+  const proof = result.evidence.browserRuntime;
+  assert.equal(proof.status, 'passed');
+  assert.deepEqual(proof.selectedRoots, [...roots].sort());
+  assert.equal(proof.runtime.chromium.available, true);
+  assert.equal(proof.runtime.chromium.version, 'fixture-chromium-151');
+  assert.equal(proof.runtime.webkit.available, false, 'a hidden WebKit installation outside the explicit path cannot satisfy the control');
+  assert.equal(proof.runtime.browserPath, fs.realpathSync(explicitBrowsers));
+  const actualRoots = proof.outcomes.filter(item => item.id === item.root);
+  assert.deepEqual(actualRoots.map(item => item.id).sort(), [...roots].sort());
+  assert.ok(actualRoots.every(item => item.status === 'passed'));
+  assert.equal(new Set(actualRoots.map(item => item.id)).size, roots.length);
+  const childEnvironment = JSON.parse(fs.readFileSync(path.join(result.outputDir, 'browser-child-env.json'), 'utf8'));
+  for (const key of ['LANDSCAPE_BROWSER_URL', 'LANDSCAPE_BROWSER_CHANNEL', 'LANDSCAPE_PLAYWRIGHT', 'PLAYWRIGHT_MODULE']) {
+    assert.equal(childEnvironment[key], null, `${key} is not inherited by the browser child`);
+  }
+  assert.notEqual(childEnvironment.NODE_TEST_CONTEXT, 'foreign-parent-context', 'Node may install its own test marker, but the invoking parent marker is cleared');
+  assert.equal(childEnvironment.HOME, path.join(result.outputDir, 'runtime-home'));
+  assert.equal(childEnvironment.PLAYWRIGHT_BROWSERS_PATH, fs.realpathSync(explicitBrowsers));
+  assert.equal(childEnvironment.CHAIN_NATIVE_PORT, null);
+  assert.equal(childEnvironment.CI, 'true');
+  assert.equal(childEnvironment.SAVED_VIEW_ARTIFACT_DIR, path.join(result.outputDir, 'browser-artifacts'));
+  assert.equal(fs.existsSync(path.join(result.outputDir, 'runtime-tmp')), false);
+  assert.equal(fs.existsSync(path.join(result.outputDir, 'runtime-home')), false);
+
+  const missingReceipt = invoke(fixture, { group: 'persistence-recovery' });
+  assert.notEqual(missingReceipt.status, 0, 'ordinary group execution must require the newly assigned browser cohort receipt');
+  assert.match(missingReceipt.evidence?.issues?.join('\n') || '', /Required browser runtime receipt is missing/);
+  const ordinaryGroup = invoke(fixture, {
+    group: 'persistence-recovery',
+    env: { CI: 'true' },
+    args: ['--browser-runtime-receipt', result.evidencePath],
+  });
+  assert.equal(ordinaryGroup.status, 0, `${ordinaryGroup.stdout}\n${ordinaryGroup.stderr}`);
+  assert.equal(ordinaryGroup.evidence.status, 'passed');
+  assert.equal(ordinaryGroup.evidence.browserRuntimeReceipt.path, 'browser-runtime-preflight/receipt.json');
+  assert.equal(fs.existsSync(path.join(ordinaryGroup.outputDir, 'browser-runtime-preflight/browser-runtime.tap')), true);
+  const ordinaryBrowserRoots=ordinaryGroup.evidence.cases.filter(item=>roots.includes(item.root));
+  assert.deepEqual(ordinaryBrowserRoots.map(item=>({root:item.root,status:item.status})).sort((a,b)=>a.root.localeCompare(b.root)),roots.map(root=>({root,status:'passed'})).sort((a,b)=>a.root.localeCompare(b.root)), 'the regular full group still executes and accounts for all six preflight roots');
+  assert.equal(ordinaryGroup.evidence.inventory.requiredRootsForGroup,fixture.groupAssignments.rootAssignments.filter(item=>item.group==='persistence-recovery').length,'the preflight does not remove roots from ordinary full-group accounting');
+});
+
+test('test group browser runtime preflight records an explicit no-change cohort without launching an engine', t => {
+  const fixture = createFixture(t);
+  const result = invoke(fixture, {
+    group: 'persistence-recovery',
+    env: { CI: 'true' },
+    args: ['--browser-runtime-preflight'],
+  });
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.equal(result.evidence.status, 'no_change');
+  assert.deepEqual(result.evidence.browserRuntime.selectedRoots, []);
+  assert.equal(result.evidence.browserRuntime.runtime, null);
+  assert.equal(fs.existsSync(path.join(result.outputDir, 'browser-runtime.tap')), false);
+  const ordinaryGroup = invoke(fixture, {
+    group: 'persistence-recovery',
+    env: { CI: 'true' },
+    args: ['--browser-runtime-receipt', result.evidencePath],
+  });
+  assert.equal(ordinaryGroup.status, 0, `${ordinaryGroup.stdout}\n${ordinaryGroup.stderr}`);
+  assert.equal(ordinaryGroup.evidence.status, 'passed');
+  assert.equal(ordinaryGroup.evidence.browserRuntimeReceipt.path, 'browser-runtime-preflight/receipt.json');
+  assert.equal(fs.existsSync(path.join(ordinaryGroup.outputDir, 'browser-runtime-preflight/browser-runtime.tap')), false);
+});
+
+test('test group browser runtime preflight fails closed for skipped, duplicated, and missing-engine outcomes', t => {
+  for (const [mode, includeChromium, expectedIssue] of [
+    ['skip', true, /unexpectedly skipped/],
+    ['duplicate', true, /executed more than once|duplicated/],
+    ['missing', true, /did not execute/],
+    ['pass', false, /Chromium is missing from the explicit browser installation/],
+  ]) {
+    const fixture = createFixture(t);
+    const root = `RISK browser runtime fixture: ${mode} outcome fails closed`;
+    const browserPath = addBrowserRuntimeRootFixture(t, fixture, root, mode, includeChromium);
+    const result = invoke(fixture, {
+      group: 'persistence-recovery',
+      env: { CI: 'true' },
+      args: ['--browser-runtime-preflight', '--browser-path', browserPath],
+    });
+    assert.notEqual(result.status, 0, `${mode} browser outcome must fail closed`);
+    assert.equal(result.evidence.status, 'failed');
+    assert.match(result.evidence.browserRuntime.issues.join('\n'), expectedIssue);
+  }
+});
 
 function readEvidence(outputDir) {
   const file = path.join(outputDir, 'result.json');
@@ -795,10 +1008,15 @@ test('group and aggregate retain actual early cases once across fresh group proc
  const early=path.join(temp,'early'),run=spawnSync('bash',['-euo','pipefail','-c',earlyStep[1]],{cwd:fixture.root,env:{...env,RUNNER_TEMP:temp},encoding:'utf8',timeout:15000});assert.equal(run.status,0,run.stdout+run.stderr);
  const receipt=path.join(early,'receipt.json'),first=fs.readFileSync(journal,'utf8').trim().split('\n');assert.equal(first.length,5,'All five fixture early roots really ran once, including the actual no-port child stream');assert.equal(new Set(first).size,5);
  fixture.originals=new Map();
- const actualStep=workflow.match(/      - name: Execute complete assigned group\n[\s\S]*?        run: ([^\n]+)/);assert.ok(actualStep,'Existing workflow group command required');
+ const actualStep=workflow.match(/      - name: Execute complete assigned group\n[\s\S]*?        run: \|\n((?:          [^\n]*\n|\n)*)/);assert.ok(actualStep,'Existing workflow group command required');
+ const actualCommand=actualStep[1].split('\n').map(line=>line.startsWith('          ')?line.slice(10):line).join('\n');
  for(const group of groups){
   const runnerTemp=path.join(temp,'job-'+group);fs.mkdirSync(runnerTemp);fs.cpSync(early,path.join(runnerTemp,'early'),{recursive:true});
-  const command=actualStep[1].replaceAll('${{ matrix.group }}',group),result=spawnSync('bash',['-euo','pipefail','-c',command],{cwd:fixture.root,env:{...env,RUNNER_TEMP:runnerTemp,CHAIN_TEST_COMPARISON_BASE:fixture.comparisonBase},encoding:'utf8',timeout:15000});
+  if(group==='persistence-recovery'){
+   const preflight=invoke(fixture,{group,env,outputDir:path.join(runnerTemp,'browser-runtime-preflight'),args:['--browser-runtime-preflight','--early-receipt',path.join(runnerTemp,'early/receipt.json')]});
+   assert.equal(preflight.status,0,preflight.stdout+preflight.stderr);assert.equal(preflight.evidence.status,'no_change','The matrix fixture still runs an explicit no-change preflight receipt.');
+  }
+  const command=actualCommand.replaceAll('${{ matrix.group }}',group),result=spawnSync('bash',['-euo','pipefail','-c',command],{cwd:fixture.root,env:{...env,RUNNER_TEMP:runnerTemp,CHAIN_TEST_COMPARISON_BASE:fixture.comparisonBase},encoding:'utf8',timeout:15000});
   assert.equal(result.status,0,result.stdout+result.stderr);const outputDir=path.join(runnerTemp,'group'),record=JSON.parse(fs.readFileSync(path.join(outputDir,'result.json')));fixture.originals.set(group,outputDir);
   if(group==='native-process'){assert.equal(record.earlyCoverage.roots.length,5);assert.equal(record.earlyCoverage.cases.length,5);assert.ok(record.cases.every(row=>!first.includes(row.root)),'Actual workflow group TAP cannot repeat early outcomes');}
  }

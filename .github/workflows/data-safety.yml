@@ -219,6 +219,7 @@ jobs:
     env:
       CHAIN_TEST_EVENT_POLICY: ${{ needs.validation-context.outputs.policy }}
       CHAIN_TEST_COMPARISON_BASE: ${{ needs.validation-context.outputs.base }}
+      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/playwright-browsers
     steps:
       - uses: actions/checkout@v4
         with:
@@ -246,12 +247,27 @@ jobs:
         with:
           name: early-startup-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/early
+      - name: Preflight newly assigned startup browser roots
+        if: needs.cohort-routing.outputs.decision == 'full' && matrix.group == 'persistence-recovery'
+        run: npm run test:group -- --browser-runtime-preflight --group "${{ matrix.group }}" --browser-path "$PLAYWRIGHT_BROWSERS_PATH" --early-receipt "$RUNNER_TEMP/early/receipt.json" --output-dir "$RUNNER_TEMP/browser-runtime-preflight" --repository "$GITHUB_REPOSITORY" --event-policy "$CHAIN_TEST_EVENT_POLICY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$CHAIN_TEST_SOURCE_SHA" --comparison-base "$CHAIN_TEST_COMPARISON_BASE"
       - name: Execute complete assigned group
         if: needs.cohort-routing.outputs.decision == 'full'
-        run: npm run test:group -- --group "${{ matrix.group }}" --early-receipt "$RUNNER_TEMP/early/receipt.json" --output-dir "$RUNNER_TEMP/group" --repository "$GITHUB_REPOSITORY" --event-policy "$CHAIN_TEST_EVENT_POLICY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$CHAIN_TEST_SOURCE_SHA" --comparison-base "$CHAIN_TEST_COMPARISON_BASE"
+        run: |
+          group_args=(--group "${{ matrix.group }}" --early-receipt "$RUNNER_TEMP/early/receipt.json")
+          if [[ "${{ matrix.group }}" == "persistence-recovery" ]]; then
+            group_args+=(--browser-runtime-receipt "$RUNNER_TEMP/browser-runtime-preflight/result.json")
+          fi
+          npm run test:group -- "${group_args[@]}" --output-dir "$RUNNER_TEMP/group" --repository "$GITHUB_REPOSITORY" --event-policy "$CHAIN_TEST_EVENT_POLICY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$CHAIN_TEST_SOURCE_SHA" --comparison-base "$CHAIN_TEST_COMPARISON_BASE"
       - name: Record verified full-producer coverage reference
         if: contains(fromJSON('["reuse","policy-reuse"]'), needs.cohort-routing.outputs.decision)
         run: npm run test:group -- --covered --proof "$RUNNER_TEMP/ci-routing/routing.json" --group "${{ matrix.group }}" --early-receipt "$RUNNER_TEMP/early/receipt.json" --output-dir "$RUNNER_TEMP/group" --repository "$GITHUB_REPOSITORY" --event-policy "$CHAIN_TEST_EVENT_POLICY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$CHAIN_TEST_SOURCE_SHA" --comparison-base "$CHAIN_TEST_COMPARISON_BASE"
+      - name: Preserve browser runtime preflight evidence
+        if: always() && matrix.group == 'persistence-recovery' && needs.cohort-routing.outputs.decision == 'full'
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-runtime-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/browser-runtime-preflight
+          if-no-files-found: error
       - name: Preserve actual group results and native evidence
         if: always()
         uses: actions/upload-artifact@v4

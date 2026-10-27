@@ -20722,5 +20722,24 @@
       "failure": "On the actual light-390 Chromium startup consumer, the screenshot boundary flipped the root theme light→dark→light across animation frames and returned to the original paint before the PNG was captured. The pre-adaptation consumer produced its PNG but no shared metrics report; the expected refusal assertion failed with actual undefined versus expected fail. The recorder classified this as assertion-failure, not infrastructure. This is a later current-consumer RED; it does not replace the original 04:08 c8659866 helper RED or the separate frozen-source and queue-edge sensitivities."
     },
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/326"
+  },
+  {
+    "baseCommit": "c2cba034b2da1e335c92e3f48be809a09de19699",
+    "testChangesSha256": "f32f459fc7452380ebf2a134755f5def64e6263b5aa6256e5781e4cb86289492",
+    "reason": "Issue #323 adds a public process contract for the existing test-group boundary: newly registered required browser roots must run in the isolated Chromium-only runtime and bind their outcomes into the ordinary group receipt.",
+    "previousBehavior": "Six registered startup browser roots could return successful process status while skipping because the runner lacked a local server URL, and the active repair also had to match the regression workflow's Chromium-only engine set.",
+    "intendedBehavior": "The existing assignment and comparison-base selection drives one bounded preflight, strips inherited browser/profile state, fails on absent setup or invalid outcomes, and transfers a source-bound receipt while the ordinary complete group still runs and counts every assigned case.",
+    "replacementTests": [
+      "RISK repository process: newly registered startup browser roots require an isolated Chromium receipt"
+    ],
+    "preservedCoverage": [
+      "The ordinary persistence-recovery group still executes and aggregates all six startup browser roots; the preflight adds a separate runtime assertion and never replaces or removes required group cases.",
+      "The accepted skip inventory and #290 early-root receipt semantics remain unchanged. The six source-specific browser roots are marked only in the isolated 3d9442c proof checkout; no product application changes are included here."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/runtime/node-v22.23.3-darwin-arm64/bin/node --test --test-name-pattern='RISK saved view (broken-board startup: prior appearance stays inert until the recovered board opens|broken-board visibility: the complete saved board is readable while durable startup waits|full-board filters: opening preserves saved membership controls and cheap task facts|full-board safety: supported copies and identity masks never grant authority|broken-board startup: configured Firebase leaves the prior warning neutral until its first event|broken-board status: configured cloud changes remain visible in the saved appearance and after recovery)' tests.js; recorder /Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/323/consumer-red/2026-10-27T05-42-09-934Z-b93ca325-6bd3-4667-8b6c-e5161c4c33a3.json",
+      "failure": "On the published source 9306a59, the public Node process exited zero while all six exact registered browser roots were SKIP and zero passed because no local browser URL/server setup was supplied. This preserved behavior-level failure evidence; a separate unknown-option probe was infrastructure and is not credited as RED."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/323"
   }
 ]
