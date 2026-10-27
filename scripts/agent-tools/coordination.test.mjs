@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { chmodSync, copyFileSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { delimiter, join } from 'node:path';
+import { delimiter, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { recordReleaseEvidence } from '../release-evidence.mjs';
@@ -1481,7 +1481,9 @@ test('Chain Scanner finish rejects a landed entry without exact-SHA release evid
     const origin = addOrigin(project, fixture);
     mkdirSync(join(project, 'scripts'), { recursive: true });
     copyFileSync(releaseEvidenceEntrypoint, join(project, 'scripts/release-evidence.mjs'));
-    git(project, 'add', 'scripts/release-evidence.mjs');
+    mkdirSync(join(project,'scripts/agent-tools'),{recursive:true});
+    copyFileSync(join(dirname(releaseEvidenceEntrypoint),'agent-tools/checkpoint-progress.mjs'),join(project,'scripts/agent-tools/checkpoint-progress.mjs'));
+    git(project, 'add', 'scripts/release-evidence.mjs','scripts/agent-tools/checkpoint-progress.mjs');
     git(project, 'commit', '--quiet', '-m', 'install fixture release adapter');
     const began = command([
       'begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Finish evidence fixture',
@@ -1585,7 +1587,9 @@ test('Chain Scanner finish keeps actual main and exact receipt authority after m
     git(project, 'checkout', '--quiet', 'main');
     mkdirSync(join(project, 'scripts'), { recursive: true });
     copyFileSync(releaseEvidenceEntrypoint, join(project, 'scripts/release-evidence.mjs'));
-    git(project, 'add', 'scripts/release-evidence.mjs');
+    mkdirSync(join(project,'scripts/agent-tools'),{recursive:true});
+    copyFileSync(join(dirname(releaseEvidenceEntrypoint),'agent-tools/checkpoint-progress.mjs'),join(project,'scripts/agent-tools/checkpoint-progress.mjs'));
+    git(project, 'add', 'scripts/release-evidence.mjs','scripts/agent-tools/checkpoint-progress.mjs');
     git(project, 'commit', '--quiet', '-m', 'install fixture release adapter');
     git(project, 'checkout', '--quiet', 'work/master-release');
     git(project, 'merge', '--quiet', '--ff-only', 'main');
@@ -1660,7 +1664,9 @@ test('Chain Scanner landed finish rejects a stale remote even when local main re
     const origin = addOrigin(project, fixture);
     mkdirSync(join(project, 'scripts'), { recursive: true });
     copyFileSync(releaseEvidenceEntrypoint, join(project, 'scripts/release-evidence.mjs'));
-    git(project, 'add', 'scripts/release-evidence.mjs');
+    mkdirSync(join(project,'scripts/agent-tools'),{recursive:true});
+    copyFileSync(join(dirname(releaseEvidenceEntrypoint),'agent-tools/checkpoint-progress.mjs'),join(project,'scripts/agent-tools/checkpoint-progress.mjs'));
+    git(project, 'add', 'scripts/release-evidence.mjs','scripts/agent-tools/checkpoint-progress.mjs');
     git(project, 'commit', '--quiet', '-m', 'install fixture release adapter');
     const began = command([
       'begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Remote divergence fixture',

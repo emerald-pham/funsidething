@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import {assertDiagnosticPublicationAllowed} from './agent-tools/checkpoint-progress.mjs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -642,6 +643,8 @@ function receiptDirectory(repoRoot, commitSha) {
 
 export function recordReleaseEvidence(repoRoot, input) {
   const { root } = gitCommonDir(repoRoot);
+  assertDiagnosticPublicationAllowed(root,input?.candidate?.commitSha);
+  if(input?.kind==='nonqualifying-diagnostic')throw Error('Diagnostic receipts cannot become product release approval.');
   const validated = input?.schemaVersion === 2 ? validateRiskBasedInput(root, input) : validateInput(root, input);
   const receipt = validated.receipt;
   receipt.receiptSha256 = receiptDigest(receipt);
@@ -825,9 +828,14 @@ function verifyRiskBasedReceipt(repoRoot, commitSha, receipt, receiptPath, evide
 }
 
 export function verifyReleaseEvidence(repoRoot, commitSha) {
+  return verifyReleaseEvidenceDirectory(repoRoot, commitSha, receiptDirectory(repoRoot, commitSha));
+}
+
+// Reuse the ordinary exact-source verifier for bounded transported evidence.
+export function verifyReleaseEvidenceDirectory(repoRoot, commitSha, directory) {
+  try{assertDiagnosticPublicationAllowed(repoRoot,commitSha);}catch(error){return {ok:false,errors:[error.message]};}
   const errors = [];
   if (!SHA1.test(commitSha || '')) return { ok: false, errors: ['Candidate SHA must contain 40 lowercase hexadecimal characters.'] };
-  const directory = receiptDirectory(repoRoot, commitSha);
   const receiptPath = path.join(directory, 'receipt.json');
   let receipt;
   try {
@@ -909,7 +917,7 @@ export function parsePrePushUpdates(input) {
   return updates;
 }
 
-export function validatePrePushUpdates(repoRoot, updates) {
+export function validatePrePushUpdates(repoRoot, updates, {diagnosticVerifier} = {}) {
   const errors = [];
   const outgoing = updates.filter(update => update && update.localSha !== '0'.repeat(40));
   if (outgoing.length === 0) return errors;
@@ -926,6 +934,11 @@ export function validatePrePushUpdates(repoRoot, updates) {
     } catch {
       errors.push('Release push blocked: outgoing ref ' + update.localRef + ' does not point to a local commit.');
       continue;
+    }
+    if (diagnosticVerifier) {
+      try {
+        if (diagnosticVerifier(repoRoot, commitSha, update)) continue;
+      } catch (error) { errors.push('Diagnostic push blocked: '+error.message); continue; }
     }
     const result = verifyReleaseEvidence(repoRoot, commitSha);
     if (!result.ok) errors.push('Release push blocked for ' + update.localRef + ' at ' + commitSha + ': ' + result.errors.join(' '));
@@ -1026,6 +1039,7 @@ export async function verifyDeploymentEvidence({ repository, deployedSha, before
       localHead=spawnSync('git',['-C',repoRoot,'cat-file','-e',headSha+'^{commit}']).status===0;
       if(!localHead)throw new Error('Exact review head remains unavailable after fetching its PR ref.');
     }
+    if(localHead)assertDiagnosticPublicationAllowed(repoRoot,headSha);
     const faqPolicy=localHead ? !!deriveReleaseReviewPlan(repoRoot,headSha,baseSha).requiresFaqReview : false;
     const reviewedCommit = await githubJson(fetchImpl, api + '/commits/' + headSha, token);
     if (!treeSha || reviewedCommit.commit?.tree?.sha !== treeSha) {
@@ -1109,6 +1123,7 @@ function postWithGh(repository, payload) {
 async function main() {
   const command = process.argv[2];
   const repoRoot = process.cwd();
+  if(command?.startsWith('diagnostic-')){const {diagnosticCommand}=await import('./agent-tools/diagnostic-receipt.mjs');process.stdout.write(JSON.stringify(await diagnosticCommand(repoRoot,command,process.argv.slice(3)))+'\n');return;}
   if (command === 'record') {
     const inputPath = process.argv[3];
     if (!inputPath) throw new Error('Usage: node scripts/release-evidence.mjs record <receipt-input.json>');
@@ -1128,7 +1143,10 @@ async function main() {
   }
   if (command === 'pre-push') {
     const input = fs.readFileSync(0, 'utf8');
-    const errors = validatePrePushUpdates(repoRoot, parsePrePushUpdates(input));
+    const updates=parsePrePushUpdates(input);
+    const hasDiagnosticSource=updates.some(update=>SHA1.test(update.localSha)&&spawnSync('git',['-C',repoRoot,'cat-file','-e',update.localSha+':.diagnostic-task.json']).status===0);
+    const diagnosticVerifier=hasDiagnosticSource?(await import('./agent-tools/diagnostic-receipt.mjs')).verifyDiagnosticOutgoing:undefined;
+    const errors = validatePrePushUpdates(repoRoot, updates, {diagnosticVerifier});
     if (errors.length) throw new Error(errors.join('\n'));
     process.stdout.write('Every outgoing commit tip has valid exact-SHA release evidence.\n');
     return;
