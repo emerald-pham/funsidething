@@ -419,6 +419,80 @@ test('keeps a failed child nonzero and reports its actual exit in the summary', 
   assert.equal((await readFile(summary.evidence.metadataPath, 'utf8')).includes(secret), false);
 });
 
+test('redacts synthetic secrets from every summary and provenance surface while preserving the child failure', async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'record-run-secret-surfaces-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(temp);
+  const evidence = path.join(temp, 'evidence');
+  const stdoutSecret = 'RECORDER-STDOUT-SECRET-415a';
+  const stderrSecret = 'RECORDER-STDERR-SECRET-730b';
+  const argumentSecret = 'RECORDER-ARGUMENT-SECRET-841c';
+  const sourceSecret = 'RECORDER-SOURCE-SECRET-952d';
+  const sourcePath = path.join(repo, 'src', 'evidence.test.mjs');
+  await writeFile(sourcePath, `export const token = "${sourceSecret}";\n`);
+  const child = `const token=process.argv[2];process.stdout.write('O'.repeat(64*1024)+' token='+token+' ${stdoutSecret}\\n');process.stderr.write('AssertionError: password='+token+' ${stderrSecret}\\n');process.exitCode=7;`;
+
+  const result = invokeRecorder({
+    repo,
+    evidence,
+    purpose: 'green',
+    command: node,
+    args: ['-e', child, '--', '--token', argumentSecret],
+    extraOptions: ['--summary', '--redact-pattern', stdoutSecret, '--redact-pattern', stderrSecret],
+  });
+
+  assert.equal(result.status, 7, result.stderr);
+  assert.ok(Buffer.byteLength(result.stdout) < 2048, 'summary output stays bounded while child output grows');
+  const summary = summaryFrom(result);
+  const serializedSummary = JSON.stringify(summary);
+  assert.equal(summary.status, 'failed');
+  assert.equal(summary.outcome, 'assertion-failure');
+  assert.equal(summary.wrapperExitCode, 7);
+  assert.deepEqual(summary.child, { exitCode: 7, signal: null });
+  assert.equal(summary.evidence.status, 'complete');
+  assert.equal(summary.source.identityStatus, 'complete');
+  assert.match(summary.source.diffSha256, /^[a-f0-9]{64}$/);
+  for (const secret of [stdoutSecret, stderrSecret, argumentSecret, sourceSecret]) {
+    assert.equal(serializedSummary.includes(secret), false, 'bounded console summary must be secret-free');
+  }
+
+  const recordPath = summary.evidence.metadataPath;
+  const recordBytes = await readFile(recordPath, 'utf8');
+  const record = JSON.parse(recordBytes);
+  assert.equal(record.execution.outcome, 'assertion-failure');
+  assert.equal(record.execution.exitCode, 7);
+  assert.equal(record.execution.signal, null);
+  assert.equal(record.git.commit, summary.source.commit);
+  assert.equal(record.workingTree.identity.status, 'complete');
+  assert.match(record.workingTree.sourceTestDiffSha256, /^[a-f0-9]{64}$/);
+  assert.equal(record.command.args.at(-2), '--token');
+  assert.equal(record.command.args.at(-1), '[REDACTED]');
+  assert.ok(record.redaction.locations['command.args[4]'] > 0);
+
+  const capturedSource = record.workingTree.sourceTestFiles.find((file) => file.path === 'src/evidence.test.mjs');
+  assert.ok(capturedSource, 'changed source remains part of the recorded provenance');
+  assert.equal(capturedSource.status, 'untracked');
+  assert.match(capturedSource.content, /token = \[REDACTED\]/);
+  assert.equal(capturedSource.content.includes(sourceSecret), false);
+  assert.match(record.execution.output.stdout, /^O{65536} token=\[REDACTED\] \[REDACTED\]$/m);
+  assert.equal(record.execution.output.stderr, 'AssertionError: password=[REDACTED] [REDACTED]\n');
+  assert.equal(await readFile(summary.evidence.stdoutPath, 'utf8'), record.execution.output.stdout);
+  assert.equal(await readFile(summary.evidence.stderrPath, 'utf8'), record.execution.output.stderr);
+
+  const evidenceFiles = await readdir(evidence);
+  assert.deepEqual(evidenceFiles.sort(), [path.basename(recordPath), path.basename(summary.evidence.stdoutPath), path.basename(summary.evidence.stderrPath)].sort());
+  for (const file of evidenceFiles) {
+    const bytes = await readFile(path.join(evidence, file), 'utf8');
+    for (const secret of [stdoutSecret, stderrSecret, argumentSecret, sourceSecret]) {
+      assert.equal(bytes.includes(secret), false, `${file} must not retain synthetic secrets`);
+    }
+  }
+  assert.equal(recordBytes.includes(stdoutSecret), false);
+  assert.equal(recordBytes.includes(stderrSecret), false);
+  assert.equal(recordBytes.includes(argumentSecret), false);
+  assert.equal(recordBytes.includes(sourceSecret), false);
+});
+
 test('reports a child signal as interruption while preserving its incomplete evidence', { skip: process.platform === 'win32' }, async (t) => {
   const temp = await mkdtemp(path.join(os.tmpdir(), 'record-run-summary-signal-'));
   t.after(() => rm(temp, { recursive: true, force: true }));
