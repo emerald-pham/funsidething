@@ -2978,6 +2978,22 @@ async function waitForNativeHistoryAck226(page,owner){
  try{return await result.jsonValue();}finally{await result.dispose();}
 }
 
+function startupCaptureProvenance(servedAssets,engine,browser){
+ const git=(...args)=>{const result=spawnSync('git',args,{cwd:__dirname,encoding:'utf8'});assert.equal(result.status,0,result.stderr||result.stdout);return result.stdout.trim();},files=new Set(['tests.js','scripts/agent-tools/rendered-evidence.mjs','scripts/installed-client-fixture.mjs','scripts/agent-tools/record-run.mjs','scripts/test-first-gate.mjs','scripts/test-group-inventory.json','scripts/test-group-assignments.json','TEST_CHANGE_RATIONALES.json','RISK_TEST_COVERAGE.md','package.json','package-lock.json','node_modules/playwright/package.json']);
+ for(const asset of servedAssets)if(asset.sourcePath&&!asset.sourcePath.startsWith('fixture:')&&!asset.sourcePath.startsWith('missing:'))files.add(asset.sourcePath);
+ const fileHashes=Object.fromEntries([...files].sort().map(file=>{const bytes=fs.readFileSync(path.join(__dirname,file));return[file,{bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')}];})),status=git('status','--porcelain','--untracked-files=all'),diff=git('diff','--binary','HEAD'),staged=git('diff','--cached','--binary');
+ const sourceIdentity={git:{commitSha:git('rev-parse','HEAD'),treeSha:git('rev-parse','HEAD^{tree}'),branch:git('rev-parse','--abbrev-ref','HEAD'),worktreeDirty:status.length>0,worktreeStatusSha256:createHash('sha256').update(status).digest('hex'),worktreeDiffSha256:createHash('sha256').update(diff).digest('hex'),stagedDiffSha256:createHash('sha256').update(staged).digest('hex')},files:fileHashes,callerCandidateShaLabel:process.env.CHAIN_NATIVE_CANDIDATE_SHA||null,sourceLabelSemantics:'callerCandidateShaLabel is metadata only; observed git identity and file hashes above bind the executed source'};
+ const assets=servedAssets.map(asset=>{const source=fileHashes[asset.sourcePath];return{...asset,sourceFileSha256:source?.sha256??null,sourceBindingStatus:source?(source.sha256===asset.sha256?'pass':'fail'):asset.sourcePath?.startsWith('fixture:')?'synthetic-fixture-bytes':asset.sourcePath?.startsWith('missing:')?'missing-file-response':'unbound-response'};});
+ const playwrightManifest=path.join(__dirname,'node_modules/playwright/package.json'),playwrightBytes=fs.readFileSync(playwrightManifest),playwright=JSON.parse(playwrightBytes);
+ return{sourceIdentity,runtime:{nodeVersion:process.version,nodeExecutable:process.execPath,playwright:{version:playwright.version,manifestPath:fs.realpathSync(playwrightManifest),manifestSha256:createHash('sha256').update(playwrightBytes).digest('hex')},browser:{engine,version:browser.version()}},servedAssets:assets,imageResponses:assets.filter(asset=>asset.resourceType==='image')};
+}
+
+async function settledStartupCaptureProvenance(servedAssets,responseJobs,responseBodies,blockedExternalRequests,engine,browser){
+ await Promise.all(responseJobs);const provenance=startupCaptureProvenance(servedAssets,engine,browser),browserResponses=responseBodies.map(response=>{const served=[...servedAssets].reverse().find(asset=>asset.url===response.url&&asset.resourceType===response.resourceType);return{...response,fulfilledBodySha256:served?.sha256??null,servedSourcePath:served?.sourcePath??null,servedStatus:served?.status??null,servedBodyMatches:!!served&&served.sha256===response.sha256&&served.status===response.status};});
+ assert.ok(browserResponses.every(response=>response.bodyStatus==='captured'&&response.servedBodyMatches),'actual browser response bodies must match the route-fulfilled asset hashes');assert.ok(provenance.servedAssets.every(asset=>!asset.sourcePath||asset.sourcePath.startsWith('fixture:')||asset.sourcePath.startsWith('missing:')||asset.sourceBindingStatus==='pass'),'served local app assets must match the current checkout bytes');
+ const imageResponses=browserResponses.filter(response=>response.resourceType==='image');return{...provenance,browserResponses,blockedExternalRequests,imageResponseCoverage:imageResponses.length?'Actual browser image-response bodies and hashes were observed.':'No actual browser image responses were requested by this startup consumer run.',imageResponseBodies:imageResponses};
+}
+
 async function runNativeRecoveryInspection226(t,width=390,holdDemoted=false,completeSource=null,automaticView=null,sharedBrowser=null){
  const {waitForTruthyProbe}=await import('./scripts/agent-tools/async-probe.mjs');
  const playwright=await import('playwright'),engine=(completeSource||automaticView)?(automaticView?.engine||process.env.CHAIN_RECOVERY_TEST_ENGINE||'chromium'):'chromium';assert.ok(['chromium','webkit'].includes(engine),'the native source consumer uses an existing supported engine');
@@ -2986,7 +3002,8 @@ async function runNativeRecoveryInspection226(t,width=390,holdDemoted=false,comp
  if(automaticView){remote.set('users/owner/generations/held-current',{...header,state:'published',baseRev:3});for(const chunk of chunks)remote.set('users/owner/generations/held-current/chunks/'+chunk.index,chunk);}
  let publicationAllowed=false,historyArmed=false,historyEntered=false;const historyGate=deferredSyncFixture();
  const boundedAck={armed:false,enteredAt:null,deliveredAt:null,observation:null},boundedAckDelivered=deferredSyncFixture();let boundedAckTimer=null,boundedAckOwner=null;const nativeHistoryOwners=[];
- const origin='https://recovery-inspection.invalid',prefix='/synthetic-sdk/';let armed=false,previousEntered=false,freshFinalEntered=false,demotedEntered=false,roots=0;
+ const origin='https://recovery-inspection.invalid',prefix='/synthetic-sdk/',servedAssets=[],blockedExternalRequests=[],browserResponseBodies=[],browserResponseJobs=[];let armed=false,previousEntered=false,freshFinalEntered=false,demotedEntered=false,roots=0;
+ page.on('response',response=>{browserResponseJobs.push((async()=>{try{const bytes=Buffer.from(await response.body()),headers=await response.allHeaders();browserResponseBodies.push({url:response.url(),resourceType:response.request().resourceType(),status:response.status(),contentType:headers['content-type']??null,bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),bodyStatus:'captured'});}catch(error){browserResponseBodies.push({url:response.url(),resourceType:response.request().resourceType(),status:response.status(),bodyStatus:'unavailable',reason:String(error)});}})());});
  t.after(async()=>{if(boundedAckTimer)await boundedAckDelivered.promise;if(boundedAckOwner)await boundedAckOwner.dispose();for(const owner of nativeHistoryOwners)await owner.dispose();if(automaticView?.boundedAck&&process.env.CHAIN_RECOVERY_UI_OUTPUT){fs.mkdirSync(process.env.CHAIN_RECOVERY_UI_OUTPUT,{recursive:true});fs.writeFileSync(path.join(process.env.CHAIN_RECOVERY_UI_OUTPUT,automaticView.theme+'-'+width+'-bounded-ack.json'),JSON.stringify(boundedAck,null,2));}try{await page.evaluate(()=>{closeModal();window.__releaseNativeRetry?.();});}catch{}current.resolve();previous.resolve();finalRoot.resolve();freshFinalRoot.resolve();demoted.resolve();historyGate.resolve();await context.close();if(ownsBrowser)await browser.close();});
  await context.exposeBinding('__installedRPC',async(_,kind,args)=>{const key=args?.[0];if(boundedAck.armed&&kind==='get'&&key==='users/owner/generations/held-current'){
   boundedAck.armed=false;boundedAck.enteredAt=Date.now();boundedAckOwner=await page.evaluateHandle(()=>window.__nativeHistoryBudget());
@@ -3017,7 +3034,8 @@ async function runNativeRecoveryInspection226(t,width=390,holdDemoted=false,comp
  });
 
  await context.addInitScript(raw=>{if(!localStorage.getItem('fvp:chain-scanner:device-store-v2')){localStorage.setItem('fvp:chain-scanner:v1',raw);localStorage.setItem('fvp:chain-scanner:protected:v1',raw);localStorage.setItem('fvp:chain-scanner:daily-backups:v1','[]');}},raw);
- await context.route('**/*',async route=>{const url=new URL(route.request().url()),file=url.pathname;if(url.origin!==origin)return route.abort();const module=file===prefix+'firebase-app.js'?sdk.appModule:file===prefix+'firebase-auth.js'?sdk.authModule:file===prefix+'firebase-firestore.js'?sdk.firestoreModule:null;if(module!==null)return route.fulfill({contentType:'application/javascript',body:automaticView&&file===prefix+'firebase-firestore.js'?module.replace("const rpc=(kind,args)=>window.__installedRPC(kind,args)","const rpc=async(kind,args)=>{const result=await window.__installedRPC(kind,args);if(result?.fixtureFailure)throw Object.assign(Error('Controlled SDK refusal'),{code:result.fixtureFailure});return result;}"):module});const relative=file==='/'?'index.html':file.slice(1);if(relative.includes('..')||!fs.existsSync(path.join(__dirname,relative)))return route.fulfill({status:404,body:''});return route.fulfill({body:fs.readFileSync(path.join(__dirname,relative)),contentType:relative.endsWith('.html')?'text/html':relative.endsWith('.js')?'application/javascript':relative.endsWith('.css')?'text/css':undefined});});
+ const fulfillAsset=async(route,body,contentType,sourcePath,status=200)=>{const bytes=Buffer.isBuffer(body)?body:Buffer.from(body),request=route.request();servedAssets.push({url:request.url(),resourceType:request.resourceType(),contentType:contentType??null,sourcePath,bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),status});return route.fulfill({status,body:bytes,...(contentType?{contentType}:{})});};
+ await context.route('**/*',async route=>{const request=route.request(),url=new URL(request.url()),file=url.pathname;if(url.origin!==origin){blockedExternalRequests.push({origin:url.origin,resourceType:request.resourceType()});return route.abort();}const module=file===prefix+'firebase-app.js'?sdk.appModule:file===prefix+'firebase-auth.js'?sdk.authModule:file===prefix+'firebase-firestore.js'?sdk.firestoreModule:null;if(module!==null){const body=automaticView&&file===prefix+'firebase-firestore.js'?module.replace("const rpc=(kind,args)=>window.__installedRPC(kind,args)","const rpc=async(kind,args)=>{const result=await window.__installedRPC(kind,args);if(result?.fixtureFailure)throw Object.assign(Error('Controlled SDK refusal'),{code:result.fixtureFailure});return result;}"):module;return fulfillAsset(route,body,'application/javascript','fixture:'+path.posix.basename(file));}const relative=file==='/'?'index.html':file.slice(1);if(relative.includes('..')||!fs.existsSync(path.join(__dirname,relative)))return fulfillAsset(route,Buffer.alloc(0),null,'missing:'+relative,404);const body=fs.readFileSync(path.join(__dirname,relative)),contentType=relative.endsWith('.html')?'text/html':relative.endsWith('.js')?'application/javascript':relative.endsWith('.css')?'text/css':undefined;return fulfillAsset(route,body,contentType,relative);});
  await page.goto(origin+'/');await page.locator('html[data-app-ready="true"]').waitFor();
  if(automaticView){
   page.on('pageerror',error=>{if(process.env.CHAIN_RECOVERY_UI_OUTPUT){fs.mkdirSync(process.env.CHAIN_RECOVERY_UI_OUTPUT,{recursive:true});fs.appendFileSync(path.join(process.env.CHAIN_RECOVERY_UI_OUTPUT,'debug.log'),error.stack+'\n');}});
@@ -3030,7 +3048,7 @@ async function runNativeRecoveryInspection226(t,width=390,holdDemoted=false,comp
    const later=structuredClone(prior);later.tasks.push({...structuredClone(prior.tasks[0]),id:'native-later-254',title:'Later readable source task'});
    const laterEncoded=await loadStorageV2().encodeSnapshot(JSON.stringify(later)),{chunks:laterChunks,...laterHeader}=laterEncoded,currentHeader={...laterHeader,state:'published',baseRev:3};
    remote.set('users/owner/generations/held-current',currentHeader);publicationAllowed=true;
-   const output=process.env.CHAIN_RECOVERY_UI_OUTPUT?path.resolve(process.env.CHAIN_RECOVERY_UI_OUTPUT):null,captures=[];if(output)fs.mkdirSync(output,{recursive:true});
+   const output=process.env.CHAIN_RECOVERY_UI_OUTPUT?path.resolve(process.env.CHAIN_RECOVERY_UI_OUTPUT):null,captures=[],renderedApi=output?await import('./scripts/agent-tools/rendered-evidence.mjs'):null,renderedSurfaces=[{name:'automatic-source-resume-status',selector:'#automaticCloudSourceResumeStatus',role:'changed-status',relationship:'persisted startup status shown beside a Settings reference control'},{name:'settings-scene-control',selector:'#modalRoot [data-act="scene-settings"]',role:'neighboring-control',relationship:'established Settings control adjacent to the changed status'}];if(output)fs.mkdirSync(output,{recursive:true});
    const capture=async(stage,expected)=>{
     await page.locator('[data-act="settings"]').first().click();const status=page.locator('#automaticCloudSourceResumeStatus'),neighbor=page.locator('#modalRoot [data-act="scene-settings"]');
     await status.waitFor();assert.match(await status.textContent(),expected);if(stage==='stopped')assert.doesNotMatch(await status.textContent(),/open Review cloud recovery/i,'a healthy-root historical status cannot direct users to an unavailable recovery action');await neighbor.focus();assert.equal(await neighbor.evaluate(el=>el===document.activeElement),true);
@@ -3040,8 +3058,10 @@ async function runNativeRecoveryInspection226(t,width=390,holdDemoted=false,comp
      await status.scrollIntoViewIfNeeded();const metrics=await status.evaluate(el=>{const pane=el.closest('.modal'),n=pane.querySelector('.settings-section > p.kv'),read=x=>{const st=getComputedStyle(x),r=x.getBoundingClientRect();return {fontFamily:st.fontFamily,fontSize:st.fontSize,lineHeight:st.lineHeight,color:st.color,height:r.height,width:r.width};};return {text:el.textContent,theme:document.documentElement.dataset.theme,scheme:getComputedStyle(document.documentElement).colorScheme,paint:getComputedStyle(pane).backgroundColor,overflow:pane.scrollWidth>pane.clientWidth+1,status:read(el),neighbor:read(n)};});
      assert.equal(metrics.theme,automaticView.theme);assert.ok(metrics.scheme.includes(automaticView.theme));assert.equal(metrics.overflow,false);assert.equal(metrics.status.fontFamily,metrics.neighbor.fontFamily);assert.ok(metrics.status.height>0);assert.match(metrics.text,expected);
      let fonts=null;if(engine==='chromium'){const cdp=await context.newCDPSession(page);await cdp.send('DOM.enable');await cdp.send('CSS.enable');const {root}=await cdp.send('DOM.getDocument',{depth:-1}),{nodeId}=await cdp.send('DOM.querySelector',{nodeId:root.nodeId,selector:'#automaticCloudSourceResumeStatus'});fonts=await cdp.send('CSS.getPlatformFontsForNode',{nodeId});await cdp.detach();}
-     if(output)await page.screenshot({path:path.join(output,automaticView.theme+'-'+width+'-'+stage+'-'+scale+'.png')});captures.push({stage,scale,...metrics,fonts});
+     let renderedEvidence=null;if(output){renderedEvidence=await renderedApi.captureRenderedState(page,{lifecycleState:'automatic recovery '+stage,expectedTheme:automaticView.theme,expectedViewport:{width,height:844},baseViewport:{width,height:844},mechanism:'diagnostic-css',scale,surfaces:renderedSurfaces,outputDirectory:output,fileName:automaticView.theme+'-'+width+'-'+stage+'-'+scale+'.png',timeoutMs:5000});assert.equal(renderedEvidence.metricsStatus,'pass','the actual startup status capture must remain stable at its requested theme and viewport');assert.equal(renderedEvidence.captureIntegrity,'pass','the saved PNG must retain complete dimensions, pixels, checksums and byte binding');}
+     captures.push({stage,scale,...metrics,fonts,renderedEvidence});
     }
+    if(output){const stageCaptures=captures.filter(capture=>capture.stage===stage),comparison=renderedApi.compareRenderedSurfaces(stageCaptures[0].renderedEvidence.observed.afterScreenshot,stageCaptures[1].renderedEvidence.observed.afterScreenshot,'diagnostic-css',renderedSurfaces,1.5);assert.ok(comparison.every(surface=>surface.metricsStatus==='pass'),'ordinary and enlarged named surfaces must both grow at the declared scale');}
     if(enlarged)await enlarged.evaluate(el=>el.remove());await page.locator('#modalRoot [data-act="close-modal"]').first().click();
     if(stage==='retrying'||stage==='checking')assert.equal(await page.evaluate(()=>cloudSourceRecoveryRead?.automaticHistoryResume===true&&!cloudSourceRecoveryRead.controller.signal.aborted),true,'closing ordinary Settings preserves the active bounded automatic source attempt');
    };
@@ -3075,7 +3095,7 @@ async function runNativeRecoveryInspection226(t,width=390,holdDemoted=false,comp
    await page.locator('#addInput').fill('Native unfinished status draft');await capture('later-edit',/not been confirmed by cloud/);assert.equal(await page.locator('#addInput').inputValue(),'Native unfinished status draft');await page.locator('#addInput').fill('');
    await page.locator('#syncBtn').click();await page.waitForFunction(()=>window.CloudSync.user===null);await capture('signed-out',/different signed-in account/);
    const signedOutCompletion=await waitForNativeHistoryAck226(page,ackOwner);assert.equal(signedOutCompletion.ok,false);assert.equal(signedOutCompletion.reason,'identity-changed','a prior completed owner cannot confirm after actual signout');
-   if(output)fs.writeFileSync(path.join(output,automaticView.theme+'-'+width+'-history.json'),JSON.stringify({source:process.env.CHAIN_NATIVE_CANDIDATE_SHA||'working-tree',indexSha256:createHash('sha256').update(fs.readFileSync(path.join(__dirname,'index.html'))).digest('hex'),engine,browser:browser.version(),captures,timerDelivery,boundedAck,ackCompletion,stoppedCompletion,staleCompletion,signedOutCompletion,limits:['actual native browser with isolated synthetic SDK','no production account or physical-device proof']},null,2));return;
+   if(output){const provenance=await settledStartupCaptureProvenance(servedAssets,browserResponseJobs,browserResponseBodies,blockedExternalRequests,engine,browser);fs.writeFileSync(path.join(output,automaticView.theme+'-'+width+'-history.json'),JSON.stringify({source:provenance.sourceIdentity.git.commitSha,sourceIdentity:provenance.sourceIdentity,runtime:provenance.runtime,servedAssets:provenance.servedAssets,browserResponses:provenance.browserResponses,imageResponseCoverage:provenance.imageResponseCoverage,imageResponseBodies:provenance.imageResponseBodies,blockedExternalRequests:provenance.blockedExternalRequests,engine,browser:browser.version(),captures,timerDelivery,boundedAck,ackCompletion,stoppedCompletion,staleCompletion,signedOutCompletion,limits:['actual native browser with isolated synthetic SDK','visual acceptance remains unverified pending independent judgment','DOM and frame observations cannot attest compositor/native screenshot atomicity or browser-provider honesty','no production account or physical-device proof']},null,2));}return;
   }
 
   await page.reload();await page.locator('html[data-app-ready="true"]').waitFor();
@@ -3091,16 +3111,24 @@ async function runNativeRecoveryInspection226(t,width=390,holdDemoted=false,comp
   const review=page.locator('#modalRoot [data-act="review-cloud-source-recovery"]'),neighbor=page.locator('#modalRoot [data-act="sync-signout"]');
   const focusForward=engine==='webkit'&&process.platform==='darwin'?'Alt+Tab':'Tab',focusBackward=engine==='webkit'&&process.platform==='darwin'?'Alt+Shift+Tab':'Shift+Tab';
   await review.focus();await page.keyboard.press(focusForward);assert.equal(await neighbor.evaluate(el=>el===document.activeElement),true,'native forward focus reaches the actual next recovery control');await page.keyboard.press(focusBackward);assert.equal(await review.evaluate(el=>el===document.activeElement),true,'native focus returns to the actual recovery action');
-  const output=process.env.CHAIN_RECOVERY_UI_OUTPUT?path.resolve(process.env.CHAIN_RECOVERY_UI_OUTPUT):null,observations=[];
+  const output=process.env.CHAIN_RECOVERY_UI_OUTPUT?path.resolve(process.env.CHAIN_RECOVERY_UI_OUTPUT):null,observations=[],renderedApi=output?await import('./scripts/agent-tools/rendered-evidence.mjs'):null,renderedSurfaces=[{name:'cloud-recovery-pending-status',selector:'#modalRoot .modal [role="status"]',role:'changed-status',relationship:'pending recovery warning beside its actual Review and neighboring Settings controls'},{name:'review-cloud-recovery-control',selector:'#modalRoot [data-act="review-cloud-source-recovery"]',role:'neighboring-reference-control',relationship:'established recovery action adjacent to the changed status'}];
   if(output)fs.mkdirSync(output,{recursive:true});
   await page.waitForFunction(()=>!document.getElementById('toast')?.classList.contains('show'),{},{timeout:15000});
   for(const scale of [1,1.5]){
    if(scale>1)await page.addStyleTag({content:'#modalRoot .modal{font-size:150%} #modalRoot .modal :is(p,button,label,summary,select,input){font-size:1em}'});
    const metrics=await page.evaluate(()=>{const modal=document.querySelector('#modalRoot .modal'),warning=[...modal.querySelectorAll('[role="status"]')].find(el=>el.textContent.includes('Cloud recovery is pending')),control=modal.querySelector('[data-act="review-cloud-source-recovery"]'),neighbor=modal.querySelector('[data-act="sync-signout"]'),read=el=>{const s=getComputedStyle(el),r=el.getBoundingClientRect();return {text:el.textContent,fontFamily:s.fontFamily,fontSize:s.fontSize,fontWeight:s.fontWeight,lineHeight:s.lineHeight,color:s.color,background:s.backgroundColor,height:r.height,width:r.width,left:r.left,right:r.right,border:s.border,radius:s.borderRadius,padding:s.padding};};return {theme:document.documentElement.dataset.theme,scheme:getComputedStyle(document.documentElement).colorScheme,paint:getComputedStyle(modal).backgroundColor,viewport:{width:innerWidth,height:innerHeight},overflow:modal.scrollWidth>modal.clientWidth+1,warning:read(warning),control:read(control),neighbor:read(neighbor)};});
    assert.equal(metrics.theme,automaticView.theme);assert.ok(metrics.scheme.includes(automaticView.theme));assert.equal(metrics.overflow,false,'status and adjacent controls fit the actual Settings pane');assert.equal(metrics.control.fontFamily,metrics.neighbor.fontFamily);assert.equal(metrics.control.fontSize,metrics.neighbor.fontSize);assert.ok(metrics.warning.height>0);
-   await warning.scrollIntoViewIfNeeded();if(output)await page.screenshot({path:path.join(output,automaticView.theme+'-'+width+'-'+scale+'.png')});observations.push({scale,...metrics});
+   await warning.scrollIntoViewIfNeeded();let renderedEvidence=null;if(output){
+    if(automaticView.captureProbe&&scale===1.5){
+     const screenshot=page.screenshot.bind(page);page.screenshot=async options=>{page.screenshot=screenshot;await page.evaluate(async expected=>{const root=document.documentElement,original=root.dataset.theme;root.dataset.theme=original==='light'?'dark':'light';await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));root.dataset.theme=expected;await new Promise(resolve=>requestAnimationFrame(resolve));},automaticView.theme);return screenshot(options);};
+    }
+    renderedEvidence=await renderedApi.captureRenderedState(page,{lifecycleState:'persisted startup recovery-pending status',expectedTheme:automaticView.theme,expectedViewport:{width,height:844},baseViewport:{width,height:844},mechanism:'diagnostic-css',scale,surfaces:renderedSurfaces,outputDirectory:output,fileName:automaticView.theme+'-'+width+'-'+scale+'.png',timeoutMs:5000});
+    assert.equal(renderedEvidence.captureIntegrity,'pass','actual startup PNG must retain complete dimensions, pixels, checksums and captured-to-saved byte binding');assert.equal(renderedEvidence.checks.screenshotFileBound,true);
+    assert.equal(renderedEvidence.metricsStatus,automaticView.captureProbe&&scale===1.5?'fail':'pass',automaticView.captureProbe&&scale===1.5?'a transient theme flip during capture must fail metrics after restoration':'stable current startup captures must pass bounded theme, viewport and named-surface metrics');
+   }observations.push({scale,...metrics,renderedEvidence});
   }
   assert.ok(parseFloat(observations[1].warning.fontSize)>parseFloat(observations[0].warning.fontSize),'enlarged observation changes actual status text size');
+  let renderedSurfaceComparisons=null;if(output){renderedSurfaceComparisons=renderedApi.compareRenderedSurfaces(observations[0].renderedEvidence.observed.afterScreenshot,observations[1].renderedEvidence.observed.afterScreenshot,'diagnostic-css',renderedSurfaces,1.5);assert.ok(renderedSurfaceComparisons.every(surface=>surface.metricsStatus==='pass'),'ordinary and enlarged named startup surfaces must both increase measured text size and line or box height');}
   let fonts={status:'unavailable'};if(engine==='chromium'){const session=await context.newCDPSession(page);await session.send('DOM.enable');await session.send('CSS.enable');const {root}=await session.send('DOM.getDocument',{depth:-1});const {nodeId}=await session.send('DOM.querySelector',{nodeId:root.nodeId,selector:'#modalRoot [data-act="review-cloud-source-recovery"]'});fonts={status:'observed',...(await session.send('CSS.getPlatformFontsForNode',{nodeId}))};await session.detach();}
   await page.locator('#modalRoot [data-act="close-modal"]').first().click();assert.equal(await page.locator('#addInput').inputValue(),draft,'Settings inspection and asynchronous recovery preserve the native unfinished draft');
   assert.equal(await page.evaluate(async()=>JSON.parse((await ScannerDeviceStore.readHead()).payload).tasks.some(row=>row.title==='Native accepted recovery edit')),true,'native accepted edit reaches the durable head before restart');
@@ -3119,7 +3147,7 @@ async function runNativeRecoveryInspection226(t,width=390,holdDemoted=false,comp
   await page.mouse.wheel(0,Math.floor(scrolling[0].height/2));await page.waitForFunction(()=>document.getElementById('listBody').scrollTop>0);scrolling.push(await listObservation());
   await page.mouse.wheel(0,scrolling[0].height);await page.waitForFunction(()=>{const el=document.getElementById('listBody');return el.scrollTop+el.clientHeight>=el.scrollHeight-2;});scrolling.push(await listObservation());
   assert.ok(scrolling[1].top>scrolling[0].top&&scrolling[2].top>scrolling[1].top,'native wheel reaches top middle and end task positions');assert.ok(scrolling.every(row=>!row.overflow&&row.visible.length>0),'actual complete task rows remain visible and contained at every scroll position');
-  if(output)fs.writeFileSync(path.join(output,automaticView.theme+'-'+width+'.json'),JSON.stringify({source:process.env.CHAIN_NATIVE_CANDIDATE_SHA||'working-tree',indexSha256:createHash('sha256').update(fs.readFileSync(path.join(__dirname,'index.html'))).digest('hex'),engine,browser:browser.version(),observations,fonts,scrolling,acknowledgement,originalArchives,finalArchives,acceptedHash:createHash('sha256').update(accepted).digest('hex'),limits:['synthetic SDK and isolated native browser','no physical-device or affected-account proof']},null,2));
+  if(output){const provenance=await settledStartupCaptureProvenance(servedAssets,browserResponseJobs,browserResponseBodies,blockedExternalRequests,engine,browser);fs.writeFileSync(path.join(output,automaticView.theme+'-'+width+'.json'),JSON.stringify({source:provenance.sourceIdentity.git.commitSha,sourceIdentity:provenance.sourceIdentity,runtime:provenance.runtime,servedAssets:provenance.servedAssets,browserResponses:provenance.browserResponses,imageResponseCoverage:provenance.imageResponseCoverage,imageResponseBodies:provenance.imageResponseBodies,blockedExternalRequests:provenance.blockedExternalRequests,observations,renderedSurfaceComparisons,fonts,scrolling,acknowledgement,originalArchives,finalArchives,acceptedHash:createHash('sha256').update(accepted).digest('hex'),limits:['synthetic SDK and isolated native browser','visual acceptance remains unverified pending independent judgment','DOM and frame observations cannot attest compositor/native screenshot atomicity or browser-provider honesty','no physical-device or affected-account proof']},null,2));}
   return;
  }
  await page.waitForFunction(()=>typeof state!=='undefined'&&state?.tasks.length===64&&CloudSync.ready===true&&CloudSync.errorCode==='corrupt-generation');
@@ -3167,6 +3195,8 @@ async function runNativeRecoveryInspection226(t,width=390,holdDemoted=false,comp
 
 async function runNativeRecoveryInspectionMatrix226(t,engine,viewForCase){
  const playwright=await import('playwright'),browserType=playwright[engine],originalLaunch=browserType.launch,launches=[],contexts=[],pages=[];let sharedBrowser=null;
+ const cases=[['light',390],['dark',390],['light',1280],['dark',1280]],probeCase=process.env.CHAIN_RECOVERY_UI_CAPTURE_PROBE,selectedCases=probeCase?cases.filter(([theme,width])=>`${theme}-${width}`===probeCase):cases;
+ assert.equal(selectedCases.length,probeCase?1:4,'a focused rendered capture probe selects one existing theme and viewport case');
  browserType.launch=async function(...args){
   const browser=await originalLaunch.apply(this,args);launches.push(browser);const newContext=browser.newContext.bind(browser);
   browser.newContext=async function(...contextArgs){
@@ -3176,10 +3206,10 @@ async function runNativeRecoveryInspectionMatrix226(t,engine,viewForCase){
  };
  t.after(async()=>{browserType.launch=originalLaunch;if(sharedBrowser)await sharedBrowser.close();});
  sharedBrowser=await browserType.launch({headless:true});
- for(const [theme,width]of [['light',390],['dark',390],['light',1280],['dark',1280]])await t.test(theme+' '+width,sub=>runNativeRecoveryInspection226(sub,width,false,null,viewForCase(theme,width),sharedBrowser));
- assert.equal(contexts.length,4,'each theme/viewport scenario must create its own fresh browser context');assert.equal(new Set(contexts).size,4,'theme/viewport scenarios cannot share browser context state');
- assert.equal(pages.length,4,'each theme/viewport scenario must create its own page');assert.equal(new Set(pages).size,4,'theme/viewport scenarios cannot share page state');
- assert.equal(launches.length,1,'all four independent theme/viewport scenarios should reuse one browser process');assert.equal(launches[0],sharedBrowser);
+ for(const [theme,width]of selectedCases)await t.test(theme+' '+width,sub=>runNativeRecoveryInspection226(sub,width,false,null,viewForCase(theme,width),sharedBrowser));
+ assert.equal(contexts.length,selectedCases.length,'each selected theme/viewport scenario must create its own fresh browser context');assert.equal(new Set(contexts).size,selectedCases.length,'theme/viewport scenarios cannot share browser context state');
+ assert.equal(pages.length,selectedCases.length,'each selected theme/viewport scenario must create its own page');assert.equal(new Set(pages).size,selectedCases.length,'theme/viewport scenarios cannot share page state');
+ assert.equal(launches.length,1,'selected independent theme/viewport scenarios should reuse one browser process');assert.equal(launches[0],sharedBrowser);
 }
 
 test('RISK automatic source status native: historical retry checking stop and confirmation remain current',
@@ -3189,7 +3219,7 @@ async t=>{
 });
 
 test('RISK integrated automatic recovery native: persisted startup status and neighboring controls remain usable with one browser and isolated contexts',async t=>{const engine=process.env.CHAIN_RECOVERY_TEST_ENGINE||'chromium';
- await runNativeRecoveryInspectionMatrix226(t,engine,(theme,width)=>({theme,engine}));
+ await runNativeRecoveryInspectionMatrix226(t,engine,(theme,width)=>({theme,engine,captureProbe:process.env.CHAIN_RECOVERY_UI_CAPTURE_PROBE===`${theme}-${width}`}));
 });
 
 test('RISK cloud source inspection: native asynchronous updates retain focus disclosure scroll and current source roles',async t=>runNativeRecoveryInspection226(t));
@@ -27229,13 +27259,16 @@ test('Consistency repair: cloud adoption waits for an edit and retains a history
  const now=Date.now(),remote=cloudState(now),h=makeSyncHarness({remote,rev:9});remote.syncRev=9;
  const {ctx,shim}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(remote)},cloudSyncFactory:h.factory});await ctx.cloudPull();
  const id=ctx.state.tasks[0].id;ctx.openEdit(id);fillEditPane(ctx,shim,{title:'Saved draft'});
- let editing=true;shim.document.querySelector=selector=>selector.includes('.mback')&&editing?{}:null;
- const newer=JSON.parse(ctx.cloudPayload());newer.tasks=newer.tasks.filter(t=>t.id!==id);newer.chain=newer.chain.filter(t=>t!==id);h.writeBehindBack(newer);
- await ctx.cloudPull();assert.ok(ctx.state.tasks.some(t=>t.id===id));
- ctx.cloudPushNow();await syncSettle(20);assert.equal(h.remoteState().tasks.some(t=>t.id===id),false,'deferred reconciliation cannot overwrite a remote change during editing');
- editing=false;ctx.onAction('save-edit',{dataset:{id}});await syncSettle(40);
- assert.equal(ctx.state.tasks.some(t=>t.id===id),true,'absence without explicit deletion cannot discard the task');
- assert.equal(ctx.state.tasks.find(t=>t.id===id).title,'Saved draft');
+ const originalQuery=shim.document.querySelector,delegateQuery=originalQuery.bind(shim.document);
+ shim.document.querySelector=selector=>selector==='.mback, dialog[open]'&&shim.document.getElementById('modalRoot').innerHTML?{}:delegateQuery(selector);
+ try{
+  const newer=JSON.parse(ctx.cloudPayload());newer.tasks=newer.tasks.filter(t=>t.id!==id);newer.chain=newer.chain.filter(t=>t!==id);h.writeBehindBack(newer);
+  await ctx.cloudPull();assert.ok(ctx.state.tasks.some(t=>t.id===id));
+  ctx.cloudPushNow();await syncSettle(20);assert.equal(h.remoteState().tasks.some(t=>t.id===id),false,'deferred reconciliation cannot overwrite a remote change during editing');
+  ctx.onAction('save-edit',{dataset:{id}});await syncSettle(40);
+  assert.equal(ctx.state.tasks.some(t=>t.id===id),true,'absence without explicit deletion cannot discard the task');
+  assert.equal(ctx.state.tasks.find(t=>t.id===id).title,'Saved draft');
+ }finally{shim.document.querySelector=originalQuery;}
 });
 test('Consistency repair: Add and dot establishes the 2 AM clock and honors single-mode preference',async()=>{
  const {ctx}=await loadApp();const at=new Date(2026,8,16,1).getTime();setFakeTime(ctx,at);ctx.addTask('Candidate');ctx.addTask('Urgent',true);ctx.state.snooze=100;
@@ -27541,12 +27574,20 @@ test('Update toast: fresh install is quiet, changed release notifies once and re
 test('Update toast: waits for visible app and closed editor, then survives blocked storage',async()=>{
  const {ctx,shim}=await loadApp({seedStorage:{[updateNoticeKey]:'old-release'},beforeStateReady(c,s){prepareReleaseNotice(c,s);s.document.hidden=true;}});
  assert.equal(shim.localStorage.getItem(updateNoticeKey),'old-release');
- shim.document.hidden=false;shim.document.querySelector=()=>({});ctx.showAppUpdateNotice();
+ const task=ctx.addTask('Update notice editor');ctx.openEdit(task.id);const title=shim.document.getElementById('etTitle');title.value='Unsaved editor draft';
+ const originalQuery=shim.document.querySelector,delegateQuery=originalQuery.bind(shim.document),savedViewStatus='[data-saved-preview] .syncbtn';
+ assert.equal(delegateQuery(savedViewStatus),null,'the shim has no saved-view status node');
+ shim.document.querySelector=selector=>selector==='.mback, dialog[open]'&&shim.document.getElementById('modalRoot').innerHTML?{}:delegateQuery(selector);
+ shim.document.hidden=false;ctx.showAppUpdateNotice();
  assert.equal(shim.localStorage.getItem(updateNoticeKey),'old-release');
- shim.document.querySelector=()=>null;shim.localStorage.setItem=()=>{throw Error('blocked');};
+ assert.equal(shim.document.querySelector(savedViewStatus),null,'unrelated saved-view selector delegates to the original shim result');
+ assert.equal(title.value,'Unsaved editor draft','the real update-notice consumer leaves the editor draft untouched');
+ shim.localStorage.setItem=()=>{throw Error('blocked');};
+ ctx.closeModal();shim.document.querySelector=originalQuery;
  assert.doesNotThrow(()=>ctx.showAppUpdateNotice());
  assert.match(shim.elements.get('toast').textContent,/App updated/);
  shim.elements.get('toast').textContent='other';ctx.showAppUpdateNotice();assert.equal(shim.elements.get('toast').textContent,'other');
+ assert.strictEqual(shim.document.querySelector,originalQuery,'the update-notice selector is restored after the simulated editor');
 });
 test('Update toast: existing installations without release tracking get the first announcement',async()=>{
  const old=await loadApp();const saved=JSON.stringify(old.ctx.state);
@@ -28525,16 +28566,23 @@ test('RISK synced scene: an open editor defers another tab scene adoption until 
  const storage=sharedScannerStorage();
  const first=await loadApp({withSceneModules:true,sharedStorage:storage});
  const second=await loadApp({withSceneModules:true,sharedStorage:storage});
+ const task=second.ctx.addTask('Scene adoption editor');second.ctx.openEdit(task.id);
+ const draft=second.shim.document.getElementById('etTitle');draft.value='Keep the editor open';
+ const originalQuery=second.shim.document.querySelector,delegateQuery=originalQuery.bind(second.shim.document);
+ second.shim.document.querySelector=selector=>selector==='.mback, dialog[open]'&&second.shim.document.getElementById('modalRoot').innerHTML?{}:delegateQuery(selector);
+ try{
  first.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'sunrise',season:'winter'}});
  await first.ctx.persist();
- second.shim.document.querySelector=()=>({}); // an active dialog or edit form
  second.shim.window.dispatchEvent({type:'storage',key:SYNC_STORE_KEY,newValue:storage.getItem(SYNC_STORE_KEY)});
  assert.equal(second.ctx.state.settings.scene.time,null,'do not replace a board underneath an editor');
- second.shim.document.querySelector=()=>null;
+ assert.equal(draft.value,'Keep the editor open','scene adoption cannot replace the active editor draft');
+ assert.equal(second.shim.document.querySelector('[data-saved-preview] .syncbtn'),null,'an unrelated selector keeps the shim result');
+ second.ctx.closeModal();
  second.shim.document.dispatchEvent({type:'focusout'});
  await flush();
  assert.equal(second.ctx.state.settings.scene.time,'sunrise');
  assert.equal(second.shim.localStorage.getItem('fvp:chain-scanner:scene-season'),'winter');
+ }finally{second.shim.document.querySelector=originalQuery;}
 });
 
 test('RISK synced scene: a legacy cloud board adopts existing device choices before publishing',async()=>{
@@ -28873,6 +28921,76 @@ test('RISK landscape water browser: GPU distortion preserves contact and sharp p
  }finally{await browser.close();}
 });
 
+// Deliberately narrow source check for the known mechanical fixture error:
+// direct document query assignments whose simple single-parameter
+// arrow/function callback returns an object, array, null, or an identifier
+// without using its selector parameter. It does not parse arbitrary JavaScript
+// control flow, aliases, or computed assignments, does not tokenize comments
+// and strings, and cannot prove delegation/restoration; fixtures check those.
+function findSelectorBlindDocumentQueries(source,sourceName){
+ const assignment=/(?:\b[$A-Z_a-z][$\w]*\.)*\bdocument\.(querySelectorAll|querySelector)\s*=\s*/g,findings=[];
+ for(const match of source.matchAll(assignment)){
+  const callback=source.slice(match.index+match[0].length);
+  const arrow=callback.match(/^(?:\(\s*([$A-Z_a-z][$\w]*)?\s*\)|([$A-Z_a-z][$\w]*))\s*=>/);
+  const fn=arrow?null:callback.match(/^function(?:\s+[$A-Z_a-z][$\w]*)?\s*\(\s*([$A-Z_a-z][$\w]*)?\s*\)\s*\{/);
+  if(!arrow&&!fn)continue;
+  const parameter=arrow?(arrow[1]||arrow[2]||null):(fn[1]||null),body=callback.slice(arrow?arrow[0].length:fn[0].length);
+  const block=body.match(/^\s*\{\s*return\s+([^;\n]+)\s*;?\s*\}/);
+  const returned=fn?body.match(/^\s*return\s+([^;\n]+)\s*;?\s*\}/):null;
+  const expression=block?.[1]||returned?.[1]||body.match(/^\s*\(?\s*(null\b|\{[^;\n]*\}|\[[^\]\n]*\]|[$A-Z_a-z][$\w]*)\s*\)?\s*(?=[;,\n]|$)/)?.[1];
+  const value=expression?.trim().replace(/^\((.*)\)$/,'$1').trim();
+  const blind=!!value&&(/^(?:null\b|\{[^\n]*\}|\[[^\]\n]*\])/.test(value)||
+    /^[$A-Z_a-z][$\w]*$/.test(value)&&value!==parameter);
+  if(blind){
+   const line=source.slice(0,match.index).split('\n').length;
+   findings.push(`${sourceName}:${line}: document.${match[1]} has a selector-blind object, array, null, or identifier result`);
+  }
+ }
+ return findings;
+}
+
+test('RISK repository process: document query fixtures stay selector scoped and preserve shim results',async()=>{
+ const assignment=(method,callback)=>['shim.document.',method,'=',callback,';'].join('');
+ const blind=[
+  assignment('querySelector','()=>({nodeType:1})'),
+  assignment('querySelector','(selector)=>null'),
+  assignment('querySelector','selector=>cachedModal'),
+  assignment('querySelectorAll','function(selector){return [button];}')
+ ];
+ for(const source of blind)assert.equal(findSelectorBlindDocumentQueries(source,'fixture').length,1,`known selector-blind object, null, identifier, and list stubs are detected: ${source}`);
+ const scoped=['const original=shim.document.querySelector.bind(shim.document);','shim.document.','querySelector','=','selector=>selector===".mback"?{}:original(selector);'].join('');
+ assert.deepEqual(findSelectorBlindDocumentQueries(scoped,'fixture'),[],'a selector-specific override that delegates other selectors is allowed');
+ assert.deepEqual(findSelectorBlindDocumentQueries(assignment('querySelector','selector=>selector'),'fixture'),[],'a callback that returns the requested selector is not a constant fixture');
+
+ const root=path.dirname(fileURLToPath(import.meta.url)),toolTests=fs.readdirSync(path.join(root,'scripts/agent-tools')).filter(name=>name.endsWith('.test.mjs')).sort();
+ const maintainedTests=['tests.js',...toolTests.map(name=>`scripts/agent-tools/${name}`)];
+ const findings=maintainedTests.flatMap(file=>findSelectorBlindDocumentQueries(fs.readFileSync(path.join(root,file),'utf8'),file));
+ assert.deepEqual(findings,[],`maintained test sources contain selector-blind document query stubs:\n${findings.join('\n')}`);
+
+ const {ctx,shim}=await loadApp({seedStorage:{[updateNoticeKey]:'old-release'},beforeStateReady(c,s){prepareReleaseNotice(c,s);s.document.hidden=true;}});
+ const task=ctx.addTask('Selector fixture draft');ctx.openEdit(task.id);
+ const title=shim.document.getElementById('etTitle');title.value='Keep this editor draft';
+ const originalQuery=shim.document.querySelector,delegateQuery=originalQuery.bind(shim.document),originalQueryAll=shim.document.querySelectorAll,delegateQueryAll=originalQueryAll.bind(shim.document);
+ const unrelated='[data-saved-preview] .syncbtn',underlying=delegateQuery(unrelated),underlyingAll=delegateQueryAll('[data-selector-contract-unrelated]'),modal={nodeType:1};
+ assert.equal(underlying,null,'the lightweight app shim has no unrelated saved-view status node');
+ shim.document.querySelector=selector=>selector==='.mback, dialog[open]'&&shim.document.getElementById('modalRoot').innerHTML?modal:delegateQuery(selector);
+ shim.document.querySelectorAll=selector=>selector==='[data-selector-contract-picked]'?[modal]:delegateQueryAll(selector);
+ try{
+  shim.document.hidden=false;ctx.showAppUpdateNotice();
+  assert.equal(shim.localStorage.getItem(updateNoticeKey),'old-release','the real app consumer defers its announcement under the editor');
+  assert.equal(shim.document.querySelector(unrelated),underlying,'an unrelated selector keeps the shim result, including null');
+  assert.equal(title.value,'Keep this editor draft','the real consumer cannot replace the active editor draft');
+  assert.deepEqual(shim.document.querySelectorAll('[data-selector-contract-unrelated]'),underlyingAll,'an unrelated list selector keeps its shim result');
+  assert.strictEqual(shim.document.querySelectorAll('[data-selector-contract-picked]')[0],modal);
+ }finally{
+  shim.document.querySelector=originalQuery;shim.document.querySelectorAll=originalQueryAll;
+ }
+ assert.strictEqual(shim.document.querySelector,originalQuery,'the saved document selector is restored after the simulated modal');
+ assert.strictEqual(shim.document.querySelectorAll,originalQueryAll,'the saved document list selector is restored after the simulated modal');
+ assert.equal(shim.document.querySelector(unrelated),underlying,'restoration returns to the exact original selector behavior');
+ assert.equal(title.value,'Keep this editor draft');
+});
+
 test('RISK repository process: npm test fails when an agent-tool cohort assertion fails',async t=>{
  const root=path.dirname(fileURLToPath(import.meta.url)),os=await import('node:os');
  const fixture=fs.mkdtempSync(path.join(os.tmpdir(),'funsidething-agent-tool-cohort-'));
@@ -28888,6 +29006,19 @@ test('RISK repository process: npm test fails when an agent-tool cohort assertio
  const output=[result.stdout,result.stderr].filter(Boolean).join('\n');
  assert.notEqual(result.status,0,`npm test passed despite a failing agent-tool cohort:\n${output}`);
  assert.match(output,/synthetic agent-tool cohort assertion failed/);
+});
+
+test('RISK repository process: coordination rejects misspelled resource options before side effects',()=>{
+ const root=path.dirname(fileURLToPath(import.meta.url));
+ const selected='begin rejects the singular resource typo before launching git or mutating ledger bytes';
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap',`--test-name-pattern=^${selected}$`,path.join(root,'scripts/agent-tools/coordination.test.mjs')],{cwd:root,encoding:'utf8',timeout:30000,maxBuffer:4*1024*1024,env});
+ const output=[result.stdout,result.stderr].filter(Boolean).join('\n');
+ assert.equal(result.error,undefined,result.error?.message);
+ assert.equal(result.status,0,output);
+ assert.match(output,/^# Subtest: begin rejects the singular resource typo before launching git or mutating ledger bytes$/m);
+ assert.match(output,/^# pass 1$/m);
+ assert.match(output,/^# fail 0$/m);
 });
 
 test('RISK regression gate: changing existing tests requires a specific reason and replacement coverage',async()=>{
@@ -29247,6 +29378,8 @@ test('RISK repository process: release recording classifies the tail of a comple
    'release:verify':'node scripts/release-evidence.mjs verify'
   }}));
   fs.copyFileSync(path.join(__dirname,'scripts/release-evidence.mjs'),path.join(fixture.repo,'scripts/release-evidence.mjs'));
+  fs.mkdirSync(path.join(fixture.repo,'scripts/agent-tools'),{recursive:true});
+  fs.copyFileSync(path.join(__dirname,'scripts/agent-tools/checkpoint-progress.mjs'),path.join(fixture.repo,'scripts/agent-tools/checkpoint-progress.mjs'));
   const inputPath=path.join(fixture.root,'release-input.json');
   fs.writeFileSync(inputPath,JSON.stringify(riskBasedReleaseInput(fixture,{domains:['security-deployment']}),null,2)+'\n');
   return { ...fixture,inputPath,receiptPath:path.join(fixture.repo,'.git','funsidething-release-evidence',fixture.candidateSha,'receipt.json') };
@@ -32286,16 +32419,24 @@ test('RISK PWA SYNC RESUME: restoration preserves editor drafts and sign-out whi
  await fixtureDeadline(async wait=>{while(vm.runInContext('automaticCloudFallbackBootCapturePending',app.ctx))await wait();},'durable startup completes before the wake/editor gesture');
  const h=await loadCloudBackendV2({runtimeWindow:app.ctx.window,rootData:null,timeoutMs:200});
  app.shim.window.CloudSync=h.CS;
+ const task=app.ctx.addTask('Wake editor');app.ctx.openEdit(task.id);
+ const draft=app.shim.document.getElementById('etTitle');draft.value='Keep this wake-time draft';
+ const originalQuery=app.shim.document.querySelector,delegateQuery=originalQuery.bind(app.shim.document);
+ app.shim.document.querySelector=selector=>selector==='.mback, dialog[open]'&&app.shim.document.getElementById('modalRoot').innerHTML?{}:delegateQuery(selector);
+ try{
  app.shim.document.hidden=true;app.shim.window.dispatchEvent({type:'pagehide'});
- app.shim.document.hidden=false;app.shim.document.querySelector=()=>({});
+ app.shim.document.hidden=false;
  app.shim.window.dispatchEvent({type:'pageshow',persisted:true});await syncSettle(20);
  assert.equal(h.network.filter(row=>row.startsWith('server:')).length,0,'open drafts defer cloud adoption');
- app.shim.document.querySelector=()=>null;app.shim.document.dispatchEvent({type:'focusout'});await syncSettle(20);
+ assert.equal(draft.value,'Keep this wake-time draft','wake does not replace an active editor draft');
+ assert.equal(app.shim.document.querySelector('[data-saved-preview] .syncbtn'),null,'an unrelated selector keeps the shim result');
+ app.ctx.closeModal();app.shim.document.dispatchEvent({type:'focusout'});await syncSettle(20);
  assert.ok(h.network.some(row=>row==='server:users/owner'),'closing the editor releases reconciliation');
  app.shim.document.hidden=true;app.shim.window.dispatchEvent({type:'pagehide'});
  h.auth.currentUser=null;h.CS.user=null;h.CS.status='signed-out';
  app.shim.document.hidden=false;app.shim.window.dispatchEvent({type:'pageshow',persisted:true});await syncSettle(20);
  assert.equal(h.CS.status,'signed-out','wake never revives a previous account');
+ }finally{app.shim.document.querySelector=originalQuery;}
 });
 
 
@@ -33231,7 +33372,10 @@ async function exerciseCompletionEditorBoundaries(t,nativeOnly=false,holdAcknowl
  const pending=ctx.cloudPull();await readStarted;
  const paintsBeforeEditorPull=paints.length,scanBeforeEditorPull=scan.innerHTML,chainBeforeEditorPull=[...ctx.state.chain];
  hydrateUnchangedEditorDraft(app,peerId);const title=shim.document.getElementById('etTitle'),due=shim.document.getElementById('etDue');
- shim.document.querySelector=()=>({}); // The lightweight DOM does not derive .mback from modal markup.
+ const originalQuery=shim.document.querySelector,delegateQuery=originalQuery.bind(shim.document),savedViewStatus='[data-saved-preview] .syncbtn';
+ t.after(()=>{shim.document.querySelector=originalQuery;});
+ assert.equal(delegateQuery(savedViewStatus),null,'the fixture has no saved-view status node until its startup consumer adds one');
+ shim.document.querySelector=selector=>selector==='.mback, dialog[open]'&&shim.document.getElementById('modalRoot').innerHTML?{}:delegateQuery(selector);
  title.value='Editor draft during delayed recovery';due.value='2026-11-02';
  releaseRead();await pending;CS.pull=basePull;
  assert.equal(shim.document.getElementById('etTitle').value,'Editor draft during delayed recovery','the editor draft remains open when the stale response arrives');
@@ -33240,8 +33384,9 @@ async function exerciseCompletionEditorBoundaries(t,nativeOnly=false,holdAcknowl
  assert.equal(scan.innerHTML,scanBeforeEditorPull,'the scanner remains exactly as shown before the held read');
  assert.equal(ctx.state.tasks.find(row=>row.id===peerId).title,'Independent peer task','cloud content cannot replace the active editor under its draft');
  assert.equal(vm.runInContext('deferredCloudPull',ctx),true,'the cloud adoption waits for the editor close boundary');
+ assert.equal(shim.document.querySelector(savedViewStatus),null,'an unrelated saved-view selector preserves the original shim result');
  if(nativeOnly){await oldEntered.promise;const pendingHead=await store.readHead();assert.equal(pendingHead.payload,nativeSource,'the held real native save already protects the original Done and theme before editor Save');}
- shim.document.querySelector=()=>null;
+ shim.document.querySelector=originalQuery;
  phase='editor-save-and-deferred-adoption';
  const schedule=ctx.setTimeout;
  // Observe the real Save callback and its persistence result. Let the native
@@ -41440,6 +41585,28 @@ test('RISK repository process: preflight catches outgoing upstream rationale gap
  assert.deepEqual({refs:git('show-ref'),head:git('rev-parse','HEAD'),status:git('status','--porcelain','--untracked-files=no'),config:git('config','--local','--list')},before,'preflight preserves local refs, HEAD, tracked files and configuration');
 });
 
+test('RISK repository process: local preflight rejects stale FAQ and unassigned roots before qualification',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,[
+  '--test','--test-reporter=tap',
+  '--test-name-pattern=^preflight reports the existing FAQ length failure before full regression$',
+  path.join(__dirname,'scripts/agent-tools/preflight.test.mjs')
+ ],{cwd:__dirname,encoding:'utf8',env,timeout:30000,maxBuffer:8*1024*1024});
+ const output=[result.stdout,result.stderr].filter(Boolean).join('\n');
+ assert.equal(result.error,undefined,output);
+ assert.equal(result.signal,null,output);
+ assert.equal(result.status,0,output);
+ const lines=output.split(/\r?\n/).map(line=>line.trim());
+ const completed=lines.filter(line=>/^ok \d+ - /.test(line));
+ for(const name of [
+  'preflight reports the existing FAQ length failure before full regression',
+  'stale unreadable-device FAQ assertion',
+  'new unassigned root'
+ ])assert.equal(completed.filter(line=>line.endsWith(' - '+name)).length,1,`expected exactly one completed outcome for ${name}:\n${output}`);
+ for(const summary of ['# tests 3','# pass 3','# fail 0','# cancelled 0','# skipped 0'])
+  assert.equal(lines.filter(line=>line===summary).length,1,`required TAP summary ${summary}:\n${output}`);
+});
+
 test('RISK device save warning browser: actual held Add keeps every text line on contrasting toast paint and preserves short notices',
  {skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
  const {exactOldDevice}=await releasedExpiryStartSource173(t),original=JSON.parse(exactOldDevice);
@@ -45035,6 +45202,62 @@ test('RISK repository process: grouped catalog binds real declarations rather th
  assert.match(result.stdout||'',/^# tests 1$/m);assert.match(result.stdout||'',/^# skipped 0$/m);
 });
 
+test('RISK repository process: newly registered startup browser roots require an isolated Chromium receipt',async t=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const names=[
+  'test group browser runtime preflight runs exactly the newly assigned roots in a scrubbed child',
+  'test group browser runtime preflight records an explicit no-change cohort without launching an engine',
+  'test group browser runtime preflight fails closed for skipped, duplicated, and missing-engine outcomes',
+  'test group workflow consumer forbids duplicate execution for a verified input pass',
+  'reconciled covered group verifies current early evidence without repeating any root',
+  'reconciled fresh group consumes the explicit browser preflight before its cohort',
+ ];
+ const pattern=`^(?:${names.join('|')})$`;
+ const child=spawnSync(process.execPath,['--test','--test-reporter=tap',`--test-name-pattern=${pattern}`,'scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:90000,maxBuffer:8*1024*1024});
+ const output=[child.stdout,child.stderr].filter(Boolean).join('\n');t.diagnostic(output);
+ assert.equal(child.error,undefined,'The browser-runtime process contract must start: '+output);
+ assert.equal(child.signal,null,'The browser-runtime process contract must finish: '+output);
+ assert.equal(child.status,0,'Newly assigned browser roots must require an actual isolated Chromium result: '+output);
+ const {parseTap}=await import('./scripts/test-groups.mjs'),cases=parseTap(child.stdout);
+ assert.deepEqual(cases.map(row=>row.id).sort(),[...names].sort(),'All three original browser contracts and all three enforcing CI consumers must execute exactly once');
+ assert.ok(cases.every(row=>row.id===row.root&&row.status==='passed'&&row.skipReason===null),'Every browser/preflight/covered contract must complete successfully');
+ for(const [summary,count]of Object.entries({tests:6,suites:0,pass:6,fail:0,cancelled:0,skipped:0,todo:0}))assert.match(child.stdout,new RegExp('^# '+summary+' '+count+'$','m'),'Exact child TAP summary: '+summary);
+ const workflow=fs.readFileSync(path.join(__dirname,'.github/workflows/data-safety.yml'),'utf8').split(/^  regression:/m)[1].split(/^  scanner-tests:/m)[0];
+ assert.match(workflow,/PLAYWRIGHT_BROWSERS_PATH:\s*\$\{\{ runner\.temp \}\}\/playwright-browsers/,'the regression install must use its explicit isolated browser directory');
+ const install=workflow.match(/      - name: Install matching native Chromium\n(?:        env:\n(?:          [^\n]*\n)+)?        if: ([^\n]+)\n        run: \|\n((?:          [^\n]*\n|\n)*)/);
+ assert.ok(install,'The actual conditional workflow install command must remain present');
+ const guard="steps.selected.outputs.decision == 'full' && !contains(fromJSON(steps.selected.outputs.reused), matrix.group)";
+ assert.equal(install[1],guard,'Covered groups must skip browser installation');
+ assert.ok(workflow.indexOf('Select coverage for this runner')<workflow.indexOf('Install matching native Chromium'),'Current runtime coverage selection must precede browser setup');
+ assert.match(workflow,/uses: actions\/setup-java@v4\n\s+if: steps\.selected\.outputs\.decision == 'full' && !contains\(fromJSON\(steps\.selected\.outputs\.reused\), matrix\.group\)/,'Covered groups must skip Java setup');
+ assert.match(workflow,/- run: npm ci\n\s+if: steps\.selected\.outputs\.decision == 'full' && !contains\(fromJSON\(steps\.selected\.outputs\.reused\), matrix\.group\)/,'Covered groups must skip dependency installation');
+ const command=install[2].split('\n').map(line=>line.startsWith('          ')?line.slice(10):line).join('\n');
+ const os=await import('node:os'),directory=fs.mkdtempSync(path.join(os.tmpdir(),'chain-workflow-browser-install-'));t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const journal=path.join(directory,'external-npx.jsonl'),browserPath=path.join(directory,'isolated-engines');
+ const engineCases=[
+  ['core','full',['chromium']],['core','reuse',['chromium']],['core','policy-reuse',['chromium']],
+  ['scenery','full',['chromium']],['scenery','reuse',['chromium']],['scenery','policy-reuse',['chromium']],
+  ['persistence-recovery','full',['chromium']],['persistence-recovery','reuse',['chromium']],['persistence-recovery','policy-reuse',['chromium']],
+  ['native-process','full',['chromium']],['native-process','reuse',['chromium','webkit']],['native-process','policy-reuse',['chromium']],
+ ];
+ for(const [group,early,engines]of engineCases)for(const [decision,reused,expected]of [['full',[],engines],['full',[group],null],['reuse',[],null],['policy-reuse',[],null]]){
+  fs.rmSync(journal,{force:true});
+  const admitted=vm.runInNewContext(install[1],{steps:{selected:{outputs:{decision,reused:JSON.stringify(reused)}}},matrix:{group},contains:(values,value)=>values.includes(value),fromJSON:JSON.parse});
+  const actualCommand=command.replaceAll('${{ matrix.group }}',group).replaceAll('${{ steps.selected.outputs.early-decision }}',early);
+  const shell='npx(){ printf "%s\\n" "$PLAYWRIGHT_BROWSERS_PATH" "$@" >> "$CHAIN_INSTALL_JOURNAL"; }\nif [[ "$CHAIN_INSTALL_ADMITTED" == 1 ]]; then\n'+actualCommand+'\nfi';
+  const result=spawnSync('bash',['-euo','pipefail','-c',shell],{cwd:__dirname,env:{...env,PLAYWRIGHT_BROWSERS_PATH:browserPath,CHAIN_INSTALL_JOURNAL:journal,CHAIN_INSTALL_ADMITTED:admitted?'1':'0'},encoding:'utf8',timeout:5000});
+  const context=JSON.stringify({group,early,decision,reused});
+  assert.equal(result.error,undefined,'Actual browser install shell must start: '+context);
+  assert.equal(result.status,0,'Actual browser install shell must complete: '+context+' '+result.stderr);
+  const actual=fs.existsSync(journal)?fs.readFileSync(journal,'utf8').trim().split('\n'):[];
+  assert.deepEqual(actual,expected?[browserPath,'--no-install','playwright','install','--with-deps',...expected]:[],'Exact external install calls: persistence remains Chromium-only; only fresh native with reused early needs WebKit; covered setup launches zero calls: '+context);
+ }
+ assert.match(workflow,/group_args\+=\(--browser-path "\$PLAYWRIGHT_BROWSERS_PATH"\)/,'The enforcing group consumer must receive the exact isolated browser installation');
+ assert.match(workflow,/node scripts\/agent-tools\/ci-pass-reuse\.mjs run-group "\$\{group_args\[@\]\}" --proof "\$RUNNER_TEMP\/selected-routing\/routing\.json"/,'The selected per-gate consumer owns preflight admission and retained receipt consumption');
+ assert.match(workflow,/name: Preserve actual group results and native evidence[\s\S]*path: \$\{\{ runner\.temp \}\}\/group/,'The complete group evidence, including its retained raw browser preflight, must be uploaded');
+ t.diagnostic('Actual workflow install shell passed 48 fresh/covered controls; external npx only was journaled, with no dependency or browser launch. Six public process contracts retain exact-source isolated Chromium preflight, preflight-before-cohort receipt consumption and zero covered workload.');
+});
+
 test('RISK repository process: nested native fixture output stays isolated at the command boundary',t=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
  const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group runner reconciles complete full and grouped fixture cohorts$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
@@ -45247,4 +45470,404 @@ test('RISK independent cloud boot authority: source-only preflight waits for bou
  const remote=await backend.CS.pull();assert.equal(typeof remote.payload,'string','the real decoder confirms independent cloud repair after bounded unavailable startup');assert.ok(remote.rev>seed.originalRoot.rev);
  assert.equal(JSON.stringify(ctx.state),local);assert.equal(shim.document.getElementById('addInput').value,'Draft after unavailable boot');assert.equal(ctx.state.syncDirty,true);
  assert.equal(JSON.parse(remote.payload).tasks.some(row=>row.title==='Accepted after bounded unavailable boot'),false,'server-only repair never uploads unobserved accepted local work');
+});
+
+
+test('RISK repository process: policy prose receipts inherit only identical product evidence',async()=>{
+ const root=fs.mkdtempSync(path.join(process.env.TMPDIR||'/tmp','chain-policy-prose-')),repo=path.join(root,'repo');
+ fs.mkdirSync(repo);releaseGateGit(repo,['init','-q']);releaseGateGit(repo,['config','user.name','Policy fixture']);releaseGateGit(repo,['config','user.email','policy@example.invalid']);
+ const policy='Read [release and review](docs/agents/release-and-review.md) before release.\nIndependent FAQ coverage review is required for every product release.\n';
+ fs.writeFileSync(path.join(repo,'AGENTS.md'),policy);fs.writeFileSync(path.join(repo,'index.html'),'<p>Version one</p>\n');
+ releaseGateGit(repo,['add','.']);releaseGateGit(repo,['commit','-qm','Initial product']);const initial=releaseGateGit(repo,['rev-parse','HEAD']);
+ fs.writeFileSync(path.join(repo,'index.html'),'<p>Version two</p>\n');releaseGateGit(repo,['add','.']);releaseGateGit(repo,['commit','-qm','Reviewed product']);
+ const base=releaseGateGit(repo,['rev-parse','HEAD']),baseTree=releaseGateGit(repo,['rev-parse','HEAD^{tree}']);
+ const fixture={root,repo,candidateSha:base,baseSha:initial,treeSha:baseTree,sourcePath:path.join(root,'source.md')};fs.writeFileSync(fixture.sourcePath,'Fixture source for inherited product review.\n');
+ for(const [key,name] of [['ownerEvidencePath','owner'],['codeEvidencePath','code'],['faqEvidencePath','faq'],['specialistEvidencePath','specialist']]){fixture[key]=path.join(root,name+'.md');fs.writeFileSync(fixture[key],'Exact source fixture '+name+' review inspected its scope and all applicable evidence.\n');}
+ const cli=(command,...args)=>spawnSync(process.execPath,[path.join(__dirname,'scripts/release-evidence.mjs'),command,...args],{cwd:repo,encoding:'utf8',timeout:15000});
+ const inputPath=path.join(root,'input.json');
+ const product=riskBasedReleaseInput(fixture,{specialistReview:false});
+ product.faqReview={...product.independentReview,task:'/root/policy-fixture-faq',evidencePath:fixture.faqEvidencePath,evidenceSha256:releaseGateHash(fixture.faqEvidencePath)};
+ fs.writeFileSync(inputPath,JSON.stringify(product));
+ try{
+  const prior=cli('record',inputPath);assert.equal(prior.status,0,prior.stdout+prior.stderr);
+  const priorPath=path.join(repo,'.git/funsidething-release-evidence',base,'receipt.json'),priorReceipt=JSON.parse(fs.readFileSync(priorPath));
+  const rendered=path.join(root,'rendered.json'),capture=path.join(root,'capture.txt');fs.writeFileSync(capture,'Bounded synthetic rendered artifact; no real rendering claimed.\n');fs.writeFileSync(rendered,JSON.stringify({schemaVersion:1,reviewedSha:base,treeSha:baseTree,outcome:'approved',task:'/root/independent-rendered-fixture',artifacts:[{evidencePath:capture,sha256:releaseGateHash(capture)}],summary:'Independent rendered review inspected the exact product source and retained evidence.'}));
+  fs.writeFileSync(path.join(repo,'AGENTS.md'),policy.replace('Read [release and review]','Consult [release and review guidance]').replace(' before release.','\nbefore release.'));
+  releaseGateGit(repo,['add','.']);releaseGateGit(repo,['commit','-qm','Instruction preserving policy reflow']);
+  fixture.candidateSha=releaseGateGit(repo,['rev-parse','HEAD']);fixture.treeSha=releaseGateGit(repo,['rev-parse','HEAD^{tree}']);fixture.baseSha=base;
+  const input=riskBasedReleaseInput(fixture,{codeReview:false,domains:['release-process']});
+  input.policyInheritance={reviewedSha:base,receiptSha256:priorReceipt.receiptSha256,renderedEvidencePath:rendered,renderedEvidenceSha256:releaseGateHash(rendered)};
+  fs.writeFileSync(inputPath,JSON.stringify({...input,policyInheritance:undefined}));assert.notEqual(cli('record',inputPath).status,0,'missing inherited evidence fails closed');
+  fs.writeFileSync(inputPath,JSON.stringify({...input,specialistReview:undefined}));assert.notEqual(cli('record',inputPath).status,0,'current policy review remains independent and mandatory');
+  const completeRendered=fs.readFileSync(rendered);
+  fs.writeFileSync(rendered,JSON.stringify({...JSON.parse(completeRendered),task:product.ownerReview.task.toUpperCase()}));fs.writeFileSync(inputPath,JSON.stringify({...input,policyInheritance:{...input.policyInheritance,renderedEvidenceSha256:releaseGateHash(rendered)}}));assert.notEqual(cli('record',inputPath).status,0,'rendered reviewer must remain independent under case-normalized task identity');
+  fs.writeFileSync(rendered,JSON.stringify({...JSON.parse(completeRendered),artifacts:[]}));
+  const incomplete={...input,policyInheritance:{...input.policyInheritance,renderedEvidenceSha256:releaseGateHash(rendered)}};fs.writeFileSync(inputPath,JSON.stringify(incomplete));
+  assert.notEqual(cli('record',inputPath).status,0,'a rendered approval without fingerprinted source artifacts must not authorize inheritance');
+  fs.writeFileSync(rendered,completeRendered);fs.writeFileSync(inputPath,JSON.stringify(input));
+  const recorded=cli('record',inputPath);
+  assert.equal(recorded.status,0,'The public recorder must retain policy specialist review while inheriting unchanged product/FAQ/rendered evidence:\n'+recorded.stdout+recorded.stderr);
+  const currentPath=path.join(repo,'.git/funsidething-release-evidence',fixture.candidateSha,'receipt.json'),receipt=JSON.parse(fs.readFileSync(currentPath));
+  assert.equal(receipt.reviewPlan.requiresCodeReview,false);assert.equal(Boolean(receipt.reviewPlan.requiresFaqReview),false);assert.deepEqual(receipt.reviewPlan.specialistDomains,['release-process']);
+  assert.equal(receipt.reviewPlan.policyProse.baseSha,base);assert.equal(receipt.reviewPlan.policyProse.sourceSha,fixture.candidateSha);assert.equal(receipt.policyInheritance.reviewedSha,base);
+  assert.equal(receipt.policyInheritance.receiptSha256,priorReceipt.receiptSha256);assert.equal(receipt.policyInheritance.faqEvidenceSha256,priorReceipt.faqReview.evidence.sha256);
+  assert.equal(cli('verify',fixture.candidateSha).status,0,'a fresh process must rederive classification and inherited evidence');
+  const {publishReleaseStatuses,validatePolicyProseStatuses}=await import('./scripts/release-evidence.mjs');
+  releaseGateGit(repo,['remote','add','origin','https://github.com/fixture/repo.git']);
+  const statuses=[];await publishReleaseStatuses(repo,fixture.candidateSha,async status=>statuses.push({...status,created_at:new Date().toISOString()}));
+  assert.equal(statuses.length,3,'all existing status contexts remain published');assert.ok(statuses.every(status=>status.description.endsWith(';v=4')));
+  assert.equal(validatePolicyProseStatuses(repo,fixture.candidateSha,base,statuses).receiptSha256,receipt.receiptSha256);
+  const {verifyDeploymentEvidence}=await import('./scripts/release-evidence.mjs');
+  const main=releaseGateGit(repo,['commit-tree',fixture.treeSha,'-p',base,'-p',fixture.candidateSha,'-m','Policy fixture main merge']);
+  const deploy=values=>verifyDeploymentEvidence({repoRoot:repo,repository:'fixture/repo',deployedSha:main,beforeSha:base,token:'fixture-read-token',fetchImpl:async url=>{
+   const pathname=new URL(url).pathname;let body;
+   if(pathname.endsWith('/commits/'+main+'/pulls'))body=[{number:17,merged_at:new Date().toISOString(),merge_commit_sha:main,head:{sha:fixture.candidateSha},base:{ref:'main'}}];
+   else if(pathname.endsWith('/commits/'+main))body={parents:[{sha:base}],commit:{tree:{sha:fixture.treeSha}}};
+   else if(pathname.endsWith('/commits/'+fixture.candidateSha))body={commit:{tree:{sha:fixture.treeSha}}};
+   else if(pathname.endsWith('/compare/'+base+'...'+fixture.candidateSha))body={status:'ahead'};
+   else if(pathname.endsWith('/commits/'+fixture.candidateSha+'/statuses'))body=values;
+   else throw new Error('Unexpected policy deployment request '+pathname);
+   return {ok:true,json:async()=>body};
+  }});
+  const deployed=await deploy(statuses);assert.equal(deployed.ok,true,deployed.errors.join('; '));assert.equal(deployed.reviewedSha,fixture.candidateSha);
+  assert.equal((await deploy(statuses.slice(1))).ok,false,'policy deployment retains every required current context');
+
+  const faqCopy=path.join(path.dirname(currentPath),'inherited-faq-review.md'),faqBytes=fs.readFileSync(faqCopy);fs.writeFileSync(faqCopy,'tampered');assert.notEqual(cli('verify',fixture.candidateSha).status,0,'inherited FAQ bytes remain fingerprinted');fs.writeFileSync(faqCopy,faqBytes);
+  fs.writeFileSync(path.join(path.dirname(currentPath),'inherited-rendered.json'),'tampered');
+  const changed=cli('verify',fixture.candidateSha);assert.notEqual(changed.status,0,'inherited rendered bytes remain fingerprinted');
+  fs.rmSync(path.dirname(currentPath),{recursive:true,force:true});
+  const escalated={...input,additionalSpecialistDomains:['security-deployment'],specialistReview:{...input.specialistReview,domains:['release-process','security-deployment']}};fs.writeFileSync(inputPath,JSON.stringify(escalated));
+  const escalatedRecorded=cli('record',inputPath);assert.equal(escalatedRecorded.status,0,escalatedRecorded.stdout+escalatedRecorded.stderr);
+  const escalatedStatuses=[];await publishReleaseStatuses(repo,fixture.candidateSha,async status=>escalatedStatuses.push({...status,created_at:new Date().toISOString()}));
+  assert.ok(escalatedStatuses.every(status=>status.description.endsWith(';v=2')),'additional specialist escalation retains full CI routing rather than issuing an unsupported narrow status');
+  assert.equal((await deploy(escalatedStatuses)).ok,true,'stronger review roles remain deployable through full validation');
+
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+
+test('RISK repository process: policy prose false exemptions retain full applicable review',async()=>{
+ const {deriveReleaseReviewPlan,derivePolicyProseImpact}=await import('./scripts/release-evidence.mjs');
+ const cases=[
+  ['authorization','AGENTS.md','The owner must approve publication.\n','Any contributor may approve publication.\n'],
+  ['gate weakening','AGENTS.md','Run all required tests before release.\n','Skip required tests before release.\n'],
+  ['new policy obligation','AGENTS.md','Read [release](guide.md) before release.\n','Read [release](guide.md) before release.\nSkip review when convenient.\n'],
+  ['changed destination','AGENTS.md','Read [release](guide.md) before release.\n','Read [release](other.md) before release.\n'],
+  ['configuration','package.json','{"scripts":{"test":"node --test"}}\n','{"scripts":{"test":"true"}}\n'],
+  ['executable policy comments','scripts/release-evidence.mjs','// Old gate description\n','// New gate description\n'],
+  ['workflow','AGENTS.yml','jobs: full\n','jobs: skipped\n'],
+  ['ambiguous instruction','docs/agents/release.md','Review every candidate.\n','Review selected candidates.\n'],
+  ['Markdown code boundary','AGENTS.md','Read [release](guide.md) before release.\n','    Read [release](guide.md) before release.\n'],
+ ];
+ for(const [name,changedPath,baseText,candidateText]of cases){const f=makeReleaseGateFixture({changedPath,baseText,candidateText});try{const plan=deriveReleaseReviewPlan(f.repo,f.candidateSha,f.baseSha);assert.equal(plan.policyProse,undefined,name+' must not inherit product evidence');assert.equal(plan.requiresCodeReview,true,name+' retains independent code review');assert.equal(derivePolicyProseImpact(f.repo,f.candidateSha,f.baseSha),null);}finally{cleanupReleaseGateFixture(f);}}
+ const mixed=makeReleaseGateFixture({changedPath:'AGENTS.md',baseText:'Read [release](guide.md) before release.\n',candidateText:'Consult [release guidance](guide.md) before release.\n'});
+ try{fs.writeFileSync(path.join(mixed.repo,'new-runtime.js'),'export const enabled = true;\n');releaseGateGit(mixed.repo,['add','.']);releaseGateGit(mixed.repo,['commit','-qm','Mixed functional change']);const sha=releaseGateGit(mixed.repo,['rev-parse','HEAD']);const plan=deriveReleaseReviewPlan(mixed.repo,sha,mixed.baseSha);assert.equal(plan.policyProse,undefined);assert.equal(plan.requiresCodeReview,true);assert.ok(plan.specialistDomains.includes('release-process'));}finally{cleanupReleaseGateFixture(mixed);}
+});
+
+test('RISK repository process: diagnostic checkpoints retain finite authority across fresh process and CI boundaries',async t=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap',path.join(__dirname,'scripts/agent-tools/checkpoint-progress.test.mjs')],{encoding:'utf8',timeout:30000,env});
+ const output=[result.stdout,result.stderr].filter(Boolean).join('\n');t.diagnostic(output);
+ assert.equal(result.error,undefined,'The finite-authority process contracts must start and finish within the original thirty-second timeout: '+output);
+ assert.equal(result.signal,null,'The finite-authority process contracts must finish without cancellation: '+output);
+ assert.equal(result.status,0,output);
+ const originalRoots=[
+  'diagnostic recorder refuses missing durable state before starting a child',
+  'diagnostic recorder rejects tampered state without launching',
+  'a fresh process given only the task fetches complete parent authority and admissions consume the same durable allowance',
+  'an active failed investigation prevents caller-asserted completed release checkpoints',
+  'consumption derives failed observations from actual output and a finite allowance survives branch and observer commits',
+  'stale authority dirty source and changed result bytes refuse without further children',
+  'two fresh concurrent public recorder processes admit exactly one identical request',
+  'independently consumed passing output completes only the actual current source',
+  'a predicted diagnostic failure cannot pay an unresolved required gate',
+  'portable CI independently verifies a signed admitted attempt in a separate clone and refuses tampering retry and missing manifest',
+  'bounded extension requires exact source and current journal authorization evidence and retains failures',
+  'a caller-authored approval file cannot impersonate the repository approval authority',
+  'source prerequisites include paginated comments beyond the issue summary',
+  'an owner extension comment appended to the bound issue updates only that explicit authority append',
+  'an owner approval append cannot hide an unrelated task scope change',
+ ];
+ const addedRoots=[
+  'reconciled checkpoint retains six routing decisions and originals without renewing diagnostics',
+  'reconciled authorized issue refresh preserves original snapshots failures and finite allowance',
+ ];
+ const {parseTap}=await import('./scripts/test-groups.mjs'),cases=parseTap(result.stdout),expected=[...originalRoots,...addedRoots];
+ assert.equal(originalRoots.length,15,'All fifteen original finite diagnostic authority contracts remain required');
+ assert.deepEqual(cases.map(row=>row.id).sort(),[...expected].sort(),'The exact original fifteen plus two accepted routing/source-authority identities must execute once, with no missing, duplicate or substitute child');
+ assert.ok(cases.every(row=>row.id===row.root&&row.status==='passed'&&row.skipReason===null),'Every required finite-authority root must complete successfully without skip, TODO, failure or extra nested outcomes');
+ for(const [summary,count]of Object.entries({tests:17,suites:0,pass:17,fail:0,cancelled:0,skipped:0,todo:0}))assert.match(result.stdout,new RegExp('^# '+summary+' '+count+'$','m'),'Exact child TAP summary: '+summary);
+});
+
+test('RISK repository process: known frozen diagnostic source derives narrow eligibility from exact content',()=>{
+ const result=spawnSync(process.execPath,[path.join(__dirname,'scripts/release-evidence.mjs'),'diagnostic-plan','c899e5e983cd756152c1d0c8057ffe8455e80956','b176026825e4f9539780f745fe60e09cf348d288'],{cwd:__dirname,encoding:'utf8',timeout:20000});
+ assert.equal(result.status,0,result.stderr);const plan=JSON.parse(result.stdout);assert.equal(plan.eligible,true,'the exact canonical observer preserves frozen product and dependency bytes');assert.equal(plan.kind,'nonqualifying-diagnostic-plan');
+});
+
+test('RISK repository process: diagnostic source cannot acquire product receipts through ordinary record',async()=>{
+ const f=makeReleaseGateFixture({changedPath:'README.md',baseText:'Frozen documentation\n',candidateText:'Clarified documentation\n'});
+ try{fs.writeFileSync(path.join(f.repo,'.diagnostic-task.json'),JSON.stringify({schemaVersion:1,mode:'diagnostic-only',task:286,repository:'emerald-pham/funsidething',publicKey:'fixture-key'}));releaseGateGit(f.repo,['add','.diagnostic-task.json']);releaseGateGit(f.repo,['commit','-qm','Mark nonqualifying source']);f.candidateSha=releaseGateGit(f.repo,['rev-parse','HEAD']);f.treeSha=releaseGateGit(f.repo,['rev-parse','HEAD^{tree}']);
+ const input=path.join(f.root,'product-input.json');fs.writeFileSync(input,JSON.stringify(riskBasedReleaseInput(f,{domains:(await import('./scripts/release-evidence.mjs')).deriveReleaseReviewPlan(f.repo,f.candidateSha,f.baseSha).specialistDomains})));const result=spawnSync(process.execPath,[path.join(__dirname,'scripts/release-evidence.mjs'),'record',input],{cwd:f.repo,encoding:'utf8',timeout:20000});assert.notEqual(result.status,0,'ordinary record cannot turn diagnostic-only source into product approval');assert.match(result.stderr,/Diagnostic|diagnostic/);
+ }finally{cleanupReleaseGateFixture(f);}
+});
+
+
+test('RISK repository process: distributed diagnostic admission binds actual terminal failure without product qualification',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=terminal consumption uses|concurrent fresh launch|actual pre-push permits',path.join(__dirname,'scripts/agent-tools/diagnostic-receipt.test.mjs')],{encoding:'utf8',timeout:90000,env});
+ assert.equal(result.status,0,result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# tests 3$/m,'all three actual process boundary contracts must execute');assert.match(result.stdout,/^# pass 3$/m);assert.match(result.stdout,/^# skipped 0$/m);
+});
+
+
+test('RISK repository process: early startup failure blocks costly CI without counting blocked coverage',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const child=spawnSync(process.execPath,['--test','--test-reporter=tap','scripts/agent-tools/early-ci.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:120000});
+ assert.equal(child.status,0,'Public early-stage process contracts must pass: '+child.stdout+child.stderr);
+ assert.match(child.stdout,/# Subtest: early CI public command preserves durable predecessor authority/,'Required actual process assertions must execute');
+});
+
+
+test('RISK scenery backdrop cache: first unchanged lighting timer reuses actual pixels while changed slots and loaded copy still paint',async t=>{
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});const directory=fs.mkdtempSync(path.join(base,'painted-slot-'));
+ const playwright=await import('playwright'),launch=playwright.webkit.launch,{runButtonSafety}=await import('./scripts/button-safety-native.mjs');
+ const evidence={kind:'nonqualifying-deterministic-renderer-consumer',route:[],limits:['Local uncapped emulated mobile rendering and exact pixel/source preservation; no hosted memory/timing or physical-device claim.']},finished=Error('Causal painted-slot probe complete; not native acceptance');let releaseBank,probeError;
+ const gate=new Promise(resolve=>{releaseBank=resolve;});
+ t.after(()=>{releaseBank();playwright.webkit.launch=launch;});
+ playwright.webkit.launch=async(...args)=>{
+  const browser=await launch.apply(playwright.webkit,args),newContext=browser.newContext.bind(browser);browser.newContext=async(...args)=>{
+   const context=await newContext(...args),newPage=context.newPage.bind(context);context.newPage=async(...args)=>{
+    const page=await newPage(...args),goto=page.goto.bind(page);await page.addInitScript(()=>{const NativeDate=Date;globalThis.__paintedSlotAt=Date.parse('2026-10-06T03:23:42.125Z');globalThis.Date=class extends NativeDate{constructor(...args){super(...(args.length?args:[globalThis.__paintedSlotAt]));}static now(){return globalThis.__paintedSlotAt;}};});
+    await page.route('**/HUMAN_WRITTEN_HOURLY_TAGS.md',async route=>{await gate;const response=await route.fetch(),original=await response.text(),body=original+'\n## Any time of day\n- Controlled scenery text\n## Skywriters\n- HELLO\n';const hash=value=>createHash('sha256').update(value).digest('hex');evidence.bankRoute={originalSha256:hash(original),fixtureSha256:hash(body)};await route.fulfill({response,body});});
+    await page.route('**/landscape.js',async route=>{
+     const response=await route.fetch();assert.equal(response.status(),200);let body=await response.text();const hash=value=>createHash('sha256').update(value).digest('hex');assert.equal(hash(body),hash(spawnSync('git',['show','b176026825e4f9539780f745fe60e09cf348d288:landscape.js'],{cwd:__dirname}).stdout));
+     const anchor="  window.addEventListener('pageshow'",ready="  document.dispatchEvent(new CustomEvent('landscape-scene-time-ready'));";assert.ok(body.includes(anchor)&&body.includes(ready));
+     const instrumentation=`
+      const cacheProbe={backgrounds:0,lives:0};globalThis.paintedSlotProbe=cacheProbe;
+      const paintBackdrop=paintBackground,paintVisitors=paintLife;paintBackground=(...args)=>{const result=paintBackdrop(...args);cacheProbe.backgrounds++;return result;};paintLife=(...args)=>{const result=paintVisitors(...args);cacheProbe.lives++;return result;};
+      cacheProbe.read=()=>({backgrounds:cacheProbe.backgrounds,lives:cacheProbe.lives,slot:sceneSnapshot.windowsSlot,paintedSlot:lastCitySlot,back:back.toDataURL(),status:status.textContent,scene:JSON.parse(JSON.stringify(sceneSnapshot))});
+      cacheProbe.advance=()=>{advanceRooftopParty(1);return cacheProbe.read();};cacheProbe.repaint=()=>{refreshSky();return cacheProbe.read();};
+     `;
+     const sourceSha256=hash(body);body=body.replace(anchor,instrumentation+'\n'+anchor).replace(ready,"  paintedSlotProbe.initial=paintedSlotProbe.read();paintedSlotProbe.unchanged=paintedSlotProbe.advance();\n"+ready);
+     evidence.route.push({sourceSha256,injectedSha256:hash(body),bytes:Buffer.byteLength(body)});await route.fulfill({response,body});
+    });
+    page.goto=async(url,...args)=>{
+     const response=await goto(url,...args);if(url.endsWith('__button-observer'))return response;
+     try{
+      await page.waitForFunction(()=>window.paintedSlotProbe?.unchanged&&document.documentElement.dataset.appReady==='true'&&window.CloudSync?.ready,null,{polling:100});
+      evidence.before=await page.evaluate(()=>{const p=paintedSlotProbe;return{initial:p.initial,unchanged:p.unchanged,taskCount:state.tasks.length,bankPending:p.read().status===''};});
+      releaseBank();await page.waitForFunction(()=>document.getElementById('sceneStatus').textContent.includes('Human written'),null,{polling:100});evidence.bank=await page.evaluate(()=>paintedSlotProbe.read());
+      evidence.changed=await page.evaluate(()=>{const before=paintedSlotProbe.read();globalThis.__paintedSlotAt+=8000;const after=paintedSlotProbe.advance(),fresh=paintedSlotProbe.repaint();return{before,after,fresh};});
+      evidence.stored=await page.evaluate(async()=>{const head=await ScannerDeviceStore.readHead(),saved=JSON.parse(head.payload);return{durableTasks:saved.tasks.length,retainedSources:await Promise.all((await ScannerDeviceStore.listBackups()).filter(row=>row.id.startsWith('gate-retained-')).sort((a,b)=>a.id.localeCompare(b.id)).map(async row=>({id:row.id,payloadHash:await ChainStorageV2.hashPayload(row.payload)}))),unknownBytes:saved.futurePopulated.opaque.length};});
+     }catch(error){probeError=error;}finally{releaseBank();}throw finished;
+    };return page;
+   };return context;
+  };return browser;
+ };
+ try{try{await runButtonSafety({repo:__dirname,engine:'webkit',port:Number(process.env.CHAIN_NATIVE_PORT||process.env.CHAIN_NATIVE_SMOKE_PORT||0),outputDir:directory,mobileYesMotion:'reduced',appFixture:'saved-scenery-b176'});assert.fail('Expected scenery probe completion');}catch(error){if(error!==finished)throw error;}}
+ finally{releaseBank();playwright.webkit.launch=launch;evidence.probeError=probeError?.stack;const files=fs.readdirSync(directory).filter(name=>/^button-safety-webkit-.*\.json$/.test(name));if(files.length===1){const native=JSON.parse(fs.readFileSync(path.join(directory,files[0])));evidence.nativeReportPath=path.join(directory,files[0]);evidence.appFixture=native.appFixture;evidence.cleanup=native.cleanup;evidence.preparedSources=native.retainedSources?.[0]?.bootstrap?.retainedSources?.map(({id,payloadHash})=>({id,payloadHash}));}
+  fs.writeFileSync(path.join(directory,'painted-slot-observation.json'),JSON.stringify(evidence,null,2)+'\n');}
+ if(probeError)throw probeError;
+ for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(evidence.cleanup?.[key],true);
+ const {initial,unchanged}=evidence.before;assert.equal(evidence.before.taskCount,400);assert.equal(evidence.stored.durableTasks,400);assert.equal(evidence.stored.unknownBytes,1048576);assert.equal(evidence.stored.retainedSources.length,2);assert.deepEqual(evidence.stored.retainedSources,evidence.preparedSources,'Both protected source payloads remain byte exact');
+ assert.equal(initial.backgrounds,1,'Initial full backdrop still paints once');assert.equal(unchanged.backgrounds,initial.backgrounds,'First unchanged lighting timer must reuse the backdrop already painted');assert.equal(unchanged.lives,initial.lives,'Unchanged Reduced membership must not redraw life');assert.equal(unchanged.back,initial.back,'The cached actual raster bytes remain exact');assert.deepEqual(unchanged.scene,initial.scene);
+ assert.equal(initial.paintedSlot,initial.slot,'The initial pixels record their actual lighting slot');assert.equal(evidence.before.bankPending,true);assert.match(evidence.bank.status,/Human written/);assert.equal(evidence.bank.back,initial.back,'Newly loaded copy retains the exact same fixed-time backdrop');
+ assert.notEqual(evidence.changed.before.slot,evidence.changed.after.slot,'Positive control advances the real lighting slot');assert.equal(evidence.changed.after.backgrounds,evidence.changed.before.backgrounds+1,'A genuinely changed slot must repaint');assert.equal(evidence.changed.after.paintedSlot,evidence.changed.after.slot);assert.equal(evidence.changed.fresh.backgrounds,evidence.changed.after.backgrounds+1,'Independent full refresh actually repaints');assert.equal(evidence.changed.after.back,evidence.changed.fresh.back,'Changed-slot pixels equal a complete refresh at the same instant, even when window states hold across slots');
+ t.diagnostic('Nonqualifying deterministic rendered consumer: '+directory);
+});
+test('RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh',async t=>{
+ for(const [motion,change] of [['reduced',false],['normal',false],['reduced',true]])await t.test(motion+(change?' pending scene change':' unchanged scene'),async t=>{
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});const directory=fs.mkdtempSync(path.join(base,'late-copy-'));
+ const playwright=await import('playwright'),launch=playwright.webkit.launch,{runButtonSafety}=await import('./scripts/button-safety-native.mjs');
+ const evidence={kind:'nonqualifying-deterministic-renderer-consumer',route:[],limits:['Local uncapped emulated mobile rendering and exact pixel/source preservation; no hosted memory/timing or physical-device claim.']},finished=Error('Causal late-copy probe complete; not native acceptance');let releaseBank,probeError;
+ const gate=new Promise(resolve=>{releaseBank=resolve;});
+ t.after(()=>{releaseBank();playwright.webkit.launch=launch;});
+ playwright.webkit.launch=async(...args)=>{
+  const browser=await launch.apply(playwright.webkit,args),newContext=browser.newContext.bind(browser);browser.newContext=async(...args)=>{
+   const context=await newContext(...args),newPage=context.newPage.bind(context);context.newPage=async(...args)=>{
+    const page=await newPage(...args),goto=page.goto.bind(page);await page.addInitScript(()=>{const NativeDate=Date;globalThis.__paintedSlotAt=Date.parse('2026-10-06T03:23:42.125Z');globalThis.Date=class extends NativeDate{constructor(...args){super(...(args.length?args:[globalThis.__paintedSlotAt]));}static now(){return globalThis.__paintedSlotAt;}};});
+    await page.route('**/HUMAN_WRITTEN_HOURLY_TAGS.md',async route=>{await gate;const response=await route.fetch(),original=await response.text(),body=original+'\n## Any time of day\n- Controlled scenery text\n## Skywriters\n- HELLO\n';const hash=value=>createHash('sha256').update(value).digest('hex');evidence.bankRoute={originalSha256:hash(original),fixtureSha256:hash(body)};await route.fulfill({response,body});});
+    await page.route('**/landscape.js',async route=>{
+     const response=await route.fetch();assert.equal(response.status(),200);let body=await response.text();const hash=value=>createHash('sha256').update(value).digest('hex');assert.equal(hash(body),hash(spawnSync('git',['show','b176026825e4f9539780f745fe60e09cf348d288:landscape.js'],{cwd:__dirname}).stdout));
+     const anchor="  window.addEventListener('pageshow'",ready="  document.dispatchEvent(new CustomEvent('landscape-scene-time-ready'));";assert.ok(body.includes(anchor)&&body.includes(ready));
+     const instrumentation=`
+      const cacheProbe={backgrounds:0,lives:0,paints:[]};globalThis.paintedSlotProbe=cacheProbe;
+      const paintBackdrop=paintBackground,paintVisitors=paintLife;paintBackground=(...args)=>{const result=paintBackdrop(...args);cacheProbe.backgrounds++;if(cacheProbe.paints.length<12)cacheProbe.paints.push({stack:new Error().stack,skyDate:+sky.date,slot:sceneSnapshot.windowsSlot,pixels:back.toDataURL()});return result;};paintLife=(...args)=>{const result=paintVisitors(...args);cacheProbe.lives++;return result;};
+      cacheProbe.read=()=>({backgrounds:cacheProbe.backgrounds,lives:cacheProbe.lives,paints:cacheProbe.paints,slot:sceneSnapshot.windowsSlot,paintedSlot:lastCitySlot,back:back.toDataURL(),status:status.textContent,skyDate:+sky.date,signatureBytes:new TextEncoder().encode(JSON.stringify([sky,p,sceneSeason,sceneSnapshot.gardens,lastCitySlot,W,H,dpr])).length,visitors:JSON.parse(JSON.stringify(world.events)),scene:JSON.parse(JSON.stringify(sceneSnapshot))});
+      cacheProbe.stop=stop;cacheProbe.advance=()=>{advanceRooftopParty(1);return cacheProbe.read();};cacheProbe.repaint=()=>{refreshSky();return cacheProbe.read();};
+     `;
+     const sourceSha256=hash(body);body=body.replace(anchor,instrumentation+'\n'+anchor).replace(ready,"  paintedSlotProbe.initial=paintedSlotProbe.read();paintedSlotProbe.unchanged=paintedSlotProbe.advance();\n"+ready);
+     evidence.route.push({sourceSha256,injectedSha256:hash(body),bytes:Buffer.byteLength(body)});await route.fulfill({response,body});
+    });
+    page.goto=async(url,...args)=>{
+     const response=await goto(url,...args);if(url.endsWith('__button-observer'))return response;
+     try{
+      await page.waitForFunction(()=>window.paintedSlotProbe?.unchanged&&document.documentElement.dataset.appReady==='true'&&window.CloudSync?.ready,null,{polling:100});
+      evidence.before=await page.evaluate(change=>{const p=paintedSlotProbe;window.dispatchEvent(new PageTransitionEvent('pageshow'));p.stop();const before=p.read();if(change){globalThis.__paintedSlotAt+=3600000;LivingLocation.applySynced({latitude:51.5074,longitude:-.1278,timezone:'Europe/London',label:'Controlled London',enabled:true});paintedSlotProbe.stop();globalThis.__paintedSlotAt+=60000;}return{initial:p.initial,unchanged:p.unchanged,taskCount:state.tasks.length,bankPending:before.status==='',before,pending:p.read()};},change);
+      releaseBank();await page.waitForFunction(()=>document.getElementById('sceneStatus').textContent.includes('Human written'),null,{polling:100});evidence.bank=await page.evaluate(()=>paintedSlotProbe.read());
+      evidence.fresh=await page.evaluate(()=>paintedSlotProbe.repaint());
+      evidence.stored=await page.evaluate(async()=>{const head=await ScannerDeviceStore.readHead(),saved=JSON.parse(head.payload);return{durableTasks:saved.tasks.length,retainedSources:await Promise.all((await ScannerDeviceStore.listBackups()).filter(row=>row.id.startsWith('gate-retained-')).sort((a,b)=>a.id.localeCompare(b.id)).map(async row=>({id:row.id,payloadHash:await ChainStorageV2.hashPayload(row.payload)}))),unknownBytes:saved.futurePopulated.opaque.length};});
+     }catch(error){probeError=error;}finally{releaseBank();}throw finished;
+    };return page;
+   };return context;
+  };return browser;
+ };
+ try{try{await runButtonSafety({repo:__dirname,engine:'webkit',port:Number(process.env.CHAIN_NATIVE_PORT||process.env.CHAIN_NATIVE_SMOKE_PORT||0),outputDir:directory,mobileYesMotion:motion,appFixture:'saved-scenery-b176'});assert.fail('Expected scenery probe completion');}catch(error){if(error!==finished)throw error;}}
+ finally{releaseBank();playwright.webkit.launch=launch;evidence.probeError=probeError?.stack;const files=fs.readdirSync(directory).filter(name=>/^button-safety-webkit-.*\.json$/.test(name));if(files.length===1){const native=JSON.parse(fs.readFileSync(path.join(directory,files[0])));evidence.nativeReportPath=path.join(directory,files[0]);evidence.appFixture=native.appFixture;evidence.cleanup=native.cleanup;evidence.preparedSources=native.retainedSources?.[0]?.bootstrap?.retainedSources?.map(({id,payloadHash})=>({id,payloadHash}));}
+  fs.writeFileSync(path.join(directory,'late-copy-observation.json'),JSON.stringify(evidence,null,2)+'\n');}
+ if(probeError)throw probeError;
+ for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(evidence.cleanup?.[key],true);
+ const {initial,before,pending}=evidence.before;assert.equal(evidence.before.taskCount,400);assert.equal(evidence.stored.durableTasks,400);assert.equal(evidence.stored.unknownBytes,1048576);assert.equal(evidence.stored.retainedSources.length,2);assert.deepEqual(evidence.stored.retainedSources,evidence.preparedSources,'Both protected source payloads remain byte exact');
+ assert.equal(initial.backgrounds,1,'Initial full backdrop still paints once');assert.equal(before.backgrounds,1,'Unchanged native pageshow and initial hourly copy must reuse the initial backdrop');assert.equal(evidence.before.bankPending,true);assert.match(evidence.bank.status,/Controlled scenery text.*Human written/);assert.equal(evidence.bank.lives,pending.lives+1,'Loading the bank still paints current visitors once');
+ if(change){assert.ok(pending.backgrounds>before.backgrounds,'Public location change while the bank is pending performs a full scene refresh');assert.notEqual(pending.back,before.back,'Changed location and time actually change rendered pixels');assert.equal(evidence.bank.backgrounds,pending.backgrounds+1,'A further changed minute while pending still paints its fresh sky');assert.notEqual(evidence.bank.skyDate,pending.skyDate,'Delayed response uses the current effective scene date');}
+ else{assert.equal(evidence.bank.back,before.back,'New text preserves the exact already rendered backdrop');assert.equal(evidence.bank.backgrounds,before.backgrounds,'Loading only new text must not repaint an identical backdrop');assert.deepEqual(evidence.bank.scene,before.scene,'Text loading cannot move the shared scene at a fixed instant');}
+ assert.equal(evidence.fresh.backgrounds,evidence.bank.backgrounds+1,'Independent full refresh actually repaints');assert.equal(evidence.fresh.back,evidence.bank.back,'Bank response pixels equal an independent complete current-scene refresh');assert.equal(evidence.fresh.status,evidence.bank.status,'Bank response copy equals an independent complete current-scene refresh');assert.deepEqual(evidence.fresh.visitors,evidence.bank.visitors,'Bank response keeps current-flight reconciliation equivalent to a complete refresh');
+ const flight=sharedSkywriterConsumer(false,true);flight.context.LandscapeMood.setHumanText('## Skywriters\n- HELLO');flight.context.syncScene(123000);assert.equal(flight.context.world.events[0].skywriterWord,'HELLO','Actual current-flight consumer adopts the newly loaded bank');
+ t.diagnostic('Nonqualifying deterministic late-copy consumer: '+directory);
+ });
+});
+test('RISK repository process: scenery consumers use allocated fallback ports and preserve early native failures',async t=>{
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});const directory=fs.mkdtempSync(path.join(base,'scenery-harness-'));
+ const env={...process.env,CHAIN_NATIVE_OUTPUT:path.join(directory,'native'),CHAIN_NATIVE_SMOKE_PORT:process.env.CHAIN_NATIVE_PORT||process.env.CHAIN_NATIVE_SMOKE_PORT||''};delete env.CHAIN_NATIVE_PORT;delete env.NODE_TEST_CONTEXT;
+ await t.test('real scenery source and rendering consumers without CHAIN_NATIVE_PORT',()=>{
+  const result=spawnSync(process.execPath,['--test','--test-name-pattern=^RISK scenery backdrop cache:|^RISK scenery text loading:','tests.js'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});fs.writeFileSync(path.join(directory,'no-port.tap'),result.stdout+result.stderr);assert.equal(result.error,undefined);assert.equal(result.status,0,'Actual scenery consumers must launch and retain every rendering/data assertion without CHAIN_NATIVE_PORT: '+result.stdout+result.stderr);assert.match(result.stdout,/# fail 0/);assert.match(result.stdout,/# skipped 0/);
+ });
+ await t.test('early native launch failure stays primary without bootstrap evidence',async()=>{
+  const {pathToFileURL}=await import('node:url'),preload=path.join(directory,'early-launch.mjs');fs.writeFileSync(preload,'const {webkit}=await import('+JSON.stringify(pathToFileURL(path.join(__dirname,'node_modules/playwright/index.mjs')).href)+');webkit.launch=async()=>{throw Error("Controlled early scenery launch failure");};\n');
+  const result=spawnSync(process.execPath,['--import',preload,'--test','--test-name-pattern=^RISK scenery backdrop cache:','tests.js'],{cwd:__dirname,env:{...env,CHAIN_NATIVE_PORT:process.env.CHAIN_NATIVE_PORT||process.env.CHAIN_NATIVE_SMOKE_PORT||''},encoding:'utf8',timeout:10000,maxBuffer:4*1024*1024});fs.writeFileSync(path.join(directory,'early-launch.tap'),result.stdout+result.stderr);assert.equal(result.error,undefined);assert.equal(result.status,1,'Controlled early launch remains failed');assert.match(result.stdout+result.stderr,/Controlled early scenery launch failure/,'The original native failure must survive missing retainedSources/bootstrap');assert.doesNotMatch(result.stdout+result.stderr,/Cannot read properties of undefined/);
+ });
+ t.diagnostic('Actual child scenery consumer evidence: '+directory);
+});
+
+test('RISK repository process: native scene-time bursts cannot activate controls behind a refused top-layer release',async t=>{
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});const directory=fs.mkdtempSync(path.join(base,'scene-dialog-release-')),{runButtonSafety}=await import('./scripts/button-safety-native.mjs');
+ const playwright=await import('playwright'),launch=playwright.chromium.launch;let geometry;
+ t.after(()=>{playwright.chromium.launch=launch;});
+ playwright.chromium.launch=async(...args)=>{const browser=await launch.apply(playwright.chromium,args),newContext=browser.newContext.bind(browser);browser.newContext=async(...args)=>{const context=await newContext(...args),newPage=context.newPage.bind(context);context.newPage=async(...args)=>{const page=await newPage(...args),down=page.mouse.down.bind(page.mouse),up=page.mouse.up.bind(page.mouse);let point;
+  page.mouse.down=async(...args)=>{point=await page.evaluate(()=>{const el=document.querySelector('[data-act="scene-time-settings"]');if(!el)return null;const r=el.getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2};});return down(...args);};
+  page.mouse.up=async(...args)=>{const result=await up(...args);if(point&&!geometry)geometry=await page.evaluate(point=>{const dialog=document.querySelector('#sceneTimeDialog[open]'),preset=dialog?.querySelector('[data-scene-preset="first-light"]');if(!preset)return null;preset.style.cssText='position:fixed;left:'+(point.x-20)+'px;top:'+(point.y-10)+'px;width:40px;height:20px;margin:0;z-index:2147483647';return{point,hit:document.elementFromPoint(point.x,point.y)===preset,open:dialog.open};},point);return result;};return page;};return context;};return browser;};
+ let result;try{result=await runButtonSafety({repo:__dirname,engine:'chromium',port:Number(process.env.CHAIN_NATIVE_PORT||0),outputDir:directory,scenarioFilter:'rapid scene time presets, lock, live time, and close'});}finally{playwright.chromium.launch=launch;fs.writeFileSync(path.join(directory,'top-layer-geometry.json'),JSON.stringify(geometry,null,2)+'\n');}assert.equal(geometry?.open,true,'The actual scene dialog opens in the controlled overlap fixture');assert.equal(result.report.status,'passed');
+ assert.ok(result.report.actionObservation.recognizedOffered.includes('act:download-backup'),'Canonical offered backup action is recognized by the limited profile');assert.ok(!result.report.actionObservation.executed.includes('act:download-backup'),'Offering a backup button cannot credit execution');
+ const opened=result.report.rapidOutcomes.find(row=>row.action==='act:scene-time-settings').bursts[0];assert.equal(opened.attempts,10);assert.equal(opened.trustedPresses,10);assert.equal(opened.unrelatedClicks,0);assert.equal(opened.acceptedClicks,1);assert.ok(opened.windowMs<=2000);assert.ok(opened.attemptDetails.slice(1).every(row=>row.nativeDownAction==='scene-preset:first-light'&&row.neutralRelease&&row.acceptedClicks===0&&row.neutralDocumentId===result.report.releaseSurfaces[0].documentId));
+ for(const value of Object.values(result.report.cleanup))assert.equal(value,true);t.diagnostic('Actual scene dialog burst evidence: '+directory);
+});
+
+test('RISK repository process: CI monitor preserves early startup and stress predecessor failures',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^parallel workflow observation preserves complete missing skipped canceled and unknown distinctions$','scripts/agent-tools/ci-monitor.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:120000});
+ assert.equal(child.status,0,'Public observation must retain every early predecessor distinction: '+child.stdout+child.stderr);
+ assert.match(child.stdout,/# Subtest: parallel workflow observation preserves complete missing skipped canceled and unknown distinctions/,'Required actual observer assertions must execute');
+});
+
+test('RISK repository process: canonical limited source profiles preserve original mobile acceptance',{concurrency:false},()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const child=spawnSync(process.execPath,['--test','--test-reporter=tap','scripts/agent-tools/mobile-source-profile.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:120000});
+ assert.equal(child.status,0,'Limited canonical source admission must preserve exact original contracts: '+child.stdout+child.stderr);
+ assert.match(child.stdout,/# Subtest: canonical mobile source profile admits exact current app/);
+});
+
+test('RISK repository process: early-assigned consumers execute once through durable group accounting',{concurrency:false},()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^group process refuses missing early predecessor|^group and aggregate retain actual early','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:120000});
+ assert.equal(child.status,0,'Actual group consumer must preserve one execution and predecessor integrity: '+child.stdout+child.stderr);
+ assert.match(child.stdout,/# Subtest: group process refuses missing early predecessor/);
+ assert.match(child.stdout,/Actual failed native producer accounting survives strict public stress and literal aggregate composition/,'Failed stress must preserve offered/executed integrity through the actual aggregate consumer');
+});
+
+
+test('RISK repository process: metadata observation preserves bound producer outcomes without duplicate execution',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^metadata observation |^workflow metadata events serialize','scripts/agent-tools/ci-routing.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:120000,maxBuffer:8*1024*1024});
+ assert.equal(child.status,0,'Actual routing process must preserve incomplete exact producers: '+child.stdout+child.stderr);
+ assert.match(child.stdout,/ok [0-9]+ - metadata observation retains a bound pending producer without launching another cohort/);
+ assert.match(child.stdout,/# fail 0/);assert.match(child.stdout,/# cancelled 0/);assert.match(child.stdout,/# skipped 0/);
+ for(const name of ['metadata observation preserves cancelled producers and incomplete final evidence','metadata observation resumes the saved producer in a fresh process despite newer equivalent history','workflow metadata events serialize equivalent admission and run the actual routing command once per event','metadata observation recovers after an actual interrupted process using only durable evidence'])assert.ok(child.stdout.includes(' - '+name),name+' must execute');
+ const aggregate=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^workflow metadata aggregate rejects','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:120000,maxBuffer:8*1024*1024});
+ assert.equal(aggregate.status,0,'Literal workflow aggregate must preserve incomplete and stale evidence: '+aggregate.stdout+aggregate.stderr);assert.match(aggregate.stdout,/ok [0-9]+ - workflow metadata aggregate rejects pending cancelled unresolved and stale successful routing proofs/);assert.match(aggregate.stdout,/# fail 0/);assert.match(aggregate.stdout,/# cancelled 0/);assert.match(aggregate.stdout,/# skipped 0/);
+
+});
+
+test('RISK repository process: reconciled CI retains original input coverage and incomplete admission',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^reconciled ','scripts/agent-tools/ci-routing.test.mjs','scripts/agent-tools/test-groups.test.mjs','scripts/agent-tools/early-ci.test.mjs','scripts/agent-tools/checkpoint-progress.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:120000,maxBuffer:8*1024*1024});
+ assert.equal(child.status,0,'Reconciled public CI consumers must preserve original coverage and admission: '+child.stdout+child.stderr);
+ assert.match(child.stdout,/ok \d+ - reconciled metadata input routing preserves pending failed and cancelled admission/);
+ assert.match(child.stdout,/# fail 0$/m);assert.match(child.stdout,/# cancelled 0$/m);assert.match(child.stdout,/# skipped 0$/m);
+});
+
+test('RISK repository process: protected diagnostic governance remains distinct from frozen app source',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=independently reviewed protected governance',path.join(__dirname,'scripts/agent-tools/diagnostic-receipt.test.mjs')],{encoding:'utf8',timeout:45000,env});assert.equal(result.status,0,result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# tests 1$/m);assert.match(result.stdout,/^# pass 1$/m);assert.match(result.stdout,/^# skipped 0$/m);
+});
+
+test('RISK repository process: native diagnostic captures remain bounded and missing attribution never qualifies a repair',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap',path.join(__dirname,'scripts/agent-tools/native-attribution.test.mjs')],{encoding:'utf8',timeout:30000,env});assert.equal(result.status,0,result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# tests 5$/m);assert.match(result.stdout,/^# pass 5$/m);assert.match(result.stdout,/^# skipped 0$/m);
+});
+
+
+test('RISK repository process: canonical early admission retains mixed owners and fresh durable verification',{timeout:125000,concurrency:false},async()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^early CI canonical source|^group and aggregate retain actual early','scripts/agent-tools/early-ci.test.mjs','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:120000,maxBuffer:8*1024*1024});
+ assert.equal(child.status,0,'Actual canonical admission and owned early accounting must agree: '+child.stdout+child.stderr);
+ const {parseTap}=await import('./scripts/test-groups.mjs'),cases=parseTap(child.stdout);
+ const roots=['early CI canonical source admits its existing mixed owners through durable public verification','group and aggregate retain actual early cases once across fresh group processes'];
+ const nested=['known completed partial action remains accounted without full coverage credit','failed stress still refuses missing accounting','failed stress still refuses unknown offered ID','failed stress still refuses unknown executed ID','failed stress still refuses profile tamper','failed stress still refuses source tamper','failed stress still refuses transport failure','failed stress still refuses instrumentation failure','failed stress still refuses cleanup failure','changed group transfer reference','missing durable predecessor'];
+ const expected=[...roots,...nested.map(name=>roots[1]+' > '+name)].sort(),actual=cases.map(row=>row.id);
+ assert.equal(expected.length,13,'Four original identities plus nine approved stress controls remain required');
+ assert.deepEqual([...actual].sort(),expected,'Only the exact required identities and their original hierarchy may execute');
+ assert.equal(new Set(actual).size,13,'No required child outcome may execute twice');
+ assert.deepEqual(cases.filter(row=>row.id===row.root).map(row=>row.root).sort(),[...roots].sort(),'Exactly the two required top-level roots execute once');
+ assert.ok(cases.every(row=>row.status==='passed'&&row.skipReason===null),'All required roots and nested controls must complete without skip, TODO or failure');
+ for(const [summary,count]of Object.entries({tests:13,suites:0,pass:13,fail:0,cancelled:0,skipped:0,todo:0}))assert.match(child.stdout,new RegExp('^# '+summary+' '+count+'$','m'),'Exact child TAP summary: '+summary);
+ assert.match(child.stdout,/Actual canonical Node predicate child completed exactly one required outcome with zero skips/,'The canonical consumer must exercise actual predicate cardinality as well as durable admission and accounting');
+ assert.match(child.stdout,/Local allocation public consumer passed9 isolated ledger cases without foreign or own ledger writes/,'The native local owner lookup must retain foreign conflicts and fail closed on unsafe identity or lease state');
+});
+
+
+test('RISK repository process: browser preflight interruption cleans its actual owned process family',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group browser runtime interruption','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:45000,maxBuffer:4*1024*1024});
+ assert.equal(child.status,0,'SIGINT and SIGTERM must finalize and clean actual owned descendants: '+child.stdout+child.stderr);assert.match(child.stdout,/# tests 5$/m);assert.match(child.stdout,/# skipped 0$/m);
+});
+
+
+test('RISK repository process: early predecessor proof survives fresh consumer runtimes',{timeout:45000},()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group fresh runtimes consume an intact original early predecessor$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:40000,maxBuffer:4*1024*1024});
+ assert.equal(child.error,undefined,'The public predecessor/runtime controls must start: '+child.stderr);
+ assert.equal(child.status,0,'Fresh runtime execution must preserve intact original early proof and reject mutations before workload: '+child.stdout+child.stderr);
+ for(const [name,count]of Object.entries({tests:12,pass:12,fail:0,cancelled:0,skipped:0,todo:0}))assert.match(child.stdout,new RegExp('^# '+name+' '+count+'$','m'));
+});
+
+test('RISK repository process: aggregate modes account for every inherited required source',{timeout:45000},()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group aggregate preserves observer protocol across emulator coverage and fresh fallback$|^test group aggregate classifies early-only inheritance across every required source$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:40000,maxBuffer:4*1024*1024});
+ assert.equal(child.error,undefined,'The public aggregate controls must start: '+child.stderr);
+ assert.equal(child.status,0,'Durable full/mixed/covered modes must include group, emulator and early evidence while retaining original authority barriers: '+child.stdout+child.stderr);
+ for(const title of ['test group aggregate preserves observer protocol across emulator coverage and fresh fallback','test group aggregate classifies early-only inheritance across every required source'])assert.ok(child.stdout.includes(' - '+title),'Both public aggregate consumers must execute: '+title);
+ for(const [name,count]of Object.entries({tests:12,pass:12,fail:0,cancelled:0,skipped:0,todo:0}))assert.match(child.stdout,new RegExp('^# '+name+' '+count+'$','m'));
+});
+
+test('RISK repository process: fresh Linux known-control verification requires its independent hot routine',{timeout:20000},()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^fresh Linux known-control verification','scripts/agent-tools/native-attribution.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:15000});
+ assert.equal(child.status,0,'Fresh durable Linux control verification must distinguish the known hot routine from generic loader symbols: '+child.stdout+child.stderr);assert.match(child.stdout,/# tests 1$/m);assert.match(child.stdout,/# skipped 0$/m);
+ assert.match(child.stdout,/Known native symbol offsets passed fresh verification; loader-only and wrong-symbol witnesses stayed refused/,'The existing public risk consumer must execute its offset-positive and retained negative controls');
+});
+
+
+test('RISK repository process: rendered diagnostic comparisons enforce declared scale on all named controls',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^named diagnostic comparisons','scripts/agent-tools/rendered-evidence.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:15000});
+ assert.equal(child.status,0,'Named diagnostic enlargement must meet its declared factor for changed and reference targets: '+child.stdout+child.stderr);assert.match(child.stdout,/# tests 1$/m);assert.match(child.stdout,/# skipped 0$/m);
+});
+
+
+test('RISK repository process: workflow browser paths resolve only in supported runner contexts',async t=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group workflow browser path reaches the installer and enforcing persistence consumer$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
+ const output=[child.stdout,child.stderr].filter(Boolean).join('\n');t.diagnostic(output);
+ assert.equal(child.error,undefined,'The public workflow environment consumer must start and finish: '+output);assert.equal(child.signal,null,'The public workflow environment consumer cannot be cancelled: '+output);assert.equal(child.status,0,'The actual workflow must be valid at its environment scope and propagate the exact installed browser path: '+output);
+ const {parseTap}=await import('./scripts/test-groups.mjs'),cases=parseTap(child.stdout);
+ assert.deepEqual(cases.map(row=>[row.id,row.root,row.status,row.skipReason]),[['test group workflow browser path reaches the installer and enforcing persistence consumer','test group workflow browser path reaches the installer and enforcing persistence consumer','passed',null]],'Exactly one successful actual workflow consumer must execute');
+ for(const [summary,count]of Object.entries({tests:1,suites:0,pass:1,fail:0,cancelled:0,skipped:0,todo:0}))assert.match(child.stdout,new RegExp('^# '+summary+' '+count+'$','m'),'Exact workflow consumer TAP summary: '+summary);
 });

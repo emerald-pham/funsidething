@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { spawnSync } from 'node:child_process';
-import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createMobileBundle, refreshMobileBundle } from './mobile-memory-fixture.mjs';
+import { deriveReleaseReviewPlan } from '../release-evidence.mjs';
+import { spawn, spawnSync } from 'node:child_process';
+import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -15,9 +17,9 @@ const git = (cwd, ...args) => {
   return result.stdout.trim();
 };
 
-function fixture(t, grouped=false) {
+function fixture(t, grouped=false, policy=false, early=false) {
   const root = mkdtempSync(path.join(os.tmpdir(), 'chain-ci-routing-'));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
+  t.after(() => { if(process.env.CHAIN_METADATA_EVIDENCE){mkdirSync(process.env.CHAIN_METADATA_EVIDENCE,{recursive:true});cpSync(root,path.join(process.env.CHAIN_METADATA_EVIDENCE,path.basename(root)),{recursive:true});} rmSync(root, { recursive: true, force: true }); });
   const source = path.join(root, 'source'), bin = path.join(root, 'bin');
   mkdirSync(source); mkdirSync(bin);
   mkdirSync(path.join(source,'scripts/agent-tools'),{recursive:true});
@@ -25,12 +27,16 @@ function fixture(t, grouped=false) {
   git(source, 'init', '-b', 'fixture');
   git(source, 'config', 'user.name', 'Routing fixture');
   git(source, 'config', 'user.email', 'routing@example.invalid');
+  if(policy)git(source,'-c','core.hooksPath=/dev/null','commit','--allow-empty','-qm','prior product');
   writeFileSync(path.join(source, 'package.json'), JSON.stringify({ private: true, scripts: { test: 'node --test tests.js' } }));
   writeFileSync(path.join(source, 'tests.js'), "import { test } from 'node:test';test('isolated routing fixture',()=>{});\n");
   if(grouped){for(const file of ['.github/workflows/data-safety.yml','scripts/test-group-inventory.json','scripts/test-group-assignments.json','scripts/test-groups.mjs','scripts/agent-tools/ci-routing.mjs']){mkdirSync(path.dirname(path.join(source,file)),{recursive:true});writeFileSync(path.join(source,file),'fixture '+file+'\n');}}
+  if(early){writeFileSync(path.join(source,'scripts/early-ci-harness-source.json'),'{"files":[],"testExcerpts":[],"limits":["Controlled parser fixtures only; no native proof"]}\n');writeFileSync(path.join(source,'scripts/test-group-assignments.json'),'{"rootAssignments":[]}\n');}
+  if(policy)writeFileSync(path.join(source,'AGENTS.md'),'Read [release and review](docs/agents/release-and-review.md) before release.\nIndependent FAQ coverage review is required for every product release.\n');
   git(source, 'add', '.'); git(source, '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'fixture base');
   const base = git(source, 'rev-parse', 'HEAD');
-  writeFileSync(path.join(source, 'candidate.txt'), 'isolated candidate\n');
+  if(policy)writeFileSync(path.join(source,'AGENTS.md'),'Consult [release and review guidance](docs/agents/release-and-review.md)\nbefore release.\nIndependent FAQ coverage review is required for every product release.\n');
+  else writeFileSync(path.join(source, 'candidate.txt'), 'isolated candidate\n');
   git(source, 'add', '.'); git(source, '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'fixture candidate');
   const head = git(source, 'rev-parse', 'HEAD');
   const tree = git(source, 'rev-parse', 'HEAD^{tree}');
@@ -42,30 +48,34 @@ function fixture(t, grouped=false) {
   writeFileSync(path.join(bin, 'curl'), `#!/usr/bin/env node
 const fs=require('node:fs'),x=JSON.parse(fs.readFileSync(process.env.ROUTING_GITHUB));
 const url=process.argv.at(-1);
+fs.appendFileSync(process.env.ROUTING_GITHUB+'.requests',JSON.stringify(process.argv.slice(2))+'\\n');
 if(url.includes('/actions/artifacts/')&&url.endsWith('/zip')){if(x.archiveError)process.exit(22);process.stdout.write(fs.readFileSync(x.artifacts.find(a=>String(a.id)===url.split('/artifacts/')[1].split('/')[0]).fixturePath));process.exit(0);}
 if(url.includes('/runs?')&&x.runSequence?.length){x.runs=x.runSequence.shift();fs.writeFileSync(process.env.ROUTING_GITHUB,JSON.stringify(x));}
 if(url.includes('/pulls?')&&x.pullSequence?.length){x.pulls=x.pullSequence.shift();fs.writeFileSync(process.env.ROUTING_GITHUB,JSON.stringify(x));}
 if(x.error){process.stderr.write('controlled unavailable GitHub');process.exit(22);}
 const jobs=x.jobsByAttempt?.[url.split('/runs/')[1]?.split('/jobs?')[0]]??x.jobsByRun?.[url.split('/runs/')[1]?.split('/')[0]]??x.jobs;
 const artifacts=(x.artifacts||[]).filter(a=>String(a.workflow_run.id)===url.split('/runs/')[1]?.split('/')[0]);
-console.log(JSON.stringify(url.includes('/artifacts?')?{total_count:artifacts.length,artifacts}:url.includes('/jobs?')?{total_count:jobs.length,jobs}:url.includes('/attempts/')?x.attempts?.[url.split('/runs/')[1].replace('/attempts/','/')]:url.includes('/pulls?')?(x.pulls??[]).map(({mergeable,...listed})=>listed):url.includes('/pulls/')?x.pulls?.[0]:url.includes('/git/commits/')?(x.commits?.[url.split('/git/commits/')[1]]??x.merge):url.includes('/git/trees/')?x.tree:{total_count:x.omitRunTotal?undefined:x.runs.length,workflow_runs:x.runs}));
+console.log(JSON.stringify(url.includes('/statuses?')?(x.statusesBySha?.[url.split('/commits/')[1]?.split('/')[0]]??x.statuses):url.includes('/commits/')&&url.includes('/pulls?')?(x.associatedBySha?.[url.split('/commits/')[1]?.split('/')[0]]??x.pulls):url.includes('/compare/')?(x.comparison??{}):url.includes('/commits/')&&!url.includes('/git/commits/')?(x.restCommits?.[url.split('/commits/')[1]]??{}):url.includes('/artifacts?')?{total_count:artifacts.length,artifacts}:url.includes('/jobs?')?{total_count:jobs.length,jobs}:url.includes('/attempts/')?x.attempts?.[url.split('/runs/')[1].replace('/attempts/','/')]:url.includes('/pulls?')?(x.pulls??[]).map(({mergeable,...listed})=>listed):url.includes('/pulls/')?x.pulls?.[0]:url.includes('/git/commits/')?(x.commits?.[url.split('/git/commits/')[1]]??x.merge):url.includes('/git/trees/')?x.tree:{total_count:x.omitRunTotal?undefined:(x.runsByHead?.[new URL(url).searchParams.get('head_sha')]??x.runs).length,workflow_runs:x.runsByHead?.[new URL(url).searchParams.get('head_sha')]??x.runs}));
 `);
   writeFileSync(path.join(bin, 'node'), '#!/bin/sh\nif [ "$1" = "-p" ] && [ "$ROUTING_READ_FAILURE" = "1" ]; then exit 1; fi\nexec ' + JSON.stringify(process.execPath) + ' "$@"\n');
   chmodSync(path.join(bin, 'node'), 0o755);
   chmodSync(path.join(bin, 'npm'), 0o755); chmodSync(path.join(bin, 'curl'), 0o755);
-  return { root, source, bin, base, head, merge, tree, journal, external, attempt: 0 };
+  return { root, source, bin, base, head, merge, tree, journal, external, early, attempt: 0 };
 }
 
 // Public routing-command consumer fixtures; the grouped workflow's actual
 // scanner command is separately executed by test-groups.test.mjs.
 function cohortShell() {
-  return `set -- --max-wait-ms 1000 --poll-interval-ms 1 --comparison-base "$ROUTING_BASE" --evidence-dir "$ROUTING_OUTPUT/ci-routing"
+  return `set -- --max-wait-ms "\${ROUTING_MAX_WAIT:-1000}" --poll-interval-ms 1 --comparison-base "$ROUTING_BASE" --evidence-dir "$ROUTING_OUTPUT/ci-routing"
 if [[ -n "\${ROUTING_DESCRIPTOR:-}" ]]; then set -- "$@" --descriptor "$ROUTING_DESCRIPTOR"; fi
+if [[ -n "\${ROUTING_RESUME:-}" ]]; then set -- "$@" --resume "$ROUTING_RESUME"; fi
 if [[ "\${ROUTING_REQUIRE_INPUT_PASSES:-}" == "1" ]]; then set -- "$@" --require-input-passes 1; fi
 if [[ -n "\${ROUTING_INPUT_PROOF:-}" ]]; then set -- "$@" --input-proof "$ROUTING_INPUT_PROOF"; fi
 node "$ROUTING_COMMAND" "$@"
 decision="$(node -p "require('$ROUTING_OUTPUT/ci-routing/routing.json').decision")"
-if [[ "$decision" == "full" ]]; then npm test; elif [[ "$decision" != "reuse" ]]; then exit 1; fi`;
+if [[ "$decision" == "full" ]]; then
+  if [[ "$(node -p "Object.keys(require('$ROUTING_OUTPUT/ci-routing/routing.json').inputPasses||{}).length")" != "6" ]]; then npm test; fi
+elif [[ "$decision" != "reuse" && "$decision" != "policy-reuse" ]]; then exit 1; fi`;
 }
 
 function invoke(f, { event = 'push', ref = 'refs/heads/topic', source = f.head, checkout = f.head, base = f.base, action = 'synchronize', changes = undefined, planOnly = false, environment = {} } = {}) {
@@ -76,7 +86,7 @@ function invoke(f, { event = 'push', ref = 'refs/heads/topic', source = f.head, 
   writeFileSync(eventPath, JSON.stringify(event === 'pull_request' ? {
     action, changes, number: 17, pull_request: { number: 17, head: { sha: source, ref: 'topic', repo: { full_name: 'fixture/repo' } }, base: { sha: base, ref: 'main' } },
   } : { after: source, before: base, repository: { full_name: 'fixture/repo' } }));
-  const result = spawnSync('bash', ['-euo', 'pipefail', '-c', planOnly ? 'node "$ROUTING_COMMAND" --comparison-base "$ROUTING_BASE" --evidence-dir "$ROUTING_OUTPUT/ci-routing" --plan-only 1' : cohortShell()], {
+  const result = spawnSync('bash', ['-euo', 'pipefail', '-c', planOnly ? 'set -- --comparison-base "$ROUTING_BASE" --evidence-dir "$ROUTING_OUTPUT/ci-routing" --plan-only 1; if [[ -n "${ROUTING_DESCRIPTOR:-}" ]]; then set -- "$@" --descriptor "$ROUTING_DESCRIPTOR"; fi; node "$ROUTING_COMMAND" "$@"' : cohortShell()], {
     cwd: f.source, encoding: 'utf8', timeout: 15000,
     env: { ...process.env, PATH: f.bin + path.delimiter + process.env.PATH,
       ROUTING_COMMAND: command, ROUTING_BASE: base, ROUTING_OUTPUT: output,
@@ -137,7 +147,7 @@ function attachInputArtifacts(f,github,jobs){
     const stdout='TAP version 13\n# tests 24\n# pass 24\n# fail 0\n# cancelled 0\n# skipped 0\n';
     writeFileSync(path.join(directory,prefix,'stdout.tap'),stdout);writeFileSync(path.join(directory,prefix,'stderr.log'),'');
     const native=gate==='native-process'&&f.largeNativeEvidence?f.largeNativeEvidence:'{"status":"passed","mode":"original"}\n';writeFileSync(path.join(directory,prefix,'native/original.json'),native);
-    const report={status:'passed',resultIdentity:{repository:'fixture/repo',runId:String(job.run_id),runAttempt:emulator?String(job.run_attempt):Number(job.run_attempt),sourceSha:job.head_sha,checkoutSha:f.merge,checkoutTree:f.tree,comparisonBase:f.base,selectedGroup:gate,checkoutDirty:false},
+    const report={status:'passed',resultIdentity:{repository:'fixture/repo',runId:String(job.run_id),runAttempt:emulator?String(job.run_attempt):Number(job.run_attempt),sourceSha:job.head_sha,checkoutSha:f.merge,checkoutTree:f.tree,comparisonBase:f.base,selectedGroup:gate,checkoutDirty:false,...(f.artifactIdentity||{})},
       issues:[],cases:[{id:'original fixture case',status:'passed'}],artifacts:[{path:'native/original.json',bytes:Buffer.byteLength(native),sha256:hash(native)}],process:{exitCode:0,signal:null,spawnError:null,stdout:{path:'stdout.tap',sha256:hash(stdout)},stderr:{path:'stderr.log',sha256:hash('')},stdoutSha256:hash(stdout),stderrSha256:hash('')},tests:24,passed:24};
     const bytes=JSON.stringify(report);writeFileSync(path.join(directory,prefix,'result.json'),bytes);
     marker.name=marker.name.replace(/result [a-f0-9]{64}$/,`result ${hash(bytes)}`);
@@ -338,6 +348,22 @@ test('workflow input reuse retains large original native evidence and rejects ch
       assert.equal(main.record.inputPasses['native-process'].coveredBy.runId,'71');
     }else{assert.equal(main.record.inputPasses['native-process'],undefined,scenario+' must require current execution');}
   });
+});
+
+test('reconciled input reuse retains transferred early and browser evidence bytes', async parent=>{
+ for(const kind of ['earlyReceiptRef','browserRuntimeReceipt'])for(const changed of [false,true])await parent.test(kind+(changed?' changed':' original'),t=>{
+  const f=fixture(t),plan=invoke(f,{event:'pull_request',checkout:f.merge,planOnly:true}),github=publishedInputPass(f,plan.record,['native-process']);
+  const artifact=github.artifacts[0],directory=artifact.fixturePath.slice(0,-4),reportPath=path.join(directory,'result.json'),report=JSON.parse(readFileSync(reportPath));
+  const folder=kind==='earlyReceiptRef'?'early-startup-evidence':'browser-runtime-preflight';mkdirSync(path.join(directory,folder));
+  const raw=Buffer.from('retained actual raw fixture stream\n'),hash=bytes=>createHash('sha256').update(bytes).digest('hex');
+  writeFileSync(path.join(directory,folder,'raw.tap'),changed?'changed bytes\n':raw);
+  const receipt=Buffer.from(JSON.stringify({status:'passed',resultIdentity:report.resultIdentity,identity:{descriptor:report.resultIdentity},artifacts:[{path:'raw.tap',bytes:raw.length,sha256:hash(raw)}]}));
+  writeFileSync(path.join(directory,folder,'receipt.json'),receipt);report[kind]={path:folder+'/receipt.json',sha256:hash(receipt)};
+  const bytes=JSON.stringify(report);writeFileSync(reportPath,bytes);github.jobs.find(job=>job.name==='regression-native-process').steps.find(step=>step.name.startsWith('Completed CI gate ')).name=`Completed CI gate native-process input ${plan.record.inputKeys['native-process']} result ${hash(bytes)}`;
+  assert.equal(spawnSync('zip',['-qr',artifact.fixturePath,'.'],{cwd:directory}).status,0);artifact.digest='sha256:'+hash(readFileSync(artifact.fixturePath));writeFileSync(f.external,JSON.stringify(github));
+  const result=invoke(f,{ref:'refs/heads/main',checkout:f.merge,source:f.merge});assert.equal(result.status,0,result.stderr);
+  assert.equal(Boolean(result.record.inputPasses['native-process']),!changed,'Changed transferred evidence must execute the gate instead of accepting a stale original');
+ });
 });
 
 test('workflow avoids a second complete cohort only for an already successful exact validation context', t => {
@@ -561,17 +587,48 @@ test('workflow routing refuses a descriptor for a different validation candidate
 
 
 const groupedIds=['core','scenery','persistence-recovery','native-process'];
-function descriptorFor(f,checkout) {
+function descriptorFor(f,checkout,source=f.head) {
   const file=path.join(f.root,'descriptor-'+(f.attempt+1)+'.json');
-  writeFileSync(file,JSON.stringify({resultIdentity:{repository:'fixture/repo',sourceSha:f.head,sourceTree:f.tree,checkoutSha:checkout,checkoutTree:git(f.source,'rev-parse',checkout+'^{tree}'),comparisonBase:f.base,runId:String(101+f.attempt),runAttempt:1,checkoutDirty:false,cohortDigestSha256:'1'.repeat(64),inventorySha256:'2'.repeat(64),assignmentsSha256:'3'.repeat(64),expectedGroups:groupedIds}}));
+  writeFileSync(file,JSON.stringify({resultIdentity:{repository:'fixture/repo',sourceSha:source,sourceTree:git(f.source,'rev-parse',source+'^{tree}'),checkoutSha:checkout,checkoutTree:git(f.source,'rev-parse',checkout+'^{tree}'),comparisonBase:f.base,runId:String(101+f.attempt),runAttempt:1,checkoutDirty:false,cohortDigestSha256:'1'.repeat(64),inventorySha256:'2'.repeat(64),assignmentsSha256:'3'.repeat(64),expectedGroups:groupedIds}}));
   return {ROUTING_DESCRIPTOR:file};
 }
 function publishedGroups(f,record) {
   published(f,record);const github=JSON.parse(readFileSync(f.external));
   github.tree={truncated:false,tree:['.github/workflows/data-safety.yml','scripts/test-group-inventory.json','scripts/test-group-assignments.json','scripts/test-groups.mjs','scripts/agent-tools/ci-routing.mjs'].map(file=>({path:file,type:'blob',sha:git(f.source,'rev-parse',f.head+':'+file)}))};
   const original=github.jobs[0];original.steps=[{name:`Complete regression context ${record.contextSha256} report ${'8'.repeat(64)}`,conclusion:'success'}];
-  github.jobs=['validation-context','event-gates','cohort-routing',...groupedIds.map(id=>'regression-'+id)].map(name=>({...original,name,steps:name==='validation-context'?[{name:`Announce regression context ${record.contextSha256}`,conclusion:'success'}]:[]})).concat(original);
+  github.jobs=['validation-context','event-gates','cohort-routing',...(f.early?['early-startup','mobile-stress']:[]),...groupedIds.map(id=>'regression-'+id)].map(name=>({...original,name,steps:name==='validation-context'?[{name:`Announce regression context ${record.contextSha256}`,conclusion:'success'}]:name==='early-startup'?[{name:`Complete early startup report ${'6'.repeat(64)}`,conclusion:'success'}]:name==='cohort-routing'?[{name:`Admit original full producer context ${record.contextSha256}`,status:'completed',conclusion:'success'}]:[]})).concat(original);
   writeFileSync(f.external,JSON.stringify(github));return github;
+}
+function publishedOriginalEarly(f,record,github,variant='valid'){
+ const original=github.runs[0],id={...JSON.parse(readFileSync(path.join(f.root,'descriptor-1.json'))).resultIdentity,...Object.fromEntries(['repository','sourceSha','sourceTree','checkoutSha','checkoutTree','comparisonBase','cohortDigestSha256','inventorySha256','assignmentsSha256','expectedGroups'].map(key=>[key,record.cohortContext[key]])),runId:String(original.id),runAttempt:Number(original.run_attempt),eventPolicy:record.cohortContext.eventPolicy};
+ const root=path.join(f.root,'original-early'),policy={eventPolicy:id.eventPolicy,eventName:'pull_request',eventRef:'refs/pull/17/merge'};
+ const required=createMobileBundle(path.join(root,'required'),{candidateCommit:id.checkoutSha,candidateTree:id.checkoutTree,sourceSha:id.sourceSha,repository:id.repository,runId:id.runId,runAttempt:id.runAttempt,eventPolicy:id.eventPolicy});
+ const stress=createMobileBundle(path.join(f.root,'original-stress'),{candidateCommit:id.checkoutSha,candidateTree:id.checkoutTree,sourceSha:id.sourceSha,repository:id.repository,runId:id.runId,runAttempt:id.runAttempt,eventPolicy:id.eventPolicy},'stress-512mb');
+ for(const bundle of [required,stress]){bundle.report.hostedPolicy=policy;for(const row of [bundle.report.negativeControl,...bundle.report.cases]){row.hostedPolicy=policy;row.server.hostedPolicy=policy;}for(const native of Object.values(bundle.native))native.hostedPolicy=policy;refreshMobileBundle(bundle);}
+ if(variant==='wrong cap'){required.report.requiredStory.memoryBudgetBytes=512000000;refreshMobileBundle(required);}
+ const names=['RISK repository process: Playwright waitForFunction predicates are synchronous','RISK repository process: scenery consumers use allocated fallback ports and preserve early native failures','RISK repository process: native scene-time bursts cannot activate controls behind a refused top-layer release'];
+ writeFileSync(path.join(root,'harness.stdout'),'TAP version 13\n'+names.map((name,i)=>`# Subtest: ${name}\nok ${i+1} - ${name}\n`).join(''));writeFileSync(path.join(root,'harness.stderr'),'');
+ const hash=bytes=>createHash('sha256').update(bytes).digest('hex'),artifacts=[];const visit=dir=>{for(const item of readdirSync(dir,{withFileTypes:true})){const file=path.join(dir,item.name);if(item.isDirectory())visit(file);else{const bytes=readFileSync(file);artifacts.push({path:path.relative(root,file).split(path.sep).join('/'),bytes:bytes.length,sha256:hash(bytes)});}}};
+ visit(root);
+ const receipt={schemaVersion:1,status:'passed',mode:variant==='covered early'?'covered':'full',identity:{descriptor:id,workflowBlob:record.cohortContext.workflowBlob,harnessSourceSha256:hash(readFileSync(path.join(f.source,'scripts/early-ci-harness-source.json'))),runtime:record.inputContext.runtime,eventName:'pull_request',eventRef:'refs/pull/17/merge'},children:['harness','required-1gb'].map(kind=>({kind,exitCode:0,signal:null,error:null})),harnessCaseCount:3,artifacts:artifacts.sort((a,b)=>a.path.localeCompare(b.path))};
+ if(variant==='changed runtime')receipt.identity.runtime={...receipt.identity.runtime,imageVersion:'mutated-original-image'};
+ if(variant==='unknown runtime')delete receipt.identity.runtime;
+ const bytes=JSON.stringify(receipt);writeFileSync(path.join(root,'receipt.json'),bytes);
+ if(variant==='changed raw')writeFileSync(path.join(root,'harness.stdout'),'changed stream\n');
+ for(const [name,directory]of [['early-startup',root],['mobile-stress',stress.directory]]){
+  const job=github.jobs.find(job=>job.name===name);Object.assign(job,{id:name==='early-startup'?1701:1702,started_at:'2026-10-27T10:00:00Z',completed_at:'2026-10-27T10:01:00Z'});
+  job.steps=[{name:name==='early-startup'?'Required saved harness and populated mobile startup':'Report 512MB application stress with required execution integrity',status:'completed',conclusion:'success'},...(name==='early-startup'?[{name:`Complete early startup report ${hash(bytes)}`,status:'completed',conclusion:'success'}]:[])];
+  const archive=directory+'.zip';assert.equal(spawnSync('zip',['-qr',archive,'.'],{cwd:directory}).status,0);const data=readFileSync(archive);
+  github.artifacts||=[];if(variant!=='missing early'||name!=='early-startup')github.artifacts.push({id:2000+github.artifacts.length,name:`${name}-${original.id}-${original.run_attempt}`,expired:false,created_at:'2026-10-27T10:00:45Z',expires_at:'2030-01-01T00:00:00Z',digest:'sha256:'+hash(data),workflow_run:{id:original.id,head_sha:original.head_sha},fixturePath:archive});
+ }
+ return hash(bytes);
+}
+function publishedOriginalAggregate(f,context,github,run,jobs,{early=null,mode='full'}={}){
+ const hash=bytes=>createHash('sha256').update(bytes).digest('hex'),id={...context,runId:String(run.id),runAttempt:Number(run.run_attempt),checkoutDirty:false,selectedGroup:null};
+ const report={schemaVersion:1,status:'passed',mode,resultIdentity:id,issues:[],emulatorCoverage:{},caseCount:4,groups:groupedIds.map(group=>({group,cases:1,earlyCases:0,resultSha256:jobs.find(job=>job.name==='regression-'+group).steps.find(step=>step.name.startsWith('Completed CI gate ')).name.split(' result ')[1],identity:{...id,selectedGroup:group}})),...(early?{earlyEvidence:{mode:'full',receiptSha256:early},stressEvidence:{status:'passed',reportSha256:hash(readFileSync(path.join(f.root,'original-stress/report.json')))}}:{})};
+ const directory=path.join(f.root,'original-aggregate');mkdirSync(path.join(directory,'aggregate'),{recursive:true});const bytes=JSON.stringify(report);writeFileSync(path.join(directory,'aggregate/aggregate.json'),bytes);
+ const job=jobs.find(job=>job.name==='scanner-tests');for(const step of job.steps)if(/ report [a-f0-9]{64}/.test(step.name))step.name=step.name.replace(/ report [a-f0-9]{64}/,' report '+hash(bytes));Object.assign(job,{id:job.id||1800,started_at:'2026-10-27T10:00:00Z',completed_at:'2026-10-27T10:01:00Z'});
+ const archive=directory+'.zip';assert.equal(spawnSync('zip',['-qr',archive,'.'],{cwd:directory}).status,0);github.artifacts||=[];github.artifacts.push({id:3000+github.artifacts.length,name:`scanner-aggregate-${run.id}-${run.run_attempt}`,expired:false,created_at:'2026-10-27T10:00:45Z',expires_at:'2030-01-01T00:00:00Z',digest:'sha256:'+hash(readFileSync(archive)),workflow_run:{id:run.id,head_sha:run.head_sha},fixturePath:archive});
 }
 test('grouped routing reuses only an exact completed reconciled producer and preserves origin attempt', async parent => {
   const scenarios=[
@@ -603,8 +660,369 @@ test('grouped metadata-only edited PR reuses only its completed exact merge cont
 
 test('metadata edits continue past verified covered runs to the original full producer', t => {
   const f=fixture(t,true),first=invoke(f,{event:'pull_request',checkout:f.merge,environment:descriptorFor(f,f.merge)});assert.equal(first.status,0,first.stderr);
-  const github=publishedGroups(f,first.record),covered=github.jobs.map(job=>({...job,run_id:72,run_attempt:1,steps:job.name==='scanner-tests'?[{name:`Verified complete cohort ${first.record.contextSha256} report ${'9'.repeat(64)} mode reuse`,conclusion:'success'}]:job.steps}));
+  const github=publishedGroups(f,first.record),covered=github.jobs.map(job=>({...job,run_id:72,run_attempt:1,steps:job.name==='cohort-routing'?[]:job.name==='scanner-tests'?[{name:`Verified complete cohort ${first.record.contextSha256} report ${'9'.repeat(64)} mode reuse`,conclusion:'success'}]:job.steps}));
   github.jobsByRun={'71':github.jobs,'72':covered};github.runs.unshift({...github.runs[0],id:72,run_attempt:1});writeFileSync(f.external,JSON.stringify(github));
   const edited=invoke(f,{event:'pull_request',checkout:f.merge,action:'edited',changes:{title:{from:'earlier title'}},environment:descriptorFor(f,f.merge)});
   assert.equal(edited.status,0,edited.stderr);assert.equal(edited.record.decision,'reuse',edited.stdout);assert.equal(edited.record.coveredBy.runId,'71');assert.equal(edited.record.coveredBy.runAttempt,'2');assert.equal(executions(f).length,1);
+});
+
+
+function publishedPolicyBase(f) {
+  const baseTree=git(f.source,'rev-parse',f.base+'^{tree}'),baseParent=git(f.source,'rev-parse',f.base+'^');
+  const plan=deriveReleaseReviewPlan(f.source,f.head,f.base);
+  const canonical=value=>Array.isArray(value)?'['+value.map(canonical).join(',')+']':value&&typeof value==='object'?'{'+Object.keys(value).sort().map(key=>JSON.stringify(key)+':'+canonical(value[key])).join(',')+'}':JSON.stringify(value);
+  const prefix=createHash('sha256').update(canonical(plan)).digest('hex').slice(0,12);
+  const description=`r=${'7'.repeat(64)};b=${f.base};p=${prefix};c=0;s=1;v=4`;
+  const context={repository:'fixture/repo',sourceSha:f.base,sourceTree:baseTree,checkoutSha:f.base,checkoutTree:baseTree,comparisonBase:baseParent,eventPolicy:'exact-main-push-v1',requiredCohort:'four-groups-v1',runtime:{node:process.versions.node,platform:process.platform,arch:process.arch},cohortDigestSha256:'1'.repeat(64),inventorySha256:'2'.repeat(64),assignmentsSha256:'3'.repeat(64),expectedGroups:groupedIds,workflowBlob:git(f.source,'rev-parse',f.base+':.github/workflows/data-safety.yml'),...(f.early?{earlyPolicy:'saved-harness-required-mobile-v1'}:{})};
+  const digest=createHash('sha256').update(JSON.stringify(context)).digest('hex');
+  const step=name=>({name,status:'completed',conclusion:'success'});
+  const names=['validation-context','event-gates','cohort-routing',...(f.early?['early-startup','mobile-stress']:[]),...groupedIds.map(id=>'regression-'+id),'scanner-tests','release-evidence','deploy-pages'];
+  const github={runs:[{id:70,run_attempt:1,status:'completed',conclusion:'success',event:'push',head_branch:'main',head_sha:f.base,name:'Data safety',path:'.github/workflows/data-safety.yml',repository:{full_name:'fixture/repo'},head_repository:{full_name:'fixture/repo'}}],jobs:names.map(name=>({name,status:'completed',conclusion:'success',run_id:70,run_attempt:1,head_sha:f.base,steps:name==='validation-context'?[step(`Announce regression context ${digest}`),step(`Actual checkout ${f.base} tree ${baseTree}`),step(`Validation source ${f.base} base ${baseParent}`),step(`Workflow blob ${context.workflowBlob} policy four-groups-v1`)]:name==='early-startup'?[step(`Complete early startup report ${'6'.repeat(64)}`)]:name==='scanner-tests'?[step(`Complete regression context ${digest} report ${'8'.repeat(64)}`)]:name.startsWith('regression-')?[step('Execute complete assigned group')]:name==='event-gates'?[step('Run npm run test:rules'),step('Backward compatibility')]:[]})),statuses:['funsidething/memory-audit','funsidething/independent-review','funsidething/specialist-review'].map(context=>({context,state:'success',description,created_at:new Date().toISOString()}))};
+  github.fixtureContext=context;writeFileSync(f.external,JSON.stringify(github));return github;
+}
+
+test('policy prose routing inherits only a successful full exact-base product cohort and current reviews', t=>{
+  const f=fixture(t,true,true);
+  // A genuine baseline parent is needed for the full producer's own comparison.
+  // Amend no source after publishing the immutable fixture identities.
+  const github=publishedPolicyBase(f);
+  const result=invoke(f,{event:'pull_request',checkout:f.merge,environment:descriptorFor(f,f.merge)});
+  assert.equal(result.status,0,result.stdout+result.stderr);
+  assert.equal(result.record?.decision,'policy-reuse','unchanged product execution is inherited only after current policy review and authoritative base cohort checks');
+  assert.equal(executions(f).length,0,'the policy route must not claim another current product execution');
+  assert.equal(result.record.coveredBy.runId,'70');assert.equal(result.record.coveredBy.reportSha256,'8'.repeat(64));
+  assert.equal(result.record.policyImpact.sourceSha,f.head);assert.equal(result.record.policyImpact.baseSha,f.base);
+  assert.equal(result.record.cohortContext.sourceSha,f.base);assert.equal(result.record.validationContext.sourceSha,f.head);
+});
+
+
+test('policy prose routing rejects incomplete inherited rule and compatibility execution',t=>{
+ const f=fixture(t,true,true),github=publishedPolicyBase(f);github.jobs.find(job=>job.name==='event-gates').steps=[];writeFileSync(f.external,JSON.stringify(github));
+ const result=invoke(f,{event:'pull_request',checkout:f.merge,environment:descriptorFor(f,f.merge)});
+ assert.equal(result.status,0,result.stdout+result.stderr);assert.equal(result.record.decision,'full','inheriting an aggregate cannot silently skip the original rules/compatibility gates');assert.equal(executions(f).length,1);
+});
+
+test('reconciled policy input routing refuses an unretained full-product origin',t=>{
+ const f=fixture(t,true,true);publishedPolicyBase(f);
+ const result=invoke(f,{event:'pull_request',checkout:f.merge,environment:{...descriptorFor(f,f.merge),ROUTING_REQUIRE_INPUT_PASSES:'1'}});
+ assert.equal(result.status,0,result.stderr);assert.equal(result.record.decision,'full','A legacy full marker cannot substitute for six retained original gate passes in the hosted policy path');
+ assert.equal(executions(f).length,1,'Unavailable policy inheritance falls back to actual required execution');
+});
+
+test('reconciled policy routing uses six keyed originals and refuses a covered origin',t=>{
+ const f=fixture(t,true,true),github=publishedPolicyBase(f),baseTree=git(f.source,'rev-parse',f.base+'^{tree}'),parent=git(f.source,'rev-parse',f.base+'^');
+ const inputs={policy:'complete-ci-inputs-v1',repository:'fixture/repo',checkoutTree:baseTree,comparisonBase:parent,runtime:{node:process.versions.node,platform:process.platform,arch:process.arch,imageOS:'ubuntu24',imageVersion:'20261022.1.0'}};
+ const gates=['core','scenery','persistence-recovery','native-process','rules','compatibility'];
+ for(const [index,job]of github.jobs.entries()){
+  job.id=700+index;job.started_at='2026-10-27T10:00:00Z';job.completed_at='2026-10-27T10:01:00Z';
+  if(job.name==='event-gates')job.steps=[];
+  for(const gate of gates.filter(gate=>job.name===(['rules','compatibility'].includes(gate)?'event-gates':'regression-'+gate))){
+   const key=createHash('sha256').update(JSON.stringify({...inputs,gate})).digest('hex');
+   job.steps.push({name:`Execute CI gate ${gate} input ${key}`,status:'completed',conclusion:'success',completed_at:'2026-10-27T10:00:11Z'},{name:`Completed CI gate ${gate} input ${key} result ${'8'.repeat(64)}`,status:'completed',conclusion:'success',completed_at:'2026-10-27T10:00:50Z'});
+  }
+ }
+ f.artifactIdentity={checkoutSha:f.base,checkoutTree:baseTree,comparisonBase:parent};attachInputArtifacts(f,github,github.jobs);publishedOriginalAggregate(f,github.fixtureContext,github,github.runs[0],github.jobs);github.commits={[f.base]:{sha:f.base,tree:{sha:baseTree},parents:[{sha:parent}]}};writeFileSync(f.external,JSON.stringify(github));
+ const environment={...descriptorFor(f,f.merge),ROUTING_REQUIRE_INPUT_PASSES:'1'};
+ const result=invoke(f,{event:'pull_request',checkout:f.merge,environment});assert.equal(result.status,0,result.stderr);
+ assert.equal(result.record.decision,'policy-reuse','The current workflow names must admit the retained original full execution');assert.equal(Object.keys(result.record.policyInputPasses).length,6);for(const gate of groupedIds.concat(['rules','compatibility']))assert.deepEqual(result.record.gateDecisions[gate].original,result.record.policyInputPasses[gate].coveredBy,'Durable policy decisions retain the actual original producer');assert.equal(executions(f).length,0);
+ const workflow=readFileSync(path.join(repo,'.github/workflows/data-safety.yml'),'utf8'),upload=workflow.match(/- name: Preserve emulator gate evidence\n([\s\S]*?)\n      - name:/)?.[1];
+ assert.match(upload||'',/if: always\(\) && steps\.selected\.outputs\.decision != 'policy-reuse'/,'Policy inheritance produces no current emulator archive; its upload must be skipped rather than failing the required job');
+ github.jobs.find(job=>job.name==='scanner-tests').steps[0].name=`Verified complete cohort ${result.record.contextSha256} report ${'8'.repeat(64)} mode reuse`;writeFileSync(f.external,JSON.stringify(github));
+ const covered=invoke(f,{event:'pull_request',checkout:f.merge,environment:{...descriptorFor(f,f.merge),ROUTING_REQUIRE_INPUT_PASSES:'1'}});assert.equal(covered.status,0,covered.stderr);assert.equal(covered.record.decision,'full','A covered or mixed consumer cannot become the policy origin');
+});
+
+function publishedReviewedProductOrigin(f,record,variant='valid'){
+ const github=publishedPolicyBase(f),tree=git(f.source,'rev-parse',f.base+'^{tree}'),base=git(f.source,'rev-parse',f.base+'^');
+ const head=git(f.source,'commit-tree',tree,'-p',base,'-m','independently reviewed full product head'),checkout=git(f.source,'commit-tree',tree,'-p',base,'-p',head,'-m','original full PR checkout');
+ const context={...record.cohortContext,sourceSha:head,sourceTree:tree,checkoutSha:checkout,checkoutTree:tree,comparisonBase:base,eventPolicy:'canonical-pr-merge-v1'};
+ const digest=createHash('sha256').update(JSON.stringify(context)).digest('hex'),runtime=variant==='original earlier image'?{...record.inputContext.runtime,imageVersion:'20261021.1.0'}:record.inputContext.runtime,inputs={policy:'complete-ci-inputs-v1',repository:'fixture/repo',checkoutTree:tree,comparisonBase:base,runtime};
+ const origin={id:71,run_attempt:2,status:'completed',conclusion:'success',event:'pull_request',head_sha:head,name:'Data safety',path:'.github/workflows/data-safety.yml',repository:{full_name:'fixture/repo'},head_repository:{full_name:'fixture/repo'}};
+ const originalJobs=github.jobs.map((job,index)=>({...job,id:1700+index,run_id:71,run_attempt:2,head_sha:head,started_at:'2026-10-27T10:00:00Z',completed_at:'2026-10-27T10:01:00Z',steps:[]}));
+ const step=name=>({name,status:'completed',conclusion:'success'});
+ originalJobs.find(job=>job.name==='validation-context').steps=[`Announce regression context ${digest}`,`Actual checkout ${checkout} tree ${tree}`,`Validation source ${head} base ${base}`,`Workflow blob ${context.workflowBlob} policy four-groups-v1`].map(step);
+ originalJobs.find(job=>job.name==='cohort-routing').steps=[step(`Admit original full producer context ${digest}`)];
+ originalJobs.find(job=>job.name==='scanner-tests').steps=[step(`${variant==='covered origin'?'Verified complete cohort':'Complete regression context'} ${digest} report ${'8'.repeat(64)}${variant==='covered origin'?' mode reuse':''}`)];
+ for(const gate of ['core','scenery','persistence-recovery','native-process','rules','compatibility']){
+  const job=originalJobs.find(job=>job.name===(['rules','compatibility'].includes(gate)?'event-gates':'regression-'+gate)),key=createHash('sha256').update(JSON.stringify({...inputs,gate})).digest('hex');
+  if(job.name.startsWith('regression-'))job.steps.push(step('Execute complete assigned group'));
+  job.steps.push({...step(`Execute CI gate ${gate} input ${key}`),completed_at:'2026-10-27T10:00:11Z'},{...step(`Completed CI gate ${gate} input ${key} result ${'8'.repeat(64)}`),completed_at:'2026-10-27T10:00:50Z'});
+ }
+ const mainJobs=github.jobs;mainJobs.find(job=>job.name==='scanner-tests').steps=[step(`Verified complete cohort ${digest} report ${'9'.repeat(64)} mode reuse`)];
+ github.runs=[origin,...github.runs];github.runsByHead={[head]:[origin],[f.base]:github.runs.filter(run=>run.id===70)};github.jobs=originalJobs;github.jobsByRun={'71':originalJobs,'70':mainJobs};github.attempts={'71/1':{...origin,run_attempt:1,conclusion:'failure'}};github.jobsByAttempt={'71/attempts/1':[]};
+ f.artifactIdentity={checkoutSha:checkout,checkoutTree:tree,comparisonBase:base};attachInputArtifacts(f,github,originalJobs);
+ const early=publishedOriginalEarly(f,{...record,cohortContext:context,inputContext:inputs},github);
+ github.commits={[checkout]:{sha:checkout,tree:{sha:tree},parents:[{sha:base},{sha:head}]}};
+ github.restCommits={[f.base]:{sha:f.base,parents:[{sha:base}],commit:{tree:{sha:tree}}},[head]:{sha:head,parents:[{sha:base}],commit:{tree:{sha:variant==='changed reviewed tree'?'f'.repeat(40):tree}}}};
+ github.associatedBySha={[f.base]:[{number:19,merge_commit_sha:f.base,merged_at:'2026-10-27T10:02:00Z',head:{sha:head,ref:'product',repo:{full_name:'fixture/repo'}},base:{sha:base,ref:'main',repo:{full_name:'fixture/repo'}}}]};github.comparison={status:'ahead'};
+ const plan=deriveReleaseReviewPlan(f.source,head,base),canonical=value=>Array.isArray(value)?'['+value.map(canonical).join(',')+']':value&&typeof value==='object'?'{'+Object.keys(value).sort().map(key=>JSON.stringify(key)+':'+canonical(value[key])).join(',')+'}':JSON.stringify(value);
+ const prefix=createHash('sha256').update(canonical(plan)).digest('hex').slice(0,12),description=`r=${'5'.repeat(64)};b=${base};p=${prefix};c=${plan.requiresCodeReview?1:0};s=${plan.requiresSpecialistReview?1:0};v=${variant==='policy receipt'?4:3}`;
+ github.statusesBySha={[head]:['funsidething/memory-audit','funsidething/independent-review','funsidething/specialist-review'].map(context=>({context,state:'success',description,created_at:new Date().toISOString()}))};
+ if(variant!=='missing aggregate')publishedOriginalAggregate(f,context,github,origin,originalJobs,{early,mode:variant==='mixed aggregate'?'mixed':'full'});
+ writeFileSync(f.external,JSON.stringify(github));return{head,base,checkout,tree,early,github};
+}
+
+test('reconciled policy routing directly verifies the reviewed full origin behind covered main',async parent=>{
+ for(const variant of ['valid','original earlier image','covered origin','changed reviewed tree','policy receipt','missing aggregate','mixed aggregate'])await parent.test(variant,t=>{
+  const f=fixture(t,true,true,true),initial=invoke(f,{event:'pull_request',checkout:f.merge,planOnly:true,environment:descriptorFor(f,f.merge)});assert.equal(initial.status,0,initial.stderr);
+  const original=publishedReviewedProductOrigin(f,initial.record,variant),result=invoke(f,{event:'pull_request',checkout:f.merge,environment:{...descriptorFor(f,f.merge),ROUTING_REQUIRE_INPUT_PASSES:'1'}});assert.equal(result.status,0,result.stdout+result.stderr);
+  assert.equal(result.record.decision,['valid','original earlier image'].includes(variant)?'policy-reuse':'full','Only the directly bound full reviewed execution may supply inherited product coverage: '+result.record.reason);
+  if(['valid','original earlier image'].includes(variant)){assert.equal(result.record.policyOriginReview.reviewedSha,original.head);assert.equal(result.record.policyOriginReview.deployedSha,f.base);assert.equal(result.record.policyOriginReview.receiptSha256,'5'.repeat(64));assert.equal(result.record.cohortContext.sourceSha,original.head);assert.equal(result.record.cohortContext.comparisonBase,original.base);assert.equal(result.record.coveredBy.runId,'71');assert.equal(result.record.coveredBy.earlyReportSha256,original.early);assert.equal(Object.keys(result.record.policyInputPasses).length,6);assert.equal(executions(f).length,0);}
+ });
+});
+
+test('policy prose routing preserves gates for uncertain base execution and stale current evidence',async parent=>{
+ const scenarios=[
+  ['missing current status',x=>{x.statuses.pop();}],
+  ['revoked current status',x=>{x.statuses[0].state='failure';}],
+  ['stale policy plan',x=>{x.statuses.forEach(status=>status.description=status.description.replace(/;p=[a-f0-9]{12}/,';p='+ '0'.repeat(12)));}],
+  ['wrong receipt',x=>{x.statuses[0].description=x.statuses[0].description.replace(/^r=[a-f0-9]{64}/,'r='+ '0'.repeat(64));}],
+  ['old status schema',x=>{x.statuses.forEach(status=>status.description=status.description.replace(';v=4',';v=2'));}],
+  ['incomplete runs',x=>{x.omitRunTotal=true;}],
+  ['pending base',x=>{x.runs[0].status='in_progress';x.runs[0].conclusion=null;}],
+  ['failed base',x=>{x.runs[0].conclusion='failure';}],
+  ['wrong producer source',x=>{x.runs[0].head_sha='0'.repeat(40);}],
+  ['wrong base branch',x=>{x.runs[0].head_branch='topic';}],
+  ['missing group',x=>{x.jobs=x.jobs.filter(job=>job.name!=='regression-core');}],
+  ['skipped group',x=>{x.jobs.find(job=>job.name==='regression-core').conclusion='skipped';}],
+  ['covered base',x=>{x.jobs.find(job=>job.name==='scanner-tests').steps[0].name=x.jobs.find(job=>job.name==='scanner-tests').steps[0].name.replace('Complete regression context','Verified complete cohort')+' mode reuse';}],
+  ['wrong base attempt',x=>{x.jobs[0].run_attempt=2;}],
+  ['wrong frozen context',x=>{x.jobs.find(job=>job.name==='validation-context').steps[0].name='Announce regression context '+'0'.repeat(64);}],
+  ['missing compatibility',x=>{x.jobs.find(job=>job.name==='event-gates').steps=x.jobs.find(job=>job.name==='event-gates').steps.filter(step=>step.name!=='Backward compatibility');}],
+ ];
+ for(const [name,mutate]of scenarios)await parent.test(name,t=>{const f=fixture(t,true,true),github=publishedPolicyBase(f);mutate(github);writeFileSync(f.external,JSON.stringify(github));const result=invoke(f,{event:'pull_request',checkout:f.merge,environment:descriptorFor(f,f.merge)});assert.equal(result.status,0,result.stdout+result.stderr);assert.equal(result.record.decision,'full',name+' requires full current execution');assert.equal(result.record.coveredBy,null);assert.equal(executions(f).length,1);});
+});
+
+
+test('policy prose exact main routing retains current reviewed head and original base execution',t=>{
+ const f=fixture(t,true,true),github=publishedPolicyBase(f);
+ github.pulls=[{number:17,merged_at:new Date().toISOString(),merge_commit_sha:f.merge,head:{sha:f.head},base:{ref:'main'}}];writeFileSync(f.external,JSON.stringify(github));
+ const result=invoke(f,{event:'push',ref:'refs/heads/main',source:f.merge,checkout:f.merge,environment:descriptorFor(f,f.merge,f.merge)});
+ assert.equal(result.status,0,result.stdout+result.stderr);assert.equal(result.record.decision,'policy-reuse',result.stdout);assert.equal(result.record.policyReview.sourceSha,f.head);assert.equal(result.record.policyImpact.sourceSha,f.merge);assert.equal(result.record.coveredBy.checkoutSha,f.base);assert.equal(executions(f).length,0);
+});
+
+
+test('early CI routing retains original full startup and stress proof for ordinary and policy coverage',async parent=>{
+ for(const policy of [false,true])await parent.test(policy?'policy inheritance':'same-source reuse',async t=>{
+  for(const fault of ['none','missing early','skipped early','missing stress','missing receipt'])await t.test(fault,sub=>{
+   const f=fixture(sub,true,policy,true);let github;
+   if(policy)github=publishedPolicyBase(f);else{const producer=invoke(f,{event:'pull_request',checkout:f.merge,environment:descriptorFor(f,f.merge)});assert.equal(producer.status,0,producer.stderr);github=publishedGroups(f,producer.record);}
+   if(fault==='missing early')github.jobs=github.jobs.filter(job=>job.name!=='early-startup');
+   if(fault==='skipped early')github.jobs.find(job=>job.name==='early-startup').conclusion='skipped';
+   if(fault==='missing stress')github.jobs=github.jobs.filter(job=>job.name!=='mobile-stress');
+   if(fault==='missing receipt')github.jobs.find(job=>job.name==='early-startup').steps=[];
+   writeFileSync(f.external,JSON.stringify(github));
+   const result=invoke(f,{event:policy?'pull_request':'push',checkout:policy?f.merge:f.head,environment:descriptorFor(f,policy?f.merge:f.head)});assert.equal(result.status,0,result.stderr);
+   assert.equal(result.record.decision,fault==='none'?(policy?'policy-reuse':'reuse'):'full',result.stdout);
+   if(fault==='none')assert.equal(result.record.coveredBy.earlyReportSha256,'6'.repeat(64));
+  });
+ });
+});
+
+
+test('metadata observation retains a bound pending producer without launching another cohort', t => {
+  const f=fixture(t,true), first=invoke(f,{event:'pull_request',checkout:f.merge,environment:descriptorFor(f,f.merge)});
+  assert.equal(first.status,0,first.stdout+first.stderr);
+  const github=publishedGroups(f,first.record);
+  github.runs[0].status='in_progress';github.runs[0].conclusion=null;
+  github.jobs=github.jobs.filter(job=>['validation-context','cohort-routing'].includes(job.name));
+  writeFileSync(f.external,JSON.stringify(github));
+  const result=invoke(f,{event:'pull_request',checkout:f.merge,action:'edited',changes:{body:{from:'prior evidence'}},environment:{...descriptorFor(f,f.merge),ROUTING_MAX_WAIT:'0'}});
+  assert.equal(executions(f).length,1,'An announced pending producer must not launch a second full cohort');
+  assert.equal(result.status,2,'Pending is incomplete, not successful');
+  assert.equal(result.record.decision,'pending');
+  assert.equal(result.record.coveredBy.runId,'71');
+  assert.equal(result.record.coveredBy.runAttempt,'2');
+  assert.equal(result.record.producerOutcome.status,'in_progress');
+});
+
+test('reconciled metadata input routing preserves pending failed and cancelled admission', async parent => {
+  for (const [status, conclusion, decision, code] of [['in_progress',null,'pending',2],['completed','failure','fail',1],['completed','cancelled','cancelled',1]]) await parent.test(decision, t => {
+    const f=fixture(t,true), first=invoke(f,{event:'pull_request',checkout:f.merge,environment:descriptorFor(f,f.merge)});
+    assert.equal(first.status,0,first.stderr);
+    const github=publishedGroups(f,first.record);
+    github.runs[0].status=status;github.runs[0].conclusion=conclusion;
+    github.jobs=github.jobs.filter(job=>['validation-context','cohort-routing'].includes(job.name));
+    writeFileSync(f.external,JSON.stringify(github));
+    const result=invoke(f,{event:'pull_request',checkout:f.merge,action:'edited',changes:{body:{from:'old'}},environment:{...descriptorFor(f,f.merge),ROUTING_MAX_WAIT:'0',ROUTING_REQUIRE_INPUT_PASSES:'1'}});
+    assert.equal(result.status,code,'Mandatory input-pass routing must retain the admitted producer outcome: '+result.stdout+result.stderr);
+    assert.equal(result.record.decision,decision);
+    assert.equal(result.record.coveredBy.runId,'71');
+    assert.equal(executions(f).length,1,'No duplicate cohort or early mobile producer may be admitted');
+  });
+});
+
+test('reconciled metadata routing retains six original gate passes and the full early producer', t => {
+  const f=fixture(t,true,false,true), first=invoke(f,{event:'pull_request',checkout:f.merge,environment:descriptorFor(f,f.merge)});
+  const canonical=publishedGroups(f,first.record);
+  const gates=['core','scenery','persistence-recovery','native-process','rules','compatibility'];
+  const github=publishedInputPass(f,first.record,gates);
+  for(const job of canonical.jobs){const keyed=github.jobs.find(row=>row.name===job.name);if(keyed)keyed.steps.push(...job.steps);else github.jobs.push(job);}
+  Object.assign(github,{tree:canonical.tree});const earlyReport=publishedOriginalEarly(f,first.record,github);writeFileSync(f.external,JSON.stringify(github));
+  const result=invoke(f,{event:'pull_request',checkout:f.merge,action:'edited',changes:{body:{from:'old'}},environment:{...descriptorFor(f,f.merge),ROUTING_REQUIRE_INPUT_PASSES:'1'}});
+  assert.equal(result.status,0,result.stderr);
+  assert.equal(result.record.decision,'reuse','Six retained passes plus the original complete early producer admit no new early or group child');
+  assert.deepEqual(Object.keys(result.record.inputPasses).sort(),[...gates].sort());
+  assert.equal(result.record.coveredBy.earlyReportSha256,earlyReport);
+  assert.deepEqual(Object.keys(result.record.gateDecisions).sort(),[...gates].sort(),'The durable routing checkpoint retains every gate decision');
+  for(const gate of gates){assert.equal(result.record.gateDecisions[gate].mode,'covered');assert.deepEqual(result.record.gateDecisions[gate].original,result.record.inputPasses[gate].coveredBy);}
+  assert.equal(executions(f).length,1);
+});
+
+test('reconciled metadata routing holds a mixed early origin without duplicate mobile admission',t=>{
+ const f=fixture(t,true,false,true),first=invoke(f,{event:'pull_request',checkout:f.merge,environment:descriptorFor(f,f.merge)}),github=publishedGroups(f,first.record);
+ github.jobs.find(job=>job.name==='scanner-tests').steps=[{name:`Verified complete cohort ${first.record.contextSha256} report ${'8'.repeat(64)} mode reuse`,status:'completed',conclusion:'success'}];writeFileSync(f.external,JSON.stringify(github));
+ const result=invoke(f,{event:'pull_request',checkout:f.merge,action:'edited',changes:{body:{from:'old'}},environment:{...descriptorFor(f,f.merge),ROUTING_REQUIRE_INPUT_PASSES:'1'}});
+ assert.equal(result.status,2,'An unverified original early receipt is an observation gap, never permission for another mobile story');
+ assert.equal(result.record.decision,'unresolved');assert.equal(result.record.nextGate,'verify-original-early-producer');
+ assert.equal(result.record.producerKind,'early-evidence-unavailable');assert.equal(result.record.coveredBy.runId,'71');
+ assert.equal(executions(f).length,1);
+});
+
+test('reconciled mixed metadata verifies original early artifacts without full-product authority',async parent=>{
+ for(const variant of ['valid','wrong cap','covered early','changed raw','missing early','changed runtime','unknown runtime'])await parent.test(variant,t=>{
+  const f=fixture(t,true,false,true),first=invoke(f,{event:'pull_request',checkout:f.merge,environment:descriptorFor(f,f.merge)}),canonical=publishedGroups(f,first.record),github=publishedInputPass(f,first.record,['core','scenery','persistence-recovery','native-process','rules','compatibility']);
+  for(const job of canonical.jobs){const keyed=github.jobs.find(row=>row.name===job.name);if(keyed)keyed.steps.push(...job.steps);else github.jobs.push(job);}github.tree=canonical.tree;
+  const report=publishedOriginalEarly(f,first.record,github,variant);github.jobs.find(job=>job.name==='scanner-tests').steps=[{name:`Verified complete cohort ${first.record.contextSha256} report ${'8'.repeat(64)} mode reuse`,status:'completed',conclusion:'success'}];writeFileSync(f.external,JSON.stringify(github));
+  const result=invoke(f,{event:'pull_request',checkout:f.merge,action:'edited',changes:{body:{from:'old'}},environment:{...descriptorFor(f,f.merge),ROUTING_REQUIRE_INPUT_PASSES:'1'}});
+  assert.equal(result.status,variant==='valid'?0:2,'Only actual complete retained early execution can suppress the mobile story: '+result.stdout+result.stderr);
+  if(variant==='valid'){assert.equal(result.record.decision,'full','Mixed evidence cannot claim legacy full-cohort reuse');assert.equal(result.record.coveredBy,null);assert.equal(result.record.earlyCoverage.coveredBy.earlyReportSha256,report);assert.equal(result.record.earlyCoverage.coveredBy.runId,'71');assert.equal(Object.keys(result.record.inputPasses).length,6);}
+  else assert.equal(result.record.decision,'unresolved');
+  assert.equal(executions(f).length,1,'Observing originals starts no equivalent gate or early workload');
+ });
+});
+
+
+test('metadata observation preserves cancelled producers and incomplete final evidence', async parent => {
+ for(const [name,mutate,decision,code] of [
+  ['cancelled',x=>{x.runs[0].conclusion='cancelled';x.jobs=x.jobs.filter(job=>['validation-context','cohort-routing'].includes(job.name));},'cancelled',1],
+  ['failed',x=>{x.runs[0].conclusion='failure';x.jobs=x.jobs.filter(job=>['validation-context','cohort-routing'].includes(job.name));},'fail',1],
+  ['missing completion',x=>{x.jobs.find(job=>job.name==='scanner-tests').steps=[];},'unresolved',2],
+  ['missing aggregate',x=>{x.jobs=x.jobs.filter(job=>job.name!=='scanner-tests');},'unresolved',2],
+  ['unknown lifecycle',x=>{x.runs[0].status='unclassified';},'unresolved',2],
+  ['unknown conclusion',x=>{x.runs[0].conclusion='neutral';},'unresolved',2],
+ ]) await parent.test(name,t=>{
+  const f=fixture(t,true),first=invoke(f,{event:'pull_request',checkout:f.merge,environment:descriptorFor(f,f.merge)});
+  assert.equal(first.status,0,first.stderr);const github=publishedGroups(f,first.record);mutate(github);writeFileSync(f.external,JSON.stringify(github));
+  const result=invoke(f,{event:'pull_request',checkout:f.merge,action:'edited',changes:{body:{from:'previous'}},environment:descriptorFor(f,f.merge)});
+  assert.equal(result.record.decision,decision,result.stdout+result.stderr);assert.equal(result.status,code);
+  assert.equal(result.record.coveredBy.runId,'71');assert.equal(result.record.producerOutcome.conclusion,github.runs[0].conclusion);
+  assert.equal(executions(f).length,1,'Metadata must preserve actual unsuccessful history without launching another cohort');
+ });
+});
+
+
+test('metadata observation resumes the saved producer in a fresh process despite newer equivalent history', t => {
+ const f=fixture(t,true),first=invoke(f,{event:'pull_request',checkout:f.merge,environment:descriptorFor(f,f.merge)});
+ assert.equal(first.status,0,first.stderr);const github=publishedGroups(f,first.record);
+ github.runs[0].status='in_progress';github.runs[0].conclusion=null;writeFileSync(f.external,JSON.stringify(github));
+ const pending=invoke(f,{event:'pull_request',checkout:f.merge,action:'edited',changes:{body:{from:'before'}},environment:{...descriptorFor(f,f.merge),ROUTING_MAX_WAIT:'0'}});
+ assert.equal(pending.record.decision,'pending');
+ const saved=path.join(f.root,'attempt-'+f.attempt,'ci-routing/routing.json'),binding=JSON.parse(readFileSync(saved));
+ assert.equal(binding.coveredBy.runId,'71');
+ github.runs[0].status='completed';github.runs[0].conclusion='failure';
+ github.jobsByRun={'71':github.jobs,'72':github.jobs.map(job=>({...job,run_id:72,run_attempt:1}))};
+ github.runs.unshift({...github.runs[0],id:72,run_attempt:1,conclusion:'success'});writeFileSync(f.external,JSON.stringify(github));
+ const resumed=invoke(f,{event:'pull_request',checkout:binding.validationContext.checkoutSha,base:binding.validationContext.comparisonBase,action:'edited',changes:{body:{from:'before'}},environment:{...descriptorFor(f,f.merge),ROUTING_RESUME:saved}});
+ assert.equal(resumed.record.decision,'fail','Resumption must observe the saved producer rather than hide its failure behind newer success');
+ assert.equal(resumed.record.coveredBy.runId,'71');assert.equal(resumed.status,1);
+ assert.equal(executions(f).length,1,'Observation/resumption launches zero additional cohorts');
+ const freshOutput=path.join(f.root,'fresh-no-conversation'),freshEnv={...process.env,PATH:f.bin+path.delimiter+process.env.PATH,ROUTING_GITHUB:f.external};delete freshEnv.NODE_TEST_CONTEXT;for(const key of Object.keys(freshEnv))if(key.startsWith('GITHUB_'))delete freshEnv[key];
+ const fresh=spawnSync(process.execPath,[command,'--resume',saved,'--evidence-dir',freshOutput],{cwd:f.source,env:freshEnv,encoding:'utf8',timeout:15000});
+ assert.equal(fresh.status,1,fresh.stdout+fresh.stderr);const freshRecord=JSON.parse(readFileSync(path.join(freshOutput,'routing.json')));assert.equal(freshRecord.decision,'fail');assert.equal(freshRecord.coveredBy.runId,binding.coveredBy.runId);assert.equal(freshRecord.contextSha256,binding.contextSha256);
+
+ const requests=readFileSync(f.external+'.requests','utf8').trim().split('\n').map(JSON.parse);
+ assert.ok(requests.every(args=>!args.some(value=>/dispatch|POST|PATCH|PUT/.test(value))),'Actual transport children only observe GitHub');
+});
+
+
+test('workflow metadata events serialize equivalent admission and run the actual routing command once per event', async t => {
+ const f=fixture(t,true);rmSync(path.join(f.bin,'npm'));
+ // Real isolated npm test callbacks are counted; only the GitHub service and
+ // its documented concurrency scheduler are controlled in this process proof.
+ writeFileSync(path.join(f.source,'tests.js'),"import {test} from 'node:test';import fs from 'node:fs';test('isolated admitted cohort',()=>{fs.appendFileSync(process.env.ROUTING_EXECUTIONS,JSON.stringify({sha:process.env.GITHUB_SHA,runId:process.env.GITHUB_RUN_ID})+'\\n')});\n");
+ git(f.source,'add','.');git(f.source,'-c','core.hooksPath=/dev/null','commit','-qm','real process callback');
+ f.head=git(f.source,'rev-parse','HEAD');f.tree=git(f.source,'rev-parse','HEAD^{tree}');f.merge=git(f.source,'commit-tree',f.tree,'-p',f.base,'-p',f.head,'-m','concurrent merge');git(f.source,'checkout','--detach',f.merge);
+ const workflow=readFileSync(path.join(repo,'.github/workflows/data-safety.yml'),'utf8');
+ const route=workflow.match(/      - name: Resolve complete cohort coverage\n[\s\S]*?        run: ([^\n]+)/);assert.ok(route,'Actual event routing command required');
+ const concurrency=workflow.match(/^concurrency:\n  group: ([^\n]+)\n  cancel-in-progress: (true|false)$/m);
+ const admission=workflow.match(/      - name: (Admit original full producer context [^\n]+)\n        if: ([^\n]+)\n        run: ([^\n]+)/);
+ const queues=new Map();
+ const eventKey=index=>concurrency?concurrency[1].replaceAll('${{ github.workflow }}','Data safety').replaceAll('${{ github.event.pull_request.number || github.ref }}','17'):'event-'+index;
+ const launch=async index=>{
+  const key=eventKey(index),previous=queues.get(key)||Promise.resolve();
+  let release;queues.set(key,new Promise(resolve=>{release=resolve;}));await previous;
+  try {
+   if(concurrency)assert.equal(concurrency[2],'false','A metadata event cannot cancel its running producer');
+   const output=path.join(f.root,'scheduled-'+index),descriptor=descriptorFor(f,f.merge).ROUTING_DESCRIPTOR;f.attempt++;
+   mkdirSync(path.join(output,'validation/descriptor'),{recursive:true});writeFileSync(path.join(output,'validation/descriptor/descriptor.json'),readFileSync(descriptor));
+   const eventPath=path.join(output,'event.json');writeFileSync(eventPath,JSON.stringify({action:'edited',changes:{body:{from:'previous'}},number:17,pull_request:{head:{sha:f.head,ref:'topic'}}}));
+   const script=route[1].replace('node scripts/agent-tools/ci-routing.mjs',JSON.stringify(process.execPath)+' '+JSON.stringify(command)).replace('${{ needs.validation-context.outputs.base }}','$ROUTING_BASE')+"\n"+`decision="$(node -p "require('$RUNNER_TEMP/ci-routing/routing.json').decision")"\nif [[ "$decision" == "full" ]]; then npm test; elif [[ "$decision" != "reuse" ]]; then exit 1; fi`;
+   const env={...process.env,PATH:f.bin+path.delimiter+process.env.PATH,RUNNER_TEMP:output,ROUTING_BASE:f.base,ROUTING_EXECUTIONS:f.journal,ROUTING_GITHUB:f.external,GITHUB_REPOSITORY:'fixture/repo',GITHUB_EVENT_NAME:'pull_request',GITHUB_EVENT_PATH:eventPath,GITHUB_SHA:f.merge,GITHUB_REF:'refs/pull/17/merge',GITHUB_RUN_ID:String(100+f.attempt),GITHUB_RUN_ATTEMPT:'1',ImageOS:'ubuntu24',ImageVersion:'20261022.1.0'};delete env.NODE_TEST_CONTEXT;
+   const result=await new Promise(resolve=>{const child=spawn('bash',['-euo','pipefail','-c',script],{cwd:f.source,env});let stdout='',stderr='';child.stdout.on('data',data=>stdout+=data);child.stderr.on('data',data=>stderr+=data);child.on('close',status=>resolve({status,stdout,stderr}));});
+   writeFileSync(path.join(output,'consumer.stdout'),result.stdout);writeFileSync(path.join(output,'consumer.stderr'),result.stderr);writeFileSync(path.join(output,'command.sh'),script);
+   assert.equal(result.status,0,result.stdout+result.stderr);const record=JSON.parse(readFileSync(path.join(output,'ci-routing/routing.json')));
+   let admitted=false;if(admission){assert.equal(admission[2],"success() && steps.route.outputs.decision == 'full'");if(record.decision==='full'){const step=spawnSync('bash',['-euo','pipefail','-c',admission[3]],{cwd:f.source,env,encoding:'utf8'});assert.equal(step.status,0,step.stderr);admitted=true;}}
+   if(record.decision==='full'){
+    const canonical=publishedGroups(f,record),github=publishedInputPass(f,record,['core','scenery','persistence-recovery','native-process','rules','compatibility']);
+    for(const job of canonical.jobs){const keyed=github.jobs.find(row=>row.name===job.name);if(keyed)keyed.steps.push(...job.steps);else github.jobs.push(job);}
+    github.tree=canonical.tree;github.jobs.find(job=>job.name==='cohort-routing').steps=admitted?[{name:admission[1].replace('${{ needs.validation-context.outputs.context }}',record.contextSha256),status:'completed',conclusion:'success'}]:[];
+    github.runs[0].id=Number(record.runId);github.runs[0].run_attempt=Number(record.runAttempt);github.jobs.forEach(job=>{job.run_id=Number(record.runId);job.run_attempt=Number(record.runAttempt);});github.artifacts=[];github.attempts={};github.jobsByAttempt={};attachInputArtifacts(f,github,github.jobs);writeFileSync(f.external,JSON.stringify(github));
+   }
+   return record;
+  }finally{release();}
+ };
+ const settled=await Promise.allSettled([launch(0),launch(1)]);for(const result of settled)assert.equal(result.status,'fulfilled',String(result.reason));const records=settled.map(result=>result.value);
+ assert.deepEqual(records.map(record=>record.decision).sort(),['full','reuse'],'Concurrent equivalent metadata events admit exactly one full producer');
+ assert.equal(executions(f).length,1,'Count actual npm child callbacks, not successful routing exits');
+ assert.equal(new Set(records.map(record=>record.contextSha256)).size,1);
+ const producer=records.find(record=>record.decision==='full'),covered=records.find(record=>record.decision==='reuse');assert.equal(covered.coveredBy.runId,producer.runId);assert.equal(covered.coveredBy.runAttempt,producer.runAttempt);assert.equal(covered.coveredBy.checkoutSha,f.merge);assert.equal(covered.coveredBy.checkoutTree,f.tree);assert.equal(executions(f)[0].runId,producer.runId);
+});
+
+
+test('metadata observation recovers after an actual interrupted process using only durable evidence', async t => {
+ const f=fixture(t,true),first=invoke(f,{event:'pull_request',checkout:f.merge,environment:descriptorFor(f,f.merge)});
+ assert.equal(first.status,0,first.stderr);const github=publishedGroups(f,first.record);
+ github.runs[0].status='in_progress';github.runs[0].conclusion=null;writeFileSync(f.external,JSON.stringify(github));
+ const descriptor=descriptorFor(f,f.merge).ROUTING_DESCRIPTOR,output=path.join(f.root,'interrupted');mkdirSync(output);
+ const eventPath=path.join(output,'event.json');writeFileSync(eventPath,JSON.stringify({action:'edited',changes:{body:{from:'before interruption'}},number:17,pull_request:{head:{sha:f.head,ref:'topic'}}}));
+ f.attempt++;const env={...process.env,PATH:f.bin+path.delimiter+process.env.PATH,ROUTING_GITHUB:f.external,GITHUB_REPOSITORY:'fixture/repo',GITHUB_EVENT_NAME:'pull_request',GITHUB_EVENT_PATH:eventPath,GITHUB_SHA:f.merge,GITHUB_REF:'refs/pull/17/merge',GITHUB_RUN_ID:String(100+f.attempt),GITHUB_RUN_ATTEMPT:'1',ImageOS:'ubuntu24',ImageVersion:'20261022.1.0'};delete env.NODE_TEST_CONTEXT;
+ const child=spawn(process.execPath,[command,'--descriptor',descriptor,'--comparison-base',f.base,'--evidence-dir',path.join(output,'routing'),'--max-wait-ms','9000','--poll-interval-ms','5000'],{cwd:f.source,env,stdio:'ignore'});
+ t.after(()=>{if(child.exitCode===null)child.kill('SIGKILL');});
+ const ended=new Promise(resolve=>child.on('close',(code,signal)=>resolve({code,signal}))),file=path.join(output,'routing/routing.json');
+ let saved;for(let i=0;i<200;i++){if(existsSync(file)){try{saved=JSON.parse(readFileSync(file));}catch{}}if(saved?.decision==='pending')break;await new Promise(resolve=>setTimeout(resolve,10));}
+ assert.equal(saved?.decision,'pending','The pending producer binding must be durable before waiting');child.kill('SIGTERM');assert.equal((await ended).signal,'SIGTERM');
+ assert.equal(saved.coveredBy.runId,'71');assert.equal(saved.nextGate,'resume-bound-producer-observation');assert.ok(saved.observations.length>0);
+ github.runs[0].status='completed';github.runs[0].conclusion='success';writeFileSync(f.external,JSON.stringify(github));
+ const resumed=invoke(f,{event:saved.eventName,checkout:saved.validationContext.checkoutSha,base:saved.validationContext.comparisonBase,action:'edited',changes:{body:{from:'before interruption'}},environment:{...descriptorFor(f,saved.validationContext.checkoutSha),ROUTING_RESUME:file}});
+ assert.equal(resumed.status,0,resumed.stdout+resumed.stderr);assert.equal(resumed.record.decision,'reuse');assert.equal(resumed.record.coveredBy.runId,saved.coveredBy.runId);assert.equal(resumed.record.resumedFrom.path,file);assert.equal(executions(f).length,1);
+ assert.equal(JSON.parse(readFileSync(file)).decision,'pending','Resumption must retain original interrupted evidence');
+});
+
+
+test('metadata observation requires fresh validation for changed complete contexts or unverifiable admission', async parent=>{
+ for(const [name,mutate,descriptorChange] of [
+  ['base',x=>{x.pulls[0].base.sha='b'.repeat(40);}],
+  ['checkout',x=>{x.pulls[0].merge_commit_sha='c'.repeat(40);x.merge.sha='c'.repeat(40);}],
+  ['source',x=>{x.pulls[0].head.sha='d'.repeat(40);}],
+  ['event policy',x=>{x.runs[0].event='push';}],
+  ['repository',x=>{x.runs[0].repository.full_name='other/repo';}],
+  ['workflow/configuration',x=>{x.tree.tree[0].sha='e'.repeat(40);}],
+  ['cohort inventory',()=>{},true],
+  ['missing announcement',x=>{x.jobs.find(job=>job.name==='validation-context').steps=[];}],
+ ])await parent.test(name,t=>{
+  const f=fixture(t,true),first=invoke(f,{event:'pull_request',checkout:f.merge,environment:descriptorFor(f,f.merge)});assert.equal(first.status,0,first.stderr);
+  const github=publishedGroups(f,first.record);mutate(github);writeFileSync(f.external,JSON.stringify(github));const env=descriptorFor(f,f.merge);
+  if(descriptorChange){const file=env.ROUTING_DESCRIPTOR,descriptor=JSON.parse(readFileSync(file));descriptor.resultIdentity.cohortDigestSha256='4'.repeat(64);writeFileSync(file,JSON.stringify(descriptor));}
+  const result=invoke(f,{event:'pull_request',checkout:f.merge,action:'edited',changes:{body:{from:'prior'}},environment:env});
+  assert.equal(result.status,0,result.stdout+result.stderr);assert.equal(result.record.decision,'full',name+' cannot inherit source SHA alone');assert.equal(result.record.coveredBy,null);assert.equal(executions(f).length,2);
+ });
+});
+
+
+test('metadata observation skips failed observers without full producer admission and retains original execution',t=>{
+ const f=fixture(t,true),first=invoke(f,{event:'pull_request',checkout:f.merge,environment:descriptorFor(f,f.merge)});assert.equal(first.status,0,first.stderr);
+ const github=publishedGroups(f,first.record),observer=github.jobs.map(job=>({...job,run_id:72,run_attempt:1,steps:job.name==='cohort-routing'?[]:job.steps}));
+ github.jobsByRun={'71':github.jobs,'72':observer};github.runs.unshift({...github.runs[0],id:72,run_attempt:1,conclusion:'cancelled'});writeFileSync(f.external,JSON.stringify(github));
+ const result=invoke(f,{event:'pull_request',checkout:f.merge,action:'edited',changes:{body:{from:'earlier'}},environment:descriptorFor(f,f.merge)});
+ assert.equal(result.record.decision,'reuse','A cancelled observer cannot impersonate original full producer admission');assert.equal(result.status,0,result.stderr);assert.equal(result.record.coveredBy.runId,'71');assert.equal(executions(f).length,1);
 });

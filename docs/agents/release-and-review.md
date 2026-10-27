@@ -74,6 +74,17 @@ migration, memory, cloud persistence, and synchronization need the relevant
 specialist review. A code reviewer and a specialist reviewer are both required
 only when the exact diff affects both domains.
 
+Instruction-preserving policy prose has a narrow product-evidence inheritance
+path. The classifier accepts paragraph reflow and existing-link navigation
+wording (`Read`/`Consult`, `guide`/`guidance`) only when instruction tokens,
+paragraph structure and destinations remain unchanged. It freezes every other
+tracked blob and mode, including application, dependencies, tests, FAQ and
+rendered assets. It retains current independent release-process review.
+Authorization changes, gate weakening, executable/configuration/test changes,
+mixed changes and unknown prose rewrites retain their ordinary review plan.
+Use the [receipt procedure](../../RELEASE_GATES.md#policy-prose-inheritance)
+for the required immutable product, FAQ and rendered source evidence.
+
 Risk is derived from changed paths and their exact diff content; callers cannot
 lower the required review plan. An optional `additionalSpecialistDomains`
 input may add domains from the validator's known-domain list, but cannot replace

@@ -1,0 +1,406 @@
+{
+  "schemaVersion": 1,
+  "name": "noble-amd64-perf-6.8.0-147",
+  "platform": "linux",
+  "architecture": "x64",
+  "executable": "perf",
+  "loader": "ld-linux-x86-64.so.2",
+  "packages": [
+    {
+      "name": "libbz2-1.0",
+      "version": "1.0.8-5.1ubuntu0.1",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/b/bzip2/libbz2-1.0_1.0.8-5.1ubuntu0.1_amd64.deb",
+      "sha256": "36ee08b00b1ee5018b2fce02881b7d2d73c9b4e32990bde3388400d86c48126a",
+      "bytes": 34562
+    },
+    {
+      "name": "libc6",
+      "version": "2.39-0ubuntu8.9",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/glibc/libc6_2.39-0ubuntu8.9_amd64.deb",
+      "sha256": "ff5557d99b51f761c4b7c92368b9cc45565eda17df9bf9eb4b134d09825008be",
+      "bytes": 3264314
+    },
+    {
+      "name": "libcap2",
+      "version": "1:2.66-5ubuntu2.4",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/libc/libcap2/libcap2_2.66-5ubuntu2.4_amd64.deb",
+      "sha256": "23c627c77c66552a658e62852f244f4946dc543898e0ec5428d5dc6bffde2d6a",
+      "bytes": 30500
+    },
+    {
+      "name": "libdw1t64",
+      "version": "0.190-1.1ubuntu0.1",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/e/elfutils/libdw1t64_0.190-1.1ubuntu0.1_amd64.deb",
+      "sha256": "edaa9ce4221d95f4bd72a9805100902e313092a2f31a7a51e7186be97734714d",
+      "bytes": 261194
+    },
+    {
+      "name": "libelf1t64",
+      "version": "0.190-1.1ubuntu0.1",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/e/elfutils/libelf1t64_0.190-1.1ubuntu0.1_amd64.deb",
+      "sha256": "b4aee123a37472d213647594b4f7d4a0d13615b0ca2a6fd33926b768d6b232c2",
+      "bytes": 57810
+    },
+    {
+      "name": "libexpat1",
+      "version": "2.6.1-2ubuntu0.6",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/e/expat/libexpat1_2.6.1-2ubuntu0.6_amd64.deb",
+      "sha256": "494b8e672f722130c6bca6a7bc4cc31a43ca891a31d60d868bfdd699a3c20b13",
+      "bytes": 98940
+    },
+    {
+      "name": "libgcc-s1",
+      "version": "14.2.0-4ubuntu2~24.04.1",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gcc-14/libgcc-s1_14.2.0-4ubuntu2~24.04.1_amd64.deb",
+      "sha256": "aa7fadbe33b78bcf99885318040601c550c208929565b179891d9a3cc2aa68cd",
+      "bytes": 78392
+    },
+    {
+      "name": "liblzma5",
+      "version": "5.6.1+really5.4.5-1ubuntu0.4",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/x/xz-utils/liblzma5_5.6.1+really5.4.5-1ubuntu0.4_amd64.deb",
+      "sha256": "5bcf5da2339331e21d3f42a831e82c61c54c6b2f29804010e8d59abd0ae52167",
+      "bytes": 127704
+    },
+    {
+      "name": "libnuma1",
+      "version": "2.0.18-1build1",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/n/numactl/libnuma1_2.0.18-1build1_amd64.deb",
+      "sha256": "508daa855e99959acaa945e6a89d218e0be6b5727fd28773580942ff37cf5805",
+      "bytes": 23268
+    },
+    {
+      "name": "libpython3.12t64",
+      "version": "3.12.3-1ubuntu0.17",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/p/python3.12/libpython3.12t64_3.12.3-1ubuntu0.17_amd64.deb",
+      "sha256": "0d29f4763eb95b8a4283a4aca3ef1d9658629c618be1778def41bdc31be12b46",
+      "bytes": 2348034
+    },
+    {
+      "name": "libslang2",
+      "version": "2.3.3-3build2",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/s/slang2/libslang2_2.3.3-3build2_amd64.deb",
+      "sha256": "352deab8d4dcb023ecffc766088d9c5420c36a3bef9ef5b1c9b173d1c3c88bd7",
+      "bytes": 505982
+    },
+    {
+      "name": "libssl3t64",
+      "version": "3.0.13-0ubuntu3.16",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl3t64_3.0.13-0ubuntu3.16_amd64.deb",
+      "sha256": "219f43b1cd836a4da550938db5fda93160d269d39a4edcf1f1ce698a470db797",
+      "bytes": 1945300
+    },
+    {
+      "name": "libstdc++6",
+      "version": "14.2.0-4ubuntu2~24.04.1",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gcc-14/libstdc++6_14.2.0-4ubuntu2~24.04.1_amd64.deb",
+      "sha256": "a51f8de7829211db961a31f02158058ad1a95f92ac6d0a5dff6350e2821c54c0",
+      "bytes": 792064
+    },
+    {
+      "name": "libtraceevent1",
+      "version": "1:1.8.2-1ubuntu2",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/libt/libtraceevent/libtraceevent1_1.8.2-1ubuntu2_amd64.deb",
+      "sha256": "6493d2f65f232eceba7e6b6b85d86364ad959429f1f08ce44011f7451e5ec8d0",
+      "bytes": 55112
+    },
+    {
+      "name": "libunwind8",
+      "version": "1.6.2-3build1",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/libu/libunwind/libunwind8_1.6.2-3build1_amd64.deb",
+      "sha256": "658977d18976149b75391850ba0ccacaf7bde3201f0284189da50cd634334d17",
+      "bytes": 55198
+    },
+    {
+      "name": "libzstd1",
+      "version": "1.5.5+dfsg2-2build1",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/libz/libzstd/libzstd1_1.5.5+dfsg2-2build1_amd64.deb",
+      "sha256": "4dcc3ba9606a5837a55248d08162a5b426dd621f75c0eb24d86409e0d0e71d52",
+      "bytes": 299490
+    },
+    {
+      "name": "linux-tools-6.8.0-147",
+      "version": "6.8.0-147.147",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/l/linux/linux-tools-6.8.0-147_6.8.0-147.147_amd64.deb",
+      "sha256": "7bf31034e1914ff171c2b82c48e1f17b5123b7e63e1d4ef0582877c45cc17cd0",
+      "bytes": 5319262
+    },
+    {
+      "name": "zlib1g",
+      "version": "1:1.3.dfsg-3.1ubuntu2.3",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/z/zlib/zlib1g_1.3.dfsg-3.1ubuntu2.3_amd64.deb",
+      "sha256": "376249c8de139568221dbb242318cc8cb8f02299e3a62b7432948e1754fbddf9",
+      "bytes": 63158
+    }
+  ],
+  "files": [
+    {
+      "name": "ld-linux-x86-64.so.2",
+      "packagePath": "usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+      "bytes": 236616,
+      "sha256": "c20a2dc8917c755f02b94049356320fe1f62ac7d9f8994731f807d9df39302da",
+      "buildId": "0d77dbd4379bf0b5af3e05be7fb6af1e4cea7c96",
+      "needed": [],
+      "package": "libc6"
+    },
+    {
+      "name": "libbz2.so.1.0",
+      "packagePath": "usr/lib/x86_64-linux-gnu/libbz2.so.1.0.4",
+      "bytes": 78944,
+      "sha256": "cc08c9f50a8009ffd6391e0116a100369b11ca9238fa52392c019e6645b122a1",
+      "buildId": "51ac1a227e1c3c5c449b6bcf8eb7323a3cbf8642",
+      "needed": [
+        "libc.so.6"
+      ],
+      "package": "libbz2-1.0"
+    },
+    {
+      "name": "libc.so.6",
+      "packagePath": "usr/lib/x86_64-linux-gnu/libc.so.6",
+      "bytes": 2129424,
+      "sha256": "3a15d66867d83762c7f2f1e37359cb8f6c5743edb369c65285cb0b1c4f7498bf",
+      "buildId": "a4a7992a8e66555c8141ab2a08a8465ff6e0ea65",
+      "needed": [
+        "ld-linux-x86-64.so.2"
+      ],
+      "package": "libc6"
+    },
+    {
+      "name": "libcap.so.2",
+      "packagePath": "usr/lib/x86_64-linux-gnu/libcap.so.2.66",
+      "bytes": 51536,
+      "sha256": "6ac6abc86ac891c6e13486470e26f1d939f47fda9e6b5d5508a7f5ec881adc84",
+      "buildId": "7a7c2bbc541071e68f1c74f691d5ffba03bfb5ad",
+      "needed": [
+        "libc.so.6"
+      ],
+      "package": "libcap2"
+    },
+    {
+      "name": "libcrypto.so.3",
+      "packagePath": "usr/lib/x86_64-linux-gnu/libcrypto.so.3",
+      "bytes": 5309400,
+      "sha256": "6866ed711dab8927e1bf82bf1cd30e828bdfc34f3cc1e83b1c9eb01ce6c37d9a",
+      "buildId": "2eb7babe130d27bd183d57702b02626012169094",
+      "needed": [
+        "libc.so.6"
+      ],
+      "package": "libssl3t64"
+    },
+    {
+      "name": "libdw.so.1",
+      "packagePath": "usr/lib/x86_64-linux-gnu/libdw-0.190.so",
+      "bytes": 737696,
+      "sha256": "989dc9873f358a5af7d18d6100cf5fd66531d7990dc47d69068b3c6c96588867",
+      "buildId": "f42ea1acec449b8cf6b9ab42d6a2a3dfa9df6f78",
+      "needed": [
+        "libelf.so.1",
+        "libz.so.1",
+        "libzstd.so.1",
+        "liblzma.so.5",
+        "libbz2.so.1.0",
+        "libc.so.6",
+        "ld-linux-x86-64.so.2"
+      ],
+      "package": "libdw1t64"
+    },
+    {
+      "name": "libelf.so.1",
+      "packagePath": "usr/lib/x86_64-linux-gnu/libelf-0.190.so",
+      "bytes": 121560,
+      "sha256": "248c989360783cdc52f3659921de852c2efcc2097253ce58e34443f856412814",
+      "buildId": "bb9b8ea33788154ebd8ffbf9cb89ea2f5608cdb2",
+      "needed": [
+        "libz.so.1",
+        "libzstd.so.1",
+        "libc.so.6",
+        "ld-linux-x86-64.so.2"
+      ],
+      "package": "libelf1t64"
+    },
+    {
+      "name": "libexpat.so.1",
+      "packagePath": "usr/lib/x86_64-linux-gnu/libexpat.so.1.9.1",
+      "bytes": 186624,
+      "sha256": "286682ecbc5e59a638963b1a4e6351e65eb32fcf4bdcb9cb7569b6a61fe06a8d",
+      "buildId": "8ae4253012c773ce4f3ceb73efbd6dbd47fd9510",
+      "needed": [
+        "libc.so.6"
+      ],
+      "package": "libexpat1"
+    },
+    {
+      "name": "libgcc_s.so.1",
+      "packagePath": "usr/lib/x86_64-linux-gnu/libgcc_s.so.1",
+      "bytes": 183024,
+      "sha256": "d93224d2b0dab4247598be683adca02f5cf00586f99c187579cd7e92058fb7cb",
+      "buildId": "58736497cba1173fec6ad05c75e996dacefd1def",
+      "needed": [
+        "libc.so.6",
+        "ld-linux-x86-64.so.2"
+      ],
+      "package": "libgcc-s1"
+    },
+    {
+      "name": "liblzma.so.5",
+      "packagePath": "usr/lib/x86_64-linux-gnu/liblzma.so.5.4.5",
+      "bytes": 202904,
+      "sha256": "26b37d25f7ca2a2d348de8ecabacda12e921cd933b21fa069a179760db77219d",
+      "buildId": "fd7b2b7aa549c6506c6b1a26c181d5fafbc52253",
+      "needed": [
+        "libc.so.6"
+      ],
+      "package": "liblzma5"
+    },
+    {
+      "name": "libm.so.6",
+      "packagePath": "usr/lib/x86_64-linux-gnu/libm.so.6",
+      "bytes": 952616,
+      "sha256": "fce00b6f25f459cf4ae0b7fae4257909a1a8a86f9149e7c029a5d617baf1ccd0",
+      "buildId": "d53fcbff9f855463606b25cfbe2a2e10856ea3a7",
+      "needed": [
+        "libc.so.6",
+        "ld-linux-x86-64.so.2"
+      ],
+      "package": "libc6"
+    },
+    {
+      "name": "libnuma.so.1",
+      "packagePath": "usr/lib/x86_64-linux-gnu/libnuma.so.1.0.0",
+      "bytes": 52248,
+      "sha256": "ccce381ad9aca398846df70536100d3936eaa218b228ba589523ad6b67ef7f3c",
+      "buildId": "7e06443de4d98f60fdbe7db7b26815e564e13af2",
+      "needed": [
+        "libc.so.6",
+        "ld-linux-x86-64.so.2"
+      ],
+      "package": "libnuma1"
+    },
+    {
+      "name": "libpython3.12.so.1.0",
+      "packagePath": "usr/lib/x86_64-linux-gnu/libpython3.12.so.1.0",
+      "bytes": 9061000,
+      "sha256": "1021f236227334ded6d1bbbc4bb6f5d933f793d8397c969896cfbdf03ce96223",
+      "buildId": "f9dc4186e18f6f7d17b385949329fb0c00ad4dde",
+      "needed": [
+        "libm.so.6",
+        "libz.so.1",
+        "libexpat.so.1",
+        "libc.so.6",
+        "ld-linux-x86-64.so.2"
+      ],
+      "package": "libpython3.12t64"
+    },
+    {
+      "name": "libslang.so.2",
+      "packagePath": "usr/lib/x86_64-linux-gnu/libslang.so.2.3.3",
+      "bytes": 2157592,
+      "sha256": "af564bc54e7c7bc51c21de935846ac6fe5bd551c22ab5af72927ff5e31aaaac4",
+      "buildId": "595d7ffd9d49b31c4683cefc352c34bc88a7e09e",
+      "needed": [
+        "libm.so.6",
+        "libc.so.6"
+      ],
+      "package": "libslang2"
+    },
+    {
+      "name": "libstdc++.so.6",
+      "packagePath": "usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.33",
+      "bytes": 2592224,
+      "sha256": "1fd75fe70354a416d75aef22bcae68c47bd25d20e2d0568c30b1a9838cf62f11",
+      "buildId": "753c6c8608b61d4e67be8f0c890e03e0aa046b8b",
+      "needed": [
+        "libm.so.6",
+        "libc.so.6",
+        "ld-linux-x86-64.so.2",
+        "libgcc_s.so.1"
+      ],
+      "package": "libstdc++6"
+    },
+    {
+      "name": "libtraceevent.so.1",
+      "packagePath": "usr/lib/x86_64-linux-gnu/libtraceevent.so.1.8.2",
+      "bytes": 162696,
+      "sha256": "73f9f6318c2f3ac0ec348a4b6e54b9747398def8b5f95bfdc348065c3819433f",
+      "buildId": "26ce66bfc85faae2567391e7d89978338242acee",
+      "needed": [
+        "libc.so.6"
+      ],
+      "package": "libtraceevent1"
+    },
+    {
+      "name": "libunwind-x86_64.so.8",
+      "packagePath": "usr/lib/x86_64-linux-gnu/libunwind-x86_64.so.8.0.1",
+      "bytes": 67672,
+      "sha256": "1d31524f4e26991446e6ba93ddf9963e9099a59c19630db12cd9bcea0b736005",
+      "buildId": "99ad3571fa06c813452ea85cb7af329fc1d780d3",
+      "needed": [
+        "liblzma.so.5",
+        "libunwind.so.8",
+        "libc.so.6"
+      ],
+      "package": "libunwind8"
+    },
+    {
+      "name": "libunwind.so.8",
+      "packagePath": "usr/lib/x86_64-linux-gnu/libunwind.so.8.0.1",
+      "bytes": 63776,
+      "sha256": "a8799def8bcf082c99ef861bd200f37bd02d5cad43c1166e54e35044ffea0a49",
+      "buildId": "f401e4b23f01884b8fcf195f843e0c78a803d4a3",
+      "needed": [
+        "libc.so.6",
+        "ld-linux-x86-64.so.2",
+        "liblzma.so.5"
+      ],
+      "package": "libunwind8"
+    },
+    {
+      "name": "libz.so.1",
+      "packagePath": "usr/lib/x86_64-linux-gnu/libz.so.1.3",
+      "bytes": 113000,
+      "sha256": "f61677c7bdb7c2aa2a243ea781bfd16afcb361cede7b4ef76127a9d8eb9a5242",
+      "buildId": "2f47d490170763b8b8e0064675d234bfede6c1db",
+      "needed": [
+        "libc.so.6"
+      ],
+      "package": "zlib1g"
+    },
+    {
+      "name": "libzstd.so.1",
+      "packagePath": "usr/lib/x86_64-linux-gnu/libzstd.so.1.5.5",
+      "bytes": 755864,
+      "sha256": "3c8a5cd1ce4008afa91da80db302b6987b2a75bb053f3a80e203068c11f7ca49",
+      "buildId": "599d234038295d3fef76e38eacceadec6f2a556a",
+      "needed": [
+        "libc.so.6"
+      ],
+      "package": "libzstd1"
+    },
+    {
+      "name": "perf",
+      "packagePath": "usr/lib/linux-tools-6.8.0-147/perf",
+      "bytes": 11765032,
+      "sha256": "2927eb0973fd937bdd417622531c95f1e6e19307a29c3e05a2c6198e12af6e56",
+      "buildId": "2d22584580c4fcd043be5858647fb45d6a91e121",
+      "needed": [
+        "libm.so.6",
+        "libz.so.1",
+        "libelf.so.1",
+        "libdw.so.1",
+        "libunwind-x86_64.so.8",
+        "libunwind.so.8",
+        "liblzma.so.5",
+        "libcrypto.so.3",
+        "libslang.so.2",
+        "libpython3.12.so.1.0",
+        "libstdc++.so.6",
+        "libzstd.so.1",
+        "libcap.so.2",
+        "libnuma.so.1",
+        "libtraceevent.so.1",
+        "libc.so.6"
+      ],
+      "package": "linux-tools-6.8.0-147"
+    }
+  ]
+}

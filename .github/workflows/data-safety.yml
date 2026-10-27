@@ -5,6 +5,12 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, edited]
 
+# Equivalent PR events serialize admission; a metadata edit cannot cancel the
+# admitted producer. Routing still verifies its exact durable context/outcome.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
 env:
   CHAIN_CI_TOPOLOGY: four-groups-v1
   CHAIN_TEST_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -23,6 +29,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Reject nonqualifying diagnostic source
+        shell: bash
+        run: |
+          if git cat-file -e HEAD:.diagnostic-task.json 2>/dev/null; then
+            echo "nonqualifying diagnostic source: ordinary product qualification is unavailable; use supported diagnostic workflow" >&2
+            exit 1
+          fi
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -73,7 +86,7 @@ jobs:
           if-no-files-found: error
 
   event-gates:
-    needs: [validation-context, cohort-routing]
+    needs: [validation-context, cohort-routing, early-startup]
     runs-on: ubuntu-latest
     outputs:
       rules: ${{ steps.rules.outputs.mode }}
@@ -96,30 +109,32 @@ jobs:
         id: selected
         run: node scripts/agent-tools/ci-pass-reuse.mjs select --proof "$RUNNER_TEMP/ci-routing/routing.json" --output-file "$RUNNER_TEMP/selected-routing/routing.json"
       - uses: actions/setup-java@v4
-        if: ${{ !contains(fromJSON(steps.selected.outputs.reused), 'rules') || !contains(fromJSON(steps.selected.outputs.reused), 'compatibility') }}
+        if: ${{ steps.selected.outputs.decision != 'policy-reuse' && (!contains(fromJSON(steps.selected.outputs.reused), 'rules') || !contains(fromJSON(steps.selected.outputs.reused), 'compatibility')) }}
         with:
           distribution: temurin
           java-version: '21'
       - run: npm ci
-        if: ${{ !contains(fromJSON(steps.selected.outputs.reused), 'rules') || !contains(fromJSON(steps.selected.outputs.reused), 'compatibility') }}
+        if: ${{ steps.selected.outputs.decision != 'policy-reuse' && (!contains(fromJSON(steps.selected.outputs.reused), 'rules') || !contains(fromJSON(steps.selected.outputs.reused), 'compatibility')) }}
       - run: node scripts/test-first-gate.mjs "${{ needs.validation-context.outputs.base }}"
       - name: Execute CI gate rules input ${{ fromJSON(steps.selected.outputs.input-keys).rules }}
-        if: ${{ !contains(fromJSON(steps.selected.outputs.reused), 'rules') }}
+        if: ${{ steps.selected.outputs.decision != 'policy-reuse' && !contains(fromJSON(steps.selected.outputs.reused), 'rules') }}
         run: echo "Executing previously uncovered rules inputs"
       - name: Firestore rules or verified original pass
         id: rules
+        if: steps.selected.outputs.decision != 'policy-reuse'
         run: node scripts/agent-tools/ci-pass-reuse.mjs run-gate --gate rules --proof "$RUNNER_TEMP/selected-routing/routing.json" --output-dir "$RUNNER_TEMP/emulator-gates/rules" --comparison-base "${{ needs.validation-context.outputs.base }}"
       - name: Execute CI gate compatibility input ${{ fromJSON(steps.selected.outputs.input-keys).compatibility }}
-        if: ${{ !contains(fromJSON(steps.selected.outputs.reused), 'compatibility') }}
+        if: ${{ steps.selected.outputs.decision != 'policy-reuse' && !contains(fromJSON(steps.selected.outputs.reused), 'compatibility') }}
         run: echo "Executing previously uncovered compatibility inputs"
       - name: Backward compatibility
         id: compatibility
+        if: steps.selected.outputs.decision != 'policy-reuse'
         env:
           COMPATIBILITY_BASE_SHA: ${{ needs.validation-context.outputs.base }}
         run: node scripts/agent-tools/ci-pass-reuse.mjs run-gate --gate compatibility --proof "$RUNNER_TEMP/selected-routing/routing.json" --output-dir "$RUNNER_TEMP/emulator-gates/compatibility" --comparison-base "${{ needs.validation-context.outputs.base }}"
       - name: Preserve emulator gate evidence
         id: upload
-        if: always()
+        if: always() && steps.selected.outputs.decision != 'policy-reuse'
         uses: actions/upload-artifact@v4
         with:
           name: event-gates-${{ github.run_id }}-${{ github.run_attempt }}
@@ -157,6 +172,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node scripts/agent-tools/ci-routing.mjs --require-input-passes 1 --descriptor "$RUNNER_TEMP/validation/descriptor/descriptor.json" --comparison-base "${{ needs.validation-context.outputs.base }}" --evidence-dir "$RUNNER_TEMP/ci-routing"
+      - name: Admit original full producer context ${{ needs.validation-context.outputs.context }}
+        if: success() && steps.route.outputs.decision == 'full'
+        run: echo "Original complete cohort admitted; references never emit this marker"
       - name: Preserve routing observations
         if: always()
         uses: actions/upload-artifact@v4
@@ -165,10 +183,87 @@ jobs:
           path: ${{ runner.temp }}/ci-routing
           if-no-files-found: error
 
+  early-startup:
+    needs: [validation-context, cohort-routing]
+    runs-on: ubuntu-latest
+    outputs:
+      decision: ${{ steps.selected.outputs.early-decision }}
+    env:
+      CHAIN_TEST_EVENT_POLICY: ${{ needs.validation-context.outputs.policy }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Admit immutable saved scenery fixture object
+        run: |
+          git cat-file -e 'b176026825e4f9539780f745fe60e09cf348d288^{commit}' || git fetch --no-tags origin b176026825e4f9539780f745fe60e09cf348d288
+          test "$(git rev-parse 'b176026825e4f9539780f745fe60e09cf348d288^{tree}')" = 27e293d0fa9aae62a906b36dc984bd0ef184f956
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/download-artifact@v4
+        with:
+          name: validation-context-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/validation
+      - uses: actions/download-artifact@v4
+        with:
+          name: ci-routing-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ci-routing
+      - name: Select early coverage for this runner
+        id: selected
+        run: node scripts/agent-tools/ci-pass-reuse.mjs select --proof "$RUNNER_TEMP/ci-routing/routing.json" --output-file "$RUNNER_TEMP/selected-routing/routing.json"
+      - run: npm ci
+        if: steps.selected.outputs.early-decision == 'full'
+      - name: Install matching harness engines
+        if: steps.selected.outputs.early-decision == 'full'
+        run: npx --no-install playwright install --with-deps chromium webkit
+      - name: Required saved harness and populated mobile startup
+        id: early
+        if: steps.selected.outputs.early-decision == 'full'
+        run: node scripts/early-ci.mjs --run --descriptor "$RUNNER_TEMP/validation/descriptor/descriptor.json" --output-dir "$RUNNER_TEMP/early"
+      - name: Record exact original early producer coverage
+        if: contains(fromJSON('["reuse","policy-reuse"]'), steps.selected.outputs.early-decision)
+        run: node scripts/early-ci.mjs --covered --descriptor "$RUNNER_TEMP/validation/descriptor/descriptor.json" --output-dir "$RUNNER_TEMP/early" --proof "$RUNNER_TEMP/selected-routing/routing.json"
+      - name: Preserve immutable early evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: early-startup-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/early
+          if-no-files-found: error
+      - name: Complete early startup report ${{ steps.early.outputs.report }}
+        if: success() && steps.selected.outputs.early-decision == 'full'
+        run: echo "Original harness and required one GB story completed"
+
+  mobile-stress:
+    needs: [validation-context, cohort-routing, early-startup]
+    runs-on: ubuntu-latest
+    env:
+      CHAIN_TEST_EVENT_POLICY: ${{ needs.validation-context.outputs.policy }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+        if: needs.early-startup.outputs.decision == 'full'
+      - name: Report 512MB application stress with required execution integrity
+        if: needs.early-startup.outputs.decision == 'full'
+        run: node scripts/button-safety-mobile-memory.mjs --run --profile stress-512mb --output-dir "$RUNNER_TEMP/stress"
+      - uses: actions/upload-artifact@v4
+        if: always() && needs.early-startup.outputs.decision == 'full'
+        with:
+          name: mobile-stress-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/stress
+          if-no-files-found: error
+
   regression:
     name: regression-${{ matrix.group }}
-    needs: [validation-context, cohort-routing]
-    if: always() && needs.validation-context.result == 'success' && needs.cohort-routing.result == 'success'
+    needs: [validation-context, cohort-routing, early-startup]
+    if: always() && needs.validation-context.result == 'success' && needs.cohort-routing.result == 'success' && needs.early-startup.result == 'success'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -181,6 +276,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Admit immutable saved scenery fixture object
+        run: |
+          git cat-file -e 'b176026825e4f9539780f745fe60e09cf348d288^{commit}' || git fetch --no-tags origin b176026825e4f9539780f745fe60e09cf348d288
+          test "$(git rev-parse 'b176026825e4f9539780f745fe60e09cf348d288^{tree}')" = 27e293d0fa9aae62a906b36dc984bd0ef184f956
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -200,14 +299,32 @@ jobs:
       - run: npm ci
         if: steps.selected.outputs.decision == 'full' && !contains(fromJSON(steps.selected.outputs.reused), matrix.group)
       - name: Install matching native Chromium
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/playwright-browsers
         if: steps.selected.outputs.decision == 'full' && !contains(fromJSON(steps.selected.outputs.reused), matrix.group)
-        run: npx --no-install playwright install --with-deps chromium
+        run: |
+          engines=(chromium)
+          if [[ "${{ matrix.group }}" == "native-process" ]] && [[ "${{ steps.selected.outputs.early-decision }}" == "reuse" ]]; then
+            engines+=(webkit)
+          fi
+          npx --no-install playwright install --with-deps "${engines[@]}"
       - name: Execute CI gate ${{ matrix.group }} input ${{ fromJSON(steps.selected.outputs.input-keys)[matrix.group] }}
         if: steps.selected.outputs.decision == 'full' && !contains(fromJSON(steps.selected.outputs.reused), matrix.group)
         run: echo "Executing previously uncovered group inputs"
-      - name: Execute or reuse assigned group
+      - uses: actions/download-artifact@v4
+        with:
+          name: early-startup-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/early
+      - name: Execute complete assigned group
         id: group
-        run: node scripts/agent-tools/ci-pass-reuse.mjs run-group --proof "$RUNNER_TEMP/selected-routing/routing.json" --group "${{ matrix.group }}" --output-dir "$RUNNER_TEMP/group" --repository "$GITHUB_REPOSITORY" --event-policy "$CHAIN_TEST_EVENT_POLICY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$CHAIN_TEST_SOURCE_SHA" --comparison-base "$CHAIN_TEST_COMPARISON_BASE"
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/playwright-browsers
+        run: |
+          group_args=(--group "${{ matrix.group }}" --early-receipt "$RUNNER_TEMP/early/receipt.json")
+          if [[ "${{ matrix.group }}" == "persistence-recovery" ]]; then
+            group_args+=(--browser-path "$PLAYWRIGHT_BROWSERS_PATH")
+          fi
+          node scripts/agent-tools/ci-pass-reuse.mjs run-group "${group_args[@]}" --proof "$RUNNER_TEMP/selected-routing/routing.json" --output-dir "$RUNNER_TEMP/group" --repository "$GITHUB_REPOSITORY" --event-policy "$CHAIN_TEST_EVENT_POLICY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$CHAIN_TEST_SOURCE_SHA" --comparison-base "$CHAIN_TEST_COMPARISON_BASE"
       - name: Preserve actual group results and native evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -220,7 +337,7 @@ jobs:
         run: echo "Original group execution and retained result verified"
 
   scanner-tests:
-    needs: [validation-context, event-gates, cohort-routing, regression]
+    needs: [validation-context, event-gates, cohort-routing, early-startup, regression, mobile-stress]
     if: always()
     runs-on: ubuntu-latest
     permissions:
@@ -233,6 +350,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Admit immutable saved scenery fixture object
+        run: |
+          git cat-file -e 'b176026825e4f9539780f745fe60e09cf348d288^{commit}' || git fetch --no-tags origin b176026825e4f9539780f745fe60e09cf348d288
+          test "$(git rev-parse 'b176026825e4f9539780f745fe60e09cf348d288^{tree}')" = 27e293d0fa9aae62a906b36dc984bd0ef184f956
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -269,8 +390,18 @@ jobs:
         with:
           name: ci-routing-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/ci-routing
+      - uses: actions/download-artifact@v4
+        if: always()
+        with:
+          name: early-startup-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/early
+      - uses: actions/download-artifact@v4
+        if: needs.early-startup.outputs.decision == 'full'
+        with:
+          name: mobile-stress-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/stress
       - name: Recheck covered producer immediately before aggregation
-        if: needs.cohort-routing.outputs.decision == 'reuse' || needs.cohort-routing.outputs.reused != '[]'
+        if: contains(fromJSON('["reuse","policy-reuse"]'), needs.cohort-routing.outputs.decision) || needs.cohort-routing.outputs.reused != '[]' || needs.early-startup.outputs.decision == 'reuse'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node scripts/agent-tools/ci-routing.mjs --require-input-passes 1 --input-proof "$RUNNER_TEMP/ci-routing/routing.json" --max-wait-ms 0 --descriptor "$RUNNER_TEMP/validation/descriptor/descriptor.json" --comparison-base "$CHAIN_TEST_COMPARISON_BASE" --evidence-dir "$RUNNER_TEMP/final-routing"
@@ -278,7 +409,7 @@ jobs:
         id: aggregate
         if: always()
         run: |
-          npm run test:group -- --aggregate --group core --output-dir "$RUNNER_TEMP/aggregate" --results-dir "$RUNNER_TEMP/groups" --needs-json "$RUNNER_TEMP/needs.json" --proof "$RUNNER_TEMP/final-routing/routing.json" --repository "$GITHUB_REPOSITORY" --event-policy "$CHAIN_TEST_EVENT_POLICY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$CHAIN_TEST_SOURCE_SHA" --comparison-base "$CHAIN_TEST_COMPARISON_BASE"
+          npm run test:group -- --aggregate --group core --output-dir "$RUNNER_TEMP/aggregate" --results-dir "$RUNNER_TEMP/groups" --needs-json "$RUNNER_TEMP/needs.json" --early-receipt "$RUNNER_TEMP/early/receipt.json" --mobile-stress-report "$RUNNER_TEMP/stress/report.json" --proof "$RUNNER_TEMP/final-routing/routing.json" --repository "$GITHUB_REPOSITORY" --event-policy "$CHAIN_TEST_EVENT_POLICY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$CHAIN_TEST_SOURCE_SHA" --comparison-base "$CHAIN_TEST_COMPARISON_BASE"
       - name: Preserve verified aggregate and final observations
         if: always()
         uses: actions/upload-artifact@v4

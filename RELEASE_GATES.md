@@ -184,6 +184,41 @@ deployment verifier because they have no merged pull request with matching
 evidence. A PR approval count does not replace the exact-task reviews recorded
 in the receipt.
 
+## Policy-prose inheritance
+
+For a classifier-proven instruction-preserving policy diff, keep the current
+owner and independent release-process specialist reviews. Supply
+`policyInheritance` with the existing full product receipt's `reviewedSha` and
+`receiptSha256`, plus absolute `renderedEvidencePath` and its
+`renderedEvidenceSha256`. The full receipt must verify under current policy,
+contain its independent FAQ approval, and name exactly the comparison base's
+full tree. A prior policy-only receipt cannot become the product origin.
+Missing evidence stops recording; a filename or housekeeping label grants no
+exemption.
+
+The rendered JSON envelope contains `schemaVersion: 1`, `reviewedSha`,
+`treeSha`, `outcome: "approved"`, independent reviewer `task`, a specific
+`summary`, and a nonempty `artifacts` array of absolute `evidencePath` and
+`sha256` pairs. Use the existing final rendered review and its actual source
+artifacts. The recorder checks each hash and source/tree binding, then copies
+the full product receipt, all review reports, rendered envelope and artifacts
+into the immutable current receipt. A fresh `release:verify` process rederives
+the complete frozen inventory and checks every copied artifact. These checks
+bind reported human review; they cannot establish that a person performed it.
+
+All three required status contexts remain present. Policy-inheritance statuses
+use `v=4`, binding the current policy review plan and receipt digest. Explicit
+additional specialist escalation keeps the ordinary status format and full CI
+route. CI may
+inherit the exact base's successful full main cohort only after verifying
+current statuses, the unchanged complete inventory, original run/attempt,
+full group execution, rules/compatibility execution, and final aggregate
+attestation. Missing, stale, failed, skipped or ambiguous evidence executes the
+current full cohort. Current policy review is never inherited from that run.
+See [test groups](docs/agents/test-groups.md#parallel-actions-aggregation) for
+honest current-versus-inherited outcome records. Pages retains its exact
+merged-head/tree/base and current-status verification.
+
 ## Deployment verification and limits
 
 Before Pages deploys, CI resolves the merged pull request for the pushed commit,
@@ -228,3 +263,7 @@ deletion. Deployment verification fetches the associated merged PR's retained
 `refs/pull/<number>/head` when that exact object is absent, then requires its SHA
 to match GitHub's reviewed head before deriving policy. A missing, invalid, or
 moved ref fails closed; fetching does not replace the deployed checkout.
+
+## Nonqualifying diagnostic receipt
+
+The existing release evidence command has a narrow `diagnostic-*` family; see [checkpoint authorization](docs/agents/checkpoints.md#ci-and-publication-boundaries) for its exact input and trust boundaries. It reuses valid unchanged product/FAQ/rendered reviews from the frozen source, retains failed CI, and requires exact independent instrumentation/security/memory/release-process reviews. Ordinary `record`, `verify`, `publish`, main pre-push and deployment verification reject diagnostic-only identity even when the caller omits a task flag. A diagnostic receipt cannot authorize a repair release. The separately reviewed governance anchor, default-branch workflow registration and actual hosted/native evidence remain prerequisites; local fixture passes do not satisfy them.

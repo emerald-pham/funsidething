@@ -488,15 +488,20 @@ test('binds required parallel topology to actual candidate workflow even when ne
 
 test('parallel workflow observation preserves complete missing skipped canceled and unknown distinctions', async parent => {
   const workflow=await readFile(new URL('../../.github/workflows/data-safety.yml',import.meta.url),'utf8');
-  const required=['validation-context','event-gates','cohort-routing','regression-core','regression-scenery','regression-persistence-recovery','regression-native-process','scanner-tests'];
+  const required=['validation-context','event-gates','cohort-routing','early-startup','mobile-stress','regression-core','regression-scenery','regression-persistence-recovery','regression-native-process','scanner-tests'];
   const scenarios=[
     ['complete full cohort',()=>{},0,'success'],
     ['complete covered cohort',run=>{run.jobs.find(job=>job.name==='scanner-tests').steps=run.jobs.find(job=>job.name==='scanner-tests').steps.filter(step=>!step.name.startsWith('Complete regression')).map(step=>({...step,name:step.name.replace('mode full','mode reuse')}));},0,'success'],
+    ['complete policy covered cohort',run=>{run.jobs.find(job=>job.name==='scanner-tests').steps=run.jobs.find(job=>job.name==='scanner-tests').steps.filter(step=>!step.name.startsWith('Complete regression')).map(step=>({...step,name:step.name.replace('mode full','mode policy-reuse')}));},0,'success'],
     ['absent verified aggregate marker',run=>{run.jobs.find(job=>job.name==='scanner-tests').steps=[];},1,'failure'],
     ['absent core group',run=>{run.jobs=run.jobs.filter(job=>job.name!=='regression-core');},1,'failure'],
-    ['skipped group',run=>{run.jobs[3].conclusion='skipped';},1,'failure'],
-    ['canceled group',run=>{run.jobs[4].conclusion='cancelled';},1,'canceled'],
-    ['duplicate group',run=>{run.jobs.push({...run.jobs[3]});},2,'unresolved'],
+    ['skipped group',run=>{run.jobs.find(job=>job.name==='regression-core').conclusion='skipped';},1,'failure'],
+    ['canceled group',run=>{run.jobs.find(job=>job.name==='regression-scenery').conclusion='cancelled';},1,'canceled'],
+    ['duplicate group',run=>{run.jobs.push({...run.jobs.find(job=>job.name==='regression-core')});},2,'unresolved'],
+    ['missing early story',run=>{run.jobs=run.jobs.filter(job=>job.name!=='early-startup');},1,'failure'],
+    ['skipped early story',run=>{run.jobs.find(job=>job.name==='early-startup').conclusion='skipped';},1,'failure'],
+    ['cancelled early story',run=>{run.jobs.find(job=>job.name==='early-startup').conclusion='cancelled';},1,'canceled'],
+    ['missing stress integrity',run=>{run.jobs=run.jobs.filter(job=>job.name!=='mobile-stress');},1,'failure'],
     ['unknown group',run=>{run.jobs.push({name:'regression-other',conclusion:'success'});},2,'unresolved'],
     ['unknown candidate topology',()=>{},2,'unresolved',workflow.replace('four-groups-v1','unrecognized-v2')],
     ['unavailable candidate bytes',()=>{},2,'unresolved',workflow,'controlled public API failure'],

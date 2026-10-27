@@ -851,15 +851,15 @@ function pruneOrphanedConfigurations(state) {
 }
 
 async function begin(filePath, options) {
-  const start = await readGitStartState(process.cwd(), options['base-ref']);
-  const worktreeRoot = await realpath(start.repositoryRoot);
-  if (await realpath(process.cwd()) !== worktreeRoot) {
-    throw new Error(`coordination begin requires the actual Git worktree root: ${worktreeRoot}.`);
-  }
   const { scopes, claims, resources } = normalizeOwnership(options);
   const workType = text(options['work-type'], 'tooling');
   if (!['product', 'tooling', 'documentation', 'investigation'].includes(workType)) {
     throw new Error('coordination begin requires --work-type product|tooling|documentation|investigation.');
+  }
+  const start = await readGitStartState(process.cwd(), options['base-ref']);
+  const worktreeRoot = await realpath(start.repositoryRoot);
+  if (await realpath(process.cwd()) !== worktreeRoot) {
+    throw new Error(`coordination begin requires the actual Git worktree root: ${worktreeRoot}.`);
   }
   return withCoordinationLock(filePath, async () => {
     const state = pruneDeadReservations(await readState(filePath));
@@ -1215,114 +1215,217 @@ async function releaseClaim(filePath, options) {
   });
 }
 
-function parseOptions(args) {
+const ownershipOptionSchema = {
+  scope: { key: 'scope', repeatable: true },
+  scopes: { key: 'scope', repeatable: true },
+  claim: { key: 'claims', repeatable: true },
+  claims: { key: 'claims', repeatable: true },
+  resources: { key: 'resources', repeatable: true },
+};
+const fileOptionSchema = { file: { key: 'file' } };
+const COMMAND_OPTION_SCHEMAS = {
+  discover: { ...fileOptionSchema },
+  'export-env': { ...fileOptionSchema },
+  status: { ...fileOptionSchema },
+  begin: {
+    ...fileOptionSchema,
+    ...ownershipOptionSchema,
+    'base-ref': { key: 'base-ref' },
+    'work-type': { key: 'work-type' },
+    intent: { key: 'intent' },
+    'version-plan': { key: 'version-plan' },
+    'preemptive-changelog': { key: 'preemptive-changelog' },
+    'implementation-prompt': { key: 'implementation-prompt' },
+  },
+  heartbeat: { ...fileOptionSchema, id: { key: 'id' }, now: { key: 'now' } },
+  claim: { ...fileOptionSchema, ...ownershipOptionSchema, id: { key: 'id' }, now: { key: 'now' } },
+  'release-claim': { ...fileOptionSchema, ...ownershipOptionSchema, id: { key: 'id' }, now: { key: 'now' } },
+  park: {
+    ...fileOptionSchema,
+    id: { key: 'id' },
+    'checkpoint-sha': { key: 'checkpoint-sha' },
+    'next-action': { key: 'next-action' },
+    now: { key: 'now' },
+  },
+  resume: { ...fileOptionSchema, id: { key: 'id' }, 'checkpoint-sha': { key: 'checkpoint-sha' }, now: { key: 'now' } },
+  finish: {
+    ...fileOptionSchema,
+    id: { key: 'id' },
+    adapter: { key: 'adapter' },
+    outcome: { key: 'outcome' },
+    'preserve-ref': { key: 'preserve-ref' },
+    reason: { key: 'reason' },
+    result: { key: 'result' },
+  },
+  install: { to: { key: 'to' } },
+  migrate: {
+    ...fileOptionSchema,
+    to: { key: 'to' },
+    'backup-dir': { key: 'backup-dir' },
+    'expected-sha256': { key: 'expected-sha256' },
+    phase: { key: 'phase' },
+  },
+};
+
+function parseOptions(command, args) {
+  const schema = COMMAND_OPTION_SCHEMAS[command];
+  if (!schema) throw new Error(`Unknown coordination command: ${command}.`);
   const options = {};
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index];
     if (!argument?.startsWith('--')) throw new Error(`Unexpected argument: ${argument}`);
     const name = argument.slice(2);
+    const definition = schema[name];
+    if (!definition) {
+      if (name === 'resource' && Object.hasOwn(schema, 'resources')) {
+        throw new Error(`Unknown option --resource for coordination ${command}. Use --resources; it accepts repeated values.`);
+      }
+      throw new Error(`Unknown option --${name} for coordination ${command}.`);
+    }
     const value = args[index + 1];
-    if (!value || value.startsWith('--')) throw new Error(`Missing value for --${name}.`);
-    if (['scope', 'claims', 'claim', 'resources'].includes(name)) {
-      options[name] = [...(Array.isArray(options[name]) ? options[name] : []), value];
+    if (typeof value !== 'string' || !value.trim() || value.startsWith('--')) {
+      throw new Error(`Missing value for --${name}.`);
+    }
+    if (definition.repeatable) {
+      options[definition.key] = [...(Array.isArray(options[definition.key]) ? options[definition.key] : []), value];
     } else {
-      if (Object.hasOwn(options, name)) throw new Error(`Option --${name} can be provided only once.`);
-      options[name] = value;
+      if (Object.hasOwn(options, definition.key)) throw new Error(`Option --${name} can be provided only once.`);
+      options[definition.key] = value;
     }
     index += 1;
   }
   return options;
 }
 
+function validateOptionContract(command, options) {
+  const requireId = (operation) => {
+    if (!options.id) throw new Error(`coordination ${operation} requires --id <entry-id>.`);
+  };
+  const validateNow = () => {
+    if (options.now !== undefined) isoNow(options.now);
+  };
+  const requireOwnership = (operation) => {
+    const ownership = normalizeOwnership(options);
+    if (!ownership.scopes.length && !ownership.claims.length && !ownership.resources.length) {
+      throw new Error(`coordination ${operation} requires at least one --scope/--scopes, --claim/--claims, or --resources value.`);
+    }
+    return ownership;
+  };
+
+  if (command === 'begin') {
+    const workType = text(options['work-type'], 'tooling');
+    if (!['product', 'tooling', 'documentation', 'investigation'].includes(workType)) {
+      throw new Error('coordination begin requires --work-type product|tooling|documentation|investigation.');
+    }
+    normalizeOwnership(options);
+  } else if (command === 'heartbeat') {
+    requireId(command);
+    validateNow();
+  } else if (command === 'claim' || command === 'release-claim') {
+    requireId(command);
+    requireOwnership(command);
+    validateNow();
+  } else if (command === 'park') {
+    requireId(command);
+    if (!/^[0-9a-f]{40}$/i.test(text(options['checkpoint-sha']))) {
+      throw new Error('coordination park requires an exact 40-character --checkpoint-sha value.');
+    }
+    validateNow();
+  } else if (command === 'resume') {
+    requireId(command);
+    if (options['checkpoint-sha'] !== undefined && !/^[0-9a-f]{40}$/i.test(options['checkpoint-sha'])) {
+      throw new Error('coordination resume --checkpoint-sha must be an exact 40-character commit SHA.');
+    }
+    validateNow();
+  } else if (command === 'finish') {
+    requireId(command);
+    const adapter = text(options.adapter);
+    if (!adapter) throw new Error('coordination finish requires an explicit --adapter chain-scanner.');
+    if (adapter !== 'chain-scanner') throw new Error(`Unsupported coordination completion adapter: ${adapter}.`);
+    const outcome = text(options.outcome, 'landed');
+    if (!['landed', 'preserved', 'discarded'].includes(outcome)) {
+      throw new Error('coordination finish outcome must be landed, preserved, or discarded.');
+    }
+    if (outcome === 'preserved') {
+      const destination = text(options['preserve-ref']);
+      if (!destination) {
+        throw new Error(`Cannot preserve coordination entry ${options.id}: --preserve-ref is required.`);
+      }
+      const separator = destination.indexOf('/');
+      if (separator < 1 || separator === destination.length - 1) {
+        throw new Error(`Cannot preserve coordination entry ${options.id}: --preserve-ref must be remote/branch.`);
+      }
+    } else if (options['preserve-ref'] !== undefined) {
+      throw new Error('--preserve-ref is only valid when --outcome preserved.');
+    }
+    if (outcome === 'discarded') {
+      if (!text(options.reason)) throw new Error(`Cannot discard coordination entry ${options.id}: --reason is required.`);
+    } else if (options.reason !== undefined) {
+      throw new Error('--reason is only valid when --outcome discarded.');
+    }
+  } else if (command === 'install') {
+    if (!text(options.to) || !isAbsolute(options.to)) {
+      throw new Error('coordination install requires an explicit absolute --to <destination-file>.');
+    }
+  } else if (command === 'migrate') {
+    if (!options.file) throw new Error('Migration requires an explicit --file source.');
+    if (!options.to) throw new Error('Migration requires an explicit --to destination.');
+    if (!options['backup-dir']) throw new Error('Migration requires an explicit --backup-dir.');
+    if (!/^[0-9a-f]{64}$/.test(options['expected-sha256'] ?? '')) {
+      throw new Error('Migration requires an exact lowercase --expected-sha256 digest from the reviewed source.');
+    }
+    if (!['prepare', 'block', 'publish', 'all', 'rollback'].includes(options.phase ?? 'all')) {
+      throw new Error('Migration --phase must be prepare, block, publish, all or rollback.');
+    }
+  }
+}
+
+function validatedOptions(command, args) {
+  const options = parseOptions(command, args);
+  validateOptionContract(command, options);
+  return options;
+}
+
 const [command, ...args] = process.argv.slice(2);
-if (command === 'discover') {
-  try {
-    console.log(discover(args));
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 2;
-  }
-} else if (command === 'status') {
-  try {
-    const filePath = discover(args);
-    console.log(JSON.stringify({ filePath, state: await readState(filePath) }, null, 2));
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 2;
-  }
-} else if (command === 'begin') {
-  try {
-    const entry = await begin(discover(args), parseOptions(args));
-    console.log(JSON.stringify(entry, null, 2));
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 2;
-  }
-} else if (command === 'heartbeat') {
-  try {
-    const entry = await heartbeat(discover(args), parseOptions(args));
-    console.log(JSON.stringify(entry, null, 2));
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 2;
-  }
-} else if (command === 'park' || command === 'resume') {
-  try {
-    const operation = command === 'park' ? park : resume;
-    const entry = await operation(discover(args), parseOptions(args));
-    console.log(JSON.stringify(entry, null, 2));
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 2;
-  }
-} else if (command === 'finish') {
-  try {
-    const entry = await finish(discover(args), parseOptions(args));
-    console.log(JSON.stringify(entry, null, 2));
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 2;
-  }
-} else if (command === 'export-env') {
-  try {
-    const filePath = discover(args);
-    console.log(`export CODEX_COORDINATION_FILE=${shellQuote(filePath)}`);
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 2;
-  }
-} else if (command === 'install') {
-  try {
-    await install(parseOptions(args));
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 2;
-  }
-} else if (command === 'migrate') {
-  try {
-    const options = parseOptions(args);
-    console.log(JSON.stringify(await migrate(discover(args), options), null, 2));
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 2;
-  }
-} else if (command === 'claim') {
-  try {
-    const entry = await claim(discover(args), parseOptions(args));
-    console.log(JSON.stringify(entry, null, 2));
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 2;
-  }
-} else if (command === 'release-claim') {
-  try {
-    const entry = await releaseClaim(discover(args), parseOptions(args));
-    console.log(JSON.stringify(entry, null, 2));
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 2;
-  }
-} else {
+if (!Object.hasOwn(COMMAND_OPTION_SCHEMAS, command)) {
   console.error('usage: coordination.mjs <discover|export-env|install|migrate|status|begin|heartbeat|claim|release-claim|park|resume|finish> [options]');
   process.exitCode = 2;
+} else {
+  try {
+    const options = validatedOptions(command, args);
+    if (command === 'discover') console.log(discover(args));
+    else if (command === 'status') {
+      const filePath = discover(args);
+      console.log(JSON.stringify({ filePath, state: await readState(filePath) }, null, 2));
+    } else if (command === 'begin') {
+      const entry = await begin(discover(args), options);
+      console.log(JSON.stringify(entry, null, 2));
+    } else if (command === 'heartbeat') {
+      const entry = await heartbeat(discover(args), options);
+      console.log(JSON.stringify(entry, null, 2));
+    } else if (command === 'park' || command === 'resume') {
+      const operation = command === 'park' ? park : resume;
+      const entry = await operation(discover(args), options);
+      console.log(JSON.stringify(entry, null, 2));
+    } else if (command === 'finish') {
+      const entry = await finish(discover(args), options);
+      console.log(JSON.stringify(entry, null, 2));
+    } else if (command === 'export-env') {
+      const filePath = discover(args);
+      console.log(`export CODEX_COORDINATION_FILE=${shellQuote(filePath)}`);
+    } else if (command === 'install') {
+      await install(options);
+    } else if (command === 'migrate') {
+      console.log(JSON.stringify(await migrate(discover(args), options), null, 2));
+    } else if (command === 'claim') {
+      const entry = await claim(discover(args), options);
+      console.log(JSON.stringify(entry, null, 2));
+    } else if (command === 'release-claim') {
+      const entry = await releaseClaim(discover(args), options);
+      console.log(JSON.stringify(entry, null, 2));
+    }
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 2;
+  }
 }

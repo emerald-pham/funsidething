@@ -133,16 +133,23 @@ function main() {
     const target=path.resolve(options['--output-file']||'');
     if(!options['--output-file']||target.startsWith(process.cwd()+path.sep))throw new Error('Selected routing requires an output file outside the checkout.');
     mkdirSync(path.dirname(target),{recursive:true,mode:0o700});writeFileSync(target,JSON.stringify(proof,null,2)+'\n',{flag:'wx',mode:0o600});
-    const output=`decision=${proof.decision}\nreused=${JSON.stringify(Object.keys(proof.inputPasses||{}))}\ninput-keys=${JSON.stringify(proof.inputKeys)}\n`;
+    const output=`decision=${proof.decision}\nearly-decision=${proof.earlyCoverage?'reuse':proof.decision}\nreused=${JSON.stringify(Object.keys(proof.inputPasses||{}))}\ninput-keys=${JSON.stringify(proof.inputKeys)}\n`;
     if(process.env.GITHUB_OUTPUT)appendFileSync(process.env.GITHUB_OUTPUT,output);process.stdout.write(output);return;
   }
   if(command==='run-gate')return runGate(options);
   if(command!=='run-group')throw new Error('Expected run-group.');
   if(!options['--proof']||!CI_GATES.slice(0,4).includes(options['--group']))throw new Error('run-group requires a routing proof and stable group.');
   const proof=selectRuntime(JSON.parse(readFileSync(options['--proof'],'utf8')));
-  if(!['full','reuse'].includes(proof.decision))throw new Error('Routing did not admit required execution or verified coverage.');
-  const covered=proof.decision==='reuse'||Boolean(proof.inputPasses?.[options['--group']]);
-  const args=argv.filter((_value,index)=>!(!covered&&(argv[index]==='--proof'||argv[index-1]==='--proof')));
+  if(!['full','reuse','policy-reuse'].includes(proof.decision))throw new Error('Routing did not admit required execution or verified coverage.');
+  const covered=['reuse','policy-reuse'].includes(proof.decision)||Boolean(proof.inputPasses?.[options['--group']]);
+  const args=argv.filter((_value,index)=>!(!covered&&!proof.earlyCoverage&&(argv[index]==='--proof'||argv[index-1]==='--proof'))&&!['--browser-path','--native-port'].includes(argv[index])&&!['--browser-path','--native-port'].includes(argv[index-1]));
+  if(!covered&&options['--browser-path']){
+    const output=path.resolve(options['--output-dir']+'-browser-runtime-preflight');
+    const preflightArgs=[...args];preflightArgs[preflightArgs.indexOf('--output-dir')+1]=output;
+    const preflight=spawnSync(process.execPath,[fileURLToPath(new URL('../test-groups.mjs',import.meta.url)),...preflightArgs,'--browser-runtime-preflight','--browser-path',options['--browser-path'],...(options['--native-port']?['--native-port',options['--native-port']]:[])],{stdio:'inherit'});
+    if(preflight.status!==0||preflight.error||preflight.signal)throw new Error('Required browser preflight failed before the assigned group.');
+    args.push('--browser-runtime-receipt',path.join(output,'result.json'));
+  }
   const result=spawnSync(process.execPath,[fileURLToPath(new URL('../test-groups.mjs',import.meta.url)),...args,...(covered?['--covered']:[])],{stdio:'inherit'});
   if(result.error||result.signal)throw new Error('Required group did not complete: '+(result.error?.message||result.signal));
   process.exitCode=result.status??1;
@@ -161,10 +168,11 @@ function main() {
 }
 
 function selectRuntime(proof){
-  if(!['full','reuse'].includes(proof.decision))throw new Error('Routing did not admit execution or coverage.');
+  if(!['full','reuse','policy-reuse'].includes(proof.decision))throw new Error('Routing did not admit execution or coverage.');
+  if(proof.decision==='policy-reuse')return proof;
   const inputs=ciInputContext({...proof.validationContext,runtime:{node:process.versions.node,platform:process.platform,arch:process.arch}});
   if(JSON.stringify(inputs.runtime)!==JSON.stringify(proof.inputContext?.runtime)||!inputs.runtime.imageOS||!inputs.runtime.imageVersion){
-    proof={...proof,decision:'full',inputContext:inputs,inputKeys:Object.fromEntries(CI_GATES.map(gate=>[gate,ciInputKey(inputs,gate)])),inputPasses:{},runtimeMiss:'The consuming runtime differs or is unknown; execute required gates.'};
+    proof={...proof,decision:'full',earlyCoverage:null,inputContext:inputs,inputKeys:Object.fromEntries(CI_GATES.map(gate=>[gate,ciInputKey(inputs,gate)])),inputPasses:{},runtimeMiss:'The consuming runtime differs or is unknown; execute required gates.'};
   }
   return proof;
 }

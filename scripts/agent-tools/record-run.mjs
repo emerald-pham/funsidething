@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn } from 'node:child_process';
+import { assertDiagnosticLaunchAllowed, admitDiagnosticAttempt, finishDiagnosticAttempt } from './checkpoint-progress.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 import { lstat, mkdir, open, readFile, readlink, realpath, rename, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
@@ -34,7 +35,7 @@ function parseArguments(argv) {
     const value = argv[index + 1];
     if (value === undefined || value.startsWith('--')) throw new Error(`Missing value for ${name}.`);
     const key = name.slice(2);
-    if (!['repo', 'evidence-dir', 'purpose', 'redact-pattern', 'correction-of', 'correction-note'].includes(key)) throw new Error(`Unknown option: ${name}`);
+    if (!['repo', 'evidence-dir', 'purpose', 'redact-pattern', 'correction-of', 'correction-note', 'diagnostic-request', 'diagnostic-task'].includes(key)) throw new Error(`Unknown option: ${name}`);
     if (key === 'redact-pattern') options[key] = [...(options[key] ?? []), value];
     else options[key] = value;
     index += 1;
@@ -491,9 +492,9 @@ function summarizeEvidenceError(error, redaction, location) {
   return sanitizeText(message, redaction, location).slice(0, 240);
 }
 
-async function execute(command, args, cwd) {
+export async function execute(command, args, cwd, options = {}) {
   return new Promise((resolveResult) => {
-    const child = spawn(command, args, { cwd, stdio: ['inherit', 'pipe', 'pipe'], detached: process.platform !== 'win32' });
+    const child = spawn(command, args, { cwd, env: options.env ?? process.env, stdio: options.diagnosticAuthorization ? ['inherit', 'pipe', 'pipe', 'pipe'] : ['inherit', 'pipe', 'pipe'], detached: process.platform !== 'win32' });
     const stdout = [];
     const stderr = [];
     let launchError;
@@ -548,6 +549,7 @@ async function execute(command, args, cwd) {
     child.stderr.on('data', (chunk) => stderr.push(Buffer.from(chunk)));
     child.on('error', (error) => { launchError = error; });
     child.once('spawn', () => {
+      if(options.diagnosticAuthorization){try{child.stdio[3].on('error',()=>{});child.stdio[3].end(JSON.stringify(options.diagnosticAuthorization(child.pid)));}catch(error){launchError=error;sendOwnedSignal('SIGTERM');}}
       if (wrapperSignal && !cleanup.signalSent) cleanup.signalSent = sendOwnedSignal(wrapperSignal);
     });
     child.on('close', (code, signal) => {
@@ -598,6 +600,7 @@ async function main(argv) {
   const prepared = new Date();
   const id = `${prepared.toISOString().replace(/[:.]/g, '-')}-${randomUUID()}`;
   const repo = path.resolve(options.repo);
+  assertDiagnosticLaunchAllowed(repo,{task:options['diagnostic-task'],command,args:commandArgs});
   const evidenceDirectory = path.resolve(options['evidence-dir']);
   const recordPath = path.join(evidenceDirectory, `${id}.json`);
   const stdoutPath = options.summary ? path.join(evidenceDirectory, `${id}.stdout.txt`) : undefined;
@@ -698,6 +701,8 @@ async function main(argv) {
   }
   if (!options.summary) process.stderr.write(`record-run: evidence=${evidencePaths.metadataPath}\n`);
 
+  const diagnostic = await admitDiagnosticAttempt(repo, {task:options['diagnostic-task'],request:options['diagnostic-request'],command,args:commandArgs,resultPath:recordPath});
+  if(diagnostic?.observed){process.stdout.write(JSON.stringify(diagnostic)+'\n');return;}
   const result = await execute(command, commandArgs, repo);
   const signalNumber = { SIGINT: 2, SIGKILL: 9, SIGTERM: 15 }[result.interruption?.signal ?? result.signal];
   const wrapperExitCode = result.interruption || result.signal
@@ -763,6 +768,7 @@ async function main(argv) {
       if (finalWrapperExitCode === 0) finalWrapperExitCode = evidenceFailureExitCode;
       record.execution.wrapperExitCode = finalWrapperExitCode;
     }
+    await finishDiagnosticAttempt(repo,diagnostic);
     emitSummary({
       status: summaryStatus(result, record.evidence.status),
       outcome: record.execution.outcome,
@@ -778,6 +784,7 @@ async function main(argv) {
     return;
   }
   await writeRecord(recordPath, record);
+  await finishDiagnosticAttempt(repo,diagnostic);
   process.stdout.write(output.stdout);
   process.stderr.write(output.stderr);
   process.stderr.write(`record-run: purpose=${options.purpose} outcome=${record.execution.outcome} exit=${wrapperExitCode} childExit=${result.exitCode}\n`);
