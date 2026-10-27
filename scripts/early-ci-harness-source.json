@@ -73,8 +73,8 @@
       "gitBlob": "af91a33a6af193fd5582255b7eb09361bb9cc6f1",
       "sha256": "99781010cea67b0157fdb757162ff05a99ef62da77cec62b070bbbcbe5f8d9de",
       "preservedOriginalPath": "scripts/source-snapshots/issue-290/button-safety-native-9b5bc1c.mjs.txt",
-      "effectiveSha256": "cd829995ecb9f4399412ff3ca1f4282cb2c8b47a9b30e8c86d6ba3db33ef4147",
-      "adaptation": "Explicit canonical source-profile hook for only original mobile story and confirmed modal release; original full inventory guard retained."
+      "effectiveSha256": "8054674a9fbb0101970e113317f9d1b13fb3a9ceabd9b759e37c8d8df7575035",
+      "adaptation": "Explicit canonical source-profile hook for only original mobile story and confirmed modal release; original full inventory guard retained. Local owner lookup canonicalizes the existing repo once, skips only unavailable other paths, rejects ambiguous own allocations, and retains all foreign entries for conflict checks."
     },
     {
       "path": "scripts/button-safety-rapid-core.mjs",

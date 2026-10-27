@@ -102,5 +102,28 @@ test('early CI canonical source admits its existing mixed owners through durable
   {root:requiredCases[0],group:'core'},...requiredCases.slice(1).map(root=>({root,group:'native-process'})),
   ...['RISK scenery backdrop cache: first unchanged lighting timer reuses actual pixels while changed slots and loaded copy still paint','RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh'].map(root=>({root,group:'native-process'})),
  ].sort((a,b)=>a.root.localeCompare(b.root)));
+
+ const localDirectory=path.join(directory,'local-allocation');fs.mkdirSync(localDirectory);const boundary=path.join(localDirectory,'runtime-boundary-file');fs.writeFileSync(boundary,'owned deliberate pre-browser boundary');
+ const foreignMissing=path.join(localDirectory,'foreign-missing'),foreignFile=path.join(localDirectory,'foreign-file');fs.writeFileSync(foreignFile,'foreign controlled fixture');const foreignLoop=path.join(localDirectory,'foreign-loop');fs.symlinkSync('foreign-loop',foreignLoop);
+ const resources=['browser-runtime:playwright-chromium','loopback:127.0.0.1:31275'],own={id:'own-fixture',status:'active',worktree:repo,resources,lease:{state:'healthy',expiresAt:new Date(Date.now()+60000).toISOString(),ownerConfirmationRequired:false}},foreign={id:'foreign-fixture',status:'active',worktree:foreignMissing,resources:[],unknown:{opaque:'retain exact foreign fields'}};
+ const scenarios=[
+  ['missing foreign path',[foreign,own],true,/EEXIST|file already exists/],
+  ['foreign path under a regular file',[{...foreign,worktree:foreignFile+'/child'},own],true,/EEXIST|file already exists/],
+  ['missing parked foreign browser conflict',[{...foreign,status:'parked',resources:[resources[0]]},own],false,/Conflicting local native allocation/],
+  ['missing active foreign port conflict',[{...foreign,resources:[resources[1]]},own],false,/Conflicting local native allocation/],
+  ['missing own allocation',[foreign],false,/Active worktree allocation/],
+  ['expired own lease',[foreign,{...own,lease:{...own.lease,expiresAt:'2000-01-01T00:00:00.000Z'}}],false,/healthy worktree lease/],
+  ['ambiguous own allocation',[foreign,own,{...own,id:'duplicate-own-fixture',worktree:repo+path.sep+'.'}],false,/Ambiguous active worktree allocation/],
+  ['malformed foreign identity',[{...foreign,worktree:null},own],false,/ERR_INVALID_ARG_TYPE|path.*string/i],
+  ['unresolvable foreign symlink',[{...foreign,worktree:foreignLoop},own],false,/ELOOP|too many symbolic links/i],
+ ];
+ for(const [name,entries,admitted,expected]of scenarios){
+  const ledger=path.join(localDirectory,name.replaceAll(' ','-')+'.json'),raw=JSON.stringify({version:1,entries,unknown:{preserve:'all raw ledger bytes'}},null,2)+'\n';fs.writeFileSync(ledger,raw);
+  const localEnv={...process.env,CODEX_COORDINATION_FILE:ledger};for(const key of ['CI','DOW_EMULATOR_COORDINATION_FILE','NODE_TEST_CONTEXT','NODE_OPTIONS'])delete localEnv[key];
+  const local=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine','chromium','--probe','--port','31275','--output-dir',boundary],{cwd:repo,env:localEnv,encoding:'utf8',timeout:10000});assert.equal(local.error,undefined);assert.equal(local.signal,null);assert.notEqual(local.status,0,'Every controlled public consumer stops before browser work');assert.equal(fs.readFileSync(ledger,'utf8'),raw,'All own/foreign ledger bytes must remain exact: '+name);assert.equal(fs.readFileSync(boundary,'utf8'),'owned deliberate pre-browser boundary');
+  const observed=local.stdout+local.stderr;if(admitted)assert.equal(/EEXIST|file already exists/.test(observed),true,'Valid own allocation must reach its deliberate runtime-preparation boundary despite an unavailable foreign path: '+name);else{assert.match(observed,expected,'Unsafe allocation must fail closed: '+name+'\n'+observed);assert.doesNotMatch(observed,/EEXIST|file already exists/,'Refused allocation cannot reach runtime work: '+name);}
+ }
+ t.diagnostic('Local allocation public consumer passed9 isolated ledger cases without foreign or own ledger writes; no browser was launched.');
+
  t.diagnostic('Actual canonical source/manifest/catalog covered admission with controlled GitHub producer metadata starts zero workload children; the separately counted canonical predicate child executes once; no hosted or native qualification.');
 });

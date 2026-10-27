@@ -21032,5 +21032,77 @@
       "command": "Node22.23.3 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node22 --test --test-reporter=tap --test-name-pattern=^RISK repository process: canonical early admission retains mixed owners tests.js; exact command/source/time in review/early-duplicate-repair/runs/red/2026-10-27T11-10-52-326Z-62674577-cef1-4368-b8ac-9c56600727d6.json.",
       "failure": "Observed before duplicate removal on b290820: the actual canonical Node predicate command exited0 but printed two same-name passed roots; permanent public-consumer cardinality assertion expected1 and observed2. GREEN follows removal of only the appended byte-identical second body. This is actual predicate execution and controlled source/group accounting, not full early Docker/WebKit or hosted proof."
     }
+  },
+  {
+    "testChangesSha256": "9cc38f44ebfec0dcbb87cc209160ee886e386e0ee2c6161e7af5a54f1e5f9837",
+    "reason": "Repair only the observed local native owner-identity lookup failure at the existing effective adapter. Extend the existing canonical public consumer with9 isolated ledger cases and explicit serial risk-root execution. Keep all830 prior rationale records as an exact raw prefix. Comparison c4a497390f8d861da5ffb3c718e777c64d2eef69.",
+    "previousBehavior": "The actual canonical harness failed before browser launch because native owner lookup realpathed a missing foreign active worktree. A valid own allocation could not reach native runtime preparation; a first partial repair also admitted a malformed null foreign path.",
+    "intendedBehavior": "Canonicalize the actual repo once; skip only unavailable ENOENT/ENOTDIR other paths during own identity lookup; reject malformed or ambiguous active identities; keep all owners for resource conflict detection and keep own healthy lease/port/browser/source guards. The existing public consumer asserts two valid missing-path admissions and seven fail-closed negatives, with every ledger byte unchanged.",
+    "replacementTests": [
+      "RISK repository process: canonical early admission retains mixed owners and fresh durable verification"
+    ],
+    "preservedCoverage": [
+      "All2678 catalog roots/owners, accepted skips, original805 predicate and other four early consumer bodies, original9b5 native snapshot, canonical source profile, application assets and native budgets/deadlines remain unchanged.",
+      "The complete foreign owners list is retained for active/parked resource conflicts; missing own allocation, expired lease, duplicate own aliases, malformed identity and symlink-loop errors remain refused before runtime work.",
+      "Original raw/historical native source remains exact; only the reviewed effective local adapter and its effectiveSha256/adaptation binding change. No other-thread, remote, full-suite or hosted authority is added."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder preimplementation-red commands are bound in review/native-ledger-repair/runs/red/2026-10-27T11-24-18-272Z-ada66df6-d4ca-4770-91c3-8a6329d45945.json and runs/malformed-red/2026-10-27T11-26-41-043Z-1e1163bd-5ed5-4243-a675-222f5cbcb488.json; both use the existing actual public canonical/native consumer.",
+      "failure": "Before lookup implementation, valid own allocation failed its expected deliberate runtime-preparation boundary for a missing foreign path, expectedtrue/actualfalse. After that narrow partial fix, the malformed-path negative observed an admitted EEXIST boundary before the explicit type guard. Both assertion failures precede their respective fixes; final9case GREEN9df5f551 preserves all ledger bytes. Initial63ca37a7 contextual output was classified infrastructure by the coarse ENOENT recognizer and remains retained without replacing the assertion RED. Actual c4 harness failureda94874c stays immutable."
+    }
+  },
+  {
+    "testChangesSha256": "29048015c70b72b9c86b5a5615cb451083ede3f8d3afee86117ac1ff2114fa1f",
+    "reason": "Repair only the observed local native owner-identity lookup failure at the existing effective adapter. Extend the existing canonical public consumer with9 isolated ledger cases and explicit serial risk-root execution. Keep all830 prior rationale records as an exact raw prefix. Comparison b290820341755d632f85a3f57bb906bb8d00bdcf.",
+    "previousBehavior": "The actual canonical harness failed before browser launch because native owner lookup realpathed a missing foreign active worktree. A valid own allocation could not reach native runtime preparation; a first partial repair also admitted a malformed null foreign path.",
+    "intendedBehavior": "Canonicalize the actual repo once; skip only unavailable ENOENT/ENOTDIR other paths during own identity lookup; reject malformed or ambiguous active identities; keep all owners for resource conflict detection and keep own healthy lease/port/browser/source guards. The existing public consumer asserts two valid missing-path admissions and seven fail-closed negatives, with every ledger byte unchanged.",
+    "replacementTests": [
+      "RISK repository process: canonical early admission retains mixed owners and fresh durable verification"
+    ],
+    "preservedCoverage": [
+      "All2678 catalog roots/owners, accepted skips, original805 predicate and other four early consumer bodies, original9b5 native snapshot, canonical source profile, application assets and native budgets/deadlines remain unchanged.",
+      "The complete foreign owners list is retained for active/parked resource conflicts; missing own allocation, expired lease, duplicate own aliases, malformed identity and symlink-loop errors remain refused before runtime work.",
+      "Original raw/historical native source remains exact; only the reviewed effective local adapter and its effectiveSha256/adaptation binding change. No other-thread, remote, full-suite or hosted authority is added."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder preimplementation-red commands are bound in review/native-ledger-repair/runs/red/2026-10-27T11-24-18-272Z-ada66df6-d4ca-4770-91c3-8a6329d45945.json and runs/malformed-red/2026-10-27T11-26-41-043Z-1e1163bd-5ed5-4243-a675-222f5cbcb488.json; both use the existing actual public canonical/native consumer.",
+      "failure": "Before lookup implementation, valid own allocation failed its expected deliberate runtime-preparation boundary for a missing foreign path, expectedtrue/actualfalse. After that narrow partial fix, the malformed-path negative observed an admitted EEXIST boundary before the explicit type guard. Both assertion failures precede their respective fixes; final9case GREEN9df5f551 preserves all ledger bytes. Initial63ca37a7 contextual output was classified infrastructure by the coarse ENOENT recognizer and remains retained without replacing the assertion RED. Actual c4 harness failureda94874c stays immutable."
+    }
+  },
+  {
+    "testChangesSha256": "4e6912a67bd69250bc51cbd14186d7e0d3f282c03c8be1a37c96419c5923dbc0",
+    "reason": "Repair only the observed local native owner-identity lookup failure at the existing effective adapter. Extend the existing canonical public consumer with9 isolated ledger cases and explicit serial risk-root execution. Keep all830 prior rationale records as an exact raw prefix. Comparison d635379ebb7913a165f88027828b5a57ef64d4e1.",
+    "previousBehavior": "The actual canonical harness failed before browser launch because native owner lookup realpathed a missing foreign active worktree. A valid own allocation could not reach native runtime preparation; a first partial repair also admitted a malformed null foreign path.",
+    "intendedBehavior": "Canonicalize the actual repo once; skip only unavailable ENOENT/ENOTDIR other paths during own identity lookup; reject malformed or ambiguous active identities; keep all owners for resource conflict detection and keep own healthy lease/port/browser/source guards. The existing public consumer asserts two valid missing-path admissions and seven fail-closed negatives, with every ledger byte unchanged.",
+    "replacementTests": [
+      "RISK repository process: canonical early admission retains mixed owners and fresh durable verification"
+    ],
+    "preservedCoverage": [
+      "All2678 catalog roots/owners, accepted skips, original805 predicate and other four early consumer bodies, original9b5 native snapshot, canonical source profile, application assets and native budgets/deadlines remain unchanged.",
+      "The complete foreign owners list is retained for active/parked resource conflicts; missing own allocation, expired lease, duplicate own aliases, malformed identity and symlink-loop errors remain refused before runtime work.",
+      "Original raw/historical native source remains exact; only the reviewed effective local adapter and its effectiveSha256/adaptation binding change. No other-thread, remote, full-suite or hosted authority is added."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder preimplementation-red commands are bound in review/native-ledger-repair/runs/red/2026-10-27T11-24-18-272Z-ada66df6-d4ca-4770-91c3-8a6329d45945.json and runs/malformed-red/2026-10-27T11-26-41-043Z-1e1163bd-5ed5-4243-a675-222f5cbcb488.json; both use the existing actual public canonical/native consumer.",
+      "failure": "Before lookup implementation, valid own allocation failed its expected deliberate runtime-preparation boundary for a missing foreign path, expectedtrue/actualfalse. After that narrow partial fix, the malformed-path negative observed an admitted EEXIST boundary before the explicit type guard. Both assertion failures precede their respective fixes; final9case GREEN9df5f551 preserves all ledger bytes. Initial63ca37a7 contextual output was classified infrastructure by the coarse ENOENT recognizer and remains retained without replacing the assertion RED. Actual c4 harness failureda94874c stays immutable."
+    }
+  },
+  {
+    "testChangesSha256": "e479478a2455ca05814e835d901bdc2d013f58a36318c4998f9803b9744fb2cf",
+    "reason": "Repair only the observed local native owner-identity lookup failure at the existing effective adapter. Extend the existing canonical public consumer with9 isolated ledger cases and explicit serial risk-root execution. Keep all830 prior rationale records as an exact raw prefix. Comparison 6c67fb0c9988d3e578579c7bb23a8ed0731aac3f.",
+    "previousBehavior": "The actual canonical harness failed before browser launch because native owner lookup realpathed a missing foreign active worktree. A valid own allocation could not reach native runtime preparation; a first partial repair also admitted a malformed null foreign path.",
+    "intendedBehavior": "Canonicalize the actual repo once; skip only unavailable ENOENT/ENOTDIR other paths during own identity lookup; reject malformed or ambiguous active identities; keep all owners for resource conflict detection and keep own healthy lease/port/browser/source guards. The existing public consumer asserts two valid missing-path admissions and seven fail-closed negatives, with every ledger byte unchanged.",
+    "replacementTests": [
+      "RISK repository process: canonical early admission retains mixed owners and fresh durable verification"
+    ],
+    "preservedCoverage": [
+      "All2678 catalog roots/owners, accepted skips, original805 predicate and other four early consumer bodies, original9b5 native snapshot, canonical source profile, application assets and native budgets/deadlines remain unchanged.",
+      "The complete foreign owners list is retained for active/parked resource conflicts; missing own allocation, expired lease, duplicate own aliases, malformed identity and symlink-loop errors remain refused before runtime work.",
+      "Original raw/historical native source remains exact; only the reviewed effective local adapter and its effectiveSha256/adaptation binding change. No other-thread, remote, full-suite or hosted authority is added."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder preimplementation-red commands are bound in review/native-ledger-repair/runs/red/2026-10-27T11-24-18-272Z-ada66df6-d4ca-4770-91c3-8a6329d45945.json and runs/malformed-red/2026-10-27T11-26-41-043Z-1e1163bd-5ed5-4243-a675-222f5cbcb488.json; both use the existing actual public canonical/native consumer.",
+      "failure": "Before lookup implementation, valid own allocation failed its expected deliberate runtime-preparation boundary for a missing foreign path, expectedtrue/actualfalse. After that narrow partial fix, the malformed-path negative observed an admitted EEXIST boundary before the explicit type guard. Both assertion failures precede their respective fixes; final9case GREEN9df5f551 preserves all ledger bytes. Initial63ca37a7 contextual output was classified infrastructure by the coarse ENOENT recognizer and remains retained without replacing the assertion RED. Actual c4 harness failureda94874c stays immutable."
+    }
   }
 ]

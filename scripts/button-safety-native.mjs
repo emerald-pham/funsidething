@@ -23,8 +23,16 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
   assert.ok(ledgerPath&&path.isAbsolute(ledgerPath),'Local named-engine launch requires explicit canonical coordination ledger');
   const ledger=JSON.parse(fs.readFileSync(ledgerPath,'utf8'));
   const owners=(ledger.entries||[]).filter(entry=>['active','parked'].includes(entry.status));
-  const own=owners.find(entry=>entry.status==='active'&&fs.realpathSync(entry.worktree)===fs.realpathSync(repo));
-  assert.ok(own,'Active worktree allocation required before native launch');
+  const canonicalRepo=fs.realpathSync(repo);
+  const ownEntries=owners.filter(entry=>{
+   if(entry.status!=='active')return false;
+   assert.ok(typeof entry.worktree==='string'&&path.isAbsolute(entry.worktree),'Native owner worktree path must be an absolute string');
+   try{return fs.realpathSync(entry.worktree)===canonicalRepo;}
+   catch(error){if(error.code==='ENOENT'||error.code==='ENOTDIR')return false;throw error;}
+  });
+  assert.ok(ownEntries.length,'Active worktree allocation required before native launch');
+  assert.equal(ownEntries.length,1,'Ambiguous active worktree allocation before native launch');
+  const own=ownEntries[0];
   assert.ok(own.lease?.state==='healthy'&&Date.parse(own.lease.expiresAt)>Date.now()&&!own.lease.ownerConfirmationRequired,'Current healthy worktree lease required before native launch');
   for(const resource of ['browser-runtime:playwright-'+engine,'loopback:127.0.0.1:'+port]){
    assert.ok(own.resources?.includes(resource),'Local named-engine allocation missing: '+resource);
