@@ -228,20 +228,21 @@ jobs:
       - name: Install matching native Chromium
         if: needs.cohort-routing.outputs.decision == 'full'
         run: npx --no-install playwright install --with-deps chromium
-      - name: Install matching full native WebKit
-        if: needs.cohort-routing.outputs.decision == 'full' && matrix.group == 'native-process'
-        run: npx --no-install playwright install --with-deps webkit
       - uses: actions/download-artifact@v4
         if: contains(fromJSON('["reuse","policy-reuse"]'), needs.cohort-routing.outputs.decision)
         with:
           name: ci-routing-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/ci-routing
+      - uses: actions/download-artifact@v4
+        with:
+          name: early-startup-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/early
       - name: Execute complete assigned group
         if: needs.cohort-routing.outputs.decision == 'full'
-        run: npm run test:group -- --group "${{ matrix.group }}" --output-dir "$RUNNER_TEMP/group" --repository "$GITHUB_REPOSITORY" --event-policy "$CHAIN_TEST_EVENT_POLICY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$CHAIN_TEST_SOURCE_SHA" --comparison-base "$CHAIN_TEST_COMPARISON_BASE"
+        run: npm run test:group -- --group "${{ matrix.group }}" --early-receipt "$RUNNER_TEMP/early/receipt.json" --output-dir "$RUNNER_TEMP/group" --repository "$GITHUB_REPOSITORY" --event-policy "$CHAIN_TEST_EVENT_POLICY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$CHAIN_TEST_SOURCE_SHA" --comparison-base "$CHAIN_TEST_COMPARISON_BASE"
       - name: Record verified full-producer coverage reference
         if: contains(fromJSON('["reuse","policy-reuse"]'), needs.cohort-routing.outputs.decision)
-        run: npm run test:group -- --covered --proof "$RUNNER_TEMP/ci-routing/routing.json" --group "${{ matrix.group }}" --output-dir "$RUNNER_TEMP/group" --repository "$GITHUB_REPOSITORY" --event-policy "$CHAIN_TEST_EVENT_POLICY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$CHAIN_TEST_SOURCE_SHA" --comparison-base "$CHAIN_TEST_COMPARISON_BASE"
+        run: npm run test:group -- --covered --proof "$RUNNER_TEMP/ci-routing/routing.json" --group "${{ matrix.group }}" --early-receipt "$RUNNER_TEMP/early/receipt.json" --output-dir "$RUNNER_TEMP/group" --repository "$GITHUB_REPOSITORY" --event-policy "$CHAIN_TEST_EVENT_POLICY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$CHAIN_TEST_SOURCE_SHA" --comparison-base "$CHAIN_TEST_COMPARISON_BASE"
       - name: Preserve actual group results and native evidence
         if: always()
         uses: actions/upload-artifact@v4

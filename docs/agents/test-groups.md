@@ -171,3 +171,17 @@ Local process fixtures prove ordering and accounting only. A source mismatch or
 failed startup story remains a failed release gate. See the bounded
 [issue 290 handoff](../releases/issue-290-early-ci.md) for hosted demonstration and
 source limits; previous local harness evidence supplies no hosted qualification.
+
+The five confirmed roots retain their existing `native-process` assignments with
+`executionStage: early-startup`. Early TAP plus the original saved no-port child
+stream establish their actual cases. Each real group command verifies that durable
+receipt before launching a child; its ordinary TAP excludes only those cataloged
+early roots. The aggregate rederives and counts their cases once from the original
+raw streams. Covered records still claim zero current execution. This uses the
+existing groups/catalog and adds no accepted skips or competing inventory.
+
+Both matching engines are installed for the early stage. Its inherited TAP reporter
+keeps the unchanged saved nested source assertions observable. The long regression
+jobs retain their ordinary Chromium setup after early-only WebKit consumers have
+finished; local execution still requires the repository's actual runtime/resource
+allocation, and process fixtures supply no native proof.

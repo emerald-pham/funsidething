@@ -2280,3 +2280,7 @@ The supported CI observer reads the actual workflow and retains missing, skipped
 - RISK repository process: canonical limited source profiles preserve original mobile acceptance
 
 The canonical profile admits only the original mobile story and the named confirmed Chromium modal harness. Complete canonical app assets/templates and raw report scope remain bound; unknown scopes, full runs, wrong source/profile and sensitivity controls refuse. The saved native original is preserved with a separately hashed effective hook. Three newly imported PR285 full-product tests remain exact unexecuted source snapshots; all preexisting main tests, original story limits and saved full native catalog remain unchanged.
+
+- RISK repository process: early-assigned consumers execute once through durable group accounting
+
+Existing catalog assignments mark the five confirmed roots as early execution while retaining their native-process ownership. Real workflow commands consume verified durable early cases before any group child, omit only those already executed roots from the later Node process, and aggregate raw early/ordinary outcomes exactly once. Missing or changed receipts and transfer references fail; the accepted skip inventory is unchanged.

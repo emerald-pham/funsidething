@@ -73,3 +73,22 @@ before pushing. The worker launches no live runtime or hosted workflow.
 
 All ordinary independent risk/FAQ/release evidence, exact-main qualification and
 Stable deployment verification remain required. Beta mirroring stays paused.
+
+## One actual early execution per confirmed root
+
+The five current executable harness roots keep their native-process catalog owner
+and declare early execution. Their early raw streams are verified before each
+ordinary group child and rechecked during aggregation. They are excluded from the
+long child selection and counted exactly once from the early receipt. The existing
+source wrapper's deliberate failed-primary control remains a negative control,
+not passed feature coverage. Both matching engines and durable native output are
+supplied at the early stage; hosted ephemeral port 0 follows the saved CI policy.
+No new skip inventory or test group was introduced.
+
+Public missing-predecessor RED `f13c9f1c` on `dab087e` observed a group exit 0 and
+actual deferred-root launches without early evidence. GREEN `7997d291` follows.
+The positive fixture executes literal checked-in early, all-four-group and aggregate
+workflow commands with real controlled OS children, proving all five fixture early
+roots (including the real nested no-port Node child) run once and contribute
+exactly five of eleven aggregate outcomes. It mocks
+only native/capped workload results and claims no actual runtime qualification.

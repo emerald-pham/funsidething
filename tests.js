@@ -45598,3 +45598,10 @@ test('RISK repository process: canonical limited source profiles preserve origin
  assert.equal(child.status,0,'Limited canonical source admission must preserve exact original contracts: '+child.stdout+child.stderr);
  assert.match(child.stdout,/# Subtest: canonical mobile source profile admits exact current app/);
 });
+
+test('RISK repository process: early-assigned consumers execute once through durable group accounting',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^group process refuses missing early predecessor|^group and aggregate retain actual early','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:120000});
+ assert.equal(child.status,0,'Actual group consumer must preserve one execution and predecessor integrity: '+child.stdout+child.stderr);
+ assert.match(child.stdout,/# Subtest: group process refuses missing early predecessor/);
+});

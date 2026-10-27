@@ -9335,7 +9335,8 @@
     {
       "root": "RISK repository process: Playwright waitForFunction predicates are synchronous",
       "group": "core",
-      "file": "tests.js"
+      "file": "tests.js",
+      "executionStage": "early-startup"
     },
     {
       "root": "RISK repository process: pre-push checks every outgoing tip and rejects dirty worktrees",
@@ -12880,22 +12881,26 @@
     {
       "root": "RISK repository process: native scene-time bursts cannot activate controls behind a refused top-layer release",
       "group": "native-process",
-      "file": "tests.js"
+      "file": "tests.js",
+      "executionStage": "early-startup"
     },
     {
       "root": "RISK repository process: scenery consumers use allocated fallback ports and preserve early native failures",
       "group": "native-process",
-      "file": "tests.js"
+      "file": "tests.js",
+      "executionStage": "early-startup"
     },
     {
       "root": "RISK scenery backdrop cache: first unchanged lighting timer reuses actual pixels while changed slots and loaded copy still paint",
       "group": "native-process",
-      "file": "tests.js"
+      "file": "tests.js",
+      "executionStage": "early-startup"
     },
     {
       "root": "RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh",
       "group": "native-process",
-      "file": "tests.js"
+      "file": "tests.js",
+      "executionStage": "early-startup"
     },
     {
       "root": "early CI public command preserves durable predecessor authority and rejects corrupted artifacts",
@@ -13056,6 +13061,21 @@
       "root": "native report verifier binds the complete actual source and refuses full-action relabeling",
       "group": "native-process",
       "file": "scripts/agent-tools/mobile-source-profile.test.mjs"
+    },
+    {
+      "root": "RISK repository process: early-assigned consumers execute once through durable group accounting",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "group process refuses missing early predecessor before launching any deferred root",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "group and aggregate retain actual early cases once across fresh group processes",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
     }
   ],
   "processControls": [

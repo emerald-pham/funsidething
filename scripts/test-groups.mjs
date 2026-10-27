@@ -196,6 +196,7 @@ function validateAssignments(assignments, inventory, inventoryIndex, files) {
     if (!entry || typeof entry.root !== 'string' || !groupSet.has(entry.group) || !fileSet.has(entry.file)) {
       fail('Every root assignment must name a known group and full-suite source file.');
     }
+    if(entry.executionStage!==undefined&&entry.executionStage!=='early-startup')fail('Unknown root execution stage.');
     if (entry.registration !== undefined && !['literal','dynamic'].includes(entry.registration)) fail('Unknown root registration policy.');
     if (assignmentsByRoot.has(entry.root)) fail(`Root ${JSON.stringify(entry.root)} has overlapping group assignments.`);
     assignmentsByRoot.set(entry.root, entry);
@@ -274,7 +275,7 @@ function cohortDigest(inventory, assignments, assignmentIndex) {
     return replacement ? replacementCaseId(item.id, replacement) : item.id;
   }).sort();
   const rootAssignments = [...assignmentIndex.assignmentsByRoot.values()]
-    .map(({ root, group, file }) => ({ root, group, file }))
+    .map(({ root, group, file, executionStage }) => ({ root, group, file, ...(executionStage?{executionStage}:{}) }))
     .sort((left, right) => left.root.localeCompare(right.root));
   const rootReplacements = [...assignmentIndex.replacementByBaseline.values()]
     .map(({ baselineRoot, currentRoot, baselineGroup, group, file }) => ({ baselineRoot, currentRoot, baselineGroup, group, file }))
@@ -721,14 +722,15 @@ async function aggregateResults({options, outputDir, descriptor, inventory, assi
     if (needs[id]?.result !== 'success') issues.push(`Required job ${id} did not succeed: ${needs[id]?.result || 'missing'}.`);
   }
   const earlyWorkflow=fs.existsSync(path.join(ROOT,'.github/workflows/data-safety.yml')) && /^  early-startup:/m.test(fs.readFileSync(path.join(ROOT,'.github/workflows/data-safety.yml'),'utf8'));
-  let earlyEvidence=null,stressEvidence=null;
+  let earlyEvidence=null,stressEvidence=null,earlyCoverageByGroup=new Map();
   if(earlyWorkflow){
     for(const id of ['early-startup','mobile-stress'])if(needs[id]?.result!=='success')issues.push(`Required early job ${id} did not succeed: ${needs[id]?.result||'missing'}.`);
     try{
       if(!options.earlyReceipt)fail('Required --early-receipt is missing; blocked work is not executed coverage.');
-      const {verifyEarlyReceipt,verifyEarlyMobileReport}=await import('./early-ci.mjs');
+      const {verifyEarlyReceipt,verifyEarlyMobileReport,earlyGroupCoverage}=await import('./early-ci.mjs');
       const early=verifyEarlyReceipt(options.earlyReceipt,descriptor,{proof:covered?options.proof:undefined});
       if(early.mode!==(covered?'covered':'full'))fail('Early receipt execution mode mismatch.');
+      if(!covered)for(const group of GROUP_IDS)earlyCoverageByGroup.set(group,earlyGroupCoverage(options.earlyReceipt,descriptor,group));
       earlyEvidence={mode:early.mode,receiptSha256:sha256(fs.readFileSync(options.earlyReceipt)),children:early.children.length,coverage:early.coverage||null};
       if(!covered){if(!options.mobileStressReport)fail('Required stress execution integrity report is missing.');const stress=verifyEarlyMobileReport(path.dirname(options.mobileStressReport),descriptor.resultIdentity,true);stressEvidence={status:stress.status,reportSha256:sha256(fs.readFileSync(options.mobileStressReport))};}
     }catch(error){issues.push('Early startup evidence: '+error.message);}
@@ -766,9 +768,11 @@ async function aggregateResults({options, outputDir, descriptor, inventory, assi
       verifiedFile(root,record.process.stderr.path,record.process.stderr.sha256);
       const cases = parseTap(tap).map(({id,root,status,skipReason}) => ({id,root,status,skipReason}));
       if (JSON.stringify(cases) !== JSON.stringify(record.cases)) fail(`Required group ${id} case report differs from actual TAP.`);
-      const errors = verifyResults({cases,group:id,inventory,assignments:{...assignmentIndex,processControls:assignments.processControls},files,source});
+      const transferred=earlyCoverageByGroup.get(id)||null;if(JSON.stringify(record.earlyCoverage||null)!==JSON.stringify(transferred))fail('Group early execution reference is missing or changed.');
+      const completeCases=[...cases,...(transferred?.cases||[])];
+      const errors = verifyResults({cases:completeCases,group:id,inventory,assignments:{...assignmentIndex,processControls:assignments.processControls},files,source});
       if (errors.length) fail(errors.join(' '));
-      for (const item of cases) { if (allCases.has(item.id)) fail(`Duplicate case across groups: ${item.id}.`); allCases.add(item.id); }
+      for (const item of completeCases) { if (allCases.has(item.id)) fail(`Duplicate case across groups: ${item.id}.`); allCases.add(item.id); }
       const artifactPaths = new Set();
       for (const artifact of record.artifacts || []) {
         if (artifactPaths.has(artifact.path)) fail('Duplicate native/recovery artifact path.');
@@ -806,7 +810,7 @@ async function aggregateResults({options, outputDir, descriptor, inventory, assi
           if (report.status !== 'passed' || report.oldCommit !== '779defa4e8c3465fdf535fe17dbe2227d2b76ea1' || report.candidateCommit !== identity.checkoutSha || report.candidateTree !== identity.checkoutTree || !['contextClosed','browserClosed','serverClosed'].every(key=>report.cleanup?.[key]===true)) fail('Native report outcome, actual checkout or cleanup mismatch.');
         }
       }
-      records.push({group:id,resultSha256:sha256(fs.readFileSync(path.join(root,'result.json'))),cases:cases.length,passed:cases.filter(item=>item.status==='passed').length,skipped:cases.filter(item=>item.status==='skipped').length,artifacts:record.artifacts,identity});
+      records.push({group:id,resultSha256:sha256(fs.readFileSync(path.join(root,'result.json'))),cases:cases.length,earlyCases:transferred?.cases.length||0,earlyCoverage:transferred,passed:cases.filter(item=>item.status==='passed').length,skipped:cases.filter(item=>item.status==='skipped').length,artifacts:record.artifacts,identity});
     } catch (error) { issues.push(`${id}: ${error.message}`); }
   }
   const report = {schemaVersion:1,status:issues.length?'failed':'passed',mode:policyCovered?'policy-covered':covered?'covered':'full',resultIdentity:descriptor.resultIdentity,groups:records,caseCount:allCases.size,...(earlyWorkflow?{earlyEvidence,stressEvidence}:{}),issues,finishedAt:new Date().toISOString()};
@@ -1004,10 +1008,18 @@ async function main() {
       const descriptor = { schemaVersion: 1, resultIdentity: { ...result.resultIdentity, selectedGroup: null },
         groups: GROUP_IDS.map(id => ({ id,
           roots: assignmentIndex.rootsPerGroup.get(id).map(normalizeTapIdentity).sort(),
+          earlyRoots: assignments.rootAssignments.filter(row=>row.group===id&&row.executionStage==='early-startup').map(row=>normalizeTapIdentity(row.root)).sort(),
           requiredCaseIds: [...expectedCasesForGroup(inventory, assignmentIndex, id).keys()],
           acceptedSkipCaseIds: [...expectedCasesForGroup(inventory, assignmentIndex, id)].filter(([, baselineId]) => accepted.has(baselineId)).map(([runtimeId]) => runtimeId),
           processControls: assignments.processControls.filter(control => control.group === id).map(control => ({ ...control, ownerRoot: normalizeTapIdentity(control.ownerRoot) })),
         })), baseline: inventory.baseline };
+      if(!options.describe&&!options.aggregate&&assignments.rootAssignments.some(row=>row.executionStage==='early-startup')){
+        if(!options.earlyReceipt)fail('Required early predecessor receipt is missing before group execution.');
+        const {verifyEarlyReceipt,earlyGroupCoverage}=await import('./early-ci.mjs');
+        const early=verifyEarlyReceipt(options.earlyReceipt,descriptor,{proof:options.covered?options.proof:undefined});
+        if(early.mode!==(options.covered?'covered':'full'))fail('Group early predecessor mode mismatch.');
+        if(!options.covered)result.earlyCoverage=earlyGroupCoverage(options.earlyReceipt,descriptor,options.group);
+      }
       if(options.covered){
         result.coverage=coverageReference(readJson(options.proof,'verified coverage proof'),result.resultIdentity);
         result.status='covered';result.finishedAt=new Date().toISOString();atomicWrite(path.join(outputDir,'result.json'),result);
@@ -1027,7 +1039,7 @@ async function main() {
     const selectedFiles = [...new Set([
       ...files.filter(file => assignmentIndex.rootsPerGroup.get(options.group).some(root => assignmentIndex.assignmentsByRoot.get(root)?.file === file)),
     ])].sort();
-    const selectedRoots = assignmentIndex.rootsPerGroup.get(options.group).sort();
+    const selectedRoots = assignmentIndex.rootsPerGroup.get(options.group).filter(title=>assignmentIndex.assignmentsByRoot.get(title).executionStage!=='early-startup').sort();
     if (!selectedFiles.length || !selectedRoots.length) fail(`Required group ${options.group} is empty.`);
 
     result.inventory = {
@@ -1066,7 +1078,7 @@ async function main() {
     result.cases = childResult.cases.map(({ id, root, status, skipReason }) => ({ id, root, status, skipReason }));
     result.artifacts = [...artifactInventory(nativeDir), ...artifactInventory(childResult.recoveryDir)];
     result.issues = verifyResults({
-      cases: childResult.cases,
+      cases: [...childResult.cases,...(result.earlyCoverage?.cases||[])],
       group: options.group,
       inventory,
       assignments: { ...assignmentIndex, processControls: assignments.processControls },
