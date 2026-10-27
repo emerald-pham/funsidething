@@ -20213,5 +20213,24 @@
       "failure": "On baseline 6c67fb0c9988d3e578579c7bb23a8ed0731aac3f, the exact fresh-process CLI test returned status 0 for --resource with --claims, emitted a successful entry with resources [], changed the isolated ledger bytes, and launched the Git child. The test expected status 2 and failed before implementation. Raw output: /Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/287/red-process-risk.txt."
     },
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/287"
+  },
+  {
+    "baseCommit": "6e6d001ffcf4983edd0547a9d021a3ef645c650e",
+    "testChangesSha256": "fd6852196a6cb96f57298fa789c9ddf1f256d661309481eee3dcd283efa664d8",
+    "reason": "Ticket #325 adds mechanical enforcement after maintained editor and modal fixtures returned one fake document query result for every selector.",
+    "previousBehavior": "Four document.querySelector fixtures always returned an object or null, so a new saved-view status query could receive a fabricated node. Selector-specific patterns were not checked across maintained test sources.",
+    "intendedBehavior": "A required RISK test scans tests.js and agent-tool tests for simple direct document query callbacks that return an object, array, null, or identifier without using their selector parameter. Maintained modal fixtures now delegate unrelated queries to the original shim and restore it after the simulated state. The actual app update-notice consumer preserves an unrelated selector result of null and the editor draft.",
+    "replacementTests": [
+      "RISK repository process: document query fixtures stay selector scoped and preserve shim results"
+    ],
+    "preservedCoverage": [
+      "Cloud adoption, update-notice storage failure, scene adoption, pageshow recovery, and completion recovery retain their original draft, reconciliation, and completion assertions.",
+      "Explicit malformed-selector controls and element-scoped doubles remain bounded; the source scan documents its supported syntax and does not claim general JavaScript semantic analysis."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='^RISK repository process: document query fixtures stay selector scoped and preserve shim results$' tests.js",
+      "failure": "Before fixture migration on 6e6d001ffcf4983edd0547a9d021a3ef645c650e, the new checker failed with eight findings at the four unconditional update-notice, synced-scene, pageshow, and completion-editor overrides. Recorder metadata/stdout: /Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/325/runs/2026-10-27T03-41-49-526Z-ff067be1-980f-415c-aa16-689346702a94.json and .stdout.txt."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/325"
   }
 ]

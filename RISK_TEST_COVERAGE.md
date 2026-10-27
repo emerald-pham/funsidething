@@ -14,6 +14,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK repository process: required parallel scanner aggregation rejects absent group evidence
 - RISK repository process: grouped catalog binds real declarations rather than quoted fixtures
 - RISK repository process: nested native fixture output stays isolated at the command boundary
+- RISK repository process: document query fixtures stay selector scoped and preserve shim results
 
 - RISK cloud recovery device connection: a failed handle is reopened within the same protected review
 - RISK cloud recovery reconnect guidance: mounted help explains reconnecting without replacing saved data
