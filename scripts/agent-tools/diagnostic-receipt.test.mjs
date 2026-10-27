@@ -1237,3 +1237,38 @@ test("ordinary governance source with a standalone diagnostic workflow retains f
     ),
   );
 });
+
+test("only named inherited review artifacts are selected and unrelated private files never enter a public permit", (t) => {
+  const f = fixture(t),
+    secret = path.join(
+      f.repo,
+      ".git",
+      "funsidething-release-evidence",
+      frozen,
+      "signing-key.pem",
+    );
+  fs.writeFileSync(
+    secret,
+    "-----BEGIN PRIVATE KEY-----\nSYNTHETIC PRIVATE CANARY\n",
+  );
+  const result = command(f, "diagnostic-record", f.inputPath);
+  assert.equal(result.status, 0, result.stderr);
+  const receipt = JSON.parse(
+    fs.readFileSync(JSON.parse(result.stdout).receiptPath),
+  );
+  assert.equal(
+    Object.keys(receipt.body.files).some((name) =>
+      name.endsWith("signing-key.pem"),
+    ),
+    false,
+    "publication must select review artifacts rather than copying an evidence directory",
+  );
+  assert.equal(
+    JSON.stringify(receipt).includes(
+      Buffer.from(
+        "-----BEGIN PRIVATE KEY-----\nSYNTHETIC PRIVATE CANARY\n",
+      ).toString("base64"),
+    ),
+    false,
+  );
+});

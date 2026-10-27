@@ -211,7 +211,7 @@ function readEvidence(repo, file, digest) {
   if (/\.(?:pem|key|p12|pfx)$/i.test(actual))
     throw Error("Private signing material cannot become diagnostic evidence.");
   const bytes = fs.readFileSync(actual);
-  if (bytes.toString("utf8").includes("BEGIN PRIVATE KEY"))
+  if (/-----BEGIN (?:[A-Z ]+ )?PRIVATE KEY-----/.test(bytes.toString("utf8")))
     throw Error("Private signing material cannot become diagnostic evidence.");
   if (hash(bytes) !== digest)
     throw Error("Diagnostic inherited/review evidence fingerprint changed.");
@@ -225,14 +225,35 @@ function receiptPath(repo, source) {
     "receipt.json",
   );
 }
+const frozenArtifacts = [
+  "receipt.json",
+  "owner-review.md",
+  "independent-review.md",
+  "specialist-review.md",
+  "faq-review.md",
+];
+const privateKeyBytes = (bytes) =>
+  /-----BEGIN (?:[A-Z ]+ )?PRIVATE KEY-----/.test(bytes.toString("utf8"));
 function evidenceFiles(frozenPath) {
   const files = {};
-  for (const name of fs.readdirSync(path.dirname(frozenPath))) {
-    if (!/^[a-z0-9.-]+$/.test(name))
-      throw Error("Unknown inherited review artifact.");
-    files["frozen/" + name] = fs
-      .readFileSync(path.join(path.dirname(frozenPath), name))
-      .toString("base64");
+  for (const name of frozenArtifacts) {
+    const file = path.join(path.dirname(frozenPath), name),
+      stat = fs.lstatSync(file);
+    if (
+      !stat.isFile() ||
+      stat.isSymbolicLink() ||
+      stat.nlink !== 1 ||
+      stat.size > 32 * 1024 * 1024
+    )
+      throw Error(
+        "Diagnostic inherited review artifact is not a bounded regular file.",
+      );
+    const bytes = fs.readFileSync(file);
+    if (privateKeyBytes(bytes))
+      throw Error(
+        "Private signing material cannot become diagnostic evidence.",
+      );
+    files["frozen/" + name] = bytes.toString("base64");
   }
   return files;
 }
@@ -470,7 +491,33 @@ function validatePortableReceipt(repo, receipt, source) {
     throw Error(
       "Diagnostic receipt exact instrumentation/frozen inventory changed.",
     );
+  const allowedFiles = new Set([
+    "admission.json",
+    "rendered.json",
+    "independent.txt",
+    "specialist.txt",
+    ...frozenArtifacts.map((name) => "frozen/" + name),
+  ]);
+  const renderedPreview = JSON.parse(
+    Buffer.from(body.files["rendered.json"], "base64"),
+  );
+  for (let i = 0; i < (renderedPreview.artifacts?.length ?? 0); i++)
+    allowedFiles.add("rendered-" + i);
+  if (
+    canonical(Object.keys(body.files).sort()) !==
+      canonical([...allowedFiles].sort()) ||
+    canonical(Object.keys(body.fileSha256).sort()) !==
+      canonical([...allowedFiles].sort())
+  )
+    throw Error(
+      "Diagnostic portable bundle must contain only selected review and public admission artifacts.",
+    );
   for (const [name, data] of Object.entries(body.files)) {
+    const bytes = Buffer.from(data, "base64");
+    if (bytes.length > 32 * 1024 * 1024 || privateKeyBytes(bytes))
+      throw Error(
+        "Private or oversized bytes cannot become diagnostic evidence.",
+      );
     if (hash(Buffer.from(data, "base64")) !== body.fileSha256[name])
       throw Error(
         "Diagnostic portable inherited/review artifact fingerprint changed.",

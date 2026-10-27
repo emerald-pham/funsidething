@@ -12996,6 +12996,11 @@
       "root": "ordinary governance source with a standalone diagnostic workflow retains full product receipt and publication authority",
       "group": "native-process",
       "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "only named inherited review artifacts are selected and unrelated private files never enter a public permit",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
     }
   ],
   "processControls": [
