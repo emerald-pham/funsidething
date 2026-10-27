@@ -21104,5 +21104,59 @@
       "command": "Node22 recorder preimplementation-red commands are bound in review/native-ledger-repair/runs/red/2026-10-27T11-24-18-272Z-ada66df6-d4ca-4770-91c3-8a6329d45945.json and runs/malformed-red/2026-10-27T11-26-41-043Z-1e1163bd-5ed5-4243-a675-222f5cbcb488.json; both use the existing actual public canonical/native consumer.",
       "failure": "Before lookup implementation, valid own allocation failed its expected deliberate runtime-preparation boundary for a missing foreign path, expectedtrue/actualfalse. After that narrow partial fix, the malformed-path negative observed an admitted EEXIST boundary before the explicit type guard. Both assertion failures precede their respective fixes; final9case GREEN9df5f551 preserves all ledger bytes. Initial63ca37a7 contextual output was classified infrastructure by the coarse ENOENT recognizer and remains retained without replacing the assertion RED. Actual c4 harness failureda94874c stays immutable."
     }
+  },
+  {
+    "testChangesSha256": "25e820c9d244cedbf4e80fa53951f656e82de2362a2ba86aa02ca3a76d9e69da",
+    "reason": "Reconcile only approved #290 source applicability: preserve all original scenery/modal assertions in immutable snapshots and retain executable effective adapters; extend the existing limited-profile process root. Comparison dd6790e64817434df77c26518e9f24d324f1447b.",
+    "previousBehavior": "Canonical app paint bytes cannot satisfy saved b176 scenery assertions; canonical offered download-backup is rejected by the saved full catalog after the modal scenario passes.",
+    "intendedBehavior": "Only the two source-dependent scenery consumers serve the fixed immutable b176 application with current tooling. Modal and required mobile use current candidate assets, with exact profile-known offered IDs distinguished from executed coverage. Unknown IDs remain refused and fixture evidence cannot qualify current mobile.",
+    "replacementTests": [
+      "RISK repository process: canonical limited source profiles preserve original mobile acceptance"
+    ],
+    "preservedCoverage": [
+      "All834 prior raw rationale records,2678 unique catalog roots and owners, accepted skips,36 current app assets and dependencies remain exact; all original scenery/modal test bodies are retained as hashed snapshots and every original assertion remains executable.",
+      "Current400-task Normal/Reduced 1GB zero-swap story,2GiB driver,ten distinct trusted Yes decisions/two seconds,1000ms frame limit,unknown fields and two protected copies remain mandatory; frozen fixture reports cannot qualify those gates.",
+      "Original9b5 harness provenance, full action catalog/source guard, healthy local lease/browser/port admission, caps, deadlines and complete early execution/accounting remain preserved."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder public source consumer RED be807b97 at11:48:14Z; actual original Chromium modal root RED65cbd8a1 at11:51:06Z; workflow source-delivery assertion REDa8aad37f at11:53:10Z. Exact commands and raw streams retained under review/source-applicability-repair/runs.",
+      "failure": "Before fixture implementation, explicit saved-source consumer returned canonical landscape hash eec5719 instead of b176 a19438f. Before action-recognition implementation, actual modal consumer failed New untested button action: act:download-backup. Original dd6790e paint/action failures remain prior-source evidence, never rewritten. The first pre-assets test TypeError5078a634 and intermediate copy-fixture infrastructure failurea0043b51 are retained without RED credit."
+    }
+  },
+  {
+    "testChangesSha256": "0af6e925b5bb8159fb98dea97e85ede5f972af9e0224fbf89dd985806bb6018f",
+    "reason": "Reconcile only approved #290 source applicability: preserve all original scenery/modal assertions in immutable snapshots and retain executable effective adapters; extend the existing limited-profile process root. Comparison d635379ebb7913a165f88027828b5a57ef64d4e1.",
+    "previousBehavior": "Canonical app paint bytes cannot satisfy saved b176 scenery assertions; canonical offered download-backup is rejected by the saved full catalog after the modal scenario passes.",
+    "intendedBehavior": "Only the two source-dependent scenery consumers serve the fixed immutable b176 application with current tooling. Modal and required mobile use current candidate assets, with exact profile-known offered IDs distinguished from executed coverage. Unknown IDs remain refused and fixture evidence cannot qualify current mobile.",
+    "replacementTests": [
+      "RISK repository process: canonical limited source profiles preserve original mobile acceptance"
+    ],
+    "preservedCoverage": [
+      "All834 prior raw rationale records,2678 unique catalog roots and owners, accepted skips,36 current app assets and dependencies remain exact; all original scenery/modal test bodies are retained as hashed snapshots and every original assertion remains executable.",
+      "Current400-task Normal/Reduced 1GB zero-swap story,2GiB driver,ten distinct trusted Yes decisions/two seconds,1000ms frame limit,unknown fields and two protected copies remain mandatory; frozen fixture reports cannot qualify those gates.",
+      "Original9b5 harness provenance, full action catalog/source guard, healthy local lease/browser/port admission, caps, deadlines and complete early execution/accounting remain preserved."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder public source consumer RED be807b97 at11:48:14Z; actual original Chromium modal root RED65cbd8a1 at11:51:06Z; workflow source-delivery assertion REDa8aad37f at11:53:10Z. Exact commands and raw streams retained under review/source-applicability-repair/runs.",
+      "failure": "Before fixture implementation, explicit saved-source consumer returned canonical landscape hash eec5719 instead of b176 a19438f. Before action-recognition implementation, actual modal consumer failed New untested button action: act:download-backup. Original dd6790e paint/action failures remain prior-source evidence, never rewritten. The first pre-assets test TypeError5078a634 and intermediate copy-fixture infrastructure failurea0043b51 are retained without RED credit."
+    }
+  },
+  {
+    "testChangesSha256": "083193fb44c6e628c283c793fd36a9b971c7a5c5bd0891990dfed55e14ed2627",
+    "reason": "Reconcile only approved #290 source applicability: preserve all original scenery/modal assertions in immutable snapshots and retain executable effective adapters; extend the existing limited-profile process root. Comparison 6c67fb0c9988d3e578579c7bb23a8ed0731aac3f.",
+    "previousBehavior": "Canonical app paint bytes cannot satisfy saved b176 scenery assertions; canonical offered download-backup is rejected by the saved full catalog after the modal scenario passes.",
+    "intendedBehavior": "Only the two source-dependent scenery consumers serve the fixed immutable b176 application with current tooling. Modal and required mobile use current candidate assets, with exact profile-known offered IDs distinguished from executed coverage. Unknown IDs remain refused and fixture evidence cannot qualify current mobile.",
+    "replacementTests": [
+      "RISK repository process: canonical limited source profiles preserve original mobile acceptance"
+    ],
+    "preservedCoverage": [
+      "All834 prior raw rationale records,2678 unique catalog roots and owners, accepted skips,36 current app assets and dependencies remain exact; all original scenery/modal test bodies are retained as hashed snapshots and every original assertion remains executable.",
+      "Current400-task Normal/Reduced 1GB zero-swap story,2GiB driver,ten distinct trusted Yes decisions/two seconds,1000ms frame limit,unknown fields and two protected copies remain mandatory; frozen fixture reports cannot qualify those gates.",
+      "Original9b5 harness provenance, full action catalog/source guard, healthy local lease/browser/port admission, caps, deadlines and complete early execution/accounting remain preserved."
+    ],
+    "redEvidence": {
+      "command": "Node22 recorder public source consumer RED be807b97 at11:48:14Z; actual original Chromium modal root RED65cbd8a1 at11:51:06Z; workflow source-delivery assertion REDa8aad37f at11:53:10Z. Exact commands and raw streams retained under review/source-applicability-repair/runs.",
+      "failure": "Before fixture implementation, explicit saved-source consumer returned canonical landscape hash eec5719 instead of b176 a19438f. Before action-recognition implementation, actual modal consumer failed New untested button action: act:download-backup. Original dd6790e paint/action failures remain prior-source evidence, never rewritten. The first pre-assets test TypeError5078a634 and intermediate copy-fixture infrastructure failurea0043b51 are retained without RED credit."
+    }
   }
 ]
