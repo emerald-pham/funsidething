@@ -15,9 +15,10 @@ function options(args) {
   const result = {};
   for (let i = 0; i < args.length; i += 2) {
     const key = args[i]?.slice(2), value = args[i + 1];
-    if (!['comparison-base', 'evidence-dir', 'max-wait-ms', 'poll-interval-ms', 'descriptor', 'plan-only'].includes(key) || !value || result[key]) throw new Error('Pass --comparison-base SHA --evidence-dir NEW_DIRECTORY.');
+    if (!['comparison-base', 'evidence-dir', 'max-wait-ms', 'poll-interval-ms', 'descriptor', 'plan-only', 'resume'].includes(key) || !value || result[key]) throw new Error('Pass --comparison-base SHA --evidence-dir NEW_DIRECTORY.');
     result[key] = value;
   }
+  if (result.resume && !result['comparison-base']) result['comparison-base'] = JSON.parse(readFileSync(result.resume, 'utf8')).validationContext?.comparisonBase;
   if (!sha(result['comparison-base']) || !result['evidence-dir']) throw new Error('An exact comparison base and fresh evidence directory are required.');
   result.maxWaitMs = result['max-wait-ms'] === undefined ? 900000 : Number(result['max-wait-ms']);
   result.pollIntervalMs = result['poll-interval-ms'] === undefined ? 30000 : Number(result['poll-interval-ms']);
@@ -40,6 +41,14 @@ function context(repository, sourceSha, sourceTree, checkoutSha, checkoutTree, c
 
 async function main() {
   const args = options(process.argv.slice(2));
+  if (args.resume) {
+    const previous = JSON.parse(readFileSync(args.resume, 'utf8'));
+    for (const [key, value] of Object.entries(previous.observationEnvironment || {})) {
+      if (['GITHUB_REPOSITORY','GITHUB_RUN_ID','GITHUB_RUN_ATTEMPT','GITHUB_EVENT_NAME','GITHUB_REF','GITHUB_SHA'].includes(key) && process.env[key] === undefined) process.env[key] = value;
+    }
+    if (!process.env.GITHUB_EVENT_PATH) process.env.GITHUB_EVENT_PATH = path.join(path.dirname(path.resolve(args.resume)), 'event.json');
+    if (!args.descriptor && previous.descriptorFile === 'descriptor.json') args.descriptor = path.join(path.dirname(path.resolve(args.resume)), 'descriptor.json');
+  }
   const directory = path.resolve(args['evidence-dir']);
   mkdirSync(directory, { mode: 0o700 });
   const repository = process.env.GITHUB_REPOSITORY;
@@ -71,6 +80,26 @@ async function main() {
   const record = { schemaVersion: 1, eventName, runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT,
     validationContext, cohortContext: validationContext, contextSha256: hash(validationContext), decision: 'full',
     reason: isMain ? 'Exact main always executes its own complete cohort.' : 'No verified equivalent producer.', coveredBy: null, observations: [] };
+  // Persist only routing inputs, never PR prose or token-bearing environment.
+  // Together with the descriptor these restore a fresh observer process after
+  // interruption; all claimed context and producer evidence is verified again.
+  record.observationEnvironment = Object.fromEntries(['GITHUB_REPOSITORY','GITHUB_RUN_ID','GITHUB_RUN_ATTEMPT','GITHUB_EVENT_NAME','GITHUB_REF','GITHUB_SHA'].map(key => [key, process.env[key]]));
+  const savedEvent = eventName === 'pull_request' ? {action: event.action, number: event.number,
+    changes: event.changes?.base ? {base: true} : {}, pull_request: {head: {sha: sourceSha, ref: event.pull_request?.head?.ref}}} : {after: sourceSha};
+  writeFileSync(path.join(directory, 'event.json'), JSON.stringify(savedEvent) + '\n', {mode: 0o600});
+  if (args.descriptor) { writeFileSync(path.join(directory, 'descriptor.json'), readFileSync(args.descriptor), {mode: 0o600}); record.descriptorFile = 'descriptor.json'; }
+  let boundProducer = null;
+  if (args.resume) {
+    const previousBytes = readFileSync(args.resume), previous = JSON.parse(previousBytes);
+    if (eventName !== 'pull_request' || event.action !== 'edited' || event.changes?.base
+      || previous.schemaVersion !== 1 || hash(previous.validationContext) !== hash(validationContext)
+      || previous.contextSha256 !== hash(previous.cohortContext)
+      || !decimal(previous.coveredBy?.runId) || !decimal(previous.coveredBy?.runAttempt)
+      || !['pending','unresolved','fail','cancelled','reuse'].includes(previous.decision)) throw new Error('Saved observation does not bind this complete metadata context.');
+    boundProducer = {runId: previous.coveredBy.runId, runAttempt: previous.coveredBy.runAttempt};
+    record.coveredBy = previous.coveredBy; record.producerOutcome = previous.producerOutcome;
+    record.resumedFrom = {path: path.resolve(args.resume), sha256: createHash('sha256').update(previousBytes).digest('hex')};
+  }
   let apiReads = 0;
   function readApi(suffix) {
     if (++apiReads > 40) throw new Error('Public observation request budget exhausted.');
@@ -114,7 +143,7 @@ async function main() {
   }
   // Prove the complete unchanged inventory before looking for inherited
   // execution. Current policy reviews are never inherited from the producer.
-  if (!args['plan-only'] && cohort) {
+  if (!args['plan-only'] && !args.resume && cohort) {
     try {
       const impact = derivePolicyProseImpact(process.cwd(), sourceSha, args['comparison-base']);
       if (impact) {
@@ -172,9 +201,9 @@ async function main() {
         && run.head_repository?.full_name === repository && decimal(run.id) && decimal(run.run_attempt))
         .sort((a, b) => Number(b.id) - Number(a.id));
       let pending = false;
-      for (const run of runs) {
-        if (['queued', 'in_progress', 'waiting', 'requested', 'pending'].includes(run.status)) { pending = true; continue; }
-        if (run.status !== 'completed') throw new Error('Unknown producer lifecycle.');
+      const candidates = boundProducer ? runs.filter(run => String(run.id) === String(boundProducer.runId) && String(run.run_attempt) === String(boundProducer.runAttempt)) : runs;
+      if (boundProducer && candidates.length !== 1) throw new Error('Bound producer attempt is no longer verifiable in current observations.');
+      for (const run of candidates) {
         const result = readApi(`actions/runs/${run.id}/attempts/${run.run_attempt}/jobs?per_page=100`);
         if (!Array.isArray(result.jobs) || result.total_count !== result.jobs.length) throw new Error('Producer jobs are incomplete.');
         const scanners = result.jobs.filter(job => job.name === 'scanner-tests');
@@ -184,13 +213,46 @@ async function main() {
         const announcements=(earlyJobs[0].steps||[]).filter(step=>step.name===`Announce regression context ${expected}`&&step.conclusion==='success');
         if(announcements.length!==1)continue;
         for(const job of earlyJobs)if(String(job.run_id)!==String(run.id)||String(job.run_attempt)!==String(run.run_attempt)||job.head_sha!==sourceSha)throw new Error('Producer announcement attempt identity changed.');
+        if (cohort) {
+          const admissions = result.jobs.filter(job => job.name === 'cohort-routing');
+          const marker = `Admit original full producer context ${expected}`;
+          if (admissions.length !== 1 || (admissions[0].steps || []).filter(step => step.name === marker && step.status === 'completed' && step.conclusion === 'success').length !== 1) {
+            if (boundProducer) throw new Error('Saved original producer admission is no longer verifiable.');
+            continue;
+          }
+          if (String(admissions[0].run_id) !== String(run.id) || String(admissions[0].run_attempt) !== String(run.run_attempt) || admissions[0].head_sha !== sourceSha) throw new Error('Producer admission attempt identity changed.');
+          record.producerAdmission = {contextSha256: expected, job: 'cohort-routing', step: marker};
+        }
+        const coveredAnnouncement = cohort && steps.some(step => new RegExp(`^Verified complete cohort ${expected} report [a-f0-9]{64} mode (reuse|policy-reuse)$`).test(step.name) && step.conclusion === 'success');
+        if (coveredAnnouncement && !steps.some(step => step.name.startsWith('Complete regression context '))) {
+          if (boundProducer) throw new Error('Bound producer is a coverage reference rather than original execution.');
+          continue;
+        }
+        if (boundProducer && hash(canonical.cohort) !== record.contextSha256) throw new Error('Saved producer context changed.');
+        boundProducer = {runId: String(run.id), runAttempt: String(run.run_attempt)};
+        // Persist the exact admitted producer before waiting or inspecting its
+        // terminal result. Pending, cancelled and incomplete runs remain that
+        // producer's outcome; metadata never upgrades them to fresh execution.
+        record.cohortContext = canonical.cohort; record.contextSha256 = expected;
+        record.coveredBy = { runId: String(run.id), runAttempt: String(run.run_attempt),
+          checkoutSha: canonical.cohort.checkoutSha, checkoutTree: canonical.cohort.checkoutTree,
+          comparisonBase: canonical.cohort.comparisonBase };
+        record.producerOutcome = {status: run.status, conclusion: run.conclusion ?? null};
+        if (['queued', 'in_progress', 'waiting', 'requested', 'pending'].includes(run.status)) {
+          pending = true; record.decision = 'pending'; record.nextGate = 'resume-bound-producer-observation';
+          record.reason = `Exact producer ${run.id}/${run.run_attempt} is ${run.status}; resume observation.`;
+          writeFileSync(path.join(directory, 'routing.json'), JSON.stringify(record, null, 2) + '\n', {mode: 0o600});
+          break;
+        }
+        if (run.status !== 'completed') throw new Error('Unknown producer lifecycle.');
+        if(metadataEdit && !['success','failure','cancelled','timed_out','action_required','stale','startup_failure'].includes(run.conclusion)) throw new Error('Unknown producer conclusion.');
         if(cohort&&run.conclusion!=='success') {
-          record.decision='fail';record.reason=`Exact producer ${run.id}/${run.run_attempt} concluded ${run.conclusion}.`;break;
+          record.decision=metadataEdit&&run.conclusion==='cancelled'?'cancelled':'fail';record.reason=`Exact producer ${run.id}/${run.run_attempt} concluded ${run.conclusion}.`;break;
         }
         if(!scanner)throw new Error('Producer aggregate is missing or ambiguous.');
         if (String(scanner.run_id) !== String(run.id) || String(scanner.run_attempt) !== String(run.run_attempt) || scanner.head_sha !== sourceSha) throw new Error('Producer attempt identity changed.');
         if (run.conclusion !== 'success' || scanner.conclusion !== 'success' || scanner.status !== 'completed') {
-          record.decision = 'fail'; record.reason = `Exact producer ${run.id}/${run.run_attempt} concluded ${run.conclusion}.`; break;
+          record.decision = metadataEdit&&run.conclusion==='cancelled'?'cancelled':'fail'; record.reason = `Exact producer ${run.id}/${run.run_attempt} concluded ${run.conclusion}.`; break;
         }
         if(cohort){
           const required=['validation-context','event-gates','cohort-routing',...(earlyRequired?['early-startup','mobile-stress']:[]),...cohort.expectedGroups.map(id=>'regression-'+id),'scanner-tests'];
@@ -212,17 +274,21 @@ async function main() {
         if(earlyRequired){const early=result.jobs.find(job=>job.name==='early-startup'),markers=(early.steps||[]).filter(step=>step.conclusion==='success'&&/^Complete early startup report [a-f0-9]{64}$/.test(step.name));if(markers.length!==1)throw new Error('Original complete early execution receipt is absent.');record.coveredBy.earlyReportSha256=markers[0].name.split(' report ')[1];}
         break;
       }
-      if (record.decision !== 'full' || !pending || Date.now() >= deadline) break;
+      if (!['full','pending'].includes(record.decision) || !pending || Date.now() >= deadline) break;
       await new Promise(resolve => setTimeout(resolve, Math.min(args.pollIntervalMs, Math.max(0, deadline - Date.now()))));
       }
     } catch (error) {
-      record.decision = 'full'; record.reason = `${error.message} Executing the actual checkout's complete cohort.`;
+      record.decision = metadataEdit && record.coveredBy ? 'unresolved' : 'full';
+      if (record.decision === 'full') { record.coveredBy = null; delete record.producerOutcome; delete record.producerAdmission; }
+      record.reason = record.decision === 'unresolved' ? `${error.message} Resume the bound producer observation.` : `${error.message} Executing the actual checkout's complete cohort.`;
     }
   }
-  writeFileSync(path.join(directory, 'routing.json'), JSON.stringify(record, null, 2) + '\n', { mode: 0o600 });
+  record.nextGate = ['pending','unresolved'].includes(record.decision) ? 'resume-bound-producer-observation' : ['fail','cancelled'].includes(record.decision) ? 'repair-bound-producer' : record.decision === 'full' ? 'execute-complete-cohort' : 'verify-required-aggregate';
+  writeFileSync(path.join(directory, 'routing.json'), JSON.stringify(record, null, 2) + '\n', {mode: 0o600});
   if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `decision=${record.decision}\ncontext=${record.contextSha256}\nevent-policy=${validationContext.eventPolicy}\npolicy=${validationContext.eventPolicy}\ntree=${checkoutTree}\nworkflow-blob=${cohort?.workflowBlob||''}\ncohort=${cohort?.cohortDigestSha256||''}\n`);
-  console.log(`CI routing decision=${record.decision} context=${record.contextSha256} source=${sourceSha} actual-checkout=${checkoutSha} producer=${record.coveredBy ? `${record.coveredBy.runId}/${record.coveredBy.runAttempt}` : 'none'} reason=${record.reason}`);
-  if (record.decision === 'fail') process.exitCode = 1;
+  console.log(`CI routing decision=${record.decision} next=${record.nextGate} evidence=${path.join(directory, 'routing.json')} context=${record.contextSha256} source=${sourceSha} actual-checkout=${checkoutSha} producer=${record.coveredBy ? `${record.coveredBy.runId}/${record.coveredBy.runAttempt}` : 'none'} reason=${record.reason}`);
+  if (record.decision === 'fail' || record.decision === 'cancelled') process.exitCode = 1;
+  if (record.decision === 'pending' || record.decision === 'unresolved') process.exitCode = 2;
 }
 
 main().catch(error => { console.error(`ci-routing: ${error.message}`); process.exitCode = 1; });

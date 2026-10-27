@@ -13211,6 +13211,51 @@
       "root": "independent CI restores nested immutable proof artifacts through actual recursive Git tree semantics",
       "group": "native-process",
       "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "RISK repository process: metadata observation preserves bound producer outcomes without duplicate execution",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "metadata observation retains a bound pending producer without launching another cohort",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "metadata observation preserves cancelled producers and incomplete final evidence",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "metadata observation resumes the saved producer in a fresh process despite newer equivalent history",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "workflow metadata events serialize equivalent admission and run the actual routing command once per event",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "metadata observation recovers after an actual interrupted process using only durable evidence",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "metadata observation requires fresh validation for changed complete contexts or unverifiable admission",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "metadata observation skips failed observers without full producer admission and retains original execution",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "workflow metadata aggregate rejects pending cancelled unresolved and stale successful routing proofs",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
     }
   ],
   "processControls": [
