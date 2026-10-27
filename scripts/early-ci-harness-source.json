@@ -71,7 +71,10 @@
     {
       "path": "scripts/button-safety-native.mjs",
       "gitBlob": "af91a33a6af193fd5582255b7eb09361bb9cc6f1",
-      "sha256": "99781010cea67b0157fdb757162ff05a99ef62da77cec62b070bbbcbe5f8d9de"
+      "sha256": "99781010cea67b0157fdb757162ff05a99ef62da77cec62b070bbbcbe5f8d9de",
+      "preservedOriginalPath": "scripts/source-snapshots/issue-290/button-safety-native-9b5bc1c.mjs.txt",
+      "effectiveSha256": "cd829995ecb9f4399412ff3ca1f4282cb2c8b47a9b30e8c86d6ba3db33ef4147",
+      "adaptation": "Explicit canonical source-profile hook for only original mobile story and confirmed modal release; original full inventory guard retained."
     },
     {
       "path": "scripts/button-safety-rapid-core.mjs",
@@ -133,21 +136,37 @@
     {
       "name": "RISK repository process: required native button actions execute in Chromium and WebKit",
       "sha256": "6029c8253ee348f2cdaed69d9d6bb01664d2ca7d39c9c4a63e570c595422aeb2",
-      "sourceStartLine": 45581
+      "sourceStartLine": 45581,
+      "snapshotPath": "scripts/source-snapshots/issue-290/full-button-actions.source.txt",
+      "execution": "Unexecuted saved PR285 source; not applicable current-main full coverage."
     },
     {
       "name": "RISK repository process: native button gate detects errors raised by a real click",
       "sha256": "2adce1bf3ee3ab1deff8acf42a00bbc751ef43d9b0fca992f1d14136d61cf00d",
-      "sourceStartLine": 45568
+      "sourceStartLine": 45568,
+      "snapshotPath": "scripts/source-snapshots/issue-290/click-sensitivity.source.txt",
+      "execution": "Unexecuted saved PR285 source; not applicable current-main full coverage."
     },
     {
       "name": "RISK repository process: native button gate awaits an asynchronous false outcome",
       "sha256": "26202054f3134c6e9bf443ba289f1f956c11e5a34728c90c072939eea6dca6f7",
-      "sourceStartLine": 45786
+      "sourceStartLine": 45786,
+      "snapshotPath": "scripts/source-snapshots/issue-290/async-outcome.source.txt",
+      "execution": "Unexecuted saved PR285 source; not applicable current-main full coverage."
     }
   ],
   "limits": [
-    "Harness-only source import; no product patch or prior hosted qualification inherited."
+    "Harness-only source import; no product patch or prior hosted qualification inherited.",
+    "The one effective native consumer is explicitly adapted; its saved original and separately bound effective blob are both retained. Three full PR285 product-case bodies are unexecuted snapshots, not current-main execution."
   ],
-  "sourceParent": "b176026825e4f9539780f745fe60e09cf348d288"
+  "sourceParent": "b176026825e4f9539780f745fe60e09cf348d288",
+  "canonicalLimitedProfile": {
+    "path": "scripts/mobile-source-profile.json",
+    "sha256": "88e7582220ce4364a420208f44dbcb596a73bffc52ea7ea2a14bacdded0bc67d",
+    "scopes": [
+      "required-mobile-story",
+      "confirmed-modal-release"
+    ],
+    "limits": "Exact canonical applicability only; original full native catalog unchanged; no actual runtime qualification supplied."
+  }
 }

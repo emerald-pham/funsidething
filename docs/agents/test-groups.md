@@ -150,7 +150,14 @@ the exact 1,000,000,000-byte browser scope, zero swap, ten distinct trusted Yes
 acceptances within two seconds, and original startup/source/durability/frame
 checks. `scripts/early-ci-harness-source.json` binds the harness-only import from
 `9b5bc1c9d5a87fed022a17706bbb0e69e94757b1` (directly after `b176026`). It advances
-no product source or immutable button inventory.
+no product source or immutable full button inventory. A separately reviewed
+canonical profile admits only the required mobile story and the named confirmed
+Chromium modal-release harness. The saved native consumer remains preserved as a
+source snapshot; its effective profile hook is separately hashed. Five confirmed
+harness regressions remain executable. Three newly imported full PR285 product
+cases remain exact unexecuted source snapshots rather than becoming prerequisites
+for unrelated current-main application routes. Every preexisting main regression
+remains applicable and unchanged.
 
 The early job preserves raw children and artifacts in `early-startup-RUN-ATTEMPT`.
 The aggregate independently verifies that receipt and the separate 512 MB stress

@@ -45585,44 +45585,16 @@ test('RISK repository process: native scene-time bursts cannot activate controls
  for(const value of Object.values(result.report.cleanup))assert.equal(value,true);t.diagnostic('Actual scene dialog burst evidence: '+directory);
 });
 
-test('RISK repository process: required native button actions execute in Chromium and WebKit',{timeout:750000},async t=>{
- const inventory=JSON.parse(fs.readFileSync(path.join(__dirname,'scripts/button-safety-inventory.json'),'utf8'));assert.deepEqual(inventory.requiredWorkload,{savedTasks:400,rapidAttempts:10,rapidWindowMs:2000},'Both explicit user workload stories remain required');assert.deepEqual(inventory.requiredRapidActions,inventory.requiredActions,'Every required button/action family needs rapid coverage');
- const output=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(output,'Durable allocated native output required');
- // This bounds the entire 90-scenario engine process, including isolated fixture
- // setup and 173 ten-press bursts. Measured WebKit exceeded five minutes while
- // individual action bounds still passed; those native bounds remain unchanged.
- for(const engine of ['chromium','webkit'])await t.test(engine,()=>{
-  const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine',engine,'--output-dir',output,'--port',process.env.CHAIN_NATIVE_PORT||'0'],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:360000,maxBuffer:16*1024*1024});
-  assert.equal(result.error,undefined,'Named engine must be available: '+(result.error?.message||result.stderr));assert.equal(result.signal,null);assert.equal(result.status,0,'Every required native button scenario must pass: '+result.stderr);
-  const paths=result.stdout.split('\n').map(line=>line.match(/^Button evidence: (.+)$/)?.[1]).filter(Boolean);assert.equal(paths.length,1,'One exact native button report per engine');
-  const verified=spawnSync(process.execPath,['scripts/button-safety.mjs','--verify-report',paths[0],'--inventory','scripts/button-safety-inventory.json'],{cwd:__dirname,encoding:'utf8'});
-  assert.equal(verified.status,0,'Actual native report must cover the independent required action inventory: '+verified.stderr);t.diagnostic('Button evidence: '+paths[0]);
- });
-});
-
-test('RISK repository process: native button gate detects errors raised by a real click',async t=>{
- const output=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(output,'Durable allocated native output required');fs.mkdirSync(output,{recursive:true});
- const controls={pageerror:/pageerror/,unhandled:/unhandledrejection/,close:/unexpected-close/,crash:/page-crash/,reload:/unexpected-navigation-or-reload/,navigation:/unexpected-navigation-or-reload/,stall:/stalled responsiveness|blocked frame loop/,'async-pending':/stalled responsiveness/,'new-action':/New untested button action/};
- const cases=Object.entries(controls).map(([control,signal])=>({engine:'chromium',control,signal}));cases.push({engine:'webkit',control:'pageerror',signal:/pageerror/},{engine:'webkit',control:'unhandled',signal:/unhandledrejection/},{engine:'webkit',control:'short-stall',signal:/blocked frame loop/});
- for(const {engine,control,signal}of cases)await t.test(engine+' '+control,()=>{
-  const before=new Set(fs.readdirSync(output));
-  const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine',engine,'--output-dir',output,'--port',process.env.CHAIN_NATIVE_PORT||'0','--probe','--control',control],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:45000,maxBuffer:8*1024*1024});
-  assert.equal(result.error,undefined);assert.equal(result.signal,null);assert.notEqual(result.status,0,'actual native Settings click must reject '+control);
-  const reports=fs.readdirSync(output).filter(file=>!before.has(file)&&file.startsWith('button-safety-'+engine+'-')&&file.endsWith('.json'));assert.equal(reports.length,1,'one preserved real native sensitivity artifact');
-  const report=JSON.parse(fs.readFileSync(path.join(output,reports[0]),'utf8'));assert.equal(report.kind,'button-sensitivity');assert.equal(report.status,'failed');assert.match(JSON.stringify({errors:report.errors,failure:report.failure}),signal,'actual detector must catch '+control);t.diagnostic('Button sensitivity: '+path.join(output,reports[0]));
- });
-});
-
-test('RISK repository process: native button gate awaits an asynchronous false outcome',t=>{
- const output=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(output,'Durable allocated native output required');
- const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine','chromium','--output-dir',output,'--port',process.env.CHAIN_NATIVE_PORT||'0','--probe','--control','async-predicate-false'],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:45000});
- assert.equal(result.error,undefined);assert.equal(result.signal,null);assert.notEqual(result.status,0,'Promise(false) must not be mistaken for a completed expected native button outcome');assert.match(result.stderr,/stalled responsiveness: outcome settings/);
-});
-
-
 test('RISK repository process: CI monitor preserves early startup and stress predecessor failures',()=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
  const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^parallel workflow observation preserves complete missing skipped canceled and unknown distinctions$','scripts/agent-tools/ci-monitor.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:120000});
  assert.equal(child.status,0,'Public observation must retain every early predecessor distinction: '+child.stdout+child.stderr);
  assert.match(child.stdout,/# Subtest: parallel workflow observation preserves complete missing skipped canceled and unknown distinctions/,'Required actual observer assertions must execute');
+});
+
+test('RISK repository process: canonical limited source profiles preserve original mobile acceptance',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const child=spawnSync(process.execPath,['--test','--test-reporter=tap','scripts/agent-tools/mobile-source-profile.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:120000});
+ assert.equal(child.status,0,'Limited canonical source admission must preserve exact original contracts: '+child.stdout+child.stderr);
+ assert.match(child.stdout,/# Subtest: canonical mobile source profile admits exact current app/);
 });

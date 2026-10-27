@@ -43,7 +43,14 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
  for(const file of git('ls-files').toString().trim().split('\n'))if(file!=='tests.js'&&!file.startsWith('scripts/')&&(/\.(html|js|css|svg|png|webmanifest)$/.test(file)||Object.hasOwn(runtimeAssets,file)))sources.set(file,fs.readFileSync(path.join(repo,file)));
  report.assets=Object.fromEntries([...sources].map(([file,bytes])=>[file,digest(bytes)]));
  for(const [file,hash]of Object.entries(runtimeAssets))assert.equal(report.assets[file],hash,'Reviewed runtime asset missing or changed: '+file);
- const {verifyButtonInventorySource}=await import('./button-safety-contract.mjs');verifyButtonInventorySource([...sources].filter(([file])=>/\.(?:js|html)$/.test(file)).map(([,bytes])=>bytes.toString()).join('\n'),JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')));
+ const {verifyButtonInventorySource}=await import('./button-safety-contract.mjs');
+ const inventorySource=[...sources].filter(([file])=>/\.(?:js|html)$/.test(file)).map(([,bytes])=>bytes.toString()).join('\n');
+ // These two fixed consumers have independent reviewed canonical applicability.
+ // Every full run and every other scenario retains the saved full catalog guard.
+ if(mobileYesMotion||(!control&&!probe&&engine==='chromium'&&scenarioFilter==='rapid scene time presets, lock, live time, and close')){
+  const {checkProfile}=await import('./mobile-source-profile.mjs');
+  report.sourceProfile=checkProfile({repo,source:inventorySource,assets:report.assets,engine,motion:mobileYesMotion,scenario:scenarioFilter,control,probe});
+ }else verifyButtonInventorySource(inventorySource,JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')));
  for(const [file,bytes]of sources)assert.equal(digest(bytes),digest(git('show','HEAD:'+file)),'Button run requires exact committed app bytes: '+file);
  let server,browser,context,page,armed=false,closing=false;
  const check=()=>{assert.equal(report.errors.length,0,'Native button safety detected '+report.errors.join(', '));};

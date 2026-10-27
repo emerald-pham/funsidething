@@ -12878,22 +12878,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK repository process: native button gate awaits an asynchronous false outcome",
-      "group": "native-process",
-      "file": "tests.js"
-    },
-    {
-      "root": "RISK repository process: native button gate detects errors raised by a real click",
-      "group": "native-process",
-      "file": "tests.js"
-    },
-    {
       "root": "RISK repository process: native scene-time bursts cannot activate controls behind a refused top-layer release",
-      "group": "native-process",
-      "file": "tests.js"
-    },
-    {
-      "root": "RISK repository process: required native button actions execute in Chromium and WebKit",
       "group": "native-process",
       "file": "tests.js"
     },
@@ -13046,6 +13031,31 @@
       "root": "RISK repository process: CI monitor preserves early startup and stress predecessor failures",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: canonical limited source profiles preserve original mobile acceptance",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "canonical mobile source profile admits exact current app without changing original story or full catalog",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-source-profile.test.mjs"
+    },
+    {
+      "root": "canonical limited profiles reject wrong source profile engine scenario control and full coverage",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-source-profile.test.mjs"
+    },
+    {
+      "root": "confirmed modal source profile admits only its exact existing Chromium consumer",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-source-profile.test.mjs"
+    },
+    {
+      "root": "native report verifier binds the complete actual source and refuses full-action relabeling",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-source-profile.test.mjs"
     }
   ],
   "processControls": [

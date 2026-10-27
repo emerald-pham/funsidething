@@ -1,11 +1,28 @@
 # Issue 290 early CI gate
 
 Harness source: `9b5bc1c9d5a87fed022a17706bbb0e69e94757b1`, whose direct parent
-is `b176026825e4f9539780f745fe60e09cf348d288`. The import contains only the existing
-button harness closure and eight unchanged regression bodies. The byte/blob
-manifest records each script and regression excerpt. The source product worktree,
-branches, runtime application files and immutable inventory remain separately
-owned. The source ancestry was verified locally; its previous proof is local.
+is `b176026825e4f9539780f745fe60e09cf348d288`. Saved scripts and all eight original
+regression bodies are retained exactly. Five confirmed harness regressions remain
+executable; three newly imported PR285 full-product cases are explicit unexecuted
+source snapshots. They do not claim current-main action coverage. Every
+preexisting main full/native/installed-client requirement remains unchanged.
+
+The one effective native consumer has an explicit limited source-profile hook;
+its original snapshot and modified blob are separately bound in the manifest.
+The profile freezes complete canonical app assets and source templates, allowing
+only the original mobile story and the exact confirmed Chromium modal-release
+consumer. It admits no full action run, other scenario or sensitivity control.
+Both actual native report scope and verifier bind that profile. The saved full
+native catalog, original story, memory budgets, policy, timing, input and durability
+checks remain unchanged. No product source or separately owned worktree was changed.
+
+The original whole-catalog refusal on canonical source (`65a2ad7e`) occurred
+before launch: 31 template hashes differed, with 211 canonical versus 197 saved
+occurrences, 11 canonical-only and four saved-only literal action routes. This was
+source applicability drift, not an observed mobile story failure. The initial
+adapter's actual public expected-acceptance RED (`914bc984`, 04:22:59 UTC) preceded
+the limited profile implementation; GREEN `9aa3b611` follows. Source-only acceptance
+still supplies no actual mobile/runtime qualification.
 
 Observed local RED: the existing workflow launched four regression children after
 a controlled early failure (`6b86f9e2`, 2026-10-27 03:57:34 UTC). The aggregate also
@@ -37,10 +54,10 @@ before pushing. The worker launches no live runtime or hosted workflow.
    compatibility. The separate stress job must preserve its actual application
    outcome and pass execution integrity. The required aggregate must independently
    verify all bytes and current predecessor outcomes before release/deployment.
-3. If current application source fails the imported inventory, renderer contract
+3. If current application source fails the exact limited profile, renderer contract
    or mobile story, preserve the exact failure and stop release. This change
-   intentionally imports no PR285 product patch; its missing successful current
-   mobile execution is an unresolved acceptance/release blocker. A controlled
+   intentionally imports no PR285 product patch; successful current
+   mobile execution remains a required acceptance/release gate. A controlled
    fixture pass cannot replace it. Integrate any separately owned product repair
    only with its owner's actual source/review evidence and renewed exact candidate
    qualification.

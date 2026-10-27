@@ -2269,9 +2269,6 @@ The existing checkpoint and recorder commands exercise disposable Git repositori
 - RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh
 - RISK repository process: scenery consumers use allocated fallback ports and preserve early native failures
 - RISK repository process: native scene-time bursts cannot activate controls behind a refused top-layer release
-- RISK repository process: required native button actions execute in Chromium and WebKit
-- RISK repository process: native button gate detects errors raised by a real click
-- RISK repository process: native button gate awaits an asynchronous false outcome
 - RISK repository process: early startup failure blocks costly CI without counting blocked coverage
 
 The original saved harness and native assertion bodies are imported byte-for-byte from 9b5bc1c, a child of b176026. The public early command preserves source/run/workflow and every raw artifact, rejects omitted/skipped/cancelled work, and authorizes long cohorts only after the original required 1 GB mobile story. The separate stress parser retains nonblocking application outcomes and mandatory integrity. Controlled OS children establish process ordering only; actual hosted source may still fail and remains a release blocker.
@@ -2279,3 +2276,7 @@ The original saved harness and native assertion bodies are imported byte-for-byt
 - RISK repository process: CI monitor preserves early startup and stress predecessor failures
 
 The supported CI observer reads the actual workflow and retains missing, skipped, cancelled and unknown early/stress predecessor outcomes. New process wrappers clear the inherited Node runner marker and require actual named TAP outcomes.
+
+- RISK repository process: canonical limited source profiles preserve original mobile acceptance
+
+The canonical profile admits only the original mobile story and the named confirmed Chromium modal harness. Complete canonical app assets/templates and raw report scope remain bound; unknown scopes, full runs, wrong source/profile and sensitivity controls refuse. The saved native original is preserved with a separately hashed effective hook. Three newly imported PR285 full-product tests remain exact unexecuted source snapshots; all preexisting main tests, original story limits and saved full native catalog remain unchanged.
