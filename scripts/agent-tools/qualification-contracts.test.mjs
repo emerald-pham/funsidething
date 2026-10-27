@@ -5,31 +5,20 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
+import { planQualificationContracts, qualificationTestCommand, verifyQualificationOutcomes } from './qualification-contracts.mjs';
 
 const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const selector = path.join(repository, 'scripts/agent-tools/qualification-contracts.mjs');
-const contractRoots = {
-  'startup-browser': 'RISK repository process: newly registered startup browser roots require an isolated Chromium receipt',
-  'finite-authority': 'RISK repository process: diagnostic checkpoints retain finite authority across fresh process and CI boundaries',
-  'workflow-context': 'RISK repository process: workflow browser paths resolve only in supported runner contexts',
-};
-const pathsByContract = {
-  'startup-browser': [
-    '.github/workflows/data-safety.yml', 'scripts/test-groups.mjs',
-    'scripts/agent-tools/test-groups.test.mjs', 'scripts/agent-tools/ci-pass-reuse.mjs',
-    'scripts/test-group-assignments.json', 'tests.js',
-  ],
-  'finite-authority': [
-    'scripts/agent-tools/checkpoint-progress.mjs', 'scripts/agent-tools/checkpoint-progress.test.mjs',
-    'scripts/test-group-assignments.json', 'tests.js',
-  ],
-  'workflow-context': [
-    '.github/workflows/data-safety.yml', 'scripts/agent-tools/workflow-validator.mjs',
-    'scripts/agent-tools/test-groups.test.mjs', 'scripts/agent-tools/ci-pass-reuse.mjs',
-    'scripts/test-group-assignments.json', 'tests.js',
-  ],
-};
+const sourceAssignments = JSON.parse(fs.readFileSync(path.join(repository, 'scripts/test-group-assignments.json'), 'utf8'));
+const contractRows = sourceAssignments.rootAssignments.filter(row => row.qualificationContract);
+const contractRoots = Object.fromEntries(contractRows.map(row => [row.qualificationContract.id, row.root]));
+const contractIds = contractRows.map(row => row.qualificationContract.id);
+const triggerPathsByContract = Object.fromEntries(contractRows.map(row => [row.qualificationContract.id, row.qualificationContract.triggerPaths]));
 const groups = ['core', 'scenery', 'persistence-recovery', 'native-process'];
+
+function uniqueTriggerFor(id) {
+  return triggerPathsByContract[id].find(candidate => contractRows.every(row => row.qualificationContract.id === id || !row.qualificationContract.triggerPaths.includes(candidate)));
+}
 
 function git(root, ...args) {
   const result = spawnSync('git', args, { cwd: root, encoding: 'utf8', timeout: 10_000 });
@@ -53,13 +42,15 @@ function makeFixture(t) {
     ['fixture persistence contract baseline', 'persistence-recovery'],
     ['fixture native contract baseline', 'native-process'],
   ];
-  const allRoots = [...baselineRoots, ...Object.entries(contractRoots).map(([id, title]) => [title, 'native-process', id])];
+  const allRoots = [...baselineRoots, ...contractRows.map(row => [row.root, row.group, row.qualificationContract])];
   fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({
     type: 'module',
     scripts: { test: 'node --test tests.js scripts/agent-tools/*.test.mjs' },
   }, null, 2) + '\n');
-  fs.writeFileSync(path.join(root, 'tests.js'), `import { test } from 'node:test';\n${allRoots.map(([title]) => `test(${JSON.stringify(title)}, () => {});`).join('\n')}\n`);
-  for (const file of new Set(Object.values(pathsByContract).flat())) {
+  fs.writeFileSync(path.join(root, 'tests.js'), `import { test } from 'node:test';\n${allRoots.map(([title, , qualificationContract]) => qualificationContract
+    ? `test(${JSON.stringify(title)}, t => { if (process.env.CHAIN_QUALIFICATION_FIXTURE_FAILURE === ${JSON.stringify(qualificationContract.id)}) throw new Error('controlled selected failure'); if (process.env.CHAIN_QUALIFICATION_FIXTURE_SKIP === ${JSON.stringify(qualificationContract.id)}) t.skip('controlled selected skip'); if (process.env.CHAIN_QUALIFICATION_FIXTURE_HANG === ${JSON.stringify(qualificationContract.id)}) return new Promise(() => {}); });`
+    : `test(${JSON.stringify(title)}, () => {});`).join('\n')}\n`);
+  for (const file of new Set(Object.values(triggerPathsByContract).flat())) {
     const target = path.join(root, file);
     fs.mkdirSync(path.dirname(target), { recursive: true });
     if (!fs.existsSync(target)) fs.writeFileSync(target, 'fixture source\n');
@@ -80,11 +71,11 @@ function makeFixture(t) {
         baselineRootCount: roots.length, baselineEstimatedDurationMs: roots.length * 100,
       };
     }),
-    rootAssignments: allRoots.map(([rootName, group, qualificationId]) => ({
+    rootAssignments: allRoots.map(([rootName, group, qualificationContract]) => ({
       root: rootName,
       group,
       file: 'tests.js',
-      ...(qualificationId ? { qualificationContract: { id: qualificationId, triggerPaths: pathsByContract[qualificationId] } } : {}),
+      ...(qualificationContract ? { qualificationContract } : {}),
     })),
     rootReplacements: [],
     processControls: [],
@@ -138,12 +129,25 @@ function invoke(fixture, ...selectionArgs) {
   });
 }
 
+function executeSelectedFixture(fixture, { environment = {}, timeout = 15_000 } = {}) {
+  const plan = planQualificationContracts({ repo: fixture.root, comparisonBase: fixture.base });
+  const command = qualificationTestCommand(plan);
+  const env = { ...process.env, ...environment };
+  delete env.NODE_TEST_CONTEXT;
+  const child = spawnSync(command.executable, command.args, { cwd: fixture.root, env, encoding: 'utf8', timeout, maxBuffer: 1024 * 1024 });
+  const verified = verifyQualificationOutcomes(plan, {
+    exitCode: child.status,
+    signal: child.signal,
+    launchError: child.error,
+    stdout: child.stdout || '',
+  });
+  return { plan, child, verified };
+}
+
 test('qualification selector binds exact assigned risk wrappers to source changes and fails closed', async t => {
-  for (const [id, trigger] of [
-    ['startup-browser', '.github/workflows/data-safety.yml'],
-    ['finite-authority', 'scripts/agent-tools/checkpoint-progress.mjs'],
-    ['workflow-context', 'scripts/agent-tools/workflow-validator.mjs'],
-  ]) await t.test(`${id} selects its exact existing wrapper`, () => {
+  for (const id of contractIds) await t.test(`${id} selects its exact existing wrapper`, () => {
+    const trigger = uniqueTriggerFor(id);
+    assert.ok(trigger, `contract ${id} must have a unique source trigger for the isolated selection check`);
     const fixture = makeFixture(t);
     commitChanged(fixture, { [trigger]: 'changed source\n' });
     const result = invoke(fixture);
@@ -175,6 +179,60 @@ test('qualification selector binds exact assigned risk wrappers to source change
     assert.match(unknown.stderr, /unknown|not registered/i);
   });
 
+  await t.test('the exact selected parent process executes once and its raw TAP is verified', () => {
+    const fixture = makeFixture(t);
+    commitChanged(fixture, { 'scripts/agent-tools/checkpoint-progress.mjs': 'changed source\n' });
+    const { plan, child, verified } = executeSelectedFixture(fixture);
+    assert.equal(child.error, undefined, child.error?.message || 'selected parent process must start');
+    assert.equal(child.status, 0, child.stdout + child.stderr);
+    assert.deepEqual(plan.selected.map(row => row.root), [contractRoots['finite-authority']]);
+    assert.deepEqual(verified, {
+      status: 'passed', expected: [contractRoots['finite-authority']],
+      outcomes: [{ root: contractRoots['finite-authority'], status: 'passed', count: 1, skipReason: null }], issues: [],
+    });
+  });
+
+  await t.test('failed and skipped selected children do not qualify', () => {
+    const failedFixture = makeFixture(t);
+    commitChanged(failedFixture, { 'scripts/agent-tools/checkpoint-progress.mjs': 'changed source\n' });
+    const failure = executeSelectedFixture(failedFixture, { environment: { CHAIN_QUALIFICATION_FIXTURE_FAILURE: 'finite-authority' } });
+    assert.equal(failure.child.status, 1, failure.child.stdout + failure.child.stderr);
+    assert.equal(failure.verified.status, 'failed');
+    assert.deepEqual(failure.verified.outcomes.map(row => row.status), ['failed']);
+
+    const skippedFixture = makeFixture(t);
+    commitChanged(skippedFixture, { 'scripts/agent-tools/checkpoint-progress.mjs': 'changed source\n' });
+    const skipped = executeSelectedFixture(skippedFixture, { environment: { CHAIN_QUALIFICATION_FIXTURE_SKIP: 'finite-authority' } });
+    assert.equal(skipped.child.status, 0, skipped.child.stdout + skipped.child.stderr);
+    assert.equal(skipped.verified.status, 'failed');
+    assert.deepEqual(skipped.verified.outcomes.map(row => row.status), ['skipped']);
+  });
+
+  await t.test('cancelled, missing, and duplicate child results remain nonqualifying', () => {
+    const fixture = makeFixture(t);
+    commitChanged(fixture, { 'scripts/agent-tools/checkpoint-progress.mjs': 'changed source\n' });
+    const plan = planQualificationContracts({ repo: fixture.root, comparisonBase: fixture.base });
+    const command = qualificationTestCommand(plan);
+    const env = { ...process.env, CHAIN_QUALIFICATION_FIXTURE_HANG: 'finite-authority' };
+    delete env.NODE_TEST_CONTEXT;
+    const cancelled = spawnSync(command.executable, command.args, { cwd: fixture.root, env, encoding: 'utf8', timeout: 500, maxBuffer: 1024 * 1024 });
+    const cancelledResult = verifyQualificationOutcomes(plan, { exitCode: cancelled.status, signal: cancelled.signal, launchError: cancelled.error, stdout: cancelled.stdout || '' });
+    assert.equal(cancelledResult.status, 'failed');
+    assert.ok(cancelledResult.issues.some(issue => /interrupted|exited|TAP|exactly one/i.test(issue)));
+
+    const omitted = spawnSync(process.execPath, ['-e', 'process.exit(0)'], { cwd: fixture.root, encoding: 'utf8', timeout: 2_000 });
+    const omittedResult = verifyQualificationOutcomes(plan, { exitCode: omitted.status, signal: omitted.signal, stdout: omitted.stdout || '' });
+    assert.equal(omittedResult.status, 'failed');
+    assert.deepEqual(omittedResult.outcomes.map(row => row.status), ['missing']);
+
+    const root = contractRoots['finite-authority'];
+    const duplicateTap = `TAP version 13\n# Subtest: ${root}\nok 1 - ${root}\n# Subtest: ${root}\nok 2 - ${root}\n1..2\n`;
+    const duplicateChild = spawnSync(process.execPath, ['-e', `process.stdout.write(${JSON.stringify(duplicateTap)})`], { cwd: fixture.root, encoding: 'utf8', timeout: 2_000 });
+    const duplicateResult = verifyQualificationOutcomes(plan, { exitCode: duplicateChild.status, signal: duplicateChild.signal, stdout: duplicateChild.stdout || '' });
+    assert.equal(duplicateResult.status, 'failed');
+    assert.deepEqual(duplicateResult.outcomes.map(row => row.status), ['duplicate']);
+  });
+
   await t.test('missing and duplicate registry metadata fail closed', () => {
     for (const mutation of ['missing', 'duplicate']) {
       const fixture = makeFixture(t);
@@ -184,11 +242,25 @@ test('qualification selector binds exact assigned risk wrappers to source change
       if (mutation === 'missing') delete selected.qualificationContract;
       else catalog.rootAssignments.find(row => row.root === 'fixture native contract baseline').qualificationContract = selected.qualificationContract;
       writeJson(file, catalog);
+      git(fixture.root, 'add', 'scripts/test-group-assignments.json');
       commitChanged(fixture, { 'scripts/agent-tools/checkpoint-progress.mjs': 'changed source\n' });
       const result = invoke(fixture);
       assert.notEqual(result.status, 0, `${mutation} selector metadata must fail closed`);
       assert.match(result.stderr, /qualification|contract|duplicate|exactly once/i);
     }
+  });
+
+  await t.test('overlapping root assignments remain rejected by the canonical registration validator', () => {
+    const fixture = makeFixture(t);
+    const file = path.join(fixture.root, 'scripts/test-group-assignments.json');
+    const catalog = JSON.parse(fs.readFileSync(file, 'utf8'));
+    catalog.rootAssignments.push({ ...catalog.rootAssignments.find(row => row.qualificationContract?.id === 'startup-browser') });
+    writeJson(file, catalog);
+    git(fixture.root, 'add', 'scripts/test-group-assignments.json');
+    commitChanged(fixture, { 'scripts/agent-tools/test-groups.test.mjs': 'changed source\n' });
+    const result = invoke(fixture);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /overlapping group assignments/i);
   });
 
   await t.test('renamed exact wrapper identity is rejected by the current registration authority', () => {
@@ -201,6 +273,7 @@ test('qualification selector binds exact assigned risk wrappers to source change
     const source = fs.readFileSync(suite, 'utf8').replace(contractRoots['startup-browser'], renamed);
     fs.writeFileSync(suite, source);
     writeJson(file, catalog);
+    git(fixture.root, 'add', 'tests.js', 'scripts/test-group-assignments.json');
     commitChanged(fixture, { 'scripts/agent-tools/checkpoint-progress.mjs': 'changed source\n' });
     const result = invoke(fixture);
     assert.notEqual(result.status, 0);
