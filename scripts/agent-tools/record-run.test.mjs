@@ -388,6 +388,87 @@ test('summarizes large real child output while preserving complete redacted evid
   assert.equal((await readFile(stderrPath, 'utf8')).includes(stderrSecret), false);
 });
 
+test('keeps ordinary and compact callers compatible for large failures and changed-source evidence', async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'record-run-caller-compatibility-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(temp);
+  const sourcePath = path.join(repo, 'src/app.js');
+  await writeFile(sourcePath, 'export const value = 2;\n');
+  const stdoutSecret = 'COMPAT-STDOUT-SECRET-19d2';
+  const stderrSecret = 'COMPAT-STDERR-SECRET-b510';
+  const child = `process.stdout.write('O'.repeat(128 * 1024) + ' token=${stdoutSecret}\\n'); process.stderr.write('E'.repeat(96 * 1024) + ' password=${stderrSecret}\\n'); process.exitCode = 7;`;
+  const expectedStdout = `${'O'.repeat(128 * 1024)} token=[REDACTED]\n`;
+  const expectedStderr = `${'E'.repeat(96 * 1024)} password=[REDACTED]\n`;
+  const ordinaryEvidence = path.join(temp, 'ordinary-evidence');
+  const ordinary = invokeRecorder({
+    repo,
+    evidence: ordinaryEvidence,
+    purpose: 'green',
+    command: node,
+    args: ['-e', child],
+  });
+
+  assert.equal(ordinary.status, 7, 'the default stream mode preserves the actual child exit');
+  assert.equal(ordinary.stdout, expectedStdout, 'existing ordinary callers still receive the full sanitized stdout');
+  assert.ok(ordinary.stderr.includes(expectedStderr), 'existing ordinary callers still receive the full sanitized stderr');
+  const ordinaryMetadataPath = evidencePathFrom(ordinary);
+  const ordinaryRecordBytes = await readFile(ordinaryMetadataPath);
+  const ordinaryRecord = JSON.parse(ordinaryRecordBytes.toString('utf8'));
+  assert.equal(ordinaryRecord.execution.exitCode, 7);
+  assert.equal(ordinaryRecord.execution.signal, null);
+  assert.equal(ordinaryRecord.execution.outcome, 'nonzero-exit');
+  assert.equal(ordinaryRecord.state, 'complete');
+  assert.equal(ordinaryRecord.execution.output.stdout, expectedStdout);
+  assert.equal(ordinaryRecord.execution.output.stderr, expectedStderr);
+
+  const compactEvidence = path.join(temp, 'compact-evidence');
+  const compact = invokeRecorder({
+    repo,
+    evidence: compactEvidence,
+    purpose: 'green',
+    command: node,
+    args: ['-e', child],
+    extraOptions: ['--summary'],
+  });
+
+  assert.equal(compact.status, 7, 'summary mode also preserves the actual child exit');
+  assert.ok(Buffer.byteLength(compact.stdout) + Buffer.byteLength(compact.stderr) < 2048,
+    'the compact caller remains bounded as child output grows');
+  const compactSummary = summaryFrom(compact);
+  assert.equal(compactSummary.status, 'failed');
+  assert.equal(compactSummary.outcome, 'nonzero-exit');
+  assert.deepEqual(compactSummary.child, { exitCode: 7, signal: null });
+  const compactRecordBytes = await readFile(compactSummary.evidence.metadataPath);
+  const compactRecord = JSON.parse(compactRecordBytes.toString('utf8'));
+  assert.equal(compactRecord.execution.output.stdout, expectedStdout);
+  assert.equal(compactRecord.execution.output.stderr, expectedStderr);
+  assert.equal(await readFile(compactSummary.evidence.stdoutPath, 'utf8'), expectedStdout);
+  assert.equal(await readFile(compactSummary.evidence.stderrPath, 'utf8'), expectedStderr);
+
+  for (const record of [ordinaryRecord, compactRecord]) {
+    assert.equal(record.workingTree.identity.status, 'complete');
+    assert.match(record.workingTree.sourceTestDiffSha256, /^[a-f0-9]{64}$/);
+    const changedSource = record.workingTree.sourceTestFiles.find(file => file.path === 'src/app.js');
+    assert.ok(changedSource, 'the changed source remains attributed to the recorded attempt');
+    assert.match(changedSource.actualBytesSha256, /^[a-f0-9]{64}$/);
+    assert.equal(JSON.stringify(record).includes(stdoutSecret), false);
+    assert.equal(JSON.stringify(record).includes(stderrSecret), false);
+    assert.equal(record.execution.output.stdout.includes(stdoutSecret), false);
+    assert.equal(record.execution.output.stderr.includes(stderrSecret), false);
+  }
+  assert.equal(ordinaryRecord.workingTree.sourceTestDiffSha256, compactRecord.workingTree.sourceTestDiffSha256,
+    'ordinary and compact callers identify the same unchanged source diff');
+  for (const [pathValue, secret] of [
+    [ordinaryMetadataPath, stdoutSecret], [ordinaryMetadataPath, stderrSecret],
+    [compactSummary.evidence.metadataPath, stdoutSecret], [compactSummary.evidence.metadataPath, stderrSecret],
+    [compactSummary.evidence.stdoutPath, stdoutSecret], [compactSummary.evidence.stderrPath, stderrSecret],
+  ]) assert.equal((await readFile(pathValue, 'utf8')).includes(secret), false, `${path.basename(pathValue)} stays redacted`);
+  assert.equal(ordinary.stdout.includes(stdoutSecret), false);
+  assert.equal(ordinary.stderr.includes(stderrSecret), false);
+  assert.equal(compact.stdout.includes(stdoutSecret), false);
+  assert.equal(compact.stdout.includes(stderrSecret), false);
+});
+
 test('keeps a failed child nonzero and reports its actual exit in the summary', async (t) => {
   const temp = await mkdtemp(path.join(os.tmpdir(), 'record-run-summary-failure-'));
   t.after(() => rm(temp, { recursive: true, force: true }));
