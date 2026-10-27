@@ -6,6 +6,7 @@ import { mkdtemp, mkdir, readFile, readdir, rm, stat, symlink, writeFile } from 
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseTap } from '../test-groups.mjs';
 
 const node = process.execPath;
 const recorder = fileURLToPath(new URL('./record-run.mjs', import.meta.url));
@@ -1007,6 +1008,73 @@ test('classifies real TAP syntax and import failures separately from assertions 
   }
   const result = invokeRecorder({ repo, evidence, purpose: 'green', command: node, args: ['-e', 'console.log("not ok 1 - failed runner\\n# fail 1"); process.exitCode=1;'] });
   assert.equal(JSON.parse(await readFile(evidencePathFrom(result), 'utf8')).execution.outcome, 'nonzero-exit');
+});
+
+test('preserves an ordinary TAP case identity containing the word token through recording', async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'record-tap-token-name-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(temp);
+  const evidence = process.env.CHAIN_RECORDER_TAP_TEST_EVIDENCE_DIR
+    ? path.resolve(process.env.CHAIN_RECORDER_TAP_TEST_EVIDENCE_DIR)
+    : path.join(temp, 'evidence');
+  const caseName = 'token results keep their full nonsecret identity';
+  const testFile = path.join(repo, 'token-case.test.mjs');
+  await writeFile(testFile, `import { test } from 'node:test';\ntest(${JSON.stringify(caseName)}, () => {});\n`);
+
+  const result = invokeRecorder({
+    repo,
+    evidence,
+    purpose: 'green',
+    command: node,
+    args: ['--test', '--test-reporter=tap', testFile],
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  const record = JSON.parse(await readFile(evidencePathFrom(result), 'utf8'));
+  const tapOutput = record.execution.output.stdout;
+  const cases = parseTap(tapOutput).map(({ id, root, status, skipReason }) => ({ id, root, status, skipReason }));
+  assert.deepEqual(cases, [{ id: caseName, root: caseName, status: 'passed', skipReason: null }]);
+  assert.match(tapOutput, /^1\.\.1$/m);
+  assert.match(tapOutput, /^# tests 1$/m);
+  assert.match(tapOutput, /^# pass 1$/m);
+  assert.match(tapOutput, /^# fail 0$/m);
+  assert.equal(record.execution.exitCode, 0);
+  assert.equal(record.execution.outcome, 'passed');
+});
+
+test('redacts a secret-bearing TAP token identity without losing its status or plain-log sanitization', async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'record-tap-token-secret-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(temp);
+  const evidence = process.env.CHAIN_RECORDER_TAP_TEST_EVIDENCE_DIR
+    ? path.resolve(process.env.CHAIN_RECORDER_TAP_TEST_EVIDENCE_DIR)
+    : path.join(temp, 'evidence');
+  const secret = 'TAP-NAME-SECRET-8c14a19f';
+  const caseName = `token=${secret}`;
+  const testFile = path.join(repo, 'token-secret-case.test.mjs');
+  const diagnosticLine = `token ${secret}\n`;
+  await writeFile(testFile, `import { test } from 'node:test';\ntest(${JSON.stringify(caseName)}, () => process.stderr.write(${JSON.stringify(diagnosticLine)}));\n`);
+
+  const result = invokeRecorder({
+    repo,
+    evidence,
+    purpose: 'green',
+    command: node,
+    args: ['--test', '--test-reporter=tap', testFile],
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  const recordBytes = await readFile(evidencePathFrom(result), 'utf8');
+  const record = JSON.parse(recordBytes);
+  const tapOutput = record.execution.output.stdout;
+  const cases = parseTap(tapOutput).map(({ id, root, status, skipReason }) => ({ id, root, status, skipReason }));
+  assert.deepEqual(cases, [{ id: 'token=[REDACTED]', root: 'token=[REDACTED]', status: 'passed', skipReason: null }]);
+  assert.match(tapOutput, /^# token \[REDACTED\]$/m, 'bare token/value log syntax stays protected outside TAP identity context');
+  assert.match(tapOutput, /^# tests 1$/m);
+  assert.match(tapOutput, /^# pass 1$/m);
+  assert.match(tapOutput, /^# fail 0$/m);
+  assert.equal(recordBytes.includes(secret), false, 'the persisted metadata must not contain the synthetic secret');
+  assert.equal(record.execution.exitCode, 0);
 });
 
 test('opaque identity never exposes deleted binary or renamed sensitive diff payloads', async (t) => {

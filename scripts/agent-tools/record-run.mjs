@@ -52,9 +52,11 @@ function sanitizeText(input, redaction, location = 'metadata') {
   let value = String(input);
   const replace = (pattern, replacement) => {
     value = value.replace(pattern, (...args) => {
+      const sanitized = typeof replacement === 'function' ? replacement(...args) : replacement;
+      if (sanitized === undefined) return args[0];
       redaction.count += 1;
       redaction.locations[location] = (redaction.locations[location] ?? 0) + 1;
-      return typeof replacement === 'function' ? replacement(...args) : replacement;
+      return sanitized;
     });
   };
   // Match JSON keys before the ordinary key/value forms, including JSON nested in code strings.
@@ -88,7 +90,19 @@ function sanitizeText(input, redaction, location = 'metadata') {
   if (cursor) value = sanitized + original.slice(cursor);
   replace(/\b(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/g, '[REDACTED]');
   replace(/\bBearer\s+[A-Za-z0-9._~+/-]{8,}=*/gi, 'Bearer [REDACTED]');
-  replace(/(^|[^A-Za-z0-9])((?:github[_-]?token|aws[_-]?secret[_-]?access[_-]?key|password|passwd|secret|token|api[_-]?(?:key|token)|authorization|cookie|access[_-]?(?:token|key)|client[_-]?secret|private[_-]?key))(\s*(?:[:=]\s*|\s+))(?:\\(["'])(.*?)\\\4|(["'])(.*?)\6|[^\s,;]+)/gi, (_match, beforeKey, key, separator) => `${beforeKey}${key}${separator}[REDACTED]`);
+  const isTapIdentityLine = (source, offset) => {
+    const lineStart = source.lastIndexOf('\n', offset - 1) + 1;
+    const lineEnd = source.indexOf('\n', offset);
+    const line = source.slice(lineStart, lineEnd < 0 ? source.length : lineEnd);
+    return /^[ \t]*(?:# Subtest: |(?:not )?ok \d+ - )/.test(line);
+  };
+  replace(/(^|[^A-Za-z0-9])((?:github[_-]?token|aws[_-]?secret[_-]?access[_-]?key|password|passwd|secret|token|api[_-]?(?:key|token)|authorization|cookie|access[_-]?(?:token|key)|client[_-]?secret|private[_-]?key))(\s*(?:[:=]\s*|\s+))(?:\\(["'])(.*?)\\\4|(["'])(.*?)\6|[^\s,;]+)/gi, (_match, beforeKey, key, separator, _escapedQuote, _escapedValue, _quote, _value, offset, source) => {
+    // Bare `token <word>` text is also ordinary prose in TAP case names. Keep
+    // that identity intact, while still redacting explicit key/value forms,
+    // recognizable token credentials, custom patterns, and all non-TAP logs.
+    if (key.toLowerCase() === 'token' && !/[:=]/.test(separator) && isTapIdentityLine(source, offset)) return undefined;
+    return `${beforeKey}${key}${separator}[REDACTED]`;
+  });
   for (const source of redaction.patterns) {
     const pattern = new RegExp(source, 'g');
     value = value.replace(pattern, () => {
