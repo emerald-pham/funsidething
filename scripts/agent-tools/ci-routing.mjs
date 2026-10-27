@@ -4,7 +4,9 @@ import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { derivePolicyProseImpact, validatePolicyProseStatuses } from '../release-evidence.mjs';
+import { derivePolicyProseImpact, validatePolicyProseStatuses, verifyDeploymentEvidence } from '../release-evidence.mjs';
+import { CI_GATES, ciInputContext, ciInputKey, findInputPasses } from './ci-pass-reuse.mjs';
+import { originalArtifactVerifier, originalEarlyVerifier, verifyOriginalAggregate } from './ci-pass-artifacts.mjs';
 
 const sha = value => typeof value === 'string' && /^[a-f0-9]{40}$/.test(value);
 const decimal = value => /^[1-9][0-9]*$/.test(String(value));
@@ -15,7 +17,7 @@ function options(args) {
   const result = {};
   for (let i = 0; i < args.length; i += 2) {
     const key = args[i]?.slice(2), value = args[i + 1];
-    if (!['comparison-base', 'evidence-dir', 'max-wait-ms', 'poll-interval-ms', 'descriptor', 'plan-only', 'resume'].includes(key) || !value || result[key]) throw new Error('Pass --comparison-base SHA --evidence-dir NEW_DIRECTORY.');
+    if (!['comparison-base', 'evidence-dir', 'max-wait-ms', 'poll-interval-ms', 'descriptor', 'plan-only', 'require-input-passes', 'input-proof', 'resume'].includes(key) || !value || result[key]) throw new Error('Pass --comparison-base SHA --evidence-dir NEW_DIRECTORY.');
     result[key] = value;
   }
   if (result.resume && !result['comparison-base']) result['comparison-base'] = JSON.parse(readFileSync(result.resume, 'utf8')).validationContext?.comparisonBase;
@@ -79,7 +81,7 @@ async function main() {
     eventName === 'pull_request' ? 'canonical-pr-merge-v1' : isMain ? 'exact-main-push-v1' : 'outgoing-branch-push-v1');
   const record = { schemaVersion: 1, eventName, runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT,
     validationContext, cohortContext: validationContext, contextSha256: hash(validationContext), decision: 'full',
-    reason: isMain ? 'Exact main always executes its own complete cohort.' : 'No verified equivalent producer.', coveredBy: null, observations: [] };
+    reason: isMain ? 'Exact main requires execution or verified original passes for complete inputs.' : 'No verified equivalent producer.', coveredBy: null, observations: [] };
   // Persist only routing inputs, never PR prose or token-bearing environment.
   // Together with the descriptor these restore a fresh observer process after
   // interruption; all claimed context and producer evidence is verified again.
@@ -98,19 +100,34 @@ async function main() {
       || !['pending','unresolved','fail','cancelled','reuse'].includes(previous.decision)) throw new Error('Saved observation does not bind this complete metadata context.');
     boundProducer = {runId: previous.coveredBy.runId, runAttempt: previous.coveredBy.runAttempt};
     record.coveredBy = previous.coveredBy; record.producerOutcome = previous.producerOutcome;
+    if(previous.producerKind)record.producerKind=previous.producerKind;
     record.resumedFrom = {path: path.resolve(args.resume), sha256: createHash('sha256').update(previousBytes).digest('hex')};
   }
+  record.inputContext = ciInputContext(validationContext);
+  record.inputKeys = Object.fromEntries(CI_GATES.map(gate => [gate, ciInputKey(record.inputContext, gate)]));
+  record.inputPasses = {};
+  if(args['input-proof']){
+    const original=JSON.parse(readFileSync(args['input-proof'],'utf8'));
+    if(String(original.runId)!==record.runId||String(original.runAttempt)!==record.runAttempt)throw new Error('Original routing run/attempt changed.');
+    for(const key of ['repository','sourceSha','sourceTree','checkoutSha','checkoutTree','comparisonBase'])if(original.validationContext?.[key]!==validationContext[key])throw new Error('Original routing context changed: '+key);
+    const inputs={...ciInputContext(validationContext),runtime:original.inputContext?.runtime};
+    if(JSON.stringify(inputs)!==JSON.stringify(original.inputContext)||!inputs.runtime)throw new Error('Original routing input identity is incomplete.');
+    record.inputContext=inputs;record.inputKeys=Object.fromEntries(CI_GATES.map(gate=>[gate,ciInputKey(inputs,gate)]));
+  }
   let apiReads = 0;
-  function readApi(suffix) {
-    if (++apiReads > 40) throw new Error('Public observation request budget exhausted.');
+  function readApi(suffix, archive=false) {
+    if (++apiReads > 96) throw new Error('Public observation request budget exhausted.');
     const url = `https://api.github.com/repos/${repository}/${suffix}`;
-    const response = spawnSync('curl', ['--disable', '--fail', '--silent', '--show-error', '--max-time', '10', '--connect-timeout', '5',
+    const response = spawnSync('curl', ['--disable', '--fail', '--silent', '--show-error', '--max-time', archive?'45':'10', '--connect-timeout', '5',
+      ...(archive?['--location','--proto','=https','--proto-redir','=https','--max-filesize','134217728']:[]),
+      ...(process.env.GITHUB_TOKEN?['--header','Authorization: Bearer '+process.env.GITHUB_TOKEN]:[]),
       '--header', 'Accept: application/vnd.github+json', '--header', 'User-Agent: chain-scanner-ci-routing', url],
-    { encoding: 'utf8', timeout: 11000, maxBuffer: 8 * 1024 * 1024 });
-    const evidence = `observation-${apiReads}.json`;
+    { encoding: archive?undefined:'utf8', timeout: archive?46000:11000, maxBuffer: (archive?128:8) * 1024 * 1024 });
+    const evidence = `observation-${apiReads}.${archive?'zip':'json'}`;
     writeFileSync(path.join(directory, evidence), response.stdout || response.stderr || response.error?.message || '', { mode: 0o600 });
     record.observations.push({ url, evidence, exitCode: response.status, observedAt: new Date().toISOString() });
     if (response.status !== 0 || response.error) throw new Error('Public GitHub observation unavailable.');
+    if(archive)return {path:path.join(directory,evidence),sha256:createHash('sha256').update(response.stdout).digest('hex')};
     return JSON.parse(response.stdout);
   }
   function canonicalPull() {
@@ -141,9 +158,47 @@ async function main() {
     }
     return { pull, cohort: boundContext(repository, sourceSha, sourceTree, merge.sha, merge.tree.sha, pull.base.sha, 'canonical-pr-merge-v1') };
   }
+  async function reviewedProductOrigin(base,baseTree){
+    const observed=new Map(),prefix=`https://api.github.com/repos/${repository}/`;
+    const binding=await verifyDeploymentEvidence({repository,deployedSha:base,beforeSha:git('rev-parse',`${base}^`),token:process.env.GITHUB_TOKEN||'public-read-only-observer',repoRoot:process.cwd(),fetchImpl:async url=>{
+      if(!url.startsWith(prefix))throw new Error('Unexpected original-review observation URL.');const suffix=url.slice(prefix.length),value=readApi(suffix);observed.set(suffix,value);return{ok:true,status:200,json:async()=>value};
+    }});
+    if(!binding.ok)throw new Error('Reviewed full-product origin unavailable: '+binding.errors.join(' '));
+    const head=binding.reviewedSha,originalBase=binding.baseSha,statuses=observed.get(`commits/${head}/statuses?per_page=100`),associated=observed.get(`commits/${base}/pulls?per_page=100`);
+    const merged=associated.filter(pull=>pull.merge_commit_sha===base&&pull.head?.sha===head&&pull.base?.sha===originalBase&&pull.base?.ref==='main'&&pull.head?.repo?.full_name===repository&&pull.base?.repo?.full_name===repository&&pull.merged_at);
+    if(merged.length!==1||git('rev-parse',`${head}^{tree}`)!==baseTree||!Array.isArray(statuses)||['funsidething/memory-audit','funsidething/independent-review','funsidething/specialist-review'].some(context=>!/^r=[a-f0-9]{64};b=[a-f0-9]{40};p=[a-f0-9]{12};c=[01];s=[01];v=3$/.test(statuses.find(status=>status.context===context)?.description||'')))throw new Error('Policy origin needs an exact merged full FAQ-reviewed product receipt.');
+    const inventory=readApi(`actions/workflows/data-safety.yml/runs?head_sha=${head}&per_page=20`);
+    if(!Array.isArray(inventory.workflow_runs)||inventory.total_count!==inventory.workflow_runs.length)throw new Error('Original reviewed full-run inventory is incomplete.');
+    for(const run of inventory.workflow_runs.slice(0,16)){
+      if(run.head_sha!==head||!['push','pull_request'].includes(run.event)||run.status!=='completed'||run.conclusion!=='success'||run.name!=='Data safety'||run.path!==workflowPath||run.repository?.full_name!==repository||run.head_repository?.full_name!==repository||!decimal(run.id)||!decimal(run.run_attempt))continue;
+      const result=readApi(`actions/runs/${run.id}/attempts/${run.run_attempt}/jobs?per_page=100`);
+      if(!Array.isArray(result.jobs)||result.total_count!==result.jobs.length)continue;
+      const completed=name=>result.jobs.filter(job=>job.name===name&&job.status==='completed'&&job.conclusion==='success'&&String(job.run_id)===String(run.id)&&String(job.run_attempt)===String(run.run_attempt)&&job.head_sha===head);
+      const required=['validation-context','event-gates','cohort-routing',...(earlyRequired?['early-startup','mobile-stress']:[]),...cohort.expectedGroups.map(group=>'regression-'+group),'scanner-tests'];
+      if(required.some(name=>completed(name).length!==1)||result.jobs.some(job=>!required.includes(job.name)&&!['release-evidence','deploy-pages'].includes(job.name)))continue;
+      const steps=name=>(completed(name)[0].steps||[]).filter(step=>step.status==='completed'&&step.conclusion==='success');
+      const checkouts=steps('validation-context').map(step=>step.name.match(/^Actual checkout ([a-f0-9]{40}) tree ([a-f0-9]{40})$/)).filter(Boolean);
+      if(checkouts.length!==1||checkouts[0][2]!==baseTree)continue;
+      // The retained original receipt supplies its own runtime. A later policy
+      // observation may run on another image without pretending to execute it.
+      if(steps('scanner-tests').filter(step=>/^Complete regression context [a-f0-9]{64} report [a-f0-9]{64}$/.test(step.name)).length!==1)continue;
+      const context=boundContext(repository,head,baseTree,checkouts[0][1],baseTree,originalBase,run.event==='pull_request'?'canonical-pr-merge-v1':'outgoing-branch-push-v1');
+      const early=earlyRequired?originalEarlyVerifier(readApi)(context,run,result.jobs,null):null;
+      if(early)context.runtime=Object.fromEntries(['node','platform','arch'].map(key=>[key,early.inputs.runtime[key]]));
+      const contextSha256=hash(context);
+      if([`Announce regression context ${contextSha256}`,`Validation source ${head} base ${originalBase}`,`Workflow blob ${cohort.workflowBlob} policy four-groups-v1`].some(name=>steps('validation-context').filter(step=>step.name===name).length!==1)||steps('cohort-routing').filter(step=>step.name===`Admit original full producer context ${contextSha256}`).length!==1)continue;
+      const markers=steps('scanner-tests').filter(step=>new RegExp(`^Complete regression context ${contextSha256} report [a-f0-9]{64}$`).test(step.name));if(markers.length!==1)continue;
+      const inputs=early?.inputs||ciInputContext(context),inputKeys=Object.fromEntries(CI_GATES.map(gate=>[gate,ciInputKey(inputs,gate)])),retained=findInputPasses({...record,validationContext:context,inputContext:inputs,inputKeys},readApi,originalArtifactVerifier(readApi));
+      if(CI_GATES.some(gate=>retained[gate]?.coveredBy.runId!==String(run.id)||retained[gate]?.coveredBy.runAttempt!==String(run.run_attempt)))continue;
+      const aggregate=verifyOriginalAggregate(readApi,{context,run,job:completed('scanner-tests')[0],reportSha256:markers[0].name.split(' report ')[1],retained,early});
+      return{context,contextSha256,retained,originReview:{...binding,mergedPullRequest:merged[0].number},originStatuses:statuses,coveredBy:{runId:String(run.id),runAttempt:String(run.run_attempt),checkoutSha:context.checkoutSha,checkoutTree:baseTree,comparisonBase:originalBase,reportSha256:markers[0].name.split(' report ')[1],aggregateArtifact:aggregate,...(early?{earlyReportSha256:early.coveredBy.earlyReportSha256,earlyOrigin:early}: {})}};
+    }
+    throw new Error('No retained original full execution for the exact reviewed product source.');
+  }
   // Prove the complete unchanged inventory before looking for inherited
   // execution. Current policy reviews are never inherited from the producer.
   if (!args['plan-only'] && !args.resume && cohort) {
+    let policyCandidate=null;
     try {
       const impact = derivePolicyProseImpact(process.cwd(), sourceSha, args['comparison-base']);
       if (impact) {
@@ -157,6 +212,7 @@ async function main() {
         }
         const policyStatuses = readApi(`commits/${reviewedSha}/statuses?per_page=100`);
         const review = validatePolicyProseStatuses(process.cwd(), reviewedSha, args['comparison-base'], policyStatuses);
+        policyCandidate={impact,review,policyStatuses,reviewedSha};
         const base = args['comparison-base'], baseTree = git('rev-parse', `${base}^{tree}`), parent = git('rev-parse', `${base}^`);
         const producerContext = boundContext(repository, base, baseTree, base, baseTree, parent, 'exact-main-push-v1');
         const expected = hash(producerContext);
@@ -170,23 +226,45 @@ async function main() {
         if (!Array.isArray(result.jobs) || result.total_count !== result.jobs.length || required.some(name => result.jobs.filter(job=>job.name===name && job.status==='completed' && job.conclusion==='success' && String(job.run_id)===String(run.id) && String(job.run_attempt)===String(run.run_attempt) && job.head_sha===base).length!==1) || result.jobs.some(job=>!required.includes(job.name) && !['release-evidence','deploy-pages'].includes(job.name))) throw new Error('Policy base full topology is incomplete.');
         const completed = name => result.jobs.find(job=>job.name===name)?.steps?.filter(step=>step.status==='completed' && step.conclusion==='success') || [];
         for (const name of [`Announce regression context ${expected}`,`Actual checkout ${base} tree ${baseTree}`,`Validation source ${base} base ${parent}`,`Workflow blob ${cohort.workflowBlob} policy four-groups-v1`]) if (completed('validation-context').filter(step=>step.name===name).length!==1) throw new Error('Policy base context does not match the frozen complete cohort.');
-        for (const gate of ['Run npm run test:rules','Backward compatibility']) if (completed('event-gates').filter(step=>step.name===gate).length!==1) throw new Error('Policy base rules or compatibility execution is absent.');
+        const producerInputs=ciInputContext(producerContext),producerKeys=Object.fromEntries(CI_GATES.map(gate=>[gate,ciInputKey(producerInputs,gate)]));
+        for (const [gate,legacy] of [['rules','Run npm run test:rules'],['compatibility','Backward compatibility']]) {
+          const steps=completed('event-gates');
+          const keyed=steps.filter(step=>step.name===`Execute CI gate ${gate} input ${producerKeys[gate]}`).length===1&&steps.filter(step=>new RegExp(`^Completed CI gate ${gate} input ${producerKeys[gate]} result [a-f0-9]{64}$`).test(step.name)).length===1;
+          if(!keyed&&(args['require-input-passes']==='1'||steps.filter(step=>step.name===legacy).length!==1))throw new Error('Policy base rules or compatibility execution is absent.');
+        }
         for (const group of cohort.expectedGroups) if (completed('regression-'+group).filter(step=>step.name==='Execute complete assigned group').length!==1) throw new Error('Policy base producer did not execute every group.');
         const earlyMarkers=earlyRequired?completed('early-startup').filter(step=>/^Complete early startup report [a-f0-9]{64}$/.test(step.name)):[];
         if(earlyRequired&&earlyMarkers.length!==1)throw new Error('Original complete early execution receipt is absent.');
         const markers = completed('scanner-tests').filter(step=>new RegExp(`^Complete regression context ${expected} report [a-f0-9]{64}$`).test(step.name));
         if (markers.length !== 1) throw new Error('Policy base full reconciliation attestation is absent.');
+        if(args['require-input-passes']==='1'){
+          const retained=findInputPasses({...record,validationContext:producerContext,inputContext:producerInputs,inputKeys:producerKeys},readApi,originalArtifactVerifier(readApi));
+          if(CI_GATES.some(gate=>retained[gate]?.coveredBy.runId!==String(run.id)||retained[gate]?.coveredBy.runAttempt!==String(run.run_attempt)))throw new Error('Policy inheritance requires six retained original passes from the exact full-product producer.');
+          record.policyInputPasses=retained;
+          const early=earlyRequired?originalEarlyVerifier(readApi)(producerContext,run,result.jobs,producerInputs):null;
+          record.policyAggregateArtifact=verifyOriginalAggregate(readApi,{context:producerContext,run,job:result.jobs.find(job=>job.name==='scanner-tests'),reportSha256:markers[0].name.split(' report ')[1],retained,early});
+          if(early)record.policyEarlyOrigin=early;
+        }
         // Re-read current statuses: changed or revoked evidence cannot be hidden
         // behind an earlier successful base execution observation.
         const currentReview = validatePolicyProseStatuses(process.cwd(), reviewedSha, base, readApi(`commits/${reviewedSha}/statuses?per_page=100`));
         if (JSON.stringify(review) !== JSON.stringify(currentReview)) throw new Error('Policy review changed during inheritance validation.');
         record.decision='policy-reuse'; record.reason='Instruction-preserving policy prose; unchanged product/FAQ/rendered evidence and full base execution verified.';
         record.policyImpact=impact; record.policyReview=review; record.policyStatuses=policyStatuses; record.cohortContext=producerContext; record.contextSha256=expected;
-        record.coveredBy={runId:String(run.id),runAttempt:String(run.run_attempt),checkoutSha:base,checkoutTree:baseTree,comparisonBase:parent,reportSha256:markers[0].name.split(' report ')[1],...(earlyRequired?{earlyReportSha256:earlyMarkers[0].name.split(' report ')[1]}:{})};
+        record.coveredBy={runId:String(run.id),runAttempt:String(run.run_attempt),checkoutSha:base,checkoutTree:baseTree,comparisonBase:parent,reportSha256:markers[0].name.split(' report ')[1],...(record.policyAggregateArtifact?{aggregateArtifact:record.policyAggregateArtifact}:{}),...(record.policyEarlyOrigin?{earlyOrigin:record.policyEarlyOrigin}:{}),...(earlyRequired?{earlyReportSha256:earlyMarkers[0].name.split(' report ')[1]}:{})};
       }
-    } catch (error) { record.reason=`${error.message} Executing the actual checkout's complete cohort.`; }
+    } catch (error) {
+      if(policyCandidate&&args['require-input-passes']==='1'){
+        try{
+          const origin=await reviewedProductOrigin(args['comparison-base'],git('rev-parse',`${args['comparison-base']}^{tree}`));
+          const current=validatePolicyProseStatuses(process.cwd(),policyCandidate.reviewedSha,args['comparison-base'],readApi(`commits/${policyCandidate.reviewedSha}/statuses?per_page=100`));if(JSON.stringify(current)!==JSON.stringify(policyCandidate.review))throw new Error('Current policy review changed during original-product validation.');
+          Object.assign(record,{decision:'policy-reuse',reason:'Current policy review and the directly reviewed original full-product execution verified.',policyImpact:policyCandidate.impact,policyReview:policyCandidate.review,policyStatuses:policyCandidate.policyStatuses,policyOriginReview:origin.originReview,policyOriginStatuses:origin.originStatuses,policyInputPasses:origin.retained,cohortContext:origin.context,contextSha256:origin.contextSha256,coveredBy:origin.coveredBy});
+        }catch(originError){record.reason=`${originError.message} Executing the actual checkout's required gates.`;}
+      }else record.reason=`${error.message} Executing the actual checkout's complete cohort.`;
+    }
   }
   const metadataEdit = eventName === 'pull_request' && event.action === 'edited' && !event.changes?.base;
+  let observedEarlyOrigin=null;
   if (record.decision === 'full' && !args['plan-only'] && ((eventName === 'push' && !isMain) || metadataEdit)) {
     try {
       const canonical = canonicalPull();
@@ -200,7 +278,7 @@ async function main() {
         && run.path === workflowPath && run.name === 'Data safety' && run.repository?.full_name === repository
         && run.head_repository?.full_name === repository && decimal(run.id) && decimal(run.run_attempt))
         .sort((a, b) => Number(b.id) - Number(a.id));
-      let pending = false;
+      let pending = false, mixedEarlyProducer = null;
       const candidates = boundProducer ? runs.filter(run => String(run.id) === String(boundProducer.runId) && String(run.run_attempt) === String(boundProducer.runAttempt)) : runs;
       if (boundProducer && candidates.length !== 1) throw new Error('Bound producer attempt is no longer verifiable in current observations.');
       for (const run of candidates) {
@@ -225,7 +303,8 @@ async function main() {
         }
         const coveredAnnouncement = cohort && steps.some(step => new RegExp(`^Verified complete cohort ${expected} report [a-f0-9]{64} mode (reuse|policy-reuse)$`).test(step.name) && step.conclusion === 'success');
         if (coveredAnnouncement && !steps.some(step => step.name.startsWith('Complete regression context '))) {
-          if (boundProducer) throw new Error('Bound producer is a coverage reference rather than original execution.');
+          if(metadataEdit&&earlyRequired){mixedEarlyProducer={runId:String(run.id),runAttempt:String(run.run_attempt),checkoutSha:canonical.cohort.checkoutSha,checkoutTree:canonical.cohort.checkoutTree,comparisonBase:canonical.cohort.comparisonBase};observedEarlyOrigin={context:canonical.cohort,run,jobs:result.jobs};}
+          else if (boundProducer) throw new Error('Bound producer is a coverage reference rather than original execution.');
           continue;
         }
         if (boundProducer && hash(canonical.cohort) !== record.contextSha256) throw new Error('Saved producer context changed.');
@@ -272,7 +351,12 @@ async function main() {
           checkoutTree: canonical.cohort.checkoutTree, comparisonBase: canonical.cohort.comparisonBase };
         if(cohort)record.coveredBy.reportSha256=completed[0].name.split(' report ')[1];
         if(earlyRequired){const early=result.jobs.find(job=>job.name==='early-startup'),markers=(early.steps||[]).filter(step=>step.conclusion==='success'&&/^Complete early startup report [a-f0-9]{64}$/.test(step.name));if(markers.length!==1)throw new Error('Original complete early execution receipt is absent.');record.coveredBy.earlyReportSha256=markers[0].name.split(' report ')[1];}
+        if(metadataEdit&&earlyRequired)observedEarlyOrigin={context:canonical.cohort,run,jobs:result.jobs};
         break;
+      }
+      if(record.decision==='full'&&mixedEarlyProducer){
+        record.decision='unresolved';record.producerKind='mixed-consumer';record.coveredBy=mixedEarlyProducer;
+        record.reason='Equivalent mixed consumer retained; verify its original early execution before admitting another mobile story.';
       }
       if (!['full','pending'].includes(record.decision) || !pending || Date.now() >= deadline) break;
       await new Promise(resolve => setTimeout(resolve, Math.min(args.pollIntervalMs, Math.max(0, deadline - Date.now()))));
@@ -283,10 +367,34 @@ async function main() {
       record.reason = record.decision === 'unresolved' ? `${error.message} Resume the bound producer observation.` : `${error.message} Executing the actual checkout's complete cohort.`;
     }
   }
-  record.nextGate = ['pending','unresolved'].includes(record.decision) ? 'resume-bound-producer-observation' : ['fail','cancelled'].includes(record.decision) ? 'repair-bound-producer' : record.decision === 'full' ? 'execute-complete-cohort' : 'verify-required-aggregate';
-  writeFileSync(path.join(directory, 'routing.json'), JSON.stringify(record, null, 2) + '\n', {mode: 0o600});
-  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `decision=${record.decision}\ncontext=${record.contextSha256}\nevent-policy=${validationContext.eventPolicy}\npolicy=${validationContext.eventPolicy}\ntree=${checkoutTree}\nworkflow-blob=${cohort?.workflowBlob||''}\ncohort=${cohort?.cohortDigestSha256||''}\n`);
-  console.log(`CI routing decision=${record.decision} next=${record.nextGate} evidence=${path.join(directory, 'routing.json')} context=${record.contextSha256} source=${sourceSha} actual-checkout=${checkoutSha} producer=${record.coveredBy ? `${record.coveredBy.runId}/${record.coveredBy.runAttempt}` : 'none'} reason=${record.reason}`);
+  const canonicalCoverage=record.decision==='reuse'?{cohortContext:record.cohortContext,contextSha256:record.contextSha256,coveredBy:record.coveredBy}:null;
+  if(!args['plan-only']&&args['require-input-passes']==='1'&&['full','reuse'].includes(record.decision)){
+    record.reason='Required gates use verified retained original input passes; uncovered gates execute.';
+    record.decision='full';record.coveredBy=null;record.cohortContext=validationContext;record.contextSha256=hash(validationContext);
+  }
+  if (!args['plan-only'] && record.decision !== 'policy-reuse') {
+    try { record.inputPasses = findInputPasses(record, readApi,originalArtifactVerifier(readApi)); }
+    catch (error) { record.inputReuseReason = `${error.message} Unverified gates require execution.`; }
+  }
+  // Complete canonical coverage can suppress a second early producer only
+  // after every shipped gate has retained original-execution proof as well.
+  if(canonicalCoverage&&args['require-input-passes']==='1'&&CI_GATES.every(gate=>record.inputPasses[gate])){
+    Object.assign(record,canonicalCoverage,{decision:'reuse'});
+  }
+  if(observedEarlyOrigin&&args['require-input-passes']==='1'&&['full','reuse','unresolved'].includes(record.decision)){
+    try{
+      const original=originalEarlyVerifier(readApi)(observedEarlyOrigin.context,observedEarlyOrigin.run,observedEarlyOrigin.jobs,record.inputContext);
+      original.inputKey=ciInputKey(record.inputContext,'early-startup');record.earlyCoverage=original;
+      if(!canonicalCoverage){record.decision='full';record.coveredBy=null;delete record.producerKind;}
+    }catch(error){record.decision='unresolved';record.producerKind='early-evidence-unavailable';record.reason=error.message;}
+  }
+  record.gateDecisions=Object.fromEntries(CI_GATES.map(gate=>[gate,{inputKey:record.inputKeys[gate],mode:record.inputPasses[gate]?'covered':record.decision==='policy-reuse'?'policy-covered':['pending','unresolved','fail','cancelled'].includes(record.decision)?record.decision:'execute',original:(record.inputPasses[gate]||(record.decision==='policy-reuse'?record.policyInputPasses?.[gate]:null))?.coveredBy||null}]));
+  record.nextGate = ['pending','unresolved'].includes(record.decision) ? 'resume-bound-producer-observation' : ['fail','cancelled'].includes(record.decision) ? 'repair-bound-producer' : record.decision === 'full' ? 'execute-uncovered-gates' : 'verify-required-aggregate';
+  if(record.decision==='unresolved'&&record.producerKind==='mixed-consumer')record.nextGate='verify-original-early-producer';
+  if(record.decision==='unresolved'&&record.producerKind==='early-evidence-unavailable')record.nextGate='verify-original-early-producer';
+  writeFileSync(path.join(directory, 'routing.json'), JSON.stringify(record, null, 2) + '\n', { mode: 0o600 });
+  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `decision=${record.decision}\nearly-decision=${record.earlyCoverage?'reuse':record.decision}\ncontext=${record.contextSha256}\nevent-policy=${validationContext.eventPolicy}\npolicy=${validationContext.eventPolicy}\ntree=${checkoutTree}\nworkflow-blob=${cohort?.workflowBlob||''}\ncohort=${cohort?.cohortDigestSha256||''}\ninput-keys=${JSON.stringify(record.inputKeys)}\nreused=${JSON.stringify(Object.keys(record.inputPasses))}\n`);
+  console.log(`CI routing decision=${record.decision} reused-gates=${Object.keys(record.inputPasses).join(',')||'none'} context=${record.contextSha256} source=${sourceSha} actual-checkout=${checkoutSha} producer=${record.coveredBy ? `${record.coveredBy.runId}/${record.coveredBy.runAttempt}` : 'none'} reason=${record.reason}`);
   if (record.decision === 'fail' || record.decision === 'cancelled') process.exitCode = 1;
   if (record.decision === 'pending' || record.decision === 'unresolved') process.exitCode = 2;
 }

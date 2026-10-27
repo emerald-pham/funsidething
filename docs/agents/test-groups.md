@@ -122,11 +122,10 @@ merge checkout/tree, base and aggregate report digest. The aggregate re-observes
 that producer immediately before accepting all four references; a changed or
 missing proof fails. A covered run cannot become a new full producer.
 
-Ordinary full and same-source covered runs retain actual event-checkout
-test-first, Firestore rules and compatibility execution. Main executes its own
-full cohort unless the narrow policy-prose inheritance path below is proven.
-Pages still requires both `scanner-tests` and `release-evidence`; same-run
-artifact reads add no token permissions.
+The current event-checkout test-first and registration checks always run.
+Rules, compatibility and each group use the per-gate original-pass consumer
+described below, including on main. Pages still requires both `scanner-tests`
+and `release-evidence`; proof reads add no write permissions.
 
 For instruction-preserving policy prose, `policy-reuse` keeps the current
 source/base/tree and review evidence separate from the exact base's original
@@ -134,7 +133,7 @@ full execution. All four `--covered` records have zero current cases,
 artifacts or child execution. The aggregate rederives the frozen inventory,
 validates current policy statuses, re-observes the full producer, and reports
 `policy-covered` with zero current case count. Rules and compatibility are
-inherited only after their original successful execution steps are verified;
+inherited only after all six retained original passes and original execution steps are verified;
 the current test-first diff gate still runs. A policy-covered run cannot become
 a full producer. Uncertain classification or evidence retains the full current
 cohort. The [release procedure](../../RELEASE_GATES.md#policy-prose-inheritance)
@@ -142,8 +141,8 @@ owns product/FAQ/rendered receipt inheritance and its limits.
 
 Literal roots that newly require a browser may declare
 `browserRuntime: "ci-chromium"` on their existing root-assignment row. Before
-the full `persistence-recovery` group, the regression job runs
-`--browser-runtime-preflight` against only those marked titles whose literal
+the full `persistence-recovery` group, the enforcing `ci-pass-reuse.mjs run-group` consumer runs
+`--browser-runtime-preflight` only on its fresh path against only those marked titles whose literal
 registrations were added since the same comparison base. An empty intersection
 produces a durable `no_change` receipt. Otherwise the command requires the
 locked Playwright package, launches Chromium from the explicit isolated browser
@@ -156,7 +155,9 @@ The ordinary group requires that successful receipt whenever the selected set
 is nonempty, copies its result, TAP, stderr and emitted artifacts into the group
 evidence, and binds it to the same source/tree/base, assignment and inventory
 hashes. The aggregate repeats that receipt and child-outcome verification. A
-new marked browser root cannot be covered by old cohort execution. The matching
+covered group verifies matching retained original evidence and launches no
+current browser preflight or test child. Changed complete inputs require fresh
+execution. The matching
 regression workflow installs Chromium alone under
 `$RUNNER_TEMP/playwright-browsers`; the earlier WebKit/mobile job remains a
 separate stage.
@@ -193,14 +194,18 @@ bundle. Measured application stress failure remains nonblocking; missing,
 corrupt, cancelled, skipped, unbound or incomplete execution fails closed. Blocked
 groups contribute no executed outcomes. Same-source and policy-prose coverage
 require the original full producer's successful early/stress jobs and exact early
-receipt attestation; current covered records launch no native children.
+receipt attestation, together with six retained original input passes on the
+hosted path; current covered records launch no native children. Ordinary
+per-gate coverage alone cannot supply the new required mobile story. The early
+consumer selects its actual runner inputs before conditional setup; a runtime
+miss executes the story and its separate stress accounting.
 
 Local process fixtures prove ordering and accounting only. A source mismatch or
 failed startup story remains a failed release gate. See the bounded
 [issue 290 handoff](../releases/issue-290-early-ci.md) for hosted demonstration and
 source limits; previous local harness evidence supplies no hosted qualification.
 
-The five confirmed roots retain their existing `native-process` assignments with
+The five confirmed roots retain their existing `core`/`native-process` assignments with
 `executionStage: early-startup`. Early TAP plus the original saved no-port child
 stream establish their actual cases. Each real group command verifies that durable
 receipt before launching a child; its ordinary TAP excludes only those cataloged
@@ -215,3 +220,91 @@ finished; local execution still requires the repository's actual runtime/resourc
 allocation, and process fixtures supply no native proof.
 
 The browser runtime child owns a separate POSIX process group. On SIGINT or SIGTERM, the preflight forwards the signal, waits a bounded 500 ms, escalates against only that owned group, finalizes failed evidence with the interruption and cleanup result, and removes its temporary runtime/profile directories. Its exit is 130 or 143 respectively. The shorter grace period lets the existing recorder finish this nested cleanup before its own 750 ms escalation. Uncatchable termination still cannot guarantee final evidence.
+
+The test-first diff gate always runs for the actual event checkout and comparison
+base. Pages still requires both `scanner-tests` and `release-evidence`.
+
+## Reusing successful CI inputs
+
+Each regression group, Firestore rules and compatibility uses the enforcing
+`scripts/agent-tools/ci-pass-reuse.mjs` consumer. A verified original pass for
+identical inputs must be reused, including on main and workflow retries. CI
+admission runs the actual workflow consumer regressions before expensive jobs;
+direct suite/group execution bypassing this consumer fails that contract.
+
+Keys bind the repository, complete committed checkout tree, exact comparison
+base, gate, Node version, platform, architecture and hosted runner image. The
+tree includes application code, tests, dependencies, workflow and cohort
+definitions. Commit metadata and event names do not invalidate identical tested
+inputs. Each consuming job selects its actual runner inputs before dependency
+installation. A different or unknown image executes that job's required gates;
+aggregation can accept that fresh execution alongside earlier coverage.
+Changes to any keyed input require execution. This is deliberately
+conservative: unrelated tracked changes also invalidate the key.
+
+The router observes up to 16 recent workflow runs and eight earlier attempts per
+run, within a 96-request API budget. Subset retries retain their earlier immutable
+validation context and contribute later failures even when that dependency is
+not repeated. It accepts repository-local
+push/PR jobs only, independently verifies their Git checkout/tree/base, and pins
+the original run, attempt, job and result digest. A unique successful execution
+admission and completion marker are required. The marker follows result upload;
+covered work cannot publish an original-execution marker. Execution timestamps,
+rather than run creation IDs, establish retry order. A later failed or ambiguously
+overlapping gate invalidates its older pass. A completed successful gate remains usable when a
+different gate failed. Missing, cancelled, skipped, ambiguous, expired or
+unobservable original proof requires execution at routing time. These bounds
+and GitHub evidence retention can cause safe cache misses. The router verifies
+the original attempt's unique unexpired upload, its creation within the original
+job, archive digest, exact result bytes/identity, raw output and referenced native
+artifacts. Unreadable, missing or changed members require execution. Archives are
+inspected without extracting their paths into the checkout.
+
+Reused group records claim zero current cases, artifacts or test-child execution.
+The aggregate accepts a mixture of original coverage and actual current groups,
+reobserves original proof immediately before acceptance, and counts only current
+execution as current cases. Changed or missing final proof fails the aggregate.
+Actual emulator consumer outcomes decide whether retained emulator proof is still
+needed after a runtime fallback. Each covered emulator consumer fingerprints its complete original reference;
+the final recheck must match that exact original, including its run/attempt/job,
+result and retained archive. A different successful producer cannot replace it.
+The observer keeps its existing `full`/`reuse`
+attestation protocol; the report separately retains precise group modes and
+original emulator references. Only an entirely executed cohort can publish the
+original full-producer marker.
+The hosted workflow requires these input passes; legacy completion markers alone
+cannot bypass retained-proof checks. The legacy command API retains its existing
+complete canonical-producer validation for compatibility.
+
+The router and aggregate have read-only Actions access for original-job
+observations. Tokens are not written to evidence. Local `npm test`, exact review
+receipts, the current diff gate, deployment verification and Pages checks retain
+their existing boundaries. Original native reports retain their original commit
+identity; reuse does not claim another native execution for the consumer SHA.
+
+The durable `routing.json` records all six `gateDecisions`, their complete
+input keys, current validation context and each original run/attempt/job/result
+and artifact identity. `checkpoint.mjs record-routing --repo <worktree>
+--task <issue> --input <routing.json>` snapshots this observation in the existing
+immutable checkpoint journal. Resume reobserves the originals; the stored
+observation never replaces an execution pass or renews diagnostic allowance.
+See [checkpoints](checkpoints.md) for the explicit issue-source refresh operation,
+which preserves original snapshots, failures and the finite remaining allowance.
+
+Metadata observations may reuse an independently retained early execution from
+a full or mixed producer. The router verifies that producer's actual early and
+stress jobs, source/base/runtime identity, capped outcomes and complete raw
+uploads. A covered reference cannot become another early origin. Covered early
+work starts no current mobile child; a fresh ordinary group still executes its
+own assigned roots. Any inherited group, emulator or early evidence keeps the
+aggregate mixed/covered and prevents full-product producer authority.
+
+Policy inheritance requires retained original full-product authority. It may
+verify an original full exact-base main execution, or directly verify the full
+execution of the uniquely merged, independently reviewed candidate whose whole
+tree became that main base. The latter binds the merged PR and full review
+receipt, original source/base/runtime, all six keyed original jobs, complete
+early/stress uploads and original full aggregate. Current policy source equality,
+reviews and exact-main checks remain independent. A mixed/covered main is never
+an origin, and the lookup never follows an inheritance chain. Missing, changed
+or unobservable original evidence falls back to required execution.

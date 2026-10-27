@@ -99,6 +99,28 @@ another identical regression. `hold --reason <actual-blocker-or-user-hold>`
 records a real stop; it does not complete the task. Interrupted locks and missing
 terminal results fail closed for owner investigation.
 
+### Routing observations and authorized issue refreshes
+
+`record-routing --input <routing.json>` records all six current gate decisions,
+complete input keys and validation context, plus each retained original
+run/attempt/job/result/artifact identity. It checks the current Git source and
+complete pass identities, then stores the exact routing bytes as a fingerprinted
+immutable journal observation. It neither launches work nor changes the failed
+gate, frozen source, attempts or allowance. Resume still reobserves GitHub proof.
+
+When the owner explicitly authorizes an updated issue specification, use
+`refresh-authority --input <refresh.json>`. The exact input fields are
+`expectedTaskFingerprint`, `expectedSourceFingerprint`, `currentTaskFingerprint`,
+`currentSourceFingerprint`, `reason`, and `authorizationEvidence` with an absolute
+`path` and `sha256` for the saved owner authorization. The command fetches the
+same task and parent with full bodies/comments, verifies both old and current
+fingerprints, and snapshots the previous/current authority and authorization.
+Consume any admitted observation first. Extra fields, unchanged authority or
+mismatched source fail closed. Original snapshots, failures, starting source
+fingerprint, frozen inputs and finite remaining allowance remain intact. This
+operation grants no diagnostic attempt, launch or extension; extensions retain
+the separate owner-comment verification below.
+
 ### Explicit extensions
 
 `extend --approval <approval.json>` requires an exact current journal digest

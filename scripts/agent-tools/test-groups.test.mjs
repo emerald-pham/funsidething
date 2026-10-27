@@ -136,6 +136,7 @@ function createFixture(t, options = {}) {
   fs.copyFileSync(path.join(repository,'scripts/agent-tools/checkpoint-progress.mjs'),path.join(root,'scripts/agent-tools/checkpoint-progress.mjs'));
   if(options.policy)fs.writeFileSync(path.join(root,'AGENTS.md'),'Read [release guide](docs/release.md) before release.\n');
   if(options.early){fs.mkdirSync(path.join(root,'.github/workflows'),{recursive:true});fs.writeFileSync(path.join(root,'.github/workflows/data-safety.yml'),'jobs:\n  early-startup:\n    runs-on: controlled-fixture\n');for(const name of ['early-ci.mjs','scenery-source-fixture.mjs','mobile-source-profile.mjs','button-safety-mobile-contract.mjs','button-safety-inventory.json','button-safety-contract.mjs','button-safety-ci-policy.mjs'])fs.copyFileSync(path.join(repository,'scripts',name),path.join(root,'scripts',name));writeJson(path.join(root,'scripts/early-ci-harness-source.json'),{schemaVersion:1,files:[],testExcerpts:[],limits:['Controlled parser fixture, not imported source or actual hosted evidence.']});}
+  fs.copyFileSync(path.join(repository,'scripts/agent-tools/ci-pass-reuse.mjs'),path.join(root,'scripts/agent-tools/ci-pass-reuse.mjs'));
   const coreTitle = options.coreTitle || fixtureRoots.core;
   writeJson(path.join(root, 'package.json'), {
     type: 'module',
@@ -218,15 +219,16 @@ function isolatedFixtureNativeOutput(fixture, inheritedEnvironment = process.env
   };
 }
 
-function invoke(fixture, { group = 'core', env = {}, repository = 'example/fixture', outputDir: requestedOutputDir, args = [], preserveNodeTestContext = false } = {}) {
+function invoke(fixture, { group = 'core', env = {}, repository = 'example/fixture', outputDir: requestedOutputDir, args = [], consumer = false, preserveNodeTestContext = false } = {}) {
   const outputDir = requestedOutputDir || path.join(os.tmpdir(), `chain-test-group-output-${process.pid}-${++outputSerial}`);
   fixture.outputs.push(outputDir);
   const childEnv = { ...process.env, ...env };
   if (!preserveNodeTestContext) delete childEnv.NODE_TEST_CONTEXT;
-  const result = run('npm', ['run', 'test:group', '--', '--group', group, '--output-dir', outputDir,
+  const selectedArgs = ['--group', group, '--output-dir', outputDir,
     '--repository', repository, '--event-policy', 'local', '--run-id', 'fixture-run-1', '--run-attempt', '1',
-    '--source-sha', fixture.sourceSha, '--comparison-base', fixture.comparisonBase, ...args], fixture.root,
-  childEnv);
+    '--source-sha', fixture.sourceSha, '--comparison-base', fixture.comparisonBase, ...args];
+  const result = consumer ? run(process.execPath,['scripts/agent-tools/ci-pass-reuse.mjs','run-group',...selectedArgs],fixture.root,childEnv)
+    : run('npm',['run','test:group','--',...selectedArgs],fixture.root,childEnv);
   return { ...result, outputDir, evidencePath: path.join(outputDir, 'result.json'), evidence: readEvidence(outputDir) };
 }
 
@@ -790,12 +792,12 @@ function aggregateFixture(t,options={}) {
   for(const group of groups){const result=invoke(fixture,{group});assert.equal(result.status,0,result.stdout+result.stderr);fixture.originals.set(group,result.outputDir);}
   return fixture;
 }
-function aggregateCopy(t,fixture,mutate=()=>{},args=[]) {
+function aggregateCopy(t,fixture,mutate=()=>{},args=[],env={}) {
   const collected=fs.mkdtempSync(path.join(os.tmpdir(),'chain-group-aggregate-'));t.after(()=>fs.rmSync(collected,{recursive:true,force:true}));
   for(const [id,output]of fixture.originals)fs.cpSync(output,path.join(collected,id),{recursive:true});
   const needs=path.join(collected,'needs.json');writeJson(needs,Object.fromEntries(['validation-context','event-gates','cohort-routing','regression'].map(id=>[id,{result:'success'}])));
   mutate(collected,needs);
-  return invoke(fixture,{args:['--aggregate','--results-dir',collected,'--needs-json',needs,...args]});
+  return invoke(fixture,{args:['--aggregate','--results-dir',collected,'--needs-json',needs,...args],env});
 }
 test('test group aggregate verifies the complete actual cohort and native artifacts', t => {
   const fixture=aggregateFixture(t),result=aggregateCopy(t,fixture);
@@ -897,6 +899,135 @@ function fixtureCoverage(fixture) {
   const proof={decision:'reuse',runId:identity.runId,runAttempt:identity.runAttempt,validationContext:identity,cohortContext:context,contextSha256:createHash('sha256').update(JSON.stringify(context)).digest('hex'),coveredBy:{runId:'71',runAttempt:'2',checkoutSha:context.checkoutSha,checkoutTree:context.checkoutTree,comparisonBase:context.comparisonBase,reportSha256:'8'.repeat(64)}};
   const file=path.join(description.outputDir,'proof.json');writeJson(file,proof);return {file,proof};
 }
+
+function inputCoverage(fixture, group = 'core') {
+  const description = invoke(fixture,{args:['--describe']});
+  assert.equal(description.status,0,description.stdout+description.stderr);
+  const identity = JSON.parse(fs.readFileSync(path.join(description.outputDir,'descriptor.json'))).resultIdentity;
+  const inputs = {policy:'complete-ci-inputs-v1',repository:identity.repository,checkoutTree:identity.checkoutTree,comparisonBase:identity.comparisonBase,
+    runtime:{node:process.versions.node,platform:process.platform,arch:process.arch,imageOS:'ubuntu24',imageVersion:'20261022.1.0'}};
+  const pass = {kind:'ci-input-pass-v1',inputs,gate:group,inputKey:createHash('sha256').update(JSON.stringify({...inputs,gate:group})).digest('hex'),
+    coveredBy:{runId:'71',runAttempt:'2',jobId:'701',sourceSha:'a'.repeat(40),checkoutSha:'b'.repeat(40),checkoutTree:identity.checkoutTree,comparisonBase:identity.comparisonBase,resultSha256:'8'.repeat(64),artifactId:'901',artifactName:'regression-71-2-'+group,artifactSha256:'7'.repeat(64),artifactExpiresAt:'2030-01-01T00:00:00Z'}};
+  const proof = {decision:'full',runId:identity.runId,runAttempt:identity.runAttempt,validationContext:identity,inputContext:inputs,inputPasses:{[group]:pass}};
+  const file = path.join(description.outputDir,'input-proof.json');writeJson(file,proof);
+  return {file,proof};
+}
+
+test('test group input coverage reuses a passed group without claiming new execution', t => {
+  const fixture=createFixture(t),{file,proof}=inputCoverage(fixture),sentinel=path.join(fixture.root,'duplicate-core-execution');
+  const result=invoke(fixture,{args:['--covered','--proof',file],env:{ImageOS:'ubuntu24',ImageVersion:'20261022.1.0',CHAIN_DESCRIPTOR_SENTINEL:sentinel}});
+  assert.equal(result.status,0,result.stdout+result.stderr);
+  assert.equal(fs.existsSync(sentinel),false,'a verified same-input pass must not execute the core child again');
+  assert.equal(result.evidence.status,'covered');assert.deepEqual(result.evidence.cases,[]);assert.deepEqual(result.evidence.artifacts,[]);assert.equal(result.evidence.process,null);
+  assert.deepEqual(result.evidence.coverage,proof.inputPasses.core,'coverage must retain the original report and commit rather than relabel them');
+});
+
+test('test group aggregate reconciles reused and executed groups with fresh original proof', t => {
+  const fixture=aggregateFixture(t),{file}=inputCoverage(fixture);
+  const env={ImageOS:'ubuntu24',ImageVersion:'20261022.1.0'};
+  const covered=invoke(fixture,{args:['--covered','--proof',file],env});assert.equal(covered.status,0,covered.stdout+covered.stderr);
+  fixture.originals.set('core',covered.outputDir);
+  const result=aggregateCopy(t,fixture,(_root,needs)=>{
+    const x=JSON.parse(fs.readFileSync(needs));x['cohort-routing'].outputs={decision:'full',reused:'["core"]'};writeJson(needs,x);
+  },['--proof',file],env);
+  assert.equal(result.status,0,result.stdout+result.stderr);
+  const report=JSON.parse(fs.readFileSync(path.join(result.outputDir,'aggregate.json')));
+  assert.equal(report.mode,'mixed');assert.equal(report.caseCount,4,'only this run\'s actual cases count as executed');
+  assert.equal(report.groups.filter(group=>group.mode==='covered').length,1);
+  assert.equal(report.groups.find(group=>group.group==='core').coverage.coveredBy.checkoutSha,'b'.repeat(40));
+  assert.equal(report.groups.find(group=>group.group==='native-process').identity.checkoutSha,fixture.sourceSha,'actual native evidence retains its current checkout');
+});
+
+test('test group aggregate admits a fresh execution after consumer runtime changes',t=>{
+  const fixture=aggregateFixture(t),{file}=inputCoverage(fixture);
+  const actual=aggregateCopy(t,fixture,(_root,needs)=>{const x=JSON.parse(fs.readFileSync(needs));x['cohort-routing'].outputs={decision:'full',reused:'["core"]'};writeJson(needs,x);},['--proof',file],{ImageOS:'ubuntu24',ImageVersion:'20261023.2.0'});
+  assert.equal(actual.status,0,actual.stdout+actual.stderr);
+  const report=JSON.parse(fs.readFileSync(path.join(actual.outputDir,'aggregate.json')));assert.equal(report.mode,'full');assert.ok(report.caseCount>0);assert.ok(report.groups.every(group=>group.mode!=='covered'),'fresh execution keeps its own current cases');
+});
+
+test('test group aggregate preserves observer protocol across emulator coverage and fresh fallback',async parent=>{
+  const fixture=aggregateFixture(parent);
+  const workflow=fs.readFileSync(path.join(repository,'.github/workflows/data-safety.yml'),'utf8');
+  assert.match(workflow,/name: Verified complete cohort .* mode \$\{\{ steps\.aggregate\.outputs\.attestation-mode \}\}/,'the actual workflow must publish the observer-compatible aggregate output');
+  assert.match(workflow,/if: success\(\) && steps\.aggregate\.outputs\.original == 'true'/,'only actual fully executed cohorts advertise original producer authority');
+  for(const [name,rulesMode,hasProof,accepted,mode]of [['retained rules','covered',true,true,'reuse'],['fresh emulator fallback','executed',false,true,'full'],['missing covered proof','covered',false,false,null],['changed consumed original','covered',true,false,null]])await parent.test(name,t=>{
+    const {file,proof}=inputCoverage(fixture,'rules'),consumed=createHash('sha256').update(JSON.stringify(proof.inputPasses.rules)).digest('hex');if(!hasProof)proof.inputPasses={};
+    if(name==='changed consumed original'){proof.inputPasses.rules.coveredBy.runId='72';proof.inputPasses.rules.coveredBy.runAttempt='1';proof.inputPasses.rules.coveredBy.resultSha256='9'.repeat(64);}
+    writeJson(file,proof);
+    const outputs=path.join(path.dirname(file),'aggregate-outputs');
+    const result=aggregateCopy(t,fixture,(_root,needs)=>{const x=JSON.parse(fs.readFileSync(needs));x['cohort-routing'].outputs={decision:'full',reused:'["rules"]'};x['event-gates'].outputs={rules:rulesMode,compatibility:'executed','rules-coverage':rulesMode==='covered'?consumed:''};writeJson(needs,x);},['--proof',file],{ImageOS:'ubuntu24',ImageVersion:'20261022.1.0',GITHUB_OUTPUT:outputs});
+    assert.equal(result.status===0,accepted,result.stdout+result.stderr);
+    if(accepted){const text=fs.readFileSync(outputs,'utf8');assert.match(text,new RegExp('^attestation-mode='+mode+'$','m'),'the existing observer must receive a truthful full/reuse attestation');assert.match(text,new RegExp('^original='+(mode==='full')+'$','m'),'only entirely executed cohorts can publish the original full producer marker');}
+  });
+});
+
+test('test group workflow consumer forbids duplicate execution for a verified input pass', t => {
+  const fixture=createFixture(t),{proof}=inputCoverage(fixture);
+  const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'chain-workflow-reuse-'));fixture.outputs.push(temporary);
+  fs.mkdirSync(path.join(temporary,'ci-routing'));writeJson(path.join(temporary,'ci-routing/routing.json'),proof);
+  const sentinel=path.join(temporary,'test-child-executed');
+  const workflow=fs.readFileSync(path.join(repository,'.github/workflows/data-safety.yml'),'utf8');
+  const commands=[...workflow.matchAll(/      - name: Execute complete assigned group\n[\s\S]*?        run: \|\n((?:          [^\n]*\n|\n)*)/g)].map(match=>match[1].split('\n').map(line=>line.startsWith('          ')?line.slice(10):line).join('\n'));
+  const selection=[...workflow.matchAll(/^\s+run: (node scripts\/agent-tools\/ci-pass-reuse\.mjs select .+)$/gm)][0]?.[1];assert.ok(selection,'the workflow must select consumer inputs before dependency setup');
+  assert.equal(commands.length,1,'the workflow must use the enforcing consumer exactly once');
+  const command=selection+'\n'+commands[0].replaceAll('${{ matrix.group }}','core');
+  const env={...process.env,ImageOS:'ubuntu24',ImageVersion:'20261022.1.0',RUNNER_TEMP:temporary,GITHUB_REPOSITORY:'example/fixture',CHAIN_TEST_EVENT_POLICY:'local',GITHUB_RUN_ID:'fixture-run-1',GITHUB_RUN_ATTEMPT:'1',CHAIN_TEST_SOURCE_SHA:fixture.sourceSha,CHAIN_TEST_COMPARISON_BASE:fixture.comparisonBase,CHAIN_DESCRIPTOR_SENTINEL:sentinel};delete env.NODE_TEST_CONTEXT;
+  const reused=run('bash',['-euo','pipefail','-c',command],fixture.root,env);
+  assert.equal(reused.status,0,reused.stdout+reused.stderr);
+  assert.equal(readEvidence(path.join(temporary,'group'))?.status,'covered','the actual workflow dispatch must consume the verified pass');
+  assert.equal(fs.existsSync(sentinel),false,'the enforced CI consumer must not launch an already passed test child');
+  assert.equal(commands.length,1,'the workflow must use the enforcing consumer exactly once');
+  assert.doesNotMatch(workflow,/run: npm (?:test|run test:group -- --group)/,'direct suite/group execution would bypass the mandatory reuse gate');
+  assert.match(workflow,/name: Enforce CI reuse contract\n\s+run: node --test --test-name-pattern=/,'admission must enforce this process regression before expensive jobs');
+  fs.rmSync(path.join(temporary,'group'),{recursive:true,force:true});fs.rmSync(path.join(temporary,'selected-routing'),{recursive:true,force:true});proof.inputPasses={};writeJson(path.join(temporary,'ci-routing/routing.json'),proof);
+  const fresh=run('bash',['-euo','pipefail','-c',command],fixture.root,env);
+  assert.equal(fresh.status,0,fresh.stdout+fresh.stderr);
+  assert.equal(fs.existsSync(sentinel),true,'the same workflow must execute the real child when coverage is absent');
+  assert.equal(readEvidence(path.join(temporary,'group')).status,'passed');
+  fs.rmSync(path.join(temporary,'group'),{recursive:true,force:true});fs.rmSync(path.join(temporary,'selected-routing'),{recursive:true,force:true});fs.rmSync(sentinel);
+  const original=inputCoverage(fixture).proof;writeJson(path.join(temporary,'ci-routing/routing.json'),original);
+  const changedImage=run('bash',['-euo','pipefail','-c',command],fixture.root,{...env,ImageVersion:'20261023.2.0'});
+  assert.equal(changedImage.status,0,changedImage.stdout+changedImage.stderr);
+  assert.equal(fs.existsSync(sentinel),true,'a different consumer image must execute instead of failing or inheriting coverage');
+  assert.equal(readEvidence(path.join(temporary,'group')).status,'passed');
+});
+
+test('test group workflow publication attests actual execution and never promotes a reused result', t => {
+  const fixture=createFixture(t),{file,proof}=inputCoverage(fixture),original=proof.inputPasses;
+  const output=path.join(path.dirname(file),'step-outputs');
+  const env={ImageOS:'ubuntu24',ImageVersion:'20261022.1.0',GITHUB_OUTPUT:output};
+  proof.inputPasses={};writeJson(file,proof);
+  const actual=invoke(fixture,{consumer:true,args:['--proof',file],env});assert.equal(actual.status,0,actual.stdout+actual.stderr);
+  const published=fs.existsSync(output)?fs.readFileSync(output,'utf8'):'';
+  assert.match(published,/^key=[a-f0-9]{64}$/m,'an executed job must publish its complete-input key');
+  assert.match(published,new RegExp('^result='+createHash('sha256').update(fs.readFileSync(actual.evidencePath)).digest('hex')+'$','m'),'publication must fingerprint the actual result bytes');
+  assert.match(published,/^mode=executed$/m);
+  fs.rmSync(output);proof.inputPasses=original;writeJson(file,proof);
+  const covered=invoke(fixture,{consumer:true,args:['--proof',file],env});assert.equal(covered.status,0,covered.stdout+covered.stderr);
+  const reused=fs.readFileSync(output,'utf8');assert.match(reused,/^mode=covered$/m);assert.doesNotMatch(reused,/^(key|result)=/m,'covered work cannot become an original producer');
+});
+
+test('test group input aggregation rejects stale missing and fabricated coverage', async parent => {
+  const fixture=aggregateFixture(parent),{file,proof}=inputCoverage(fixture),env={ImageOS:'ubuntu24',ImageVersion:'20261022.1.0'};
+  const covered=invoke(fixture,{args:['--covered','--proof',file],env});assert.equal(covered.status,0,covered.stderr);fixture.originals.set('core',covered.outputDir);
+  const scenarios=[
+    ['missing fresh gate',(_root,fresh)=>{fresh.inputPasses={};}],
+    ['different fresh report',(_root,fresh)=>{fresh.inputPasses.core.coveredBy.resultSha256='9'.repeat(64);}],
+    ['different current run',(_root,fresh)=>{fresh.runId='different-run';}],
+    ['different runtime',(_root,fresh)=>{fresh.inputPasses.core.inputs.runtime.node='0.0.0';}],
+    ['invalid original job',(_root,fresh)=>{fresh.inputPasses.core.coveredBy.jobId='0';}],
+    ['fabricated current case',root=>{const p=path.join(root,'core/result.json'),x=JSON.parse(fs.readFileSync(p));x.cases.push({id:'fabricated',status:'passed'});writeJson(p,x);}],
+    ['missing reused inventory',(_root,_fresh,needs)=>{const x=JSON.parse(fs.readFileSync(needs));x['cohort-routing'].outputs.reused='[]';writeJson(needs,x);}],
+    ['failed required fresh group',root=>{const p=path.join(root,'scenery/result.json'),x=JSON.parse(fs.readFileSync(p));x.status='failed';writeJson(p,x);}],
+  ];
+  for(const [name,mutate]of scenarios)await parent.test(name,t=>{
+    const fresh=structuredClone(proof);
+    const result=aggregateCopy(t,fixture,(root,needs)=>{
+      const x=JSON.parse(fs.readFileSync(needs));x['cohort-routing'].outputs={decision:'full',reused:'["core"]'};writeJson(needs,x);mutate(root,fresh,needs);writeJson(file,fresh);
+    },['--proof',file],env);
+    assert.notEqual(result.status,0,name+' must fail the required aggregate');
+  });
+});
 test('test group covered aggregate requires four honest references and fresh original producer proof', async parent => {
   const fixture=createFixture(parent),{file,proof}=fixtureCoverage(fixture);fixture.originals=new Map();
   for(const group of groups){const result=invoke(fixture,{group,args:['--covered','--proof',file]});assert.equal(result.status,0,result.stdout+result.stderr);fixture.originals.set(group,result.outputDir);}
@@ -969,6 +1100,20 @@ test('policy prose covered groups rederive unchanged product inheritance and agg
  for(const [name,mutate]of [['wrong inventory',x=>{x.policyImpact.frozenInventorySha256='0'.repeat(64);}],['stale review',x=>{x.policyStatuses[0].state='failure';}],['wrong producer source',x=>{x.cohortContext.sourceSha=fixture.sourceSha;x.contextSha256=createHash('sha256').update(JSON.stringify(x.cohortContext)).digest('hex');}]])await parent.test(name,()=>{const x=structuredClone(proof);mutate(x);writeJson(file,x);const result=invoke(fixture,{args:['--covered','--proof',file]});assert.notEqual(result.status,0,name+' must retain full execution requirements');});
 });
 
+test('reconciled policy covered consumers retain the directly reviewed full-product origin',async t=>{
+ const f=createFixture(t,{policy:true});fs.writeFileSync(path.join(f.root,'AGENTS.md'),'Read [release guide](docs/release.md) before release.\nIndependent FAQ coverage review is required for every product release.\n');fs.writeFileSync(path.join(f.root,'app.js'),'export const originalProductBehavior = true;\n');git(f.root,'add','app.js','AGENTS.md');git(f.root,'commit','-qm','Original full-product main tree');f.comparisonBase=git(f.root,'rev-parse','HEAD');fs.writeFileSync(path.join(f.root,'AGENTS.md'),'Consult [release guidance](docs/release.md)\nbefore release.\nIndependent FAQ coverage review is required for every product release.\n');git(f.root,'add','.');git(f.root,'commit','-qm','Instruction-preserving policy change');f.sourceSha=git(f.root,'rev-parse','HEAD');
+ const {file,proof}=fixtureCoverage(f),base=f.comparisonBase,baseTree=git(f.root,'rev-parse',base+'^{tree}'),originBase=git(f.root,'rev-parse',base+'^'),head=git(f.root,'commit-tree',baseTree,'-p',originBase,'-m','Original reviewed product head');
+ proof.decision='policy-reuse';proof.policyImpact=derivePolicyProseImpact(f.root,f.sourceSha,base);Object.assign(proof.cohortContext,{sourceSha:head,sourceTree:baseTree,checkoutSha:head,checkoutTree:baseTree,comparisonBase:originBase});proof.contextSha256=createHash('sha256').update(JSON.stringify(proof.cohortContext)).digest('hex');Object.assign(proof.coveredBy,{checkoutSha:head,checkoutTree:baseTree,comparisonBase:originBase,aggregateArtifact:{artifactId:'902',artifactName:'scanner-aggregate-71-2',artifactSha256:'2'.repeat(64),artifactExpiresAt:'2030-01-01T00:00:00Z',reportSha256:proof.coveredBy.reportSha256}});
+ const canonical=value=>Array.isArray(value)?'['+value.map(canonical).join(',')+']':value&&typeof value==='object'?'{'+Object.keys(value).sort().map(key=>JSON.stringify(key)+':'+canonical(value[key])).join(',')+'}':JSON.stringify(value),prefix=plan=>createHash('sha256').update(canonical(plan)).digest('hex').slice(0,12),policyPlan=deriveReleaseReviewPlan(f.root,f.sourceSha,base),originPlan=deriveReleaseReviewPlan(f.root,head,originBase);
+ proof.policyReview={sourceSha:f.sourceSha,baseSha:base,receiptSha256:'7'.repeat(64),reviewPlanPrefix:prefix(policyPlan)};proof.policyStatuses=['funsidething/memory-audit','funsidething/independent-review','funsidething/specialist-review'].map(context=>({context,state:'success',created_at:new Date().toISOString(),description:`r=${'7'.repeat(64)};b=${base};p=${prefix(policyPlan)};c=0;s=1;v=4`}));
+ proof.policyOriginReview={ok:true,deployedSha:base,reviewedSha:head,treeSha:baseTree,baseSha:originBase,receiptSha256:'5'.repeat(64),mergedPullRequest:19};proof.policyOriginStatuses=proof.policyStatuses.map(status=>({...status,description:`r=${'5'.repeat(64)};b=${originBase};p=${prefix(originPlan)};c=${originPlan.requiresCodeReview?1:0};s=${originPlan.requiresSpecialistReview?1:0};v=3`}));
+ const inputs={policy:'complete-ci-inputs-v1',repository:proof.cohortContext.repository,checkoutTree:baseTree,comparisonBase:originBase,runtime:{node:process.versions.node,platform:process.platform,arch:process.arch,imageOS:'fixture-os',imageVersion:'fixture-image'}};
+ proof.policyInputPasses=Object.fromEntries([...groups,'rules','compatibility'].map(gate=>[gate,{kind:'ci-input-pass-v1',gate,inputs,inputKey:createHash('sha256').update(JSON.stringify({...inputs,gate})).digest('hex'),coveredBy:{runId:'71',runAttempt:'2',jobId:'701',sourceSha:head,checkoutSha:head,checkoutTree:baseTree,comparisonBase:originBase,resultSha256:'1'.repeat(64),artifactId:'901',artifactName:'original-'+gate,artifactSha256:'2'.repeat(64),artifactExpiresAt:'2030-01-01T00:00:00Z'}}]));writeJson(file,proof);
+ f.originals=new Map();for(const group of groups){const result=invoke(f,{group,consumer:true,args:['--proof',file]});assert.equal(result.status,0,'The workflow consumer must preserve directly reviewed full-product authority: '+result.stderr);assert.deepEqual(result.evidence.cases,[]);assert.equal(result.evidence.process,null);f.originals.set(group,result.outputDir);}
+ const aggregate=aggregateCopy(t,f,(_root,needs)=>{const x=JSON.parse(fs.readFileSync(needs));x['cohort-routing'].outputs={decision:'policy-reuse'};writeJson(needs,x);},['--proof',file]);assert.equal(aggregate.status,0,aggregate.stdout+aggregate.stderr);assert.equal(JSON.parse(fs.readFileSync(path.join(aggregate.outputDir,'aggregate.json'))).mode,'policy-covered');
+ for(const [name,mutate]of [['policy receipt',x=>{x.policyOriginStatuses[0].description=x.policyOriginStatuses[0].description.replace('v=3','v=4');}],['changed original',x=>{x.policyInputPasses.core.coveredBy.runId='72';}],['changed aggregate',x=>{x.coveredBy.aggregateArtifact.reportSha256='0'.repeat(64);}]])await t.test(name,()=>{const changed=structuredClone(proof);mutate(changed);writeJson(file,changed);assert.notEqual(invoke(f,{consumer:true,args:['--proof',file]}).status,0,'Invalid direct original coverage must fail: '+name);});
+});
+
 
 test('test group aggregate cannot accept a full cohort without required early predecessor evidence',t=>{
  const fixture=aggregateFixture(t,{early:true}),result=aggregateCopy(t,fixture);
@@ -989,7 +1134,7 @@ test('test group aggregate binds successful early execution and separate failed 
  const hash=bytes=>createHash('sha256').update(bytes).digest('hex'),artifacts=[];const visit=dir=>{for(const entry of fs.readdirSync(dir,{withFileTypes:true})){const file=path.join(dir,entry.name);if(entry.isDirectory())visit(file);else{const bytes=fs.readFileSync(file);artifacts.push({path:path.relative(early,file).split(path.sep).join('/'),bytes:bytes.length,sha256:hash(bytes)});}}};visit(early);
  const receipt={schemaVersion:1,status:'passed',mode:'full',identity:{descriptor:id,workflowBlob:git(fixture.root,'rev-parse','HEAD:.github/workflows/data-safety.yml'),harnessSourceSha256:hash(fs.readFileSync(path.join(fixture.root,'scripts/early-ci-harness-source.json'))),eventName:null,eventRef:null},children:['harness','required-1gb'].map(kind=>({kind,exitCode:0,signal:null,error:null})),harnessCaseCount:3,artifacts:artifacts.sort((a,b)=>a.path.localeCompare(b.path))};writeJson(path.join(early,'receipt.json'),receipt);
  const collected=path.join(evidence,'groups');for(const [group,output]of fixture.originals)fs.cpSync(output,path.join(collected,group),{recursive:true});const needs=path.join(evidence,'needs.json');writeJson(needs,Object.fromEntries(['validation-context','event-gates','cohort-routing','regression','early-startup','mobile-stress'].map(name=>[name,{result:'success'}])));
- const env={GITHUB_REPOSITORY:id.repository,CHAIN_TEST_SOURCE_SHA:id.sourceSha,CHAIN_TEST_EVENT_POLICY:id.eventPolicy,GITHUB_RUN_ID:id.runId,GITHUB_RUN_ATTEMPT:String(id.runAttempt)};
+ const env={GITHUB_REPOSITORY:id.repository,CHAIN_TEST_SOURCE_SHA:id.sourceSha,CHAIN_TEST_EVENT_POLICY:id.eventPolicy,GITHUB_RUN_ID:id.runId,GITHUB_RUN_ATTEMPT:String(id.runAttempt),GITHUB_EVENT_NAME:undefined,GITHUB_REF:undefined};
  const args=['--aggregate','--results-dir',collected,'--needs-json',needs,'--early-receipt',path.join(early,'receipt.json'),'--mobile-stress-report',path.join(stress.directory,'report.json')];
  const result=invoke(fixture,{env,args});assert.equal(result.status,0,result.stdout+result.stderr);const report=JSON.parse(fs.readFileSync(path.join(result.outputDir,'aggregate.json')));assert.equal(report.earlyEvidence.children,2);assert.equal(report.stressEvidence.status,'failed','Measured application stress remains reported without failing complete integrity');assert.equal(report.caseCount,6,'Only original actual group outcomes count as current coverage');
  fs.unlinkSync(path.join(stress.directory,stress.report.cases[0].nativeReportPath));const broken=invoke(fixture,{env,args});assert.notEqual(broken.status,0,'Missing stress integrity blocks aggregate even when application stress is nonblocking');
@@ -1000,6 +1145,55 @@ test('group process refuses missing early predecessor before launching any defer
  const result=invoke(fixture,{group:'native-process',env:{EARLY_ROOT_JOURNAL:journal}});
  assert.notEqual(result.status,0,'Catalog-declared early consumers need durable predecessor proof before any group child');
  assert.equal(fs.existsSync(journal),false,'Missing predecessor must dispatch no deferred root');
+});
+
+test('reconciled covered group verifies current early evidence without repeating any root',async t=>{
+ const f=createFixture(t,{early:true,earlyTransfer:true});
+ const out=fs.mkdtempSync(path.join(os.tmpdir(),'chain-reconciled-covered-'));t.after(()=>fs.rmSync(out,{recursive:true,force:true}));
+ const described=invoke(f,{args:['--describe']});assert.equal(described.status,0,described.stderr);
+ const descriptor=path.join(described.outputDir,'descriptor.json'),id=JSON.parse(fs.readFileSync(descriptor)).resultIdentity;
+ const {createMobileBundle}=await import('./mobile-memory-fixture.mjs');const seed=createMobileBundle(path.join(out,'seed'),{candidateCommit:id.checkoutSha,candidateTree:id.checkoutTree,sourceSha:id.sourceSha,repository:id.repository,runId:id.runId,runAttempt:id.runAttempt,eventPolicy:id.eventPolicy});
+ const journal=path.join(out,'executions.jsonl'),env={GITHUB_REPOSITORY:id.repository,CHAIN_TEST_SOURCE_SHA:id.sourceSha,CHAIN_TEST_EVENT_POLICY:id.eventPolicy,GITHUB_RUN_ID:id.runId,GITHUB_RUN_ATTEMPT:String(id.runAttempt),EARLY_TRANSFER_SEED:seed.directory,EARLY_ROOT_JOURNAL:journal,GITHUB_EVENT_NAME:undefined,GITHUB_REF:undefined,ImageOS:'fixture-os',ImageVersion:'fixture-image'};
+ const early=path.join(out,'early'),childEnv={...process.env,...env};delete childEnv.NODE_TEST_CONTEXT;delete childEnv.GITHUB_EVENT_NAME;delete childEnv.GITHUB_REF;
+ const run=spawnSync(process.execPath,['scripts/early-ci.mjs','--run','--descriptor',descriptor,'--output-dir',early],{cwd:f.root,env:childEnv,encoding:'utf8'});assert.equal(run.status,0,run.stderr);
+ const first=fs.readFileSync(journal,'utf8');assert.equal(first.trim().split('\n').length,5);
+ const inputs={policy:'complete-ci-inputs-v1',repository:id.repository,checkoutTree:id.checkoutTree,comparisonBase:id.comparisonBase,runtime:{node:process.versions.node,platform:process.platform,arch:process.arch,imageOS:env.ImageOS,imageVersion:env.ImageVersion}};
+ const key=createHash('sha256').update(JSON.stringify({...inputs,gate:'native-process'})).digest('hex');
+ const pass={kind:'ci-input-pass-v1',gate:'native-process',inputs,inputKey:key,coveredBy:{runId:'71',runAttempt:'2',jobId:'701',sourceSha:id.sourceSha,checkoutSha:id.checkoutSha,checkoutTree:id.checkoutTree,comparisonBase:id.comparisonBase,resultSha256:'1'.repeat(64),artifactId:'901',artifactName:'original-native',artifactSha256:'2'.repeat(64),artifactExpiresAt:'2030-01-01T00:00:00Z'}};
+ const proof=path.join(out,'routing.json');writeJson(proof,{decision:'full',runId:id.runId,runAttempt:id.runAttempt,validationContext:id,inputContext:inputs,inputKeys:{'native-process':key},inputPasses:{'native-process':pass}});
+ const result=invoke(f,{group:'native-process',consumer:true,env,args:['--proof',proof,'--browser-path',path.join(out,'absent-engines'),'--early-receipt',path.join(early,'receipt.json')]});
+ assert.equal(result.status,0,'The covered group must accept the independently executed current early stage: '+result.stdout+result.stderr);
+ assert.equal(result.evidence.status,'covered');assert.deepEqual(result.evidence.cases,[]);assert.equal(result.evidence.process,null);assert.deepEqual(result.evidence.artifacts,[]);
+ assert.equal(fs.readFileSync(journal,'utf8'),first,'Covered gate must launch zero additional early or ordinary roots');
+ const fresh=invoke(f,{group:'core',env,args:['--early-receipt',path.join(early,'receipt.json')]});assert.equal(fresh.status,0,fresh.stderr);
+ assert.equal(fresh.evidence.earlyReceiptRef?.path,'early-startup-evidence/receipt.json','An original group must retain the raw early proof it transfers');
+ assert.equal(fs.readFileSync(path.join(fresh.outputDir,fresh.evidence.earlyReceiptRef.path),'utf8'),fs.readFileSync(path.join(early,'receipt.json'),'utf8'));
+ const earlyArtifact={artifactId:'902',artifactName:'early-original',artifactSha256:'3'.repeat(64),artifactExpiresAt:'2030-01-01T00:00:00Z',reportSha256:createHash('sha256').update(fs.readFileSync(path.join(early,'receipt.json'))).digest('hex')};
+ const earlyPass={kind:'ci-early-execution-v1',inputs,inputKey:createHash('sha256').update(JSON.stringify({...inputs,gate:'early-startup'})).digest('hex'),coveredBy:{runId:'71',runAttempt:'2',earlyJobId:'703',stressJobId:'704',sourceSha:id.sourceSha,checkoutSha:id.checkoutSha,checkoutTree:id.checkoutTree,comparisonBase:id.comparisonBase,earlyReportSha256:earlyArtifact.reportSha256,earlyArtifact,stressArtifact:{...earlyArtifact,artifactId:'903',artifactName:'stress-original'}}};
+ const routing=JSON.parse(fs.readFileSync(proof));routing.earlyCoverage=earlyPass;writeJson(proof,routing);
+ const coveredEarly=path.join(out,'covered-early'),coveredCommand=spawnSync(process.execPath,['scripts/early-ci.mjs','--covered','--descriptor',descriptor,'--proof',proof,'--output-dir',coveredEarly],{cwd:f.root,env:childEnv,encoding:'utf8'});assert.equal(coveredCommand.status,0,coveredCommand.stderr);
+ const core=invoke(f,{group:'core',consumer:true,env,args:['--proof',proof,'--early-receipt',path.join(coveredEarly,'receipt.json')]});
+ assert.equal(core.status,0,'An uncovered group must execute its complete roots while separately referencing original mobile execution: '+core.stderr);
+ assert.equal(core.evidence.earlyCoverage??null,null);assert.equal(core.evidence.cases.filter(row=>row.root==='RISK repository process: Playwright waitForFunction predicates are synchronous').length,1);
+ const reused=['scenery','persistence-recovery','native-process','rules','compatibility'];routing.inputPasses={};routing.inputKeys={};
+ for(const gate of reused){const inputKey=createHash('sha256').update(JSON.stringify({...inputs,gate})).digest('hex');routing.inputPasses[gate]={...pass,gate,inputKey};routing.inputKeys[gate]=inputKey;}writeJson(proof,routing);
+ const collected=path.join(out,'groups');fs.mkdirSync(collected);fs.cpSync(core.outputDir,path.join(collected,'core'),{recursive:true});
+ for(const group of ['scenery','persistence-recovery','native-process']){const covered=invoke(f,{group,consumer:true,env,args:['--proof',proof,'--early-receipt',path.join(coveredEarly,'receipt.json')]});assert.equal(covered.status,0,covered.stderr);assert.deepEqual(covered.evidence.cases,[]);assert.equal(covered.evidence.process,null);fs.cpSync(covered.outputDir,path.join(collected,group),{recursive:true});}
+ const needs=Object.fromEntries(['validation-context','event-gates','cohort-routing','early-startup','regression','mobile-stress'].map(name=>[name,{result:'success'}]));needs['cohort-routing'].outputs={decision:'full',reused:JSON.stringify(reused)};needs['early-startup'].outputs={decision:'reuse'};needs['event-gates'].outputs={rules:'covered',compatibility:'covered',...Object.fromEntries(['rules','compatibility'].map(gate=>[gate+'-coverage',createHash('sha256').update(JSON.stringify(routing.inputPasses[gate])).digest('hex')]))};
+ const needsPath=path.join(out,'needs.json');writeJson(needsPath,needs);
+ const aggregate=invoke(f,{env,args:['--aggregate','--results-dir',collected,'--needs-json',needsPath,'--proof',proof,'--early-receipt',path.join(coveredEarly,'receipt.json')]});assert.equal(aggregate.status,0,aggregate.stdout+aggregate.stderr);
+ const report=JSON.parse(fs.readFileSync(path.join(aggregate.outputDir,'aggregate.json')));assert.equal(report.mode,'mixed');assert.equal(report.caseCount,core.evidence.cases.length,'Only current complete core execution counts as current cases');assert.equal(report.earlyEvidence.mode,'covered');
+});
+
+test('reconciled fresh group consumes the explicit browser preflight before its cohort', t=>{
+ const f=createFixture(t),directory=fs.mkdtempSync(path.join(os.tmpdir(),'chain-reconciled-browser-'));t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const described=invoke(f,{args:['--describe']});assert.equal(described.status,0,described.stderr);const id=JSON.parse(fs.readFileSync(path.join(described.outputDir,'descriptor.json'))).resultIdentity;
+ const proof=path.join(directory,'routing.json');writeJson(proof,{decision:'full',validationContext:id,runId:id.runId,runAttempt:id.runAttempt,inputPasses:{}});
+ const result=invoke(f,{group:'persistence-recovery',consumer:true,args:['--proof',proof,'--browser-path',path.join(directory,'absent-engines')]});
+ assert.equal(result.status,0,result.stdout+result.stderr);
+ assert.equal(result.evidence.browserRuntimeReceipt?.path,'browser-runtime-preflight/receipt.json','The actual workflow consumer must retain an explicit preflight result before the group');
+ const receipt=JSON.parse(fs.readFileSync(path.join(result.outputDir,result.evidence.browserRuntimeReceipt.path)));
+ assert.equal(receipt.status,'no_change');assert.equal(receipt.process,null,'No selected new roots launches zero browser children');
 });
 
 test('group and aggregate retain actual early cases once across fresh group processes',async t=>{
@@ -1035,7 +1229,7 @@ test('group and aggregate retain actual early cases once across fresh group proc
  writeJson(path.join(seed.directory,'modal-parser-only.json'),{kind:'button-diagnostic',engine:'chromium',candidateCommit:identity.checkoutSha,candidateTree:identity.checkoutTree,status:'passed',assets:application.assets,sourceProfile:checkProfile({repo:fixture.root,source:application.source,assets:application.assets,engine:'chromium',motion:null,scenario:'rapid scene time presets, lock, live time, and close'}),observedActions:[],outcomes:[],rapidOutcomes:[],actionObservation:{recognizedOffered:[],executed:[],coverage},scenarios:[{name:'rapid scene time presets, lock, live time, and close'}]});
  refreshMobileBundle(seed);refreshMobileBundle(stress);
  const {verifyMobileStressReport}=await import('../button-safety-mobile-contract.mjs');assert.equal(verifyMobileStressReport(stress.report,{artifactRoot:stress.directory}).cases[0].appOutcome,'app-runtime-failure','Synthetic raw stress classifier accepts the attributable failed app before profile/aggregate composition');
- const env={...process.env,GITHUB_REPOSITORY:identity.repository,CHAIN_TEST_SOURCE_SHA:identity.sourceSha,CHAIN_TEST_EVENT_POLICY:identity.eventPolicy,GITHUB_RUN_ID:identity.runId,GITHUB_RUN_ATTEMPT:String(identity.runAttempt),EARLY_TRANSFER_SEED:seed.directory,EARLY_ROOT_JOURNAL:journal};delete env.NODE_TEST_CONTEXT;delete env.GITHUB_EVENT_NAME;delete env.GITHUB_REF;
+ const env={...process.env,GITHUB_REPOSITORY:identity.repository,CHAIN_TEST_SOURCE_SHA:identity.sourceSha,CHAIN_TEST_EVENT_POLICY:identity.eventPolicy,GITHUB_RUN_ID:identity.runId,GITHUB_RUN_ATTEMPT:String(identity.runAttempt),EARLY_TRANSFER_SEED:seed.directory,EARLY_ROOT_JOURNAL:journal,PLAYWRIGHT_BROWSERS_PATH:path.join(temp,'absent-ci-engines')};delete env.NODE_TEST_CONTEXT;env.GITHUB_EVENT_NAME=undefined;env.GITHUB_REF=undefined;
  const workflow=fs.readFileSync(path.join(repository,'.github/workflows/data-safety.yml'),'utf8');
  const earlyStep=workflow.match(/      - name: Required saved harness and populated mobile startup\n[\s\S]*?        run: ([^\n]+)/);assert.ok(earlyStep);
  const descriptorCopy=path.join(temp,'validation/descriptor');fs.mkdirSync(descriptorCopy,{recursive:true});fs.copyFileSync(descriptor,path.join(descriptorCopy,'descriptor.json'));
@@ -1046,6 +1240,7 @@ test('group and aggregate retain actual early cases once across fresh group proc
  const actualCommand=actualStep[1].split('\n').map(line=>line.startsWith('          ')?line.slice(10):line).join('\n');
  for(const group of groups){
   const runnerTemp=path.join(temp,'job-'+group);fs.mkdirSync(runnerTemp);fs.cpSync(early,path.join(runnerTemp,'early'),{recursive:true});
+  fs.mkdirSync(path.join(runnerTemp,'selected-routing'));writeJson(path.join(runnerTemp,'selected-routing/routing.json'),{decision:'full',validationContext:identity,runId:identity.runId,runAttempt:identity.runAttempt,inputPasses:{}});
   if(group==='persistence-recovery'){
    const preflight=invoke(fixture,{group,env,outputDir:path.join(runnerTemp,'browser-runtime-preflight'),args:['--browser-runtime-preflight','--early-receipt',path.join(runnerTemp,'early/receipt.json')]});
    assert.equal(preflight.status,0,preflight.stdout+preflight.stderr);assert.equal(preflight.evidence.status,'no_change','The matrix fixture still runs an explicit no-change preflight receipt.');

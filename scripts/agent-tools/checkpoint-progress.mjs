@@ -114,6 +114,7 @@ function load(dir) {
     !Array.isArray(state.attempts)
   )
     throw Error("Diagnostic state journal integrity invalid.");
+  for(const event of state.events)if(['ci-routing-observation','authorized-issue-refresh'].includes(event.type)&&digest(read(event.snapshot.path))!==event.snapshot.sha256)throw Error('Durable checkpoint observation snapshot changed.');
   return { state, head };
 }
 function save(dir, state, prior = null) {
@@ -384,6 +385,7 @@ function summary(s) {
     events: s.events,
     allowance: s.allowance,
     revision: s.revision,
+    ...(s.ciRouting?{ciRouting:s.ciRouting}:{}),
   };
 }
 function requestedTask(repo, context = {}) {
@@ -971,6 +973,29 @@ export async function progressCommand(operation, options) {
       throw Error("Diagnostic task identity mismatch.");
     if (operation === "inspect")
       return { ...summary(state), journalDigest: head.digest };
+    if (operation === "record-routing") {
+      const { CI_GATES, ciInputKey, validateInputPass } = await import('./ci-pass-reuse.mjs');
+      verifyAuthority(repo,state);
+      const raw=read(path.resolve(options.input)),routing=JSON.parse(raw),context=routing.validationContext,inputs=routing.inputContext;
+      if(routing.schemaVersion!==1||!['full','reuse','policy-reuse','pending','unresolved','fail','cancelled'].includes(routing.decision)||context?.repository!==state.repository||context.checkoutSha!==git(repo,'rev-parse','HEAD')||context.checkoutTree!==git(repo,'rev-parse','HEAD^{tree}')||context.sourceTree!==git(repo,'rev-parse',context.sourceSha+'^{tree}')||inputs?.policy!=='complete-ci-inputs-v1'||inputs.repository!==state.repository||inputs.checkoutTree!==context.checkoutTree||inputs.comparisonBase!==context.comparisonBase||!['node','platform','arch'].every(key=>typeof inputs.runtime?.[key]==='string'&&inputs.runtime[key])||!['imageOS','imageVersion'].every(key=>typeof inputs.runtime?.[key]==='string'))throw Error('Routing observation must bind the exact current source/tree/base and complete input context.');
+      git(repo,'merge-base','--is-ancestor',context.comparisonBase,context.checkoutSha);
+      if(JSON.stringify(Object.keys(routing.inputKeys||{}).sort())!==JSON.stringify([...CI_GATES].sort())||JSON.stringify(Object.keys(routing.gateDecisions||{}).sort())!==JSON.stringify([...CI_GATES].sort()))throw Error('Routing observation requires all six complete input keys and gate decisions.');
+      for(const gate of CI_GATES){const decision=routing.gateDecisions[gate];if(routing.inputKeys[gate]!==ciInputKey(inputs,gate)||decision.inputKey!==routing.inputKeys[gate]||!['covered','execute','policy-covered','pending','unresolved','fail','cancelled'].includes(decision.mode))throw Error('Routing gate decision/key mismatch: '+gate);if(['covered','policy-covered'].includes(decision.mode)){if(decision.mode==='policy-covered'&&routing.decision!=='policy-reuse')throw Error('Policy gate observation requires the policy routing context.');const pass=validateInputPass((decision.mode==='covered'?routing.inputPasses:routing.policyInputPasses)?.[gate],{...(decision.mode==='covered'?context:routing.cohortContext),runId:routing.runId,runAttempt:routing.runAttempt,selectedGroup:gate,checkoutDirty:false},{execution:false});if(JSON.stringify(decision.original)!==JSON.stringify(pass.coveredBy))throw Error('Routing gate original identity changed: '+gate);}else if(decision.original!==null)throw Error('Uncovered routing gate cannot claim an original pass.');}
+      const file=path.join(dir,`routing-observation-${head.revision+1}.json`);immutable(file,{raw,sha256:digest(raw)});const snapshot={path:file,sha256:digest(read(file))};
+      state.ciRouting={decision:routing.decision,validationContext:context,inputContext:inputs,inputKeys:routing.inputKeys,gateDecisions:routing.gateDecisions,...(routing.decision==='policy-reuse'?{originalContext:routing.cohortContext,originalInputPasses:routing.policyInputPasses}:{}),routingSha256:digest(raw),snapshot};state.events.push({type:'ci-routing-observation',snapshot,at:new Date().toISOString()});save(dir,state,head);return summary(state);
+    }
+    if (operation === "refresh-authority") {
+      if(state.attempts.some(attempt=>!attempt.consumed))throw Error('Consume the existing diagnostic observation before refreshing issue authority.');
+      const plan=JSON.parse(read(path.resolve(options.input))),keys=['expectedTaskFingerprint','expectedSourceFingerprint','currentTaskFingerprint','currentSourceFingerprint','reason','authorizationEvidence'];
+      if(JSON.stringify(Object.keys(plan).sort())!==JSON.stringify(keys.sort()))throw Error('Issue refresh cannot change allowance, attempts, launch authority or frozen source.');
+      text(plan.reason,'explicit issue refresh reason');const evidence=read(path.resolve(plan.authorizationEvidence?.path||''));if(digest(evidence)!==plan.authorizationEvidence.sha256)throw Error('Explicit issue refresh authorization evidence changed.');
+      const current=authority(repo,state.task);
+      if(plan.expectedTaskFingerprint!==state.taskIssue.fingerprint||plan.expectedSourceFingerprint!==state.sourceIssue.fingerprint||plan.currentTaskFingerprint!==current.task.fingerprint||plan.currentSourceFingerprint!==current.parent.fingerprint||current.repository!==state.repository||current.task.issue.number!==state.taskIssue.issue.number||current.parent.issue.number!==state.sourceIssue.issue.number)throw Error('Issue refresh must bind the exact previous and current complete task/parent snapshots.');
+      if(plan.currentTaskFingerprint===plan.expectedTaskFingerprint&&plan.currentSourceFingerprint===plan.expectedSourceFingerprint)throw Error('Issue authority did not change.');
+      const previous={taskIssue:state.taskIssue,sourceIssue:state.sourceIssue};state.authorityHistory??=[];state.authorityHistory.push(previous);
+      const file=path.join(dir,`issue-refresh-${head.revision+1}.json`);immutable(file,{plan,authorizationEvidence:evidence,previous,current});const snapshot={path:file,sha256:digest(read(file))};
+      state.taskIssue=current.task;state.sourceIssue=current.parent;state.events.push({type:'authorized-issue-refresh',snapshot,previousFingerprints:{task:previous.taskIssue.fingerprint,parent:previous.sourceIssue.fingerprint},currentFingerprints:{task:current.task.fingerprint,parent:current.parent.fingerprint},at:new Date().toISOString()});save(dir,state,head);return summary(state);
+    }
     if (operation === "export" || operation === "export-public") {
       verifyAuthority(repo, state);
       verifySource(repo, state);

@@ -312,7 +312,7 @@ function parseArguments(args) {
 }
 
 async function main() {
-  const progressOps=['admit','prepare','verify-ci','export','export-public','start','inspect','consume','hold','extend','change-source','verify-publication'];
+  const progressOps=['admit','prepare','verify-ci','export','export-public','start','inspect','consume','hold','extend','change-source','verify-publication','record-routing','refresh-authority'];
   if(progressOps.includes(process.argv[2])) {
     const options={};const args=process.argv.slice(3);
     for(let i=0;i<args.length;i+=2){const key=args[i];if(!/^--(?:repo|task|input|record|attempt|result|reason|commit|approval)$/.test(key)||!args[i+1]||args[i+1].startsWith('--')||Object.hasOwn(options,key.slice(2)))throw Error('Invalid diagnostic checkpoint options.');options[key.slice(2)]=args[i+1];}

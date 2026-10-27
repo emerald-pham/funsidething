@@ -6,7 +6,8 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { derivePolicyProseImpact, validatePolicyProseStatuses } from './release-evidence.mjs';
+import { derivePolicyProseImpact, validatePolicyProseStatuses, deriveReleaseReviewPlan } from './release-evidence.mjs';
+import { validateInputPass } from './agent-tools/ci-pass-reuse.mjs';
 
 export const GROUP_IDS = ['core', 'scenery', 'persistence-recovery', 'native-process'];
 const TEST_NAME_PATTERN_ARGUMENT_BUDGET = 64 * 1024;
@@ -1293,7 +1294,12 @@ function copyBrowserRuntimeEvidence(receiptPath, inspected, destination) {
   return { path: 'browser-runtime-preflight/receipt.json', sha256: inspected.receiptSha256 };
 }
 
-function coverageReference(proof, identity) {
+function coverageReference(proof, identity, execution=true) {
+  if (proof?.inputPasses?.[identity.selectedGroup]) {
+    if (!['full','reuse'].includes(proof.decision) || String(proof.runId)!==String(identity.runId) || String(proof.runAttempt)!==String(identity.runAttempt)) fail('Input coverage requires current-run routing proof.');
+    for (const key of ['repository','sourceSha','sourceTree','checkoutSha','checkoutTree','comparisonBase']) if(proof.validationContext?.[key]!==identity[key])fail(`Input coverage validation mismatch: ${key}.`);
+    return validateInputPass(proof.inputPasses[identity.selectedGroup],identity,{execution});
+  }
   if (!['reuse','policy-reuse'].includes(proof?.decision) || String(proof.runId)!==String(identity.runId) || String(proof.runAttempt)!==String(identity.runAttempt)) fail('Covered mode requires a verified current-run routing proof.');
   for (const key of ['repository','sourceSha','sourceTree','checkoutSha','checkoutTree','comparisonBase']) if(proof.validationContext?.[key]!==identity[key])fail(`Coverage validation context mismatch: ${key}.`);
   const context=proof.cohortContext,producer=proof.coveredBy;
@@ -1303,8 +1309,19 @@ function coverageReference(proof, identity) {
     if (!impact || JSON.stringify(impact) !== JSON.stringify(proof.policyImpact) || identity.sourceTree !== impact.sourceTree || identity.checkoutTree !== impact.sourceTree) fail('Policy inheritance inventory does not match the exact current source and checkout.');
     const review = validatePolicyProseStatuses(ROOT, proof.policyReview?.sourceSha, identity.comparisonBase, proof.policyStatuses);
     if (JSON.stringify(review) !== JSON.stringify(proof.policyReview) || git(['rev-parse', `${review.sourceSha}^{tree}`]).trim() !== identity.sourceTree) fail('Policy inheritance current review is stale.');
-    if (context?.repository !== identity.repository || context.sourceSha !== identity.comparisonBase || context.sourceTree !== impact.baseTree || context.checkoutSha !== identity.comparisonBase || context.checkoutTree !== impact.baseTree || context.comparisonBase !== git(['rev-parse', `${identity.comparisonBase}^`]).trim()) fail('Policy inheritance producer does not bind the exact unchanged base tree.');
-    policyCoverage = {policyImpact:impact, policyReview:review};
+    if(proof.policyOriginReview){
+      const origin=proof.policyOriginReview,canonical=value=>Array.isArray(value)?'['+value.map(canonical).join(',')+']':value&&typeof value==='object'?'{'+Object.keys(value).sort().map(key=>JSON.stringify(key)+':'+canonical(value[key])).join(',')+'}':JSON.stringify(value);
+      if(origin.ok!==true||origin.deployedSha!==identity.comparisonBase||origin.reviewedSha!==context.sourceSha||origin.baseSha!==context.comparisonBase||origin.treeSha!==impact.baseTree||git(['rev-parse',`${origin.reviewedSha}^{tree}`]).trim()!==impact.baseTree||origin.baseSha!==git(['rev-parse',`${identity.comparisonBase}^`]).trim()||!Number.isSafeInteger(origin.mergedPullRequest)||origin.mergedPullRequest<1)fail('Direct reviewed product origin does not bind the exact landed base tree.');
+      const plan=deriveReleaseReviewPlan(ROOT,origin.reviewedSha,origin.baseSha),prefix=sha256(canonical(plan)).slice(0,12);
+      if(!plan.requiresFaqReview||plan.policyProse||!Array.isArray(proof.policyOriginStatuses))fail('Policy inheritance needs a full FAQ-reviewed product origin.');
+      const descriptors=['funsidething/memory-audit','funsidething/independent-review','funsidething/specialist-review'].map(context=>{const status=proof.policyOriginStatuses.find(status=>status.context===context),match=status?.description?.match(/^r=([a-f0-9]{64});b=([a-f0-9]{40});p=([a-f0-9]{12});c=([01]);s=([01]);v=3$/);if(status?.state!=='success'||!match||match[1]!==origin.receiptSha256||match[2]!==origin.baseSha||match[3]!==prefix||plan.requiresCodeReview&&match[4]!=='1'||plan.requiresSpecialistReview&&match[5]!=='1')fail('Direct product review statuses are stale or not a full receipt.');return match.slice(1);});
+      if(descriptors.some(value=>JSON.stringify(value)!==JSON.stringify(descriptors[0])))fail('Direct full-product receipt statuses disagree.');
+      for(const gate of [...GROUP_IDS,'rules','compatibility']){const pass=validateInputPass(proof.policyInputPasses?.[gate],{...context,runId:producer?.runId,runAttempt:producer?.runAttempt,selectedGroup:gate,checkoutDirty:false},{execution:false});if(pass.coveredBy.runId!==producer?.runId||pass.coveredBy.runAttempt!==producer?.runAttempt||pass.coveredBy.checkoutSha!==context.checkoutSha||pass.coveredBy.sourceSha!==context.sourceSha)fail('Direct product gate changed its original full producer.');}
+      const aggregate=producer?.aggregateArtifact;if(!aggregate||aggregate.reportSha256!==producer.reportSha256||aggregate.artifactName!==`scanner-aggregate-${producer.runId}-${producer.runAttempt}`||!/^[a-f0-9]{64}$/.test(aggregate.artifactSha256)||!/^[1-9][0-9]*$/.test(aggregate.artifactId)||!(Date.parse(aggregate.artifactExpiresAt)>Date.now()))fail('Direct product full aggregate is unavailable or changed.');
+      if(context.repository!==identity.repository||context.sourceTree!==impact.baseTree||context.checkoutTree!==impact.baseTree)fail('Direct full-product source tree changed.');
+      policyCoverage={policyOriginReview:origin};
+    }else if (context?.repository !== identity.repository || context.sourceSha !== identity.comparisonBase || context.sourceTree !== impact.baseTree || context.checkoutSha !== identity.comparisonBase || context.checkoutTree !== impact.baseTree || context.comparisonBase !== git(['rev-parse', `${identity.comparisonBase}^`]).trim()) fail('Policy inheritance producer does not bind the exact unchanged base tree.');
+    policyCoverage = {...policyCoverage,policyImpact:impact, policyReview:review};
   } else for(const key of ['repository','sourceSha','sourceTree'])if(context?.[key]!==identity[key])fail(`Coverage producer source context mismatch: ${key}.`);
   if(identity.checkoutDirty || context?.requiredCohort!=='four-groups-v1' || proof.contextSha256!==sha256(JSON.stringify(context)))fail('Coverage context is incomplete or dirty.');
   for(const key of ['cohortDigestSha256','inventorySha256','assignmentsSha256','expectedGroups'])if(JSON.stringify(context[key])!==JSON.stringify(identity[key]))fail(`Coverage cohort mismatch: ${key}.`);
@@ -1317,8 +1334,23 @@ async function aggregateResults({options, outputDir, descriptor, inventory, assi
   const needs = readJson(options.needsJson, 'actual workflow predecessor results');
   const issues = [], records = [], allCases = new Set();
   const policyCovered=needs['cohort-routing']?.outputs?.decision==='policy-reuse';
-  const covered=policyCovered || needs['cohort-routing']?.outputs?.decision==='reuse';
-  const freshCoverage=covered?coverageReference(readJson(options.proof,'fresh full-producer proof'),descriptor.resultIdentity):null;
+  const reused=JSON.parse(needs['cohort-routing']?.outputs?.reused||'[]');
+  const covered=policyCovered || needs['cohort-routing']?.outputs?.decision==='reuse'&&reused.length===0;
+  const earlyDecision=needs['early-startup']?.outputs?.decision||needs['cohort-routing']?.outputs?.decision;
+  const earlyCovered=policyCovered || earlyDecision==='reuse';
+  if(!Array.isArray(reused)||new Set(reused).size!==reused.length||reused.some(id=>!GROUP_IDS.includes(id)&&!['rules','compatibility'].includes(id)))fail('Invalid reused-gate inventory.');
+  const emulatorModes=policyCovered?null:needs['event-gates']?.outputs;
+  if(!emulatorModes&&reused.some(gate=>['rules','compatibility'].includes(gate)))fail('Reused emulator gates require their actual consumer outcomes and original coverage fingerprints.');
+  if(emulatorModes&&['rules','compatibility'].some(gate=>!['executed','covered'].includes(emulatorModes[gate])))fail('Required emulator gate outcomes are missing or unknown.');
+  const reusedEmulators=emulatorModes?['rules','compatibility'].filter(gate=>emulatorModes[gate]==='covered'):reused.filter(id=>!GROUP_IDS.includes(id));
+  if(reusedEmulators.some(gate=>!reused.includes(gate)))fail('Emulator coverage was not admitted by the original routing proof.');
+  const freshProof=covered||reused.length?readJson(options.proof,'fresh original-producer proof'):null;
+  const freshCoverage=covered?coverageReference(freshProof,descriptor.resultIdentity):null;
+  const emulatorCoverage=Object.fromEntries(reusedEmulators.map(gate=>{
+    const reference=coverageReference(freshProof,{...descriptor.resultIdentity,selectedGroup:gate},false);
+    if(emulatorModes[gate+'-coverage']!==sha256(JSON.stringify(reference)))fail('Emulator original coverage changed after the consumer: '+gate);
+    return [gate,reference];
+  }));
   for (const id of ['validation-context','event-gates','cohort-routing','regression']) {
     if (needs[id]?.result !== 'success') issues.push(`Required job ${id} did not succeed: ${needs[id]?.result || 'missing'}.`);
   }
@@ -1329,11 +1361,11 @@ async function aggregateResults({options, outputDir, descriptor, inventory, assi
     try{
       if(!options.earlyReceipt)fail('Required --early-receipt is missing; blocked work is not executed coverage.');
       const {verifyEarlyReceipt,verifyEarlyMobileReport,earlyGroupCoverage}=await import('./early-ci.mjs');
-      const early=verifyEarlyReceipt(options.earlyReceipt,descriptor,{proof:covered?options.proof:undefined});
-      if(early.mode!==(covered?'covered':'full'))fail('Early receipt execution mode mismatch.');
-      if(!covered)for(const group of GROUP_IDS)earlyCoverageByGroup.set(group,earlyGroupCoverage(options.earlyReceipt,descriptor,group));
+      const early=verifyEarlyReceipt(options.earlyReceipt,descriptor,{proof:earlyCovered?options.proof:undefined});
+      if(early.mode!==(earlyCovered?'covered':'full'))fail('Early receipt execution mode mismatch.');
+      if(!earlyCovered)for(const group of GROUP_IDS)earlyCoverageByGroup.set(group,earlyGroupCoverage(options.earlyReceipt,descriptor,group));
       earlyEvidence={mode:early.mode,receiptSha256:sha256(fs.readFileSync(options.earlyReceipt)),children:early.children.length,coverage:early.coverage||null};
-      if(!covered){if(!options.mobileStressReport)fail('Required stress execution integrity report is missing.');const stress=verifyEarlyMobileReport(path.dirname(options.mobileStressReport),descriptor.resultIdentity,true);stressEvidence={status:stress.status,reportSha256:sha256(fs.readFileSync(options.mobileStressReport))};}
+      if(!earlyCovered){if(!options.mobileStressReport)fail('Required stress execution integrity report is missing.');const stress=verifyEarlyMobileReport(path.dirname(options.mobileStressReport),descriptor.resultIdentity,true);stressEvidence={status:stress.status,reportSha256:sha256(fs.readFileSync(options.mobileStressReport))};}
     }catch(error){issues.push('Early startup evidence: '+error.message);}
   }
   const directories = fs.readdirSync(options.resultsDir).filter(name => fs.lstatSync(path.join(options.resultsDir,name)).isDirectory());
@@ -1353,16 +1385,17 @@ async function aggregateResults({options, outputDir, descriptor, inventory, assi
       const root = path.resolve(options.resultsDir,id);
       if (fs.lstatSync(root).isSymbolicLink()) fail('Group evidence must be a real directory.');
       const record = readJson(path.join(root,'result.json'),`required result for ${id}`);
-      if (record.status !== (covered?'covered':'passed') || record.issues?.length || !Array.isArray(record.issues)) fail(`Required group ${id} did not pass.`);
+      const inputCovered=!covered&&reused.includes(id)&&record.status==='covered';
+      if (record.status !== (covered||inputCovered?'covered':'passed') || record.issues?.length || !Array.isArray(record.issues)) fail(`Required group ${id} did not pass.`);
       const identity = record.resultIdentity;
       for (const [key,value] of Object.entries(descriptor.resultIdentity)) {
         if (key === 'selectedGroup') continue;
         if (JSON.stringify(identity?.[key]) !== JSON.stringify(value)) fail(`Required group ${id} identity mismatch: ${key}.`);
       }
       if (identity?.selectedGroup !== id || identity.checkoutDirty) fail(`Wrong or dirty group identity: ${id}.`);
-      if(covered){
-        if(record.cases?.length!==0||record.artifacts?.length!==0||record.process!==null||JSON.stringify(record.coverage)!==JSON.stringify(freshCoverage))fail('Covered records are mixed, incomplete or claim current execution.');
-        if (descriptor.groups.find(group=>group.id===id).browserRuntimeRoots.selectedRoots.length) fail('A group with newly required browser roots cannot be covered without current browser execution.');
+      if(covered||inputCovered){
+        const expectedCoverage=inputCovered?coverageReference(freshProof,{...descriptor.resultIdentity,selectedGroup:id},false):freshCoverage;
+        if(record.cases?.length!==0||record.artifacts?.length!==0||record.process!==null||JSON.stringify(record.coverage)!==JSON.stringify(expectedCoverage))fail('Covered records are mixed, incomplete or claim current execution.');
         records.push({group:id,mode:'covered',identity,coverage:record.coverage});continue;
       }
       if (record.process?.exitCode !== 0 || record.process?.signal || record.process?.spawnError) fail(`Required group ${id} process failed or was canceled.`);
@@ -1456,11 +1489,13 @@ async function aggregateResults({options, outputDir, descriptor, inventory, assi
       records.push({group:id,resultSha256:sha256(fs.readFileSync(path.join(root,'result.json'))),cases:cases.length,earlyCases:transferred?.cases.length||0,earlyCoverage:transferred,passed:cases.filter(item=>item.status==='passed').length,skipped:cases.filter(item=>item.status==='skipped').length,artifacts:record.artifacts,identity});
     } catch (error) { issues.push(`${id}: ${error.message}`); }
   }
-  const report = {schemaVersion:1,status:issues.length?'failed':'passed',mode:policyCovered?'policy-covered':covered?'covered':'full',resultIdentity:descriptor.resultIdentity,groups:records,caseCount:allCases.size,...(earlyWorkflow?{earlyEvidence,stressEvidence}:{}),issues,finishedAt:new Date().toISOString()};
+  const coveredCount=records.filter(record=>record.mode==='covered').length;
+  const original=!policyCovered&&!earlyCovered&&coveredCount===0&&reusedEmulators.length===0;
+  const report = {schemaVersion:1,status:issues.length?'failed':'passed',mode:policyCovered?'policy-covered':coveredCount===GROUP_IDS.length?'covered':coveredCount?'mixed':'full',resultIdentity:descriptor.resultIdentity,groups:records,emulatorCoverage,caseCount:allCases.size,...(earlyWorkflow?{earlyEvidence,stressEvidence}:{}),issues,finishedAt:new Date().toISOString()};
   atomicWrite(path.join(outputDir,'aggregate.json'),report);
   if (issues.length) fail(issues.join('\n'));
   process.stdout.write(`Complete required cohort verified: ${allCases.size} cases.\n`);
-  if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT,`report=${sha256(fs.readFileSync(path.join(outputDir,'aggregate.json')))}\n`);
+  if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT,`report=${sha256(fs.readFileSync(path.join(outputDir,'aggregate.json')))}\nmode=${report.mode}\nattestation-mode=${original?'full':'reuse'}\noriginal=${original}\n`);
   return 0;
 }
 
@@ -1661,9 +1696,19 @@ async function main() {
       if(!options.describe&&!options.aggregate&&assignments.rootAssignments.some(row=>row.executionStage==='early-startup')){
         if(!options.earlyReceipt)fail('Required early predecessor receipt is missing before group execution.');
         const {verifyEarlyReceipt,earlyGroupCoverage}=await import('./early-ci.mjs');
-        const early=verifyEarlyReceipt(options.earlyReceipt,descriptor,{proof:options.covered?options.proof:undefined});
-        if(early.mode!==(options.covered?'covered':'full'))fail('Group early predecessor mode mismatch.');
-        if(!options.covered)result.earlyCoverage=earlyGroupCoverage(options.earlyReceipt,descriptor,options.group);
+        const early=verifyEarlyReceipt(options.earlyReceipt,descriptor,{proof:options.proof});
+        result.earlyStageMode=early.mode;
+        const inputCovered=options.covered&&readJson(options.proof,'verified coverage proof').inputPasses?.[options.group];
+        const independentCovered=early.mode==='covered'&&options.proof&&readJson(options.proof,'verified early proof').earlyCoverage;
+        if(early.mode!==(options.covered&&!inputCovered?'covered':'full')&&!(inputCovered&&early.mode==='covered')&&!independentCovered)fail('Group early predecessor mode mismatch.');
+        if(!options.covered&&early.mode==='full'){
+          result.earlyCoverage=earlyGroupCoverage(options.earlyReceipt,descriptor,options.group);
+          if(result.earlyCoverage){
+            const destination=path.join(outputDir,'early-startup-evidence');
+            fs.cpSync(path.dirname(options.earlyReceipt),destination,{recursive:true,errorOnExist:true,dereference:false});
+            result.earlyReceiptRef={path:'early-startup-evidence/receipt.json',sha256:sha256(fs.readFileSync(path.join(destination,'receipt.json')))};
+          }
+        }
       }
       if (options.browserRuntimePreflight) {
         const selection = descriptor.groups.find(group => group.id === options.group).browserRuntimeRoots;
@@ -1711,7 +1756,7 @@ async function main() {
     const selectedFiles = [...new Set([
       ...files.filter(file => assignmentIndex.rootsPerGroup.get(options.group).some(root => assignmentIndex.assignmentsByRoot.get(root)?.file === file)),
     ])].sort();
-    const selectedRoots = assignmentIndex.rootsPerGroup.get(options.group).filter(title=>assignmentIndex.assignmentsByRoot.get(title).executionStage!=='early-startup').sort();
+    const selectedRoots = assignmentIndex.rootsPerGroup.get(options.group).filter(title=>assignmentIndex.assignmentsByRoot.get(title).executionStage!=='early-startup'||result.earlyStageMode==='covered').sort();
     if (!selectedFiles.length || !selectedRoots.length) fail(`Required group ${options.group} is empty.`);
 
       const browserSelection = descriptor.groups.find(group => group.id === options.group).browserRuntimeRoots;

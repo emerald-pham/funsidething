@@ -11,6 +11,11 @@ This map records the current named RISK contracts in tests.js. It lets reviewers
 The named-contract test in tests.js checks that every top-level test whose title starts with RISK appears in this inventory. Add or rename the inventory entry in the same test-first change. If a future feature adds a new risk area, add a heading and place its concrete test names under it.
 
 - RISK repository process: event routing retains exact merge validation before avoiding a duplicate cohort
+- RISK repository process: unchanged CI inputs reuse an original successful gate across events
+- RISK repository process: large original CI artifacts retain verified coverage without buffering native reports
+- RISK repository process: released host locks cannot cause spurious CI migration failures
+- RISK repository process: CI admission enforces reuse before repeating a passed test child
+- RISK repository process: CI observer keeps honest reuse and fresh emulator fallback outcomes
 - RISK repository process: required parallel scanner aggregation rejects absent group evidence
 - RISK repository process: grouped catalog binds real declarations rather than quoted fixtures
 - RISK repository process: nested native fixture output stays isolated at the command boundary
@@ -2323,3 +2328,9 @@ The existing canonical limited-profile process risk also checks the fixed saved 
 The existing early-assigned process root also composes a real failed producer with an external mocked browser and strict canonical profile/stress/aggregate consumers. Finalization retains known offered IDs without execution credit, while missing accounting, unknown offered/executed IDs, source/profile tampering, transport, instrumentation and cleanup faults still block. Synthetic stress records do not establish actual512MB or Linux execution.
 
 The canonical early-admission wrapper uses the existing public TAP parser to require its two exact top-level roots and all13 exact outcome identities: four original outcomes plus nine approved stress controls. Strict totals and identity/hierarchy checks reject missing, duplicate, unknown, failed, cancelled, skipped or TODO child outcomes.
+
+## Reconciled CI admission and retained originals
+
+- `RISK repository process: reconciled CI retains original input coverage and incomplete admission`
+
+Public routing and workflow-consumer controls retain metadata pending, failure and cancellation outcomes, six complete input keys and original run/attempt/job/result/artifact identities. Covered groups launch zero workload children while the independently required early story remains distinct. Fresh Chromium preflight precedes its group; transferred early and browser receipts retain raw bytes and reject changed original artifacts. Policy inheritance requires the original full-product producer and all six retained passes; a mixed or covered consumer cannot become that origin. These are controlled local command/process checks, separate from actual hosted, mobile and release qualification.

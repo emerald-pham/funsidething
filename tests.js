@@ -31704,7 +31704,7 @@ test('RISK CLOUD V2 STARTUP: a transient chunk read automatically recovers to sy
 test('RISK repository process: backward compatibility is a mandatory fail-closed release gate',()=>{
  const workflow=fs.readFileSync(path.join(__dirname,'.github/workflows/data-safety.yml'),'utf8');
  assert.match(workflow,/name: Backward compatibility/,'the required scanner job must run the compatibility matrix');
- assert.match(workflow,/run: npm run test:compatibility/);
+ assert.match(workflow,/run: node scripts\/agent-tools\/ci-pass-reuse\.mjs run-gate --gate compatibility /,'compatibility must use the enforcing execution-or-original-pass consumer');
  const pkg=JSON.parse(fs.readFileSync(path.join(__dirname,'package.json'),'utf8'));
  assert.match(pkg.scripts['test:compatibility'],/firebase emulators:exec.*backward-compatibility\.mjs/);
  const result=spawnSync(process.execPath,['scripts/backward-compatibility.mjs'],{cwd:__dirname,encoding:'utf8',env:{...process.env,FIRESTORE_EMULATOR_HOST:''}});
@@ -45139,6 +45139,43 @@ test('RISK repository process: event routing retains exact merge validation befo
  assert.equal(result.status,0,'The public workflow cohort command must preserve exact canonical merge validation: '+result.stdout+'\n'+result.stderr);
 });
 
+test('RISK repository process: unchanged CI inputs reuse an original successful gate across events',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^workflow reuses an independently passed gate on main for the same complete inputs$','scripts/agent-tools/ci-routing.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
+ const output=(result.stdout||'')+'\n'+(result.stderr||'');
+ assert.equal(result.error,undefined,'The public CI reuse consumer must start: '+output);
+ assert.equal(result.status,0,'Equivalent complete inputs must retain their original successful gate: '+output);
+ assert.match(result.stdout||'',/^# tests 1$/m);assert.match(result.stdout||'',/^# skipped 0$/m);
+});
+
+test('RISK repository process: large original CI artifacts retain verified coverage without buffering native reports',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^workflow input reuse retains large original native evidence and rejects changed bytes$','scripts/agent-tools/ci-routing.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
+ assert.equal(result.status,0,result.stdout+result.stderr);assert.match(result.stdout||'',/^# tests 4$/m);assert.match(result.stdout||'',/^# skipped 0$/m);
+});
+
+test('RISK repository process: released host locks cannot cause spurious CI migration failures',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^migration accepts a live token lock released during ownership inspection$','scripts/agent-tools/coordination.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
+ assert.equal(result.status,0,result.stdout+result.stderr);
+ assert.match(result.stdout||'',/^# tests 1$/m);assert.match(result.stdout||'',/^# skipped 0$/m);
+});
+
+test('RISK repository process: CI admission enforces reuse before repeating a passed test child',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group workflow consumer forbids duplicate execution for a verified input pass$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
+ const output=(result.stdout||'')+'\n'+(result.stderr||'');
+ assert.equal(result.error,undefined,'The actual workflow reuse guard must start: '+output);
+ assert.equal(result.status,0,'CI must reject any route that repeats an already passed test child: '+output);
+ assert.match(result.stdout||'',/^# tests 1$/m);assert.match(result.stdout||'',/^# skipped 0$/m);
+});
+
+test('RISK repository process: CI observer keeps honest reuse and fresh emulator fallback outcomes',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group aggregate preserves observer protocol across emulator coverage and fresh fallback$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
+ assert.equal(result.status,0,result.stdout+result.stderr);assert.match(result.stdout||'',/^# tests 5$/m);assert.match(result.stdout||'',/^# skipped 0$/m);
+});
+
 test('RISK repository process: grouped runner stays covered at the default npm test boundary',t=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
  const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group runner (executes a complete isolated group with bound identity|keeps oversized group selections below the portable argument limit|binds native tests to the actual checkout commit and tree|reconciles a renamed root and preserves baseline case identities)$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
@@ -45688,6 +45725,14 @@ test('RISK repository process: metadata observation preserves bound producer out
  const aggregate=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^workflow metadata aggregate rejects','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:120000,maxBuffer:8*1024*1024});
  assert.equal(aggregate.status,0,'Literal workflow aggregate must preserve incomplete and stale evidence: '+aggregate.stdout+aggregate.stderr);assert.match(aggregate.stdout,/ok [0-9]+ - workflow metadata aggregate rejects pending cancelled unresolved and stale successful routing proofs/);assert.match(aggregate.stdout,/# fail 0/);assert.match(aggregate.stdout,/# cancelled 0/);assert.match(aggregate.stdout,/# skipped 0/);
 
+});
+
+test('RISK repository process: reconciled CI retains original input coverage and incomplete admission',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^reconciled ','scripts/agent-tools/ci-routing.test.mjs','scripts/agent-tools/test-groups.test.mjs','scripts/agent-tools/early-ci.test.mjs','scripts/agent-tools/checkpoint-progress.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:120000,maxBuffer:8*1024*1024});
+ assert.equal(child.status,0,'Reconciled public CI consumers must preserve original coverage and admission: '+child.stdout+child.stderr);
+ assert.match(child.stdout,/ok \d+ - reconciled metadata input routing preserves pending failed and cancelled admission/);
+ assert.match(child.stdout,/# fail 0$/m);assert.match(child.stdout,/# cancelled 0$/m);assert.match(child.stdout,/# skipped 0$/m);
 });
 
 test('RISK repository process: protected diagnostic governance remains distinct from frozen app source',()=>{
