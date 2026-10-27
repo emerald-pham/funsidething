@@ -2334,3 +2334,12 @@ The canonical early-admission wrapper uses the existing public TAP parser to req
 - `RISK repository process: reconciled CI retains original input coverage and incomplete admission`
 
 Public routing and workflow-consumer controls retain metadata pending, failure and cancellation outcomes, six complete input keys and original run/attempt/job/result/artifact identities. Covered groups launch zero workload children while the independently required early story remains distinct. Fresh Chromium preflight precedes its group; transferred early and browser receipts retain raw bytes and reject changed original artifacts. Policy inheritance requires the original full-product producer and all six retained passes; a mixed or covered consumer cannot become that origin. These are controlled local command/process checks, separate from actual hosted, mobile and release qualification.
+
+## Early predecessor runtime and complete aggregate modes
+
+- `RISK repository process: early predecessor proof survives fresh consumer runtimes`
+- `RISK repository process: aggregate modes account for every inherited required source`
+
+Public early execution on synthetic image A retains its complete producing inputs in the raw artifact. Real fresh group and aggregate processes on synthetic image B must accept the intact original source/runtime proof while current-runtime input selection invalidates group reuse. Missing, incomplete or changed producer runtime, source, workflow, complete-input key and retained proof are refused before workload dispatch. Existing covered admission still requires its matching current runtime.
+
+Public aggregate controls cover four fresh groups with inherited emulator evidence, four fresh groups with inherited early evidence, covered groups with fresh emulators and entirely inherited required sources. Durable modes report full, mixed or covered across those actual sources; inherited evidence retains reuse attestation and cannot claim original full-producer authority. Missing or changed original references fail. These controlled OS-process/parser fixtures provide no actual browser, memory-cap, emulator, hosted or deployment proof.

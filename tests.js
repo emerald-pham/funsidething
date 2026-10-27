@@ -45772,6 +45772,23 @@ test('RISK repository process: browser preflight interruption cleans its actual 
 });
 
 
+test('RISK repository process: early predecessor proof survives fresh consumer runtimes',{timeout:45000},()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group fresh runtimes consume an intact original early predecessor$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:40000,maxBuffer:4*1024*1024});
+ assert.equal(child.error,undefined,'The public predecessor/runtime controls must start: '+child.stderr);
+ assert.equal(child.status,0,'Fresh runtime execution must preserve intact original early proof and reject mutations before workload: '+child.stdout+child.stderr);
+ for(const [name,count]of Object.entries({tests:12,pass:12,fail:0,cancelled:0,skipped:0,todo:0}))assert.match(child.stdout,new RegExp('^# '+name+' '+count+'$','m'));
+});
+
+test('RISK repository process: aggregate modes account for every inherited required source',{timeout:45000},()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group aggregate preserves observer protocol across emulator coverage and fresh fallback$|^test group aggregate classifies early-only inheritance across every required source$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:40000,maxBuffer:4*1024*1024});
+ assert.equal(child.error,undefined,'The public aggregate controls must start: '+child.stderr);
+ assert.equal(child.status,0,'Durable full/mixed/covered modes must include group, emulator and early evidence while retaining original authority barriers: '+child.stdout+child.stderr);
+ for(const title of ['test group aggregate preserves observer protocol across emulator coverage and fresh fallback','test group aggregate classifies early-only inheritance across every required source'])assert.ok(child.stdout.includes(' - '+title),'Both public aggregate consumers must execute: '+title);
+ for(const [name,count]of Object.entries({tests:12,pass:12,fail:0,cancelled:0,skipped:0,todo:0}))assert.match(child.stdout,new RegExp('^# '+name+' '+count+'$','m'));
+});
+
 test('RISK repository process: fresh Linux known-control verification requires its independent hot routine',{timeout:20000},()=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
  const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^fresh Linux known-control verification','scripts/agent-tools/native-attribution.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:15000});

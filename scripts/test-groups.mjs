@@ -1491,7 +1491,12 @@ async function aggregateResults({options, outputDir, descriptor, inventory, assi
   }
   const coveredCount=records.filter(record=>record.mode==='covered').length;
   const original=!policyCovered&&!earlyCovered&&coveredCount===0&&reusedEmulators.length===0;
-  const report = {schemaVersion:1,status:issues.length?'failed':'passed',mode:policyCovered?'policy-covered':coveredCount===GROUP_IDS.length?'covered':coveredCount?'mixed':'full',resultIdentity:descriptor.resultIdentity,groups:records,emulatorCoverage,caseCount:allCases.size,...(earlyWorkflow?{earlyEvidence,stressEvidence}:{}),issues,finishedAt:new Date().toISOString()};
+  // Canonical cohort coverage inherits its emulator gates when no individual
+  // consumer outputs exist. Actual emulator outcomes and early execution still
+  // determine whether a partially executed cohort is mixed rather than covered.
+  const executionModes=[...records.map(record=>record.mode==='covered'?'covered':'executed'),...['rules','compatibility'].map(gate=>emulatorModes?.[gate]||(covered?'covered':'executed')),...(earlyWorkflow?[earlyCovered?'covered':'executed']:[])];
+  const mode=policyCovered?'policy-covered':executionModes.every(mode=>mode==='covered')?'covered':executionModes.some(mode=>mode==='covered')?'mixed':'full';
+  const report = {schemaVersion:1,status:issues.length?'failed':'passed',mode,resultIdentity:descriptor.resultIdentity,groups:records,emulatorCoverage,caseCount:allCases.size,...(earlyWorkflow?{earlyEvidence,stressEvidence}:{}),issues,finishedAt:new Date().toISOString()};
   atomicWrite(path.join(outputDir,'aggregate.json'),report);
   if (issues.length) fail(issues.join('\n'));
   process.stdout.write(`Complete required cohort verified: ${allCases.size} cases.\n`);

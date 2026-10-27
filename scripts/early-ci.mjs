@@ -42,6 +42,19 @@ function identity(descriptor){
 function inventory(directory){
  const rows=[];const visit=dir=>{for(const entry of fs.readdirSync(dir,{withFileTypes:true})){const file=path.join(dir,entry.name);assert.equal(entry.isSymbolicLink(),false);if(entry.isDirectory())visit(file);else{assert.equal(entry.isFile(),true);const relative=path.relative(directory,file).split(path.sep).join('/');if(relative==='receipt.json')continue;const bytes=fs.readFileSync(file);rows.push({path:relative,bytes:bytes.length,sha256:hash(bytes)});}}};visit(directory);return rows.sort((a,b)=>a.path.localeCompare(b.path));
 }
+function producerInputs(identity){
+ const id=identity.descriptor,inputs={policy:'complete-ci-inputs-v1',repository:id.repository,checkoutTree:id.checkoutTree,comparisonBase:id.comparisonBase,runtime:identity.runtime};
+ return{kind:'ci-early-producer-inputs-v1',identity,inputs,inputKey:ciInputKey(inputs,'early-startup')};
+}
+function verifyProducerRuntime(receipt,directory){
+ const runtime=receipt.identity?.runtime,file=path.join(directory,'producer-inputs.json');
+ if(runtime===undefined){assert.equal(fs.existsSync(file),false,'Early producer runtime is missing from its retained identity');return null;}
+ const keys=['node','platform','arch','imageOS','imageVersion'];
+ assert.deepEqual(Object.keys(runtime||{}).sort(),[...keys].sort(),'Complete original early runtime required');
+ assert.ok(keys.every(key=>typeof runtime[key]==='string'&&runtime[key].trim()),'Original early runtime cannot be unknown');
+ assert.deepEqual(json(file),producerInputs(receipt.identity),'Early producer complete-input proof differs from its retained identity');
+ return runtime;
+}
 function assertHarness(raw){const cases=parseTap(raw),roots=cases.filter(row=>EARLY_CASES.includes(row.root));for(const name of EARLY_CASES)assert.equal(cases.filter(row=>row.id===name&&row.status==='passed').length,1,'One completed required harness root: '+name);assert.ok(roots.length>=EARLY_CASES.length);assert.ok(cases.every(row=>row.status==='passed'),'Harness cannot omit, skip, cancel or fail outcomes');return cases.length;}
 function earlyCatalog(repo=root){
  const file=path.join(repo,'scripts/test-group-assignments.json');
@@ -82,18 +95,29 @@ function earlyCoverageReference(proof,id){
  assert.equal(origin.earlyArtifact.reportSha256,origin.earlyReportSha256);return pass;
 }
 export function verifyEarlyReceipt(file,descriptor,{proof}={}){
- const receipt=json(file),directory=path.dirname(file),bound=identity(descriptor);assert.equal(receipt.schemaVersion,1);assert.equal(receipt.status,'passed');assert.deepEqual(receipt.identity,bound);assert.deepEqual(receipt.artifacts,inventory(directory),'Every early artifact byte must remain present');
+ const receipt=json(file),directory=path.dirname(file),bound=identity(descriptor);
+ assert.equal(receipt.schemaVersion,1);assert.equal(receipt.status,'passed');assert.deepEqual(receipt.artifacts,inventory(directory),'Every early artifact byte must remain present');
+ // A fresh downstream job may use another image. Verify the original producer's
+ // complete inputs from the inventoried artifact; reuse admission still checks
+ // the current runtime when creating and consuming covered evidence below.
+ if(receipt.mode==='full'){const runtime=verifyProducerRuntime(receipt,directory);if(runtime)bound.runtime=runtime;}
+ assert.deepEqual(receipt.identity,bound);
  if(receipt.mode==='covered'){assert.ok(proof,'Fresh complete producer proof required');const coverage=earlyCoverageReference(json(proof),descriptor.resultIdentity);assert.deepEqual(receipt.coverage,coverage);assert.match(coverage.coveredBy.earlyReportSha256||'',/^[a-f0-9]{64}$/,'Original early receipt required');assert.equal(receipt.children.length,0);return receipt;}
  return verifyRetainedEarlyReceipt(file,bound,{repo:root});
 }
 export function verifyRetainedEarlyReceipt(file,expected,{repo=root}={}){
  const receipt=json(file),directory=path.dirname(file),descriptor={resultIdentity:expected.descriptor};assert.equal(receipt.schemaVersion,1);assert.equal(receipt.status,'passed');assert.deepEqual(receipt.identity,expected);assert.deepEqual(receipt.artifacts,inventory(directory),'Every retained early artifact byte must remain present');
+ // Older retained uploads predate producer-inputs.json. Their caller binds the
+ // exact expected identity/runtime to original job, archive and input-key proof;
+ // current standalone/group verification requires the new inventoried proof.
+ if(fs.existsSync(path.join(directory,'producer-inputs.json')))verifyProducerRuntime(receipt,directory);
  assert.equal(receipt.mode,'full');assert.deepEqual(receipt.children.map(row=>row.kind),['harness','required-1gb']);for(const child of receipt.children){assert.equal(child.exitCode,0);assert.equal(child.signal,null);assert.equal(child.error,null);}
  assert.equal(receipt.harnessCaseCount,assertHarness(fs.readFileSync(path.join(directory,'harness.stdout'),'utf8')));if(earlyCatalog(repo).length||receipt.executionCases)assert.deepEqual(receipt.executionCases,collectEarlyCases(directory,descriptor,repo),'Early outcome records must equal actual raw streams');if(json(path.join(repo,manifestPath)).canonicalLimitedProfile){const reports=receipt.artifacts.filter(row=>row.path.endsWith('.json')).map(row=>json(path.join(directory,row.path))).filter(row=>row.kind==='button-diagnostic'&&row.engine==='chromium');assert.equal(reports.length,1,'Exactly one actual confirmed modal consumer report required');for(const report of reports)verifyProfiledNativeReport(report,{repo,candidateCommit:descriptor.resultIdentity.checkoutSha,candidateTree:descriptor.resultIdentity.checkoutTree});}if(json(path.join(repo,manifestPath)).sceneryFixture){const reports=receipt.artifacts.filter(row=>row.path.endsWith('.json')).map(row=>json(path.join(directory,row.path))).filter(row=>row.kind==='button-scenery-fixture');assert.equal(reports.length,5,'Four actual saved scenery causal reports plus their early-launch refusal required');const causal=reports.filter(report=>/^Error: Causal (?:painted-slot|late-copy) probe complete; not native acceptance/.test(report.failure||''));assert.equal(causal.length,4);assert.equal(causal.filter(report=>report.failure.startsWith('Error: Causal painted-slot')).length,1);for(const report of reports){verifySceneryFixtureReport(report,{repo,candidateCommit:descriptor.resultIdentity.checkoutSha,candidateTree:descriptor.resultIdentity.checkoutTree});assert.equal(report.status,'failed');assert.equal(report.cleanup?.serverClosed,true);if(causal.includes(report)){for(const key of ['contextClosed','browserClosed'])assert.equal(report.cleanup?.[key],true);}else assert.match(report.failure,/Controlled early scenery launch failure/);}}mobile(path.join(directory,'required'),descriptor.resultIdentity,false,repo);return receipt;
 }
 function options(argv){const result={};for(let i=0;i<argv.length;i++){const key=argv[i];assert.ok(['--run','--verify','--covered','--descriptor','--output-dir','--receipt','--proof'].includes(key),'Unknown early option: '+key);assert.equal(result[key],undefined);result[key]=['--run','--verify','--covered'].includes(key)?true:argv[++i];assert.ok(result[key]);}assert.equal(['--run','--verify','--covered'].filter(key=>result[key]).length,1);assert.ok(result['--descriptor']);return result;}
 async function main(){const args=options(process.argv.slice(2)),descriptor=json(args['--descriptor']);if(args['--verify']){verifyEarlyReceipt(args['--receipt'],descriptor,{proof:args['--proof']});return;}
  const bound=identity(descriptor),directory=path.resolve(args['--output-dir']);assert.equal(fs.existsSync(directory),false,'Fresh early output required');fs.mkdirSync(directory,{recursive:true});
+ if(args['--run']&&bound.runtime)fs.writeFileSync(path.join(directory,'producer-inputs.json'),JSON.stringify(producerInputs(bound),null,2)+'\n',{flag:'wx'});
  const receipt={schemaVersion:1,status:'running',mode:args['--covered']?'covered':'full',identity:bound,startedAt:new Date().toISOString(),children:[],artifacts:[],limits:['OS-process and raw artifact accounting; actual hosted mobile evidence is required separately from controlled process fixtures.']};
  const save=()=>{receipt.artifacts=inventory(directory);fs.writeFileSync(path.join(directory,'receipt.json'),JSON.stringify(receipt,null,2)+'\n');};
  try{

@@ -913,6 +913,88 @@ function inputCoverage(fixture, group = 'core') {
   return {file,proof};
 }
 
+async function earlyProcessFixture(t) {
+  const fixture=createFixture(t,{early:true,earlyTransfer:true,nativeTitle:'RISK repository process: required installed-client native outcomes and artifacts execute exactly once',nativeReports:true});
+  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'chain-early-runtime-proof-'));t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+  const description=invoke(fixture,{args:['--describe']});assert.equal(description.status,0,description.stderr);
+  const descriptor=path.join(description.outputDir,'descriptor.json'),id=JSON.parse(fs.readFileSync(descriptor)).resultIdentity;
+  const {createMobileBundle}=await import('./mobile-memory-fixture.mjs');
+  const nativeIdentity={candidateCommit:id.checkoutSha,candidateTree:id.checkoutTree,sourceSha:id.sourceSha,repository:id.repository,runId:id.runId,runAttempt:id.runAttempt,eventPolicy:id.eventPolicy};
+  const seed=createMobileBundle(path.join(directory,'seed'),nativeIdentity),stress=createMobileBundle(path.join(directory,'stress'),nativeIdentity,'stress-512mb');
+  const journal=path.join(directory,'early-roots.jsonl'),early=path.join(directory,'early');
+  const env={GITHUB_REPOSITORY:id.repository,CHAIN_TEST_SOURCE_SHA:id.sourceSha,CHAIN_TEST_EVENT_POLICY:id.eventPolicy,GITHUB_RUN_ID:id.runId,GITHUB_RUN_ATTEMPT:String(id.runAttempt),GITHUB_EVENT_NAME:undefined,GITHUB_REF:undefined,EARLY_TRANSFER_SEED:seed.directory,EARLY_ROOT_JOURNAL:journal,ImageOS:'fixture-os-A',ImageVersion:'fixture-image-A'};
+  const producerEnv={...process.env,...env};delete producerEnv.NODE_TEST_CONTEXT;
+  const produced=run(process.execPath,['scripts/early-ci.mjs','--run','--descriptor',descriptor,'--output-dir',early],fixture.root,producerEnv);
+  assert.equal(produced.status,0,'The real early command must produce complete controlled evidence: '+produced.stderr);
+  const receipt=path.join(early,'receipt.json'),first=fs.readFileSync(journal,'utf8');assert.equal(first.trim().split('\n').length,5);
+  return {fixture,directory,descriptor,id,stress,env,journal,first,receipt};
+}
+
+test('test group fresh runtimes consume an intact original early predecessor',async t=>{
+  const {fixture,directory,descriptor,id,stress,env,journal,first,receipt}=await earlyProcessFixture(t);
+  const {file,proof}=inputCoverage(fixture);
+  proof.inputContext.runtime.imageOS=env.ImageOS;proof.inputContext.runtime.imageVersion=env.ImageVersion;
+  proof.inputPasses.core.inputKey=createHash('sha256').update(JSON.stringify({...proof.inputContext,gate:'core'})).digest('hex');writeJson(file,proof);
+  const freshEnv={...env,ImageOS:'fixture-os-B',ImageVersion:'fixture-image-B'};
+  const sentinel=path.join(directory,'fresh-core-executed');fixture.originals=new Map();
+  for(const group of groups){
+    const result=invoke(fixture,{group,consumer:true,args:['--proof',file,'--early-receipt',receipt],env:{...freshEnv,CHAIN_DESCRIPTOR_SENTINEL:sentinel}});
+    assert.equal(result.status,0,'Fresh '+group+' on runtime B must accept the verified early producer on runtime A: '+result.stdout+result.stderr);
+    assert.equal(result.evidence.status,'passed','A changed consumer runtime must execute instead of using the A group pass');fixture.originals.set(group,result.outputDir);
+    if(group==='core'||group==='native-process')assert.equal(fs.readFileSync(path.join(result.outputDir,result.evidence.earlyReceiptRef.path),'utf8'),fs.readFileSync(receipt,'utf8'),'Transferred predecessor bytes retain their producer identity');
+  }
+  assert.equal(fs.existsSync(sentinel),true,'The real uncovered core child must run after runtime selection');
+  assert.equal(fs.readFileSync(journal,'utf8'),first,'Fresh readers must not repeat any of the five early roots');
+  const outputs=path.join(directory,'aggregate-outputs');
+  const aggregate=()=>aggregateCopy(t,fixture,(_root,needs)=>{
+    const value=JSON.parse(fs.readFileSync(needs));value['cohort-routing'].outputs={decision:'full',reused:'["core"]'};value['event-gates'].outputs={rules:'executed',compatibility:'executed'};value['early-startup']={result:'success',outputs:{decision:'full'}};value['mobile-stress']={result:'success'};writeJson(needs,value);
+  },['--proof',file,'--early-receipt',receipt,'--mobile-stress-report',path.join(stress.directory,'report.json')],{...freshEnv,GITHUB_OUTPUT:outputs});
+  const accepted=aggregate();assert.equal(accepted.status,0,'Runtime B aggregate must verify the intact runtime A predecessor: '+accepted.stdout+accepted.stderr);
+  const report=JSON.parse(fs.readFileSync(path.join(accepted.outputDir,'aggregate.json')));assert.equal(report.mode,'full');assert.equal(report.caseCount,11);assert.equal(report.earlyEvidence.mode,'full');
+  assert.match(fs.readFileSync(outputs,'utf8'),/^original=true$/m);
+  const consumerEnv={...process.env,...freshEnv};delete consumerEnv.NODE_TEST_CONTEXT;
+  const verify=()=>run(process.execPath,['scripts/early-ci.mjs','--verify','--descriptor',descriptor,'--receipt',receipt],fixture.root,consumerEnv);
+  assert.equal(verify().status,0,'The independent public verifier must use the retained producer runtime');
+  const original=fs.readFileSync(receipt);fs.rmSync(sentinel);
+  for(const [name,mutate]of [
+    ['changed producer image',value=>value.identity.runtime.imageVersion='mutated-image'],
+    ['changed producer Node',value=>value.identity.runtime.node='0.0.0'],
+    ['missing producer runtime',value=>delete value.identity.runtime],
+    ['incomplete producer runtime',value=>delete value.identity.runtime.arch],
+    ['unknown producer image',value=>value.identity.runtime.imageOS=''],
+    ['changed producer source',value=>value.identity.descriptor.sourceSha='0'.repeat(40)],
+    ['changed workflow source',value=>value.identity.workflowBlob='0'.repeat(40)],
+  ])await t.test(name,()=>{
+    const value=JSON.parse(original);mutate(value);writeJson(receipt,value);
+    assert.notEqual(verify().status,0,'Runtime-independent verification must still reject '+name);
+    const refused=invoke(fixture,{consumer:true,args:['--proof',file,'--early-receipt',receipt],env:{...freshEnv,CHAIN_DESCRIPTOR_SENTINEL:sentinel}});
+    assert.notEqual(refused.status,0,'The public group must reject '+name);assert.equal(fs.existsSync(sentinel),false,'Invalid predecessor proof must stop before the workload child');
+    assert.notEqual(aggregate().status,0,'The public aggregate must reject '+name);fs.writeFileSync(receipt,original);
+  });
+  const producerFile=path.join(path.dirname(receipt),'producer-inputs.json'),producerBytes=fs.readFileSync(producerFile);
+  for(const [name,mutate]of [
+    ['missing retained producer inputs',()=>fs.unlinkSync(producerFile)],
+    ['changed producer runtime proof',value=>value.inputs.runtime.imageVersion='mutated-image'],
+    ['changed producer source inputs',value=>value.inputs.checkoutTree='0'.repeat(40)],
+    ['changed producer input key',value=>value.inputKey='0'.repeat(64)],
+  ])await t.test(name,()=>{
+    const producer=JSON.parse(producerBytes);mutate(producer);
+    if(fs.existsSync(producerFile)){
+      writeJson(producerFile,producer);
+      // Keep the byte inventory coherent so semantic checks, rather than a
+      // generic hash mismatch, must refuse a changed complete-input proof.
+      const value=JSON.parse(original),artifact=value.artifacts.find(row=>row.path==='producer-inputs.json'),bytes=fs.readFileSync(producerFile);
+      artifact.bytes=bytes.length;artifact.sha256=createHash('sha256').update(bytes).digest('hex');writeJson(receipt,value);
+    }
+    assert.notEqual(verify().status,0,'The public verifier must reject '+name);
+    const refused=invoke(fixture,{consumer:true,args:['--proof',file,'--early-receipt',receipt],env:{...freshEnv,CHAIN_DESCRIPTOR_SENTINEL:sentinel}});
+    assert.notEqual(refused.status,0,'The public group must reject '+name);assert.equal(fs.existsSync(sentinel),false);
+    assert.notEqual(aggregate().status,0,'The public aggregate must reject '+name);fs.writeFileSync(producerFile,producerBytes);fs.writeFileSync(receipt,original);
+  });
+  assert.equal(fs.readFileSync(journal,'utf8'),first,'Refused readers launch no early children');
+  t.diagnostic(JSON.stringify({scope:'Controlled public early/group/aggregate OS processes; synthetic runner labels, no engine/cgroup/hosted proof',producerRuntime:JSON.parse(original).identity.runtime,readerImage:{ImageOS:freshEnv.ImageOS,ImageVersion:freshEnv.ImageVersion},actualGroups:report.groups.map(row=>({group:row.group,cases:row.cases,earlyCases:row.earlyCases})),caseCount:report.caseCount,sourceSha:id.sourceSha}));
+});
+
 test('test group input coverage reuses a passed group without claiming new execution', t => {
   const fixture=createFixture(t),{file,proof}=inputCoverage(fixture),sentinel=path.join(fixture.root,'duplicate-core-execution');
   const result=invoke(fixture,{args:['--covered','--proof',file],env:{ImageOS:'ubuntu24',ImageVersion:'20261022.1.0',CHAIN_DESCRIPTOR_SENTINEL:sentinel}});
@@ -957,8 +1039,56 @@ test('test group aggregate preserves observer protocol across emulator coverage 
     const outputs=path.join(path.dirname(file),'aggregate-outputs');
     const result=aggregateCopy(t,fixture,(_root,needs)=>{const x=JSON.parse(fs.readFileSync(needs));x['cohort-routing'].outputs={decision:'full',reused:'["rules"]'};x['event-gates'].outputs={rules:rulesMode,compatibility:'executed','rules-coverage':rulesMode==='covered'?consumed:''};writeJson(needs,x);},['--proof',file],{ImageOS:'ubuntu24',ImageVersion:'20261022.1.0',GITHUB_OUTPUT:outputs});
     assert.equal(result.status===0,accepted,result.stdout+result.stderr);
-    if(accepted){const text=fs.readFileSync(outputs,'utf8');assert.match(text,new RegExp('^attestation-mode='+mode+'$','m'),'the existing observer must receive a truthful full/reuse attestation');assert.match(text,new RegExp('^original='+(mode==='full')+'$','m'),'only entirely executed cohorts can publish the original full producer marker');}
+    if(accepted){const text=fs.readFileSync(outputs,'utf8');assert.match(text,new RegExp('^attestation-mode='+mode+'$','m'),'the existing observer must receive a truthful full/reuse attestation');assert.match(text,new RegExp('^original='+(mode==='full')+'$','m'),'only entirely executed cohorts can publish the original full producer marker');const report=JSON.parse(fs.readFileSync(path.join(result.outputDir,'aggregate.json')));assert.ok(report.groups.every(group=>group.mode!=='covered'),'The emulator-only control must retain four actually executed groups');assert.equal(report.mode,mode==='reuse'?'mixed':'full','Durable aggregate mode must include inherited emulator evidence even with four fresh groups');assert.match(text,new RegExp('^mode='+report.mode+'$','m'));}
   });
+});
+
+test('test group aggregate classifies early-only inheritance across every required source',async t=>{
+  const {fixture,directory,descriptor,id,env,receipt}=await earlyProcessFixture(t);
+  const {file,proof}=inputCoverage(fixture);proof.inputPasses={};
+  const inputs={...proof.inputContext,runtime:{...proof.inputContext.runtime,imageOS:env.ImageOS,imageVersion:env.ImageVersion}};proof.inputContext=inputs;
+  const hash=value=>createHash('sha256').update(value).digest('hex');
+  const earlyArtifact={artifactId:'902',artifactName:'original-early',artifactSha256:'3'.repeat(64),artifactExpiresAt:'2030-01-01T00:00:00Z',reportSha256:hash(fs.readFileSync(receipt))};
+  proof.earlyCoverage={kind:'ci-early-execution-v1',inputs,inputKey:hash(JSON.stringify({...inputs,gate:'early-startup'})),coveredBy:{runId:'71',runAttempt:'2',earlyJobId:'703',stressJobId:'704',sourceSha:id.sourceSha,checkoutSha:id.checkoutSha,checkoutTree:id.checkoutTree,comparisonBase:id.comparisonBase,earlyReportSha256:earlyArtifact.reportSha256,earlyArtifact,stressArtifact:{...earlyArtifact,artifactId:'903',artifactName:'original-stress'}}};writeJson(file,proof);
+  const early=path.join(directory,'covered-early'),childEnv={...process.env,...env};delete childEnv.NODE_TEST_CONTEXT;
+  const coveredEarly=run(process.execPath,['scripts/early-ci.mjs','--covered','--descriptor',descriptor,'--proof',file,'--output-dir',early],fixture.root,childEnv);assert.equal(coveredEarly.status,0,coveredEarly.stderr);
+  const inheritedReceipt=path.join(early,'receipt.json');assert.deepEqual(JSON.parse(fs.readFileSync(inheritedReceipt)).children,[],'Inherited early execution contributes no current workload');
+  fixture.originals=new Map();
+  for(const group of groups){const result=invoke(fixture,{group,consumer:true,args:['--proof',file,'--early-receipt',inheritedReceipt],env});assert.equal(result.status,0,result.stdout+result.stderr);assert.equal(result.evidence.status,'passed');fixture.originals.set(group,result.outputDir);}
+  const freshGroups=new Map(fixture.originals);
+  const aggregate=({reused=[],emulators={rules:'executed',compatibility:'executed'},mutate=()=>{}}={})=>{
+    const output=path.join(directory,'aggregate-outputs-'+(++outputSerial));
+    const result=aggregateCopy(t,fixture,(_root,needs)=>{
+      const value=JSON.parse(fs.readFileSync(needs));value['cohort-routing'].outputs={decision:'full',reused:JSON.stringify(reused)};value['event-gates'].outputs=emulators;value['early-startup']={result:'success',outputs:{decision:'reuse'}};value['mobile-stress']={result:'success'};mutate(value);writeJson(needs,value);
+    },['--proof',file,'--early-receipt',inheritedReceipt],{...env,GITHUB_OUTPUT:output});
+    return{...result,outputs:fs.existsSync(output)?fs.readFileSync(output,'utf8'):''};
+  };
+  const accepted=aggregate();assert.equal(accepted.status,0,accepted.stdout+accepted.stderr);
+  const report=JSON.parse(fs.readFileSync(path.join(accepted.outputDir,'aggregate.json')));
+  assert.equal(report.mode,'mixed','Four fresh groups plus inherited early execution must never claim a full aggregate');
+  assert.ok(report.groups.every(group=>group.mode!=='covered'));assert.equal(report.earlyEvidence.mode,'covered');assert.equal(report.stressEvidence,null);assert.equal(report.caseCount,11);
+  assert.match(accepted.outputs,/^mode=mixed$/m);assert.match(accepted.outputs,/^attestation-mode=reuse$/m);assert.match(accepted.outputs,/^original=false$/m);
+  const originalProof=structuredClone(proof);
+  for(const [name,mutate]of [
+    ['missing original early proof',value=>delete value.earlyCoverage],
+    ['changed original early report',value=>{value.earlyCoverage.coveredBy.earlyReportSha256='0'.repeat(64);value.earlyCoverage.coveredBy.earlyArtifact.reportSha256='0'.repeat(64);}],
+    ['changed producing runtime proof',value=>value.earlyCoverage.inputs.runtime.imageVersion='mutated-image'],
+    ['changed original early source',value=>value.earlyCoverage.coveredBy.checkoutTree='0'.repeat(40)],
+  ])await t.test(name,()=>{
+    const changed=structuredClone(originalProof);mutate(changed);writeJson(file,changed);const refused=aggregate();assert.notEqual(refused.status,0,'Inherited early evidence must reject '+name);assert.doesNotMatch(refused.outputs,/^original=true$/m);writeJson(file,originalProof);
+  });
+  const passFor=gate=>({kind:'ci-input-pass-v1',gate,inputs,inputKey:hash(JSON.stringify({...inputs,gate})),coveredBy:{runId:'71',runAttempt:'2',jobId:'701',sourceSha:id.sourceSha,checkoutSha:id.checkoutSha,checkoutTree:id.checkoutTree,comparisonBase:id.comparisonBase,resultSha256:'1'.repeat(64),artifactId:'901',artifactName:'original-'+gate,artifactSha256:'2'.repeat(64),artifactExpiresAt:'2030-01-01T00:00:00Z'}});
+  proof.inputPasses=Object.fromEntries([...groups,'rules','compatibility'].map(gate=>[gate,passFor(gate)]));writeJson(file,proof);
+  fixture.originals=new Map();for(const group of groups){const result=invoke(fixture,{group,consumer:true,args:['--proof',file,'--early-receipt',inheritedReceipt],env});assert.equal(result.status,0,result.stderr);assert.equal(result.evidence.status,'covered');assert.equal(result.evidence.process,null);fixture.originals.set(group,result.outputDir);}
+  await t.test('all groups inherited with fresh emulators remains mixed',()=>{
+    const result=aggregate({reused:groups});assert.equal(result.status,0,result.stdout+result.stderr);assert.equal(JSON.parse(fs.readFileSync(path.join(result.outputDir,'aggregate.json'))).mode,'mixed','Fresh emulator executions keep an otherwise inherited cohort mixed');assert.match(result.outputs,/^original=false$/m);
+  });
+  await t.test('all required sources inherited reports covered',()=>{
+    const emulators={rules:'covered',compatibility:'covered',...Object.fromEntries(['rules','compatibility'].map(gate=>[gate+'-coverage',hash(JSON.stringify(proof.inputPasses[gate]))]))};
+    const result=aggregate({reused:[...groups,'rules','compatibility'],emulators});assert.equal(result.status,0,result.stdout+result.stderr);const report=JSON.parse(fs.readFileSync(path.join(result.outputDir,'aggregate.json')));assert.equal(report.mode,'covered');assert.equal(report.caseCount,0);assert.match(result.outputs,/^attestation-mode=reuse$/m);assert.match(result.outputs,/^original=false$/m);
+  });
+  fixture.originals=freshGroups;
+  t.diagnostic('Public aggregate controls retain early-only mixed, partially executed mixed and entirely inherited covered modes; no synthetic evidence becomes an original full producer.');
 });
 
 test('test group workflow consumer forbids duplicate execution for a verified input pass', t => {

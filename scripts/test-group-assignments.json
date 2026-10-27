@@ -38,6 +38,26 @@
   ],
   "rootAssignments": [
     {
+      "root": "test group fresh runtimes consume an intact original early predecessor",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "test group aggregate classifies early-only inheritance across every required source",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "RISK repository process: early predecessor proof survives fresh consumer runtimes",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: aggregate modes account for every inherited required source",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
       "root": "workflow input reuse retains large original native evidence and rejects changed bytes",
       "group": "native-process",
       "file": "scripts/agent-tools/ci-routing.test.mjs"

@@ -611,6 +611,8 @@ function publishedOriginalEarly(f,record,github,variant='valid'){
  const hash=bytes=>createHash('sha256').update(bytes).digest('hex'),artifacts=[];const visit=dir=>{for(const item of readdirSync(dir,{withFileTypes:true})){const file=path.join(dir,item.name);if(item.isDirectory())visit(file);else{const bytes=readFileSync(file);artifacts.push({path:path.relative(root,file).split(path.sep).join('/'),bytes:bytes.length,sha256:hash(bytes)});}}};
  visit(root);
  const receipt={schemaVersion:1,status:'passed',mode:variant==='covered early'?'covered':'full',identity:{descriptor:id,workflowBlob:record.cohortContext.workflowBlob,harnessSourceSha256:hash(readFileSync(path.join(f.source,'scripts/early-ci-harness-source.json'))),runtime:record.inputContext.runtime,eventName:'pull_request',eventRef:'refs/pull/17/merge'},children:['harness','required-1gb'].map(kind=>({kind,exitCode:0,signal:null,error:null})),harnessCaseCount:3,artifacts:artifacts.sort((a,b)=>a.path.localeCompare(b.path))};
+ if(variant==='changed runtime')receipt.identity.runtime={...receipt.identity.runtime,imageVersion:'mutated-original-image'};
+ if(variant==='unknown runtime')delete receipt.identity.runtime;
  const bytes=JSON.stringify(receipt);writeFileSync(path.join(root,'receipt.json'),bytes);
  if(variant==='changed raw')writeFileSync(path.join(root,'harness.stdout'),'changed stream\n');
  for(const [name,directory]of [['early-startup',root],['mobile-stress',stress.directory]]){
@@ -877,7 +879,7 @@ test('reconciled metadata routing holds a mixed early origin without duplicate m
 });
 
 test('reconciled mixed metadata verifies original early artifacts without full-product authority',async parent=>{
- for(const variant of ['valid','wrong cap','covered early','changed raw','missing early'])await parent.test(variant,t=>{
+ for(const variant of ['valid','wrong cap','covered early','changed raw','missing early','changed runtime','unknown runtime'])await parent.test(variant,t=>{
   const f=fixture(t,true,false,true),first=invoke(f,{event:'pull_request',checkout:f.merge,environment:descriptorFor(f,f.merge)}),canonical=publishedGroups(f,first.record),github=publishedInputPass(f,first.record,['core','scenery','persistence-recovery','native-process','rules','compatibility']);
   for(const job of canonical.jobs){const keyed=github.jobs.find(row=>row.name===job.name);if(keyed)keyed.steps.push(...job.steps);else github.jobs.push(job);}github.tree=canonical.tree;
   const report=publishedOriginalEarly(f,first.record,github,variant);github.jobs.find(job=>job.name==='scanner-tests').steps=[{name:`Verified complete cohort ${first.record.contextSha256} report ${'8'.repeat(64)} mode reuse`,status:'completed',conclusion:'success'}];writeFileSync(f.external,JSON.stringify(github));
