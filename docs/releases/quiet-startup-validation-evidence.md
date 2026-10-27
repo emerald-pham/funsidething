@@ -313,3 +313,29 @@ Its exact served app bytes are recorded separately in
 `full-board-visibility/baseline-92cb-uid-source-binding.json`; the recorder
 identifies the newer producing test source. This later sensitivity is not
 claimed as the original preimplementation RED.
+
+
+## Final full-run fixture boundary
+
+The clean `dbde27a` full qualification completed in record
+`final-full-board/full-suite/2026-10-27T01-46-36-467Z-bcd81fd3-b54d-421c-80c6-5974fe108264.json`:
+3259 passed, four failed and 67 optional cases skipped. It is a failed full
+run, despite both exact installed-client cases passing with complete cleanup.
+The four failures share one fake DOM boundary in
+`exerciseCompletionEditorBoundaries`: it replaced document.querySelector with
+an unconditional object solely to simulate the open modal. The new status
+mirror legitimately asks for a saved-preview button; that broad override
+invented a non-DOM object, producing missing removeAttribute. The three real
+editor/gesture/ack consumers and their five-consumer process controller all
+retained their original source, field, native-save and cold-reopen assertions.
+
+The test-only repair delegates every unrelated selector to the original fixture
+and simulates only `.mback, dialog[open]`. It explicitly asserts that the modal
+exists and no saved-preview status node is invented, then restores the original
+selector. All four previously failing roots pass in
+`final-full-board/fixture-repair/2026-10-27T02-02-50-415Z-f1eb75fa-14c7-46a2-a31b-41961d21ed56.json`.
+This is a fixture contract repair, not a new product RED or runtime fix. App,
+styles, service worker and rendered producer helpers remain byte-identical to
+`dbde27a`; prior visuals retain their actual producing tests and candidate.
+The test-only successor still requires its own clean full/native qualification
+and exact renewed review receipts.

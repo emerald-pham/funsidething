@@ -33785,7 +33785,12 @@ async function exerciseCompletionEditorBoundaries(t,nativeOnly=false,holdAcknowl
  const pending=ctx.cloudPull();await readStarted;
  const paintsBeforeEditorPull=paints.length,scanBeforeEditorPull=scan.innerHTML,chainBeforeEditorPull=[...ctx.state.chain];
  hydrateUnchangedEditorDraft(app,peerId);const title=shim.document.getElementById('etTitle'),due=shim.document.getElementById('etDue');
- shim.document.querySelector=()=>({}); // The lightweight DOM does not derive .mback from modal markup.
+ const querySelector=shim.document.querySelector.bind(shim.document);
+ // Model only the modal boundary absent from this lightweight DOM. Other
+ // selectors must keep their real fixture result, including no saved preview.
+ shim.document.querySelector=selector=>selector==='.mback, dialog[open]'?{}:querySelector(selector);
+ assert.ok(shim.document.querySelector('.mback, dialog[open]'));
+ assert.equal(shim.document.querySelector('[data-saved-preview] .syncbtn'),null,'the editor fixture does not invent a saved appearance status node');
  title.value='Editor draft during delayed recovery';due.value='2026-11-02';
  releaseRead();await pending;CS.pull=basePull;
  assert.equal(shim.document.getElementById('etTitle').value,'Editor draft during delayed recovery','the editor draft remains open when the stale response arrives');
@@ -33795,7 +33800,7 @@ async function exerciseCompletionEditorBoundaries(t,nativeOnly=false,holdAcknowl
  assert.equal(ctx.state.tasks.find(row=>row.id===peerId).title,'Independent peer task','cloud content cannot replace the active editor under its draft');
  assert.equal(vm.runInContext('deferredCloudPull',ctx),true,'the cloud adoption waits for the editor close boundary');
  if(nativeOnly){await oldEntered.promise;const pendingHead=await store.readHead();assert.equal(pendingHead.payload,nativeSource,'the held real native save already protects the original Done and theme before editor Save');}
- shim.document.querySelector=()=>null;
+ shim.document.querySelector=querySelector;
  phase='editor-save-and-deferred-adoption';
  const schedule=ctx.setTimeout;
  // Observe the real Save callback and its persistence result. Let the native
