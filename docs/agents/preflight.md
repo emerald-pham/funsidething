@@ -28,6 +28,8 @@ The command runs the existing default-sky wording test and Quick start FAQ brevi
 
 The managed release pre-push hook uses that same pinned validator on the YAML workflow blobs from every distinct non-deletion outgoing commit before the exact-SHA receipt gate. It reports the outgoing commit and failing workflow path, so an unrelated valid checkout cannot stand in for invalid bytes being pushed. The existing prior hook still receives the original update payload and its nonzero status still blocks the push. A missing or corrupt local validator fails with the documented setup command.
 
+The Data safety workflow also installs and runs the pinned validator in its early `validation-context` job, before cohort setup. The validation step labels the checked-out GitHub SHA, prints the workflow-set hash, and writes a JSON report that an `always()` artifact step retains even when linting fails. This source-bound static check stops later qualification steps on failure; it does not claim hosted or release acceptance until that workflow actually runs.
+
 With no `--base`, the command uses the first available merge base from `origin/main`, `main`, or `master`. Pass `--base <ref>` to choose the comparison explicitly.
 
 It also checks the current branch's published upstream tip when configured. Identical resolved comparison commits run only once. A branch with no upstream (or a detached checkout) keeps the selected-base check. An invalid explicit ref, unavailable configured upstream, or real Git error fails clearly.

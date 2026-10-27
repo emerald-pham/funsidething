@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { chmod, copyFile, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { delimiter, dirname, join, resolve } from 'node:path';
 import { test } from 'node:test';
 import { ACTIONLINT_VERSION, pinnedActionlintAsset, validateWorkflows } from './workflow-validator.mjs';
 
@@ -19,6 +19,21 @@ function validateInRoot(root, sourceDir) {
   const args = [validatorScript, 'validate'];
   if (sourceDir) args.push('--source-dir', sourceDir);
   return spawnSync(process.execPath, args, { cwd: root, encoding: 'utf8', maxBuffer: 1024 * 1024 });
+}
+
+function namedWorkflowStep(workflow, name) {
+  const lines = workflow.split(/\r?\n/);
+  const start = lines.findIndex(line => line.trim() === `- name: ${name}`);
+  if (start < 0) return null;
+  const indent = lines[start].length - lines[start].trimStart().length;
+  let end = start + 1;
+  for (; end < lines.length; end += 1) {
+    const leading = lines[end].length - lines[end].trimStart().length;
+    if (leading === indent && lines[end].trimStart().startsWith('- ')) break;
+  }
+  const block = lines.slice(start, end).join('\n');
+  const run = block.match(new RegExp(`^ {${indent + 2}}run: (.+)$`, 'm'))?.[1] ?? null;
+  return { index: start, block, run };
 }
 
 test('workflow validator command contracts are pinned and source-bound', async (t) => {
@@ -189,6 +204,96 @@ await t.test('public workflow command runs pinned actionlint on invalid job and 
     const validEvidence = JSON.parse(await readFile(validReceipt, 'utf8'));
     assert.equal(validEvidence.ok, true);
     assert.equal(validEvidence.source.label, 'test fixture with step-level runner.temp');
+  } finally {
+    await rm(fixtureRoot, { recursive: true, force: true });
+  }
+});
+
+await t.test('CI executes the checkout-bound validator command and retains its result before qualification', async () => {
+  const workflowPath = join(repositoryRoot, '.github', 'workflows', 'data-safety.yml');
+  const workflowBytes = await readFile(workflowPath);
+  const workflow = workflowBytes.toString('utf8');
+  const jobStart = workflow.indexOf('\n  validation-context:\n');
+  const nextJob = workflow.indexOf('\n  event-gates:\n', jobStart);
+  assert.notEqual(jobStart, -1, 'the existing validation-context job remains the early source authority');
+  assert.notEqual(nextJob, -1, 'the validation-context job remains bounded before event gates');
+  const contextJob = workflow.slice(jobStart, nextJob);
+  const setupStep = namedWorkflowStep(contextJob, 'Install pinned workflow validator');
+  const validateStep = namedWorkflowStep(contextJob, 'Validate pinned workflow checkout');
+  const retainStep = namedWorkflowStep(contextJob, 'Preserve workflow validation evidence');
+  const cohortStep = namedWorkflowStep(contextJob, 'Describe required cohort');
+  assert.ok(setupStep && validateStep && retainStep && cohortStep,
+    'CI must set up the pinned validator, invoke it, retain its report, and only then prepare qualification');
+  assert.match(setupStep.run ?? '', /^npm run agent:setup-workflow-validator$/);
+  assert.match(validateStep.run ?? '', /^npm run agent:validate-workflows/);
+  assert.ok(setupStep.index < validateStep.index && validateStep.index < retainStep.index && retainStep.index < cohortStep.index,
+    'pinned workflow validation and its report precede the cohort and workload graph');
+  assert.match(validateStep.run, /--source-label "GitHub checkout \$\{GITHUB_SHA\}"/);
+  assert.match(validateStep.run, /--evidence-file "\$\{RUNNER_TEMP\}\/workflow-validation\.json"/);
+  assert.match(retainStep.block, /if: always\(\)/);
+  assert.match(retainStep.block, /\$\{\{ runner\.temp \}\}\/workflow-validation\.json/);
+
+  const fixtureRoot = await mkdtemp(join(tmpdir(), 'workflow-validator-ci-step-test-'));
+  try {
+    const workflowDirectory = join(fixtureRoot, '.github', 'workflows');
+    const runnerTemp = join(fixtureRoot, 'runner temp');
+    const fixtureCache = cachePaths(fixtureRoot);
+    await Promise.all([
+      mkdir(workflowDirectory, { recursive: true }),
+      mkdir(runnerTemp, { recursive: true }),
+      mkdir(fixtureCache.directory, { recursive: true }),
+      mkdir(join(fixtureRoot, 'scripts', 'agent-tools'), { recursive: true }),
+    ]);
+    await Promise.all([
+      writeFile(join(fixtureRoot, 'package.json'), JSON.stringify({
+        private: true,
+        type: 'module',
+        scripts: { 'agent:validate-workflows': 'node scripts/agent-tools/workflow-validator.mjs validate' },
+      }, null, 2)),
+      copyFile(validatorScript, join(fixtureRoot, 'scripts', 'agent-tools', 'workflow-validator.mjs')),
+      copyFile(cachePaths(repositoryRoot).executable, fixtureCache.executable),
+      copyFile(cachePaths(repositoryRoot).manifest, fixtureCache.manifest),
+      writeFile(join(workflowDirectory, 'data-safety.yml'), workflowBytes),
+    ]);
+    await chmod(fixtureCache.executable, 0o755);
+
+    const environment = {
+      ...process.env,
+      PATH: `${dirname(process.execPath)}${delimiter}${process.env.PATH ?? ''}`,
+      GITHUB_SHA: '0123456789abcdef0123456789abcdef01234567',
+      RUNNER_TEMP: runnerTemp,
+    };
+    const invokeWorkflowStep = () => spawnSync('bash', [
+      '--noprofile', '--norc', '-e', '-u', '-o', 'pipefail', '-c', validateStep.run,
+    ], { cwd: fixtureRoot, env: environment, encoding: 'utf8', maxBuffer: 2 * 1024 * 1024 });
+    const evidencePath = join(runnerTemp, 'workflow-validation.json');
+    const expectedWorkflowSha256 = createHash('sha256').update(workflowBytes).digest('hex');
+
+    const invalidBytes = Buffer.from('name: invalid CI runner context\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    env:\n      VALUE: ${{ runner.temp }}\n    steps:\n      - run: echo test\n');
+    await writeFile(join(workflowDirectory, 'invalid.yml'), invalidBytes);
+    const invalid = invokeWorkflowStep();
+    assert.equal(invalid.error, undefined, invalid.error?.message);
+    assert.equal(invalid.status, 1, `${invalid.stdout}\n${invalid.stderr}`);
+    assert.match(invalid.stderr, /context "runner" is not allowed here/);
+    assert.match(invalid.stderr, /source=GitHub checkout 0123456789abcdef0123456789abcdef01234567/);
+    const invalidEvidence = JSON.parse(await readFile(evidencePath, 'utf8'));
+    assert.equal(invalidEvidence.ok, false);
+    assert.equal(invalidEvidence.validator.version, ACTIONLINT_VERSION);
+    assert.equal(invalidEvidence.source.label, 'GitHub checkout 0123456789abcdef0123456789abcdef01234567');
+    assert.equal(invalidEvidence.source.files.find(file => file.path === 'data-safety.yml')?.sha256, expectedWorkflowSha256,
+      'the step evidence binds the exact candidate workflow bytes in its checkout');
+    assert.equal(invalidEvidence.source.files.find(file => file.path === 'invalid.yml')?.sha256,
+      createHash('sha256').update(invalidBytes).digest('hex'));
+
+    const validBytes = Buffer.from('name: valid CI runner context\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - name: Supported runner scope\n        env:\n          VALUE: ${{ runner.temp }}\n        run: echo test\n');
+    await writeFile(join(workflowDirectory, 'invalid.yml'), validBytes);
+    const valid = invokeWorkflowStep();
+    assert.equal(valid.error, undefined, valid.error?.message);
+    assert.equal(valid.status, 0, `${valid.stdout}\n${valid.stderr}`);
+    const validEvidence = JSON.parse(await readFile(evidencePath, 'utf8'));
+    assert.equal(validEvidence.ok, true);
+    assert.equal(validEvidence.source.files.find(file => file.path === 'invalid.yml')?.sha256,
+      createHash('sha256').update(validBytes).digest('hex'));
   } finally {
     await rm(fixtureRoot, { recursive: true, force: true });
   }
