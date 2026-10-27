@@ -1,5 +1,21 @@
 # Focused agent preflight
 
+The repository pins the official actionlint v1.7.12 release. Set it up explicitly
+once for this checkout, then run the read-only workflow check:
+
+```sh
+npm run agent:setup-workflow-validator
+npm run agent:validate-workflows
+```
+
+Setup verifies the upstream release archive SHA-256 and stores the executable
+under the ignored, checkout-local `node_modules/.cache` directory. Validation
+never downloads or installs tools. If the pinned executable is absent or
+invalid, validation fails with the exact setup command. To preserve a JSON
+validation receipt, pass `--evidence-file <path>` to `agent:validate-workflows`;
+without that option it prints a bounded source hash and validator result and
+writes no files.
+
 From the repository root, run this before shell packaging and the expensive final regression:
 
 ```sh
