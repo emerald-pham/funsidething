@@ -13016,7 +13016,16 @@
     {
       "root": "RISK repository process: diagnostic checkpoints retain finite authority across fresh process and CI boundaries",
       "group": "native-process",
-      "file": "tests.js"
+      "file": "tests.js",
+      "qualificationContract": {
+        "id": "finite-authority",
+        "triggerPaths": [
+          "scripts/agent-tools/checkpoint-progress.mjs",
+          "scripts/agent-tools/checkpoint-progress.test.mjs",
+          "scripts/test-group-assignments.json",
+          "tests.js"
+        ]
+      }
     },
     {
       "root": "source prerequisites include paginated comments beyond the issue summary",
@@ -13520,7 +13529,18 @@
     {
       "root": "RISK repository process: newly registered startup browser roots require an isolated Chromium receipt",
       "group": "native-process",
-      "file": "tests.js"
+      "file": "tests.js",
+      "qualificationContract": {
+        "id": "startup-browser",
+        "triggerPaths": [
+          ".github/workflows/data-safety.yml",
+          "scripts/test-groups.mjs",
+          "scripts/agent-tools/test-groups.test.mjs",
+          "scripts/agent-tools/ci-pass-reuse.mjs",
+          "scripts/test-group-assignments.json",
+          "tests.js"
+        ]
+      }
     },
     {
       "root": "RISK repository process: canonical early admission retains mixed owners and fresh durable verification",
@@ -13651,7 +13671,18 @@
     {
       "root": "RISK repository process: workflow browser paths resolve only in supported runner contexts",
       "group": "native-process",
-      "file": "tests.js"
+      "file": "tests.js",
+      "qualificationContract": {
+        "id": "workflow-context",
+        "triggerPaths": [
+          ".github/workflows/data-safety.yml",
+          "scripts/agent-tools/workflow-validator.mjs",
+          "scripts/agent-tools/test-groups.test.mjs",
+          "scripts/agent-tools/ci-pass-reuse.mjs",
+          "scripts/test-group-assignments.json",
+          "tests.js"
+        ]
+      }
     },
     {
       "root": "RISK repository process: managed pre-push validates the exact outgoing workflow commit",
@@ -13667,6 +13698,11 @@
       "root": "workflow validator command contracts are pinned and source-bound",
       "group": "native-process",
       "file": "scripts/agent-tools/workflow-validator.test.mjs"
+    },
+    {
+      "root": "qualification selector binds exact assigned risk wrappers to source changes and fails closed",
+      "group": "native-process",
+      "file": "scripts/agent-tools/qualification-contracts.test.mjs"
     }
   ],
   "processControls": [
