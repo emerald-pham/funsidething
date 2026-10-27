@@ -16165,7 +16165,7 @@ test('RISK saved view full-board safety: supported copies and identity masks nev
 
 test('RISK saved view broken-board startup: configured Firebase leaves the prior warning neutral until its first event',async t=>{
  await openingBoardFixture(t);
- const view=await invisibleSavedViewBrowser('light',false,false,{width:390,height:844},false,{brokenDeviceBoard:true,retainAppearance:true,topOfPage:true,seedPriorRecoveryAppearance:true,syntheticCloud:true,holdConfiguredFirebaseImports:true,browserEngine:'webkit'});
+ const view=await invisibleSavedViewBrowser('light',false,false,{width:390,height:844},false,{brokenDeviceBoard:true,retainAppearance:true,topOfPage:true,seedPriorRecoveryAppearance:true,syntheticCloud:true,holdConfiguredFirebaseImports:true,browserEngine:openingBoardSelfHosted?'chromium':'webkit'});
  try{
   assert.equal(view.startup.priorRecovery?.hold?.reason,'device-source-recovery','the remembered warning comes from a real protected local recovery');
   assert.equal(view.startup.priorRecovery?.appearanceStatus,'☁ recovery pending','the initial cache contains the exact prior warning being tested');

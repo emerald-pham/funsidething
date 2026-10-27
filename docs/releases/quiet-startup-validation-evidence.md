@@ -377,3 +377,17 @@ passes all 18 cases with zero skips and no external browser URL. The first
 fixture attempt `1b95a84e` passed 17/18 but its final theme summary still
 expected an unexecuted WebKit result; the correction checks both themes for
 exactly the installed runtime set, retaining all paint assertions.
+
+
+Independent review found one configured-Firebase caller still unconditionally
+requested WebKit in `ef4ae68`. Its local 18/18 pass used host-installed WebKit
+and did not prove CI portability. Exact clean runtime-availability RED
+`ci-assignment-repair/chromium-only-before/2026-10-27T02-42-21-861Z-5213f96f-de36-46c7-9520-65e1db016049.json`
+uses an external module exposing actual Chromium and an unavailable WebKit
+launch boundary. After selecting Chromium only for self-hosted execution,
+`chromium-only-after/2026-10-27T02-42-31-884Z-46850720-624e-46fa-89e0-4cf907aaa636.json`
+passes all 18 cases with zero skips under that same restricted runtime.
+Explicit external QA still selects WebKit for this case. This is a test
+portability RED, not a new product RED. Superseded ef4 group execution was
+stopped and remains failed/incomplete with `group-stop-audit.json`; no group
+pass or exact qualification is inherited.
