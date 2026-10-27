@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
 import { createHash } from 'node:crypto';
-import { access, link, mkdir, readdir, unlink, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { access, link, mkdir, readFile, readdir, unlink, writeFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { inflateSync } from 'node:zlib';
 import { resolveExpectedFirstRunHelp } from '../browser-fixture-setup.mjs';
 
@@ -19,6 +19,8 @@ const SURFACES = [
 
 const MECHANISMS = ['diagnostic-css', 'native-page-zoom', 'pinch-zoom'];
 const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+
+export const renderedEvidenceSurfaces = Object.freeze(SURFACES.map((surface) => Object.freeze({ ...surface })));
 
 function usage() {
   return `Usage: node scripts/agent-tools/rendered-evidence.mjs \\
@@ -88,6 +90,20 @@ function caseIdentifier(options) {
 
 function sha256(buffer) {
   return createHash('sha256').update(buffer).digest('hex');
+}
+
+export function verifyRenderedScreenshotBytes(screenshot, bytes) {
+  if (!screenshot || typeof screenshot.sha256 !== 'string' || !Buffer.isBuffer(bytes)) {
+    return { status: 'unverified', matches: false, expectedSha256: screenshot?.sha256 ?? null, actualSha256: null, reason: 'A screenshot SHA-256 and actual PNG bytes are required.' };
+  }
+  const actualSha256 = sha256(bytes);
+  return {
+    status: actualSha256 === screenshot.sha256 ? 'pass' : 'fail',
+    matches: actualSha256 === screenshot.sha256,
+    expectedSha256: screenshot.sha256,
+    actualSha256,
+    reason: actualSha256 === screenshot.sha256 ? null : 'PNG bytes do not match the screenshot captured for this report.',
+  };
 }
 
 function safeUrl(value) {
@@ -214,7 +230,25 @@ function inspectPng(buffer) {
   return { width, height, supported: true, nonBlank: opaquePixelCount > 0 && colors.size > 1, uniqueColorCount: colors.size, opaquePixelCount };
 }
 
-async function observePage(page) {
+function validateSurfaces(surfaces) {
+  if (!Array.isArray(surfaces) || surfaces.length === 0) throw new TypeError('At least one named rendered surface is required.');
+  const names = new Set();
+  return surfaces.map((surface) => {
+    if (!surface || typeof surface.name !== 'string' || !surface.name.trim() || typeof surface.selector !== 'string' || !surface.selector.trim()) {
+      throw new TypeError('Every rendered surface needs a non-empty name and selector.');
+    }
+    if (names.has(surface.name)) throw new TypeError(`Rendered surface name ${surface.name} was supplied more than once.`);
+    names.add(surface.name);
+    return {
+      name: surface.name,
+      selector: surface.selector,
+      role: typeof surface.role === 'string' && surface.role.trim() ? surface.role : 'text-surface',
+      relationship: typeof surface.relationship === 'string' && surface.relationship.trim() ? surface.relationship : null,
+    };
+  });
+}
+
+async function observePage(page, surfaces = SURFACES) {
   return page.evaluate((surfaces) => {
     const root = document.documentElement;
     const body = document.body;
@@ -286,7 +320,7 @@ async function observePage(page) {
         };
       }),
     };
-  }, SURFACES);
+  }, surfaces);
 }
 
 async function waitForDocumentFonts(page, timeoutMs) {
@@ -300,7 +334,7 @@ async function waitForDocumentFonts(page, timeoutMs) {
   }), boundedTimeout);
 }
 
-async function captureResolvedFonts(page) {
+async function captureResolvedFonts(page, surfaces = SURFACES) {
   const result = { status: 'unavailable', bySurface: [], reason: null };
   let session;
   try {
@@ -308,7 +342,7 @@ async function captureResolvedFonts(page) {
     await session.send('DOM.enable');
     await session.send('CSS.enable');
     const { root } = await session.send('DOM.getDocument', { depth: -1 });
-    for (const surface of SURFACES) {
+    for (const surface of surfaces) {
       const { nodeIds } = await session.send('DOM.querySelectorAll', { nodeId: root.nodeId, selector: surface.selector });
       if (!nodeIds?.length) {
         result.bySurface.push({ name: surface.name, elementCount: 0, sampledElementCount: 0, truncated: false, elements: [] });
@@ -338,8 +372,9 @@ async function captureResolvedFonts(page) {
   return result;
 }
 
-function compareSurfaces(before, after, mechanism) {
-  return SURFACES.map(({ name, selector }) => {
+export function compareRenderedSurfaces(before, after, mechanism, surfaces = SURFACES) {
+  const namedSurfaces = validateSurfaces(surfaces);
+  return namedSurfaces.map(({ name, selector, role, relationship }) => {
     const reference = before?.surfaces?.find((surface) => surface.name === name);
     const capture = after?.surfaces?.find((surface) => surface.name === name);
     const beforeElements = reference?.elements ?? [];
@@ -364,6 +399,8 @@ function compareSurfaces(before, after, mechanism) {
     return {
       name,
       selector,
+      role,
+      relationship,
       beforeCount: beforeElements.length,
       afterCount: afterElements.length,
       elements,
@@ -371,6 +408,210 @@ function compareSurfaces(before, after, mechanism) {
       reason: !matched ? 'Surface was missing or its element count changed between the reference and capture.' : !measurementsPresent ? 'At least one surface element is missing a finite font-size, line-height or box-height measurement.' : mechanism === 'diagnostic-css' && !passed ? 'At least one text element did not increase both font size and a measured line or box metric.' : null,
     };
   });
+}
+
+function startCaptureObservation({ surfaces, maximumDurationMs, maximumSamples }) {
+  const root = document.documentElement;
+  const existing = window.__renderedEvidenceCaptureObservation;
+  if (existing) return { started: false, reason: 'A rendered capture observation is already active.' };
+
+  const startedAt = performance.now();
+  const samples = [];
+  const mutations = [];
+  const paintTransitions = [];
+  const observers = [];
+  let frameId = null;
+  let stopTimer = null;
+  let stopped = false;
+  let complete = true;
+  let overflow = false;
+  let previousPaint = null;
+  let previousSample = null;
+  let frameSamples = 0;
+
+  const paintSnapshot = () => {
+    const body = document.body;
+    const modal = document.querySelector('#modalRoot .modal');
+    const styleFor = (element) => {
+      if (!element) return null;
+      const style = getComputedStyle(element);
+      return {
+        color: style.color,
+        backgroundColor: style.backgroundColor,
+        borderColor: style.borderColor,
+        fontFamily: style.fontFamily,
+        fontSize: style.fontSize,
+      };
+    };
+    return {
+      theme: {
+        attribute: root.getAttribute('data-theme'),
+        colorScheme: getComputedStyle(root).colorScheme,
+        document: styleFor(root),
+        body: styleFor(body),
+        modal: styleFor(modal),
+      },
+      viewport: {
+        width: window.innerWidth,
+        height: window.innerHeight,
+        devicePixelRatio: window.devicePixelRatio,
+        visualScale: window.visualViewport?.scale ?? null,
+      },
+      surfaces: surfaces.map(({ name, selector }) => {
+        let elements = [];
+        try { elements = [...document.querySelectorAll(selector)]; } catch { /* selector validation is reported by the main observation */ }
+        return {
+          name,
+          count: elements.length,
+          paints: elements.map((element) => {
+            const style = getComputedStyle(element);
+            return {
+              color: style.color,
+              backgroundColor: style.backgroundColor,
+              borderColor: style.borderColor,
+              fontFamily: style.fontFamily,
+              fontSize: style.fontSize,
+            };
+          }),
+        };
+      }),
+    };
+  };
+
+  const record = (source, details = null) => {
+    if (samples.length >= maximumSamples) {
+      overflow = true;
+      complete = false;
+      stopped = true;
+      return;
+    }
+    const now = performance.now();
+    if (now - startedAt > maximumDurationMs) {
+      complete = false;
+      stopped = true;
+      return;
+    }
+    const paint = paintSnapshot();
+    const signature = JSON.stringify(paint);
+    if (previousPaint !== null && previousPaint !== signature) {
+      paintTransitions.push({ sampleIndex: samples.length, source, before: JSON.parse(previousPaint), after: paint });
+    }
+    previousPaint = signature;
+    previousSample = paint;
+    samples.push({ elapsedMs: Number((now - startedAt).toFixed(2)), source, paint, details });
+  };
+
+  record('capture-start');
+  const onRelevantMutations = (records) => {
+    const relevant = records.map((item) => ({
+      type: item.type,
+      attributeName: item.attributeName ?? null,
+      oldValue: item.oldValue ?? null,
+      target: item.target?.id ? `#${item.target.id}` : item.target?.nodeName ?? null,
+      currentValue: item.attributeName && item.target?.getAttribute ? item.target.getAttribute(item.attributeName) : null,
+    }));
+    const remainingMutations = Math.max(0, maximumSamples - mutations.length);
+    mutations.push(...relevant.slice(0, remainingMutations));
+    if (relevant.length > remainingMutations) {
+      overflow = true;
+      complete = false;
+      stopped = true;
+    }
+    record('mutation', relevant);
+    if (mutations.length >= maximumSamples) {
+      overflow = true;
+      complete = false;
+      stopped = true;
+    }
+  };
+  const nodeOptions = new Map();
+  const markNode = (node, options) => {
+    if (!node) return;
+    const current = nodeOptions.get(node) ?? { attributes: false, childList: false, characterData: false, subtree: false, attributeOldValue: false, attributeFilter: new Set() };
+    current.attributes ||= options.attributes === true;
+    current.childList ||= options.childList === true;
+    current.characterData ||= options.characterData === true;
+    current.subtree ||= options.subtree === true;
+    current.attributeOldValue ||= options.attributeOldValue === true;
+    for (const name of options.attributeFilter ?? []) current.attributeFilter.add(name);
+    nodeOptions.set(node, current);
+  };
+  const themeAttributes = ['data-theme', 'style', 'class'];
+  const surfaceAttributes = ['data-theme', 'style', 'class', 'hidden', 'aria-hidden', 'open', 'src', 'srcset', 'href'];
+  markNode(root, { attributes: true, attributeOldValue: true, attributeFilter: themeAttributes });
+  markNode(document.body, { attributes: true, attributeOldValue: true, attributeFilter: ['style', 'class'] });
+  markNode(document.head, { attributes: true, attributeOldValue: true, attributeFilter: ['style', 'class', 'href', 'rel', 'disabled', 'media'], childList: true, characterData: true, subtree: true });
+  for (const { selector } of surfaces) {
+    let elements = [];
+    try { elements = [...document.querySelectorAll(selector)]; } catch { /* the main observation reports invalid or missing target selectors */ }
+    for (const element of elements) {
+      let ancestor = element;
+      while (ancestor?.nodeType === 1) {
+        markNode(ancestor, { attributes: true, attributeOldValue: true, attributeFilter: surfaceAttributes });
+        ancestor = ancestor.parentElement;
+      }
+      markNode(element, { attributes: true, attributeOldValue: true, attributeFilter: surfaceAttributes, childList: true, characterData: true, subtree: true });
+      markNode(element.parentElement, { childList: true });
+    }
+  }
+  for (const [node, options] of nodeOptions) {
+    const observer = new MutationObserver(onRelevantMutations);
+    const { attributeFilter, ...observeOptions } = options;
+    if (attributeFilter.size > 0) observeOptions.attributeFilter = [...attributeFilter];
+    observer.observe(node, observeOptions);
+    observers.push(observer);
+  }
+  const frame = () => {
+    if (stopped) return;
+    frameSamples += 1;
+    record('animation-frame');
+    if (!stopped) frameId = requestAnimationFrame(frame);
+  };
+  frameId = requestAnimationFrame(frame);
+  stopTimer = window.setTimeout(() => {
+    complete = false;
+    stopped = true;
+  }, maximumDurationMs);
+
+  window.__renderedEvidenceCaptureObservation = {
+    stop() {
+      for (const observer of observers) {
+        const pendingMutations = observer.takeRecords();
+        if (pendingMutations.length > 0) onRelevantMutations(pendingMutations);
+        observer.disconnect();
+      }
+      if (frameId !== null) cancelAnimationFrame(frameId);
+      if (stopTimer !== null) clearTimeout(stopTimer);
+      stopped = true;
+      const endedAt = performance.now();
+      const finalPaint = paintSnapshot();
+      const finalSignature = JSON.stringify(finalPaint);
+      if (previousPaint !== null && previousPaint !== finalSignature) paintTransitions.push({ sampleIndex: samples.length, source: 'capture-stop', before: previousSample, after: finalPaint });
+      const samplingPresent = frameSamples > 0;
+      return {
+        complete,
+        stable: complete && samplingPresent && !overflow && mutations.length === 0 && paintTransitions.length === 0,
+        overflow,
+        samplingPresent,
+        durationMs: Number((endedAt - startedAt).toFixed(2)),
+        frameSamples,
+        samples,
+        mutations,
+        paintTransitions,
+        finalPaint,
+        observationLimit: 'The monitor records DOM mutations and animation-frame computed paint. It cannot attest that compositor or native screenshot bytes are an atomic rendering of one sampled frame, and it cannot cryptographically attest browser-provider honesty.',
+      };
+    },
+  };
+  return { started: true, initialPaint: previousSample };
+}
+
+function stopCaptureObservation() {
+  const active = window.__renderedEvidenceCaptureObservation;
+  if (!active) return { complete: false, stable: false, reason: 'The capture observation did not start.' };
+  const result = active.stop();
+  delete window.__renderedEvidenceCaptureObservation;
+  return result;
 }
 
 function makeDiagnosticCss(reference, scale) {
@@ -525,9 +766,9 @@ async function performMechanism(page, context, options, before, result) {
   }
 }
 
-async function pngScreenshot(page, outputDirectory, fileName, expectedDimensions) {
+async function pngScreenshot(page, outputDirectory, fileName, expectedDimensions, timeoutMs) {
   const path = resolve(outputDirectory, fileName);
-  const bytes = Buffer.from(await page.screenshot({ fullPage: false, scale: 'css', animations: 'disabled' }));
+  const bytes = Buffer.from(await page.screenshot({ fullPage: false, scale: 'css', animations: 'disabled', timeout: timeoutMs }));
   let info;
   let integrityStatus = 'pass';
   let failure = null;
@@ -549,9 +790,19 @@ async function pngScreenshot(page, outputDirectory, fileName, expectedDimensions
     failure = `Screenshot dimensions ${info.width}x${info.height} do not match any measured viewport for this capture: ${expectedDimensions.join(', ')}.`;
   }
   await writeAtomicallyWithoutOverwrite(path, bytes);
+  const savedBytes = await readFile(path);
+  const savedBinding = verifyRenderedScreenshotBytes({ sha256: sha256(bytes) }, savedBytes);
+  const savedSha256 = savedBinding.actualSha256;
+  const fileBindingMatches = savedBinding.matches;
+  if (!fileBindingMatches) {
+    integrityStatus = 'fail';
+    failure = 'Saved screenshot bytes do not match the bytes returned by the browser capture.';
+  }
   return {
     path: fileName,
     sha256: sha256(bytes),
+    savedSha256,
+    fileBindingMatches,
     width: info?.width ?? null,
     height: info?.height ?? null,
     nonBlank: info?.nonBlank ?? null,
@@ -559,6 +810,94 @@ async function pngScreenshot(page, outputDirectory, fileName, expectedDimensions
     opaquePixelCount: info?.opaquePixelCount ?? null,
     integrityStatus,
     failure,
+  };
+}
+
+export async function captureRenderedState(page, {
+  lifecycleState,
+  expectedTheme,
+  expectedViewport = null,
+  mechanism = 'diagnostic-css',
+  baseViewport = expectedViewport,
+  scale = 1,
+  surfaces = SURFACES,
+  outputDirectory,
+  fileName,
+  timeoutMs = 5000,
+}) {
+  if (typeof lifecycleState !== 'string' || !lifecycleState.trim()) throw new TypeError('A capture lifecycleState is required.');
+  if (!['light', 'dark'].includes(expectedTheme)) throw new TypeError('A capture expectedTheme must be light or dark.');
+  if (!Number.isFinite(scale) || scale <= 0) throw new TypeError('A capture scale must be a positive number.');
+  if (!outputDirectory || !fileName) throw new TypeError('A capture outputDirectory and fileName are required.');
+  const namedSurfaces = validateSurfaces(surfaces);
+
+  const documentFontsReady = await waitForDocumentFonts(page, timeoutMs);
+  const beforeScreenshot = await observePage(page, namedSurfaces);
+  const acceptedScreenshotDimensions = new Set();
+  if (baseViewport?.width && baseViewport?.height) acceptedScreenshotDimensions.add(`${baseViewport.width}x${baseViewport.height}`);
+  if (mechanism === 'native-page-zoom') acceptedScreenshotDimensions.add(`${beforeScreenshot.viewportCss.innerWidth}x${beforeScreenshot.viewportCss.innerHeight}`);
+  else if (!expectedViewport) acceptedScreenshotDimensions.add(`${beforeScreenshot.viewportCss.innerWidth}x${beforeScreenshot.viewportCss.innerHeight}`);
+  const observationWindowMs = Math.max(500, Math.min(timeoutMs, 5000));
+  const observerStart = await page.evaluate(startCaptureObservation, {
+    surfaces: namedSurfaces.map(({ name, selector }) => ({ name, selector })),
+    maximumDurationMs: observationWindowMs,
+    maximumSamples: 240,
+  });
+  let screenshot;
+  let captureObservation;
+  try {
+    if (!observerStart?.started) throw new Error(observerStart?.reason ?? 'The bounded capture observation could not start.');
+    screenshot = await pngScreenshot(page, outputDirectory, fileName, [...acceptedScreenshotDimensions], observationWindowMs);
+  } finally {
+    captureObservation = await page.evaluate(stopCaptureObservation);
+  }
+  const afterScreenshot = await observePage(page, namedSurfaces);
+  const resolvedFonts = await captureResolvedFonts(page, namedSurfaces);
+  const paintSnapshots = [
+    observerStart?.initialPaint,
+    ...(captureObservation?.samples ?? []).map((sample) => sample.paint),
+    captureObservation?.finalPaint,
+  ].filter(Boolean);
+  const themeStable = captureObservation?.stable === true
+    && (captureObservation?.paintTransitions?.length ?? 0) === 0
+    && (captureObservation?.mutations ?? []).every((mutation) => !['data-theme', 'style', 'class', 'color-scheme'].includes(mutation.attributeName));
+  const mutationThemeMatched = (captureObservation?.mutations ?? []).every((mutation) =>
+    mutation.attributeName !== 'data-theme' || [mutation.oldValue, mutation.currentValue].every((value) => value === expectedTheme));
+  const themeMatched = mutationThemeMatched
+    && [beforeScreenshot, afterScreenshot].every((snapshot) => themeMatches(snapshot, expectedTheme))
+    && paintSnapshots.every((snapshot) => snapshot.theme.attribute === expectedTheme && snapshot.theme.colorScheme === expectedTheme);
+  const observedViewports = [beforeScreenshot, afterScreenshot].map((snapshot) => snapshot.viewportCss)
+    .concat(paintSnapshots.map((snapshot) => ({ innerWidth: snapshot.viewport.width, innerHeight: snapshot.viewport.height })));
+  const viewportMatched = !expectedViewport || observedViewports.every((viewport) =>
+    viewport.innerWidth === expectedViewport.width && viewport.innerHeight === expectedViewport.height);
+  const stateHasEverySurface = (snapshot) => snapshot.surfaces.length === namedSurfaces.length && snapshot.surfaces.every((surface) =>
+    surface.count > 0 && surface.elements.every((element) => Number.isFinite(element.fontSizePx)));
+  const surfacesPresent = stateHasEverySurface(beforeScreenshot) && stateHasEverySurface(afterScreenshot);
+  const metricsStatus = themeStable && themeMatched && viewportMatched && surfacesPresent ? 'pass' : 'fail';
+  const captureIntegrity = screenshot.integrityStatus;
+  const coverageLimits = [];
+  if (!documentFontsReady) coverageLimits.push('Document fonts did not finish loading within the bounded wait before this capture.');
+  if (resolvedFonts.status !== 'captured') coverageLimits.push(`Actual platform font names were unavailable: ${resolvedFonts.reason ?? 'unsupported browser protocol'}.`);
+  if (!captureObservation?.samplingPresent) coverageLimits.push('No animation-frame sample was observed during the bounded screenshot interval; capture stability is unverified and metrics fail closed.');
+  if ((captureObservation?.mutations?.length ?? 0) > 0) coverageLimits.push('Relevant DOM mutation occurred during capture; the image is retained but capture metrics fail closed.');
+  if ((captureObservation?.paintTransitions?.length ?? 0) > 0) coverageLimits.push('Computed theme or named-surface paint changed during capture; the image is retained but capture metrics fail closed.');
+  if (!captureObservation?.complete || captureObservation?.overflow) coverageLimits.push('The bounded capture observation timed out or reached its sample limit; capture metrics fail closed.');
+  coverageLimits.push(captureObservation?.observationLimit ?? 'DOM/frame observations cannot attest compositor/native screenshot atomicity or browser-provider honesty.');
+  return {
+    lifecycleState,
+    expectedTheme,
+    expectedViewport,
+    scale,
+    surfaces: namedSurfaces,
+    observed: { beforeScreenshot, duringScreenshot: captureObservation, afterScreenshot, documentFontsReady },
+    resolvedFonts,
+    screenshot,
+    checks: { themeStable, themeMatched, viewportMatched, surfacesPresent, screenshotFileBound: screenshot.fileBindingMatches },
+    metricsStatus,
+    captureIntegrity,
+    visualStatus: captureIntegrity === 'fail' ? 'fail' : 'unverified',
+    overallStatus: metricsStatus === 'fail' || captureIntegrity === 'fail' ? 'fail' : 'unverified',
+    coverageLimits,
   };
 }
 
@@ -625,6 +964,7 @@ function initialResult(options) {
     },
     browserRuntime: { engine: null, version: null, nodeVersion: process.version, platform: process.platform, architecture: process.arch, headless: options.headless, customExecutable: Boolean(options.browserExecutable) },
     observed: { reference: null, capture: null, resolvedFonts: { status: 'unavailable', bySurface: [], reason: null } },
+    captureAudits: { reference: null, capture: null },
     references: [{ name: 'same-session ordinary-size FAQ view', screenshot: `${caseId}-reference.png` }],
     screenshots: { reference: null, capture: null },
     surfaces: [],
@@ -642,6 +982,27 @@ function initialResult(options) {
       'The caller-provided source identity is recorded as supplied; served document and local resources are hashed separately.',
     ],
   };
+}
+
+async function producerFingerprints() {
+  const helperPath = fileURLToPath(import.meta.url);
+  const repoRoot = resolve(dirname(helperPath), '../..');
+  const inputs = [
+    ['rendererModule', helperPath],
+    ['rendererTest', resolve(dirname(helperPath), 'rendered-evidence.test.mjs')],
+    ['packageConfig', resolve(repoRoot, 'package.json')],
+    ['lockfile', resolve(repoRoot, 'package-lock.json')],
+  ];
+  const fingerprints = {};
+  for (const [name, path] of inputs) {
+    try {
+      const bytes = await readFile(path);
+      fingerprints[name] = { path: name === 'rendererModule' || name === 'rendererTest' ? `scripts/agent-tools/${name === 'rendererModule' ? 'rendered-evidence.mjs' : 'rendered-evidence.test.mjs'}` : name === 'packageConfig' ? 'package.json' : 'package-lock.json', sha256: sha256(bytes), bytes: bytes.length };
+    } catch (error) {
+      fingerprints[name] = { path: null, sha256: null, status: 'unavailable', reason: error instanceof Error ? error.message : String(error) };
+    }
+  }
+  return fingerprints;
 }
 
 async function saveResult(result, outputDirectory) {
@@ -682,6 +1043,7 @@ async function runCase(options) {
   if (collision) throw new Error(`Refusing to overwrite existing rendered evidence: ${resolve(options.outputDirectory, collision)}`);
 
   const result = initialResult(options);
+  result.artifact.producerFingerprints = await producerFingerprints();
   let browser;
   let context;
   let page;
@@ -724,7 +1086,7 @@ async function runCase(options) {
     page.on('response', (response) => {
       const request = response.request();
       const resourceType = request.resourceType();
-      if (!['document', 'script', 'stylesheet', 'font'].includes(resourceType)) return;
+      if (!['document', 'script', 'stylesheet', 'font', 'image'].includes(resourceType)) return;
       const rawUrl = response.url();
       let local = false;
       try { local = new URL(rawUrl).origin === options.url.origin; } catch { /* ignore malformed resource URL */ }
@@ -764,23 +1126,76 @@ async function runCase(options) {
     result.observed.documentFontsReady = await waitForDocumentFonts(page, options.timeoutMs);
     if (!result.observed.documentFontsReady) result.coverageLimits.push('Document fonts did not finish loading within the bounded wait; screenshots and measurements record the resulting fallback or loading state.');
     await page.waitForTimeout(100);
-    before = await observePage(page);
+    const referenceCapture = await captureRenderedState(page, {
+      lifecycleState: 'ordinary-reference',
+      expectedTheme: options.theme,
+      expectedViewport: { width: options.width, height: options.height },
+      mechanism: 'diagnostic-css',
+      baseViewport: { width: options.width, height: options.height },
+      outputDirectory: options.outputDirectory,
+      fileName: `${result.caseId}-reference.png`,
+      timeoutMs: options.timeoutMs,
+    });
+    before = referenceCapture.observed.beforeScreenshot;
     result.observed.reference = before;
-    result.observed.resolvedFonts = await captureResolvedFonts(page);
+    result.observed.resolvedFonts = referenceCapture.resolvedFonts;
+    result.captureAudits.reference = {
+      lifecycleState: referenceCapture.lifecycleState,
+      scale: referenceCapture.scale,
+      expectedTheme: referenceCapture.expectedTheme,
+      expectedViewport: referenceCapture.expectedViewport,
+      surfaces: referenceCapture.surfaces,
+      observed: {
+        beforeScreenshot: { theme: referenceCapture.observed.beforeScreenshot.theme, viewportCss: referenceCapture.observed.beforeScreenshot.viewportCss },
+        duringScreenshot: referenceCapture.observed.duringScreenshot,
+        afterScreenshot: { theme: referenceCapture.observed.afterScreenshot.theme, viewportCss: referenceCapture.observed.afterScreenshot.viewportCss },
+      },
+      checks: referenceCapture.checks,
+      metricsStatus: referenceCapture.metricsStatus,
+      captureIntegrity: referenceCapture.captureIntegrity,
+    };
     if (result.observed.resolvedFonts.status !== 'captured') result.coverageLimits.push(`Actual platform font names were unavailable: ${result.observed.resolvedFonts.reason ?? 'unsupported browser protocol'}.`);
     if (result.observed.resolvedFonts.bySurface.some((surface) => surface.truncated)) result.coverageLimits.push('Resolved platform font sampling is capped at 20 elements per surface; the font list may not cover every repeated FAQ entry.');
-
-    result.screenshots.reference = await pngScreenshot(page, options.outputDirectory, `${result.caseId}-reference.png`, expectedScreenshotDimensions(options, before, 'reference'));
+    result.screenshots.reference = referenceCapture.screenshot;
+    result.coverageLimits.push(...referenceCapture.coverageLimits);
     await performMechanism(page, context, options, before, result);
     await page.waitForTimeout(100);
-    after = await observePage(page);
+    const captureState = await captureRenderedState(page, {
+      lifecycleState: `${options.mechanism}-capture`,
+      expectedTheme: options.theme,
+      expectedViewport: options.mechanism === 'diagnostic-css' ? { width: options.width, height: options.height } : null,
+      mechanism: options.mechanism,
+      baseViewport: { width: options.width, height: options.height },
+      outputDirectory: options.outputDirectory,
+      fileName: `${result.caseId}-capture.png`,
+      timeoutMs: options.timeoutMs,
+    });
+    after = captureState.observed.afterScreenshot;
     result.observed.capture = after;
-    result.surfaces = compareSurfaces(before, after, options.mechanism);
-    result.observed.resolvedFontsAfter = await captureResolvedFonts(page);
-    result.screenshots.capture = await pngScreenshot(page, options.outputDirectory, `${result.caseId}-capture.png`, expectedScreenshotDimensions(options, after, options.mechanism));
+    result.surfaces = compareRenderedSurfaces(before, after, options.mechanism);
+    result.observed.resolvedFontsAfter = captureState.resolvedFonts;
+    result.screenshots.capture = captureState.screenshot;
+    result.captureAudits.capture = {
+      lifecycleState: captureState.lifecycleState,
+      scale: captureState.scale,
+      expectedTheme: captureState.expectedTheme,
+      expectedViewport: captureState.expectedViewport,
+      surfaces: captureState.surfaces,
+      observed: {
+        beforeScreenshot: { theme: captureState.observed.beforeScreenshot.theme, viewportCss: captureState.observed.beforeScreenshot.viewportCss },
+        duringScreenshot: captureState.observed.duringScreenshot,
+        afterScreenshot: { theme: captureState.observed.afterScreenshot.theme, viewportCss: captureState.observed.afterScreenshot.viewportCss },
+      },
+      checks: captureState.checks,
+      metricsStatus: captureState.metricsStatus,
+      captureIntegrity: captureState.captureIntegrity,
+    };
+    result.coverageLimits.push(...captureState.coverageLimits);
     await Promise.allSettled(pendingResourceHashes);
     result.artifact.loadedResources.sort((a, b) => a.url.localeCompare(b.url));
-    result.metricsStatus = metricStatus(options, before, after, result.surfaces, appSetup.themeMatched, result.operations, result.runtimeErrors);
+    result.metricsStatus = [result.captureAudits.reference, result.captureAudits.capture].some((capture) => capture.metricsStatus === 'fail')
+      ? 'fail'
+      : metricStatus(options, before, after, result.surfaces, appSetup.themeMatched, result.operations, result.runtimeErrors);
     result.captureIntegrity = [result.screenshots.reference, result.screenshots.capture].some((shot) => shot?.integrityStatus === 'fail')
       ? 'fail'
       : [result.screenshots.reference, result.screenshots.capture].every((shot) => shot?.integrityStatus === 'pass')
@@ -818,7 +1233,10 @@ async function main() {
   return runCase(parseOptions(rawOptions));
 }
 
-main().then((code) => { process.exitCode = code; }).catch((error) => {
-  process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
-  process.exitCode = 1;
-});
+const invokedDirectly = process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url;
+if (invokedDirectly) {
+  main().then((code) => { process.exitCode = code; }).catch((error) => {
+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+    process.exitCode = 1;
+  });
+}

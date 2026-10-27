@@ -1,12 +1,15 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { chromium } from 'playwright';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { captureRenderedState, verifyRenderedScreenshotBytes } from './rendered-evidence.mjs';
 
-const command = fileURLToPath(new URL('./rendered-evidence.mjs', import.meta.url));
+const command = process.env.RENDERED_EVIDENCE_COMMAND ?? fileURLToPath(new URL('./rendered-evidence.mjs', import.meta.url));
 const expectedSurfaces = ['faq-title', 'faq-section', 'faq-question', 'faq-answer', 'faq-list-item', 'faq-paragraph', 'faq-subheading'];
 
 const browserFixture = String.raw`import { deflateSync } from 'node:zlib';
@@ -71,6 +74,9 @@ const state = {
   helpOpen: false,
   expanded: 0,
   screenshotCount: 0,
+  expectedTheme: 'light',
+  restoreThemeAfterHydration: false,
+  captureObservation: null,
   metricTargets: new Map(),
   routeHandler: null,
 };
@@ -117,6 +123,24 @@ function observe(surfaces) {
   };
 }
 
+function capturePaint(theme = state.theme) {
+  const effectiveTheme = theme === 'system' ? state.preferredTheme : theme;
+  const colors = effectiveTheme === 'dark'
+    ? { background: 'rgb(20, 22, 28)', color: 'rgb(234, 235, 240)', modalBackground: 'rgb(35, 39, 51)' }
+    : { background: 'rgb(250, 251, 254)', color: 'rgb(31, 35, 43)', modalBackground: 'rgb(255, 255, 255)' };
+  return {
+    theme: {
+      attribute: theme === 'system' ? null : theme,
+      colorScheme: theme === 'system' ? 'light dark' : theme,
+      document: { color: colors.color, backgroundColor: colors.background },
+      body: { color: colors.color, backgroundColor: colors.background },
+      modal: { color: colors.color, backgroundColor: colors.modalBackground },
+    },
+    viewport: { width: state.innerWidth, height: state.innerHeight, devicePixelRatio: state.dpr, visualScale: state.visualScale },
+    surfaces: [],
+  };
+}
+
 const page = {
   events: new Map(),
   setDefaultTimeout() {},
@@ -129,6 +153,7 @@ const page = {
     state.innerHeight = state.height;
     if (mode === 'layout-reference-mismatch') state.innerWidth += 100;
     state.preferredTheme = context.options.colorScheme;
+    state.expectedTheme = context.options.colorScheme;
     state.theme = context.options.colorScheme === 'light' ? 'dark' : 'light';
     if (state.routeHandler) {
       let localContinued = false;
@@ -141,6 +166,16 @@ const page = {
     const request = { resourceType: () => 'document' };
     const response = { request: () => request, url: () => url, status: () => 200, body: async () => body };
     for (const callback of this.events.get('response') ?? []) callback(response);
+    if (mode === 'image-response') {
+      const imageBody = Buffer.from('synthetic-served-image-v1');
+      const imageResponse = {
+        request: () => ({ resourceType: () => 'image' }),
+        url: () => 'http://127.0.0.1:8999/assets/fixture.png',
+        status: () => 200,
+        body: async () => imageBody,
+      };
+      for (const callback of this.events.get('response') ?? []) callback(imageResponse);
+    }
       for (const callback of this.events.get('requestfailed') ?? []) callback({
         url: () => 'https://external.example/blocked.css',
         failure: () => ({ errorText: 'net::ERR_FAILED' }),
@@ -179,11 +214,27 @@ const page = {
       first() { return this; },
     };
   },
-  async evaluate(callback, surfaces) {
-    if (!Array.isArray(surfaces)) return true;
-    return observe(surfaces);
+  async evaluate(callback, argument) {
+    if (callback.name === 'startCaptureObservation') {
+      const initialPaint = capturePaint();
+      state.captureObservation = { initialPaint, mutations: [], paintTransitions: [], samples: [], complete: true, frameSamples: 1, samplingPresent: true };
+      return { started: true, initialPaint };
+    }
+    if (callback.name === 'stopCaptureObservation') {
+      const observation = state.captureObservation;
+      state.captureObservation = null;
+      return observation
+        ? { ...observation, stable: observation.complete && observation.mutations.length === 0 && observation.paintTransitions.length === 0, overflow: false, durationMs: 18, finalPaint: capturePaint(), observationLimit: 'fixture: fake capture observer' }
+        : { complete: false, stable: false, reason: 'fixture observer was not started' };
+    }
+    if (!Array.isArray(argument)) return true;
+    return observe(argument);
   },
   async addStyleTag({ content }) {
+    if (state.restoreThemeAfterHydration) {
+      state.theme = state.expectedTheme;
+      state.restoreThemeAfterHydration = false;
+    }
     if (mode === 'layout-capture-mismatch') state.innerHeight += 100;
     if (mode === 'noop-css') return;
     if (mode === 'broken-selector') content = content.replace(/#fixture-/g, '.absent #fixture-');
@@ -218,6 +269,18 @@ const page = {
     if (mode === 'missing-reference' && state.screenshotCount === 1) throw new Error('fixture reference intentionally missing');
     if (mode === 'missing-capture' && state.screenshotCount === 2) throw new Error('fixture capture intentionally missing');
     if (mode === 'viewport-mismatch' && state.screenshotCount === 2) return png(2, 2);
+    if (mode === 'theme-flips-and-restores-during-capture' && state.screenshotCount === 1) {
+      const before = capturePaint();
+      const flippedTheme = state.expectedTheme === 'light' ? 'dark' : 'light';
+      state.theme = flippedTheme;
+      const flipped = capturePaint();
+      state.captureObservation.mutations.push({ type: 'attributes', attributeName: 'data-theme', oldValue: state.expectedTheme, currentValue: flippedTheme, target: 'HTML' });
+      state.captureObservation.paintTransitions.push({ sampleIndex: 1, source: 'mutation', before, after: flipped });
+      state.theme = state.expectedTheme;
+      const restored = capturePaint();
+      state.captureObservation.mutations.push({ type: 'attributes', attributeName: 'data-theme', oldValue: flippedTheme, currentValue: state.expectedTheme, target: 'HTML' });
+      state.captureObservation.paintTransitions.push({ sampleIndex: 2, source: 'mutation', before: flipped, after: restored });
+    }
     const image = png(state.width, state.height, { blank: mode === 'blank', unsupported: mode === 'unsupported-png' });
     if (mode === 'corrupt-png') image[image.length - 1] ^= 0xff;
     return image;
@@ -315,6 +378,109 @@ test('theme audit cycles past automatic to verify the explicit opposite paint', 
     assert.equal(report.themePaintAudit.requestedPaintRestored, true);
     assert.equal(report.observed.capture.theme.attribute, theme);
   }
+});
+
+test('a reversible theme flip during capture remains visible in bounded mutation and paint evidence', async (t) => {
+  const fixture = await makeFixture(t);
+  const { result, output } = run({ ...fixture, name: 'transient-theme-flip', mode: 'theme-flips-and-restores-during-capture', theme: 'light' });
+  assert.equal(result.status, 1, `a light-labelled capture must fail when a transient dark paint occurs during capture\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
+  const report = await readCase(output);
+  assert.equal(report.metricsStatus, 'fail');
+  assert.equal(report.captureIntegrity, 'pass');
+  assert.equal(report.requested.theme, 'light');
+  assert.equal(report.captureAudits.reference.checks.themeStable, false);
+  assert.equal(report.captureAudits.reference.checks.themeMatched, false);
+  assert.equal(report.captureAudits.reference.observed.afterScreenshot.theme.attribute, 'light', 'the transient flip must already have reverted before the post-capture snapshot');
+  assert.equal(report.captureAudits.reference.observed.duringScreenshot.mutations[1].oldValue, 'dark');
+  assert.equal(report.captureAudits.reference.observed.duringScreenshot.paintTransitions.length, 2);
+});
+
+test('capture stop drains queued theme mutations before disconnecting its observer', async (t) => {
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: 'light' });
+  const page = await context.newPage();
+  t.after(async () => {
+    await context.close();
+    await browser.close();
+  });
+  await page.setContent(`<!doctype html><html data-theme="light"><head><style>
+    html { color-scheme: light; color: #111; background: #fff; }
+    body { color: #111; background: #fff; }
+    #modalRoot .modal { color: #111; background: #fff; }
+    #target { font: 14px/1.4 sans-serif; }
+  </style></head><body><main id="modalRoot"><section class="modal"><p id="target">A stable target surface.</p></section></main></body></html>`);
+
+  const observedPage = {
+    context: () => ({ newCDPSession: () => context.newCDPSession(page) }),
+    evaluate(callback, argument) {
+      if (callback.name === 'stopCaptureObservation') {
+        return page.evaluate(() => {
+          const root = document.documentElement;
+          const expectedTheme = root.getAttribute('data-theme');
+          root.setAttribute('data-theme', expectedTheme === 'light' ? 'dark' : 'light');
+          root.setAttribute('data-theme', expectedTheme);
+          const active = window.__renderedEvidenceCaptureObservation;
+          const observation = active.stop();
+          delete window.__renderedEvidenceCaptureObservation;
+          return observation;
+        });
+      }
+      return page.evaluate(callback, argument);
+    },
+    async screenshot(options) {
+      const bytes = await page.screenshot(options);
+      await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => resolve(true))));
+      return bytes;
+    },
+  };
+  const outputDirectory = await mkdtemp(path.join(os.tmpdir(), 'rendered-capture-window-'));
+  t.after(() => rm(outputDirectory, { recursive: true, force: true }));
+  const evidence = await captureRenderedState(observedPage, {
+    lifecycleState: 'queued-theme-change-at-stop',
+    expectedTheme: 'light',
+    expectedViewport: { width: 390, height: 844 },
+    baseViewport: { width: 390, height: 844 },
+    scale: 1,
+    surfaces: [{ name: 'capture-target', selector: '#target', role: 'changed-control', relationship: 'isolated synthetic target' }],
+    outputDirectory,
+    fileName: 'capture.png',
+  });
+
+  assert.equal(evidence.observed.afterScreenshot.theme.attribute, 'light');
+  assert.equal(evidence.observed.duringScreenshot.paintTransitions.length, 0, 'the same-task flip does not appear in an animation-frame sample');
+  assert.ok(evidence.observed.duringScreenshot.mutations.some((mutation) => mutation.attributeName === 'data-theme' && mutation.oldValue === 'dark'));
+  assert.equal(evidence.checks.themeStable, false);
+  assert.equal(evidence.metricsStatus, 'fail');
+  assert.equal(evidence.captureIntegrity, 'pass');
+});
+
+test('a saved screenshot is bound to its actual bytes and a stale image fails the hash check', async (t) => {
+  const fixture = await makeFixture(t);
+  const { result, output } = run({ ...fixture, name: 'image-hash-binding', mode: 'image-response' });
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  const report = await readCase(output);
+  const screenshotPath = path.join(output, report.screenshots.capture.path);
+  const capturedBytes = await readFile(screenshotPath);
+  const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
+  assert.equal(report.screenshots.capture.fileBindingMatches, true);
+  assert.equal(report.screenshots.capture.sha256, digest(capturedBytes));
+  assert.equal(report.screenshots.capture.savedSha256, digest(capturedBytes));
+
+  const staleBytes = Buffer.from(capturedBytes);
+  staleBytes[staleBytes.length - 1] ^= 0xff;
+  const staleBinding = verifyRenderedScreenshotBytes(report.screenshots.capture, staleBytes);
+  assert.equal(staleBinding.status, 'fail');
+  assert.equal(staleBinding.matches, false, 'a stale or changed image cannot retain the capture hash');
+  assert.equal(report.artifact.producerFingerprints.rendererModule.sha256.length, 64);
+  assert.equal(report.artifact.producerFingerprints.rendererTest.sha256.length, 64);
+  assert.equal(report.artifact.producerFingerprints.packageConfig.sha256.length, 64);
+  assert.deepEqual(report.artifact.loadedResources.find(({ resourceType }) => resourceType === 'image'), {
+    url: 'http://127.0.0.1:8999/assets/fixture.png',
+    resourceType: 'image',
+    status: 200,
+    sha256: digest(Buffer.from('synthetic-served-image-v1')),
+    bytes: Buffer.byteLength('synthetic-served-image-v1'),
+  });
 });
 
 test('no-op CSS enlargement is a real behavioral failure with observed measurements', async (t) => {
