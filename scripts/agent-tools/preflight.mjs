@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { validateCurrentRegistrations } from '../test-groups.mjs';
 
 const focusedChecks = [
@@ -30,11 +32,11 @@ function parseArguments(args) {
   return { help: false, base };
 }
 
-function resolveBase(requestedBase) {
+export function resolveBase(requestedBase, root = process.cwd()) {
   const candidates = requestedBase ? [requestedBase] : ['origin/main', 'main', 'master'];
   for (const candidate of candidates) {
     const ref = spawnSync('git', ['rev-parse', '--verify', '--quiet', candidate + '^{commit}'], {
-      cwd: repositoryRoot,
+      cwd: root,
       encoding: 'utf8',
       maxBuffer: 1024 * 1024,
     });
@@ -43,7 +45,7 @@ function resolveBase(requestedBase) {
       throw new Error(`Could not resolve the selected comparison ${candidate}: ${ref.error?.message || ref.stderr?.trim() || ref.signal || `Git exited ${ref.status}`}`);
     }
     const result = spawnSync('git', ['merge-base', 'HEAD', ref.stdout.trim()], {
-      cwd: repositoryRoot, encoding: 'utf8', maxBuffer: 1024 * 1024,
+      cwd: root, encoding: 'utf8', maxBuffer: 1024 * 1024,
     });
     if (result.status === 0 && /^[0-9a-f]{40}$/i.test(result.stdout.trim())) return result.stdout.trim();
     if (!result.error && !result.signal && result.status === 1 && !requestedBase) continue;
@@ -182,7 +184,7 @@ async function main() {
 
   let comparisons;
   try {
-    const base = resolveBase(options.base);
+    const base = resolveBase(options.base, repositoryRoot);
     const upstream = resolveUpstream();
     comparisons = [{ sha: base, label: 'selected base' }];
     if (upstream && upstream.sha !== base) comparisons.push(upstream);
@@ -227,4 +229,6 @@ async function main() {
   return 0;
 }
 
-process.exitCode = await main();
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+  process.exitCode = await main();
+}

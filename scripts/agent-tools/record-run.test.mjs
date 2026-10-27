@@ -10,6 +10,7 @@ import { parseTap } from '../test-groups.mjs';
 
 const node = process.execPath;
 const recorder = fileURLToPath(new URL('./record-run.mjs', import.meta.url));
+const sourceRepository = fileURLToPath(new URL('../../', import.meta.url));
 
 async function createCommittedRepository(root) {
   const repo = path.join(root, 'repo');
@@ -39,10 +40,26 @@ function invokeRecorder({ repo, evidence, purpose, command, args = [], extraOpti
   });
 }
 
-async function createQualificationFixture(t) {
+async function createQualificationFixture(t, { preflightCapable = false } = {}) {
   const root = await mkdtemp(path.join(os.tmpdir(), 'record-run-qualification-'));
   t.after(() => rm(root, { recursive: true, force: true }));
-  const repo = await createCommittedRepository(root);
+  let repo;
+  if (preflightCapable) {
+    repo = path.join(root, 'repo');
+    const clone = spawnSync('git', ['clone', '--quiet', '--local', '--no-hardlinks', sourceRepository, repo], { encoding: 'utf8' });
+    assert.equal(clone.status, 0, clone.stderr);
+    const removeOrigin = spawnSync('git', ['-C', repo, 'remote', 'remove', 'origin'], { encoding: 'utf8' });
+    assert.equal(removeOrigin.status, 0, removeOrigin.stderr);
+    const makeDefaultBranch = spawnSync('git', ['-C', repo, 'branch', '-M', 'main'], { encoding: 'utf8' });
+    assert.equal(makeDefaultBranch.status, 0, makeDefaultBranch.stderr);
+    await symlink(path.join(sourceRepository, 'node_modules'), path.join(repo, 'node_modules'), 'dir');
+    await writeFile(path.join(repo, '.git', 'info', 'exclude'), '\n/node_modules\n', { flag: 'a' });
+    const seededStatus = spawnSync('git', ['-C', repo, 'status', '--porcelain=v1', '--untracked-files=all'], { encoding: 'utf8' });
+    assert.equal(seededStatus.status, 0, seededStatus.stderr);
+    assert.equal(seededStatus.stdout, '', `preflight fixture should stay clean: ${seededStatus.stdout}`);
+  } else {
+    repo = await createCommittedRepository(root);
+  }
   const commit = spawnSync('git', ['-C', repo, 'rev-parse', 'HEAD'], { encoding: 'utf8' });
   const tree = spawnSync('git', ['-C', repo, 'rev-parse', 'HEAD^{tree}'], { encoding: 'utf8' });
   assert.equal(commit.status, 0, commit.stderr);
@@ -91,7 +108,7 @@ function summaryFrom(result) {
 }
 
 test('qualification readiness creates evidence destinations and launches the requested child', async (t) => {
-  const fixture = await createQualificationFixture(t);
+  const fixture = await createQualificationFixture(t, { preflightCapable: true });
   const result = invokeRecorder({
     repo: fixture.repo,
     evidence: fixture.evidence,

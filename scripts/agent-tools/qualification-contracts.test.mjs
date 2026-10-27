@@ -129,7 +129,7 @@ function invoke(fixture, ...selectionArgs) {
   });
 }
 
-function makeRecorderFixture(t, { sourceChange = true } = {}) {
+function makeRecorderFixture(t, { sourceChange = true, selectionFailure = false, workflowFailure = false } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'chain-qualification-recorder-'));
   const repo = path.join(root, 'repo');
   const branch = git(repository, 'branch', '--show-current');
@@ -149,6 +149,20 @@ function makeRecorderFixture(t, { sourceChange = true } = {}) {
     writeJson(assignmentFile, assignments);
     git(repo, 'add', 'scripts/test-group-assignments.json');
     git(repo, 'commit', '-qm', 'qualification recorder fixture source trigger');
+  }
+  if (selectionFailure) {
+    const assignmentFile = path.join(repo, 'scripts/test-group-assignments.json');
+    const assignments = JSON.parse(fs.readFileSync(assignmentFile, 'utf8'));
+    delete assignments.rootAssignments.find(row => row.qualificationContract?.id === 'startup-browser').qualificationContract;
+    writeJson(assignmentFile, assignments);
+    git(repo, 'add', 'scripts/test-group-assignments.json');
+    git(repo, 'commit', '-qm', 'remove required qualification selector metadata');
+  }
+  if (workflowFailure) {
+    const workflowFile = path.join(repo, '.github/workflows/data-safety.yml');
+    fs.appendFileSync(workflowFile, '\ninvalid: [\n');
+    git(repo, 'add', '.github/workflows/data-safety.yml');
+    git(repo, 'commit', '-qm', 'make focused workflow validation fail');
   }
   const candidate = git(repo, 'rev-parse', 'HEAD');
   const tree = git(repo, 'rev-parse', 'HEAD^{tree}');
@@ -215,6 +229,7 @@ function invokeReadyRecorder(fixture, { mode = 'actual', sentinel = fixture.sent
     CHAIN_QUALIFICATION_FIXTURE_OUTCOME: mode,
     CHAIN_QUALIFICATION_FIXTURE_SENTINEL: sentinel,
   };
+  delete env.NODE_TEST_CONTEXT;
   const command = "require('node:fs').writeFileSync(process.env.CHAIN_QUALIFICATION_FIXTURE_SENTINEL, 'started'); process.stdout.write('requested long child only\\n')";
   return spawnSync(process.execPath, [
     path.join(repository, 'scripts/agent-tools/record-run.mjs'),
@@ -233,6 +248,17 @@ function readRecorderSummary(result) {
   const lines = result.stdout.trimEnd().split('\n');
   assert.equal(lines.length, 1, `expected one bounded recorder summary line, got ${lines.length}`);
   return JSON.parse(lines[0]);
+}
+
+function recorderFailureDetails(result) {
+  try {
+    const summary = JSON.parse(result.stdout.trim());
+    const reportPath = summary.qualificationPreflight?.reportPath;
+    if (!reportPath || !fs.existsSync(reportPath)) return '';
+    const directory = path.dirname(reportPath);
+    const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+    return JSON.stringify({ report, preflightStdout: fs.readFileSync(path.join(directory, 'preflight.stdout.txt'), 'utf8'), preflightStderr: fs.readFileSync(path.join(directory, 'preflight.stderr.txt'), 'utf8') });
+  } catch { return ''; }
 }
 
 function recorderRecord(fixture) {
@@ -411,7 +437,7 @@ test('qualification readiness gates the recorder child on selected parent contra
     const result = invokeReadyRecorder(fixture, { comparisonBase: fixture.base });
     assert.equal(result.error, undefined, result.error?.message);
     assert.equal(result.signal, null, result.stderr);
-    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}\n${recorderFailureDetails(result)}`);
     assert.equal(fs.readFileSync(fixture.sentinel, 'utf8'), 'started', 'the requested long child starts only after all selected wrappers pass');
     const summary = readRecorderSummary(result);
     assert.equal(summary.status, 'passed');
@@ -430,6 +456,41 @@ test('qualification readiness gates the recorder child on selected parent contra
     assert.ok(children.includes('contracts.stdout.tap'));
     assert.ok(children.includes('contracts.stderr.txt'));
     for (const file of children) assert.equal(fs.statSync(path.join(path.dirname(record.qualificationPreflight.reportPath), file)).mode & 0o777, 0o600, `${file} is private`);
+  });
+
+  await t.test('workflow preflight failure blocks the requested child', () => {
+    const fixture = makeRecorderFixture(t, { workflowFailure: true });
+    const result = invokeReadyRecorder(fixture);
+    assert.equal(result.error, undefined, result.error?.message);
+    assert.equal(result.signal, null, result.stderr);
+    assert.notEqual(result.status, 0, `invalid workflow bytes must stop the child: ${result.stdout}\n${result.stderr}`);
+    assert.equal(fs.existsSync(fixture.sentinel), false, 'workflow validation failure must not launch the requested child');
+    const summary = readRecorderSummary(result);
+    assert.equal(summary.status, 'qualification-failure');
+    assert.equal(summary.qualificationPreflight.stage, 'workflow-preflight');
+    const { record, report } = assertPrivateQualificationReport(fixture, summary, 'failed');
+    assert.equal(report.selection, null, 'selection does not run after workflow validation fails');
+    assert.notEqual(report.workflowPreflight.exitCode, 0);
+    assert.equal(record.execution.outcome, 'qualification-failure');
+    assert.deepEqual(summary.child, { exitCode: null, signal: null });
+  });
+
+  await t.test('invalid selector metadata blocks the requested child after preflight', () => {
+    const fixture = makeRecorderFixture(t, { selectionFailure: true });
+    const result = invokeReadyRecorder(fixture);
+    assert.equal(result.error, undefined, result.error?.message);
+    assert.equal(result.signal, null, result.stderr);
+    assert.notEqual(result.status, 0, `missing required selector metadata must stop the child: ${result.stdout}\n${result.stderr}`);
+    assert.equal(fs.existsSync(fixture.sentinel), false, 'invalid contract selection must not launch the requested child');
+    const summary = readRecorderSummary(result);
+    assert.equal(summary.status, 'qualification-failure');
+    assert.equal(summary.qualificationPreflight.stage, 'selection');
+    const { record, report } = assertPrivateQualificationReport(fixture, summary, 'failed');
+    assert.equal(report.workflowPreflight.exitCode, 0, 'the standard preflight completed before selector validation');
+    assert.equal(report.selection, null, 'invalid registry metadata cannot yield a plan');
+    assert.match(report.errors.join(' '), /startup-browser.*missing/i);
+    assert.equal(record.execution.outcome, 'qualification-failure');
+    assert.deepEqual(summary.child, { exitCode: null, signal: null });
   });
 
   for (const mode of ['failed', 'skipped', 'duplicate', 'missing']) await t.test(`${mode} selected outcomes block the requested child`, () => {
