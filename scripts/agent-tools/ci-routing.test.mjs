@@ -16,7 +16,7 @@ const git = (cwd, ...args) => {
   return result.stdout.trim();
 };
 
-function fixture(t, grouped=false, policy=false) {
+function fixture(t, grouped=false, policy=false, early=false) {
   const root = mkdtempSync(path.join(os.tmpdir(), 'chain-ci-routing-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const source = path.join(root, 'source'), bin = path.join(root, 'bin');
@@ -28,6 +28,7 @@ function fixture(t, grouped=false, policy=false) {
   writeFileSync(path.join(source, 'package.json'), JSON.stringify({ private: true, scripts: { test: 'node --test tests.js' } }));
   writeFileSync(path.join(source, 'tests.js'), "import { test } from 'node:test';test('isolated routing fixture',()=>{});\n");
   if(grouped){for(const file of ['.github/workflows/data-safety.yml','scripts/test-group-inventory.json','scripts/test-group-assignments.json','scripts/test-groups.mjs','scripts/agent-tools/ci-routing.mjs']){mkdirSync(path.dirname(path.join(source,file)),{recursive:true});writeFileSync(path.join(source,file),'fixture '+file+'\n');}}
+  if(early)writeFileSync(path.join(source,'scripts/early-ci-harness-source.json'),'{"source":"controlled fixture only"}\n');
   if(policy)writeFileSync(path.join(source,'AGENTS.md'),'Read [release and review](docs/agents/release-and-review.md) before release.\n');
   git(source, 'add', '.'); git(source, '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'fixture base');
   const base = git(source, 'rev-parse', 'HEAD');
@@ -53,7 +54,7 @@ console.log(JSON.stringify(url.includes('/statuses?')?x.statuses:url.includes('/
   writeFileSync(path.join(bin, 'node'), '#!/bin/sh\nif [ "$1" = "-p" ] && [ "$ROUTING_READ_FAILURE" = "1" ]; then exit 1; fi\nexec ' + JSON.stringify(process.execPath) + ' "$@"\n');
   chmodSync(path.join(bin, 'node'), 0o755);
   chmodSync(path.join(bin, 'npm'), 0o755); chmodSync(path.join(bin, 'curl'), 0o755);
-  return { root, source, bin, base, head, merge, tree, journal, external, attempt: 0 };
+  return { root, source, bin, base, head, merge, tree, journal, external, early, attempt: 0 };
 }
 
 // Public routing-command consumer fixtures; the grouped workflow's actual
@@ -325,7 +326,7 @@ function publishedGroups(f,record) {
   published(f,record);const github=JSON.parse(readFileSync(f.external));
   github.tree={truncated:false,tree:['.github/workflows/data-safety.yml','scripts/test-group-inventory.json','scripts/test-group-assignments.json','scripts/test-groups.mjs','scripts/agent-tools/ci-routing.mjs'].map(file=>({path:file,type:'blob',sha:git(f.source,'rev-parse',f.head+':'+file)}))};
   const original=github.jobs[0];original.steps=[{name:`Complete regression context ${record.contextSha256} report ${'8'.repeat(64)}`,conclusion:'success'}];
-  github.jobs=['validation-context','event-gates','cohort-routing',...groupedIds.map(id=>'regression-'+id)].map(name=>({...original,name,steps:name==='validation-context'?[{name:`Announce regression context ${record.contextSha256}`,conclusion:'success'}]:[]})).concat(original);
+  github.jobs=['validation-context','event-gates','cohort-routing',...(f.early?['early-startup','mobile-stress']:[]),...groupedIds.map(id=>'regression-'+id)].map(name=>({...original,name,steps:name==='validation-context'?[{name:`Announce regression context ${record.contextSha256}`,conclusion:'success'}]:name==='early-startup'?[{name:`Complete early startup report ${'6'.repeat(64)}`,conclusion:'success'}]:[]})).concat(original);
   writeFileSync(f.external,JSON.stringify(github));return github;
 }
 test('grouped routing reuses only an exact completed reconciled producer and preserves origin attempt', async parent => {
@@ -371,11 +372,11 @@ function publishedPolicyBase(f) {
   const canonical=value=>Array.isArray(value)?'['+value.map(canonical).join(',')+']':value&&typeof value==='object'?'{'+Object.keys(value).sort().map(key=>JSON.stringify(key)+':'+canonical(value[key])).join(',')+'}':JSON.stringify(value);
   const prefix=createHash('sha256').update(canonical(plan)).digest('hex').slice(0,12);
   const description=`r=${'7'.repeat(64)};b=${f.base};p=${prefix};c=0;s=1;v=4`;
-  const context={repository:'fixture/repo',sourceSha:f.base,sourceTree:baseTree,checkoutSha:f.base,checkoutTree:baseTree,comparisonBase:baseParent,eventPolicy:'exact-main-push-v1',requiredCohort:'four-groups-v1',runtime:{node:process.versions.node,platform:process.platform,arch:process.arch},cohortDigestSha256:'1'.repeat(64),inventorySha256:'2'.repeat(64),assignmentsSha256:'3'.repeat(64),expectedGroups:groupedIds,workflowBlob:git(f.source,'rev-parse',f.base+':.github/workflows/data-safety.yml')};
+  const context={repository:'fixture/repo',sourceSha:f.base,sourceTree:baseTree,checkoutSha:f.base,checkoutTree:baseTree,comparisonBase:baseParent,eventPolicy:'exact-main-push-v1',requiredCohort:'four-groups-v1',runtime:{node:process.versions.node,platform:process.platform,arch:process.arch},cohortDigestSha256:'1'.repeat(64),inventorySha256:'2'.repeat(64),assignmentsSha256:'3'.repeat(64),expectedGroups:groupedIds,workflowBlob:git(f.source,'rev-parse',f.base+':.github/workflows/data-safety.yml'),...(f.early?{earlyPolicy:'saved-harness-required-mobile-v1'}:{})};
   const digest=createHash('sha256').update(JSON.stringify(context)).digest('hex');
   const step=name=>({name,status:'completed',conclusion:'success'});
-  const names=['validation-context','event-gates','cohort-routing',...groupedIds.map(id=>'regression-'+id),'scanner-tests','release-evidence','deploy-pages'];
-  const github={runs:[{id:70,run_attempt:1,status:'completed',conclusion:'success',event:'push',head_branch:'main',head_sha:f.base,name:'Data safety',path:'.github/workflows/data-safety.yml',repository:{full_name:'fixture/repo'},head_repository:{full_name:'fixture/repo'}}],jobs:names.map(name=>({name,status:'completed',conclusion:'success',run_id:70,run_attempt:1,head_sha:f.base,steps:name==='validation-context'?[step(`Announce regression context ${digest}`),step(`Actual checkout ${f.base} tree ${baseTree}`),step(`Validation source ${f.base} base ${baseParent}`),step(`Workflow blob ${context.workflowBlob} policy four-groups-v1`)]:name==='scanner-tests'?[step(`Complete regression context ${digest} report ${'8'.repeat(64)}`)]:name.startsWith('regression-')?[step('Execute complete assigned group')]:name==='event-gates'?[step('Run npm run test:rules'),step('Backward compatibility')]:[]})),statuses:['funsidething/memory-audit','funsidething/independent-review','funsidething/specialist-review'].map(context=>({context,state:'success',description,created_at:new Date().toISOString()}))};
+  const names=['validation-context','event-gates','cohort-routing',...(f.early?['early-startup','mobile-stress']:[]),...groupedIds.map(id=>'regression-'+id),'scanner-tests','release-evidence','deploy-pages'];
+  const github={runs:[{id:70,run_attempt:1,status:'completed',conclusion:'success',event:'push',head_branch:'main',head_sha:f.base,name:'Data safety',path:'.github/workflows/data-safety.yml',repository:{full_name:'fixture/repo'},head_repository:{full_name:'fixture/repo'}}],jobs:names.map(name=>({name,status:'completed',conclusion:'success',run_id:70,run_attempt:1,head_sha:f.base,steps:name==='validation-context'?[step(`Announce regression context ${digest}`),step(`Actual checkout ${f.base} tree ${baseTree}`),step(`Validation source ${f.base} base ${baseParent}`),step(`Workflow blob ${context.workflowBlob} policy four-groups-v1`)]:name==='early-startup'?[step(`Complete early startup report ${'6'.repeat(64)}`)]:name==='scanner-tests'?[step(`Complete regression context ${digest} report ${'8'.repeat(64)}`)]:name.startsWith('regression-')?[step('Execute complete assigned group')]:name==='event-gates'?[step('Run npm run test:rules'),step('Backward compatibility')]:[]})),statuses:['funsidething/memory-audit','funsidething/independent-review','funsidething/specialist-review'].map(context=>({context,state:'success',description,created_at:new Date().toISOString()}))};
   writeFileSync(f.external,JSON.stringify(github));return github;
 }
 
@@ -428,4 +429,22 @@ test('policy prose exact main routing retains current reviewed head and original
  github.pulls=[{number:17,merged_at:new Date().toISOString(),merge_commit_sha:f.merge,head:{sha:f.head},base:{ref:'main'}}];writeFileSync(f.external,JSON.stringify(github));
  const result=invoke(f,{event:'push',ref:'refs/heads/main',source:f.merge,checkout:f.merge,environment:descriptorFor(f,f.merge,f.merge)});
  assert.equal(result.status,0,result.stdout+result.stderr);assert.equal(result.record.decision,'policy-reuse',result.stdout);assert.equal(result.record.policyReview.sourceSha,f.head);assert.equal(result.record.policyImpact.sourceSha,f.merge);assert.equal(result.record.coveredBy.checkoutSha,f.base);assert.equal(executions(f).length,0);
+});
+
+
+test('early CI routing retains original full startup and stress proof for ordinary and policy coverage',async parent=>{
+ for(const policy of [false,true])await parent.test(policy?'policy inheritance':'same-source reuse',async t=>{
+  for(const fault of ['none','missing early','skipped early','missing stress','missing receipt'])await t.test(fault,sub=>{
+   const f=fixture(sub,true,policy,true);let github;
+   if(policy)github=publishedPolicyBase(f);else{const producer=invoke(f,{event:'pull_request',checkout:f.merge,environment:descriptorFor(f,f.merge)});assert.equal(producer.status,0,producer.stderr);github=publishedGroups(f,producer.record);}
+   if(fault==='missing early')github.jobs=github.jobs.filter(job=>job.name!=='early-startup');
+   if(fault==='skipped early')github.jobs.find(job=>job.name==='early-startup').conclusion='skipped';
+   if(fault==='missing stress')github.jobs=github.jobs.filter(job=>job.name!=='mobile-stress');
+   if(fault==='missing receipt')github.jobs.find(job=>job.name==='early-startup').steps=[];
+   writeFileSync(f.external,JSON.stringify(github));
+   const result=invoke(f,{event:policy?'pull_request':'push',checkout:policy?f.merge:f.head,environment:descriptorFor(f,policy?f.merge:f.head)});assert.equal(result.status,0,result.stderr);
+   assert.equal(result.record.decision,fault==='none'?(policy?'policy-reuse':'reuse'):'full',result.stdout);
+   if(fault==='none')assert.equal(result.record.coveredBy.earlyReportSha256,'6'.repeat(64));
+  });
+ });
 });

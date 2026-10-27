@@ -1,0 +1,5 @@
+test('RISK repository process: native button gate awaits an asynchronous false outcome',t=>{
+ const output=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(output,'Durable allocated native output required');
+ const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine','chromium','--output-dir',output,'--port',process.env.CHAIN_NATIVE_PORT||'0','--probe','--control','async-predicate-false'],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:45000});
+ assert.equal(result.error,undefined);assert.equal(result.signal,null);assert.notEqual(result.status,0,'Promise(false) must not be mistaken for a completed expected native button outcome');assert.match(result.stderr,/stalled responsiveness: outcome settings/);
+});

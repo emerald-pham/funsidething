@@ -2262,6 +2262,29 @@ Public recording and fresh verification preserve full source/base/tree inventori
 
 The existing checkpoint and recorder commands exercise disposable Git repositories, actual child processes, independent expected observations, concurrent admission, full source-issue refresh, finite budgets, immutable failed results, repository-owner approval and a separately cloned CI verifier. Diagnostic source cannot receive product release receipts. The unlanded WebKit consumer patch is retained separately until its owner integrates it; this contract does not establish hosted execution, physical-device recovery or private-board proof.
 
+## Early populated startup CI admission
+
+- RISK repository process: Playwright waitForFunction predicates are synchronous
+- RISK scenery backdrop cache: first unchanged lighting timer reuses actual pixels while changed slots and loaded copy still paint
+- RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh
+- RISK repository process: scenery consumers use allocated fallback ports and preserve early native failures
+- RISK repository process: native scene-time bursts cannot activate controls behind a refused top-layer release
+- RISK repository process: early startup failure blocks costly CI without counting blocked coverage
+
+The original saved harness and native assertion bodies are imported byte-for-byte from 9b5bc1c, a child of b176026. The public early command preserves source/run/workflow and every raw artifact, rejects omitted/skipped/cancelled work, and authorizes long cohorts only after the original required 1 GB mobile story. The separate stress parser retains nonblocking application outcomes and mandatory integrity. Controlled OS children establish process ordering only; actual hosted source may still fail and remains a release blocker.
+
+- RISK repository process: CI monitor preserves early startup and stress predecessor failures
+
+The supported CI observer reads the actual workflow and retains missing, skipped, cancelled and unknown early/stress predecessor outcomes. New process wrappers clear the inherited Node runner marker and require actual named TAP outcomes.
+
+- RISK repository process: canonical limited source profiles preserve original mobile acceptance
+
+The canonical profile admits only the original mobile story and the named confirmed Chromium modal harness. Complete canonical app assets/templates and raw report scope remain bound; unknown scopes, full runs, wrong source/profile and sensitivity controls refuse. The saved native original is preserved with a separately hashed effective hook. Three newly imported PR285 full-product tests remain exact unexecuted source snapshots; all preexisting main tests, original story limits and saved full native catalog remain unchanged.
+
+- RISK repository process: early-assigned consumers execute once through durable group accounting
+
+Existing catalog assignments mark the five confirmed roots as early execution while retaining their native-process ownership. Real workflow commands consume verified durable early cases before any group child, omit only those already executed roots from the later Node process, and aggregate raw early/ordinary outcomes exactly once. Missing or changed receipts and transfer references fail; the accepted skip inventory is unchanged.
+
 ## Nonqualifying source-bound diagnostic authority
 
 - `RISK repository process: known frozen diagnostic source derives narrow eligibility from exact content`

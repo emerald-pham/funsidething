@@ -63,6 +63,8 @@ async function main() {
     if (String(identity.runAttempt)!==process.env.GITHUB_RUN_ATTEMPT || identity.checkoutDirty || !/^[a-f0-9]{64}$/.test(identity.cohortDigestSha256) || JSON.stringify(identity.expectedGroups)!==JSON.stringify(['core','scenery','persistence-recovery','native-process'])) throw new Error('Invalid complete cohort descriptor.');
     cohort={requiredCohort:'four-groups-v1',cohortDigestSha256:identity.cohortDigestSha256,inventorySha256:identity.inventorySha256,assignmentsSha256:identity.assignmentsSha256,expectedGroups:identity.expectedGroups,workflowBlob:git('rev-parse',`${checkoutSha}:${workflowPath}`)};
   }
+  const earlyRequired=Boolean(cohort&&git('ls-tree','--name-only',checkoutSha,'scripts/early-ci-harness-source.json'));
+  if(earlyRequired)cohort.earlyPolicy='saved-harness-required-mobile-v1';
   const boundContext = (...values) => ({...context(...values),...(cohort||{})});
   const validationContext = boundContext(repository, sourceSha, sourceTree, checkoutSha, checkoutTree, args['comparison-base'],
     eventName === 'pull_request' ? 'canonical-pr-merge-v1' : isMain ? 'exact-main-push-v1' : 'outgoing-branch-push-v1');
@@ -135,12 +137,14 @@ async function main() {
         const run = runs[0];
         if (!run || !decimal(run.id) || !decimal(run.run_attempt) || run.status !== 'completed' || run.conclusion !== 'success') throw new Error('No successful current full exact-base producer.');
         const result = readApi(`actions/runs/${run.id}/attempts/${run.run_attempt}/jobs?per_page=100`);
-        const required = ['validation-context','event-gates','cohort-routing',...cohort.expectedGroups.map(id=>'regression-'+id),'scanner-tests'];
+        const required = ['validation-context','event-gates','cohort-routing',...(earlyRequired?['early-startup','mobile-stress']:[]),...cohort.expectedGroups.map(id=>'regression-'+id),'scanner-tests'];
         if (!Array.isArray(result.jobs) || result.total_count !== result.jobs.length || required.some(name => result.jobs.filter(job=>job.name===name && job.status==='completed' && job.conclusion==='success' && String(job.run_id)===String(run.id) && String(job.run_attempt)===String(run.run_attempt) && job.head_sha===base).length!==1) || result.jobs.some(job=>!required.includes(job.name) && !['release-evidence','deploy-pages'].includes(job.name))) throw new Error('Policy base full topology is incomplete.');
         const completed = name => result.jobs.find(job=>job.name===name)?.steps?.filter(step=>step.status==='completed' && step.conclusion==='success') || [];
         for (const name of [`Announce regression context ${expected}`,`Actual checkout ${base} tree ${baseTree}`,`Validation source ${base} base ${parent}`,`Workflow blob ${cohort.workflowBlob} policy four-groups-v1`]) if (completed('validation-context').filter(step=>step.name===name).length!==1) throw new Error('Policy base context does not match the frozen complete cohort.');
         for (const gate of ['Run npm run test:rules','Backward compatibility']) if (completed('event-gates').filter(step=>step.name===gate).length!==1) throw new Error('Policy base rules or compatibility execution is absent.');
         for (const group of cohort.expectedGroups) if (completed('regression-'+group).filter(step=>step.name==='Execute complete assigned group').length!==1) throw new Error('Policy base producer did not execute every group.');
+        const earlyMarkers=earlyRequired?completed('early-startup').filter(step=>/^Complete early startup report [a-f0-9]{64}$/.test(step.name)):[];
+        if(earlyRequired&&earlyMarkers.length!==1)throw new Error('Original complete early execution receipt is absent.');
         const markers = completed('scanner-tests').filter(step=>new RegExp(`^Complete regression context ${expected} report [a-f0-9]{64}$`).test(step.name));
         if (markers.length !== 1) throw new Error('Policy base full reconciliation attestation is absent.');
         // Re-read current statuses: changed or revoked evidence cannot be hidden
@@ -149,7 +153,7 @@ async function main() {
         if (JSON.stringify(review) !== JSON.stringify(currentReview)) throw new Error('Policy review changed during inheritance validation.');
         record.decision='policy-reuse'; record.reason='Instruction-preserving policy prose; unchanged product/FAQ/rendered evidence and full base execution verified.';
         record.policyImpact=impact; record.policyReview=review; record.policyStatuses=policyStatuses; record.cohortContext=producerContext; record.contextSha256=expected;
-        record.coveredBy={runId:String(run.id),runAttempt:String(run.run_attempt),checkoutSha:base,checkoutTree:baseTree,comparisonBase:parent,reportSha256:markers[0].name.split(' report ')[1]};
+        record.coveredBy={runId:String(run.id),runAttempt:String(run.run_attempt),checkoutSha:base,checkoutTree:baseTree,comparisonBase:parent,reportSha256:markers[0].name.split(' report ')[1],...(earlyRequired?{earlyReportSha256:earlyMarkers[0].name.split(' report ')[1]}:{})};
       }
     } catch (error) { record.reason=`${error.message} Executing the actual checkout's complete cohort.`; }
   }
@@ -189,7 +193,7 @@ async function main() {
           record.decision = 'fail'; record.reason = `Exact producer ${run.id}/${run.run_attempt} concluded ${run.conclusion}.`; break;
         }
         if(cohort){
-          const required=['validation-context','event-gates','cohort-routing',...cohort.expectedGroups.map(id=>'regression-'+id),'scanner-tests'];
+          const required=['validation-context','event-gates','cohort-routing',...(earlyRequired?['early-startup','mobile-stress']:[]),...cohort.expectedGroups.map(id=>'regression-'+id),'scanner-tests'];
           if(required.some(name=>result.jobs.filter(job=>job.name===name&&job.status==='completed'&&job.conclusion==='success'&&String(job.run_id)===String(run.id)&&String(job.run_attempt)===String(run.run_attempt)&&job.head_sha===sourceSha).length!==1))throw new Error('Producer required topology is incomplete.');
           if(result.jobs.some(job=>!required.includes(job.name)&&!['release-evidence','deploy-pages'].includes(job.name)))throw new Error('Producer topology is unknown.');
         }
@@ -205,6 +209,7 @@ async function main() {
         record.coveredBy = { runId: String(run.id), runAttempt: String(run.run_attempt), checkoutSha: canonical.cohort.checkoutSha,
           checkoutTree: canonical.cohort.checkoutTree, comparisonBase: canonical.cohort.comparisonBase };
         if(cohort)record.coveredBy.reportSha256=completed[0].name.split(' report ')[1];
+        if(earlyRequired){const early=result.jobs.find(job=>job.name==='early-startup'),markers=(early.steps||[]).filter(step=>step.conclusion==='success'&&/^Complete early startup report [a-f0-9]{64}$/.test(step.name));if(markers.length!==1)throw new Error('Original complete early execution receipt is absent.');record.coveredBy.earlyReportSha256=markers[0].name.split(' report ')[1];}
         break;
       }
       if (record.decision !== 'full' || !pending || Date.now() >= deadline) break;
