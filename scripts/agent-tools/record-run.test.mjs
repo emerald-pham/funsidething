@@ -6,6 +6,7 @@ import { mkdtemp, mkdir, readFile, readdir, rm, stat, symlink, writeFile } from 
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseTap } from '../test-groups.mjs';
 
 const node = process.execPath;
 const recorder = fileURLToPath(new URL('./record-run.mjs', import.meta.url));
@@ -387,6 +388,87 @@ test('summarizes large real child output while preserving complete redacted evid
   assert.equal((await readFile(stderrPath, 'utf8')).includes(stderrSecret), false);
 });
 
+test('keeps ordinary and compact callers compatible for large failures and changed-source evidence', async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'record-run-caller-compatibility-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(temp);
+  const sourcePath = path.join(repo, 'src/app.js');
+  await writeFile(sourcePath, 'export const value = 2;\n');
+  const stdoutSecret = 'COMPAT-STDOUT-SECRET-19d2';
+  const stderrSecret = 'COMPAT-STDERR-SECRET-b510';
+  const child = `process.stdout.write('O'.repeat(128 * 1024) + ' token=${stdoutSecret}\\n'); process.stderr.write('E'.repeat(96 * 1024) + ' password=${stderrSecret}\\n'); process.exitCode = 7;`;
+  const expectedStdout = `${'O'.repeat(128 * 1024)} token=[REDACTED]\n`;
+  const expectedStderr = `${'E'.repeat(96 * 1024)} password=[REDACTED]\n`;
+  const ordinaryEvidence = path.join(temp, 'ordinary-evidence');
+  const ordinary = invokeRecorder({
+    repo,
+    evidence: ordinaryEvidence,
+    purpose: 'green',
+    command: node,
+    args: ['-e', child],
+  });
+
+  assert.equal(ordinary.status, 7, 'the default stream mode preserves the actual child exit');
+  assert.equal(ordinary.stdout, expectedStdout, 'existing ordinary callers still receive the full sanitized stdout');
+  assert.ok(ordinary.stderr.includes(expectedStderr), 'existing ordinary callers still receive the full sanitized stderr');
+  const ordinaryMetadataPath = evidencePathFrom(ordinary);
+  const ordinaryRecordBytes = await readFile(ordinaryMetadataPath);
+  const ordinaryRecord = JSON.parse(ordinaryRecordBytes.toString('utf8'));
+  assert.equal(ordinaryRecord.execution.exitCode, 7);
+  assert.equal(ordinaryRecord.execution.signal, null);
+  assert.equal(ordinaryRecord.execution.outcome, 'nonzero-exit');
+  assert.equal(ordinaryRecord.state, 'complete');
+  assert.equal(ordinaryRecord.execution.output.stdout, expectedStdout);
+  assert.equal(ordinaryRecord.execution.output.stderr, expectedStderr);
+
+  const compactEvidence = path.join(temp, 'compact-evidence');
+  const compact = invokeRecorder({
+    repo,
+    evidence: compactEvidence,
+    purpose: 'green',
+    command: node,
+    args: ['-e', child],
+    extraOptions: ['--summary'],
+  });
+
+  assert.equal(compact.status, 7, 'summary mode also preserves the actual child exit');
+  assert.ok(Buffer.byteLength(compact.stdout) + Buffer.byteLength(compact.stderr) < 2048,
+    'the compact caller remains bounded as child output grows');
+  const compactSummary = summaryFrom(compact);
+  assert.equal(compactSummary.status, 'failed');
+  assert.equal(compactSummary.outcome, 'nonzero-exit');
+  assert.deepEqual(compactSummary.child, { exitCode: 7, signal: null });
+  const compactRecordBytes = await readFile(compactSummary.evidence.metadataPath);
+  const compactRecord = JSON.parse(compactRecordBytes.toString('utf8'));
+  assert.equal(compactRecord.execution.output.stdout, expectedStdout);
+  assert.equal(compactRecord.execution.output.stderr, expectedStderr);
+  assert.equal(await readFile(compactSummary.evidence.stdoutPath, 'utf8'), expectedStdout);
+  assert.equal(await readFile(compactSummary.evidence.stderrPath, 'utf8'), expectedStderr);
+
+  for (const record of [ordinaryRecord, compactRecord]) {
+    assert.equal(record.workingTree.identity.status, 'complete');
+    assert.match(record.workingTree.sourceTestDiffSha256, /^[a-f0-9]{64}$/);
+    const changedSource = record.workingTree.sourceTestFiles.find(file => file.path === 'src/app.js');
+    assert.ok(changedSource, 'the changed source remains attributed to the recorded attempt');
+    assert.match(changedSource.actualBytesSha256, /^[a-f0-9]{64}$/);
+    assert.equal(JSON.stringify(record).includes(stdoutSecret), false);
+    assert.equal(JSON.stringify(record).includes(stderrSecret), false);
+    assert.equal(record.execution.output.stdout.includes(stdoutSecret), false);
+    assert.equal(record.execution.output.stderr.includes(stderrSecret), false);
+  }
+  assert.equal(ordinaryRecord.workingTree.sourceTestDiffSha256, compactRecord.workingTree.sourceTestDiffSha256,
+    'ordinary and compact callers identify the same unchanged source diff');
+  for (const [pathValue, secret] of [
+    [ordinaryMetadataPath, stdoutSecret], [ordinaryMetadataPath, stderrSecret],
+    [compactSummary.evidence.metadataPath, stdoutSecret], [compactSummary.evidence.metadataPath, stderrSecret],
+    [compactSummary.evidence.stdoutPath, stdoutSecret], [compactSummary.evidence.stderrPath, stderrSecret],
+  ]) assert.equal((await readFile(pathValue, 'utf8')).includes(secret), false, `${path.basename(pathValue)} stays redacted`);
+  assert.equal(ordinary.stdout.includes(stdoutSecret), false);
+  assert.equal(ordinary.stderr.includes(stderrSecret), false);
+  assert.equal(compact.stdout.includes(stdoutSecret), false);
+  assert.equal(compact.stdout.includes(stderrSecret), false);
+});
+
 test('keeps a failed child nonzero and reports its actual exit in the summary', async (t) => {
   const temp = await mkdtemp(path.join(os.tmpdir(), 'record-run-summary-failure-'));
   t.after(() => rm(temp, { recursive: true, force: true }));
@@ -416,6 +498,80 @@ test('keeps a failed child nonzero and reports its actual exit in the summary', 
   assert.equal(record.execution.output.stderr, `AssertionError: expected failure password=[REDACTED]\n`);
   assert.equal(await readFile(summary.evidence.stderrPath, 'utf8'), record.execution.output.stderr);
   assert.equal((await readFile(summary.evidence.metadataPath, 'utf8')).includes(secret), false);
+});
+
+test('redacts synthetic secrets from every summary and provenance surface while preserving the child failure', async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'record-run-secret-surfaces-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(temp);
+  const evidence = path.join(temp, 'evidence');
+  const stdoutSecret = 'RECORDER-STDOUT-SECRET-415a';
+  const stderrSecret = 'RECORDER-STDERR-SECRET-730b';
+  const argumentSecret = 'RECORDER-ARGUMENT-SECRET-841c';
+  const sourceSecret = 'RECORDER-SOURCE-SECRET-952d';
+  const sourcePath = path.join(repo, 'src', 'evidence.test.mjs');
+  await writeFile(sourcePath, `export const token = "${sourceSecret}";\n`);
+  const child = `const token=process.argv[2];process.stdout.write('O'.repeat(64*1024)+' token='+token+' ${stdoutSecret}\\n');process.stderr.write('AssertionError: password='+token+' ${stderrSecret}\\n');process.exitCode=7;`;
+
+  const result = invokeRecorder({
+    repo,
+    evidence,
+    purpose: 'green',
+    command: node,
+    args: ['-e', child, '--', '--token', argumentSecret],
+    extraOptions: ['--summary', '--redact-pattern', stdoutSecret, '--redact-pattern', stderrSecret],
+  });
+
+  assert.equal(result.status, 7, result.stderr);
+  assert.ok(Buffer.byteLength(result.stdout) < 2048, 'summary output stays bounded while child output grows');
+  const summary = summaryFrom(result);
+  const serializedSummary = JSON.stringify(summary);
+  assert.equal(summary.status, 'failed');
+  assert.equal(summary.outcome, 'assertion-failure');
+  assert.equal(summary.wrapperExitCode, 7);
+  assert.deepEqual(summary.child, { exitCode: 7, signal: null });
+  assert.equal(summary.evidence.status, 'complete');
+  assert.equal(summary.source.identityStatus, 'complete');
+  assert.match(summary.source.diffSha256, /^[a-f0-9]{64}$/);
+  for (const secret of [stdoutSecret, stderrSecret, argumentSecret, sourceSecret]) {
+    assert.equal(serializedSummary.includes(secret), false, 'bounded console summary must be secret-free');
+  }
+
+  const recordPath = summary.evidence.metadataPath;
+  const recordBytes = await readFile(recordPath, 'utf8');
+  const record = JSON.parse(recordBytes);
+  assert.equal(record.execution.outcome, 'assertion-failure');
+  assert.equal(record.execution.exitCode, 7);
+  assert.equal(record.execution.signal, null);
+  assert.equal(record.git.commit, summary.source.commit);
+  assert.equal(record.workingTree.identity.status, 'complete');
+  assert.match(record.workingTree.sourceTestDiffSha256, /^[a-f0-9]{64}$/);
+  assert.equal(record.command.args.at(-2), '--token');
+  assert.equal(record.command.args.at(-1), '[REDACTED]');
+  assert.ok(record.redaction.locations['command.args[4]'] > 0);
+
+  const capturedSource = record.workingTree.sourceTestFiles.find((file) => file.path === 'src/evidence.test.mjs');
+  assert.ok(capturedSource, 'changed source remains part of the recorded provenance');
+  assert.equal(capturedSource.status, 'untracked');
+  assert.match(capturedSource.content, /token = \[REDACTED\]/);
+  assert.equal(capturedSource.content.includes(sourceSecret), false);
+  assert.match(record.execution.output.stdout, /^O{65536} token=\[REDACTED\] \[REDACTED\]$/m);
+  assert.equal(record.execution.output.stderr, 'AssertionError: password=[REDACTED] [REDACTED]\n');
+  assert.equal(await readFile(summary.evidence.stdoutPath, 'utf8'), record.execution.output.stdout);
+  assert.equal(await readFile(summary.evidence.stderrPath, 'utf8'), record.execution.output.stderr);
+
+  const evidenceFiles = await readdir(evidence);
+  assert.deepEqual(evidenceFiles.sort(), [path.basename(recordPath), path.basename(summary.evidence.stdoutPath), path.basename(summary.evidence.stderrPath)].sort());
+  for (const file of evidenceFiles) {
+    const bytes = await readFile(path.join(evidence, file), 'utf8');
+    for (const secret of [stdoutSecret, stderrSecret, argumentSecret, sourceSecret]) {
+      assert.equal(bytes.includes(secret), false, `${file} must not retain synthetic secrets`);
+    }
+  }
+  assert.equal(recordBytes.includes(stdoutSecret), false);
+  assert.equal(recordBytes.includes(stderrSecret), false);
+  assert.equal(recordBytes.includes(argumentSecret), false);
+  assert.equal(recordBytes.includes(sourceSecret), false);
 });
 
 test('reports a child signal as interruption while preserving its incomplete evidence', { skip: process.platform === 'win32' }, async (t) => {
@@ -1007,6 +1163,308 @@ test('classifies real TAP syntax and import failures separately from assertions 
   }
   const result = invokeRecorder({ repo, evidence, purpose: 'green', command: node, args: ['-e', 'console.log("not ok 1 - failed runner\\n# fail 1"); process.exitCode=1;'] });
   assert.equal(JSON.parse(await readFile(evidencePathFrom(result), 'utf8')).execution.outcome, 'nonzero-exit');
+});
+
+test('preserves an ordinary TAP case identity containing the word token through recording', async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'record-tap-token-name-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(temp);
+  const evidence = process.env.CHAIN_RECORDER_TAP_TEST_EVIDENCE_DIR
+    ? path.resolve(process.env.CHAIN_RECORDER_TAP_TEST_EVIDENCE_DIR)
+    : path.join(temp, 'evidence');
+  const caseName = 'token results keep their full nonsecret identity';
+  const testFile = path.join(repo, 'token-case.test.mjs');
+  await writeFile(testFile, `import { test } from 'node:test';\ntest(${JSON.stringify(caseName)}, () => {});\n`);
+
+  const result = invokeRecorder({
+    repo,
+    evidence,
+    purpose: 'green',
+    command: node,
+    args: ['--test', '--test-reporter=tap', testFile],
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  const record = JSON.parse(await readFile(evidencePathFrom(result), 'utf8'));
+  const tapOutput = record.execution.output.stdout;
+  const cases = parseTap(tapOutput).map(({ id, root, status, skipReason }) => ({ id, root, status, skipReason }));
+  assert.deepEqual(cases, [{ id: caseName, root: caseName, status: 'passed', skipReason: null }]);
+  assert.match(tapOutput, /^1\.\.1$/m);
+  assert.match(tapOutput, /^# tests 1$/m);
+  assert.match(tapOutput, /^# pass 1$/m);
+  assert.match(tapOutput, /^# fail 0$/m);
+  assert.equal(record.execution.exitCode, 0);
+  assert.equal(record.execution.outcome, 'passed');
+});
+
+test('redacts a secret-bearing TAP token identity without losing its status or plain-log sanitization', async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'record-tap-token-secret-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(temp);
+  const evidence = process.env.CHAIN_RECORDER_TAP_TEST_EVIDENCE_DIR
+    ? path.resolve(process.env.CHAIN_RECORDER_TAP_TEST_EVIDENCE_DIR)
+    : path.join(temp, 'evidence');
+  const secret = 'TAP-NAME-SECRET-8c14a19f';
+  const caseName = `token=${secret}`;
+  const testFile = path.join(repo, 'token-secret-case.test.mjs');
+  const diagnosticLine = `token ${secret}\n`;
+  await writeFile(testFile, `import { test } from 'node:test';\ntest(${JSON.stringify(caseName)}, () => process.stderr.write(${JSON.stringify(diagnosticLine)}));\n`);
+
+  const result = invokeRecorder({
+    repo,
+    evidence,
+    purpose: 'green',
+    command: node,
+    args: ['--test', '--test-reporter=tap', testFile],
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  const recordBytes = await readFile(evidencePathFrom(result), 'utf8');
+  const record = JSON.parse(recordBytes);
+  const tapOutput = record.execution.output.stdout;
+  const cases = parseTap(tapOutput).map(({ id, root, status, skipReason }) => ({ id, root, status, skipReason }));
+  assert.deepEqual(cases, [{ id: 'token=[REDACTED]', root: 'token=[REDACTED]', status: 'passed', skipReason: null }]);
+  assert.match(tapOutput, /^# token \[REDACTED\]$/m, 'bare token/value log syntax stays protected outside TAP identity context');
+  assert.match(tapOutput, /^# tests 1$/m);
+  assert.match(tapOutput, /^# pass 1$/m);
+  assert.match(tapOutput, /^# fail 0$/m);
+  assert.equal(recordBytes.includes(secret), false, 'the persisted metadata must not contain the synthetic secret');
+  assert.equal(record.execution.exitCode, 0);
+});
+
+test('preserves adjacent nested TAP records across multiline secret redaction', async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'record-tap-multiline-secret-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(temp);
+  const evidence = process.env.CHAIN_RECORDER_TAP_TEST_EVIDENCE_DIR
+    ? path.resolve(process.env.CHAIN_RECORDER_TAP_TEST_EVIDENCE_DIR)
+    : path.join(temp, 'evidence');
+  const firstLineSecret = 'MULTILINE-RECORDER-SECRET-BEGIN-591a';
+  const secondLineSecret = 'MULTILINE-RECORDER-SECRET-CONTINUED-602b';
+  const testFile = path.join(repo, 'multiline-tap.test.mjs');
+  const rawTapOutput = [
+    'TAP version 13',
+    '# Subtest: outer case',
+    '    # token',
+    '    # Subtest: nested case',
+    '    ok 1 - nested case',
+    '    1..1',
+    'ok 1 - outer case',
+    '1..1',
+    '# tests 2',
+    '# suites 0',
+    '# pass 2',
+    '# fail 0',
+    '# cancelled 0',
+    '# skipped 0',
+    '# todo 0',
+    '# duration_ms 1',
+    `# "password": "${firstLineSecret}\n    # ${secondLineSecret}"`,
+    '',
+  ].join('\n');
+  await writeFile(testFile, `process.stdout.write(${JSON.stringify(rawTapOutput)});\n`);
+
+  const result = invokeRecorder({
+    repo,
+    evidence,
+    purpose: 'green',
+    command: node,
+    args: [testFile],
+    extraOptions: ['--summary'],
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  const summary = summaryFrom(result);
+  assert.equal(summary.status, 'passed');
+  assert.equal(summary.outcome, 'passed');
+  assert.equal(summary.evidence.status, 'complete');
+  assert.equal(summary.source.identityStatus, 'complete');
+  assert.equal(JSON.stringify(summary).includes(firstLineSecret), false);
+  assert.equal(JSON.stringify(summary).includes(secondLineSecret), false);
+  const recordPath = summary.evidence.metadataPath;
+  const recordBytes = await readFile(recordPath, 'utf8');
+  const record = JSON.parse(recordBytes);
+  assert.equal(record.workingTree.identity.status, 'complete');
+  const tapOutput = record.execution.output.stdout;
+  const cases = parseTap(record.execution.output.stdout).map(({ id, root, status, skipReason }) => ({ id, root, status, skipReason }));
+  assert.deepEqual(cases, [
+    { id: 'outer case > nested case', root: 'outer case', status: 'passed', skipReason: null },
+    { id: 'outer case', root: 'outer case', status: 'passed', skipReason: null },
+  ]);
+  assert.match(tapOutput, /^# tests 2$/m);
+  assert.match(tapOutput, /^# pass 2$/m);
+  assert.match(tapOutput, /^# fail 0$/m);
+  assert.equal(await readFile(summary.evidence.stdoutPath, 'utf8'), tapOutput, 'the retained stream matches the parsed sanitized protocol');
+  assert.equal(tapOutput.includes(firstLineSecret), false);
+  assert.equal(tapOutput.includes(secondLineSecret), false);
+  assert.equal(recordBytes.includes(firstLineSecret), false);
+  assert.equal(recordBytes.includes(secondLineSecret), false);
+  const capturedSource = record.workingTree.sourceTestFiles.find((file) => file.path === 'multiline-tap.test.mjs');
+  assert.ok(capturedSource, 'the child fixture remains in captured source provenance');
+  assert.equal(capturedSource.content.includes(firstLineSecret), false);
+  assert.equal(capturedSource.content.includes(secondLineSecret), false);
+  assert.equal(record.execution.outcome, 'passed');
+  assert.equal(record.execution.exitCode, 0);
+});
+
+test('reconciles nested token and ordinary cases and keeps corrected redacted evidence immutable', async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'record-tap-nested-outcomes-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(temp);
+  const evidence = path.join(temp, 'evidence');
+  const secret = 'NESTED-TAP-SECRET-661c';
+  const testFile = path.join(repo, 'nested-outcomes.test.mjs');
+  await writeFile(testFile, `import { test } from 'node:test';\nimport assert from 'node:assert/strict';\ntest('token parent result', async (t) => {\n  await t.test('ordinary child', () => {});\n  await t.test('token failure child', (child) => {\n    child.diagnostic('"password": "${secret}"');\n    assert.fail('controlled nested assertion');\n  });\n});\n`);
+
+  const run = (purpose, extraOptions = []) => invokeRecorder({
+    repo,
+    evidence,
+    purpose,
+    command: node,
+    args: ['--test', '--test-reporter=tap', testFile],
+    extraOptions: ['--summary', ...extraOptions],
+  });
+  const first = run('green');
+
+  assert.equal(first.status, 1, first.stderr);
+  const firstSummary = summaryFrom(first);
+  assert.equal(firstSummary.status, 'failed');
+  assert.equal(firstSummary.outcome, 'assertion-failure');
+  assert.deepEqual(firstSummary.child, { exitCode: 1, signal: null });
+  const firstMetadataPath = firstSummary.evidence.metadataPath;
+  const firstStdoutPath = firstSummary.evidence.stdoutPath;
+  const firstStderrPath = firstSummary.evidence.stderrPath;
+  const firstBytes = await readFile(firstMetadataPath);
+  const firstStdout = await readFile(firstStdoutPath);
+  const firstStderr = await readFile(firstStderrPath);
+  const firstRecord = JSON.parse(firstBytes.toString('utf8'));
+  const firstTap = firstStdout.toString('utf8');
+  const cases = parseTap(firstTap).map(({ id, root, status, skipReason }) => ({ id, root, status, skipReason }));
+  assert.deepEqual(cases, [
+    { id: 'token parent result > ordinary child', root: 'token parent result', status: 'passed', skipReason: null },
+    { id: 'token parent result > token failure child', root: 'token parent result', status: 'failed', skipReason: null },
+    { id: 'token parent result', root: 'token parent result', status: 'failed', skipReason: null },
+  ]);
+  assert.match(firstTap, /^# tests 3$/m);
+  assert.match(firstTap, /^# pass 1$/m);
+  assert.match(firstTap, /^# fail 2$/m);
+  assert.equal(firstRecord.execution.outcome, 'assertion-failure');
+  assert.equal(firstRecord.execution.exitCode, 1);
+  for (const bytes of [firstBytes, firstStdout, firstStderr, Buffer.from(JSON.stringify(firstSummary))]) {
+    assert.equal(bytes.includes(secret), false, 'the first attempt must retain only redacted payloads');
+  }
+  const capturedSource = firstRecord.workingTree.sourceTestFiles.find((file) => file.path === 'nested-outcomes.test.mjs');
+  assert.ok(capturedSource);
+  assert.equal(capturedSource.content.includes(secret), false);
+
+  const correctionNote = 'Later controlled replay; original remains immutable.';
+  const corrected = run('later-baseline-sensitivity', ['--correction-of', firstRecord.id, '--correction-note', correctionNote]);
+  assert.equal(corrected.status, 1, corrected.stderr);
+  const correctedSummary = summaryFrom(corrected);
+  const correctedRecord = JSON.parse(await readFile(correctedSummary.evidence.metadataPath, 'utf8'));
+  assert.notEqual(correctedRecord.id, firstRecord.id);
+  assert.deepEqual(correctedRecord.correction, { originalRecordId: firstRecord.id, note: correctionNote });
+  assert.deepEqual(await readFile(firstMetadataPath), firstBytes);
+  assert.deepEqual(await readFile(firstStdoutPath), firstStdout);
+  assert.deepEqual(await readFile(firstStderrPath), firstStderr);
+  for (const file of await readdir(evidence)) {
+    assert.equal((await readFile(path.join(evidence, file))).includes(secret), false, `${file} must stay secret-free`);
+  }
+});
+
+test('preserves passed, skipped, TODO, and failed TAP cases with their bounded summary totals', async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'record-tap-terminal-statuses-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(temp);
+  const evidence = path.join(temp, 'evidence');
+  const secret = 'RECORDER-STATUS-SECRET-913e';
+  const testFile = path.join(repo, 'terminal-statuses.test.mjs');
+  await writeFile(testFile, `import { test } from 'node:test';\nimport assert from 'node:assert/strict';\ntest('token passing case', () => {});\ntest('accepted optional case', { skip: 'accepted fixture skip' }, () => {});\ntest('required case remains skipped', { skip: 'forbidden required skip' }, () => {});\ntest.todo('TODO case remains distinct');\ntest('required failing case', () => assert.fail('password=${secret}'));\n`);
+
+  const result = invokeRecorder({
+    repo,
+    evidence,
+    purpose: 'green',
+    command: node,
+    args: ['--test', '--test-reporter=tap', testFile],
+    extraOptions: ['--summary'],
+  });
+
+  assert.equal(result.status, 1, result.stderr);
+  assert.ok(Buffer.byteLength(result.stdout) < 2048, 'console summary remains bounded');
+  const summary = summaryFrom(result);
+  assert.equal(summary.status, 'failed');
+  assert.equal(summary.outcome, 'assertion-failure');
+  assert.deepEqual(summary.child, { exitCode: 1, signal: null });
+  const recordBytes = await readFile(summary.evidence.metadataPath);
+  const record = JSON.parse(recordBytes.toString('utf8'));
+  const tap = await readFile(summary.evidence.stdoutPath, 'utf8');
+  const cases = parseTap(tap).map(({ id, root, status, skipReason }) => ({ id, root, status, skipReason }));
+  assert.deepEqual(cases, [
+    { id: 'token passing case', root: 'token passing case', status: 'passed', skipReason: null },
+    { id: 'accepted optional case', root: 'accepted optional case', status: 'skipped', skipReason: 'accepted fixture skip' },
+    { id: 'required case remains skipped', root: 'required case remains skipped', status: 'skipped', skipReason: 'forbidden required skip' },
+    { id: 'TODO case remains distinct', root: 'TODO case remains distinct', status: 'todo', skipReason: null },
+    { id: 'required failing case', root: 'required failing case', status: 'failed', skipReason: null },
+  ]);
+  assert.match(tap, /^# tests 5$/m);
+  assert.match(tap, /^# pass 1$/m);
+  assert.match(tap, /^# fail 1$/m);
+  assert.match(tap, /^# skipped 2$/m);
+  assert.match(tap, /^# todo 1$/m);
+  assert.equal(record.execution.outcome, 'assertion-failure');
+  assert.equal(record.execution.exitCode, 1);
+  assert.equal(record.execution.output.stdout, tap);
+  assert.equal(record.execution.output.stderr.includes(secret), false);
+  assert.equal(recordBytes.includes(secret), false);
+  assert.equal(tap.includes(secret), false);
+  assert.equal(JSON.stringify(summary).includes(secret), false);
+});
+
+test('keeps a cancelled child non-successful when only partial TAP was retained', async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'record-tap-cancelled-child-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(temp);
+  const evidence = path.join(temp, 'evidence');
+  const secret = 'RECORDER-CANCELLED-SECRET-a41d';
+  const partialTap = [
+    'TAP version 13',
+    '# Subtest: interrupted after one case',
+    'ok 1 - interrupted after one case',
+    `# "password": "${secret}"`,
+    '',
+  ].join('\n');
+  const child = `process.stdout.write(${JSON.stringify(partialTap)}, () => process.kill(process.pid, 'SIGTERM'));`;
+
+  const result = invokeRecorder({
+    repo,
+    evidence,
+    purpose: 'green',
+    command: node,
+    args: ['-e', child],
+    extraOptions: ['--summary'],
+  });
+
+  assert.equal(result.status, 143, result.stderr);
+  assert.ok(Buffer.byteLength(result.stdout) < 2048, 'interruption summary remains bounded');
+  const summary = summaryFrom(result);
+  assert.equal(summary.status, 'interrupted');
+  assert.equal(summary.outcome, 'interrupted');
+  assert.deepEqual(summary.child, { exitCode: null, signal: 'SIGTERM' });
+  assert.equal(summary.wrapperExitCode, 143);
+  const recordBytes = await readFile(summary.evidence.metadataPath);
+  const record = JSON.parse(recordBytes.toString('utf8'));
+  const tap = await readFile(summary.evidence.stdoutPath, 'utf8');
+  assert.deepEqual(parseTap(tap).map(({ id, root, status }) => ({ id, root, status })), [
+    { id: 'interrupted after one case', root: 'interrupted after one case', status: 'passed' },
+  ]);
+  assert.equal(/^# (?:tests|pass|fail)\b/m.test(tap), false, 'partial cases do not acquire a fabricated complete summary');
+  assert.equal(record.state, 'incomplete');
+  assert.equal(record.execution.outcome, 'interrupted');
+  assert.equal(record.execution.signal, 'SIGTERM');
+  assert.equal(recordBytes.includes(secret), false);
+  assert.equal(tap.includes(secret), false);
+  assert.equal(JSON.stringify(summary).includes(secret), false);
 });
 
 test('opaque identity never exposes deleted binary or renamed sensitive diff payloads', async (t) => {

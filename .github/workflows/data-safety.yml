@@ -39,6 +39,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Install pinned workflow validator
+        run: npm run agent:setup-workflow-validator
+      - name: Validate pinned workflow checkout
+        id: workflow-validation
+        run: npm run agent:validate-workflows -- --source-label "GitHub checkout ${GITHUB_SHA}" --evidence-file "${RUNNER_TEMP}/workflow-validation.json"
+      - name: Preserve workflow validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workflow-validation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/workflow-validation.json
+          if-no-files-found: ignore
       - name: Enforce CI reuse contract
         run: node --test --test-name-pattern='^workflow input reuse retains large original native evidence and rejects changed bytes$|^test group workflow consumer forbids duplicate execution for a verified input pass$|^workflow emulator gate reuses a verified pass and executes an uncovered gate$|^workflow reuses an independently passed gate on main for the same complete inputs$|^workflow partial retries preserve successful gates and invalidate a later failed execution$|^test group aggregate preserves observer protocol across emulator coverage and fresh fallback$' scripts/agent-tools/test-groups.test.mjs scripts/agent-tools/ci-routing.test.mjs
       - name: Resolve comparison base

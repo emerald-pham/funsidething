@@ -29725,6 +29725,88 @@ test('RISK repository process: pre-push checks every outgoing tip and rejects di
  }finally{cleanupReleaseGateFixture(fixture);}
 });
 
+test('RISK repository process: managed pre-push validates the exact outgoing workflow commit',async t=>{
+ const {installSharedPrePushHook}=await import('./scripts/install-release-hook.mjs');
+ const {recordReleaseEvidence}=await import('./scripts/release-evidence.mjs');
+ const {ACTIONLINT_VERSION,validateWorkflows}=await import('./scripts/agent-tools/workflow-validator.mjs');
+ const setup=await validateWorkflows({repositoryRoot:__dirname,sourceDir:path.join(__dirname,'.github','workflows')});
+ if(setup.error?.includes('is not set up in this repository')){
+  t.skip('Run npm run agent:setup-workflow-validator before the managed pre-push integration test.');
+  return;
+ }
+ assert.equal(setup.ok,true,setup.error??setup.diagnostics);
+
+ const fixture=makeReleaseGateFixture();
+ try{
+  const sourceFiles=['scripts/release-evidence.mjs','scripts/agent-tools/checkpoint-progress.mjs','scripts/agent-tools/workflow-validator.mjs'];
+  for(const file of sourceFiles){
+   const target=path.join(fixture.repo,file);fs.mkdirSync(path.dirname(target),{recursive:true});
+   fs.copyFileSync(path.join(__dirname,file),target);
+  }
+  fs.writeFileSync(path.join(fixture.repo,'.gitignore'),'node_modules/\n');
+  const cacheRelative=path.join('node_modules','.cache','funsidething','actionlint',`v${ACTIONLINT_VERSION}`,`${process.platform}-${process.arch}`);
+  const sourceCache=path.join(__dirname,cacheRelative),fixtureCache=path.join(fixture.repo,cacheRelative);
+  fs.mkdirSync(fixtureCache,{recursive:true});
+  for(const file of ['actionlint','manifest.json'])fs.copyFileSync(path.join(sourceCache,file),path.join(fixtureCache,file));
+  fs.chmodSync(path.join(fixtureCache,'actionlint'),0o755);
+
+  releaseGateGit(fixture.repo,['switch','-c','outgoing-workflow']);
+  const workflowPath=path.join(fixture.repo,'.github','workflows','data-safety.yml');
+  fs.mkdirSync(path.dirname(workflowPath),{recursive:true});
+  fs.writeFileSync(workflowPath,'name: invalid outgoing workflow\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    env:\n      VALUE: \${{ runner.temp }}\n    steps:\n      - run: echo test\n');
+  releaseGateGit(fixture.repo,['add','--all']);releaseGateGit(fixture.repo,['commit','-m','Add invalid job-scope workflow']);
+  const invalidSha=releaseGateGit(fixture.repo,['rev-parse','HEAD']);
+  fixture.candidateSha=invalidSha;fixture.treeSha=releaseGateGit(fixture.repo,['rev-parse',invalidSha+'^{tree}']);
+  recordReleaseEvidence(fixture.repo,releaseGateInput(fixture));
+  releaseGateGit(fixture.repo,['branch','release-candidate',invalidSha]);
+
+  releaseGateGit(fixture.repo,['switch','-c','working-head']);
+  fs.writeFileSync(workflowPath,'name: valid current workflow\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - name: Use supported runner scope\n        env:\n          VALUE: \${{ runner.temp }}\n        run: echo test\n');
+  releaseGateGit(fixture.repo,['add','--all']);releaseGateGit(fixture.repo,['commit','-m','Move runner context to a step']);
+  const currentSha=releaseGateGit(fixture.repo,['rev-parse','HEAD']);
+  fixture.candidateSha=currentSha;fixture.treeSha=releaseGateGit(fixture.repo,['rev-parse',currentSha+'^{tree}']);
+  const currentReceipt=recordReleaseEvidence(fixture.repo,releaseGateInput(fixture));
+
+  const common=releaseGateGit(fixture.repo,['rev-parse','--path-format=absolute','--git-common-dir']);
+  const hooks=path.join(common,'hooks');fs.mkdirSync(hooks,{recursive:true});
+  const marker=path.join(fixture.root,'prior-hook-ran'),captured=path.join(fixture.root,'prior-hook-payload');
+  const prior='#!/usr/bin/env bash\ncat > "$RELEASE_HOOK_CAPTURE"\nprintf "ran\\n" >> "$RELEASE_HOOK_MARKER"\nif [[ "${RELEASE_HOOK_FAIL:-0}" == 1 ]]; then exit 23; fi\n';
+  fs.writeFileSync(path.join(hooks,'pre-push'),prior,{mode:0o755});
+  const installed=installSharedPrePushHook(fixture.repo);
+  assert.equal(fs.readFileSync(installed.preservedHookPath,'utf8'),prior,'the prior dispatcher remains byte-for-byte recoverable');
+  const hookInput=[
+   `refs/heads/release-candidate ${invalidSha} refs/heads/release-candidate ${'0'.repeat(40)}`,
+   `refs/heads/working-head ${currentSha} refs/heads/working-head ${'0'.repeat(40)}`,
+   `refs/heads/deleted ${'0'.repeat(40)} refs/heads/deleted ${invalidSha}`,
+  ].join('\n')+'\n';
+  const invoke=(input,fail=false)=>spawnSync('bash',[installed.hookPath],{cwd:fixture.repo,encoding:'utf8',input,
+   maxBuffer:4*1024*1024,env:{...process.env,RELEASE_HOOK_MARKER:marker,RELEASE_HOOK_CAPTURE:captured,RELEASE_HOOK_FAIL:fail?'1':'0'}});
+
+  const priorFailure=invoke(hookInput,true);
+  assert.equal(priorFailure.status,23,'the managed dispatcher preserves a prior hook nonzero exit');
+  assert.equal(fs.readFileSync(captured,'utf8'),hookInput,'the prior hook receives the exact pre-push payload');
+  const invalid=invoke(hookInput);
+  assert.notEqual(invalid.status,0,`${invalid.stdout}\n${invalid.stderr}`);
+  assert.match(invalid.stderr,new RegExp(invalidSha),'the refusal identifies the exact invalid outgoing commit');
+  assert.match(invalid.stderr,/\.github\/workflows\/data-safety\.yml/,'the refusal names the workflow blob that failed');
+  assert.match(invalid.stderr,/context "runner" is not allowed here/i,'the refusal carries the pinned actionlint finding');
+  assert.equal(fs.readFileSync(captured,'utf8'),hookInput,'the prior hook still receives bytes before the validator rejects');
+
+  const validInput=`refs/heads/working-head ${currentSha} refs/heads/working-head ${'0'.repeat(40)}\nrefs/heads/deleted ${'0'.repeat(40)} refs/heads/deleted ${invalidSha}\n`;
+  const valid=invoke(validInput);
+  assert.equal(valid.status,0,`${valid.stdout}\n${valid.stderr}`);
+  assert.match(valid.stdout,/Every outgoing commit tip has valid exact-SHA release evidence/);
+  assert.equal(fs.readFileSync(captured,'utf8'),validInput,'multiple-ref/deletion handling keeps the prior hook payload intact');
+
+  fs.rmSync(currentReceipt.receiptPath);
+  const missingReceipt=invoke(validInput);
+  assert.notEqual(missingReceipt.status,0,'workflow validation cannot bypass the existing exact-candidate receipt gate');
+  assert.match(missingReceipt.stderr,/receipt|evidence/i);
+  assert.equal(fs.readFileSync(captured,'utf8'),validInput,'receipt failures still follow prior-hook dispatch');
+  assert.equal(fs.readFileSync(marker,'utf8').trim().split('\n').length,4,'the prior hook runs once for each real invocation');
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
 test('RISK repository process: status publication needs a valid exact-SHA receipt',async()=>{
  const {recordReleaseEvidence,publishReleaseStatuses}=await import('./scripts/release-evidence.mjs');
  const fixture=makeReleaseGateFixture();

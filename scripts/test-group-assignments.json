@@ -13652,6 +13652,66 @@
       "root": "RISK repository process: workflow browser paths resolve only in supported runner contexts",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: managed pre-push validates the exact outgoing workflow commit",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "preflight rejects a workflow expression unavailable at job scope before full qualification",
+      "group": "native-process",
+      "file": "scripts/agent-tools/preflight.test.mjs"
+    },
+    {
+      "root": "workflow validator command contracts are pinned and source-bound",
+      "group": "native-process",
+      "file": "scripts/agent-tools/workflow-validator.test.mjs"
+    },
+    {
+      "root": "keeps ordinary and compact callers compatible for large failures and changed-source evidence",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "redacts synthetic secrets from every summary and provenance surface while preserving the child failure",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "preserves an ordinary TAP case identity containing the word token through recording",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "redacts a secret-bearing TAP token identity without losing its status or plain-log sanitization",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "preserves adjacent nested TAP records across multiline secret redaction",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "reconciles nested token and ordinary cases and keeps corrected redacted evidence immutable",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "preserves passed, skipped, TODO, and failed TAP cases with their bounded summary totals",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "keeps a cancelled child non-successful when only partial TAP was retained",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "public group qualification consumes sanitized recorder TAP against its described required identities",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
     }
   ],
   "processControls": [
