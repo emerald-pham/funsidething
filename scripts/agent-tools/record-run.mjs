@@ -96,7 +96,8 @@ function sanitizeText(input, redaction, location = 'metadata') {
     const line = source.slice(lineStart, lineEnd < 0 ? source.length : lineEnd);
     return /^[ \t]*(?:# Subtest: |(?:not )?ok \d+ - )/.test(line);
   };
-  replace(/(^|[^A-Za-z0-9])((?:github[_-]?token|aws[_-]?secret[_-]?access[_-]?key|password|passwd|secret|token|api[_-]?(?:key|token)|authorization|cookie|access[_-]?(?:token|key)|client[_-]?secret|private[_-]?key))(\s*(?:[:=]\s*|\s+))(?:\\(["'])(.*?)\\\4|(["'])(.*?)\6|[^\s,;]+)/gi, (_match, beforeKey, key, separator, _escapedQuote, _escapedValue, _quote, _value, offset, source) => {
+  // Generic key/value separators stay on one line so they cannot consume TAP controls.
+  replace(/(^|[^A-Za-z0-9])((?:github[_-]?token|aws[_-]?secret[_-]?access[_-]?key|password|passwd|secret|token|api[_-]?(?:key|token)|authorization|cookie|access[_-]?(?:token|key)|client[_-]?secret|private[_-]?key))([ \t]*(?:[:=][ \t]*|[ \t]+))(?:\\(["'])(.*?)\\\4|(["'])(.*?)\6|[^\s,;]+)/gi, (_match, beforeKey, key, separator, _escapedQuote, _escapedValue, _quote, _value, offset, source) => {
     // Bare `token <word>` text is also ordinary prose in TAP case names. Keep
     // that identity intact, while still redacting explicit key/value forms,
     // recognizable token credentials, custom patterns, and all non-TAP logs.

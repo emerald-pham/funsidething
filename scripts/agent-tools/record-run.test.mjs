@@ -1151,6 +1151,81 @@ test('redacts a secret-bearing TAP token identity without losing its status or p
   assert.equal(record.execution.exitCode, 0);
 });
 
+test('preserves adjacent nested TAP records across multiline secret redaction', async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'record-tap-multiline-secret-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(temp);
+  const evidence = process.env.CHAIN_RECORDER_TAP_TEST_EVIDENCE_DIR
+    ? path.resolve(process.env.CHAIN_RECORDER_TAP_TEST_EVIDENCE_DIR)
+    : path.join(temp, 'evidence');
+  const firstLineSecret = 'MULTILINE-RECORDER-SECRET-BEGIN-591a';
+  const secondLineSecret = 'MULTILINE-RECORDER-SECRET-CONTINUED-602b';
+  const testFile = path.join(repo, 'multiline-tap.test.mjs');
+  const rawTapOutput = [
+    'TAP version 13',
+    '# Subtest: outer case',
+    '    # token',
+    '    # Subtest: nested case',
+    '    ok 1 - nested case',
+    '    1..1',
+    'ok 1 - outer case',
+    '1..1',
+    '# tests 2',
+    '# suites 0',
+    '# pass 2',
+    '# fail 0',
+    '# cancelled 0',
+    '# skipped 0',
+    '# todo 0',
+    '# duration_ms 1',
+    `# "password": "${firstLineSecret}\n    # ${secondLineSecret}"`,
+    '',
+  ].join('\n');
+  await writeFile(testFile, `process.stdout.write(${JSON.stringify(rawTapOutput)});\n`);
+
+  const result = invokeRecorder({
+    repo,
+    evidence,
+    purpose: 'green',
+    command: node,
+    args: [testFile],
+    extraOptions: ['--summary'],
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  const summary = summaryFrom(result);
+  assert.equal(summary.status, 'passed');
+  assert.equal(summary.outcome, 'passed');
+  assert.equal(summary.evidence.status, 'complete');
+  assert.equal(summary.source.identityStatus, 'complete');
+  assert.equal(JSON.stringify(summary).includes(firstLineSecret), false);
+  assert.equal(JSON.stringify(summary).includes(secondLineSecret), false);
+  const recordPath = summary.evidence.metadataPath;
+  const recordBytes = await readFile(recordPath, 'utf8');
+  const record = JSON.parse(recordBytes);
+  assert.equal(record.workingTree.identity.status, 'complete');
+  const tapOutput = record.execution.output.stdout;
+  const cases = parseTap(record.execution.output.stdout).map(({ id, root, status, skipReason }) => ({ id, root, status, skipReason }));
+  assert.deepEqual(cases, [
+    { id: 'outer case > nested case', root: 'outer case', status: 'passed', skipReason: null },
+    { id: 'outer case', root: 'outer case', status: 'passed', skipReason: null },
+  ]);
+  assert.match(tapOutput, /^# tests 2$/m);
+  assert.match(tapOutput, /^# pass 2$/m);
+  assert.match(tapOutput, /^# fail 0$/m);
+  assert.equal(await readFile(summary.evidence.stdoutPath, 'utf8'), tapOutput, 'the retained stream matches the parsed sanitized protocol');
+  assert.equal(tapOutput.includes(firstLineSecret), false);
+  assert.equal(tapOutput.includes(secondLineSecret), false);
+  assert.equal(recordBytes.includes(firstLineSecret), false);
+  assert.equal(recordBytes.includes(secondLineSecret), false);
+  const capturedSource = record.workingTree.sourceTestFiles.find((file) => file.path === 'multiline-tap.test.mjs');
+  assert.ok(capturedSource, 'the child fixture remains in captured source provenance');
+  assert.equal(capturedSource.content.includes(firstLineSecret), false);
+  assert.equal(capturedSource.content.includes(secondLineSecret), false);
+  assert.equal(record.execution.outcome, 'passed');
+  assert.equal(record.execution.exitCode, 0);
+});
+
 test('opaque identity never exposes deleted binary or renamed sensitive diff payloads', async (t) => {
   const temp = await mkdtemp(path.join(os.tmpdir(), 'record-opaque-diffs-'));
   t.after(() => rm(temp, { recursive: true, force: true }));
