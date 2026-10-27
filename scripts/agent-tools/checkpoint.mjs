@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { constants } from 'node:fs';
+import { progressCommand, assertDiagnosticPublicationAllowed } from './checkpoint-progress.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 import { open, link, mkdir, unlink } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
@@ -144,6 +145,7 @@ function collectPointers(record) {
 }
 
 async function validateRecord(repo, record) {
+  if(record?.status==='complete')assertDiagnosticPublicationAllowed(repo,record.source?.commit);
   exactKeys(record, ['schemaVersion', 'id', 'revision', 'source', 'status', 'requiredGates', 'followUps', 'nextAction'], 'checkpoint');
   if (record.schemaVersion !== 1) fail('checkpoint.schemaVersion must be 1.');
   recordId(record.id, 'checkpoint.id');
@@ -310,9 +312,16 @@ function parseArguments(args) {
 }
 
 async function main() {
+  const progressOps=['admit','prepare','verify-ci','export','start','inspect','consume','hold','extend','change-source','verify-publication'];
+  if(progressOps.includes(process.argv[2])) {
+    const options={};const args=process.argv.slice(3);
+    for(let i=0;i<args.length;i+=2){const key=args[i];if(!/^--(?:repo|task|input|record|attempt|result|reason|commit|approval)$/.test(key)||!args[i+1]||args[i+1].startsWith('--')||Object.hasOwn(options,key.slice(2)))throw Error('Invalid diagnostic checkpoint options.');options[key.slice(2)]=args[i+1];}
+    if(!options.repo)throw Error('Diagnostic --repo required.');
+    process.stdout.write(JSON.stringify(await progressCommand(process.argv[2],options))+'\n');return;
+  }
   if (process.argv[2] === '--help' || process.argv[2] === '-h') {
     process.stdout.write('Usage: node scripts/agent-tools/checkpoint.mjs <create|resume|validate> --repo <git-worktree> --record <json-path> [--input <manifest.json>] [--previous <checkpoint.json>]\n');
-    process.stdout.write('Checkpoint state records exact Git identity, required gates, separate follow-ups, immutable artifact pointers, and one next required action. It does not run gates.\n');
+    process.stdout.write('Diagnostic commands: prepare, start, inspect, admit, export, verify-ci, consume, change-source, extend, hold, verify-publication. See docs/agents/checkpoints.md for input contracts and trust limits.\n');
     return;
   }
   const { operation, options } = parseArguments(process.argv.slice(2));

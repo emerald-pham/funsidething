@@ -12796,6 +12796,76 @@
       "root": "policy prose exact main routing retains current reviewed head and original base execution",
       "group": "native-process",
       "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "diagnostic recorder refuses missing durable state before starting a child",
+      "group": "native-process",
+      "file": "scripts/agent-tools/checkpoint-progress.test.mjs"
+    },
+    {
+      "root": "diagnostic recorder rejects tampered state without launching",
+      "group": "native-process",
+      "file": "scripts/agent-tools/checkpoint-progress.test.mjs"
+    },
+    {
+      "root": "a fresh process given only the task fetches complete parent authority and admissions consume the same durable allowance",
+      "group": "native-process",
+      "file": "scripts/agent-tools/checkpoint-progress.test.mjs"
+    },
+    {
+      "root": "an active failed investigation prevents caller-asserted completed release checkpoints",
+      "group": "native-process",
+      "file": "scripts/agent-tools/checkpoint-progress.test.mjs"
+    },
+    {
+      "root": "consumption derives failed observations from actual output and a finite allowance survives branch and observer commits",
+      "group": "native-process",
+      "file": "scripts/agent-tools/checkpoint-progress.test.mjs"
+    },
+    {
+      "root": "stale authority dirty source and changed result bytes refuse without further children",
+      "group": "native-process",
+      "file": "scripts/agent-tools/checkpoint-progress.test.mjs"
+    },
+    {
+      "root": "two fresh concurrent public recorder processes admit exactly one identical request",
+      "group": "native-process",
+      "file": "scripts/agent-tools/checkpoint-progress.test.mjs"
+    },
+    {
+      "root": "independently consumed passing output completes only the actual current source",
+      "group": "native-process",
+      "file": "scripts/agent-tools/checkpoint-progress.test.mjs"
+    },
+    {
+      "root": "a predicted diagnostic failure cannot pay an unresolved required gate",
+      "group": "native-process",
+      "file": "scripts/agent-tools/checkpoint-progress.test.mjs"
+    },
+    {
+      "root": "portable CI independently verifies a signed admitted attempt in a separate clone and refuses tampering retry and missing manifest",
+      "group": "native-process",
+      "file": "scripts/agent-tools/checkpoint-progress.test.mjs"
+    },
+    {
+      "root": "bounded extension requires exact source and current journal authorization evidence and retains failures",
+      "group": "native-process",
+      "file": "scripts/agent-tools/checkpoint-progress.test.mjs"
+    },
+    {
+      "root": "a caller-authored approval file cannot impersonate the repository approval authority",
+      "group": "native-process",
+      "file": "scripts/agent-tools/checkpoint-progress.test.mjs"
+    },
+    {
+      "root": "RISK repository process: diagnostic checkpoints retain finite authority across fresh process and CI boundaries",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "source prerequisites include paginated comments beyond the issue summary",
+      "group": "native-process",
+      "file": "scripts/agent-tools/checkpoint-progress.test.mjs"
     }
   ],
   "processControls": [

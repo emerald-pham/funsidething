@@ -2253,3 +2253,9 @@ The real Sync → Review action and Copy debug log consumer distinguish failed p
 - RISK repository process: policy prose false exemptions retain full applicable review
 
 Public recording and fresh verification preserve full source/base/tree inventories, current independent policy review, immutable product/FAQ/rendered reports and all three required statuses. Instruction-preserving prose reuses only unchanged product evidence; authorization, gate weakening, executable/configuration/test, mixed and ambiguous changes keep full applicable review. Public CI routing and covered/aggregate command cohorts retain exact producer execution, rules/compatibility, current statuses and zero claimed current test outcomes. Hosted proof remains a separate release requirement.
+
+## Durable diagnostic progress
+
+- RISK repository process: diagnostic checkpoints retain finite authority across fresh process and CI boundaries
+
+The existing checkpoint and recorder commands exercise disposable Git repositories, actual child processes, independent expected observations, concurrent admission, full source-issue refresh, finite budgets, immutable failed results, repository-owner approval and a separately cloned CI verifier. Diagnostic source cannot receive product release receipts. The unlanded WebKit consumer patch is retained separately until its owner integrates it; this contract does not establish hosted execution, physical-device recovery or private-board proof.
