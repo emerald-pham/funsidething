@@ -20188,8 +20188,7 @@
       "RISK saved view broken-board startup: prior appearance stays inert until the recovered board opens",
       "RISK saved view broken-board startup: configured Firebase leaves the prior warning neutral until its first event",
       "RISK saved view broken-board status: configured cloud changes remain visible in the saved appearance and after recovery",
-      "RISK saved view broken-board guidance: opening status does not imply cloud confirmation or erase recovery warnings",
-      "RISK unreadable device recovery: Quick start and current Changelog explain preserved sources and local pending recovery"
+      "RISK saved view broken-board guidance: opening status does not imply cloud confirmation or erase recovery warnings"
     ],
     "preservedCoverage": [
       "The malformed device head, exact retained sources, durable recovery hold, and independently supported working board remain distinct; the real consumer validates the supported board before hydration.",
