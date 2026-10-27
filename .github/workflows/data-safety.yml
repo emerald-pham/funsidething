@@ -18,6 +18,7 @@ jobs:
       policy: ${{ steps.plan.outputs.policy }}
       tree: ${{ steps.plan.outputs.tree }}
       workflow-blob: ${{ steps.plan.outputs.workflow-blob }}
+      input-keys: ${{ steps.plan.outputs.input-keys }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -25,6 +26,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Enforce CI reuse contract
+        run: node --test --test-name-pattern='^test group workflow consumer forbids duplicate execution for a verified input pass$|^workflow emulator gate reuses a verified pass and executes an uncovered gate$|^workflow reuses an independently passed gate on main for the same complete inputs$|^workflow partial retries preserve successful gates and invalidate a later failed execution$|^test group aggregate preserves observer protocol across emulator coverage and fresh fallback$' scripts/agent-tools/test-groups.test.mjs scripts/agent-tools/ci-routing.test.mjs
       - name: Resolve comparison base
         id: diff-base
         shell: bash
@@ -70,8 +73,13 @@ jobs:
           if-no-files-found: error
 
   event-gates:
-    needs: validation-context
+    needs: [validation-context, cohort-routing]
     runs-on: ubuntu-latest
+    outputs:
+      rules: ${{ steps.rules.outputs.mode }}
+      compatibility: ${{ steps.compatibility.outputs.mode }}
+      rules-coverage: ${{ steps.rules.outputs.coverage }}
+      compatibility-coverage: ${{ steps.compatibility.outputs.coverage }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -80,23 +88,59 @@ jobs:
         with:
           node-version: '22'
           cache: npm
+      - uses: actions/download-artifact@v4
+        with:
+          name: ci-routing-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ci-routing
+      - name: Select coverage for this runner
+        id: selected
+        run: node scripts/agent-tools/ci-pass-reuse.mjs select --proof "$RUNNER_TEMP/ci-routing/routing.json" --output-file "$RUNNER_TEMP/selected-routing/routing.json"
       - uses: actions/setup-java@v4
+        if: ${{ !contains(fromJSON(steps.selected.outputs.reused), 'rules') || !contains(fromJSON(steps.selected.outputs.reused), 'compatibility') }}
         with:
           distribution: temurin
           java-version: '21'
       - run: npm ci
+        if: ${{ !contains(fromJSON(steps.selected.outputs.reused), 'rules') || !contains(fromJSON(steps.selected.outputs.reused), 'compatibility') }}
       - run: node scripts/test-first-gate.mjs "${{ needs.validation-context.outputs.base }}"
-      - run: npm run test:rules
+      - name: Execute CI gate rules input ${{ fromJSON(steps.selected.outputs.input-keys).rules }}
+        if: ${{ !contains(fromJSON(steps.selected.outputs.reused), 'rules') }}
+        run: echo "Executing previously uncovered rules inputs"
+      - name: Firestore rules or verified original pass
+        id: rules
+        run: node scripts/agent-tools/ci-pass-reuse.mjs run-gate --gate rules --proof "$RUNNER_TEMP/selected-routing/routing.json" --output-dir "$RUNNER_TEMP/emulator-gates/rules" --comparison-base "${{ needs.validation-context.outputs.base }}"
+      - name: Execute CI gate compatibility input ${{ fromJSON(steps.selected.outputs.input-keys).compatibility }}
+        if: ${{ !contains(fromJSON(steps.selected.outputs.reused), 'compatibility') }}
+        run: echo "Executing previously uncovered compatibility inputs"
       - name: Backward compatibility
+        id: compatibility
         env:
           COMPATIBILITY_BASE_SHA: ${{ needs.validation-context.outputs.base }}
-        run: npm run test:compatibility
+        run: node scripts/agent-tools/ci-pass-reuse.mjs run-gate --gate compatibility --proof "$RUNNER_TEMP/selected-routing/routing.json" --output-dir "$RUNNER_TEMP/emulator-gates/compatibility" --comparison-base "${{ needs.validation-context.outputs.base }}"
+      - name: Preserve emulator gate evidence
+        id: upload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: event-gates-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/emulator-gates
+          if-no-files-found: error
+      - name: Completed CI gate rules input ${{ steps.rules.outputs.key }} result ${{ steps.rules.outputs.result }}
+        if: always() && steps.rules.outputs.mode == 'executed' && steps.rules.outputs.key != '' && steps.upload.outcome == 'success'
+        run: echo "Original rules execution and retained result verified"
+      - name: Completed CI gate compatibility input ${{ steps.compatibility.outputs.key }} result ${{ steps.compatibility.outputs.result }}
+        if: always() && steps.compatibility.outputs.mode == 'executed' && steps.compatibility.outputs.key != '' && steps.upload.outcome == 'success'
+        run: echo "Original compatibility execution and retained result verified"
 
   cohort-routing:
     needs: validation-context
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
     outputs:
       decision: ${{ steps.route.outputs.decision }}
+      reused: ${{ steps.route.outputs.reused }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -110,7 +154,9 @@ jobs:
           path: ${{ runner.temp }}/validation
       - name: Resolve complete cohort coverage
         id: route
-        run: node scripts/agent-tools/ci-routing.mjs --descriptor "$RUNNER_TEMP/validation/descriptor/descriptor.json" --comparison-base "${{ needs.validation-context.outputs.base }}" --evidence-dir "$RUNNER_TEMP/ci-routing"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/agent-tools/ci-routing.mjs --require-input-passes 1 --descriptor "$RUNNER_TEMP/validation/descriptor/descriptor.json" --comparison-base "${{ needs.validation-context.outputs.base }}" --evidence-dir "$RUNNER_TEMP/ci-routing"
       - name: Preserve routing observations
         if: always()
         uses: actions/upload-artifact@v4
@@ -139,27 +185,29 @@ jobs:
         with:
           node-version: '22'
           cache: npm
+      - uses: actions/download-artifact@v4
+        with:
+          name: ci-routing-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ci-routing
+      - name: Select coverage for this runner
+        id: selected
+        run: node scripts/agent-tools/ci-pass-reuse.mjs select --proof "$RUNNER_TEMP/ci-routing/routing.json" --output-file "$RUNNER_TEMP/selected-routing/routing.json"
       - uses: actions/setup-java@v4
-        if: needs.cohort-routing.outputs.decision == 'full'
+        if: steps.selected.outputs.decision == 'full' && !contains(fromJSON(steps.selected.outputs.reused), matrix.group)
         with:
           distribution: temurin
           java-version: '21'
       - run: npm ci
-        if: needs.cohort-routing.outputs.decision == 'full'
+        if: steps.selected.outputs.decision == 'full' && !contains(fromJSON(steps.selected.outputs.reused), matrix.group)
       - name: Install matching native Chromium
-        if: needs.cohort-routing.outputs.decision == 'full'
+        if: steps.selected.outputs.decision == 'full' && !contains(fromJSON(steps.selected.outputs.reused), matrix.group)
         run: npx --no-install playwright install --with-deps chromium
-      - uses: actions/download-artifact@v4
-        if: needs.cohort-routing.outputs.decision == 'reuse'
-        with:
-          name: ci-routing-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/ci-routing
-      - name: Execute complete assigned group
-        if: needs.cohort-routing.outputs.decision == 'full'
-        run: npm run test:group -- --group "${{ matrix.group }}" --output-dir "$RUNNER_TEMP/group" --repository "$GITHUB_REPOSITORY" --event-policy "$CHAIN_TEST_EVENT_POLICY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$CHAIN_TEST_SOURCE_SHA" --comparison-base "$CHAIN_TEST_COMPARISON_BASE"
-      - name: Record verified full-producer coverage reference
-        if: needs.cohort-routing.outputs.decision == 'reuse'
-        run: npm run test:group -- --covered --proof "$RUNNER_TEMP/ci-routing/routing.json" --group "${{ matrix.group }}" --output-dir "$RUNNER_TEMP/group" --repository "$GITHUB_REPOSITORY" --event-policy "$CHAIN_TEST_EVENT_POLICY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$CHAIN_TEST_SOURCE_SHA" --comparison-base "$CHAIN_TEST_COMPARISON_BASE"
+      - name: Execute CI gate ${{ matrix.group }} input ${{ fromJSON(steps.selected.outputs.input-keys)[matrix.group] }}
+        if: steps.selected.outputs.decision == 'full' && !contains(fromJSON(steps.selected.outputs.reused), matrix.group)
+        run: echo "Executing previously uncovered group inputs"
+      - name: Execute or reuse assigned group
+        id: group
+        run: node scripts/agent-tools/ci-pass-reuse.mjs run-group --proof "$RUNNER_TEMP/selected-routing/routing.json" --group "${{ matrix.group }}" --output-dir "$RUNNER_TEMP/group" --repository "$GITHUB_REPOSITORY" --event-policy "$CHAIN_TEST_EVENT_POLICY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$CHAIN_TEST_SOURCE_SHA" --comparison-base "$CHAIN_TEST_COMPARISON_BASE"
       - name: Preserve actual group results and native evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -167,11 +215,17 @@ jobs:
           name: regression-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}
           path: ${{ runner.temp }}/group
           if-no-files-found: error
+      - name: Completed CI gate ${{ matrix.group }} input ${{ steps.group.outputs.key }} result ${{ steps.group.outputs.result }}
+        if: success() && steps.group.outputs.mode == 'executed' && steps.group.outputs.key != ''
+        run: echo "Original group execution and retained result verified"
 
   scanner-tests:
     needs: [validation-context, event-gates, cohort-routing, regression]
     if: always()
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
     env:
       CHAIN_TEST_EVENT_POLICY: ${{ needs.validation-context.outputs.policy }}
       CHAIN_TEST_COMPARISON_BASE: ${{ needs.validation-context.outputs.base }}
@@ -211,9 +265,15 @@ jobs:
         with:
           name: regression-${{ github.run_id }}-${{ github.run_attempt }}-native-process
           path: ${{ runner.temp }}/groups/native-process
+      - uses: actions/download-artifact@v4
+        with:
+          name: ci-routing-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ci-routing
       - name: Recheck covered producer immediately before aggregation
-        if: needs.cohort-routing.outputs.decision == 'reuse'
-        run: node scripts/agent-tools/ci-routing.mjs --max-wait-ms 0 --descriptor "$RUNNER_TEMP/validation/descriptor/descriptor.json" --comparison-base "$CHAIN_TEST_COMPARISON_BASE" --evidence-dir "$RUNNER_TEMP/final-routing"
+        if: needs.cohort-routing.outputs.decision == 'reuse' || needs.cohort-routing.outputs.reused != '[]'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/agent-tools/ci-routing.mjs --require-input-passes 1 --input-proof "$RUNNER_TEMP/ci-routing/routing.json" --max-wait-ms 0 --descriptor "$RUNNER_TEMP/validation/descriptor/descriptor.json" --comparison-base "$CHAIN_TEST_COMPARISON_BASE" --evidence-dir "$RUNNER_TEMP/final-routing"
       - name: Verify complete required cohort
         id: aggregate
         if: always()
@@ -228,11 +288,11 @@ jobs:
             ${{ runner.temp }}/aggregate
             ${{ runner.temp }}/final-routing
           if-no-files-found: error
-      - name: Verified complete cohort ${{ needs.validation-context.outputs.context }} report ${{ steps.aggregate.outputs.report }} mode ${{ needs.cohort-routing.outputs.decision }}
+      - name: Verified complete cohort ${{ needs.validation-context.outputs.context }} report ${{ steps.aggregate.outputs.report }} mode ${{ steps.aggregate.outputs.attestation-mode }}
         if: success()
         run: echo "Required current execution or original producer coverage verified"
       - name: Complete regression context ${{ needs.validation-context.outputs.context }} report ${{ steps.aggregate.outputs.report }}
-        if: success() && needs.cohort-routing.outputs.decision == 'full'
+        if: success() && steps.aggregate.outputs.original == 'true'
         run: echo "Every required group, outcome, raw hash, native report and gate reconciled"
 
   release-evidence:
