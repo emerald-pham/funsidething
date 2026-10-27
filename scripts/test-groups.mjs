@@ -15,19 +15,19 @@ const sha1Pattern = /^[0-9a-f]{40}$/;
 const sha256 = value => createHash('sha256').update(value).digest('hex');
 const fail = message => { throw new Error(message); };
 
-function git(args, { encoding = 'utf8' } = {}) {
-  return spawnSyncGit(args, encoding);
+function git(args, { encoding = 'utf8', cwd = ROOT } = {}) {
+  return spawnSyncGit(args, encoding, cwd);
 }
 
-function spawnSyncGit(args, encoding) {
-  const result = requireGit(args, encoding);
+function spawnSyncGit(args, encoding, cwd) {
+  const result = requireGit(args, encoding, cwd);
   if (result.status !== 0) fail(`git ${args.join(' ')} failed: ${(result.stderr || result.stdout || '').trim()}`);
   return result.stdout;
 }
 
-function requireGit(args, encoding) {
+function requireGit(args, encoding, cwd = ROOT) {
   // Keep git execution shell-free: refs and paths are data, never shell syntax.
-  return spawnSync('git', args, { cwd: ROOT, encoding, maxBuffer: 64 * 1024 * 1024 });
+  return spawnSync('git', args, { cwd, encoding, maxBuffer: 64 * 1024 * 1024 });
 }
 
 function parseArgs(argv) {
@@ -104,17 +104,17 @@ function readJson(file, label) {
   catch (error) { fail(`Could not read ${label}: ${error.message}`); }
 }
 
-function testFiles() {
-  const packageJson = readJson(path.join(ROOT, 'package.json'), 'package.json');
+function testFiles(root = ROOT) {
+  const packageJson = readJson(path.join(root, 'package.json'), 'package.json');
   if (packageJson.scripts?.test !== 'node --test tests.js scripts/agent-tools/*.test.mjs') {
     fail('The full npm test entry point changed; update the group runner contract explicitly before grouping this suite.');
   }
-  const scriptFiles = fs.readdirSync(path.join(ROOT, 'scripts/agent-tools'))
+  const scriptFiles = fs.readdirSync(path.join(root, 'scripts/agent-tools'))
     .filter(file => file.endsWith('.test.mjs'))
     .sort()
     .map(file => `scripts/agent-tools/${file}`);
   const files = ['tests.js', ...scriptFiles];
-  for (const file of files) if (!fs.statSync(path.join(ROOT, file)).isFile()) fail(`Missing full-suite file ${file}.`);
+  for (const file of files) if (!fs.statSync(path.join(root, file)).isFile()) fail(`Missing full-suite file ${file}.`);
   return files;
 }
 
@@ -285,24 +285,24 @@ function cohortDigest(inventory, assignments, assignmentIndex) {
   return sha256(JSON.stringify({ expectedGroups: GROUP_IDS, requiredCaseIds, rootAssignments, rootReplacements, processControls }));
 }
 
-function addedRootRegistrations(comparisonBase, files) {
-  const diff = git(['diff', '--no-ext-diff', '--unified=0', comparisonBase, '--', ...files]);
+function addedRootRegistrations(comparisonBase, files, root = ROOT) {
+  const diff = git(['diff', '--no-ext-diff', '--unified=0', comparisonBase, '--', ...files], { cwd: root });
   const names = new Set();
   const capture = line => {
     const match = line.match(/^\s*test\s*\(\s*(['"])(.*?)\1/);
     if (match) names.add(match[2]);
   };
   for (const line of diff.split('\n')) if (line.startsWith('+') && !line.startsWith('+++')) capture(line.slice(1));
-  const untracked = git(['ls-files', '--others', '--exclude-standard', '--', ...files]).split('\n').filter(Boolean);
+  const untracked = git(['ls-files', '--others', '--exclude-standard', '--', ...files], { cwd: root }).split('\n').filter(Boolean);
   for (const file of untracked) {
-    const source = fs.readFileSync(path.join(ROOT, file), 'utf8');
+    const source = fs.readFileSync(path.join(root, file), 'utf8');
     for (const line of source.split('\n')) capture(line);
   }
   return names;
 }
 
-function validateAddedRegistrations(assignments, inventoryIndex, index, files, inventorySourceSha) {
-  const added = addedRootRegistrations(inventorySourceSha, files);
+function validateAddedRegistrations(assignments, inventoryIndex, index, files, inventorySourceSha, root = ROOT) {
+  const added = addedRootRegistrations(inventorySourceSha, files, root);
   const baseline = inventoryIndex.roots;
   const mappedBaseline = new Set(index.replacementByBaseline.keys());
   for (const replacement of index.replacementByBaseline.values()) {
@@ -321,6 +321,28 @@ function validateAddedRegistrations(assignments, inventoryIndex, index, files, i
   }
   const addedRootTitles = [...index.assignmentsByRoot.keys()].filter(root => !baseline.has(root)).sort();
   return { addedRootTitles, mappedBaselineRoots: [...mappedBaseline].sort() };
+}
+
+export function validateCurrentRegistrations({ root = ROOT } = {}) {
+  const repositoryRoot = path.resolve(root);
+  const files = testFiles(repositoryRoot);
+  const inventory = readJson(path.join(repositoryRoot, 'scripts/test-group-inventory.json'), 'test-group inventory');
+  const assignments = readJson(path.join(repositoryRoot, 'scripts/test-group-assignments.json'), 'test-group assignments');
+  const inventoryIndex = validateInventory(inventory);
+  const assignmentIndex = validateAssignments(assignments, inventory, inventoryIndex, files);
+  const registrations = validateAddedRegistrations(
+    assignments,
+    inventoryIndex,
+    assignmentIndex,
+    files,
+    inventory.baseline.sourceSha,
+    repositoryRoot,
+  );
+  return {
+    assignedRootCount: assignmentIndex.assignmentsByRoot.size,
+    processControlCount: assignments.processControls.length,
+    addedRootTitles: registrations.addedRootTitles,
+  };
 }
 
 function replacementCaseId(id, replacement) {

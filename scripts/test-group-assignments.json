@@ -9348,6 +9348,11 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK repository process: local preflight rejects stale FAQ and unassigned roots before qualification",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK repository process: release evidence rejects future and noncanonical audit timestamps",
       "group": "native-process",
       "file": "tests.js"
@@ -12400,6 +12405,11 @@
     {
       "root": "RISK repository process: nested native fixture output stays isolated at the command boundary",
       "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: document query fixtures stay selector scoped and preserve shim results",
+      "group": "core",
       "file": "tests.js"
     },
     {

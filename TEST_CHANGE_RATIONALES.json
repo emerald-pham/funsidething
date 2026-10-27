@@ -20302,5 +20302,63 @@
       "command": "node --test --test-name-pattern=\"diagnostic recorder refuses missing\" scripts/agent-tools/checkpoint-progress.test.mjs",
       "failure": "Contemporaneous /Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/286/red-missing-state.txt: no diagnostic child may start without durable authorization, true !== false. Early raw logs preserve chronology but lack per-stage dirty-source snapshots. Fully fingerprinted subsequent RED/GREEN: approval-authority-red/2026-10-27T03-25-20-748Z-a9de3a35-75c6-42c6-8a3e-665809804f09.json observed caller-authored approval accepted (0); approval-authority-green/2026-10-27T03-25-52-793Z-60cb8c21-1b93-4b8d-960c-34943ce080e8.json passes. Unknown-option red-admission.txt is infrastructure and confers no RED credit."
     }
+  },
+  {
+    "baseCommit": "0e4fefb5eaebcd2007406ae95f2ce69904e0e27d",
+    "testChangesSha256": "8ec2e9227909c728c9c46dd619d314cf011832c22a8dacf9335454a88ac734bd",
+    "reason": "Carry #324's existing public preflight failure cases into the required test-group and process-risk cohort; require the actual stale-FAQ and unassigned-root outcomes exactly once.",
+    "previousBehavior": "Candidates could retain a stale unreadable-device FAQ assertion, and newly added roots could remain unassigned until a later hosted gate; focused preflight did not run these checks early.",
+    "intendedBehavior": "The public local preflight runs the existing FAQ contract when recovery guidance changes and validates current group registrations before expensive qualification; the process-risk root ensures both discriminating failure contracts remain in the default suite.",
+    "replacementTests": [
+      "RISK repository process: local preflight rejects stale FAQ and unassigned roots before qualification"
+    ],
+    "preservedCoverage": [
+      "Existing default-sky, FAQ-brevity, comparison/upstream and test-first contracts remain intact; the new process test runs only the existing preflight fixture parent and its named stale-FAQ and unassigned-root subtests.",
+      "The process wrapper clears NODE_TEST_CONTEXT and requires one completed TAP outcome for each named case plus three passing, zero skipped, zero failed outcomes; it does not launch a full suite or claim hosted or release proof."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='preflight reports the existing FAQ length failure before full regression' scripts/agent-tools/preflight.test.mjs",
+      "failure": "Original preimplementation RED on 779c7df is preserved at /Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/324/runs/2026-10-27T03-33-17-927Z-3390405c-b714-4c84-9d1e-6d2710db503b.json and its stdout file. The stale-FAQ and newly unassigned-root fixture processes each returned 0 and printed Preflight passed, so the expected exit-1 assertions failed with 0 !== 1; the recorder retains source/test fingerprints and actual timestamps. The tests.js process-RISK wrapper was added later as integration coverage and is not presented as the original RED."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/324"
+  },
+  {
+    "baseCommit": "6e6d001ffcf4983edd0547a9d021a3ef645c650e",
+    "testChangesSha256": "fd6852196a6cb96f57298fa789c9ddf1f256d661309481eee3dcd283efa664d8",
+    "reason": "Ticket #325 adds mechanical enforcement after maintained editor and modal fixtures returned one fake document query result for every selector.",
+    "previousBehavior": "Four document.querySelector fixtures always returned an object or null, so a new saved-view status query could receive a fabricated node. Selector-specific patterns were not checked across maintained test sources.",
+    "intendedBehavior": "A required RISK test scans tests.js and agent-tool tests for simple direct document query callbacks that return an object, array, null, or identifier without using their selector parameter. Maintained modal fixtures now delegate unrelated queries to the original shim and restore it after the simulated state. The actual app update-notice consumer preserves an unrelated selector result of null and the editor draft.",
+    "replacementTests": [
+      "RISK repository process: document query fixtures stay selector scoped and preserve shim results"
+    ],
+    "preservedCoverage": [
+      "Cloud adoption, update-notice storage failure, scene adoption, pageshow recovery, and completion recovery retain their original draft, reconciliation, and completion assertions.",
+      "Explicit malformed-selector controls and element-scoped doubles remain bounded; the source scan documents its supported syntax and does not claim general JavaScript semantic analysis."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='^RISK repository process: document query fixtures stay selector scoped and preserve shim results$' tests.js",
+      "failure": "Before fixture migration on 6e6d001ffcf4983edd0547a9d021a3ef645c650e, the new checker failed with eight findings at the four unconditional update-notice, synced-scene, pageshow, and completion-editor overrides. Recorder metadata/stdout: /Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/325/runs/2026-10-27T03-41-49-526Z-ff067be1-980f-415c-aa16-689346702a94.json and .stdout.txt."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/325"
+  },
+  {
+    "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
+    "testChangesSha256": "c9b0037e87edbfd7afba691b79c3df36ff8dc6d513a28c531a3b7545b002f56f",
+    "reason": "Integrate the independently accepted #324 local-preflight process contract and #325 selector-scoped fixture contract into one exact-main test diff while retaining both original test roots.",
+    "previousBehavior": "The required test diff now includes both focused process contracts plus #325 fixture migrations; each handoff rationale fingerprints only its independent branch diff, so the combined exact-main change needs its own truthful rationale.",
+    "intendedBehavior": "Keep both required process-risk roots in the core cohort, reject stale FAQ and unassigned-root preflight failures, and require maintained document-query fixtures to preserve selector-specific behavior and delegate unrelated results.",
+    "replacementTests": [
+      "RISK repository process: local preflight rejects stale FAQ and unassigned roots before qualification",
+      "RISK repository process: document query fixtures stay selector scoped and preserve shim results"
+    ],
+    "preservedCoverage": [
+      "The #324 preflight contract still runs the selected FAQ and registration checks before qualification; the #325 source scan and selector fixtures preserve shim behavior, active editor drafts, and the cloud, scene, pageshow, and completion boundaries they touch.",
+      "This integrated rationale covers the cumulative tests.js diff against fetched main only; the two source handoffs keep their separate branch-bound RED and GREEN evidence, and no frozen PR consumer patch or product source is included."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='preflight reports the existing FAQ length failure before full regression' scripts/agent-tools/preflight.test.mjs; node --test --test-name-pattern='^RISK repository process: document query fixtures stay selector scoped and preserve shim results$' tests.js",
+      "failure": "Original independent REDs remain separate: #324 on 779c7df at 03:33:17 UTC recorded stale-FAQ and new-unassigned-root fixtures incorrectly returning 0 (expected 1), in /Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/324/runs/2026-10-27T03-33-17-927Z-3390405c-b714-4c84-9d1e-6d2710db503b.json; #325 on 6e6d001 at 03:41:49 UTC found eight unconditional selector-blind fixture overrides, in /Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/325/runs/2026-10-27T03-41-49-526Z-ff067be1-980f-415c-aa16-689346702a94.json. On frozen PR commit 3d9442c, the original completion-boundary check passed at 03:45:47 UTC; a later-baseline-sensitivity run at 03:46:14 UTC temporarily added a one-line renderSync assertion and failed with projected.removeAttribute is not a function (/Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/325/pr294-runs/2026-10-27T03-46-14-130Z-d6e88b65-2f69-47a2-baee-670c3bad9d60.json). That later frozen-PR sensitivity is not claimed as an original or integrated-checkpoint RED; its patch remains outside this merge."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/integration/324-325"
   }
 ]
