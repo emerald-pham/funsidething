@@ -408,7 +408,7 @@ test('qualification selector binds exact assigned risk wrappers to source change
 test('qualification readiness gates the recorder child on selected parent contracts and explicit no-change', async t => {
   await t.test('selected existing wrappers pass privately before the requested child starts', () => {
     const fixture = makeRecorderFixture(t);
-    const result = invokeReadyRecorder(fixture);
+    const result = invokeReadyRecorder(fixture, { comparisonBase: fixture.base });
     assert.equal(result.error, undefined, result.error?.message);
     assert.equal(result.signal, null, result.stderr);
     assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
@@ -451,7 +451,7 @@ test('qualification readiness gates the recorder child on selected parent contra
 
   await t.test('an explicit empty selection skips wrappers and still launches the requested child', () => {
     const fixture = makeRecorderFixture(t, { sourceChange: false });
-    const result = invokeReadyRecorder(fixture);
+    const result = invokeReadyRecorder(fixture, { comparisonBase: fixture.base });
     assert.equal(result.error, undefined, result.error?.message);
     assert.equal(result.signal, null, result.stderr);
     assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
