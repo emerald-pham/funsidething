@@ -312,6 +312,7 @@ async function observePage(page, surfaces = SURFACES) {
               selectorPath: uniquePathFor(element),
               fontSizePx: Number.parseFloat(style.fontSize),
               lineHeightPx: Number.isFinite(lineHeight) ? lineHeight : null,
+              contentHeightPx: Math.max(0, rect.height - ['paddingTop', 'paddingBottom', 'borderTopWidth', 'borderBottomWidth'].reduce((total, property) => total + (Number.parseFloat(style[property]) || 0), 0)),
               fontFamilyCss: style.fontFamily,
               bounds: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
               documentFontAvailable: document.fonts?.check(`${style.fontSize} ${style.fontFamily}`) ?? null,
@@ -372,8 +373,13 @@ async function captureResolvedFonts(page, surfaces = SURFACES) {
   return result;
 }
 
-export function compareRenderedSurfaces(before, after, mechanism, surfaces = SURFACES) {
+export function compareRenderedSurfaces(before, after, mechanism, surfaces = SURFACES, declaredScale) {
   const namedSurfaces = validateSurfaces(surfaces);
+  const scaleValid = Number.isFinite(declaredScale) && declaredScale > 1 && declaredScale <= 4;
+  // CSS values serialize to four decimals and layout boxes quantize to 1/64px.
+  // An absolute 0.05 CSS-pixel allowance covers that rounding without excusing under-scaling.
+  const roundingTolerancePx = 0.05;
+  const reachesScale = (ordinary, enlarged) => scaleValid && Number.isFinite(ordinary) && ordinary > 0 && Number.isFinite(enlarged) && enlarged > ordinary + 0.01 && enlarged + roundingTolerancePx >= ordinary * declaredScale;
   return namedSurfaces.map(({ name, selector, role, relationship }) => {
     const reference = before?.surfaces?.find((surface) => surface.name === name);
     const capture = after?.surfaces?.find((surface) => surface.name === name);
@@ -388,11 +394,17 @@ export function compareRenderedSurfaces(before, after, mechanism, surfaces = SUR
       const fontIncreased = Number.isFinite(metric.fontSizePx) && Number.isFinite(observed?.fontSizePx) && observed.fontSizePx > metric.fontSizePx + 0.01;
       const lineHeightIncreased = Number.isFinite(metric.lineHeightPx) && Number.isFinite(observed?.lineHeightPx) && observed.lineHeightPx > metric.lineHeightPx + 0.01;
       const boundsIncreased = Number.isFinite(metric.bounds?.height) && Number.isFinite(observed?.bounds?.height) && observed.bounds.height > metric.bounds.height + 0.01;
+      const fontReachedScale = reachesScale(metric.fontSizePx, observed?.fontSizePx);
+      const lineHeightReachedScale = reachesScale(metric.lineHeightPx, observed?.lineHeightPx);
+      const contentHeightReachedScale = reachesScale(metric.contentHeightPx ?? metric.bounds?.height, observed?.contentHeightPx ?? observed?.bounds?.height);
       return {
         before: metric,
         after: observed,
+        declaredScale: scaleValid ? declaredScale : null,
+        roundingTolerancePx,
+        scaleChecks: { fontReachedScale, lineHeightReachedScale, contentHeightReachedScale },
         changes: { fontSizeIncreased: fontIncreased, lineHeightIncreased, boundsHeightIncreased: boundsIncreased },
-        metricsStatus: mechanism !== 'diagnostic-css' ? 'observed-only' : fontIncreased && (lineHeightIncreased || boundsIncreased) ? 'pass' : 'fail',
+        metricsStatus: mechanism !== 'diagnostic-css' ? 'observed-only' : fontReachedScale && (lineHeightReachedScale || contentHeightReachedScale) ? 'pass' : 'fail',
       };
     });
     const passed = measurementsPresent && elements.length === beforeElements.length && (mechanism !== 'diagnostic-css' || elements.every((element) => element.metricsStatus === 'pass'));
@@ -405,7 +417,7 @@ export function compareRenderedSurfaces(before, after, mechanism, surfaces = SUR
       afterCount: afterElements.length,
       elements,
       metricsStatus: !measurementsPresent ? 'fail' : mechanism === 'diagnostic-css' ? passed ? 'pass' : 'fail' : 'observed-only',
-      reason: !matched ? 'Surface was missing or its element count changed between the reference and capture.' : !measurementsPresent ? 'At least one surface element is missing a finite font-size, line-height or box-height measurement.' : mechanism === 'diagnostic-css' && !passed ? 'At least one text element did not increase both font size and a measured line or box metric.' : null,
+      reason: !matched ? 'Surface was missing or its element count changed between the reference and capture.' : !measurementsPresent ? 'At least one surface element is missing a finite font-size, line-height or box-height measurement.' : mechanism === 'diagnostic-css' && !scaleValid ? 'Diagnostic CSS requires an explicit finite declared scale greater than 1 and no greater than 4.' : mechanism === 'diagnostic-css' && !passed ? 'At least one text element did not reach the declared scale in font size and a measured line or content-box height.' : null,
     };
   });
 }
@@ -1166,13 +1178,14 @@ async function runCase(options) {
       expectedViewport: options.mechanism === 'diagnostic-css' ? { width: options.width, height: options.height } : null,
       mechanism: options.mechanism,
       baseViewport: { width: options.width, height: options.height },
+      scale: options.scale,
       outputDirectory: options.outputDirectory,
       fileName: `${result.caseId}-capture.png`,
       timeoutMs: options.timeoutMs,
     });
     after = captureState.observed.afterScreenshot;
     result.observed.capture = after;
-    result.surfaces = compareRenderedSurfaces(before, after, options.mechanism);
+    result.surfaces = compareRenderedSurfaces(before, after, options.mechanism, SURFACES, options.scale);
     result.observed.resolvedFontsAfter = captureState.resolvedFonts;
     result.screenshots.capture = captureState.screenshot;
     result.captureAudits.capture = {

@@ -213,3 +213,5 @@ keeps the unchanged saved nested source assertions observable. The long regressi
 jobs retain their ordinary Chromium setup after early-only WebKit consumers have
 finished; local execution still requires the repository's actual runtime/resource
 allocation, and process fixtures supply no native proof.
+
+The browser runtime child owns a separate POSIX process group. On SIGINT or SIGTERM, the preflight forwards the signal, waits a bounded 500 ms, escalates against only that owned group, finalizes failed evidence with the interruption and cleanup result, and removes its temporary runtime/profile directories. Its exit is 130 or 143 respectively. The shorter grace period lets the existing recorder finish this nested cleanup before its own 750 ms escalation. Uncatchable termination still cannot guarantee final evidence.

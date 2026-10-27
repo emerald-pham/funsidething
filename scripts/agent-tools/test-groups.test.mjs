@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {derivePolicyProseImpact,deriveReleaseReviewPlan} from '../release-evidence.mjs';
 import {createHash} from 'node:crypto';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -183,7 +183,7 @@ function createFixture(t, options = {}) {
       return `test(${JSON.stringify(title)},()=>{if(process.env.EARLY_ROOT_JOURNAL)fs.appendFileSync(process.env.EARLY_ROOT_JOURNAL,${JSON.stringify(title+'\n')});${nested}});`;
     }).join('\n');
     fs.appendFileSync(path.join(root,'tests.js'),"\nimport {spawnSync as earlySpawn} from 'node:child_process';\n"+added+'\n');
-    groupAssignments.rootAssignments.push(...titles.map(title=>({root:title,group:'native-process',file:'tests.js',executionStage:'early-startup'})));
+    groupAssignments.rootAssignments.push(...titles.map((title,index)=>({root:title,group:index===0?'core':'native-process',file:'tests.js',executionStage:'early-startup'})));
     writeJson(path.join(root,'scripts/test-group-assignments.json'),groupAssignments);
     fs.writeFileSync(path.join(root,'scripts/button-safety-mobile-memory.mjs'),"import fs from 'node:fs';const args=process.argv.slice(2);fs.cpSync(process.env.EARLY_TRANSFER_SEED,args[args.indexOf('--output-dir')+1],{recursive:true});\n");
     git(root,'add','.');git(root,'commit','-qm','Declare exact early consumers in the existing catalog');sourceSha=git(root,'rev-parse','HEAD');
@@ -1018,14 +1018,14 @@ test('group and aggregate retain actual early cases once across fresh group proc
   }
   const command=actualCommand.replaceAll('${{ matrix.group }}',group),result=spawnSync('bash',['-euo','pipefail','-c',command],{cwd:fixture.root,env:{...env,RUNNER_TEMP:runnerTemp,CHAIN_TEST_COMPARISON_BASE:fixture.comparisonBase},encoding:'utf8',timeout:15000});
   assert.equal(result.status,0,result.stdout+result.stderr);const outputDir=path.join(runnerTemp,'group'),record=JSON.parse(fs.readFileSync(path.join(outputDir,'result.json')));fixture.originals.set(group,outputDir);
-  if(group==='native-process'){assert.equal(record.earlyCoverage.roots.length,5);assert.equal(record.earlyCoverage.cases.length,5);assert.ok(record.cases.every(row=>!first.includes(row.root)),'Actual workflow group TAP cannot repeat early outcomes');}
+  if(group==='core'||group==='native-process'){const count=group==='core'?1:4;assert.equal(record.earlyCoverage.roots.length,count);assert.equal(record.earlyCoverage.cases.length,count);assert.ok(record.cases.every(row=>!first.includes(row.root)),'Actual workflow group TAP cannot repeat early outcomes');}else assert.equal(record.earlyCoverage??null,null);
  }
  assert.deepEqual(fs.readFileSync(journal,'utf8').trim().split('\n'),first,'Fresh complete groups reuse actual durable early execution without repeating those roots');
  const collected=path.join(temp,'groups');for(const [group,output]of fixture.originals)fs.cpSync(output,path.join(collected,group),{recursive:true});const needs=path.join(temp,'needs.json');writeJson(needs,Object.fromEntries(['validation-context','event-gates','cohort-routing','early-startup','regression','mobile-stress'].map(name=>[name,{result:'success'}])));
  const args=['--aggregate','--results-dir',collected,'--needs-json',needs,'--early-receipt',receipt,'--mobile-stress-report',path.join(stress.directory,'report.json')];
  const aggregateStep=workflow.match(/      - name: Verify complete required cohort\n[\s\S]*?        run: \|\n((?:          [^\n]*\n|\n)*)/);assert.ok(aggregateStep);
  const aggregateCommand=aggregateStep[1].split('\n').map(line=>line.startsWith('          ')?line.slice(10):line).join('\n');
- const aggregate=spawnSync('bash',['-euo','pipefail','-c',aggregateCommand],{cwd:fixture.root,env:{...env,RUNNER_TEMP:temp,CHAIN_TEST_COMPARISON_BASE:fixture.comparisonBase},encoding:'utf8',timeout:15000});assert.equal(aggregate.status,0,aggregate.stdout+aggregate.stderr);const report=JSON.parse(fs.readFileSync(path.join(temp,'aggregate/aggregate.json')));assert.equal(report.caseCount,11,'Six actual ordinary fixture cases plus five actual early cases count exactly once');assert.equal(report.groups.find(row=>row.group==='native-process').earlyCases,5);
+ const aggregate=spawnSync('bash',['-euo','pipefail','-c',aggregateCommand],{cwd:fixture.root,env:{...env,RUNNER_TEMP:temp,CHAIN_TEST_COMPARISON_BASE:fixture.comparisonBase},encoding:'utf8',timeout:15000});assert.equal(aggregate.status,0,aggregate.stdout+aggregate.stderr);const report=JSON.parse(fs.readFileSync(path.join(temp,'aggregate/aggregate.json')));assert.equal(report.caseCount,11,'Six actual ordinary fixture cases plus five actual early cases count exactly once');assert.equal(report.groups.find(row=>row.group==='core').earlyCases,1);assert.equal(report.groups.find(row=>row.group==='native-process').earlyCases,4);
  await t.test('changed group transfer reference',()=>{const file=path.join(collected,'native-process/result.json'),original=fs.readFileSync(file),record=JSON.parse(original);record.earlyCoverage.cases.pop();writeJson(file,record);assert.notEqual(invoke(fixture,{env,args}).status,0,'Aggregate must rederive every transferred early outcome');fs.writeFileSync(file,original);});
  await t.test('missing durable predecessor',()=>{fs.unlinkSync(path.join(early,'harness.stdout'));assert.notEqual(invoke(fixture,{group:'native-process',env,args:['--early-receipt',receipt]}).status,0);assert.notEqual(invoke(fixture,{env,args}).status,0);assert.deepEqual(fs.readFileSync(journal,'utf8').trim().split('\n'),first);});
  t.diagnostic(JSON.stringify({scope:'Controlled OS-process transfer only; no native/runtime proof',earlyRootExecutions:first.length,uniqueEarlyRoots:new Set(first).size,ordinaryGroups:groups.length,aggregateCaseCount:report.caseCount}));
@@ -1049,5 +1049,41 @@ test('workflow metadata aggregate rejects pending cancelled unresolved and stale
   assert.equal(fs.existsSync(sentinel),false,'Required aggregate and coverage references never execute another test child');
   if(decision==='reuse'){const report=JSON.parse(fs.readFileSync(path.join(temporary,'aggregate/aggregate.json')));assert.equal(report.caseCount,0);assert.equal(report.mode,'covered');assert.equal(report.groups.length,4);}
   if(process.env.CHAIN_METADATA_EVIDENCE){const destination=path.join(process.env.CHAIN_METADATA_EVIDENCE,'aggregate-'+decision);fs.mkdirSync(process.env.CHAIN_METADATA_EVIDENCE,{recursive:true});fs.cpSync(temporary,destination,{recursive:true});fs.writeFileSync(path.join(destination,'consumer.stdout'),result.stdout);fs.writeFileSync(path.join(destination,'consumer.stderr'),result.stderr);}
+ });
+});
+
+
+test('test group browser runtime interruption finalizes and stops only its owned child family',async t=>{
+ for(const viaRecorder of [false,true])for(const signal of ['SIGINT','SIGTERM'])await t.test((viaRecorder?'recorder ':'parent ')+signal,async t=>{
+  const fixture=createFixture(t),title='fixture browser interrupted owned family';const browserPath=addBrowserRuntimeRootFixture(t,fixture,title);
+  const file=path.join(fixture.root,'tests.js');let source=fs.readFileSync(file,'utf8');source=source.replace(`test(${JSON.stringify(title)},()=>{});`,`test(${JSON.stringify(title)},async()=>{
+   const {spawn}=await import('node:child_process');
+   const descendant=spawn(process.execPath,['-e',"const net=require('node:net');process.on('SIGINT',()=>{});process.on('SIGTERM',()=>{});net.createServer().listen(0,'127.0.0.1',function(){process.send({port:this.address().port});});"],{stdio:['ignore','ignore','ignore','ipc']});
+   const {port}=await new Promise(resolve=>descendant.once('message',resolve));
+   process.on('SIGINT',()=>{});process.on('SIGTERM',()=>{});
+   fs.writeFileSync(path.join(process.env.TMPDIR,'owned-runtime-file'),'owned');
+   fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,'family.json'),JSON.stringify({pid:process.pid,ppid:process.ppid,descendant:descendant.pid,port}));
+   await new Promise(()=>{});
+  });`);fs.writeFileSync(file,source);git(fixture.root,'add','tests.js');git(fixture.root,'commit','-qm','Observe real owned interruption family');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');
+  const output=fs.mkdtempSync(path.join(os.tmpdir(),'chain-browser-interruption-'));fs.rmdirSync(output);fixture.outputs.push(output);
+  const env={...process.env,CI:'true'};delete env.NODE_TEST_CONTEXT;
+  const args=['scripts/test-groups.mjs','--group','persistence-recovery','--output-dir',output,'--repository','example/fixture','--event-policy','local','--run-id','fixture-run-1','--run-attempt','1','--source-sha',fixture.sourceSha,'--comparison-base',fixture.comparisonBase,'--browser-runtime-preflight','--browser-path',browserPath];
+  const recorderDir=path.join(os.tmpdir(),'chain-browser-recorder-'+process.pid+'-'+(++outputSerial));fixture.outputs.push(recorderDir);
+  const command=viaRecorder?[path.join(repository,'scripts/agent-tools/record-run.mjs'),'--repo',fixture.root,'--evidence-dir',recorderDir,'--purpose','green','--summary','--',process.execPath,...args]:args;
+  const parent=spawn(process.execPath,command,{cwd:fixture.root,env,stdio:['ignore','pipe','pipe']});
+  const unrelated=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore'});t.after(()=>unrelated.kill('SIGKILL'));
+  let streams='';parent.stdout.on('data',x=>streams+=x);parent.stderr.on('data',x=>streams+=x);const exited=new Promise(resolve=>parent.once('close',(code,signal)=>resolve({code,signal})));
+  const live=pid=>{try{process.kill(pid,0);const state=spawnSync('ps',['-o','stat=','-p',String(pid)],{encoding:'utf8'}).stdout.trim();return !!state&&!state.startsWith('Z');}catch(e){if(e.code==='ESRCH')return false;throw e;}};
+  let family;t.after(()=>{if(family){for(const pid of [family.ppid,family.pid,family.descendant])try{process.kill(pid,'SIGKILL');}catch{}}try{parent.kill('SIGKILL');}catch{}});
+  const deadline=Date.now()+10000,familyPath=path.join(output,'browser-artifacts/family.json');while(!fs.existsSync(familyPath)&&Date.now()<deadline)await new Promise(resolve=>setTimeout(resolve,20));assert.ok(fs.existsSync(familyPath),'Owned browser fixture must reach its actual process/server boundary: '+streams);family=JSON.parse(fs.readFileSync(familyPath));
+  parent.kill(signal);const result=await Promise.race([exited,new Promise(resolve=>setTimeout(()=>resolve(null),3000))]);assert.ok(result,'Interrupted public command must finish within its bounded cleanup window');
+  const stoppedBy=Date.now()+1500;while([family.ppid,family.pid,family.descendant].some(live)&&Date.now()<stoppedBy)await new Promise(resolve=>setTimeout(resolve,20));
+  assert.ok([family.ppid,family.pid,family.descendant].every(pid=>!live(pid)),signal+' must stop the actual detached child, test worker and grandchild');
+  assert.ok(live(unrelated.pid),'Owned cleanup must leave the unrelated process running');
+  assert.equal(result.code,signal==='SIGINT'?130:143,'Public exit preserves received interruption');assert.equal(result.signal,null);
+  const evidence=JSON.parse(fs.readFileSync(path.join(output,'result.json')));assert.equal(evidence.status,'failed');assert.equal(evidence.browserRuntime.process.interruption.signal,signal);assert.equal(evidence.browserRuntime.process.interruption.cleanup.completed,true);assert.equal(evidence.browserRuntime.process.interruption.cleanup.escalated,true);
+  for(const name of ['runtime-tmp','runtime-home'])assert.equal(fs.existsSync(path.join(output,name)),false,'Owned runtime/profile directories must be removed');
+  const net=await import('node:net');await new Promise((resolve,reject)=>{const server=net.createServer();server.once('error',reject);server.listen(family.port,'127.0.0.1',()=>server.close(resolve));});
+  t.diagnostic(JSON.stringify({scope:'Controlled browser-provider fixture, actual OS child/grandchild and listener',signal,viaRecorder,exit:result,ownedFamilyStopped:true,unrelatedProcessPreserved:true,portReleased:true}));
  });
 });

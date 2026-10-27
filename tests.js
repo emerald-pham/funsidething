@@ -3061,7 +3061,7 @@ async function runNativeRecoveryInspection226(t,width=390,holdDemoted=false,comp
      let renderedEvidence=null;if(output){renderedEvidence=await renderedApi.captureRenderedState(page,{lifecycleState:'automatic recovery '+stage,expectedTheme:automaticView.theme,expectedViewport:{width,height:844},baseViewport:{width,height:844},mechanism:'diagnostic-css',scale,surfaces:renderedSurfaces,outputDirectory:output,fileName:automaticView.theme+'-'+width+'-'+stage+'-'+scale+'.png',timeoutMs:5000});assert.equal(renderedEvidence.metricsStatus,'pass','the actual startup status capture must remain stable at its requested theme and viewport');assert.equal(renderedEvidence.captureIntegrity,'pass','the saved PNG must retain complete dimensions, pixels, checksums and byte binding');}
      captures.push({stage,scale,...metrics,fonts,renderedEvidence});
     }
-    if(output){const stageCaptures=captures.filter(capture=>capture.stage===stage),comparison=renderedApi.compareRenderedSurfaces(stageCaptures[0].renderedEvidence.observed.afterScreenshot,stageCaptures[1].renderedEvidence.observed.afterScreenshot,'diagnostic-css',renderedSurfaces);assert.ok(comparison.every(surface=>surface.metricsStatus==='pass'),'ordinary and enlarged named surfaces must both grow at the declared scale');}
+    if(output){const stageCaptures=captures.filter(capture=>capture.stage===stage),comparison=renderedApi.compareRenderedSurfaces(stageCaptures[0].renderedEvidence.observed.afterScreenshot,stageCaptures[1].renderedEvidence.observed.afterScreenshot,'diagnostic-css',renderedSurfaces,1.5);assert.ok(comparison.every(surface=>surface.metricsStatus==='pass'),'ordinary and enlarged named surfaces must both grow at the declared scale');}
     if(enlarged)await enlarged.evaluate(el=>el.remove());await page.locator('#modalRoot [data-act="close-modal"]').first().click();
     if(stage==='retrying'||stage==='checking')assert.equal(await page.evaluate(()=>cloudSourceRecoveryRead?.automaticHistoryResume===true&&!cloudSourceRecoveryRead.controller.signal.aborted),true,'closing ordinary Settings preserves the active bounded automatic source attempt');
    };
@@ -3128,7 +3128,7 @@ async function runNativeRecoveryInspection226(t,width=390,holdDemoted=false,comp
    }observations.push({scale,...metrics,renderedEvidence});
   }
   assert.ok(parseFloat(observations[1].warning.fontSize)>parseFloat(observations[0].warning.fontSize),'enlarged observation changes actual status text size');
-  let renderedSurfaceComparisons=null;if(output){renderedSurfaceComparisons=renderedApi.compareRenderedSurfaces(observations[0].renderedEvidence.observed.afterScreenshot,observations[1].renderedEvidence.observed.afterScreenshot,'diagnostic-css',renderedSurfaces);assert.ok(renderedSurfaceComparisons.every(surface=>surface.metricsStatus==='pass'),'ordinary and enlarged named startup surfaces must both increase measured text size and line or box height');}
+  let renderedSurfaceComparisons=null;if(output){renderedSurfaceComparisons=renderedApi.compareRenderedSurfaces(observations[0].renderedEvidence.observed.afterScreenshot,observations[1].renderedEvidence.observed.afterScreenshot,'diagnostic-css',renderedSurfaces,1.5);assert.ok(renderedSurfaceComparisons.every(surface=>surface.metricsStatus==='pass'),'ordinary and enlarged named startup surfaces must both increase measured text size and line or box height');}
   let fonts={status:'unavailable'};if(engine==='chromium'){const session=await context.newCDPSession(page);await session.send('DOM.enable');await session.send('CSS.enable');const {root}=await session.send('DOM.getDocument',{depth:-1});const {nodeId}=await session.send('DOM.querySelector',{nodeId:root.nodeId,selector:'#modalRoot [data-act="review-cloud-source-recovery"]'});fonts={status:'observed',...(await session.send('CSS.getPlatformFontsForNode',{nodeId}))};await session.detach();}
   await page.locator('#modalRoot [data-act="close-modal"]').first().click();assert.equal(await page.locator('#addInput').inputValue(),draft,'Settings inspection and asynchronous recovery preserve the native unfinished draft');
   assert.equal(await page.evaluate(async()=>JSON.parse((await ScannerDeviceStore.readHead()).payload).tasks.some(row=>row.title==='Native accepted recovery edit')),true,'native accepted edit reaches the durable head before restart');
@@ -45702,5 +45702,34 @@ test('RISK repository process: protected diagnostic governance remains distinct 
 
 test('RISK repository process: native diagnostic captures remain bounded and missing attribution never qualifies a repair',()=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
- const result=spawnSync(process.execPath,['--test','--test-reporter=tap',path.join(__dirname,'scripts/agent-tools/native-attribution.test.mjs')],{encoding:'utf8',timeout:30000,env});assert.equal(result.status,0,result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# tests 4$/m);assert.match(result.stdout,/^# pass 4$/m);assert.match(result.stdout,/^# skipped 0$/m);
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap',path.join(__dirname,'scripts/agent-tools/native-attribution.test.mjs')],{encoding:'utf8',timeout:30000,env});assert.equal(result.status,0,result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# tests 5$/m);assert.match(result.stdout,/^# pass 5$/m);assert.match(result.stdout,/^# skipped 0$/m);
+});
+
+
+test('RISK repository process: canonical early admission retains mixed owners and fresh durable verification',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^early CI canonical source|^group and aggregate retain actual early','scripts/agent-tools/early-ci.test.mjs','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:120000,maxBuffer:8*1024*1024});
+ assert.equal(child.status,0,'Actual canonical admission and owned early accounting must agree: '+child.stdout+child.stderr);
+ assert.match(child.stdout,/# tests 4$/m);assert.match(child.stdout,/# skipped 0$/m);
+});
+
+
+test('RISK repository process: browser preflight interruption cleans its actual owned process family',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group browser runtime interruption','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:45000,maxBuffer:4*1024*1024});
+ assert.equal(child.status,0,'SIGINT and SIGTERM must finalize and clean actual owned descendants: '+child.stdout+child.stderr);assert.match(child.stdout,/# tests 5$/m);assert.match(child.stdout,/# skipped 0$/m);
+});
+
+
+test('RISK repository process: fresh Linux known-control verification requires its independent hot routine',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^fresh Linux known-control verification','scripts/agent-tools/native-attribution.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:15000});
+ assert.equal(child.status,0,'Fresh durable Linux control verification must distinguish the known hot routine from generic loader symbols: '+child.stdout+child.stderr);assert.match(child.stdout,/# tests 1$/m);assert.match(child.stdout,/# skipped 0$/m);
+});
+
+
+test('RISK repository process: rendered diagnostic comparisons enforce declared scale on all named controls',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^named diagnostic comparisons','scripts/agent-tools/rendered-evidence.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:15000});
+ assert.equal(child.status,0,'Named diagnostic enlargement must meet its declared factor for changed and reference targets: '+child.stdout+child.stderr);assert.match(child.stdout,/# tests 1$/m);assert.match(child.stdout,/# skipped 0$/m);
 });

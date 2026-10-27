@@ -7,7 +7,7 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { captureRenderedState, verifyRenderedScreenshotBytes } from './rendered-evidence.mjs';
+import { captureRenderedState, compareRenderedSurfaces, verifyRenderedScreenshotBytes } from './rendered-evidence.mjs';
 
 const command = process.env.RENDERED_EVIDENCE_COMMAND ?? fileURLToPath(new URL('./rendered-evidence.mjs', import.meta.url));
 const expectedSurfaces = ['faq-title', 'faq-section', 'faq-question', 'faq-answer', 'faq-list-item', 'faq-paragraph', 'faq-subheading'];
@@ -248,7 +248,7 @@ const page = {
       if (!element || !fontSize || (element[1] === 'faq-title' && element[2] !== '0')) continue;
       const [, name, index] = element;
       if (mode === 'partial-css' && name === 'faq-answer' && index === '0') continue;
-      state.metricTargets.set(name + ':' + index, Number(fontSize[1]));
+      state.metricTargets.set(name + ':' + index, mode === 'underscaled-css' ? Number(fontSize[1]) / 1.5 + 0.1 : Number(fontSize[1]));
     }
   },
   async waitForTimeout(ms) {
@@ -731,4 +731,23 @@ test('CSS consumer rejects broken selectors and declarations even when diagnosti
     assert.equal(report.metricsStatus, 'fail');
     assert.ok(report.surfaces.every(surface => surface.elements.every(({ before, after }) => before.fontSizePx === after.fontSizePx)));
   }
+});
+
+
+test('named diagnostic comparisons require the declared factor for every changed and reference target',()=>{
+ const surfaces=[{name:'changed-status',selector:'#status',role:'changed-control'},{name:'settings-reference',selector:'#settings',role:'neighboring-reference-control'}];
+ const snapshot=(font,line,height=40,contentHeight=20)=>({surfaces:surfaces.map(surface=>({...surface,count:1,elements:[{fontSizePx:font,lineHeightPx:line,bounds:{height},contentHeightPx:contentHeight}]}))});
+ const before=snapshot(16,20),underscale=snapshot(16.1,20.1,40.1,20.1);
+ assert.ok(compareRenderedSurfaces(before,underscale,'diagnostic-css',surfaces,1.5).every(row=>row.metricsStatus==='fail'),'16px to 16.1px and 20px to 20.1px cannot qualify declared 1.5x text');
+ const enlarged=snapshot(24,30,50,30);assert.ok(compareRenderedSurfaces(before,enlarged,'diagnostic-css',surfaces,1.5).every(row=>row.metricsStatus==='pass'));
+ const partial=structuredClone(enlarged);partial.surfaces[1]=underscale.surfaces[1];assert.deepEqual(compareRenderedSurfaces(before,partial,'diagnostic-css',surfaces,1.5).map(row=>row.metricsStatus),['pass','fail']);
+ for(const scale of [undefined,null,0,1,NaN,Infinity,'1.5'])assert.ok(compareRenderedSurfaces(before,enlarged,'diagnostic-css',surfaces,scale).every(row=>row.metricsStatus==='fail'),'Absent or invalid declared factors must fail closed');
+ const autoBefore=snapshot(16,null,40,20),autoAfter=snapshot(24,null,50,30);assert.ok(compareRenderedSurfaces(autoBefore,autoAfter,'diagnostic-css',surfaces,1.5).every(row=>row.metricsStatus==='pass'),'Fixed 20px padding and border need not enlarge when the measured text content box scales from 20px to 30px');
+ for(const mechanism of ['native-page-zoom','pinch-zoom'])assert.ok(compareRenderedSurfaces(before,before,mechanism,surfaces).every(row=>row.metricsStatus==='observed-only'),'Native mechanisms retain viewport-based semantics');
+});
+
+
+test('standalone diagnostic command refuses small positive growth below its declared scale',async t=>{
+ const fixture=await makeFixture(t),{result,output}=run({...fixture,name:'underscaled-css',mode:'underscaled-css',scale:1.5});
+ assert.equal(result.status,1,'A CLI case labelled 1.5x cannot accept only 0.1px growth');const report=await readCase(output);assert.equal(report.metricsStatus,'fail');assert.equal(report.captureAudits.capture.scale,1.5);assert.ok(report.surfaces.every(surface=>surface.metricsStatus==='fail'));assert.ok(report.surfaces.every(surface=>surface.elements.every(element=>element.declaredScale===1.5)));
 });

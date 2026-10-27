@@ -188,3 +188,17 @@ test("the fixed Linux native control reproduces its reviewed executable and inde
     known.elfSha256,
   );
 });
+
+
+test('fresh Linux known-control verification refuses self-consistent loader-only retained evidence',async t=>{
+ const output=fs.mkdtempSync(path.join(os.tmpdir(),'linux-native-verifier-control-'));t.after(()=>fs.rmSync(output,{recursive:true,force:true}));
+ const hash=bytes=>createHash('sha256').update(bytes).digest('hex'),known=JSON.parse(fs.readFileSync(path.join(repo,'scripts/agent-tools/native-known-control.json'))),manifestBytes=fs.readFileSync(path.join(repo,'scripts/agent-tools/native-toolchain.json')),manifest=JSON.parse(manifestBytes),reportPath=path.join(output,'native-attribution.json');
+ const retained=symbol=>{
+  const stacks=Buffer.from('known-native 41/41 2.000000000: cycles:u:\n    401000 '+symbol+' (/controlled/known-native)\n');fs.writeFileSync(path.join(output,'stacks.txt'),stacks);
+  const report={schemaVersion:1,kind:'nonqualifying-native-attribution',scope:'linux-webkit-startup',platform:'linux',architecture:'x64',observerSha256:hash(fs.readFileSync(path.join(repo,'scripts/agent-tools/native-attribution.mjs'))),identity:{nativeControl:true,knownElfSha256:known.elfSha256},control:{sourceSha256:known.sourceSha256,elfSha256:known.elfSha256,buildId:known.buildId,symbol:known.symbol},controlCleanup:{ownedChildExited:true},cleanup:{ownedChildExited:true},toolchain:{ok:true,manifestSha256:hash(manifestBytes),name:manifest.name,packages:manifest.packages,files:manifest.files},files:{stacks:{path:'stacks.txt',bytes:stacks.length,sha256:hash(stacks)}},sampleCount:1,threadIntervals:[{pid:41,threadId:41,sampleCount:1,firstSampleMonotonicNs:'2000000000',lastSampleMonotonicNs:'2000000000'}],symbolizedFunctions:[symbol],lostEventRecords:0,status:'partial',nativeStacksCaptured:true,completeAttribution:false,productQualification:false,causeProved:false,truncated:false,captureStarted:{monotonicNs:'1000000000'},captureFinished:{monotonicNs:'3000000000'},trigger:{monotonicNs:'2000000000'},targets:[{pid:41,threadId:41}],limitations:['Controlled retained perf-text verifier witness; no Linux execution or actual native-frame claim.']};fs.writeFileSync(reportPath,JSON.stringify(report));return report;
+ };
+ retained('diagnosticKnownHotLoop');const positive=command('diagnostic-native-verify',reportPath);assert.equal(positive.status,0,positive.stderr);assert.equal(JSON.parse(positive.stdout).nativeStacksCaptured,true);
+ const loader=retained('_dl_start');const refused=command('diagnostic-native-verify',reportPath);assert.notEqual(refused.status,0,'Fresh known-control verification must require its independently expected diagnosticKnownHotLoop even when raw text, hashes and summary agree');assert.match(refused.stderr,/known.*(?:symbol|routine)|diagnosticKnownHotLoop/i);
+ delete loader.control;delete loader.controlCleanup;loader.identity={application:'controlled-partial'};fs.writeFileSync(reportPath,JSON.stringify(loader));const {verifyNativeAttribution}=await import('./native-attribution.mjs');assert.equal(verifyNativeAttribution(reportPath,{application:'controlled-partial'}).nativeStacksCaptured,true,'Partial app attribution may retain available routines without claiming the independently fixed known control or a causal repair');
+ t.diagnostic('Controlled durable verifier mutation only; expected source/ELF metadata is the approved known control. Actual Linux/perf capture remains unexecuted here.');
+});

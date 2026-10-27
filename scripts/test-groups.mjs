@@ -965,10 +965,28 @@ async function runBrowserRuntimeChild(files, roots, outputDir, options, source, 
   let outputLimited = false;
   let outputBytes = 0;
   let cleanupSignal = null;
+  let interruption = null;
+  let cleanupTimer;
+  let closed = false;
+  let exitResult;
+  let finishExit;
   const stop = signal => {
     cleanupSignal = signal;
     try { return signalOwnedChild(child, signal); } catch { return false; }
   };
+  const onSignal = signal => {
+    if (interruption) return;
+    interruption = { signal, receivedAt: new Date().toISOString(), cleanup: { scope: process.platform === 'win32' ? 'direct-child' : 'owned-process-group', graceMs: 500, signalSent: stop(signal), escalated: false, completed: false } };
+    cleanupTimer = setTimeout(() => {
+      interruption.cleanup.escalated = stop('SIGKILL');
+      interruption.cleanup.graceElapsed = true;
+      finishExit();
+    }, interruption.cleanup.graceMs);
+  };
+  const onSigint = () => onSignal('SIGINT');
+  const onSigterm = () => onSignal('SIGTERM');
+  process.on('SIGINT', onSigint);
+  process.on('SIGTERM', onSigterm);
   for (const stream of [child.stdout, child.stderr]) stream.on('data', chunk => {
     outputBytes += chunk.length;
     if (outputBytes > 32 * 1024 * 1024 && !outputLimited) {
@@ -981,12 +999,19 @@ async function runBrowserRuntimeChild(files, roots, outputDir, options, source, 
     stop('SIGKILL');
   }, 240000);
   const exit = await new Promise(resolveExit => {
-    let resolved = false;
-    const finish = value => { if (!resolved) { resolved = true; resolveExit(value); } };
+    finishExit = () => {
+      if (!closed || (interruption && !interruption.cleanup.graceElapsed)) return;
+      if (interruption) interruption.cleanup.completed = true;
+      resolveExit(exitResult);
+    };
+    const finish = value => { if (!closed) { closed = true; exitResult = value; finishExit(); } };
     child.once('error', error => finish({ code: null, signal: null, error: error.message }));
     child.once('close', (code, signal) => finish({ code, signal, error: null }));
   });
   clearTimeout(timer);
+  clearTimeout(cleanupTimer);
+  process.removeListener('SIGINT', onSigint);
+  process.removeListener('SIGTERM', onSigterm);
   await Promise.all([new Promise(resolveEnd => tap.end(resolveEnd)), new Promise(resolveEnd => stderr.end(resolveEnd))]);
   let tapText = '';
   try { tapText = fs.readFileSync(tapPath, 'utf8'); } catch {}
@@ -997,6 +1022,7 @@ async function runBrowserRuntimeChild(files, roots, outputDir, options, source, 
     timedOut,
     outputLimited,
     cleanupSignal,
+    interruption,
     tapPath,
     stderrPath,
     tapText,
@@ -1071,6 +1097,7 @@ async function runBrowserRuntimePreflight({ options, source, inventory, assignme
       timedOut: child.timedOut,
       outputLimited: child.outputLimited,
       cleanupSignal: child.cleanupSignal,
+      interruption: child.interruption,
       stdout: { path: path.basename(child.tapPath), sha256: child.tapSha256 },
       stderr: { path: path.basename(child.stderrPath), sha256: child.stderrSha256 },
       selection: child.selection,
@@ -1092,6 +1119,7 @@ async function runBrowserRuntimePreflight({ options, source, inventory, assignme
       selectedRoots: selection.selectedRoots,
     }));
     if (child.exit.code !== 0) proof.issues.unshift(`Browser test process exited with ${child.exit.code ?? child.exit.signal ?? child.exit.error}.`);
+    if (child.interruption) proof.issues.push(`Browser preflight interrupted by ${child.interruption.signal}; owned process-family cleanup completed.`);
     if (child.timedOut) proof.issues.push('Browser test process exceeded the four-minute runtime bound and was terminated.');
     if (child.outputLimited) proof.issues.push('Browser test process exceeded the 32 MiB output bound and was terminated.');
     if (!proof.cleanup.childExited) proof.issues.push('Browser test child did not produce a terminal process outcome.');
@@ -1659,7 +1687,7 @@ async function main() {
         atomicWrite(path.join(outputDir, 'result.json'), result);
         if (result.status !== 'passed' && result.status !== 'no_change') {
           process.stderr.write(`${result.status}: ${result.issues.join('\n')}\n`);
-          return 1;
+          return browserResult.process?.interruption ? (browserResult.process.interruption.signal === 'SIGINT' ? 130 : 143) : 1;
         }
         process.stdout.write(`${options.group}: browser runtime ${result.status}; evidence: ${path.join(outputDir, 'result.json')}\n`);
         return 0;

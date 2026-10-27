@@ -24,7 +24,8 @@ function source(){
   const expected=manifest.testExcerpts.filter(row=>!row.snapshotPath).map(row=>row.name).sort(),catalog=earlyCatalog();
   assert.equal(expected.length,5,'The five confirmed saved regressions remain executable');
   assert.deepEqual(catalog.map(row=>row.root).sort(),expected,'Saved confirmed regressions must retain exact early execution assignments');
-  assert.ok(catalog.every(row=>row.group==='native-process'&&row.file==='tests.js'),'Early execution retains the existing native-process catalog owner');
+  const owners=new Map(expected.map(name=>[name,name===EARLY_CASES[0]?'core':'native-process']));
+  assert.ok(catalog.every(row=>row.group===owners.get(row.root)&&row.file==='tests.js'),'Early execution retains each existing core/native-process catalog owner');
  }
  return hash(fs.readFileSync(path.join(root,manifestPath)));
 }

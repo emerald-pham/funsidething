@@ -2287,7 +2287,7 @@ The canonical profile admits only the original mobile story and the named confir
 
 - RISK repository process: early-assigned consumers execute once through durable group accounting
 
-Existing catalog assignments mark the five confirmed roots as early execution while retaining their native-process ownership. Real workflow commands consume verified durable early cases before any group child, omit only those already executed roots from the later Node process, and aggregate raw early/ordinary outcomes exactly once. Missing or changed receipts and transfer references fail; the accepted skip inventory is unchanged.
+Existing catalog assignments mark the five confirmed roots as early execution while retaining the predicate root in core and the other four roots in native-process. Real workflow commands consume verified durable early cases before any group child, omit only those already executed roots from the later Node process, and aggregate raw early/ordinary outcomes exactly once. Missing or changed receipts and transfer references fail; the accepted skip inventory is unchanged.
 
 ## Nonqualifying source-bound diagnostic authority
 
@@ -2308,3 +2308,12 @@ The actual routing CLI binds complete source/checkout/tree/base/policy/cohort/ru
 - `RISK repository process: native diagnostic captures remain bounded and missing attribution never qualifies a repair`
 
 Protected default governance, separate diagnostic source, actual run/artifact identity and one-use inherited parent channels remain distinct. Public process controls cover stale/forged/replayed contexts, Node injection, finite duplicate admission and ordinary release compatibility. Native controls use an actual fixed native workload, real macOS sampler and fresh retained-artifact verification; Linux control/tool delivery is prepared with pinned source, ELF bytes and dependency closure. Missing Linux capability, symbols, samples or coverage remains unavailable or partial within the same attempt; local controls establish no hosted WebKit, product repair or physical-device result.
+
+## Final review repairs for #278
+
+- `RISK repository process: canonical early admission retains mixed owners and fresh durable verification`
+- `RISK repository process: browser preflight interruption cleans its actual owned process family`
+- `RISK repository process: fresh Linux known-control verification requires its independent hot routine`
+- `RISK repository process: rendered diagnostic comparisons enforce declared scale on all named controls`
+
+Canonical source admission reads the actual preserved manifest, profile and five catalog owners; fresh public verification starts zero current children for controlled covered metadata. The full controlled process transfer separately executes all five early roots once and deducts one core plus four native-process roots from ordinary groups. Interruption tests operate on actual owned OS test children, grandchildren and listeners through both the direct preflight and recorder, preserving an unrelated process and finalizing bounded cleanup. The fixed Linux known-control fresh verifier requires its independently named hot routine; controlled retained-text witnesses do not claim actual Linux frames, while ordinary partial app attribution remains separate. Named diagnostic comparisons require the explicit scale on both changed and reference text, allow bounded CSS rounding, and measure content height without requiring fixed padding to scale. Existing original assertions, accepted skips, app bytes and native budgets remain protected.

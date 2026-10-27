@@ -77,3 +77,28 @@ test('early CI public command refuses failed skipped cancelled and missing manda
 test('early CI workflow cancelled missing and skipped predecessors never authorize downstream',()=>{
  for(const outcome of ['cancelled','skipped',undefined]){const observed=dispatch(outcome);assert.equal(observed.launched.filter(id=>['regression','event-gates','mobile-stress','deploy-pages'].includes(id)).length,0);assert.notEqual(observed.results['scanner-tests'],'success');}
 });
+
+
+test('early CI canonical source admits its existing mixed owners through durable public verification',t=>{
+ const directory=fs.mkdtempSync(path.join(os.tmpdir(),'chain-early-canonical-'));t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const repo=path.join(directory,'repo');fs.mkdirSync(repo);
+ const tracked=spawnSync('git',['ls-files','-z'],{cwd:root,encoding:'utf8'});assert.equal(tracked.status,0);
+ for(const file of tracked.stdout.split('\0').filter(Boolean)){const destination=path.join(repo,file);fs.mkdirSync(path.dirname(destination),{recursive:true});fs.copyFileSync(path.join(root,file),destination);}
+ const git=(...args)=>{const result=spawnSync('git',args,{cwd:repo,encoding:'utf8'});assert.equal(result.status,0,result.stderr);return result.stdout.trim();};
+ git('init','-q');git('add','.');git('-c','core.hooksPath=/dev/null','-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','-qm','Actual canonical source admission fixture');
+ const sha=git('rev-parse','HEAD'),tree=git('rev-parse','HEAD^{tree}');
+ const id={repository:'example/fixture',eventPolicy:'outgoing-branch-push-v1',runId:'100',runAttempt:1,sourceSha:sha,sourceTree:tree,checkoutSha:sha,checkoutTree:tree,checkoutDirty:false,comparisonBase:sha,expectedGroups:['core','scenery','persistence-recovery','native-process']};
+ const descriptor=path.join(directory,'descriptor.json');fs.writeFileSync(descriptor,JSON.stringify({resultIdentity:id}));
+ const context={repository:id.repository,sourceSha:sha,sourceTree:tree,checkoutSha:sha,checkoutTree:tree,comparisonBase:sha,requiredCohort:'four-groups-v1',expectedGroups:id.expectedGroups};
+ const proof=path.join(directory,'proof.json');fs.writeFileSync(proof,JSON.stringify({decision:'reuse',runId:100,runAttempt:1,validationContext:id,cohortContext:context,contextSha256:digest(JSON.stringify(context)),coveredBy:{runId:'71',runAttempt:'2',checkoutSha:sha,checkoutTree:tree,comparisonBase:sha,reportSha256:'8'.repeat(64),earlyReportSha256:'9'.repeat(64)}}));
+ const env={...process.env,GITHUB_REPOSITORY:id.repository,CHAIN_TEST_SOURCE_SHA:sha,CHAIN_TEST_EVENT_POLICY:id.eventPolicy,GITHUB_RUN_ID:'100',GITHUB_RUN_ATTEMPT:'1'};delete env.NODE_TEST_CONTEXT;
+ const invoke=args=>spawnSync(process.execPath,['scripts/early-ci.mjs',...args,'--descriptor',descriptor,'--proof',proof],{cwd:repo,env,encoding:'utf8',timeout:15000});
+ const output=path.join(directory,'early'),started=invoke(['--covered','--output-dir',output]);assert.equal(started.status,0,'Actual canonical manifest must admit its literal core/native owners: '+started.stderr);
+ const receipt=path.join(output,'receipt.json');assert.equal(invoke(['--verify','--receipt',receipt]).status,0,'A fresh verifier must re-admit the exact canonical source');
+ const result=JSON.parse(fs.readFileSync(receipt));assert.equal(result.identity.harnessSourceSha256,digest(fs.readFileSync(path.join(root,'scripts/early-ci-harness-source.json'))));assert.deepEqual(result.children,[],'Controlled inherited coverage starts zero current workload children');
+ const rows=JSON.parse(fs.readFileSync(path.join(repo,'scripts/test-group-assignments.json'))).rootAssignments.filter(row=>row.executionStage==='early-startup');assert.deepEqual(rows.map(({root,group})=>({root,group})).sort((a,b)=>a.root.localeCompare(b.root)),[
+  {root:requiredCases[0],group:'core'},...requiredCases.slice(1).map(root=>({root,group:'native-process'})),
+  ...['RISK scenery backdrop cache: first unchanged lighting timer reuses actual pixels while changed slots and loaded copy still paint','RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh'].map(root=>({root,group:'native-process'})),
+ ].sort((a,b)=>a.root.localeCompare(b.root)));
+ t.diagnostic('Actual canonical source/manifest/catalog admission with controlled GitHub producer metadata; zero workload children; no hosted or native qualification.');
+});
