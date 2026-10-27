@@ -45701,11 +45701,20 @@ test('RISK repository process: native diagnostic captures remain bounded and mis
 });
 
 
-test('RISK repository process: canonical early admission retains mixed owners and fresh durable verification',{timeout:125000,concurrency:false},()=>{
+test('RISK repository process: canonical early admission retains mixed owners and fresh durable verification',{timeout:125000,concurrency:false},async()=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
  const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^early CI canonical source|^group and aggregate retain actual early','scripts/agent-tools/early-ci.test.mjs','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:120000,maxBuffer:8*1024*1024});
  assert.equal(child.status,0,'Actual canonical admission and owned early accounting must agree: '+child.stdout+child.stderr);
- assert.match(child.stdout,/# tests 4$/m);assert.match(child.stdout,/# skipped 0$/m);
+ const {parseTap}=await import('./scripts/test-groups.mjs'),cases=parseTap(child.stdout);
+ const roots=['early CI canonical source admits its existing mixed owners through durable public verification','group and aggregate retain actual early cases once across fresh group processes'];
+ const nested=['known completed partial action remains accounted without full coverage credit','failed stress still refuses missing accounting','failed stress still refuses unknown offered ID','failed stress still refuses unknown executed ID','failed stress still refuses profile tamper','failed stress still refuses source tamper','failed stress still refuses transport failure','failed stress still refuses instrumentation failure','failed stress still refuses cleanup failure','changed group transfer reference','missing durable predecessor'];
+ const expected=[...roots,...nested.map(name=>roots[1]+' > '+name)].sort(),actual=cases.map(row=>row.id);
+ assert.equal(expected.length,13,'Four original identities plus nine approved stress controls remain required');
+ assert.deepEqual([...actual].sort(),expected,'Only the exact required identities and their original hierarchy may execute');
+ assert.equal(new Set(actual).size,13,'No required child outcome may execute twice');
+ assert.deepEqual(cases.filter(row=>row.id===row.root).map(row=>row.root).sort(),[...roots].sort(),'Exactly the two required top-level roots execute once');
+ assert.ok(cases.every(row=>row.status==='passed'&&row.skipReason===null),'All required roots and nested controls must complete without skip, TODO or failure');
+ for(const [summary,count]of Object.entries({tests:13,suites:0,pass:13,fail:0,cancelled:0,skipped:0,todo:0}))assert.match(child.stdout,new RegExp('^# '+summary+' '+count+'$','m'),'Exact child TAP summary: '+summary);
  assert.match(child.stdout,/Actual canonical Node predicate child completed exactly one required outcome with zero skips/,'The canonical consumer must exercise actual predicate cardinality as well as durable admission and accounting');
  assert.match(child.stdout,/Local allocation public consumer passed9 isolated ledger cases without foreign or own ledger writes/,'The native local owner lookup must retain foreign conflicts and fail closed on unsafe identity or lease state');
 });
