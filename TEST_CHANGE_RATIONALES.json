@@ -20804,4 +20804,101 @@
     },
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/323"
   }
+,
+  {
+    "baseCommit": "c2cba034b2da1e335c92e3f48be809a09de19699",
+    "testChangesSha256": "7676ef215f2ac2517fc790eecf5a57812c3f21ec5303fad8a575b678cbd2b0ce",
+    "reason": "Bind protected default governance separately from immutable diagnostic app source; enforce one-use inherited claim channels and retain bounded real native controls without granting product qualification. Integrated earlier owners retain their independent original evidence and source attribution.",
+    "previousBehavior": "Diagnostic dispatch and artifact heads were conflated with the unlanded diagnostic branch; credential-free descendant admission lacked an independently consumed parent channel and the fixed native capture/report boundary.",
+    "intendedBehavior": "Actual protected governance executes the verified parent, distinct source remains signed and frozen, and missing/stale/forged/replayed context is denied. Actual native controls retain bounded samples or an explicit unavailable/partial result on the same finite attempt.",
+    "replacementTests": [
+      "RISK repository process: protected diagnostic governance remains distinct from frozen app source",
+      "RISK repository process: native diagnostic captures remain bounded and missing attribution never qualifies a repair"
+    ],
+    "preservedCoverage": [
+      "Earlier checkpoint, release, policy classification, cohort accounting, routing, early-CI and rendered-source controls retain their original owner RED records and meaningful expectations.",
+      "The original frozen app, dependency, cap, isolation, deadlines, trusted inputs and readiness remain fixed; native attribution cannot establish a product repair or physical-device outcome."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern=independently reviewed protected governance scripts/agent-tools/diagnostic-receipt.test.mjs (the single pattern argument and exact argv are retained in governance-receipt-red/2026-10-27T05-01-19-431Z-42d618c8-d50d-4abe-9883-cfb87650dd42.json); native-control-red and channel-red preserve their distinct exact invocations.",
+      "failure": "Contemporaneous public assertions observed missing governance binding, candidate-ref dispatch, source-headed CI claim, environment-only runtime admission and absent native stacks. Exact command/source/test/timestamps are preserved in artifacts289 recorder JSON; infrastructure trials are excluded from RED credit."
+    }
+  },
+  {
+    "baseCommit": "5baedb2e237b366bc8fe1f82a36faf9357ae02e8",
+    "testChangesSha256": "59cdcd397d4e86f3b55067c808d6a7156823376619605403b4d2bb64c858ad60",
+    "reason": "Bind protected default governance separately from immutable diagnostic app source; enforce one-use inherited claim channels and retain bounded real native controls without granting product qualification. Integrated earlier owners retain their independent original evidence and source attribution.",
+    "previousBehavior": "Diagnostic dispatch and artifact heads were conflated with the unlanded diagnostic branch; credential-free descendant admission lacked an independently consumed parent channel and the fixed native capture/report boundary.",
+    "intendedBehavior": "Actual protected governance executes the verified parent, distinct source remains signed and frozen, and missing/stale/forged/replayed context is denied. Actual native controls retain bounded samples or an explicit unavailable/partial result on the same finite attempt.",
+    "replacementTests": [
+      "RISK repository process: protected diagnostic governance remains distinct from frozen app source",
+      "RISK repository process: native diagnostic captures remain bounded and missing attribution never qualifies a repair"
+    ],
+    "preservedCoverage": [
+      "Earlier checkpoint, release, policy classification, cohort accounting, routing, early-CI and rendered-source controls retain their original owner RED records and meaningful expectations.",
+      "The original frozen app, dependency, cap, isolation, deadlines, trusted inputs and readiness remain fixed; native attribution cannot establish a product repair or physical-device outcome."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern=independently reviewed protected governance scripts/agent-tools/diagnostic-receipt.test.mjs (the single pattern argument and exact argv are retained in governance-receipt-red/2026-10-27T05-01-19-431Z-42d618c8-d50d-4abe-9883-cfb87650dd42.json); native-control-red and channel-red preserve their distinct exact invocations.",
+      "failure": "Contemporaneous public assertions observed missing governance binding, candidate-ref dispatch, source-headed CI claim, environment-only runtime admission and absent native stacks. Exact command/source/test/timestamps are preserved in artifacts289 recorder JSON; infrastructure trials are excluded from RED credit."
+    }
+  },
+  {
+    "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
+    "testChangesSha256": "b1823dbaa0790ada9894853e8d61a9bfb626d926563ce146942442336e7e9089",
+    "reason": "Bind protected default governance separately from immutable diagnostic app source; enforce one-use inherited claim channels and retain bounded real native controls without granting product qualification. Integrated earlier owners retain their independent original evidence and source attribution.",
+    "previousBehavior": "Diagnostic dispatch and artifact heads were conflated with the unlanded diagnostic branch; credential-free descendant admission lacked an independently consumed parent channel and the fixed native capture/report boundary.",
+    "intendedBehavior": "Actual protected governance executes the verified parent, distinct source remains signed and frozen, and missing/stale/forged/replayed context is denied. Actual native controls retain bounded samples or an explicit unavailable/partial result on the same finite attempt.",
+    "replacementTests": [
+      "RISK repository process: protected diagnostic governance remains distinct from frozen app source",
+      "RISK repository process: native diagnostic captures remain bounded and missing attribution never qualifies a repair"
+    ],
+    "preservedCoverage": [
+      "Earlier checkpoint, release, policy classification, cohort accounting, routing, early-CI and rendered-source controls retain their original owner RED records and meaningful expectations.",
+      "The original frozen app, dependency, cap, isolation, deadlines, trusted inputs and readiness remain fixed; native attribution cannot establish a product repair or physical-device outcome."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern=independently reviewed protected governance scripts/agent-tools/diagnostic-receipt.test.mjs (the single pattern argument and exact argv are retained in governance-receipt-red/2026-10-27T05-01-19-431Z-42d618c8-d50d-4abe-9883-cfb87650dd42.json); native-control-red and channel-red preserve their distinct exact invocations.",
+      "failure": "Contemporaneous public assertions observed missing governance binding, candidate-ref dispatch, source-headed CI claim, environment-only runtime admission and absent native stacks. Exact command/source/test/timestamps are preserved in artifacts289 recorder JSON; infrastructure trials are excluded from RED credit."
+    }
+  },
+  {
+    "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
+    "testChangesSha256": "d3f996f8b257adb346d8bfa63d70b92d29f481d66a9fc5f5078de8d97b269650",
+    "reason": "Integration metadata only: reconcile already implemented #323 Chromium preflight receipts with #289 protected diagnostic governance and bounded native evidence. Preserve both owners original test-first chronology; this append is not a new behavioral RED or chronology repair.",
+    "previousBehavior": "The separate parent and diagnostic candidates each carried their own executable process tests and original source-bound rationale, while no record yet identified their combined origin/main diff.",
+    "intendedBehavior": "The combined candidate retains the complete ordinary group and Chromium no_change/receipt contract alongside protected distinct-governance diagnostic admission, exact one-use descendant channel and nonqualifying native boundaries.",
+    "replacementTests": [
+      "RISK repository process: newly registered startup browser roots require an isolated Chromium receipt",
+      "RISK repository process: protected diagnostic governance remains distinct from frozen app source",
+      "RISK repository process: native diagnostic captures remain bounded and missing attribution never qualifies a repair"
+    ],
+    "preservedCoverage": [
+      "All 818 parent rationale records and all prior #289 records remain unchanged. Ordinary groups still execute every assigned case; #323 preflight never substitutes for ordinary execution.",
+      "Original frozen diagnostic app, dependencies, isolation, caps, timing, input and readiness remain unchanged. Native attribution remains partial/unavailable and never confers product release or physical-device qualification."
+    ],
+    "redEvidence": {
+      "command": "Original #323: node --test source consumer command is retained verbatim in artifacts323/consumer-red/2026-10-27T05-42-09-934Z-b93ca325-6bd3-4667-8b6c-e5161c4c33a3.json; original #289 governance: node --test --test-name-pattern=independently reviewed protected governance scripts/agent-tools/diagnostic-receipt.test.mjs, exact argv in artifacts289/governance-receipt-red/2026-10-27T05-01-19-431Z-42d618c8-d50d-4abe-9883-cfb87650dd42.json; each separate channel/native/concurrency RED remains in artifacts289/PROOF-INDEX.json.",
+      "failure": "Original #323 consumer exited successfully while all six targeted browser consumers skipped; original #289 assertions observed missing governance binding, source-headed dispatch/claim, env-only admission, absent native capture and missing retained concurrent child identity. This merge-only metadata retains those distinct observed failures and does not manufacture a combined preimplementation RED."
+    }
+  },
+  {
+    "baseCommit": "139ac15f847996c94ab4b53cdbf6f05e9ff4e43f",
+    "testChangesSha256": "c64d51879883d7a3f210ec9b2d55515f2b56bc276246ceada36688d00e468bb1",
+    "reason": "Integration metadata only: #323 inserts earlier test declarations and shifts the line-addressed #289 fingerprint relative to the current integration base. The unchanged #289 tests and implementation retain their original source-bound RED/GREEN; this record does not claim a new behavioral failure.",
+    "previousBehavior": "The separate parent and diagnostic candidates each carried their own executable process tests and original source-bound rationale, while no record yet identified their combined origin/main diff.",
+    "intendedBehavior": "The combined candidate retains the complete ordinary group and Chromium no_change/receipt contract alongside protected distinct-governance diagnostic admission, exact one-use descendant channel and nonqualifying native boundaries.",
+    "replacementTests": [
+      "RISK repository process: protected diagnostic governance remains distinct from frozen app source",
+      "RISK repository process: native diagnostic captures remain bounded and missing attribution never qualifies a repair"
+    ],
+    "preservedCoverage": [
+      "All 818 parent rationale records and all prior #289 records remain unchanged. Ordinary groups still execute every assigned case; #323 preflight never substitutes for ordinary execution.",
+      "Original frozen diagnostic app, dependencies, isolation, caps, timing, input and readiness remain unchanged. Native attribution remains partial/unavailable and never confers product release or physical-device qualification."
+    ],
+    "redEvidence": {
+      "command": "Original #323: node --test source consumer command is retained verbatim in artifacts323/consumer-red/2026-10-27T05-42-09-934Z-b93ca325-6bd3-4667-8b6c-e5161c4c33a3.json; original #289 governance: node --test --test-name-pattern=independently reviewed protected governance scripts/agent-tools/diagnostic-receipt.test.mjs, exact argv in artifacts289/governance-receipt-red/2026-10-27T05-01-19-431Z-42d618c8-d50d-4abe-9883-cfb87650dd42.json; each separate channel/native/concurrency RED remains in artifacts289/PROOF-INDEX.json.",
+      "failure": "Original #323 consumer exited successfully while all six targeted browser consumers skipped; original #289 assertions observed missing governance binding, source-headed dispatch/claim, env-only admission, absent native capture and missing retained concurrent child identity. This merge-only metadata retains those distinct observed failures and does not manufacture a combined preimplementation RED."
+    }
+  }
 ]

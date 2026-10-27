@@ -484,16 +484,267 @@ function diagnosticSource(repo, commit) {
     );
   return null;
 }
+// One-use local handoff from the protected, online-verified governance parent.
+// Kernel identity does not attest JavaScript; same-user/admin replacement of
+// protected workflow code or processes is outside the supported guarantee.
+let consumed = false;
+export function rejectDiagnosticNodeInjection(
+  env = process.env,
+  args = process.execArgv,
+) {
+  if (
+    env.NODE_OPTIONS ||
+    env.NODE_PATH ||
+    args.some((arg) =>
+      /^(?:-r|--require(?:=|$)|--import(?:=|$)|--loader(?:=|$)|--experimental-loader(?:=|$))/.test(
+        arg,
+      ),
+    )
+  )
+    throw Error(
+      "Diagnostic runtime refuses Node preload or module-path injection.",
+    );
+}
+export function diagnosticProcessIdentity(pid) {
+  if (!Number.isSafeInteger(pid) || pid < 1)
+    throw Error("Diagnostic channel PID invalid.");
+  if (process.platform === "linux") {
+    const stat = fs.readFileSync(`/proc/${pid}/stat`, "utf8"),
+      tail = stat.slice(stat.lastIndexOf(")") + 2).split(" "),
+      status = fs.readFileSync(`/proc/${pid}/status`, "utf8");
+    return {
+      pid,
+      parentPid: Number(tail[1]),
+      start: tail[19],
+      uid: Number(status.match(/^Uid:\s+(\d+)/m)?.[1]),
+      executable: fs.readlinkSync(`/proc/${pid}/exe`),
+      argv: fs
+        .readFileSync(`/proc/${pid}/cmdline`, "utf8")
+        .split("\0")
+        .filter(Boolean),
+    };
+  }
+  if (process.platform === "darwin") {
+    const row = spawnSync(
+      "/bin/ps",
+      ["-p", String(pid), "-o", "ppid=,uid=,lstart="],
+      { encoding: "utf8" },
+    );
+    if (row.status !== 0) throw Error("Diagnostic parent process unavailable.");
+    const parsed = row.stdout.trim().match(/^(\d+)\s+(\d+)\s+(.+)$/);
+    if (!parsed) throw Error("Diagnostic process identity unavailable.");
+    // ps identity supplements the protected workflow trust root; argv is not an attestation.
+    return {
+      pid,
+      parentPid: Number(parsed[1]),
+      uid: Number(parsed[2]),
+      start: parsed[3],
+      executable: spawnSync(
+        "/usr/sbin/lsof",
+        ["-a", "-p", String(pid), "-d", "txt", "-Fn"],
+        {
+          encoding: "utf8",
+          timeout: 1500,
+          maxBuffer: 1024 * 1024,
+        },
+      )
+        .stdout.split("\n")
+        .find((line) => line.startsWith("n"))
+        ?.slice(1),
+      argv: spawnSync("/bin/ps", ["-p", String(pid), "-o", "command="], {
+        encoding: "utf8",
+      })
+        .stdout.trim()
+        .split(/\s+/),
+    };
+  }
+  throw Error(
+    "Diagnostic inherited channel requires Linux or macOS kernel process identity.",
+  );
+}
+export function diagnosticChannelPayload(binding, childPid) {
+  rejectDiagnosticNodeInjection();
+  return {
+    ...binding,
+    version: 1,
+    nonce: randomUUID(),
+    issuedAt: Date.now(),
+    expiresAt: Date.now() + 5000,
+    parent: diagnosticProcessIdentity(process.pid),
+    child: diagnosticProcessIdentity(childPid),
+  };
+}
+export function consumeDiagnosticChannel(context, repo) {
+  rejectDiagnosticNodeInjection();
+  if (consumed)
+    throw Error("Diagnostic inherited authorization channel already consumed.");
+  consumed = true;
+  let raw = Buffer.alloc(0),
+    payload;
+  try {
+    if (!fs.fstatSync(3).isSocket() && !fs.fstatSync(3).isFIFO())
+      throw Error("not an inherited pipe");
+    const until = Date.now() + 1500,
+      chunk = Buffer.alloc(16385);
+    for (;;) {
+      try {
+        const n = fs.readSync(3, chunk, 0, chunk.length, null);
+        if (!n) break;
+        raw = Buffer.concat([raw, chunk.subarray(0, n)]);
+        if (raw.length > 16384) throw Error("oversized authorization");
+      } catch (error) {
+        if (error.code !== "EAGAIN") throw error;
+        if (Date.now() >= until) throw Error("authorization channel timed out");
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
+      }
+    }
+    payload = JSON.parse(raw.toString());
+  } catch (error) {
+    throw Error(
+      "Diagnostic inherited parent authorization missing or invalid: " +
+        error.message,
+    );
+  } finally {
+    try {
+      fs.closeSync(3);
+    } catch {}
+  }
+  if (
+    payload.version !== 1 ||
+    !/^[a-f0-9-]{36}$/.test(payload.nonce ?? "") ||
+    !Number.isSafeInteger(payload.issuedAt) ||
+    payload.issuedAt > Date.now() ||
+    payload.expiresAt - payload.issuedAt !== 5000 ||
+    Date.now() > payload.expiresAt
+  )
+    throw Error("Diagnostic inherited authorization stale or malformed.");
+  for (const key of [
+    "governance",
+    "source",
+    "sourceRef",
+    "claim",
+    "runId",
+    "runAttempt",
+  ])
+    if (payload[key] !== context[key])
+      throw Error(
+        "Diagnostic inherited authorization context mismatch: " + key,
+      );
+  const actualParent = diagnosticProcessIdentity(process.ppid),
+    actualChild = diagnosticProcessIdentity(process.pid);
+  if (
+    JSON.stringify(actualParent) !== JSON.stringify(payload.parent) ||
+    JSON.stringify(actualChild) !== JSON.stringify(payload.child) ||
+    payload.child.parentPid !== payload.parent.pid ||
+    payload.parent.pid !== process.ppid ||
+    payload.parent.uid !== process.getuid() ||
+    payload.child.uid !== process.getuid()
+  )
+    throw Error("Diagnostic inherited parent/child kernel identity changed.");
+  const gov = fs.realpathSync(payload.governanceRoot),
+    cli = fs.realpathSync(path.join(gov, "scripts/release-evidence.mjs"));
+  if (
+    payload.parent.executable !== fs.realpathSync(process.execPath) ||
+    payload.parent.argv[1] !== cli ||
+    !payload.parent.argv.includes("diagnostic-ci-run") ||
+    git(gov, "rev-parse", "HEAD") !== context.governance ||
+    git(gov, "status", "--porcelain", "--untracked-files=all") ||
+    fs.realpathSync(repo) === gov
+  )
+    throw Error(
+      "Diagnostic channel parent is not the bound immutable governance invocation.",
+    );
+  return {
+    ...context,
+    channel: {
+      nonce: payload.nonce,
+      parentPid: payload.parent.pid,
+      childPid: process.pid,
+      issuedAt: payload.issuedAt,
+      consumed: true,
+    },
+  };
+}
+
+// Metadata forwarded only after the host has consumed its parent channel.
+export function diagnosticDescendantContext(
+  env,
+  commit = env.CHAIN_TEST_SOURCE_SHA,
+) {
+  const sha = (value) => /^[a-f0-9]{40}$/.test(value ?? "");
+  if (
+    env.CI !== "true" ||
+    env.CHAIN_TEST_EVENT_POLICY !== "diagnostic-workflow-dispatch-v1" ||
+    env.GITHUB_EVENT_NAME !== "workflow_dispatch" ||
+    env.GITHUB_REF !== "refs/heads/main" ||
+    !sha(env.CHAIN_DIAGNOSTIC_GOVERNANCE) ||
+    env.GITHUB_SHA !== env.CHAIN_DIAGNOSTIC_GOVERNANCE ||
+    !sha(commit) ||
+    env.CHAIN_DIAGNOSTIC_SOURCE !== commit ||
+    env.CHAIN_TEST_SOURCE_SHA !== commit ||
+    !/^refs\/heads\/diagnose\/[A-Za-z0-9._/-]+$/.test(
+      env.CHAIN_DIAGNOSTIC_SOURCE_REF ?? "",
+    ) ||
+    !sha(env.CHAIN_DIAGNOSTIC_CLAIM) ||
+    !/^[1-9][0-9]*$/.test(env.GITHUB_RUN_ID ?? "") ||
+    env.GITHUB_RUN_ATTEMPT !== "1"
+  )
+    throw Error(
+      "Diagnostic verified descendant source/governance context invalid.",
+    );
+  const expected = [
+    env.CHAIN_DIAGNOSTIC_GOVERNANCE,
+    commit,
+    env.CHAIN_DIAGNOSTIC_SOURCE_REF,
+    env.GITHUB_RUN_ID,
+    "1",
+    env.CHAIN_DIAGNOSTIC_CLAIM,
+  ].join(":");
+  if (env.CHAIN_DIAGNOSTIC_AUTHORIZATION !== expected)
+    throw Error("Diagnostic parent-issued descendant authorization invalid.");
+  return {
+    eventPolicy: env.CHAIN_TEST_EVENT_POLICY,
+    eventName: env.GITHUB_EVENT_NAME,
+    eventRef: env.GITHUB_REF,
+    governance: env.GITHUB_SHA,
+    source: commit,
+    sourceRef: env.CHAIN_DIAGNOSTIC_SOURCE_REF,
+    claim: env.CHAIN_DIAGNOSTIC_CLAIM,
+    runId: env.GITHUB_RUN_ID,
+    runAttempt: 1,
+    nonqualifying: true,
+  };
+}
 export function assertDiagnosticRuntimeAllowed(repo, commit, input) {
   if (!diagnosticSource(repo, commit)) return null;
   if (!input)
     throw Error(
       "Diagnostic CI requires a signed admitted bundle before launching its runtime.",
     );
+  if (
+    process.env.CHAIN_TEST_EVENT_POLICY === "diagnostic-workflow-dispatch-v1"
+  ) {
+    const descendant = consumeDiagnosticChannel(
+      diagnosticDescendantContext(process.env, commit),
+      repo,
+    );
+    return {
+      ...verifyDiagnosticSignedInputs(repo, commit, input, false),
+      descendant,
+    };
+  }
   return verifyDiagnosticCI(repo, commit, input);
 }
 
 export function verifyDiagnosticCI(repo, commit, input) {
+  return verifyDiagnosticSignedInputs(repo, commit, input, true);
+}
+function verifyDiagnosticSignedInputs(
+  repo,
+  commit,
+  input,
+  verifyAuthorityLive,
+) {
   const marker = diagnosticSource(repo, commit);
   if (!marker)
     throw Error("Diagnostic CI requires its committed source manifest.");
@@ -535,7 +786,7 @@ export function verifyDiagnosticCI(repo, commit, input) {
     throw Error(
       "Diagnostic CI retry needs a newly admitted explicit authorized attempt.",
     );
-  verifyAuthority(repo, state, true);
+  if (verifyAuthorityLive) verifyAuthority(repo, state, true);
   const actual = source(repo, state.source.base, state.sourcePaths);
   if (
     actual.commit !== commit ||

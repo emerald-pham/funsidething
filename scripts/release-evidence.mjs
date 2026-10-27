@@ -937,7 +937,7 @@ export function validatePrePushUpdates(repoRoot, updates, {diagnosticVerifier} =
     }
     if (diagnosticVerifier) {
       try {
-        if (diagnosticVerifier(repoRoot, commitSha, update)) continue;
+        if (diagnosticVerifier(repoRoot, commitSha, update)===true) continue;
       } catch (error) { errors.push('Diagnostic push blocked: '+error.message); continue; }
     }
     const result = verifyReleaseEvidence(repoRoot, commitSha);
@@ -1146,7 +1146,8 @@ async function main() {
     const updates=parsePrePushUpdates(input);
     const hasDiagnosticSource=updates.some(update=>SHA1.test(update.localSha)&&spawnSync('git',['-C',repoRoot,'cat-file','-e',update.localSha+':.diagnostic-task.json']).status===0);
     const diagnosticVerifier=hasDiagnosticSource?(await import('./agent-tools/diagnostic-receipt.mjs')).verifyDiagnosticOutgoing:undefined;
-    const errors = validatePrePushUpdates(repoRoot, updates, {diagnosticVerifier});
+    const admitted=new Set();if(diagnosticVerifier)for(const update of updates)if(await diagnosticVerifier(repoRoot,update.localSha,update))admitted.add(update);
+    const errors = validatePrePushUpdates(repoRoot, updates, {diagnosticVerifier:diagnosticVerifier?(_repo,_commit,update)=>admitted.has(update):undefined});
     if (errors.length) throw new Error(errors.join('\n'));
     process.stdout.write('Every outgoing commit tip has valid exact-SHA release evidence.\n');
     return;

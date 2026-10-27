@@ -135,7 +135,7 @@ The nonqualifying path in `scripts/release-evidence.mjs` consumes that public
 admission through the following existing-command extensions:
 
 - `diagnostic-plan <source> <frozen>` derives exact eligibility. The registered
-  `webkit-stall-thread-v1` template fixes reviewed product `b176026825e4f9539780f745fe60e09cf348d288`
+  `webkit-native-attribution-v1` template fixes reviewed product `b176026825e4f9539780f745fe60e09cf348d288`
   and canonical observer `c899e5e983cd756152c1d0c8057ffe8455e80956`.
   The complete app, dependencies, original authorization, caps, deadlines, input
   and readiness contracts remain byte-identical. Unknown templates or deltas
@@ -144,7 +144,9 @@ admission through the following existing-command extensions:
   frozen product/FAQ receipt, unchanged rendered artifacts, independent code
   review and memory/security/release-process review. Valid frozen reviews can
   belong to a candidate with failed CI; that failure remains unpaid. The input
-  names one exact outgoing `diagnose/` ref and prior remote SHA. The installed
+  also names `governance.commitSha`: the exact normally reviewed protected
+  default-main checkout, with its independently verified merged review/status
+  binding, commit/tree/workflow identities. It names one exact outgoing `diagnose/` ref and prior remote SHA. The installed
   pre-push hook permits only that update. All other updates keep their ordinary
   release requirements, and main/tag promotion is refused.
 - `diagnostic-launch <source>` independently rechecks evidence and fresh full
@@ -154,7 +156,7 @@ admission through the following existing-command extensions:
   The immutable `permit` ref contains selected review artifacts and a signed
   public admission. A matching duplicate only observes; a pending reservation
   after a crash remains unresolved and never auto-redispatches or renews budget.
-- `diagnostic-ci-run <permit-ref> <permit-object> <source> <run-id> 1 <output-dir>`
+- `diagnostic-ci-run --repo <diagnostic-checkout> <permit-ref> <permit-object> <source> <run-id> 1 <output-dir> prepare-reviewed-native-tools`
   independently verifies the bundle, exact checkout and fresh GitHub workflow
   run. A create-only `claim-reservation` and immutable `claim` bind one actual
   run attempt before the capped runtime starts. A duplicate does not start a
@@ -168,17 +170,49 @@ admission through the following existing-command extensions:
   immutable permit/claim, remote artifact ZIP digest, terminal source/tree/run
   and output/report hashes before attaching and consuming the journal result.
   Missing, stale, ambiguous or tampered evidence stays unresolved. The current
-  thread observer cannot establish native attribution: its required gate stays
-  failed even if the child exits zero. No diagnostic result grants product status.
+  observer retains native stacks or an explicit unavailable/partial outcome;
+  its required gate stays failed even if the child exits zero. No diagnostic result grants product status.
 
-Hosted prerequisites remain explicit: the normally reviewed enforcement bytes
-need an immutable governance anchor independent of candidate-supplied code, and
-GitHub must register the diagnostic dispatch workflow on the default branch (or
-an existing separately validated transport must be selected). Installed local
-byte equality alone cannot independently authenticate candidate-hosted bootstrap
-code. The isolated integration test applies the concrete guarded consumer patch
-without absorbing or editing the separately owned product branch. No local test
-establishes that these hosted prerequisites have happened.
+The dispatch runs on protected default `main`, with the actual workflow/run and
+artifact head bound to reviewed governance. The diagnostic source is a separate
+checkout and explicit permit input. Both checkouts disable persisted credentials.
+The parent checks fresh issue authority, protected head, exact normal release
+review/status binding and canonical run/attempt before issuing a one-use inherited
+channel to a credential-free source host guard. That guard checks signed inputs,
+source/run/claim context, expiry, actual parent/child kernel identity and immutable
+governance invocation. It consumes/closes the channel once. Environment text alone,
+preload/module-path injection, wrong/stale/replayed context and a non-governance
+parent cannot authorize a runtime. `verify-ci` always performs its online authority
+check. Kernel PID/argv/executable checks do not cryptographically attest JavaScript;
+the trust root is the protected workflow executing reviewed governance.
+
+The supported workflow always supplies the literal `prepare-reviewed-native-tools`
+mode. After the winning claim it downloads only reviewed Noble amd64 package URLs,
+checks package and every selected ELF SHA-256/build ID, and creates a generated tool
+artifact outside candidate source and Git metadata. The unchanged browser-family
+container mounts it read-only at `/opt/chain-native-tools`. Only perf uses its pinned
+loader/library path; WebKit retains its original image/libraries. Profiler processes,
+ring buffers and symbolization run inside the original 1,000,000,000-byte browser
+cgroup with zero swap, dropped capabilities, read-only root and unchanged deadlines.
+No runtime apt, network, privilege or capability relaxation is permitted. Missing
+tooling mode produces a durable unavailable result on the used claim, with zero
+runtime children and no renewed allowance.
+
+`diagnostic-native-control <empty-external-output>` captures one fixed known native
+workload using actual native tools. Linux uses the reviewed reproducible amd64 ELF,
+source/build command/toolchain hash/build ID and independently named hot-loop symbol;
+macOS uses its actual compiler and `sample`, separately attributed. Retained coverage
+and symbolization gaps remain explicit. `diagnostic-native-verify <report>` performs
+fresh verification; a missing Linux app source binding cannot qualify attribution.
+`diagnostic-native-toolchain-prepare` and `diagnostic-native-toolchain-verify` prepare
+or verify only the fixed governance package inventory, without accepting caller URLs
+or approvals. These commands do not grant release authority.
+
+The normal reviewed governance release and default-branch workflow registration,
+actual Linux known-workload sampling and one bounded WebKit startup capture remain
+hosted prerequisites until observed. Local Mac native controls, generated source
+patches, package-byte verification and fake-GitHub process tests establish none of
+those hosted outcomes or a causal product repair.
 
 Local locks/hooks and signed bundles enforce supported paths, not arbitrary
 writer/admin actions. A writer can replace Git metadata, keys, manifests or code;

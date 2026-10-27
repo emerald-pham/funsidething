@@ -54,7 +54,22 @@ try {
       data = args.includes("--input")
         ? JSON.parse(fs.readFileSync(0, "utf8"))
         : {};
-    if (endpoint.endsWith("/comments"))
+    const apiPath = "/" + endpoint.split("/").slice(3).join("/");
+    if (method === "GET" && Object.hasOwn(state.http ?? {}, apiPath))
+      output = state.http[apiPath];
+    else if (method === "POST" && endpoint.includes("/statuses/")) {
+      const field = (name) => args[args.indexOf("-f", args.indexOf(name)) + 1];
+      const pairs = args
+        .filter((v, i) => args[i - 1] === "-f")
+        .map((v) => v.split(/=(.*)/s).slice(0, 2));
+      const status = Object.fromEntries(pairs);
+      status.created_at = "2026-10-27T00:00:00Z";
+      const sha = endpoint.split("/").at(-1);
+      state.normalStatuses ??= {};
+      (state.normalStatuses[sha] ??= []).push(status);
+      state.publications++;
+      output = status;
+    } else if (endpoint.endsWith("/comments"))
       output = [state.issues[endpoint.split("/").at(-2)].comments];
     else if (endpoint.includes("/git/ref/")) {
       const ref = "refs/" + endpoint.split("/git/ref/")[1];

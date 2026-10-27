@@ -13273,6 +13273,101 @@
       "file": "scripts/agent-tools/test-groups.test.mjs"
     },
     {
+      "root": "a nonqualifying receipt binds independently reviewed protected governance separately from diagnostic source",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "diagnostic dispatch selects the protected governance default ref and rejects a moved head before any write",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "a changed protected default head cannot publish any diagnostic reservation objects or dispatch",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "independent CI claim binds actual main governance run while retaining distinct diagnostic source",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "a source-headed diagnostic workflow cannot impersonate protected main governance or write a claim",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "actual diagnostic descendant retains truthful governance metadata and receives no publication credentials",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "terminal consumption binds governance run and artifact head separately from admitted app source",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "environment-only diagnostic descendant forgery cannot launch through the public source host guard",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "a verified child consumes its inherited authorization once and cannot replay it",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "actual inherited channels reject wrong stale and non-governance parent contexts before runtime",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "Node injection configuration cannot publish a claim or start a diagnostic descendant",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "the literal workflow node invocation retains a valid kernel-bound parent channel",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "the actual native capture consumer retains symbolized stacks for its fixed known workload",
+      "group": "native-process",
+      "file": "scripts/agent-tools/native-attribution.test.mjs"
+    },
+    {
+      "root": "fresh native verification rejects invented complete attribution and retained source, sample, clock and symbol loss",
+      "group": "native-process",
+      "file": "scripts/agent-tools/native-attribution.test.mjs"
+    },
+    {
+      "root": "the public native toolchain verifier refuses a missing pinned ELF closure",
+      "group": "native-process",
+      "file": "scripts/agent-tools/native-attribution.test.mjs"
+    },
+    {
+      "root": "RISK repository process: protected diagnostic governance remains distinct from frozen app source",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: native diagnostic captures remain bounded and missing attribution never qualifies a repair",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "the fixed Linux native control reproduces its reviewed executable and independently named hot loop",
+      "group": "native-process",
+      "file": "scripts/agent-tools/native-attribution.test.mjs"
+    },
+    {
+      "root": "concurrent winning CI runners retain one actual authorized child identity and no duplicate runtime",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
       "root": "test group browser runtime preflight runs exactly the newly assigned roots in a scrubbed child",
       "group": "native-process",
       "file": "scripts/agent-tools/test-groups.test.mjs"
