@@ -27,7 +27,7 @@ jobs:
         with:
           node-version: '22'
       - name: Enforce CI reuse contract
-        run: node --test --test-name-pattern='^test group workflow consumer forbids duplicate execution for a verified input pass$|^workflow emulator gate reuses a verified pass and executes an uncovered gate$' scripts/agent-tools/test-groups.test.mjs scripts/agent-tools/ci-routing.test.mjs
+        run: node --test --test-name-pattern='^test group workflow consumer forbids duplicate execution for a verified input pass$|^workflow emulator gate reuses a verified pass and executes an uncovered gate$|^workflow reuses an independently passed gate on main for the same complete inputs$|^workflow partial retries preserve successful gates and invalidate a later failed execution$' scripts/agent-tools/test-groups.test.mjs scripts/agent-tools/ci-routing.test.mjs
       - name: Resolve comparison base
         id: diff-base
         shell: bash

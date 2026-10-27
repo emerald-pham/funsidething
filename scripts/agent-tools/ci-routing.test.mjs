@@ -116,12 +116,14 @@ function publishedInputPass(f, plan, gates = ['core']) {
       { name: `Execute CI gate ${gate} input ${plan.inputKeys?.[gate] || '0'.repeat(64)}`, status: 'completed', conclusion: 'success' },
       { name: `Completed CI gate ${gate} input ${plan.inputKeys?.[gate] || '0'.repeat(64)} result ${'8'.repeat(64)}`, status: 'completed', conclusion: 'success' },
     ] }))];
+  github.jobs=github.jobs.reduce((jobs,job)=>{const existing=jobs.find(item=>item.name===job.name);if(existing)existing.steps.push(...job.steps);else jobs.push(job);return jobs;},[]);
   github.commits = { [f.merge]: github.merge };
   for(const job of github.jobs){
     job.started_at='2026-10-27T10:00:00Z';job.completed_at='2026-10-27T10:01:00Z';
     for(const step of job.steps){step.started_at='2026-10-27T10:00:10Z';step.completed_at=step.name.startsWith('Completed CI gate ')?'2026-10-27T10:00:50Z':'2026-10-27T10:00:11Z';}
   }
   attachInputArtifacts(f,github,github.jobs);
+  github.attempts={'71/1':{...github.runs[0],run_attempt:1,conclusion:'failure'}};github.jobsByAttempt={'71/attempts/1':[]};
   writeFileSync(f.external, JSON.stringify(github));
   return github;
 }
@@ -135,7 +137,7 @@ function attachInputArtifacts(f,github,jobs){
     const stdout='TAP version 13\n# tests 24\n# pass 24\n# fail 0\n# cancelled 0\n# skipped 0\n';
     writeFileSync(path.join(directory,prefix,'stdout.tap'),stdout);writeFileSync(path.join(directory,prefix,'stderr.log'),'');
     const native='{"status":"passed","mode":"original"}\n';writeFileSync(path.join(directory,prefix,'native/original.json'),native);
-    const report={status:'passed',resultIdentity:{repository:'fixture/repo',runId:String(job.run_id),runAttempt:String(job.run_attempt),sourceSha:job.head_sha,checkoutSha:f.merge,checkoutTree:f.tree,comparisonBase:f.base,selectedGroup:gate,checkoutDirty:false},
+    const report={status:'passed',resultIdentity:{repository:'fixture/repo',runId:String(job.run_id),runAttempt:emulator?String(job.run_attempt):Number(job.run_attempt),sourceSha:job.head_sha,checkoutSha:f.merge,checkoutTree:f.tree,comparisonBase:f.base,selectedGroup:gate,checkoutDirty:false},
       issues:[],cases:[{id:'original fixture case',status:'passed'}],artifacts:[{path:'native/original.json',bytes:Buffer.byteLength(native),sha256:hash(native)}],process:{exitCode:0,signal:null,spawnError:null,stdout:{path:'stdout.tap',sha256:hash(stdout)},stderr:{path:'stderr.log',sha256:hash('')},stdoutSha256:hash(stdout),stderrSha256:hash('')},tests:24,passed:24};
     const bytes=JSON.stringify(report);writeFileSync(path.join(directory,prefix,'result.json'),bytes);
     marker.name=marker.name.replace(/result [a-f0-9]{64}$/,`result ${hash(bytes)}`);
@@ -217,6 +219,32 @@ test('workflow rerun reuses an original successful gate from its own earlier att
   assert.equal(rerun.record.inputPasses.core.coveredBy.runId,'71');
 });
 
+test('workflow partial retries preserve successful gates and invalidate a later failed execution',async parent=>{
+  for(const [name,failedGate]of [['later group failure','core'],['later emulator failure','rules'],['successful subset','compatibility']])await parent.test(name,t=>{
+    const f=fixture(t),plan=invoke(f,{event:'pull_request',ref:'refs/pull/17/merge',checkout:f.merge,planOnly:true});
+    const github=publishedInputPass(f,plan.record,['core','rules','compatibility']);
+    const original=structuredClone(github.runs[0]),initialJobs=structuredClone(github.jobs);
+    // A failed-job/specific-job retry omits the already successful dependency.
+    github.runs[0]={...original,run_attempt:3,conclusion:failedGate==='compatibility'?'success':'failure'};
+    github.attempts={'71/2':original,'71/1':{...original,run_attempt:1,conclusion:'failure'}};
+    github.jobsByAttempt={'71/attempts/1':[],'71/attempts/2':initialJobs};
+    const job=structuredClone(initialJobs.find(job=>job.name===(failedGate==='core'?'regression-core':'event-gates')));
+    job.id=801;job.run_attempt=3;job.started_at='2026-10-27T11:00:00Z';job.completed_at='2026-10-27T11:01:00Z';
+    job.steps=[{name:`Execute CI gate ${failedGate} input ${plan.record.inputKeys[failedGate]}`,status:'completed',conclusion:'success',started_at:job.started_at,completed_at:job.started_at}];
+    job.conclusion=failedGate==='compatibility'?'success':'failure';
+    if(failedGate==='compatibility')job.steps.push({name:`Completed CI gate compatibility input ${plan.record.inputKeys.compatibility} result ${'8'.repeat(64)}`,status:'completed',conclusion:'success',started_at:'2026-10-27T11:00:45Z',completed_at:'2026-10-27T11:00:50Z'});
+    github.jobs=[job];
+    const olderPass=initialJobs.map(job=>({...structuredClone(job),id:job.id+100,run_id:72,run_attempt:1}));
+    attachInputArtifacts(f,github,olderPass);github.runs.push({...original,id:72,run_attempt:1});github.jobsByRun={72:olderPass};
+    if(failedGate==='compatibility'){attachInputArtifacts(f,github,[job]);const a=github.artifacts.find(a=>a.name==='event-gates-71-3');a.created_at='2026-10-27T11:00:45Z';}
+    writeFileSync(f.external,JSON.stringify(github));
+    const main=invoke(f,{ref:'refs/heads/main',checkout:f.merge,source:f.merge});assert.equal(main.status,0,main.stderr);
+    assert.ok(main.record.inputPasses[failedGate==='rules'?'compatibility':'rules'],'the independently successful earlier gate must remain reusable');
+    if(failedGate==='compatibility')assert.equal(main.record.inputPasses.compatibility?.coveredBy.runAttempt,'3','a successful subset can use its original immutable validation context');
+    else assert.equal(main.record.inputPasses[failedGate],undefined,'a later failed subset execution must invalidate the older pass even without rerunning validation-context');
+  });
+});
+
 test('workflow input reuse rejects changed inputs and uncertain original evidence', async parent => {
   const scenarios=[
     ['changed candidate bytes',(_x,f)=>({checkout:f.base,source:f.base})],
@@ -256,6 +284,7 @@ test('workflow input reuse orders actual gate executions across rerun IDs', asyn
   ])await parent.test(name,t=>{
     const f=fixture(t),plan=invoke(f,{event:'pull_request',ref:'refs/pull/17/merge',checkout:f.merge,planOnly:true});
     const github=publishedInputPass(f,plan.record);
+    github.attempts['71/2']={...github.runs[0]};github.jobsByAttempt['71/attempts/2']=structuredClone(github.jobs);
     const passed=github.jobs.map(job=>({...structuredClone(job),id:job.id+10,run_id:72,run_attempt:1}));
     attachInputArtifacts(f,github,passed);
     const failed=github.jobs.map(job=>({...structuredClone(job),run_attempt:3,...(job.name==='regression-core'?{conclusion:'failure',started_at:start,completed_at:end,steps:job.steps.filter(step=>!step.name.startsWith('Completed CI gate ')).map(step=>({...step,started_at:start,completed_at:start}))}:{})}));

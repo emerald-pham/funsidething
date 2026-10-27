@@ -45,54 +45,61 @@ export function findInputPasses(record, readApi, verifyArtifact) {
     ['push', 'pull_request'].includes(run.event) && ['completed','in_progress'].includes(run.status) &&
     run.path === '.github/workflows/data-safety.yml' && run.name === 'Data safety' &&
     run.repository?.full_name === inputs.repository && run.head_repository?.full_name === inputs.repository;
-  const runs = response.workflow_runs.filter(eligible).sort((a,b)=>Number(b.id)-Number(a.id)).slice(0,16).flatMap(run => {
-    if(String(run.id)!==record.runId)return [run];
-    if(String(run.run_attempt)!==record.runAttempt||run.head_sha!==record.validationContext.sourceSha)return [];
-    return Array.from({length:Math.min(8,Number(record.runAttempt)-1)},(_unused,index)=>({...run,priorAttempt:Number(record.runAttempt)-1-index}));
-  });
-  for (let run of runs) {
-    if(run.priorAttempt){
-      const id=run.id,attempt=run.priorAttempt;
-      run=readApi(`actions/runs/${id}/attempts/${attempt}`);
-      if(!eligible(run)||String(run.id)!==String(id)||Number(run.run_attempt)!==attempt) throw new Error('Prior attempt identity is unavailable.');
+  const timestamp=value=>typeof value==='string'&&/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z$/.test(value)?Date.parse(value):NaN;
+  const commits=new Map();
+  for(const latest of response.workflow_runs.filter(eligible).sort((a,b)=>Number(b.id)-Number(a.id)).slice(0,16)){
+    const own=String(latest.id)===record.runId;
+    if(own&&(String(latest.run_attempt)!==record.runAttempt||latest.head_sha!==record.validationContext.sourceSha))continue;
+    const attempts=own?[]:[latest];
+    for(let attempt=Number(latest.run_attempt)-1;attempt>=Math.max(1,Number(latest.run_attempt)-8);attempt--){
+      const previous=readApi(`actions/runs/${latest.id}/attempts/${attempt}`);
+      if(!eligible(previous)||String(previous.id)!==String(latest.id)||Number(previous.run_attempt)!==attempt||previous.head_sha!==latest.head_sha||previous.event!==latest.event)throw new Error('Prior attempt identity is unavailable.');
+      attempts.push(previous);
     }
-    const result = readApi(`actions/runs/${run.id}/attempts/${run.run_attempt}/jobs?per_page=100`);
-    if (!Array.isArray(result.jobs) || result.total_count !== result.jobs.length) throw new Error('CI producer job inventory is incomplete.');
-    const belongs = job => String(job.run_id) === String(run.id) && String(job.run_attempt) === String(run.run_attempt) && job.head_sha === run.head_sha;
-    const contexts = result.jobs.filter(job => job.name === 'validation-context' && belongs(job) && job.status === 'completed' && job.conclusion === 'success');
-    if (contexts.length !== 1) continue;
-    const steps = contexts[0].steps || [];
-    const checkouts = steps.filter(successful).map(step => step.name.match(/^Actual checkout ([a-f0-9]{40}) tree ([a-f0-9]{40})$/)).filter(Boolean);
-    const sources = steps.filter(successful).map(step => step.name.match(/^Validation source ([a-f0-9]{40}) base ([a-f0-9]{40})$/)).filter(Boolean);
-    if (checkouts.length !== 1 || sources.length !== 1 || checkouts[0][2] !== inputs.checkoutTree || sources[0][1] !== run.head_sha || sources[0][2] !== inputs.comparisonBase) continue;
-    const matched = CI_GATES.filter(gate => result.jobs.some(job => belongs(job) && job.name === (['rules','compatibility'].includes(gate) ? 'event-gates' : 'regression-' + gate) &&
-      (job.steps || []).some(step => successful(step) && step.name === `Execute CI gate ${gate} input ${record.inputKeys[gate]}`)));
-    if (!matched.length) continue;
-    const checkoutSha = checkouts[0][1];
-    const commit = readApi(`git/commits/${checkoutSha}`);
-    if (commit.sha !== checkoutSha || commit.tree?.sha !== inputs.checkoutTree ||
-      (run.event === 'push' ? checkoutSha !== run.head_sha : commit.parents?.length !== 2 || commit.parents[0]?.sha !== inputs.comparisonBase || commit.parents[1]?.sha !== run.head_sha)) continue;
-    for (const gate of matched) {
-      const jobs = result.jobs.filter(job => belongs(job) && job.name === (['rules','compatibility'].includes(gate) ? 'event-gates' : 'regression-' + gate));
-      const observation = {start: NaN, end: NaN};
-      observations[gate].push(observation);
-      if(jobs.length !== 1) continue;
-      const admissions=(jobs[0].steps||[]).filter(step=>successful(step)&&step.name===`Execute CI gate ${gate} input ${record.inputKeys[gate]}`);
-      if(admissions.length !== 1) continue;
-      const timestamp=value=>typeof value==='string'&&/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z$/.test(value)?Date.parse(value):NaN;
-      const jobStart=timestamp(jobs[0].started_at),jobEnd=timestamp(jobs[0].completed_at);
-      observation.start=timestamp(admissions[0].completed_at);observation.end=jobEnd;
-      if(!(jobStart<=observation.start&&observation.start<=jobEnd)) {observation.start=NaN;continue;}
-      const gatePassedJob=jobs.length===1&&(jobs[0].conclusion==='success'||(['rules','compatibility'].includes(gate)&&jobs[0].conclusion==='failure'));
-      if (!gatePassedJob || !decimal(jobs[0].id) || jobs[0].status !== 'completed') continue;
-      const markers = (jobs[0].steps || []).filter(step => successful(step) && new RegExp(`^Completed CI gate ${gate} input ${record.inputKeys[gate]} result [a-f0-9]{64}$`).test(step.name));
-      if (markers.length !== 1) continue;
-      const completion=timestamp(markers[0].completed_at);
-      if(!(observation.start<=completion&&completion<=jobEnd))continue;
-      observation.end=completion;observation.job=jobs[0];
-      observation.pass = { kind: 'ci-input-pass-v1', inputs, inputKey: record.inputKeys[gate], gate,
-        coveredBy: { runId: String(run.id), runAttempt: String(run.run_attempt), jobId: String(jobs[0].id), sourceSha: run.head_sha,
-          checkoutSha, checkoutTree: inputs.checkoutTree, comparisonBase: inputs.comparisonBase, resultSha256: markers[0].name.split(' result ')[1] } };
+    const inventories=attempts.map(run=>{
+      const result=readApi(`actions/runs/${run.id}/attempts/${run.run_attempt}/jobs?per_page=100`);
+      if(!Array.isArray(result.jobs)||result.total_count!==result.jobs.length)throw new Error('CI producer job inventory is incomplete.');
+      const belongs=job=>String(job.run_id)===String(run.id)&&String(job.run_attempt)===String(run.run_attempt)&&job.head_sha===run.head_sha;
+      const contexts=result.jobs.filter(job=>job.name==='validation-context'&&belongs(job));
+      let context;
+      if(contexts.length===1&&contexts[0].status==='completed'&&contexts[0].conclusion==='success'){
+        const steps=(contexts[0].steps||[]).filter(successful);
+        const checkouts=steps.map(step=>step.name.match(/^Actual checkout ([a-f0-9]{40}) tree ([a-f0-9]{40})$/)).filter(Boolean);
+        const sources=steps.map(step=>step.name.match(/^Validation source ([a-f0-9]{40}) base ([a-f0-9]{40})$/)).filter(Boolean);
+        if(checkouts.length===1&&sources.length===1&&checkouts[0][2]===inputs.checkoutTree&&sources[0][1]===run.head_sha&&sources[0][2]===inputs.comparisonBase)context={checkoutSha:checkouts[0][1]};
+      }
+      return {run,jobs:result.jobs.filter(belongs),contexts:contexts.length,context};
+    });
+    for(const inventory of inventories){
+      const {run,jobs}=inventory;
+      // Subset retries omit successful dependencies. Their immutable run event
+      // retains the earlier validation context; they still contribute failures
+      // even when that context cannot be recovered.
+      const context=inventory.context||(inventory.contexts===0?inventories.find(previous=>Number(previous.run.run_attempt)<Number(run.run_attempt)&&previous.context)?.context:null);
+      for(const gate of CI_GATES){
+        const matches=jobs.filter(job=>job.name===(['rules','compatibility'].includes(gate)?'event-gates':'regression-'+gate));
+        const admissionName=`Execute CI gate ${gate} input ${record.inputKeys[gate]}`;
+        if(!matches.some(job=>(job.steps||[]).some(step=>successful(step)&&step.name===admissionName)))continue;
+        const observation={start:NaN,end:NaN};observations[gate].push(observation);
+        if(matches.length!==1)continue;
+        const job=matches[0],admissions=(job.steps||[]).filter(step=>successful(step)&&step.name===admissionName);
+        if(admissions.length!==1)continue;
+        const jobStart=timestamp(job.started_at),jobEnd=timestamp(job.completed_at);
+        observation.start=timestamp(admissions[0].completed_at);observation.end=jobEnd;
+        if(!(jobStart<=observation.start&&observation.start<=jobEnd)){observation.start=NaN;continue;}
+        if(!context)continue;
+        const checkoutSha=context.checkoutSha;
+        if(!commits.has(checkoutSha))commits.set(checkoutSha,readApi(`git/commits/${checkoutSha}`));
+        const commit=commits.get(checkoutSha);
+        if(commit.sha!==checkoutSha||commit.tree?.sha!==inputs.checkoutTree||(run.event==='push'?checkoutSha!==run.head_sha:commit.parents?.length!==2||commit.parents[0]?.sha!==inputs.comparisonBase||commit.parents[1]?.sha!==run.head_sha))continue;
+        if(!decimal(job.id)||job.status!=='completed'||!(job.conclusion==='success'||(['rules','compatibility'].includes(gate)&&job.conclusion==='failure')))continue;
+        const markers=(job.steps||[]).filter(step=>successful(step)&&new RegExp(`^Completed CI gate ${gate} input ${record.inputKeys[gate]} result [a-f0-9]{64}$`).test(step.name));
+        if(markers.length!==1)continue;
+        const completion=timestamp(markers[0].completed_at);
+        if(!(observation.start<=completion&&completion<=jobEnd))continue;
+        observation.end=completion;observation.job=job;
+        observation.pass={kind:'ci-input-pass-v1',inputs,inputKey:record.inputKeys[gate],gate,coveredBy:{runId:String(run.id),runAttempt:String(run.run_attempt),jobId:String(job.id),sourceSha:run.head_sha,checkoutSha,checkoutTree:inputs.checkoutTree,comparisonBase:inputs.comparisonBase,resultSha256:markers[0].name.split(' result ')[1]}};
+      }
     }
   }
   // Run IDs describe creation order. An old run can be retried after a newer

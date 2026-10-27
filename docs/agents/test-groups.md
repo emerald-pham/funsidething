@@ -143,8 +143,10 @@ aggregation can accept that fresh execution alongside earlier coverage.
 Changes to any keyed input require execution. This is deliberately
 conservative: unrelated tracked changes also invalidate the key.
 
-The router observes up to 16 recent workflow runs and eight earlier attempts of
-the current run, within a 96-request API budget. It accepts repository-local
+The router observes up to 16 recent workflow runs and eight earlier attempts per
+run, within a 96-request API budget. Subset retries retain their earlier immutable
+validation context and contribute later failures even when that dependency is
+not repeated. It accepts repository-local
 push/PR jobs only, independently verifies their Git checkout/tree/base, and pins
 the original run, attempt, job and result digest. A unique successful execution
 admission and completion marker are required. The marker follows result upload;

@@ -38,7 +38,7 @@ export function originalArtifactVerifier(readApi){
     };
     const report=JSON.parse(read('result.json',original.resultSha256).toString('utf8'));
     const identity=report.resultIdentity;
-    for(const key of ['runId','runAttempt','sourceSha','checkoutSha','checkoutTree','comparisonBase'])if(identity?.[key]!==original[key])throw new Error('Original result identity changed: '+key);
+    for(const key of ['runId','runAttempt','sourceSha','checkoutSha','checkoutTree','comparisonBase'])if(['runId','runAttempt'].includes(key)?String(identity?.[key])!==original[key]:identity?.[key]!==original[key])throw new Error('Original result identity changed: '+key);
     if(identity.repository!==pass.inputs.repository||identity.selectedGroup!==gate||identity.checkoutDirty!==false||report.status!=='passed'||report.coverage||report.process?.exitCode!==0||report.process.signal||report.process.error||report.process.spawnError)throw new Error('Original result is not a clean successful execution.');
     if(emulator){
       if(!(report.tests>=(gate==='rules'?24:15))||report.tests!==report.passed)throw new Error('Original emulator cohort is incomplete.');
