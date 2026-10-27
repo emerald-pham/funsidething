@@ -240,7 +240,7 @@ function classifyRun(run, policy = null) {
     const base=source[0].split(' ').at(-1),digest=context[0].split(' ').at(-1);
     if(policy.comparisonBase&&base!==policy.comparisonBase)return classification('failure',1,'Announced PR comparison base differs from actual merge parent.');
     const steps=(byName.get('scanner-tests').steps||[]).filter(step=>step.conclusion==='success').map(step=>step.name);
-    const verified=steps.filter(name=>new RegExp(`^Verified complete cohort ${digest} report [a-f0-9]{64} mode (full|reuse)$`).test(name));
+    const verified=steps.filter(name=>new RegExp(`^Verified complete cohort ${digest} report [a-f0-9]{64} mode (full|reuse|policy-reuse)$`).test(name));
     if(!steps.includes('Verify complete required cohort')||verified.length!==1)return classification('failure',1,'Required verified aggregate attestation is missing or ambiguous.');
     const words=verified[0].split(' '),report=words[5],mode=words[7];
     if(mode==='full'&&steps.filter(name=>name===`Complete regression context ${digest} report ${report}`).length!==1)return classification('failure',1,'Required full producer completion attestation is missing.');

@@ -2293,3 +2293,8 @@ Existing catalog assignments mark the five confirmed roots as early execution wh
 - `RISK repository process: distributed diagnostic admission binds actual terminal failure without product qualification`
 
 The existing checkpoint process contract now includes an API-consistent owner approval append and rejection of an unrelated concurrent scope change. Narrow diagnostic tests use disposable repositories and a bounded fake external GitHub CLI; they prove local command/ref/process behavior, not hosted execution, native attribution, product qualification or physical-device repair.
+
+
+- RISK repository process: metadata observation preserves bound producer outcomes without duplicate execution
+
+The actual routing CLI binds complete source/checkout/tree/base/policy/cohort/runtime identity and original full-producer admission before retaining pending, failure, cancellation or unresolved evidence. Fresh-process resumption pins that producer despite newer successful history and restores saved nonsecret inputs after interruption. Literal workflow routing/admission commands under the controlled external scheduler count real isolated npm callbacks once; the literal required aggregate accepts honest coverage references and rejects pending/cancelled/unresolved or stale proof. The wrapper clears NODE_TEST_CONTEXT and requires named successful TAP outcomes. Hosted GitHub event/scheduler and final qualification remain separate parent-owned proof.

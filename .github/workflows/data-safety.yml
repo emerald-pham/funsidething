@@ -5,6 +5,12 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, edited]
 
+# Equivalent PR events serialize admission; a metadata edit cannot cancel the
+# admitted producer. Routing still verifies its exact durable context/outcome.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
 env:
   CHAIN_CI_TOPOLOGY: four-groups-v1
   CHAIN_TEST_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -122,6 +128,9 @@ jobs:
       - name: Resolve complete cohort coverage
         id: route
         run: node scripts/agent-tools/ci-routing.mjs --descriptor "$RUNNER_TEMP/validation/descriptor/descriptor.json" --comparison-base "${{ needs.validation-context.outputs.base }}" --evidence-dir "$RUNNER_TEMP/ci-routing"
+      - name: Admit original full producer context ${{ needs.validation-context.outputs.context }}
+        if: success() && steps.route.outputs.decision == 'full'
+        run: echo "Original complete cohort admitted; references never emit this marker"
       - name: Preserve routing observations
         if: always()
         uses: actions/upload-artifact@v4

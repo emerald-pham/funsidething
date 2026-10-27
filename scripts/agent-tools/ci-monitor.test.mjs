@@ -492,6 +492,7 @@ test('parallel workflow observation preserves complete missing skipped canceled 
   const scenarios=[
     ['complete full cohort',()=>{},0,'success'],
     ['complete covered cohort',run=>{run.jobs.find(job=>job.name==='scanner-tests').steps=run.jobs.find(job=>job.name==='scanner-tests').steps.filter(step=>!step.name.startsWith('Complete regression')).map(step=>({...step,name:step.name.replace('mode full','mode reuse')}));},0,'success'],
+    ['complete policy covered cohort',run=>{run.jobs.find(job=>job.name==='scanner-tests').steps=run.jobs.find(job=>job.name==='scanner-tests').steps.filter(step=>!step.name.startsWith('Complete regression')).map(step=>({...step,name:step.name.replace('mode full','mode policy-reuse')}));},0,'success'],
     ['absent verified aggregate marker',run=>{run.jobs.find(job=>job.name==='scanner-tests').steps=[];},1,'failure'],
     ['absent core group',run=>{run.jobs=run.jobs.filter(job=>job.name!=='regression-core');},1,'failure'],
     ['skipped group',run=>{run.jobs.find(job=>job.name==='regression-core').conclusion='skipped';},1,'failure'],
