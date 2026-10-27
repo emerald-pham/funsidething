@@ -1226,6 +1226,71 @@ test('preserves adjacent nested TAP records across multiline secret redaction', 
   assert.equal(record.execution.exitCode, 0);
 });
 
+test('reconciles nested token and ordinary cases and keeps corrected redacted evidence immutable', async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'record-tap-nested-outcomes-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(temp);
+  const evidence = path.join(temp, 'evidence');
+  const secret = 'NESTED-TAP-SECRET-661c';
+  const testFile = path.join(repo, 'nested-outcomes.test.mjs');
+  await writeFile(testFile, `import { test } from 'node:test';\nimport assert from 'node:assert/strict';\ntest('token parent result', async (t) => {\n  await t.test('ordinary child', () => {});\n  await t.test('token failure child', (child) => {\n    child.diagnostic('"password": "${secret}"');\n    assert.fail('controlled nested assertion');\n  });\n});\n`);
+
+  const run = (purpose, extraOptions = []) => invokeRecorder({
+    repo,
+    evidence,
+    purpose,
+    command: node,
+    args: ['--test', '--test-reporter=tap', testFile],
+    extraOptions: ['--summary', ...extraOptions],
+  });
+  const first = run('green');
+
+  assert.equal(first.status, 1, first.stderr);
+  const firstSummary = summaryFrom(first);
+  assert.equal(firstSummary.status, 'failed');
+  assert.equal(firstSummary.outcome, 'assertion-failure');
+  assert.deepEqual(firstSummary.child, { exitCode: 1, signal: null });
+  const firstMetadataPath = firstSummary.evidence.metadataPath;
+  const firstStdoutPath = firstSummary.evidence.stdoutPath;
+  const firstStderrPath = firstSummary.evidence.stderrPath;
+  const firstBytes = await readFile(firstMetadataPath);
+  const firstStdout = await readFile(firstStdoutPath);
+  const firstStderr = await readFile(firstStderrPath);
+  const firstRecord = JSON.parse(firstBytes.toString('utf8'));
+  const firstTap = firstStdout.toString('utf8');
+  const cases = parseTap(firstTap).map(({ id, root, status, skipReason }) => ({ id, root, status, skipReason }));
+  assert.deepEqual(cases, [
+    { id: 'token parent result > ordinary child', root: 'token parent result', status: 'passed', skipReason: null },
+    { id: 'token parent result > token failure child', root: 'token parent result', status: 'failed', skipReason: null },
+    { id: 'token parent result', root: 'token parent result', status: 'failed', skipReason: null },
+  ]);
+  assert.match(firstTap, /^# tests 3$/m);
+  assert.match(firstTap, /^# pass 1$/m);
+  assert.match(firstTap, /^# fail 2$/m);
+  assert.equal(firstRecord.execution.outcome, 'assertion-failure');
+  assert.equal(firstRecord.execution.exitCode, 1);
+  for (const bytes of [firstBytes, firstStdout, firstStderr, Buffer.from(JSON.stringify(firstSummary))]) {
+    assert.equal(bytes.includes(secret), false, 'the first attempt must retain only redacted payloads');
+  }
+  const capturedSource = firstRecord.workingTree.sourceTestFiles.find((file) => file.path === 'nested-outcomes.test.mjs');
+  assert.ok(capturedSource);
+  assert.equal(capturedSource.content.includes(secret), false);
+
+  const correctionNote = 'Later controlled replay; original remains immutable.';
+  const corrected = run('later-baseline-sensitivity', ['--correction-of', firstRecord.id, '--correction-note', correctionNote]);
+  assert.equal(corrected.status, 1, corrected.stderr);
+  const correctedSummary = summaryFrom(corrected);
+  const correctedRecord = JSON.parse(await readFile(correctedSummary.evidence.metadataPath, 'utf8'));
+  assert.notEqual(correctedRecord.id, firstRecord.id);
+  assert.deepEqual(correctedRecord.correction, { originalRecordId: firstRecord.id, note: correctionNote });
+  assert.deepEqual(await readFile(firstMetadataPath), firstBytes);
+  assert.deepEqual(await readFile(firstStdoutPath), firstStdout);
+  assert.deepEqual(await readFile(firstStderrPath), firstStderr);
+  for (const file of await readdir(evidence)) {
+    assert.equal((await readFile(path.join(evidence, file))).includes(secret), false, `${file} must stay secret-free`);
+  }
+});
+
 test('opaque identity never exposes deleted binary or renamed sensitive diff payloads', async (t) => {
   const temp = await mkdtemp(path.join(os.tmpdir(), 'record-opaque-diffs-'));
   t.after(() => rm(temp, { recursive: true, force: true }));
