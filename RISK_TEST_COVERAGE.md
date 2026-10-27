@@ -2133,6 +2133,7 @@ This boundary control holds a successful real provider reply, installs a later a
 
 - RISK integrated automatic recovery: persisted multichunk sources retain pending ACK and true Done Undo through restart
 - RISK integrated automatic recovery native: persisted startup status and neighboring controls remain usable with one browser and isolated contexts
+- Requested output from the current startup consumer binds its named pending status and neighboring Review control to the shared bounded paint/mutation/frame observation, exact viewport and ordinary/enlarged measurements, platform-font observation, and saved PNG bytes. A theme flip that reverts during capture must fail metrics while retaining separately verified image integrity; `CHAIN_RECOVERY_UI_OUTPUT` stays optional and the report leaves visual judgment unverified.
 - RISK integrated automatic recovery: a failed current read cannot hide the healthy previous source
 
 - RISK automatic source status: completed confirmation follows current edits and signed-in identity
