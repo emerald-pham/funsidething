@@ -45323,3 +45323,184 @@ test('RISK repository process: diagnostic checkpoints retain finite authority ac
  assert.match(result.stdout,/^# tests 13$/m,'the actual thirteen process contracts must execute, rather than an empty child pass');
  assert.match(result.stdout,/^# pass 13$/m);assert.match(result.stdout,/^# skipped 0$/m);
 });
+
+
+test('RISK repository process: early startup failure blocks costly CI without counting blocked coverage',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const child=spawnSync(process.execPath,['--test','--test-reporter=tap','scripts/agent-tools/early-ci.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:120000});
+ assert.equal(child.status,0,'Public early-stage process contracts must pass: '+child.stdout+child.stderr);
+ assert.match(child.stdout,/# Subtest: early CI public command preserves durable predecessor authority/,'Required actual process assertions must execute');
+});
+
+test('RISK repository process: Playwright waitForFunction predicates are synchronous',()=>{
+ const source=fs.readFileSync(fileURLToPath(import.meta.url),'utf8');
+ const asyncWaitCalls=[...source.matchAll(/\.waitForFunction\s*\(\s*async\b/g)].map(match=>source.slice(0,match.index).split('\n').length);
+ assert.deepEqual(asyncWaitCalls,[],'waitForFunction predicates must be synchronous; await storage reads through a bounded Node probe. Found lines: '+asyncWaitCalls.join(', '));
+});
+
+test('RISK scenery backdrop cache: first unchanged lighting timer reuses actual pixels while changed slots and loaded copy still paint',async t=>{
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});const directory=fs.mkdtempSync(path.join(base,'painted-slot-'));
+ const playwright=await import('playwright'),launch=playwright.webkit.launch,{runButtonSafety}=await import('./scripts/button-safety-native.mjs');
+ const evidence={kind:'nonqualifying-deterministic-renderer-consumer',route:[],limits:['Local uncapped emulated mobile rendering and exact pixel/source preservation; no hosted memory/timing or physical-device claim.']},finished=Error('Causal painted-slot probe complete; not native acceptance');let releaseBank,probeError;
+ const gate=new Promise(resolve=>{releaseBank=resolve;});
+ t.after(()=>{releaseBank();playwright.webkit.launch=launch;});
+ playwright.webkit.launch=async(...args)=>{
+  const browser=await launch.apply(playwright.webkit,args),newContext=browser.newContext.bind(browser);browser.newContext=async(...args)=>{
+   const context=await newContext(...args),newPage=context.newPage.bind(context);context.newPage=async(...args)=>{
+    const page=await newPage(...args),goto=page.goto.bind(page);await page.addInitScript(()=>{const NativeDate=Date;globalThis.__paintedSlotAt=Date.parse('2026-10-06T03:23:42.125Z');globalThis.Date=class extends NativeDate{constructor(...args){super(...(args.length?args:[globalThis.__paintedSlotAt]));}static now(){return globalThis.__paintedSlotAt;}};});
+    await page.route('**/HUMAN_WRITTEN_HOURLY_TAGS.md',async route=>{await gate;const response=await route.fetch(),original=await response.text(),body=original+'\n## Any time of day\n- Controlled scenery text\n## Skywriters\n- HELLO\n';const hash=value=>createHash('sha256').update(value).digest('hex');evidence.bankRoute={originalSha256:hash(original),fixtureSha256:hash(body)};await route.fulfill({response,body});});
+    await page.route('**/landscape.js',async route=>{
+     const response=await route.fetch();assert.equal(response.status(),200);let body=await response.text();const hash=value=>createHash('sha256').update(value).digest('hex');assert.equal(hash(body),hash(fs.readFileSync(path.join(__dirname,'landscape.js'))));
+     const anchor="  window.addEventListener('pageshow'",ready="  document.dispatchEvent(new CustomEvent('landscape-scene-time-ready'));";assert.ok(body.includes(anchor)&&body.includes(ready));
+     const instrumentation=`
+      const cacheProbe={backgrounds:0,lives:0};globalThis.paintedSlotProbe=cacheProbe;
+      const paintBackdrop=paintBackground,paintVisitors=paintLife;paintBackground=(...args)=>{const result=paintBackdrop(...args);cacheProbe.backgrounds++;return result;};paintLife=(...args)=>{const result=paintVisitors(...args);cacheProbe.lives++;return result;};
+      cacheProbe.read=()=>({backgrounds:cacheProbe.backgrounds,lives:cacheProbe.lives,slot:sceneSnapshot.windowsSlot,paintedSlot:lastCitySlot,back:back.toDataURL(),status:status.textContent,scene:JSON.parse(JSON.stringify(sceneSnapshot))});
+      cacheProbe.advance=()=>{advanceRooftopParty(1);return cacheProbe.read();};cacheProbe.repaint=()=>{refreshSky();return cacheProbe.read();};
+     `;
+     const sourceSha256=hash(body);body=body.replace(anchor,instrumentation+'\n'+anchor).replace(ready,"  paintedSlotProbe.initial=paintedSlotProbe.read();paintedSlotProbe.unchanged=paintedSlotProbe.advance();\n"+ready);
+     evidence.route.push({sourceSha256,injectedSha256:hash(body),bytes:Buffer.byteLength(body)});await route.fulfill({response,body});
+    });
+    page.goto=async(url,...args)=>{
+     const response=await goto(url,...args);if(url.endsWith('__button-observer'))return response;
+     try{
+      await page.waitForFunction(()=>window.paintedSlotProbe?.unchanged&&document.documentElement.dataset.appReady==='true'&&window.CloudSync?.ready,null,{polling:100});
+      evidence.before=await page.evaluate(()=>{const p=paintedSlotProbe;return{initial:p.initial,unchanged:p.unchanged,taskCount:state.tasks.length,bankPending:p.read().status===''};});
+      releaseBank();await page.waitForFunction(()=>document.getElementById('sceneStatus').textContent.includes('Human written'),null,{polling:100});evidence.bank=await page.evaluate(()=>paintedSlotProbe.read());
+      evidence.changed=await page.evaluate(()=>{const before=paintedSlotProbe.read();globalThis.__paintedSlotAt+=8000;const after=paintedSlotProbe.advance(),fresh=paintedSlotProbe.repaint();return{before,after,fresh};});
+      evidence.stored=await page.evaluate(async()=>{const head=await ScannerDeviceStore.readHead(),saved=JSON.parse(head.payload);return{durableTasks:saved.tasks.length,retainedSources:await Promise.all((await ScannerDeviceStore.listBackups()).filter(row=>row.id.startsWith('gate-retained-')).sort((a,b)=>a.id.localeCompare(b.id)).map(async row=>({id:row.id,payloadHash:await ChainStorageV2.hashPayload(row.payload)}))),unknownBytes:saved.futurePopulated.opaque.length};});
+     }catch(error){probeError=error;}finally{releaseBank();}throw finished;
+    };return page;
+   };return context;
+  };return browser;
+ };
+ try{try{await runButtonSafety({repo:__dirname,engine:'webkit',port:Number(process.env.CHAIN_NATIVE_PORT||process.env.CHAIN_NATIVE_SMOKE_PORT||0),outputDir:directory,mobileYesMotion:'reduced'});assert.fail('Expected scenery probe completion');}catch(error){if(error!==finished)throw error;}}
+ finally{releaseBank();playwright.webkit.launch=launch;evidence.probeError=probeError?.stack;const files=fs.readdirSync(directory).filter(name=>/^button-safety-webkit-.*\.json$/.test(name));if(files.length===1){const native=JSON.parse(fs.readFileSync(path.join(directory,files[0])));evidence.nativeReportPath=path.join(directory,files[0]);evidence.cleanup=native.cleanup;evidence.preparedSources=native.retainedSources?.[0]?.bootstrap?.retainedSources?.map(({id,payloadHash})=>({id,payloadHash}));}
+  fs.writeFileSync(path.join(directory,'painted-slot-observation.json'),JSON.stringify(evidence,null,2)+'\n');}
+ if(probeError)throw probeError;
+ for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(evidence.cleanup?.[key],true);
+ const {initial,unchanged}=evidence.before;assert.equal(evidence.before.taskCount,400);assert.equal(evidence.stored.durableTasks,400);assert.equal(evidence.stored.unknownBytes,1048576);assert.equal(evidence.stored.retainedSources.length,2);assert.deepEqual(evidence.stored.retainedSources,evidence.preparedSources,'Both protected source payloads remain byte exact');
+ assert.equal(initial.backgrounds,1,'Initial full backdrop still paints once');assert.equal(unchanged.backgrounds,initial.backgrounds,'First unchanged lighting timer must reuse the backdrop already painted');assert.equal(unchanged.lives,initial.lives,'Unchanged Reduced membership must not redraw life');assert.equal(unchanged.back,initial.back,'The cached actual raster bytes remain exact');assert.deepEqual(unchanged.scene,initial.scene);
+ assert.equal(initial.paintedSlot,initial.slot,'The initial pixels record their actual lighting slot');assert.equal(evidence.before.bankPending,true);assert.match(evidence.bank.status,/Human written/);assert.equal(evidence.bank.back,initial.back,'Newly loaded copy retains the exact same fixed-time backdrop');
+ assert.notEqual(evidence.changed.before.slot,evidence.changed.after.slot,'Positive control advances the real lighting slot');assert.equal(evidence.changed.after.backgrounds,evidence.changed.before.backgrounds+1,'A genuinely changed slot must repaint');assert.equal(evidence.changed.after.paintedSlot,evidence.changed.after.slot);assert.equal(evidence.changed.fresh.backgrounds,evidence.changed.after.backgrounds+1,'Independent full refresh actually repaints');assert.equal(evidence.changed.after.back,evidence.changed.fresh.back,'Changed-slot pixels equal a complete refresh at the same instant, even when window states hold across slots');
+ t.diagnostic('Nonqualifying deterministic rendered consumer: '+directory);
+});
+
+test('RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh',async t=>{
+ for(const [motion,change] of [['reduced',false],['normal',false],['reduced',true]])await t.test(motion+(change?' pending scene change':' unchanged scene'),async t=>{
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});const directory=fs.mkdtempSync(path.join(base,'late-copy-'));
+ const playwright=await import('playwright'),launch=playwright.webkit.launch,{runButtonSafety}=await import('./scripts/button-safety-native.mjs');
+ const evidence={kind:'nonqualifying-deterministic-renderer-consumer',route:[],limits:['Local uncapped emulated mobile rendering and exact pixel/source preservation; no hosted memory/timing or physical-device claim.']},finished=Error('Causal late-copy probe complete; not native acceptance');let releaseBank,probeError;
+ const gate=new Promise(resolve=>{releaseBank=resolve;});
+ t.after(()=>{releaseBank();playwright.webkit.launch=launch;});
+ playwright.webkit.launch=async(...args)=>{
+  const browser=await launch.apply(playwright.webkit,args),newContext=browser.newContext.bind(browser);browser.newContext=async(...args)=>{
+   const context=await newContext(...args),newPage=context.newPage.bind(context);context.newPage=async(...args)=>{
+    const page=await newPage(...args),goto=page.goto.bind(page);await page.addInitScript(()=>{const NativeDate=Date;globalThis.__paintedSlotAt=Date.parse('2026-10-06T03:23:42.125Z');globalThis.Date=class extends NativeDate{constructor(...args){super(...(args.length?args:[globalThis.__paintedSlotAt]));}static now(){return globalThis.__paintedSlotAt;}};});
+    await page.route('**/HUMAN_WRITTEN_HOURLY_TAGS.md',async route=>{await gate;const response=await route.fetch(),original=await response.text(),body=original+'\n## Any time of day\n- Controlled scenery text\n## Skywriters\n- HELLO\n';const hash=value=>createHash('sha256').update(value).digest('hex');evidence.bankRoute={originalSha256:hash(original),fixtureSha256:hash(body)};await route.fulfill({response,body});});
+    await page.route('**/landscape.js',async route=>{
+     const response=await route.fetch();assert.equal(response.status(),200);let body=await response.text();const hash=value=>createHash('sha256').update(value).digest('hex');assert.equal(hash(body),hash(fs.readFileSync(path.join(__dirname,'landscape.js'))));
+     const anchor="  window.addEventListener('pageshow'",ready="  document.dispatchEvent(new CustomEvent('landscape-scene-time-ready'));";assert.ok(body.includes(anchor)&&body.includes(ready));
+     const instrumentation=`
+      const cacheProbe={backgrounds:0,lives:0,paints:[]};globalThis.paintedSlotProbe=cacheProbe;
+      const paintBackdrop=paintBackground,paintVisitors=paintLife;paintBackground=(...args)=>{const result=paintBackdrop(...args);cacheProbe.backgrounds++;if(cacheProbe.paints.length<12)cacheProbe.paints.push({stack:new Error().stack,skyDate:+sky.date,slot:sceneSnapshot.windowsSlot,pixels:back.toDataURL()});return result;};paintLife=(...args)=>{const result=paintVisitors(...args);cacheProbe.lives++;return result;};
+      cacheProbe.read=()=>({backgrounds:cacheProbe.backgrounds,lives:cacheProbe.lives,paints:cacheProbe.paints,slot:sceneSnapshot.windowsSlot,paintedSlot:lastCitySlot,back:back.toDataURL(),status:status.textContent,skyDate:+sky.date,signatureBytes:new TextEncoder().encode(JSON.stringify([sky,p,sceneSeason,sceneSnapshot.gardens,lastCitySlot,W,H,dpr])).length,visitors:JSON.parse(JSON.stringify(world.events)),scene:JSON.parse(JSON.stringify(sceneSnapshot))});
+      cacheProbe.stop=stop;cacheProbe.advance=()=>{advanceRooftopParty(1);return cacheProbe.read();};cacheProbe.repaint=()=>{refreshSky();return cacheProbe.read();};
+     `;
+     const sourceSha256=hash(body);body=body.replace(anchor,instrumentation+'\n'+anchor).replace(ready,"  paintedSlotProbe.initial=paintedSlotProbe.read();paintedSlotProbe.unchanged=paintedSlotProbe.advance();\n"+ready);
+     evidence.route.push({sourceSha256,injectedSha256:hash(body),bytes:Buffer.byteLength(body)});await route.fulfill({response,body});
+    });
+    page.goto=async(url,...args)=>{
+     const response=await goto(url,...args);if(url.endsWith('__button-observer'))return response;
+     try{
+      await page.waitForFunction(()=>window.paintedSlotProbe?.unchanged&&document.documentElement.dataset.appReady==='true'&&window.CloudSync?.ready,null,{polling:100});
+      evidence.before=await page.evaluate(change=>{const p=paintedSlotProbe;window.dispatchEvent(new PageTransitionEvent('pageshow'));p.stop();const before=p.read();if(change){globalThis.__paintedSlotAt+=3600000;LivingLocation.applySynced({latitude:51.5074,longitude:-.1278,timezone:'Europe/London',label:'Controlled London',enabled:true});paintedSlotProbe.stop();globalThis.__paintedSlotAt+=60000;}return{initial:p.initial,unchanged:p.unchanged,taskCount:state.tasks.length,bankPending:before.status==='',before,pending:p.read()};},change);
+      releaseBank();await page.waitForFunction(()=>document.getElementById('sceneStatus').textContent.includes('Human written'),null,{polling:100});evidence.bank=await page.evaluate(()=>paintedSlotProbe.read());
+      evidence.fresh=await page.evaluate(()=>paintedSlotProbe.repaint());
+      evidence.stored=await page.evaluate(async()=>{const head=await ScannerDeviceStore.readHead(),saved=JSON.parse(head.payload);return{durableTasks:saved.tasks.length,retainedSources:await Promise.all((await ScannerDeviceStore.listBackups()).filter(row=>row.id.startsWith('gate-retained-')).sort((a,b)=>a.id.localeCompare(b.id)).map(async row=>({id:row.id,payloadHash:await ChainStorageV2.hashPayload(row.payload)}))),unknownBytes:saved.futurePopulated.opaque.length};});
+     }catch(error){probeError=error;}finally{releaseBank();}throw finished;
+    };return page;
+   };return context;
+  };return browser;
+ };
+ try{try{await runButtonSafety({repo:__dirname,engine:'webkit',port:Number(process.env.CHAIN_NATIVE_PORT||process.env.CHAIN_NATIVE_SMOKE_PORT||0),outputDir:directory,mobileYesMotion:motion});assert.fail('Expected scenery probe completion');}catch(error){if(error!==finished)throw error;}}
+ finally{releaseBank();playwright.webkit.launch=launch;evidence.probeError=probeError?.stack;const files=fs.readdirSync(directory).filter(name=>/^button-safety-webkit-.*\.json$/.test(name));if(files.length===1){const native=JSON.parse(fs.readFileSync(path.join(directory,files[0])));evidence.nativeReportPath=path.join(directory,files[0]);evidence.cleanup=native.cleanup;evidence.preparedSources=native.retainedSources?.[0]?.bootstrap?.retainedSources?.map(({id,payloadHash})=>({id,payloadHash}));}
+  fs.writeFileSync(path.join(directory,'late-copy-observation.json'),JSON.stringify(evidence,null,2)+'\n');}
+ if(probeError)throw probeError;
+ for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(evidence.cleanup?.[key],true);
+ const {initial,before,pending}=evidence.before;assert.equal(evidence.before.taskCount,400);assert.equal(evidence.stored.durableTasks,400);assert.equal(evidence.stored.unknownBytes,1048576);assert.equal(evidence.stored.retainedSources.length,2);assert.deepEqual(evidence.stored.retainedSources,evidence.preparedSources,'Both protected source payloads remain byte exact');
+ assert.equal(initial.backgrounds,1,'Initial full backdrop still paints once');assert.equal(before.backgrounds,1,'Unchanged native pageshow and initial hourly copy must reuse the initial backdrop');assert.equal(evidence.before.bankPending,true);assert.match(evidence.bank.status,/Controlled scenery text.*Human written/);assert.equal(evidence.bank.lives,pending.lives+1,'Loading the bank still paints current visitors once');
+ if(change){assert.ok(pending.backgrounds>before.backgrounds,'Public location change while the bank is pending performs a full scene refresh');assert.notEqual(pending.back,before.back,'Changed location and time actually change rendered pixels');assert.equal(evidence.bank.backgrounds,pending.backgrounds+1,'A further changed minute while pending still paints its fresh sky');assert.notEqual(evidence.bank.skyDate,pending.skyDate,'Delayed response uses the current effective scene date');}
+ else{assert.equal(evidence.bank.back,before.back,'New text preserves the exact already rendered backdrop');assert.equal(evidence.bank.backgrounds,before.backgrounds,'Loading only new text must not repaint an identical backdrop');assert.deepEqual(evidence.bank.scene,before.scene,'Text loading cannot move the shared scene at a fixed instant');}
+ assert.equal(evidence.fresh.backgrounds,evidence.bank.backgrounds+1,'Independent full refresh actually repaints');assert.equal(evidence.fresh.back,evidence.bank.back,'Bank response pixels equal an independent complete current-scene refresh');assert.equal(evidence.fresh.status,evidence.bank.status,'Bank response copy equals an independent complete current-scene refresh');assert.deepEqual(evidence.fresh.visitors,evidence.bank.visitors,'Bank response keeps current-flight reconciliation equivalent to a complete refresh');
+ const flight=sharedSkywriterConsumer(false,true);flight.context.LandscapeMood.setHumanText('## Skywriters\n- HELLO');flight.context.syncScene(123000);assert.equal(flight.context.world.events[0].skywriterWord,'HELLO','Actual current-flight consumer adopts the newly loaded bank');
+ t.diagnostic('Nonqualifying deterministic late-copy consumer: '+directory);
+ });
+});
+
+test('RISK repository process: scenery consumers use allocated fallback ports and preserve early native failures',async t=>{
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});const directory=fs.mkdtempSync(path.join(base,'scenery-harness-'));
+ const env={...process.env,CHAIN_NATIVE_OUTPUT:path.join(directory,'native'),CHAIN_NATIVE_SMOKE_PORT:process.env.CHAIN_NATIVE_PORT||process.env.CHAIN_NATIVE_SMOKE_PORT||''};delete env.CHAIN_NATIVE_PORT;delete env.NODE_TEST_CONTEXT;
+ await t.test('real scenery source and rendering consumers without CHAIN_NATIVE_PORT',()=>{
+  const result=spawnSync(process.execPath,['--test','--test-name-pattern=^RISK scenery backdrop cache:|^RISK scenery text loading:','tests.js'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});fs.writeFileSync(path.join(directory,'no-port.tap'),result.stdout+result.stderr);assert.equal(result.error,undefined);assert.equal(result.status,0,'Actual scenery consumers must launch and retain every rendering/data assertion without CHAIN_NATIVE_PORT: '+result.stdout+result.stderr);assert.match(result.stdout,/# fail 0/);assert.match(result.stdout,/# skipped 0/);
+ });
+ await t.test('early native launch failure stays primary without bootstrap evidence',async()=>{
+  const {pathToFileURL}=await import('node:url'),preload=path.join(directory,'early-launch.mjs');fs.writeFileSync(preload,'const {webkit}=await import('+JSON.stringify(pathToFileURL(path.join(__dirname,'node_modules/playwright/index.mjs')).href)+');webkit.launch=async()=>{throw Error("Controlled early scenery launch failure");};\n');
+  const result=spawnSync(process.execPath,['--import',preload,'--test','--test-name-pattern=^RISK scenery backdrop cache:','tests.js'],{cwd:__dirname,env:{...env,CHAIN_NATIVE_PORT:process.env.CHAIN_NATIVE_PORT||process.env.CHAIN_NATIVE_SMOKE_PORT||''},encoding:'utf8',timeout:10000,maxBuffer:4*1024*1024});fs.writeFileSync(path.join(directory,'early-launch.tap'),result.stdout+result.stderr);assert.equal(result.error,undefined);assert.equal(result.status,1,'Controlled early launch remains failed');assert.match(result.stdout+result.stderr,/Controlled early scenery launch failure/,'The original native failure must survive missing retainedSources/bootstrap');assert.doesNotMatch(result.stdout+result.stderr,/Cannot read properties of undefined/);
+ });
+ t.diagnostic('Actual child scenery consumer evidence: '+directory);
+});
+
+test('RISK repository process: native scene-time bursts cannot activate controls behind a refused top-layer release',async t=>{
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});const directory=fs.mkdtempSync(path.join(base,'scene-dialog-release-')),{runButtonSafety}=await import('./scripts/button-safety-native.mjs');
+ const playwright=await import('playwright'),launch=playwright.chromium.launch;let geometry;
+ t.after(()=>{playwright.chromium.launch=launch;});
+ playwright.chromium.launch=async(...args)=>{const browser=await launch.apply(playwright.chromium,args),newContext=browser.newContext.bind(browser);browser.newContext=async(...args)=>{const context=await newContext(...args),newPage=context.newPage.bind(context);context.newPage=async(...args)=>{const page=await newPage(...args),down=page.mouse.down.bind(page.mouse),up=page.mouse.up.bind(page.mouse);let point;
+  page.mouse.down=async(...args)=>{point=await page.evaluate(()=>{const el=document.querySelector('[data-act="scene-time-settings"]');if(!el)return null;const r=el.getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2};});return down(...args);};
+  page.mouse.up=async(...args)=>{const result=await up(...args);if(point&&!geometry)geometry=await page.evaluate(point=>{const dialog=document.querySelector('#sceneTimeDialog[open]'),preset=dialog?.querySelector('[data-scene-preset="first-light"]');if(!preset)return null;preset.style.cssText='position:fixed;left:'+(point.x-20)+'px;top:'+(point.y-10)+'px;width:40px;height:20px;margin:0;z-index:2147483647';return{point,hit:document.elementFromPoint(point.x,point.y)===preset,open:dialog.open};},point);return result;};return page;};return context;};return browser;};
+ let result;try{result=await runButtonSafety({repo:__dirname,engine:'chromium',port:Number(process.env.CHAIN_NATIVE_PORT||0),outputDir:directory,scenarioFilter:'rapid scene time presets, lock, live time, and close'});}finally{playwright.chromium.launch=launch;fs.writeFileSync(path.join(directory,'top-layer-geometry.json'),JSON.stringify(geometry,null,2)+'\n');}assert.equal(geometry?.open,true,'The actual scene dialog opens in the controlled overlap fixture');assert.equal(result.report.status,'passed');
+ const opened=result.report.rapidOutcomes.find(row=>row.action==='act:scene-time-settings').bursts[0];assert.equal(opened.attempts,10);assert.equal(opened.trustedPresses,10);assert.equal(opened.unrelatedClicks,0);assert.equal(opened.acceptedClicks,1);assert.ok(opened.windowMs<=2000);assert.ok(opened.attemptDetails.slice(1).every(row=>row.nativeDownAction==='scene-preset:first-light'&&row.neutralRelease&&row.acceptedClicks===0&&row.neutralDocumentId===result.report.releaseSurfaces[0].documentId));
+ for(const value of Object.values(result.report.cleanup))assert.equal(value,true);t.diagnostic('Actual scene dialog burst evidence: '+directory);
+});
+
+test('RISK repository process: required native button actions execute in Chromium and WebKit',{timeout:750000},async t=>{
+ const inventory=JSON.parse(fs.readFileSync(path.join(__dirname,'scripts/button-safety-inventory.json'),'utf8'));assert.deepEqual(inventory.requiredWorkload,{savedTasks:400,rapidAttempts:10,rapidWindowMs:2000},'Both explicit user workload stories remain required');assert.deepEqual(inventory.requiredRapidActions,inventory.requiredActions,'Every required button/action family needs rapid coverage');
+ const output=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(output,'Durable allocated native output required');
+ // This bounds the entire 90-scenario engine process, including isolated fixture
+ // setup and 173 ten-press bursts. Measured WebKit exceeded five minutes while
+ // individual action bounds still passed; those native bounds remain unchanged.
+ for(const engine of ['chromium','webkit'])await t.test(engine,()=>{
+  const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine',engine,'--output-dir',output,'--port',process.env.CHAIN_NATIVE_PORT||'0'],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:360000,maxBuffer:16*1024*1024});
+  assert.equal(result.error,undefined,'Named engine must be available: '+(result.error?.message||result.stderr));assert.equal(result.signal,null);assert.equal(result.status,0,'Every required native button scenario must pass: '+result.stderr);
+  const paths=result.stdout.split('\n').map(line=>line.match(/^Button evidence: (.+)$/)?.[1]).filter(Boolean);assert.equal(paths.length,1,'One exact native button report per engine');
+  const verified=spawnSync(process.execPath,['scripts/button-safety.mjs','--verify-report',paths[0],'--inventory','scripts/button-safety-inventory.json'],{cwd:__dirname,encoding:'utf8'});
+  assert.equal(verified.status,0,'Actual native report must cover the independent required action inventory: '+verified.stderr);t.diagnostic('Button evidence: '+paths[0]);
+ });
+});
+
+test('RISK repository process: native button gate detects errors raised by a real click',async t=>{
+ const output=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(output,'Durable allocated native output required');fs.mkdirSync(output,{recursive:true});
+ const controls={pageerror:/pageerror/,unhandled:/unhandledrejection/,close:/unexpected-close/,crash:/page-crash/,reload:/unexpected-navigation-or-reload/,navigation:/unexpected-navigation-or-reload/,stall:/stalled responsiveness|blocked frame loop/,'async-pending':/stalled responsiveness/,'new-action':/New untested button action/};
+ const cases=Object.entries(controls).map(([control,signal])=>({engine:'chromium',control,signal}));cases.push({engine:'webkit',control:'pageerror',signal:/pageerror/},{engine:'webkit',control:'unhandled',signal:/unhandledrejection/},{engine:'webkit',control:'short-stall',signal:/blocked frame loop/});
+ for(const {engine,control,signal}of cases)await t.test(engine+' '+control,()=>{
+  const before=new Set(fs.readdirSync(output));
+  const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine',engine,'--output-dir',output,'--port',process.env.CHAIN_NATIVE_PORT||'0','--probe','--control',control],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:45000,maxBuffer:8*1024*1024});
+  assert.equal(result.error,undefined);assert.equal(result.signal,null);assert.notEqual(result.status,0,'actual native Settings click must reject '+control);
+  const reports=fs.readdirSync(output).filter(file=>!before.has(file)&&file.startsWith('button-safety-'+engine+'-')&&file.endsWith('.json'));assert.equal(reports.length,1,'one preserved real native sensitivity artifact');
+  const report=JSON.parse(fs.readFileSync(path.join(output,reports[0]),'utf8'));assert.equal(report.kind,'button-sensitivity');assert.equal(report.status,'failed');assert.match(JSON.stringify({errors:report.errors,failure:report.failure}),signal,'actual detector must catch '+control);t.diagnostic('Button sensitivity: '+path.join(output,reports[0]));
+ });
+});
+
+test('RISK repository process: native button gate awaits an asynchronous false outcome',t=>{
+ const output=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(output,'Durable allocated native output required');
+ const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine','chromium','--output-dir',output,'--port',process.env.CHAIN_NATIVE_PORT||'0','--probe','--control','async-predicate-false'],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:45000});
+ assert.equal(result.error,undefined);assert.equal(result.signal,null);assert.notEqual(result.status,0,'Promise(false) must not be mistaken for a completed expected native button outcome');assert.match(result.stderr,/stalled responsiveness: outcome settings/);
+});
+
+
+test('RISK repository process: CI monitor preserves early startup and stress predecessor failures',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^parallel workflow observation preserves complete missing skipped canceled and unknown distinctions$','scripts/agent-tools/ci-monitor.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:120000});
+ assert.equal(child.status,0,'Public observation must retain every early predecessor distinction: '+child.stdout+child.stderr);
+ assert.match(child.stdout,/# Subtest: parallel workflow observation preserves complete missing skipped canceled and unknown distinctions/,'Required actual observer assertions must execute');
+});

@@ -139,3 +139,28 @@ the current test-first diff gate still runs. A policy-covered run cannot become
 a full producer. Uncertain classification or evidence retains the full current
 cohort. The [release procedure](../../RELEASE_GATES.md#policy-prose-inheritance)
 owns product/FAQ/rendered receipt inheritance and its limits.
+
+## Early populated startup admission
+
+The product workflow runs `scripts/early-ci.mjs` before event gates and all four
+regression groups. It verifies the saved synchronous-predicate, allocated-port,
+primary-error and real modal-release consumers, then the original required
+400-task mobile WebKit story in both motion modes. Its imported contract retains
+the exact 1,000,000,000-byte browser scope, zero swap, ten distinct trusted Yes
+acceptances within two seconds, and original startup/source/durability/frame
+checks. `scripts/early-ci-harness-source.json` binds the harness-only import from
+`9b5bc1c9d5a87fed022a17706bbb0e69e94757b1` (directly after `b176026`). It advances
+no product source or immutable button inventory.
+
+The early job preserves raw children and artifacts in `early-startup-RUN-ATTEMPT`.
+The aggregate independently verifies that receipt and the separate 512 MB stress
+bundle. Measured application stress failure remains nonblocking; missing,
+corrupt, cancelled, skipped, unbound or incomplete execution fails closed. Blocked
+groups contribute no executed outcomes. Same-source and policy-prose coverage
+require the original full producer's successful early/stress jobs and exact early
+receipt attestation; current covered records launch no native children.
+
+Local process fixtures prove ordering and accounting only. A source mismatch or
+failed startup story remains a failed release gate. See the bounded
+[issue 290 handoff](../releases/issue-290-early-ci.md) for hosted demonstration and
+source limits; previous local harness evidence supplies no hosted qualification.

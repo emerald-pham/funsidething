@@ -134,6 +134,7 @@ function createFixture(t, options = {}) {
   fs.copyFileSync(runner, path.join(root, 'scripts/test-groups.mjs'));
   fs.copyFileSync(path.join(repository,'scripts/release-evidence.mjs'),path.join(root,'scripts/release-evidence.mjs'));
   if(options.policy)fs.writeFileSync(path.join(root,'AGENTS.md'),'Read [release guide](docs/release.md) before release.\n');
+  if(options.early){fs.mkdirSync(path.join(root,'.github/workflows'),{recursive:true});fs.writeFileSync(path.join(root,'.github/workflows/data-safety.yml'),'jobs:\n  early-startup:\n    runs-on: controlled-fixture\n');for(const name of ['early-ci.mjs','button-safety-mobile-contract.mjs','button-safety-inventory.json','button-safety-contract.mjs','button-safety-ci-policy.mjs'])fs.copyFileSync(path.join(repository,'scripts',name),path.join(root,'scripts',name));writeJson(path.join(root,'scripts/early-ci-harness-source.json'),{schemaVersion:1,files:[],testExcerpts:[],limits:['Controlled parser fixture, not imported source or actual hosted evidence.']});}
   const coreTitle = options.coreTitle || fixtureRoots.core;
   writeJson(path.join(root, 'package.json'), {
     type: 'module',
@@ -549,8 +550,8 @@ test('test group preflight rejects a passing dynamic row added at an unchanged r
 });
 
 
-function aggregateFixture(t) {
-  const fixture=createFixture(t,{nativeTitle:'RISK repository process: required installed-client native outcomes and artifacts execute exactly once',nativeReports:true});
+function aggregateFixture(t,options={}) {
+  const fixture=createFixture(t,{nativeTitle:'RISK repository process: required installed-client native outcomes and artifacts execute exactly once',nativeReports:true,...options});
   fixture.originals=new Map();
   for(const group of groups){const result=invoke(fixture,{group});assert.equal(result.status,0,result.stdout+result.stderr);fixture.originals.set(group,result.outputDir);}
   return fixture;
@@ -732,4 +733,30 @@ test('policy prose covered groups rederive unchanged product inheritance and agg
  const aggregate=aggregateCopy(parent,fixture,(_root,needs)=>{const x=JSON.parse(fs.readFileSync(needs));x['cohort-routing'].outputs={decision:'policy-reuse'};writeJson(needs,x);},['--proof',file]);
  assert.equal(aggregate.status,0,aggregate.stdout+aggregate.stderr);const report=JSON.parse(fs.readFileSync(path.join(aggregate.outputDir,'aggregate.json')));assert.equal(report.mode,'policy-covered');assert.equal(report.caseCount,0);
  for(const [name,mutate]of [['wrong inventory',x=>{x.policyImpact.frozenInventorySha256='0'.repeat(64);}],['stale review',x=>{x.policyStatuses[0].state='failure';}],['wrong producer source',x=>{x.cohortContext.sourceSha=fixture.sourceSha;x.contextSha256=createHash('sha256').update(JSON.stringify(x.cohortContext)).digest('hex');}]])await parent.test(name,()=>{const x=structuredClone(proof);mutate(x);writeJson(file,x);const result=invoke(fixture,{args:['--covered','--proof',file]});assert.notEqual(result.status,0,name+' must retain full execution requirements');});
+});
+
+
+test('test group aggregate cannot accept a full cohort without required early predecessor evidence',t=>{
+ const fixture=aggregateFixture(t,{early:true}),result=aggregateCopy(t,fixture);
+ assert.notEqual(result.status,0,'A complete later cohort cannot hide missing early execution');
+ assert.match(result.stdout+result.stderr,/early|startup/i);
+});
+
+test('test group aggregate binds successful early execution and separate failed application stress integrity',async t=>{
+ const {createMobileBundle}=await import('./mobile-memory-fixture.mjs');
+ const fixture=aggregateFixture(t,{early:true});
+ const id={...JSON.parse(fs.readFileSync(path.join(fixture.originals.get('core'),'result.json'))).resultIdentity,selectedGroup:null};
+ const evidence=fs.mkdtempSync(path.join(os.tmpdir(),'chain-early-aggregate-proof-'));t.after(()=>fs.rmSync(evidence,{recursive:true,force:true}));
+ const early=path.join(evidence,'early');fs.mkdirSync(early);const identity={candidateCommit:id.checkoutSha,candidateTree:id.checkoutTree,sourceSha:id.sourceSha,repository:id.repository,runId:id.runId,runAttempt:id.runAttempt,eventPolicy:id.eventPolicy};
+ createMobileBundle(path.join(early,'required'),identity);
+ const {refreshMobileBundle}=await import('./mobile-memory-fixture.mjs'),stress=createMobileBundle(path.join(evidence,'stress'),identity,'stress-512mb');stress.report.status='failed';stress.report.cases[0].appOutcome='app-runtime-failure';stress.native.normal.status='failed';stress.native.normal.errors=['page-crash'];stress.native.normal.failure='page.goto: Page crashed';refreshMobileBundle(stress);
+ const names=['RISK repository process: Playwright waitForFunction predicates are synchronous','RISK repository process: scenery consumers use allocated fallback ports and preserve early native failures','RISK repository process: native scene-time bursts cannot activate controls behind a refused top-layer release'];
+ fs.writeFileSync(path.join(early,'harness.stdout'),'TAP version 13\n'+names.map((name,index)=>`# Subtest: ${name}\nok ${index+1} - ${name}\n`).join(''));
+ const hash=bytes=>createHash('sha256').update(bytes).digest('hex'),artifacts=[];const visit=dir=>{for(const entry of fs.readdirSync(dir,{withFileTypes:true})){const file=path.join(dir,entry.name);if(entry.isDirectory())visit(file);else{const bytes=fs.readFileSync(file);artifacts.push({path:path.relative(early,file).split(path.sep).join('/'),bytes:bytes.length,sha256:hash(bytes)});}}};visit(early);
+ const receipt={schemaVersion:1,status:'passed',mode:'full',identity:{descriptor:id,workflowBlob:git(fixture.root,'rev-parse','HEAD:.github/workflows/data-safety.yml'),harnessSourceSha256:hash(fs.readFileSync(path.join(fixture.root,'scripts/early-ci-harness-source.json'))),eventName:null,eventRef:null},children:['harness','required-1gb'].map(kind=>({kind,exitCode:0,signal:null,error:null})),harnessCaseCount:3,artifacts:artifacts.sort((a,b)=>a.path.localeCompare(b.path))};writeJson(path.join(early,'receipt.json'),receipt);
+ const collected=path.join(evidence,'groups');for(const [group,output]of fixture.originals)fs.cpSync(output,path.join(collected,group),{recursive:true});const needs=path.join(evidence,'needs.json');writeJson(needs,Object.fromEntries(['validation-context','event-gates','cohort-routing','regression','early-startup','mobile-stress'].map(name=>[name,{result:'success'}])));
+ const env={GITHUB_REPOSITORY:id.repository,CHAIN_TEST_SOURCE_SHA:id.sourceSha,CHAIN_TEST_EVENT_POLICY:id.eventPolicy,GITHUB_RUN_ID:id.runId,GITHUB_RUN_ATTEMPT:String(id.runAttempt)};
+ const args=['--aggregate','--results-dir',collected,'--needs-json',needs,'--early-receipt',path.join(early,'receipt.json'),'--mobile-stress-report',path.join(stress.directory,'report.json')];
+ const result=invoke(fixture,{env,args});assert.equal(result.status,0,result.stdout+result.stderr);const report=JSON.parse(fs.readFileSync(path.join(result.outputDir,'aggregate.json')));assert.equal(report.earlyEvidence.children,2);assert.equal(report.stressEvidence.status,'failed','Measured application stress remains reported without failing complete integrity');assert.equal(report.caseCount,6,'Only original actual group outcomes count as current coverage');
+ fs.unlinkSync(path.join(stress.directory,stress.report.cases[0].nativeReportPath));const broken=invoke(fixture,{env,args});assert.notEqual(broken.status,0,'Missing stress integrity blocks aggregate even when application stress is nonblocking');
 });

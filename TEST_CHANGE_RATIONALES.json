@@ -1,5 +1,43 @@
 [
   {
+    "baseCommit": "0e4fefb5eaebcd2007406ae95f2ce69904e0e27d",
+    "testChangesSha256": "33323d0f7e696226c18520888c216fe4bab9df4527dd13fc55059aae492787c8",
+    "reason": "Require the existing saved harness and original populated mobile startup story before launching costly CI; preserve imported assertions exactly and reject incomplete predecessor evidence.",
+    "previousBehavior": "The four long regression groups could launch before the decisive mobile startup failure was observed. Main did not contain the saved required mobile harness repairs.",
+    "intendedBehavior": "The early public process and durable receipt bind exact source, checkout/tree/base, workflow, event and attempt; blocked or incomplete work never counts as passed or executed.",
+    "replacementTests": [
+      "RISK repository process: early startup failure blocks costly CI without counting blocked coverage",
+      "RISK repository process: CI monitor preserves early startup and stress predecessor failures"
+    ],
+    "preservedCoverage": [
+      "All existing product assertions, installed-client native cases, rules, compatibility, full/same-source/policy reuse and release reviews remain protected. No application or runtime asset was changed.",
+      "Saved harness scripts and selected original native regression bodies are imported by exact source/hash without importing separately owned product edits. Actual current-source native acceptance remains required and may fail."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <retro290> --evidence-dir <retro278>/290/runs --purpose preimplementation-red --summary -- node --test scripts/agent-tools/early-ci.test.mjs",
+      "failure": "Observed topology RED6b86f9e2 at2026-10-27T03:57:34Z on0e4fefb: failed early story dispatched expensive children. GREENe51a32c8 after topology. Aggregate public-process RED482219b6 at04:02:21Z accepted complete later cohort without early evidence (exit0); GREENb11877b6 after gate. Initial process receipt run17c08a6c exposed a TAP reporter integration problem and is not behavioral RED. Process GREEN72f8a91b andba904a53 prove two children on pass, one on fail/skip/cancel and rejection of missing artifacts with a fresh verifier. Raw provenance retained outside Git at /Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/290/runs. Additional public observer RED3973b8a6 at04:09:42Z and actual RISK wrapper RED507067f5 at04:10:36Z exposed unknown early topology; GREENaaac6ec5 after observer integration. Earlier wrapper attempt363e893d was vacuous due inherited NODE_TEST_CONTEXT and supplies no RED or qualification credit; wrappers now clear it and assert named TAP execution."
+    }
+  },
+  {
+    "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
+    "testChangesSha256": "bdfdfeb4acb83cfa5ee7b3a1299d49d8b91fa8b43eb8ca36357aae06c40530d7",
+    "reason": "Require the existing saved harness and original populated mobile startup story before launching costly CI; preserve imported assertions exactly and reject incomplete predecessor evidence.",
+    "previousBehavior": "The four long regression groups could launch before the decisive mobile startup failure was observed. Main did not contain the saved required mobile harness repairs.",
+    "intendedBehavior": "The early public process and durable receipt bind exact source, checkout/tree/base, workflow, event and attempt; blocked or incomplete work never counts as passed or executed.",
+    "replacementTests": [
+      "RISK repository process: early startup failure blocks costly CI without counting blocked coverage",
+      "RISK repository process: CI monitor preserves early startup and stress predecessor failures"
+    ],
+    "preservedCoverage": [
+      "All existing product assertions, installed-client native cases, rules, compatibility, full/same-source/policy reuse and release reviews remain protected. No application or runtime asset was changed.",
+      "Saved harness scripts and selected original native regression bodies are imported by exact source/hash without importing separately owned product edits. Actual current-source native acceptance remains required and may fail."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <retro290> --evidence-dir <retro278>/290/runs --purpose preimplementation-red --summary -- node --test scripts/agent-tools/early-ci.test.mjs",
+      "failure": "Observed topology RED6b86f9e2 at2026-10-27T03:57:34Z on0e4fefb: failed early story dispatched expensive children. GREENe51a32c8 after topology. Aggregate public-process RED482219b6 at04:02:21Z accepted complete later cohort without early evidence (exit0); GREENb11877b6 after gate. Initial process receipt run17c08a6c exposed a TAP reporter integration problem and is not behavioral RED. Process GREEN72f8a91b andba904a53 prove two children on pass, one on fail/skip/cancel and rejection of missing artifacts with a fresh verifier. Raw provenance retained outside Git at /Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/290/runs. Additional public observer RED3973b8a6 at04:09:42Z and actual RISK wrapper RED507067f5 at04:10:36Z exposed unknown early topology; GREENaaac6ec5 after observer integration. Earlier wrapper attempt363e893d was vacuous due inherited NODE_TEST_CONTEXT and supplies no RED or qualification credit; wrappers now clear it and assert named TAP execution."
+    }
+  },
+  {
     "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
     "testChangesSha256": "fe4b353ce0242fe7bf234ce0a9ea31616e927667c5e2c5f6c37f5afcb6aa3546",
     "reason": "Classify only provably instruction-preserving policy prose while preserving current release-process review and complete unchanged product evidence. Add command-boundary controls for exact inventories, artifact inheritance, current statuses and forbidden exemptions. Exact integrated frontier rationale retains #287 option-validation assertions and its independent original RED record below.",

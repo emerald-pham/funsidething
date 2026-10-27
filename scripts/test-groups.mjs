@@ -35,7 +35,7 @@ function parseArgs(argv) {
   const keyMap = new Map([
     ['--group', 'group'], ['--output-dir', 'outputDir'], ['--repository', 'repository'],
     ['--event-policy', 'eventPolicy'], ['--run-id', 'runId'], ['--run-attempt', 'runAttempt'],
-    ['--source-sha', 'sourceSha'], ['--comparison-base', 'comparisonBase'], ['--results-dir','resultsDir'], ['--needs-json','needsJson'], ['--proof','proof'],
+    ['--source-sha', 'sourceSha'], ['--comparison-base', 'comparisonBase'], ['--results-dir','resultsDir'], ['--needs-json','needsJson'], ['--proof','proof'], ['--early-receipt','earlyReceipt'], ['--mobile-stress-report','mobileStressReport'],
   ]);
   for (let index = 0; index < argv.length; index++) {
     if (['--describe','--aggregate','--covered'].includes(argv[index])) { values[argv[index].slice(2)] = true; continue; }
@@ -688,7 +688,7 @@ function coverageReference(proof, identity) {
   return {contextSha256:proof.contextSha256,cohortContext:context,coveredBy:producer,...(policyCoverage || {})};
 }
 
-function aggregateResults({options, outputDir, descriptor, inventory, assignmentIndex, assignments, files, source}) {
+async function aggregateResults({options, outputDir, descriptor, inventory, assignmentIndex, assignments, files, source}) {
   if (!options.resultsDir || !options.needsJson) fail('Aggregate requires --results-dir and --needs-json.');
   const needs = readJson(options.needsJson, 'actual workflow predecessor results');
   const issues = [], records = [], allCases = new Set();
@@ -697,6 +697,19 @@ function aggregateResults({options, outputDir, descriptor, inventory, assignment
   const freshCoverage=covered?coverageReference(readJson(options.proof,'fresh full-producer proof'),descriptor.resultIdentity):null;
   for (const id of ['validation-context','event-gates','cohort-routing','regression']) {
     if (needs[id]?.result !== 'success') issues.push(`Required job ${id} did not succeed: ${needs[id]?.result || 'missing'}.`);
+  }
+  const earlyWorkflow=fs.existsSync(path.join(ROOT,'.github/workflows/data-safety.yml')) && /^  early-startup:/m.test(fs.readFileSync(path.join(ROOT,'.github/workflows/data-safety.yml'),'utf8'));
+  let earlyEvidence=null,stressEvidence=null;
+  if(earlyWorkflow){
+    for(const id of ['early-startup','mobile-stress'])if(needs[id]?.result!=='success')issues.push(`Required early job ${id} did not succeed: ${needs[id]?.result||'missing'}.`);
+    try{
+      if(!options.earlyReceipt)fail('Required --early-receipt is missing; blocked work is not executed coverage.');
+      const {verifyEarlyReceipt,verifyEarlyMobileReport}=await import('./early-ci.mjs');
+      const early=verifyEarlyReceipt(options.earlyReceipt,descriptor,{proof:covered?options.proof:undefined});
+      if(early.mode!==(covered?'covered':'full'))fail('Early receipt execution mode mismatch.');
+      earlyEvidence={mode:early.mode,receiptSha256:sha256(fs.readFileSync(options.earlyReceipt)),children:early.children.length,coverage:early.coverage||null};
+      if(!covered){if(!options.mobileStressReport)fail('Required stress execution integrity report is missing.');const stress=verifyEarlyMobileReport(path.dirname(options.mobileStressReport),descriptor.resultIdentity,true);stressEvidence={status:stress.status,reportSha256:sha256(fs.readFileSync(options.mobileStressReport))};}
+    }catch(error){issues.push('Early startup evidence: '+error.message);}
   }
   const directories = fs.readdirSync(options.resultsDir).filter(name => fs.lstatSync(path.join(options.resultsDir,name)).isDirectory());
   if (JSON.stringify([...directories].sort()) !== JSON.stringify([...GROUP_IDS].sort())) issues.push('Required group directories are missing or unknown.');
@@ -774,7 +787,7 @@ function aggregateResults({options, outputDir, descriptor, inventory, assignment
       records.push({group:id,resultSha256:sha256(fs.readFileSync(path.join(root,'result.json'))),cases:cases.length,passed:cases.filter(item=>item.status==='passed').length,skipped:cases.filter(item=>item.status==='skipped').length,artifacts:record.artifacts,identity});
     } catch (error) { issues.push(`${id}: ${error.message}`); }
   }
-  const report = {schemaVersion:1,status:issues.length?'failed':'passed',mode:policyCovered?'policy-covered':covered?'covered':'full',resultIdentity:descriptor.resultIdentity,groups:records,caseCount:allCases.size,issues,finishedAt:new Date().toISOString()};
+  const report = {schemaVersion:1,status:issues.length?'failed':'passed',mode:policyCovered?'policy-covered':covered?'covered':'full',resultIdentity:descriptor.resultIdentity,groups:records,caseCount:allCases.size,...(earlyWorkflow?{earlyEvidence,stressEvidence}:{}),issues,finishedAt:new Date().toISOString()};
   atomicWrite(path.join(outputDir,'aggregate.json'),report);
   if (issues.length) fail(issues.join('\n'));
   process.stdout.write(`Complete required cohort verified: ${allCases.size} cases.\n`);
@@ -1058,7 +1071,7 @@ async function main() {
   return 0;
 }
 
-export { parseTap, normalizeTapIdentity };
+export { parseTap, normalizeTapIdentity, coverageReference };
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main().then(code => { process.exitCode = code; }).catch(error => {
   process.stderr.write(`${error.stack || error.message}\n`);
