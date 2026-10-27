@@ -325,6 +325,10 @@ jobs:
         run: echo "Executing previously uncovered group inputs"
       - uses: actions/download-artifact@v4
         with:
+          name: validation-context-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/validation
+      - uses: actions/download-artifact@v4
+        with:
           name: early-startup-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/early
       - name: Execute complete assigned group
@@ -332,7 +336,7 @@ jobs:
         env:
           PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/playwright-browsers
         run: |
-          group_args=(--group "${{ matrix.group }}" --early-receipt "$RUNNER_TEMP/early/receipt.json")
+          group_args=(--group "${{ matrix.group }}" --descriptor "$RUNNER_TEMP/validation/descriptor/descriptor.json" --early-receipt "$RUNNER_TEMP/early/receipt.json")
           if [[ "${{ matrix.group }}" == "persistence-recovery" ]]; then
             group_args+=(--browser-path "$PLAYWRIGHT_BROWSERS_PATH")
           fi
@@ -421,7 +425,7 @@ jobs:
         id: aggregate
         if: always()
         run: |
-          npm run test:group -- --aggregate --group core --output-dir "$RUNNER_TEMP/aggregate" --results-dir "$RUNNER_TEMP/groups" --needs-json "$RUNNER_TEMP/needs.json" --early-receipt "$RUNNER_TEMP/early/receipt.json" --mobile-stress-report "$RUNNER_TEMP/stress/report.json" --proof "$RUNNER_TEMP/final-routing/routing.json" --repository "$GITHUB_REPOSITORY" --event-policy "$CHAIN_TEST_EVENT_POLICY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$CHAIN_TEST_SOURCE_SHA" --comparison-base "$CHAIN_TEST_COMPARISON_BASE"
+          npm run test:group -- --aggregate --group core --descriptor "$RUNNER_TEMP/validation/descriptor/descriptor.json" --output-dir "$RUNNER_TEMP/aggregate" --results-dir "$RUNNER_TEMP/groups" --needs-json "$RUNNER_TEMP/needs.json" --early-receipt "$RUNNER_TEMP/early/receipt.json" --mobile-stress-report "$RUNNER_TEMP/stress/report.json" --proof "$RUNNER_TEMP/final-routing/routing.json" --repository "$GITHUB_REPOSITORY" --event-policy "$CHAIN_TEST_EVENT_POLICY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$CHAIN_TEST_SOURCE_SHA" --comparison-base "$CHAIN_TEST_COMPARISON_BASE"
       - name: Preserve verified aggregate and final observations
         if: always()
         uses: actions/upload-artifact@v4

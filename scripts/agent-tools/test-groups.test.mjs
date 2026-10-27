@@ -3,6 +3,7 @@ import {derivePolicyProseImpact,deriveReleaseReviewPlan} from '../release-eviden
 import {createHash} from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -26,6 +27,17 @@ function run(command, args, cwd, env = process.env) {
   const result = spawnSync(command, args, { cwd, env, encoding: 'utf8', timeout: 15_000 });
   assert.equal(result.error, undefined, `${command} must start: ${result.error?.message || ''}`);
   return result;
+}
+
+function alternateNodeRuntime() {
+  const candidates=[process.env.CHAIN_RUNTIME_DRIFT_NODE,'/opt/homebrew/bin/node','/opt/local/bin/node','/usr/local/bin/node','/usr/bin/node','node'].filter(Boolean);
+  for(const executable of [...new Set(candidates)]){
+    if(path.isAbsolute(executable)&&!fs.existsSync(executable))continue;
+    const result=spawnSync(executable,['--version'],{encoding:'utf8',timeout:5000});
+    const version=(result.stdout||'').trim().replace(/^v/,'');
+    if(result.status===0&&/^\d+\.\d+\.\d+$/.test(version)&&version!==process.versions.node)return{executable,version};
+  }
+  return null;
 }
 
 function git(root, ...args) {
@@ -428,8 +440,9 @@ function isolatedFixtureNativeOutput(fixture, inheritedEnvironment = process.env
 function invoke(fixture, { group = 'core', env = {}, repository = 'example/fixture', outputDir: requestedOutputDir, args = [], consumer = false, preserveNodeTestContext = false, publicCli = false } = {}) {
   const outputDir = requestedOutputDir || path.join(os.tmpdir(), `chain-test-group-output-${process.pid}-${++outputSerial}`);
   fixture.outputs.push(outputDir);
-  const childEnv = { ...process.env, ...env };
+  const childEnv = { ...process.env, PATH: path.dirname(process.execPath)+path.delimiter+process.env.PATH, ...env };
   if (!preserveNodeTestContext) delete childEnv.NODE_TEST_CONTEXT;
+  for(const key of ['GITHUB_EVENT_NAME','GITHUB_EVENT_PATH','GITHUB_REF'])if(!Object.hasOwn(env,key))delete childEnv[key];
   const selectedArgs = ['--group', group, '--output-dir', outputDir,
     '--repository', repository, '--event-policy', 'local', '--run-id', 'fixture-run-1', '--run-attempt', '1',
     '--source-sha', fixture.sourceSha, '--comparison-base', fixture.comparisonBase, ...args];
@@ -1137,6 +1150,229 @@ async function earlyProcessFixture(t) {
   return {fixture,directory,descriptor,id,stress,env,journal,first,receipt};
 }
 
+async function producerPlannerConsumerChain(t,{eventName='push',eventRef='refs/heads/fixture',eventAction=null}={}){
+  const fixture=createFixture(t,{early:true,earlyTransfer:true,nativeTitle:'RISK repository process: required installed-client native outcomes and artifacts execute exactly once',nativeReports:true});
+  const evidenceName=eventName==='pull_request'?`pull-request-${eventAction}`:eventRef==='refs/heads/main'?'exact-main-push':'ordinary-branch-push';
+  const evidence=fs.mkdtempSync(path.join(os.tmpdir(),'chain-produced-event-identity-'));t.after(()=>{
+    if(process.env.CHAIN_METADATA_EVIDENCE){const retained=path.join(process.env.CHAIN_METADATA_EVIDENCE,evidenceName);fs.mkdirSync(path.dirname(retained),{recursive:true});fs.cpSync(evidence,retained,{recursive:true});}
+    fs.rmSync(evidence,{recursive:true,force:true});
+  });
+  const descriptorDir=path.join(evidence,'descriptor'),descriptor=path.join(descriptorDir,'descriptor.json'),eventPath=path.join(evidence,'event.json');
+  let sourceSha=fixture.sourceSha,checkout=git(fixture.root,'rev-parse','HEAD');
+  if(eventName==='pull_request'){
+    git(fixture.root,'checkout','-qb','fixture-pr-head');
+    fs.writeFileSync(path.join(fixture.root,'pr-head-only.txt'),'distinct PR source tree\n');git(fixture.root,'add','pr-head-only.txt');git(fixture.root,'commit','-qm','Synthetic PR head source');sourceSha=git(fixture.root,'rev-parse','HEAD');
+    git(fixture.root,'checkout','--detach',fixture.comparisonBase);git(fixture.root,'merge','--no-ff','--no-commit',sourceSha);
+    fs.writeFileSync(path.join(fixture.root,'merge-checkout-only.txt'),'distinct actual merge checkout tree\n');git(fixture.root,'add','merge-checkout-only.txt');git(fixture.root,'commit','-qm','Synthetic actual PR merge checkout');checkout=git(fixture.root,'rev-parse','HEAD');
+    fixture.sourceSha=sourceSha;
+  }
+  fs.writeFileSync(eventPath,JSON.stringify(eventName==='pull_request'?{
+    action:eventAction,number:42,repository:{full_name:'example/fixture'},pull_request:{head:{sha:sourceSha,ref:'fixture-pr-head'}},
+  }:{after:sourceSha,before:fixture.comparisonBase,repository:{full_name:'example/fixture'}}));
+  const env={...process.env,PATH:path.dirname(process.execPath)+path.delimiter+process.env.PATH,
+    GITHUB_REPOSITORY:'example/fixture',GITHUB_EVENT_NAME:eventName,GITHUB_EVENT_PATH:eventPath,GITHUB_REF:eventRef,GITHUB_SHA:checkout,
+    GITHUB_RUN_ID:'505001',GITHUB_RUN_ATTEMPT:'1',CHAIN_TEST_SOURCE_SHA:sourceSha,CHAIN_TEST_COMPARISON_BASE:fixture.comparisonBase,
+    ImageOS:'fixture-os-A',ImageVersion:'fixture-image-A'};
+  delete env.NODE_TEST_CONTEXT;
+  const produced=run('npm',['run','test:group','--','--describe','--group','core','--output-dir',descriptorDir,
+    '--repository','example/fixture','--event-policy',eventName,'--run-id','505001','--run-attempt','1','--source-sha',sourceSha,
+    '--comparison-base',fixture.comparisonBase],fixture.root,env);
+  assert.equal(produced.status,0,produced.stdout+produced.stderr);
+  const actualDescriptor=JSON.parse(fs.readFileSync(descriptor));
+  const planned=run(process.execPath,[path.join(repository,'scripts/agent-tools/ci-routing.mjs'),'--plan-only','1','--descriptor',descriptor,
+    '--comparison-base',fixture.comparisonBase,'--evidence-dir',path.join(evidence,'routing')],fixture.root,env);
+  assert.equal(planned.status,0,planned.stdout+planned.stderr);
+  const route=JSON.parse(fs.readFileSync(path.join(evidence,'routing','routing.json')));
+  const negativeControls=[];
+  let runtimeDriftSelection=null;
+  if(eventName==='push'&&eventRef==='refs/heads/fixture'){
+    const bindingMutations=[
+      ['eventPolicy','canonical-pr-merge-v1'],['eventName','pull_request'],['eventRef','refs/heads/other'],['eventAction','edited'],
+      ['sourceSha','0'.repeat(40)],['sourceTree','1'.repeat(40)],['checkoutSha','2'.repeat(40)],['checkoutTree','3'.repeat(40)],
+      ['comparisonBase','4'.repeat(40)],['runId','505002'],['runAttempt',2],
+    ];
+    for(const [field,value] of bindingMutations){
+      const tampered=structuredClone(actualDescriptor);tampered.resultIdentity[field]=value;
+      const tamperedFile=path.join(evidence,`tampered-${field}.json`);writeJson(tamperedFile,tampered);
+      const planner=run(process.execPath,[path.join(repository,'scripts/agent-tools/ci-routing.mjs'),'--plan-only','1','--descriptor',tamperedFile,
+        '--comparison-base',fixture.comparisonBase,'--evidence-dir',path.join(evidence,`routing-tampered-${field}`)],fixture.root,env);
+      assert.notEqual(planner.status,0,`The actual planner must refuse a producer descriptor whose ${field} binding changed.`);
+      const sentinel=path.join(evidence,`tampered-child-${field}`),output=path.join(evidence,`tampered-group-${field}`);
+      const group=run('npm',['run','test:group','--','--group','core','--output-dir',output,'--repository','example/fixture',
+        '--event-policy',route.validationContext.eventPolicy,'--run-id','505001','--run-attempt','1','--source-sha',sourceSha,
+        '--comparison-base',fixture.comparisonBase,'--descriptor',tamperedFile],fixture.root,{...env,CHAIN_TEST_EVENT_POLICY:route.validationContext.eventPolicy,CHAIN_DESCRIPTOR_SENTINEL:sentinel});
+      assert.notEqual(group.status,0,`The actual group consumer must refuse a producer descriptor whose ${field} binding changed: ${group.stdout}${group.stderr}`);
+      assert.equal(fs.existsSync(sentinel),false,`${field} descriptor tampering must stop before any required workload child starts`);
+      negativeControls.push({field,plannerStatus:planner.status,plannerError:(planner.stderr||'').trim(),groupStatus:group.status,groupError:(group.stderr||'').trim(),workloadStarted:fs.existsSync(sentinel)});
+    }
+  }
+  if(eventName==='pull_request'){
+    const prMutations=[['sourceSha',actualDescriptor.resultIdentity.checkoutSha],['sourceTree',actualDescriptor.resultIdentity.checkoutTree],
+      ['checkoutSha',actualDescriptor.resultIdentity.sourceSha],['checkoutTree',actualDescriptor.resultIdentity.sourceTree]],prControls=[];
+    for(const [field,value]of prMutations){
+      const tampered=structuredClone(actualDescriptor);tampered.resultIdentity[field]=value;
+      const tamperedFile=path.join(evidence,`pr-tampered-${field}.json`);writeJson(tamperedFile,tampered);
+      const planner=run(process.execPath,[path.join(repository,'scripts/agent-tools/ci-routing.mjs'),'--plan-only','1','--descriptor',tamperedFile,
+        '--comparison-base',fixture.comparisonBase,'--evidence-dir',path.join(evidence,`pr-routing-tampered-${field}`)],fixture.root,env);
+      assert.notEqual(planner.status,0,`The PR planner must refuse a merge-checkout/source substitution in ${field}.`);
+      const sentinel=path.join(evidence,`pr-tampered-child-${field}`),output=path.join(evidence,`pr-tampered-group-${field}`);
+      const group=run('npm',['run','test:group','--','--group','core','--output-dir',output,'--repository','example/fixture',
+        '--event-policy',route.validationContext.eventPolicy,'--run-id','505001','--run-attempt','1','--source-sha',sourceSha,
+        '--comparison-base',fixture.comparisonBase,'--descriptor',tamperedFile],fixture.root,{...env,CHAIN_TEST_EVENT_POLICY:route.validationContext.eventPolicy,CHAIN_DESCRIPTOR_SENTINEL:sentinel});
+      assert.notEqual(group.status,0,`The actual PR group consumer must reject ${field} source/merge substitution: ${group.stdout}${group.stderr}`);
+      assert.equal(fs.existsSync(sentinel),false,`${field} PR binding disagreement must stop before workload execution`);
+      prControls.push({field,plannerStatus:planner.status,plannerError:(planner.stderr||'').trim(),groupStatus:group.status,groupError:(group.stderr||'').trim(),workloadStarted:fs.existsSync(sentinel)});
+    }
+    fs.writeFileSync(path.join(evidence,'pr-source-checkout-controls.json'),JSON.stringify(prControls,null,2)+'\n');
+  }
+  if(eventRef==='refs/heads/main'){
+    const wrongRef=run(process.execPath,[path.join(repository,'scripts/agent-tools/ci-routing.mjs'),'--plan-only','1','--descriptor',descriptor,
+      '--comparison-base',fixture.comparisonBase,'--evidence-dir',path.join(evidence,'routing-wrong-main-ref')],fixture.root,{...env,GITHUB_REF:'refs/heads/fixture'});
+    assert.notEqual(wrongRef.status,0,'An exact-main descriptor cannot acquire main authority after the raw ref changes.');
+    const wrongPolicyOutput=path.join(evidence,'group-wrong-main-policy'),wrongPolicySentinel=path.join(evidence,'wrong-main-policy-child');
+    const wrongPolicy=run('npm',['run','test:group','--','--group','core','--output-dir',wrongPolicyOutput,'--repository','example/fixture',
+      '--event-policy','exact-main-push-v1','--run-id','505001','--run-attempt','1','--source-sha',sourceSha,
+      '--comparison-base',fixture.comparisonBase,'--descriptor',descriptor],fixture.root,
+      {...env,CHAIN_TEST_EVENT_POLICY:'outgoing-branch-push-v1',CHAIN_DESCRIPTOR_SENTINEL:wrongPolicySentinel});
+    assert.notEqual(wrongPolicy.status,0,'A caller-supplied branch policy cannot relabel an exact-main raw event.');
+    assert.equal(fs.existsSync(wrongPolicySentinel),false,'Wrong exact-main policy must be refused before the group workload.');
+    negativeControls.push({field:'exact-main wrong ref/policy',plannerStatus:wrongRef.status,plannerError:wrongRef.stderr.trim(),groupStatus:wrongPolicy.status,groupError:wrongPolicy.stderr.trim(),workloadStarted:fs.existsSync(wrongPolicySentinel)});
+  }
+  if(negativeControls.length){
+    fs.writeFileSync(path.join(evidence,'descriptor-negative-controls.json'),JSON.stringify(negativeControls,null,2)+'\n');
+    assert.equal(negativeControls.some(row=>row.workloadStarted),false);
+  }
+
+  if(eventName==='push'&&eventRef==='refs/heads/fixture'){
+  const routeEquivalent=run(process.execPath,[path.join(repository,'scripts/agent-tools/ci-routing.mjs'),'--plan-only','1','--descriptor',descriptor,
+    '--comparison-base',fixture.comparisonBase,'--evidence-dir',path.join(evidence,'routing-equivalent')],fixture.root,env);
+  assert.equal(routeEquivalent.status,0,routeEquivalent.stdout+routeEquivalent.stderr);
+  const equivalent=JSON.parse(fs.readFileSync(path.join(evidence,'routing-equivalent','routing.json')));
+  assert.deepEqual(equivalent.inputKeys,route.inputKeys,'An actually equivalent same-runtime plan preserves complete input keys.');
+  const alternateNode=alternateNodeRuntime();
+  if(!alternateNode)t.diagnostic('A second actual Node runtime is unavailable here; the real runner-image drift path remains active, and local runtime drift is separately recorded when a second binary is installed.');
+  let nodeDrift=null;
+  if(alternateNode){
+    const routeNodeDrift=run(alternateNode.executable,[path.join(repository,'scripts/agent-tools/ci-routing.mjs'),'--plan-only','1','--descriptor',descriptor,
+      '--comparison-base',fixture.comparisonBase,'--evidence-dir',path.join(evidence,'routing-node-drift')],fixture.root,env);
+    assert.equal(routeNodeDrift.status,0,routeNodeDrift.stdout+routeNodeDrift.stderr);
+    nodeDrift=JSON.parse(fs.readFileSync(path.join(evidence,'routing-node-drift','routing.json')));
+    assert.equal(nodeDrift.validationContext.sourceSha,route.validationContext.sourceSha);assert.equal(nodeDrift.validationContext.checkoutSha,route.validationContext.checkoutSha);
+    assert.deepEqual([nodeDrift.eventName,nodeDrift.eventRef,nodeDrift.eventAction,nodeDrift.validationContext.eventPolicy],
+      [route.eventName,route.eventRef,route.eventAction,route.validationContext.eventPolicy],'Actual runtime drift preserves raw and canonical workflow authority.');
+    assert.notDeepEqual(nodeDrift.inputKeys,route.inputKeys,'The changed actual Node runtime invalidates every affected gate input key.');
+    assert.equal(nodeDrift.decision,'full');assert.deepEqual(nodeDrift.inputPasses,{});
+    assert.equal(nodeDrift.inputContext.runtime.node,alternateNode.version,'Runtime values come from actual Node processes.');
+  }
+  const routeImageDrift=run(process.execPath,[path.join(repository,'scripts/agent-tools/ci-routing.mjs'),'--plan-only','1','--descriptor',descriptor,
+    '--comparison-base',fixture.comparisonBase,'--evidence-dir',path.join(evidence,'routing-image-drift')],fixture.root,{...env,ImageVersion:'fixture-image-B'});
+  assert.equal(routeImageDrift.status,0,routeImageDrift.stdout+routeImageDrift.stderr);
+  const imageDrift=JSON.parse(fs.readFileSync(path.join(evidence,'routing-image-drift','routing.json')));
+  assert.notDeepEqual(imageDrift.inputKeys,route.inputKeys,'A changed runner image also invalidates affected gate input keys.');
+  assert.equal(imageDrift.decision,'full');assert.deepEqual(imageDrift.inputPasses,{});
+  let selected=null;
+  if(alternateNode){
+    const selectedNodeDrift=run(alternateNode.executable,[path.join(repository,'scripts/agent-tools/ci-pass-reuse.mjs'),'select','--proof',path.join(evidence,'routing','routing.json'),
+      '--output-file',path.join(evidence,'selected-node-drift.json')],fixture.root,env);
+    assert.equal(selectedNodeDrift.status,0,selectedNodeDrift.stdout+selectedNodeDrift.stderr);
+    selected=JSON.parse(fs.readFileSync(path.join(evidence,'selected-node-drift.json')));
+    assert.equal(selected.decision,'full');assert.deepEqual(selected.inputPasses,{});assert.notDeepEqual(selected.inputKeys,route.inputKeys);
+    runtimeDriftSelection=selected;
+  }
+  fs.writeFileSync(path.join(evidence,'runtime-drift-controls.json'),JSON.stringify({
+    equivalent:{node:route.inputContext.runtime.node,imageOS:route.inputContext.runtime.imageOS,imageVersion:route.inputContext.runtime.imageVersion,inputKeys:route.inputKeys},
+    nodeDrift:nodeDrift?{executable:alternateNode.executable,node:nodeDrift.inputContext.runtime.node,imageOS:nodeDrift.inputContext.runtime.imageOS,imageVersion:nodeDrift.inputContext.runtime.imageVersion,inputKeys:nodeDrift.inputKeys,decision:nodeDrift.decision,inputPasses:nodeDrift.inputPasses}:null,
+    imageDrift:{node:imageDrift.inputContext.runtime.node,imageOS:imageDrift.inputContext.runtime.imageOS,imageVersion:imageDrift.inputContext.runtime.imageVersion,inputKeys:imageDrift.inputKeys,decision:imageDrift.decision,inputPasses:imageDrift.inputPasses},
+    consumingRuntimeSelection:selected?{node:selected.inputContext.runtime.node,inputKeys:selected.inputKeys,decision:selected.decision,inputPasses:selected.inputPasses}:null,
+  },null,2)+'\n');
+  }
+  const {createMobileBundle,refreshMobileBundle}=await import('./mobile-memory-fixture.mjs');
+  const seed=createMobileBundle(path.join(evidence,'seed'),{candidateCommit:actualDescriptor.resultIdentity.checkoutSha,
+    candidateTree:actualDescriptor.resultIdentity.checkoutTree,sourceSha:actualDescriptor.resultIdentity.sourceSha,repository:'example/fixture',runId:'505001',runAttempt:1,
+    eventPolicy:route.validationContext.eventPolicy});
+  const hostedPolicy={eventPolicy:route.validationContext.eventPolicy,eventName,eventRef};
+  const bindHostedPolicy=bundle=>{bundle.report.hostedPolicy=hostedPolicy;for(const row of [bundle.report.negativeControl,...bundle.report.cases]){row.hostedPolicy=hostedPolicy;row.server.hostedPolicy=hostedPolicy;}for(const native of Object.values(bundle.native))native.hostedPolicy=hostedPolicy;refreshMobileBundle(bundle);};
+  bindHostedPolicy(seed);
+  const journal=path.join(evidence,'early-roots.jsonl'),early=path.join(evidence,'early');
+  const consumerEnv={...env,CHAIN_TEST_EVENT_POLICY:route.validationContext.eventPolicy,EARLY_TRANSFER_SEED:seed.directory,EARLY_ROOT_JOURNAL:journal};
+  const earlyRun=run(process.execPath,['scripts/early-ci.mjs','--run','--descriptor',descriptor,'--output-dir',early],fixture.root,consumerEnv);
+  t.diagnostic(JSON.stringify({producer:{status:produced.status,identity:actualDescriptor.resultIdentity},planner:{status:planned.status,identity:route.validationContext},early:{status:earlyRun.status,stdout:earlyRun.stdout,stderr:earlyRun.stderr,journalExists:fs.existsSync(journal)}}));
+  assert.equal(earlyRun.status,0,'Actual producer descriptor and planner context must reach the real early consumer: '+earlyRun.stdout+earlyRun.stderr);
+
+  const receipt=path.join(early,'receipt.json'),stress=createMobileBundle(path.join(evidence,'stress'),{
+    candidateCommit:actualDescriptor.resultIdentity.checkoutSha,candidateTree:actualDescriptor.resultIdentity.checkoutTree,
+    sourceSha:actualDescriptor.resultIdentity.sourceSha,repository:'example/fixture',runId:'505001',runAttempt:1,eventPolicy:route.validationContext.eventPolicy},'stress-512mb');
+  bindHostedPolicy(stress);
+  const collected=path.join(evidence,'groups');fs.mkdirSync(collected);
+  for(const group of groups){
+    const output=path.join(evidence,`group-${group}`),args=['run-group','--group',group,'--output-dir',output,'--repository','example/fixture',
+      '--event-policy',route.validationContext.eventPolicy,'--run-id','505001','--run-attempt','1','--source-sha',sourceSha,
+      '--comparison-base',fixture.comparisonBase,'--descriptor',descriptor,'--proof',path.join(evidence,'routing','routing.json'),'--early-receipt',receipt];
+    const driftedConsumer=group==='core'&&runtimeDriftSelection;
+    const groupOutput=driftedConsumer?path.join(evidence,'runtime-consumer-core.env'):null;
+    const result=run(driftedConsumer?'/opt/homebrew/bin/node':process.execPath,['scripts/agent-tools/ci-pass-reuse.mjs',...args],fixture.root,
+      {...consumerEnv,...(groupOutput?{GITHUB_OUTPUT:groupOutput}:{})});
+    assert.equal(result.status,0,`The actual ${group} consumer must use the persisted descriptor: ${result.stdout}${result.stderr}`);
+    if(driftedConsumer){
+      const emitted=fs.readFileSync(groupOutput,'utf8'),key=emitted.match(/^key=([a-f0-9]{64})$/m)?.[1];
+      const groupReport=JSON.parse(fs.readFileSync(path.join(output,'result.json'))),producerReceipt=JSON.parse(fs.readFileSync(receipt));
+      assert.equal(key,runtimeDriftSelection.inputKeys.core,'The fresh group job emits its actual consuming-runtime key.');
+      assert.notEqual(key,route.inputKeys.core,'The fresh runtime-drift job cannot reuse the original runtime input.');
+      assert.equal(groupReport.status,'passed');assert.equal(groupReport.earlyStageMode,'full');
+      assert.equal(producerReceipt.identity.runtime.node,route.inputContext.runtime.node,'Retained early receipt keeps its actual producer runtime.');
+      assert.notEqual(runtimeDriftSelection.inputContext.runtime.node,producerReceipt.identity.runtime.node,'Fresh group consuming runtime remains distinct from its saved early producer runtime.');
+      fs.writeFileSync(path.join(evidence,'mixed-runtime-consumer.json'),JSON.stringify({
+        earlyProducerRuntime:producerReceipt.identity.runtime,groupConsumerRuntime:runtimeDriftSelection.inputContext.runtime,
+        plannedNode22Key:route.inputKeys.core,consumingNode23Key:key,groupStatus:groupReport.status,earlyStageMode:groupReport.earlyStageMode,
+        earlyReceipt:groupReport.earlyReceiptRef,
+      },null,2)+'\n');
+    }
+    fs.cpSync(output,path.join(collected,group),{recursive:true});
+  }
+  const needs=path.join(evidence,'needs.json');writeJson(needs,{
+    'validation-context':{result:'success'},'event-gates':{result:'success',outputs:{rules:'executed',compatibility:'executed'}},
+    'cohort-routing':{result:'success',outputs:{decision:'full',reused:'[]'}},'early-startup':{result:'success',outputs:{decision:'full'}},
+    'mobile-stress':{result:'success'},regression:{result:'success'},
+  });
+  const aggregate=run('npm',['run','test:group','--','--aggregate','--group','core','--output-dir',path.join(evidence,'aggregate'),
+    '--results-dir',collected,'--needs-json',needs,'--early-receipt',receipt,'--mobile-stress-report',path.join(stress.directory,'report.json'),
+    '--proof',path.join(evidence,'routing','routing.json'),'--descriptor',descriptor,'--repository','example/fixture',
+    '--event-policy',route.validationContext.eventPolicy,'--run-id','505001','--run-attempt','1','--source-sha',sourceSha,
+    '--comparison-base',fixture.comparisonBase],fixture.root,consumerEnv);
+  assert.equal(aggregate.status,0,aggregate.stdout+aggregate.stderr);
+  const report=JSON.parse(fs.readFileSync(path.join(evidence,'aggregate','aggregate.json')));
+  assert.equal(report.status,'passed');assert.equal(report.mode,'full');
+  const receiptObject=JSON.parse(fs.readFileSync(receipt));
+  assert.deepEqual(receiptObject.identity.descriptor,actualDescriptor.resultIdentity,'Early receipt retains the producer-owned descriptor exactly');
+  assert.equal(receiptObject.identity.eventName,eventName);assert.equal(receiptObject.identity.eventRef,eventRef);assert.equal(receiptObject.identity.eventAction,eventAction);
+  for(const file of [path.join(early,'required/report.json'),path.join(stress.directory,'report.json')]){
+    const mobile=JSON.parse(fs.readFileSync(file));assert.equal(mobile.eventPolicy,route.validationContext.eventPolicy);assert.deepEqual(mobile.hostedPolicy,hostedPolicy);
+    assert.equal(mobile.repository,'example/fixture');assert.equal(mobile.sourceSha,sourceSha);assert.equal(mobile.candidateCommit,checkout);
+    assert.equal(mobile.candidateTree,git(fixture.root,'rev-parse','HEAD^{tree}'));assert.equal(mobile.runId,'505001');assert.equal(mobile.runAttempt,1);
+  }
+  for(const group of groups){const result=JSON.parse(fs.readFileSync(path.join(collected,group,'result.json')));assert.equal(result.status,'passed');
+    for(const [key,value]of Object.entries({repository:'example/fixture',sourceSha,sourceTree:git(fixture.root,'rev-parse',`${sourceSha}^{tree}`),checkoutSha:checkout,
+      checkoutTree:git(fixture.root,'rev-parse','HEAD^{tree}'),comparisonBase:fixture.comparisonBase,runId:'505001',runAttempt:1,eventName,eventRef,eventAction,eventPolicy:route.validationContext.eventPolicy}))assert.equal(result.resultIdentity[key],value,`${group} report identity ${key}`);
+  }
+  for(const artifact of [actualDescriptor.resultIdentity,report.resultIdentity]){
+    assert.equal(artifact.repository,'example/fixture');assert.equal(artifact.sourceSha,sourceSha);assert.equal(artifact.sourceTree,git(fixture.root,'rev-parse',`${sourceSha}^{tree}`));
+    assert.equal(artifact.checkoutSha,checkout);assert.equal(artifact.checkoutTree,git(fixture.root,'rev-parse','HEAD^{tree}'));assert.equal(artifact.comparisonBase,fixture.comparisonBase);
+    assert.equal(artifact.runId,'505001');assert.equal(artifact.runAttempt,1);assert.equal(artifact.eventPolicy,route.validationContext.eventPolicy);
+    assert.equal(artifact.eventName,eventName);assert.equal(artifact.eventRef,eventRef);assert.equal(artifact.eventAction,eventAction);
+  }
+  assert.equal(route.validationContext.eventPolicy,actualDescriptor.resultIdentity.eventPolicy);assert.equal(route.eventName,eventName);assert.equal(route.eventRef,eventRef);assert.equal(route.eventAction,eventAction);
+  fs.writeFileSync(path.join(evidence,'coverage-limits.json'),JSON.stringify({
+    evidenceBoundary:'Local public command/process fixtures with controlled workload children; no GitHub API, hosted runner, external provider, actual mobile runtime, or native device was invoked.',
+    controlledChildren:'Prove identity propagation and current process/evidence accounting only; they do not qualify hosted, native, or deployed behavior.',
+    actualInputRuntimeDrift:Boolean(runtimeDriftSelection),
+  },null,2)+'\n');
+  if(eventName==='pull_request'){
+    assert.notEqual(sourceSha,checkout,'PR head source and actual merge checkout remain distinct commits');
+    assert.notEqual(git(fixture.root,'rev-parse',`${sourceSha}^{tree}`),git(fixture.root,'rev-parse','HEAD^{tree}'),'PR head source and merge checkout retain distinct trees');
+    assert.equal(actualDescriptor.resultIdentity.eventPolicy,'canonical-pr-merge-v1');assert.equal(actualDescriptor.resultIdentity.eventAction,'synchronize');
+  }
+}
+
 test('test group fresh runtimes consume an intact original early predecessor',async t=>{
   const {fixture,directory,descriptor,id,stress,env,journal,first,receipt}=await earlyProcessFixture(t);
   const {file,proof}=inputCoverage(fixture);
@@ -1298,17 +1534,18 @@ test('test group aggregate classifies early-only inheritance across every requir
   t.diagnostic('Public aggregate controls retain early-only mixed, partially executed mixed and entirely inherited covered modes; no synthetic evidence becomes an original full producer.');
 });
 
-test('test group workflow consumer forbids duplicate execution for a verified input pass', t => {
-  const fixture=createFixture(t),{proof}=inputCoverage(fixture);
+test('test group workflow consumer forbids duplicate execution for a verified input pass', async t => {
+  const fixture=createFixture(t),{file,proof}=inputCoverage(fixture);
   const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'chain-workflow-reuse-'));fixture.outputs.push(temporary);
   fs.mkdirSync(path.join(temporary,'ci-routing'));writeJson(path.join(temporary,'ci-routing/routing.json'),proof);
+  const descriptorDestination=path.join(temporary,'validation/descriptor/descriptor.json');fs.mkdirSync(path.dirname(descriptorDestination),{recursive:true});fs.copyFileSync(path.join(path.dirname(file), 'descriptor.json'),descriptorDestination);
   const sentinel=path.join(temporary,'test-child-executed');
   const workflow=fs.readFileSync(path.join(repository,'.github/workflows/data-safety.yml'),'utf8');
   const commands=[...workflow.matchAll(/      - name: Execute complete assigned group\n[\s\S]*?        run: \|\n((?:          [^\n]*\n|\n)*)/g)].map(match=>match[1].split('\n').map(line=>line.startsWith('          ')?line.slice(10):line).join('\n'));
   const selection=[...workflow.matchAll(/^\s+run: (node scripts\/agent-tools\/ci-pass-reuse\.mjs select .+)$/gm)][0]?.[1];assert.ok(selection,'the workflow must select consumer inputs before dependency setup');
   assert.equal(commands.length,1,'the workflow must use the enforcing consumer exactly once');
   const command=selection+'\n'+commands[0].replaceAll('${{ matrix.group }}','core');
-  const env={...process.env,ImageOS:'ubuntu24',ImageVersion:'20261022.1.0',RUNNER_TEMP:temporary,GITHUB_REPOSITORY:'example/fixture',CHAIN_TEST_EVENT_POLICY:'local',GITHUB_RUN_ID:'fixture-run-1',GITHUB_RUN_ATTEMPT:'1',CHAIN_TEST_SOURCE_SHA:fixture.sourceSha,CHAIN_TEST_COMPARISON_BASE:fixture.comparisonBase,CHAIN_DESCRIPTOR_SENTINEL:sentinel};delete env.NODE_TEST_CONTEXT;
+  const env={...process.env,PATH:path.dirname(process.execPath)+path.delimiter+process.env.PATH,ImageOS:'ubuntu24',ImageVersion:'20261022.1.0',RUNNER_TEMP:temporary,GITHUB_REPOSITORY:'example/fixture',CHAIN_TEST_EVENT_POLICY:'local',GITHUB_RUN_ID:'fixture-run-1',GITHUB_RUN_ATTEMPT:'1',CHAIN_TEST_SOURCE_SHA:fixture.sourceSha,CHAIN_TEST_COMPARISON_BASE:fixture.comparisonBase,CHAIN_DESCRIPTOR_SENTINEL:sentinel};delete env.NODE_TEST_CONTEXT;
   const reused=run('bash',['-euo','pipefail','-c',command],fixture.root,env);
   assert.equal(reused.status,0,reused.stdout+reused.stderr);
   assert.equal(readEvidence(path.join(temporary,'group'))?.status,'covered','the actual workflow dispatch must consume the verified pass');
@@ -1327,6 +1564,9 @@ test('test group workflow consumer forbids duplicate execution for a verified in
   assert.equal(changedImage.status,0,changedImage.stdout+changedImage.stderr);
   assert.equal(fs.existsSync(sentinel),true,'a different consumer image must execute instead of failing or inheriting coverage');
   assert.equal(readEvidence(path.join(temporary,'group')).status,'passed');
+  await producerPlannerConsumerChain(t);
+  await producerPlannerConsumerChain(t,{eventRef:'refs/heads/main'});
+  await producerPlannerConsumerChain(t,{eventName:'pull_request',eventRef:'refs/pull/42/merge',eventAction:'synchronize'});
 });
 
 test('test group workflow publication attests actual execution and never promotes a reused result', t => {
@@ -1469,7 +1709,7 @@ test('test group aggregate binds successful early execution and separate failed 
  const names=['RISK repository process: Playwright waitForFunction predicates are synchronous','RISK repository process: scenery consumers use allocated fallback ports and preserve early native failures','RISK repository process: native scene-time bursts cannot activate controls behind a refused top-layer release'];
  fs.writeFileSync(path.join(early,'harness.stdout'),'TAP version 13\n'+names.map((name,index)=>`# Subtest: ${name}\nok ${index+1} - ${name}\n`).join(''));
  const hash=bytes=>createHash('sha256').update(bytes).digest('hex'),artifacts=[];const visit=dir=>{for(const entry of fs.readdirSync(dir,{withFileTypes:true})){const file=path.join(dir,entry.name);if(entry.isDirectory())visit(file);else{const bytes=fs.readFileSync(file);artifacts.push({path:path.relative(early,file).split(path.sep).join('/'),bytes:bytes.length,sha256:hash(bytes)});}}};visit(early);
- const receipt={schemaVersion:1,status:'passed',mode:'full',identity:{descriptor:id,workflowBlob:git(fixture.root,'rev-parse','HEAD:.github/workflows/data-safety.yml'),harnessSourceSha256:hash(fs.readFileSync(path.join(fixture.root,'scripts/early-ci-harness-source.json'))),eventName:null,eventRef:null},children:['harness','required-1gb'].map(kind=>({kind,exitCode:0,signal:null,error:null})),harnessCaseCount:3,artifacts:artifacts.sort((a,b)=>a.path.localeCompare(b.path))};writeJson(path.join(early,'receipt.json'),receipt);
+ const receipt={schemaVersion:1,status:'passed',mode:'full',identity:{descriptor:id,workflowBlob:git(fixture.root,'rev-parse','HEAD:.github/workflows/data-safety.yml'),harnessSourceSha256:hash(fs.readFileSync(path.join(fixture.root,'scripts/early-ci-harness-source.json'))),eventName:null,eventRef:null,eventAction:null},children:['harness','required-1gb'].map(kind=>({kind,exitCode:0,signal:null,error:null})),harnessCaseCount:3,artifacts:artifacts.sort((a,b)=>a.path.localeCompare(b.path))};writeJson(path.join(early,'receipt.json'),receipt);
  const collected=path.join(evidence,'groups');for(const [group,output]of fixture.originals)fs.cpSync(output,path.join(collected,group),{recursive:true});const needs=path.join(evidence,'needs.json');writeJson(needs,Object.fromEntries(['validation-context','event-gates','cohort-routing','regression','early-startup','mobile-stress'].map(name=>[name,{result:'success'}])));
  const env={GITHUB_REPOSITORY:id.repository,CHAIN_TEST_SOURCE_SHA:id.sourceSha,CHAIN_TEST_EVENT_POLICY:id.eventPolicy,GITHUB_RUN_ID:id.runId,GITHUB_RUN_ATTEMPT:String(id.runAttempt),GITHUB_EVENT_NAME:undefined,GITHUB_REF:undefined};
  const args=['--aggregate','--results-dir',collected,'--needs-json',needs,'--early-receipt',path.join(early,'receipt.json'),'--mobile-stress-report',path.join(stress.directory,'report.json')];
@@ -1536,7 +1776,7 @@ test('reconciled fresh group consumes the explicit browser preflight before its 
 test('group and aggregate retain actual early cases once across fresh group processes',async t=>{
  const {runButtonSafety}=await import('../button-safety-native.mjs'),playwright=await import('playwright');
  const proofBase=process.env.CHAIN_NATIVE_OUTPUT||os.tmpdir();fs.mkdirSync(proofBase,{recursive:true});const proof=fs.mkdtempSync(path.join(proofBase,'failed-accounting-'));if(!process.env.CHAIN_NATIVE_OUTPUT)t.after(()=>fs.rmSync(proof,{recursive:true,force:true}));
- const port=process.env.CI==='true'?0:Number(process.env.CHAIN_NATIVE_PORT||process.env.CHAIN_NATIVE_SMOKE_PORT||0);assert.ok(process.env.CI==='true'||port>0,'Mock-launch consumer requires the existing allocated local port');
+ const portServer=net.createServer();await new Promise((resolve,reject)=>{portServer.once('error',reject);portServer.listen(0,'127.0.0.1',resolve);});const port=portServer.address().port;await new Promise((resolve,reject)=>portServer.close(error=>error?reject(error):resolve()));assert.ok(port>0,'Mock-launch consumer requires a locally allocated loopback port');
  const ledger=path.join(proof,'ledger.json'),prior=process.env.CODEX_COORDINATION_FILE,launch=playwright.chromium.launch;
  writeJson(ledger,{entries:[{status:'active',worktree:repository,lease:{state:'healthy',expiresAt:new Date(Date.now()+60000).toISOString()},resources:['browser-runtime:playwright-chromium','loopback:127.0.0.1:'+port]}]});process.env.CODEX_COORDINATION_FILE=ledger;
  const stopped=Error('page.goto: Page crashed'),bindings=new Map(),events=new Map();
@@ -1577,6 +1817,7 @@ test('group and aggregate retain actual early cases once across fresh group proc
  const actualCommand=actualStep[1].split('\n').map(line=>line.startsWith('          ')?line.slice(10):line).join('\n');
  for(const group of groups){
   const runnerTemp=path.join(temp,'job-'+group);fs.mkdirSync(runnerTemp);fs.cpSync(early,path.join(runnerTemp,'early'),{recursive:true});
+  const jobDescriptor=path.join(runnerTemp,'validation/descriptor');fs.mkdirSync(jobDescriptor,{recursive:true});fs.copyFileSync(descriptor,path.join(jobDescriptor,'descriptor.json'));
   fs.mkdirSync(path.join(runnerTemp,'selected-routing'));writeJson(path.join(runnerTemp,'selected-routing/routing.json'),{decision:'full',validationContext:identity,runId:identity.runId,runAttempt:identity.runAttempt,inputPasses:{}});
   if(group==='persistence-recovery'){
    const preflight=invoke(fixture,{group,env,outputDir:path.join(runnerTemp,'browser-runtime-preflight'),args:['--browser-runtime-preflight','--early-receipt',path.join(runnerTemp,'early/receipt.json')]});
@@ -1614,6 +1855,7 @@ test('group and aggregate retain actual early cases once across fresh group proc
 test('workflow metadata aggregate rejects pending cancelled unresolved and stale successful routing proofs', async parent=>{
  const fixture=createFixture(parent),{file,proof}=fixtureCoverage(fixture),temporary=fs.mkdtempSync(path.join(os.tmpdir(),'chain-metadata-aggregate-'));
  parent.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));fs.mkdirSync(path.join(temporary,'groups'));fs.mkdirSync(path.join(temporary,'final-routing'));
+ fs.mkdirSync(path.join(temporary,'validation/descriptor'),{recursive:true});fs.copyFileSync(path.join(path.dirname(file),'descriptor.json'),path.join(temporary,'validation/descriptor/descriptor.json'));
  const sentinel=path.join(temporary,'unexpected-test-child'),workflow=fs.readFileSync(path.join(repository,'.github/workflows/data-safety.yml'),'utf8');
  const step=workflow.match(/      - name: Verify complete required cohort\n[\s\S]*?        run: \|\n((?:          [^\n]*\n|\n)*)/);assert.ok(step);
  const command=step[1].split('\n').map(line=>line.startsWith('          ')?line.slice(10):line).join('\n');
@@ -1692,6 +1934,7 @@ test('test group workflow browser path reaches the installer and enforcing persi
  assert.equal(installPath,expected,'The installer must resolve the isolated absolute runner-temp path');assert.equal(groupPath,expected,'The enforcing persistence consumer must resolve the same isolated runner-temp path');
  const command=step=>{const value=step.match(/        run: \|\n((?:          [^\n]*\n|\n)*)/);assert.ok(value,'Actual multi-line workflow command required');return value[1].split('\n').map(line=>line.startsWith('          ')?line.slice(10):line).join('\n').replaceAll('${{ matrix.group }}','persistence-recovery').replaceAll('${{ steps.selected.outputs.early-decision }}','full');};
  const described=invoke(fixture,{args:['--describe']});assert.equal(described.status,0,described.stderr);const identity=JSON.parse(fs.readFileSync(path.join(described.outputDir,'descriptor.json'))).resultIdentity;
+ const descriptorDestination=path.join(runnerTemp,'validation/descriptor/descriptor.json');fs.mkdirSync(path.dirname(descriptorDestination),{recursive:true});fs.copyFileSync(path.join(described.outputDir,'descriptor.json'),descriptorDestination);
  const proof=path.join(runnerTemp,'selected-routing/routing.json');fs.mkdirSync(path.dirname(proof),{recursive:true});writeJson(proof,{decision:'full',runId:identity.runId,runAttempt:identity.runAttempt,validationContext:identity,inputPasses:{}});
  const env={...process.env,CI:'true',RUNNER_TEMP:runnerTemp,GITHUB_REPOSITORY:identity.repository,CHAIN_TEST_SOURCE_SHA:fixture.sourceSha,CHAIN_TEST_COMPARISON_BASE:fixture.comparisonBase,CHAIN_TEST_EVENT_POLICY:identity.eventPolicy,GITHUB_RUN_ID:identity.runId,GITHUB_RUN_ATTEMPT:String(identity.runAttempt),WORKFLOW_INSTALL_JOURNAL:journal};delete env.NODE_TEST_CONTEXT;delete env.PLAYWRIGHT_BROWSERS_PATH;
  const installer='npx(){ printf "%s\\n" "$PLAYWRIGHT_BROWSERS_PATH" "$@" >> "$WORKFLOW_INSTALL_JOURNAL"; mkdir -p "$PLAYWRIGHT_BROWSERS_PATH/chromium"; printf "%s\\n" "controlled external Chromium provider" > "$PLAYWRIGHT_BROWSERS_PATH/chromium/chrome"; chmod +x "$PLAYWRIGHT_BROWSERS_PATH/chromium/chrome"; }\n'+command(install);
