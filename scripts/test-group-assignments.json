@@ -13747,6 +13747,11 @@
       "root": "qualification selector binds exact assigned risk wrappers to source changes and fails closed",
       "group": "native-process",
       "file": "scripts/agent-tools/qualification-contracts.test.mjs"
+    },
+    {
+      "root": "qualification readiness gates the recorder child on selected parent contracts and explicit no-change",
+      "group": "native-process",
+      "file": "scripts/agent-tools/qualification-contracts.test.mjs"
     }
   ],
   "processControls": [

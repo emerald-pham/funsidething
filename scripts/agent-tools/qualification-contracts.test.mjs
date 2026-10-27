@@ -129,6 +129,130 @@ function invoke(fixture, ...selectionArgs) {
   });
 }
 
+function makeRecorderFixture(t, { sourceChange = true } = {}) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'chain-qualification-recorder-'));
+  const repo = path.join(root, 'repo');
+  const branch = git(repository, 'branch', '--show-current');
+  git(root, 'clone', '--shared', '--quiet', '--single-branch', '--branch', branch, repository, repo);
+  const sourceHead = git(repo, 'rev-parse', 'HEAD');
+  if (!git(repo, 'branch', '--list', 'main')) git(repo, 'branch', 'main', sourceHead);
+  git(repo, 'checkout', '--detach', sourceHead);
+  const modules = path.join(repository, 'node_modules');
+  if (fs.existsSync(modules)) {
+    fs.symlinkSync(modules, path.join(repo, 'node_modules'), 'dir');
+    fs.appendFileSync(path.join(repo, '.git/info/exclude'), '\n/node_modules\n');
+  }
+  if (sourceChange) {
+    const assignmentFile = path.join(repo, 'scripts/test-group-assignments.json');
+    const assignments = JSON.parse(fs.readFileSync(assignmentFile, 'utf8'));
+    assignments.assignmentMethod += ' Qualification recorder fixture source-bound trigger.';
+    writeJson(assignmentFile, assignments);
+    git(repo, 'add', 'scripts/test-group-assignments.json');
+    git(repo, 'commit', '-qm', 'qualification recorder fixture source trigger');
+  }
+  const candidate = git(repo, 'rev-parse', 'HEAD');
+  const tree = git(repo, 'rev-parse', 'HEAD^{tree}');
+  const deliveryPort = 40_000 + (process.pid % 10_000) * 2;
+  const smokePort = deliveryPort + 1;
+  const evidence = path.join(root, 'evidence');
+  const nativeOutput = path.join(root, 'native-output');
+  const ledger = path.join(root, 'coordination.json');
+  const sentinel = path.join(root, 'long-child-started');
+  const preload = path.join(root, 'qualification-child-outcome.cjs');
+  fs.writeFileSync(preload, `
+const childProcess = require('node:child_process');
+const { syncBuiltinESMExports } = require('node:module');
+const realSpawn = childProcess.spawn;
+const titles = JSON.parse(process.env.CHAIN_QUALIFICATION_FIXTURE_TITLES || '[]');
+childProcess.spawn = function (command, args = [], options = {}) {
+  const mode = process.env.CHAIN_QUALIFICATION_FIXTURE_OUTCOME || 'actual';
+  const pattern = Array.isArray(args) && args.find(argument => argument.startsWith('--test-name-pattern=')) || '';
+  const selected = Array.isArray(args) && args.includes('--test-reporter=tap') && args.at(-1) === 'tests.js'
+    && titles.length > 0 && titles.every(title => pattern.includes(title));
+  if (!selected || mode === 'actual') return realSpawn(command, args, options);
+  let rows = titles.map((title, index) => {
+    const failed = mode === 'failed' && index === 0;
+    const skipped = mode === 'skipped' && index === 0;
+    return '# Subtest: ' + title + '\\n' + (failed ? 'not ' : '') + 'ok ' + (index + 1) + ' - ' + title
+      + (skipped ? ' # SKIP controlled fixture' : '') + '\\n';
+  });
+  if (mode === 'missing') rows = [];
+  if (mode === 'duplicate') rows.push(rows[0]);
+  const output = 'TAP version 13\\n' + rows.join('') + '1..' + rows.length + '\\n';
+  const exitCode = mode === 'failed' ? 1 : 0;
+  return realSpawn(process.execPath, ['-e', 'process.stdout.write(' + JSON.stringify(output) + '); process.exitCode = ' + exitCode], options);
+};
+syncBuiltinESMExports();
+`);
+  writeJson(ledger, { version: 1, scope: 'codex-wide', entries: [{
+    id: 'qualification-recorder-fixture', status: 'active', worktree: repo,
+    resources: [`loopback:127.0.0.1:${deliveryPort}`, `loopback:127.0.0.1:${smokePort}`],
+  }] });
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  return {
+    root, repo, candidate, tree, base: sourceHead, evidence, nativeOutput, ledger, sentinel, preload,
+    environment: {
+      ...process.env,
+      CI: '',
+      CODEX_COORDINATION_FILE: ledger,
+      DOW_EMULATOR_COORDINATION_FILE: '',
+      CHAIN_NATIVE_CANDIDATE_SHA: candidate,
+      CHAIN_NATIVE_CANDIDATE_TREE: tree,
+      CHAIN_NATIVE_OUTPUT: nativeOutput,
+      CHAIN_NATIVE_PORT: String(deliveryPort),
+      CHAIN_NATIVE_SMOKE_PORT: String(smokePort),
+      CHAIN_QUALIFICATION_FIXTURE_SENTINEL: sentinel,
+      CHAIN_QUALIFICATION_FIXTURE_TITLES: JSON.stringify(contractRows.map(row => row.root)),
+      PATH: `${path.dirname(process.execPath)}:${process.env.PATH || ''}`,
+      NODE_OPTIONS: `${process.env.NODE_OPTIONS || ''} --require=${preload}`.trim(),
+    },
+  };
+}
+
+function invokeReadyRecorder(fixture, { mode = 'actual', sentinel = fixture.sentinel, comparisonBase = undefined } = {}) {
+  const env = {
+    ...fixture.environment,
+    CHAIN_QUALIFICATION_FIXTURE_OUTCOME: mode,
+    CHAIN_QUALIFICATION_FIXTURE_SENTINEL: sentinel,
+  };
+  const command = "require('node:fs').writeFileSync(process.env.CHAIN_QUALIFICATION_FIXTURE_SENTINEL, 'started'); process.stdout.write('requested long child only\\n')";
+  return spawnSync(process.execPath, [
+    path.join(repository, 'scripts/agent-tools/record-run.mjs'),
+    '--repo', fixture.repo,
+    '--evidence-dir', fixture.evidence,
+    '--purpose', 'green',
+    '--qualification-readiness',
+    ...(comparisonBase ? ['--qualification-base', comparisonBase] : []),
+    '--summary',
+    '--', process.execPath, '-e', command,
+  ], { cwd: fixture.repo, encoding: 'utf8', timeout: 240_000, maxBuffer: 8 * 1024 * 1024, env });
+}
+
+function readRecorderSummary(result) {
+  assert.equal(result.stderr, '', `summary mode should keep qualification TAP private: ${result.stderr.slice(0, 300)}`);
+  const lines = result.stdout.trimEnd().split('\n');
+  assert.equal(lines.length, 1, `expected one bounded recorder summary line, got ${lines.length}`);
+  return JSON.parse(lines[0]);
+}
+
+function recorderRecord(fixture) {
+  const records = fs.readdirSync(fixture.evidence).filter(file => file.endsWith('.json'));
+  assert.equal(records.length, 1, 'each readiness invocation should leave exactly one durable parent record');
+  return JSON.parse(fs.readFileSync(path.join(fixture.evidence, records[0]), 'utf8'));
+}
+
+function assertPrivateQualificationReport(fixture, summary, expectedStatus) {
+  assert.equal(summary.qualificationPreflight?.status, expectedStatus, 'the summary exposes only bounded qualification status');
+  const record = recorderRecord(fixture);
+  const reportPath = record.qualificationPreflight?.reportPath;
+  assert.equal(typeof reportPath, 'string', 'the recorder record links to a distinct qualification report');
+  const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+  assert.equal(fs.statSync(path.dirname(reportPath)).mode & 0o777, 0o700, 'qualification report directory is private');
+  assert.equal(fs.statSync(reportPath).mode & 0o777, 0o600, 'qualification report is private');
+  assert.equal(report.status, expectedStatus);
+  return { record, report, reportPath };
+}
+
 function executeSelectedFixture(fixture, { environment = {}, timeout = 15_000 } = {}) {
   const plan = planQualificationContracts({ repo: fixture.root, comparisonBase: fixture.base });
   const command = qualificationTestCommand(plan);
@@ -278,5 +402,68 @@ test('qualification selector binds exact assigned risk wrappers to source change
     const result = invoke(fixture);
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /baseline root|replacement|registration|qualification/i);
+  });
+});
+
+test('qualification readiness gates the recorder child on selected parent contracts and explicit no-change', async t => {
+  await t.test('selected existing wrappers pass privately before the requested child starts', () => {
+    const fixture = makeRecorderFixture(t);
+    const result = invokeReadyRecorder(fixture);
+    assert.equal(result.error, undefined, result.error?.message);
+    assert.equal(result.signal, null, result.stderr);
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+    assert.equal(fs.readFileSync(fixture.sentinel, 'utf8'), 'started', 'the requested long child starts only after all selected wrappers pass');
+    const summary = readRecorderSummary(result);
+    assert.equal(summary.status, 'passed');
+    assert.equal(summary.qualificationPreflight.status, 'passed');
+    assert.deepEqual(summary.qualificationPreflight.selectedContractIds, ['startup-browser', 'finite-authority', 'workflow-context']);
+    const { record, report } = assertPrivateQualificationReport(fixture, summary, 'passed');
+    assert.equal(report.selection.status, 'selected');
+    assert.deepEqual(report.outcomes.outcomes.map(row => row.status), ['passed', 'passed', 'passed']);
+    assert.match(report.contracts.stdout, /# tests 3\n/);
+    assert.match(record.execution.output.stdout, /requested long child only/);
+    assert.doesNotMatch(record.execution.output.stdout, /# Subtest:|startup-browser|finite-authority|workflow-context/);
+    assert.doesNotMatch(summary.stdout ?? '', /# Subtest:|# tests 3/);
+    const children = fs.readdirSync(path.dirname(record.qualificationPreflight.reportPath));
+    assert.ok(children.includes('preflight.stdout.txt'));
+    assert.ok(children.includes('preflight.stderr.txt'));
+    assert.ok(children.includes('contracts.stdout.tap'));
+    assert.ok(children.includes('contracts.stderr.txt'));
+    for (const file of children) assert.equal(fs.statSync(path.join(path.dirname(record.qualificationPreflight.reportPath), file)).mode & 0o777, 0o600, `${file} is private`);
+  });
+
+  for (const mode of ['failed', 'skipped', 'duplicate', 'missing']) await t.test(`${mode} selected outcomes block the requested child`, () => {
+    const fixture = makeRecorderFixture(t);
+    const result = invokeReadyRecorder(fixture, { mode });
+    assert.equal(result.error, undefined, result.error?.message);
+    assert.equal(result.signal, null, result.stderr);
+    assert.notEqual(result.status, 0, `${mode} must fail closed before the requested child: ${result.stdout}\n${result.stderr}`);
+    assert.equal(fs.existsSync(fixture.sentinel), false, `${mode} must not launch the requested child`);
+    const summary = readRecorderSummary(result);
+    assert.equal(summary.status, 'qualification-failure', result.stdout);
+    assert.equal(summary.qualificationPreflight.status, 'failed');
+    const { record, report } = assertPrivateQualificationReport(fixture, summary, 'failed');
+    assert.equal(report.outcomes.status, 'failed');
+    assert.ok(report.outcomes.outcomes.some(row => row.status === mode), `${mode} is represented as the observed child outcome`);
+    assert.equal(record.execution.outcome, 'qualification-failure');
+    assert.equal(record.execution.output.stdout, '');
+  });
+
+  await t.test('an explicit empty selection skips wrappers and still launches the requested child', () => {
+    const fixture = makeRecorderFixture(t, { sourceChange: false });
+    const result = invokeReadyRecorder(fixture);
+    assert.equal(result.error, undefined, result.error?.message);
+    assert.equal(result.signal, null, result.stderr);
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+    assert.equal(fs.readFileSync(fixture.sentinel, 'utf8'), 'started');
+    const summary = readRecorderSummary(result);
+    assert.equal(summary.status, 'passed');
+    assert.equal(summary.qualificationPreflight.status, 'no_change');
+    assert.deepEqual(summary.qualificationPreflight.selectedContractIds, []);
+    const { record, report } = assertPrivateQualificationReport(fixture, summary, 'no_change');
+    assert.equal(report.selection.status, 'no_change');
+    assert.equal(report.outcomes, null, 'no-change records no parent cohort outcome');
+    assert.equal(record.execution.outcome, 'passed');
+    assert.match(record.execution.output.stdout, /requested long child only/);
   });
 });
