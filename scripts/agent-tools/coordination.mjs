@@ -472,11 +472,7 @@ async function migrate(source, options) {
   for (const path of [source, target]) {
     for (const suffix of ['.lock', '.lock.recovery']) {
       const lockPath = `${path}${suffix}`;
-      const lock = await metadataIfPresent(lockPath);
-      if (lock) {
-        assertOwnedMetadata(lock, lockPath);
-        if (!lockOwner(await readFile(lockPath, 'utf8'))) throw new Error(`Migration cannot verify lock ownership at ${lockPath}.`);
-      }
+      await migrationLockSnapshot(lockPath);
     }
   }
   const locks = [canonicalSource, canonicalTarget].sort();
