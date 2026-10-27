@@ -183,3 +183,14 @@ create a new product RED claim. The focused repair run
 `2026-10-27T00-27-03-732Z-63eea31f-5771-4db4-9b76-728f05e95854.json`
 passes the existing FAQ, new guidance, hydration, and inventory roots on the
 recorded dirty test delta; final committed qualification remains separate.
+
+Required preflight then found the All Tasks answer above its unchanged
+130-word limit (record `1e5c53da-0109-4f33-86eb-18beadee4f06`), followed by
+the unreadable-device answer (`b2456ed0-3e8a-472a-933b-15b0cffc2c83`).
+Two concise rewrites preserve the complete recovery/confirmation guidance and
+all existing FAQ assertions. The unchanged brevity and affected guidance tests
+pass in record `1ffbe0a7-1164-4a38-9308-1861774fbb4a`. This later FAQ-only
+application delta requires refreshed shell identities and affected FAQ review;
+startup runtime, status styling, and the 142 earlier header/scroll artifacts
+retain their original producing-test and application identity, with unchanged
+behavior rather than a claim that they were reexecuted on the new commit.
