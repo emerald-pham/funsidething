@@ -2,6 +2,8 @@
 import { createHash } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import net from 'node:net';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { derivePolicyProseImpact, validatePolicyProseStatuses } from './release-evidence.mjs';
@@ -36,15 +38,30 @@ function parseArgs(argv) {
     ['--group', 'group'], ['--output-dir', 'outputDir'], ['--repository', 'repository'],
     ['--event-policy', 'eventPolicy'], ['--run-id', 'runId'], ['--run-attempt', 'runAttempt'],
     ['--source-sha', 'sourceSha'], ['--comparison-base', 'comparisonBase'], ['--results-dir','resultsDir'], ['--needs-json','needsJson'], ['--proof','proof'], ['--early-receipt','earlyReceipt'], ['--mobile-stress-report','mobileStressReport'],
+    ['--browser-path', 'browserPath'], ['--native-port', 'nativePort'], ['--browser-runtime-receipt', 'browserRuntimeReceipt'],
   ]);
   for (let index = 0; index < argv.length; index++) {
-    if (['--describe','--aggregate','--covered'].includes(argv[index])) { values[argv[index].slice(2)] = true; continue; }
+    if (['--describe','--aggregate','--covered','--browser-runtime-preflight'].includes(argv[index])) {
+      const key = argv[index].slice(2).replace(/-([a-z])/g, (_match, letter) => letter.toUpperCase());
+      if (values[key] !== undefined) fail(`Argument ${argv[index]} was provided more than once.`);
+      values[key] = true;
+      continue;
+    }
     const key = keyMap.get(argv[index]);
     if (!key) fail(`Unknown argument: ${argv[index]}`);
     if (values[key] !== undefined) fail(`Argument ${argv[index]} was provided more than once.`);
     const value = argv[++index];
     if (!value || value.startsWith('--')) fail(`Argument ${argv[index - 1]} needs a value.`);
     values[key] = value;
+  }
+  if (values.browserRuntimePreflight && (values.describe || values.aggregate || values.covered)) {
+    fail('--browser-runtime-preflight cannot be combined with --describe, --aggregate, or --covered.');
+  }
+  if (values.browserRuntimeReceipt && (values.browserRuntimePreflight || values.describe || values.aggregate || values.covered)) {
+    fail('--browser-runtime-receipt is only valid on an ordinary group invocation.');
+  }
+  if (!values.browserRuntimePreflight && (values.browserPath || values.nativePort)) {
+    fail('--browser-path and --native-port are only valid with --browser-runtime-preflight.');
   }
   const defaults = {
     repository: process.env.GITHUB_REPOSITORY,
@@ -198,6 +215,10 @@ function validateAssignments(assignments, inventory, inventoryIndex, files) {
     }
     if(entry.executionStage!==undefined&&entry.executionStage!=='early-startup')fail('Unknown root execution stage.');
     if (entry.registration !== undefined && !['literal','dynamic'].includes(entry.registration)) fail('Unknown root registration policy.');
+    if (entry.browserRuntime !== undefined && entry.browserRuntime !== 'ci-chromium') fail('Unknown required browser runtime policy.');
+    if (entry.browserRuntime && (entry.registration === 'dynamic' || entry.executionStage === 'early-startup')) {
+      fail('CI Chromium browser roots must be literal regression-stage registrations.');
+    }
     if (assignmentsByRoot.has(entry.root)) fail(`Root ${JSON.stringify(entry.root)} has overlapping group assignments.`);
     assignmentsByRoot.set(entry.root, entry);
   }
@@ -275,7 +296,8 @@ function cohortDigest(inventory, assignments, assignmentIndex) {
     return replacement ? replacementCaseId(item.id, replacement) : item.id;
   }).sort();
   const rootAssignments = [...assignmentIndex.assignmentsByRoot.values()]
-    .map(({ root, group, file, executionStage }) => ({ root, group, file, ...(executionStage?{executionStage}:{}) }))
+    .map(({ root, group, file, executionStage, browserRuntime }) => ({ root, group, file,
+      ...(executionStage?{executionStage}:{}), ...(browserRuntime?{browserRuntime}:{}) }))
     .sort((left, right) => left.root.localeCompare(right.root));
   const rootReplacements = [...assignmentIndex.replacementByBaseline.values()]
     .map(({ baselineRoot, currentRoot, baselineGroup, group, file }) => ({ baselineRoot, currentRoot, baselineGroup, group, file }))
@@ -604,14 +626,15 @@ function parseTap(text) {
   return cases;
 }
 
-function expectedCasesForGroup(inventory, assignments, group) {
+function expectedCasesForGroup(inventory, assignments, group, selectedRoots = null) {
   const roots = new Map(assignments.assignmentsByRoot);
+  const selected = selectedRoots ? new Set(selectedRoots.map(normalizeTapIdentity)) : null;
   const expected = new Map();
   for (const item of inventory.requiredCases) {
     const replacement = assignments.replacementByBaseline.get(item.root);
     const currentRoot = replacement?.currentRoot || item.root;
     const assignment = roots.get(currentRoot);
-    if (assignment?.group === group) {
+    if (assignment?.group === group && (!selected || selected.has(normalizeTapIdentity(currentRoot)))) {
       const currentId = replacement ? replacementCaseId(item.id, replacement) : item.id;
       expected.set(normalizeTapIdentity(currentId), item.id);
     }
@@ -619,12 +642,14 @@ function expectedCasesForGroup(inventory, assignments, group) {
   return expected;
 }
 
-function verifyResults({ cases, group, inventory, assignments, files, source }) {
+function verifyResults({ cases, group, inventory, assignments, files, source, selectedRoots: selectedRootFilter = null }) {
   const errors = [];
-  const selectedRoots = [...assignments.assignmentsByRoot.values()]
-    .filter(entry => entry.group === group)
-    .map(entry => normalizeTapIdentity(entry.root))
-    .sort();
+  const selectedRoots = selectedRootFilter
+    ? selectedRootFilter.map(normalizeTapIdentity).sort()
+    : [...assignments.assignmentsByRoot.values()]
+      .filter(entry => entry.group === group)
+      .map(entry => normalizeTapIdentity(entry.root))
+      .sort();
   const selectedRootSet = new Set(selectedRoots);
   const actualRoots = cases.filter(item => item.id === item.root).map(item => item.root);
   const seenRoots = new Set();
@@ -635,7 +660,7 @@ function verifyResults({ cases, group, inventory, assignments, files, source }) 
   for (const root of selectedRoots) if (!seenRoots.has(root)) errors.push(`Assigned root ${JSON.stringify(root)} did not execute.`);
   for (const root of seenRoots) if (!selectedRootSet.has(root)) errors.push(`Unassigned or wrong-group root ${JSON.stringify(root)} executed.`);
 
-  const expected = expectedCasesForGroup(inventory, assignments, group);
+  const expected = expectedCasesForGroup(inventory, assignments, group, selectedRoots);
   const actualById = new Map();
   for (const item of cases) {
     if (actualById.has(item.id)) errors.push(`Case ${JSON.stringify(item.id)} executed more than once.`);
@@ -658,7 +683,7 @@ function verifyResults({ cases, group, inventory, assignments, files, source }) 
     errors.push(`Accepted environment-dependent baseline case ${JSON.stringify(id)} is missing or invalid.`);
   }
 
-  for (const control of assignments.processControls.filter(item => item.group === group)) {
+  for (const control of assignments.processControls.filter(item => item.group === group && selectedRootSet.has(normalizeTapIdentity(item.ownerRoot)))) {
     const sourceText = fs.readFileSync(path.join(ROOT, control.file), 'utf8');
     const registrations = countTestRegistrations(sourceText, control.id);
     if (registrations !== control.expectedExecutions) errors.push(`Controlled child ${JSON.stringify(control.id)} is registered ${registrations} times; expected exactly ${control.expectedExecutions}.`);
@@ -690,6 +715,554 @@ function artifactInventory(nativeDir) {
   };
   visit(nativeDir);
   return artifacts;
+}
+
+function browserRuntimeRootsForComparison(assignments, group, comparisonBase, files) {
+  const addedRoots = addedRootRegistrations(comparisonBase, files);
+  const registered = assignments.rootAssignments
+    .filter(entry => entry.group === group && entry.browserRuntime === 'ci-chromium')
+    .map(entry => entry.root)
+    .sort();
+  return {
+    registeredRoots: registered,
+    addedRegistrationTitles: [...addedRoots].sort(),
+    selectedRoots: registered.filter(root => addedRoots.has(root)),
+  };
+}
+
+function localBrowserRuntimePort(options) {
+  if (process.env.CI === 'true') {
+    if (options.nativePort !== undefined) fail('Omit --native-port in CI; the browser fixture must allocate an ephemeral loopback port.');
+    return { mode: 'ci-ephemeral', port: null };
+  }
+  if (typeof options.nativePort !== 'string' || !/^[1-9]\d{0,4}$/.test(options.nativePort) || Number(options.nativePort) > 65535) {
+    fail('Local browser runtime preflight requires an explicit allocated --native-port from 1 through 65535.');
+  }
+  const canonical = process.env.CODEX_COORDINATION_FILE?.trim();
+  const legacy = process.env.DOW_EMULATOR_COORDINATION_FILE?.trim();
+  const canonicalPath = canonical ? path.resolve(canonical) : undefined;
+  const legacyPath = legacy ? path.resolve(legacy) : undefined;
+  if (canonicalPath && legacyPath && canonicalPath !== legacyPath) {
+    fail(`Conflicting coordination paths: CODEX_COORDINATION_FILE selects ${canonicalPath}, while DOW_EMULATOR_COORDINATION_FILE selects ${legacyPath}.`);
+  }
+  const ledgerPath = canonicalPath ?? legacyPath;
+  if (!ledgerPath || !path.isAbsolute(ledgerPath)) fail('Local browser runtime preflight requires CODEX_COORDINATION_FILE (or its compatibility alias) for the live host ledger.');
+  let ledger;
+  try { ledger = readJson(ledgerPath, 'live host coordination ledger'); }
+  catch (error) { fail(`Cannot read live host coordination ledger at ${ledgerPath}: ${error.message}`); }
+  if (ledger?.version !== 1 || ledger?.scope !== 'codex-wide' || !Array.isArray(ledger.entries)) {
+    fail(`Live host coordination ledger at ${ledgerPath} is not a codex-wide v1 ledger.`);
+  }
+  const owners = ledger.entries.filter(entry => entry && ['active','parked'].includes(entry.status));
+  const worktree = fs.realpathSync(ROOT);
+  const current = owners.filter(entry => {
+    if (entry.status !== 'active' || typeof entry.worktree !== 'string') return false;
+    try { return fs.realpathSync(entry.worktree) === worktree; } catch { return false; }
+  });
+  if (current.length !== 1) fail(`Local browser runtime preflight requires exactly one active host allocation for ${worktree}; found ${current.length}.`);
+  const owner = current[0];
+  if (owner.lease?.state !== 'healthy' || Date.parse(owner.lease?.expiresAt || '') <= Date.now() || owner.lease?.ownerConfirmationRequired) {
+    fail('Local browser runtime preflight requires a current healthy host coordination lease.');
+  }
+  const port = Number(options.nativePort);
+  const resources = [`browser-runtime:playwright-chromium`, `loopback:127.0.0.1:${port}`];
+  for (const resource of resources) {
+    if (!owner.resources?.includes(resource)) fail(`Local browser runtime allocation is missing ${resource}.`);
+    if (owners.some(entry => entry !== owner && entry.resources?.includes(resource))) fail(`Local browser runtime resource ${resource} is allocated to another active or parked worktree.`);
+  }
+  return { mode: 'host-allocated', port };
+}
+
+function assertLoopbackPortAvailable(port) {
+  if (port === null) return;
+  return new Promise((resolvePort, rejectPort) => {
+    const server = net.createServer();
+    server.once('error', error => rejectPort(new Error(`Allocated loopback port ${port} is not free: ${error.message}`)));
+    server.listen({ host: '127.0.0.1', port, exclusive: true }, () => {
+      server.close(error => error ? rejectPort(error) : resolvePort());
+    });
+  });
+}
+
+function checkedBrowserInstallPath(value) {
+  if (typeof value !== 'string' || !path.isAbsolute(value)) fail('--browser-path must be an explicit absolute isolated Playwright installation directory.');
+  const candidate = path.resolve(value);
+  let info;
+  try { info = fs.lstatSync(candidate); }
+  catch (error) { fail(`Playwright browser installation is unavailable at ${candidate}: ${error.message}`); }
+  if (info.isSymbolicLink() || !info.isDirectory()) fail(`Playwright browser installation must be a real directory: ${candidate}`);
+  const real = fs.realpathSync(candidate);
+  if (isPathWithin(fs.realpathSync(ROOT), real)) fail('Playwright browser installation must be outside the repository checkout.');
+  return real;
+}
+
+function installedPlaywrightVersion() {
+  const manifest = readJson(path.join(ROOT, 'package.json'), 'package manifest');
+  const lock = readJson(path.join(ROOT, 'package-lock.json'), 'package lockfile');
+  const installed = readJson(path.join(ROOT, 'node_modules/playwright/package.json'), 'installed Playwright package');
+  const requestedVersion = manifest.devDependencies?.playwright;
+  const lockedVersion = lock.packages?.['node_modules/playwright']?.version;
+  if (typeof requestedVersion !== 'string' || !/^\d+\.\d+\.\d+$/.test(requestedVersion) ||
+      lockedVersion !== requestedVersion || installed.name !== 'playwright' || installed.version !== lockedVersion) {
+    fail('Browser runtime preflight requires the exact npm-locked Playwright package version to be installed.');
+  }
+  return { requestedVersion, lockedVersion, installedVersion: installed.version };
+}
+
+function setTemporaryEnvironment(values, clearNames = []) {
+  const keys = new Set([...Object.keys(values), ...clearNames]);
+  const previous = new Map([...keys].map(key => [key, Object.hasOwn(process.env, key) ? process.env[key] : undefined]));
+  for (const key of clearNames) delete process.env[key];
+  for (const [key, value] of Object.entries(values)) {
+    if (value === undefined || value === null) delete process.env[key];
+    else process.env[key] = String(value);
+  }
+  return () => {
+    for (const [key, value] of previous) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  };
+}
+
+async function probeBrowserRuntime(browserPath, runtimeHome, runtimeTmp, playwrightVersion) {
+  const runtime = {
+    browserPath,
+    playwright: playwrightVersion,
+    chromium: { available: false, executablePath: null, version: null },
+    webkit: { available: false, executablePath: null, executableMissing: false, launchError: null },
+  };
+  const restore = setTemporaryEnvironment({
+    PLAYWRIGHT_BROWSERS_PATH: browserPath,
+    HOME: runtimeHome,
+    USERPROFILE: runtimeHome,
+    XDG_CONFIG_HOME: path.join(runtimeHome, 'xdg-config'),
+    XDG_DATA_HOME: path.join(runtimeHome, 'xdg-data'),
+    XDG_CACHE_HOME: path.join(runtimeHome, 'xdg-cache'),
+    TMPDIR: runtimeTmp,
+    TMP: runtimeTmp,
+    TEMP: runtimeTmp,
+  }, ['LANDSCAPE_BROWSER_URL','LANDSCAPE_BROWSER_CHANNEL','LANDSCAPE_PLAYWRIGHT','PLAYWRIGHT_MODULE','SAVED_VIEW_ARTIFACT_DIR']);
+  let browser;
+  let browserClosed = false;
+  try {
+    const playwright = await import('playwright');
+    if (!playwright.chromium?.launch || !playwright.webkit?.launch) fail('The locked Playwright package does not expose Chromium and WebKit launchers.');
+    const chromiumPath = path.resolve(playwright.chromium.executablePath());
+    if (!isPathWithin(browserPath, chromiumPath)) fail('Playwright Chromium executable resolves outside the explicit browser installation path.');
+    let chromiumInfo;
+    try { chromiumInfo = fs.statSync(chromiumPath); }
+    catch { fail(`Chromium is missing from the explicit browser installation: ${chromiumPath}`); }
+    if (!chromiumInfo.isFile()) fail(`Chromium executable is not a regular file: ${chromiumPath}`);
+    try { fs.accessSync(chromiumPath, fs.constants.X_OK); }
+    catch { fail(`Chromium executable is not runnable: ${chromiumPath}`); }
+    runtime.chromium.executablePath = fs.realpathSync(chromiumPath);
+    if (!isPathWithin(browserPath, runtime.chromium.executablePath)) fail('Playwright Chromium executable symlink escapes the explicit browser installation path.');
+
+    const webkitPath = path.resolve(playwright.webkit.executablePath());
+    if (!isPathWithin(browserPath, webkitPath)) fail('Playwright WebKit executable resolves outside the explicit browser installation path.');
+    runtime.webkit.executablePath = webkitPath;
+    let webkitInfo;
+    try { webkitInfo = fs.lstatSync(webkitPath); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+    if (webkitInfo) fail(`WebKit must be unavailable in the Chromium-only installation, but its executable exists at ${webkitPath}.`);
+    runtime.webkit.executableMissing = true;
+
+    browser = await playwright.chromium.launch({ headless: true, timeout: 30000 });
+    runtime.chromium.version = browser.version();
+    runtime.chromium.available = true;
+    await browser.close();
+    browserClosed = true;
+    browser = null;
+
+    try {
+      const unexpectedWebkit = await playwright.webkit.launch({ headless: true, timeout: 10000 });
+      runtime.webkit.available = true;
+      await unexpectedWebkit.close();
+      fail('WebKit unexpectedly launched from the Chromium-only browser installation.');
+    } catch (error) {
+      if (runtime.webkit.available) throw error;
+      const message = String(error?.message || error);
+      if (!/executable.*(?:does not exist|doesn't exist|missing)/i.test(message) || !message.includes(webkitPath)) {
+        fail(`WebKit absence control failed for an unexpected launch reason: ${message}`);
+      }
+      runtime.webkit.launchError = message;
+    }
+    runtime.probe = { chromiumClosed: browserClosed };
+    return runtime;
+  } finally {
+    try {
+      if (browser) {
+        await browser.close();
+        browserClosed = true;
+      }
+    } finally {
+      restore();
+      runtime.probe = { ...(runtime.probe || {}), chromiumClosed: browserClosed };
+    }
+  }
+}
+
+function browserChildEnvironment(options, source, browserPath, runtimeHome, runtimeTmp, artifactDir, nativeDir, recoveryDir, port) {
+  const env = {};
+  for (const key of ['PATH','CI','SystemRoot','WINDIR','COMSPEC','PATHEXT','LANG','LC_ALL','TZ']) {
+    if (process.env[key] !== undefined && (key !== 'CI' || process.env.CI === 'true')) env[key] = process.env[key];
+  }
+  Object.assign(env, {
+    HOME: runtimeHome,
+    USERPROFILE: runtimeHome,
+    APPDATA: path.join(runtimeHome, 'AppData', 'Roaming'),
+    LOCALAPPDATA: path.join(runtimeHome, 'AppData', 'Local'),
+    XDG_CONFIG_HOME: path.join(runtimeHome, 'xdg-config'),
+    XDG_DATA_HOME: path.join(runtimeHome, 'xdg-data'),
+    XDG_CACHE_HOME: path.join(runtimeHome, 'xdg-cache'),
+    TMPDIR: runtimeTmp,
+    TMP: runtimeTmp,
+    TEMP: runtimeTmp,
+    PLAYWRIGHT_BROWSERS_PATH: browserPath,
+    SAVED_VIEW_ARTIFACT_DIR: artifactDir,
+    CHAIN_TEST_GROUP: options.group,
+    CHAIN_TEST_RUN_ID: options.runId,
+    CHAIN_GROUP_OUTPUT_DIR: options.outputDir,
+    CHAIN_NATIVE_OUTPUT: nativeDir,
+    CHAIN_NATIVE_CANDIDATE_SHA: source.sha,
+    CHAIN_NATIVE_CANDIDATE_TREE: source.tree,
+    CHAIN_RECOVERY_UI_OUTPUT: recoveryDir,
+  });
+  if (port !== null) env.CHAIN_NATIVE_PORT = String(port);
+  return env;
+}
+
+function signalOwnedChild(child, signal) {
+  if (!child.pid) return false;
+  try {
+    if (process.platform === 'win32') child.kill(signal);
+    else process.kill(-child.pid, signal);
+    return true;
+  } catch (error) {
+    if (error.code === 'ESRCH') return false;
+    throw error;
+  }
+}
+
+async function runBrowserRuntimeChild(files, roots, outputDir, options, source, browserPath, directories, port) {
+  const tapPath = path.join(outputDir, 'browser-runtime.tap');
+  const stderrPath = path.join(outputDir, 'browser-runtime.stderr.log');
+  const tap = fs.createWriteStream(tapPath, { flags: 'wx' });
+  const stderr = fs.createWriteStream(stderrPath, { flags: 'wx' });
+  const patternArguments = testNamePatternArguments(roots.map(normalizeTapIdentity));
+  const env = browserChildEnvironment(options, source, browserPath, directories.runtimeHome,
+    directories.runtimeTmp, directories.artifactDir, directories.nativeDir, directories.recoveryDir, port);
+  const child = spawn(process.execPath, ['--test','--test-reporter=tap','--test-concurrency=1',...patternArguments,...files], {
+    cwd: ROOT,
+    env,
+    detached: process.platform !== 'win32',
+    stdio: ['ignore','pipe','pipe'],
+  });
+  child.stdout.pipe(tap);
+  child.stderr.pipe(stderr);
+  let timedOut = false;
+  let outputLimited = false;
+  let outputBytes = 0;
+  let cleanupSignal = null;
+  const stop = signal => {
+    cleanupSignal = signal;
+    try { return signalOwnedChild(child, signal); } catch { return false; }
+  };
+  for (const stream of [child.stdout, child.stderr]) stream.on('data', chunk => {
+    outputBytes += chunk.length;
+    if (outputBytes > 32 * 1024 * 1024 && !outputLimited) {
+      outputLimited = true;
+      stop('SIGKILL');
+    }
+  });
+  const timer = setTimeout(() => {
+    timedOut = true;
+    stop('SIGKILL');
+  }, 240000);
+  const exit = await new Promise(resolveExit => {
+    let resolved = false;
+    const finish = value => { if (!resolved) { resolved = true; resolveExit(value); } };
+    child.once('error', error => finish({ code: null, signal: null, error: error.message }));
+    child.once('close', (code, signal) => finish({ code, signal, error: null }));
+  });
+  clearTimeout(timer);
+  await Promise.all([new Promise(resolveEnd => tap.end(resolveEnd)), new Promise(resolveEnd => stderr.end(resolveEnd))]);
+  let tapText = '';
+  try { tapText = fs.readFileSync(tapPath, 'utf8'); } catch {}
+  let stderrText = '';
+  try { stderrText = fs.readFileSync(stderrPath, 'utf8'); } catch {}
+  return {
+    exit,
+    timedOut,
+    outputLimited,
+    cleanupSignal,
+    tapPath,
+    stderrPath,
+    tapText,
+    stderrText,
+    tapSha256: sha256(tapText),
+    stderrSha256: sha256(stderrText),
+    selection: { requiredRootCount: roots.length, namePatternArgumentBytes: patternArguments.map(argument => Buffer.byteLength(argument)) },
+  };
+}
+
+async function runBrowserRuntimePreflight({ options, source, inventory, assignments, assignmentIndex, files, selection }) {
+  const proof = {
+    status: 'running',
+    selectedRoots: selection.selectedRoots,
+    selection: {
+      group: options.group,
+      method: 'literal browserRuntime=ci-chromium assignments intersected with root registrations added since comparisonBase',
+      comparisonBase: options.comparisonBase,
+      registeredRoots: selection.registeredRoots,
+      addedRegistrationTitles: selection.addedRegistrationTitles,
+      selectedRoots: selection.selectedRoots,
+    },
+    runtime: null,
+    outcomes: [],
+    process: null,
+    cleanup: { started: false, chromiumProbeClosed: false, childExited: false, runtimeTmpRemoved: false, profileHomeRemoved: false },
+    issues: [],
+  };
+  if (!selection.selectedRoots.length) {
+    proof.status = 'no_change';
+    proof.cleanup = { started: false, noChildRequired: true };
+    proof.outcomes = [];
+    proof.cases = [];
+    proof.process = null;
+    proof.artifacts = [];
+    return { proof, cases: [], artifacts: [], issues: [], status: 'no_change' };
+  }
+
+  let directories = null;
+  let child = null;
+  let browserPath = null;
+  try {
+    if (typeof options.browserRuntimeReceipt !== 'undefined') fail('--browser-runtime-receipt is only valid on the ordinary group invocation.');
+    if (typeof options.browserPath !== 'string') fail('Selected browser roots require an explicit --browser-path to the isolated Playwright installation.');
+    browserPath = checkedBrowserInstallPath(options.browserPath);
+    const allocation = localBrowserRuntimePort(options);
+    proof.allocation = allocation;
+    directories = {
+      runtimeTmp: path.join(options.outputDir, 'runtime-tmp'),
+      runtimeHome: path.join(options.outputDir, 'runtime-home'),
+      artifactDir: path.join(options.outputDir, 'browser-artifacts'),
+      nativeDir: path.join(options.outputDir, 'native'),
+      recoveryDir: path.join(options.outputDir, 'recovery-ui'),
+    };
+    for (const directory of Object.values(directories)) fs.mkdirSync(directory);
+    for (const directory of ['AppData/Roaming','AppData/Local','xdg-config','xdg-data','xdg-cache']) {
+      fs.mkdirSync(path.join(directories.runtimeHome, directory), { recursive: true });
+    }
+    proof.cleanup.started = true;
+    const playwrightVersion = installedPlaywrightVersion();
+    proof.runtime = await probeBrowserRuntime(browserPath, directories.runtimeHome, directories.runtimeTmp, playwrightVersion);
+    await assertLoopbackPortAvailable(allocation.port);
+    const selectedFiles = [...new Set(selection.selectedRoots.map(root => assignmentIndex.assignmentsByRoot.get(root)?.file).filter(Boolean))].sort();
+    if (selectedFiles.length === 0) fail('Selected browser roots have no assigned source file.');
+    child = await runBrowserRuntimeChild(selectedFiles, selection.selectedRoots, options.outputDir, options, source,
+      browserPath, directories, allocation.port);
+    proof.cleanup.childExited = child.exit.code !== null || child.exit.signal !== null || child.exit.error !== null;
+    proof.process = {
+      exitCode: child.exit.code,
+      signal: child.exit.signal,
+      spawnError: child.exit.error,
+      timedOut: child.timedOut,
+      outputLimited: child.outputLimited,
+      cleanupSignal: child.cleanupSignal,
+      stdout: { path: path.basename(child.tapPath), sha256: child.tapSha256 },
+      stderr: { path: path.basename(child.stderrPath), sha256: child.stderrSha256 },
+      selection: child.selection,
+    };
+    try { proof.cases = child.tapText ? parseTap(child.tapText) : []; }
+    catch (error) { proof.issues.push(`Browser test process produced invalid TAP: ${error.message}`); proof.cases = []; }
+    const rootCases = proof.cases.filter(item => item.id === item.root);
+    proof.outcomes = selection.selectedRoots.map(root => {
+      const matches = rootCases.filter(item => item.id === normalizeTapIdentity(root));
+      return { root, status: matches.length === 1 ? matches[0].status : matches.length ? 'duplicate' : 'missing', count: matches.length, id: normalizeTapIdentity(root) };
+    });
+    proof.issues.push(...verifyResults({
+      cases: proof.cases,
+      group: options.group,
+      inventory,
+      assignments: { ...assignmentIndex, processControls: assignments.processControls },
+      files: selectedFiles,
+      source,
+      selectedRoots: selection.selectedRoots,
+    }));
+    if (child.exit.code !== 0) proof.issues.unshift(`Browser test process exited with ${child.exit.code ?? child.exit.signal ?? child.exit.error}.`);
+    if (child.timedOut) proof.issues.push('Browser test process exceeded the four-minute runtime bound and was terminated.');
+    if (child.outputLimited) proof.issues.push('Browser test process exceeded the 32 MiB output bound and was terminated.');
+    if (!proof.cleanup.childExited) proof.issues.push('Browser test child did not produce a terminal process outcome.');
+    try {
+      await assertLoopbackPortAvailable(allocation.port);
+      proof.cleanup.loopbackPortReleased = true;
+    } catch (error) { proof.issues.push(error.message); proof.cleanup.loopbackPortReleased = false; }
+  } catch (error) {
+    proof.issues.push(error.message);
+  } finally {
+    if (proof.runtime?.probe?.chromiumClosed) proof.cleanup.chromiumProbeClosed = true;
+    if (directories) {
+      for (const [key, directory] of [['runtimeTmpRemoved','runtimeTmp'],['profileHomeRemoved','runtimeHome']]) {
+        try {
+          fs.rmSync(directories[directory], { recursive: true, force: true });
+          proof.cleanup[key] = !fs.existsSync(directories[directory]);
+          if (!proof.cleanup[key]) proof.issues.push(`Owned browser runtime directory was not removed: ${directories[directory]}`);
+        } catch (error) { proof.issues.push(`Could not remove owned browser runtime directory ${directories[directory]}: ${error.message}`); }
+      }
+    }
+  }
+  const artifacts = directories && fs.existsSync(directories.artifactDir) ? artifactInventory(directories.artifactDir) : [];
+  if (directories) {
+    try {
+      proof.artifacts = [...artifactInventory(directories.nativeDir), ...artifactInventory(directories.recoveryDir), ...artifacts];
+    } catch (error) { proof.issues.push(`Browser runtime artifact inventory failed: ${error.message}`); }
+  }
+  proof.status = proof.issues.length ? 'failed' : 'passed';
+  return {
+    proof,
+    cases: proof.cases || [],
+    artifacts: proof.artifacts || [],
+    issues: proof.issues,
+    status: proof.status,
+    process: proof.process,
+  };
+}
+
+function browserRuntimeSelectionMatches(proof, selection, group, comparisonBase) {
+  if (proof?.selection?.group !== group || proof.selection.comparisonBase !== comparisonBase ||
+      proof.selection.method !== 'literal browserRuntime=ci-chromium assignments intersected with root registrations added since comparisonBase' ||
+      JSON.stringify(proof.selection.registeredRoots) !== JSON.stringify(selection.registeredRoots) ||
+      JSON.stringify(proof.selection.addedRegistrationTitles) !== JSON.stringify(selection.addedRegistrationTitles) ||
+      JSON.stringify(proof.selection.selectedRoots) !== JSON.stringify(selection.selectedRoots) ||
+      JSON.stringify(proof.selectedRoots) !== JSON.stringify(selection.selectedRoots)) {
+    fail('Browser runtime receipt selected a different comparison cohort.');
+  }
+}
+
+function inspectBrowserRuntimeReceipt({ receiptPath, evidenceRoot, group, descriptor, selection, inventory, assignmentIndex,
+  assignments, files, source, expectedStatus = selection.selectedRoots.length ? 'passed' : 'no_change' }) {
+  const receiptStat = fs.lstatSync(receiptPath);
+  if (!receiptStat.isFile() || receiptStat.isSymbolicLink()) fail('Browser runtime receipt must be a regular file, not a symbolic link.');
+  const receiptBytes = fs.readFileSync(receiptPath);
+  const record = JSON.parse(receiptBytes.toString('utf8'));
+  if (record.status !== expectedStatus || record.issues?.length || !Array.isArray(record.issues)) fail('Browser runtime receipt did not pass.');
+  const identity = record.resultIdentity;
+  const expectedIdentity = { ...descriptor.resultIdentity, selectedGroup: group };
+  if (JSON.stringify(identity) !== JSON.stringify(expectedIdentity)) fail('Browser runtime receipt source, tree, comparison base, inventory, assignment, or group identity changed.');
+  const proof = record.browserRuntime;
+  if (!proof || proof.status !== expectedStatus || proof.issues?.length || !Array.isArray(proof.issues)) fail('Browser runtime receipt has no successful runtime proof.');
+  browserRuntimeSelectionMatches(proof, selection, group, descriptor.resultIdentity.comparisonBase);
+  if (proof.cases?.length !== record.cases?.length) fail('Browser runtime receipt case accounting differs from its result record.');
+  const normalizedRecordCases = (record.cases || []).map(({ id, root, status, skipReason }) => ({ id, root, status, skipReason }));
+  const normalizedProofCases = (proof.cases || []).map(({ id, root, status, skipReason }) => ({ id, root, status, skipReason }));
+  if (JSON.stringify(normalizedProofCases) !== JSON.stringify(normalizedRecordCases)) fail('Browser runtime receipt case accounting differs from its browser proof.');
+
+  if (expectedStatus === 'no_change') {
+    if (record.process !== null || proof.process !== null || normalizedRecordCases.length || proof.runtime !== null ||
+        proof.cleanup?.noChildRequired !== true || proof.artifacts?.length || proof.outcomes?.length) {
+      fail('A no-change browser runtime receipt unexpectedly contains a child process, runtime, case, or artifact.');
+    }
+    return { record, receiptBytes, receiptSha256: sha256(receiptBytes), cases: [], evidenceFile: null };
+  }
+
+  const runtime = proof.runtime;
+  if (!runtime?.chromium?.available || !runtime.chromium.version || !runtime.chromium.executablePath ||
+      !runtime?.webkit || runtime.webkit.available !== false || runtime.webkit.executableMissing !== true ||
+      typeof runtime.webkit.executablePath !== 'string' || typeof runtime.webkit.launchError !== 'string' ||
+      !runtime.webkit.launchError.includes(runtime.webkit.executablePath)) fail('Browser runtime receipt does not prove Chromium available and WebKit absent from the same installation.');
+  const browserPath = path.resolve(runtime.browserPath || '');
+  const chromiumPath = path.resolve(runtime.chromium.executablePath);
+  const webkitPath = path.resolve(runtime.webkit.executablePath);
+  if (!path.isAbsolute(runtime.browserPath || '') || !isPathWithin(browserPath, chromiumPath) || !isPathWithin(browserPath, webkitPath)) {
+    fail('Browser runtime receipt executable paths escape the selected Playwright installation.');
+  }
+  const version = runtime.playwright;
+  const packageManifest = readJson(path.join(ROOT, 'package.json'), 'package manifest');
+  const packageLock = readJson(path.join(ROOT, 'package-lock.json'), 'package lockfile');
+  const expectedPlaywright = packageManifest.devDependencies?.playwright;
+  if (version?.requestedVersion !== expectedPlaywright || version?.lockedVersion !== expectedPlaywright || version?.installedVersion !== expectedPlaywright ||
+      packageLock.packages?.['node_modules/playwright']?.version !== expectedPlaywright) {
+    fail('Browser runtime receipt does not bind the exact locked Playwright package version.');
+  }
+  if (proof.cleanup?.chromiumProbeClosed !== true || proof.cleanup?.childExited !== true ||
+      proof.cleanup?.runtimeTmpRemoved !== true || proof.cleanup?.profileHomeRemoved !== true || proof.cleanup?.loopbackPortReleased !== true) {
+    fail('Browser runtime receipt is missing successful owned-process and temporary-resource cleanup evidence.');
+  }
+  if (record.process?.exitCode !== 0 || record.process?.signal || record.process?.spawnError || record.process?.timedOut || record.process?.outputLimited) {
+    fail('Browser runtime receipt child process failed, timed out, or exceeded its output bound.');
+  }
+  if (proof.process?.exitCode !== 0 || proof.process?.signal || proof.process?.spawnError || proof.process?.timedOut || proof.process?.outputLimited) {
+    fail('Browser runtime proof child process failed, timed out, or exceeded its output bound.');
+  }
+  const evidenceFile = (relative, expectedHash) => {
+    if (typeof relative !== 'string' || !relative || path.isAbsolute(relative) || relative.split(/[\\/]/).some(part => !part || part === '..' || part === '.')) fail('Unsafe browser runtime evidence path.');
+    let current = evidenceRoot;
+    for (const part of relative.split('/')) {
+      current = path.join(current, part);
+      const info = fs.lstatSync(current);
+      if (info.isSymbolicLink()) fail('Browser runtime evidence symlinks are forbidden.');
+    }
+    const info = fs.lstatSync(current);
+    if (!info.isFile()) fail(`Browser runtime evidence is not a regular file: ${relative}.`);
+    const bytes = fs.readFileSync(current);
+    if (sha256(bytes) !== expectedHash) fail(`Browser runtime evidence hash mismatch: ${relative}.`);
+    return bytes;
+  };
+  const tapBytes = evidenceFile(proof.process?.stdout?.path, proof.process?.stdout?.sha256);
+  evidenceFile(proof.process?.stderr?.path, proof.process?.stderr?.sha256);
+  const expectedArtifacts = [];
+  for (const directory of ['native', 'recovery-ui', 'browser-artifacts']) {
+    const artifactDirectory = path.join(evidenceRoot, directory);
+    if (fs.existsSync(artifactDirectory)) expectedArtifacts.push(...artifactInventory(artifactDirectory));
+  }
+  const recordedArtifacts = proof.artifacts;
+  if (!Array.isArray(recordedArtifacts) || JSON.stringify([...recordedArtifacts].sort((a,b)=>a.path.localeCompare(b.path))) !==
+      JSON.stringify([...expectedArtifacts].sort((a,b)=>a.path.localeCompare(b.path)))) {
+    fail('Browser runtime artifact inventory is incomplete or inconsistent.');
+  }
+  const artifactPaths = new Set();
+  for (const artifact of recordedArtifacts) {
+    if (artifactPaths.has(artifact.path)) fail('Duplicate browser runtime artifact path.');
+    artifactPaths.add(artifact.path);
+    const content = evidenceFile(artifact.path, artifact.sha256);
+    if (content.byteLength !== artifact.bytes) fail(`Browser runtime artifact size mismatch: ${artifact.path}.`);
+  }
+  const actualCases = parseTap(tapBytes.toString('utf8')).map(({ id, root, status, skipReason }) => ({ id, root, status, skipReason }));
+  if (JSON.stringify(actualCases) !== JSON.stringify(normalizedRecordCases)) fail('Browser runtime receipt case report differs from the hashed TAP output.');
+  const expectedOutcomes = selection.selectedRoots.map(root => ({ root, status: 'passed', count: 1, id: normalizeTapIdentity(root) }));
+  if (JSON.stringify(proof.outcomes) !== JSON.stringify(expectedOutcomes)) fail('Browser runtime receipt root outcomes are missing, duplicated, or failed.');
+  const errors = verifyResults({
+    cases: actualCases,
+    group,
+    inventory,
+    assignments: { ...assignmentIndex, processControls: assignments.processControls },
+    files,
+    source,
+    selectedRoots: selection.selectedRoots,
+  });
+  if (errors.length) fail(errors.join(' '));
+  return { record, receiptBytes, receiptSha256: sha256(receiptBytes), cases: actualCases, evidenceFile };
+}
+
+function copyBrowserRuntimeEvidence(receiptPath, inspected, destination) {
+  fs.mkdirSync(destination);
+  fs.copyFileSync(receiptPath, path.join(destination, 'receipt.json'), fs.constants.COPYFILE_EXCL);
+  const sourceDir = path.dirname(receiptPath);
+  for (const entry of ['browser-runtime.tap', 'browser-runtime.stderr.log', 'browser-artifacts', 'native', 'recovery-ui']) {
+    const sourcePath = path.join(sourceDir, entry);
+    if (!fs.existsSync(sourcePath)) continue;
+    const targetPath = path.join(destination, entry);
+    const info = fs.lstatSync(sourcePath);
+    if (info.isSymbolicLink()) fail(`Browser runtime evidence must not contain symlinks: ${sourcePath}`);
+    if (info.isDirectory()) fs.cpSync(sourcePath, targetPath, { recursive: true, errorOnExist: true, dereference: false });
+    else if (info.isFile()) fs.copyFileSync(sourcePath, targetPath, fs.constants.COPYFILE_EXCL);
+    else fail(`Browser runtime evidence contains a non-regular entry: ${sourcePath}`);
+  }
+  const copiedReceipt = fs.readFileSync(path.join(destination, 'receipt.json'));
+  if (sha256(copiedReceipt) !== inspected.receiptSha256) fail('Copied browser runtime receipt hash changed.');
+  return { path: 'browser-runtime-preflight/receipt.json', sha256: inspected.receiptSha256 };
 }
 
 function coverageReference(proof, identity) {
@@ -761,6 +1334,7 @@ async function aggregateResults({options, outputDir, descriptor, inventory, assi
       if (identity?.selectedGroup !== id || identity.checkoutDirty) fail(`Wrong or dirty group identity: ${id}.`);
       if(covered){
         if(record.cases?.length!==0||record.artifacts?.length!==0||record.process!==null||JSON.stringify(record.coverage)!==JSON.stringify(freshCoverage))fail('Covered records are mixed, incomplete or claim current execution.');
+        if (descriptor.groups.find(group=>group.id===id).browserRuntimeRoots.selectedRoots.length) fail('A group with newly required browser roots cannot be covered without current browser execution.');
         records.push({group:id,mode:'covered',identity,coverage:record.coverage});continue;
       }
       if (record.process?.exitCode !== 0 || record.process?.signal || record.process?.spawnError) fail(`Required group ${id} process failed or was canceled.`);
@@ -772,6 +1346,47 @@ async function aggregateResults({options, outputDir, descriptor, inventory, assi
       const completeCases=[...cases,...(transferred?.cases||[])];
       const errors = verifyResults({cases:completeCases,group:id,inventory,assignments:{...assignmentIndex,processControls:assignments.processControls},files,source});
       if (errors.length) fail(errors.join(' '));
+      const browserSelection = descriptor.groups.find(group=>group.id===id).browserRuntimeRoots;
+      if (browserSelection.selectedRoots.length) {
+        if (record.browserRuntimeReceipt?.path !== 'browser-runtime-preflight/receipt.json' || !/^[a-f0-9]{64}$/.test(record.browserRuntimeReceipt?.sha256 || '')) {
+          fail('Required browser runtime receipt reference is missing or malformed.');
+        }
+        const receiptBytes = verifiedFile(root, record.browserRuntimeReceipt.path, record.browserRuntimeReceipt.sha256);
+        const receiptPath = path.join(root, record.browserRuntimeReceipt.path);
+        const inspected = inspectBrowserRuntimeReceipt({
+          receiptPath,
+          evidenceRoot: path.dirname(receiptPath),
+          group: id,
+          descriptor,
+          selection: browserSelection,
+          inventory,
+          assignmentIndex,
+          assignments,
+          files,
+          source,
+        });
+        if (sha256(receiptBytes) !== inspected.receiptSha256) fail('Browser runtime receipt copy differs from its verified evidence.');
+      } else if (record.browserRuntimeReceipt) {
+        if (record.browserRuntimeReceipt.path !== 'browser-runtime-preflight/receipt.json' || !/^[a-f0-9]{64}$/.test(record.browserRuntimeReceipt.sha256 || '')) {
+          fail('No-change browser runtime receipt reference is malformed.');
+        }
+        const receiptBytes = verifiedFile(root, record.browserRuntimeReceipt.path, record.browserRuntimeReceipt.sha256);
+        const receiptPath = path.join(root, record.browserRuntimeReceipt.path);
+        const inspected = inspectBrowserRuntimeReceipt({
+          receiptPath,
+          evidenceRoot: path.dirname(receiptPath),
+          group: id,
+          descriptor,
+          selection: browserSelection,
+          inventory,
+          assignmentIndex,
+          assignments,
+          files,
+          source,
+          expectedStatus: 'no_change',
+        });
+        if (sha256(receiptBytes) !== inspected.receiptSha256) fail('No-change browser runtime receipt copy differs from its verified evidence.');
+      }
       for (const item of completeCases) { if (allCases.has(item.id)) fail(`Duplicate case across groups: ${item.id}.`); allCases.add(item.id); }
       const artifactPaths = new Set();
       for (const artifact of record.artifacts || []) {
@@ -927,7 +1542,7 @@ async function runChild(files, roots, outputDir, options, source) {
 
 async function main() {
   if (process.argv.slice(2).includes('--help')) {
-    process.stdout.write('Usage: npm run test:group -- --group <core|scenery|persistence-recovery|native-process> --output-dir <new-empty-dir> --repository <owner/name> --event-policy <policy> --run-id <id> --run-attempt <n> --source-sha <sha> --comparison-base <sha>\n');
+    process.stdout.write('Usage: npm run test:group -- --group <core|scenery|persistence-recovery|native-process> --output-dir <new-empty-dir> --repository <owner/name> --event-policy <policy> --run-id <id> --run-attempt <n> --source-sha <sha> --comparison-base <sha> [--browser-runtime-preflight --browser-path <absolute-dir> [--native-port <allocated-port>]] [--browser-runtime-receipt <result.json>]\n');
     return 0;
   }
   let outputDir;
@@ -936,7 +1551,7 @@ async function main() {
   try {
     const parsed = parseArgs(process.argv.slice(2));
     outputDir = validateOutputDirectory(parsed.outputDir);
-    options = requiredIdentity(parsed);
+    options = requiredIdentity({ ...parsed, outputDir });
   } catch (error) {
     if (outputDir) {
       atomicWrite(path.join(outputDir, 'result.json'), {
@@ -961,6 +1576,7 @@ async function main() {
     issues: [],
   };
   let nativeDir;
+  let descriptor;
   try {
     const files = testFiles();
     const inventoryBytes = fs.readFileSync(INVENTORY_PATH);
@@ -1005,9 +1621,10 @@ async function main() {
     result.resultIdentity.cohortDigestSha256 = cohortDigest(inventory, assignments, assignmentIndex);
     {
       const accepted = new Set(inventory.acceptedSkipCaseIds);
-      const descriptor = { schemaVersion: 1, resultIdentity: { ...result.resultIdentity, selectedGroup: null },
+      descriptor = { schemaVersion: 1, resultIdentity: { ...result.resultIdentity, selectedGroup: null },
         groups: GROUP_IDS.map(id => ({ id,
           roots: assignmentIndex.rootsPerGroup.get(id).map(normalizeTapIdentity).sort(),
+          browserRuntimeRoots: browserRuntimeRootsForComparison(assignments, id, options.comparisonBase, files),
           earlyRoots: assignments.rootAssignments.filter(row=>row.group===id&&row.executionStage==='early-startup').map(row=>normalizeTapIdentity(row.root)).sort(),
           requiredCaseIds: [...expectedCasesForGroup(inventory, assignmentIndex, id).keys()],
           acceptedSkipCaseIds: [...expectedCasesForGroup(inventory, assignmentIndex, id)].filter(([, baselineId]) => accepted.has(baselineId)).map(([runtimeId]) => runtimeId),
@@ -1019,6 +1636,33 @@ async function main() {
         const early=verifyEarlyReceipt(options.earlyReceipt,descriptor,{proof:options.covered?options.proof:undefined});
         if(early.mode!==(options.covered?'covered':'full'))fail('Group early predecessor mode mismatch.');
         if(!options.covered)result.earlyCoverage=earlyGroupCoverage(options.earlyReceipt,descriptor,options.group);
+      }
+      if (options.browserRuntimePreflight) {
+        const selection = descriptor.groups.find(group => group.id === options.group).browserRuntimeRoots;
+        const browserResult = await runBrowserRuntimePreflight({ options, source, inventory, assignments,
+          assignmentIndex, files, selection });
+        result.browserRuntime = browserResult.proof;
+        result.cases = browserResult.cases.map(({ id, root, status, skipReason }) => ({ id, root, status, skipReason }));
+        result.process = browserResult.process ? {
+          exitCode: browserResult.process.exitCode,
+          signal: browserResult.process.signal,
+          spawnError: browserResult.process.spawnError,
+          timedOut: browserResult.process.timedOut,
+          outputLimited: browserResult.process.outputLimited,
+          stdout: browserResult.process.stdout,
+          stderr: browserResult.process.stderr,
+        } : null;
+        result.artifacts = browserResult.artifacts;
+        result.issues = browserResult.issues;
+        result.status = browserResult.status;
+        result.finishedAt = new Date().toISOString();
+        atomicWrite(path.join(outputDir, 'result.json'), result);
+        if (result.status !== 'passed' && result.status !== 'no_change') {
+          process.stderr.write(`${result.status}: ${result.issues.join('\n')}\n`);
+          return 1;
+        }
+        process.stdout.write(`${options.group}: browser runtime ${result.status}; evidence: ${path.join(outputDir, 'result.json')}\n`);
+        return 0;
       }
       if(options.covered){
         result.coverage=coverageReference(readJson(options.proof,'verified coverage proof'),result.resultIdentity);
@@ -1041,6 +1685,25 @@ async function main() {
     ])].sort();
     const selectedRoots = assignmentIndex.rootsPerGroup.get(options.group).filter(title=>assignmentIndex.assignmentsByRoot.get(title).executionStage!=='early-startup').sort();
     if (!selectedFiles.length || !selectedRoots.length) fail(`Required group ${options.group} is empty.`);
+
+      const browserSelection = descriptor.groups.find(group => group.id === options.group).browserRuntimeRoots;
+    if (browserSelection.selectedRoots.length || options.browserRuntimeReceipt) {
+      if (browserSelection.selectedRoots.length && !options.browserRuntimeReceipt) fail(`Required browser runtime receipt is missing for ${browserSelection.selectedRoots.length} newly assigned Chromium root(s).`);
+      const inspected = inspectBrowserRuntimeReceipt({
+        receiptPath: path.resolve(ROOT, options.browserRuntimeReceipt),
+        evidenceRoot: path.dirname(path.resolve(ROOT, options.browserRuntimeReceipt)),
+        group: options.group,
+        descriptor,
+        selection: browserSelection,
+        inventory,
+        assignmentIndex,
+        assignments,
+        files,
+        source,
+      });
+      result.browserRuntimeReceipt = copyBrowserRuntimeEvidence(path.resolve(ROOT, options.browserRuntimeReceipt), inspected,
+        path.join(outputDir, 'browser-runtime-preflight'));
+    }
 
     result.inventory = {
       baselineRunId: inventory.baseline.runId,

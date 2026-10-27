@@ -1596,6 +1596,7 @@ The actual intervention Yes records deliberate current-pass Scan intent even whe
 - `RISK repository process: npm test fails when an agent-tool cohort assertion fails`
 - `RISK repository process: coordination rejects misspelled resource options before side effects`
 - `RISK repository process: grouped runner stays covered at the default npm test boundary`
+- `RISK repository process: newly registered startup browser roots require an isolated Chromium receipt`
 - `RISK test group runner preserves hash identities and counts only executable controlled registrations`
 
 Preflight comparison coverage:
@@ -1605,6 +1606,8 @@ Preflight comparison coverage:
   runs the existing public preflight fixture through a fresh Node process and requires one completed outcome for the stale FAQ assertion, one for a newly unassigned root, and one for their parent case. The fixtures confirm each failure exits before the qualification sentinel; they do not stand in for hosted or release checks.
 
 The required npm test entry point surfaces a failing isolated agent-tool cohort with a nonzero result and its assertion output. Group-runner identity evidence preserves the independently captured TAP-escaped inventory while reporting canonical runtime titles, and native-child registration checks distinguish executable declarations from quoted fixture text while rejecting missing and duplicate controls.
+
+The browser-runtime process wrapper runs the existing public group-runner fixture contracts for exact newly added-root selection, inherited environment scrubbing, receipt transfer, no-change, unexpected skips, duplicate outcomes and missing Chromium. It checks the actual regression workflow orders that preflight before the full persistence-recovery group, installs Chromium under the explicit runner-temp path, passes the receipt into ordinary accounting and uploads the raw result. The preflight remains an additional assertion: ordinary full-group TAP still executes and aggregates every assigned browser root, while the five early-startup roots retain only their existing receipt accounting.
 
 The coordination process risk launches the CLI test in a fresh Node process. Synthetic Git projects and ledgers verify command-specific option rejection, byte-for-byte preservation, no Git child for rejected `begin` arguments, and canonical output for repeated scope, claim and plural resource controls. Existing competing-resource ownership coverage remains in `scripts/agent-tools/coordination.test.mjs`; neither test uses the host ledger.
 

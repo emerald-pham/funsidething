@@ -140,6 +140,34 @@ a full producer. Uncertain classification or evidence retains the full current
 cohort. The [release procedure](../../RELEASE_GATES.md#policy-prose-inheritance)
 owns product/FAQ/rendered receipt inheritance and its limits.
 
+Literal roots that newly require a browser may declare
+`browserRuntime: "ci-chromium"` on their existing root-assignment row. Before
+the full `persistence-recovery` group, the regression job runs
+`--browser-runtime-preflight` against only those marked titles whose literal
+registrations were added since the same comparison base. An empty intersection
+produces a durable `no_change` receipt. Otherwise the command requires the
+locked Playwright package, launches Chromium from the explicit isolated browser
+path, confirms WebKit is absent from that same installation, and runs only the
+selected roots in a fresh serial child with inherited browser URLs, module
+overrides, profiles and artifact paths removed. It checks the actual TAP
+outcomes, duplicate/missing roots, skips, process exit, and cleanup.
+
+The ordinary group requires that successful receipt whenever the selected set
+is nonempty, copies its result, TAP, stderr and emitted artifacts into the group
+evidence, and binds it to the same source/tree/base, assignment and inventory
+hashes. The aggregate repeats that receipt and child-outcome verification. A
+new marked browser root cannot be covered by old cohort execution. The matching
+regression workflow installs Chromium alone under
+`$RUNNER_TEMP/playwright-browsers`; the earlier WebKit/mobile job remains a
+separate stage.
+
+Local use also requires an active healthy entry in the shared host coordination
+ledger claiming `browser-runtime:playwright-chromium` and the exact
+`loopback:127.0.0.1:<port>` resource. Pass that leased port with
+`--native-port`; the runner checks it is available before the child and released
+afterward. Hosted CI omits `--native-port` and lets the source fixture choose an
+ephemeral loopback port. The runner does not create or modify host allocations.
+
 ## Early populated startup admission
 
 The product workflow runs `scripts/early-ci.mjs` before event gates and all four

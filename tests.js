@@ -45165,6 +45165,31 @@ test('RISK repository process: grouped catalog binds real declarations rather th
  assert.match(result.stdout||'',/^# tests 1$/m);assert.match(result.stdout||'',/^# skipped 0$/m);
 });
 
+test('RISK repository process: newly registered startup browser roots require an isolated Chromium receipt',t=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const names=[
+  'test group browser runtime preflight runs exactly the newly assigned roots in a scrubbed child',
+  'test group browser runtime preflight records an explicit no-change cohort without launching an engine',
+  'test group browser runtime preflight fails closed for skipped, duplicated, and missing-engine outcomes',
+ ];
+ const pattern=`^(?:${names.join('|')})$`;
+ const child=spawnSync(process.execPath,['--test','--test-reporter=tap',`--test-name-pattern=${pattern}`,'scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:90000,maxBuffer:8*1024*1024});
+ const output=[child.stdout,child.stderr].filter(Boolean).join('\n');t.diagnostic(output);
+ assert.equal(child.error,undefined,'The browser-runtime process contract must start: '+output);
+ assert.equal(child.signal,null,'The browser-runtime process contract must finish: '+output);
+ assert.equal(child.status,0,'Newly assigned browser roots must require an actual isolated Chromium result: '+output);
+ assert.match(child.stdout||'',/^# tests 3$/m);
+ assert.match(child.stdout||'',/^# pass 3$/m);assert.match(child.stdout||'',/^# fail 0$/m);assert.match(child.stdout||'',/^# skipped 0$/m);
+ for(const name of names)assert.ok(child.stdout.includes('# Subtest: '+name),name+' must execute through the public test boundary');
+ const workflow=fs.readFileSync(path.join(__dirname,'.github/workflows/data-safety.yml'),'utf8').split(/^  regression:/m)[1].split(/^  scanner-tests:/m)[0];
+ assert.match(workflow,/PLAYWRIGHT_BROWSERS_PATH:\s*\$\{\{ runner\.temp \}\}\/playwright-browsers/,'the regression install must use its explicit isolated browser directory');
+ assert.match(workflow,/playwright install --with-deps chromium/,'the regression install must provide Chromium only');
+ assert.match(workflow,/--browser-runtime-preflight[^\n]*--browser-path "\$PLAYWRIGHT_BROWSERS_PATH"/,'the browser preflight must receive that exact installation path');
+ assert.match(workflow,/--browser-runtime-receipt "\$RUNNER_TEMP\/browser-runtime-preflight\/result\.json"/,'the ordinary group must consume the preflight receipt');
+ assert.ok(workflow.indexOf('Preflight newly assigned startup browser roots')<workflow.indexOf('Execute complete assigned group'),'preflight must precede the complete ordinary group');
+ assert.match(workflow,/Preserve browser runtime preflight evidence/,'the raw preflight record must be uploaded separately');
+});
+
 test('RISK repository process: nested native fixture output stays isolated at the command boundary',t=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
  const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group runner reconciles complete full and grouped fixture cohorts$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});

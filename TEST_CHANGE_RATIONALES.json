@@ -20722,6 +20722,87 @@
       "failure": "On the actual light-390 Chromium startup consumer, the screenshot boundary flipped the root theme light→dark→light across animation frames and returned to the original paint before the PNG was captured. The pre-adaptation consumer produced its PNG but no shared metrics report; the expected refusal assertion failed with actual undefined versus expected fail. The recorder classified this as assertion-failure, not infrastructure. This is a later current-consumer RED; it does not replace the original 04:08 c8659866 helper RED or the separate frozen-source and queue-edge sensitivities."
     },
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/326"
+  },
+  {
+    "baseCommit": "c2cba034b2da1e335c92e3f48be809a09de19699",
+    "testChangesSha256": "f32f459fc7452380ebf2a134755f5def64e6263b5aa6256e5781e4cb86289492",
+    "reason": "Issue #323 adds a public process contract for the existing test-group boundary: newly registered required browser roots must run in the isolated Chromium-only runtime and bind their outcomes into the ordinary group receipt.",
+    "previousBehavior": "Six registered startup browser roots could return successful process status while skipping because the runner lacked a local server URL, and the active repair also had to match the regression workflow's Chromium-only engine set.",
+    "intendedBehavior": "The existing assignment and comparison-base selection drives one bounded preflight, strips inherited browser/profile state, fails on absent setup or invalid outcomes, and transfers a source-bound receipt while the ordinary complete group still runs and counts every assigned case.",
+    "replacementTests": [
+      "RISK repository process: newly registered startup browser roots require an isolated Chromium receipt"
+    ],
+    "preservedCoverage": [
+      "The ordinary persistence-recovery group still executes and aggregates all six startup browser roots; the preflight adds a separate runtime assertion and never replaces or removes required group cases.",
+      "The accepted skip inventory and #290 early-root receipt semantics remain unchanged. The six source-specific browser roots are marked only in the isolated 3d9442c proof checkout; no product application changes are included here."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/runtime/node-v22.23.3-darwin-arm64/bin/node --test --test-name-pattern='RISK saved view (broken-board startup: prior appearance stays inert until the recovered board opens|broken-board visibility: the complete saved board is readable while durable startup waits|full-board filters: opening preserves saved membership controls and cheap task facts|full-board safety: supported copies and identity masks never grant authority|broken-board startup: configured Firebase leaves the prior warning neutral until its first event|broken-board status: configured cloud changes remain visible in the saved appearance and after recovery)' tests.js; recorder /Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/323/consumer-red/2026-10-27T05-42-09-934Z-b93ca325-6bd3-4667-8b6c-e5161c4c33a3.json",
+      "failure": "On the published source 9306a59, the public Node process exited zero while all six exact registered browser roots were SKIP and zero passed because no local browser URL/server setup was supplied. This preserved behavior-level failure evidence; a separate unknown-option probe was infrastructure and is not credited as RED."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/323"
+  },
+  {
+    "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
+    "testChangesSha256": "49e14cc6cec6f11b46359182ddd94e8016e4ea685bcb2cfc50bb79cde4cd7bf5",
+    "reason": "Integration metadata binds the complete protected-test diff at the required origin/main base after the accepted #323 browser-runtime preflight was added to the existing #278 candidate. The existing issue-scoped rationales and RED records remain unchanged; this entry is not a new original RED or a repair to test chronology.",
+    "previousBehavior": "For issue #323, the six exact startup browser consumers could finish the public Node process with zero passes and six skips when the expected external browser URL and server were absent; the ordinary group had no source-bound local Chromium preflight receipt.",
+    "intendedBehavior": "The existing group assignment and comparison-base selection drives a scrubbed, pinned-Chromium preflight for newly assigned browser roots, requires exact outcomes and cleanup, binds a receipt to source/tree/base/cohort identity, and transfers that receipt into the still-required complete group with raw evidence preserved. If the integrated source selects no browser roots, the preflight returns explicit no_change without launching an engine.",
+    "replacementTests": [
+      "RISK repository process: newly registered startup browser roots require an isolated Chromium receipt"
+    ],
+    "preservedCoverage": [
+      "All 817 preexisting rationale entries, including the incoming issue-scoped #323 entry, remain byte-for-byte; this additional entry only binds their combined origin/main fingerprint.",
+      "The ordinary full persistence-recovery group remains required and retains its assigned cases and skip inventory. Receipt preflight is additive, and the public process contract checks the exact workflow preflight order, receipt path transfer, and separate raw evidence upload.",
+      "The six-consumer 18/18 result remains source-specific to the dirty isolated 3d9442c checkout with its exact marker and instrumentation patch. Those six roots are absent from the integrated candidate; this record does not claim they executed on current main."
+    ],
+    "redEvidence": {
+      "command": "Node22 public command: --test --test-name-pattern=RISK saved view (six exact startup roots) tests.js; recorded in 323/consumer-red/2026-10-27T05-42-09-934Z-b93ca325-6bd3-4667-8b6c-e5161c4c33a3.json.",
+      "failure": "Original public consumer RED on source 9306a59 exited zero with zero passed and six skipped because the external browser URL/server was missing; the expected required-consumer outcome was absent. This is the issue-scoped source RED, not an integrated-candidate RED."
+    },
+    "sourceRedRecords": [
+      {
+        "kind": "original-public-consumer-red",
+        "sourceCommit": "9306a59b9041db7c34f20a50976b37280a3dd3cf",
+        "record": "323/consumer-red/2026-10-27T05-42-09-934Z-b93ca325-6bd3-4667-8b6c-e5161c4c33a3.json",
+        "sha256": "085f268c47add9bdc585e89db9c4021702b7f684bedf0b8eac997b17fb8aa410",
+        "command": "Node22 --test --test-name-pattern=RISK saved view (six exact startup roots) tests.js",
+        "outcome": "Public process exited zero while six target consumer roots skipped and zero passed because no local browser URL/server setup was supplied."
+      },
+      {
+        "kind": "separate-whole-group-red-with-unrelated-legacy-issues",
+        "sourceCommit": "27301a1be921587d6b5d9c46208fa8b3cfe81c85",
+        "record": "323/group-consumer-red/2026-10-27T05-43-09-117Z-e8a27b86-f206-4a8e-a111-81bb531a56c5.json",
+        "sha256": "f27120c70dd1a0be9acc7378c1acacb97d6e4544823c05b934c1d9a99606604e",
+        "command": "npm run test:group -- --group persistence-recovery --output-dir <issue323-red-output> --repository emerald-pham/funsidething --event-policy local --run-id issue323-red --run-attempt 1 --source-sha 27301a1be921587d6b5d9c46208fa8b3cfe81c85 --comparison-base 3b273718df28919586c2cd84ca835de573631fe3",
+        "outcome": "Exit 1 with 250 TAP records (72 pass, 172 fail, six skipped) and 203 reported issues. Six skipped target roots reproduce setup failure; the other 197 suite/baseline issues are unrelated and not attributed to #323."
+      }
+    ],
+    "setupFailureLimits": [
+      "The first browser-runtime-preflight probe failed on an unknown CLI option before implementation; infrastructure setup only.",
+      "An isolated source runner first lacked derivePolicyProseImpact and then checkpoint-progress.mjs; supplying both dependencies resolved setup.",
+      "A malformed shell invocation attempted /node before launching code. These setup failures are not behavioral RED evidence."
+    ],
+    "sourceProofBoundary": {
+      "sourceCommit": "3d9442c5329bf32da6904a9ed2bdca65eed0d3c8",
+      "sourceTree": "3e42173d59e889826a0e3102085349f750385c83",
+      "comparisonBase": "9306a59b9041db7c34f20a50976b37280a3dd3cf",
+      "patch": "323/source-proof/runner-marker-instrumentation.patch",
+      "patchSha256": "a254b8b2b829a95b88ad54300f01b5f4b295f94630a90d33286849aa7a11f5a1",
+      "result": "323/source-proof/actual-green-3d9442c/result.json",
+      "resultSha256": "ffabd6a210da1b0d6c87fc77809d8f04977c8fffe443cf8c9f7f5d28035960ec",
+      "verification": "323/source-proof/actual-six-consumer-verification.json",
+      "verificationSha256": "259b7788fe71f10defb28298b6d7a0f6588ff187df5faf871d8594a3d5eb1904",
+      "outcome": "Six actual consumer roots, 18/18 TAP, Chromium launched, WebKit absent from the same explicit browser path.",
+      "scope": "This is a dirty isolated source proof with markers, runner dependencies, and test instrumentation. The exact six roots are not present in this clean integration candidate and were not exercised by the integration descriptor."
+    },
+    "workflowTransferProof": {
+      "test": "RISK repository process: newly registered startup browser roots require an isolated Chromium receipt",
+      "sourceFile": "tests.js",
+      "assertions": "Checks the explicit PLAYWRIGHT_BROWSERS_PATH, Chromium-only install, preflight step before the complete group, exact --browser-runtime-receipt path, and separate raw preflight artifact upload.",
+      "hostedWorkflowExecution": false
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/323"
   }
 ,
   {
@@ -20779,6 +20860,26 @@
     "redEvidence": {
       "command": "node --test --test-name-pattern=independently reviewed protected governance scripts/agent-tools/diagnostic-receipt.test.mjs (the single pattern argument and exact argv are retained in governance-receipt-red/2026-10-27T05-01-19-431Z-42d618c8-d50d-4abe-9883-cfb87650dd42.json); native-control-red and channel-red preserve their distinct exact invocations.",
       "failure": "Contemporaneous public assertions observed missing governance binding, candidate-ref dispatch, source-headed CI claim, environment-only runtime admission and absent native stacks. Exact command/source/test/timestamps are preserved in artifacts289 recorder JSON; infrastructure trials are excluded from RED credit."
+    }
+  },
+  {
+    "baseCommit": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
+    "testChangesSha256": "d3f996f8b257adb346d8bfa63d70b92d29f481d66a9fc5f5078de8d97b269650",
+    "reason": "Integration metadata only: reconcile already implemented #323 Chromium preflight receipts with #289 protected diagnostic governance and bounded native evidence. Preserve both owners original test-first chronology; this append is not a new behavioral RED or chronology repair.",
+    "previousBehavior": "The separate parent and diagnostic candidates each carried their own executable process tests and original source-bound rationale, while no record yet identified their combined origin/main diff.",
+    "intendedBehavior": "The combined candidate retains the complete ordinary group and Chromium no_change/receipt contract alongside protected distinct-governance diagnostic admission, exact one-use descendant channel and nonqualifying native boundaries.",
+    "replacementTests": [
+      "RISK repository process: newly registered startup browser roots require an isolated Chromium receipt",
+      "RISK repository process: protected diagnostic governance remains distinct from frozen app source",
+      "RISK repository process: native diagnostic captures remain bounded and missing attribution never qualifies a repair"
+    ],
+    "preservedCoverage": [
+      "All 818 parent rationale records and all prior #289 records remain unchanged. Ordinary groups still execute every assigned case; #323 preflight never substitutes for ordinary execution.",
+      "Original frozen diagnostic app, dependencies, isolation, caps, timing, input and readiness remain unchanged. Native attribution remains partial/unavailable and never confers product release or physical-device qualification."
+    ],
+    "redEvidence": {
+      "command": "Original #323: node --test source consumer command is retained verbatim in artifacts323/consumer-red/2026-10-27T05-42-09-934Z-b93ca325-6bd3-4667-8b6c-e5161c4c33a3.json; original #289 governance: node --test --test-name-pattern=independently reviewed protected governance scripts/agent-tools/diagnostic-receipt.test.mjs, exact argv in artifacts289/governance-receipt-red/2026-10-27T05-01-19-431Z-42d618c8-d50d-4abe-9883-cfb87650dd42.json; each separate channel/native/concurrency RED remains in artifacts289/PROOF-INDEX.json.",
+      "failure": "Original #323 consumer exited successfully while all six targeted browser consumers skipped; original #289 assertions observed missing governance binding, source-headed dispatch/claim, env-only admission, absent native capture and missing retained concurrent child identity. This merge-only metadata retains those distinct observed failures and does not manufacture a combined preimplementation RED."
     }
   }
 ]
