@@ -120,15 +120,22 @@ function lockOwner(content) {
 }
 
 async function migrationLockSnapshot(lockPath) {
-  const metadata = await metadataIfPresent(lockPath);
-  if (!metadata) return undefined;
-  assertOwnedMetadata(metadata, lockPath);
-  const contents = await readFile(lockPath, 'utf8');
-  const owner = lockOwner(contents);
-  if (!owner) throw new Error(`Migration cannot verify lock ownership at ${lockPath}.`);
-  const identity = fileIdentity(metadata);
-  await requireMigrationFile(lockPath, identity, sha256(contents));
-  return { identity, digest: sha256(contents), owner };
+  try {
+    const metadata = await metadataIfPresent(lockPath);
+    if (!metadata) return undefined;
+    assertOwnedMetadata(metadata, lockPath);
+    const contents = await readFile(lockPath, 'utf8');
+    const owner = lockOwner(contents);
+    if (!owner) throw new Error(`Migration cannot verify lock ownership at ${lockPath}.`);
+    const identity = fileIdentity(metadata);
+    await requireMigrationFile(lockPath, identity, sha256(contents));
+    return { identity, digest: sha256(contents), owner };
+  } catch (error) {
+    // A live owner may release between metadata and content reads. Retry the
+    // exclusive acquisition; changed/replaced/unsafe locks still fail closed.
+    if (error?.code === 'ENOENT') return undefined;
+    throw error;
+  }
 }
 
 async function requireMigrationLockSnapshot(lockPath, snapshot) {

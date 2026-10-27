@@ -491,6 +491,24 @@ test('migration waits for both existing token locks before changing ledger autho
   }
 });
 
+test('migration accepts a live token lock released during ownership inspection',()=>{
+  for(const selected of ['source','target']){
+    const f=migrationFixture();
+    try{
+      mkdirSync(join(f.root,'persistent'));
+      const lock=`${selected==='source'?f.source:f.target}.lock`,journal=join(f.root,'released.txt'),preload=join(f.root,'release-boundary.mjs');
+      writeFileSync(lock,JSON.stringify({pid:process.pid,token:'fixture-release-lock'}));
+      // Intercept only the external filesystem read: a real owner can unlink
+      // its lock after lstat succeeds and before the CLI reads that same path.
+      writeFileSync(preload,`import {createRequire,syncBuiltinESMExports} from 'node:module';\nconst require=createRequire(import.meta.url),fs=require('node:fs/promises');\nconst read=fs.readFile;let released=false;\nfs.readFile=async function(file,...args){if(!released&&String(file)===process.env.CHAIN_LOCK_RELEASE_PATH){released=true;await fs.unlink(file);await fs.writeFile(process.env.CHAIN_LOCK_RELEASE_JOURNAL,'released');}return read.call(this,file,...args);};syncBuiltinESMExports();\n`);
+      const result=command(f.args(),f.root,{NODE_OPTIONS:'--import='+preload,CHAIN_LOCK_RELEASE_PATH:lock,CHAIN_LOCK_RELEASE_JOURNAL:journal});
+      assert.equal(readFileSync(journal,'utf8'),'released','the handoff race must actually occur at the filesystem boundary');
+      assert.equal(result.status,0,result.stderr);
+      assert.equal(JSON.parse(result.stdout).status,'migrated');assert.equal(readFileSync(f.target,'utf8'),f.contents,'exact ledger bytes survive the handoff');
+    }finally{rmSync(f.root,{recursive:true,force:true});}
+  }
+});
+
 test('discover reports conflicting explicit and environment ledger paths', () => {
   const fixture = mkdtempSync(join(tmpdir(), 'chain-coordination-discovery-'));
   try {

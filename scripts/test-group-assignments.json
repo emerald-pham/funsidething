@@ -37,6 +37,8 @@
     }
   ],
   "rootAssignments": [
+    {"root": "migration accepts a live token lock released during ownership inspection", "group": "native-process", "file": "scripts/agent-tools/coordination.test.mjs"},
+    {"root": "RISK repository process: released host locks cannot cause spurious CI migration failures", "group": "native-process", "file": "tests.js"},
     {"root": "workflow partial retries preserve successful gates and invalidate a later failed execution", "group": "native-process", "file": "scripts/agent-tools/ci-routing.test.mjs"},
     {"root": "workflow input reuse orders actual gate executions across rerun IDs", "group": "native-process", "file": "scripts/agent-tools/ci-routing.test.mjs"},
     {"root": "workflow input reuse requires readable retained original result and native artifacts", "group": "native-process", "file": "scripts/agent-tools/ci-routing.test.mjs"},
