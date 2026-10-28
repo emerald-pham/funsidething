@@ -653,19 +653,32 @@ async function readFixtureProducer(outputDirectory, startedAt) {
   }
 }
 
-function localFixtureNestedOutcomes(stdout, execution) {
+function localFixtureNestedOutcomes(stdout, execution, expectedPort) {
   const diagnostic = stdout.split(/\r?\n/).map((line) => line.startsWith('# ') ? line.slice(2) : '')
     .find((line) => line.includes('"scope":"Controlled OS-process transfer only; no native/runtime proof"'));
   let observed;
   try { if (diagnostic) observed = JSON.parse(diagnostic); } catch { /* Keep the raw test output as the authoritative evidence. */ }
   const passed = execution.exitCode === 0 && !execution.signal && !execution.interruption;
+  const listenerObservations = Array.isArray(observed?.liveListenerObservations) ? observed.liveListenerObservations : [];
+  const listener = listenerObservations.at(-1);
+  const liveListener = {
+    allocatedPort: expectedPort,
+    observedPort: listener?.port ?? null,
+    httpStatus: listener?.httpStatus ?? null,
+    reachable: listener?.reachable ?? null,
+    responseBodyVerified: listener?.htmlDocument === true || listener?.bodyMatches === true,
+    matchesAllocation: listener?.port === expectedPort,
+    observationCount: listenerObservations.length,
+  };
   return {
     testName: localFixtureTestName,
-    status: passed ? 'passed' : execution.outcome,
+    status: passed && liveListener.matchesAllocation && liveListener.httpStatus === 200
+      && liveListener.reachable === true && liveListener.responseBodyVerified ? 'passed' : execution.outcome,
     earlyRootExecutions: observed?.earlyRootExecutions ?? null,
     uniqueEarlyRoots: observed?.uniqueEarlyRoots ?? null,
     ordinaryGroups: observed?.ordinaryGroups ?? null,
     aggregateCaseCount: observed?.aggregateCaseCount ?? null,
+    liveListener,
     controlledBoundary: 'Playwright chromium.launch is replaced by the fixture; no native browser engine or memory qualification runs.',
   };
 }
@@ -1191,7 +1204,7 @@ async function main(argv) {
     });
     if (producer?.artifactPath) producer.artifactPath = sanitizeText(producer.artifactPath, redaction, 'localFixture.producer.artifactPath');
     const safeProducer = sanitizeFixtureValue(producer, redaction, 'localFixture.producer');
-    record.localFixture.nestedOutcomes = localFixtureNestedOutcomes(output.stdout, record.execution);
+    record.localFixture.nestedOutcomes = localFixtureNestedOutcomes(output.stdout, record.execution, fixturePort);
     record.localFixture.producer = safeProducer;
     record.localFixture.workloadOutcome = record.execution.outcome;
     record.localFixture.cleanup = sanitizeFixtureValue(cleanup, redaction, 'localFixture.cleanup');
