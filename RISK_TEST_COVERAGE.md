@@ -2375,3 +2375,8 @@ The pinned Linux x64 reader preserves the raw AT_PAGESZ witness and binds it to 
 
 - RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh
   - Actual held-bank mobile WebKit consumer in Normal/Reduced preserves initial/full pixels, changed pending time/location, current copy and visitor reconciliation, 400 durable tasks, both retained source hashes and cleanup. Local uncapped deterministic rendering only; no hosted 1GB or physical-device claim.
+
+- RISK repository process: scenery consumers use allocated fallback ports and preserve early native failures
+  - Actual child scenery consumers run without CHAIN_NATIVE_PORT using the allocated smoke fallback (CI with neither uses ephemeral0); controlled early launch preserves its primary failure before bootstrap exists. Original pixel/copy/source/data assertions remain.
+- RISK repository process: native scene-time bursts cannot activate controls behind a refused top-layer release
+  - The real scene dialog preset occupies the refused opener coordinate: nine actual trusted first-light downs must receive isolated neutral ups, zero wrong clicks, one accepted opener, ten attempts within2s, and complete cleanup. Existing two-engine neutral release preservation remains required.

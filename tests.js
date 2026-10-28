@@ -46378,8 +46378,8 @@ test('RISK scenery backdrop cache: first unchanged lighting timer reuses actual 
    };return context;
   };return browser;
  };
- try{await assert.rejects(()=>runButtonSafety({repo:__dirname,engine:'webkit',port:Number(process.env.CHAIN_NATIVE_PORT),outputDir:directory,mobileYesMotion:'reduced'}),error=>error===finished);}
- finally{releaseBank();playwright.webkit.launch=launch;evidence.probeError=probeError?.stack;const files=fs.readdirSync(directory).filter(name=>/^button-safety-webkit-.*\.json$/.test(name));if(files.length===1){const native=JSON.parse(fs.readFileSync(path.join(directory,files[0])));evidence.nativeReportPath=path.join(directory,files[0]);evidence.cleanup=native.cleanup;evidence.preparedSources=native.retainedSources[0].bootstrap.retainedSources.map(({id,payloadHash})=>({id,payloadHash}));}
+ try{try{await runButtonSafety({repo:__dirname,engine:'webkit',port:Number(process.env.CHAIN_NATIVE_PORT||process.env.CHAIN_NATIVE_SMOKE_PORT||0),outputDir:directory,mobileYesMotion:'reduced'});assert.fail('Expected scenery probe completion');}catch(error){if(error!==finished)throw error;}}
+ finally{releaseBank();playwright.webkit.launch=launch;evidence.probeError=probeError?.stack;const files=fs.readdirSync(directory).filter(name=>/^button-safety-webkit-.*\.json$/.test(name));if(files.length===1){const native=JSON.parse(fs.readFileSync(path.join(directory,files[0])));evidence.nativeReportPath=path.join(directory,files[0]);evidence.cleanup=native.cleanup;evidence.preparedSources=native.retainedSources?.[0]?.bootstrap?.retainedSources?.map(({id,payloadHash})=>({id,payloadHash}));}
   fs.writeFileSync(path.join(directory,'painted-slot-observation.json'),JSON.stringify(evidence,null,2)+'\n');}
  if(probeError)throw probeError;
  for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(evidence.cleanup?.[key],true);
@@ -46427,8 +46427,8 @@ test('RISK scenery text loading: delayed bank reuses identical backdrop while cu
    };return context;
   };return browser;
  };
- try{await assert.rejects(()=>runButtonSafety({repo:__dirname,engine:'webkit',port:Number(process.env.CHAIN_NATIVE_PORT),outputDir:directory,mobileYesMotion:motion}),error=>error===finished);}
- finally{releaseBank();playwright.webkit.launch=launch;evidence.probeError=probeError?.stack;const files=fs.readdirSync(directory).filter(name=>/^button-safety-webkit-.*\.json$/.test(name));if(files.length===1){const native=JSON.parse(fs.readFileSync(path.join(directory,files[0])));evidence.nativeReportPath=path.join(directory,files[0]);evidence.cleanup=native.cleanup;evidence.preparedSources=native.retainedSources[0].bootstrap.retainedSources.map(({id,payloadHash})=>({id,payloadHash}));}
+ try{try{await runButtonSafety({repo:__dirname,engine:'webkit',port:Number(process.env.CHAIN_NATIVE_PORT||process.env.CHAIN_NATIVE_SMOKE_PORT||0),outputDir:directory,mobileYesMotion:motion});assert.fail('Expected scenery probe completion');}catch(error){if(error!==finished)throw error;}}
+ finally{releaseBank();playwright.webkit.launch=launch;evidence.probeError=probeError?.stack;const files=fs.readdirSync(directory).filter(name=>/^button-safety-webkit-.*\.json$/.test(name));if(files.length===1){const native=JSON.parse(fs.readFileSync(path.join(directory,files[0])));evidence.nativeReportPath=path.join(directory,files[0]);evidence.cleanup=native.cleanup;evidence.preparedSources=native.retainedSources?.[0]?.bootstrap?.retainedSources?.map(({id,payloadHash})=>({id,payloadHash}));}
   fs.writeFileSync(path.join(directory,'late-copy-observation.json'),JSON.stringify(evidence,null,2)+'\n');}
  if(probeError)throw probeError;
  for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(evidence.cleanup?.[key],true);
@@ -46440,4 +46440,29 @@ test('RISK scenery text loading: delayed bank reuses identical backdrop while cu
  const flight=sharedSkywriterConsumer(false,true);flight.context.LandscapeMood.setHumanText('## Skywriters\n- HELLO');flight.context.syncScene(123000);assert.equal(flight.context.world.events[0].skywriterWord,'HELLO','Actual current-flight consumer adopts the newly loaded bank');
  t.diagnostic('Nonqualifying deterministic late-copy consumer: '+directory);
  });
+});
+
+test('RISK repository process: scenery consumers use allocated fallback ports and preserve early native failures',async t=>{
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});const directory=fs.mkdtempSync(path.join(base,'scenery-harness-'));
+ const env={...process.env,CHAIN_NATIVE_OUTPUT:path.join(directory,'native'),CHAIN_NATIVE_SMOKE_PORT:process.env.CHAIN_NATIVE_PORT||process.env.CHAIN_NATIVE_SMOKE_PORT||''};delete env.CHAIN_NATIVE_PORT;delete env.NODE_TEST_CONTEXT;
+ await t.test('real scenery source and rendering consumers without CHAIN_NATIVE_PORT',()=>{
+  const result=spawnSync(process.execPath,['--test','--test-name-pattern=^RISK scenery backdrop cache:|^RISK scenery text loading:','tests.js'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});fs.writeFileSync(path.join(directory,'no-port.tap'),result.stdout+result.stderr);assert.equal(result.error,undefined);assert.equal(result.status,0,'Actual scenery consumers must launch and retain every rendering/data assertion without CHAIN_NATIVE_PORT: '+result.stdout+result.stderr);assert.match(result.stdout,/# fail 0/);assert.match(result.stdout,/# skipped 0/);
+ });
+ await t.test('early native launch failure stays primary without bootstrap evidence',async()=>{
+  const {pathToFileURL}=await import('node:url'),preload=path.join(directory,'early-launch.mjs');fs.writeFileSync(preload,'const {webkit}=await import('+JSON.stringify(pathToFileURL(path.join(__dirname,'node_modules/playwright/index.mjs')).href)+');webkit.launch=async()=>{throw Error("Controlled early scenery launch failure");};\n');
+  const result=spawnSync(process.execPath,['--import',preload,'--test','--test-name-pattern=^RISK scenery backdrop cache:','tests.js'],{cwd:__dirname,env:{...env,CHAIN_NATIVE_PORT:process.env.CHAIN_NATIVE_PORT||process.env.CHAIN_NATIVE_SMOKE_PORT||''},encoding:'utf8',timeout:10000,maxBuffer:4*1024*1024});fs.writeFileSync(path.join(directory,'early-launch.tap'),result.stdout+result.stderr);assert.equal(result.error,undefined);assert.equal(result.status,1,'Controlled early launch remains failed');assert.match(result.stdout+result.stderr,/Controlled early scenery launch failure/,'The original native failure must survive missing retainedSources/bootstrap');assert.doesNotMatch(result.stdout+result.stderr,/Cannot read properties of undefined/);
+ });
+ t.diagnostic('Actual child scenery consumer evidence: '+directory);
+});
+
+test('RISK repository process: native scene-time bursts cannot activate controls behind a refused top-layer release',async t=>{
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});const directory=fs.mkdtempSync(path.join(base,'scene-dialog-release-')),{runButtonSafety}=await import('./scripts/button-safety-native.mjs');
+ const playwright=await import('playwright'),launch=playwright.chromium.launch;let geometry;
+ t.after(()=>{playwright.chromium.launch=launch;});
+ playwright.chromium.launch=async(...args)=>{const browser=await launch.apply(playwright.chromium,args),newContext=browser.newContext.bind(browser);browser.newContext=async(...args)=>{const context=await newContext(...args),newPage=context.newPage.bind(context);context.newPage=async(...args)=>{const page=await newPage(...args),down=page.mouse.down.bind(page.mouse),up=page.mouse.up.bind(page.mouse);let point;
+  page.mouse.down=async(...args)=>{point=await page.evaluate(()=>{const el=document.querySelector('[data-act="scene-time-settings"]');if(!el)return null;const r=el.getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2};});return down(...args);};
+  page.mouse.up=async(...args)=>{const result=await up(...args);if(point&&!geometry)geometry=await page.evaluate(point=>{const dialog=document.querySelector('#sceneTimeDialog[open]'),preset=dialog?.querySelector('[data-scene-preset="first-light"]');if(!preset)return null;preset.style.cssText='position:fixed;left:'+(point.x-20)+'px;top:'+(point.y-10)+'px;width:40px;height:20px;margin:0;z-index:2147483647';return{point,hit:document.elementFromPoint(point.x,point.y)===preset,open:dialog.open};},point);return result;};return page;};return context;};return browser;};
+ let result;try{result=await runButtonSafety({repo:__dirname,engine:'chromium',port:Number(process.env.CHAIN_NATIVE_PORT||0),outputDir:directory,scenarioFilter:'rapid scene time presets, lock, live time, and close'});}finally{playwright.chromium.launch=launch;fs.writeFileSync(path.join(directory,'top-layer-geometry.json'),JSON.stringify(geometry,null,2)+'\n');}assert.equal(geometry?.open,true,'The actual scene dialog opens in the controlled overlap fixture');assert.equal(result.report.status,'passed');
+ const opened=result.report.rapidOutcomes.find(row=>row.action==='act:scene-time-settings').bursts[0];assert.equal(opened.attempts,10);assert.equal(opened.trustedPresses,10);assert.equal(opened.unrelatedClicks,0);assert.equal(opened.acceptedClicks,1);assert.ok(opened.windowMs<=2000);assert.ok(opened.attemptDetails.slice(1).every(row=>row.nativeDownAction==='scene-preset:first-light'&&row.neutralRelease&&row.acceptedClicks===0&&row.neutralDocumentId===result.report.releaseSurfaces[0].documentId));
+ for(const value of Object.values(result.report.cleanup))assert.equal(value,true);t.diagnostic('Actual scene dialog burst evidence: '+directory);
 });
