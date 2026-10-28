@@ -26262,5 +26262,24 @@
     "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app$\" tests.js; external startup/D03-runs/2026-10-28T18-50-21-043Z-43a039b2-3a68-49c5-b2b2-bc0b16ec26dc.json",
     "failure": "Actual contemporaneous assertion RED at unchanged recorder d29410a: missing actual complete-board paint retained complete instead of incomplete. D05 observed GREEN c9697535 after the recorder change; complete positive control at800ms remains accepted, showing200ms is not a gate."
   }
+},
+{
+  "baseCommit": "99b5dd01df0bc6fee9fa2f9cac30d5ce0c701ee5",
+  "testChangesSha256": "2b7c29d1765ce36447b5714cef36dbfc479b2904abf6873c835de35ac9ea198c",
+  "reason": "D03-D05 require the existing report input consumer to reject a false complete startup timeline while retaining the independently passing app verdict. Only the ordinary diagnostic capture reuses the native consumer. This aggregate fingerprint binds inherited reviewed integration tests plus the new startup report case against current main; it credits their unchanged original RED records and does not invent chronology.",
+  "previousBehavior": "A report could claim complete despite missing the actual complete-board paint timestamp. Native opening ran current checkout400-task stories instead of the frozen ordinary baseline and fixture.",
+  "intendedBehavior": "A missing complete-board timestamp classifies diagnostic timing incomplete without inventing app failure. The optional ordinary-opening recorder reads immutable frozen app bytes and exact64-task installed fixture with explicit unavailable paints and work observations.",
+  "replacementTests": [
+    "RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app"
+  ],
+  "preservedCoverage": [
+    "All existing native action, rapid input, asset verification, lifecycle and cleanup assertions stay unchanged for ordinary full button runs.",
+    "The diagnostic kind/scope cannot qualify button or mobile-memory acceptance; actual WebKit paint and overlapping operation intervals remain explicitly unavailable.",
+    "No app assets, saved-board semantics,200ms release threshold, optional memory policy or existing mandatory release checks change."
+  ],
+  "redEvidence": {
+    "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app$\" tests.js; external startup/D03-runs/2026-10-28T18-50-21-043Z-43a039b2-3a68-49c5-b2b2-bc0b16ec26dc.json",
+    "failure": "Actual contemporaneous assertion RED at unchanged recorder d29410a: missing actual complete-board paint retained complete instead of incomplete. D05 observed GREEN c9697535 after the recorder change; complete positive control at800ms remains accepted, showing200ms is not a gate."
+  }
 }
 ]
