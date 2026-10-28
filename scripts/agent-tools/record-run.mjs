@@ -181,10 +181,14 @@ function sanitizeText(input, redaction, location = 'metadata') {
   };
   // Generic key/value separators stay on one line so they cannot consume TAP controls.
   replace(/(^|[^A-Za-z0-9])((?:github[_-]?token|aws[_-]?secret[_-]?access[_-]?key|password|passwd|secret|token|api[_-]?(?:key|token)|authorization|cookie|access[_-]?(?:token|key)|client[_-]?secret|private[_-]?key))([ \t]*(?:[:=][ \t]*|[ \t]+))(?:\\(["'])(.*?)\\\4|(["'])(.*?)\6|[^\s,;]+)/gi, (_match, beforeKey, key, separator, _escapedQuote, _escapedValue, _quote, _value, offset, source) => {
-    // Bare `token <word>` text is also ordinary prose in TAP case names. Keep
-    // that identity intact, while still redacting explicit key/value forms,
-    // recognizable token credentials, custom patterns, and all non-TAP logs.
-    if (key.toLowerCase() === 'token' && !/[:=]/.test(separator) && isTapIdentityLine(source, offset)) return undefined;
+    // Extend the existing bare-token prose rule only for these public word
+    // pairs. Other authorization/secret values, all quotes, assignments and
+    // ordinary logs stay sensitive; token formats and custom patterns apply.
+    const bareValue = _match.slice(beforeKey.length + key.length + separator.length);
+    const publicProse = key.toLowerCase() === 'token' ||
+      key.toLowerCase() === 'authorization' && /^(?:evidence|rejects|once)$/.test(bareValue) ||
+      key.toLowerCase() === 'secret' && bareValue === 'redaction';
+    if (publicProse && !_escapedQuote && !_quote && !/[:=]/.test(separator) && isTapIdentityLine(source, offset)) return undefined;
     return `${beforeKey}${key}${separator}[REDACTED]`;
   });
   for (const source of redaction.patterns) {
@@ -988,7 +992,9 @@ async function runQualificationPreflight({ repo, evidenceDirectory, id, requeste
     outcomes,
     errors,
   };
-  const serializedReport = sanitizeText(`${JSON.stringify(report, null, 2)}\n`, redaction, 'qualificationPreflight.report');
+  // Sanitize field values while TAP still has real line boundaries. A second
+  // pass over serialized JSON loses that context and can also consume escapes.
+  const serializedReport = `${JSON.stringify(sanitizeFixtureValue(report, redaction, 'qualificationPreflight.report'), null, 2)}\n`;
   await writeOutputFile(reportPath, serializedReport);
   const summary = {
     status,

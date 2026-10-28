@@ -2387,3 +2387,19 @@ each bound to the existing governance byte/mode and tooling digest contract.
 Byte and mode tampering, unknown paths and frozen application/profile/catalog
 changes are refused. No finite attempt, allowance or diagnostic qualification
 policy changes; old source and receipts remain immutable.
+
+
+## Public recorder identity preservation
+
+- RISK repository process: recorder retains exact public identities through streams and qualification reports
+
+The actual public recorder executes real controlled Node children. The existing
+TAP parser and exact qualification consumer require the four current harmless
+authorization/secret prose identities in default and summary streams, and in
+the private qualification stream plus its JSON report. Explicit assignments,
+quoted and unknown authorization values, recognized credentials, custom patterns,
+ordinary logs and multiline credentials stay sanitized; masked required
+identities remain nonqualifying. Report values are sanitized before JSON
+serialization so the retained TAP keeps its real line boundaries. These focused
+controlled processes establish neither browser/native nor full-suite, hosted,
+deployment, release or physical-device qualification.

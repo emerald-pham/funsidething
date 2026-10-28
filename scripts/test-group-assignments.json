@@ -13832,6 +13832,21 @@
       "root": "RISK repository process: diagnostic command closure remains exact and nonqualifying",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "retains harmless credential prose in exact TAP identities and protects real credentials",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "qualification reports preserve sanitized TAP identities without a serialized second pass",
+      "group": "native-process",
+      "file": "scripts/agent-tools/qualification-contracts.test.mjs"
+    },
+    {
+      "root": "RISK repository process: recorder retains exact public identities through streams and qualification reports",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [

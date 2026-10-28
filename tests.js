@@ -46022,3 +46022,20 @@ test('RISK repository process: diagnostic command closure remains exact and nonq
  assert.equal(result.stdout.split(/\r?\n/).filter(line=>new RegExp('^ok \\d+ - '+name+'$').test(line)).length,1,'The exact closure and frozen-source refusal controls must finish');
  assert.doesNotMatch(result.stdout,/# SKIP|# TODO/);
 });
+test('RISK repository process: recorder retains exact public identities through streams and qualification reports',async t=>{
+ const names=[
+  'retains harmless credential prose in exact TAP identities and protects real credentials',
+  'qualification reports preserve sanitized TAP identities without a serialized second pass',
+ ];
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const pattern='^(?:'+names.map(name=>name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|')+')$';
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern='+pattern,'scripts/agent-tools/record-run.test.mjs','scripts/agent-tools/qualification-contracts.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:120000,maxBuffer:8*1024*1024});
+ t.diagnostic(result.stdout+'\n'+result.stderr);
+ assert.equal(result.status,0,'Actual recorder and qualification-report consumers must preserve public identities and private credentials');
+ const {parseTap}=await import('./scripts/test-groups.mjs');
+ const roots=parseTap(result.stdout).filter(row=>row.id===row.root).map(({id,status,skipReason})=>({id,status,skipReason}));
+ assert.deepEqual(roots.sort((a,b)=>a.id.localeCompare(b.id)),names.map(id=>({id,status:'passed',skipReason:null})).sort((a,b)=>a.id.localeCompare(b.id)),'Both exact public process contracts must pass once without missing, duplicate or skipped roots');
+ assert.match(result.stdout,/^# tests 4$/m);
+ assert.match(result.stdout,/^# pass 4$/m);
+ for(const label of ['fail','cancelled','skipped','todo'])assert.match(result.stdout,new RegExp('^# '+label+' 0$','m'));
+});

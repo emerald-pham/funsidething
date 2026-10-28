@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 import { planQualificationContracts, qualificationTestCommand, verifyQualificationOutcomes } from './qualification-contracts.mjs';
+import { parseTap } from '../test-groups.mjs';
 
 const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const selector = path.join(repository, 'scripts/agent-tools/qualification-contracts.mjs');
@@ -456,6 +457,56 @@ test('qualification selector binds exact assigned risk wrappers to source change
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /baseline root|replacement|registration|qualification/i);
   });
+});
+
+test('qualification reports preserve sanitized TAP identities without a serialized second pass', t => {
+  const fixture = makeRecorderFixture(t);
+  const publicNames = [
+    'bounded extension requires exact source and current journal authorization evidence and retains failures',
+    'portable authorization rejects observer-only HEAD drift even when selected inputs are unchanged',
+    'a verified child consumes its inherited authorization once and cannot replay it',
+    'preserves adjacent nested TAP records across multiline secret redaction',
+  ];
+  const parent = contractRows[0].root;
+  const secret = 'QUALIFICATION-IDENTITY-SECRET-218';
+  const rawNestedTap = [...publicNames, `authorization=${secret}`].map((name, index) =>
+    `    # Subtest: ${name}\n    ok ${index + 1} - ${name}\n`).join('') + '    1..5\n';
+  const preload = fs.readFileSync(fixture.preload, 'utf8');
+  const marker = "  const output = 'TAP version 13";
+  assert.equal(preload.split(marker).length, 2, 'extend the existing controlled child emitter once');
+  fs.writeFileSync(fixture.preload, preload.replace(marker,
+    `  rows[0] = rows[0].replace(${JSON.stringify(`# Subtest: ${parent}\n`)}, ${JSON.stringify(`# Subtest: ${parent}\n${rawNestedTap}`)});\n  rows.push(${JSON.stringify('# authorization evidence\n# "password": "' + secret + '\ncontinued-private-value"\n')});\n${marker}`));
+  if (process.env.CHAIN_RECORDER_TAP_TEST_EVIDENCE_DIR) fixture.evidence = path.join(process.env.CHAIN_RECORDER_TAP_TEST_EVIDENCE_DIR, 'qualification-prose');
+  const result = invokeReadyRecorder(fixture, { mode: 'passed', comparisonBase: fixture.base });
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}\n${recorderFailureDetails(result)}`);
+  const summary = readRecorderSummary(result);
+  let retained;
+  let reportError = null;
+  try { retained = assertPrivateQualificationReport(fixture, summary, 'passed'); }
+  catch (error) { reportError = error.message; }
+  assert.equal(reportError, null, 'the real persisted qualification report must retain valid JSON after credential sanitization');
+  const { record, report, reportPath } = retained;
+  const contractsTap = fs.readFileSync(path.join(path.dirname(reportPath), 'contracts.stdout.tap'), 'utf8');
+  const expected = [...publicNames, 'authorization=[REDACTED]'].map(name => ({
+    id: `${parent} > ${name}`, root: parent, status: 'passed', skipReason: null,
+  }));
+  const observations = [contractsTap, report.contracts.stdout].map(tap => ({
+    nested: parseTap(tap).filter(row => row.id !== row.root).map(({ id, root, status, skipReason }) => ({ id, root, status, skipReason })),
+    qualification: verifyQualificationOutcomes({ status: 'selected', selected: contractRows }, { exitCode: report.contracts.exitCode, stdout: tap }),
+  }));
+  t.diagnostic(JSON.stringify({ recordId: record.id, reportPath, observations }));
+  for (const observation of observations) {
+    assert.deepEqual(observation.nested, expected, 'each retained report surface must preserve the original public IDs and sanitized private ID');
+    assert.equal(observation.qualification.status, 'passed');
+  }
+  assert.equal(report.contracts.stdout, contractsTap, 'serialization must not sanitize a retained TAP string without its line context');
+  assert.match(contractsTap, /^# authorization \[REDACTED\]$/m);
+  for (const output of [fs.readFileSync(reportPath, 'utf8'), contractsTap, JSON.stringify(record), result.stdout, result.stderr]) {
+    assert.equal(output.includes(secret), false);
+    assert.equal(output.includes('continued-private-value'), false);
+  }
+  assert.deepEqual(summary.child, { exitCode: 0, signal: null });
+  assert.equal(record.execution.output.stdout, 'requested long child only\n');
 });
 
 test('qualification readiness gates the recorder child on selected parent contracts and explicit no-change', async t => {

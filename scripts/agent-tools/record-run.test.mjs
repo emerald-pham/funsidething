@@ -9,6 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseTap } from '../test-groups.mjs';
+import { verifyQualificationOutcomes } from './qualification-contracts.mjs';
 
 const node = process.execPath;
 const recorder = fileURLToPath(new URL('./record-run.mjs', import.meta.url));
@@ -1693,6 +1694,73 @@ test('preserves an ordinary TAP case identity containing the word token through 
   assert.match(tapOutput, /^# fail 0$/m);
   assert.equal(record.execution.exitCode, 0);
   assert.equal(record.execution.outcome, 'passed');
+});
+
+test('retains harmless credential prose in exact TAP identities and protects real credentials', async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'record-tap-public-prose-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(temp);
+  const publicNames = [
+    'bounded extension requires exact source and current journal authorization evidence and retains failures',
+    'portable authorization rejects observer-only HEAD drift even when selected inputs are unchanged',
+    'a verified child consumes its inherited authorization once and cannot replay it',
+    'preserves adjacent nested TAP records across multiline secret redaction',
+  ];
+  const privateNames = [
+    ['authorization=EXPLICIT-AUTH-5f0', 'authorization=[REDACTED]'],
+    ['secret "QUOTED-SECRET-a52"', 'secret [REDACTED]'],
+    ['authorization unknowncredential', 'authorization [REDACTED]'],
+    ['password=evidence', 'password=[REDACTED]'],
+    ['authorization "evidence"', 'authorization [REDACTED]'],
+    ['secret=redaction', 'secret=[REDACTED]'],
+    ['recognized ghp_abcdefghijklmnopqrstuvwxyz123456', 'recognized [REDACTED]'],
+    ['Bearer SYNTHETICBEARER123456', 'Bearer [REDACTED]'],
+    ['custom PRIVATE-TAP-818', 'custom [REDACTED]'],
+    ['token "TOKEN-QUOTED-0a"', 'token [REDACTED]'],
+  ];
+  const testFile = path.join(repo, 'public-prose.test.mjs');
+  await writeFile(testFile, `import { test } from 'node:test';\n${publicNames.map(name => `test(${JSON.stringify(name)}, () => {});`).join('\n')}\ntest(${JSON.stringify(privateNames[0][0])}, () => {});\ntest('privacy controls', async t => {\n  t.diagnostic('authorization evidence');\n  process.stderr.write('secret redaction\\n');\n${privateNames.slice(1).map(([name]) => `  await t.test(${JSON.stringify(name)}, () => {});`).join('\n')}\n});\n`);
+  const roots = [...publicNames, privateNames[0][1], 'privacy controls'];
+  const plan = { status: 'selected', selected: roots.map(root => ({ root })) };
+  const expectedCases = [
+    ...publicNames.map(id => ({ id, root: id, status: 'passed', skipReason: null })),
+    { id: privateNames[0][1], root: privateNames[0][1], status: 'passed', skipReason: null },
+    ...privateNames.slice(1).map(([, name]) => ({ id: `privacy controls > ${name}`, root: 'privacy controls', status: 'passed', skipReason: null })),
+    { id: 'privacy controls', root: 'privacy controls', status: 'passed', skipReason: null },
+  ];
+  for (const summaryMode of [false, true]) await t.test(summaryMode ? 'summary output' : 'default output', async () => {
+    const evidence = path.join(process.env.CHAIN_RECORDER_TAP_TEST_EVIDENCE_DIR || temp, summaryMode ? 'public-prose-summary' : 'public-prose-default');
+    const result = invokeRecorder({
+      repo, evidence, purpose: 'green', command: node,
+      args: ['--test', '--test-reporter=tap', testFile],
+      extraOptions: [...(summaryMode ? ['--summary'] : []), '--redact-pattern', 'PRIVATE-TAP-[0-9]+'],
+    });
+    assert.equal(result.status, 0, result.stderr);
+    const summary = summaryMode ? summaryFrom(result) : null;
+    const recordBytes = await readFile(summary?.evidence.metadataPath || evidencePathFrom(result), 'utf8');
+    const record = JSON.parse(recordBytes);
+    const tap = record.execution.output.stdout;
+    const parsed = parseTap(tap).map(({ id, root, status, skipReason }) => ({ id, root, status, skipReason }));
+    t.diagnostic(JSON.stringify({ summaryMode, recordId: record.id, parsed, qualification: verifyQualificationOutcomes(plan, { exitCode: record.execution.exitCode, stdout: tap }) }));
+    assert.deepEqual(parsed, expectedCases, 'retained real TAP must preserve each public identity and redact each credential-bearing identity');
+    assert.equal(verifyQualificationOutcomes(plan, { exitCode: record.execution.exitCode, stdout: tap }).status, 'passed');
+    const required = { status: 'selected', selected: [...publicNames, privateNames[0][0], 'privacy controls'].map(root => ({ root })) };
+    const qualification = verifyQualificationOutcomes(required, { exitCode: record.execution.exitCode, stdout: tap });
+    assert.equal(qualification.status, 'failed', 'a real secret-bearing required root cannot acquire exact identity credit after masking');
+    assert.equal(qualification.outcomes.find(row => row.root === privateNames[0][0]).status, 'missing');
+    assert.match(tap, /^# authorization \[REDACTED\]$/m, 'non-TAP prose logs retain whitespace credential redaction');
+    assert.match(tap, /^# secret \[REDACTED\]$/m);
+    for (const bytes of [recordBytes, result.stdout, result.stderr]) for (const secret of ['EXPLICIT-AUTH-5f0', 'QUOTED-SECRET-a52', 'unknowncredential', 'ghp_abcdefghijklmnopqrstuvwxyz123456', 'SYNTHETICBEARER123456', 'PRIVATE-TAP-818', 'TOKEN-QUOTED-0a']) {
+      assert.equal(bytes.includes(secret), false, 'commands, source, metadata and console retain only sanitized credentials');
+    }
+    if (summaryMode) assert.equal(await readFile(summary.evidence.stdoutPath, 'utf8'), tap);
+    else assert.equal(result.stdout, tap);
+    assert.match(tap, /^# tests 15$/m);
+    assert.match(tap, /^# pass 15$/m);
+    assert.match(tap, /^# fail 0$/m);
+    assert.match(tap, /^# skipped 0$/m);
+    assert.equal(record.execution.outcome, 'passed');
+  });
 });
 
 test('redacts a secret-bearing TAP token identity without losing its status or plain-log sanitization', async (t) => {
