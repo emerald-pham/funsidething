@@ -2,13 +2,37 @@ import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { test } from 'node:test';
-import { mkdtemp, mkdir, readFile, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, readdir, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises';
+import { createServer as createHttpServer } from 'node:http';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseTap } from '../test-groups.mjs';
+import { verifyQualificationOutcomes } from './qualification-contracts.mjs';
 
 const node = process.execPath;
 const recorder = fileURLToPath(new URL('./record-run.mjs', import.meta.url));
+const coordinationEntrypoint = fileURLToPath(new URL('./coordination.mjs', import.meta.url));
+const sourceRepository = fileURLToPath(new URL('../../', import.meta.url));
+
+function activeLedgerOwner({ id, worktree, resources, now = new Date(), expiresAt = new Date(now.getTime() + 60000), status = 'active' }) {
+  const heartbeatAt = now.toISOString();
+  return {
+    id,
+    status,
+    worktree,
+    heartbeatAt,
+    lease: {
+      state: 'healthy',
+      ownerConfirmationRequired: false,
+      takeoverAllowed: false,
+      lastHeartbeatAt: heartbeatAt,
+      expiresAt: expiresAt.toISOString(),
+    },
+    resources,
+  };
+}
 
 async function createCommittedRepository(root) {
   const repo = path.join(root, 'repo');
@@ -38,10 +62,27 @@ function invokeRecorder({ repo, evidence, purpose, command, args = [], extraOpti
   });
 }
 
-async function createQualificationFixture(t) {
-  const root = await mkdtemp(path.join(os.tmpdir(), 'record-run-qualification-'));
+async function createQualificationFixture(t, { preflightCapable = false } = {}) {
+  const root = await realpath(await mkdtemp(path.join(os.tmpdir(), 'record-run-qualification-')));
   t.after(() => rm(root, { recursive: true, force: true }));
-  const repo = await createCommittedRepository(root);
+  let repo;
+  if (preflightCapable) {
+    repo = path.join(root, 'repo');
+    const clone = spawnSync('git', ['clone', '--quiet', '--local', '--no-hardlinks', sourceRepository, repo], { encoding: 'utf8' });
+    assert.equal(clone.status, 0, clone.stderr);
+    const removeOrigin = spawnSync('git', ['-C', repo, 'remote', 'remove', 'origin'], { encoding: 'utf8' });
+    assert.equal(removeOrigin.status, 0, removeOrigin.stderr);
+    const makeDefaultBranch = spawnSync('git', ['-C', repo, 'branch', '-M', 'main'], { encoding: 'utf8' });
+    assert.equal(makeDefaultBranch.status, 0, makeDefaultBranch.stderr);
+    await symlink(path.join(sourceRepository, 'node_modules'), path.join(repo, 'node_modules'), 'dir');
+    await writeFile(path.join(repo, '.git', 'info', 'exclude'), '\n/node_modules\n', { flag: 'a' });
+    const seededStatus = spawnSync('git', ['-C', repo, 'status', '--porcelain=v1', '--untracked-files=all'], { encoding: 'utf8' });
+    assert.equal(seededStatus.status, 0, seededStatus.stderr);
+    assert.equal(seededStatus.stdout, '', `preflight fixture should stay clean: ${seededStatus.stdout}`);
+  } else {
+    repo = await createCommittedRepository(root);
+  }
+  const canonicalRepo = await realpath(repo);
   const commit = spawnSync('git', ['-C', repo, 'rev-parse', 'HEAD'], { encoding: 'utf8' });
   const tree = spawnSync('git', ['-C', repo, 'rev-parse', 'HEAD^{tree}'], { encoding: 'utf8' });
   assert.equal(commit.status, 0, commit.stderr);
@@ -50,16 +91,19 @@ async function createQualificationFixture(t) {
   const smokePort = 51632;
   const ledger = path.join(root, 'coordination.json');
   const resources = [`loopback:127.0.0.1:${deliveryPort}`, `loopback:127.0.0.1:${smokePort}`];
-  await writeFile(ledger, JSON.stringify({ version: 1, scope: 'codex-wide', entries: [{ id: 'fixture-owner', status: 'active', worktree: repo, resources }] }));
+  const owner = activeLedgerOwner({ id: 'fixture-owner', worktree: canonicalRepo, resources });
+  await writeFile(ledger, JSON.stringify({ version: 1, scope: 'codex-wide', entries: [owner] }));
   return {
     root,
     repo,
+    canonicalRepo,
     commit: commit.stdout.trim(),
     tree: tree.stdout.trim(),
     evidence: path.join(root, 'recorder-evidence'),
     nativeOutput: path.join(root, 'native-output'),
     sentinel: path.join(root, 'expensive-child-launched'),
     ledger,
+    owner,
     deliveryPort,
     smokePort,
     env: {
@@ -72,6 +116,207 @@ async function createQualificationFixture(t) {
       CHAIN_NATIVE_PORT: String(deliveryPort),
       CHAIN_NATIVE_SMOKE_PORT: String(smokePort),
       CHAIN_QUALIFICATION_READINESS_SENTINEL: path.join(root, 'expensive-child-launched'),
+    },
+  };
+}
+
+async function getFreePort() {
+  const server = net.createServer();
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  const { port } = server.address();
+  await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  return port;
+}
+
+function invokeLocalFixture({ repo, evidence, env: overrides = {}, extraOptions = [], timeout = 30000 }) {
+  const env = { ...process.env, ...overrides };
+  delete env.NODE_TEST_CONTEXT;
+  return spawnSync(node, [recorder, '--repo', repo, '--evidence-dir', evidence, '--purpose', 'green',
+    '--summary', '--local-fixture', 'early-group-aggregate', ...extraOptions], {
+    cwd: repo,
+    encoding: 'utf8',
+    timeout,
+    env,
+    maxBuffer: 8 * 1024 * 1024,
+  });
+}
+
+function claimLocalFixtureResource(fixture, resource = fixture.resource) {
+  return spawnSync(node, [coordinationEntrypoint, 'claim', '--file', fixture.ledger,
+    '--id', fixture.owner.id, '--resources', resource], {
+    cwd: fixture.canonicalRepo,
+    encoding: 'utf8',
+    env: { ...process.env, CODEX_COORDINATION_FILE: fixture.ledger, DOW_EMULATOR_COORDINATION_FILE: '' },
+  });
+}
+
+async function listenAtPort(port) {
+  const server = createHttpServer((_request, response) => response.end('foreign-control-live'));
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(port, '127.0.0.1', resolve);
+  });
+  return server;
+}
+
+async function assertPortCanBind(port) {
+  const server = await listenAtPort(port);
+  await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+}
+
+function startLocalFixture(fixture, overrides = {}) {
+  const env = { ...process.env, ...fixture.env, ...overrides };
+  delete env.NODE_TEST_CONTEXT;
+  return spawn(node, [recorder, '--repo', fixture.repo, '--evidence-dir', fixture.evidence,
+    '--purpose', 'green', '--summary', '--local-fixture', 'early-group-aggregate'], {
+    cwd: fixture.canonicalRepo,
+    env,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+}
+
+async function waitForFixtureFile(fixture, fileName, timeoutMs = 10000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const directories = (await readdir(fixture.root)).filter((name) => name.startsWith(path.basename(fixture.nativeOutput)));
+    for (const directory of directories) {
+      const filePath = path.join(fixture.root, directory, fileName);
+      try { await stat(filePath); return filePath; } catch (error) { if (error?.code !== 'ENOENT') throw error; }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error('Timed out waiting for local fixture output ' + fileName + '.');
+}
+
+async function assertNoFixtureOutput(fixture) {
+  const names = await readdir(fixture.root);
+  assert.equal(names.some((name) => name.startsWith(path.basename(fixture.nativeOutput))), false,
+    'readiness failure cannot launch the fixture or create its output directory');
+}
+
+function captureProcess(child) {
+  return new Promise((resolve, reject) => {
+    let stdout = '';
+    let stderr = '';
+    child.stdout.setEncoding('utf8').on('data', (chunk) => { stdout += chunk; });
+    child.stderr.setEncoding('utf8').on('data', (chunk) => { stderr += chunk; });
+    child.once('error', reject);
+    child.once('close', (status, signal) => resolve({ status, signal, stdout, stderr }));
+  });
+}
+
+function fixtureTestSource(behavior, coordinationScript) {
+  return [
+    "import assert from 'node:assert/strict';",
+    "import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';",
+    "import { createServer } from 'node:http';",
+    "import path from 'node:path';",
+    "import { spawnSync } from 'node:child_process';",
+    "import test from 'node:test';",
+    'const behavior = ' + JSON.stringify(behavior) + ';',
+    'const coordinationScript = ' + JSON.stringify(coordinationScript) + ';',
+    "test('group and aggregate retain actual early cases once across fresh group processes', async t => {",
+    "  assert.equal(process.versions.node.split('.')[0], '22');",
+    "  const nested = spawnSync('node', ['-p', 'process.version'], { encoding: 'utf8' });",
+    "  assert.equal(nested.status, 0, nested.stderr);",
+    "  assert.equal(nested.stdout.trim(), process.version, 'PATH must select the same actual Node runtime as the fixed child');",
+    "  for (const key of ['CI', 'CONTINUOUS_INTEGRATION', 'NODE_OPTIONS', 'NODE_PATH', 'GITHUB_ACTIONS', 'GITHUB_RUN_ID', 'PLAYWRIGHT_BROWSERS_PATH', 'FIREBASE_CONFIG', 'AWS_PROFILE', 'DOW_EMULATOR_COORDINATION_FILE', 'CHAIN_NATIVE_SMOKE_PORT']) {",
+    "    assert.equal(process.env[key], undefined, key + ' must not cross the controlled local boundary');",
+    "  }",
+    "  assert.ok(process.env.CODEX_COORDINATION_FILE);",
+    "  const output = process.env.CHAIN_NATIVE_OUTPUT;",
+    "  mkdirSync(output, { recursive: true });",
+    "  appendFileSync(path.join(output, 'fixture-started.txt'), process.pid + '\\n');",
+    "  const port = Number(process.env.CHAIN_NATIVE_PORT);",
+    "  let listenerObservation;",
+    "  const server = createServer((_request, response) => response.end('fixture-listener-live'));",
+    "  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolve); });",
+    "  writeFileSync(path.join(output, 'fixture-listener-live.txt'), String(port));",
+    "  try {",
+    "    const response = await fetch('http://127.0.0.1:' + port + '/fixture');",
+    "    const body = await response.text();",
+    "    listenerObservation = { port, httpStatus: response.status, reachable: response.ok, bodyMatches: body === 'fixture-listener-live' };",
+    "    assert.equal(body, 'fixture-listener-live');",
+    "    if (behavior === 'interrupt') await new Promise(resolve => setTimeout(resolve, 60000));",
+    "    await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));",
+    "    if (behavior === 'change-lease') { const refreshed = spawnSync(process.execPath, [coordinationScript, 'heartbeat', '--file', process.env.CODEX_COORDINATION_FILE, '--id', 'fixture-owner'], { cwd: process.cwd(), encoding: 'utf8' }); assert.equal(refreshed.status, 0, refreshed.stderr); }",
+    "    writeFileSync(path.join(output, 'button-safety-chromium-fixture.json'), JSON.stringify({ status: 'failed', observedActions: ['act:download-backup'], actionObservation: { recognizedOffered: ['act:download-backup'], executed: [], coverage: 'fixture producer only' }, outcomes: [], rapidOutcomes: [], errors: ['controlled-page-crash'], cleanup: { contextClosed: true, browserClosed: true, serverClosed: true }, browserVersion: 'external-mock-no-engine' }));",
+    ...['known completed partial action remains accounted without full coverage credit',
+      ...['missing accounting','unknown offered ID','unknown executed ID','profile tamper','source tamper','transport failure','instrumentation failure','cleanup failure'].map(name=>'failed stress still refuses '+name),
+      'changed group transfer reference','missing durable predecessor'].map(name=>'    await t.test('+JSON.stringify(name)+',()=>{});'),
+    "    t.diagnostic(JSON.stringify({ scope: 'Controlled OS-process transfer only; no native/runtime proof', earlyRootExecutions: 5, uniqueEarlyRoots: 5, ordinaryGroups: 4, aggregateCaseCount: 11, liveListenerObservations: [listenerObservation] }));",
+    "    if (behavior === 'failure') assert.fail('controlled local fixture failure');",
+    "  } finally {",
+    "    if (server.listening) await new Promise(resolve => server.close(() => resolve()));",
+    "  }",
+    "});",
+  ].join('\n');
+}
+
+async function createLocalFixture(t, { behavior = 'success', foreignEntry = false, sourceTransform = source => source } = {}) {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'record-run-local-fixture-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(root);
+  const canonicalRepo = await realpath(repo);
+  const testPath = path.join(repo, 'scripts/agent-tools/test-groups.test.mjs');
+  await mkdir(path.dirname(testPath), { recursive: true });
+  await writeFile(testPath, sourceTransform(fixtureTestSource(behavior, coordinationEntrypoint)));
+  const add = spawnSync('git', ['-C', repo, 'add', 'scripts/agent-tools/test-groups.test.mjs'], { encoding: 'utf8' });
+  assert.equal(add.status, 0, add.stderr);
+  const commit = spawnSync('git', ['-C', repo, 'commit', '--quiet', '-m', 'fixed fixture runner'], { encoding: 'utf8' });
+  assert.equal(commit.status, 0, commit.stderr);
+  const deliveryPort = await getFreePort();
+  const smokePort = await getFreePort();
+  const foreignPort = foreignEntry ? await getFreePort() : null;
+  const now = new Date();
+  const resource = 'loopback:127.0.0.1:' + deliveryPort;
+  const ledger = path.join(root, 'coordination.json');
+  const owner = activeLedgerOwner({ id: 'fixture-owner', worktree: canonicalRepo, resources: [resource], now });
+  const foreign = foreignEntry ? activeLedgerOwner({
+    id: 'foreign-owner',
+    worktree: path.join(root, 'foreign-repo'),
+    resources: ['loopback:127.0.0.1:' + foreignPort, 'foreign-reservation:keep'],
+    now,
+  }) : null;
+  const ledgerValue = { version: 1, scope: 'codex-wide', entries: [owner, ...(foreign ? [foreign] : [])] };
+  await writeFile(ledger, JSON.stringify(ledgerValue));
+  const evidence = path.join(root, 'evidence');
+  const nativeOutput = path.join(root, 'evidence-native-output-');
+  return {
+    root,
+    repo,
+    canonicalRepo,
+    evidence,
+    nativeOutput,
+    ledger,
+    ledgerValue,
+    owner,
+    foreign,
+    resource,
+    deliveryPort,
+    smokePort,
+    foreignPort,
+    env: {
+      PATH: '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin',
+      CODEX_COORDINATION_FILE: ledger,
+      DOW_EMULATOR_COORDINATION_FILE: path.join(root, 'foreign-ledger.json'),
+      CHAIN_NATIVE_PORT: String(deliveryPort),
+      CHAIN_NATIVE_SMOKE_PORT: String(smokePort),
+      CHAIN_NATIVE_OUTPUT: path.join(root, 'inherited-output'),
+      CHAIN_NATIVE_CANDIDATE_SHA: 'stale-sha',
+      CHAIN_NATIVE_CANDIDATE_TREE: 'stale-tree',
+      CI: 'true',
+      CONTINUOUS_INTEGRATION: 'true',
+      GITHUB_ACTIONS: 'true',
+      GITHUB_RUN_ID: 'foreign-run',
+      PLAYWRIGHT_BROWSERS_PATH: path.join(root, 'foreign-engines'),
+      FIREBASE_CONFIG: path.join(root, 'foreign-firebase.json'),
+      AWS_PROFILE: 'foreign-profile',
+      NODE_OPTIONS: '--trace-warnings',
+      NODE_PATH: path.join(root, 'foreign-node-path'),
     },
   };
 }
@@ -90,7 +335,7 @@ function summaryFrom(result) {
 }
 
 test('qualification readiness creates evidence destinations and launches the requested child', async (t) => {
-  const fixture = await createQualificationFixture(t);
+  const fixture = await createQualificationFixture(t, { preflightCapable: true });
   const result = invokeRecorder({
     repo: fixture.repo,
     evidence: fixture.evidence,
@@ -109,6 +354,248 @@ test('qualification readiness creates evidence destinations and launches the req
   assert.ok((await readdir(fixture.nativeOutput)).length === 0, 'readiness probes leave no files in the native evidence destination');
   const record = JSON.parse(await readFile(summary.evidence.metadataPath, 'utf8'));
   assert.equal(record.git.commit, fixture.commit);
+});
+
+test('local fixture refuses absent or inconsistent required outcome proof', async t => {
+  const rootName='group and aggregate retain actual early cases once across fresh group processes';
+  const nestedName='missing durable predecessor';
+  for(const [name,sourceTransform,extraOptions=[]] of [
+    ['missing root',source=>source.replace("test('"+rootName+"',", "test('unselected root',")],
+    ['renamed root',source=>source.replace(rootName,rootName+' renamed')],
+    ['skipped root',source=>source.replace("test('"+rootName+"', async", "test('"+rootName+"', {skip:'controlled omission'}, async")],
+    ['missing nested outcome',source=>source.replace('    await t.test("'+nestedName+'",()=>{});','')],
+    ['renamed nested outcome',source=>source.replace(nestedName,nestedName+' renamed')],
+    ['skipped nested outcome',source=>source.replace('t.test("'+nestedName+'",()=>{});','t.test("'+nestedName+'",{skip:"controlled omission"},()=>{});')],
+    ['missing diagnostic',source=>source.replace('t.diagnostic(JSON.stringify({ scope:', 'void(JSON.stringify({ scope:')],
+    ['malformed diagnostic',source=>source.replace('t.diagnostic(JSON.stringify({ scope:', 't.diagnostic("malformed "+JSON.stringify({ scope:')],
+    ['wrong listener port',source=>source.replace('liveListenerObservations: [listenerObservation]', 'liveListenerObservations: [{...listenerObservation,port:1}]')],
+    ['missing listener',source=>source.replace('liveListenerObservations: [listenerObservation]', 'liveListenerObservations: []')],
+    ['missing accounting',source=>source.replace('earlyRootExecutions: 5, uniqueEarlyRoots: 5, ordinaryGroups: 4, aggregateCaseCount: 11,','')],
+    ['inconsistent accounting',source=>source.replace('aggregateCaseCount: 11','aggregateCaseCount: 12')],
+    ['caller redaction removes diagnostic',source=>source,['--redact-pattern','Controlled OS-process transfer only; no native/runtime proof']],
+  ])await t.test(name,async sub=>{
+    const fixture=await createLocalFixture(sub,{sourceTransform});
+    const result=invokeLocalFixture({repo:fixture.repo,evidence:fixture.evidence,env:fixture.env,extraOptions});
+    const summary=summaryFrom(result),record=JSON.parse(await readFile(summary.evidence.metadataPath,'utf8'));
+    sub.diagnostic(JSON.stringify({control:name,summary,record,stdout:await readFile(summary.evidence.stdoutPath,'utf8'),stderr:await readFile(summary.evidence.stderrPath,'utf8')}));
+    assert.equal(summary.child.exitCode,0,'Control workload itself exits successfully');
+    assert.equal(summary.fixture.workloadOutcome,'passed','Actual workload exit remains separate from evidence validity');
+    assert.notEqual(result.status,0,name+' must fail the wrapper despite a successful child');
+    assert.equal(summary.status,'evidence-failure');
+    assert.equal(summary.fixture.nestedOutcomes.status,'unverified');
+    assert.equal(summary.fixture.cleanup.listener.status,'closed');assert.equal(summary.fixture.cleanup.allocation.status,'released');
+    assert.equal(record.execution.exitCode,0);assert.equal(record.execution.outcome,'passed');
+  });
+});
+
+test('local fixture runs its fixed child, records nested outcomes, and releases only its own allocation', async (t) => {
+  const fixture = await createLocalFixture(t, { foreignEntry: true });
+  const foreignServer = await listenAtPort(fixture.foreignPort);
+  t.after(() => new Promise((resolve) => foreignServer.close(() => resolve())));
+  const foreignBefore = structuredClone(fixture.foreign);
+
+  const first = invokeLocalFixture({ repo: fixture.repo, evidence: fixture.evidence, env: fixture.env });
+  assert.equal(first.status, 0, JSON.stringify({ status: first.status, signal: first.signal, error: first.error?.message, stdout: first.stdout, stderr: first.stderr }));
+  const firstSummary = summaryFrom(first);
+  assert.equal(firstSummary.status, 'passed');
+  assert.equal(firstSummary.fixture.mode, 'early-group-aggregate');
+  assert.equal(firstSummary.fixture.workloadOutcome, 'passed');
+  assert.deepEqual(firstSummary.fixture.nestedOutcomes, {
+    testName: 'group and aggregate retain actual early cases once across fresh group processes',
+    status: 'passed',
+    earlyRootExecutions: 5,
+    uniqueEarlyRoots: 5,
+    ordinaryGroups: 4,
+    aggregateCaseCount: 11,
+    liveListener: {
+      allocatedPort: fixture.deliveryPort,
+      observedPort: fixture.deliveryPort,
+      httpStatus: 200,
+      reachable: true,
+      responseBodyVerified: true,
+      matchesAllocation: true,
+      observationCount: 1,
+    },
+    controlledBoundary: 'Playwright chromium.launch is replaced by the fixture; no native browser engine or memory qualification runs.',
+  });
+  assert.equal(firstSummary.fixture.producer.status, 'failed', 'the expected page-crash producer remains visible inside a passing group assertion');
+  assert.deepEqual(firstSummary.fixture.producer.errors, ['controlled-page-crash']);
+  assert.equal(firstSummary.fixture.producer.cleanup.serverClosed, true);
+  assert.equal(firstSummary.fixture.cleanup.child.completed, true);
+  assert.equal(firstSummary.fixture.cleanup.listener.status, 'closed');
+  assert.equal(firstSummary.fixture.cleanup.allocation.status, 'released');
+  assert.equal(firstSummary.fixture.cleanup.runtimeDirectory.status, 'removed');
+  const firstRecord = JSON.parse(await readFile(firstSummary.evidence.metadataPath, 'utf8'));
+  assert.match(firstRecord.localFixture.runtime.nodeVersion, /^v22\./);
+  assert.equal(firstRecord.localFixture.runtime.nodeExecutable, node);
+  assert.equal(firstRecord.localFixture.nestedOutcomes.aggregateCaseCount, 11);
+  assert.notEqual(firstRecord.localFixture.evidence.nativeOutputDirectory, fixture.evidence);
+
+  let ledger = JSON.parse(await readFile(fixture.ledger, 'utf8'));
+  assert.equal(ledger.entries[0].resources.includes(fixture.resource), false, 'the exact completed fixture allocation is released');
+  assert.deepEqual(ledger.entries[1], foreignBefore, 'foreign owner and reservation metadata remain byte-equivalent');
+  const foreignResponse = await fetch('http://127.0.0.1:' + fixture.foreignPort + '/foreign');
+  assert.equal(await foreignResponse.text(), 'foreign-control-live', 'foreign listener remains live after owned cleanup');
+  await assertPortCanBind(fixture.deliveryPort);
+
+  const reclaimed = claimLocalFixtureResource(fixture);
+  assert.equal(reclaimed.status, 0, reclaimed.stderr);
+  const second = invokeLocalFixture({ repo: fixture.repo, evidence: fixture.evidence, env: fixture.env });
+  assert.equal(second.status, 0, `${second.stdout}\n${second.stderr}`);
+  const secondSummary = summaryFrom(second);
+  assert.equal(secondSummary.status, 'passed');
+  assert.notEqual(secondSummary.evidence.metadataPath, firstSummary.evidence.metadataPath);
+  const secondRecord = JSON.parse(await readFile(secondSummary.evidence.metadataPath, 'utf8'));
+  assert.notEqual(secondRecord.localFixture.evidence.nativeOutputDirectory, firstRecord.localFixture.evidence.nativeOutputDirectory,
+    'fresh invocation retains a separate producer directory');
+  await readFile(firstSummary.evidence.metadataPath, 'utf8');
+  ledger = JSON.parse(await readFile(fixture.ledger, 'utf8'));
+  assert.equal(ledger.entries[0].resources.includes(fixture.resource), false);
+  assert.deepEqual(ledger.entries[1], foreignBefore);
+});
+
+test('local fixture rejects invalid ownership and evidence before starting the fixed workload', async (t) => {
+  for (const [name, mutate, expectedError] of [
+    ['missing resource', (ledger) => { ledger.entries[0].resources = []; }, /CHAIN_NATIVE_PORT.*not allocated/],
+    ['changed owner', (ledger, fixture) => { ledger.entries[0].worktree = path.join(fixture.root, 'changed-owner'); }, /exactly one active host coordination entry/],
+    ['expired lease', (ledger) => { ledger.entries[0].lease.expiresAt = new Date(Date.now() - 1000).toISOString(); }, /lease.*stale|expired/i],
+  ]) {
+    await t.test(name, async (t) => {
+      const fixture = await createLocalFixture(t);
+      const changed = JSON.parse(await readFile(fixture.ledger, 'utf8'));
+      mutate(changed, fixture);
+      await writeFile(fixture.ledger, JSON.stringify(changed));
+      const ledgerBefore = await readFile(fixture.ledger, 'utf8');
+      const result = invokeLocalFixture({ repo: fixture.repo, evidence: fixture.evidence, env: fixture.env });
+      assert.equal(result.status, 74, `${result.stdout}\n${result.stderr}`);
+      const summary = summaryFrom(result);
+      assert.equal(summary.status, 'evidence-failure');
+      assert.equal(summary.outcome, 'not-started');
+      assert.equal(summary.fixture.workloadOutcome, undefined);
+      assert.match(summary.evidence.errors[0].message, expectedError);
+      await assertNoFixtureOutput(fixture);
+      assert.equal(await readFile(fixture.ledger, 'utf8'), ledgerBefore, 'failed readiness must not edit the canonical ledger');
+    });
+  }
+
+  const badEvidence = await createLocalFixture(t);
+  const ledgerBefore = await readFile(badEvidence.ledger, 'utf8');
+  const rejected = invokeLocalFixture({
+    repo: badEvidence.repo,
+    evidence: path.join(badEvidence.repo, 'inside-checkout-evidence'),
+    env: badEvidence.env,
+  });
+  assert.equal(rejected.status, 74, `${rejected.stdout}\n${rejected.stderr}`);
+  assert.match(summaryFrom(rejected).evidence.errors[0].message, /outside the candidate Git worktree/);
+  const badEvidenceNames = await readdir(badEvidence.repo);
+  assert.equal(badEvidenceNames.some((name) => name.startsWith('inside-checkout-evidence-native-output-')), false);
+  assert.equal(await readFile(badEvidence.ledger, 'utf8'), ledgerBefore);
+  await assert.rejects(stat(path.join(badEvidence.repo, 'inside-checkout-evidence')), { code: 'ENOENT' });
+});
+
+test('local fixture rejects help misuse and arbitrary commands without workload or ledger writes', async (t) => {
+  const fixture = await createLocalFixture(t);
+  const ledgerBefore = await readFile(fixture.ledger, 'utf8');
+  const help = spawnSync(node, [recorder, '--help'], { cwd: fixture.repo, encoding: 'utf8', env: fixture.env });
+  assert.equal(help.status, 0, help.stderr);
+  assert.match(help.stdout, /--local-fixture early-group-aggregate/);
+  const invalid = invokeLocalFixture({ repo: fixture.repo, evidence: fixture.evidence, env: fixture.env, extraOptions: ['--unknown'] });
+  assert.equal(invalid.status, 2);
+  assert.match(invalid.stderr, /Unsupported option for --local-fixture/);
+  const arbitrary = invokeLocalFixture({ repo: fixture.repo, evidence: fixture.evidence, env: fixture.env, extraOptions: ['--', 'node', '-e', 'process.exit(77)'] });
+  assert.equal(arbitrary.status, 2);
+  assert.match(arbitrary.stderr, /fixed child command/);
+  await assertNoFixtureOutput(fixture);
+  assert.equal(await readFile(fixture.ledger, 'utf8'), ledgerBefore);
+  await assert.rejects(stat(fixture.evidence), { code: 'ENOENT' });
+});
+
+test('record-run CLI executes through a path alias and importing its readiness helper stays inert', async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'record-run-cli-alias-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const alias = path.join(root, 'record-run-alias.mjs');
+  await symlink(recorder, alias);
+
+  const help = spawnSync(node, [alias, '--help'], { cwd: root, encoding: 'utf8' });
+  assert.equal(help.status, 0, help.stderr);
+  assert.match(help.stdout, /Usage: record-run\.mjs/);
+  assert.equal(help.stderr, '');
+
+  const importUrl = new URL('./record-run.mjs', import.meta.url).href;
+  const importSource = 'import { validateQualificationReadiness } from ' + JSON.stringify(importUrl)
+    + '; process.stdout.write(typeof validateQualificationReadiness + "\\n");';
+  const imported = spawnSync(node, ['--input-type=module', '-e', importSource], { cwd: root, encoding: 'utf8' });
+  assert.equal(imported.status, 0, imported.stderr);
+  assert.equal(imported.stdout, 'function\n', 'importing the shared readiness helper must not start the recorder CLI');
+  assert.equal(imported.stderr, '');
+});
+
+test('local fixture reports child failure separately from successful owned cleanup', async (t) => {
+  const fixture = await createLocalFixture(t, { behavior: 'failure' });
+  const result = invokeLocalFixture({ repo: fixture.repo, evidence: fixture.evidence, env: fixture.env });
+  assert.equal(result.status, 1, `${result.stdout}\n${result.stderr}`);
+  const summary = summaryFrom(result);
+  assert.equal(summary.status, 'failed');
+  assert.equal(summary.outcome, 'assertion-failure');
+  assert.equal(summary.fixture.workloadOutcome, 'assertion-failure');
+  assert.equal(summary.fixture.nestedOutcomes.status, 'assertion-failure');
+  assert.equal(summary.fixture.cleanup.child.completed, true);
+  assert.equal(summary.fixture.cleanup.listener.status, 'closed');
+  assert.equal(summary.fixture.cleanup.allocation.status, 'released');
+  assert.equal(summary.fixture.cleanup.runtimeDirectory.status, 'removed');
+  const ledger = JSON.parse(await readFile(fixture.ledger, 'utf8'));
+  assert.equal(ledger.entries[0].resources.includes(fixture.resource), false);
+});
+
+test('local fixture interruption finalizes child and allocation cleanup independently', async (t) => {
+  const fixture = await createLocalFixture(t, { behavior: 'interrupt' });
+  const child = startLocalFixture(fixture);
+  const completion = captureProcess(child);
+  let result;
+  try {
+    await waitForFixtureFile(fixture, 'fixture-listener-live.txt');
+    child.kill('SIGTERM');
+    result = await completion;
+  } finally {
+    if (child.exitCode === null && child.signalCode === null) {
+      child.kill('SIGTERM');
+      await completion;
+    }
+  }
+  assert.equal(result.status, 143, `${result.stdout}\n${result.stderr}`);
+  assert.equal(result.stderr, '');
+  const summary = JSON.parse(result.stdout.trim());
+  assert.equal(summary.status, 'interrupted');
+  assert.equal(summary.outcome, 'interrupted');
+  assert.equal(summary.fixture.workloadOutcome, 'interrupted');
+  assert.equal(summary.fixture.cleanup.child.completed, true);
+  assert.equal(summary.fixture.cleanup.listener.status, 'closed');
+  assert.equal(summary.fixture.cleanup.allocation.status, 'released');
+  assert.equal(summary.fixture.cleanup.runtimeDirectory.status, 'removed');
+  const record = JSON.parse(await readFile(summary.evidence.metadataPath, 'utf8'));
+  assert.equal(record.state, 'incomplete');
+  assert.equal(record.execution.outcome, 'interrupted');
+  const ledger = JSON.parse(await readFile(fixture.ledger, 'utf8'));
+  assert.equal(ledger.entries[0].resources.includes(fixture.resource), false);
+});
+
+test('local fixture preserves a passing workload and allocation when lease identity changes during cleanup', async (t) => {
+  const fixture = await createLocalFixture(t, { behavior: 'change-lease', foreignEntry: true });
+  const foreignBefore = structuredClone(fixture.foreign);
+  const result = invokeLocalFixture({ repo: fixture.repo, evidence: fixture.evidence, env: fixture.env });
+  const summary = summaryFrom(result);
+  const attempt = JSON.parse(await readFile(summary.evidence.metadataPath, 'utf8'));
+  assert.equal(result.status, 74, JSON.stringify({ summary, childStdout: attempt.execution.output.stdout, childStderr: attempt.execution.output.stderr }));
+  assert.equal(summary.status, 'evidence-failure');
+  assert.equal(summary.outcome, 'passed');
+  assert.equal(summary.fixture.workloadOutcome, 'passed');
+  assert.equal(summary.fixture.cleanup.child.completed, true);
+  assert.equal(summary.fixture.cleanup.listener.status, 'closed');
+  assert.equal(summary.fixture.cleanup.allocation.status, 'unresolved');
+  assert.match(summary.fixture.cleanup.allocation.error, /allocation identity changed/);
+  const ledger = JSON.parse(await readFile(fixture.ledger, 'utf8'));
+  assert.equal(ledger.entries[0].resources.includes(fixture.resource), true, 'a changed lease prevents automatic release');
+  assert.deepEqual(ledger.entries[1], foreignBefore, 'foreign ledger entry bytes are not rewritten by the local fixture');
 });
 
 async function assertQualificationSetupRejected(t, fixture, { env = {}, evidence = fixture.evidence, expectedError }) {
@@ -179,16 +666,29 @@ test('qualification readiness requires distinct explicit local ports and rejects
 
 test('qualification readiness requires live host ownership for both native ports', async (t) => {
   const unowned = await createQualificationFixture(t);
-  await writeFile(unowned.ledger, JSON.stringify({ version: 1, scope: 'codex-wide', entries: [{
+  const unownedOwner = activeLedgerOwner({
     id: 'fixture-owner',
-    status: 'active', worktree: unowned.repo, resources: [`loopback:127.0.0.1:${unowned.deliveryPort}`],
-  }] }));
+    worktree: unowned.canonicalRepo,
+    resources: [`loopback:127.0.0.1:${unowned.deliveryPort}`],
+  });
+  await writeFile(unowned.ledger, JSON.stringify({ version: 1, scope: 'codex-wide', entries: [unownedOwner] }));
   await assertQualificationSetupRejected(t, unowned, { expectedError: /CHAIN_NATIVE_SMOKE_PORT.*active worktree/ });
 
   const conflict = await createQualificationFixture(t);
+  const conflictOwner = activeLedgerOwner({
+    id: 'fixture-owner',
+    worktree: conflict.canonicalRepo,
+    resources: [`loopback:127.0.0.1:${conflict.deliveryPort}`, `loopback:127.0.0.1:${conflict.smokePort}`],
+  });
+  const otherOwner = activeLedgerOwner({
+    id: 'other-owner',
+    worktree: path.join(conflict.root, 'other-repo'),
+    resources: [`loopback:127.0.0.1:${conflict.smokePort}`],
+    status: 'parked',
+  });
   await writeFile(conflict.ledger, JSON.stringify({ version: 1, scope: 'codex-wide', entries: [
-    { id: 'fixture-owner', status: 'active', worktree: conflict.repo, resources: [`loopback:127.0.0.1:${conflict.deliveryPort}`, `loopback:127.0.0.1:${conflict.smokePort}`] },
-    { id: 'other-owner', status: 'parked', worktree: path.join(conflict.root, 'other-repo'), resources: [`loopback:127.0.0.1:${conflict.smokePort}`] },
+    conflictOwner,
+    otherOwner,
   ] }));
   await assertQualificationSetupRejected(t, conflict, { expectedError: /already owned by another active or parked worktree/ });
 });
@@ -387,6 +887,87 @@ test('summarizes large real child output while preserving complete redacted evid
   assert.equal((await readFile(stderrPath, 'utf8')).includes(stderrSecret), false);
 });
 
+test('keeps ordinary and compact callers compatible for large failures and changed-source evidence', async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'record-run-caller-compatibility-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(temp);
+  const sourcePath = path.join(repo, 'src/app.js');
+  await writeFile(sourcePath, 'export const value = 2;\n');
+  const stdoutSecret = 'COMPAT-STDOUT-SECRET-19d2';
+  const stderrSecret = 'COMPAT-STDERR-SECRET-b510';
+  const child = `process.stdout.write('O'.repeat(128 * 1024) + ' token=${stdoutSecret}\\n'); process.stderr.write('E'.repeat(96 * 1024) + ' password=${stderrSecret}\\n'); process.exitCode = 7;`;
+  const expectedStdout = `${'O'.repeat(128 * 1024)} token=[REDACTED]\n`;
+  const expectedStderr = `${'E'.repeat(96 * 1024)} password=[REDACTED]\n`;
+  const ordinaryEvidence = path.join(temp, 'ordinary-evidence');
+  const ordinary = invokeRecorder({
+    repo,
+    evidence: ordinaryEvidence,
+    purpose: 'green',
+    command: node,
+    args: ['-e', child],
+  });
+
+  assert.equal(ordinary.status, 7, 'the default stream mode preserves the actual child exit');
+  assert.equal(ordinary.stdout, expectedStdout, 'existing ordinary callers still receive the full sanitized stdout');
+  assert.ok(ordinary.stderr.includes(expectedStderr), 'existing ordinary callers still receive the full sanitized stderr');
+  const ordinaryMetadataPath = evidencePathFrom(ordinary);
+  const ordinaryRecordBytes = await readFile(ordinaryMetadataPath);
+  const ordinaryRecord = JSON.parse(ordinaryRecordBytes.toString('utf8'));
+  assert.equal(ordinaryRecord.execution.exitCode, 7);
+  assert.equal(ordinaryRecord.execution.signal, null);
+  assert.equal(ordinaryRecord.execution.outcome, 'nonzero-exit');
+  assert.equal(ordinaryRecord.state, 'complete');
+  assert.equal(ordinaryRecord.execution.output.stdout, expectedStdout);
+  assert.equal(ordinaryRecord.execution.output.stderr, expectedStderr);
+
+  const compactEvidence = path.join(temp, 'compact-evidence');
+  const compact = invokeRecorder({
+    repo,
+    evidence: compactEvidence,
+    purpose: 'green',
+    command: node,
+    args: ['-e', child],
+    extraOptions: ['--summary'],
+  });
+
+  assert.equal(compact.status, 7, 'summary mode also preserves the actual child exit');
+  assert.ok(Buffer.byteLength(compact.stdout) + Buffer.byteLength(compact.stderr) < 2048,
+    'the compact caller remains bounded as child output grows');
+  const compactSummary = summaryFrom(compact);
+  assert.equal(compactSummary.status, 'failed');
+  assert.equal(compactSummary.outcome, 'nonzero-exit');
+  assert.deepEqual(compactSummary.child, { exitCode: 7, signal: null });
+  const compactRecordBytes = await readFile(compactSummary.evidence.metadataPath);
+  const compactRecord = JSON.parse(compactRecordBytes.toString('utf8'));
+  assert.equal(compactRecord.execution.output.stdout, expectedStdout);
+  assert.equal(compactRecord.execution.output.stderr, expectedStderr);
+  assert.equal(await readFile(compactSummary.evidence.stdoutPath, 'utf8'), expectedStdout);
+  assert.equal(await readFile(compactSummary.evidence.stderrPath, 'utf8'), expectedStderr);
+
+  for (const record of [ordinaryRecord, compactRecord]) {
+    assert.equal(record.workingTree.identity.status, 'complete');
+    assert.match(record.workingTree.sourceTestDiffSha256, /^[a-f0-9]{64}$/);
+    const changedSource = record.workingTree.sourceTestFiles.find(file => file.path === 'src/app.js');
+    assert.ok(changedSource, 'the changed source remains attributed to the recorded attempt');
+    assert.match(changedSource.actualBytesSha256, /^[a-f0-9]{64}$/);
+    assert.equal(JSON.stringify(record).includes(stdoutSecret), false);
+    assert.equal(JSON.stringify(record).includes(stderrSecret), false);
+    assert.equal(record.execution.output.stdout.includes(stdoutSecret), false);
+    assert.equal(record.execution.output.stderr.includes(stderrSecret), false);
+  }
+  assert.equal(ordinaryRecord.workingTree.sourceTestDiffSha256, compactRecord.workingTree.sourceTestDiffSha256,
+    'ordinary and compact callers identify the same unchanged source diff');
+  for (const [pathValue, secret] of [
+    [ordinaryMetadataPath, stdoutSecret], [ordinaryMetadataPath, stderrSecret],
+    [compactSummary.evidence.metadataPath, stdoutSecret], [compactSummary.evidence.metadataPath, stderrSecret],
+    [compactSummary.evidence.stdoutPath, stdoutSecret], [compactSummary.evidence.stderrPath, stderrSecret],
+  ]) assert.equal((await readFile(pathValue, 'utf8')).includes(secret), false, `${path.basename(pathValue)} stays redacted`);
+  assert.equal(ordinary.stdout.includes(stdoutSecret), false);
+  assert.equal(ordinary.stderr.includes(stderrSecret), false);
+  assert.equal(compact.stdout.includes(stdoutSecret), false);
+  assert.equal(compact.stdout.includes(stderrSecret), false);
+});
+
 test('keeps a failed child nonzero and reports its actual exit in the summary', async (t) => {
   const temp = await mkdtemp(path.join(os.tmpdir(), 'record-run-summary-failure-'));
   t.after(() => rm(temp, { recursive: true, force: true }));
@@ -416,6 +997,80 @@ test('keeps a failed child nonzero and reports its actual exit in the summary', 
   assert.equal(record.execution.output.stderr, `AssertionError: expected failure password=[REDACTED]\n`);
   assert.equal(await readFile(summary.evidence.stderrPath, 'utf8'), record.execution.output.stderr);
   assert.equal((await readFile(summary.evidence.metadataPath, 'utf8')).includes(secret), false);
+});
+
+test('redacts synthetic secrets from every summary and provenance surface while preserving the child failure', async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'record-run-secret-surfaces-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(temp);
+  const evidence = path.join(temp, 'evidence');
+  const stdoutSecret = 'RECORDER-STDOUT-SECRET-415a';
+  const stderrSecret = 'RECORDER-STDERR-SECRET-730b';
+  const argumentSecret = 'RECORDER-ARGUMENT-SECRET-841c';
+  const sourceSecret = 'RECORDER-SOURCE-SECRET-952d';
+  const sourcePath = path.join(repo, 'src', 'evidence.test.mjs');
+  await writeFile(sourcePath, `export const token = "${sourceSecret}";\n`);
+  const child = `const token=process.argv[2];process.stdout.write('O'.repeat(64*1024)+' token='+token+' ${stdoutSecret}\\n');process.stderr.write('AssertionError: password='+token+' ${stderrSecret}\\n');process.exitCode=7;`;
+
+  const result = invokeRecorder({
+    repo,
+    evidence,
+    purpose: 'green',
+    command: node,
+    args: ['-e', child, '--', '--token', argumentSecret],
+    extraOptions: ['--summary', '--redact-pattern', stdoutSecret, '--redact-pattern', stderrSecret],
+  });
+
+  assert.equal(result.status, 7, result.stderr);
+  assert.ok(Buffer.byteLength(result.stdout) < 2048, 'summary output stays bounded while child output grows');
+  const summary = summaryFrom(result);
+  const serializedSummary = JSON.stringify(summary);
+  assert.equal(summary.status, 'failed');
+  assert.equal(summary.outcome, 'assertion-failure');
+  assert.equal(summary.wrapperExitCode, 7);
+  assert.deepEqual(summary.child, { exitCode: 7, signal: null });
+  assert.equal(summary.evidence.status, 'complete');
+  assert.equal(summary.source.identityStatus, 'complete');
+  assert.match(summary.source.diffSha256, /^[a-f0-9]{64}$/);
+  for (const secret of [stdoutSecret, stderrSecret, argumentSecret, sourceSecret]) {
+    assert.equal(serializedSummary.includes(secret), false, 'bounded console summary must be secret-free');
+  }
+
+  const recordPath = summary.evidence.metadataPath;
+  const recordBytes = await readFile(recordPath, 'utf8');
+  const record = JSON.parse(recordBytes);
+  assert.equal(record.execution.outcome, 'assertion-failure');
+  assert.equal(record.execution.exitCode, 7);
+  assert.equal(record.execution.signal, null);
+  assert.equal(record.git.commit, summary.source.commit);
+  assert.equal(record.workingTree.identity.status, 'complete');
+  assert.match(record.workingTree.sourceTestDiffSha256, /^[a-f0-9]{64}$/);
+  assert.equal(record.command.args.at(-2), '--token');
+  assert.equal(record.command.args.at(-1), '[REDACTED]');
+  assert.ok(record.redaction.locations['command.args[4]'] > 0);
+
+  const capturedSource = record.workingTree.sourceTestFiles.find((file) => file.path === 'src/evidence.test.mjs');
+  assert.ok(capturedSource, 'changed source remains part of the recorded provenance');
+  assert.equal(capturedSource.status, 'untracked');
+  assert.match(capturedSource.content, /token = \[REDACTED\]/);
+  assert.equal(capturedSource.content.includes(sourceSecret), false);
+  assert.match(record.execution.output.stdout, /^O{65536} token=\[REDACTED\] \[REDACTED\]$/m);
+  assert.equal(record.execution.output.stderr, 'AssertionError: password=[REDACTED] [REDACTED]\n');
+  assert.equal(await readFile(summary.evidence.stdoutPath, 'utf8'), record.execution.output.stdout);
+  assert.equal(await readFile(summary.evidence.stderrPath, 'utf8'), record.execution.output.stderr);
+
+  const evidenceFiles = await readdir(evidence);
+  assert.deepEqual(evidenceFiles.sort(), [path.basename(recordPath), path.basename(summary.evidence.stdoutPath), path.basename(summary.evidence.stderrPath)].sort());
+  for (const file of evidenceFiles) {
+    const bytes = await readFile(path.join(evidence, file), 'utf8');
+    for (const secret of [stdoutSecret, stderrSecret, argumentSecret, sourceSecret]) {
+      assert.equal(bytes.includes(secret), false, `${file} must not retain synthetic secrets`);
+    }
+  }
+  assert.equal(recordBytes.includes(stdoutSecret), false);
+  assert.equal(recordBytes.includes(stderrSecret), false);
+  assert.equal(recordBytes.includes(argumentSecret), false);
+  assert.equal(recordBytes.includes(sourceSecret), false);
 });
 
 test('reports a child signal as interruption while preserving its incomplete evidence', { skip: process.platform === 'win32' }, async (t) => {
@@ -1007,6 +1662,375 @@ test('classifies real TAP syntax and import failures separately from assertions 
   }
   const result = invokeRecorder({ repo, evidence, purpose: 'green', command: node, args: ['-e', 'console.log("not ok 1 - failed runner\\n# fail 1"); process.exitCode=1;'] });
   assert.equal(JSON.parse(await readFile(evidencePathFrom(result), 'utf8')).execution.outcome, 'nonzero-exit');
+});
+
+test('preserves an ordinary TAP case identity containing the word token through recording', async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'record-tap-token-name-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(temp);
+  const evidence = process.env.CHAIN_RECORDER_TAP_TEST_EVIDENCE_DIR
+    ? path.resolve(process.env.CHAIN_RECORDER_TAP_TEST_EVIDENCE_DIR)
+    : path.join(temp, 'evidence');
+  const caseName = 'token results keep their full nonsecret identity';
+  const testFile = path.join(repo, 'token-case.test.mjs');
+  await writeFile(testFile, `import { test } from 'node:test';\ntest(${JSON.stringify(caseName)}, () => {});\n`);
+
+  const result = invokeRecorder({
+    repo,
+    evidence,
+    purpose: 'green',
+    command: node,
+    args: ['--test', '--test-reporter=tap', testFile],
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  const record = JSON.parse(await readFile(evidencePathFrom(result), 'utf8'));
+  const tapOutput = record.execution.output.stdout;
+  const cases = parseTap(tapOutput).map(({ id, root, status, skipReason }) => ({ id, root, status, skipReason }));
+  assert.deepEqual(cases, [{ id: caseName, root: caseName, status: 'passed', skipReason: null }]);
+  assert.match(tapOutput, /^1\.\.1$/m);
+  assert.match(tapOutput, /^# tests 1$/m);
+  assert.match(tapOutput, /^# pass 1$/m);
+  assert.match(tapOutput, /^# fail 0$/m);
+  assert.equal(record.execution.exitCode, 0);
+  assert.equal(record.execution.outcome, 'passed');
+});
+
+test('retains harmless credential prose in exact TAP identities and protects real credentials', async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'record-tap-public-prose-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(temp);
+  const publicNames = [
+    'bounded extension requires exact source and current journal authorization evidence and retains failures',
+    'portable authorization rejects observer-only HEAD drift even when selected inputs are unchanged',
+    'a verified child consumes its inherited authorization once and cannot replay it',
+    'preserves adjacent nested TAP records across multiline secret redaction',
+  ];
+  const privateNames = [
+    ['authorization=EXPLICIT-AUTH-5f0', 'authorization=[REDACTED]'],
+    ['secret "QUOTED-SECRET-a52"', 'secret [REDACTED]'],
+    ['authorization unknowncredential', 'authorization [REDACTED]'],
+    ['password=evidence', 'password=[REDACTED]'],
+    ['authorization "evidence"', 'authorization [REDACTED]'],
+    ['secret=redaction', 'secret=[REDACTED]'],
+    ['recognized ghp_abcdefghijklmnopqrstuvwxyz123456', 'recognized [REDACTED]'],
+    ['Bearer SYNTHETICBEARER123456', 'Bearer [REDACTED]'],
+    ['custom PRIVATE-TAP-818', 'custom [REDACTED]'],
+    ['token "TOKEN-QUOTED-0a"', 'token [REDACTED]'],
+  ];
+  const testFile = path.join(repo, 'public-prose.test.mjs');
+  await writeFile(testFile, `import { test } from 'node:test';\n${publicNames.map(name => `test(${JSON.stringify(name)}, () => {});`).join('\n')}\ntest(${JSON.stringify(privateNames[0][0])}, () => {});\ntest('privacy controls', async t => {\n  t.diagnostic('authorization evidence');\n  process.stderr.write('secret redaction\\n');\n${privateNames.slice(1).map(([name]) => `  await t.test(${JSON.stringify(name)}, () => {});`).join('\n')}\n});\n`);
+  const roots = [...publicNames, privateNames[0][1], 'privacy controls'];
+  const plan = { status: 'selected', selected: roots.map(root => ({ root })) };
+  const expectedCases = [
+    ...publicNames.map(id => ({ id, root: id, status: 'passed', skipReason: null })),
+    { id: privateNames[0][1], root: privateNames[0][1], status: 'passed', skipReason: null },
+    ...privateNames.slice(1).map(([, name]) => ({ id: `privacy controls > ${name}`, root: 'privacy controls', status: 'passed', skipReason: null })),
+    { id: 'privacy controls', root: 'privacy controls', status: 'passed', skipReason: null },
+  ];
+  for (const summaryMode of [false, true]) await t.test(summaryMode ? 'summary output' : 'default output', async () => {
+    const evidence = path.join(process.env.CHAIN_RECORDER_TAP_TEST_EVIDENCE_DIR || temp, summaryMode ? 'public-prose-summary' : 'public-prose-default');
+    const result = invokeRecorder({
+      repo, evidence, purpose: 'green', command: node,
+      args: ['--test', '--test-reporter=tap', testFile],
+      extraOptions: [...(summaryMode ? ['--summary'] : []), '--redact-pattern', 'PRIVATE-TAP-[0-9]+'],
+    });
+    assert.equal(result.status, 0, result.stderr);
+    const summary = summaryMode ? summaryFrom(result) : null;
+    const recordBytes = await readFile(summary?.evidence.metadataPath || evidencePathFrom(result), 'utf8');
+    const record = JSON.parse(recordBytes);
+    const tap = record.execution.output.stdout;
+    const parsed = parseTap(tap).map(({ id, root, status, skipReason }) => ({ id, root, status, skipReason }));
+    t.diagnostic(JSON.stringify({ summaryMode, recordId: record.id, parsed, qualification: verifyQualificationOutcomes(plan, { exitCode: record.execution.exitCode, stdout: tap }) }));
+    assert.deepEqual(parsed, expectedCases, 'retained real TAP must preserve each public identity and redact each credential-bearing identity');
+    assert.equal(verifyQualificationOutcomes(plan, { exitCode: record.execution.exitCode, stdout: tap }).status, 'passed');
+    const required = { status: 'selected', selected: [...publicNames, privateNames[0][0], 'privacy controls'].map(root => ({ root })) };
+    const qualification = verifyQualificationOutcomes(required, { exitCode: record.execution.exitCode, stdout: tap });
+    assert.equal(qualification.status, 'failed', 'a real secret-bearing required root cannot acquire exact identity credit after masking');
+    assert.equal(qualification.outcomes.find(row => row.root === privateNames[0][0]).status, 'missing');
+    assert.match(tap, /^# authorization \[REDACTED\]$/m, 'non-TAP prose logs retain whitespace credential redaction');
+    assert.match(tap, /^# secret \[REDACTED\]$/m);
+    for (const bytes of [recordBytes, result.stdout, result.stderr]) for (const secret of ['EXPLICIT-AUTH-5f0', 'QUOTED-SECRET-a52', 'unknowncredential', 'ghp_abcdefghijklmnopqrstuvwxyz123456', 'SYNTHETICBEARER123456', 'PRIVATE-TAP-818', 'TOKEN-QUOTED-0a']) {
+      assert.equal(bytes.includes(secret), false, 'commands, source, metadata and console retain only sanitized credentials');
+    }
+    if (summaryMode) assert.equal(await readFile(summary.evidence.stdoutPath, 'utf8'), tap);
+    else assert.equal(result.stdout, tap);
+    assert.match(tap, /^# tests 15$/m);
+    assert.match(tap, /^# pass 15$/m);
+    assert.match(tap, /^# fail 0$/m);
+    assert.match(tap, /^# skipped 0$/m);
+    assert.equal(record.execution.outcome, 'passed');
+  });
+});
+
+test('redacts a secret-bearing TAP token identity without losing its status or plain-log sanitization', async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'record-tap-token-secret-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(temp);
+  const evidence = process.env.CHAIN_RECORDER_TAP_TEST_EVIDENCE_DIR
+    ? path.resolve(process.env.CHAIN_RECORDER_TAP_TEST_EVIDENCE_DIR)
+    : path.join(temp, 'evidence');
+  const secret = 'TAP-NAME-SECRET-8c14a19f';
+  const caseName = `token=${secret}`;
+  const testFile = path.join(repo, 'token-secret-case.test.mjs');
+  const diagnosticLine = `token ${secret}\n`;
+  await writeFile(testFile, `import { test } from 'node:test';\ntest(${JSON.stringify(caseName)}, () => process.stderr.write(${JSON.stringify(diagnosticLine)}));\n`);
+
+  const result = invokeRecorder({
+    repo,
+    evidence,
+    purpose: 'green',
+    command: node,
+    args: ['--test', '--test-reporter=tap', testFile],
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  const recordBytes = await readFile(evidencePathFrom(result), 'utf8');
+  const record = JSON.parse(recordBytes);
+  const tapOutput = record.execution.output.stdout;
+  const cases = parseTap(tapOutput).map(({ id, root, status, skipReason }) => ({ id, root, status, skipReason }));
+  assert.deepEqual(cases, [{ id: 'token=[REDACTED]', root: 'token=[REDACTED]', status: 'passed', skipReason: null }]);
+  assert.match(tapOutput, /^# token \[REDACTED\]$/m, 'bare token/value log syntax stays protected outside TAP identity context');
+  assert.match(tapOutput, /^# tests 1$/m);
+  assert.match(tapOutput, /^# pass 1$/m);
+  assert.match(tapOutput, /^# fail 0$/m);
+  assert.equal(recordBytes.includes(secret), false, 'the persisted metadata must not contain the synthetic secret');
+  assert.equal(record.execution.exitCode, 0);
+});
+
+test('preserves adjacent nested TAP records across multiline secret redaction', async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'record-tap-multiline-secret-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(temp);
+  const evidence = process.env.CHAIN_RECORDER_TAP_TEST_EVIDENCE_DIR
+    ? path.resolve(process.env.CHAIN_RECORDER_TAP_TEST_EVIDENCE_DIR)
+    : path.join(temp, 'evidence');
+  const firstLineSecret = 'MULTILINE-RECORDER-SECRET-BEGIN-591a';
+  const secondLineSecret = 'MULTILINE-RECORDER-SECRET-CONTINUED-602b';
+  const testFile = path.join(repo, 'multiline-tap.test.mjs');
+  const rawTapOutput = [
+    'TAP version 13',
+    '# Subtest: outer case',
+    '    # token',
+    '    # Subtest: nested case',
+    '    ok 1 - nested case',
+    '    1..1',
+    'ok 1 - outer case',
+    '1..1',
+    '# tests 2',
+    '# suites 0',
+    '# pass 2',
+    '# fail 0',
+    '# cancelled 0',
+    '# skipped 0',
+    '# todo 0',
+    '# duration_ms 1',
+    `# "password": "${firstLineSecret}\n    # ${secondLineSecret}"`,
+    '',
+  ].join('\n');
+  await writeFile(testFile, `process.stdout.write(${JSON.stringify(rawTapOutput)});\n`);
+
+  const result = invokeRecorder({
+    repo,
+    evidence,
+    purpose: 'green',
+    command: node,
+    args: [testFile],
+    extraOptions: ['--summary'],
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  const summary = summaryFrom(result);
+  assert.equal(summary.status, 'passed');
+  assert.equal(summary.outcome, 'passed');
+  assert.equal(summary.evidence.status, 'complete');
+  assert.equal(summary.source.identityStatus, 'complete');
+  assert.equal(JSON.stringify(summary).includes(firstLineSecret), false);
+  assert.equal(JSON.stringify(summary).includes(secondLineSecret), false);
+  const recordPath = summary.evidence.metadataPath;
+  const recordBytes = await readFile(recordPath, 'utf8');
+  const record = JSON.parse(recordBytes);
+  assert.equal(record.workingTree.identity.status, 'complete');
+  const tapOutput = record.execution.output.stdout;
+  const cases = parseTap(record.execution.output.stdout).map(({ id, root, status, skipReason }) => ({ id, root, status, skipReason }));
+  assert.deepEqual(cases, [
+    { id: 'outer case > nested case', root: 'outer case', status: 'passed', skipReason: null },
+    { id: 'outer case', root: 'outer case', status: 'passed', skipReason: null },
+  ]);
+  assert.match(tapOutput, /^# tests 2$/m);
+  assert.match(tapOutput, /^# pass 2$/m);
+  assert.match(tapOutput, /^# fail 0$/m);
+  assert.equal(await readFile(summary.evidence.stdoutPath, 'utf8'), tapOutput, 'the retained stream matches the parsed sanitized protocol');
+  assert.equal(tapOutput.includes(firstLineSecret), false);
+  assert.equal(tapOutput.includes(secondLineSecret), false);
+  assert.equal(recordBytes.includes(firstLineSecret), false);
+  assert.equal(recordBytes.includes(secondLineSecret), false);
+  const capturedSource = record.workingTree.sourceTestFiles.find((file) => file.path === 'multiline-tap.test.mjs');
+  assert.ok(capturedSource, 'the child fixture remains in captured source provenance');
+  assert.equal(capturedSource.content.includes(firstLineSecret), false);
+  assert.equal(capturedSource.content.includes(secondLineSecret), false);
+  assert.equal(record.execution.outcome, 'passed');
+  assert.equal(record.execution.exitCode, 0);
+});
+
+test('reconciles nested token and ordinary cases and keeps corrected redacted evidence immutable', async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'record-tap-nested-outcomes-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(temp);
+  const evidence = path.join(temp, 'evidence');
+  const secret = 'NESTED-TAP-SECRET-661c';
+  const testFile = path.join(repo, 'nested-outcomes.test.mjs');
+  await writeFile(testFile, `import { test } from 'node:test';\nimport assert from 'node:assert/strict';\ntest('token parent result', async (t) => {\n  await t.test('ordinary child', () => {});\n  await t.test('token failure child', (child) => {\n    child.diagnostic('"password": "${secret}"');\n    assert.fail('controlled nested assertion');\n  });\n});\n`);
+
+  const run = (purpose, extraOptions = []) => invokeRecorder({
+    repo,
+    evidence,
+    purpose,
+    command: node,
+    args: ['--test', '--test-reporter=tap', testFile],
+    extraOptions: ['--summary', ...extraOptions],
+  });
+  const first = run('green');
+
+  assert.equal(first.status, 1, first.stderr);
+  const firstSummary = summaryFrom(first);
+  assert.equal(firstSummary.status, 'failed');
+  assert.equal(firstSummary.outcome, 'assertion-failure');
+  assert.deepEqual(firstSummary.child, { exitCode: 1, signal: null });
+  const firstMetadataPath = firstSummary.evidence.metadataPath;
+  const firstStdoutPath = firstSummary.evidence.stdoutPath;
+  const firstStderrPath = firstSummary.evidence.stderrPath;
+  const firstBytes = await readFile(firstMetadataPath);
+  const firstStdout = await readFile(firstStdoutPath);
+  const firstStderr = await readFile(firstStderrPath);
+  const firstRecord = JSON.parse(firstBytes.toString('utf8'));
+  const firstTap = firstStdout.toString('utf8');
+  const cases = parseTap(firstTap).map(({ id, root, status, skipReason }) => ({ id, root, status, skipReason }));
+  assert.deepEqual(cases, [
+    { id: 'token parent result > ordinary child', root: 'token parent result', status: 'passed', skipReason: null },
+    { id: 'token parent result > token failure child', root: 'token parent result', status: 'failed', skipReason: null },
+    { id: 'token parent result', root: 'token parent result', status: 'failed', skipReason: null },
+  ]);
+  assert.match(firstTap, /^# tests 3$/m);
+  assert.match(firstTap, /^# pass 1$/m);
+  assert.match(firstTap, /^# fail 2$/m);
+  assert.equal(firstRecord.execution.outcome, 'assertion-failure');
+  assert.equal(firstRecord.execution.exitCode, 1);
+  for (const bytes of [firstBytes, firstStdout, firstStderr, Buffer.from(JSON.stringify(firstSummary))]) {
+    assert.equal(bytes.includes(secret), false, 'the first attempt must retain only redacted payloads');
+  }
+  const capturedSource = firstRecord.workingTree.sourceTestFiles.find((file) => file.path === 'nested-outcomes.test.mjs');
+  assert.ok(capturedSource);
+  assert.equal(capturedSource.content.includes(secret), false);
+
+  const correctionNote = 'Later controlled replay; original remains immutable.';
+  const corrected = run('later-baseline-sensitivity', ['--correction-of', firstRecord.id, '--correction-note', correctionNote]);
+  assert.equal(corrected.status, 1, corrected.stderr);
+  const correctedSummary = summaryFrom(corrected);
+  const correctedRecord = JSON.parse(await readFile(correctedSummary.evidence.metadataPath, 'utf8'));
+  assert.notEqual(correctedRecord.id, firstRecord.id);
+  assert.deepEqual(correctedRecord.correction, { originalRecordId: firstRecord.id, note: correctionNote });
+  assert.deepEqual(await readFile(firstMetadataPath), firstBytes);
+  assert.deepEqual(await readFile(firstStdoutPath), firstStdout);
+  assert.deepEqual(await readFile(firstStderrPath), firstStderr);
+  for (const file of await readdir(evidence)) {
+    assert.equal((await readFile(path.join(evidence, file))).includes(secret), false, `${file} must stay secret-free`);
+  }
+});
+
+test('preserves passed, skipped, TODO, and failed TAP cases with their bounded summary totals', async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'record-tap-terminal-statuses-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(temp);
+  const evidence = path.join(temp, 'evidence');
+  const secret = 'RECORDER-STATUS-SECRET-913e';
+  const testFile = path.join(repo, 'terminal-statuses.test.mjs');
+  await writeFile(testFile, `import { test } from 'node:test';\nimport assert from 'node:assert/strict';\ntest('token passing case', () => {});\ntest('accepted optional case', { skip: 'accepted fixture skip' }, () => {});\ntest('required case remains skipped', { skip: 'forbidden required skip' }, () => {});\ntest.todo('TODO case remains distinct');\ntest('required failing case', () => assert.fail('password=${secret}'));\n`);
+
+  const result = invokeRecorder({
+    repo,
+    evidence,
+    purpose: 'green',
+    command: node,
+    args: ['--test', '--test-reporter=tap', testFile],
+    extraOptions: ['--summary'],
+  });
+
+  assert.equal(result.status, 1, result.stderr);
+  assert.ok(Buffer.byteLength(result.stdout) < 2048, 'console summary remains bounded');
+  const summary = summaryFrom(result);
+  assert.equal(summary.status, 'failed');
+  assert.equal(summary.outcome, 'assertion-failure');
+  assert.deepEqual(summary.child, { exitCode: 1, signal: null });
+  const recordBytes = await readFile(summary.evidence.metadataPath);
+  const record = JSON.parse(recordBytes.toString('utf8'));
+  const tap = await readFile(summary.evidence.stdoutPath, 'utf8');
+  const cases = parseTap(tap).map(({ id, root, status, skipReason }) => ({ id, root, status, skipReason }));
+  assert.deepEqual(cases, [
+    { id: 'token passing case', root: 'token passing case', status: 'passed', skipReason: null },
+    { id: 'accepted optional case', root: 'accepted optional case', status: 'skipped', skipReason: 'accepted fixture skip' },
+    { id: 'required case remains skipped', root: 'required case remains skipped', status: 'skipped', skipReason: 'forbidden required skip' },
+    { id: 'TODO case remains distinct', root: 'TODO case remains distinct', status: 'todo', skipReason: null },
+    { id: 'required failing case', root: 'required failing case', status: 'failed', skipReason: null },
+  ]);
+  assert.match(tap, /^# tests 5$/m);
+  assert.match(tap, /^# pass 1$/m);
+  assert.match(tap, /^# fail 1$/m);
+  assert.match(tap, /^# skipped 2$/m);
+  assert.match(tap, /^# todo 1$/m);
+  assert.equal(record.execution.outcome, 'assertion-failure');
+  assert.equal(record.execution.exitCode, 1);
+  assert.equal(record.execution.output.stdout, tap);
+  assert.equal(record.execution.output.stderr.includes(secret), false);
+  assert.equal(recordBytes.includes(secret), false);
+  assert.equal(tap.includes(secret), false);
+  assert.equal(JSON.stringify(summary).includes(secret), false);
+});
+
+test('keeps a cancelled child non-successful when only partial TAP was retained', async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'record-tap-cancelled-child-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(temp);
+  const evidence = path.join(temp, 'evidence');
+  const secret = 'RECORDER-CANCELLED-SECRET-a41d';
+  const partialTap = [
+    'TAP version 13',
+    '# Subtest: interrupted after one case',
+    'ok 1 - interrupted after one case',
+    `# "password": "${secret}"`,
+    '',
+  ].join('\n');
+  const child = `process.stdout.write(${JSON.stringify(partialTap)}, () => process.kill(process.pid, 'SIGTERM'));`;
+
+  const result = invokeRecorder({
+    repo,
+    evidence,
+    purpose: 'green',
+    command: node,
+    args: ['-e', child],
+    extraOptions: ['--summary'],
+  });
+
+  assert.equal(result.status, 143, result.stderr);
+  assert.ok(Buffer.byteLength(result.stdout) < 2048, 'interruption summary remains bounded');
+  const summary = summaryFrom(result);
+  assert.equal(summary.status, 'interrupted');
+  assert.equal(summary.outcome, 'interrupted');
+  assert.deepEqual(summary.child, { exitCode: null, signal: 'SIGTERM' });
+  assert.equal(summary.wrapperExitCode, 143);
+  const recordBytes = await readFile(summary.evidence.metadataPath);
+  const record = JSON.parse(recordBytes.toString('utf8'));
+  const tap = await readFile(summary.evidence.stdoutPath, 'utf8');
+  assert.deepEqual(parseTap(tap).map(({ id, root, status }) => ({ id, root, status })), [
+    { id: 'interrupted after one case', root: 'interrupted after one case', status: 'passed' },
+  ]);
+  assert.equal(/^# (?:tests|pass|fail)\b/m.test(tap), false, 'partial cases do not acquire a fabricated complete summary');
+  assert.equal(record.state, 'incomplete');
+  assert.equal(record.execution.outcome, 'interrupted');
+  assert.equal(record.execution.signal, 'SIGTERM');
+  assert.equal(recordBytes.includes(secret), false);
+  assert.equal(tap.includes(secret), false);
+  assert.equal(JSON.stringify(summary).includes(secret), false);
 });
 
 test('opaque identity never exposes deleted binary or renamed sensitive diff payloads', async (t) => {

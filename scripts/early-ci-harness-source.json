@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "9b5bc1c9d5a87fed022a17706bbb0e69e94757b1",
+  "importBase": "6c67fb0c9988d3e578579c7bb23a8ed0731aac3f",
+  "files": [
+    {
+      "path": "scripts/agent-tools/button-ci-policy.test.mjs",
+      "gitBlob": "c11a56dcc44a8f0e760b42b10c7cc01adb0722fa",
+      "sha256": "1e3dde0688f16f2d166a965464a14575868cf2edbb6428522efc0b12a992408b"
+    },
+    {
+      "path": "scripts/agent-tools/mobile-memory-fixture.mjs",
+      "gitBlob": "5175f20894621ec4d29fd4f9051979084348f8b1",
+      "sha256": "b93c891b05a2f85b997198e240e70f43535ad81acc684fc4ce94b1a3fcc29d1d"
+    },
+    {
+      "path": "scripts/agent-tools/mobile-memory-lifecycle.test.mjs",
+      "gitBlob": "b21631f90efcbb8feadaa8eb652fcccd976b5162",
+      "sha256": "1c66df1d344217bc5cfe18bd992e56236b47d8e1a6bee02d6722be147c409864"
+    },
+    {
+      "path": "scripts/agent-tools/mobile-memory-stress-lifecycle.test.mjs",
+      "gitBlob": "3f7a93d3f382ed8bfc2ead1aa236fb528f2ea06d",
+      "sha256": "24942e570d894024dbbd8aa7d019718fa0be7df2116632178f9cf2e8d2cd18f0"
+    },
+    {
+      "path": "scripts/agent-tools/mobile-memory.test.mjs",
+      "gitBlob": "87345c84ee038985ac16ff648a17df245be5ba0d",
+      "sha256": "7b66ccc7a2879abace0a4eafd824d09c12141f5994021c97a7286cfcf4f7ba74"
+    },
+    {
+      "path": "scripts/button-safety-ci-policy.mjs",
+      "gitBlob": "54fae74fd5266f5ac90c083ad19b421ffcacee53",
+      "sha256": "e42961340440567363f241f595401765143d2c8c5a1215312156781e4c1580fb"
+    },
+    {
+      "path": "scripts/button-safety-cloud.mjs",
+      "gitBlob": "3e9b6aca5e9d51f54229090438d06bcad8777a7f",
+      "sha256": "9231996423e1a1fe77c608682527cb484a371a49db789d8f59e0869c0809b626"
+    },
+    {
+      "path": "scripts/button-safety-contract.mjs",
+      "gitBlob": "8902bb8958337152f1bbc24a353dbd96bcce5291",
+      "sha256": "7259887475e5b71eb43f32b38ce2e658b972e177031588aee66a89f9a18c6bd7"
+    },
+    {
+      "path": "scripts/button-safety-fixture.mjs",
+      "gitBlob": "c56ca1f6e724ab36efaa4353833ac86a2a6bb955",
+      "sha256": "3da5d11e9a55192a94ca4e83369d08b8361fc5222e9d0159dc11819e1fdacc7b"
+    },
+    {
+      "path": "scripts/button-safety-inventory.json",
+      "gitBlob": "3d84321eeeb108fd598445c8328e6bf063b7b923",
+      "sha256": "a6301aa5eb854da41b249415946d4c29d7f121861560052c02e9215972f0f735"
+    },
+    {
+      "path": "scripts/button-safety-mobile-contract.mjs",
+      "gitBlob": "47b08466c6180253ce94b31f8a6ccb46d29fb233",
+      "sha256": "a29f5a56497785c648495a25ea661d77cf7c73b85f70ccdb29f313013ebb3b92"
+    },
+    {
+      "path": "scripts/button-safety-mobile-memory.mjs",
+      "gitBlob": "0eb963936e7bd822fa651080011043e4593515f6",
+      "sha256": "6e47b263340f9506a27c906bbf7ed0395a97c2cecb7c89b643b8c7757ac6a770"
+    },
+    {
+      "path": "scripts/button-safety-mobile-scenario.mjs",
+      "gitBlob": "73bce29759fe18b3f0e0968f37291e83abd41d7d",
+      "sha256": "8c7a2605c283f58d4cde20727278987c69fedeb7b282755f4ea885e08c798884"
+    },
+    {
+      "path": "scripts/button-safety-native.mjs",
+      "gitBlob": "af91a33a6af193fd5582255b7eb09361bb9cc6f1",
+      "sha256": "99781010cea67b0157fdb757162ff05a99ef62da77cec62b070bbbcbe5f8d9de",
+      "preservedOriginalPath": "scripts/source-snapshots/issue-290/button-safety-native-9b5bc1c.mjs.txt",
+      "effectiveSha256": "8257f0978ffde817416b76102139083f695653c4198a1a42ca4d7441648ce4de",
+      "adaptation": "Explicit canonical source-profile hook for only original mobile story and confirmed modal release; original full inventory guard retained. Local owner lookup canonicalizes the existing repo once, skips only unavailable other paths, rejects ambiguous own allocations, and retains all foreign entries for conflict checks. The two saved scenery consumers may serve only the explicit immutable b176 fixture; native output separates saved app bytes from current tooling and cannot pay current mobile acceptance. Exact limited-profile offered action IDs are recognized separately from actual executed outcomes; unknown IDs and full catalog remain guarded. Observed IDs and completed action maps are finalized on both success and failure without bypassing strict limited-profile or stress integrity verification."
+    },
+    {
+      "path": "scripts/button-safety-rapid-core.mjs",
+      "gitBlob": "71e99ca9c08f71e4aeea7618fcb08a8fc23e3155",
+      "sha256": "2c2a9634f301e5c861d9b189d8d540479f85dda3726cc6d7d416d20492260110"
+    },
+    {
+      "path": "scripts/button-safety-rapid.mjs",
+      "gitBlob": "78729b0c70602cd290047ee4fc0d86add77807af",
+      "sha256": "373911692423e4b2207cacaec8b336542eb627ff9f7580b798424698692a3639"
+    },
+    {
+      "path": "scripts/button-safety-scenarios.mjs",
+      "gitBlob": "9680d22b75aef8d0617468c4449b32850d17efc0",
+      "sha256": "9f3f53914c710a812f2565798a8210d9d2cd5b25a92478d24f0ff1f1b0adb8e1"
+    },
+    {
+      "path": "scripts/button-safety-scenes.mjs",
+      "gitBlob": "58cedf69405e5d104f1e74c7ffe5b6c2d2f8b2ca",
+      "sha256": "ba17861046134c3179060a14255843b114f4383b617f05f84955bfee14010949"
+    },
+    {
+      "path": "scripts/button-safety-transfer.mjs",
+      "gitBlob": "a6b9d973567aa099133c8e02217634f0ed60c2b3",
+      "sha256": "3fccab6b674de90ee8d9db0a0b3ebd24d3e6bc2d87119b96400e8e791ebfc46c"
+    },
+    {
+      "path": "scripts/button-safety.mjs",
+      "gitBlob": "9afedc4b41d2081ead2c6768a312f012fc938805",
+      "sha256": "14bc7d925e0c4562cc77e70c29ad28000bb15dd92b088b3da8ed84991fba16a7"
+    }
+  ],
+  "testExcerpts": [
+    {
+      "name": "RISK repository process: Playwright waitForFunction predicates are synchronous",
+      "sha256": "ea391246fbd778df64f8bc253e02b0d19cdb0eeb2f71873d6e7a99d9c59cd950",
+      "sourceStartLine": 805
+    },
+    {
+      "name": "RISK scenery backdrop cache: first unchanged lighting timer reuses actual pixels while changed slots and loaded copy still paint",
+      "sha256": "583784e402c8d9f381aba9add5c3c507013132997aa69316c89866f078f7fef4",
+      "sourceStartLine": 46345,
+      "preservedOriginalPath": "scripts/source-snapshots/issue-290/scenery-1-9b5bc1c.source.txt",
+      "effectiveSha256": "970b86ece3cf5d3fe42882489115b3b61ba1015e73a95324c513b0c497e4ba10",
+      "adaptation": "Only the explicit saved-scenery-b176 app fixture, its routed landscape hash and native source binding differ; all original causal paint, copy, pixels, data-preservation and cleanup assertions remain executable."
+    },
+    {
+      "name": "RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh",
+      "sha256": "ea24953f6e8f3a1cf0e69ed9e136d9d7c25eb02d1416206da8466f96818db40b",
+      "sourceStartLine": 46393,
+      "preservedOriginalPath": "scripts/source-snapshots/issue-290/scenery-2-9b5bc1c.source.txt",
+      "effectiveSha256": "5afb42a96feaf7cb611c07bf2d6d57377b91cc23d68d967cf9bbfc70919d2171",
+      "adaptation": "Explicit saved-scenery-b176 app fixture, routed landscape hash and native source binding retained. User instruction on 2026-10-28 excludes only final bank/fresh raster equality for Linux WebKit Reduced pending scene change on the exact immutable b176 app; actual image hashes/equality and excluded assertion remain durable. All other original causal paint, copy, pixels, data-preservation and cleanup assertions remain executable on every original case; no whole-test or skip-inventory exception."
+    },
+    {
+      "name": "RISK repository process: scenery consumers use allocated fallback ports and preserve early native failures",
+      "sha256": "8c6945cd85723b6697565de3ad679424fc5ad42a4a3a0ef8cbc12e3f1f65f3e2",
+      "sourceStartLine": 46445
+    },
+    {
+      "name": "RISK repository process: native scene-time bursts cannot activate controls behind a refused top-layer release",
+      "sha256": "bd68d0178600acdd77c68166978cddf62d86703f54d650d4d02addeadaf61f5a",
+      "sourceStartLine": 46458,
+      "preservedOriginalPath": "scripts/source-snapshots/issue-290/modal-release-9b5bc1c.source.txt",
+      "effectiveSha256": "54e8c76fcd00a096cf367df7b0ad48e8f2bfed254f8c52491329754b09213784",
+      "adaptation": "Original modal current-candidate scenario and all assertions retained; adds offered download-backup recognition versus non-execution assertions for the exact canonical limited profile."
+    },
+    {
+      "name": "RISK repository process: required native button actions execute in Chromium and WebKit",
+      "sha256": "6029c8253ee348f2cdaed69d9d6bb01664d2ca7d39c9c4a63e570c595422aeb2",
+      "sourceStartLine": 45581,
+      "snapshotPath": "scripts/source-snapshots/issue-290/full-button-actions.source.txt",
+      "execution": "Unexecuted saved PR285 source; not applicable current-main full coverage."
+    },
+    {
+      "name": "RISK repository process: native button gate detects errors raised by a real click",
+      "sha256": "2adce1bf3ee3ab1deff8acf42a00bbc751ef43d9b0fca992f1d14136d61cf00d",
+      "sourceStartLine": 45568,
+      "snapshotPath": "scripts/source-snapshots/issue-290/click-sensitivity.source.txt",
+      "execution": "Unexecuted saved PR285 source; not applicable current-main full coverage."
+    },
+    {
+      "name": "RISK repository process: native button gate awaits an asynchronous false outcome",
+      "sha256": "26202054f3134c6e9bf443ba289f1f956c11e5a34728c90c072939eea6dca6f7",
+      "sourceStartLine": 45786,
+      "snapshotPath": "scripts/source-snapshots/issue-290/async-outcome.source.txt",
+      "execution": "Unexecuted saved PR285 source; not applicable current-main full coverage."
+    }
+  ],
+  "limits": [
+    "Harness-only source import; no product patch or prior hosted qualification inherited.",
+    "The one effective native consumer is explicitly adapted; its saved original and separately bound effective blob are both retained. Three full PR285 product-case bodies are unexecuted snapshots, not current-main execution."
+  ],
+  "sourceParent": "b176026825e4f9539780f745fe60e09cf348d288",
+  "canonicalLimitedProfile": {
+    "path": "scripts/mobile-source-profile.json",
+    "sha256": "1a3e61edc692e9050f9224ad2bd2bccde9075561a84b6f03c363dfaab5c0afd5",
+    "scopes": [
+      "required-mobile-story",
+      "confirmed-modal-release"
+    ],
+    "limits": "Exact canonical applicability only; original full native catalog unchanged; no actual runtime qualification supplied."
+  },
+  "sceneryFixture": {
+    "path": "scripts/scenery-source-fixture.json",
+    "sha256": "9f060d48cb3918520af1160cead2d1584953e471cbab6f741760b242d4b3ba1d",
+    "scope": "Only two saved scenery consumers; current tooling plus immutable b176 app; no current-app or mobile-story credit."
+  }
+}

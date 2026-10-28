@@ -155,11 +155,12 @@ async function bindWorkflowPolicy(run, logs, state) {
   const text=bytes.toString('utf8');
   const ids=[...text.matchAll(/^  ([a-z][a-z0-9-]*):\s*$/gm)].map(match=>match[1]).filter(id=>!['push','pull_request'].includes(id));
   const legacy=['scanner-tests','release-evidence','deploy-pages'];
-  const parallel=['validation-context','event-gates','cohort-routing','regression',...legacy];
+  const early=ids.includes('early-startup')?['early-startup','mobile-stress']:[];
+  const parallel=['validation-context','event-gates','cohort-routing',...early,'regression',...legacy];
   let topology,required;
   if(/^  CHAIN_CI_TOPOLOGY: four-groups-v1$/m.test(text)) {
     if(JSON.stringify(ids)!==JSON.stringify(parallel)||!text.includes('name: regression-${{ matrix.group }}')||!text.includes('group: ['+GROUP_IDS.join(', ')+']')||!text.includes('needs: [scanner-tests, release-evidence]'))throw new Error('Unknown parallel workflow topology.');
-    topology='four-groups-v1';required=['validation-context','event-gates','cohort-routing',...GROUP_IDS.map(id=>'regression-'+id),'scanner-tests'];
+    topology='four-groups-v1';required=['validation-context','event-gates','cohort-routing',...early,...GROUP_IDS.map(id=>'regression-'+id),'scanner-tests'];
   } else if(JSON.stringify(ids)===JSON.stringify(legacy)&&!text.includes('CHAIN_CI_TOPOLOGY')) {topology='legacy-serial';required=['scanner-tests'];}
   else throw new Error('Unknown actual candidate workflow topology.');
   const binding={topology,checkoutSha,checkoutTree:commit.tree.sha,comparisonBase:run.event==='pull_request'?commit.parents[0].sha:null,workflowBlob:blob,runId:String(run.databaseId),runAttempt:run.attempt,required,known:[...required,'release-evidence','deploy-pages']};
@@ -239,7 +240,7 @@ function classifyRun(run, policy = null) {
     const base=source[0].split(' ').at(-1),digest=context[0].split(' ').at(-1);
     if(policy.comparisonBase&&base!==policy.comparisonBase)return classification('failure',1,'Announced PR comparison base differs from actual merge parent.');
     const steps=(byName.get('scanner-tests').steps||[]).filter(step=>step.conclusion==='success').map(step=>step.name);
-    const verified=steps.filter(name=>new RegExp(`^Verified complete cohort ${digest} report [a-f0-9]{64} mode (full|reuse)$`).test(name));
+    const verified=steps.filter(name=>new RegExp(`^Verified complete cohort ${digest} report [a-f0-9]{64} mode (full|reuse|policy-reuse)$`).test(name));
     if(!steps.includes('Verify complete required cohort')||verified.length!==1)return classification('failure',1,'Required verified aggregate attestation is missing or ambiguous.');
     const words=verified[0].split(' '),report=words[5],mode=words[7];
     if(mode==='full'&&steps.filter(name=>name===`Complete regression context ${digest} report ${report}`).length!==1)return classification('failure',1,'Required full producer completion attestation is missing.');

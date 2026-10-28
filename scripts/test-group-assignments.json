@@ -37,29 +37,151 @@
     }
   ],
   "rootAssignments": [
-    {"root": "workflow input reuse retains large original native evidence and rejects changed bytes", "group": "native-process", "file": "scripts/agent-tools/ci-routing.test.mjs"},
-    {"root": "RISK repository process: large original CI artifacts retain verified coverage without buffering native reports", "group": "native-process", "file": "tests.js"},
-    {"root": "test group aggregate preserves observer protocol across emulator coverage and fresh fallback", "group": "native-process", "file": "scripts/agent-tools/test-groups.test.mjs"},
-    {"root": "RISK repository process: CI observer keeps honest reuse and fresh emulator fallback outcomes", "group": "native-process", "file": "tests.js"},
-    {"root": "migration accepts a live token lock released during ownership inspection", "group": "native-process", "file": "scripts/agent-tools/coordination.test.mjs"},
-    {"root": "RISK repository process: released host locks cannot cause spurious CI migration failures", "group": "native-process", "file": "tests.js"},
-    {"root": "workflow partial retries preserve successful gates and invalidate a later failed execution", "group": "native-process", "file": "scripts/agent-tools/ci-routing.test.mjs"},
-    {"root": "workflow input reuse orders actual gate executions across rerun IDs", "group": "native-process", "file": "scripts/agent-tools/ci-routing.test.mjs"},
-    {"root": "workflow input reuse requires readable retained original result and native artifacts", "group": "native-process", "file": "scripts/agent-tools/ci-routing.test.mjs"},
-    {"root": "workflow mandatory input policy rejects legacy coverage without original gate artifacts", "group": "native-process", "file": "scripts/agent-tools/ci-routing.test.mjs"},
-    {"root": "test group aggregate admits a fresh execution after consumer runtime changes", "group": "native-process", "file": "scripts/agent-tools/test-groups.test.mjs"},
-    {"root": "RISK repository process: unchanged CI inputs reuse an original successful gate across events", "group": "core", "file": "tests.js"},
-    {"root": "RISK repository process: CI admission enforces reuse before repeating a passed test child", "group": "core", "file": "tests.js"},
-    {"root": "workflow reuses an independently passed gate on main for the same complete inputs", "group": "native-process", "file": "scripts/agent-tools/ci-routing.test.mjs"},
-    {"root": "workflow input reuse keeps a newer failed gate from inheriting an older pass", "group": "native-process", "file": "scripts/agent-tools/ci-routing.test.mjs"},
-    {"root": "workflow emulator gate reuses a verified pass and executes an uncovered gate", "group": "native-process", "file": "scripts/agent-tools/ci-routing.test.mjs"},
-    {"root": "workflow rerun reuses an original successful gate from its own earlier attempt", "group": "native-process", "file": "scripts/agent-tools/ci-routing.test.mjs"},
-    {"root": "workflow input reuse rejects changed inputs and uncertain original evidence", "group": "native-process", "file": "scripts/agent-tools/ci-routing.test.mjs"},
-    {"root": "test group input coverage reuses a passed group without claiming new execution", "group": "native-process", "file": "scripts/agent-tools/test-groups.test.mjs"},
-    {"root": "test group aggregate reconciles reused and executed groups with fresh original proof", "group": "native-process", "file": "scripts/agent-tools/test-groups.test.mjs"},
-    {"root": "test group workflow consumer forbids duplicate execution for a verified input pass", "group": "native-process", "file": "scripts/agent-tools/test-groups.test.mjs"},
-    {"root": "test group workflow publication attests actual execution and never promotes a reused result", "group": "native-process", "file": "scripts/agent-tools/test-groups.test.mjs"},
-    {"root": "test group input aggregation rejects stale missing and fabricated coverage", "group": "native-process", "file": "scripts/agent-tools/test-groups.test.mjs"},
+    {
+      "root": "required validator integrations fail actionably without setup and never skip",
+      "group": "native-process",
+      "file": "scripts/agent-tools/workflow-validator.test.mjs"
+    },
+    {
+      "root": "RISK repository process: fresh native-process CI sets up the pinned validator before workload",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "test group fresh runtimes consume an intact original early predecessor",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "test group aggregate classifies early-only inheritance across every required source",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "RISK repository process: early predecessor proof survives fresh consumer runtimes",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: aggregate modes account for every inherited required source",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "workflow input reuse retains large original native evidence and rejects changed bytes",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "RISK repository process: large original CI artifacts retain verified coverage without buffering native reports",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "test group aggregate preserves observer protocol across emulator coverage and fresh fallback",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "RISK repository process: CI observer keeps honest reuse and fresh emulator fallback outcomes",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "migration accepts a live token lock released during ownership inspection",
+      "group": "native-process",
+      "file": "scripts/agent-tools/coordination.test.mjs"
+    },
+    {
+      "root": "RISK repository process: released host locks cannot cause spurious CI migration failures",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "workflow partial retries preserve successful gates and invalidate a later failed execution",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "workflow input reuse orders actual gate executions across rerun IDs",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "workflow input reuse requires readable retained original result and native artifacts",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "workflow mandatory input policy rejects legacy coverage without original gate artifacts",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "test group aggregate admits a fresh execution after consumer runtime changes",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "RISK repository process: unchanged CI inputs reuse an original successful gate across events",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: CI admission enforces reuse before repeating a passed test child",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "workflow reuses an independently passed gate on main for the same complete inputs",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "workflow input reuse keeps a newer failed gate from inheriting an older pass",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "workflow emulator gate reuses a verified pass and executes an uncovered gate",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "workflow rerun reuses an original successful gate from its own earlier attempt",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "workflow input reuse rejects changed inputs and uncertain original evidence",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "test group input coverage reuses a passed group without claiming new execution",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "test group aggregate reconciles reused and executed groups with fresh original proof",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "test group workflow consumer forbids duplicate execution for a verified input pass",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "test group workflow publication attests actual execution and never promotes a reused result",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "test group input aggregation rejects stale missing and fabricated coverage",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
     {
       "root": "18 hours elapsed before the next 02:00 does not recycle scanned tasks",
       "group": "core",
@@ -146,6 +268,11 @@
       "file": "tests.js"
     },
     {
+      "root": "a reversible theme flip during capture remains visible in bounded mutation and paint evidence",
+      "group": "native-process",
+      "file": "scripts/agent-tools/rendered-evidence.test.mjs"
+    },
+    {
       "root": "a renderer report missing a contracted FAQ surface fails without discarding its original statuses or report",
       "group": "native-process",
       "file": "scripts/agent-tools/browser-audit.test.mjs"
@@ -154,6 +281,11 @@
       "root": "a same-day repeat is caught by the regular sweep, not only when asked",
       "group": "core",
       "file": "tests.js"
+    },
+    {
+      "root": "a saved screenshot is bound to its actual bytes and a stale image fails the hash check",
+      "group": "native-process",
+      "file": "scripts/agent-tools/rendered-evidence.test.mjs"
     },
     {
       "root": "a silent adopt stays silent when there was nothing local to lose",
@@ -839,6 +971,11 @@
       "root": "cant is timestamped and excludes the task from the pool immediately",
       "group": "core",
       "file": "tests.js"
+    },
+    {
+      "root": "capture stop drains queued theme mutations before disconnecting its observer",
+      "group": "native-process",
+      "file": "scripts/agent-tools/rendered-evidence.test.mjs"
     },
     {
       "root": "capture waits for durable native Add acknowledgement before reusing the draft",
@@ -3602,6 +3739,11 @@
     },
     {
       "root": "release-claim enforces owner identity and only releases the requested ownership",
+      "group": "native-process",
+      "file": "scripts/agent-tools/coordination.test.mjs"
+    },
+    {
+      "root": "release-claim compares the healthy lease and exact resource under lock",
       "group": "native-process",
       "file": "scripts/agent-tools/coordination.test.mjs"
     },
@@ -9358,7 +9500,8 @@
     {
       "root": "RISK repository process: Playwright waitForFunction predicates are synchronous",
       "group": "core",
-      "file": "tests.js"
+      "file": "tests.js",
+      "executionStage": "early-startup"
     },
     {
       "root": "RISK repository process: pre-push checks every outgoing tip and rejects dirty worktrees",
@@ -9367,6 +9510,11 @@
     },
     {
       "root": "RISK repository process: preflight catches outgoing upstream rationale gaps after the selected base passes",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: local preflight rejects stale FAQ and unassigned roots before qualification",
       "group": "core",
       "file": "tests.js"
     },
@@ -12406,8 +12554,28 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK repository process: coordination rejects misspelled resource options before side effects",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "begin rejects the singular resource typo before launching git or mutating ledger bytes",
+      "group": "native-process",
+      "file": "scripts/agent-tools/coordination.test.mjs"
+    },
+    {
+      "root": "coordination validates command option schemas, missing values, duplicates, and incompatible combinations",
+      "group": "native-process",
+      "file": "scripts/agent-tools/coordination.test.mjs"
+    },
+    {
       "root": "RISK repository process: nested native fixture output stays isolated at the command boundary",
       "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: document query fixtures stay selector scoped and preserve shim results",
+      "group": "core",
       "file": "tests.js"
     },
     {
@@ -12763,6 +12931,936 @@
     {
       "root": "RISK DATABASE REPAIR EXPORT: reload help routes users to the combined export after standalone log exporters are removed",
       "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: policy prose receipts inherit only identical product evidence",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: policy prose false exemptions retain full applicable review",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "policy prose routing inherits only a successful full exact-base product cohort and current reviews",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "policy prose routing rejects incomplete inherited rule and compatibility execution",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "policy prose routing preserves gates for uncertain base execution and stale current evidence",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "policy prose covered groups rederive unchanged product inheritance and aggregate honest references",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "policy prose exact main routing retains current reviewed head and original base execution",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "diagnostic recorder refuses missing durable state before starting a child",
+      "group": "native-process",
+      "file": "scripts/agent-tools/checkpoint-progress.test.mjs"
+    },
+    {
+      "root": "diagnostic recorder rejects tampered state without launching",
+      "group": "native-process",
+      "file": "scripts/agent-tools/checkpoint-progress.test.mjs"
+    },
+    {
+      "root": "a fresh process given only the task fetches complete parent authority and admissions consume the same durable allowance",
+      "group": "native-process",
+      "file": "scripts/agent-tools/checkpoint-progress.test.mjs"
+    },
+    {
+      "root": "an active failed investigation prevents caller-asserted completed release checkpoints",
+      "group": "native-process",
+      "file": "scripts/agent-tools/checkpoint-progress.test.mjs"
+    },
+    {
+      "root": "consumption derives failed observations from actual output and a finite allowance survives branch and observer commits",
+      "group": "native-process",
+      "file": "scripts/agent-tools/checkpoint-progress.test.mjs"
+    },
+    {
+      "root": "stale authority dirty source and changed result bytes refuse without further children",
+      "group": "native-process",
+      "file": "scripts/agent-tools/checkpoint-progress.test.mjs"
+    },
+    {
+      "root": "two fresh concurrent public recorder processes admit exactly one identical request",
+      "group": "native-process",
+      "file": "scripts/agent-tools/checkpoint-progress.test.mjs"
+    },
+    {
+      "root": "independently consumed passing output completes only the actual current source",
+      "group": "native-process",
+      "file": "scripts/agent-tools/checkpoint-progress.test.mjs"
+    },
+    {
+      "root": "a predicted diagnostic failure cannot pay an unresolved required gate",
+      "group": "native-process",
+      "file": "scripts/agent-tools/checkpoint-progress.test.mjs"
+    },
+    {
+      "root": "portable CI independently verifies a signed admitted attempt in a separate clone and refuses tampering retry and missing manifest",
+      "group": "native-process",
+      "file": "scripts/agent-tools/checkpoint-progress.test.mjs"
+    },
+    {
+      "root": "bounded extension requires exact source and current journal authorization evidence and retains failures",
+      "group": "native-process",
+      "file": "scripts/agent-tools/checkpoint-progress.test.mjs"
+    },
+    {
+      "root": "a caller-authored approval file cannot impersonate the repository approval authority",
+      "group": "native-process",
+      "file": "scripts/agent-tools/checkpoint-progress.test.mjs"
+    },
+    {
+      "root": "RISK repository process: diagnostic checkpoints retain finite authority across fresh process and CI boundaries",
+      "group": "native-process",
+      "file": "tests.js",
+      "qualificationContract": {
+        "id": "finite-authority",
+        "triggerPaths": [
+          "scripts/agent-tools/checkpoint-progress.mjs",
+          "scripts/agent-tools/checkpoint-progress.test.mjs",
+          "scripts/test-group-assignments.json",
+          "tests.js"
+        ]
+      }
+    },
+    {
+      "root": "source prerequisites include paginated comments beyond the issue summary",
+      "group": "native-process",
+      "file": "scripts/agent-tools/checkpoint-progress.test.mjs"
+    },
+    {
+      "root": "RISK repository process: early startup failure blocks costly CI without counting blocked coverage",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: native scene-time bursts cannot activate controls behind a refused top-layer release",
+      "group": "native-process",
+      "file": "tests.js",
+      "executionStage": "early-startup"
+    },
+    {
+      "root": "RISK repository process: scenery consumers use allocated fallback ports and preserve early native failures",
+      "group": "native-process",
+      "file": "tests.js",
+      "executionStage": "early-startup"
+    },
+    {
+      "root": "RISK scenery backdrop cache: first unchanged lighting timer reuses actual pixels while changed slots and loaded copy still paint",
+      "group": "native-process",
+      "file": "tests.js",
+      "executionStage": "early-startup"
+    },
+    {
+      "root": "RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh",
+      "group": "native-process",
+      "file": "tests.js",
+      "executionStage": "early-startup"
+    },
+    {
+      "root": "early CI public command preserves durable predecessor authority and rejects corrupted artifacts",
+      "group": "native-process",
+      "file": "scripts/agent-tools/early-ci.test.mjs"
+    },
+    {
+      "root": "early CI public command refuses failed skipped cancelled and missing mandatory execution",
+      "group": "native-process",
+      "file": "scripts/agent-tools/early-ci.test.mjs"
+    },
+    {
+      "root": "early CI workflow failure blocks every expensive child and deployment",
+      "group": "native-process",
+      "file": "scripts/agent-tools/early-ci.test.mjs"
+    },
+    {
+      "root": "early CI workflow success retains the complete assigned cohort and deployment chain",
+      "group": "native-process",
+      "file": "scripts/agent-tools/early-ci.test.mjs"
+    },
+    {
+      "root": "hosted button consumers admit routed event policies before their runtime boundary",
+      "group": "native-process",
+      "file": "scripts/agent-tools/button-ci-policy.test.mjs"
+    },
+    {
+      "root": "hosted button consumers reject invalid missing mismatched and local launches",
+      "group": "native-process",
+      "file": "scripts/agent-tools/button-ci-policy.test.mjs"
+    },
+    {
+      "root": "hosted child and memory artifacts preserve raw policy and distinct source checkout identity",
+      "group": "native-process",
+      "file": "scripts/agent-tools/button-ci-policy.test.mjs"
+    },
+    {
+      "root": "mobile budget CLI preserves uncertain create ownership and cleans confirmed objects",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory-lifecycle.test.mjs"
+    },
+    {
+      "root": "mobile budget profiles reject failed stress setup substitutions and mixed nonapp errors",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "mobile budget profiles report authentic stress application failures without waiving execution integrity",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "mobile budget profiles require attributable primary failures for reported stress",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "mobile budget profiles require one decimal GB without accepting the reported stress limit",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "mobile kernel page floor actual CLI preserves exact requests and rejects substituted observations",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory-stress-lifecycle.test.mjs"
+    },
+    {
+      "root": "mobile kernel page floor uses actual auxv readback without changing requested budgets",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "mobile memory boundary refuses unsupported or unbounded runtimes before native launch",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "mobile memory command cannot run a pretend local cap and pins the owned container boundary",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "mobile memory intentional OOM control binds the Docker flag while clients reject it",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "mobile memory parser rejects changed final browser or driver container isolation",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "mobile memory parser rejects waived limits synthetic touch and mismatched durable evidence",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "mobile stress CLI preserves a failed normal app attempt and executes reduced before complete cleanup",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory-stress-lifecycle.test.mjs"
+    },
+    {
+      "root": "mobile stress CLI retains the observed reduced owned-engine OOM after a failed normal attempt",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory-stress-lifecycle.test.mjs"
+    },
+    {
+      "root": "mobile stress owned engine loss reports the observed waitForFunction Browser closed without hiding driver faults",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "test group aggregate cannot accept a full cohort without required early predecessor evidence",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "early CI routing retains original full startup and stress proof for ordinary and policy coverage",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "test group aggregate binds successful early execution and separate failed application stress integrity",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "early CI workflow cancelled missing and skipped predecessors never authorize downstream",
+      "group": "native-process",
+      "file": "scripts/agent-tools/early-ci.test.mjs"
+    },
+    {
+      "root": "RISK repository process: CI monitor preserves early startup and stress predecessor failures",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: canonical limited source profiles preserve original mobile acceptance",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "canonical mobile source profile admits exact current app without changing original story or full catalog",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-source-profile.test.mjs"
+    },
+    {
+      "root": "canonical limited profiles reject wrong source profile engine scenario control and full coverage",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-source-profile.test.mjs"
+    },
+    {
+      "root": "confirmed modal source profile admits only its exact existing Chromium consumer",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-source-profile.test.mjs"
+    },
+    {
+      "root": "native report verifier binds the complete actual source and refuses full-action relabeling",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-source-profile.test.mjs"
+    },
+    {
+      "root": "RISK repository process: early-assigned consumers execute once through durable group accounting",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "group process refuses missing early predecessor before launching any deferred root",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "group and aggregate retain actual early cases once across fresh group processes",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "an owner extension comment appended to the bound issue updates only that explicit authority append",
+      "group": "native-process",
+      "file": "scripts/agent-tools/checkpoint-progress.test.mjs"
+    },
+    {
+      "root": "public diagnostic receipt records frozen reviewed source with its admitted finite attempt",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "public diagnostic receipt transports no private journal bodies or local result pointers",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "a canonical atomic diagnostic permit dispatches once and a fresh duplicate only observes",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "independent CI claims the canonical permit once for exact run attempt one",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "the real isolated diagnostic consumer starts only for the winning CI claim and retains a missing attribution failure",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "terminal consumption uses same-run monitor logs and remote artifact digest while retaining the failed required gate",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "CI claim rejects a different actual GitHub source before any publication or runtime",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "portable verifier revalidates inherited full review bytes rather than trusting the local signing owner",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "actual pre-push permits only the admitted exact diagnostic destination and rejects promotion",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "portable authorization rejects observer-only HEAD drift even when selected inputs are unchanged",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "diagnostic eligibility and receipt rejection matrix performs zero publication and launch side effects",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "concurrent fresh launch processes publish one canonical permit and dispatch once",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "an interrupted canonical reservation stays unresolved without objects dispatch or renewed allowance",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "fresh checkout verifies portable frozen reviews and admitted attempt without local private journal or repeated review",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "terminal tamper missing logs and wrong run identity cannot consume or renew an admitted attempt",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "RISK repository process: known frozen diagnostic source derives narrow eligibility from exact content",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: diagnostic source cannot acquire product receipts through ordinary record",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: distributed diagnostic admission binds actual terminal failure without product qualification",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "an owner approval append cannot hide an unrelated task scope change",
+      "group": "native-process",
+      "file": "scripts/agent-tools/checkpoint-progress.test.mjs"
+    },
+    {
+      "root": "actual product verify publication and deployment gates reject diagnostic identity before outgoing statuses",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "a signed portable admission without a finite budget is denied before publication",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "a symlinked runtime output into the checkout is denied before claim publication",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "the winning diagnostic runtime installs pinned dependencies once before the actual consumer",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "ordinary governance source with a standalone diagnostic workflow retains full product receipt and publication authority",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "only named inherited review artifacts are selected and unrelated private files never enter a public permit",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "independent CI restores nested immutable proof artifacts through actual recursive Git tree semantics",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "RISK repository process: metadata observation preserves bound producer outcomes without duplicate execution",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "metadata observation retains a bound pending producer without launching another cohort",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "metadata observation preserves cancelled producers and incomplete final evidence",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "metadata observation resumes the saved producer in a fresh process despite newer equivalent history",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "workflow metadata events serialize equivalent admission and run the actual routing command once per event",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "metadata observation recovers after an actual interrupted process using only durable evidence",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "metadata observation requires fresh validation for changed complete contexts or unverifiable admission",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "metadata observation skips failed observers without full producer admission and retains original execution",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "workflow metadata aggregate rejects pending cancelled unresolved and stale successful routing proofs",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "a nonqualifying receipt binds independently reviewed protected governance separately from diagnostic source",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "diagnostic dispatch selects the protected governance default ref and rejects a moved head before any write",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "a changed protected default head cannot publish any diagnostic reservation objects or dispatch",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "independent CI claim binds actual main governance run while retaining distinct diagnostic source",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "a source-headed diagnostic workflow cannot impersonate protected main governance or write a claim",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "actual diagnostic descendant retains truthful governance metadata and receives no publication credentials",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "terminal consumption binds governance run and artifact head separately from admitted app source",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "environment-only diagnostic descendant forgery cannot launch through the public source host guard",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "a verified child consumes its inherited authorization once and cannot replay it",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "actual inherited channels reject wrong stale and non-governance parent contexts before runtime",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "Node injection configuration cannot publish a claim or start a diagnostic descendant",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "the literal workflow node invocation retains a valid kernel-bound parent channel",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "the actual native capture consumer retains symbolized stacks for its fixed known workload",
+      "group": "native-process",
+      "file": "scripts/agent-tools/native-attribution.test.mjs"
+    },
+    {
+      "root": "fresh native verification rejects invented complete attribution and retained source, sample, clock and symbol loss",
+      "group": "native-process",
+      "file": "scripts/agent-tools/native-attribution.test.mjs"
+    },
+    {
+      "root": "the public native toolchain verifier refuses a missing pinned ELF closure",
+      "group": "native-process",
+      "file": "scripts/agent-tools/native-attribution.test.mjs"
+    },
+    {
+      "root": "RISK repository process: protected diagnostic governance remains distinct from frozen app source",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: native diagnostic captures remain bounded and missing attribution never qualifies a repair",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "the fixed Linux native control reproduces its reviewed executable and independently named hot loop",
+      "group": "native-process",
+      "file": "scripts/agent-tools/native-attribution.test.mjs"
+    },
+    {
+      "root": "concurrent winning CI runners retain one actual authorized child identity and no duplicate runtime",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "test group browser runtime preflight runs exactly the newly assigned roots in a scrubbed child",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "test group browser runtime preflight records an explicit no-change cohort without launching an engine",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "test group browser runtime preflight fails closed for skipped, duplicated, and missing-engine outcomes",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "RISK repository process: newly registered startup browser roots require an isolated Chromium receipt",
+      "group": "native-process",
+      "file": "tests.js",
+      "qualificationContract": {
+        "id": "startup-browser",
+        "triggerPaths": [
+          ".github/workflows/data-safety.yml",
+          "scripts/test-groups.mjs",
+          "scripts/agent-tools/test-groups.test.mjs",
+          "scripts/agent-tools/ci-pass-reuse.mjs",
+          "scripts/test-group-assignments.json",
+          "tests.js"
+        ]
+      }
+    },
+    {
+      "root": "RISK repository process: canonical early admission retains mixed owners and fresh durable verification",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: browser preflight interruption cleans its actual owned process family",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: fresh Linux known-control verification requires its independent hot routine",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: rendered diagnostic comparisons enforce declared scale on all named controls",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "early CI canonical source admits its existing mixed owners through durable public verification",
+      "group": "native-process",
+      "file": "scripts/agent-tools/early-ci.test.mjs"
+    },
+    {
+      "root": "test group browser runtime interruption finalizes and stops only its owned child family",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "fresh Linux known-control verification refuses self-consistent loader-only retained evidence",
+      "group": "native-process",
+      "file": "scripts/agent-tools/native-attribution.test.mjs"
+    },
+    {
+      "root": "named diagnostic comparisons require the declared factor for every changed and reference target",
+      "group": "native-process",
+      "file": "scripts/agent-tools/rendered-evidence.test.mjs"
+    },
+    {
+      "root": "standalone diagnostic command refuses small positive growth below its declared scale",
+      "group": "native-process",
+      "file": "scripts/agent-tools/rendered-evidence.test.mjs"
+    },
+    {
+      "root": "RISK repository process: reconciled CI retains original input coverage and incomplete admission",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "reconciled input reuse retains transferred early and browser evidence bytes",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "reconciled policy input routing refuses an unretained full-product origin",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "reconciled policy routing uses six keyed originals and refuses a covered origin",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "reconciled metadata input routing preserves pending failed and cancelled admission",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "reconciled metadata routing retains six original gate passes and the full early producer",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "reconciled covered group verifies current early evidence without repeating any root",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "reconciled fresh group consumes the explicit browser preflight before its cohort",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "reconciled policy routing directly verifies the reviewed full origin behind covered main",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "reconciled metadata routing holds a mixed early origin without duplicate mobile admission",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "reconciled mixed metadata verifies original early artifacts without full-product authority",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "reconciled policy covered consumers retain the directly reviewed full-product origin",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "reconciled early consumer references an independently verified execution without workload children",
+      "group": "native-process",
+      "file": "scripts/agent-tools/early-ci.test.mjs"
+    },
+    {
+      "root": "reconciled checkpoint retains six routing decisions and originals without renewing diagnostics",
+      "group": "native-process",
+      "file": "scripts/agent-tools/checkpoint-progress.test.mjs"
+    },
+    {
+      "root": "reconciled authorized issue refresh preserves original snapshots failures and finite allowance",
+      "group": "native-process",
+      "file": "scripts/agent-tools/checkpoint-progress.test.mjs"
+    },
+    {
+      "root": "test group workflow browser path reaches the installer and enforcing persistence consumer",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "RISK repository process: workflow browser paths resolve only in supported runner contexts",
+      "group": "native-process",
+      "file": "tests.js",
+      "qualificationContract": {
+        "id": "workflow-context",
+        "triggerPaths": [
+          ".github/workflows/data-safety.yml",
+          "scripts/agent-tools/workflow-validator.mjs",
+          "scripts/agent-tools/test-groups.test.mjs",
+          "scripts/agent-tools/ci-pass-reuse.mjs",
+          "scripts/test-group-assignments.json",
+          "tests.js"
+        ]
+      }
+    },
+    {
+      "root": "RISK repository process: managed pre-push validates the exact outgoing workflow commit",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "preflight rejects a workflow expression unavailable at job scope before full qualification",
+      "group": "native-process",
+      "file": "scripts/agent-tools/preflight.test.mjs"
+    },
+    {
+      "root": "workflow validator command contracts are pinned and source-bound",
+      "group": "native-process",
+      "file": "scripts/agent-tools/workflow-validator.test.mjs"
+    },
+    {
+      "root": "keeps ordinary and compact callers compatible for large failures and changed-source evidence",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "redacts synthetic secrets from every summary and provenance surface while preserving the child failure",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "preserves an ordinary TAP case identity containing the word token through recording",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "redacts a secret-bearing TAP token identity without losing its status or plain-log sanitization",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "preserves adjacent nested TAP records across multiline secret redaction",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "reconciles nested token and ordinary cases and keeps corrected redacted evidence immutable",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "preserves passed, skipped, TODO, and failed TAP cases with their bounded summary totals",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "keeps a cancelled child non-successful when only partial TAP was retained",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "public group qualification consumes sanitized recorder TAP against its described required identities",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "qualification selector binds exact assigned risk wrappers to source changes and fails closed",
+      "group": "native-process",
+      "file": "scripts/agent-tools/qualification-contracts.test.mjs"
+    },
+    {
+      "root": "qualification readiness gates the recorder child on selected parent contracts and explicit no-change",
+      "group": "native-process",
+      "file": "scripts/agent-tools/qualification-contracts.test.mjs"
+    },
+    {
+      "root": "local fixture runs its fixed child, records nested outcomes, and releases only its own allocation",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "local fixture rejects invalid ownership and evidence before starting the fixed workload",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "local fixture rejects help misuse and arbitrary commands without workload or ledger writes",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "record-run CLI executes through a path alias and importing its readiness helper stays inert",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "local fixture reports child failure separately from successful owned cleanup",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "local fixture interruption finalizes child and allocation cleanup independently",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "local fixture preserves a passing workload and allocation when lease identity changes during cleanup",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "test group local browser preflight refuses unverifiable leases before any launch",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "local fixture refuses absent or inconsistent required outcome proof",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "RISK repository process: local browser admission requires complete current owner authority",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: fixed local fixture refuses absent required execution and observation proof",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "diagnostic public plan admits only the exact approved executable dependency closure",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "RISK repository process: diagnostic command closure remains exact and nonqualifying",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "retains harmless credential prose in exact TAP identities and protects real credentials",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "qualification reports preserve sanitized TAP identities without a serialized second pass",
+      "group": "native-process",
+      "file": "scripts/agent-tools/qualification-contracts.test.mjs"
+    },
+    {
+      "root": "RISK repository process: recorder retains exact public identities through streams and qualification reports",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "test group workflow fixture isolates hosted events without relaxing raw event authority",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "RISK repository process: workflow fixtures isolate hosted events and retain raw event refusals",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: saved scenery Linux raster exclusion is exact and durably disclosed",
+      "group": "native-process",
       "file": "tests.js"
     }
   ],

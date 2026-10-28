@@ -19,6 +19,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK repository process: required parallel scanner aggregation rejects absent group evidence
 - RISK repository process: grouped catalog binds real declarations rather than quoted fixtures
 - RISK repository process: nested native fixture output stays isolated at the command boundary
+- RISK repository process: document query fixtures stay selector scoped and preserve shim results
 
 - RISK cloud recovery device connection: a failed handle is reopened within the same protected review
 - RISK cloud recovery reconnect guidance: mounted help explains reconnecting without replacing saved data
@@ -446,6 +447,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK repository process: memory receipts require absolute source paths
 - RISK repository process: release evidence rejects future and noncanonical audit timestamps
 - RISK repository process: pre-push checks every outgoing tip and rejects dirty worktrees
+- RISK repository process: managed pre-push validates the exact outgoing workflow commit
 - RISK repository process: status publication needs a valid exact-SHA receipt
 - RISK repository process: main deployment requires the merged reviewed head, full tree parity, and latest statuses
 - RISK repository process: CI makes verified release evidence a deployment prerequisite
@@ -455,6 +457,8 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK test-first gate: release evidence scripts receive edit-time process protection
 
 The release gate derives a review plan from the exact candidate diff: the owner reviews every diff, ordinary behavior changes require one independent code reviewer, and high-risk domains require a specialist. It requires both independent roles only when code behavior and specialist risk are materially affected. Ambiguous auth, state-persistence, and session changes fail closed to relevant specialists; callers may add known specialist domains to raise the plan but cannot replace or remove derived domains. Memory/cloud/sync specialist evidence records source fingerprints, per-domain impact, and rationale. Every affected domain lists focused tests; an all-unaffected assessment still includes at least one focused preservation test across the assessed domains. Schema version 1 receipts remain verifiable under their former two-review rule, and their publisher also emits a third specialist-compatibility status bound to the same receipt so current branch protection can accept them without inventing a new reviewer. The local hook checks each outgoing tip; the main deployment job independently verifies the merged PR head, derived status plan, and latest statuses. Statuses bind receipts but cannot prove that a person actually read or reviewed them.
+
+The managed pre-push process test invokes the real dispatcher in a disposable Git repository, with a valid current `HEAD` and a different outgoing commit containing a job-level `runner.temp` expression. It checks exact workflow-blob validation, multiple refs and deletions, valid workflow admission, prior-hook stdin/exit propagation, and the independent exact-SHA receipt refusal without contacting a remote.
 
 Companion coverage protects the existing local-backup behavior: LOCAL BACKUPS: seven local calendar days, latest save today, and pre-restore safety copy; LOCAL BACKUPS: a manual backup remains restorable after the seven-day window; LOCAL BACKUPS: a failed safety copy blocks restore and leaves the current board untouched; HARD GATE: full backup store blocks browser overwrite and preserves its prior bytes; and HARD GATE: unreadable backup index is preserved instead of overwritten by a save.
 
@@ -1598,14 +1602,22 @@ The actual intervention Yes records deliberate current-pass Scan intent even whe
 ## Agent evidence command wiring (#152)
 
 - `RISK repository process: npm test fails when an agent-tool cohort assertion fails`
+- `RISK repository process: coordination rejects misspelled resource options before side effects`
 - `RISK repository process: grouped runner stays covered at the default npm test boundary`
+- `RISK repository process: newly registered startup browser roots require an isolated Chromium receipt`
 - `RISK test group runner preserves hash identities and counts only executable controlled registrations`
 
 Preflight comparison coverage:
 - `RISK repository process: preflight catches outgoing upstream rationale gaps after the selected base passes`
   exercises the public command with a real published local Git branch, a passing selected comparison and a missing outgoing rationale. It preserves the existing gate, focused copy checks, refs, HEAD, tracked files and configuration.
+- `RISK repository process: local preflight rejects stale FAQ and unassigned roots before qualification`
+  runs the existing public preflight fixture through a fresh Node process and requires one completed outcome for the stale FAQ assertion, one for a newly unassigned root, and one for their parent case. The fixtures confirm each failure exits before the qualification sentinel; they do not stand in for hosted or release checks.
 
 The required npm test entry point surfaces a failing isolated agent-tool cohort with a nonzero result and its assertion output. Group-runner identity evidence preserves the independently captured TAP-escaped inventory while reporting canonical runtime titles, and native-child registration checks distinguish executable declarations from quoted fixture text while rejecting missing and duplicate controls.
+
+The browser-runtime process wrapper runs the existing public group-runner fixture contracts for exact newly added-root selection, inherited environment scrubbing, receipt transfer, no-change, unexpected skips, duplicate outcomes and missing Chromium. It checks the actual regression workflow orders that preflight before the full persistence-recovery group, installs Chromium under the explicit runner-temp path, passes the receipt into ordinary accounting and uploads the raw result. The preflight remains an additional assertion: ordinary full-group TAP still executes and aggregates every assigned browser root, while the five early-startup roots retain only their existing receipt accounting.
+
+The coordination process risk launches the CLI test in a fresh Node process. Synthetic Git projects and ledgers verify command-specific option rejection, byte-for-byte preservation, no Git child for rejected `begin` arguments, and canonical output for repeated scope, claim and plural resource controls. Existing competing-resource ownership coverage remains in `scripts/agent-tools/coordination.test.mjs`; neither test uses the host ledger.
 
 ## Deletion membership authority after log pruning (#171)
 
@@ -2132,6 +2144,7 @@ This boundary control holds a successful real provider reply, installs a later a
 
 - RISK integrated automatic recovery: persisted multichunk sources retain pending ACK and true Done Undo through restart
 - RISK integrated automatic recovery native: persisted startup status and neighboring controls remain usable with one browser and isolated contexts
+- Requested output from the current startup consumer binds its named pending status and neighboring Review control to the shared bounded paint/mutation/frame observation, exact viewport and ordinary/enlarged measurements, platform-font observation, and saved PNG bytes. A theme flip that reverts during capture must fail metrics while retaining separately verified image integrity; `CHAIN_RECOVERY_UI_OUTPUT` stays optional and the report leaves visual judgment unverified.
 - RISK integrated automatic recovery: a failed current read cannot hide the healthy previous source
 
 - RISK automatic source status: completed confirmation follows current edits and signed-in identity
@@ -2247,3 +2260,175 @@ Protect actual automatic recovery, manual source review, exact protected copies 
 - RISK support diagnostics: event retention and malformed observer input stay bounded and redacted
 
 The real Sync → Review action and Copy debug log consumer distinguish failed pending-upload, recovery-hold and head reads, fixed exception categories and temporary connection aliases. Repeated failures still stop after the existing one recheck. Exact device/cloud originals, unfinished drafts, source-selection guards and the 24 KiB report/512-byte event limits stay intact. Arbitrary error messages, paths, account identifiers, out-of-range aliases, extra fields and changing/throwing getters cannot enter the copied report. The current physical-phone failure remains unreproduced; these diagnostics do not repair data or establish its cause.
+
+## Policy prose release evidence inheritance
+
+- RISK repository process: policy prose receipts inherit only identical product evidence
+- RISK repository process: policy prose false exemptions retain full applicable review
+
+Public recording and fresh verification preserve full source/base/tree inventories, current independent policy review, immutable product/FAQ/rendered reports and all three required statuses. Instruction-preserving prose reuses only unchanged product evidence; authorization, gate weakening, executable/configuration/test, mixed and ambiguous changes keep full applicable review. Public CI routing and covered/aggregate command cohorts retain exact producer execution, rules/compatibility, current statuses and zero claimed current test outcomes. Hosted proof remains a separate release requirement.
+
+## Durable diagnostic progress
+
+- RISK repository process: diagnostic checkpoints retain finite authority across fresh process and CI boundaries
+
+The existing checkpoint and recorder commands exercise disposable Git repositories, actual child processes, independent expected observations, concurrent admission, full source-issue refresh, finite budgets, immutable failed results, repository-owner approval and a separately cloned CI verifier. Diagnostic source cannot receive product release receipts. The unlanded WebKit consumer patch is retained separately until its owner integrates it; this contract does not establish hosted execution, physical-device recovery or private-board proof.
+
+## Early populated startup CI admission
+
+- RISK repository process: Playwright waitForFunction predicates are synchronous
+- RISK scenery backdrop cache: first unchanged lighting timer reuses actual pixels while changed slots and loaded copy still paint
+- RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh
+- RISK repository process: scenery consumers use allocated fallback ports and preserve early native failures
+- RISK repository process: native scene-time bursts cannot activate controls behind a refused top-layer release
+- RISK repository process: early startup failure blocks costly CI without counting blocked coverage
+
+The original saved harness and native assertion bodies are imported byte-for-byte from 9b5bc1c, a child of b176026. The public early command preserves source/run/workflow and every raw artifact, rejects omitted/skipped/cancelled work, and authorizes long cohorts only after the original required 1 GB mobile story. The separate stress parser retains nonblocking application outcomes and mandatory integrity. Controlled OS children establish process ordering only; actual hosted source may still fail and remains a release blocker.
+
+- RISK repository process: CI monitor preserves early startup and stress predecessor failures
+
+The supported CI observer reads the actual workflow and retains missing, skipped, cancelled and unknown early/stress predecessor outcomes. New process wrappers clear the inherited Node runner marker and require actual named TAP outcomes.
+
+- RISK repository process: canonical limited source profiles preserve original mobile acceptance
+
+The canonical profile admits only the original mobile story and the named confirmed Chromium modal harness. Complete canonical app assets/templates and raw report scope remain bound; unknown scopes, full runs, wrong source/profile and sensitivity controls refuse. The saved native original is preserved with a separately hashed effective hook. Three newly imported PR285 full-product tests remain exact unexecuted source snapshots; all preexisting main tests, original story limits and saved full native catalog remain unchanged.
+
+- RISK repository process: early-assigned consumers execute once through durable group accounting
+
+Existing catalog assignments mark the five confirmed roots as early execution while retaining the predicate root in core and the other four roots in native-process. Real workflow commands consume verified durable early cases before any group child, omit only those already executed roots from the later Node process, and aggregate raw early/ordinary outcomes exactly once. Missing or changed receipts and transfer references fail; the accepted skip inventory is unchanged.
+
+## Nonqualifying source-bound diagnostic authority
+
+- `RISK repository process: known frozen diagnostic source derives narrow eligibility from exact content`
+- `RISK repository process: diagnostic source cannot acquire product receipts through ordinary record`
+- `RISK repository process: distributed diagnostic admission binds actual terminal failure without product qualification`
+
+The existing checkpoint process contract now includes an API-consistent owner approval append and rejection of an unrelated concurrent scope change. Narrow diagnostic tests use disposable repositories and a bounded fake external GitHub CLI; they prove local command/ref/process behavior, not hosted execution, native attribution, product qualification or physical-device repair.
+
+
+- RISK repository process: metadata observation preserves bound producer outcomes without duplicate execution
+
+The actual routing CLI binds complete source/checkout/tree/base/policy/cohort/runtime identity and original full-producer admission before retaining pending, failure, cancellation or unresolved evidence. Fresh-process resumption pins that producer despite newer successful history and restores saved nonsecret inputs after interruption. Literal workflow routing/admission commands under the controlled external scheduler count real isolated npm callbacks once; the literal required aggregate accepts honest coverage references and rejects pending/cancelled/unresolved or stale proof. The wrapper clears NODE_TEST_CONTEXT and requires named successful TAP outcomes. Hosted GitHub event/scheduler and final qualification remain separate parent-owned proof.
+
+## Protected diagnostic governance and bounded native observation
+
+- `RISK repository process: protected diagnostic governance remains distinct from frozen app source`
+- `RISK repository process: native diagnostic captures remain bounded and missing attribution never qualifies a repair`
+
+Protected default governance, separate diagnostic source, actual run/artifact identity and one-use inherited parent channels remain distinct. Public process controls cover stale/forged/replayed contexts, Node injection, finite duplicate admission and ordinary release compatibility. Native controls use an actual fixed native workload, real macOS sampler and fresh retained-artifact verification; Linux control/tool delivery is prepared with pinned source, ELF bytes and dependency closure. Missing Linux capability, symbols, samples or coverage remains unavailable or partial within the same attempt; local controls establish no hosted WebKit, product repair or physical-device result.
+
+## Final review repairs for #278
+
+- `RISK repository process: canonical early admission retains mixed owners and fresh durable verification`
+- `RISK repository process: browser preflight interruption cleans its actual owned process family`
+- `RISK repository process: fresh Linux known-control verification requires its independent hot routine`
+- `RISK repository process: rendered diagnostic comparisons enforce declared scale on all named controls`
+
+Canonical source admission reads the actual preserved manifest, profile and five catalog owners; fresh public verification starts zero current children for controlled covered metadata. The full controlled process transfer separately executes all five early roots once and deducts one core plus four native-process roots from ordinary groups. Interruption tests operate on actual owned OS test children, grandchildren and listeners through both the direct preflight and recorder, preserving an unrelated process and finalizing bounded cleanup. The fixed Linux known-control fresh verifier requires its independently named hot routine; controlled retained-text witnesses do not claim actual Linux frames, while ordinary partial app attribution remains separate. Named diagnostic comparisons require the explicit scale on both changed and reference text, allow bounded CSS rounding, and measure content height without requiring fixed padding to scale. Existing original assertions, accepted skips, app bytes and native budgets remain protected.
+
+The existing canonical limited-profile process risk also checks the fixed saved scenery app/current tooling split and rejects fixture mobile credit, unknown offered IDs, unbound profile IDs and offered-to-executed relabeling. The modal consumer retains every original burst assertion and separately requires canonical backup recognition without execution credit. All five early roots keep their existing owners and execute once.
+
+The existing early-assigned process root also composes a real failed producer with an external mocked browser and strict canonical profile/stress/aggregate consumers. Finalization retains known offered IDs without execution credit, while missing accounting, unknown offered/executed IDs, source/profile tampering, transport, instrumentation and cleanup faults still block. Synthetic stress records do not establish actual512MB or Linux execution.
+
+The canonical early-admission wrapper uses the existing public TAP parser to require its two exact top-level roots and all13 exact outcome identities: four original outcomes plus nine approved stress controls. Strict totals and identity/hierarchy checks reject missing, duplicate, unknown, failed, cancelled, skipped or TODO child outcomes.
+
+## Reconciled CI admission and retained originals
+
+- `RISK repository process: reconciled CI retains original input coverage and incomplete admission`
+
+Public routing and workflow-consumer controls retain metadata pending, failure and cancellation outcomes, six complete input keys and original run/attempt/job/result/artifact identities. Covered groups launch zero workload children while the independently required early story remains distinct. Fresh Chromium preflight precedes its group; transferred early and browser receipts retain raw bytes and reject changed original artifacts. Policy inheritance requires the original full-product producer and all six retained passes; a mixed or covered consumer cannot become that origin. These are controlled local command/process checks, separate from actual hosted, mobile and release qualification.
+
+## Early predecessor runtime and complete aggregate modes
+
+- `RISK repository process: early predecessor proof survives fresh consumer runtimes`
+- `RISK repository process: aggregate modes account for every inherited required source`
+
+Public early execution on synthetic image A retains its complete producing inputs in the raw artifact. Real fresh group and aggregate processes on synthetic image B must accept the intact original source/runtime proof while current-runtime input selection invalidates group reuse. Missing, incomplete or changed producer runtime, source, workflow, complete-input key and retained proof are refused before workload dispatch. Existing covered admission still requires its matching current runtime.
+
+Public aggregate controls cover four fresh groups with inherited emulator evidence, four fresh groups with inherited early evidence, covered groups with fresh emulators and entirely inherited required sources. Durable modes report full, mixed or covered across those actual sources; inherited evidence retains reuse attestation and cannot claim original full-producer authority. Missing or changed original references fail. These controlled OS-process/parser fixtures provide no actual browser, memory-cap, emulator, hosted or deployment proof.
+
+## Supported browser workflow environment scope
+
+- `RISK repository process: workflow browser paths resolve only in supported runner contexts`
+
+The actual workflow installer and enforcing persistence consumer must resolve the same isolated runner-temp browser directory at a supported environment scope. Controlled external Chromium installation feeds the real group preflight and complete outcomes; missing, literal unexpanded or mismatched consumer paths fail closed. This process contract starts no real browser and supplies no hosted qualification.
+
+## Pinned validator readiness on fresh CI runners
+
+- `RISK repository process: fresh native-process CI sets up the pinned validator before workload`
+
+The checked-in fresh native-process setup command runs through the real public
+CLI with a controlled external provider serving the official checksum-pinned
+archive. Missing or corrupt setup and provider failure stop before the workload
+sentinel; successful setup retains verified platform archive bytes for offline
+process integrations. Covered, reused and other-group runners retain the existing
+zero-setup condition. The required validator and outgoing pre-push integration
+commands fail actionably instead of adding environment-dependent skips. These
+isolated command checks launch no native browser and provide no hosted proof.
+
+## Local process authority and required fixture proof
+
+- `RISK repository process: local browser admission requires complete current owner authority`
+- `RISK repository process: fixed local fixture refuses absent required execution and observation proof`
+
+Disposable canonical ledgers drive the real allocated browser-preflight command,
+with external provider and workload sentinels proving refusals happen before
+launch. Fixed-mode recorder controls require the selected root and all eleven
+nested outcomes to pass once, actual allocated listener observations, and the
+original five-root/four-group/eleven-case accounting. Missing, renamed, skipped,
+malformed, inconsistent or caller-redacted proof cannot qualify a passing child.
+Actual child outcome, evidence validity and owned cleanup remain separate.
+These are controlled public process checks, with no native or hosted claim.
+
+- `RISK repository process: diagnostic command closure remains exact and nonqualifying`
+
+The public diagnostic plan admits exactly five current command dependencies,
+each bound to the existing governance byte/mode and tooling digest contract.
+Byte and mode tampering, unknown paths and frozen application/profile/catalog
+changes are refused. No finite attempt, allowance or diagnostic qualification
+policy changes; old source and receipts remain immutable.
+
+
+## Public recorder identity preservation
+
+- RISK repository process: recorder retains exact public identities through streams and qualification reports
+
+The actual public recorder executes real controlled Node children. The existing
+TAP parser and exact qualification consumer require the four current harmless
+authorization/secret prose identities in default and summary streams, and in
+the private qualification stream plus its JSON report. Explicit assignments,
+quoted and unknown authorization values, recognized credentials, custom patterns,
+ordinary logs and multiline credentials stay sanitized; masked required
+identities remain nonqualifying. Report values are sanitized before JSON
+serialization so the retained TAP keeps its real line boundaries. These focused
+controlled processes establish neither browser/native nor full-suite, hosted,
+deployment, release or physical-device qualification.
+
+## Hosted event isolation in workflow fixtures
+
+- RISK repository process: workflow fixtures isolate hosted events and retain raw event refusals
+
+The public process regression runs the existing checked-in workflow consumer
+under controlled foreign push, PR synchronize and PR edited parent events. Its
+local example/fixture must still retain covered execution without a workload,
+fresh execution when uncovered, and fresh execution after runtime or image
+changes. A separately described matching raw fixture event reaches its real
+group workload; changed repository, source and checkout identities are refused
+before that workload. Only the local fixture clears inherited raw event fields;
+real workflow authority remains strict. These controlled Node processes do not
+establish hosted admission, native/browser or release qualification.
+
+## Scoped Linux saved-scenery comparison exclusion
+
+- RISK repository process: saved scenery Linux raster exclusion is exact and durably disclosed
+
+The real saved-text Node consumer executes with only external browser/network
+boundaries controlled. It records the single user-excluded Linux Reduced pending
+scene bank/fresh image comparison, including unequal and equal measured hashes.
+Darwin pending and Linux Normal/Reduced unchanged inequalities still fail.
+Linux pending copy, visitor, paint, protected-data and cleanup faults still fail.
+All three original cases execute; the exception is an assertion exclusion,
+not a passing equality claim, whole-test skip or accepted-skip change.
+The immutable saved application and original regression snapshots stay fixed.
+These controlled processes establish neither Linux/native raster acceptance
+nor current mobile, full-suite, hosted, deployment or physical-device proof.

@@ -1,0 +1,162 @@
+import assert from 'node:assert/strict';
+import {hostedButtonPolicy} from './button-safety-ci-policy.mjs';
+import fs from 'node:fs';
+import path from 'node:path';
+import {createHash} from 'node:crypto';
+export const MOBILE_BUDGET_PROFILES=Object.freeze({'required-1gb':1000000000,'stress-512mb':512000000});
+export const MOBILE_MEMORY_BYTES=MOBILE_BUDGET_PROFILES['required-1gb'];
+export function mobileBudgetBytes(budgetProfile='required-1gb'){assert.ok(Object.hasOwn(MOBILE_BUDGET_PROFILES,budgetProfile),'Known immutable mobile budget profile required');return MOBILE_BUDGET_PROFILES[budgetProfile];}
+export const MOBILE_DRIVER_BYTES=2147483648;
+export const MOBILE_MEMORY_SCOPE='browser-family-plus-minimal-protocol-server';
+export const MOBILE_IMAGE='mcr.microsoft.com/playwright@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e';
+export const MOBILE_SCENARIO='rapid scanner candidate actions with 400 active tasks';
+export const MOBILE_PROFILE={name:'iPhone 13 WebKit equivalent, full app viewport',viewport:{width:390,height:844},screen:{width:390,height:844},deviceScaleFactor:3,isMobile:true,hasTouch:true};
+export const MOBILE_STORY={savedTasks:400,yesCount:10,distinctTasks:true,windowMs:2000,memoryBudgetBytes:MOBILE_MEMORY_BYTES,motions:['normal','reduced']};
+export const mobileDigest=value=>createHash('sha256').update(value).digest('hex');
+const hash=value=>assert.match(value||'',/^[a-f0-9]{64}$/,'Exact SHA256 required');
+// Startup failures have no completed story. Require the actual browser context
+// and durable fixture readbacks captured before the app navigation independently.
+function verifyMobileAttempt(report,motion){
+ const attempt=report.mobileAttempt;assert.ok(attempt,'Actual pre-attempt mobile setup required');assert.equal(attempt.phase,'before-app-navigation');assert.equal(attempt.scenario,MOBILE_SCENARIO);assert.deepEqual(attempt.profile,MOBILE_PROFILE);assert.ok(MOBILE_STORY.motions.includes(attempt.motion));assert.equal(attempt.motion,motion||attempt.motion);
+ const observed=attempt.observed;assert.equal(observed?.width,390);assert.equal(observed.height,844);assert.equal(observed.screenWidth,390);assert.equal(observed.screenHeight,844);assert.equal(observed.deviceScaleFactor,3);assert.ok(Number.isSafeInteger(observed.maxTouchPoints)&&observed.maxTouchPoints>=0);assert.equal(observed.coarsePointer,true);assert.match(observed.userAgent||'',/iPhone.*AppleWebKit.*Mobile/);assert.equal(observed.reducedMedia,attempt.motion==='reduced');assert.equal(observed.appMotion,attempt.motion);
+ assert.equal(report.retainedSources?.length,1);const retained=report.retainedSources[0],proof=retained.bootstrap;assert.equal(retained.count,2);assert.equal(proof?.delivery,'observer-evaluate-once');hash(proof.headPayloadHash);assert.equal(attempt.headPayloadHash,proof.headPayloadHash);assert.ok(proof.headPayloadBytes>1048576);
+ const workload=proof.workload;assert.equal(workload?.durableTasks,400);assert.equal(workload.activeTasks,400);assert.equal(workload.distinctTaskIds,400);assert.equal(workload.unknownBytes,1048576);hash(workload.taskIdentityHash);hash(workload.unknownSourceHash);
+ assert.deepEqual(workload.opaque,{key:'gate-opaque-exact',rawHash:mobileDigest('opaque exact bytes\0retain'),futureBytes:[0,17,255],futureMinusZero:true});assert.deepEqual(workload.pending,{generationId:'gate-pending',payloadHash:proof.headPayloadHash,baseRev:0,updatedAt:7,account:'gate-owner'});
+ assert.deepEqual(proof.retainedSources?.map(row=>row.id),['gate-retained-0','gate-retained-1']);assert.equal(new Set(proof.retainedSources.map(row=>row.payloadHash)).size,2,'Two exact distinct protected payloads required');for(const row of proof.retainedSources){hash(row.payloadHash);assert.equal(row.durableTasks,400);assert.equal(row.unknownBytes,1048576);}return attempt;
+}
+export function verifyMobileFunctionalReport(report,{candidateCommit,candidateTree,motion}={}){
+ verifyMobileAttempt(report,motion);
+ assert.equal(report.kind,'button-mobile-functional','Actual mobile consumer report required');assert.equal(report.status,'passed');assert.equal(report.engine,'webkit');
+ const runtimeAssets=JSON.parse(fs.readFileSync(new URL('./button-safety-inventory.json',import.meta.url),'utf8')).requiredRuntimeAssets;
+ assert.ok(runtimeAssets&&Object.keys(runtimeAssets).length,'Independent reviewed runtime asset inventory required');
+ for(const [file,expected]of Object.entries(runtimeAssets)){
+  assert.match(expected,/^[a-f0-9]{64}$/,'Reviewed runtime asset SHA256 required: '+file);
+  assert.equal(report.assets?.[file],expected,'Mobile runtime asset missing or changed: '+file);
+ }
+ for(const [key,value]of Object.entries({candidateCommit,candidateTree}))if(value!==undefined)assert.equal(report[key],value,'Mobile exact source '+key);
+ for(const key of ['candidateCommit','candidateTree'])assert.match(report[key]||'',/^[a-f0-9]{40}$/);
+ assert.equal(report.scenarios?.length,1);assert.equal(report.scenarios[0].name,MOBILE_SCENARIO);assert.equal(report.scenarios[0].status,'passed');assert.equal(report.scenarios[0].setup.durableTasks,400);
+ const story=report.mobileStory;assert.ok(story,'Distinct offered-task evidence required');
+ assert.deepEqual(story.profile,MOBILE_PROFILE);assert.equal(story.motion,motion||story.motion);assert.ok(MOBILE_STORY.motions.includes(story.motion));
+ const observed=story.observed;assert.equal(observed.width,390);assert.equal(observed.height,844);assert.equal(observed.screenWidth,390);assert.equal(observed.screenHeight,844);assert.equal(observed.deviceScaleFactor,3);assert.ok(Number.isSafeInteger(observed.maxTouchPoints)&&observed.maxTouchPoints>=0,'Record native capability metadata without spoofing it');assert.equal(observed.coarsePointer,true);assert.match(observed.userAgent,/iPhone.*AppleWebKit.*Mobile/);assert.equal(observed.appMotion,story.motion);assert.equal(observed.appliedMotion,story.motion);assert.equal(observed.reducedMedia,story.motion==='reduced');
+ const yes=report.rapidOutcomes?.find(row=>row.action==='act:yes');assert.equal(yes?.bursts.length,1);const burst=yes.bursts[0];assert.equal(burst.attempts,10);assert.equal(burst.trustedPresses,10);assert.equal(burst.acceptedClicks,10);assert.equal(burst.refused,0);assert.equal(burst.disappeared,0);assert.equal(burst.unrelatedClicks,0);assert.ok(burst.windowMs<=2000&&burst.windowMs>=0);assert.ok(burst.maxFrameGapMs<1000);
+ const presses=(report.presses||[]).filter(row=>row.action==='act:yes'),clicks=(report.clicks||[]).filter(row=>row.action==='act:yes');assert.equal(presses.length,10);assert.equal(clicks.length,10);
+ const ids=presses.map(row=>row.offeredTaskId);assert.equal(new Set(ids).size,10,'Ten distinct actually offered tasks required');assert.ok(ids.every(id=>typeof id==='string'&&id.length>0));
+ for(let i=0;i<10;i++){assert.equal(presses[i].pointerType,'touch');assert.equal(presses[i].trusted,true);assert.equal(clicks[i].trusted,true);assert.equal(clicks[i].offeredTaskId,ids[i],'The accepted click must refer to the delivered offered task');const attempt=burst.attemptDetails[i];assert.equal(attempt.acceptedClicks,1);assert.equal(attempt.neutralRelease,false);assert.equal(attempt.nativeDownAction,'act:yes');assert.equal(attempt.availability.disabled,false);assert.equal(attempt.availability.present,true);assert.equal(attempt.availability.hit,true);}
+ assert.ok(presses.at(-1).at-presses[0].at<=2000);assert.equal(story.initialChain.length,1);assert.deepEqual(story.acceptedTaskIds,ids);assert.deepEqual(story.finalChain,[...story.initialChain,...ids]);assert.deepEqual(story.durableChain,story.finalChain);assert.equal(new Set(story.finalChain).size,11);
+ for(const key of ['taskIdentityHash','unknownSourceHash'])assert.equal(story.before[key],report.retainedSources[0].bootstrap.workload[key],'Successful story must use the actual prepared fixture');
+ assert.equal(story.taskCount,400);assert.equal(story.durableTaskCount,400);assert.equal(story.retainedSourceCount,2);for(const key of ['taskIdentityHash','unknownSourceHash','protectedSourcesHash']){hash(story.before[key]);assert.equal(story.after[key],story.before[key],'Original source preservation: '+key);}hash(story.durableHash);
+ assert.deepEqual(report.errors,[]);for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(report.cleanup?.[key],true);return report;
+}
+// Linux page_counter_memparse stores bytes / PAGE_SIZE pages (integer floor).
+// https://kernel.googlesource.com/pub/scm/linux/kernel/git/stable/linux-stable.git/+/refs/tags/v6.14.7/mm/page_counter.c
+function verifyKernelPageObservation(observation){
+ assert.ok(observation,'Actual kernel page-size observation required');assert.equal(observation.source,'/proc/self/auxv:AT_PAGESZ');assert.equal(observation.architecture,'x64');assert.equal(observation.wordBytes,8);assert.equal(observation.endianness,'LE');assert.match(observation.entryHex||'',/^[a-f0-9]{32}$/);const entry=Buffer.from(observation.entryHex,'hex');assert.equal(entry.readBigUInt64LE(0),6n);assert.equal(entry.readBigUInt64LE(8),4096n,'Unsupported pinned x64 kernel page size');assert.equal(observation.bytes,4096,'Decoded page size must match the actual raw witness');return observation.bytes;
+}
+export function verifyMemoryBoundary(snapshot,{successful=false,budgetProfile='required-1gb'}={}){
+ const budget=mobileBudgetBytes(budgetProfile),pageSize=verifyKernelPageObservation(snapshot?.pageSizeObservation),effective=Math.floor(budget/pageSize)*pageSize;
+ assert.equal(snapshot?.platform,'linux','Linux kernel memory accounting required');assert.equal(snapshot.controller,'cgroup-v2');assert.equal(snapshot.scope,MOBILE_MEMORY_SCOPE);assert.equal(snapshot.memoryMaxBytes,effective,'Exact observed page-floored kernel limit required');assert.ok(effective<=budget);assert.equal(snapshot.swapMaxBytes,0,'Swap must be disabled');assert.equal(snapshot.swapCurrentBytes,0);assert.ok(snapshot.currentBytes>0&&snapshot.peakBytes>=snapshot.currentBytes);assert.equal(typeof snapshot.membership,'string');assert.ok(snapshot.membership.startsWith('0::'));
+ for(const key of ['oom','oom_kill','max'])assert.ok(Number.isSafeInteger(snapshot.events?.[key])&&snapshot.events[key]>=0);
+ if(successful)assert.ok(snapshot.peakBytes<=effective,'Successful client exceeded its effective kernel cap');return snapshot;
+}
+function bundleFile(root,relative,sha){
+ assert.ok(typeof relative==='string'&&!path.isAbsolute(relative)&&relative.split(/[\\/]/).every(part=>part&&part!=='.'&&part!=='..'),'Safe mobile artifact path required');let file=root;for(const part of relative.split('/')){file=path.join(file,part);assert.equal(fs.lstatSync(file).isSymbolicLink(),false);}const bytes=fs.readFileSync(file);assert.equal(mobileDigest(bytes),sha,'Mobile raw artifact hash mismatch');return JSON.parse(bytes);
+}
+export function mobileArtifactInventory(root){
+ const files=[];function visit(directory){for(const entry of fs.readdirSync(directory,{withFileTypes:true})){const file=path.join(directory,entry.name);assert.equal(entry.isSymbolicLink(),false,'Mobile artifact symlinks forbidden');if(entry.isDirectory())visit(file);else{assert.equal(entry.isFile(),true);const relative=path.relative(root,file).split(path.sep).join('/');if(relative==='report.json')continue;const bytes=fs.readFileSync(file);files.push({path:relative,sha256:mobileDigest(bytes),bytes:bytes.length});}}}visit(root);return files.sort((a,b)=>a.path.localeCompare(b.path));
+}
+// Moby EventOOM marks a container even when only the intentional child dies:
+// https://github.com/moby/moby/blob/v28.0.4/daemon/monitor.go#L159-L173
+export function verifyMobileContainerExit(state,{control=false}={}){
+ assert.equal(state.Running,false);assert.equal(state.ExitCode,0);assert.equal(typeof state.OOMKilled,'boolean','Raw Docker OOM flag required');
+ if(!control)assert.equal(state.OOMKilled,false,'Acceptance client must not encounter Docker OOM');return state;
+}
+
+function verifyMobileProcessScope(row,{artifactRoot,control,report,appOutcome='passed'}){
+ const budget=mobileBudgetBytes(report.budgetProfile);
+ const server=bundleFile(artifactRoot,row.browserServerPath,row.browserServerSha256);assert.deepEqual(server,row.server,'Raw owner browser report must match envelope');
+ assert.equal(server.budgetProfile,report.budgetProfile);assert.equal(row.budgetProfile,report.budgetProfile);if(appOutcome==='kernel-oom'){assert.equal(server.status,'failed');assert.ok(server.errors.length>0);assert.ok(server.errors.every(error=>/^(Browser budget OOM: (?:oom|oom_kill)|Error: Owned WebKit exited before closure request)/.test(error)),'Only measured kernel OOM owner failures are reportable');}else{assert.equal(server.status,'passed');assert.deepEqual(server.errors,[]);}assert.deepEqual(server.before,row.before);assert.deepEqual(server.after,row.after);
+ for(const key of ['candidateCommit','candidateTree','sourceSha','repository','runId','runAttempt','eventPolicy'])assert.equal(server[key],report[key],'Browser owner exact source/run '+key);
+ if(report.hostedPolicy)assert.deepEqual(server.hostedPolicy,report.hostedPolicy);
+ assert.match(server.nodeVersion||'',/^v22\./);assert.equal(server.role,'browser');assert.equal(server.scope,MOBILE_MEMORY_SCOPE);
+ assert.equal(server.cleanup?.serverClosed,true,'BrowserServer owner must close');assert.equal(server.cleanup.engineExited,true,'Remote disconnect is not engine exit');if(appOutcome!=='kernel-oom'){assert.equal(server.engineExit?.exitCode,0);assert.equal(server.engineExit?.signal,null);}else assert.ok(Number.isInteger(server.engineExit?.exitCode)||server.engineExit?.signal==='SIGKILL','Observed browser exit required after OOM');
+ const browser=server.browser;hash(browser?.endpointSha256);assert.ok(browser&&Number.isSafeInteger(browser.rootPid)&&browser.rootPid>0);assert.match(browser.rootStartTime||'',/^\d+$/);assert.match(browser.executable||'',/^\/ms-playwright\/webkit-[0-9]+\/pw_run\.sh$/);hash(browser.executableSha256);assert.equal(browser.playwrightVersion,'1.62.1');assert.match(browser.version||'',/^26\.5/);assert.equal(browser.revision,'2336');
+ assert.ok(browser.processes?.length>0,'Actual browser family membership required');assert.ok(browser.processes.some(p=>p.pid===browser.rootPid&&p.startTime===browser.rootStartTime));
+ assert.match(server.namespace||'',/^net:\[\d+\]$/);assert.match(server.pidNamespace||'',/^pid:\[\d+\]$/);assert.ok(server.ownerPid>0);assert.equal(server.uid>0,true);assert.equal(server.gid>0,true);
+ for(const p of browser.processes){assert.ok(Number.isSafeInteger(p.pid)&&p.pid>0);assert.match(p.startTime||'',/^\d+$/);assert.equal(p.cgroup,row.before.membership,'Every observed browser descendant must remain capped');assert.equal(p.namespace,server.namespace);assert.equal(p.pidNamespace,server.pidNamespace);assert.ok(typeof p.executable==='string'&&p.executable.startsWith('/'));hash(p.executableSha256);}
+ const inside=bundleFile(artifactRoot,row.insidePath,row.insideSha256);assert.equal(inside.budgetProfile,report.budgetProfile);assert.equal(inside.role,'external-driver');assert.equal(inside.playwrightVersion,'1.62.1');for(const key of ['namespace','pidNamespace','memoryMaxBytes','swapMaxBytes','swapCurrentBytes'])assert.equal(inside.driver?.[key],row.driver?.[key],'Raw external driver observation '+key);
+ const driver=row.driver;assert.match(driver?.containerId||'',/^[a-f0-9]{64}$/);assert.notEqual(driver.containerId,row.containerId,'Driver cannot share browser cgroup');assert.equal(driver.networkMode,'container:'+row.containerId);assert.equal(driver.namespace,server.namespace);assert.match(driver.pidNamespace||'',/^pid:\[\d+\]$/);assert.notEqual(driver.pidNamespace,server.pidNamespace);assert.equal(driver.memoryMaxBytes,MOBILE_DRIVER_BYTES);assert.equal(driver.swapMaxBytes,0);assert.equal(driver.swapCurrentBytes,0);assert.equal(driver.containerExitCode,0);assert.equal(driver.containerOOMKilled,false);
+ const db=bundleFile(artifactRoot,driver.dockerBeforePath,driver.dockerBeforeSha256),da=bundleFile(artifactRoot,driver.dockerAfterPath,driver.dockerAfterSha256);assert.equal(db.Id,driver.containerId);assert.equal(da.Id,driver.containerId);verifyMobileContainerConfig(db,{role:'driver',browserContainerId:row.containerId,budgetProfile:report.budgetProfile});verifyMobileContainerConfig(da,{role:'driver',browserContainerId:row.containerId,budgetProfile:report.budgetProfile});verifyMobileContainerExit(da.State);
+ const bb=bundleFile(artifactRoot,row.dockerBeforePath,row.dockerBeforeSha256);verifyMobileContainerConfig(bb,{role:'browser',budgetProfile:report.budgetProfile});const ba=bundleFile(artifactRoot,row.dockerAfterPath,row.dockerAfterSha256);verifyMobileContainerConfig(ba,{role:'browser',budgetProfile:report.budgetProfile});assert.equal(ba.Image,report.imageId);assert.equal(da.Image,report.imageId);assert.equal(bb.Image,report.imageId);assert.equal(db.Image,report.imageId);
+ const host=bundleFile(artifactRoot,row.membershipPath,row.membershipSha256);assert.deepEqual(host,row.membership);verifyKernelPageObservation(host.pageSizeObservation);for(const snapshot of [row.before,row.after,row.driver,inside.driver])assert.deepEqual(snapshot.pageSizeObservation,host.pageSizeObservation,'Browser, external driver and host must observe the same actual kernel page size');assert.equal(host.browser.namespace,server.namespace);assert.equal(host.driver.namespace,server.namespace);assert.equal(host.browser.pidNamespace,server.pidNamespace);assert.equal(host.driver.pidNamespace,driver.pidNamespace);assert.ok(host.browser.cgroup.startsWith('0::/'));assert.ok(host.driver.cgroup.startsWith('0::/'));assert.notEqual(host.browser.cgroup,host.driver.cgroup,'Host must observe two different cgroups');for(const role of ['browser','driver']){assert.ok(host[role].pid>0);assert.match(host[role].startTime||'',/^\d+$/);}assert.equal(host.browser.containerId,row.containerId);assert.equal(host.driver.containerId,driver.containerId);assert.equal(host.browser.cgroup.startsWith(host.driver.cgroup+'/'),false);assert.equal(host.driver.cgroup.startsWith(host.browser.cgroup+'/'),false);
+ if(control){const c=server.control;assert.ok(c);assert.equal(c.membership,row.before.membership);assert.equal(c.browserAlive,true,'Kernel control must run with a live capped WebKit');assert.equal(c.browserPid,browser.rootPid);assert.equal(c.pidNamespace,server.pidNamespace,'Control allocator must inhabit browser PID namespace');assert.equal(c.ppid,server.ownerPid);assert.ok(c.pid>0);assert.equal(c.childSignal,'SIGKILL');assert.equal(c.childExitCode,null);assert.equal(c.requestedBytes,Math.ceil(2*budget/1048576)*1048576);assert.equal(c.childSignal,row.childSignal);assert.equal(c.requestedBytes,row.requestedBytes);}
+}
+export function verifyMobileContainerConfig(value,{role,browserContainerId,budgetProfile='required-1gb'}={}){
+ const budget=mobileBudgetBytes(budgetProfile);
+ assert.ok(['browser','driver'].includes(role),'Explicit container role required');assert.equal(value.State?.Running,false,'Limit and isolation must be observed before launch');const config=value.HostConfig;assert.equal(value.Config?.Image,MOBILE_IMAGE);assert.match(value.Config.User||'',/^[1-9]\d*:[1-9]\d*$/);assert.equal(config.Memory,role==='browser'?budget:MOBILE_DRIVER_BYTES);assert.equal(config.MemorySwap,config.Memory);assert.equal(config.NetworkMode,role==='browser'?'none':'container:'+browserContainerId);assert.equal(config.ReadonlyRootfs,true);assert.deepEqual(config.CapDrop,['ALL']);assert.ok(config.SecurityOpt?.includes('no-new-privileges'));assert.equal(config.Privileged,false);assert.equal(config.PidMode,'');assert.equal(config.IpcMode,'private');assert.ok(!config.PortBindings||Object.keys(config.PortBindings).length===0);assert.equal(config.ShmSize,67108864);assert.match(config.Tmpfs?.['/tmp']||'',/size=67108864/);assert.equal((value.Mounts||[]).some(m=>/docker\.sock|\/sys\/fs\/cgroup/.test(m.Source||'')||/docker\.sock|\/sys\/fs\/cgroup/.test(m.Destination||'')),false);assert.equal(value.Mounts?.find(m=>m.Destination==='/repo')?.RW,false);assert.equal(value.Mounts?.find(m=>m.Destination==='/opt/chain-node')?.RW,false);return value;
+}
+function verifyBudgetReport(report,{artifactRoot,budgetProfile,...identity}={}){
+ assert.equal(report.schemaVersion,3,'Mobile budget schema version3 required; historical budgets cannot be relabeled');assert.equal(report.budgetProfile,budgetProfile,'Required gate cannot accept a different or stress profile');const stress=budgetProfile==='stress-512mb';const budget=mobileBudgetBytes(report.budgetProfile);assert.equal(report.kind,'button-mobile-memory');assert.equal(report.scope,MOBILE_MEMORY_SCOPE);assert.ok(stress?['passed','failed'].includes(report.status):report.status==='passed','Required capped mobile job must pass');assert.deepEqual(report.requiredStory,{...MOBILE_STORY,memoryBudgetBytes:budget});assert.equal(report.image,MOBILE_IMAGE);assert.match(report.imageId||'',/^sha256:[a-f0-9]{64}$/);assert.ok(artifactRoot,'Actual mobile artifact bundle required');assert.deepEqual(report.artifacts,mobileArtifactInventory(artifactRoot),'Complete immutable mobile artifact inventory required');
+ for(const [key,value]of Object.entries(identity))if(value!==undefined)assert.equal(report[key],value,'Mobile report identity '+key);
+ for(const key of ['candidateCommit','candidateTree'])assert.match(report[key]||'',/^[a-f0-9]{40}$/);
+ const routed=/^(?:canonical-pr-merge|outgoing-branch-push|exact-main-push)-v1$/.test(report.eventPolicy);
+ if(routed||report.hostedPolicy){const policy=report.hostedPolicy;assert.ok(policy,'Raw and routed hosted policy evidence required');assert.deepEqual(policy,hostedButtonPolicy({CI:'true',CHAIN_TEST_EVENT_POLICY:policy.eventPolicy,GITHUB_EVENT_NAME:policy.eventName,GITHUB_REF:policy.eventRef}));assert.equal(policy.eventPolicy,report.eventPolicy);}
+ const image=bundleFile(artifactRoot,report.imageInspectPath,report.imageInspectSha256);assert.equal(image.Id,report.imageId);assert.equal(image.Architecture,'amd64');assert.equal(image.Os,'linux');assert.ok(image.RepoDigests?.includes(MOBILE_IMAGE),'Actual image must resolve to pinned digest');
+ const control=report.negativeControl;verifyMemoryBoundary(control.before,{budgetProfile:report.budgetProfile});verifyMemoryBoundary(control.after,{budgetProfile:report.budgetProfile});assert.equal(control.childSignal,'SIGKILL','Kernel must stop the over-budget control');assert.equal(control.childExitCode,null);assert.ok(control.after.events.oom_kill>control.before.events.oom_kill,'Actual kernel OOM-kill event required');assert.ok(control.after.events.max>control.before.events.max);assert.ok(control.requestedBytes>budget);
+ assert.deepEqual(report.cases?.map(row=>row.motion).sort(),['normal','reduced']);
+ for(const row of [control,...report.cases]){
+  assert.match(row.containerId||'',/^[a-f0-9]{64}$/);assert.equal(row.image,MOBILE_IMAGE);assert.equal(row.dockerMemoryBytes,budget);assert.equal(row.dockerMemorySwapBytes,budget);const native=row===control?null:bundleFile(artifactRoot,row.nativeReportPath,row.nativeReportSha256),appOutcome=native&&stress?classifyMobileStressOutcome(row,native):'passed';if(row!==control)assert.equal(row.appOutcome,appOutcome,'Raw application outcome must match measured evidence');if(appOutcome==='kernel-oom')assert.ok([0,1,137].includes(row.containerExitCode));else assert.equal(row.containerExitCode,0);assert.equal(typeof row.containerOOMKilled,'boolean');
+  const raw=bundleFile(artifactRoot,row.insidePath,row.insideSha256),before=bundleFile(artifactRoot,row.dockerBeforePath,row.dockerBeforeSha256),after=bundleFile(artifactRoot,row.dockerAfterPath,row.dockerAfterSha256);
+  verifyMobileProcessScope(row,{artifactRoot,control:row===control,report,appOutcome});
+  assert.equal(raw.status,'passed');assert.deepEqual(raw.errors,[]);if(row!==control)assert.equal(raw.appOutcome,row.appOutcome);if(report.hostedPolicy)assert.deepEqual(raw.hostedPolicy,report.hostedPolicy,'Capped child raw/routed policy must match outer report');assert.deepEqual(raw.before,row.before);assert.deepEqual(raw.after,row.after);assert.equal(raw.nodeVersion,row.nodeVersion);for(const key of ['candidateCommit','candidateTree','sourceSha','repository','runId','runAttempt','eventPolicy'])assert.equal(raw[key],report[key],'External driver exact source/run '+key);
+  for(const [key,value]of Object.entries({Id:row.containerId}))assert.equal(before[key],value);assert.equal(after.Id,row.containerId);assert.equal(before.Config.Image,MOBILE_IMAGE);assert.equal(before.HostConfig.Memory,budget);assert.equal(before.HostConfig.MemorySwap,budget);assert.equal(after.State.OOMKilled,row.containerOOMKilled,'Raw Docker OOM flag must match the envelope');if(appOutcome==='kernel-oom'){assert.equal(after.State.Running,false);assert.equal(after.State.ExitCode,row.containerExitCode);}else verifyMobileContainerExit(after.State,{control:row===control});
+  if(row===control){assert.equal(raw.childSignal,row.childSignal);assert.equal(raw.childExitCode,row.childExitCode);assert.equal(raw.requestedBytes,row.requestedBytes);}else{assert.equal(raw.motion,row.motion);assert.equal(raw.nativeReportSha256,row.nativeReportSha256);assert.equal(row.nativeReportPath,row.motion+'/'+raw.nativeReportPath);}
+ }
+ for(const row of report.cases){
+  const native=bundleFile(artifactRoot,row.nativeReportPath,row.nativeReportSha256),appOutcome=stress?classifyMobileStressOutcome(row,native):'passed';
+  verifyMemoryBoundary(row.before,{successful:true,budgetProfile:report.budgetProfile});verifyMemoryBoundary(row.after,{successful:appOutcome!=='kernel-oom',budgetProfile:report.budgetProfile});assert.equal(row.before.events.oom_kill,0,'Fresh capped client required');
+  if(appOutcome==='passed'){for(const key of ['oom','oom_kill'])assert.equal(row.after.events[key],row.before.events[key],'No client OOM may pass');verifyMobileFunctionalReport(native,{candidateCommit:report.candidateCommit,candidateTree:report.candidateTree,motion:row.motion});}
+  else{
+   assert.equal(native.kind,'button-mobile-functional');assert.equal(native.engine,'webkit');assert.equal(native.status,'failed');
+   for(const key of ['candidateCommit','candidateTree'])assert.equal(native[key],report[key],'Failed stress exact source '+key);
+   const assets=JSON.parse(fs.readFileSync(new URL('./button-safety-inventory.json',import.meta.url))).requiredRuntimeAssets;for(const [file,hash]of Object.entries(assets))assert.equal(native.assets?.[file],hash);
+   verifyMobileAttempt(native,row.motion);
+   for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(native.cleanup?.[key],true,'Stress failure must still close '+key);
+  }
+  assert.equal(native.runtime.platform,'linux');assert.equal(native.runtime.browserConnection,'remote-owned','Native workload must use the capped remote engine');assert.equal(native.runtime.browserEndpointSha256,row.server.browser.endpointSha256,'Native workload must bind the owned capped endpoint');assert.equal(native.cleanup.browserDisconnected,true);assert.equal(native.cleanup.browserServerClosed,true);if(report.hostedPolicy)assert.deepEqual(native.hostedPolicy,report.hostedPolicy,'Native child raw/routed policy binding');assert.match(row.nodeVersion||'',/^v22\./);}
+ const allIds=[control,...report.cases].flatMap(row=>[row.containerId,row.driver.containerId]);assert.equal(new Set(allIds).size,6,'Each negative control and motion needs a fresh browser and external driver');assert.deepEqual(report.errors,[]);assert.equal(report.cleanup.containersRemoved,true);if(stress)assert.equal(report.status,report.cases.every(row=>row.appOutcome==='passed')?'passed':'failed','Stress outcome cannot hide failed app execution');return report;
+}
+
+export function verifyMobileMemoryReport(report,options={}){return verifyBudgetReport(report,{...options,budgetProfile:'required-1gb'});}
+export function verifyMobileStressReport(report,options={}){return verifyBudgetReport(report,{...options,budgetProfile:'stress-512mb'});}
+// Classify only observed application signals. Transport, driver, source and
+// cleanup faults have no reportable application category and remain failures.
+export function classifyMobileStressOutcome(row,native,server=row.server){
+ if(native.status==='passed'){assert.equal(row.after.events.oom_kill,row.before.events.oom_kill);return 'passed';}
+ assert.equal(native.status,'failed');
+ const oom=row.after.events.oom_kill>row.before.events.oom_kill;assert.ok(Array.isArray(native.errors),'Actual native error inventory required');
+ assert.ok(native.errors.every(error=>/^(?:page-crash|unexpected-close)$/.test(error)||/^(?:pageerror: |unhandledrejection: )/.test(error)||(oom&&error==='browser-disconnected')),'Invalid stress execution: non-application transport, navigation or control error');
+ // Page events and the thrown primary error are independent channels. An
+ // allowed app event cannot turn an unrelated driver exception into app proof.
+ assert.equal(typeof native.failure,'string','Actual primary failure required');const primary=native.failure.split('\n',1)[0].trim();
+ const assertionHeaders=['AssertionError [ERR_ASSERTION]: ','AssertionError: '];
+ const eventCheck=native.errors.length>0&&assertionHeaders.some(header=>{const exact=header+'Native button safety detected '+native.errors.join(', ');return native.failure===exact||native.failure.startsWith(exact+'\n');});
+ const crashEvent=native.errors.some(error=>error==='page-crash'||error==='unexpected-close'||(oom&&error==='browser-disconnected'));
+ const crashConsequence=crashEvent&&/^(?:Error: )?(?:(?:page\.(?:goto|evaluate|waitForFunction)|locator\.(?:tap|click|evaluate|scrollIntoViewIfNeeded)|touchscreen\.tap): )?(?:Page crashed|Target crashed|Target page, context or browser has been closed|Browser has been closed)$/.test(primary);
+ // This observed Playwright wait failure can mean engine loss, but its text
+ // alone is not application evidence. Require the matching kernel snapshots
+ // and the owner's positively observed SIGKILL exit/cleanup as well.
+ const ownedWaitLoss=oom&&crashEvent&&primary==='page.waitForFunction: Browser closed'&&
+  server?.cleanup?.serverClosed===true&&server.cleanup.engineExited===true&&
+  (server.engineExit?.exitCode===137&&server.engineExit.signal===null||server.engineExit?.exitCode===null&&server.engineExit.signal==='SIGKILL')&&
+  JSON.stringify(server.before)===JSON.stringify(row.before)&&JSON.stringify(server.after)===JSON.stringify(row.after);
+ if(oom){assert.ok(row.after.events.max>row.before.events.max);assert.ok(crashEvent&&(crashConsequence||eventCheck||ownedWaitLoss),'Kernel OOM must coincide with an attributable primary crash or engine-loss failure');return 'kernel-oom';}
+ if(crashConsequence||eventCheck)return 'app-runtime-failure';
+ const frame=primary.match(/^AssertionError(?: \[ERR_ASSERTION\])?: Native button safety detected blocked frame loop: .+ ([0-9]+(?:\.[0-9]+)?)ms$/);
+ if(frame&&native.samples?.some(sample=>sample.maxFrameGapMs>=1000&&sample.maxFrameGapMs===Number(frame[1])))return 'app-budget-failure';
+ if(native.inFlightBurst?.windowMs>2000&&native.inFlightBurst.attempts?.length===10&&assertionHeaders.some(header=>primary===header+'Ten native press attempts must finish within two seconds: yes '+native.inFlightBurst.windowMs+'ms')){
+  const presses=(native.presses||[]).filter(row=>row.action==='act:yes');assert.equal(presses.length,10,'Reported deadline needs ten delivered native touches');assert.ok(presses.every(row=>row.trusted===true&&row.pointerType==='touch'));
+  assert.ok(native.inFlightBurst.attempts.every(row=>row.trustedPresses===1&&row.nativeDownAction==='act:yes'),'Missing or misdirected automation cannot become an app deadline failure');return 'app-budget-failure';
+ }
+ throw Error('Invalid stress execution: no measured application failure category');
+}

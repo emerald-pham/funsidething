@@ -29,3 +29,5 @@ cohort. Use `npm run test:agent-tools` for the focused agent-tool cohort. A
 focused pass does not replace the repository's required full suite or release
 checks. The isolated `test:group` command uses the separately maintained
 inventory and assignments described in [Test groups](test-groups.md).
+
+For finite nonqualifying diagnostics, follow [checkpoint authorization](checkpoints.md#ci-and-publication-boundaries). The `release-evidence.mjs diagnostic-*` commands reuse existing progress, review, process cleanup and CI monitor boundaries. They do not create release statuses or replace full release qualification.
