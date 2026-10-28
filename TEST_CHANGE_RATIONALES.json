@@ -21531,5 +21531,47 @@
       "command": "node --test --test-name-pattern='^RISK repository process: fresh native-process CI sets up' tests.js; node --test --test-name-pattern='^required validator integrations' scripts/agent-tools/workflow-validator.test.mjs",
       "failure": "Observed genuine preimplementation RED on0269713: red-fresh-job.log asserts missing explicit fresh native-process setup; red-required-integrations.log sees3 named skipped integrations instead of0; red-outgoing-required.log sees actual outgoing command exit0 with1skip; red-archive-retention.log sees public setup exit0 then missing retained official archive. Raw chronology and outputs are in external ci-validator-readiness artifacts."
     }
+  },
+  {
+    "baseCommit": "4fe423bfec43bddc4262452e4b089a2bef8c9216",
+    "testChangesSha256": "de0ebe56188484f965208ecb92c93191d3cbb3e20d2f82285244b18d797c6345",
+    "reason": "Reconcile the complete #504 candidate with preserved #278 prerequisites and the current main comparison; retain every earlier rationale and protected assertion while adding public command-boundary propagation, early refusal and validator-readiness coverage.",
+    "previousBehavior": "The preserved prerequisite had the hosted event-policy propagation defect and lacked the supported fixture invocation, automatic selected parent-contract launch gate, exact outgoing-workflow validation and current recorder TAP/privacy controls. Fresh native-process CI also lacked its own validator setup and could skip required integration tests.",
+    "intendedBehavior": "The exact combined candidate propagates a canonical event descriptor through real producer, early, group and aggregate consumers; requires read-only workflow and selected process contracts before long qualification; validates outgoing Git blobs with a pinned executable; records honest TAP and cleanup outcomes; and installs the pin explicitly for a fresh native-process runner.",
+    "replacementTests": [
+      "RISK repository process: managed pre-push validates the exact outgoing workflow commit",
+      "RISK repository process: fresh native-process CI sets up the pinned validator before workload"
+    ],
+    "preservedCoverage": [
+      "Every existing main rationale object and the full 853-object prerequisite prefix remain semantically unchanged. Existing test roots, exact process controls, frozen inventory and all 61 accepted skip identities remain; no protected assertion, native limit or full qualification requirement is removed.",
+      "The three parent risk wrappers retain their startup browser, finite-authority and supported workflow-context assertions and timeouts. New selector metadata uses the existing catalog, while selected TAP stays separate from the requested long-child stream.",
+      "Installed signed-out and reconcile-held clients, immutable compatibility floor, source/tree/base identities, source-loss, data preservation, offline delivery, actual native cleanup, required 1GB mobile workload and separate 512MB stress-integrity checks remain mandatory.",
+      "No application shell, FAQ, public changelog, version, service-worker fingerprint, Firestore rule or dependency pin changes. Controlled provider/browser fixtures prove public process behavior only; they do not confer actual engine, hosted, deployment or device qualification."
+    ],
+    "redEvidence": {
+      "command": "Actual Node22 public record-run/Node test commands retained in task artifacts retro-504-20261027: workflow-chain/505-committed-red; recorder-535/red/combined-corrected; recorder-537/red-real-node22; qualification-521/evidence; ci-validator-readiness/chronology.json; fixture-red and fixture-green records. Prerequisite RED commands remain in all unchanged inherited rationale records.",
+      "failure": "Separate contemporaneous failures precede their corresponding fixes: raw event policy mismatch, innocuous TAP identity redaction, generic credential newline consumption, missing selected parent gate, realpath CLI alias bypass, exact outgoing invalid workflow admission, fresh CI validator omission, absent required validator skips and missing verified archive retention. Later fixed-mode owned-port RED precedes its port-binding fix. These are distinct REDs rather than one combined failure. Two historical gaps are explicitly retained: CAS conditional-release implementation preceded its RED (user authorized one exception conditional on all remaining gates); initial fixed-mode implementation preceded a failing supported-mode test (separate unresolved policy gate). The original Node/PATH test exercised ordinary recorder only and is not fixed-mode RED. Later restored-baseline sensitivity cannot establish original chronology."
+    }
+  },
+  {
+    "baseCommit": "e1ed5c269a0c64b0023483d3fe7dd7c6d2bfb3ed",
+    "testChangesSha256": "0a1321e3edc1bcca6a819209d0744f93033988a6fea25953f491bd1a623f765c",
+    "reason": "Reconcile the complete #504 candidate with preserved #278 prerequisites and the current main comparison; retain every earlier rationale and protected assertion while adding public command-boundary propagation, early refusal and validator-readiness coverage.",
+    "previousBehavior": "The preserved prerequisite had the hosted event-policy propagation defect and lacked the supported fixture invocation, automatic selected parent-contract launch gate, exact outgoing-workflow validation and current recorder TAP/privacy controls. Fresh native-process CI also lacked its own validator setup and could skip required integration tests.",
+    "intendedBehavior": "The exact combined candidate propagates a canonical event descriptor through real producer, early, group and aggregate consumers; requires read-only workflow and selected process contracts before long qualification; validates outgoing Git blobs with a pinned executable; records honest TAP and cleanup outcomes; and installs the pin explicitly for a fresh native-process runner.",
+    "replacementTests": [
+      "RISK repository process: managed pre-push validates the exact outgoing workflow commit",
+      "RISK repository process: fresh native-process CI sets up the pinned validator before workload"
+    ],
+    "preservedCoverage": [
+      "Every existing main rationale object and the full 853-object prerequisite prefix remain semantically unchanged. Existing test roots, exact process controls, frozen inventory and all 61 accepted skip identities remain; no protected assertion, native limit or full qualification requirement is removed.",
+      "The three parent risk wrappers retain their startup browser, finite-authority and supported workflow-context assertions and timeouts. New selector metadata uses the existing catalog, while selected TAP stays separate from the requested long-child stream.",
+      "Installed signed-out and reconcile-held clients, immutable compatibility floor, source/tree/base identities, source-loss, data preservation, offline delivery, actual native cleanup, required 1GB mobile workload and separate 512MB stress-integrity checks remain mandatory.",
+      "No application shell, FAQ, public changelog, version, service-worker fingerprint, Firestore rule or dependency pin changes. Controlled provider/browser fixtures prove public process behavior only; they do not confer actual engine, hosted, deployment or device qualification."
+    ],
+    "redEvidence": {
+      "command": "Actual Node22 public record-run/Node test commands retained in task artifacts retro-504-20261027: workflow-chain/505-committed-red; recorder-535/red/combined-corrected; recorder-537/red-real-node22; qualification-521/evidence; ci-validator-readiness/chronology.json; fixture-red and fixture-green records. Prerequisite RED commands remain in all unchanged inherited rationale records.",
+      "failure": "Separate contemporaneous failures precede their corresponding fixes: raw event policy mismatch, innocuous TAP identity redaction, generic credential newline consumption, missing selected parent gate, realpath CLI alias bypass, exact outgoing invalid workflow admission, fresh CI validator omission, absent required validator skips and missing verified archive retention. Later fixed-mode owned-port RED precedes its port-binding fix. These are distinct REDs rather than one combined failure. Two historical gaps are explicitly retained: CAS conditional-release implementation preceded its RED (user authorized one exception conditional on all remaining gates); initial fixed-mode implementation preceded a failing supported-mode test (separate unresolved policy gate). The original Node/PATH test exercised ordinary recorder only and is not fixed-mode RED. Later restored-baseline sensitivity cannot establish original chronology."
+    }
   }
 ]
