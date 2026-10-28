@@ -13436,6 +13436,11 @@
       "root": "RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: supplemental startup capture rejects malformed artifacts and unsupported paint completeness",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [

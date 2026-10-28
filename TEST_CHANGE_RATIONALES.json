@@ -26457,5 +26457,41 @@
     "command": "Original guard recorder43a07435-dade-40d4-a518-6261724090c2 at unchanged4ef3862, GREEN823f254f; inventory original evidence retained in inventory-merge/integrated-evidence.json and unchanged inherited inventory rationale. NS01 derives only combined protected-test fingerprint after merge984d514.",
     "failure": "Original meaningful guard assertion observed expected admitted output sentinel versus actual foreign-path ENOENT with healthy controls passing. Inventory had independently preserved original mismatch assertion. This later merge metadata and buffer setup correction are not new behavioral RED or native runs."
   }
+},
+{
+  "baseCommit": "c920ccffc11af487ec84277c33fe2e370541e384",
+  "testChangesSha256": "ca2bdda26a767dfb7052964e8cea027373d9d01f80135598ae1e9a2a2558c4e0",
+  "reason": "Report-only supplemental capture admission under1101-1104 needs bounded artifact/clock/cleanup and false-completeness sensitivity at the existing verifier.",
+  "previousBehavior": "Unchanged report consumer silently accepted malformed capture counts,bytes,paths,hashes,clock conversion,cleanup,bounds and a complete claim based on ambiguous public timestamps.",
+  "intendedBehavior": "Validate fixed finite supplemental data and keep D02 incomplete for unsupported capture clocks/work without changing actual application verdicts or original no-capture positives.",
+  "replacementTests": [
+    "RISK repository process: supplemental startup capture rejects malformed artifacts and unsupported paint completeness"
+  ],
+  "preservedCoverage": [
+    "Original D03 complete and incomplete synthetic controls remain unchanged, including its accepted800ms positive and diagnostic/app-verdict separation.",
+    "All existing native button/rapid/saved-source/guard/inventory assertions remain intact; no producer or app bytes change in this report cycle."
+  ],
+  "redEvidence": {
+    "command": "Actual recorder1102-red d9fb096f: node --test --test-name-pattern=^RISK.repository.process:.supplemental.startup.capture tests.js",
+    "failure": "Nine Missing expected exception admissions and unsupported complete instead of incomplete observed at unchanged c920; exact unchanged test GREEN2a2531e2 with17/17 affected controls."
+  }
+},
+{
+  "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+  "testChangesSha256": "97e216a255a3fc51b02cfe301a3e2c75c17eb071215f75becd4c465a4bb61589",
+  "reason": "Report-only supplemental capture admission under1101-1104 needs bounded artifact/clock/cleanup and false-completeness sensitivity at the existing verifier.",
+  "previousBehavior": "Unchanged report consumer silently accepted malformed capture counts,bytes,paths,hashes,clock conversion,cleanup,bounds and a complete claim based on ambiguous public timestamps.",
+  "intendedBehavior": "Validate fixed finite supplemental data and keep D02 incomplete for unsupported capture clocks/work without changing actual application verdicts or original no-capture positives.",
+  "replacementTests": [
+    "RISK repository process: supplemental startup capture rejects malformed artifacts and unsupported paint completeness"
+  ],
+  "preservedCoverage": [
+    "Original D03 complete and incomplete synthetic controls remain unchanged, including its accepted800ms positive and diagnostic/app-verdict separation.",
+    "All existing native button/rapid/saved-source/guard/inventory assertions remain intact; no producer or app bytes change in this report cycle."
+  ],
+  "redEvidence": {
+    "command": "Actual recorder1102-red d9fb096f: node --test --test-name-pattern=^RISK.repository.process:.supplemental.startup.capture tests.js",
+    "failure": "Nine Missing expected exception admissions and unsupported complete instead of incomplete observed at unchanged c920; exact unchanged test GREEN2a2531e2 with17/17 affected controls."
+  }
 }
 ]
