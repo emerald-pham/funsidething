@@ -456,3 +456,34 @@ actual final rendered evidence, independent Standards/Spec-specialist/FAQ and
 typography review, corrected PR publication, hosted CI, merge and Stable public
 verification. Private original and physical-iPhone recovery remain unverified.
 Beta mirroring stays paused until explicit human confirmation that Stable is good.
+
+Independent review of frozen0d7c145 requested two ownership repairs and a
+rendered notice backplate. Actual owner-binding RED295d362e reproduces cached-only
+initial/later same-email UID disclosure, cached source-change continuity, and
+loss of a matching signed-in terminal view. Earlier17187d76 had meaningful
+terminal/source failures, but its two UID fixtures were overwritten by the old
+pagehide and do not prove that boundary. The corrected fixture restores its
+isolated account-only appearance at the actual new-document read. No cache
+schema/limit was expanded: a known UID without a validated full source masks
+legacy appearance; a matching complete source can rebuild. Terminal ownership
+now binds to the shown account. A separate added signed-in hold case proves
+same-node header continuity, zero authority/timers, and later UID masking; it
+claims no automatic signed-in adoption. All seven earlier retry cases remain.
+Backplate RED9dc290d2 observes transparent terminal status paint over scenery;
+the repair reuses the adjacent established notice class, border, radius and
+insets. Batched GREEN498674c5 passes27/27, zero skips.
+
+Frozen0d7 rendered run7ed80043 passed47/48, with an initial-load
+LandscapeVisits page error. Its successful214 artifacts retain only0d7 scope.
+Supplement1c4c99fe completed four Chromium terminal/Settings/Help cases, then
+failed a producer wait referencing a new-document variable before declaration;
+WebKit Help was unverified there. Independent preliminary review requested
+visible glyph-bearing font evidence and answer/changelog end captures; the
+corrected external producer preserves both limitations and does not alter app
+behavior. The exact LandscapeVisits cause remains unconfirmed. Bounded WebKit
+diagnostica58e0733, delaying the preparatory SPAWN_RATES fetch, instead exposed
+an unrelated fetch page error during fixture navigation. Waiting for those
+owned preparatory local reads before seeding/reloading passes both ordinary
+and delayed controls in25bbd359. No page error is suppressed and no wait is
+added to the actual held reopening interval. Final coherent source still
+requires the complete rendered status matrix and all release gates above.
