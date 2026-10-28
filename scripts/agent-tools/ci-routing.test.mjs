@@ -42,7 +42,7 @@ function fixture(t, grouped=false) {
   writeFileSync(path.join(bin, 'curl'), `#!/usr/bin/env node
 const fs=require('node:fs'),x=JSON.parse(fs.readFileSync(process.env.ROUTING_GITHUB));
 const url=process.argv.at(-1);
-if(url.includes('/actions/artifacts/')&&url.endsWith('/zip')){if(x.archiveError)process.exit(22);process.stdout.write(fs.readFileSync(x.artifacts.find(a=>String(a.id)===url.split('/artifacts/')[1].split('/')[0]).fixturePath));process.exit(0);}
+if(url.includes('/actions/artifacts/')&&url.endsWith('/zip')){if(x.archiveError)process.exit(22);process.stdout.write(fs.readFileSync(x.artifacts.find(a=>String(a.id)===url.split('/artifacts/')[1].split('/')[0]).fixturePath),()=>process.exit(0));return;}
 if(url.includes('/runs?')&&x.runSequence?.length){x.runs=x.runSequence.shift();fs.writeFileSync(process.env.ROUTING_GITHUB,JSON.stringify(x));}
 if(url.includes('/pulls?')&&x.pullSequence?.length){x.pulls=x.pullSequence.shift();fs.writeFileSync(process.env.ROUTING_GITHUB,JSON.stringify(x));}
 if(x.error){process.stderr.write('controlled unavailable GitHub');process.exit(22);}

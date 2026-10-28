@@ -16106,6 +16106,7 @@ test('RISK saved view opening source preservation: invalid optional appearance k
 
 test('RISK saved view accepted handover: normal actions and exact local work survive repeated offline reopening',async t=>{
  await openingBoardFixture(t);
+ const {waitForTruthyProbe}=await import('./scripts/agent-tools/async-probe.mjs');
  const view=await invisibleSavedViewBrowser('dark',false,false,{width:390,height:844},false,{brokenDeviceBoard:true,retainAppearance:false,scannerState:'active',installedOffline:true,topOfPage:true,availabilityFixture:true});
  try{
   assert.equal(view.early.settled,false);assert.equal(view.early.rows.length,66,JSON.stringify({early:view.early,startup:view.startup}));
@@ -16116,7 +16117,7 @@ test('RISK saved view accepted handover: normal actions and exact local work sur
   const futureRow=view.page.locator('#listBody .trow').filter({hasText:'Unmatched control task'});assert.equal(await futureRow.locator('.notstarted').count(),1,'the accepted board initially shows its known future start date');await view.page.clock.setFixedTime(new Date('2026-10-29T12:00:00Z'));await view.page.evaluate(()=>window.dispatchEvent(new Event('focus')));assert.equal(await futureRow.locator('.notstarted').count(),0,'returning after the controlled calendar change refreshes normal accepted availability');assert.equal(await view.page.evaluate(()=>isIntrinsicallyEligible(state.tasks.find(task=>task.title==='Unmatched control task'))),true);
   const row=view.page.locator('#listBody .trow').first(),heightBefore=await row.evaluate(e=>e.getBoundingClientRect().height);
   await row.locator('.tt').click();await view.page.locator('#etTitle').fill('Accepted task edit after recovered opening');await view.page.locator('[data-act="save-edit"]').click();
-  await view.page.waitForFunction(async()=>JSON.parse((await ScannerDeviceStore.readHead()).payload).tasks.some(t=>t.title==='Accepted task edit after recovered opening'));
+  await waitForTruthyProbe(()=>view.page.evaluate(async()=>JSON.parse((await ScannerDeviceStore.readHead()).payload).tasks.some(t=>t.title==='Accepted task edit after recovered opening')),{timeoutMs:30_000,pollIntervalMs:25});
   const edited=await view.page.evaluate(()=>({tasks:JSON.stringify(state.tasks),sources:{legacy:localStorage.getItem('fvp:chain-scanner:v1'),localHead:localStorage.getItem('fvp:chain-scanner:protected:v1')},history:JSON.stringify(state.workLog)}));
   assert.deepEqual(edited.sources,view.before.sourceCopies,'an accepted native edit preserves both protected recovery originals');assert.equal(edited.history,accepted.history,'reopening and editing a title do not invent History observations');
   await view.page.locator('[data-act="bulk-select"]').click();const selectable=view.page.locator('#listBody .trow').first();const beforeSelected=await selectable.evaluate(e=>e.getBoundingClientRect().height);await selectable.locator('[data-act="bulk-toggle"]').first().click();const selectedHeight=await selectable.evaluate(e=>e.getBoundingClientRect().height);assert.ok(Math.abs(beforeSelected-selectedHeight)<1,'natural selected state retains the same task-row height');await view.page.locator('[data-act="bulk-cancel"]').click();
@@ -16125,7 +16126,7 @@ test('RISK saved view accepted handover: normal actions and exact local work sur
   await view.context.setOffline(true);const failed=await view.page.evaluate(async()=>{try{await fetch('/uncached-opening-offline-'+Date.now(),{cache:'no-store'});return false;}catch{return true;}});assert.equal(failed,true,'actual offline transport fails before local acceptance is claimed');
   if(await view.page.locator('#addInput').isHidden())await view.page.locator('[data-act="toggle-add"]').click();
   await view.page.locator('#addInput').fill('Accepted offline task after recovered opening');await view.page.locator('[data-act="add"]').click();
-  await view.page.waitForFunction(async()=>JSON.parse((await ScannerDeviceStore.readHead()).payload).tasks.some(t=>t.title==='Accepted offline task after recovered opening'));
+  await waitForTruthyProbe(()=>view.page.evaluate(async()=>JSON.parse((await ScannerDeviceStore.readHead()).payload).tasks.some(t=>t.title==='Accepted offline task after recovered opening')),{timeoutMs:30_000,pollIntervalMs:25});
   for(let i=0;i<2;i++){
    await view.page.reload({waitUntil:'domcontentloaded'});await view.page.waitForFunction(()=>document.documentElement.dataset.appReady==='true');
    const reopened=await view.page.evaluate(()=>({titles:state.tasks.map(t=>t.title),views:document.querySelectorAll('.wrap:has(.trow)').length,preview:!!document.querySelector('[data-saved-preview]'),sources:{legacy:localStorage.getItem('fvp:chain-scanner:v1'),localHead:localStorage.getItem('fvp:chain-scanner:protected:v1')}}));

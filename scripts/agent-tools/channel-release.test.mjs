@@ -31,7 +31,11 @@ function editableFixture(t, edit) {
   const f = fixture(t);
   const repository = path.join(f.root, 'source');
   fs.mkdirSync(repository);
-  execFileSync('tar', ['-x', '-C', repository], { input: execFileSync('git', ['archive', f.source], { cwd: repo, maxBuffer: 32 * 1024 * 1024 }) });
+  // bsdtar may stop after the end marker while a pipe still sends valid padding.
+  const archive = path.join(f.root, 'source.tar');
+  fs.writeFileSync(archive, execFileSync('git', ['archive', f.source], { cwd: repo, maxBuffer: 32 * 1024 * 1024 }));
+  try { execFileSync('tar', ['-xf', archive, '-C', repository]); }
+  finally { fs.rmSync(archive); }
   git(repository, 'init', '-b', 'fixture');
   git(repository, 'config', 'user.email', 'beta-fixture@example.invalid');
   git(repository, 'config', 'user.name', 'Beta fixture');

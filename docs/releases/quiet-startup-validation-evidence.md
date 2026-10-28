@@ -511,3 +511,16 @@ in93e53fda (one complete matrix root, zero skipped). Its dirty-runner test bytes
 are retained and bound to the subsequent test-only commit rather than described
 as a clean qualification run. Clean full/npm-test and both installed-client
 outcomes remain required on that final committed source.
+
+
+## Exact full-qualification discovery and bounded test-fixture repair
+
+The clean427712c/treefb5da6ec full recorderf33a7eed completed with3438 cases:3372passed,5failed (including the large-original parent),61 accepted environment-dependent skips,0cancelled. It remains a failed overall qualification. Every saved-view product root passed. Both distinct required signed-out and actual-reconcile-held installed-client reports passed exact427/treefb5 from immutable779defa, with native accepted edits, durable originals/pending/opaque preservation, real online then failed uncached offline transport and complete owned context/browser/server cleanup. Those reports retain427 identity; they do not make the failed full run green.
+
+The existing synchronous-predicate process guard caught two new accepted-handover durable-read probes. The test-only repair uses existing Node `waitForTruthyProbe` around the same actual asynchronous native head condition, with one30000ms deadline and25ms interval. No durability assertion or product behavior changes.
+
+Bounded inherited-tooling diagnosis retained clean focused2d614241 and external instrumentedeb826e9c. The unchanged actual CI router received8192of35001 ZIP bytes because the fixture's fake curl called `process.exit(0)` immediately after asynchronous stdout write; the unchanged digest verifier correctly rejected it. The fixture now exits from write completion. Changed-native-byte and wrong-declared-size controls remain mandatory.
+
+Tar diagnostic99c7ec9c retains the actual8,652,800-byte old-client archive and a valid zero-padding control. All four actual/padded pipe/file routes extracted the same131 file/symlink hashes; padded pipe returned tarstatus0 with writerEPIPE, while file routes completed without pipe error. The original full failure likewise recorded tarstatus0/EPIPE. Only editable test-fixture extraction now reads an owned exact temporary archive file and removes it afterward; production packaging is unchanged.
+
+Focused repair GREENf7fe1eea passes8/8,0skipped: synchronous-predicate guard, actual accepted edit/native durable readback/offline Add/two reopens, channel invalid-notice guard, all three large-native integrity controls and their nested process consumer. App/static bytes remain equal to427 and8f9. Clean successor full/native, compatibility/rules, renewed exact reviews, hosted CI and Stable deployment remain required. Root's independent FAQ and typography approvals for427 are retained with their actual local scope and require successor identity renewal.
