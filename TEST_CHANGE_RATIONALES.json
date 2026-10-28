@@ -26457,5 +26457,24 @@
     "command": "Original guard recorder43a07435-dade-40d4-a518-6261724090c2 at unchanged4ef3862, GREEN823f254f; inventory original evidence retained in inventory-merge/integrated-evidence.json and unchanged inherited inventory rationale. NS01 derives only combined protected-test fingerprint after merge984d514.",
     "failure": "Original meaningful guard assertion observed expected admitted output sentinel versus actual foreign-path ENOENT with healthy controls passing. Inventory had independently preserved original mismatch assertion. This later merge metadata and buffer setup correction are not new behavioral RED or native runs."
   }
+},
+{
+  "baseCommit": "c920ccffc11af487ec84277c33fe2e370541e384",
+  "testChangesSha256": "2bae581284d3780168702a89112296fc1ca3906ae1afafa1310247cb031fbe46",
+  "reason": "Migrate the existing held source-preservation browser consumer from the stale restore-backup alias to the actual consolidated Settings Import control. Preserve its eight original configurations and assertions, then verify that closing Import and attempting held placeholder actions still leaves the recovery sources exact and the placeholder unaccepted.",
+  "previousBehavior": "The inherited consumer located restore-backup rather than the rendered import-backup action, so it did not assert that the single real Settings Import entry was enabled during the terminal hold. The migrated test then observed the actual import-backup action disabled in five terminal-hold variants on the committed test-only source.",
+  "intendedBehavior": "The existing RISK consumer requires exactly one actual Import action to be enabled before native Playwright click, opens the existing guarded paste editor, then proves that Close and attempted placeholder actions leave the real hold active, task state unaccepted and empty, timers idle, and original local recovery sources byte-for-byte unchanged.",
+  "replacementTests": [
+    "RISK saved view opening source preservation: invalid optional appearance keeps its bytes while one complete task opens"
+  ],
+  "preservedCoverage": [
+    "All eight existing appearance-fault, read-failure, account, UID, source, view-owner, viewport, theme and signed-in configurations remain in their original order, with every prior source, zero-state, bounded-read, recovery-hold, mask, focus, keyboard, Reload, and ordinary transition assertion retained.",
+    "Only this existing held consumer changes its stale selector and gains enabled-entry and after-Close preservation assertions; ordinary protected paste/file, Preview, Cancel, explicit-confirmation, stale-source and account-refusal consumers remain unchanged.",
+    "The entry test grants no adoption authority: exact protected sources, zero tasks, false acceptance, active hold, null scanner/save timers, original inventory and all source/identity/revision/CAS/cloud acknowledgement guards stay separate and unchanged."
+  ],
+  "redEvidence": {
+    "command": "Recorder 2026-10-28T21-36-34-747Z-87a7231c-7331-4cb2-a5c0-08f4725305ef (preimplementation-red) on af00e0b07f60b3fd942d5d348234ff02e85e1a56 / tree 695170d86f4fb32acebcd2bde496e4d886078fe4: node --test --test-name-pattern='RISK saved view opening source preservation: invalid optional appearance keeps its bytes while one complete task opens' tests.js. It used openingBoardFixture/invisibleSavedViewBrowser, isolated fake data, pinned Playwright 1.62.1 ESM, Chromium and loopback:127.0.0.1:52239. Full recorder argv/output are retained in evidence/held-import/rendered-1079/recorder/2026-10-28T21-36-34-747Z-87a7231c-7331-4cb2-a5c0-08f4725305ef.json.",
+    "failure": "Observed ERR_ASSERTION at tests.js:16161:325: held Settings keeps the actual Import action enabled (actual false, expected true). In each of five read-failures-2 terminal-hold variants the real import-backup locator existed exactly once but isEnabled() was false; the other three configuration children passed. TAP reported 9 results, 3 pass, and 6 fail counting the aggregate parent plus five children. This was the intended disabled-entry mismatch, not a stale-selector timeout, missing element, ESM/setup failure, or runtime-startup failure."
+  }
 }
 ]
