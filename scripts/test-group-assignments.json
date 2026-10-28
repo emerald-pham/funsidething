@@ -13847,6 +13847,16 @@
       "root": "RISK repository process: recorder retains exact public identities through streams and qualification reports",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "test group workflow fixture isolates hosted events without relaxing raw event authority",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "RISK repository process: workflow fixtures isolate hosted events and retain raw event refusals",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [

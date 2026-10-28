@@ -1589,6 +1589,8 @@ test('test group workflow consumer forbids duplicate execution for a verified in
   assert.equal(commands.length,1,'the workflow must use the enforcing consumer exactly once');
   const command=selection+'\n'+commands[0].replaceAll('${{ matrix.group }}','core');
   const env={...process.env,PATH:path.dirname(process.execPath)+path.delimiter+process.env.PATH,ImageOS:'ubuntu24',ImageVersion:'20261022.1.0',RUNNER_TEMP:temporary,GITHUB_REPOSITORY:'example/fixture',CHAIN_TEST_EVENT_POLICY:'local',GITHUB_RUN_ID:'fixture-run-1',GITHUB_RUN_ATTEMPT:'1',CHAIN_TEST_SOURCE_SHA:fixture.sourceSha,CHAIN_TEST_COMPARISON_BASE:fixture.comparisonBase,CHAIN_DESCRIPTOR_SENTINEL:sentinel};delete env.NODE_TEST_CONTEXT;
+  // This local fixture has its own repository; raw hosted authority belongs to the parent workflow.
+  for(const key of ['GITHUB_EVENT_NAME','GITHUB_EVENT_PATH','GITHUB_REF','GITHUB_SHA'])delete env[key];
   const reused=run('bash',['-euo','pipefail','-c',command],fixture.root,env);
   assert.equal(reused.status,0,reused.stdout+reused.stderr);
   assert.equal(readEvidence(path.join(temporary,'group'))?.status,'covered','the actual workflow dispatch must consume the verified pass');
@@ -1610,6 +1612,60 @@ test('test group workflow consumer forbids duplicate execution for a verified in
   await producerPlannerConsumerChain(t);
   await producerPlannerConsumerChain(t,{eventRef:'refs/heads/main'});
   await producerPlannerConsumerChain(t,{eventName:'pull_request',eventRef:'refs/pull/42/merge',eventAction:'synchronize'});
+});
+
+test('test group workflow fixture isolates hosted events without relaxing raw event authority', async t => {
+  const fixture=createFixture(t),directory=fs.mkdtempSync(path.join(os.tmpdir(),'chain-workflow-parent-event-'));
+  fixture.outputs.push(directory);
+  const sourceSha=git(repository,'rev-parse','HEAD'),name='test group workflow consumer forbids duplicate execution for a verified input pass';
+  for(const [label,eventName,eventRef,action]of [
+    ['host push','push','refs/heads/hosted-candidate',null],
+    ['host PR synchronize','pull_request','refs/pull/606/merge','synchronize'],
+    ['host PR edited','pull_request','refs/pull/606/merge','edited'],
+  ])await t.test(label,()=>{
+    const eventPath=path.join(directory,label.replaceAll(' ','-')+'.json');
+    writeJson(eventPath,eventName==='push'?{after:sourceSha,repository:{full_name:'emerald-pham/funsidething'}}:
+      {action,number:606,repository:{full_name:'emerald-pham/funsidething'},pull_request:{head:{sha:sourceSha}}});
+    const env={...process.env,PATH:path.dirname(process.execPath)+path.delimiter+process.env.PATH,
+      GITHUB_REPOSITORY:'emerald-pham/funsidething',GITHUB_EVENT_NAME:eventName,GITHUB_EVENT_PATH:eventPath,
+      GITHUB_REF:eventRef,GITHUB_SHA:sourceSha,CHAIN_TEST_SOURCE_SHA:sourceSha};
+    delete env.NODE_TEST_CONTEXT;
+    const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^'+name+'$',
+      'scripts/agent-tools/test-groups.test.mjs'],{cwd:repository,env,encoding:'utf8',timeout:60000,maxBuffer:8*1024*1024});
+    assert.equal(result.error,undefined);assert.equal(result.signal,null);
+    assert.equal(result.status,0,label+' must leave the local workflow fixture isolated\n'+result.stdout+result.stderr);
+    assert.equal(result.stdout.split(/\r?\n/).filter(line=>new RegExp('^ok \\d+ - '+name+'$').test(line)).length,1,'The actual workflow consumer must complete once');
+    assert.doesNotMatch(result.stdout,/# SKIP|# TODO/);
+  });
+  const eventPath=path.join(directory,'explicit-fixture-event.json'),sentinel=path.join(directory,'raw-event-workload');
+  const event={after:fixture.sourceSha,repository:{full_name:'example/fixture'}};
+  const env={GITHUB_EVENT_NAME:'push',GITHUB_EVENT_PATH:eventPath,GITHUB_REF:'refs/heads/fixture',GITHUB_SHA:fixture.sourceSha,
+    CHAIN_TEST_EVENT_POLICY:'push',CHAIN_DESCRIPTOR_SENTINEL:sentinel};
+  const descriptorDir=path.join(directory,'raw-producer');
+  const rawEventRun=(extraEnv,describe=false)=>{
+    const outputDir=describe?descriptorDir:path.join(directory,'raw-output-'+(++outputSerial));
+    return run(process.execPath,['scripts/test-groups.mjs','--group','core','--output-dir',outputDir,
+      '--repository','example/fixture','--event-policy','push','--run-id','fixture-run-1','--run-attempt','1',
+      '--source-sha',fixture.sourceSha,'--comparison-base',fixture.comparisonBase,
+      ...(describe?['--describe']:['--descriptor',path.join(descriptorDir,'descriptor.json')])],fixture.root,{...process.env,...env,...extraEnv,NODE_TEST_CONTEXT:undefined});
+  };
+  await t.test('matching raw event executes',()=>{
+    writeJson(eventPath,event);
+    const described=rawEventRun({},true);assert.equal(described.status,0,described.stdout+described.stderr);
+    const result=rawEventRun({});
+    assert.equal(result.status,0,result.stdout+result.stderr);
+    assert.equal(fs.existsSync(sentinel),true,'A matching explicit raw event must reach its real workload');fs.rmSync(sentinel);
+  });
+  for(const [label,changedEvent,changedEnv,message]of [
+    ['raw repository mismatch',{...event,repository:{full_name:'foreign/repository'}},{},/Raw workflow repository differs/],
+    ['raw source mismatch',{...event,after:'0'.repeat(40)},{},/Raw workflow event source differs/],
+    ['raw checkout mismatch',event,{GITHUB_SHA:'0'.repeat(40)},/Actual checkout differs from the raw workflow SHA/],
+  ])await t.test(label,()=>{
+    writeJson(eventPath,changedEvent);
+    const result=rawEventRun(changedEnv);
+    assert.equal(result.status,2,result.stdout+result.stderr);assert.match(result.stderr,message);
+    assert.equal(fs.existsSync(sentinel),false,'A real raw-event mismatch must stop before the workload child');
+  });
 });
 
 test('test group workflow publication attests actual execution and never promotes a reused result', t => {

@@ -2403,3 +2403,17 @@ identities remain nonqualifying. Report values are sanitized before JSON
 serialization so the retained TAP keeps its real line boundaries. These focused
 controlled processes establish neither browser/native nor full-suite, hosted,
 deployment, release or physical-device qualification.
+
+## Hosted event isolation in workflow fixtures
+
+- RISK repository process: workflow fixtures isolate hosted events and retain raw event refusals
+
+The public process regression runs the existing checked-in workflow consumer
+under controlled foreign push, PR synchronize and PR edited parent events. Its
+local example/fixture must still retain covered execution without a workload,
+fresh execution when uncovered, and fresh execution after runtime or image
+changes. A separately described matching raw fixture event reaches its real
+group workload; changed repository, source and checkout identities are refused
+before that workload. Only the local fixture clears inherited raw event fields;
+real workflow authority remains strict. These controlled Node processes do not
+establish hosted admission, native/browser or release qualification.

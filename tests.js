@@ -46039,3 +46039,13 @@ test('RISK repository process: recorder retains exact public identities through 
  assert.match(result.stdout,/^# pass 4$/m);
  for(const label of ['fail','cancelled','skipped','todo'])assert.match(result.stdout,new RegExp('^# '+label+' 0$','m'));
 });
+
+test('RISK repository process: workflow fixtures isolate hosted events and retain raw event refusals',async t=>{
+ const name='test group workflow fixture isolates hosted events without relaxing raw event authority',env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^'+name+'$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:180000,maxBuffer:16*1024*1024});
+ t.diagnostic(result.stdout+'\n'+result.stderr);
+ assert.equal(result.error,undefined);assert.equal(result.signal,null);assert.equal(result.status,0,'Hosted parent events must not contaminate local fixtures or weaken real raw-event authority');
+ const {parseTap}=await import('./scripts/test-groups.mjs');
+ const expected=[name,...['host push','host PR synchronize','host PR edited','matching raw event executes','raw repository mismatch','raw source mismatch','raw checkout mismatch'].map(child=>name+' > '+child)];
+ assert.deepEqual(parseTap(result.stdout).map(({id,status,skipReason})=>({id,status,skipReason})).sort((a,b)=>a.id.localeCompare(b.id)),expected.map(id=>({id,status:'passed',skipReason:null})).sort((a,b)=>a.id.localeCompare(b.id)),'All controlled parent contexts and real-authority outcomes must pass exactly once');
+});
