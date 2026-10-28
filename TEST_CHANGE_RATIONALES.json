@@ -26607,5 +26607,43 @@
     "command": "CN02 will run exact committed selected startup producer RISK once under an immutable allocated manifest. This test-definition commit deliberately precedes that execution.",
     "failure": "Native producer RED is not yet observed at CN01 and is not claimed. Existing independent report RED d9fb096f is retained only as report evidence, not native producer evidence."
   }
+},
+{
+  "baseCommit": "c920ccffc11af487ec84277c33fe2e370541e384",
+  "testChangesSha256": "989a08a8449a6b41dbc01906f7c5bd31c4c056c9b4ea5925017b7bea9207929c",
+  "reason": "Actual committed native producer expectation now has original a34d3e00 RED before CN03 collector implementation. Exact test is unchanged from a9e0892.",
+  "previousBehavior": "Existing public native startup succeeds without producing supplemental JPEG evidence; the report-only validator has been tested and fixed independently.",
+  "intendedBehavior": "One real selected startup case must retain actual JPEG files,finite counts/bytes,distinct clocks,stop/cleanup,trusted input and exact saved fixture; selection outside startup or unknown mode refuses before launch.",
+  "replacementTests": [
+    "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
+    "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
+  ],
+  "preservedCoverage": [
+    "Existing report RED/GREEN d9fb096f/2a2531e2,original D03 full/incomplete controls,all native guard/inventory/ordinary action/source assertions remain unchanged.",
+    "This commit changes only tests and their metadata; no producer implementation or native execution has occurred yet."
+  ],
+  "redEvidence": {
+    "command": "CN02 actual recorder1106-red a34d3e00: node --test --test-name-pattern=\"^RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command$\" tests.js; source a9e08924a89a44196a7e8b2b4c536f862705a63c",
+    "failure": "Actual ordinary frozen85ce64-task Normal uncapped desktopWebKit opening/action and cleanup passed; subsequent consumer assertion Selected startup operation must retain real bounded JPEG capture evidence failed because report.startupCapture was absent. Exactly one native RED; this is producer enforcement, not app defect. Report RED d9fb096f remains separate. Nonnative affected controls147dbe50 pass before committed producer GREEN."
+  }
+},
+{
+  "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+  "testChangesSha256": "d71cf9a2a91f50550be6acc2a88bf5cd4110d1a8fd003fa0f3edd529bd5cf6b3",
+  "reason": "Actual committed native producer expectation now has original a34d3e00 RED before CN03 collector implementation. Exact test is unchanged from a9e0892.",
+  "previousBehavior": "Existing public native startup succeeds without producing supplemental JPEG evidence; the report-only validator has been tested and fixed independently.",
+  "intendedBehavior": "One real selected startup case must retain actual JPEG files,finite counts/bytes,distinct clocks,stop/cleanup,trusted input and exact saved fixture; selection outside startup or unknown mode refuses before launch.",
+  "replacementTests": [
+    "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
+    "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
+  ],
+  "preservedCoverage": [
+    "Existing report RED/GREEN d9fb096f/2a2531e2,original D03 full/incomplete controls,all native guard/inventory/ordinary action/source assertions remain unchanged.",
+    "This commit changes only tests and their metadata; no producer implementation or native execution has occurred yet."
+  ],
+  "redEvidence": {
+    "command": "CN02 actual recorder1106-red a34d3e00: node --test --test-name-pattern=\"^RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command$\" tests.js; source a9e08924a89a44196a7e8b2b4c536f862705a63c",
+    "failure": "Actual ordinary frozen85ce64-task Normal uncapped desktopWebKit opening/action and cleanup passed; subsequent consumer assertion Selected startup operation must retain real bounded JPEG capture evidence failed because report.startupCapture was absent. Exactly one native RED; this is producer enforcement, not app defect. Report RED d9fb096f remains separate. Nonnative affected controls147dbe50 pass before committed producer GREEN."
+  }
 }
 ]
