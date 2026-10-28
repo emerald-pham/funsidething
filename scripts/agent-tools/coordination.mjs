@@ -1203,9 +1203,25 @@ async function releaseClaim(filePath, options) {
     const entry = state.entries.find((candidate) => candidate.id === options.id);
     if (!entry) throw new Error(`No coordination entry found for ${options.id}.`);
     if (entry.worktree !== process.cwd()) throw new Error(`Cannot release coordination claim for ${entry.id} from ${process.cwd()}; it belongs to ${entry.worktree}.`);
+    const expectedLeaseSha256 = options['expected-lease-sha256'];
+    if (expectedLeaseSha256 !== undefined) {
+      const currentLeaseSha256 = createHash('sha256').update(JSON.stringify(entry.lease ?? null)).digest('hex');
+      if (currentLeaseSha256 !== expectedLeaseSha256) {
+        throw new Error(`Cannot release coordination claim for ${entry.id}: lease identity changed.`);
+      }
+      const expiresAt = Date.parse(entry.lease?.expiresAt);
+      if (entry.status !== 'active' || entry.lease?.state !== 'healthy' || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+        throw new Error(`Cannot release coordination claim for ${entry.id}: its healthy lease is expired or inactive.`);
+      }
+    }
     const scopeSet = new Set(scopes);
     const claimSet = new Set(claims);
     const resourceSet = new Set(resources);
+    if (expectedLeaseSha256 !== undefined) {
+      const currentResources = new Set((entry.resources ?? []).map((resource) => String(resource).toLowerCase()));
+      const missing = resources.find((resource) => !currentResources.has(resource));
+      if (missing) throw new Error(`Cannot release coordination claim for ${entry.id}: resource ${missing} is no longer owned by this lease.`);
+    }
     entry.scopes = (entry.scopes ?? []).filter((scope) => !scopeSet.has(normalizePath(scope)));
     entry.claims = (entry.claims ?? []).filter((claim) => !claimSet.has(String(claim).toLowerCase()));
     entry.resources = (entry.resources ?? []).filter((resource) => !resourceSet.has(String(resource).toLowerCase()));
@@ -1239,7 +1255,7 @@ const COMMAND_OPTION_SCHEMAS = {
   },
   heartbeat: { ...fileOptionSchema, id: { key: 'id' }, now: { key: 'now' } },
   claim: { ...fileOptionSchema, ...ownershipOptionSchema, id: { key: 'id' }, now: { key: 'now' } },
-  'release-claim': { ...fileOptionSchema, ...ownershipOptionSchema, id: { key: 'id' }, now: { key: 'now' } },
+  'release-claim': { ...fileOptionSchema, ...ownershipOptionSchema, id: { key: 'id' }, now: { key: 'now' }, 'expected-lease-sha256': { key: 'expected-lease-sha256' } },
   park: {
     ...fileOptionSchema,
     id: { key: 'id' },
@@ -1323,7 +1339,16 @@ function validateOptionContract(command, options) {
     validateNow();
   } else if (command === 'claim' || command === 'release-claim') {
     requireId(command);
-    requireOwnership(command);
+    const ownership = requireOwnership(command);
+    if (options['expected-lease-sha256'] !== undefined) {
+      if (command !== 'release-claim') throw new Error('--expected-lease-sha256 is supported only by coordination release-claim.');
+      if (!/^[0-9a-f]{64}$/i.test(options['expected-lease-sha256'])) {
+        throw new Error('coordination release-claim --expected-lease-sha256 requires a 64-character SHA-256 digest.');
+      }
+      if (ownership.resources.length !== 1) {
+        throw new Error('coordination release-claim --expected-lease-sha256 requires exactly one --resources value.');
+      }
+    }
     validateNow();
   } else if (command === 'park') {
     requireId(command);

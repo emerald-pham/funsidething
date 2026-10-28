@@ -44,6 +44,37 @@ node scripts/agent-tools/record-run.mjs \
 
 This option only checks setup before launching the requested process; a passing readiness check is not evidence that the tests passed or that a native device/runtime recovered. It does not replace the suite's native reports, test-change rationale, review, CI, or release gates. Ordinary behavioral RED/GREEN recording continues to omit `--qualification-readiness` so focused iterations do not require native port allocations.
 
+### Local controlled early-group fixture
+
+Use the dedicated fixed mode to run only `group and aggregate retain actual early cases once across fresh group processes` through the recorder:
+
+```sh
+NODE22="/Users/emeraldpham/.codex/task-artifacts/retro-278-20261027/runtime/node-v22.23.3-darwin-arm64/bin/node"
+"$NODE22" --version
+GIT_COMMON_DIR="$(git rev-parse --path-format=absolute --git-common-dir)"
+EVIDENCE_DIR="$GIT_COMMON_DIR/agent-test-runs/issue-504/early-group-aggregate"
+export CHAIN_NATIVE_PORT=53124 # choose a free loopback port not reserved by another owner
+RESOURCE="loopback:127.0.0.1:$CHAIN_NATIVE_PORT"
+
+# Read status and use this worktree's existing active entry ID.
+"$NODE22" scripts/agent-tools/coordination.mjs status --file "$CODEX_COORDINATION_FILE"
+"$NODE22" scripts/agent-tools/coordination.mjs claim \
+  --file "$CODEX_COORDINATION_FILE" --id "$TASK_ENTRY_ID" --resources "$RESOURCE"
+
+"$NODE22" scripts/agent-tools/record-run.mjs \
+  --repo "$PWD" \
+  --evidence-dir "$EVIDENCE_DIR" \
+  --purpose green \
+  --summary \
+  --local-fixture early-group-aggregate
+```
+
+Set `CODEX_COORDINATION_FILE` to the canonical host-wide ledger before these commands, and replace the port and task-entry ID with the values for the current active worktree. The port must be claimed by that entry and available on loopback. The fixture requires the actual Node 22 runtime; it records `process.version`, executes the fixed child with `process.execPath`, prepends that runtime's bin directory to `PATH`, and rejects other Node majors. It creates private per-attempt `HOME`, temporary and XDG directories, removes inherited CI/runner, Node injection, browser-engine, cloud/service and project-specific `CHAIN_*` overrides, then adds back only the canonical ledger and claimed `CHAIN_NATIVE_PORT`. It computes the candidate SHA/tree from the clean committed worktree. Do not use `CI=true` or a personal browser profile.
+
+This explicit fixture profile reuses `validateQualificationReadiness` for a clean root, exact source identity, separate external evidence paths, one current healthy owner lease and one exact claimed loopback resource. Full `--qualification-readiness` keeps its existing two-port checks and never releases its task allocation. The fixture listener runs as a real child-owned HTTP server, but the test replaces Playwright's external browser launch. It proves group/process and aggregate propagation with the original nested outcomes; it does not exercise a browser engine or memory/native qualification. The repository-local Playwright package still needs to be installed from the repository's pinned dependencies before running this command.
+
+Each attempt writes a private summary record and streams plus a unique native-output directory, preserving the child producer and nested group/aggregate outcomes alongside the command and source identity. The record separates `fixture.workloadOutcome` from process-group, listener, allocation and private-runtime cleanup. After success, failure or interruption, the mode closes its owned child family and listener, then releases only the exact claimed resource if the original owner, lease digest and resource still match under the coordination lock. A changed or expired identity leaves the allocation in place and reports unresolved cleanup separately. Every terminal attempt consumes/releases this fixture allocation; explicitly claim the same port again under the same active entry before a fresh invocation. Keep evidence outside the checkout in a private directory.
+
 By default, the recorder prints the JSON record path to stderr before starting the child and prints the sanitized child output when it exits. A normal run returns the child's exit code; an interrupted run returns 128 plus the signal number. Both the child's result and the recorder's wrapper exit code are stored in the record. A missing executable is recorded as a launch failure and returns 127.
 
 Pass `--summary` before `--` to emit one bounded JSON line instead of the child streams. It reports the declared purpose, child exit and signal, source identity, evidence status, and sanitized absolute display paths for metadata, stdout, and stderr. A finalized attempt keeps the complete redacted streams in its metadata record and per-attempt `.stdout.txt` and `.stderr.txt` files when those evidence writes complete. The process keeps the child's exit or interruption status; if evidence writes fail while the child otherwise succeeds, it returns 74 and reports `evidence-failure`.
