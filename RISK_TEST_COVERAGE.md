@@ -11,6 +11,11 @@ This map records the current named RISK contracts in tests.js. It lets reviewers
 The named-contract test in tests.js checks that every top-level test whose title starts with RISK appears in this inventory. Add or rename the inventory entry in the same test-first change. If a future feature adds a new risk area, add a heading and place its concrete test names under it.
 
 - RISK repository process: event routing retains exact merge validation before avoiding a duplicate cohort
+- RISK repository process: unchanged CI inputs reuse an original successful gate across events
+- RISK repository process: large original CI artifacts retain verified coverage without buffering native reports
+- RISK repository process: released host locks cannot cause spurious CI migration failures
+- RISK repository process: CI admission enforces reuse before repeating a passed test child
+- RISK repository process: CI observer keeps honest reuse and fresh emulator fallback outcomes
 - RISK repository process: required parallel scanner aggregation rejects absent group evidence
 - RISK repository process: grouped catalog binds real declarations rather than quoted fixtures
 - RISK repository process: nested native fixture output stays isolated at the command boundary
@@ -145,6 +150,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK AUTH RESTORE: configured startup stays syncing until Firebase resolves the actual session
 - RISK AUTH RESTORE: remembered boards show syncing in header and Settings while restoration is pending
 - RISK AUTH HYDRATION: real Auth and native resume wait for the durable board, then reconcile once
+- RISK AUTH HYDRATION: a broken device board stays quiet until protected local recovery is visible
 - RISK AUTH HYDRATION: a corrupt device-head read protects exact originals before supported local recovery releases hydration
 - RISK AUTH HYDRATION: extended FAQ and current Changelog explain the saved-board wait
 
@@ -1276,6 +1282,16 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK saved view invisible fallback: corrupt oversized untrusted and blocked projections never become board authority
 - RISK saved view guidance: Quick start and Changelog describe this-device restoration and current dates
 - RISK saved view guidance qualification: FAQ and current release note promise an appearance only when available
+- RISK saved view broken-board startup: configured Firebase leaves the prior warning neutral until its first event
+- RISK saved view broken-board startup: prior appearance stays inert until the recovered board opens
+- RISK saved view broken-board status: configured cloud changes remain visible in the saved appearance and after recovery
+- RISK saved view broken-board guidance: opening status does not imply cloud confirmation or erase recovery warnings
+- RISK opening board presentation: shared markup retains released cards contexts task rows and history
+- RISK saved view broken-board visibility: the complete saved board is readable while durable startup waits
+- RISK saved view full-board safety: supported copies and identity masks never grant authority
+- RISK saved view full-board filters: opening preserves saved membership controls and cheap task facts
+- RISK saved view opening source preservation: invalid optional appearance keeps its bytes while one complete task opens
+- RISK saved view accepted handover: normal actions and exact local work survive repeated offline reopening
 - RISK bulk toolbar guidance: extended FAQ describes frozen controls and rank-slot selection
 - RISK repository process boundary: actual visual tests compare every changed control with neighboring controls and scrolled states
 

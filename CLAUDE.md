@@ -15,6 +15,8 @@ Before publishing or triaging issues/specs, read the
 [triage labels](docs/agents/triage-labels.md).
 For command-line evidence collection, coordination, audits, or CI/PR automation,
 use [agent evidence tools](docs/agents/agent-evidence.md).
+For app-opening responsiveness, visible action feedback, or optional/background
+work, read [responsiveness guidance](docs/agents/responsiveness.md).
 
 ## Test-first and regression
 
