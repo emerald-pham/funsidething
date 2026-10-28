@@ -26550,5 +26550,62 @@
     "command": "CN02 will run exact committed selected startup producer RISK once under an immutable allocated manifest. This test-definition commit deliberately precedes that execution.",
     "failure": "Native producer RED is not yet observed at CN01 and is not claimed. Existing independent report RED d9fb096f is retained only as report evidence, not native producer evidence."
   }
+},
+{
+  "baseCommit": "c920ccffc11af487ec84277c33fe2e370541e384",
+  "testChangesSha256": "989a08a8449a6b41dbc01906f7c5bd31c4c056c9b4ea5925017b7bea9207929c",
+  "reason": "CN01 test-only source defines actual selected startup JPEG artifacts and strict API/CLI selection admission before the single genuine CN02 producer RED. Static test-definition self-review uses the existing imported spawnSync for exact source identity before any native execution.",
+  "previousBehavior": "Existing public native startup succeeds without producing supplemental JPEG evidence; the report-only validator has been tested and fixed independently.",
+  "intendedBehavior": "One real selected startup case must retain actual JPEG files,finite counts/bytes,distinct clocks,stop/cleanup,trusted input and exact saved fixture; selection outside startup or unknown mode refuses before launch.",
+  "replacementTests": [
+    "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
+    "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
+  ],
+  "preservedCoverage": [
+    "Existing report RED/GREEN d9fb096f/2a2531e2,original D03 full/incomplete controls,all native guard/inventory/ordinary action/source assertions remain unchanged.",
+    "This commit changes only tests and their metadata; no producer implementation or native execution has occurred yet."
+  ],
+  "redEvidence": {
+    "command": "CN02 will run exact committed selected startup producer RISK once under an immutable allocated manifest. This test-definition commit deliberately precedes that execution.",
+    "failure": "Native producer RED is not yet observed at CN01 and is not claimed. Existing independent report RED d9fb096f is retained only as report evidence, not native producer evidence."
+  }
+},
+{
+  "baseCommit": "900a9a7796492567ade6f29ebe573dc7e1ba4ebb",
+  "testChangesSha256": "b9018c1a84be99dbc275a9774c5ec6b3eccfd62bfe48da839f35e35289c4d716",
+  "reason": "CN01 test-only source defines actual selected startup JPEG artifacts and strict API/CLI selection admission before the single genuine CN02 producer RED. Static test-definition self-review uses the existing imported spawnSync for exact source identity before any native execution.",
+  "previousBehavior": "Existing public native startup succeeds without producing supplemental JPEG evidence; the report-only validator has been tested and fixed independently.",
+  "intendedBehavior": "One real selected startup case must retain actual JPEG files,finite counts/bytes,distinct clocks,stop/cleanup,trusted input and exact saved fixture; selection outside startup or unknown mode refuses before launch.",
+  "replacementTests": [
+    "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
+    "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
+  ],
+  "preservedCoverage": [
+    "Existing report RED/GREEN d9fb096f/2a2531e2,original D03 full/incomplete controls,all native guard/inventory/ordinary action/source assertions remain unchanged.",
+    "This commit changes only tests and their metadata; no producer implementation or native execution has occurred yet."
+  ],
+  "redEvidence": {
+    "command": "CN02 will run exact committed selected startup producer RISK once under an immutable allocated manifest. This test-definition commit deliberately precedes that execution.",
+    "failure": "Native producer RED is not yet observed at CN01 and is not claimed. Existing independent report RED d9fb096f is retained only as report evidence, not native producer evidence."
+  }
+},
+{
+  "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+  "testChangesSha256": "d71cf9a2a91f50550be6acc2a88bf5cd4110d1a8fd003fa0f3edd529bd5cf6b3",
+  "reason": "CN01 test-only source defines actual selected startup JPEG artifacts and strict API/CLI selection admission before the single genuine CN02 producer RED. Static test-definition self-review uses the existing imported spawnSync for exact source identity before any native execution.",
+  "previousBehavior": "Existing public native startup succeeds without producing supplemental JPEG evidence; the report-only validator has been tested and fixed independently.",
+  "intendedBehavior": "One real selected startup case must retain actual JPEG files,finite counts/bytes,distinct clocks,stop/cleanup,trusted input and exact saved fixture; selection outside startup or unknown mode refuses before launch.",
+  "replacementTests": [
+    "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
+    "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
+  ],
+  "preservedCoverage": [
+    "Existing report RED/GREEN d9fb096f/2a2531e2,original D03 full/incomplete controls,all native guard/inventory/ordinary action/source assertions remain unchanged.",
+    "This commit changes only tests and their metadata; no producer implementation or native execution has occurred yet."
+  ],
+  "redEvidence": {
+    "command": "CN02 will run exact committed selected startup producer RISK once under an immutable allocated manifest. This test-definition commit deliberately precedes that execution.",
+    "failure": "Native producer RED is not yet observed at CN01 and is not claimed. Existing independent report RED d9fb096f is retained only as report evidence, not native producer evidence."
+  }
 }
 ]
