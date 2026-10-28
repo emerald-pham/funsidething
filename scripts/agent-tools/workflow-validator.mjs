@@ -2,10 +2,11 @@
 
 import { spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
+import { realpathSync } from 'node:fs';
 import { chmod, lstat, mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { pathToFileURL } from 'node:url';
 
 export const ACTIONLINT_VERSION = '1.7.12';
 export const SETUP_COMMAND = 'npm run agent:setup-workflow-validator';
@@ -344,8 +345,16 @@ async function main(argv = process.argv.slice(2)) {
   return 0;
 }
 
-const currentFile = fileURLToPath(import.meta.url);
-if (process.argv[1] && resolve(process.argv[1]) === currentFile) {
+function invokedAsMainModule() {
+  if (!process.argv[1]) return false;
+  try {
+    return import.meta.url === pathToFileURL(realpathSync(resolve(process.argv[1]))).href;
+  } catch {
+    return false;
+  }
+}
+
+if (invokedAsMainModule()) {
   main().then((code) => { process.exitCode = code; }).catch((error) => {
     process.stderr.write(`${error.message}\n`);
     process.exitCode = 2;

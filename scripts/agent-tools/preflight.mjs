@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
+import { realpathSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { validateCurrentRegistrations } from '../test-groups.mjs';
@@ -9,7 +10,7 @@ const focusedChecks = [
   'RISK Quick start content: essential steps stay brief and detailed help remains user-facing in existing sections',
 ];
 const unreadableDeviceFaqCheck = 'RISK unreadable device recovery: Quick start and current Changelog explain preserved sources and local pending recovery';
-const repositoryRoot = process.cwd();
+const repositoryRoot = realpathSync(process.cwd());
 
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -229,6 +230,15 @@ async function main() {
   return 0;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+function invokedAsMainModule() {
+  if (!process.argv[1]) return false;
+  try {
+    return import.meta.url === pathToFileURL(realpathSync(path.resolve(process.argv[1]))).href;
+  } catch {
+    return false;
+  }
+}
+
+if (invokedAsMainModule()) {
   process.exitCode = await main();
 }
