@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { test } from 'node:test';
-import { mkdtemp, mkdir, readFile, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, readdir, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -41,7 +41,7 @@ function invokeRecorder({ repo, evidence, purpose, command, args = [], extraOpti
 }
 
 async function createQualificationFixture(t, { preflightCapable = false } = {}) {
-  const root = await mkdtemp(path.join(os.tmpdir(), 'record-run-qualification-'));
+  const root = await realpath(await mkdtemp(path.join(os.tmpdir(), 'record-run-qualification-')));
   t.after(() => rm(root, { recursive: true, force: true }));
   let repo;
   if (preflightCapable) {

@@ -130,7 +130,7 @@ function invoke(fixture, ...selectionArgs) {
 }
 
 function makeRecorderFixture(t, { sourceChange = true, selectionFailure = false, workflowFailure = false } = {}) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'chain-qualification-recorder-'));
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'chain-qualification-recorder-')));
   const repo = path.join(root, 'repo');
   const branch = git(repository, 'branch', '--show-current');
   git(root, 'clone', '--shared', '--quiet', '--single-branch', '--branch', branch, repository, repo);
@@ -295,6 +295,28 @@ function executeSelectedFixture(fixture, { environment = {}, timeout = 15_000 } 
 }
 
 test('qualification selector binds exact assigned risk wrappers to source changes and fails closed', async t => {
+  await t.test('public selector entrypoint follows filesystem aliases and imports stay inert', t => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'chain-qualification-entry-alias-'));
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+    const alias = path.join(root, 'selector-alias.mjs');
+    fs.symlinkSync(selector, alias);
+    const invoked = spawnSync(process.execPath, [alias, '--help'], {
+      cwd: repository, encoding: 'utf8', timeout: 15_000, maxBuffer: 1024 * 1024,
+    });
+    assert.equal(invoked.error, undefined, invoked.error?.message);
+    assert.equal(invoked.status, 0, `${invoked.stdout}\n${invoked.stderr}`);
+    assert.match(invoked.stdout, /Usage: node scripts\/agent-tools\/qualification-contracts\.mjs/,
+      'the public selector must run its main through a symlinked path');
+
+    const imported = spawnSync(process.execPath, [
+      '--input-type=module', '-e', `await import(${JSON.stringify(new URL('./qualification-contracts.mjs', import.meta.url).href)});`,
+    ], { cwd: repository, encoding: 'utf8', timeout: 15_000, maxBuffer: 1024 * 1024 });
+    assert.equal(imported.error, undefined, imported.error?.message);
+    assert.equal(imported.status, 0, `${imported.stdout}\n${imported.stderr}`);
+    assert.equal(imported.stdout, '', 'importing the selector must not invoke its CLI');
+    assert.equal(imported.stderr, '', 'importing the selector must not write CLI diagnostics');
+  });
+
   for (const id of contractIds) await t.test(`${id} selects its exact existing wrapper`, () => {
     const trigger = uniqueTriggerFor(id);
     assert.ok(trigger, `contract ${id} must have a unique source trigger for the isolated selection check`);
@@ -463,7 +485,7 @@ test('qualification readiness gates the recorder child on selected parent contra
     const result = invokeReadyRecorder(fixture);
     assert.equal(result.error, undefined, result.error?.message);
     assert.equal(result.signal, null, result.stderr);
-    assert.notEqual(result.status, 0, `invalid workflow bytes must stop the child: ${result.stdout}\n${result.stderr}`);
+    assert.notEqual(result.status, 0, `invalid workflow bytes must stop the child: ${result.stdout}\n${result.stderr}\n${recorderFailureDetails(result)}`);
     assert.equal(fs.existsSync(fixture.sentinel), false, 'workflow validation failure must not launch the requested child');
     const summary = readRecorderSummary(result);
     assert.equal(summary.status, 'qualification-failure');
@@ -480,7 +502,7 @@ test('qualification readiness gates the recorder child on selected parent contra
     const result = invokeReadyRecorder(fixture);
     assert.equal(result.error, undefined, result.error?.message);
     assert.equal(result.signal, null, result.stderr);
-    assert.notEqual(result.status, 0, `missing required selector metadata must stop the child: ${result.stdout}\n${result.stderr}`);
+    assert.notEqual(result.status, 0, `missing required selector metadata must stop the child: ${result.stdout}\n${result.stderr}\n${recorderFailureDetails(result)}`);
     assert.equal(fs.existsSync(fixture.sentinel), false, 'invalid contract selection must not launch the requested child');
     const summary = readRecorderSummary(result);
     assert.equal(summary.status, 'qualification-failure');
