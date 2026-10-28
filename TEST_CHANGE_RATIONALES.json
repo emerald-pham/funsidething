@@ -26301,4 +26301,62 @@
     "failure": "Actual contemporaneous assertion RED at unchanged recorder d29410a: missing actual complete-board paint retained complete instead of incomplete. D05 observed GREEN c9697535 after the recorder change; complete positive control at800ms remains accepted, showing200ms is not a gate."
   }
 }
+,
+{
+  "baseCommit": "4ef38622839cff86c86b97ed49031a43b22e563d",
+  "testChangesSha256": "11a7718e3c0cc8eb927b8f8105159a51944719a5a089552e3ff032888e08fc4a",
+  "reason": "NK03-NK05 confirmed the existing native admission consumer incorrectly dereferenced a missing unrelated foreign path before finding a healthy owner. #993 freezes only already passing guard/tests and required metadata; inherited rationale objects and chronology are preserved.",
+  "previousBehavior": "The owner lookup threw ENOENT for a missing active foreign path before considering the healthy current owner; unrelated missing ownership prevented even the admitted native output boundary.",
+  "intendedBehavior": "The real runButtonSafety consumer reaches its output boundary for a healthy canonical current owner after an unrelated missing foreign entry, while missing active or parked foreign engine and port claims still refuse before output.",
+  "replacementTests": [
+    "RISK repository process: native allocation admits its healthy owner past missing foreign paths and protects their claims"
+  ],
+  "preservedCoverage": [
+    "Existing native allocation, lease, owner confirmation, explicit-resource and prelaunch refusal assertions remain unchanged.",
+    "The original foreign owners array retains active/parked resource conflicts and exact fixture ledger bytes; aliases canonicalize and a missing current owner grants no authority.",
+    "Only external filesystem output creation is controlled for this guard regression; native/browser launch, inventory correctness, startup cause, D06 retry, memory, physical-device and release qualification remain separate gates."
+  ],
+  "redEvidence": {
+    "command": "node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/293-native-allocation/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/native-allocation/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern='^RISK repository process: native allocation admits its healthy owner past missing foreign paths and protects their claims tests.js; record43a07435-dade-40d4-a518-6261724090c2 at unchanged4ef38622839cff86c86b97ed49031a43b22e563d",
+    "failure": "Genuine contemporaneous ERR_ASSERTION: healthy-owner/alias controls reached the external output sentinel, but missing-unrelated foreign owner produced actual guard realpathSync ENOENT instead of that sentinel. Recorder generic infrastructure-failure label is preserved because its classifier sees ENOENT in the asserted actual value. Earlier5d3e7b9e is invalid setup from separate inventory mismatch, not accepted RED. Same test bytes and command pass9/9 at GREEN823f254f; affected refusal/risk map b95b4156 passes."
+  }
+},
+{
+  "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+  "testChangesSha256": "0af809175dc91910e49973de5980da525b15cd11a98d653012174a3731dad9d0",
+  "reason": "NK03-NK05 confirmed the existing native admission consumer incorrectly dereferenced a missing unrelated foreign path before finding a healthy owner. #993 freezes only already passing guard/tests and required metadata; inherited rationale objects and chronology are preserved.",
+  "previousBehavior": "The owner lookup threw ENOENT for a missing active foreign path before considering the healthy current owner; unrelated missing ownership prevented even the admitted native output boundary.",
+  "intendedBehavior": "The real runButtonSafety consumer reaches its output boundary for a healthy canonical current owner after an unrelated missing foreign entry, while missing active or parked foreign engine and port claims still refuse before output.",
+  "replacementTests": [
+    "RISK repository process: native allocation admits its healthy owner past missing foreign paths and protects their claims"
+  ],
+  "preservedCoverage": [
+    "Existing native allocation, lease, owner confirmation, explicit-resource and prelaunch refusal assertions remain unchanged.",
+    "The original foreign owners array retains active/parked resource conflicts and exact fixture ledger bytes; aliases canonicalize and a missing current owner grants no authority.",
+    "Only external filesystem output creation is controlled for this guard regression; native/browser launch, inventory correctness, startup cause, D06 retry, memory, physical-device and release qualification remain separate gates."
+  ],
+  "redEvidence": {
+    "command": "node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/293-native-allocation/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/native-allocation/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern='^RISK repository process: native allocation admits its healthy owner past missing foreign paths and protects their claims tests.js; record43a07435-dade-40d4-a518-6261724090c2 at unchanged4ef38622839cff86c86b97ed49031a43b22e563d",
+    "failure": "Genuine contemporaneous ERR_ASSERTION: healthy-owner/alias controls reached the external output sentinel, but missing-unrelated foreign owner produced actual guard realpathSync ENOENT instead of that sentinel. Recorder generic infrastructure-failure label is preserved because its classifier sees ENOENT in the asserted actual value. Earlier5d3e7b9e is invalid setup from separate inventory mismatch, not accepted RED. Same test bytes and command pass9/9 at GREEN823f254f; affected refusal/risk map b95b4156 passes."
+  }
+},
+{
+  "baseCommit": "b176026825e4f9539780f745fe60e09cf348d288",
+  "testChangesSha256": "295cceba06cc4def5ee5cf30277485d3e13cd0209502738c02f77ca5d3746a52",
+  "reason": "NK03-NK05 confirmed the existing native admission consumer incorrectly dereferenced a missing unrelated foreign path before finding a healthy owner. #993 freezes only already passing guard/tests and required metadata; inherited rationale objects and chronology are preserved.",
+  "previousBehavior": "The owner lookup threw ENOENT for a missing active foreign path before considering the healthy current owner; unrelated missing ownership prevented even the admitted native output boundary.",
+  "intendedBehavior": "The real runButtonSafety consumer reaches its output boundary for a healthy canonical current owner after an unrelated missing foreign entry, while missing active or parked foreign engine and port claims still refuse before output.",
+  "replacementTests": [
+    "RISK repository process: native allocation admits its healthy owner past missing foreign paths and protects their claims"
+  ],
+  "preservedCoverage": [
+    "Existing native allocation, lease, owner confirmation, explicit-resource and prelaunch refusal assertions remain unchanged.",
+    "The original foreign owners array retains active/parked resource conflicts and exact fixture ledger bytes; aliases canonicalize and a missing current owner grants no authority.",
+    "Only external filesystem output creation is controlled for this guard regression; native/browser launch, inventory correctness, startup cause, D06 retry, memory, physical-device and release qualification remain separate gates."
+  ],
+  "redEvidence": {
+    "command": "node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/293-native-allocation/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/native-allocation/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern='^RISK repository process: native allocation admits its healthy owner past missing foreign paths and protects their claims tests.js; record43a07435-dade-40d4-a518-6261724090c2 at unchanged4ef38622839cff86c86b97ed49031a43b22e563d",
+    "failure": "Genuine contemporaneous ERR_ASSERTION: healthy-owner/alias controls reached the external output sentinel, but missing-unrelated foreign owner produced actual guard realpathSync ENOENT instead of that sentinel. Recorder generic infrastructure-failure label is preserved because its classifier sees ENOENT in the asserted actual value. Earlier5d3e7b9e is invalid setup from separate inventory mismatch, not accepted RED. Same test bytes and command pass9/9 at GREEN823f254f; affected refusal/risk map b95b4156 passes."
+  }
+}
 ]
