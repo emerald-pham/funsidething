@@ -29380,6 +29380,7 @@ test('RISK repository process: release recording classifies the tail of a comple
   fs.copyFileSync(path.join(__dirname,'scripts/release-evidence.mjs'),path.join(fixture.repo,'scripts/release-evidence.mjs'));
   fs.mkdirSync(path.join(fixture.repo,'scripts/agent-tools'),{recursive:true});
   fs.copyFileSync(path.join(__dirname,'scripts/agent-tools/checkpoint-progress.mjs'),path.join(fixture.repo,'scripts/agent-tools/checkpoint-progress.mjs'));
+  fs.copyFileSync(path.join(__dirname,'scripts/agent-tools/workflow-validator.mjs'),path.join(fixture.repo,'scripts/agent-tools/workflow-validator.mjs'));
   const inputPath=path.join(fixture.root,'release-input.json');
   fs.writeFileSync(inputPath,JSON.stringify(riskBasedReleaseInput(fixture,{domains:['security-deployment']}),null,2)+'\n');
   return { ...fixture,inputPath,receiptPath:path.join(fixture.repo,'.git','funsidething-release-evidence',fixture.candidateSha,'receipt.json') };
