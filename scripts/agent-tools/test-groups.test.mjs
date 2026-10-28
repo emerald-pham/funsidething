@@ -644,6 +644,37 @@ test('test group browser runtime preflight records an explicit no-change cohort 
   assert.equal(fs.existsSync(path.join(ordinaryGroup.outputDir, 'browser-runtime-preflight/browser-runtime.tap')), false);
 });
 
+test('test group local browser preflight refuses unverifiable leases before any launch', async t => {
+  const fixture=createFixture(t),title='RISK browser runtime fixture: allocated lease admission';
+  const browserPath=addBrowserRuntimeRootFixture(t,fixture,title);
+  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'chain-browser-lease-'));fixture.outputs.push(directory);
+  const launchSentinel=path.join(directory,'browser-launched'),workloadSentinel=path.join(directory,'workload-launched');
+  const provider=path.join(fixture.root,'node_modules/playwright/index.mjs');
+  fs.writeFileSync(provider,fs.readFileSync(provider,'utf8').replace('launch:async()=>{','launch:async()=>{fs.writeFileSync('+JSON.stringify(launchSentinel)+',"launched");'));
+  const testFile=path.join(fixture.root,'tests.js');
+  fs.writeFileSync(testFile,fs.readFileSync(testFile,'utf8').replace('test('+JSON.stringify(title)+',()=>{});','test('+JSON.stringify(title)+',()=>{fs.writeFileSync('+JSON.stringify(workloadSentinel)+',"launched");});'));
+  git(fixture.root,'add','-f','tests.js','node_modules/playwright/index.mjs');git(fixture.root,'commit','-qm','observable external browser and workload boundaries');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');
+  const ledger=path.join(directory,'coordination.json'),port=51777;
+  const now=new Date(),healthy={state:'healthy',lastHeartbeatAt:now.toISOString(),expiresAt:new Date(now.getTime()+60000).toISOString(),ownerConfirmationRequired:false,takeoverAllowed:false};
+  const owner={id:'fixture-owner',status:'active',worktree:fs.realpathSync(fixture.root),heartbeatAt:now.toISOString(),lease:healthy,resources:['browser-runtime:playwright-chromium','loopback:127.0.0.1:'+port]};
+  for(const [name,mutate] of [
+    ['missing expiry',lease=>delete lease.expiresAt],['malformed expiry',lease=>lease.expiresAt='not-a-date'],
+    ['missing confirmation',lease=>delete lease.ownerConfirmationRequired],['confirmation required',lease=>lease.ownerConfirmationRequired=true],
+    ['missing takeover flag',lease=>delete lease.takeoverAllowed],['takeover enabled',lease=>lease.takeoverAllowed=true],
+    ['missing heartbeat',lease=>delete lease.lastHeartbeatAt],
+  ])await t.test(name,()=>{
+    const current=structuredClone(owner);mutate(current.lease);writeJson(ledger,{version:1,scope:'codex-wide',entries:[current]});
+    const result=invoke(fixture,{group:'persistence-recovery',publicCli:true,env:{CI:'',CODEX_COORDINATION_FILE:ledger,DOW_EMULATOR_COORDINATION_FILE:''},args:['--browser-runtime-preflight','--browser-path',browserPath,'--native-port',String(port)]});
+    assert.notEqual(result.status,0,name+' must refuse admission');
+    assert.equal(fs.existsSync(launchSentinel),false,name+' cannot launch the external browser provider');
+    assert.equal(fs.existsSync(workloadSentinel),false,name+' cannot launch the selected workload');
+    assert.deepEqual(JSON.parse(fs.readFileSync(ledger)).entries,[current],'Refusal preserves ownership');
+  });
+  writeJson(ledger,{version:1,scope:'codex-wide',entries:[owner]});
+  const accepted=invoke(fixture,{group:'persistence-recovery',publicCli:true,env:{CI:'',CODEX_COORDINATION_FILE:ledger,DOW_EMULATOR_COORDINATION_FILE:''},args:['--browser-runtime-preflight','--browser-path',browserPath,'--native-port',String(port)]});
+  assert.equal(accepted.status,0,accepted.stdout+accepted.stderr);assert.equal(fs.existsSync(launchSentinel),true);assert.equal(fs.existsSync(workloadSentinel),true);
+});
+
 test('test group browser runtime preflight fails closed for skipped, duplicated, and missing-engine outcomes', t => {
   for (const [mode, includeChromium, expectedIssue] of [
     ['skip', true, /unexpectedly skipped/],
@@ -1184,7 +1215,7 @@ async function producerPlannerConsumerChain(t,{eventName='push',eventRef='refs/h
   assert.equal(planned.status,0,planned.stdout+planned.stderr);
   const route=JSON.parse(fs.readFileSync(path.join(evidence,'routing','routing.json')));
   const negativeControls=[];
-  let runtimeDriftSelection=null;
+  let runtimeDriftSelection=null, consumingNode=null, runtimeLaunchJournal=null;
   if(eventName==='push'&&eventRef==='refs/heads/fixture'){
     const bindingMutations=[
       ['eventPolicy','canonical-pr-merge-v1'],['eventName','pull_request'],['eventRef','refs/heads/other'],['eventAction','edited'],
@@ -1250,6 +1281,16 @@ async function producerPlannerConsumerChain(t,{eventName='push',eventRef='refs/h
   const equivalent=JSON.parse(fs.readFileSync(path.join(evidence,'routing-equivalent','routing.json')));
   assert.deepEqual(equivalent.inputKeys,route.inputKeys,'An actually equivalent same-runtime plan preserves complete input keys.');
   const alternateNode=alternateNodeRuntime();
+  if(alternateNode){
+    const actualExecutable=alternateNode.executable;
+    runtimeLaunchJournal=path.join(evidence,'selected-runtime-launches.jsonl');
+    const wrapper=path.join(evidence,'selected-alternate-node');
+    fs.writeFileSync(wrapper, '#!'+process.execPath+'\n'+
+      "const fs=require('node:fs'),cp=require('node:child_process');"+
+      'fs.appendFileSync('+JSON.stringify(runtimeLaunchJournal)+',JSON.stringify(process.argv.slice(2))+"\\n");'+
+      'const r=cp.spawnSync('+JSON.stringify(actualExecutable)+',process.argv.slice(2),{stdio:"inherit"});process.exit(r.status??1);\n');
+    fs.chmodSync(wrapper,0o755);alternateNode.executable=wrapper;consumingNode=wrapper;
+  }
   if(!alternateNode)t.diagnostic('A second actual Node runtime is unavailable here; the real runner-image drift path remains active, and local runtime drift is separately recorded when a second binary is installed.');
   let nodeDrift=null;
   if(alternateNode){
@@ -1310,10 +1351,12 @@ async function producerPlannerConsumerChain(t,{eventName='push',eventRef='refs/h
       '--comparison-base',fixture.comparisonBase,'--descriptor',descriptor,'--proof',path.join(evidence,'routing','routing.json'),'--early-receipt',receipt];
     const driftedConsumer=group==='core'&&runtimeDriftSelection;
     const groupOutput=driftedConsumer?path.join(evidence,'runtime-consumer-core.env'):null;
-    const result=run(driftedConsumer?'/opt/homebrew/bin/node':process.execPath,['scripts/agent-tools/ci-pass-reuse.mjs',...args],fixture.root,
+    const result=run(driftedConsumer?consumingNode:process.execPath,['scripts/agent-tools/ci-pass-reuse.mjs',...args],fixture.root,
       {...consumerEnv,...(groupOutput?{GITHUB_OUTPUT:groupOutput}:{})});
     assert.equal(result.status,0,`The actual ${group} consumer must use the persisted descriptor: ${result.stdout}${result.stderr}`);
     if(driftedConsumer){
+      const launches=fs.readFileSync(runtimeLaunchJournal,'utf8').trim().split('\n').map(line=>JSON.parse(line));
+      assert.ok(launches.some(args=>args[0]==='scripts/agent-tools/ci-pass-reuse.mjs'&&args[1]==='run-group'),'The discovered alternate executable must launch the actual group consumer');
       const emitted=fs.readFileSync(groupOutput,'utf8'),key=emitted.match(/^key=([a-f0-9]{64})$/m)?.[1];
       const groupReport=JSON.parse(fs.readFileSync(path.join(output,'result.json'))),producerReceipt=JSON.parse(fs.readFileSync(receipt));
       assert.equal(key,runtimeDriftSelection.inputKeys.core,'The fresh group job emits its actual consuming-runtime key.');

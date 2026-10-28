@@ -795,8 +795,16 @@ function localBrowserRuntimePort(options) {
   });
   if (current.length !== 1) fail(`Local browser runtime preflight requires exactly one active host allocation for ${worktree}; found ${current.length}.`);
   const owner = current[0];
-  if (owner.lease?.state !== 'healthy' || Date.parse(owner.lease?.expiresAt || '') <= Date.now() || owner.lease?.ownerConfirmationRequired) {
-    fail('Local browser runtime preflight requires a current healthy host coordination lease.');
+  const lease = owner.lease;
+  const now = Date.now(), heartbeat = Date.parse(lease?.lastHeartbeatAt), entryHeartbeat = Date.parse(owner.heartbeatAt), expires = Date.parse(lease?.expiresAt);
+  // Admission requires the complete current owner identity. A missing date is
+  // NaN and must never pass an expiry comparison or authorize runtime launch.
+  if (typeof owner.id !== 'string' || !owner.id.trim() || lease?.state !== 'healthy'
+    || lease.ownerConfirmationRequired !== false || lease.takeoverAllowed !== false
+    || !Number.isFinite(heartbeat) || !Number.isFinite(entryHeartbeat) || !Number.isFinite(expires)
+    || Math.abs(heartbeat - entryHeartbeat) > 1000 || heartbeat > now + 5000
+    || now - heartbeat > 90_000 || expires <= now || expires <= heartbeat || expires - heartbeat > 95_000) {
+    fail('Local browser runtime preflight requires a current healthy owner-confirmed host coordination lease.');
   }
   const port = Number(options.nativePort);
   const resources = [`browser-runtime:playwright-chromium`, `loopback:127.0.0.1:${port}`];

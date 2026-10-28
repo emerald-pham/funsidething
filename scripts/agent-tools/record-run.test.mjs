@@ -243,6 +243,9 @@ function fixtureTestSource(behavior, coordinationScript) {
     "    await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));",
     "    if (behavior === 'change-lease') { const refreshed = spawnSync(process.execPath, [coordinationScript, 'heartbeat', '--file', process.env.CODEX_COORDINATION_FILE, '--id', 'fixture-owner'], { cwd: process.cwd(), encoding: 'utf8' }); assert.equal(refreshed.status, 0, refreshed.stderr); }",
     "    writeFileSync(path.join(output, 'button-safety-chromium-fixture.json'), JSON.stringify({ status: 'failed', observedActions: ['act:download-backup'], actionObservation: { recognizedOffered: ['act:download-backup'], executed: [], coverage: 'fixture producer only' }, outcomes: [], rapidOutcomes: [], errors: ['controlled-page-crash'], cleanup: { contextClosed: true, browserClosed: true, serverClosed: true }, browserVersion: 'external-mock-no-engine' }));",
+    ...['known completed partial action remains accounted without full coverage credit',
+      ...['missing accounting','unknown offered ID','unknown executed ID','profile tamper','source tamper','transport failure','instrumentation failure','cleanup failure'].map(name=>'failed stress still refuses '+name),
+      'changed group transfer reference','missing durable predecessor'].map(name=>'    await t.test('+JSON.stringify(name)+',()=>{});'),
     "    t.diagnostic(JSON.stringify({ scope: 'Controlled OS-process transfer only; no native/runtime proof', earlyRootExecutions: 5, uniqueEarlyRoots: 5, ordinaryGroups: 4, aggregateCaseCount: 11, liveListenerObservations: [listenerObservation] }));",
     "    if (behavior === 'failure') assert.fail('controlled local fixture failure');",
     "  } finally {",
@@ -252,14 +255,14 @@ function fixtureTestSource(behavior, coordinationScript) {
   ].join('\n');
 }
 
-async function createLocalFixture(t, { behavior = 'success', foreignEntry = false } = {}) {
+async function createLocalFixture(t, { behavior = 'success', foreignEntry = false, sourceTransform = source => source } = {}) {
   const root = await mkdtemp(path.join(os.tmpdir(), 'record-run-local-fixture-'));
   t.after(() => rm(root, { recursive: true, force: true }));
   const repo = await createCommittedRepository(root);
   const canonicalRepo = await realpath(repo);
   const testPath = path.join(repo, 'scripts/agent-tools/test-groups.test.mjs');
   await mkdir(path.dirname(testPath), { recursive: true });
-  await writeFile(testPath, fixtureTestSource(behavior, coordinationEntrypoint));
+  await writeFile(testPath, sourceTransform(fixtureTestSource(behavior, coordinationEntrypoint)));
   const add = spawnSync('git', ['-C', repo, 'add', 'scripts/agent-tools/test-groups.test.mjs'], { encoding: 'utf8' });
   assert.equal(add.status, 0, add.stderr);
   const commit = spawnSync('git', ['-C', repo, 'commit', '--quiet', '-m', 'fixed fixture runner'], { encoding: 'utf8' });
@@ -350,6 +353,38 @@ test('qualification readiness creates evidence destinations and launches the req
   assert.ok((await readdir(fixture.nativeOutput)).length === 0, 'readiness probes leave no files in the native evidence destination');
   const record = JSON.parse(await readFile(summary.evidence.metadataPath, 'utf8'));
   assert.equal(record.git.commit, fixture.commit);
+});
+
+test('local fixture refuses absent or inconsistent required outcome proof', async t => {
+  const rootName='group and aggregate retain actual early cases once across fresh group processes';
+  const nestedName='missing durable predecessor';
+  for(const [name,sourceTransform,extraOptions=[]] of [
+    ['missing root',source=>source.replace("test('"+rootName+"',", "test('unselected root',")],
+    ['renamed root',source=>source.replace(rootName,rootName+' renamed')],
+    ['skipped root',source=>source.replace("test('"+rootName+"', async", "test('"+rootName+"', {skip:'controlled omission'}, async")],
+    ['missing nested outcome',source=>source.replace('    await t.test("'+nestedName+'",()=>{});','')],
+    ['renamed nested outcome',source=>source.replace(nestedName,nestedName+' renamed')],
+    ['skipped nested outcome',source=>source.replace('t.test("'+nestedName+'",()=>{});','t.test("'+nestedName+'",{skip:"controlled omission"},()=>{});')],
+    ['missing diagnostic',source=>source.replace('t.diagnostic(JSON.stringify({ scope:', 'void(JSON.stringify({ scope:')],
+    ['malformed diagnostic',source=>source.replace('t.diagnostic(JSON.stringify({ scope:', 't.diagnostic("malformed "+JSON.stringify({ scope:')],
+    ['wrong listener port',source=>source.replace('liveListenerObservations: [listenerObservation]', 'liveListenerObservations: [{...listenerObservation,port:1}]')],
+    ['missing listener',source=>source.replace('liveListenerObservations: [listenerObservation]', 'liveListenerObservations: []')],
+    ['missing accounting',source=>source.replace('earlyRootExecutions: 5, uniqueEarlyRoots: 5, ordinaryGroups: 4, aggregateCaseCount: 11,','')],
+    ['inconsistent accounting',source=>source.replace('aggregateCaseCount: 11','aggregateCaseCount: 12')],
+    ['caller redaction removes diagnostic',source=>source,['--redact-pattern','Controlled OS-process transfer only; no native/runtime proof']],
+  ])await t.test(name,async sub=>{
+    const fixture=await createLocalFixture(sub,{sourceTransform});
+    const result=invokeLocalFixture({repo:fixture.repo,evidence:fixture.evidence,env:fixture.env,extraOptions});
+    const summary=summaryFrom(result),record=JSON.parse(await readFile(summary.evidence.metadataPath,'utf8'));
+    sub.diagnostic(JSON.stringify({control:name,summary,record,stdout:await readFile(summary.evidence.stdoutPath,'utf8'),stderr:await readFile(summary.evidence.stderrPath,'utf8')}));
+    assert.equal(summary.child.exitCode,0,'Control workload itself exits successfully');
+    assert.equal(summary.fixture.workloadOutcome,'passed','Actual workload exit remains separate from evidence validity');
+    assert.notEqual(result.status,0,name+' must fail the wrapper despite a successful child');
+    assert.equal(summary.status,'evidence-failure');
+    assert.equal(summary.fixture.nestedOutcomes.status,'unverified');
+    assert.equal(summary.fixture.cleanup.listener.status,'closed');assert.equal(summary.fixture.cleanup.allocation.status,'released');
+    assert.equal(record.execution.exitCode,0);assert.equal(record.execution.outcome,'passed');
+  });
 });
 
 test('local fixture runs its fixed child, records nested outcomes, and releases only its own allocation', async (t) => {

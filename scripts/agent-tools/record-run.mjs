@@ -9,6 +9,7 @@ import { lstat, mkdir, open, readFile, readdir, readlink, realpath, rename, rm, 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveBase } from './preflight.mjs';
+import { parseTap } from '../test-groups.mjs';
 import { planQualificationContracts, qualificationTestCommand, verifyQualificationOutcomes } from './qualification-contracts.mjs';
 
 const purposes = new Set(['preimplementation-red', 'later-baseline-sensitivity', 'green']);
@@ -21,6 +22,12 @@ const provenanceLimits = [
 ];
 const localFixtureId = 'early-group-aggregate';
 const localFixtureTestName = 'group and aggregate retain actual early cases once across fresh group processes';
+const localFixtureNestedTestNames = [
+  'known completed partial action remains accounted without full coverage credit',
+  ...['missing accounting', 'unknown offered ID', 'unknown executed ID', 'profile tamper', 'source tamper', 'transport failure', 'instrumentation failure', 'cleanup failure'].map(name => `failed stress still refuses ${name}`),
+  'changed group transfer reference',
+  'missing durable predecessor',
+];
 const supportedNodeMajor = 22;
 const maximumCoordinationLeaseMs = 90_000;
 const localFixtureScrubbedEnvironmentKeys = [
@@ -660,11 +667,15 @@ async function readFixtureProducer(outputDirectory, startedAt) {
 }
 
 function localFixtureNestedOutcomes(stdout, execution, expectedPort) {
-  const diagnostic = stdout.split(/\r?\n/).map((line) => line.startsWith('# ') ? line.slice(2) : '')
-    .find((line) => line.includes('"scope":"Controlled OS-process transfer only; no native/runtime proof"'));
+  const diagnostics = stdout.split(/\r?\n/).filter(line => line.startsWith('# '))
+    .map(line => line.slice(2)).filter(line => line.includes('"scope":"Controlled OS-process transfer only; no native/runtime proof"'));
   let observed;
-  try { if (diagnostic) observed = JSON.parse(diagnostic); } catch { /* Keep the raw test output as the authoritative evidence. */ }
-  const passed = execution.exitCode === 0 && !execution.signal && !execution.interruption;
+  try { if (diagnostics.length === 1) observed = JSON.parse(diagnostics[0]); } catch { /* Retain sanitized raw evidence without granting observation credit. */ }
+  let cases = [];
+  try { cases = parseTap(stdout); } catch { /* Missing or malformed TAP cannot prove execution. */ }
+  const requiredIds = [localFixtureTestName, ...localFixtureNestedTestNames.map(name => `${localFixtureTestName} > ${name}`)];
+  const exactExecution = cases.length === requiredIds.length && requiredIds.every(id =>
+    cases.filter(item => item.id === id && item.status === 'passed').length === 1);
   const listenerObservations = Array.isArray(observed?.liveListenerObservations) ? observed.liveListenerObservations : [];
   const listener = listenerObservations.at(-1);
   const liveListener = {
@@ -676,10 +687,14 @@ function localFixtureNestedOutcomes(stdout, execution, expectedPort) {
     matchesAllocation: listener?.port === expectedPort,
     observationCount: listenerObservations.length,
   };
+  const completeObservation = observed?.earlyRootExecutions === 5 && observed?.uniqueEarlyRoots === 5
+    && observed?.ordinaryGroups === 4 && observed?.aggregateCaseCount === 11
+    && listenerObservations.length > 0 && listenerObservations.every(item => item?.port === expectedPort
+      && item.httpStatus === 200 && item.reachable === true && (item.htmlDocument === true || item.bodyMatches === true));
+  const passed = execution.exitCode === 0 && !execution.signal && !execution.interruption;
   return {
     testName: localFixtureTestName,
-    status: passed && liveListener.matchesAllocation && liveListener.httpStatus === 200
-      && liveListener.reachable === true && liveListener.responseBodyVerified ? 'passed' : execution.outcome,
+    status: passed ? exactExecution && completeObservation ? 'passed' : 'unverified' : execution.outcome,
     earlyRootExecutions: observed?.earlyRootExecutions ?? null,
     uniqueEarlyRoots: observed?.uniqueEarlyRoots ?? null,
     ordinaryGroups: observed?.ordinaryGroups ?? null,
@@ -1404,7 +1419,7 @@ async function main(argv) {
     record.localFixture.cleanup = sanitizeFixtureValue(cleanup, redaction, 'localFixture.cleanup');
     const cleanupComplete = cleanup.child.completed && cleanup.listener.status === 'closed'
       && cleanup.allocation.status === 'released' && cleanup.runtimeDirectory.status === 'removed';
-    if (!cleanupComplete && wrapperExitCode === 0) wrapperExitCode = evidenceFailureExitCode;
+    if ((!cleanupComplete || record.localFixture.nestedOutcomes.status !== 'passed') && wrapperExitCode === 0) wrapperExitCode = evidenceFailureExitCode;
     record.execution.wrapperExitCode = wrapperExitCode;
     fixtureSummary = {
       mode: localFixtureId,

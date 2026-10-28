@@ -13802,6 +13802,36 @@
       "root": "local fixture preserves a passing workload and allocation when lease identity changes during cleanup",
       "group": "native-process",
       "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "test group local browser preflight refuses unverifiable leases before any launch",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "local fixture refuses absent or inconsistent required outcome proof",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "RISK repository process: local browser admission requires complete current owner authority",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: fixed local fixture refuses absent required execution and observation proof",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "diagnostic public plan admits only the exact approved executable dependency closure",
+      "group": "native-process",
+      "file": "scripts/agent-tools/diagnostic-receipt.test.mjs"
+    },
+    {
+      "root": "RISK repository process: diagnostic command closure remains exact and nonqualifying",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [

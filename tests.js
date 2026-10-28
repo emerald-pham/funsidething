@@ -45989,3 +45989,26 @@ test('RISK repository process: fresh native-process CI sets up the pinned valida
  fs.appendFileSync(path.join(root,cache,'actionlint'),'corruption');
  const corrupt=run(workload);assert.notEqual(corrupt.status,0,corrupt.stdout+corrupt.stderr);assert.match(corrupt.stderr,/checksum|identity/);assert.equal(fs.existsSync(path.join(root,'workload-started')),false);
 });
+
+test('RISK repository process: local browser admission requires complete current owner authority',()=>{
+ const name='test group local browser preflight refuses unverifiable leases before any launch',env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^'+name+'$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
+ assert.equal(result.error,undefined);assert.equal(result.signal,null);assert.equal(result.status,0,result.stdout+result.stderr);
+ assert.equal(result.stdout.split(/\r?\n/).filter(line=>new RegExp('^ok \\d+ - '+name+'$').test(line)).length,1,'The public lease refusal controls must actually finish');
+ assert.doesNotMatch(result.stdout,/# SKIP|# TODO/);
+});
+
+test('RISK repository process: fixed local fixture refuses absent required execution and observation proof',()=>{
+ const name='local fixture refuses absent or inconsistent required outcome proof',env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^'+name+'$','scripts/agent-tools/record-run.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:16*1024*1024});
+ assert.equal(result.error,undefined);assert.equal(result.signal,null);assert.equal(result.status,0,result.stdout+result.stderr);
+ assert.equal(result.stdout.split(/\r?\n/).filter(line=>new RegExp('^ok \\d+ - '+name+'$').test(line)).length,1,'The actual recorder negative controls must finish');
+});
+
+test('RISK repository process: diagnostic command closure remains exact and nonqualifying',()=>{
+ const name='diagnostic public plan admits only the exact approved executable dependency closure',env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^'+name+'$','scripts/agent-tools/diagnostic-receipt.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
+ assert.equal(result.error,undefined);assert.equal(result.signal,null);assert.equal(result.status,0,result.stdout+result.stderr);
+ assert.equal(result.stdout.split(/\r?\n/).filter(line=>new RegExp('^ok \\d+ - '+name+'$').test(line)).length,1,'The exact closure and frozen-source refusal controls must finish');
+ assert.doesNotMatch(result.stdout,/# SKIP|# TODO/);
+});

@@ -142,6 +142,11 @@ function fixture(t) {
     "scripts/agent-tools/checkpoint-progress.mjs",
     "scripts/agent-tools/checkpoint.mjs",
     "scripts/agent-tools/record-run.mjs",
+    "scripts/agent-tools/workflow-validator.mjs",
+    "scripts/agent-tools/preflight.mjs",
+    "scripts/agent-tools/qualification-contracts.mjs",
+    "scripts/test-groups.mjs",
+    "scripts/agent-tools/ci-pass-reuse.mjs",
     ".github/workflows/data-safety.yml",
     ".github/workflows/diagnostic.yml",
   ];
@@ -149,6 +154,11 @@ function fixture(t) {
     fs.mkdirSync(path.dirname(path.join(repo, file)), { recursive: true });
     fs.copyFileSync(path.join(repository, file), path.join(repo, file));
   }
+  // Frozen package scripts deliberately stay unchanged. Reuse only the verified
+  // external validator cache, never untracked JavaScript command dependencies.
+  const validatorCache="node_modules/.cache/funsidething/actionlint";
+  fs.mkdirSync(path.dirname(path.join(repo,validatorCache)),{recursive:true});
+  fs.cpSync(path.join(repository,validatorCache),path.join(repo,validatorCache),{recursive:true});
   const mobile = path.join(repo, "scripts/button-safety-mobile-memory.mjs");
   fs.writeFileSync(mobile, diagnosticMobileSource(repo));
   const bin = path.join(root, "bin");
@@ -345,6 +355,31 @@ function fixture(t) {
     remoteFile,
   });
 }
+test("diagnostic public plan admits only the exact approved executable dependency closure", t => {
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'diagnostic-closure-')),repo=path.join(root,'repo');
+  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  git(repository,'clone','-q','--shared','--no-checkout',repository,repo);git(repo,'checkout','-q',observer);
+  git(repo,'config','user.name','Closure Fixture');git(repo,'config','user.email','closure@example.invalid');
+  const dependencies=['scripts/agent-tools/workflow-validator.mjs','scripts/agent-tools/preflight.mjs','scripts/agent-tools/qualification-contracts.mjs','scripts/test-groups.mjs','scripts/agent-tools/ci-pass-reuse.mjs'];
+  const governance=['scripts/release-evidence.mjs','scripts/agent-tools/diagnostic-receipt.mjs','scripts/agent-tools/diagnostic-hosted-policy.mjs','scripts/agent-tools/native-attribution.mjs','scripts/agent-tools/native-toolchain.json','scripts/agent-tools/native-known-control.json','scripts/agent-tools/build-native-known-control.py','scripts/agent-tools/checkpoint-progress.mjs','scripts/agent-tools/checkpoint.mjs','scripts/agent-tools/record-run.mjs','.github/workflows/data-safety.yml','.github/workflows/diagnostic.yml',...dependencies];
+  for(const file of governance){fs.mkdirSync(path.dirname(path.join(repo,file)),{recursive:true});fs.copyFileSync(path.join(repository,file),path.join(repo,file));}
+  fs.writeFileSync(path.join(repo,'scripts/button-safety-mobile-memory.mjs'),diagnosticMobileSource(repo));
+  git(repo,'add','.');git(repo,'commit','-qm','Exact approved current diagnostic command bundle');
+  const source=git(repo,'rev-parse','HEAD');
+  const plan=()=>command({repo,env:{}},'diagnostic-plan',git(repo,'rev-parse','HEAD'),frozen);
+  const accepted=plan();assert.equal(accepted.status,0,'Approved exact executable closure must be eligible: '+accepted.stderr);
+  const impact=JSON.parse(accepted.stdout);assert.equal(impact.kind,'nonqualifying-diagnostic-plan');assert.equal(impact.eligible,true);assert.equal(impact.governanceReady,true);assert.match(impact.toolingSha256,/^[a-f0-9]{64}$/);
+  const changed=git(repo,'diff','--name-only',observer,source).split('\n').filter(Boolean);
+  assert.ok(changed.every(file=>governance.includes(file)||file==='scripts/button-safety-mobile-memory.mjs'),'All frozen non-governance bytes and modes remain unchanged');
+  for(const file of [...dependencies,'scripts/unknown-command-dependency.mjs','index.html','scripts/mobile-source-profile.json','scripts/test-group-inventory.json','scripts/test-group-assignments.json']){
+    const target=path.join(repo,file);fs.appendFileSync(target,'\n// unapproved closure bytes\n');git(repo,'add',file);git(repo,'commit','-qm','Rejected closure mutation');
+    const refused=plan();assert.notEqual(refused.status,0,file+' byte mutation must be refused');assert.match(refused.stderr,/frozen inventory|unknown instrumentation/);git(repo,'reset','--hard',source);
+  }
+  for(const file of dependencies){
+    git(repo,'update-index','--chmod=+x',file);git(repo,'commit','-qm','Rejected closure mode mutation');assert.notEqual(plan().status,0,file+' mode mutation must be refused');git(repo,'reset','--hard',source);
+  }
+});
+
 test("public diagnostic receipt records frozen reviewed source with its admitted finite attempt", (t) => {
   const f = fixture(t),
     r = command(f, "diagnostic-record", f.inputPath);
@@ -1326,6 +1361,11 @@ function addGovernanceFixture(f) {
     "scripts/agent-tools/checkpoint-progress.mjs",
     "scripts/agent-tools/checkpoint.mjs",
     "scripts/agent-tools/record-run.mjs",
+    "scripts/agent-tools/workflow-validator.mjs",
+    "scripts/agent-tools/preflight.mjs",
+    "scripts/agent-tools/qualification-contracts.mjs",
+    "scripts/test-groups.mjs",
+    "scripts/agent-tools/ci-pass-reuse.mjs",
     ".github/workflows/data-safety.yml",
     ".github/workflows/diagnostic.yml",
   ])

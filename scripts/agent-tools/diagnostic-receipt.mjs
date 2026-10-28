@@ -38,6 +38,13 @@ const governance = [
   "scripts/agent-tools/checkpoint-progress.mjs",
   "scripts/agent-tools/checkpoint.mjs",
   "scripts/agent-tools/record-run.mjs",
+  // Current recorder and release command imports are exact governance inputs;
+  // application/profile/catalog bytes remain frozen below.
+  "scripts/agent-tools/workflow-validator.mjs",
+  "scripts/agent-tools/preflight.mjs",
+  "scripts/agent-tools/qualification-contracts.mjs",
+  "scripts/test-groups.mjs",
+  "scripts/agent-tools/ci-pass-reuse.mjs",
   ".github/workflows/data-safety.yml",
   ".github/workflows/diagnostic.yml",
 ];

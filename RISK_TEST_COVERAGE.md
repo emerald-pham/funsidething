@@ -2365,3 +2365,25 @@ process integrations. Covered, reused and other-group runners retain the existin
 zero-setup condition. The required validator and outgoing pre-push integration
 commands fail actionably instead of adding environment-dependent skips. These
 isolated command checks launch no native browser and provide no hosted proof.
+
+## Local process authority and required fixture proof
+
+- `RISK repository process: local browser admission requires complete current owner authority`
+- `RISK repository process: fixed local fixture refuses absent required execution and observation proof`
+
+Disposable canonical ledgers drive the real allocated browser-preflight command,
+with external provider and workload sentinels proving refusals happen before
+launch. Fixed-mode recorder controls require the selected root and all eleven
+nested outcomes to pass once, actual allocated listener observations, and the
+original five-root/four-group/eleven-case accounting. Missing, renamed, skipped,
+malformed, inconsistent or caller-redacted proof cannot qualify a passing child.
+Actual child outcome, evidence validity and owned cleanup remain separate.
+These are controlled public process checks, with no native or hosted claim.
+
+- `RISK repository process: diagnostic command closure remains exact and nonqualifying`
+
+The public diagnostic plan admits exactly five current command dependencies,
+each bound to the existing governance byte/mode and tooling digest contract.
+Byte and mode tampering, unknown paths and frozen application/profile/catalog
+changes are refused. No finite attempt, allowance or diagnostic qualification
+policy changes; old source and receipts remain immutable.
