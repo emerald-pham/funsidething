@@ -11,6 +11,11 @@ This map records the current named RISK contracts in tests.js. It lets reviewers
 The named-contract test in tests.js checks that every top-level test whose title starts with RISK appears in this inventory. Add or rename the inventory entry in the same test-first change. If a future feature adds a new risk area, add a heading and place its concrete test names under it.
 
 - RISK repository process: event routing retains exact merge validation before avoiding a duplicate cohort
+- RISK repository process: unchanged CI inputs reuse an original successful gate across events
+- RISK repository process: large original CI artifacts retain verified coverage without buffering native reports
+- RISK repository process: released host locks cannot cause spurious CI migration failures
+- RISK repository process: CI admission enforces reuse before repeating a passed test child
+- RISK repository process: CI observer keeps honest reuse and fresh emulator fallback outcomes
 - RISK repository process: required parallel scanner aggregation rejects absent group evidence
 - RISK repository process: grouped catalog binds real declarations rather than quoted fixtures
 - RISK repository process: nested native fixture output stays isolated at the command boundary

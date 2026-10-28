@@ -3,11 +3,17 @@
 ## Backward compatibility before release
 
 Run `npm run test:compatibility` before release. The required `scanner-tests`
-CI job runs it for every PR, push, and Pages deployment. It requires the
+CI job requires its complete pass for every PR, push, and Pages deployment. It requires the
 Firestore emulator, available Git history, and zero skipped compatibility cases.
 It executes real released client backends and codecs against candidate rules,
 and candidate clients against released rules, then runs the bounded sync-error
 and safe reload contracts. Read success alone is never evidence of sync success.
+
+CI reuses an original successful compatibility job only when the complete
+committed tree, exact comparison base and runtime inputs match. See
+[Reusing successful CI inputs](test-groups.md#reusing-successful-ci-inputs).
+Changed or unavailable proof cannot satisfy that gate. The local pre-release
+compatibility run and exact review/deployment evidence remain required.
 
 The matrix retains the immutable supported baseline in
 `scripts/backward-compatibility.mjs` and also tests the exact comparison base

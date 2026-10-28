@@ -32150,7 +32150,7 @@ test('RISK CLOUD V2 STARTUP: a transient chunk read automatically recovers to sy
 test('RISK repository process: backward compatibility is a mandatory fail-closed release gate',()=>{
  const workflow=fs.readFileSync(path.join(__dirname,'.github/workflows/data-safety.yml'),'utf8');
  assert.match(workflow,/name: Backward compatibility/,'the required scanner job must run the compatibility matrix');
- assert.match(workflow,/run: npm run test:compatibility/);
+ assert.match(workflow,/run: node scripts\/agent-tools\/ci-pass-reuse\.mjs run-gate --gate compatibility /,'compatibility must use the enforcing execution-or-original-pass consumer');
  const pkg=JSON.parse(fs.readFileSync(path.join(__dirname,'package.json'),'utf8'));
  assert.match(pkg.scripts['test:compatibility'],/firebase emulators:exec.*backward-compatibility\.mjs/);
  const result=spawnSync(process.execPath,['scripts/backward-compatibility.mjs'],{cwd:__dirname,encoding:'utf8',env:{...process.env,FIRESTORE_EMULATOR_HOST:''}});
@@ -45554,6 +45554,43 @@ test('RISK repository process: event routing retains exact merge validation befo
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
  const result=spawnSync(process.execPath,['--test','--test-name-pattern=workflow avoids a second complete cohort',path.join(__dirname,'scripts/agent-tools/ci-routing.test.mjs')],{cwd:__dirname,encoding:'utf8',timeout:30000,env});
  assert.equal(result.status,0,'The public workflow cohort command must preserve exact canonical merge validation: '+result.stdout+'\n'+result.stderr);
+});
+
+test('RISK repository process: unchanged CI inputs reuse an original successful gate across events',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^workflow reuses an independently passed gate on main for the same complete inputs$','scripts/agent-tools/ci-routing.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
+ const output=(result.stdout||'')+'\n'+(result.stderr||'');
+ assert.equal(result.error,undefined,'The public CI reuse consumer must start: '+output);
+ assert.equal(result.status,0,'Equivalent complete inputs must retain their original successful gate: '+output);
+ assert.match(result.stdout||'',/^# tests 1$/m);assert.match(result.stdout||'',/^# skipped 0$/m);
+});
+
+test('RISK repository process: large original CI artifacts retain verified coverage without buffering native reports',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^workflow input reuse retains large original native evidence and rejects changed bytes$','scripts/agent-tools/ci-routing.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
+ assert.equal(result.status,0,result.stdout+result.stderr);assert.match(result.stdout||'',/^# tests 4$/m);assert.match(result.stdout||'',/^# skipped 0$/m);
+});
+
+test('RISK repository process: released host locks cannot cause spurious CI migration failures',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^migration accepts a live token lock released during ownership inspection$','scripts/agent-tools/coordination.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
+ assert.equal(result.status,0,result.stdout+result.stderr);
+ assert.match(result.stdout||'',/^# tests 1$/m);assert.match(result.stdout||'',/^# skipped 0$/m);
+});
+
+test('RISK repository process: CI admission enforces reuse before repeating a passed test child',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group workflow consumer forbids duplicate execution for a verified input pass$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
+ const output=(result.stdout||'')+'\n'+(result.stderr||'');
+ assert.equal(result.error,undefined,'The actual workflow reuse guard must start: '+output);
+ assert.equal(result.status,0,'CI must reject any route that repeats an already passed test child: '+output);
+ assert.match(result.stdout||'',/^# tests 1$/m);assert.match(result.stdout||'',/^# skipped 0$/m);
+});
+
+test('RISK repository process: CI observer keeps honest reuse and fresh emulator fallback outcomes',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group aggregate preserves observer protocol across emulator coverage and fresh fallback$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
+ assert.equal(result.status,0,result.stdout+result.stderr);assert.match(result.stdout||'',/^# tests 5$/m);assert.match(result.stdout||'',/^# skipped 0$/m);
 });
 
 test('RISK repository process: grouped runner stays covered at the default npm test boundary',t=>{

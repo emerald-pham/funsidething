@@ -29,5 +29,18 @@ At start/end and after merge, follow [cleanup](docs/agents/cleanup.md), retainin
 live branches/worktrees, ignored data and other projects' reservations. Inspect
 the shared host ledger; do not acquire shared browsers/emulators without allocation.
 
-Delegation: only `gpt-6.1-sol` (normal speed for review) and `gpt-6-luna` (max).
-Keep the coordinator's model/effort unchanged. Select actors by actual risk.
+Delegation permits GPT-6 Luna (`gpt-6-luna`), GPT-6.1 Terra
+(`gpt-6.1-terra`) and GPT-6.1 Sol (`gpt-6.1-sol`), using only identifiers
+and effort levels exposed by the runtime. Luna is approved only at `max`;
+Terra and Sol may use all runtime-supported effort levels. Keep normal speed
+for Sol reviews, the coordinator's model/effort, assigned review roles and
+security-review floors. This guidance changes no active assignments.
+
+After a task fails, increase effort when a higher supported, permitted level
+exists. Repeated or looping failures require bounded diagnosis and model
+escalation to a task-appropriate stronger permitted route, recording the actual
+supported model/effort selection and reason. Do not assume a Terra/Sol ranking.
+At the highest supported, permitted effort, or when no stronger approved route
+is available, halt the loop, preserve evidence and report the blocker rather
+than claim escalation. Preserve existing halt/retro/fix/resume requirements and
+select actors by actual risk.
