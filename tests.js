@@ -25,6 +25,64 @@ function test(...args){
  });
 }
 
+test('RISK repository process: saved scenery Linux raster exclusion is exact and durably disclosed',async t=>{
+ const {tmpdir}=await import('node:os'),{pathToFileURL}=await import('node:url');
+ const base=process.env.CHAIN_NATIVE_OUTPUT||tmpdir();fs.mkdirSync(base,{recursive:true});const directory=fs.mkdtempSync(path.join(base,'saved-raster-process-'));
+ if(!process.env.CHAIN_NATIVE_OUTPUT)t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ // Control only external browser/network boundaries. The real test command,
+ // immutable source loader, native evidence and assertions still execute.
+ const preload=path.join(directory,'browser-boundary.mjs');fs.writeFileSync(preload,`
+ import fs from 'node:fs';import http from 'node:http';import {createHash} from 'node:crypto';import {execFileSync} from 'node:child_process';
+ const {webkit}=await import(${JSON.stringify(pathToFileURL(path.join(__dirname,'node_modules/playwright/index.mjs')).href)});
+ const options=JSON.parse(process.env.SAVED_RASTER_PROCESS_OPTIONS),journal=process.env.SAVED_RASTER_PROCESS_JOURNAL,hash=value=>createHash('sha256').update(value).digest('hex');
+ Object.defineProperty(process,'platform',{value:options.platform});
+ const record=value=>fs.appendFileSync(journal,value+'\\n');
+ http.createServer=()=>({once(){return this;},listen(port,host,done){record('server-open');done();},address(){return{port:31276};},close(done){record('server-close');done();}});
+ webkit.launch=async()=>{record('browser-open');return{on(){},version(){return'controlled-external-browser-no-native-proof';},async close(){record('browser-close');},async newContext(config){
+  record('context-open');let changed=false,reads=0;const motion=config.reducedMotion==='reduce'?'reduced':'normal',retained=[];
+  const selected=()=>motion===options.motion&&changed===options.change;
+  const image=value=>'data:image/png;base64,'+Buffer.from(value).toString('base64');
+  const initial={backgrounds:1,lives:3,slot:1,paintedSlot:1,back:image('initial'),status:'',skyDate:100,visitors:[{id:'current-flight'}],scene:{slot:1}};
+  const pending=()=>changed?{...initial,backgrounds:2,lives:4,slot:2,paintedSlot:2,back:image('pending'),skyDate:200,scene:{slot:2}}:initial;
+  const bank=()=>({...pending(),backgrounds:changed?3:1,lives:pending().lives+1,back:changed?image('bank'):initial.back,status:'Controlled scenery text Human written',skyDate:changed?300:100});
+  const stored=()=>({durableTasks:selected()&&options.fault==='preservation'?399:400,unknownBytes:1048576,retainedSources:retained});
+  return{async exposeBinding(){},async addInitScript(){},async route(){},async close(){record('context-close');if(selected()&&options.fault==='cleanup')throw Error('Controlled context cleanup refusal');},async newPage(){
+   let observer=false;const routes=new Map();
+   const response=file=>({status:()=>200,async text(){return execFileSync('git',['show','b176026825e4f9539780f745fe60e09cf348d288:'+file],{maxBuffer:32*1024*1024}).toString();}});
+   const routed=async file=>{const handler=routes.get('**/'+file);if(handler)await handler({async fetch(){return response(file);},async fulfill(){}});};
+   return{async addInitScript(){},async route(pattern,handler){routes.set(pattern,handler);},setDefaultTimeout(){},on(){},async exposeBinding(){},async addScriptTag(){},async close(){},async goto(url){observer=url.endsWith('__button-observer');if(!observer)await routed('landscape.js');return{};},async waitForFunction(fn){if(String(fn).includes('sceneStatus'))await routed('HUMAN_WRITTEN_HOURLY_TAGS.md');},async evaluate(fn,arg){
+    if(observer){if(arg?.board){for(let i=0;i<arg.count;i++)retained.push({id:'gate-retained-'+i,payloadHash:hash(JSON.stringify({...arg.board,futureSourceRole:i}))});return{bootstrap:{legacySeeded:true,legacyBeforeHash:null,legacyPayloadHash:hash(JSON.stringify(arg.board)),headPayloadHash:hash(JSON.stringify(arg.board)),headPayloadBytes:Buffer.byteLength(JSON.stringify(arg.board)),retainedSources:retained.map(row=>({...row,durableTasks:400,unknownBytes:1048576}))}};}return{};}
+    if(typeof arg==='boolean'){changed=arg;return{initial,unchanged:initial,taskCount:400,bankPending:true,before:initial,pending:pending()};}
+    if(String(fn).includes('readHead'))return stored();
+    if(String(fn).includes('paintedSlotProbe')){if(++reads===1)return bank();const fresh={...bank(),backgrounds:bank().backgrounds+1};if(selected()){if(options.fault==='pixels')fresh.back=image('unequal');if(options.fault==='copy')fresh.status='wrong copy';if(options.fault==='visitors')fresh.visitors=[];if(options.fault==='paint')fresh.backgrounds--;}return fresh;}
+    return{};
+   }};
+  }};
+ }};};
+ `);
+ const cases=[
+  {name:'Linux reduced pending inequality is excluded',platform:'linux',motion:'reduced',change:true,fault:'pixels',passes:true,excluded:true,rasterEqual:false},
+  {name:'Linux reduced pending equal pixels remain measured',platform:'linux',motion:'reduced',change:true,fault:null,passes:true,excluded:true,rasterEqual:true},
+  {name:'Darwin pending inequality still fails',platform:'darwin',motion:'reduced',change:true,fault:'pixels',passes:false},
+  {name:'Linux reduced unchanged inequality still fails',platform:'linux',motion:'reduced',change:false,fault:'pixels',passes:false,excluded:true,rasterEqual:true},
+  {name:'Linux normal unchanged inequality still fails',platform:'linux',motion:'normal',change:false,fault:'pixels',passes:false,excluded:true,rasterEqual:true},
+  ...['copy','visitors','paint','preservation','cleanup'].map(fault=>({name:'Linux pending '+fault+' assertion remains protected',platform:'linux',motion:'reduced',change:true,fault,passes:false,excluded:true,rasterEqual:true})),
+ ];
+ for(const [index,options]of cases.entries())await t.test(options.name,()=>{
+  const output=path.join(directory,String(index)),journal=path.join(directory,index+'.journal');
+  const env={...process.env,CI:'true',CHAIN_TEST_EVENT_POLICY:'outgoing-branch-push-v1',GITHUB_EVENT_NAME:'push',GITHUB_REF:'refs/heads/controlled-saved-raster-process',CHAIN_NATIVE_OUTPUT:output,SAVED_RASTER_PROCESS_OPTIONS:JSON.stringify(options),SAVED_RASTER_PROCESS_JOURNAL:journal};delete env.NODE_TEST_CONTEXT;delete env.NODE_OPTIONS;
+  const result=spawnSync(process.execPath,['--import',preload,'--test','--test-reporter=tap','--test-name-pattern=^RISK scenery text loading:','tests.js'],{cwd:__dirname,env,encoding:'utf8',timeout:20000,maxBuffer:8*1024*1024});
+  fs.writeFileSync(path.join(directory,index+'.tap'),result.stdout+result.stderr);assert.equal(result.error,undefined);assert.equal(result.signal,null);assert.equal(result.status,options.passes?0:1,'Actual saved scenery process must enforce this exact assertion scope: '+result.stdout+result.stderr);
+  assert.match(result.stdout,/# skipped 0$/m);if(!options.passes)assert.match(result.stdout,options.fault==='pixels'?/Bank response pixels equal an independent complete current-scene refresh/:options.fault==='cleanup'?/Controlled context cleanup refusal/:/AssertionError/);
+  const observations=fs.readdirSync(output).map(name=>JSON.parse(fs.readFileSync(path.join(output,name,'late-copy-observation.json'))));assert.equal(observations.length,3,'Every original scene and motion consumer still executes');
+  const changed=observations.find(row=>row.before.pending.backgrounds>row.before.before.backgrounds),excluded=observations.flatMap(row=>row.excludedAssertions||[]);
+  assert.equal(excluded.length,options.excluded?1:0,'Only the source-bound Linux pending comparison is explicitly excluded');
+  if(options.excluded){const record=excluded[0];assert.equal(record.assertion,'Bank response pixels equal an independent complete current-scene refresh');assert.equal(record.platform,'linux');assert.equal(record.engine,'webkit');assert.equal(record.motion,'reduced');assert.equal(record.case,'pending scene change');assert.equal(record.savedApplicationCommit,'b176026825e4f9539780f745fe60e09cf348d288');assert.equal(record.savedApplicationTree,'27e293d0fa9aae62a906b36dc984bd0ef184f956');assert.equal(record.bankPngSha256,createHash('sha256').update(Buffer.from(changed.bank.back.split(',')[1],'base64')).digest('hex'));assert.equal(record.freshPngSha256,createHash('sha256').update(Buffer.from(changed.fresh.back.split(',')[1],'base64')).digest('hex'));assert.equal(record.equal,options.rasterEqual);assert.match(record.reason,/user.*2026-10-28/i);}
+  const events=fs.readFileSync(journal,'utf8').trim().split('\n');for(const name of ['server','browser','context']){assert.equal(events.filter(value=>value===name+'-open').length,3);assert.equal(events.filter(value=>value===name+'-close').length,3,'Every original native cleanup boundary is reached');}
+ });
+ t.diagnostic('Controlled external browser/HTTP process evidence only; no Linux/native/hosted raster acceptance: '+directory);
+});
+
 async function injectRecoveryDatabaseFailure187(t,app,{key='pending:owner',failAt=[1],errorName='UnknownError',errorMessage='An internal error was encountered in the Indexed Database server',beforeRequest=false,untilReopened=false,onFailure=()=>{}}={}){
  const {IDBDatabase}=await import('fake-indexeddb'),originalTransaction=IDBDatabase.prototype.transaction;
  const observed={reads:0,failures:0};let failedConnection=null;
@@ -45765,7 +45823,7 @@ test('RISK scenery text loading: delayed bank reuses identical backdrop while cu
  for(const [motion,change] of [['reduced',false],['normal',false],['reduced',true]])await t.test(motion+(change?' pending scene change':' unchanged scene'),async t=>{
  const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});const directory=fs.mkdtempSync(path.join(base,'late-copy-'));
  const playwright=await import('playwright'),launch=playwright.webkit.launch,{runButtonSafety}=await import('./scripts/button-safety-native.mjs');
- const evidence={kind:'nonqualifying-deterministic-renderer-consumer',route:[],limits:['Local uncapped emulated mobile rendering and exact pixel/source preservation; no hosted memory/timing or physical-device claim.']},finished=Error('Causal late-copy probe complete; not native acceptance');let releaseBank,probeError;
+ const evidence={kind:'nonqualifying-deterministic-renderer-consumer',route:[],limits:['Local uncapped emulated mobile rendering and exact pixel/source preservation; no hosted memory/timing or physical-device claim.']},finished=Error('Causal late-copy probe complete; not native acceptance');let releaseBank,probeError,excludeBankRaster=false;
  const gate=new Promise(resolve=>{releaseBank=resolve;});
  t.after(()=>{releaseBank();playwright.webkit.launch=launch;});
  playwright.webkit.launch=async(...args)=>{
@@ -45800,6 +45858,17 @@ test('RISK scenery text loading: delayed bank reuses identical backdrop while cu
  };
  try{try{await runButtonSafety({repo:__dirname,engine:'webkit',port:Number(process.env.CHAIN_NATIVE_PORT||process.env.CHAIN_NATIVE_SMOKE_PORT||0),outputDir:directory,mobileYesMotion:motion,appFixture:'saved-scenery-b176'});assert.fail('Expected scenery probe completion');}catch(error){if(error!==finished)throw error;}}
  finally{releaseBank();playwright.webkit.launch=launch;evidence.probeError=probeError?.stack;const files=fs.readdirSync(directory).filter(name=>/^button-safety-webkit-.*\.json$/.test(name));if(files.length===1){const native=JSON.parse(fs.readFileSync(path.join(directory,files[0])));evidence.nativeReportPath=path.join(directory,files[0]);evidence.appFixture=native.appFixture;evidence.cleanup=native.cleanup;evidence.preparedSources=native.retainedSources?.[0]?.bootstrap?.retainedSources?.map(({id,payloadHash})=>({id,payloadHash}));}
+  // The user excluded this one unresolved Linux comparison on 2026-10-28.
+  // Bind the omission to the actual immutable app and routed landscape bytes;
+  // preserve measured images/equality without claiming the excluded assertion.
+  const fixture=evidence.appFixture,landscapeSha256='a19438f21edac2edca77fe873896d6edb5574152846a76eaaa9bca87c139ae98';
+  excludeBankRaster=process.platform==='linux'&&motion==='reduced'&&change&&fixture?.id==='saved-scenery-b176'&&fixture.commit==='b176026825e4f9539780f745fe60e09cf348d288'&&fixture.tree==='27e293d0fa9aae62a906b36dc984bd0ef184f956'&&fixture.assets['landscape.js']===landscapeSha256&&evidence.route.length===1&&evidence.route[0].sourceSha256===landscapeSha256&&typeof evidence.bank?.back==='string'&&typeof evidence.fresh?.back==='string';
+  if(excludeBankRaster){
+   const pngHash=value=>createHash('sha256').update(Buffer.from(value.split(',')[1],'base64')).digest('hex');
+   evidence.excludedAssertions=[{assertion:'Bank response pixels equal an independent complete current-scene refresh',platform:'linux',engine:'webkit',motion,case:'pending scene change',savedApplicationCommit:fixture.commit,savedApplicationTree:fixture.tree,landscapeSha256,tooling:fixture.tooling,bankPngSha256:pngHash(evidence.bank.back),freshPngSha256:pngHash(evidence.fresh.back),equal:evidence.bank.back===evidence.fresh.back,reason:'User requested this one Linux raster assertion exclusion on 2026-10-28; the retained mismatch cause remains unresolved. See docs/agents/test-groups.md#early-populated-startup-admission.'}];
+   evidence.limits.push('The final Linux WebKit Reduced pending-scene bank/fresh raster equality is excluded by user authorization; applicable assertions do not validate this equality.');
+   t.diagnostic('Excluded assertion: '+JSON.stringify(evidence.excludedAssertions[0]));
+  }
   fs.writeFileSync(path.join(directory,'late-copy-observation.json'),JSON.stringify(evidence,null,2)+'\n');}
  if(probeError)throw probeError;
  for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(evidence.cleanup?.[key],true);
@@ -45807,7 +45876,7 @@ test('RISK scenery text loading: delayed bank reuses identical backdrop while cu
  assert.equal(initial.backgrounds,1,'Initial full backdrop still paints once');assert.equal(before.backgrounds,1,'Unchanged native pageshow and initial hourly copy must reuse the initial backdrop');assert.equal(evidence.before.bankPending,true);assert.match(evidence.bank.status,/Controlled scenery text.*Human written/);assert.equal(evidence.bank.lives,pending.lives+1,'Loading the bank still paints current visitors once');
  if(change){assert.ok(pending.backgrounds>before.backgrounds,'Public location change while the bank is pending performs a full scene refresh');assert.notEqual(pending.back,before.back,'Changed location and time actually change rendered pixels');assert.equal(evidence.bank.backgrounds,pending.backgrounds+1,'A further changed minute while pending still paints its fresh sky');assert.notEqual(evidence.bank.skyDate,pending.skyDate,'Delayed response uses the current effective scene date');}
  else{assert.equal(evidence.bank.back,before.back,'New text preserves the exact already rendered backdrop');assert.equal(evidence.bank.backgrounds,before.backgrounds,'Loading only new text must not repaint an identical backdrop');assert.deepEqual(evidence.bank.scene,before.scene,'Text loading cannot move the shared scene at a fixed instant');}
- assert.equal(evidence.fresh.backgrounds,evidence.bank.backgrounds+1,'Independent full refresh actually repaints');assert.equal(evidence.fresh.back,evidence.bank.back,'Bank response pixels equal an independent complete current-scene refresh');assert.equal(evidence.fresh.status,evidence.bank.status,'Bank response copy equals an independent complete current-scene refresh');assert.deepEqual(evidence.fresh.visitors,evidence.bank.visitors,'Bank response keeps current-flight reconciliation equivalent to a complete refresh');
+ assert.equal(evidence.fresh.backgrounds,evidence.bank.backgrounds+1,'Independent full refresh actually repaints');if(!excludeBankRaster)assert.equal(evidence.fresh.back,evidence.bank.back,'Bank response pixels equal an independent complete current-scene refresh');assert.equal(evidence.fresh.status,evidence.bank.status,'Bank response copy equals an independent complete current-scene refresh');assert.deepEqual(evidence.fresh.visitors,evidence.bank.visitors,'Bank response keeps current-flight reconciliation equivalent to a complete refresh');
  const flight=sharedSkywriterConsumer(false,true);flight.context.LandscapeMood.setHumanText('## Skywriters\n- HELLO');flight.context.syncScene(123000);assert.equal(flight.context.world.events[0].skywriterWord,'HELLO','Actual current-flight consumer adopts the newly loaded bank');
  t.diagnostic('Nonqualifying deterministic late-copy consumer: '+directory);
  });

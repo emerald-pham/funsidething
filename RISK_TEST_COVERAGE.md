@@ -2417,3 +2417,18 @@ group workload; changed repository, source and checkout identities are refused
 before that workload. Only the local fixture clears inherited raw event fields;
 real workflow authority remains strict. These controlled Node processes do not
 establish hosted admission, native/browser or release qualification.
+
+## Scoped Linux saved-scenery comparison exclusion
+
+- RISK repository process: saved scenery Linux raster exclusion is exact and durably disclosed
+
+The real saved-text Node consumer executes with only external browser/network
+boundaries controlled. It records the single user-excluded Linux Reduced pending
+scene bank/fresh image comparison, including unequal and equal measured hashes.
+Darwin pending and Linux Normal/Reduced unchanged inequalities still fail.
+Linux pending copy, visitor, paint, protected-data and cleanup faults still fail.
+All three original cases execute; the exception is an assertion exclusion,
+not a passing equality claim, whole-test skip or accepted-skip change.
+The immutable saved application and original regression snapshots stay fixed.
+These controlled processes establish neither Linux/native raster acceptance
+nor current mobile, full-suite, hosted, deployment or physical-device proof.

@@ -224,6 +224,25 @@ The browser runtime child owns a separate POSIX process group. On SIGINT or SIGT
 The test-first diff gate always runs for the actual event checkout and comparison
 base. Pages still requires both `scanner-tests` and `release-evidence`.
 
+### User-excluded Linux saved-scenery comparison
+
+On 2026-10-28 the user requested skipping the Linux portion of checkpoint #504.
+Only the final bank-versus-fresh pixel equality in the saved `b176026` Reduced
+pending-scene WebKit case is excluded on Linux. Its cause remains unresolved:
+three retained hosted candidate executions differ by one red-channel value at
+one pixel. The immutable app/tree, source profile and original regression
+snapshot remain fixed. This does not establish that the compared pixels match.
+
+The actual consumer still runs. Its durable `late-copy-observation.json` and
+TAP diagnostic name the excluded assertion, platform, motion/case, saved app/tree,
+landscape and tooling identities, both PNG hashes and observed equality. All
+other original pixel cases/platforms, paint counts, copy/current visitors,
+400-task and protected-source preservation, and cleanup assertions stay required.
+No accepted skip is added. Current-source Normal/Reduced 1 GB mobile acceptance,
+512 MB stress integrity, group/aggregate, review and deployment gates remain.
+The public process regression controls external browser/network observations to
+verify this narrow scope; it provides no Linux raster or native acceptance.
+
 ## Reusing successful CI inputs
 
 Each regression group, Firestore rules and compatibility uses the enforcing

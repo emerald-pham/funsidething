@@ -54,7 +54,9 @@ before pushing. The worker launches no live runtime or hosted workflow.
    compatibility. The separate stress job must preserve its actual application
    outcome and pass execution integrity. The required aggregate must independently
    verify all bytes and current predecessor outcomes before release/deployment.
-3. The two saved scenery consumers retain their original paint/copy/data assertions
+3. The two saved scenery consumers retain their original paint/copy/data assertions,
+   with the user-authorized single Linux saved-raster equality exclusion described
+   in [the early gate guide](../agents/test-groups.md#user-excluded-linux-saved-scenery-comparison),
    against the exact immutable `b176026825e4f9539780f745fe60e09cf348d288` app
    (tree `27e293d0fa9aae62a906b36dc984bd0ef184f956`), using current tooling.
    Their native artifacts separately bind both sources and all served assets;

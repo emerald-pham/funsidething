@@ -126,8 +126,8 @@
       "sha256": "ea24953f6e8f3a1cf0e69ed9e136d9d7c25eb02d1416206da8466f96818db40b",
       "sourceStartLine": 46393,
       "preservedOriginalPath": "scripts/source-snapshots/issue-290/scenery-2-9b5bc1c.source.txt",
-      "effectiveSha256": "a19ae113df25d524555e82a42675ed9aea267ce9efa75c4281a901816e2bb713",
-      "adaptation": "Only the explicit saved-scenery-b176 app fixture, its routed landscape hash and native source binding differ; all original causal paint, copy, pixels, data-preservation and cleanup assertions remain executable."
+      "effectiveSha256": "5afb42a96feaf7cb611c07bf2d6d57377b91cc23d68d967cf9bbfc70919d2171",
+      "adaptation": "Explicit saved-scenery-b176 app fixture, routed landscape hash and native source binding retained. User instruction on 2026-10-28 excludes only final bank/fresh raster equality for Linux WebKit Reduced pending scene change on the exact immutable b176 app; actual image hashes/equality and excluded assertion remain durable. All other original causal paint, copy, pixels, data-preservation and cleanup assertions remain executable on every original case; no whole-test or skip-inventory exception."
     },
     {
       "name": "RISK repository process: scenery consumers use allocated fallback ports and preserve early native failures",
