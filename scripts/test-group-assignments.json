@@ -12809,6 +12809,16 @@
       "root": "RISK saved view full-board safety: supported copies and identity masks never grant authority",
       "group": "persistence-recovery",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK saved view opening source preservation: invalid optional appearance keeps its bytes while one complete task opens",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK saved view accepted handover: normal actions and exact local work survive repeated offline reopening",
+      "group": "persistence-recovery",
+      "file": "tests.js"
     }
   ],
   "processControls": [

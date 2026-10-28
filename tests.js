@@ -15733,8 +15733,9 @@ test('RISK saved view broken-board guidance: opening status does not imply cloud
  assert.match(answer,/Real cloud errors and recovery warnings remain visible\./i);
  const full=help.split('<dt>Can my full board stay visible while it opens?</dt><dd>')[1]?.split('</dd>')[0]||'';
  assert.match(full,/complete local copy.*retained copies agree/i);assert.match(full,/chain, contexts and complete matching list/i);assert.match(full,/even without a saved appearance/i);assert.match(full,/Saved searches and panel choices/i);assert.match(full,/read-only.*does not choose a recovery source or confirm cloud saving/i);assert.match(full,/conflicting or different-account/i);assert.match(full,/Rank and chance values refresh after opening/i);
+ assert.match(full,/device storage cannot finish opening.*stays read-only.*Settings.*Reload app/i,'the FAQ explains the terminal read-only board and reachable recovery/retry controls');
  const chapter=help.split('<details class="help-faq" data-help-changelog>')[1]?.split('</details>')[0]||'';
- assert.ok(chapter.includes('<h3>October 26, 2026</h3>'),'the current dated release note is visible in Help');
+ assert.ok(chapter.includes('<h3>October 28, 2026</h3>'),'the current dated release note is visible in Help');
  assert.match(chapter,/complete agreeing local copy can show your saved tasks, chain, contexts and full matching list/i);
  assert.ok(chapter.includes('<li>When a saved board needs recovery, its earlier appearance can remain visible while the app checks preserved local copies. The temporary syncing label means the board is still opening, not that cloud saving is confirmed; genuine errors and recovery warnings remain visible.</li>'),'the changelog distinguishes opening status, cloud confirmation and real recovery warnings');
 });
@@ -15832,7 +15833,7 @@ async function invisibleSavedViewBrowser(theme='light',delayAppearanceAsset=fals
   return firebaseImportCount;
  };
  try{
- const context=await browser.newContext({viewport,serviceWorkers:'block',reducedMotion:'reduce'});
+ const context=await browser.newContext({viewport,serviceWorkers:startupOptions.installedOffline?'allow':'block',reducedMotion:'reduce'});
  const origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
  await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
  if(startupOptions.holdConfiguredFirebaseImports)await context.route('https://www.gstatic.com/firebasejs/10.12.2/**',async route=>{
@@ -15859,17 +15860,19 @@ async function invisibleSavedViewBrowser(theme='light',delayAppearanceAsset=fals
   window.__firstAppearanceFrames=[];let frames=0;function observe(){if(localStorage.getItem('__delayLocalRead')==='true'&&document.querySelector('.wrap')){const preview=document.querySelector('[data-saved-preview]');const root=[...document.querySelectorAll('.wrap')].find(e=>getComputedStyle(e).visibility==='visible');window.__firstAppearanceFrames.push({ready:document.documentElement.dataset.appReady==='true',populated:!!preview&&getComputedStyle(preview).visibility==='visible'&&!!preview.querySelector('.trow'),readStarted:window.__actualLocalRead.started,boardVisible:!!root,rows:root?.querySelectorAll('.trow').length||0,connectedBoards:document.querySelectorAll('.wrap:has(.trow)').length});}if(++frames<600)requestAnimationFrame(observe);}requestAnimationFrame(observe);
   const open=indexedDB.open.bind(indexedDB),success=Object.getOwnPropertyDescriptor(IDBRequest.prototype,'onsuccess');
   indexedDB.open=(...args)=>{const request=open(...args);if(localStorage.getItem('__delayLocalRead')!=='true')return request;
-   window.__actualLocalRead.started=true;let listener=null;const delay=Number(localStorage.getItem('__delayLocalReadMs'))||1800;
+   window.__actualLocalRead.started=true;window.__actualLocalRead.attempts=(window.__actualLocalRead.attempts||0)+1;const failures=Number(localStorage.getItem('__openingReadFailures'))||0;if(window.__actualLocalRead.attempts<=failures){request.onsuccess=()=>request.result.close();const failed={};setTimeout(()=>{window.__actualLocalRead.failedAttempts=(window.__actualLocalRead.failedAttempts||0)+1;failed.error=Object.assign(Error('An internal error was encountered in the Indexed Database server'),{name:'UnknownError'});failed.onerror?.();},200);return failed;}let listener=null;const delay=Number(localStorage.getItem('__delayLocalReadMs'))||1800;
    Object.defineProperty(request,'onsuccess',{configurable:true,get:()=>listener,set:fn=>{listener=fn;success.set.call(request,event=>setTimeout(()=>{window.__actualLocalRead.settled=true;fn?.call(request,event);},delay));}});return request;};
  },theme);
  const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+ if(startupOptions.availabilityFixture)await page.clock.setFixedTime(new Date('2026-10-28T12:00:00Z'));
  await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded',timeout:10000});
  await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true',null,{timeout:10000});
  await page.waitForFunction(()=>!!document.querySelector('#modalRoot [data-act="ok-quickstart"]'),null,{timeout:10000});
  await page.locator('#modalRoot [data-act="ok-quickstart"]').click();
- await page.evaluate(async longTitle=>{document.getElementById('motionDialog')?.close();state.addOpen=false;state.histOpen=false;state.settings.theme=localStorage.getItem('fvp:chain-scanner:theme');
-  for(let i=0;i<65;i++)addTask('Saved appearance task '+String(i).padStart(2,'0')+(i===0&&longTitle?' '+('Saved long task text '.repeat(100)):''));
-  addTask('Unmatched control task');save();await persist();render();},startupOptions.longTitle===true);
+ assert.equal(await page.evaluate(()=>state.tasks.length),0,'a genuinely fresh profile contains no fabricated saved tasks');
+ await page.evaluate(async ({longTitle,oneTask,availabilityFixture})=>{document.getElementById('motionDialog')?.close();state.addOpen=false;state.histOpen=false;state.settings.theme=localStorage.getItem('fvp:chain-scanner:theme');
+  for(let i=0;i<(oneTask?1:65);i++)addTask('Saved appearance task '+String(i).padStart(2,'0')+(i===0&&longTitle?' '+('Saved long task text '.repeat(100)):''));
+  if(!oneTask)addTask('Unmatched control task');if(availabilityFixture)state.tasks.at(-1).startsAt='2026-10-29';save();await persist();render();},{longTitle:startupOptions.longTitle===true,oneTask:startupOptions.oneTask===true,availabilityFixture:startupOptions.availabilityFixture===true});
  if(activeScanner)await page.locator('[data-act="start-scan"]').first().click();
  if(startupOptions.scannerState)await page.evaluate(async mode=>{state.chain=state.tasks.slice(0,2).map(t=>t.id);state.candidateId=state.tasks[2].id;state.mode=mode==='paused'?'work':'scan';state.interventionActive=mode==='intervention';state.interventionP=.23;save();await persist();render();},startupOptions.scannerState);
  if(keepHeader){await page.locator('[data-act="settings"]').first().click();await page.getByText('Scanning and recurrence',{exact:true}).click();await page.locator('#stFloatingHeader').check();await page.locator('#modalRoot [data-act="close-modal"]').click();}
@@ -15878,16 +15881,24 @@ async function invisibleSavedViewBrowser(theme='light',delayAppearanceAsset=fals
  await page.locator('[data-act="list-eligibility"][data-id="all"]').click();
  await page.locator('#listSearch').fill('Saved appearance');
  await page.locator('#listBody').evaluate(e=>{e.scrollTop=420;e.dispatchEvent(new Event('scroll'));});
- if(startupOptions.historyFixture)await page.evaluate(async()=>{state.histOpen=true;state.workLog.push({id:'opening-history-fixture',taskId:state.tasks[64].id,title:'Saved earlier work',kind:'worked',at:Date.now()-60000});save();await persist();render();});
+ if(startupOptions.historyFixture)await page.evaluate(async()=>{state.ctxOpen=true;state.histOpen=true;state.workLog.push({id:'opening-history-fixture',taskId:state.tasks[64].id,title:'Saved earlier work',kind:'worked',at:Date.now()-60000});save();await persist();render();});
  if(startupOptions.savedFilter)await page.evaluate(async kind=>{
   if(kind==='context'){
-   const id=state.contexts[0].id;state.tasks.slice(0,60).forEach(task=>{task.ctx=[id];});save();await persist();render();
-   setTaskPrerequisites(state.tasks[5].id,[state.tasks[6].id]);decide('cant');decide('no');await persist();
+   const id=state.contexts[0].id;state.tasks.slice(0,60).forEach(task=>{task.ctx=[id];});state.tasks.slice(60).forEach(task=>{task.ctx=[state.contexts[1].id];});save();await persist();render();
+   setTaskPrerequisites(state.tasks[5].id,[state.tasks[6].id]);decide('cant');decide('no');TaskActionOwner.perform({type:'benchmark',action:'worked'});await persist();
    allTasksView.toggleTag('c:'+id);
+  }else if(kind==='status'||kind==='combined'){
+   const id=state.contexts[0].id;state.tasks.slice(0,3).forEach(task=>{task.ctx=[id];task.evergreen=true;task.evergreenHours=18;});save();await persist();render();
+   if(kind==='combined'){allTasksView.setEligibility('eligible');allTasksView.toggleTag('c:'+id);allTasksView.toggleTag('s:evergreen');}else allTasksView.toggleTag('s:evergreen');
+   allTasksView.setQuery('Saved appearance');
+  }else if(kind==='missing-context'){const view=JSON.parse(localStorage.getItem('fvp:chain-scanner:saved-view:v1'));view.tagFilter='c:missing-opening-context';localStorage.setItem('fvp:chain-scanner:saved-view:v1',JSON.stringify(view));return;
   }else if(kind==='ineligible'){allTasksView.setEligibility('ineligible');allTasksView.setQuery('Saved appearance');}
   else if(kind==='long-query')allTasksView.setQuery('Saved long task text '.repeat(100).slice(0,2048));
   renderList();window.dispatchEvent(new Event('pagehide'));
  },startupOptions.savedFilter);
+ if(startupOptions.savedFilter==='combined'){
+  await page.locator('[data-act="list-eligibility"][data-id="eligible"]').click();const id=await page.evaluate(()=>state.contexts[0].id);await page.locator('[data-act="list-tag"][data-id="c:'+id+'"]').click();assert.equal(await page.locator('[data-act="list-tag"].on').textContent(),await page.evaluate(()=>state.contexts[0].name));await page.locator('[data-act="list-tag"][data-id="s:evergreen"]').click();await page.locator('#listSearch').fill('Saved appearance');
+ }
  const startup=await page.evaluate(async({brokenDeviceBoard,retainAppearance,topOfPage,seedPriorRecoveryAppearance,theme})=>{
   window.scrollTo(0,topOfPage?0:220);window.dispatchEvent(new Event('pagehide'));
   let brokenPayload=null;
@@ -15913,12 +15924,14 @@ async function invisibleSavedViewBrowser(theme='light',delayAppearanceAsset=fals
  },{brokenDeviceBoard:startupOptions.brokenDeviceBoard===true,retainAppearance:startupOptions.retainAppearance!==false,topOfPage:startupOptions.topOfPage===true,seedPriorRecoveryAppearance:startupOptions.seedPriorRecoveryAppearance===true,theme});
  if(startupOptions.sourceFault)await page.evaluate(fault=>{
   const shared='fvp:chain-scanner:v1',protectedKey='fvp:chain-scanner:protected:v1',board=JSON.parse(localStorage.getItem(shared));
+  if(fault==='malformed-primary')localStorage.setItem(shared,'{unreadable primary source');
   if(fault==='malformed-protected')localStorage.setItem(protectedKey,'{unreadable protected source');
   if(fault==='unsupported-protected')localStorage.setItem(protectedKey,JSON.stringify({...board,v:999}));
   if(fault==='divergent'){board.tasks[0].title='Distinct supported alternative';localStorage.setItem(protectedKey,JSON.stringify(board));}
   if(fault==='no-valid'){localStorage.setItem(shared,'{unreadable shared source');localStorage.setItem(protectedKey,'{unreadable protected source');}
-  if(fault==='early-account')localStorage.setItem('__fullBoardAuth',JSON.stringify({account:'other@example.com',identity:'other-identity'}));
+  if(fault==='early-account'||fault==='early-account-no-appearance')localStorage.setItem('__fullBoardAuth',JSON.stringify({account:'other@example.com',identity:'other-identity'}));
   if(fault==='early-identity'||fault==='late-identity'){board.syncAccount='fixture@example.com';board.syncIdentity='saved-identity';for(const key of ['fvp:chain-scanner:appearance:v1','fvp:chain-scanner:saved-view:v1']){const raw=localStorage.getItem(key);if(raw){const value=JSON.parse(raw);value.account='fixture@example.com';localStorage.setItem(key,JSON.stringify(value));}}for(const key of [shared,protectedKey])localStorage.setItem(key,JSON.stringify(board));if(fault==='early-identity')localStorage.setItem('__fullBoardAuth',JSON.stringify({account:'fixture@example.com',identity:'other-identity'}));}
+  if(fault.startsWith('late-signout')){board.syncAccount='fixture@example.com';board.syncIdentity='saved-identity';for(const key of [shared,protectedKey])localStorage.setItem(key,JSON.stringify(board));for(const key of ['fvp:chain-scanner:appearance:v1','fvp:chain-scanner:saved-view:v1']){const raw=localStorage.getItem(key);if(raw){const value=JSON.parse(raw);value.account='fixture@example.com';localStorage.setItem(key,JSON.stringify(value));}}localStorage.setItem('__fullBoardAuth',JSON.stringify({account:'fixture@example.com',identity:'saved-identity'}));}
   localStorage.setItem('__fullBoardTrace','true');
  },startupOptions.sourceFault);
  if(startupOptions.sourceFault)await page.addInitScript(()=>{
@@ -15955,6 +15968,10 @@ async function invisibleSavedViewBrowser(theme='light',delayAppearanceAsset=fals
   },startup.brokenPayload);
   startup.priorRecovery={...priorRecovery,fixtureHoldSafelyCleared:priorHoldCleared};
  }
+ if(startupOptions.readFailures)await page.evaluate(count=>localStorage.setItem('__openingReadFailures',String(count)),startupOptions.readFailures);
+ if(startupOptions.seedCachedError)await page.addInitScript(()=>{if(localStorage.getItem('__delayLocalRead')!=='true')return;const key='fvp:chain-scanner:appearance:v1',record=JSON.parse(localStorage.getItem(key)),find=node=>{if(!node||typeof node!=='object')return null;if(node.t==='button'&&node.c?.split(/\s+/).includes('syncbtn'))return node;for(const child of node.n||[]){const found=find(child);if(found)return found;}return null;},button=find(record.tree);button.n=['☁ error'];localStorage.setItem(key,JSON.stringify(record));window.__cachedOldErrorSeeded=button.c.split(/\s+/).includes('err')&&button.n[0]==='☁ error';});
+ if(startupOptions.savedFilter==='missing-context')await page.addInitScript(()=>{if(localStorage.getItem('__delayLocalRead')!=='true')return;const key='fvp:chain-scanner:saved-view:v1',view=JSON.parse(localStorage.getItem(key));view.tagFilter='c:missing-opening-context';localStorage.setItem(key,JSON.stringify(view));});
+ if(startupOptions.appearanceFault)await page.addInitScript(kind=>{if(localStorage.getItem('__delayLocalRead')!=='true')return;const key='fvp:chain-scanner:appearance:v1';if(kind==='corrupt')localStorage.setItem(key,'{unreadable optional appearance');if(kind==='blocked'){const get=Storage.prototype.getItem;Storage.prototype.getItem=function(name){if(name===key)throw new DOMException('isolated appearance storage blocked','SecurityError');return get.call(this,name);};}},startupOptions.appearanceFault);
  if(process.env.SAVED_VIEW_ARTIFACT_DIR)await page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`${evidencePrefix}-before.png`)});
  const before=await page.evaluate(()=>({query:document.getElementById('listSearch').value,scroll:document.getElementById('listBody').scrollTop,pageY:scrollY,geometry:(()=>{const rect=id=>{const r=document.getElementById(id).getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height};};return{scan:rect('scan'),list:rect('listWrap'),body:rect('listBody'),separators:document.querySelectorAll('#scan hr.sep').length};})(),visibleTitles:(()=>{const body=document.getElementById('listBody'),r=body.getBoundingClientRect();return[...body.querySelectorAll('.trow')].filter(e=>{const b=e.getBoundingClientRect();return b.bottom>r.top&&b.top<Math.min(r.bottom,innerHeight);}).map(e=>e.querySelector('.tt')?.textContent);})(),header:(()=>{const r=document.getElementById('appHeader').getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height};})(),tasks:JSON.stringify(state.tasks),sourceCopies:{legacy:localStorage.getItem('fvp:chain-scanner:v1'),localHead:localStorage.getItem('fvp:chain-scanner:protected:v1')},cache:localStorage.getItem('fvp:chain-scanner:appearance:v1')}));
  if(startupOptions.holdConfiguredFirebaseImports)await page.evaluate(delay=>{localStorage.setItem('__quietStartupConfiguredCloud','true');localStorage.setItem('__delayLocalReadMs',String(delay));},startupOptions.openingDelayMs||4000);
@@ -16033,6 +16050,79 @@ test('RISK saved view broken-board startup: prior appearance stays inert until t
  }
 });
 
+test('RISK saved view opening source preservation: invalid optional appearance keeps its bytes while one complete task opens',async t=>{
+ await openingBoardFixture(t);
+ for(const config of [{appearanceFault:'corrupt'},{appearanceFault:'blocked'},{readFailures:1},{readFailures:2},{readFailures:2,theme:'dark',mask:'account'},{readFailures:2,viewport:{width:1100,height:900},mask:'source'},{readFailures:2,theme:'dark',viewport:{width:1100,height:900},mask:'view-account'}])await t.test(config.appearanceFault||('read-failures-'+config.readFailures+'-'+(config.theme||'light')+'-'+(config.viewport?.width||390)),async()=>{
+ const {appearanceFault,readFailures}=config;
+ const view=await invisibleSavedViewBrowser(config.theme||'light',false,false,config.viewport||{width:390,height:844},false,{brokenDeviceBoard:true,retainAppearance:!!appearanceFault,oneTask:true,appearanceFault,readFailures,syntheticCloud:true,holdConfiguredFirebaseImports:true,topOfPage:true});
+ try{
+  await view.waitForFirebaseImports();
+  const opening=await view.page.evaluate(()=>({ready:document.documentElement.dataset.appReady==='true',readSettled:window.__actualLocalRead.settled,stateNull:state===null,scanTimer:scanWakeTimer,saveTimer,appearance:(()=>{try{return localStorage.getItem('fvp:chain-scanner:appearance:v1');}catch{return 'blocked';}})(),rows:[...document.querySelectorAll('[data-saved-preview] .trow .tt')].map(e=>e.textContent),sources:{legacy:localStorage.getItem('fvp:chain-scanner:v1'),localHead:localStorage.getItem('fvp:chain-scanner:protected:v1')}}));
+  assert.equal(opening.ready,false);assert.equal(opening.readSettled,false);assert.deepEqual(opening.rows,['Saved appearance task 00']);assert.deepEqual(opening.sources,view.before.sourceCopies);
+  assert.equal(opening.stateNull,true);assert.equal(opening.scanTimer,null,'provisional presentation cannot start the scanner clock');assert.equal(opening.saveTimer,null,'provisional presentation cannot queue a board save');
+  await view.page.keyboard.press('y');await view.page.keyboard.press('Delete');await view.page.locator('[data-saved-preview] .trow .tt').first().dispatchEvent('click');
+  if(appearanceFault)assert.equal(opening.appearance,appearanceFault==='corrupt'?'{unreadable optional appearance':'blocked','ignoring invalid appearance while opening must not delete those bytes');
+  if(readFailures){await view.page.waitForFunction(count=>window.__actualLocalRead.failedAttempts>=count,readFailures);const afterFailure=await view.page.evaluate(()=>({ready:document.documentElement.dataset.appReady==='true',previewRows:document.querySelectorAll('[data-saved-preview] .trow').length,liveRows:document.querySelectorAll('.wrap:not([data-saved-preview]) .trow').length,attempts:window.__actualLocalRead.attempts}));assert.equal(afterFailure.previewRows+afterFailure.liveRows,1,'the safe complete board remains connected through the established retry or failure outcome');assert.ok(afterFailure.attempts<=4,'repeated read failure stays bounded');}
+  view.releaseHeldFirebaseImports();
+  if(readFailures===2){
+   await view.page.waitForFunction(()=>window.SavedAppearance?.recoveryHeld===true,null,{timeout:6000});
+   const held=await view.page.evaluate(()=>({accepted:liveBoardAccepted,stateTasks:state.tasks.length,previewRows:document.querySelectorAll('[data-saved-preview] .trow').length,scannerTimer:scanWakeTimer,saveTimer,sourceBytes:{legacy:localStorage.getItem('fvp:chain-scanner:v1'),localHead:localStorage.getItem('fvp:chain-scanner:protected:v1')},header:[...document.querySelectorAll('[data-saved-preview] #syncBtn,[data-saved-preview] [data-act="settings"]')].map(e=>({id:e.id,hiddenAncestor:!!e.closest('[aria-hidden="true"],[inert]'),disabled:e.disabled}))}));
+   assert.equal(held.accepted,false);assert.equal(held.stateTasks,0,'retained presentation is never adopted as hidden workspace state');assert.equal(held.previewRows,1);assert.equal(held.scannerTimer,null);assert.equal(held.saveTimer,null);assert.deepEqual(held.sourceBytes,view.before.sourceCopies);assert.equal(held.header.length,2);assert.ok(held.header.every(e=>!e.hiddenAncestor&&!e.disabled),'real recovery controls stay reachable outside inert or hidden ancestors');
+   const refocused=await view.page.evaluate(()=>{const before=JSON.stringify(state);window.dispatchEvent(new Event('focus'));return{changed:JSON.stringify(state)!==before,scanTimer:scanWakeTimer,saveTimer};});assert.deepEqual(refocused,{changed:false,scanTimer:null,saveTimer:null},'returning to a terminal read-only board cannot run scanner decisions or queue a hidden workspace save');
+   const hints=await view.page.evaluate(()=>{window.dispatchEvent(new StorageEvent('storage',{key:'fvp:chain-scanner:appearance:v1'}));localStorage.setItem('fvp:chain-scanner:saved-view:v1',JSON.stringify({v:1,account:null,query:'Saved appearance',eligibility:'all',tagFilter:null}));window.dispatchEvent(new StorageEvent('storage',{key:'fvp:chain-scanner:saved-view:v1'}));return{previewRows:document.querySelectorAll('[data-saved-preview] .trow').length,realSettings:document.querySelectorAll('[data-saved-preview] [data-act="settings"]').length,realSync:document.querySelectorAll('[data-saved-preview] #syncBtn').length,accepted:liveBoardAccepted};});
+   assert.deepEqual(hints,{previewRows:1,realSettings:1,realSync:1,accepted:false},'optional same-owner hints preserve the single held board and its connected real recovery header');
+   const settings=view.page.locator('[data-saved-preview] [data-act="settings"]');await settings.focus();await view.page.keyboard.press('Shift+Tab');assert.equal(await view.page.evaluate(()=>document.activeElement.id),'syncBtn','native keyboard navigation reaches the real recovery status');
+   if(process.env.SAVED_VIEW_ARTIFACT_DIR){const name='terminal-hold-'+(config.theme||'light')+'-'+(config.viewport?.width||390);await view.page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,name+'.png')});fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,name+'.json'),JSON.stringify({held,frames:await view.page.evaluate(()=>window.__firstAppearanceFrames)},null,2)+'\n');}
+   await view.page.locator('[data-saved-preview] [data-act="settings"]').click();assert.match(await view.page.locator('#modalRoot').innerText(),/read.only|needs recovery/i);assert.equal(await view.page.locator('#stDateFormat').isDisabled(),true,'held Settings cannot edit a hidden workspace');
+   await view.page.getByText('Data and backups',{exact:true}).click();await view.page.locator('#backupRestoreSource').selectOption('paste');await view.page.locator('#modalRoot [data-act="restore-backup"]').click();assert.equal(await view.page.locator('#jsonBox').isEditable(),true,'the existing deliberate Paste Restore remains reachable');await view.page.getByRole('button',{name:'Close',exact:true}).last().click();
+   if(process.env.SAVED_VIEW_ARTIFACT_DIR)await view.page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,'terminal-settings-'+(config.theme||'light')+'-'+(config.viewport?.width||390)+'.png')});
+   await view.page.evaluate(()=>{onAction('add',{});TaskActionOwner.perform({type:'benchmark',action:'done'});});assert.equal(await view.page.evaluate(()=>state.tasks.length),0);
+   if(config.mask){
+    await view.page.locator('#modalRoot [data-act="close-modal"]').first().click();
+    const masked=await view.page.evaluate(kind=>{if(kind==='account'){window.CloudSync.user='another-opening-owner@example.test';window.CloudSync.ready=true;window.dispatchEvent(new Event('cloudsync'));}else{const key=kind==='source'?'fvp:chain-scanner:v1':'fvp:chain-scanner:saved-view:v1',value=JSON.parse(localStorage.getItem(key));if(kind==='source')value.tasks[0].title='Different source after the terminal hold';else value.account='another-opening-owner@example.test';localStorage.setItem(key,JSON.stringify(value));window.dispatchEvent(new StorageEvent('storage',{key}));}return{preview:!!document.querySelector('[data-saved-preview]'),accepted:liveBoardAccepted,tasks:state.tasks.length,undoDisabled:document.querySelector('#appHeader [data-act="undo"]').disabled,themeDisabled:document.getElementById('themeBtn').disabled,settingsHidden:!!document.querySelector('#appHeader [data-act="settings"]').closest('[hidden],[inert],[aria-hidden="true"]')};},config.mask);
+    assert.deepEqual(masked,{preview:false,accepted:false,tasks:0,undoDisabled:true,themeDisabled:true,settingsHidden:false},'a held account/source change masks saved content and leaves only the real recovery controls usable');
+    await view.page.locator('#appHeader [data-act="settings"]').click();assert.equal(await view.page.locator('#modalRoot [data-act="sync-reload"]').isEnabled(),true);assert.doesNotMatch(await view.page.locator('#modalRoot').innerText(),/complete retained board stays/i,'after privacy masking, Settings cannot claim that the retained board is still visible');
+    await view.page.evaluate(sources=>{localStorage.setItem('fvp:chain-scanner:v1',sources.legacy);localStorage.setItem('fvp:chain-scanner:protected:v1',sources.localHead);},view.before.sourceCopies);
+   }
+   await view.page.evaluate(()=>localStorage.removeItem('__openingReadFailures'));await view.page.locator('#modalRoot [data-act="sync-reload"]').click();
+  }
+  await view.page.waitForFunction(()=>document.documentElement.dataset.appReady==='true');
+  assert.equal(await view.page.locator('#listBody .trow').count(),1);const frames=await view.page.evaluate(()=>window.__firstAppearanceFrames);assert.ok(frames.filter(f=>f.readStarted).every(f=>f.boardVisible&&f.rows===1&&f.connectedBoards===1),'one complete board remains connected from first read through accepted handover');assert.deepEqual(view.errors,[]);
+ }finally{view.releaseHeldFirebaseImports();await view.browser.close();}
+ });
+});
+
+test('RISK saved view accepted handover: normal actions and exact local work survive repeated offline reopening',async t=>{
+ await openingBoardFixture(t);
+ const view=await invisibleSavedViewBrowser('dark',false,false,{width:390,height:844},false,{brokenDeviceBoard:true,retainAppearance:false,scannerState:'active',installedOffline:true,topOfPage:true,availabilityFixture:true});
+ try{
+  assert.equal(view.early.settled,false);assert.equal(view.early.rows.length,66,JSON.stringify({early:view.early,startup:view.startup}));
+  await view.page.waitForFunction(()=>document.documentElement.dataset.appReady==='true');
+  await view.page.waitForFunction(()=>!!navigator.serviceWorker.controller);
+  const accepted=await view.page.evaluate(()=>({ranks:[...document.querySelectorAll('#listBody .rank-summary')].map(e=>e.textContent),sparks:document.querySelectorAll('#listBody .rank-summary svg').length,preview:!!document.querySelector('[data-saved-preview]'),mode:state.mode,intervention:state.interventionActive,history:JSON.stringify(state.workLog)}));
+  assert.equal(accepted.preview,false);assert.equal(accepted.mode,'scan');assert.equal(accepted.intervention,false);assert.ok(accepted.ranks.some(value=>value.trim()),'accepted opening resumes ordinary current ranking and chance display');assert.ok(accepted.sparks>0,'accepted opening resumes normal sparkline output');
+  const futureRow=view.page.locator('#listBody .trow').filter({hasText:'Unmatched control task'});assert.equal(await futureRow.locator('.notstarted').count(),1,'the accepted board initially shows its known future start date');await view.page.clock.setFixedTime(new Date('2026-10-29T12:00:00Z'));await view.page.evaluate(()=>window.dispatchEvent(new Event('focus')));assert.equal(await futureRow.locator('.notstarted').count(),0,'returning after the controlled calendar change refreshes normal accepted availability');assert.equal(await view.page.evaluate(()=>isIntrinsicallyEligible(state.tasks.find(task=>task.title==='Unmatched control task'))),true);
+  const row=view.page.locator('#listBody .trow').first(),heightBefore=await row.evaluate(e=>e.getBoundingClientRect().height);
+  await row.locator('.tt').click();await view.page.locator('#etTitle').fill('Accepted task edit after recovered opening');await view.page.locator('[data-act="save-edit"]').click();
+  await view.page.waitForFunction(async()=>JSON.parse((await ScannerDeviceStore.readHead()).payload).tasks.some(t=>t.title==='Accepted task edit after recovered opening'));
+  const edited=await view.page.evaluate(()=>({tasks:JSON.stringify(state.tasks),sources:{legacy:localStorage.getItem('fvp:chain-scanner:v1'),localHead:localStorage.getItem('fvp:chain-scanner:protected:v1')},history:JSON.stringify(state.workLog)}));
+  assert.deepEqual(edited.sources,view.before.sourceCopies,'an accepted native edit preserves both protected recovery originals');assert.equal(edited.history,accepted.history,'reopening and editing a title do not invent History observations');
+  await view.page.locator('[data-act="bulk-select"]').click();const selectable=view.page.locator('#listBody .trow').first();const beforeSelected=await selectable.evaluate(e=>e.getBoundingClientRect().height);await selectable.locator('[data-act="bulk-toggle"]').first().click();const selectedHeight=await selectable.evaluate(e=>e.getBoundingClientRect().height);assert.ok(Math.abs(beforeSelected-selectedHeight)<1,'natural selected state retains the same task-row height');await view.page.locator('[data-act="bulk-cancel"]').click();
+
+  const online=await view.page.evaluate(async()=>{const response=await fetch('/index.html?online-opening-control='+Date.now(),{cache:'no-store'});return response.status;});assert.equal(online,200,'online transport control reaches the available origin');
+  await view.context.setOffline(true);const failed=await view.page.evaluate(async()=>{try{await fetch('/uncached-opening-offline-'+Date.now(),{cache:'no-store'});return false;}catch{return true;}});assert.equal(failed,true,'actual offline transport fails before local acceptance is claimed');
+  if(await view.page.locator('#addInput').isHidden())await view.page.locator('[data-act="toggle-add"]').click();
+  await view.page.locator('#addInput').fill('Accepted offline task after recovered opening');await view.page.locator('[data-act="add"]').click();
+  await view.page.waitForFunction(async()=>JSON.parse((await ScannerDeviceStore.readHead()).payload).tasks.some(t=>t.title==='Accepted offline task after recovered opening'));
+  for(let i=0;i<2;i++){
+   await view.page.reload({waitUntil:'domcontentloaded'});await view.page.waitForFunction(()=>document.documentElement.dataset.appReady==='true');
+   const reopened=await view.page.evaluate(()=>({titles:state.tasks.map(t=>t.title),views:document.querySelectorAll('.wrap:has(.trow)').length,preview:!!document.querySelector('[data-saved-preview]'),sources:{legacy:localStorage.getItem('fvp:chain-scanner:v1'),localHead:localStorage.getItem('fvp:chain-scanner:protected:v1')}}));
+   assert.ok(reopened.titles.includes('Accepted task edit after recovered opening'));assert.ok(reopened.titles.includes('Accepted offline task after recovered opening'));assert.equal(reopened.views,1);assert.equal(reopened.preview,false);assert.deepEqual(reopened.sources,view.before.sourceCopies);
+  }
+  assert.ok(heightBefore>0);assert.deepEqual(view.errors,[]);
+ }finally{await view.context.setOffline(false);await view.browser.close();}
+});
+
 test('RISK opening board presentation: shared markup retains released cards contexts task rows and history',async()=>{
  const baseline=spawnSync('git',['show','6c67fb0c9988d3e578579c7bb23a8ed0731aac3f:index.html'],{cwd:__dirname,encoding:'utf8',maxBuffer:16*1024*1024});assert.equal(baseline.status,0,baseline.stderr);
  const tasks=['first','bench','candidate'].map((id,i)=>({...syncTask(id,'Saved <'+id+'> & title'),mu:25+i,ctx:['home'],evergreen:i===2,due:i===2?'2026-10-29':null}));
@@ -16053,14 +16143,14 @@ test('RISK opening board presentation: shared markup retains released cards cont
 });
 
 test('RISK saved view broken-board visibility: the complete saved board is readable while durable startup waits',async t=>{
- await openingBoardFixture(t);
+ await openingBoardFixture(t);const enlargedCoverage=new Set();
  for(const config of [
   {browserEngine:'chromium',theme:'light',scannerState:'active'}, {browserEngine:'chromium',theme:'dark',scannerState:'active'},
   {browserEngine:'webkit',theme:'light',scannerState:'active'}, {browserEngine:'webkit',theme:'dark',scannerState:'active'},
-  {retainAppearance:true,scannerState:'active',historyFixture:true}, {longTitle:true}, {scannerState:'paused'}, {scannerState:'intervention'}].filter(config=>!openingBoardSelfHosted||config.browserEngine!=='webkit')){
-  const {retainAppearance=false,longTitle=false,browserEngine='chromium',theme='light',scannerState,historyFixture}=config;
-  const label=[browserEngine,theme,retainAppearance?'saved-view':'no-appearance',longTitle?'long-title':scannerState||'no-dot'].join('-');
-  const view=await invisibleSavedViewBrowser(theme,false,false,{width:390,height:844},false,{brokenDeviceBoard:true,retainAppearance,longTitle,scannerState,historyFixture,browserEngine,syntheticCloud:true,holdConfiguredFirebaseImports:true,openingDelayMs:4000,topOfPage:true});
+  {retainAppearance:true,scannerState:'active',historyFixture:true}, {theme:'dark',retainAppearance:true,scannerState:'active',historyFixture:true,viewport:{width:1100,height:900}}, {theme:'light',retainAppearance:true,scannerState:'active',historyFixture:true,viewport:{width:1100,height:900}}, {theme:'dark',retainAppearance:true,scannerState:'active',historyFixture:true}, {longTitle:true}, {scannerState:'paused'}, {scannerState:'intervention'}].filter(config=>!openingBoardSelfHosted||config.browserEngine!=='webkit')){
+  const {retainAppearance=false,longTitle=false,browserEngine='chromium',theme='light',scannerState,historyFixture,viewport={width:390,height:844}}=config;
+  const label=[browserEngine,theme,viewport.width,retainAppearance?'saved-view':'no-appearance',longTitle?'long-title':scannerState||'no-dot'].join('-');
+  const view=await invisibleSavedViewBrowser(theme,false,false,viewport,false,{brokenDeviceBoard:true,retainAppearance,longTitle,scannerState,historyFixture,browserEngine,syntheticCloud:true,holdConfiguredFirebaseImports:true,openingDelayMs:4000,topOfPage:true});
   try{
    await view.waitForFirebaseImports();
    const opening=await view.page.evaluate(()=>{
@@ -16090,13 +16180,15 @@ test('RISK saved view broken-board visibility: the complete saved board is reada
    const capture=async file=>{if(!process.env.SAVED_VIEW_ARTIFACT_DIR)return;const previous=process.env.PW_TEST_SCREENSHOT_NO_FONTS_READY;process.env.PW_TEST_SCREENSHOT_NO_FONTS_READY='1';try{await view.page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,file)});}finally{if(previous===undefined)delete process.env.PW_TEST_SCREENSHOT_NO_FONTS_READY;else process.env.PW_TEST_SCREENSHOT_NO_FONTS_READY=previous;}};
    const surface=[];
    for(const enlarged of [false,true]){
-    await view.page.evaluate(enlarged=>{document.getElementById('full-board-text-size')?.remove();if(enlarged){const style=document.createElement('style');style.id='full-board-text-size';style.textContent='.syncbtn{font-size:18px!important}.topbtns .ghost:last-child{font-size:19.5px!important}';document.head.append(style);}window.scrollTo(0,0);},enlarged);
+    await view.page.evaluate(enlarged=>{document.getElementById('full-board-text-size')?.remove();if(enlarged){const style=document.createElement('style');style.id='full-board-text-size';style.textContent='.syncbtn{font-size:18px!important}.topbtns .ghost:last-child{font-size:19.5px!important}';document.head.append(style);const root=document.querySelector('[data-saved-preview]');window.__fullBoardTextSizes??=[...root.querySelectorAll('*')].filter(e=>[...e.childNodes].some(n=>n.nodeType===3&&n.textContent.trim())).map(e=>({element:e,old:e.style.fontSize,size:Number.parseFloat(getComputedStyle(e).fontSize)}));for(const row of window.__fullBoardTextSizes)row.element.style.fontSize=(row.size*1.5)+'px';}else{for(const row of window.__fullBoardTextSizes||[])row.element.style.fontSize=row.old;}window.scrollTo(0,0);},enlarged);
     await capture('full-board-'+label+'-'+(enlarged?'enlarged':'ordinary')+'-scanner.png');
     for(const position of ['top','middle','end']){
      const probe=await view.page.evaluate(position=>{const root=document.querySelector('[data-saved-preview]'),body=root.querySelector('[data-preview-id="listBody"]');body.scrollTop=position==='top'?0:position==='middle'?body.scrollHeight/2:body.scrollHeight;window.scrollTo(0,Math.max(0,body.getBoundingClientRect().top+scrollY-100));const r=body.getBoundingClientRect();return{position,settled:window.__actualLocalRead.settled,ready:document.documentElement.dataset.appReady==='true',scroll:body.scrollTop,rows:body.querySelectorAll('.trow').length,visible:[...body.querySelectorAll('.trow')].filter(e=>{const b=e.getBoundingClientRect();return b.bottom>r.top&&b.top<Math.min(r.bottom,innerHeight);}).map(e=>e.querySelector('.tt').textContent),theme:document.documentElement.dataset.theme,width:document.documentElement.scrollWidth,viewport:innerWidth};},position);
      assert.equal(probe.settled,false,'full saved content is actually visible before the held read completes');assert.equal(probe.ready,false);assert.equal(probe.rows,retainAppearance?65:66);assert.ok(probe.visible.length>0);assert.equal(probe.theme,theme);assert.ok(probe.width<=probe.viewport+1,'opening content fits the phone viewport');
      if(position==='end')assert.ok(probe.visible.some(title=>title.includes('Saved appearance task 64')),'the complete last matching task can actually be seen');
-     surface.push({enlarged,...probe});
+     const typography=await view.page.evaluate(()=>{const root=document.querySelector('[data-saved-preview]'),sample=selector=>[...root.querySelectorAll(selector)].filter(e=>e.textContent.trim()).slice(0,2).map(e=>({text:e.textContent,fontSize:getComputedStyle(e).fontSize}));return{cards:sample('.card .title'),filters:sample('.ltag'),rows:sample('.trow .tt'),contexts:sample('.ctxitem'),history:sample('.histbody .dt')};});
+     if(enlarged){const ordinary=surface.find(item=>!item.enlarged)?.typography;for(const key of ['cards','filters','rows','contexts','history']){assert.equal(typography[key].length,ordinary[key].length,'the enlarged '+key+' surface retains its sampled content');if(typography[key].length)enlargedCoverage.add(key);assert.ok(typography[key].every((item,i)=>Number.parseFloat(item.fontSize)>=Number.parseFloat(ordinary[key][i].fontSize)*1.49),'enlarged full-board acceptance actually increases '+key+' text, not only the header');}}
+     surface.push({enlarged,...probe,typography});
      await capture('full-board-'+label+'-'+(enlarged?'enlarged':'ordinary')+'-'+position+'.png');
     }
    }
@@ -16108,37 +16200,49 @@ test('RISK saved view broken-board visibility: the complete saved board is reada
    assert.ok(frames.filter(frame=>frame.readStarted).every(frame=>frame.boardVisible&&frame.rows>0),'every compositor opportunity from the actual durable-read boundary through handoff shows the full board');
    assert.ok(frames.every(frame=>frame.connectedBoards<=1),'the handoff never retains two connected complete board DOMs');
    assert.deepEqual(await view.page.evaluate(()=>state.tasks.map(t=>t.id)),JSON.parse(view.before.tasks).map(t=>t.id),'the authoritative recovered board keeps every displayed task');
+   if(scannerState){const lifecycle=await view.page.evaluate(()=>({mode:state.mode,intervention:state.interventionActive}));assert.equal(lifecycle.mode,scannerState==='paused'?'work':'scan');assert.equal(lifecycle.intervention,scannerState==='intervention','accepted opening retains the supported active paused and intervention lifecycle');}
+
 
    assert.deepEqual(view.errors,[]);
   }finally{view.releaseHeldFirebaseImports();await view.browser.close();}
  }
+ assert.deepEqual([...enlargedCoverage].sort(),['cards','contexts','filters','history','rows'],'actual enlarged coverage includes the complete board surfaces');
 });
 
 test('RISK saved view full-board filters: opening preserves saved membership controls and cheap task facts',async t=>{
  await openingBoardFixture(t);
- for(const savedFilter of ['ineligible','context','long-query'])await t.test(savedFilter,async()=>{
+ for(const savedFilter of ['ineligible','context','status','combined','missing-context','long-query','hint-refresh'])await t.test(savedFilter,async()=>{
   const view=await invisibleSavedViewBrowser('light',false,false,{width:390,height:844},false,{brokenDeviceBoard:true,retainAppearance:true,scannerState:'active',longTitle:savedFilter==='long-query',savedFilter,syntheticCloud:true,holdConfiguredFirebaseImports:true,topOfPage:true});
   try{
    await view.waitForFirebaseImports();assert.equal(view.startup.sourceCheck.board,true,'the populated saved fixture passes independent complete-source validation');
    const opening=await view.page.evaluate(()=>{const root=document.querySelector('[data-saved-preview]'),body=root.querySelector('[data-preview-id="listBody"]');return{stateNull:state===null,accepted:liveBoardAccepted,ready:document.documentElement.dataset.appReady==='true',settled:window.__actualLocalRead.settled,query:root.querySelector('[data-preview-id="listSearch"]').value,rows:[...body.querySelectorAll('.trow')].map(row=>({title:row.querySelector('.tt').textContent,dim:row.style.opacity,blockers:row.querySelector('.dependency-blockers')?.textContent,skip:row.querySelector('.skipped')?.textContent})),eligibility:root.querySelector('[data-preview-id="listEligibilityRow"] .on')?.textContent,tags:[...root.querySelectorAll('[data-preview-id="listTagRow"] .on')].map(e=>e.textContent),sources:{legacy:localStorage.getItem('fvp:chain-scanner:v1'),localHead:localStorage.getItem('fvp:chain-scanner:protected:v1')}};});
    assert.equal(opening.stateNull,true);assert.equal(opening.accepted,false);assert.equal(opening.ready,false);assert.equal(opening.settled,false);assert.deepEqual(opening.sources,view.before.sourceCopies);
-   assert.equal(opening.rows.length,savedFilter==='ineligible'?2:savedFilter==='context'?60:1,'all and only the complete matching tasks remain visible');
-   assert.equal(opening.eligibility,savedFilter==='ineligible'?'Ineligible':'All');
+   assert.equal(opening.rows.length,savedFilter==='ineligible'?2:savedFilter==='context'?60:savedFilter==='status'?3:savedFilter==='combined'?1:savedFilter==='missing-context'||savedFilter==='hint-refresh'?65:1,'all and only the complete matching tasks remain visible');
+   assert.equal(opening.eligibility,savedFilter==='ineligible'?'Ineligible':savedFilter==='combined'?'Eligible':'All');
    assert.equal(opening.query,savedFilter==='long-query'?'Saved long task text '.repeat(100).slice(0,2048):'Saved appearance','valid saved query text including more than1024characters stays exact');
+   if(savedFilter==='status'||savedFilter==='combined')assert.deepEqual(opening.tags,['evergreen'],'the supported status tag replaces a prior context tag in the shared saved-view slot');
+   if(savedFilter==='missing-context')assert.equal(await view.page.evaluate(()=>JSON.parse(localStorage.getItem('fvp:chain-scanner:saved-view:v1')).tagFilter),'c:missing-opening-context','the missing reference was present at the actual unresolved opening boundary');
+   if(savedFilter==='missing-context')assert.deepEqual(opening.tags,[],'a missing saved context safely falls back to all otherwise matching tasks');
+   if(savedFilter==='long-query')assert.equal(opening.query.length,2048,'the actual maximum supported saved query is retained in full');
    if(savedFilter==='context'){
     assert.ok(opening.tags.length>0,'the saved context filter remains selected');assert.ok(opening.rows.some(row=>row.blockers?.includes('Saved appearance task 06')&&row.dim==='0.45'),'a blocked saved task retains its dependency title and eligibility dimming');
-    assert.ok(opening.rows.some(row=>row.skip?.includes('can’t')),'a saved Can’t mark retains its visible hold label');assert.ok(opening.rows.some(row=>row.skip==='no'),'a saved No mark retains its visible label');
+    assert.ok(opening.rows.some(row=>row.skip?.includes('can’t')),'a saved Can’t mark retains its visible hold label');assert.ok(opening.rows.some(row=>row.skip==='no'),'a saved No mark retains its visible label');assert.ok(opening.rows.some(row=>row.skip?.includes('worked')),'a saved Worked mark retains its visible label');
+   }
+   let acceptedTitles=opening.rows.map(row=>row.title).sort();
+   if(savedFilter==='hint-refresh'){
+    const changed=await view.page.evaluate(()=>{window.dispatchEvent(new StorageEvent('storage',{key:'fvp:chain-scanner:appearance:v1',newValue:'unrelated optional appearance'}));const retained=document.querySelectorAll('[data-saved-preview] .trow').length,key='fvp:chain-scanner:saved-view:v1',value=JSON.parse(localStorage.getItem(key));value.query='Saved appearance task 64';localStorage.setItem(key,JSON.stringify(value));window.dispatchEvent(new StorageEvent('storage',{key,newValue:JSON.stringify(value)}));return{retained,ready:document.documentElement.dataset.appReady==='true',stateNull:state===null,rows:[...document.querySelectorAll('[data-saved-preview] .trow .tt')].map(e=>e.textContent)};});
+    assert.equal(changed.retained,65,'optional-cache changes do not erase a complete source projection');assert.equal(changed.ready,false);assert.equal(changed.stateNull,true);assert.deepEqual(changed.rows,['Saved appearance task 64'],'a fresh saved-view hint uses independently known exact matching membership');acceptedTitles=['Saved appearance task 64'];
    }
    view.releaseHeldFirebaseImports();await view.page.waitForFunction(()=>document.documentElement.dataset.appReady==='true');
-   assert.deepEqual(await view.page.evaluate(()=>[...document.querySelectorAll('#listBody .tt')].map(row=>row.textContent).sort()),opening.rows.map(row=>row.title).sort(),'accepted hydration keeps the same saved membership while computed ranking may reorder it');assert.deepEqual(view.errors,[]);
+   assert.deepEqual(await view.page.evaluate(()=>[...document.querySelectorAll('#listBody .tt')].map(row=>row.textContent).sort()),acceptedTitles,'accepted hydration keeps the same saved membership while computed ranking may reorder it');assert.deepEqual(view.errors,[]);
   }finally{view.releaseHeldFirebaseImports();await view.browser.close();}
  });
 });
 
 test('RISK saved view full-board safety: supported copies and identity masks never grant authority',async t=>{
  await openingBoardFixture(t);
- for(const sourceFault of ['malformed-protected','unsupported-protected','divergent','no-valid','early-account','early-identity','late-account','late-identity','late-storage'])await t.test(sourceFault,async()=>{
-  const view=await invisibleSavedViewBrowser('light',false,false,{width:390,height:844},false,{brokenDeviceBoard:true,retainAppearance:sourceFault.startsWith('early-'),syntheticCloud:true,holdConfiguredFirebaseImports:true,sourceFault,topOfPage:true});
+ for(const sourceFault of ['malformed-primary','malformed-protected','unsupported-protected','divergent','no-valid','early-account','early-account-no-appearance','early-identity','late-account','late-identity','late-storage','late-view-account','late-signout-with-appearance','late-signout-no-appearance'])await t.test(sourceFault,async()=>{
+  const view=await invisibleSavedViewBrowser('light',false,false,{width:390,height:844},false,{brokenDeviceBoard:true,retainAppearance:sourceFault.endsWith('with-appearance')||sourceFault.startsWith('early-')&&!sourceFault.endsWith('no-appearance'),syntheticCloud:true,holdConfiguredFirebaseImports:true,sourceFault,topOfPage:true});
   try{
    await view.waitForFirebaseImports();
    const opening=await view.page.evaluate(()=>({stateNull:state===null,accepted:liveBoardAccepted,ready:document.documentElement.dataset.appReady==='true',settled:window.__actualLocalRead.settled,
@@ -16148,13 +16252,14 @@ test('RISK saved view full-board safety: supported copies and identity masks nev
    assert.equal(opening.stateNull,true);assert.equal(opening.accepted,false);assert.equal(opening.ready,false);assert.equal(opening.settled,false);
    assert.equal(opening.pushes,0,'a displayed board cannot push before authority');assert.deepEqual(opening.writes,[],'display performs no saved-board or backup writes');assert.equal(opening.actions,0,'the full display cannot acquire live actions links or duplicate IDs');
    assert.deepEqual(opening.sources,view.before.sourceCopies,'all retained originals stay exact');
-   const shouldShow=['malformed-protected','unsupported-protected','late-account','late-identity','late-storage'].includes(sourceFault);
+   const shouldShow=['malformed-primary','malformed-protected','unsupported-protected','late-account','late-identity','late-storage','late-view-account'].includes(sourceFault)||sourceFault.startsWith('late-signout');
    assert.equal(opening.preview,shouldShow,'only an unambiguous supported owner may display; divergent missing unsupported and foreign-owner sources never become an empty or chosen board');
    if(shouldShow){assert.equal(opening.rows,66);assert.equal(opening.inert,true);}
    if(sourceFault.startsWith('late-')){
     const masked=await view.page.evaluate(fault=>{
-     if(fault==='late-storage')window.dispatchEvent(new StorageEvent('storage',{key:'fvp:chain-scanner:protected:v1',newValue:'changed peer source'}));
-     else{window.CloudSync.user=fault==='late-identity'?'fixture@example.com':'other@example.com';window.CloudSync.ready=true;window.CloudSync.recoveryIdentity=()=> 'other-identity';window.dispatchEvent(new Event('cloudsync'));}
+     if(fault==='late-view-account'){const key='fvp:chain-scanner:saved-view:v1',value={v:1,account:'different-view-owner',query:'private'};localStorage.setItem(key,JSON.stringify(value));window.dispatchEvent(new StorageEvent('storage',{key,newValue:JSON.stringify(value)}));}
+     else if(fault==='late-storage')window.dispatchEvent(new StorageEvent('storage',{key:'fvp:chain-scanner:protected:v1',newValue:'changed peer source'}));
+     else{window.CloudSync.user=fault.startsWith('late-signout')?null:fault==='late-identity'?'fixture@example.com':'other@example.com';window.CloudSync.ready=true;window.CloudSync.recoveryIdentity=()=>fault.startsWith('late-signout')?null:'other-identity';window.dispatchEvent(new Event('cloudsync'));}
      return{preview:!!document.querySelector('[data-saved-preview]'),stateNull:state===null,accepted:liveBoardAccepted,pushes:window.__fullBoardCloudWrites};
     },sourceFault);
     assert.equal(masked.preview,false,'late account identity and storage changes immediately mask the pending display');assert.equal(masked.stateNull,true);assert.equal(masked.accepted,false);assert.equal(masked.pushes,0);
@@ -16165,10 +16270,12 @@ test('RISK saved view full-board safety: supported copies and identity masks nev
 
 test('RISK saved view broken-board startup: configured Firebase leaves the prior warning neutral until its first event',async t=>{
  await openingBoardFixture(t);
- const view=await invisibleSavedViewBrowser('light',false,false,{width:390,height:844},false,{brokenDeviceBoard:true,retainAppearance:true,topOfPage:true,seedPriorRecoveryAppearance:true,syntheticCloud:true,holdConfiguredFirebaseImports:true,browserEngine:openingBoardSelfHosted?'chromium':'webkit'});
+ for(const seedCachedError of [false,true])await t.test(seedCachedError?'cached old error':'cached recovery warning',async()=>{
+ const view=await invisibleSavedViewBrowser('light',false,false,{width:390,height:844},false,{brokenDeviceBoard:true,retainAppearance:true,topOfPage:true,seedPriorRecoveryAppearance:true,seedCachedError,syntheticCloud:true,holdConfiguredFirebaseImports:true,browserEngine:openingBoardSelfHosted?'chromium':'webkit'});
  try{
   assert.equal(view.startup.priorRecovery?.hold?.reason,'device-source-recovery','the remembered warning comes from a real protected local recovery');
   assert.equal(view.startup.priorRecovery?.appearanceStatus,'☁ recovery pending','the initial cache contains the exact prior warning being tested');
+  if(seedCachedError)assert.equal(await view.page.evaluate(()=>window.__cachedOldErrorSeeded===true),true,'this isolated variant seeds an old cached error before actual startup has any current error');
   const heldImports=await view.waitForFirebaseImports();
   const opening=await view.page.evaluate(()=>({
    configured:window.CloudSync?.configured===true,ready:window.CloudSync?.ready,status:window.CloudSync?.status,
@@ -16180,7 +16287,7 @@ test('RISK saved view broken-board startup: configured Firebase leaves the prior
   }));
   if(process.env.SAVED_VIEW_ARTIFACT_DIR){
    fs.mkdirSync(process.env.SAVED_VIEW_ARTIFACT_DIR,{recursive:true});
-   fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,'configured-cloud-first-paint-before-event.json'),JSON.stringify({heldImports,opening,priorRecovery:view.startup.priorRecovery},null,2)+'\n');
+   fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,'configured-cloud-first-paint-'+(seedCachedError?'old-error':'old-recovery')+'-before-event.json'),JSON.stringify({heldImports,opening,priorRecovery:view.startup.priorRecovery,seedCachedError},null,2)+'\n');
   }
   assert.equal(heldImports,3,'all three real Firebase module imports are held before initialization completes');
   assert.equal(opening.configured,true);assert.equal(opening.status,'syncing');
@@ -16194,13 +16301,14 @@ test('RISK saved view broken-board startup: configured Firebase leaves the prior
   view.releaseHeldFirebaseImports();
   await view.page.waitForFunction(()=>window.CloudSync?.status==='error'&&window.__cloudsyncEvents>0,null,{timeout:8000});
   const failed=await view.page.evaluate(()=>({status:window.CloudSync?.status,events:window.__cloudsyncEvents,appReady:document.documentElement.dataset.appReady==='true',readSettled:window.__actualLocalRead.settled,projection:document.querySelector('[data-saved-preview] .syncbtn')?.textContent,title:document.querySelector('[data-saved-preview] .syncbtn')?.title,previewInert:document.querySelector('[data-saved-preview]')?.inert}));
-  if(process.env.SAVED_VIEW_ARTIFACT_DIR)fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,'configured-cloud-first-import-error.json'),JSON.stringify(failed,null,2)+'\n');
+  if(process.env.SAVED_VIEW_ARTIFACT_DIR)fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,'configured-cloud-first-'+(seedCachedError?'old-error':'old-recovery')+'-import-error.json'),JSON.stringify(failed,null,2)+'\n');
   assert.equal(failed.status,'error','an actual configured-module import failure remains visible');
   assert.equal(failed.events>0,true);assert.equal(failed.appReady,false);assert.equal(failed.readSettled,false);
   assert.equal(failed.projection,'☁ error','the real initialization failure replaces the neutral opening label');
   assert.match(failed.title,/Cloud setup failed/);assert.equal(failed.previewInert,true);
   assert.deepEqual(view.errors,[]);
  }finally{view.releaseHeldFirebaseImports();await view.browser.close();}
+ });
 });
 
 test('RISK saved view broken-board status: configured cloud changes remain visible in the saved appearance and after recovery',async t=>{

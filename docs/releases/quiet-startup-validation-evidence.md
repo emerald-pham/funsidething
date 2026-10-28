@@ -391,3 +391,68 @@ Explicit external QA still selects WebKit for this case. This is a test
 portability RED, not a new product RED. Superseded ef4 group execution was
 stopped and remains failed/incomplete with `group-stop-audit.json`; no group
 pass or exact qualification is inherited.
+
+## Resumed #358 acceptance on current main
+
+The human resumed #358 on October28. Main4fe423bf was merged without
+dropping either side's protected tests. The100 approved slices #404–#503
+continue as one integration candidate and PR294. All prior evidence above
+keeps its original source, comparison base and runtime. The prior3d9442c
+full/npm-test run was interrupted at the human hold; its two required
+installed-client reports never finalized. Its262-case persistence,15-case
+compatibility and24-case rules passes do not qualify this resumed source.
+
+Actual held-IndexedDB browser consumers demonstrated three product gaps.
+Malformed optional appearance bytes were deleted during unresolved opening
+(REDffcce662, GREENd45f5b96). Repeated device-open failures collapsed a safe
+full projection to an empty memory workspace (discovery00233d61, explicit
+RED7a423d69, GREEN4ee4678c). Installed-worker optional-cache/view events could
+erase a still-eligible full projection despite unchanged independently valid
+sources (diagnostic74f1ca0e, explicit RED97e4dc3f, accepted offline journey
+GREEN3313e9d3). Diagnostic manual renderer calls were removed before the
+permanent consumer RED and are not acceptance evidence.
+
+The opening display now preserves invalid optional bytes until normal accepted
+capture, retains the full read-only presentation after exhausted existing reads,
+and keeps actual recovery controls reachable without accepting retained data.
+Task-changing handlers, shortcuts and Settings edits remain held. No retry or
+deadline was extended. Ordinary no-safe-source memory-workspace behavior stays
+separate. A terminal same-owner hint leaves that original held view stable;
+it does not promise live cross-tab preference updates. Account, UID, source or
+view-owner changes still mask the presentation immediately. Terminal hint
+REDfe299698, masked-control RED6e3d8c0c and masked-copy RED797c0aa7 preserve
+the actual interaction chronology. Focus return passed as an unchanged positive;
+it was not a clock repair. Final boundary GREENe5a8c12b passes13/13 with zero
+skips, including native recovery-header keyboard navigation, Settings/Paste
+Restore/reload, all three held-state masking controls, accepted date change,
+native edit/durable readback and actual offline repeated reopening.
+
+The user explicitly clarified #442: preserve the existing filter choices and
+test each supported combination. Search plus eligibility plus one context or
+status tag is covered through the actual native transition; simultaneous
+context/status filtering and a saved-view schema expansion are outside scope.
+The original maximum-query fixture already reached2048 characters. Earlier
+dbde27a typography evidence included a genuine82-artifact1.5x full-board
+supplement; the current permanent consumer strengthens current-source coverage
+rather than erasing that valid historical proof. Explicit cached-old-error and
+controlled accepted calendar-change cases passed in deddd885 before the final
+boundary run. Both new required roots are registered; no inventory/skip or
+release-gate budget is weakened.
+
+An external archive event removed the active dirty checkout at10:57:57Z on
+October28. Its cause is unconfirmed. Snapshot68c878c571e441c43b0890253fda7ab2e4dc97ba
+retained the exact source bytes, matching the last pre-archive recorder.
+The same branch/path was restored byte-for-byte and Git-locked under the same
+live host entry; no foreign checkout or reservation was changed. The app
+declined ownerless attachment, and no ownership bypass was attempted. Original
+ignored dependency/debug-log preservation remains unverified; pinned dependencies
+were reconstructed. Recovery manifests and the snapshot ref remain retained.
+
+Contemporaneous records and the100-slice acceptance index live outside the
+checkout in task-artifacts/issue-358-resume-20261028. This section records focused
+acceptance, not final qualification: the clean frozen candidate still needs its
+full/npm-test and both installed-client cases, exact-base compatibility/rules,
+actual final rendered evidence, independent Standards/Spec-specialist/FAQ and
+typography review, corrected PR publication, hosted CI, merge and Stable public
+verification. Private original and physical-iPhone recovery remain unverified.
+Beta mirroring stays paused until explicit human confirmation that Stable is good.
