@@ -26378,4 +26378,84 @@
     "failure": "Genuine contemporaneous ERR_ASSERTION: healthy-owner/alias controls reached the external output sentinel, but missing-unrelated foreign owner produced actual guard realpathSync ENOENT instead of that sentinel. Recorder generic infrastructure-failure label is preserved because its classifier sees ENOENT in the asserted actual value. Earlier5d3e7b9e is invalid setup from separate inventory mismatch, not accepted RED. Same test bytes and command pass9/9 at GREEN823f254f; affected refusal/risk map b95b4156 passes."
   }
 }
+,
+{
+  "baseCommit": "7afdb551b3374c2e35daf9ce710156e9f4ab6c6d",
+  "testChangesSha256": "55435ff0389869ed038032820a47828af0aab2edf2dadb1671183ed588f67702",
+  "reason": "NS01 #992 merges exact admitted inventory3c39e8726c4c127b93505755e989dcf832602f16 into clean guard7afdb551b3374c2e35daf9ce710156e9f4ab6c6d. Derived combined fingerprint follows already committed merge984d514; all original rationale objects and original assertion chronology are preserved. Prior metadata read ENOBUFS remains setup failure.",
+  "previousBehavior": "The original guard traversed a missing unrelated foreign owner before valid admission. Separately, the reviewed button inventory did not match the current merged tracked application templates.",
+  "intendedBehavior": "Retain the already GREEN native-allocation guard and original test bytes with separately admitted source-template inventory/regression; preserve every existing refusal and complete group registration.",
+  "replacementTests": [
+    "RISK repository process: merged tracked app sources match the reviewed button templates"
+  ],
+  "preservedCoverage": [
+    "Original guard assertion RED43a07435 and GREEN823f254f remain unchanged; earlier invalid setup5d3e7b9e stays invalid and preserved.",
+    "All inherited source-inventory acceptance/refusal assertions, thirteen group replacements, foreign active/parked resource conflicts and fixture ledger byte preservation remain unchanged.",
+    "Native admission NK06, refusal NK07, rendered Reload#988 and release qualification remain separately ticketed; source metadata passing is not browser or product proof."
+  ],
+  "redEvidence": {
+    "command": "Original guard recorder43a07435-dade-40d4-a518-6261724090c2 at unchanged4ef3862, GREEN823f254f; inventory original evidence retained in inventory-merge/integrated-evidence.json and unchanged inherited inventory rationale. NS01 derives only combined protected-test fingerprint after merge984d514.",
+    "failure": "Original meaningful guard assertion observed expected admitted output sentinel versus actual foreign-path ENOENT with healthy controls passing. Inventory had independently preserved original mismatch assertion. This later merge metadata and buffer setup correction are not new behavioral RED or native runs."
+  }
+},
+{
+  "baseCommit": "4ef38622839cff86c86b97ed49031a43b22e563d",
+  "testChangesSha256": "613155aa39d340c8f3da94fdde1ae8d7febcf8d2fd8acc629787b0ffc05355f4",
+  "reason": "NS01 #992 merges exact admitted inventory3c39e8726c4c127b93505755e989dcf832602f16 into clean guard7afdb551b3374c2e35daf9ce710156e9f4ab6c6d. Derived combined fingerprint follows already committed merge984d514; all original rationale objects and original assertion chronology are preserved. Prior metadata read ENOBUFS remains setup failure.",
+  "previousBehavior": "The original guard traversed a missing unrelated foreign owner before valid admission. Separately, the reviewed button inventory did not match the current merged tracked application templates.",
+  "intendedBehavior": "Retain the already GREEN native-allocation guard and original test bytes with separately admitted source-template inventory/regression; preserve every existing refusal and complete group registration.",
+  "replacementTests": [
+    "RISK repository process: native allocation admits its healthy owner past missing foreign paths and protects their claims",
+    "RISK repository process: merged tracked app sources match the reviewed button templates"
+  ],
+  "preservedCoverage": [
+    "Original guard assertion RED43a07435 and GREEN823f254f remain unchanged; earlier invalid setup5d3e7b9e stays invalid and preserved.",
+    "All inherited source-inventory acceptance/refusal assertions, thirteen group replacements, foreign active/parked resource conflicts and fixture ledger byte preservation remain unchanged.",
+    "Native admission NK06, refusal NK07, rendered Reload#988 and release qualification remain separately ticketed; source metadata passing is not browser or product proof."
+  ],
+  "redEvidence": {
+    "command": "Original guard recorder43a07435-dade-40d4-a518-6261724090c2 at unchanged4ef3862, GREEN823f254f; inventory original evidence retained in inventory-merge/integrated-evidence.json and unchanged inherited inventory rationale. NS01 derives only combined protected-test fingerprint after merge984d514.",
+    "failure": "Original meaningful guard assertion observed expected admitted output sentinel versus actual foreign-path ENOENT with healthy controls passing. Inventory had independently preserved original mismatch assertion. This later merge metadata and buffer setup correction are not new behavioral RED or native runs."
+  }
+},
+{
+  "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+  "testChangesSha256": "99267963edd08ed5a0f4134f01483e8ef918918b5ac492d5bea48cf1003e7af3",
+  "reason": "NS01 #992 merges exact admitted inventory3c39e8726c4c127b93505755e989dcf832602f16 into clean guard7afdb551b3374c2e35daf9ce710156e9f4ab6c6d. Derived combined fingerprint follows already committed merge984d514; all original rationale objects and original assertion chronology are preserved. Prior metadata read ENOBUFS remains setup failure.",
+  "previousBehavior": "The original guard traversed a missing unrelated foreign owner before valid admission. Separately, the reviewed button inventory did not match the current merged tracked application templates.",
+  "intendedBehavior": "Retain the already GREEN native-allocation guard and original test bytes with separately admitted source-template inventory/regression; preserve every existing refusal and complete group registration.",
+  "replacementTests": [
+    "RISK repository process: native allocation admits its healthy owner past missing foreign paths and protects their claims",
+    "RISK repository process: merged tracked app sources match the reviewed button templates"
+  ],
+  "preservedCoverage": [
+    "Original guard assertion RED43a07435 and GREEN823f254f remain unchanged; earlier invalid setup5d3e7b9e stays invalid and preserved.",
+    "All inherited source-inventory acceptance/refusal assertions, thirteen group replacements, foreign active/parked resource conflicts and fixture ledger byte preservation remain unchanged.",
+    "Native admission NK06, refusal NK07, rendered Reload#988 and release qualification remain separately ticketed; source metadata passing is not browser or product proof."
+  ],
+  "redEvidence": {
+    "command": "Original guard recorder43a07435-dade-40d4-a518-6261724090c2 at unchanged4ef3862, GREEN823f254f; inventory original evidence retained in inventory-merge/integrated-evidence.json and unchanged inherited inventory rationale. NS01 derives only combined protected-test fingerprint after merge984d514.",
+    "failure": "Original meaningful guard assertion observed expected admitted output sentinel versus actual foreign-path ENOENT with healthy controls passing. Inventory had independently preserved original mismatch assertion. This later merge metadata and buffer setup correction are not new behavioral RED or native runs."
+  }
+},
+{
+  "baseCommit": "b176026825e4f9539780f745fe60e09cf348d288",
+  "testChangesSha256": "25a383b13fa7db696c7db855d09033dbb9d195e28b52bb3b09d888bbacf1f0ea",
+  "reason": "NS01 #992 merges exact admitted inventory3c39e8726c4c127b93505755e989dcf832602f16 into clean guard7afdb551b3374c2e35daf9ce710156e9f4ab6c6d. Derived combined fingerprint follows already committed merge984d514; all original rationale objects and original assertion chronology are preserved. Prior metadata read ENOBUFS remains setup failure.",
+  "previousBehavior": "The original guard traversed a missing unrelated foreign owner before valid admission. Separately, the reviewed button inventory did not match the current merged tracked application templates.",
+  "intendedBehavior": "Retain the already GREEN native-allocation guard and original test bytes with separately admitted source-template inventory/regression; preserve every existing refusal and complete group registration.",
+  "replacementTests": [
+    "RISK repository process: native allocation admits its healthy owner past missing foreign paths and protects their claims",
+    "RISK repository process: merged tracked app sources match the reviewed button templates"
+  ],
+  "preservedCoverage": [
+    "Original guard assertion RED43a07435 and GREEN823f254f remain unchanged; earlier invalid setup5d3e7b9e stays invalid and preserved.",
+    "All inherited source-inventory acceptance/refusal assertions, thirteen group replacements, foreign active/parked resource conflicts and fixture ledger byte preservation remain unchanged.",
+    "Native admission NK06, refusal NK07, rendered Reload#988 and release qualification remain separately ticketed; source metadata passing is not browser or product proof."
+  ],
+  "redEvidence": {
+    "command": "Original guard recorder43a07435-dade-40d4-a518-6261724090c2 at unchanged4ef3862, GREEN823f254f; inventory original evidence retained in inventory-merge/integrated-evidence.json and unchanged inherited inventory rationale. NS01 derives only combined protected-test fingerprint after merge984d514.",
+    "failure": "Original meaningful guard assertion observed expected admitted output sentinel versus actual foreign-path ENOENT with healthy controls passing. Inventory had independently preserved original mismatch assertion. This later merge metadata and buffer setup correction are not new behavioral RED or native runs."
+  }
+}
 ]
