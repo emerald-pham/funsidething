@@ -13441,6 +13441,16 @@
       "root": "RISK repository process: supplemental startup capture rejects malformed artifacts and unsupported paint completeness",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [

@@ -2402,3 +2402,7 @@ The pinned Linux x64 reader preserves the raw AT_PAGESZ witness and binds it to 
 - RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app
 
 - RISK repository process: supplemental startup capture rejects malformed artifacts and unsupported paint completeness
+
+- RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command
+
+- RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch
