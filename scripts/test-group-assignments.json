@@ -12803,6 +12803,11 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK repository process: merged tracked app sources match the reviewed button templates",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
       "root": "test group aggregate requires both exact native button safety reports",
       "group": "native-process",
       "file": "scripts/agent-tools/test-groups.test.mjs"
