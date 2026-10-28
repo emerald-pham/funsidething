@@ -26201,7 +26201,7 @@
       "RISK repository process: native scene-time bursts cannot activate controls behind a refused top-layer release"
     ],
     "preservedCoverage": [
-      "Every historical test title from both parents is retained; the shared help consumer keeps both transfer-preservation and cloud-opening assertions. No assertion is removed or relaxed to pass integration.",
+      "Every newly added regression from both branches and every existing integration test title is retained. Thirteen legacy title migrations already present at b176026 remain documented by their original rationale and rootReplacements. The shared help consumer keeps both transfer-preservation and cloud-opening assertions; this merge removes or relaxes no assertion.",
       "All historical TEST_CHANGE_RATIONALES entries, cap failures, native workload checks, protected saved sources, startup recovery guards and input-pass authority remain. Optional-memory policy migration and final browser/release qualification belong to the parent's subsequent bounded implementation."
     ],
     "redEvidence": {
@@ -26236,7 +26236,7 @@
       "RISK repository process: native scene-time bursts cannot activate controls behind a refused top-layer release"
     ],
     "preservedCoverage": [
-      "Every historical test title from both parents is retained; the shared help consumer keeps both transfer-preservation and cloud-opening assertions. No assertion is removed or relaxed to pass integration.",
+      "Every newly added regression from both branches and every existing integration test title is retained. Thirteen legacy title migrations already present at b176026 remain documented by their original rationale and rootReplacements. The shared help consumer keeps both transfer-preservation and cloud-opening assertions; this merge removes or relaxes no assertion.",
       "All historical TEST_CHANGE_RATIONALES entries, cap failures, native workload checks, protected saved sources, startup recovery guards and input-pass authority remain. Optional-memory policy migration and final browser/release qualification belong to the parent's subsequent bounded implementation."
     ],
     "redEvidence": {
