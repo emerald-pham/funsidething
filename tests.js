@@ -15864,7 +15864,7 @@ async function invisibleSavedViewBrowser(theme='light',delayAppearanceAsset=fals
    Object.defineProperty(request,'onsuccess',{configurable:true,get:()=>listener,set:fn=>{listener=fn;success.set.call(request,event=>setTimeout(()=>{window.__actualLocalRead.settled=true;fn?.call(request,event);},delay));}});return request;};
  },theme);
  const page=await context.newPage(),errors=[],pageErrorDetails=[];page.on('pageerror',error=>{errors.push(error.message);pageErrorDetails.push({message:error.message,stack:error.stack,url:page.url()});});
- if(startupOptions.availabilityFixture)await page.clock.setFixedTime(new Date('2026-10-28T12:00:00Z'));
+ if(startupOptions.availabilityFixture||startupOptions.fixedTime)await page.clock.setFixedTime(new Date(startupOptions.fixedTime||'2026-10-28T12:00:00Z'));
  await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded',timeout:10000});
  await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true',null,{timeout:10000});
  // Finish the fresh-profile fixture's unrelated local asset reads before
@@ -16326,7 +16326,7 @@ test('RISK saved view broken-board status: configured cloud changes remain visib
  await openingBoardFixture(t);
  const observedThemePaint=[],browserEngines=openingBoardSelfHosted?['chromium']:['chromium','webkit'];
  for(const browserEngine of browserEngines)for(const theme of ['light','dark'])for(const viewport of [{width:390,height:844},{width:1100,height:900}]){
-  const view=await invisibleSavedViewBrowser(theme,false,false,viewport,false,{brokenDeviceBoard:true,retainAppearance:true,syntheticCloud:true,topOfPage:true,browserEngine,seedPriorRecoveryAppearance:true,holdConfiguredFirebaseImports:true});
+  const view=await invisibleSavedViewBrowser(theme,false,false,viewport,false,{brokenDeviceBoard:true,retainAppearance:true,syntheticCloud:true,topOfPage:true,browserEngine,seedPriorRecoveryAppearance:true,holdConfiguredFirebaseImports:true,fixedTime:'2026-10-28T12:00:00Z'});
   try{
    const detailedPageErrors=[];view.page.on('pageerror',error=>detailedPageErrors.push(error.stack||error.message));
    assert.equal(view.startup.priorRecovery?.hold?.reason,'device-source-recovery','the cached recovery-pending label comes from a real completed protected local recovery');

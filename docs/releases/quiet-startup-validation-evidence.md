@@ -487,3 +487,15 @@ owned preparatory local reads before seeding/reloading passes both ordinary
 and delayed controls in25bbd359. No page error is suppressed and no wait is
 added to the actual held reopening interval. Final coherent source still
 requires the complete rendered status matrix and all release gates above.
+
+Exact8f9f02c rendered execution5e46ac10 passed51/52 with zero skips. The
+earlier initial-load page error did not recur. The status matrix instead crossed
+a live minute boundary: its strict before/after scene-tinted panel-color strings
+differed by about0.00024 sRGB channels while theme/scheme and painted-surface
+checks passed. The test-only successor freezes the existing external clock
+before that fixture's first navigation and retains every strict paint/geometry,
+error and keyboard assertion. Application/assets/copy remain byte-identical to
+8f9. Those successful rendered artifacts keep their producer; the failed status
+gate and corrected external supplement need fresh exact execution. Exact8f9
+compatibility478c2c78 passed15/15 and rules28586a53 passed24/24, zero skips;
+their unchanged app/rules/runtime inputs remain explicit rather than relabeled.
