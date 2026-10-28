@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { chmod, copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
@@ -423,6 +423,24 @@ test('preflight launches each selected child once and launches none for help or 
     assert.equal((output.match(/Test-first diff gate passed\./g) ?? []).length, expectedChecks, 'rationale validator execution count');
     if (!expectedChecks) assert.doesNotMatch(output, /Preflight passed/);
   }
+
+  const alias = path.join(fixture.fixtureRoot, 'preflight-entry-alias.mjs');
+  await symlink(preflight, alias);
+  const aliasHelp = spawnSync(process.execPath, [alias, '--help'], {
+    cwd: fixture.fixtureRoot, encoding: 'utf8', env: childEnvironment(),
+  });
+  assert.equal(aliasHelp.error, undefined, aliasHelp.error?.message);
+  assert.equal(aliasHelp.status, 0, `${aliasHelp.stdout}\n${aliasHelp.stderr}`);
+  assert.match(aliasHelp.stdout, /Usage: node scripts\/agent-tools\/preflight\.mjs/,
+    'the public preflight command must run its main through a symlinked path');
+
+  const imported = spawnSync(process.execPath, [
+    '--input-type=module', '-e', `await import(${JSON.stringify(new URL('./preflight.mjs', import.meta.url).href)});`,
+  ], { cwd: fixture.fixtureRoot, encoding: 'utf8', env: childEnvironment() });
+  assert.equal(imported.error, undefined, imported.error?.message);
+  assert.equal(imported.status, 0, `${imported.stdout}\n${imported.stderr}`);
+  assert.equal(imported.stdout, '', 'importing preflight must not invoke its CLI');
+  assert.equal(imported.stderr, '', 'importing preflight must not write CLI diagnostics');
 });
 
 test('preflight reports real Git errors without treating them as an unpublished branch', async t => {

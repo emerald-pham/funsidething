@@ -5,9 +5,11 @@ import { assertDiagnosticLaunchAllowed, admitDiagnosticAttempt, finishDiagnostic
 import { createHash, randomUUID } from 'node:crypto';
 import net from 'node:net';
 import { realpathSync } from 'node:fs';
-import { lstat, mkdir, open, readFile, readdir, readlink, realpath, rename, rm, stat, unlink } from 'node:fs/promises';
+import { lstat, mkdir, open, readFile, readdir, readlink, realpath, rename, rm, stat, unlink, chmod } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveBase } from './preflight.mjs';
+import { planQualificationContracts, qualificationTestCommand, verifyQualificationOutcomes } from './qualification-contracts.mjs';
 
 const purposes = new Set(['preimplementation-red', 'later-baseline-sensitivity', 'green']);
 const cleanupGraceMs = 750;
@@ -105,9 +107,12 @@ function parseArguments(argv) {
     const value = argv[index + 1];
     if (value === undefined || value.startsWith('--')) throw new Error(`Missing value for ${name}.`);
     const key = name.slice(2);
-    if (!['repo', 'evidence-dir', 'purpose', 'redact-pattern', 'correction-of', 'correction-note', 'diagnostic-request', 'diagnostic-task'].includes(key)) throw new Error(`Unknown option: ${name}`);
+    if (!['repo', 'evidence-dir', 'purpose', 'redact-pattern', 'correction-of', 'correction-note', 'diagnostic-request', 'diagnostic-task', 'qualification-base'].includes(key)) throw new Error(`Unknown option: ${name}`);
     if (key === 'redact-pattern') options[key] = [...(options[key] ?? []), value];
-    else options[key] = value;
+    else if (key === 'qualification-base') {
+      if (options[key] !== undefined) throw new Error(`${name} may be provided only once.`);
+      options[key] = value;
+    } else options[key] = value;
     index += 1;
   }
   const command = argv[separator + 1];
@@ -115,6 +120,7 @@ function parseArguments(argv) {
   if (!options.repo) throw new Error('Required option: --repo <worktree>.');
   if (!options['evidence-dir']) throw new Error('Required option: --evidence-dir <directory>.');
   if (!purposes.has(options.purpose)) throw new Error(`Required --purpose must be one of: ${[...purposes].join(', ')}.`);
+  if (options['qualification-base'] && !options.qualificationReadiness) throw new Error('--qualification-base requires --qualification-readiness.');
   return { options, command, commandArgs: argv.slice(separator + 2) };
 }
 
@@ -861,15 +867,141 @@ async function writeOutputFile(filePath, output) {
   }
 }
 
+function qualificationChildDetails(result) {
+  if (!result) return null;
+  return {
+    exitCode: Number.isInteger(result.exitCode) ? result.exitCode : null,
+    signal: result.signal ?? null,
+    launchError: result.launchError ? { message: result.launchError.message, code: result.launchError.code ?? null } : null,
+    interruption: result.interruption ? {
+      signal: result.interruption.signal,
+      source: result.interruption.source ?? 'recorder-signal',
+      cleanup: result.interruption.cleanup,
+    } : null,
+  };
+}
+
+async function runQualificationPreflight({ repo, evidenceDirectory, id, requestedBase, git, redaction }) {
+  let comparisonBase = null;
+  let plan = null;
+  let preflightResult = null;
+  let contractsResult = null;
+  let outcomes = null;
+  let status = 'failed';
+  let stage = 'comparison-base';
+  const errors = [];
+  try {
+    comparisonBase = resolveBase(requestedBase, repo);
+    stage = 'workflow-preflight';
+    preflightResult = await execute(process.execPath, [path.join(repo, 'scripts/agent-tools/preflight.mjs'), '--base', comparisonBase], repo);
+    if (preflightResult.interruption || preflightResult.signal) status = 'interrupted';
+    else if (preflightResult.launchError || preflightResult.exitCode !== 0) status = 'failed';
+    else {
+      stage = 'selection';
+      plan = planQualificationContracts({ repo, comparisonBase });
+      if (plan.status === 'no_change') {
+        status = 'no_change';
+        stage = 'no-change';
+      } else {
+        stage = 'parent-contracts';
+        const selectedCommand = qualificationTestCommand(plan);
+        contractsResult = await execute(selectedCommand.executable, selectedCommand.args, repo);
+        outcomes = verifyQualificationOutcomes(plan, {
+          exitCode: contractsResult.exitCode,
+          signal: contractsResult.signal ?? contractsResult.interruption?.signal ?? null,
+          launchError: contractsResult.launchError,
+          stdout: contractsResult.stdout,
+        });
+        if (contractsResult.interruption || contractsResult.signal) status = 'interrupted';
+        else status = outcomes.status === 'passed' ? 'passed' : 'failed';
+      }
+    }
+  } catch (error) {
+    errors.push(summarizeEvidenceError(error, redaction, 'qualificationPreflight.error'));
+    status = 'failed';
+  }
+
+  const reportRoot = path.join(evidenceDirectory, 'qualification-preflight');
+  const reportDirectory = path.join(reportRoot, id);
+  await mkdir(reportRoot, { recursive: true, mode: 0o700 });
+  await chmod(reportRoot, 0o700);
+  await mkdir(reportDirectory, { mode: 0o700 });
+  await chmod(reportDirectory, 0o700);
+  const reportPath = path.join(reportDirectory, 'report.json');
+  const files = {
+    preflightStdout: 'preflight.stdout.txt',
+    preflightStderr: 'preflight.stderr.txt',
+    contractsStdout: 'contracts.stdout.tap',
+    contractsStderr: 'contracts.stderr.txt',
+  };
+  const preflightStdout = sanitizeText(preflightResult?.stdout ?? '', redaction, 'qualificationPreflight.preflight.stdout');
+  const preflightStderr = sanitizeText(preflightResult?.stderr ?? '', redaction, 'qualificationPreflight.preflight.stderr');
+  const contractsStdout = sanitizeText(contractsResult?.stdout ?? '', redaction, 'qualificationPreflight.contracts.stdout');
+  const contractsStderr = sanitizeText(contractsResult?.stderr ?? '', redaction, 'qualificationPreflight.contracts.stderr');
+  await Promise.all([
+    writeOutputFile(path.join(reportDirectory, files.preflightStdout), preflightStdout),
+    writeOutputFile(path.join(reportDirectory, files.preflightStderr), preflightStderr),
+    writeOutputFile(path.join(reportDirectory, files.contractsStdout), contractsStdout),
+    writeOutputFile(path.join(reportDirectory, files.contractsStderr), contractsStderr),
+  ]);
+  const report = {
+    schemaVersion: 1,
+    recorderRunId: id,
+    status,
+    stage,
+    candidate: { sourceSha: plan?.sourceSha ?? git?.commit ?? null, sourceTree: plan?.sourceTree ?? null },
+    comparisonBase,
+    selection: plan ? {
+      status: plan.status,
+      selectionBasis: plan.selectionBasis,
+      changedPaths: plan.changedPaths,
+      selected: plan.selected,
+      assignmentAuthority: plan.assignmentAuthority,
+      planSha256: plan.planSha256,
+    } : null,
+    workflowPreflight: {
+      ...qualificationChildDetails(preflightResult),
+      stdoutFile: files.preflightStdout,
+      stderrFile: files.preflightStderr,
+    },
+    contracts: plan?.status === 'selected' ? {
+      ...qualificationChildDetails(contractsResult),
+      stdout: contractsStdout,
+      stdoutFile: files.contractsStdout,
+      stderrFile: files.contractsStderr,
+    } : null,
+    outcomes,
+    errors,
+  };
+  const serializedReport = sanitizeText(`${JSON.stringify(report, null, 2)}\n`, redaction, 'qualificationPreflight.report');
+  await writeOutputFile(reportPath, serializedReport);
+  const summary = {
+    status,
+    stage,
+    sourceSha: plan?.sourceSha ?? git?.commit ?? null,
+    comparisonBase,
+    selectionStatus: plan?.status ?? null,
+    selectedContractIds: plan?.selected.map(contract => contract.id) ?? [],
+    changedPathCount: plan?.changedPaths.length ?? null,
+    reportPath: sanitizeText(reportPath, redaction, 'qualificationPreflight.reportPath'),
+  };
+  return {
+    summary,
+    interruption: preflightResult?.interruption ?? contractsResult?.interruption ?? null,
+    failed: status === 'failed' || status === 'interrupted',
+  };
+}
+
 function summaryStatus(result, evidenceStatus) {
   if (evidenceStatus !== 'complete') return 'evidence-failure';
   if (result.interruption || result.signal) return 'interrupted';
+  if (result.qualificationFailure) return 'qualification-failure';
   if (result.launchError) return 'launch-failure';
   if (!Number.isInteger(result.exitCode)) return 'unknown';
   return result.exitCode === 0 ? 'passed' : 'failed';
 }
 
-function emitSummary({ status, outcome, purpose, child, interruptionSignal = null, wrapperExitCode, git, workingTree, evidence, fixture }) {
+function emitSummary({ status, outcome, purpose, child, interruptionSignal = null, wrapperExitCode, git, workingTree, evidence, fixture, qualificationPreflight }) {
   const summary = {
     status,
     outcome,
@@ -884,6 +1016,7 @@ function emitSummary({ status, outcome, purpose, child, interruptionSignal = nul
     },
     evidence,
     ...(fixture ? { fixture } : {}),
+    ...(qualificationPreflight ? { qualificationPreflight } : {}),
   };
   process.stdout.write(`${JSON.stringify(summary)}\n`);
 }
@@ -983,6 +1116,7 @@ export async function execute(command, args, cwd, options = {}) {
 
 function classifyExecution(result) {
   if (result.interruption) return { outcome: 'interrupted', basis: `wrapper-signal:${result.interruption.signal}` };
+  if (result.qualificationFailure) return { outcome: 'qualification-failure', basis: 'parent-qualification-contract-not-passed' };
   if (result.launchError) return { outcome: 'launch-failure', basis: `spawn-error:${result.launchError.code ?? 'unknown'}` };
   if (result.signal) return { outcome: 'interrupted', basis: `process-signal:${result.signal}` };
   if (result.exitCode === 0) return { outcome: 'passed', basis: 'exit-code:0' };
@@ -1157,9 +1291,69 @@ async function main(argv) {
 
   const diagnostic = await admitDiagnosticAttempt(repo, {task:options['diagnostic-task'],request:options['diagnostic-request'],command,args:commandArgs,resultPath:recordPath});
   if(diagnostic?.observed){process.stdout.write(JSON.stringify(diagnostic)+'\n');return;}
-  const result = await execute(command, commandArgs, repo, { env: effectiveEnvironment });
+  let qualificationPreflight;
+  let qualificationEvidenceError;
+  let result;
+  if (options.qualificationReadiness) {
+    try {
+      const qualification = await runQualificationPreflight({
+        repo,
+        evidenceDirectory,
+        id,
+        requestedBase: options['qualification-base'],
+        git,
+        redaction,
+      });
+      qualificationPreflight = qualification.summary;
+      record.qualificationPreflight = qualification.summary;
+      if (qualification.failed) {
+        result = {
+          finishedAt: new Date().toISOString(),
+          exitCode: null,
+          signal: null,
+          stdout: '',
+          stderr: '',
+          requestedChildStarted: false,
+          ...(qualification.interruption ? { interruption: qualification.interruption } : { qualificationFailure: true }),
+        };
+      }
+    } catch (error) {
+      qualificationEvidenceError = summarizeEvidenceError(error, redaction, 'qualificationPreflight.reportError');
+      qualificationPreflight = {
+        status: 'failed',
+        stage: 'report-write',
+        sourceSha: git?.commit ?? null,
+        comparisonBase: null,
+        selectionStatus: null,
+        selectedContractIds: [],
+        changedPathCount: null,
+        reportPath: null,
+      };
+      record.qualificationPreflight = qualificationPreflight;
+      result = {
+        finishedAt: new Date().toISOString(),
+        exitCode: null,
+        signal: null,
+        stdout: '',
+        stderr: '',
+        requestedChildStarted: false,
+        qualificationFailure: true,
+        qualificationEvidenceFailure: true,
+      };
+    }
+    if (!options.summary) {
+      const report = qualificationPreflight.reportPath ?? 'unavailable';
+      process.stderr.write(`record-run: qualification-preflight=${qualificationPreflight.status} selected=${qualificationPreflight.selectedContractIds.length} report=${report}\n`);
+    }
+  }
+  if (!result) {
+    result = await execute(command, commandArgs, repo, { env: effectiveEnvironment });
+    result.requestedChildStarted = true;
+  }
   const signalNumber = { SIGINT: 2, SIGKILL: 9, SIGTERM: 15 }[result.interruption?.signal ?? result.signal];
-  let wrapperExitCode = result.interruption || result.signal
+  let wrapperExitCode = result.qualificationEvidenceFailure
+    ? evidenceFailureExitCode
+    : result.interruption || result.signal
     ? 128 + (signalNumber ?? 1)
     : result.exitCode ?? 1;
   const output = {
@@ -1222,7 +1416,7 @@ async function main(argv) {
   }
   record.redaction = { applied: redaction.count > 0, count: redaction.count, locations: { ...redaction.locations } };
   if (options.summary) {
-    const evidenceErrors = [];
+    const evidenceErrors = qualificationEvidenceError ? [{ file: 'qualification-preflight', message: qualificationEvidenceError }] : [];
     for (const [file, filePath, contents] of [
       ['stdout', stdoutPath, output.stdout],
       ['stderr', stderrPath, output.stderr],
@@ -1239,7 +1433,7 @@ async function main(argv) {
       ...(evidenceErrors.length ? { errors: evidenceErrors } : {}),
     };
     let finalWrapperExitCode = wrapperExitCode;
-    if (evidenceErrors.length && finalWrapperExitCode === 0) finalWrapperExitCode = evidenceFailureExitCode;
+    if (evidenceErrors.length) finalWrapperExitCode = evidenceFailureExitCode;
     record.execution.wrapperExitCode = finalWrapperExitCode;
     record.redaction = { applied: redaction.count > 0, count: redaction.count, locations: { ...redaction.locations } };
     try {
@@ -1257,13 +1451,17 @@ async function main(argv) {
         ? 'evidence-failure' : summaryStatus(result, record.evidence.status),
       outcome: record.execution.outcome,
       purpose: options.purpose,
-      child: { exitCode: result.exitCode, signal: result.signal },
+      child: {
+        exitCode: result.requestedChildStarted ? result.exitCode : null,
+        signal: result.requestedChildStarted ? result.signal : null,
+      },
       interruptionSignal: result.interruption?.signal ?? null,
       wrapperExitCode: finalWrapperExitCode,
       git,
       workingTree,
       evidence: record.evidence,
       ...(fixtureSummary ? { fixture: fixtureSummary } : {}),
+      qualificationPreflight,
     });
     process.exitCode = finalWrapperExitCode;
     return;

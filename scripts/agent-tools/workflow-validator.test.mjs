@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { chmod, copyFile, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { test } from 'node:test';
@@ -48,6 +48,29 @@ await t.test('workflow validator pin identifies official release archives and re
   });
   assert.match(pinnedActionlintAsset('linux', 'x64').sha256, /^[a-f0-9]{64}$/);
   assert.throws(() => pinnedActionlintAsset('win32', 'x64'), /Supported platforms are darwin\/linux on x64\/arm64/);
+});
+
+await t.test('public validator entrypoint follows filesystem aliases and imports stay inert', async (context) => {
+  const fixtureRoot = await mkdtemp(join(tmpdir(), 'workflow-validator-entry-alias-'));
+  context.after(() => rm(fixtureRoot, { recursive: true, force: true }));
+  const alias = join(fixtureRoot, 'validator-alias.mjs');
+  await symlink(validatorScript, alias);
+
+  const invoked = spawnSync(process.execPath, [alias, 'validate', '--help'], {
+    cwd: repositoryRoot, encoding: 'utf8', maxBuffer: 1024 * 1024,
+  });
+  assert.equal(invoked.error, undefined, invoked.error?.message);
+  assert.equal(invoked.status, 0, `${invoked.stdout}\n${invoked.stderr}`);
+  assert.match(invoked.stdout, /Usage:[\s\S]*workflow-validator\.mjs validate/,
+    'the public command must run its main through a symlinked path');
+
+  const imported = spawnSync(process.execPath, [
+    '--input-type=module', '-e', `await import(${JSON.stringify(new URL('./workflow-validator.mjs', import.meta.url).href)});`,
+  ], { cwd: repositoryRoot, encoding: 'utf8', maxBuffer: 1024 * 1024 });
+  assert.equal(imported.error, undefined, imported.error?.message);
+  assert.equal(imported.status, 0, `${imported.stdout}\n${imported.stderr}`);
+  assert.equal(imported.stdout, '', 'importing the validator must not invoke its CLI');
+  assert.equal(imported.stderr, '', 'importing the validator must not write CLI diagnostics');
 });
 
 await t.test('public workflow command fails closed for missing and corrupt setup, then accepts the restored pin', async (context) => {
