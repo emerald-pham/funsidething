@@ -46049,3 +46049,4 @@ test('RISK repository process: workflow fixtures isolate hosted events and retai
  const expected=[name,...['host push','host PR synchronize','host PR edited','matching raw event executes','raw repository mismatch','raw source mismatch','raw checkout mismatch'].map(child=>name+' > '+child)];
  assert.deepEqual(parseTap(result.stdout).map(({id,status,skipReason})=>({id,status,skipReason})).sort((a,b)=>a.id.localeCompare(b.id)),expected.map(id=>({id,status:'passed',skipReason:null})).sort((a,b)=>a.id.localeCompare(b.id)),'All controlled parent contexts and real-authority outcomes must pass exactly once');
 });
+// Disposable hosted early-failure control: .waitForFunction(async
