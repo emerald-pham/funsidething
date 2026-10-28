@@ -2280,6 +2280,7 @@ The command/report consumer rejects missing, duplicate, skipped, cancelled, unre
 - RISK repository process: native rapid cloud selection preserves the two-second input burst
 - RISK repository process: native button gate refuses unallocated local launch before browser startup
 - RISK repository process: new and duplicate source buttons require native coverage inventory
+- RISK repository process: merged tracked app sources match the reviewed button templates
 
 - RISK repository process: native button gate awaits an asynchronous false outcome
 - RISK repository process: native button gate cannot omit a required stress scenario
