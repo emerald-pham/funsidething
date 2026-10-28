@@ -198,8 +198,13 @@ childProcess.spawn = function (command, args = [], options = {}) {
 };
 syncBuiltinESMExports();
 `);
+  const heartbeatAt = new Date().toISOString();
   writeJson(ledger, { version: 1, scope: 'codex-wide', entries: [{
-    id: 'qualification-recorder-fixture', status: 'active', worktree: repo,
+    id: 'qualification-recorder-fixture', status: 'active', worktree: repo, heartbeatAt,
+    lease: {
+      state: 'healthy', ownerConfirmationRequired: false, takeoverAllowed: false,
+      lastHeartbeatAt: heartbeatAt, expiresAt: new Date(Date.now() + 90_000).toISOString(),
+    },
     resources: [`loopback:127.0.0.1:${deliveryPort}`, `loopback:127.0.0.1:${smokePort}`],
   }] });
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
