@@ -3,6 +3,8 @@ import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 import { mkdtemp, mkdir, readFile, readdir, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises';
+import { createServer as createHttpServer } from 'node:http';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,7 +12,26 @@ import { parseTap } from '../test-groups.mjs';
 
 const node = process.execPath;
 const recorder = fileURLToPath(new URL('./record-run.mjs', import.meta.url));
+const coordinationEntrypoint = fileURLToPath(new URL('./coordination.mjs', import.meta.url));
 const sourceRepository = fileURLToPath(new URL('../../', import.meta.url));
+
+function activeLedgerOwner({ id, worktree, resources, now = new Date(), expiresAt = new Date(now.getTime() + 60000), status = 'active' }) {
+  const heartbeatAt = now.toISOString();
+  return {
+    id,
+    status,
+    worktree,
+    heartbeatAt,
+    lease: {
+      state: 'healthy',
+      ownerConfirmationRequired: false,
+      takeoverAllowed: false,
+      lastHeartbeatAt: heartbeatAt,
+      expiresAt: expiresAt.toISOString(),
+    },
+    resources,
+  };
+}
 
 async function createCommittedRepository(root) {
   const repo = path.join(root, 'repo');
@@ -60,6 +81,7 @@ async function createQualificationFixture(t, { preflightCapable = false } = {}) 
   } else {
     repo = await createCommittedRepository(root);
   }
+  const canonicalRepo = await realpath(repo);
   const commit = spawnSync('git', ['-C', repo, 'rev-parse', 'HEAD'], { encoding: 'utf8' });
   const tree = spawnSync('git', ['-C', repo, 'rev-parse', 'HEAD^{tree}'], { encoding: 'utf8' });
   assert.equal(commit.status, 0, commit.stderr);
@@ -68,16 +90,19 @@ async function createQualificationFixture(t, { preflightCapable = false } = {}) 
   const smokePort = 51632;
   const ledger = path.join(root, 'coordination.json');
   const resources = [`loopback:127.0.0.1:${deliveryPort}`, `loopback:127.0.0.1:${smokePort}`];
-  await writeFile(ledger, JSON.stringify({ version: 1, scope: 'codex-wide', entries: [{ id: 'fixture-owner', status: 'active', worktree: repo, resources }] }));
+  const owner = activeLedgerOwner({ id: 'fixture-owner', worktree: canonicalRepo, resources });
+  await writeFile(ledger, JSON.stringify({ version: 1, scope: 'codex-wide', entries: [owner] }));
   return {
     root,
     repo,
+    canonicalRepo,
     commit: commit.stdout.trim(),
     tree: tree.stdout.trim(),
     evidence: path.join(root, 'recorder-evidence'),
     nativeOutput: path.join(root, 'native-output'),
     sentinel: path.join(root, 'expensive-child-launched'),
     ledger,
+    owner,
     deliveryPort,
     smokePort,
     env: {
@@ -90,6 +115,204 @@ async function createQualificationFixture(t, { preflightCapable = false } = {}) 
       CHAIN_NATIVE_PORT: String(deliveryPort),
       CHAIN_NATIVE_SMOKE_PORT: String(smokePort),
       CHAIN_QUALIFICATION_READINESS_SENTINEL: path.join(root, 'expensive-child-launched'),
+    },
+  };
+}
+
+async function getFreePort() {
+  const server = net.createServer();
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  const { port } = server.address();
+  await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  return port;
+}
+
+function invokeLocalFixture({ repo, evidence, env: overrides = {}, extraOptions = [], timeout = 30000 }) {
+  const env = { ...process.env, ...overrides };
+  delete env.NODE_TEST_CONTEXT;
+  return spawnSync(node, [recorder, '--repo', repo, '--evidence-dir', evidence, '--purpose', 'green',
+    '--summary', '--local-fixture', 'early-group-aggregate', ...extraOptions], {
+    cwd: repo,
+    encoding: 'utf8',
+    timeout,
+    env,
+    maxBuffer: 8 * 1024 * 1024,
+  });
+}
+
+function claimLocalFixtureResource(fixture, resource = fixture.resource) {
+  return spawnSync(node, [coordinationEntrypoint, 'claim', '--file', fixture.ledger,
+    '--id', fixture.owner.id, '--resources', resource], {
+    cwd: fixture.canonicalRepo,
+    encoding: 'utf8',
+    env: { ...process.env, CODEX_COORDINATION_FILE: fixture.ledger, DOW_EMULATOR_COORDINATION_FILE: '' },
+  });
+}
+
+async function listenAtPort(port) {
+  const server = createHttpServer((_request, response) => response.end('foreign-control-live'));
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(port, '127.0.0.1', resolve);
+  });
+  return server;
+}
+
+async function assertPortCanBind(port) {
+  const server = await listenAtPort(port);
+  await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+}
+
+function startLocalFixture(fixture, overrides = {}) {
+  const env = { ...process.env, ...fixture.env, ...overrides };
+  delete env.NODE_TEST_CONTEXT;
+  return spawn(node, [recorder, '--repo', fixture.repo, '--evidence-dir', fixture.evidence,
+    '--purpose', 'green', '--summary', '--local-fixture', 'early-group-aggregate'], {
+    cwd: fixture.canonicalRepo,
+    env,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+}
+
+async function waitForFixtureFile(fixture, fileName, timeoutMs = 10000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const directories = (await readdir(fixture.root)).filter((name) => name.startsWith(path.basename(fixture.nativeOutput)));
+    for (const directory of directories) {
+      const filePath = path.join(fixture.root, directory, fileName);
+      try { await stat(filePath); return filePath; } catch (error) { if (error?.code !== 'ENOENT') throw error; }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error('Timed out waiting for local fixture output ' + fileName + '.');
+}
+
+async function assertNoFixtureOutput(fixture) {
+  const names = await readdir(fixture.root);
+  assert.equal(names.some((name) => name.startsWith(path.basename(fixture.nativeOutput))), false,
+    'readiness failure cannot launch the fixture or create its output directory');
+}
+
+function captureProcess(child) {
+  return new Promise((resolve, reject) => {
+    let stdout = '';
+    let stderr = '';
+    child.stdout.setEncoding('utf8').on('data', (chunk) => { stdout += chunk; });
+    child.stderr.setEncoding('utf8').on('data', (chunk) => { stderr += chunk; });
+    child.once('error', reject);
+    child.once('close', (status, signal) => resolve({ status, signal, stdout, stderr }));
+  });
+}
+
+function fixtureTestSource(behavior, coordinationScript) {
+  return [
+    "import assert from 'node:assert/strict';",
+    "import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';",
+    "import { createServer } from 'node:http';",
+    "import path from 'node:path';",
+    "import { spawnSync } from 'node:child_process';",
+    "import test from 'node:test';",
+    'const behavior = ' + JSON.stringify(behavior) + ';',
+    'const coordinationScript = ' + JSON.stringify(coordinationScript) + ';',
+    "test('group and aggregate retain actual early cases once across fresh group processes', async t => {",
+    "  assert.equal(process.versions.node.split('.')[0], '22');",
+    "  const nested = spawnSync('node', ['-p', 'process.version'], { encoding: 'utf8' });",
+    "  assert.equal(nested.status, 0, nested.stderr);",
+    "  assert.equal(nested.stdout.trim(), process.version, 'PATH must select the same actual Node runtime as the fixed child');",
+    "  for (const key of ['CI', 'CONTINUOUS_INTEGRATION', 'NODE_OPTIONS', 'NODE_PATH', 'GITHUB_ACTIONS', 'GITHUB_RUN_ID', 'PLAYWRIGHT_BROWSERS_PATH', 'FIREBASE_CONFIG', 'AWS_PROFILE', 'DOW_EMULATOR_COORDINATION_FILE', 'CHAIN_NATIVE_SMOKE_PORT']) {",
+    "    assert.equal(process.env[key], undefined, key + ' must not cross the controlled local boundary');",
+    "  }",
+    "  assert.ok(process.env.CODEX_COORDINATION_FILE);",
+    "  const output = process.env.CHAIN_NATIVE_OUTPUT;",
+    "  mkdirSync(output, { recursive: true });",
+    "  appendFileSync(path.join(output, 'fixture-started.txt'), process.pid + '\\n');",
+    "  const port = Number(process.env.CHAIN_NATIVE_PORT);",
+    "  let listenerObservation;",
+    "  const server = createServer((_request, response) => response.end('fixture-listener-live'));",
+    "  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolve); });",
+    "  writeFileSync(path.join(output, 'fixture-listener-live.txt'), String(port));",
+    "  try {",
+    "    const response = await fetch('http://127.0.0.1:' + port + '/fixture');",
+    "    const body = await response.text();",
+    "    listenerObservation = { port, httpStatus: response.status, reachable: response.ok, bodyMatches: body === 'fixture-listener-live' };",
+    "    assert.equal(body, 'fixture-listener-live');",
+    "    if (behavior === 'interrupt') await new Promise(resolve => setTimeout(resolve, 60000));",
+    "    await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));",
+    "    if (behavior === 'change-lease') { const refreshed = spawnSync(process.execPath, [coordinationScript, 'heartbeat', '--file', process.env.CODEX_COORDINATION_FILE, '--id', 'fixture-owner'], { cwd: process.cwd(), encoding: 'utf8' }); assert.equal(refreshed.status, 0, refreshed.stderr); }",
+    "    writeFileSync(path.join(output, 'button-safety-chromium-fixture.json'), JSON.stringify({ status: 'failed', observedActions: ['act:download-backup'], actionObservation: { recognizedOffered: ['act:download-backup'], executed: [], coverage: 'fixture producer only' }, outcomes: [], rapidOutcomes: [], errors: ['controlled-page-crash'], cleanup: { contextClosed: true, browserClosed: true, serverClosed: true }, browserVersion: 'external-mock-no-engine' }));",
+    "    t.diagnostic(JSON.stringify({ scope: 'Controlled OS-process transfer only; no native/runtime proof', earlyRootExecutions: 5, uniqueEarlyRoots: 5, ordinaryGroups: 4, aggregateCaseCount: 11, liveListenerObservations: [listenerObservation] }));",
+    "    if (behavior === 'failure') assert.fail('controlled local fixture failure');",
+    "  } finally {",
+    "    if (server.listening) await new Promise(resolve => server.close(() => resolve()));",
+    "  }",
+    "});",
+  ].join('\n');
+}
+
+async function createLocalFixture(t, { behavior = 'success', foreignEntry = false } = {}) {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'record-run-local-fixture-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(root);
+  const canonicalRepo = await realpath(repo);
+  const testPath = path.join(repo, 'scripts/agent-tools/test-groups.test.mjs');
+  await mkdir(path.dirname(testPath), { recursive: true });
+  await writeFile(testPath, fixtureTestSource(behavior, coordinationEntrypoint));
+  const add = spawnSync('git', ['-C', repo, 'add', 'scripts/agent-tools/test-groups.test.mjs'], { encoding: 'utf8' });
+  assert.equal(add.status, 0, add.stderr);
+  const commit = spawnSync('git', ['-C', repo, 'commit', '--quiet', '-m', 'fixed fixture runner'], { encoding: 'utf8' });
+  assert.equal(commit.status, 0, commit.stderr);
+  const deliveryPort = await getFreePort();
+  const smokePort = await getFreePort();
+  const foreignPort = foreignEntry ? await getFreePort() : null;
+  const now = new Date();
+  const resource = 'loopback:127.0.0.1:' + deliveryPort;
+  const ledger = path.join(root, 'coordination.json');
+  const owner = activeLedgerOwner({ id: 'fixture-owner', worktree: canonicalRepo, resources: [resource], now });
+  const foreign = foreignEntry ? activeLedgerOwner({
+    id: 'foreign-owner',
+    worktree: path.join(root, 'foreign-repo'),
+    resources: ['loopback:127.0.0.1:' + foreignPort, 'foreign-reservation:keep'],
+    now,
+  }) : null;
+  const ledgerValue = { version: 1, scope: 'codex-wide', entries: [owner, ...(foreign ? [foreign] : [])] };
+  await writeFile(ledger, JSON.stringify(ledgerValue));
+  const evidence = path.join(root, 'evidence');
+  const nativeOutput = path.join(root, 'evidence-native-output-');
+  return {
+    root,
+    repo,
+    canonicalRepo,
+    evidence,
+    nativeOutput,
+    ledger,
+    ledgerValue,
+    owner,
+    foreign,
+    resource,
+    deliveryPort,
+    smokePort,
+    foreignPort,
+    env: {
+      PATH: '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin',
+      CODEX_COORDINATION_FILE: ledger,
+      DOW_EMULATOR_COORDINATION_FILE: path.join(root, 'foreign-ledger.json'),
+      CHAIN_NATIVE_PORT: String(deliveryPort),
+      CHAIN_NATIVE_SMOKE_PORT: String(smokePort),
+      CHAIN_NATIVE_OUTPUT: path.join(root, 'inherited-output'),
+      CHAIN_NATIVE_CANDIDATE_SHA: 'stale-sha',
+      CHAIN_NATIVE_CANDIDATE_TREE: 'stale-tree',
+      CI: 'true',
+      CONTINUOUS_INTEGRATION: 'true',
+      GITHUB_ACTIONS: 'true',
+      GITHUB_RUN_ID: 'foreign-run',
+      PLAYWRIGHT_BROWSERS_PATH: path.join(root, 'foreign-engines'),
+      FIREBASE_CONFIG: path.join(root, 'foreign-firebase.json'),
+      AWS_PROFILE: 'foreign-profile',
+      NODE_OPTIONS: '--trace-warnings',
+      NODE_PATH: path.join(root, 'foreign-node-path'),
     },
   };
 }
@@ -127,6 +350,216 @@ test('qualification readiness creates evidence destinations and launches the req
   assert.ok((await readdir(fixture.nativeOutput)).length === 0, 'readiness probes leave no files in the native evidence destination');
   const record = JSON.parse(await readFile(summary.evidence.metadataPath, 'utf8'));
   assert.equal(record.git.commit, fixture.commit);
+});
+
+test('local fixture runs its fixed child, records nested outcomes, and releases only its own allocation', async (t) => {
+  const fixture = await createLocalFixture(t, { foreignEntry: true });
+  const foreignServer = await listenAtPort(fixture.foreignPort);
+  t.after(() => new Promise((resolve) => foreignServer.close(() => resolve())));
+  const foreignBefore = structuredClone(fixture.foreign);
+
+  const first = invokeLocalFixture({ repo: fixture.repo, evidence: fixture.evidence, env: fixture.env });
+  assert.equal(first.status, 0, JSON.stringify({ status: first.status, signal: first.signal, error: first.error?.message, stdout: first.stdout, stderr: first.stderr }));
+  const firstSummary = summaryFrom(first);
+  assert.equal(firstSummary.status, 'passed');
+  assert.equal(firstSummary.fixture.mode, 'early-group-aggregate');
+  assert.equal(firstSummary.fixture.workloadOutcome, 'passed');
+  assert.deepEqual(firstSummary.fixture.nestedOutcomes, {
+    testName: 'group and aggregate retain actual early cases once across fresh group processes',
+    status: 'passed',
+    earlyRootExecutions: 5,
+    uniqueEarlyRoots: 5,
+    ordinaryGroups: 4,
+    aggregateCaseCount: 11,
+    liveListener: {
+      allocatedPort: fixture.deliveryPort,
+      observedPort: fixture.deliveryPort,
+      httpStatus: 200,
+      reachable: true,
+      responseBodyVerified: true,
+      matchesAllocation: true,
+      observationCount: 1,
+    },
+    controlledBoundary: 'Playwright chromium.launch is replaced by the fixture; no native browser engine or memory qualification runs.',
+  });
+  assert.equal(firstSummary.fixture.producer.status, 'failed', 'the expected page-crash producer remains visible inside a passing group assertion');
+  assert.deepEqual(firstSummary.fixture.producer.errors, ['controlled-page-crash']);
+  assert.equal(firstSummary.fixture.producer.cleanup.serverClosed, true);
+  assert.equal(firstSummary.fixture.cleanup.child.completed, true);
+  assert.equal(firstSummary.fixture.cleanup.listener.status, 'closed');
+  assert.equal(firstSummary.fixture.cleanup.allocation.status, 'released');
+  assert.equal(firstSummary.fixture.cleanup.runtimeDirectory.status, 'removed');
+  const firstRecord = JSON.parse(await readFile(firstSummary.evidence.metadataPath, 'utf8'));
+  assert.match(firstRecord.localFixture.runtime.nodeVersion, /^v22\./);
+  assert.equal(firstRecord.localFixture.runtime.nodeExecutable, node);
+  assert.equal(firstRecord.localFixture.nestedOutcomes.aggregateCaseCount, 11);
+  assert.notEqual(firstRecord.localFixture.evidence.nativeOutputDirectory, fixture.evidence);
+
+  let ledger = JSON.parse(await readFile(fixture.ledger, 'utf8'));
+  assert.equal(ledger.entries[0].resources.includes(fixture.resource), false, 'the exact completed fixture allocation is released');
+  assert.deepEqual(ledger.entries[1], foreignBefore, 'foreign owner and reservation metadata remain byte-equivalent');
+  const foreignResponse = await fetch('http://127.0.0.1:' + fixture.foreignPort + '/foreign');
+  assert.equal(await foreignResponse.text(), 'foreign-control-live', 'foreign listener remains live after owned cleanup');
+  await assertPortCanBind(fixture.deliveryPort);
+
+  const reclaimed = claimLocalFixtureResource(fixture);
+  assert.equal(reclaimed.status, 0, reclaimed.stderr);
+  const second = invokeLocalFixture({ repo: fixture.repo, evidence: fixture.evidence, env: fixture.env });
+  assert.equal(second.status, 0, `${second.stdout}\n${second.stderr}`);
+  const secondSummary = summaryFrom(second);
+  assert.equal(secondSummary.status, 'passed');
+  assert.notEqual(secondSummary.evidence.metadataPath, firstSummary.evidence.metadataPath);
+  const secondRecord = JSON.parse(await readFile(secondSummary.evidence.metadataPath, 'utf8'));
+  assert.notEqual(secondRecord.localFixture.evidence.nativeOutputDirectory, firstRecord.localFixture.evidence.nativeOutputDirectory,
+    'fresh invocation retains a separate producer directory');
+  await readFile(firstSummary.evidence.metadataPath, 'utf8');
+  ledger = JSON.parse(await readFile(fixture.ledger, 'utf8'));
+  assert.equal(ledger.entries[0].resources.includes(fixture.resource), false);
+  assert.deepEqual(ledger.entries[1], foreignBefore);
+});
+
+test('local fixture rejects invalid ownership and evidence before starting the fixed workload', async (t) => {
+  for (const [name, mutate, expectedError] of [
+    ['missing resource', (ledger) => { ledger.entries[0].resources = []; }, /CHAIN_NATIVE_PORT.*not allocated/],
+    ['changed owner', (ledger, fixture) => { ledger.entries[0].worktree = path.join(fixture.root, 'changed-owner'); }, /exactly one active host coordination entry/],
+    ['expired lease', (ledger) => { ledger.entries[0].lease.expiresAt = new Date(Date.now() - 1000).toISOString(); }, /lease.*stale|expired/i],
+  ]) {
+    await t.test(name, async (t) => {
+      const fixture = await createLocalFixture(t);
+      const changed = JSON.parse(await readFile(fixture.ledger, 'utf8'));
+      mutate(changed, fixture);
+      await writeFile(fixture.ledger, JSON.stringify(changed));
+      const ledgerBefore = await readFile(fixture.ledger, 'utf8');
+      const result = invokeLocalFixture({ repo: fixture.repo, evidence: fixture.evidence, env: fixture.env });
+      assert.equal(result.status, 74, `${result.stdout}\n${result.stderr}`);
+      const summary = summaryFrom(result);
+      assert.equal(summary.status, 'evidence-failure');
+      assert.equal(summary.outcome, 'not-started');
+      assert.equal(summary.fixture.workloadOutcome, undefined);
+      assert.match(summary.evidence.errors[0].message, expectedError);
+      await assertNoFixtureOutput(fixture);
+      assert.equal(await readFile(fixture.ledger, 'utf8'), ledgerBefore, 'failed readiness must not edit the canonical ledger');
+    });
+  }
+
+  const badEvidence = await createLocalFixture(t);
+  const ledgerBefore = await readFile(badEvidence.ledger, 'utf8');
+  const rejected = invokeLocalFixture({
+    repo: badEvidence.repo,
+    evidence: path.join(badEvidence.repo, 'inside-checkout-evidence'),
+    env: badEvidence.env,
+  });
+  assert.equal(rejected.status, 74, `${rejected.stdout}\n${rejected.stderr}`);
+  assert.match(summaryFrom(rejected).evidence.errors[0].message, /outside the candidate Git worktree/);
+  const badEvidenceNames = await readdir(badEvidence.repo);
+  assert.equal(badEvidenceNames.some((name) => name.startsWith('inside-checkout-evidence-native-output-')), false);
+  assert.equal(await readFile(badEvidence.ledger, 'utf8'), ledgerBefore);
+  await assert.rejects(stat(path.join(badEvidence.repo, 'inside-checkout-evidence')), { code: 'ENOENT' });
+});
+
+test('local fixture rejects help misuse and arbitrary commands without workload or ledger writes', async (t) => {
+  const fixture = await createLocalFixture(t);
+  const ledgerBefore = await readFile(fixture.ledger, 'utf8');
+  const help = spawnSync(node, [recorder, '--help'], { cwd: fixture.repo, encoding: 'utf8', env: fixture.env });
+  assert.equal(help.status, 0, help.stderr);
+  assert.match(help.stdout, /--local-fixture early-group-aggregate/);
+  const invalid = invokeLocalFixture({ repo: fixture.repo, evidence: fixture.evidence, env: fixture.env, extraOptions: ['--unknown'] });
+  assert.equal(invalid.status, 2);
+  assert.match(invalid.stderr, /Unsupported option for --local-fixture/);
+  const arbitrary = invokeLocalFixture({ repo: fixture.repo, evidence: fixture.evidence, env: fixture.env, extraOptions: ['--', 'node', '-e', 'process.exit(77)'] });
+  assert.equal(arbitrary.status, 2);
+  assert.match(arbitrary.stderr, /fixed child command/);
+  await assertNoFixtureOutput(fixture);
+  assert.equal(await readFile(fixture.ledger, 'utf8'), ledgerBefore);
+  await assert.rejects(stat(fixture.evidence), { code: 'ENOENT' });
+});
+
+test('record-run CLI executes through a path alias and importing its readiness helper stays inert', async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'record-run-cli-alias-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const alias = path.join(root, 'record-run-alias.mjs');
+  await symlink(recorder, alias);
+
+  const help = spawnSync(node, [alias, '--help'], { cwd: root, encoding: 'utf8' });
+  assert.equal(help.status, 0, help.stderr);
+  assert.match(help.stdout, /Usage: record-run\.mjs/);
+  assert.equal(help.stderr, '');
+
+  const importUrl = new URL('./record-run.mjs', import.meta.url).href;
+  const importSource = 'import { validateQualificationReadiness } from ' + JSON.stringify(importUrl)
+    + '; process.stdout.write(typeof validateQualificationReadiness + "\\n");';
+  const imported = spawnSync(node, ['--input-type=module', '-e', importSource], { cwd: root, encoding: 'utf8' });
+  assert.equal(imported.status, 0, imported.stderr);
+  assert.equal(imported.stdout, 'function\n', 'importing the shared readiness helper must not start the recorder CLI');
+  assert.equal(imported.stderr, '');
+});
+
+test('local fixture reports child failure separately from successful owned cleanup', async (t) => {
+  const fixture = await createLocalFixture(t, { behavior: 'failure' });
+  const result = invokeLocalFixture({ repo: fixture.repo, evidence: fixture.evidence, env: fixture.env });
+  assert.equal(result.status, 1, `${result.stdout}\n${result.stderr}`);
+  const summary = summaryFrom(result);
+  assert.equal(summary.status, 'failed');
+  assert.equal(summary.outcome, 'assertion-failure');
+  assert.equal(summary.fixture.workloadOutcome, 'assertion-failure');
+  assert.equal(summary.fixture.nestedOutcomes.status, 'assertion-failure');
+  assert.equal(summary.fixture.cleanup.child.completed, true);
+  assert.equal(summary.fixture.cleanup.listener.status, 'closed');
+  assert.equal(summary.fixture.cleanup.allocation.status, 'released');
+  assert.equal(summary.fixture.cleanup.runtimeDirectory.status, 'removed');
+  const ledger = JSON.parse(await readFile(fixture.ledger, 'utf8'));
+  assert.equal(ledger.entries[0].resources.includes(fixture.resource), false);
+});
+
+test('local fixture interruption finalizes child and allocation cleanup independently', async (t) => {
+  const fixture = await createLocalFixture(t, { behavior: 'interrupt' });
+  const child = startLocalFixture(fixture);
+  const completion = captureProcess(child);
+  let result;
+  try {
+    await waitForFixtureFile(fixture, 'fixture-listener-live.txt');
+    child.kill('SIGTERM');
+    result = await completion;
+  } finally {
+    if (child.exitCode === null && child.signalCode === null) {
+      child.kill('SIGTERM');
+      await completion;
+    }
+  }
+  assert.equal(result.status, 143, `${result.stdout}\n${result.stderr}`);
+  assert.equal(result.stderr, '');
+  const summary = JSON.parse(result.stdout.trim());
+  assert.equal(summary.status, 'interrupted');
+  assert.equal(summary.outcome, 'interrupted');
+  assert.equal(summary.fixture.workloadOutcome, 'interrupted');
+  assert.equal(summary.fixture.cleanup.child.completed, true);
+  assert.equal(summary.fixture.cleanup.listener.status, 'closed');
+  assert.equal(summary.fixture.cleanup.allocation.status, 'released');
+  assert.equal(summary.fixture.cleanup.runtimeDirectory.status, 'removed');
+  const record = JSON.parse(await readFile(summary.evidence.metadataPath, 'utf8'));
+  assert.equal(record.state, 'incomplete');
+  assert.equal(record.execution.outcome, 'interrupted');
+  const ledger = JSON.parse(await readFile(fixture.ledger, 'utf8'));
+  assert.equal(ledger.entries[0].resources.includes(fixture.resource), false);
+});
+
+test('local fixture preserves a passing workload and allocation when lease identity changes during cleanup', async (t) => {
+  const fixture = await createLocalFixture(t, { behavior: 'change-lease', foreignEntry: true });
+  const foreignBefore = structuredClone(fixture.foreign);
+  const result = invokeLocalFixture({ repo: fixture.repo, evidence: fixture.evidence, env: fixture.env });
+  const summary = summaryFrom(result);
+  const attempt = JSON.parse(await readFile(summary.evidence.metadataPath, 'utf8'));
+  assert.equal(result.status, 74, JSON.stringify({ summary, childStdout: attempt.execution.output.stdout, childStderr: attempt.execution.output.stderr }));
+  assert.equal(summary.status, 'evidence-failure');
+  assert.equal(summary.outcome, 'passed');
+  assert.equal(summary.fixture.workloadOutcome, 'passed');
+  assert.equal(summary.fixture.cleanup.child.completed, true);
+  assert.equal(summary.fixture.cleanup.listener.status, 'closed');
+  assert.equal(summary.fixture.cleanup.allocation.status, 'unresolved');
+  assert.match(summary.fixture.cleanup.allocation.error, /allocation identity changed/);
+  const ledger = JSON.parse(await readFile(fixture.ledger, 'utf8'));
+  assert.equal(ledger.entries[0].resources.includes(fixture.resource), true, 'a changed lease prevents automatic release');
+  assert.deepEqual(ledger.entries[1], foreignBefore, 'foreign ledger entry bytes are not rewritten by the local fixture');
 });
 
 async function assertQualificationSetupRejected(t, fixture, { env = {}, evidence = fixture.evidence, expectedError }) {
@@ -197,16 +630,29 @@ test('qualification readiness requires distinct explicit local ports and rejects
 
 test('qualification readiness requires live host ownership for both native ports', async (t) => {
   const unowned = await createQualificationFixture(t);
-  await writeFile(unowned.ledger, JSON.stringify({ version: 1, scope: 'codex-wide', entries: [{
+  const unownedOwner = activeLedgerOwner({
     id: 'fixture-owner',
-    status: 'active', worktree: unowned.repo, resources: [`loopback:127.0.0.1:${unowned.deliveryPort}`],
-  }] }));
+    worktree: unowned.canonicalRepo,
+    resources: [`loopback:127.0.0.1:${unowned.deliveryPort}`],
+  });
+  await writeFile(unowned.ledger, JSON.stringify({ version: 1, scope: 'codex-wide', entries: [unownedOwner] }));
   await assertQualificationSetupRejected(t, unowned, { expectedError: /CHAIN_NATIVE_SMOKE_PORT.*active worktree/ });
 
   const conflict = await createQualificationFixture(t);
+  const conflictOwner = activeLedgerOwner({
+    id: 'fixture-owner',
+    worktree: conflict.canonicalRepo,
+    resources: [`loopback:127.0.0.1:${conflict.deliveryPort}`, `loopback:127.0.0.1:${conflict.smokePort}`],
+  });
+  const otherOwner = activeLedgerOwner({
+    id: 'other-owner',
+    worktree: path.join(conflict.root, 'other-repo'),
+    resources: [`loopback:127.0.0.1:${conflict.smokePort}`],
+    status: 'parked',
+  });
   await writeFile(conflict.ledger, JSON.stringify({ version: 1, scope: 'codex-wide', entries: [
-    { id: 'fixture-owner', status: 'active', worktree: conflict.repo, resources: [`loopback:127.0.0.1:${conflict.deliveryPort}`, `loopback:127.0.0.1:${conflict.smokePort}`] },
-    { id: 'other-owner', status: 'parked', worktree: path.join(conflict.root, 'other-repo'), resources: [`loopback:127.0.0.1:${conflict.smokePort}`] },
+    conflictOwner,
+    otherOwner,
   ] }));
   await assertQualificationSetupRejected(t, conflict, { expectedError: /already owned by another active or parked worktree/ });
 });

@@ -10,6 +10,7 @@ import { recordReleaseEvidence } from '../release-evidence.mjs';
 
 const entrypoint = fileURLToPath(new URL('./coordination.mjs', import.meta.url));
 const releaseEvidenceEntrypoint = fileURLToPath(new URL('../release-evidence.mjs', import.meta.url));
+const workflowValidatorEntrypoint = fileURLToPath(new URL('./workflow-validator.mjs', import.meta.url));
 
 function git(cwd, ...args) {
   return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: 'pipe' }).trim();
@@ -1501,7 +1502,8 @@ test('Chain Scanner finish rejects a landed entry without exact-SHA release evid
     copyFileSync(releaseEvidenceEntrypoint, join(project, 'scripts/release-evidence.mjs'));
     mkdirSync(join(project,'scripts/agent-tools'),{recursive:true});
     copyFileSync(join(dirname(releaseEvidenceEntrypoint),'agent-tools/checkpoint-progress.mjs'),join(project,'scripts/agent-tools/checkpoint-progress.mjs'));
-    git(project, 'add', 'scripts/release-evidence.mjs','scripts/agent-tools/checkpoint-progress.mjs');
+    copyFileSync(workflowValidatorEntrypoint, join(project, 'scripts/agent-tools/workflow-validator.mjs'));
+    git(project, 'add', 'scripts/release-evidence.mjs','scripts/agent-tools/checkpoint-progress.mjs','scripts/agent-tools/workflow-validator.mjs');
     git(project, 'commit', '--quiet', '-m', 'install fixture release adapter');
     const began = command([
       'begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Finish evidence fixture',
@@ -1607,7 +1609,8 @@ test('Chain Scanner finish keeps actual main and exact receipt authority after m
     copyFileSync(releaseEvidenceEntrypoint, join(project, 'scripts/release-evidence.mjs'));
     mkdirSync(join(project,'scripts/agent-tools'),{recursive:true});
     copyFileSync(join(dirname(releaseEvidenceEntrypoint),'agent-tools/checkpoint-progress.mjs'),join(project,'scripts/agent-tools/checkpoint-progress.mjs'));
-    git(project, 'add', 'scripts/release-evidence.mjs','scripts/agent-tools/checkpoint-progress.mjs');
+    copyFileSync(workflowValidatorEntrypoint, join(project, 'scripts/agent-tools/workflow-validator.mjs'));
+    git(project, 'add', 'scripts/release-evidence.mjs','scripts/agent-tools/checkpoint-progress.mjs','scripts/agent-tools/workflow-validator.mjs');
     git(project, 'commit', '--quiet', '-m', 'install fixture release adapter');
     git(project, 'checkout', '--quiet', 'work/master-release');
     git(project, 'merge', '--quiet', '--ff-only', 'main');
@@ -1684,7 +1687,8 @@ test('Chain Scanner landed finish rejects a stale remote even when local main re
     copyFileSync(releaseEvidenceEntrypoint, join(project, 'scripts/release-evidence.mjs'));
     mkdirSync(join(project,'scripts/agent-tools'),{recursive:true});
     copyFileSync(join(dirname(releaseEvidenceEntrypoint),'agent-tools/checkpoint-progress.mjs'),join(project,'scripts/agent-tools/checkpoint-progress.mjs'));
-    git(project, 'add', 'scripts/release-evidence.mjs','scripts/agent-tools/checkpoint-progress.mjs');
+    copyFileSync(workflowValidatorEntrypoint, join(project, 'scripts/agent-tools/workflow-validator.mjs'));
+    git(project, 'add', 'scripts/release-evidence.mjs','scripts/agent-tools/checkpoint-progress.mjs','scripts/agent-tools/workflow-validator.mjs');
     git(project, 'commit', '--quiet', '-m', 'install fixture release adapter');
     const began = command([
       'begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Remote divergence fixture',
@@ -1817,6 +1821,92 @@ test('release-claim enforces owner identity and only releases the requested owne
     ], competingProject);
     assert.equal(competingAfterRelease.status, 0, competingAfterRelease.stderr);
     assert.deepEqual(JSON.parse(competingAfterRelease.stdout).resources, ['release-resource']);
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+test('release-claim compares the healthy lease and exact resource under lock', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'chain-coordination-release-cas-'));
+  try {
+    const ledgerPath = join(fixture, 'host-ledger.json');
+    const ownerProject = createProject(join(fixture, 'owner-project'), 'work/cas-owner');
+    const foreignProject = createProject(join(fixture, 'foreign-project'), 'work/cas-foreign');
+    const begun = command([
+      'begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Lease-checked fixture release',
+      '--resources', 'fixture-resource', '--resources', 'retain-resource',
+    ], ownerProject);
+    assert.equal(begun.status, 0, begun.stderr);
+    const owner = JSON.parse(begun.stdout);
+    const firstHeartbeat = command(['heartbeat', '--file', ledgerPath, '--id', owner.id], ownerProject);
+    assert.equal(firstHeartbeat.status, 0, firstHeartbeat.stderr);
+    const leasedOwner = JSON.parse(firstHeartbeat.stdout);
+    const initialLeaseSha256 = createHash('sha256').update(JSON.stringify(leasedOwner.lease)).digest('hex');
+    const foreignHeartbeatAt = new Date().toISOString();
+    const foreignEntry = {
+      id: 'foreign-cas-control',
+      status: 'active',
+      worktree: realpathSync(foreignProject),
+      heartbeatAt: foreignHeartbeatAt,
+      lease: {
+        state: 'healthy', ownerConfirmationRequired: false, takeoverAllowed: false,
+        lastHeartbeatAt: foreignHeartbeatAt, expiresAt: new Date(Date.now() + 60000).toISOString(),
+      },
+      resources: ['foreign-reservation:retain-exactly'],
+      unknownForeignMetadata: { bytes: 'PRESERVE-FOREIGN-CAS-42', nested: ['one', 'two'] },
+    };
+    const stateWithForeign = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+    stateWithForeign.entries.push(foreignEntry);
+    writeFileSync(ledgerPath, JSON.stringify(stateWithForeign));
+
+    const matched = command([
+      'release-claim', '--file', ledgerPath, '--id', owner.id, '--resources', 'fixture-resource',
+      '--expected-lease-sha256', initialLeaseSha256,
+    ], ownerProject);
+    assert.equal(matched.status, 0, matched.stderr);
+    let state = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+    assert.deepEqual(state.entries.find((entry) => entry.id === owner.id).resources, ['retain-resource']);
+    assert.deepEqual(state.entries.find((entry) => entry.id === foreignEntry.id), foreignEntry,
+      'matched release preserves every foreign entry field');
+
+    const refreshed = command(['heartbeat', '--file', ledgerPath, '--id', owner.id], ownerProject);
+    assert.equal(refreshed.status, 0, refreshed.stderr);
+    const beforeStaleRelease = readFileSync(ledgerPath, 'utf8');
+    const stale = command([
+      'release-claim', '--file', ledgerPath, '--id', owner.id, '--resources', 'retain-resource',
+      '--expected-lease-sha256', initialLeaseSha256,
+    ], ownerProject);
+    assert.notEqual(stale.status, 0);
+    assert.match(stale.stderr, /lease identity changed/);
+    assert.equal(readFileSync(ledgerPath, 'utf8'), beforeStaleRelease,
+      'stale compare-and-swap refuses the release without changing even foreign ledger bytes');
+
+    const refreshedOwner = JSON.parse(refreshed.stdout);
+    const currentLeaseSha256 = createHash('sha256').update(JSON.stringify(refreshedOwner.lease)).digest('hex');
+    const wrongResourceBefore = readFileSync(ledgerPath, 'utf8');
+    const wrongResource = command([
+      'release-claim', '--file', ledgerPath, '--id', owner.id, '--resources', 'not-owned-resource',
+      '--expected-lease-sha256', currentLeaseSha256,
+    ], ownerProject);
+    assert.notEqual(wrongResource.status, 0);
+    assert.match(wrongResource.stderr, /no longer owned by this lease/);
+    assert.equal(readFileSync(ledgerPath, 'utf8'), wrongResourceBefore);
+
+    state = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+    const currentOwner = state.entries.find((entry) => entry.id === owner.id);
+    currentOwner.lease.expiresAt = new Date(Date.now() - 1000).toISOString();
+    writeFileSync(ledgerPath, JSON.stringify(state));
+    const expiredBefore = readFileSync(ledgerPath, 'utf8');
+    const expiredLeaseSha256 = createHash('sha256').update(JSON.stringify(currentOwner.lease)).digest('hex');
+    const expired = command([
+      'release-claim', '--file', ledgerPath, '--id', owner.id, '--resources', 'retain-resource',
+      '--expected-lease-sha256', expiredLeaseSha256,
+    ], ownerProject);
+    assert.notEqual(expired.status, 0);
+    assert.match(expired.stderr, /healthy lease is expired or inactive/);
+    assert.equal(readFileSync(ledgerPath, 'utf8'), expiredBefore);
+    state = JSON.parse(expiredBefore);
+    assert.deepEqual(state.entries.find((entry) => entry.id === foreignEntry.id), foreignEntry);
   } finally {
     rmSync(fixture, { recursive: true, force: true });
   }
