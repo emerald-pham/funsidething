@@ -26244,406 +26244,449 @@
       "failure": "No new functional story is introduced by this merge, and no retrospective run is represented as original RED. Parked repair nextAction retains original RED b8760d77/bb8725a7 and source-exact GREEN cd361380. Initial broad focused selection refused missing native allocations; the first process cohort exposed parent/child Node runtime mismatch. Both actual failures are retained unchanged outside the repository."
     }
   },
-{
-  "baseCommit": "d29410af3d9c55eac5b8bc287248048625d760bc",
-  "testChangesSha256": "58b32a9ed8833b7275eb4ef12d4fb185e8f058d7e3d90fa04bad4ff48f4fed15",
-  "reason": "D03-D05 require the existing report input consumer to reject a false complete startup timeline while retaining the independently passing app verdict. Only the ordinary diagnostic capture reuses the native consumer.",
-  "previousBehavior": "A report could claim complete despite missing the actual complete-board paint timestamp. Native opening ran current checkout400-task stories instead of the frozen ordinary baseline and fixture.",
-  "intendedBehavior": "A missing complete-board timestamp classifies diagnostic timing incomplete without inventing app failure. The optional ordinary-opening recorder reads immutable frozen app bytes and exact64-task installed fixture with explicit unavailable paints and work observations.",
-  "replacementTests": [
-    "RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app"
-  ],
-  "preservedCoverage": [
-    "All existing native action, rapid input, asset verification, lifecycle and cleanup assertions stay unchanged for ordinary full button runs.",
-    "The diagnostic kind/scope cannot qualify button or mobile-memory acceptance; actual WebKit paint and overlapping operation intervals remain explicitly unavailable.",
-    "No app assets, saved-board semantics,200ms release threshold, optional memory policy or existing mandatory release checks change."
-  ],
-  "redEvidence": {
-    "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app$\" tests.js; external startup/D03-runs/2026-10-28T18-50-21-043Z-43a039b2-3a68-49c5-b2b2-bc0b16ec26dc.json",
-    "failure": "Actual contemporaneous assertion RED at unchanged recorder d29410a: missing actual complete-board paint retained complete instead of incomplete. D05 observed GREEN c9697535 after the recorder change; complete positive control at800ms remains accepted, showing200ms is not a gate."
+  {
+    "baseCommit": "d29410af3d9c55eac5b8bc287248048625d760bc",
+    "testChangesSha256": "58b32a9ed8833b7275eb4ef12d4fb185e8f058d7e3d90fa04bad4ff48f4fed15",
+    "reason": "D03-D05 require the existing report input consumer to reject a false complete startup timeline while retaining the independently passing app verdict. Only the ordinary diagnostic capture reuses the native consumer.",
+    "previousBehavior": "A report could claim complete despite missing the actual complete-board paint timestamp. Native opening ran current checkout400-task stories instead of the frozen ordinary baseline and fixture.",
+    "intendedBehavior": "A missing complete-board timestamp classifies diagnostic timing incomplete without inventing app failure. The optional ordinary-opening recorder reads immutable frozen app bytes and exact64-task installed fixture with explicit unavailable paints and work observations.",
+    "replacementTests": [
+      "RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app"
+    ],
+    "preservedCoverage": [
+      "All existing native action, rapid input, asset verification, lifecycle and cleanup assertions stay unchanged for ordinary full button runs.",
+      "The diagnostic kind/scope cannot qualify button or mobile-memory acceptance; actual WebKit paint and overlapping operation intervals remain explicitly unavailable.",
+      "No app assets, saved-board semantics,200ms release threshold, optional memory policy or existing mandatory release checks change."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app$\" tests.js; external startup/D03-runs/2026-10-28T18-50-21-043Z-43a039b2-3a68-49c5-b2b2-bc0b16ec26dc.json",
+      "failure": "Actual contemporaneous assertion RED at unchanged recorder d29410a: missing actual complete-board paint retained complete instead of incomplete. D05 observed GREEN c9697535 after the recorder change; complete positive control at800ms remains accepted, showing200ms is not a gate."
+    }
+  },
+  {
+    "baseCommit": "99b5dd01df0bc6fee9fa2f9cac30d5ce0c701ee5",
+    "testChangesSha256": "2b7c29d1765ce36447b5714cef36dbfc479b2904abf6873c835de35ac9ea198c",
+    "reason": "D03-D05 require the existing report input consumer to reject a false complete startup timeline while retaining the independently passing app verdict. Only the ordinary diagnostic capture reuses the native consumer. This aggregate fingerprint binds inherited reviewed integration tests plus the new startup report case against current main; it credits their unchanged original RED records and does not invent chronology.",
+    "previousBehavior": "A report could claim complete despite missing the actual complete-board paint timestamp. Native opening ran current checkout400-task stories instead of the frozen ordinary baseline and fixture.",
+    "intendedBehavior": "A missing complete-board timestamp classifies diagnostic timing incomplete without inventing app failure. The optional ordinary-opening recorder reads immutable frozen app bytes and exact64-task installed fixture with explicit unavailable paints and work observations.",
+    "replacementTests": [
+      "RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app"
+    ],
+    "preservedCoverage": [
+      "All existing native action, rapid input, asset verification, lifecycle and cleanup assertions stay unchanged for ordinary full button runs.",
+      "The diagnostic kind/scope cannot qualify button or mobile-memory acceptance; actual WebKit paint and overlapping operation intervals remain explicitly unavailable.",
+      "No app assets, saved-board semantics,200ms release threshold, optional memory policy or existing mandatory release checks change."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app$\" tests.js; external startup/D03-runs/2026-10-28T18-50-21-043Z-43a039b2-3a68-49c5-b2b2-bc0b16ec26dc.json",
+      "failure": "Actual contemporaneous assertion RED at unchanged recorder d29410a: missing actual complete-board paint retained complete instead of incomplete. D05 observed GREEN c9697535 after the recorder change; complete positive control at800ms remains accepted, showing200ms is not a gate."
+    }
+  },
+  {
+    "baseCommit": "b176026825e4f9539780f745fe60e09cf348d288",
+    "testChangesSha256": "8dd082086c8248c07d21423382b3eaec462062c724b17064c8031ab0538f9d8d",
+    "reason": "D03-D05 require the existing report input consumer to reject a false complete startup timeline while retaining the independently passing app verdict. Only the ordinary diagnostic capture reuses the native consumer. This aggregate fingerprint binds inherited reviewed integration tests plus the new startup report case against current main; it credits their unchanged original RED records and does not invent chronology. Reconciliation also binds the exact published integration upstream comparison; original worker chronology and every inherited rationale object remain unchanged.",
+    "previousBehavior": "A report could claim complete despite missing the actual complete-board paint timestamp. Native opening ran current checkout400-task stories instead of the frozen ordinary baseline and fixture.",
+    "intendedBehavior": "A missing complete-board timestamp classifies diagnostic timing incomplete without inventing app failure. The optional ordinary-opening recorder reads immutable frozen app bytes and exact64-task installed fixture with explicit unavailable paints and work observations.",
+    "replacementTests": [
+      "RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app"
+    ],
+    "preservedCoverage": [
+      "All existing native action, rapid input, asset verification, lifecycle and cleanup assertions stay unchanged for ordinary full button runs.",
+      "The diagnostic kind/scope cannot qualify button or mobile-memory acceptance; actual WebKit paint and overlapping operation intervals remain explicitly unavailable.",
+      "No app assets, saved-board semantics,200ms release threshold, optional memory policy or existing mandatory release checks change."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app$\" tests.js; external startup/D03-runs/2026-10-28T18-50-21-043Z-43a039b2-3a68-49c5-b2b2-bc0b16ec26dc.json",
+      "failure": "Actual contemporaneous assertion RED at unchanged recorder d29410a: missing actual complete-board paint retained complete instead of incomplete. D05 observed GREEN c9697535 after the recorder change; complete positive control at800ms remains accepted, showing200ms is not a gate."
+    }
+  },
+  {
+    "baseCommit": "4ef38622839cff86c86b97ed49031a43b22e563d",
+    "testChangesSha256": "9683412995969fa39d5973d179c4245b73102284444e24509bcc6cb7cbcec721",
+    "reason": "Add the exact merged-source consumer required by #984 and observe its stale-inventory assertion before the #986 sourceTemplates-only reconciliation. The source admission gap has eleven fully attributed hash/count differences in #982: five same-control shared-presentation template replacements and one additional existing held-recovery Reload template.",
+    "previousBehavior": "The selected merged app's tracked JavaScript/HTML source pool failed the public source-inventory verifier against the reviewed map. No permanent consumer regression exercised that same source pool, so the stale digest map blocked native admission without a directly maintained test.",
+    "intendedBehavior": "The existing public source-inventory CLI accepts the same tracked JavaScript/HTML pool selected by runButtonSafety after only the six reviewed current templates replace five obsolete entries and the existing Reload template is counted. Action identifiers, scenario requirements and unknown-control refusal remain unchanged.",
+    "replacementTests": [
+      "RISK repository process: merged tracked app sources match the reviewed button templates"
+    ],
+    "preservedCoverage": [
+      "The existing public inventory CLI still accepts a known reviewed template and refuses an unreviewed new action, duplicate template, and nonbutton action route; those four controls passed unchanged.",
+      "Required action identifiers, rapid actions, state scenarios, workload, dormant-handler explanations, and the inert saved-preview exclusion remain intact; this reconciliation changes only sourceTemplates counts.",
+      "No app or native guard behavior changes. Optional-policy requiredWorkload and rapid-policy fields owned by the separate worker are untouched."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/293-inventory-reconciliation/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/evidence/inventory-repair/runs --purpose preimplementation-red -- node --test --test-name-pattern='RISK repository process: merged tracked app sources match the reviewed button templates' tests.js; recorder d7fe5dad-bce7-45ff-9db4-689e7bbc0690 at 2026-10-28T20:00:03Z",
+      "failure": "At unchanged candidate 4ef38622839cff86c86b97ed49031a43b22e563d, tree a78c5ece9b8c387f9b2d4975daaba59d8fcf241e, the real CLI returned status 1 and the test observed ERR_ASSERTION: Source button templates differ from reviewed native inventory. The original inventory SHA-256 was a6301aa5eb854da41b249415946d4c29d7f121861560052c02e9215972f0f735. This was a discriminating assertion after the CLI ran, not setup failure. Existing known/new/duplicate/nonbutton controls separately passed 4/4 in recorder 6147793e-8f7c-4018-b74e-e4f55462f251."
+    }
+  },
+  {
+    "baseCommit": "4ef38622839cff86c86b97ed49031a43b22e563d",
+    "testChangesSha256": "11a7718e3c0cc8eb927b8f8105159a51944719a5a089552e3ff032888e08fc4a",
+    "reason": "NK03-NK05 confirmed the existing native admission consumer incorrectly dereferenced a missing unrelated foreign path before finding a healthy owner. #993 freezes only already passing guard/tests and required metadata; inherited rationale objects and chronology are preserved.",
+    "previousBehavior": "The owner lookup threw ENOENT for a missing active foreign path before considering the healthy current owner; unrelated missing ownership prevented even the admitted native output boundary.",
+    "intendedBehavior": "The real runButtonSafety consumer reaches its output boundary for a healthy canonical current owner after an unrelated missing foreign entry, while missing active or parked foreign engine and port claims still refuse before output.",
+    "replacementTests": [
+      "RISK repository process: native allocation admits its healthy owner past missing foreign paths and protects their claims"
+    ],
+    "preservedCoverage": [
+      "Existing native allocation, lease, owner confirmation, explicit-resource and prelaunch refusal assertions remain unchanged.",
+      "The original foreign owners array retains active/parked resource conflicts and exact fixture ledger bytes; aliases canonicalize and a missing current owner grants no authority.",
+      "Only external filesystem output creation is controlled for this guard regression; native/browser launch, inventory correctness, startup cause, D06 retry, memory, physical-device and release qualification remain separate gates."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/293-native-allocation/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/native-allocation/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern='^RISK repository process: native allocation admits its healthy owner past missing foreign paths and protects their claims tests.js; record43a07435-dade-40d4-a518-6261724090c2 at unchanged4ef38622839cff86c86b97ed49031a43b22e563d",
+      "failure": "Genuine contemporaneous ERR_ASSERTION: healthy-owner/alias controls reached the external output sentinel, but missing-unrelated foreign owner produced actual guard realpathSync ENOENT instead of that sentinel. Recorder generic infrastructure-failure label is preserved because its classifier sees ENOENT in the asserted actual value. Earlier5d3e7b9e is invalid setup from separate inventory mismatch, not accepted RED. Same test bytes and command pass9/9 at GREEN823f254f; affected refusal/risk map b95b4156 passes."
+    }
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "0af809175dc91910e49973de5980da525b15cd11a98d653012174a3731dad9d0",
+    "reason": "NK03-NK05 confirmed the existing native admission consumer incorrectly dereferenced a missing unrelated foreign path before finding a healthy owner. #993 freezes only already passing guard/tests and required metadata; inherited rationale objects and chronology are preserved.",
+    "previousBehavior": "The owner lookup threw ENOENT for a missing active foreign path before considering the healthy current owner; unrelated missing ownership prevented even the admitted native output boundary.",
+    "intendedBehavior": "The real runButtonSafety consumer reaches its output boundary for a healthy canonical current owner after an unrelated missing foreign entry, while missing active or parked foreign engine and port claims still refuse before output.",
+    "replacementTests": [
+      "RISK repository process: native allocation admits its healthy owner past missing foreign paths and protects their claims"
+    ],
+    "preservedCoverage": [
+      "Existing native allocation, lease, owner confirmation, explicit-resource and prelaunch refusal assertions remain unchanged.",
+      "The original foreign owners array retains active/parked resource conflicts and exact fixture ledger bytes; aliases canonicalize and a missing current owner grants no authority.",
+      "Only external filesystem output creation is controlled for this guard regression; native/browser launch, inventory correctness, startup cause, D06 retry, memory, physical-device and release qualification remain separate gates."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/293-native-allocation/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/native-allocation/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern='^RISK repository process: native allocation admits its healthy owner past missing foreign paths and protects their claims tests.js; record43a07435-dade-40d4-a518-6261724090c2 at unchanged4ef38622839cff86c86b97ed49031a43b22e563d",
+      "failure": "Genuine contemporaneous ERR_ASSERTION: healthy-owner/alias controls reached the external output sentinel, but missing-unrelated foreign owner produced actual guard realpathSync ENOENT instead of that sentinel. Recorder generic infrastructure-failure label is preserved because its classifier sees ENOENT in the asserted actual value. Earlier5d3e7b9e is invalid setup from separate inventory mismatch, not accepted RED. Same test bytes and command pass9/9 at GREEN823f254f; affected refusal/risk map b95b4156 passes."
+    }
+  },
+  {
+    "baseCommit": "b176026825e4f9539780f745fe60e09cf348d288",
+    "testChangesSha256": "295cceba06cc4def5ee5cf30277485d3e13cd0209502738c02f77ca5d3746a52",
+    "reason": "NK03-NK05 confirmed the existing native admission consumer incorrectly dereferenced a missing unrelated foreign path before finding a healthy owner. #993 freezes only already passing guard/tests and required metadata; inherited rationale objects and chronology are preserved.",
+    "previousBehavior": "The owner lookup threw ENOENT for a missing active foreign path before considering the healthy current owner; unrelated missing ownership prevented even the admitted native output boundary.",
+    "intendedBehavior": "The real runButtonSafety consumer reaches its output boundary for a healthy canonical current owner after an unrelated missing foreign entry, while missing active or parked foreign engine and port claims still refuse before output.",
+    "replacementTests": [
+      "RISK repository process: native allocation admits its healthy owner past missing foreign paths and protects their claims"
+    ],
+    "preservedCoverage": [
+      "Existing native allocation, lease, owner confirmation, explicit-resource and prelaunch refusal assertions remain unchanged.",
+      "The original foreign owners array retains active/parked resource conflicts and exact fixture ledger bytes; aliases canonicalize and a missing current owner grants no authority.",
+      "Only external filesystem output creation is controlled for this guard regression; native/browser launch, inventory correctness, startup cause, D06 retry, memory, physical-device and release qualification remain separate gates."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/293-native-allocation/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/native-allocation/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern='^RISK repository process: native allocation admits its healthy owner past missing foreign paths and protects their claims tests.js; record43a07435-dade-40d4-a518-6261724090c2 at unchanged4ef38622839cff86c86b97ed49031a43b22e563d",
+      "failure": "Genuine contemporaneous ERR_ASSERTION: healthy-owner/alias controls reached the external output sentinel, but missing-unrelated foreign owner produced actual guard realpathSync ENOENT instead of that sentinel. Recorder generic infrastructure-failure label is preserved because its classifier sees ENOENT in the asserted actual value. Earlier5d3e7b9e is invalid setup from separate inventory mismatch, not accepted RED. Same test bytes and command pass9/9 at GREEN823f254f; affected refusal/risk map b95b4156 passes."
+    }
+  },
+  {
+    "baseCommit": "7afdb551b3374c2e35daf9ce710156e9f4ab6c6d",
+    "testChangesSha256": "55435ff0389869ed038032820a47828af0aab2edf2dadb1671183ed588f67702",
+    "reason": "NS01 #992 merges exact admitted inventory3c39e8726c4c127b93505755e989dcf832602f16 into clean guard7afdb551b3374c2e35daf9ce710156e9f4ab6c6d. Derived combined fingerprint follows already committed merge984d514; all original rationale objects and original assertion chronology are preserved. Prior metadata read ENOBUFS remains setup failure.",
+    "previousBehavior": "The original guard traversed a missing unrelated foreign owner before valid admission. Separately, the reviewed button inventory did not match the current merged tracked application templates.",
+    "intendedBehavior": "Retain the already GREEN native-allocation guard and original test bytes with separately admitted source-template inventory/regression; preserve every existing refusal and complete group registration.",
+    "replacementTests": [
+      "RISK repository process: merged tracked app sources match the reviewed button templates"
+    ],
+    "preservedCoverage": [
+      "Original guard assertion RED43a07435 and GREEN823f254f remain unchanged; earlier invalid setup5d3e7b9e stays invalid and preserved.",
+      "All inherited source-inventory acceptance/refusal assertions, thirteen group replacements, foreign active/parked resource conflicts and fixture ledger byte preservation remain unchanged.",
+      "Native admission NK06, refusal NK07, rendered Reload#988 and release qualification remain separately ticketed; source metadata passing is not browser or product proof."
+    ],
+    "redEvidence": {
+      "command": "Original guard recorder43a07435-dade-40d4-a518-6261724090c2 at unchanged4ef3862, GREEN823f254f; inventory original evidence retained in inventory-merge/integrated-evidence.json and unchanged inherited inventory rationale. NS01 derives only combined protected-test fingerprint after merge984d514.",
+      "failure": "Original meaningful guard assertion observed expected admitted output sentinel versus actual foreign-path ENOENT with healthy controls passing. Inventory had independently preserved original mismatch assertion. This later merge metadata and buffer setup correction are not new behavioral RED or native runs."
+    }
+  },
+  {
+    "baseCommit": "4ef38622839cff86c86b97ed49031a43b22e563d",
+    "testChangesSha256": "613155aa39d340c8f3da94fdde1ae8d7febcf8d2fd8acc629787b0ffc05355f4",
+    "reason": "NS01 #992 merges exact admitted inventory3c39e8726c4c127b93505755e989dcf832602f16 into clean guard7afdb551b3374c2e35daf9ce710156e9f4ab6c6d. Derived combined fingerprint follows already committed merge984d514; all original rationale objects and original assertion chronology are preserved. Prior metadata read ENOBUFS remains setup failure.",
+    "previousBehavior": "The original guard traversed a missing unrelated foreign owner before valid admission. Separately, the reviewed button inventory did not match the current merged tracked application templates.",
+    "intendedBehavior": "Retain the already GREEN native-allocation guard and original test bytes with separately admitted source-template inventory/regression; preserve every existing refusal and complete group registration.",
+    "replacementTests": [
+      "RISK repository process: native allocation admits its healthy owner past missing foreign paths and protects their claims",
+      "RISK repository process: merged tracked app sources match the reviewed button templates"
+    ],
+    "preservedCoverage": [
+      "Original guard assertion RED43a07435 and GREEN823f254f remain unchanged; earlier invalid setup5d3e7b9e stays invalid and preserved.",
+      "All inherited source-inventory acceptance/refusal assertions, thirteen group replacements, foreign active/parked resource conflicts and fixture ledger byte preservation remain unchanged.",
+      "Native admission NK06, refusal NK07, rendered Reload#988 and release qualification remain separately ticketed; source metadata passing is not browser or product proof."
+    ],
+    "redEvidence": {
+      "command": "Original guard recorder43a07435-dade-40d4-a518-6261724090c2 at unchanged4ef3862, GREEN823f254f; inventory original evidence retained in inventory-merge/integrated-evidence.json and unchanged inherited inventory rationale. NS01 derives only combined protected-test fingerprint after merge984d514.",
+      "failure": "Original meaningful guard assertion observed expected admitted output sentinel versus actual foreign-path ENOENT with healthy controls passing. Inventory had independently preserved original mismatch assertion. This later merge metadata and buffer setup correction are not new behavioral RED or native runs."
+    }
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "99267963edd08ed5a0f4134f01483e8ef918918b5ac492d5bea48cf1003e7af3",
+    "reason": "NS01 #992 merges exact admitted inventory3c39e8726c4c127b93505755e989dcf832602f16 into clean guard7afdb551b3374c2e35daf9ce710156e9f4ab6c6d. Derived combined fingerprint follows already committed merge984d514; all original rationale objects and original assertion chronology are preserved. Prior metadata read ENOBUFS remains setup failure.",
+    "previousBehavior": "The original guard traversed a missing unrelated foreign owner before valid admission. Separately, the reviewed button inventory did not match the current merged tracked application templates.",
+    "intendedBehavior": "Retain the already GREEN native-allocation guard and original test bytes with separately admitted source-template inventory/regression; preserve every existing refusal and complete group registration.",
+    "replacementTests": [
+      "RISK repository process: native allocation admits its healthy owner past missing foreign paths and protects their claims",
+      "RISK repository process: merged tracked app sources match the reviewed button templates"
+    ],
+    "preservedCoverage": [
+      "Original guard assertion RED43a07435 and GREEN823f254f remain unchanged; earlier invalid setup5d3e7b9e stays invalid and preserved.",
+      "All inherited source-inventory acceptance/refusal assertions, thirteen group replacements, foreign active/parked resource conflicts and fixture ledger byte preservation remain unchanged.",
+      "Native admission NK06, refusal NK07, rendered Reload#988 and release qualification remain separately ticketed; source metadata passing is not browser or product proof."
+    ],
+    "redEvidence": {
+      "command": "Original guard recorder43a07435-dade-40d4-a518-6261724090c2 at unchanged4ef3862, GREEN823f254f; inventory original evidence retained in inventory-merge/integrated-evidence.json and unchanged inherited inventory rationale. NS01 derives only combined protected-test fingerprint after merge984d514.",
+      "failure": "Original meaningful guard assertion observed expected admitted output sentinel versus actual foreign-path ENOENT with healthy controls passing. Inventory had independently preserved original mismatch assertion. This later merge metadata and buffer setup correction are not new behavioral RED or native runs."
+    }
+  },
+  {
+    "baseCommit": "b176026825e4f9539780f745fe60e09cf348d288",
+    "testChangesSha256": "25a383b13fa7db696c7db855d09033dbb9d195e28b52bb3b09d888bbacf1f0ea",
+    "reason": "NS01 #992 merges exact admitted inventory3c39e8726c4c127b93505755e989dcf832602f16 into clean guard7afdb551b3374c2e35daf9ce710156e9f4ab6c6d. Derived combined fingerprint follows already committed merge984d514; all original rationale objects and original assertion chronology are preserved. Prior metadata read ENOBUFS remains setup failure.",
+    "previousBehavior": "The original guard traversed a missing unrelated foreign owner before valid admission. Separately, the reviewed button inventory did not match the current merged tracked application templates.",
+    "intendedBehavior": "Retain the already GREEN native-allocation guard and original test bytes with separately admitted source-template inventory/regression; preserve every existing refusal and complete group registration.",
+    "replacementTests": [
+      "RISK repository process: native allocation admits its healthy owner past missing foreign paths and protects their claims",
+      "RISK repository process: merged tracked app sources match the reviewed button templates"
+    ],
+    "preservedCoverage": [
+      "Original guard assertion RED43a07435 and GREEN823f254f remain unchanged; earlier invalid setup5d3e7b9e stays invalid and preserved.",
+      "All inherited source-inventory acceptance/refusal assertions, thirteen group replacements, foreign active/parked resource conflicts and fixture ledger byte preservation remain unchanged.",
+      "Native admission NK06, refusal NK07, rendered Reload#988 and release qualification remain separately ticketed; source metadata passing is not browser or product proof."
+    ],
+    "redEvidence": {
+      "command": "Original guard recorder43a07435-dade-40d4-a518-6261724090c2 at unchanged4ef3862, GREEN823f254f; inventory original evidence retained in inventory-merge/integrated-evidence.json and unchanged inherited inventory rationale. NS01 derives only combined protected-test fingerprint after merge984d514.",
+      "failure": "Original meaningful guard assertion observed expected admitted output sentinel versus actual foreign-path ENOENT with healthy controls passing. Inventory had independently preserved original mismatch assertion. This later merge metadata and buffer setup correction are not new behavioral RED or native runs."
+    }
+  },
+  {
+    "baseCommit": "c920ccffc11af487ec84277c33fe2e370541e384",
+    "testChangesSha256": "ca2bdda26a767dfb7052964e8cea027373d9d01f80135598ae1e9a2a2558c4e0",
+    "reason": "Report-only supplemental capture admission under1101-1104 needs bounded artifact/clock/cleanup and false-completeness sensitivity at the existing verifier.",
+    "previousBehavior": "Unchanged report consumer silently accepted malformed capture counts,bytes,paths,hashes,clock conversion,cleanup,bounds and a complete claim based on ambiguous public timestamps.",
+    "intendedBehavior": "Validate fixed finite supplemental data and keep D02 incomplete for unsupported capture clocks/work without changing actual application verdicts or original no-capture positives.",
+    "replacementTests": [
+      "RISK repository process: supplemental startup capture rejects malformed artifacts and unsupported paint completeness"
+    ],
+    "preservedCoverage": [
+      "Original D03 complete and incomplete synthetic controls remain unchanged, including its accepted800ms positive and diagnostic/app-verdict separation.",
+      "All existing native button/rapid/saved-source/guard/inventory assertions remain intact; no producer or app bytes change in this report cycle."
+    ],
+    "redEvidence": {
+      "command": "Actual recorder1102-red d9fb096f: node --test --test-name-pattern=^RISK.repository.process:.supplemental.startup.capture tests.js",
+      "failure": "Nine Missing expected exception admissions and unsupported complete instead of incomplete observed at unchanged c920; exact unchanged test GREEN2a2531e2 with17/17 affected controls."
+    }
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "97e216a255a3fc51b02cfe301a3e2c75c17eb071215f75becd4c465a4bb61589",
+    "reason": "Report-only supplemental capture admission under1101-1104 needs bounded artifact/clock/cleanup and false-completeness sensitivity at the existing verifier.",
+    "previousBehavior": "Unchanged report consumer silently accepted malformed capture counts,bytes,paths,hashes,clock conversion,cleanup,bounds and a complete claim based on ambiguous public timestamps.",
+    "intendedBehavior": "Validate fixed finite supplemental data and keep D02 incomplete for unsupported capture clocks/work without changing actual application verdicts or original no-capture positives.",
+    "replacementTests": [
+      "RISK repository process: supplemental startup capture rejects malformed artifacts and unsupported paint completeness"
+    ],
+    "preservedCoverage": [
+      "Original D03 complete and incomplete synthetic controls remain unchanged, including its accepted800ms positive and diagnostic/app-verdict separation.",
+      "All existing native button/rapid/saved-source/guard/inventory assertions remain intact; no producer or app bytes change in this report cycle."
+    ],
+    "redEvidence": {
+      "command": "Actual recorder1102-red d9fb096f: node --test --test-name-pattern=^RISK.repository.process:.supplemental.startup.capture tests.js",
+      "failure": "Nine Missing expected exception admissions and unsupported complete instead of incomplete observed at unchanged c920; exact unchanged test GREEN2a2531e2 with17/17 affected controls."
+    }
+  },
+  {
+    "baseCommit": "c920ccffc11af487ec84277c33fe2e370541e384",
+    "testChangesSha256": "77b5dabd3ea4c836fa969a0e3296b280f75e896812330208ac0050c0e1e77271",
+    "reason": "CN01 test-only source defines actual selected startup JPEG artifacts and strict API/CLI selection admission before the single genuine CN02 producer RED.",
+    "previousBehavior": "Existing public native startup succeeds without producing supplemental JPEG evidence; the report-only validator has been tested and fixed independently.",
+    "intendedBehavior": "One real selected startup case must retain actual JPEG files,finite counts/bytes,distinct clocks,stop/cleanup,trusted input and exact saved fixture; selection outside startup or unknown mode refuses before launch.",
+    "replacementTests": [
+      "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
+      "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
+    ],
+    "preservedCoverage": [
+      "Existing report RED/GREEN d9fb096f/2a2531e2,original D03 full/incomplete controls,all native guard/inventory/ordinary action/source assertions remain unchanged.",
+      "This commit changes only tests and their metadata; no producer implementation or native execution has occurred yet."
+    ],
+    "redEvidence": {
+      "command": "CN02 will run exact committed selected startup producer RISK once under an immutable allocated manifest. This test-definition commit deliberately precedes that execution.",
+      "failure": "Native producer RED is not yet observed at CN01 and is not claimed. Existing independent report RED d9fb096f is retained only as report evidence, not native producer evidence."
+    }
+  },
+  {
+    "baseCommit": "900a9a7796492567ade6f29ebe573dc7e1ba4ebb",
+    "testChangesSha256": "924cef5b7999e42aaa4aa45c5e32819ac862a7d436c74f21f0efcede4087a20f",
+    "reason": "CN01 test-only source defines actual selected startup JPEG artifacts and strict API/CLI selection admission before the single genuine CN02 producer RED.",
+    "previousBehavior": "Existing public native startup succeeds without producing supplemental JPEG evidence; the report-only validator has been tested and fixed independently.",
+    "intendedBehavior": "One real selected startup case must retain actual JPEG files,finite counts/bytes,distinct clocks,stop/cleanup,trusted input and exact saved fixture; selection outside startup or unknown mode refuses before launch.",
+    "replacementTests": [
+      "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
+      "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
+    ],
+    "preservedCoverage": [
+      "Existing report RED/GREEN d9fb096f/2a2531e2,original D03 full/incomplete controls,all native guard/inventory/ordinary action/source assertions remain unchanged.",
+      "This commit changes only tests and their metadata; no producer implementation or native execution has occurred yet."
+    ],
+    "redEvidence": {
+      "command": "CN02 will run exact committed selected startup producer RISK once under an immutable allocated manifest. This test-definition commit deliberately precedes that execution.",
+      "failure": "Native producer RED is not yet observed at CN01 and is not claimed. Existing independent report RED d9fb096f is retained only as report evidence, not native producer evidence."
+    }
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "ef7f0898ec94f03ff7e001b9e1fbc63eae8e90331f55c638738126a767b0e4fb",
+    "reason": "CN01 test-only source defines actual selected startup JPEG artifacts and strict API/CLI selection admission before the single genuine CN02 producer RED.",
+    "previousBehavior": "Existing public native startup succeeds without producing supplemental JPEG evidence; the report-only validator has been tested and fixed independently.",
+    "intendedBehavior": "One real selected startup case must retain actual JPEG files,finite counts/bytes,distinct clocks,stop/cleanup,trusted input and exact saved fixture; selection outside startup or unknown mode refuses before launch.",
+    "replacementTests": [
+      "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
+      "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
+    ],
+    "preservedCoverage": [
+      "Existing report RED/GREEN d9fb096f/2a2531e2,original D03 full/incomplete controls,all native guard/inventory/ordinary action/source assertions remain unchanged.",
+      "This commit changes only tests and their metadata; no producer implementation or native execution has occurred yet."
+    ],
+    "redEvidence": {
+      "command": "CN02 will run exact committed selected startup producer RISK once under an immutable allocated manifest. This test-definition commit deliberately precedes that execution.",
+      "failure": "Native producer RED is not yet observed at CN01 and is not claimed. Existing independent report RED d9fb096f is retained only as report evidence, not native producer evidence."
+    }
+  },
+  {
+    "baseCommit": "c920ccffc11af487ec84277c33fe2e370541e384",
+    "testChangesSha256": "989a08a8449a6b41dbc01906f7c5bd31c4c056c9b4ea5925017b7bea9207929c",
+    "reason": "CN01 test-only source defines actual selected startup JPEG artifacts and strict API/CLI selection admission before the single genuine CN02 producer RED. Static test-definition self-review uses the existing imported spawnSync for exact source identity before any native execution.",
+    "previousBehavior": "Existing public native startup succeeds without producing supplemental JPEG evidence; the report-only validator has been tested and fixed independently.",
+    "intendedBehavior": "One real selected startup case must retain actual JPEG files,finite counts/bytes,distinct clocks,stop/cleanup,trusted input and exact saved fixture; selection outside startup or unknown mode refuses before launch.",
+    "replacementTests": [
+      "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
+      "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
+    ],
+    "preservedCoverage": [
+      "Existing report RED/GREEN d9fb096f/2a2531e2,original D03 full/incomplete controls,all native guard/inventory/ordinary action/source assertions remain unchanged.",
+      "This commit changes only tests and their metadata; no producer implementation or native execution has occurred yet."
+    ],
+    "redEvidence": {
+      "command": "CN02 will run exact committed selected startup producer RISK once under an immutable allocated manifest. This test-definition commit deliberately precedes that execution.",
+      "failure": "Native producer RED is not yet observed at CN01 and is not claimed. Existing independent report RED d9fb096f is retained only as report evidence, not native producer evidence."
+    }
+  },
+  {
+    "baseCommit": "900a9a7796492567ade6f29ebe573dc7e1ba4ebb",
+    "testChangesSha256": "b9018c1a84be99dbc275a9774c5ec6b3eccfd62bfe48da839f35e35289c4d716",
+    "reason": "CN01 test-only source defines actual selected startup JPEG artifacts and strict API/CLI selection admission before the single genuine CN02 producer RED. Static test-definition self-review uses the existing imported spawnSync for exact source identity before any native execution.",
+    "previousBehavior": "Existing public native startup succeeds without producing supplemental JPEG evidence; the report-only validator has been tested and fixed independently.",
+    "intendedBehavior": "One real selected startup case must retain actual JPEG files,finite counts/bytes,distinct clocks,stop/cleanup,trusted input and exact saved fixture; selection outside startup or unknown mode refuses before launch.",
+    "replacementTests": [
+      "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
+      "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
+    ],
+    "preservedCoverage": [
+      "Existing report RED/GREEN d9fb096f/2a2531e2,original D03 full/incomplete controls,all native guard/inventory/ordinary action/source assertions remain unchanged.",
+      "This commit changes only tests and their metadata; no producer implementation or native execution has occurred yet."
+    ],
+    "redEvidence": {
+      "command": "CN02 will run exact committed selected startup producer RISK once under an immutable allocated manifest. This test-definition commit deliberately precedes that execution.",
+      "failure": "Native producer RED is not yet observed at CN01 and is not claimed. Existing independent report RED d9fb096f is retained only as report evidence, not native producer evidence."
+    }
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "d71cf9a2a91f50550be6acc2a88bf5cd4110d1a8fd003fa0f3edd529bd5cf6b3",
+    "reason": "CN01 test-only source defines actual selected startup JPEG artifacts and strict API/CLI selection admission before the single genuine CN02 producer RED. Static test-definition self-review uses the existing imported spawnSync for exact source identity before any native execution.",
+    "previousBehavior": "Existing public native startup succeeds without producing supplemental JPEG evidence; the report-only validator has been tested and fixed independently.",
+    "intendedBehavior": "One real selected startup case must retain actual JPEG files,finite counts/bytes,distinct clocks,stop/cleanup,trusted input and exact saved fixture; selection outside startup or unknown mode refuses before launch.",
+    "replacementTests": [
+      "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
+      "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
+    ],
+    "preservedCoverage": [
+      "Existing report RED/GREEN d9fb096f/2a2531e2,original D03 full/incomplete controls,all native guard/inventory/ordinary action/source assertions remain unchanged.",
+      "This commit changes only tests and their metadata; no producer implementation or native execution has occurred yet."
+    ],
+    "redEvidence": {
+      "command": "CN02 will run exact committed selected startup producer RISK once under an immutable allocated manifest. This test-definition commit deliberately precedes that execution.",
+      "failure": "Native producer RED is not yet observed at CN01 and is not claimed. Existing independent report RED d9fb096f is retained only as report evidence, not native producer evidence."
+    }
+  },
+  {
+    "baseCommit": "c920ccffc11af487ec84277c33fe2e370541e384",
+    "testChangesSha256": "989a08a8449a6b41dbc01906f7c5bd31c4c056c9b4ea5925017b7bea9207929c",
+    "reason": "Actual committed native producer expectation now has original a34d3e00 RED before CN03 collector implementation. Exact test is unchanged from a9e0892.",
+    "previousBehavior": "Existing public native startup succeeds without producing supplemental JPEG evidence; the report-only validator has been tested and fixed independently.",
+    "intendedBehavior": "One real selected startup case must retain actual JPEG files,finite counts/bytes,distinct clocks,stop/cleanup,trusted input and exact saved fixture; selection outside startup or unknown mode refuses before launch.",
+    "replacementTests": [
+      "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
+      "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
+    ],
+    "preservedCoverage": [
+      "Existing report RED/GREEN d9fb096f/2a2531e2,original D03 full/incomplete controls,all native guard/inventory/ordinary action/source assertions remain unchanged.",
+      "This commit changes only tests and their metadata; no producer implementation or native execution has occurred yet."
+    ],
+    "redEvidence": {
+      "command": "CN02 actual recorder1106-red a34d3e00: node --test --test-name-pattern=\"^RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command$\" tests.js; source a9e08924a89a44196a7e8b2b4c536f862705a63c",
+      "failure": "Actual ordinary frozen85ce64-task Normal uncapped desktopWebKit opening/action and cleanup passed; subsequent consumer assertion Selected startup operation must retain real bounded JPEG capture evidence failed because report.startupCapture was absent. Exactly one native RED; this is producer enforcement, not app defect. Report RED d9fb096f remains separate. Nonnative affected controls147dbe50 pass before committed producer GREEN."
+    }
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "d71cf9a2a91f50550be6acc2a88bf5cd4110d1a8fd003fa0f3edd529bd5cf6b3",
+    "reason": "Actual committed native producer expectation now has original a34d3e00 RED before CN03 collector implementation. Exact test is unchanged from a9e0892.",
+    "previousBehavior": "Existing public native startup succeeds without producing supplemental JPEG evidence; the report-only validator has been tested and fixed independently.",
+    "intendedBehavior": "One real selected startup case must retain actual JPEG files,finite counts/bytes,distinct clocks,stop/cleanup,trusted input and exact saved fixture; selection outside startup or unknown mode refuses before launch.",
+    "replacementTests": [
+      "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
+      "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
+    ],
+    "preservedCoverage": [
+      "Existing report RED/GREEN d9fb096f/2a2531e2,original D03 full/incomplete controls,all native guard/inventory/ordinary action/source assertions remain unchanged.",
+      "This commit changes only tests and their metadata; no producer implementation or native execution has occurred yet."
+    ],
+    "redEvidence": {
+      "command": "CN02 actual recorder1106-red a34d3e00: node --test --test-name-pattern=\"^RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command$\" tests.js; source a9e08924a89a44196a7e8b2b4c536f862705a63c",
+      "failure": "Actual ordinary frozen85ce64-task Normal uncapped desktopWebKit opening/action and cleanup passed; subsequent consumer assertion Selected startup operation must retain real bounded JPEG capture evidence failed because report.startupCapture was absent. Exactly one native RED; this is producer enforcement, not app defect. Report RED d9fb096f remains separate. Nonnative affected controls147dbe50 pass before committed producer GREEN."
+    }
+  },
+  {
+    "baseCommit": "c920ccffc11af487ec84277c33fe2e370541e384",
+    "testChangesSha256": "2bae581284d3780168702a89112296fc1ca3906ae1afafa1310247cb031fbe46",
+    "reason": "Migrate the existing held source-preservation browser consumer from the stale restore-backup alias to the actual consolidated Settings Import control. Preserve its eight original configurations and assertions, then verify that closing Import and attempting held placeholder actions still leaves the recovery sources exact and the placeholder unaccepted.",
+    "previousBehavior": "The inherited consumer located restore-backup rather than the rendered import-backup action, so it did not assert that the single real Settings Import entry was enabled during the terminal hold. The migrated test then observed the actual import-backup action disabled in five terminal-hold variants on the committed test-only source.",
+    "intendedBehavior": "The existing RISK consumer requires exactly one actual Import action to be enabled before native Playwright click, opens the existing guarded paste editor, then proves that Close and attempted placeholder actions leave the real hold active, task state unaccepted and empty, timers idle, and original local recovery sources byte-for-byte unchanged.",
+    "replacementTests": [
+      "RISK saved view opening source preservation: invalid optional appearance keeps its bytes while one complete task opens"
+    ],
+    "preservedCoverage": [
+      "All eight existing appearance-fault, read-failure, account, UID, source, view-owner, viewport, theme and signed-in configurations remain in their original order, with every prior source, zero-state, bounded-read, recovery-hold, mask, focus, keyboard, Reload, and ordinary transition assertion retained.",
+      "Only this existing held consumer changes its stale selector and gains enabled-entry and after-Close preservation assertions; ordinary protected paste/file, Preview, Cancel, explicit-confirmation, stale-source and account-refusal consumers remain unchanged.",
+      "The entry test grants no adoption authority: exact protected sources, zero tasks, false acceptance, active hold, null scanner/save timers, original inventory and all source/identity/revision/CAS/cloud acknowledgement guards stay separate and unchanged."
+    ],
+    "redEvidence": {
+      "command": "Recorder 2026-10-28T21-36-34-747Z-87a7231c-7331-4cb2-a5c0-08f4725305ef (preimplementation-red) on af00e0b07f60b3fd942d5d348234ff02e85e1a56 / tree 695170d86f4fb32acebcd2bde496e4d886078fe4: node --test --test-name-pattern='RISK saved view opening source preservation: invalid optional appearance keeps its bytes while one complete task opens' tests.js. It used openingBoardFixture/invisibleSavedViewBrowser, isolated fake data, pinned Playwright 1.62.1 ESM, Chromium and loopback:127.0.0.1:52239. Full recorder argv/output are retained in evidence/held-import/rendered-1079/recorder/2026-10-28T21-36-34-747Z-87a7231c-7331-4cb2-a5c0-08f4725305ef.json.",
+      "failure": "Observed ERR_ASSERTION at tests.js:16161:325: held Settings keeps the actual Import action enabled (actual false, expected true). In each of five read-failures-2 terminal-hold variants the real import-backup locator existed exactly once but isEnabled() was false; the other three configuration children passed. TAP reported 9 results, 3 pass, and 6 fail counting the aggregate parent plus five children. This was the intended disabled-entry mismatch, not a stale-selector timeout, missing element, ESM/setup failure, or runtime-startup failure."
+    }
+  },
+  {
+    "baseCommit": "b176026825e4f9539780f745fe60e09cf348d288",
+    "testChangesSha256": "e041cbb1f5146664898645a92764dec6ab5338f33cf703e9f6bb798b36a3b2aa",
+    "reason": "HM02 #1141 associates the exact published-upstream protected test diff after admitted H merge82313738. The inherited b176-to-c920 test changes remain byte-for-byte intact with original rationale25a383b13fa7db696c7db855d09033dbb9d195e28b52bb3b09d888bbacf1f0ea; only the separately observed held Import consumer migration changes that combined fingerprint. All968 prior rationale objects remain unchanged. This metadata-only retrospective integration association repairs the actual154ebabe preflight failure without changing tests, gate policy, configured upstream or comparison base.",
+    "previousBehavior": "The inherited published-base test cohort already carried its original coverage and rationale. The held consumer still located the stale restore-backup alias and did not verify that the actual consolidated Import action was enabled during the terminal hold. Original1079 migrated-consumer RED observed that real action disabled in five hold variants before the allowlist repair.",
+    "intendedBehavior": "Preserve the entire inherited test diff and all original regression assertions while requiring the actual single Import action to be enabled, opening its existing guarded paste editor, and proving that Close leaves the hold active, placeholder unaccepted, timers idle and protected original sources byte-exact. This association validates metadata for the unchanged integration comparison only.",
+    "replacementTests": [
+      "RISK repository process: native allocation admits its healthy owner past missing foreign paths and protects their claims",
+      "RISK repository process: merged tracked app sources match the reviewed button templates",
+      "RISK saved view opening source preservation: invalid optional appearance keeps its bytes while one complete task opens"
+    ],
+    "preservedCoverage": [
+      "The complete942-line b176-to82313738 tests.js diff retains SHA-256 aada27d25b5abc54ccdc112e360d0726accc80f4ef2efb5f4700ec1b0ae8efaa. Its inherited941-line b176-to-c920 portion retains every test/assertion and original rationale; no coverage, inventory, assignment, application or SW byte changes in HM02.",
+      "All eight existing appearance-fault, read-failure, account, UID, source, view-owner, viewport, theme and signed-in configurations remain in their original order, with every prior source, zero-state, bounded-read, recovery-hold, mask, focus, keyboard, Reload, and ordinary transition assertion retained.",
+      "Only this existing held consumer changes its stale selector and gains enabled-entry and after-Close preservation assertions; ordinary protected paste/file, Preview, Cancel, explicit-confirmation, stale-source and account-refusal consumers remain unchanged.",
+      "The entry test grants no adoption authority: exact protected sources, zero tasks, false acceptance, active hold, null scanner/save timers, original inventory and all source/identity/revision/CAS/cloud acknowledgement guards stay separate and unchanged.",
+      "Original guard assertion RED43a07435 and GREEN823f254f remain unchanged; earlier invalid setup5d3e7b9e stays invalid and preserved.",
+      "All inherited source-inventory acceptance/refusal assertions, thirteen group replacements, foreign active/parked resource conflicts and fixture ledger byte preservation remain unchanged.",
+      "Native admission NK06, refusal NK07, rendered Reload#988 and release qualification remain separately ticketed; source metadata passing is not browser or product proof.",
+      "Original1083 recorder459b2b48 passed9/9 on7149daff/treefa8f39b after genuine1079 RED. Protected authority cohort1127 passed27/27 on that retained worker runtime. These retained results are not current-complete-tree rendered/full/native acceptance; #988 remains OPEN and original failures remain preserved."
+    ],
+    "redEvidence": {
+      "command": "Recorder 2026-10-28T21-36-34-747Z-87a7231c-7331-4cb2-a5c0-08f4725305ef (preimplementation-red) on af00e0b07f60b3fd942d5d348234ff02e85e1a56 / tree 695170d86f4fb32acebcd2bde496e4d886078fe4: node --test --test-name-pattern='RISK saved view opening source preservation: invalid optional appearance keeps its bytes while one complete task opens' tests.js. It used openingBoardFixture/invisibleSavedViewBrowser, isolated fake data, pinned Playwright 1.62.1 ESM, Chromium and loopback:127.0.0.1:52239. Full recorder argv/output are retained in evidence/held-import/rendered-1079/recorder/2026-10-28T21-36-34-747Z-87a7231c-7331-4cb2-a5c0-08f4725305ef.json. Inherited guard/inventory evidence remains under the unchanged original25a383b1 rationale: Original guard recorder43a07435-dade-40d4-a518-6261724090c2 at unchanged4ef3862, GREEN823f254f; inventory original evidence retained in inventory-merge/integrated-evidence.json and unchanged inherited inventory rationale. NS01 derives only combined protected-test fingerprint after merge984d514.",
+      "failure": "Observed ERR_ASSERTION at tests.js:16161:325: held Settings keeps the actual Import action enabled (actual false, expected true). In each of five read-failures-2 terminal-hold variants the real import-backup locator existed exactly once but isEnabled() was false; the other three configuration children passed. TAP reported 9 results, 3 pass, and 6 fail counting the aggregate parent plus five children. This was the intended disabled-entry mismatch, not a stale-selector timeout, missing element, ESM/setup failure, or runtime-startup failure. Original1083 recorder459b2b48 subsequently passed9/9 on7149daff/treefa8f39b. HM01/HM02 are later static integration metadata work, not a new preimplementation RED. Actual154ebabe at82313738 failed only this missing published-base exact-fingerprint association after copy and selected-base checks passed; that metadata failure is retained separately and is not behavioralRED."
+    }
   }
-},
-{
-  "baseCommit": "99b5dd01df0bc6fee9fa2f9cac30d5ce0c701ee5",
-  "testChangesSha256": "2b7c29d1765ce36447b5714cef36dbfc479b2904abf6873c835de35ac9ea198c",
-  "reason": "D03-D05 require the existing report input consumer to reject a false complete startup timeline while retaining the independently passing app verdict. Only the ordinary diagnostic capture reuses the native consumer. This aggregate fingerprint binds inherited reviewed integration tests plus the new startup report case against current main; it credits their unchanged original RED records and does not invent chronology.",
-  "previousBehavior": "A report could claim complete despite missing the actual complete-board paint timestamp. Native opening ran current checkout400-task stories instead of the frozen ordinary baseline and fixture.",
-  "intendedBehavior": "A missing complete-board timestamp classifies diagnostic timing incomplete without inventing app failure. The optional ordinary-opening recorder reads immutable frozen app bytes and exact64-task installed fixture with explicit unavailable paints and work observations.",
-  "replacementTests": [
-    "RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app"
-  ],
-  "preservedCoverage": [
-    "All existing native action, rapid input, asset verification, lifecycle and cleanup assertions stay unchanged for ordinary full button runs.",
-    "The diagnostic kind/scope cannot qualify button or mobile-memory acceptance; actual WebKit paint and overlapping operation intervals remain explicitly unavailable.",
-    "No app assets, saved-board semantics,200ms release threshold, optional memory policy or existing mandatory release checks change."
-  ],
-  "redEvidence": {
-    "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app$\" tests.js; external startup/D03-runs/2026-10-28T18-50-21-043Z-43a039b2-3a68-49c5-b2b2-bc0b16ec26dc.json",
-    "failure": "Actual contemporaneous assertion RED at unchanged recorder d29410a: missing actual complete-board paint retained complete instead of incomplete. D05 observed GREEN c9697535 after the recorder change; complete positive control at800ms remains accepted, showing200ms is not a gate."
-  }
-},
-{
-  "baseCommit": "b176026825e4f9539780f745fe60e09cf348d288",
-  "testChangesSha256": "8dd082086c8248c07d21423382b3eaec462062c724b17064c8031ab0538f9d8d",
-  "reason": "D03-D05 require the existing report input consumer to reject a false complete startup timeline while retaining the independently passing app verdict. Only the ordinary diagnostic capture reuses the native consumer. This aggregate fingerprint binds inherited reviewed integration tests plus the new startup report case against current main; it credits their unchanged original RED records and does not invent chronology. Reconciliation also binds the exact published integration upstream comparison; original worker chronology and every inherited rationale object remain unchanged.",
-  "previousBehavior": "A report could claim complete despite missing the actual complete-board paint timestamp. Native opening ran current checkout400-task stories instead of the frozen ordinary baseline and fixture.",
-  "intendedBehavior": "A missing complete-board timestamp classifies diagnostic timing incomplete without inventing app failure. The optional ordinary-opening recorder reads immutable frozen app bytes and exact64-task installed fixture with explicit unavailable paints and work observations.",
-  "replacementTests": [
-    "RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app"
-  ],
-  "preservedCoverage": [
-    "All existing native action, rapid input, asset verification, lifecycle and cleanup assertions stay unchanged for ordinary full button runs.",
-    "The diagnostic kind/scope cannot qualify button or mobile-memory acceptance; actual WebKit paint and overlapping operation intervals remain explicitly unavailable.",
-    "No app assets, saved-board semantics,200ms release threshold, optional memory policy or existing mandatory release checks change."
-  ],
-  "redEvidence": {
-    "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app$\" tests.js; external startup/D03-runs/2026-10-28T18-50-21-043Z-43a039b2-3a68-49c5-b2b2-bc0b16ec26dc.json",
-    "failure": "Actual contemporaneous assertion RED at unchanged recorder d29410a: missing actual complete-board paint retained complete instead of incomplete. D05 observed GREEN c9697535 after the recorder change; complete positive control at800ms remains accepted, showing200ms is not a gate."
-  }
-},
-{
-  "baseCommit": "4ef38622839cff86c86b97ed49031a43b22e563d",
-  "testChangesSha256": "9683412995969fa39d5973d179c4245b73102284444e24509bcc6cb7cbcec721",
-  "reason": "Add the exact merged-source consumer required by #984 and observe its stale-inventory assertion before the #986 sourceTemplates-only reconciliation. The source admission gap has eleven fully attributed hash/count differences in #982: five same-control shared-presentation template replacements and one additional existing held-recovery Reload template.",
-  "previousBehavior": "The selected merged app's tracked JavaScript/HTML source pool failed the public source-inventory verifier against the reviewed map. No permanent consumer regression exercised that same source pool, so the stale digest map blocked native admission without a directly maintained test.",
-  "intendedBehavior": "The existing public source-inventory CLI accepts the same tracked JavaScript/HTML pool selected by runButtonSafety after only the six reviewed current templates replace five obsolete entries and the existing Reload template is counted. Action identifiers, scenario requirements and unknown-control refusal remain unchanged.",
-  "replacementTests": [
-    "RISK repository process: merged tracked app sources match the reviewed button templates"
-  ],
-  "preservedCoverage": [
-    "The existing public inventory CLI still accepts a known reviewed template and refuses an unreviewed new action, duplicate template, and nonbutton action route; those four controls passed unchanged.",
-    "Required action identifiers, rapid actions, state scenarios, workload, dormant-handler explanations, and the inert saved-preview exclusion remain intact; this reconciliation changes only sourceTemplates counts.",
-    "No app or native guard behavior changes. Optional-policy requiredWorkload and rapid-policy fields owned by the separate worker are untouched."
-  ],
-  "redEvidence": {
-    "command": "node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/293-inventory-reconciliation/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/evidence/inventory-repair/runs --purpose preimplementation-red -- node --test --test-name-pattern='RISK repository process: merged tracked app sources match the reviewed button templates' tests.js; recorder d7fe5dad-bce7-45ff-9db4-689e7bbc0690 at 2026-10-28T20:00:03Z",
-    "failure": "At unchanged candidate 4ef38622839cff86c86b97ed49031a43b22e563d, tree a78c5ece9b8c387f9b2d4975daaba59d8fcf241e, the real CLI returned status 1 and the test observed ERR_ASSERTION: Source button templates differ from reviewed native inventory. The original inventory SHA-256 was a6301aa5eb854da41b249415946d4c29d7f121861560052c02e9215972f0f735. This was a discriminating assertion after the CLI ran, not setup failure. Existing known/new/duplicate/nonbutton controls separately passed 4/4 in recorder 6147793e-8f7c-4018-b74e-e4f55462f251."
-  }
-}
-,
-{
-  "baseCommit": "4ef38622839cff86c86b97ed49031a43b22e563d",
-  "testChangesSha256": "11a7718e3c0cc8eb927b8f8105159a51944719a5a089552e3ff032888e08fc4a",
-  "reason": "NK03-NK05 confirmed the existing native admission consumer incorrectly dereferenced a missing unrelated foreign path before finding a healthy owner. #993 freezes only already passing guard/tests and required metadata; inherited rationale objects and chronology are preserved.",
-  "previousBehavior": "The owner lookup threw ENOENT for a missing active foreign path before considering the healthy current owner; unrelated missing ownership prevented even the admitted native output boundary.",
-  "intendedBehavior": "The real runButtonSafety consumer reaches its output boundary for a healthy canonical current owner after an unrelated missing foreign entry, while missing active or parked foreign engine and port claims still refuse before output.",
-  "replacementTests": [
-    "RISK repository process: native allocation admits its healthy owner past missing foreign paths and protects their claims"
-  ],
-  "preservedCoverage": [
-    "Existing native allocation, lease, owner confirmation, explicit-resource and prelaunch refusal assertions remain unchanged.",
-    "The original foreign owners array retains active/parked resource conflicts and exact fixture ledger bytes; aliases canonicalize and a missing current owner grants no authority.",
-    "Only external filesystem output creation is controlled for this guard regression; native/browser launch, inventory correctness, startup cause, D06 retry, memory, physical-device and release qualification remain separate gates."
-  ],
-  "redEvidence": {
-    "command": "node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/293-native-allocation/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/native-allocation/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern='^RISK repository process: native allocation admits its healthy owner past missing foreign paths and protects their claims tests.js; record43a07435-dade-40d4-a518-6261724090c2 at unchanged4ef38622839cff86c86b97ed49031a43b22e563d",
-    "failure": "Genuine contemporaneous ERR_ASSERTION: healthy-owner/alias controls reached the external output sentinel, but missing-unrelated foreign owner produced actual guard realpathSync ENOENT instead of that sentinel. Recorder generic infrastructure-failure label is preserved because its classifier sees ENOENT in the asserted actual value. Earlier5d3e7b9e is invalid setup from separate inventory mismatch, not accepted RED. Same test bytes and command pass9/9 at GREEN823f254f; affected refusal/risk map b95b4156 passes."
-  }
-},
-{
-  "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
-  "testChangesSha256": "0af809175dc91910e49973de5980da525b15cd11a98d653012174a3731dad9d0",
-  "reason": "NK03-NK05 confirmed the existing native admission consumer incorrectly dereferenced a missing unrelated foreign path before finding a healthy owner. #993 freezes only already passing guard/tests and required metadata; inherited rationale objects and chronology are preserved.",
-  "previousBehavior": "The owner lookup threw ENOENT for a missing active foreign path before considering the healthy current owner; unrelated missing ownership prevented even the admitted native output boundary.",
-  "intendedBehavior": "The real runButtonSafety consumer reaches its output boundary for a healthy canonical current owner after an unrelated missing foreign entry, while missing active or parked foreign engine and port claims still refuse before output.",
-  "replacementTests": [
-    "RISK repository process: native allocation admits its healthy owner past missing foreign paths and protects their claims"
-  ],
-  "preservedCoverage": [
-    "Existing native allocation, lease, owner confirmation, explicit-resource and prelaunch refusal assertions remain unchanged.",
-    "The original foreign owners array retains active/parked resource conflicts and exact fixture ledger bytes; aliases canonicalize and a missing current owner grants no authority.",
-    "Only external filesystem output creation is controlled for this guard regression; native/browser launch, inventory correctness, startup cause, D06 retry, memory, physical-device and release qualification remain separate gates."
-  ],
-  "redEvidence": {
-    "command": "node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/293-native-allocation/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/native-allocation/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern='^RISK repository process: native allocation admits its healthy owner past missing foreign paths and protects their claims tests.js; record43a07435-dade-40d4-a518-6261724090c2 at unchanged4ef38622839cff86c86b97ed49031a43b22e563d",
-    "failure": "Genuine contemporaneous ERR_ASSERTION: healthy-owner/alias controls reached the external output sentinel, but missing-unrelated foreign owner produced actual guard realpathSync ENOENT instead of that sentinel. Recorder generic infrastructure-failure label is preserved because its classifier sees ENOENT in the asserted actual value. Earlier5d3e7b9e is invalid setup from separate inventory mismatch, not accepted RED. Same test bytes and command pass9/9 at GREEN823f254f; affected refusal/risk map b95b4156 passes."
-  }
-},
-{
-  "baseCommit": "b176026825e4f9539780f745fe60e09cf348d288",
-  "testChangesSha256": "295cceba06cc4def5ee5cf30277485d3e13cd0209502738c02f77ca5d3746a52",
-  "reason": "NK03-NK05 confirmed the existing native admission consumer incorrectly dereferenced a missing unrelated foreign path before finding a healthy owner. #993 freezes only already passing guard/tests and required metadata; inherited rationale objects and chronology are preserved.",
-  "previousBehavior": "The owner lookup threw ENOENT for a missing active foreign path before considering the healthy current owner; unrelated missing ownership prevented even the admitted native output boundary.",
-  "intendedBehavior": "The real runButtonSafety consumer reaches its output boundary for a healthy canonical current owner after an unrelated missing foreign entry, while missing active or parked foreign engine and port claims still refuse before output.",
-  "replacementTests": [
-    "RISK repository process: native allocation admits its healthy owner past missing foreign paths and protects their claims"
-  ],
-  "preservedCoverage": [
-    "Existing native allocation, lease, owner confirmation, explicit-resource and prelaunch refusal assertions remain unchanged.",
-    "The original foreign owners array retains active/parked resource conflicts and exact fixture ledger bytes; aliases canonicalize and a missing current owner grants no authority.",
-    "Only external filesystem output creation is controlled for this guard regression; native/browser launch, inventory correctness, startup cause, D06 retry, memory, physical-device and release qualification remain separate gates."
-  ],
-  "redEvidence": {
-    "command": "node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/293-native-allocation/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/native-allocation/runs --purpose preimplementation-red --summary -- node --test --test-name-pattern='^RISK repository process: native allocation admits its healthy owner past missing foreign paths and protects their claims tests.js; record43a07435-dade-40d4-a518-6261724090c2 at unchanged4ef38622839cff86c86b97ed49031a43b22e563d",
-    "failure": "Genuine contemporaneous ERR_ASSERTION: healthy-owner/alias controls reached the external output sentinel, but missing-unrelated foreign owner produced actual guard realpathSync ENOENT instead of that sentinel. Recorder generic infrastructure-failure label is preserved because its classifier sees ENOENT in the asserted actual value. Earlier5d3e7b9e is invalid setup from separate inventory mismatch, not accepted RED. Same test bytes and command pass9/9 at GREEN823f254f; affected refusal/risk map b95b4156 passes."
-  }
-}
-,
-{
-  "baseCommit": "7afdb551b3374c2e35daf9ce710156e9f4ab6c6d",
-  "testChangesSha256": "55435ff0389869ed038032820a47828af0aab2edf2dadb1671183ed588f67702",
-  "reason": "NS01 #992 merges exact admitted inventory3c39e8726c4c127b93505755e989dcf832602f16 into clean guard7afdb551b3374c2e35daf9ce710156e9f4ab6c6d. Derived combined fingerprint follows already committed merge984d514; all original rationale objects and original assertion chronology are preserved. Prior metadata read ENOBUFS remains setup failure.",
-  "previousBehavior": "The original guard traversed a missing unrelated foreign owner before valid admission. Separately, the reviewed button inventory did not match the current merged tracked application templates.",
-  "intendedBehavior": "Retain the already GREEN native-allocation guard and original test bytes with separately admitted source-template inventory/regression; preserve every existing refusal and complete group registration.",
-  "replacementTests": [
-    "RISK repository process: merged tracked app sources match the reviewed button templates"
-  ],
-  "preservedCoverage": [
-    "Original guard assertion RED43a07435 and GREEN823f254f remain unchanged; earlier invalid setup5d3e7b9e stays invalid and preserved.",
-    "All inherited source-inventory acceptance/refusal assertions, thirteen group replacements, foreign active/parked resource conflicts and fixture ledger byte preservation remain unchanged.",
-    "Native admission NK06, refusal NK07, rendered Reload#988 and release qualification remain separately ticketed; source metadata passing is not browser or product proof."
-  ],
-  "redEvidence": {
-    "command": "Original guard recorder43a07435-dade-40d4-a518-6261724090c2 at unchanged4ef3862, GREEN823f254f; inventory original evidence retained in inventory-merge/integrated-evidence.json and unchanged inherited inventory rationale. NS01 derives only combined protected-test fingerprint after merge984d514.",
-    "failure": "Original meaningful guard assertion observed expected admitted output sentinel versus actual foreign-path ENOENT with healthy controls passing. Inventory had independently preserved original mismatch assertion. This later merge metadata and buffer setup correction are not new behavioral RED or native runs."
-  }
-},
-{
-  "baseCommit": "4ef38622839cff86c86b97ed49031a43b22e563d",
-  "testChangesSha256": "613155aa39d340c8f3da94fdde1ae8d7febcf8d2fd8acc629787b0ffc05355f4",
-  "reason": "NS01 #992 merges exact admitted inventory3c39e8726c4c127b93505755e989dcf832602f16 into clean guard7afdb551b3374c2e35daf9ce710156e9f4ab6c6d. Derived combined fingerprint follows already committed merge984d514; all original rationale objects and original assertion chronology are preserved. Prior metadata read ENOBUFS remains setup failure.",
-  "previousBehavior": "The original guard traversed a missing unrelated foreign owner before valid admission. Separately, the reviewed button inventory did not match the current merged tracked application templates.",
-  "intendedBehavior": "Retain the already GREEN native-allocation guard and original test bytes with separately admitted source-template inventory/regression; preserve every existing refusal and complete group registration.",
-  "replacementTests": [
-    "RISK repository process: native allocation admits its healthy owner past missing foreign paths and protects their claims",
-    "RISK repository process: merged tracked app sources match the reviewed button templates"
-  ],
-  "preservedCoverage": [
-    "Original guard assertion RED43a07435 and GREEN823f254f remain unchanged; earlier invalid setup5d3e7b9e stays invalid and preserved.",
-    "All inherited source-inventory acceptance/refusal assertions, thirteen group replacements, foreign active/parked resource conflicts and fixture ledger byte preservation remain unchanged.",
-    "Native admission NK06, refusal NK07, rendered Reload#988 and release qualification remain separately ticketed; source metadata passing is not browser or product proof."
-  ],
-  "redEvidence": {
-    "command": "Original guard recorder43a07435-dade-40d4-a518-6261724090c2 at unchanged4ef3862, GREEN823f254f; inventory original evidence retained in inventory-merge/integrated-evidence.json and unchanged inherited inventory rationale. NS01 derives only combined protected-test fingerprint after merge984d514.",
-    "failure": "Original meaningful guard assertion observed expected admitted output sentinel versus actual foreign-path ENOENT with healthy controls passing. Inventory had independently preserved original mismatch assertion. This later merge metadata and buffer setup correction are not new behavioral RED or native runs."
-  }
-},
-{
-  "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
-  "testChangesSha256": "99267963edd08ed5a0f4134f01483e8ef918918b5ac492d5bea48cf1003e7af3",
-  "reason": "NS01 #992 merges exact admitted inventory3c39e8726c4c127b93505755e989dcf832602f16 into clean guard7afdb551b3374c2e35daf9ce710156e9f4ab6c6d. Derived combined fingerprint follows already committed merge984d514; all original rationale objects and original assertion chronology are preserved. Prior metadata read ENOBUFS remains setup failure.",
-  "previousBehavior": "The original guard traversed a missing unrelated foreign owner before valid admission. Separately, the reviewed button inventory did not match the current merged tracked application templates.",
-  "intendedBehavior": "Retain the already GREEN native-allocation guard and original test bytes with separately admitted source-template inventory/regression; preserve every existing refusal and complete group registration.",
-  "replacementTests": [
-    "RISK repository process: native allocation admits its healthy owner past missing foreign paths and protects their claims",
-    "RISK repository process: merged tracked app sources match the reviewed button templates"
-  ],
-  "preservedCoverage": [
-    "Original guard assertion RED43a07435 and GREEN823f254f remain unchanged; earlier invalid setup5d3e7b9e stays invalid and preserved.",
-    "All inherited source-inventory acceptance/refusal assertions, thirteen group replacements, foreign active/parked resource conflicts and fixture ledger byte preservation remain unchanged.",
-    "Native admission NK06, refusal NK07, rendered Reload#988 and release qualification remain separately ticketed; source metadata passing is not browser or product proof."
-  ],
-  "redEvidence": {
-    "command": "Original guard recorder43a07435-dade-40d4-a518-6261724090c2 at unchanged4ef3862, GREEN823f254f; inventory original evidence retained in inventory-merge/integrated-evidence.json and unchanged inherited inventory rationale. NS01 derives only combined protected-test fingerprint after merge984d514.",
-    "failure": "Original meaningful guard assertion observed expected admitted output sentinel versus actual foreign-path ENOENT with healthy controls passing. Inventory had independently preserved original mismatch assertion. This later merge metadata and buffer setup correction are not new behavioral RED or native runs."
-  }
-},
-{
-  "baseCommit": "b176026825e4f9539780f745fe60e09cf348d288",
-  "testChangesSha256": "25a383b13fa7db696c7db855d09033dbb9d195e28b52bb3b09d888bbacf1f0ea",
-  "reason": "NS01 #992 merges exact admitted inventory3c39e8726c4c127b93505755e989dcf832602f16 into clean guard7afdb551b3374c2e35daf9ce710156e9f4ab6c6d. Derived combined fingerprint follows already committed merge984d514; all original rationale objects and original assertion chronology are preserved. Prior metadata read ENOBUFS remains setup failure.",
-  "previousBehavior": "The original guard traversed a missing unrelated foreign owner before valid admission. Separately, the reviewed button inventory did not match the current merged tracked application templates.",
-  "intendedBehavior": "Retain the already GREEN native-allocation guard and original test bytes with separately admitted source-template inventory/regression; preserve every existing refusal and complete group registration.",
-  "replacementTests": [
-    "RISK repository process: native allocation admits its healthy owner past missing foreign paths and protects their claims",
-    "RISK repository process: merged tracked app sources match the reviewed button templates"
-  ],
-  "preservedCoverage": [
-    "Original guard assertion RED43a07435 and GREEN823f254f remain unchanged; earlier invalid setup5d3e7b9e stays invalid and preserved.",
-    "All inherited source-inventory acceptance/refusal assertions, thirteen group replacements, foreign active/parked resource conflicts and fixture ledger byte preservation remain unchanged.",
-    "Native admission NK06, refusal NK07, rendered Reload#988 and release qualification remain separately ticketed; source metadata passing is not browser or product proof."
-  ],
-  "redEvidence": {
-    "command": "Original guard recorder43a07435-dade-40d4-a518-6261724090c2 at unchanged4ef3862, GREEN823f254f; inventory original evidence retained in inventory-merge/integrated-evidence.json and unchanged inherited inventory rationale. NS01 derives only combined protected-test fingerprint after merge984d514.",
-    "failure": "Original meaningful guard assertion observed expected admitted output sentinel versus actual foreign-path ENOENT with healthy controls passing. Inventory had independently preserved original mismatch assertion. This later merge metadata and buffer setup correction are not new behavioral RED or native runs."
-  }
-},
-{
-  "baseCommit": "c920ccffc11af487ec84277c33fe2e370541e384",
-  "testChangesSha256": "ca2bdda26a767dfb7052964e8cea027373d9d01f80135598ae1e9a2a2558c4e0",
-  "reason": "Report-only supplemental capture admission under1101-1104 needs bounded artifact/clock/cleanup and false-completeness sensitivity at the existing verifier.",
-  "previousBehavior": "Unchanged report consumer silently accepted malformed capture counts,bytes,paths,hashes,clock conversion,cleanup,bounds and a complete claim based on ambiguous public timestamps.",
-  "intendedBehavior": "Validate fixed finite supplemental data and keep D02 incomplete for unsupported capture clocks/work without changing actual application verdicts or original no-capture positives.",
-  "replacementTests": [
-    "RISK repository process: supplemental startup capture rejects malformed artifacts and unsupported paint completeness"
-  ],
-  "preservedCoverage": [
-    "Original D03 complete and incomplete synthetic controls remain unchanged, including its accepted800ms positive and diagnostic/app-verdict separation.",
-    "All existing native button/rapid/saved-source/guard/inventory assertions remain intact; no producer or app bytes change in this report cycle."
-  ],
-  "redEvidence": {
-    "command": "Actual recorder1102-red d9fb096f: node --test --test-name-pattern=^RISK.repository.process:.supplemental.startup.capture tests.js",
-    "failure": "Nine Missing expected exception admissions and unsupported complete instead of incomplete observed at unchanged c920; exact unchanged test GREEN2a2531e2 with17/17 affected controls."
-  }
-},
-{
-  "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
-  "testChangesSha256": "97e216a255a3fc51b02cfe301a3e2c75c17eb071215f75becd4c465a4bb61589",
-  "reason": "Report-only supplemental capture admission under1101-1104 needs bounded artifact/clock/cleanup and false-completeness sensitivity at the existing verifier.",
-  "previousBehavior": "Unchanged report consumer silently accepted malformed capture counts,bytes,paths,hashes,clock conversion,cleanup,bounds and a complete claim based on ambiguous public timestamps.",
-  "intendedBehavior": "Validate fixed finite supplemental data and keep D02 incomplete for unsupported capture clocks/work without changing actual application verdicts or original no-capture positives.",
-  "replacementTests": [
-    "RISK repository process: supplemental startup capture rejects malformed artifacts and unsupported paint completeness"
-  ],
-  "preservedCoverage": [
-    "Original D03 complete and incomplete synthetic controls remain unchanged, including its accepted800ms positive and diagnostic/app-verdict separation.",
-    "All existing native button/rapid/saved-source/guard/inventory assertions remain intact; no producer or app bytes change in this report cycle."
-  ],
-  "redEvidence": {
-    "command": "Actual recorder1102-red d9fb096f: node --test --test-name-pattern=^RISK.repository.process:.supplemental.startup.capture tests.js",
-    "failure": "Nine Missing expected exception admissions and unsupported complete instead of incomplete observed at unchanged c920; exact unchanged test GREEN2a2531e2 with17/17 affected controls."
-  }
-},
-{
-  "baseCommit": "c920ccffc11af487ec84277c33fe2e370541e384",
-  "testChangesSha256": "77b5dabd3ea4c836fa969a0e3296b280f75e896812330208ac0050c0e1e77271",
-  "reason": "CN01 test-only source defines actual selected startup JPEG artifacts and strict API/CLI selection admission before the single genuine CN02 producer RED.",
-  "previousBehavior": "Existing public native startup succeeds without producing supplemental JPEG evidence; the report-only validator has been tested and fixed independently.",
-  "intendedBehavior": "One real selected startup case must retain actual JPEG files,finite counts/bytes,distinct clocks,stop/cleanup,trusted input and exact saved fixture; selection outside startup or unknown mode refuses before launch.",
-  "replacementTests": [
-    "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
-    "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
-  ],
-  "preservedCoverage": [
-    "Existing report RED/GREEN d9fb096f/2a2531e2,original D03 full/incomplete controls,all native guard/inventory/ordinary action/source assertions remain unchanged.",
-    "This commit changes only tests and their metadata; no producer implementation or native execution has occurred yet."
-  ],
-  "redEvidence": {
-    "command": "CN02 will run exact committed selected startup producer RISK once under an immutable allocated manifest. This test-definition commit deliberately precedes that execution.",
-    "failure": "Native producer RED is not yet observed at CN01 and is not claimed. Existing independent report RED d9fb096f is retained only as report evidence, not native producer evidence."
-  }
-},
-{
-  "baseCommit": "900a9a7796492567ade6f29ebe573dc7e1ba4ebb",
-  "testChangesSha256": "924cef5b7999e42aaa4aa45c5e32819ac862a7d436c74f21f0efcede4087a20f",
-  "reason": "CN01 test-only source defines actual selected startup JPEG artifacts and strict API/CLI selection admission before the single genuine CN02 producer RED.",
-  "previousBehavior": "Existing public native startup succeeds without producing supplemental JPEG evidence; the report-only validator has been tested and fixed independently.",
-  "intendedBehavior": "One real selected startup case must retain actual JPEG files,finite counts/bytes,distinct clocks,stop/cleanup,trusted input and exact saved fixture; selection outside startup or unknown mode refuses before launch.",
-  "replacementTests": [
-    "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
-    "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
-  ],
-  "preservedCoverage": [
-    "Existing report RED/GREEN d9fb096f/2a2531e2,original D03 full/incomplete controls,all native guard/inventory/ordinary action/source assertions remain unchanged.",
-    "This commit changes only tests and their metadata; no producer implementation or native execution has occurred yet."
-  ],
-  "redEvidence": {
-    "command": "CN02 will run exact committed selected startup producer RISK once under an immutable allocated manifest. This test-definition commit deliberately precedes that execution.",
-    "failure": "Native producer RED is not yet observed at CN01 and is not claimed. Existing independent report RED d9fb096f is retained only as report evidence, not native producer evidence."
-  }
-},
-{
-  "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
-  "testChangesSha256": "ef7f0898ec94f03ff7e001b9e1fbc63eae8e90331f55c638738126a767b0e4fb",
-  "reason": "CN01 test-only source defines actual selected startup JPEG artifacts and strict API/CLI selection admission before the single genuine CN02 producer RED.",
-  "previousBehavior": "Existing public native startup succeeds without producing supplemental JPEG evidence; the report-only validator has been tested and fixed independently.",
-  "intendedBehavior": "One real selected startup case must retain actual JPEG files,finite counts/bytes,distinct clocks,stop/cleanup,trusted input and exact saved fixture; selection outside startup or unknown mode refuses before launch.",
-  "replacementTests": [
-    "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
-    "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
-  ],
-  "preservedCoverage": [
-    "Existing report RED/GREEN d9fb096f/2a2531e2,original D03 full/incomplete controls,all native guard/inventory/ordinary action/source assertions remain unchanged.",
-    "This commit changes only tests and their metadata; no producer implementation or native execution has occurred yet."
-  ],
-  "redEvidence": {
-    "command": "CN02 will run exact committed selected startup producer RISK once under an immutable allocated manifest. This test-definition commit deliberately precedes that execution.",
-    "failure": "Native producer RED is not yet observed at CN01 and is not claimed. Existing independent report RED d9fb096f is retained only as report evidence, not native producer evidence."
-  }
-},
-{
-  "baseCommit": "c920ccffc11af487ec84277c33fe2e370541e384",
-  "testChangesSha256": "989a08a8449a6b41dbc01906f7c5bd31c4c056c9b4ea5925017b7bea9207929c",
-  "reason": "CN01 test-only source defines actual selected startup JPEG artifacts and strict API/CLI selection admission before the single genuine CN02 producer RED. Static test-definition self-review uses the existing imported spawnSync for exact source identity before any native execution.",
-  "previousBehavior": "Existing public native startup succeeds without producing supplemental JPEG evidence; the report-only validator has been tested and fixed independently.",
-  "intendedBehavior": "One real selected startup case must retain actual JPEG files,finite counts/bytes,distinct clocks,stop/cleanup,trusted input and exact saved fixture; selection outside startup or unknown mode refuses before launch.",
-  "replacementTests": [
-    "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
-    "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
-  ],
-  "preservedCoverage": [
-    "Existing report RED/GREEN d9fb096f/2a2531e2,original D03 full/incomplete controls,all native guard/inventory/ordinary action/source assertions remain unchanged.",
-    "This commit changes only tests and their metadata; no producer implementation or native execution has occurred yet."
-  ],
-  "redEvidence": {
-    "command": "CN02 will run exact committed selected startup producer RISK once under an immutable allocated manifest. This test-definition commit deliberately precedes that execution.",
-    "failure": "Native producer RED is not yet observed at CN01 and is not claimed. Existing independent report RED d9fb096f is retained only as report evidence, not native producer evidence."
-  }
-},
-{
-  "baseCommit": "900a9a7796492567ade6f29ebe573dc7e1ba4ebb",
-  "testChangesSha256": "b9018c1a84be99dbc275a9774c5ec6b3eccfd62bfe48da839f35e35289c4d716",
-  "reason": "CN01 test-only source defines actual selected startup JPEG artifacts and strict API/CLI selection admission before the single genuine CN02 producer RED. Static test-definition self-review uses the existing imported spawnSync for exact source identity before any native execution.",
-  "previousBehavior": "Existing public native startup succeeds without producing supplemental JPEG evidence; the report-only validator has been tested and fixed independently.",
-  "intendedBehavior": "One real selected startup case must retain actual JPEG files,finite counts/bytes,distinct clocks,stop/cleanup,trusted input and exact saved fixture; selection outside startup or unknown mode refuses before launch.",
-  "replacementTests": [
-    "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
-    "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
-  ],
-  "preservedCoverage": [
-    "Existing report RED/GREEN d9fb096f/2a2531e2,original D03 full/incomplete controls,all native guard/inventory/ordinary action/source assertions remain unchanged.",
-    "This commit changes only tests and their metadata; no producer implementation or native execution has occurred yet."
-  ],
-  "redEvidence": {
-    "command": "CN02 will run exact committed selected startup producer RISK once under an immutable allocated manifest. This test-definition commit deliberately precedes that execution.",
-    "failure": "Native producer RED is not yet observed at CN01 and is not claimed. Existing independent report RED d9fb096f is retained only as report evidence, not native producer evidence."
-  }
-},
-{
-  "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
-  "testChangesSha256": "d71cf9a2a91f50550be6acc2a88bf5cd4110d1a8fd003fa0f3edd529bd5cf6b3",
-  "reason": "CN01 test-only source defines actual selected startup JPEG artifacts and strict API/CLI selection admission before the single genuine CN02 producer RED. Static test-definition self-review uses the existing imported spawnSync for exact source identity before any native execution.",
-  "previousBehavior": "Existing public native startup succeeds without producing supplemental JPEG evidence; the report-only validator has been tested and fixed independently.",
-  "intendedBehavior": "One real selected startup case must retain actual JPEG files,finite counts/bytes,distinct clocks,stop/cleanup,trusted input and exact saved fixture; selection outside startup or unknown mode refuses before launch.",
-  "replacementTests": [
-    "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
-    "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
-  ],
-  "preservedCoverage": [
-    "Existing report RED/GREEN d9fb096f/2a2531e2,original D03 full/incomplete controls,all native guard/inventory/ordinary action/source assertions remain unchanged.",
-    "This commit changes only tests and their metadata; no producer implementation or native execution has occurred yet."
-  ],
-  "redEvidence": {
-    "command": "CN02 will run exact committed selected startup producer RISK once under an immutable allocated manifest. This test-definition commit deliberately precedes that execution.",
-    "failure": "Native producer RED is not yet observed at CN01 and is not claimed. Existing independent report RED d9fb096f is retained only as report evidence, not native producer evidence."
-  }
-},
-{
-  "baseCommit": "c920ccffc11af487ec84277c33fe2e370541e384",
-  "testChangesSha256": "989a08a8449a6b41dbc01906f7c5bd31c4c056c9b4ea5925017b7bea9207929c",
-  "reason": "Actual committed native producer expectation now has original a34d3e00 RED before CN03 collector implementation. Exact test is unchanged from a9e0892.",
-  "previousBehavior": "Existing public native startup succeeds without producing supplemental JPEG evidence; the report-only validator has been tested and fixed independently.",
-  "intendedBehavior": "One real selected startup case must retain actual JPEG files,finite counts/bytes,distinct clocks,stop/cleanup,trusted input and exact saved fixture; selection outside startup or unknown mode refuses before launch.",
-  "replacementTests": [
-    "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
-    "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
-  ],
-  "preservedCoverage": [
-    "Existing report RED/GREEN d9fb096f/2a2531e2,original D03 full/incomplete controls,all native guard/inventory/ordinary action/source assertions remain unchanged.",
-    "This commit changes only tests and their metadata; no producer implementation or native execution has occurred yet."
-  ],
-  "redEvidence": {
-    "command": "CN02 actual recorder1106-red a34d3e00: node --test --test-name-pattern=\"^RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command$\" tests.js; source a9e08924a89a44196a7e8b2b4c536f862705a63c",
-    "failure": "Actual ordinary frozen85ce64-task Normal uncapped desktopWebKit opening/action and cleanup passed; subsequent consumer assertion Selected startup operation must retain real bounded JPEG capture evidence failed because report.startupCapture was absent. Exactly one native RED; this is producer enforcement, not app defect. Report RED d9fb096f remains separate. Nonnative affected controls147dbe50 pass before committed producer GREEN."
-  }
-},
-{
-  "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
-  "testChangesSha256": "d71cf9a2a91f50550be6acc2a88bf5cd4110d1a8fd003fa0f3edd529bd5cf6b3",
-  "reason": "Actual committed native producer expectation now has original a34d3e00 RED before CN03 collector implementation. Exact test is unchanged from a9e0892.",
-  "previousBehavior": "Existing public native startup succeeds without producing supplemental JPEG evidence; the report-only validator has been tested and fixed independently.",
-  "intendedBehavior": "One real selected startup case must retain actual JPEG files,finite counts/bytes,distinct clocks,stop/cleanup,trusted input and exact saved fixture; selection outside startup or unknown mode refuses before launch.",
-  "replacementTests": [
-    "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
-    "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
-  ],
-  "preservedCoverage": [
-    "Existing report RED/GREEN d9fb096f/2a2531e2,original D03 full/incomplete controls,all native guard/inventory/ordinary action/source assertions remain unchanged.",
-    "This commit changes only tests and their metadata; no producer implementation or native execution has occurred yet."
-  ],
-  "redEvidence": {
-    "command": "CN02 actual recorder1106-red a34d3e00: node --test --test-name-pattern=\"^RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command$\" tests.js; source a9e08924a89a44196a7e8b2b4c536f862705a63c",
-    "failure": "Actual ordinary frozen85ce64-task Normal uncapped desktopWebKit opening/action and cleanup passed; subsequent consumer assertion Selected startup operation must retain real bounded JPEG capture evidence failed because report.startupCapture was absent. Exactly one native RED; this is producer enforcement, not app defect. Report RED d9fb096f remains separate. Nonnative affected controls147dbe50 pass before committed producer GREEN."
-  }
-}
 ]
