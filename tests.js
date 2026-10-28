@@ -46564,6 +46564,19 @@ test('RISK repository process: new and duplicate source buttons require native c
  });
 });
 
+test('RISK repository process: merged tracked app sources match the reviewed button templates',t=>{
+ const directory=fs.mkdtempSync('/tmp/chain-button-merged-source-');t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const listed=spawnSync('git',['ls-files'],{cwd:__dirname,encoding:'utf8'});assert.equal(listed.error,undefined);assert.equal(listed.status,0,listed.stderr);
+ const files=listed.stdout.split(/\r?\n/).filter(file=>file&&file!=='tests.js'&&!file.startsWith('scripts/')&&/\.(?:js|html)$/.test(file));
+ assert.ok(files.includes('index.html'),'the exact tracked native source pool includes the application entry point');
+ const source=files.map(file=>fs.readFileSync(path.join(__dirname,file),'utf8')).join('\n'),sourcePath=path.join(directory,'merged-source.html'),inventoryPath=path.join(__dirname,'scripts/button-safety-inventory.json');
+ fs.writeFileSync(sourcePath,source);
+ const identity=spawnSync('git',['rev-parse','HEAD','HEAD^{tree}'],{cwd:__dirname,encoding:'utf8'});assert.equal(identity.error,undefined);assert.equal(identity.status,0,identity.stderr);
+ const inventoryBytes=fs.readFileSync(inventoryPath),result=spawnSync(process.execPath,['scripts/button-safety.mjs','--check-inventory','--source',sourcePath,'--inventory',inventoryPath],{cwd:__dirname,encoding:'utf8'});
+ assert.equal(result.error,undefined);assert.equal(result.status,0,result.stderr+'\n'+result.stdout);assert.match(result.stdout,/Source button inventory verified\./);
+ t.diagnostic(JSON.stringify({candidate:identity.stdout.trim().split(/\r?\n/)[0],tree:identity.stdout.trim().split(/\r?\n/)[1],sourceFiles:files,sourcePoolSha256:createHash('sha256').update(source).digest('hex'),inventorySha256:createHash('sha256').update(inventoryBytes).digest('hex')}));
+});
+
 test('RISK repository process: native button gate awaits an asynchronous false outcome',t=>{
  const output=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(output,'Durable allocated native output required');
  const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine','chromium','--output-dir',output,'--port',process.env.CHAIN_NATIVE_PORT||'0','--probe','--control','async-predicate-false'],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:45000});

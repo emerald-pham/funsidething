@@ -26300,6 +26300,25 @@
     "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app$\" tests.js; external startup/D03-runs/2026-10-28T18-50-21-043Z-43a039b2-3a68-49c5-b2b2-bc0b16ec26dc.json",
     "failure": "Actual contemporaneous assertion RED at unchanged recorder d29410a: missing actual complete-board paint retained complete instead of incomplete. D05 observed GREEN c9697535 after the recorder change; complete positive control at800ms remains accepted, showing200ms is not a gate."
   }
+},
+{
+  "baseCommit": "4ef38622839cff86c86b97ed49031a43b22e563d",
+  "testChangesSha256": "9683412995969fa39d5973d179c4245b73102284444e24509bcc6cb7cbcec721",
+  "reason": "Add the exact merged-source consumer required by #984 and observe its stale-inventory assertion before the #986 sourceTemplates-only reconciliation. The source admission gap has eleven fully attributed hash/count differences in #982: five same-control shared-presentation template replacements and one additional existing held-recovery Reload template.",
+  "previousBehavior": "The selected merged app's tracked JavaScript/HTML source pool failed the public source-inventory verifier against the reviewed map. No permanent consumer regression exercised that same source pool, so the stale digest map blocked native admission without a directly maintained test.",
+  "intendedBehavior": "The existing public source-inventory CLI accepts the same tracked JavaScript/HTML pool selected by runButtonSafety after only the six reviewed current templates replace five obsolete entries and the existing Reload template is counted. Action identifiers, scenario requirements and unknown-control refusal remain unchanged.",
+  "replacementTests": [
+    "RISK repository process: merged tracked app sources match the reviewed button templates"
+  ],
+  "preservedCoverage": [
+    "The existing public inventory CLI still accepts a known reviewed template and refuses an unreviewed new action, duplicate template, and nonbutton action route; those four controls passed unchanged.",
+    "Required action identifiers, rapid actions, state scenarios, workload, dormant-handler explanations, and the inert saved-preview exclusion remain intact; this reconciliation changes only sourceTemplates counts.",
+    "No app or native guard behavior changes. Optional-policy requiredWorkload and rapid-policy fields owned by the separate worker are untouched."
+  ],
+  "redEvidence": {
+    "command": "node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/293-inventory-reconciliation/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/evidence/inventory-repair/runs --purpose preimplementation-red -- node --test --test-name-pattern='RISK repository process: merged tracked app sources match the reviewed button templates' tests.js; recorder d7fe5dad-bce7-45ff-9db4-689e7bbc0690 at 2026-10-28T20:00:03Z",
+    "failure": "At unchanged candidate 4ef38622839cff86c86b97ed49031a43b22e563d, tree a78c5ece9b8c387f9b2d4975daaba59d8fcf241e, the real CLI returned status 1 and the test observed ERR_ASSERTION: Source button templates differ from reviewed native inventory. The original inventory SHA-256 was a6301aa5eb854da41b249415946d4c29d7f121861560052c02e9215972f0f735. This was a discriminating assertion after the CLI ran, not setup failure. Existing known/new/duplicate/nonbutton controls separately passed 4/4 in recorder 6147793e-8f7c-4018-b74e-e4f55462f251."
+  }
 }
 ,
 {
