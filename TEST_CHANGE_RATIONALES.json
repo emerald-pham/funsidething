@@ -26245,6 +26245,63 @@
     }
   },
   {
+    "baseCommit": "d29410af3d9c55eac5b8bc287248048625d760bc",
+    "testChangesSha256": "58b32a9ed8833b7275eb4ef12d4fb185e8f058d7e3d90fa04bad4ff48f4fed15",
+    "reason": "D03-D05 require the existing report input consumer to reject a false complete startup timeline while retaining the independently passing app verdict. Only the ordinary diagnostic capture reuses the native consumer.",
+    "previousBehavior": "A report could claim complete despite missing the actual complete-board paint timestamp. Native opening ran current checkout400-task stories instead of the frozen ordinary baseline and fixture.",
+    "intendedBehavior": "A missing complete-board timestamp classifies diagnostic timing incomplete without inventing app failure. The optional ordinary-opening recorder reads immutable frozen app bytes and exact64-task installed fixture with explicit unavailable paints and work observations.",
+    "replacementTests": [
+      "RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app"
+    ],
+    "preservedCoverage": [
+      "All existing native action, rapid input, asset verification, lifecycle and cleanup assertions stay unchanged for ordinary full button runs.",
+      "The diagnostic kind/scope cannot qualify button or mobile-memory acceptance; actual WebKit paint and overlapping operation intervals remain explicitly unavailable.",
+      "No app assets, saved-board semantics,200ms release threshold, optional memory policy or existing mandatory release checks change."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app$\" tests.js; external startup/D03-runs/2026-10-28T18-50-21-043Z-43a039b2-3a68-49c5-b2b2-bc0b16ec26dc.json",
+      "failure": "Actual contemporaneous assertion RED at unchanged recorder d29410a: missing actual complete-board paint retained complete instead of incomplete. D05 observed GREEN c9697535 after the recorder change; complete positive control at800ms remains accepted, showing200ms is not a gate."
+    }
+  },
+  {
+    "baseCommit": "99b5dd01df0bc6fee9fa2f9cac30d5ce0c701ee5",
+    "testChangesSha256": "2b7c29d1765ce36447b5714cef36dbfc479b2904abf6873c835de35ac9ea198c",
+    "reason": "D03-D05 require the existing report input consumer to reject a false complete startup timeline while retaining the independently passing app verdict. Only the ordinary diagnostic capture reuses the native consumer. This aggregate fingerprint binds inherited reviewed integration tests plus the new startup report case against current main; it credits their unchanged original RED records and does not invent chronology.",
+    "previousBehavior": "A report could claim complete despite missing the actual complete-board paint timestamp. Native opening ran current checkout400-task stories instead of the frozen ordinary baseline and fixture.",
+    "intendedBehavior": "A missing complete-board timestamp classifies diagnostic timing incomplete without inventing app failure. The optional ordinary-opening recorder reads immutable frozen app bytes and exact64-task installed fixture with explicit unavailable paints and work observations.",
+    "replacementTests": [
+      "RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app"
+    ],
+    "preservedCoverage": [
+      "All existing native action, rapid input, asset verification, lifecycle and cleanup assertions stay unchanged for ordinary full button runs.",
+      "The diagnostic kind/scope cannot qualify button or mobile-memory acceptance; actual WebKit paint and overlapping operation intervals remain explicitly unavailable.",
+      "No app assets, saved-board semantics,200ms release threshold, optional memory policy or existing mandatory release checks change."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app$\" tests.js; external startup/D03-runs/2026-10-28T18-50-21-043Z-43a039b2-3a68-49c5-b2b2-bc0b16ec26dc.json",
+      "failure": "Actual contemporaneous assertion RED at unchanged recorder d29410a: missing actual complete-board paint retained complete instead of incomplete. D05 observed GREEN c9697535 after the recorder change; complete positive control at800ms remains accepted, showing200ms is not a gate."
+    }
+  },
+  {
+    "baseCommit": "b176026825e4f9539780f745fe60e09cf348d288",
+    "testChangesSha256": "8dd082086c8248c07d21423382b3eaec462062c724b17064c8031ab0538f9d8d",
+    "reason": "D03-D05 require the existing report input consumer to reject a false complete startup timeline while retaining the independently passing app verdict. Only the ordinary diagnostic capture reuses the native consumer. This aggregate fingerprint binds inherited reviewed integration tests plus the new startup report case against current main; it credits their unchanged original RED records and does not invent chronology. Reconciliation also binds the exact published integration upstream comparison; original worker chronology and every inherited rationale object remain unchanged.",
+    "previousBehavior": "A report could claim complete despite missing the actual complete-board paint timestamp. Native opening ran current checkout400-task stories instead of the frozen ordinary baseline and fixture.",
+    "intendedBehavior": "A missing complete-board timestamp classifies diagnostic timing incomplete without inventing app failure. The optional ordinary-opening recorder reads immutable frozen app bytes and exact64-task installed fixture with explicit unavailable paints and work observations.",
+    "replacementTests": [
+      "RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app"
+    ],
+    "preservedCoverage": [
+      "All existing native action, rapid input, asset verification, lifecycle and cleanup assertions stay unchanged for ordinary full button runs.",
+      "The diagnostic kind/scope cannot qualify button or mobile-memory acceptance; actual WebKit paint and overlapping operation intervals remain explicitly unavailable.",
+      "No app assets, saved-board semantics,200ms release threshold, optional memory policy or existing mandatory release checks change."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app$\" tests.js; external startup/D03-runs/2026-10-28T18-50-21-043Z-43a039b2-3a68-49c5-b2b2-bc0b16ec26dc.json",
+      "failure": "Actual contemporaneous assertion RED at unchanged recorder d29410a: missing actual complete-board paint retained complete instead of incomplete. D05 observed GREEN c9697535 after the recorder change; complete positive control at800ms remains accepted, showing200ms is not a gate."
+    }
+  },
+  {
     "baseCommit": "25942c39148b13da7f7cd118b6b3c87f0e15035c",
     "testChangesSha256": "6e7f1970338e2ba9ff604119e732ba5bad9a465faafc9ac6ad93e9e4005a5bd9",
     "reason": "Keep the optional capped mobile workload out of ordinary required-cohort reuse while retaining the exact explicit-selection route as a separate diagnostic.",
@@ -26299,6 +26356,29 @@
     "redEvidence": {
       "command": "node scripts/agent-tools/record-run.mjs --repo <worktree> --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/phase-G05/optional-outcomes-red --purpose preimplementation-red --summary -- node --test --test-name-pattern='^RISK repository process: optional mobile outcomes remain distinct from the required aggregate verdict$' tests.js",
       "failure": "Recorder 2026-10-28T19-53-03-445Z classified the run infrastructure-failure because missing optional reports emitted ENOENT. The nested policy assertion independently failed: for not-run, the aggregate command exited 1 with Required mobile memory job did not succeed, and the expected aggregate mobileMemory outcome was absent; invalid, pass and app-failed outcomes were also absent. Preserve both classifications separately."
+    }
+  },
+  {
+    "baseCommit": "99b5dd01df0bc6fee9fa2f9cac30d5ce0c701ee5",
+    "testChangesSha256": "5f13cea6ec739596f6996a5bc624b4114384416d966edf7ceeb4f6b8602e8289",
+    "reason": "Bind the exact source-synchronized test diff from current main to the union of the already recorded startup-report integration and optional mobile diagnostic policy slices. This merge-only aggregate rationale keeps their original source-specific records and chronology intact.",
+    "previousBehavior": "Before source sync, the D03 startup-report integration and the G optional-diagnostic policy each retained its own exact tests.js fingerprint. The combined candidate creates a different protected diff identity, so no one existing record identifies the full diff from current main.",
+    "intendedBehavior": "Record the actual comparison base 99b5dd01df0bc6fee9fa2f9cac30d5ce0c701ee5 and exact merged diff fingerprint without changing assertions or claiming new behavior. Preserve the separate original RED/GREEN evidence for every contributing slice.",
+    "replacementTests": [
+      "RISK repository process: optional mobile outcomes remain distinct from the required aggregate verdict",
+      "RISK repository process: optional mobile diagnostics do not block ordinary reuse",
+      "RISK repository process: explicit mobile diagnostics require dispatch selection and hosted admission",
+      "RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app"
+    ],
+    "preservedCoverage": [
+      "All 956 rationale objects shared at the source merge base and the three D03 plus three G rationale objects from both source branches remain unchanged; this row supplements them for the combined current-main diff only.",
+      "The separately recorded ordinary-route RED, optional aggregate RED classification and nested assertion, selected-dispatch evidence, startup-report RED/GREEN, required aggregate failure controls, source identity and cleanup controls remain independently inspectable.",
+      "All 13 inherited supported root replacements remain byte-identical; the four additional G replacements are retained, each G root occurs once, and all six exact stale nonbaseline assignment rows remain removed.",
+      "The startup recorder and optional diagnostic policy remain separate scopes; the ordinary 400-task and ten-in-two-seconds requirement remains explicitly unresolved under #1015/#1016."
+    ],
+    "redEvidence": {
+      "command": "No new behavioral command is claimed for source synchronization. Original command and RED/GREEN records are retained at phase-G01/ordinary-plan, phase-G02/selector-red, phase-G05/optional-outcomes-red and /Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/startup/D03-runs/2026-10-28T18-50-21-043Z-43a039b2-3a68-49c5-b2b2-bc0b16ec26dc.json.",
+      "failure": "Source synchronization introduces no new functional behavior or test. The original G01 behavioral assertion RED, G05 recorder infrastructure-failure classification and independent nested policy failure, and D03 assertion RED remain distinct; this entry only binds their exact merged tests.js diff and does not create retrospective RED."
     }
   }
 ]

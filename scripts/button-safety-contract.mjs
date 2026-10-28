@@ -9,6 +9,20 @@ export function verifyButtonInventorySource(source,inventory){
  assert.deepEqual(sourceButtonTemplates(source),inventory.sourceTemplates,'Source button templates differ from reviewed native inventory');return true;
 }
 export const digest=value=>createHash('sha256').update(value).digest('hex');
+// Diagnostic timing is independent of the application's functional verdict.
+export function classifyButtonStartupTimeline(timeline){
+ const names=['navigationStart','firstBackgroundPaint','completeBoardPaint','firstTrustedInputReceipt','firstVisibleResponse','overlappingWorkIntervals'];
+ const observations=timeline?.observations||{},missing=[];
+ const clockValid=timeline?.schemaVersion===1&&timeline.clock?.basis==='page-performance'&&Number.isFinite(timeline.clock.timeOrigin);
+ for(const name of names){
+  const row=observations[name];let valid=clockValid&&row?.status==='observed'&&typeof row.basis==='string'&&row.basis.length>0;
+  if(name==='overlappingWorkIntervals')valid=valid&&Array.isArray(row.intervals)&&row.intervals.every(interval=>typeof interval.name==='string'&&typeof interval.caller==='string'&&['sync','async-wall'].includes(interval.kind)&&Number.isFinite(interval.startMs)&&interval.startMs>=0&&Number.isFinite(interval.endMs)&&interval.endMs>=interval.startMs);
+  else valid=valid&&Number.isFinite(row.atMs)&&row.atMs>=0;
+  if(!valid)missing.push(name);
+ }
+ if(!missing.length){const times=names.slice(0,5).map(name=>observations[name].atMs);if(times[0]!==0||times.some((value,index)=>index>0&&value<times[index-1]))missing.push('ordered-page-clock');}
+ return{...timeline,status:missing.length?'incomplete':'complete',missing};
+}
 export function verifyButtonSafetyReport(report,{inventory,inventorySha256,candidateCommit,candidateTree,engine}={}){
  assert.equal(report.schemaVersion,1,'Known button report schema');
  assert.equal(report.kind,'button-safety','Native button report kind');
@@ -86,5 +100,5 @@ export function verifyButtonSafetyReport(report,{inventory,inventorySha256,candi
  for(const action of report.observedActions)assert.ok(actions.includes(action),'New untested button action: '+action);
  assert.deepEqual(report.errors,[],'Native lifecycle or error detector failed');
  for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(report.cleanup?.[key],true,'Button runtime cleanup required: '+key);
- return report;
+ return report.startupTimeline?{...report,startupTimeline:classifyButtonStartupTimeline(report.startupTimeline)}:report;
 }
