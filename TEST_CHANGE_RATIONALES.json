@@ -21514,5 +21514,22 @@
       "command": "Node22 --test --test-reporter=tap --test-name-pattern='^RISK repository process: managed pre-push validates the exact outgoing workflow commit tests.js",
       "failure": "On baseline ad49bd3070b81e51400788ea0a08710f3d89ac52, the actual managed hook in a disposable Git repository admitted the invalid receipted outgoing workflow while valid HEAD differed; the behavioral assertion expected a nonzero hook status and observed 0. The outer Node test exited 1. Raw TAP: /Users/emeraldpham/.codex/task-artifacts/retro-504-20261027/validator/red-519-outgoing-workflow.tap (sha256 26983ede24e0753bbc6592d52f6060c9b4754fe6b6ba029752ff9b5c375760e6); pre-fix test source sha256 fd7e07efaa31e0c25b7b0a6fd9ab05bf632b54994b86499170d4d944c95f780c. The final version adds post-GREEN commit/path/actionlint diagnostic assertions while retaining the same failing status assertion."
     }
+  },
+  {
+    "baseCommit": "026971363ff1cdd30522963c39a4734cc36a764c",
+    "testChangesSha256": "5bf55d1f414db6b36e553d41f963fccccf8bf6e563c6473c1924f654d3c967d5",
+    "reason": "Repair #520 fresh-runner validator readiness at approved public CLI and workflow-command seams; preserve required integration checks instead of adding skips.",
+    "previousBehavior": "Three validator integration cases and the outgoing workflow RISK silently skipped when the checkout-local actionlint cache was absent; fresh native-process runners never installed that cache.",
+    "intendedBehavior": "Required cases fail actionably for missing setup, fresh uncovered native-process runners execute pinned setup before native workloads, and verified official archive bytes support network-free process tests.",
+    "replacementTests": [
+      "RISK repository process: fresh native-process CI sets up the pinned validator before workload"
+    ],
+    "preservedCoverage": [
+      "Existing invalid job-context and valid step-context assertions, exact outgoing commit/pre-push receipt controls, archive and executable checksum pins, validation read-only behavior, early CI validation and the frozen 61 accepted skips remain protected."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='^RISK repository process: fresh native-process CI sets up' tests.js; node --test --test-name-pattern='^required validator integrations' scripts/agent-tools/workflow-validator.test.mjs",
+      "failure": "Observed genuine preimplementation RED on0269713: red-fresh-job.log asserts missing explicit fresh native-process setup; red-required-integrations.log sees3 named skipped integrations instead of0; red-outgoing-required.log sees actual outgoing command exit0 with1skip; red-archive-retention.log sees public setup exit0 then missing retained official archive. Raw chronology and outputs are in external ci-validator-readiness artifacts."
+    }
   }
 ]

@@ -38,6 +38,16 @@
   ],
   "rootAssignments": [
     {
+      "root": "required validator integrations fail actionably without setup and never skip",
+      "group": "native-process",
+      "file": "scripts/agent-tools/workflow-validator.test.mjs"
+    },
+    {
+      "root": "RISK repository process: fresh native-process CI sets up the pinned validator before workload",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
       "root": "test group fresh runtimes consume an intact original early predecessor",
       "group": "native-process",
       "file": "scripts/agent-tools/test-groups.test.mjs"

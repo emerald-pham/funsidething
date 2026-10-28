@@ -29730,10 +29730,6 @@ test('RISK repository process: managed pre-push validates the exact outgoing wor
  const {recordReleaseEvidence}=await import('./scripts/release-evidence.mjs');
  const {ACTIONLINT_VERSION,validateWorkflows}=await import('./scripts/agent-tools/workflow-validator.mjs');
  const setup=await validateWorkflows({repositoryRoot:__dirname,sourceDir:path.join(__dirname,'.github','workflows')});
- if(setup.error?.includes('is not set up in this repository')){
-  t.skip('Run npm run agent:setup-workflow-validator before the managed pre-push integration test.');
-  return;
- }
  assert.equal(setup.ok,true,setup.error??setup.diagnostics);
 
  const fixture=makeReleaseGateFixture();
@@ -45952,4 +45948,44 @@ test('RISK repository process: workflow browser paths resolve only in supported 
  const {parseTap}=await import('./scripts/test-groups.mjs'),cases=parseTap(child.stdout);
  assert.deepEqual(cases.map(row=>[row.id,row.root,row.status,row.skipReason]),[['test group workflow browser path reaches the installer and enforcing persistence consumer','test group workflow browser path reaches the installer and enforcing persistence consumer','passed',null]],'Exactly one successful actual workflow consumer must execute');
  for(const [summary,count]of Object.entries({tests:1,suites:0,pass:1,fail:0,cancelled:0,skipped:0,todo:0}))assert.match(child.stdout,new RegExp('^# '+summary+' '+count+'$','m'),'Exact workflow consumer TAP summary: '+summary);
+});
+
+
+test('RISK repository process: fresh native-process CI sets up the pinned validator before workload',async t=>{
+ const workflow=fs.readFileSync(path.join(__dirname,'.github/workflows/data-safety.yml'),'utf8');
+ const regression=workflow.split('\n  regression:\n')[1]?.split('\n  scanner-tests:\n')[0]??'';
+ const step=regression.match(/      - name: Install pinned workflow validator for native-process\n([\s\S]*?)(?=      - |$)/);
+ assert.ok(step,'a fresh uncovered native-process runner must explicitly set up its own pinned validator');
+ assert.match(step[1],/if: steps.selected.outputs.decision == 'full' && matrix.group == 'native-process' && !contains\(fromJSON\(steps.selected.outputs.reused\), matrix.group\)/,
+  'covered, reused and other-group runners retain zero validator setup work');
+ const command=step[1].match(/^        run: (.+)$/m)?.[1];
+ assert.equal(command,'npm run agent:setup-workflow-validator');
+ assert.ok(regression.indexOf(step[0])<regression.indexOf('- name: Install matching native Chromium'),'validator setup fails before a long native child');
+ const {mkdtemp,mkdir,copyFile,writeFile,rm,readFile}=await import('node:fs/promises');
+ const {tmpdir}=await import('node:os');
+ const {ACTIONLINT_VERSION,pinnedActionlintAsset}=await import('./scripts/agent-tools/workflow-validator.mjs');
+ const root=await mkdtemp(path.join(tmpdir(),'workflow-fresh-validator-'));t.after(()=>rm(root,{recursive:true,force:true}));
+ const scripts=path.join(root,'scripts/agent-tools'),workflows=path.join(root,'.github/workflows');
+ await Promise.all([mkdir(scripts,{recursive:true}),mkdir(workflows,{recursive:true})]);
+ await Promise.all([
+  copyFile(path.join(__dirname,'scripts/agent-tools/workflow-validator.mjs'),path.join(scripts,'workflow-validator.mjs')),
+  writeFile(path.join(workflows,'valid.yml'),'name: fresh runner\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo ready\n'),
+  writeFile(path.join(root,'package.json'),JSON.stringify({private:true,type:'module',scripts:{'agent:setup-workflow-validator':'node scripts/agent-tools/workflow-validator.mjs setup','agent:validate-workflows':'node scripts/agent-tools/workflow-validator.mjs validate'}})),
+  writeFile(path.join(root,'workload.mjs'),"import {writeFileSync} from 'node:fs';writeFileSync('workload-started','started');\n"),
+ ]);
+ const cache=path.join('node_modules/.cache/funsidething/actionlint',`v${ACTIONLINT_VERSION}`,`${process.platform}-${process.arch}`);
+ const asset=pinnedActionlintAsset(),archive=await readFile(path.join(__dirname,cache,'release.tar.gz'));
+ assert.equal(createHash('sha256').update(archive).digest('hex'),asset.sha256,'positive setup uses the official pinned archive');
+ await writeFile(path.join(root,'provider.mjs'),`import {readFileSync} from 'node:fs';globalThis.fetch=async url=>{if(url!==${JSON.stringify(asset.url)})throw Error('unexpected provider URL');if(process.env.VALIDATOR_PROVIDER_FAIL==='1')return new Response('unavailable',{status:503});return new Response(readFileSync(${JSON.stringify(path.join(root,'official.tar.gz'))}));};`);
+ await writeFile(path.join(root,'official.tar.gz'),archive);
+ const env={...process.env,PATH:path.dirname(process.execPath)+path.delimiter+process.env.PATH,NODE_OPTIONS:'--import '+JSON.stringify(path.join(root,'provider.mjs'))};delete env.NODE_TEST_CONTEXT;
+ const run=(line,extra={})=>spawnSync('bash',['--noprofile','--norc','-e','-u','-o','pipefail','-c',line],{cwd:root,env:{...env,...extra},encoding:'utf8',maxBuffer:2*1024*1024});
+ const workload='npm run agent:validate-workflows && node workload.mjs';
+ const missing=run(workload);assert.notEqual(missing.status,0,missing.stdout+missing.stderr);assert.match(missing.stderr,/npm run agent:setup-workflow-validator/);assert.equal(fs.existsSync(path.join(root,'workload-started')),false);
+ const unavailable=run(command+' && '+workload,{VALIDATOR_PROVIDER_FAIL:'1'});assert.notEqual(unavailable.status,0,unavailable.stdout+unavailable.stderr);assert.match(unavailable.stderr,/HTTP 503/);assert.equal(fs.existsSync(path.join(root,'workload-started')),false);
+ const installed=run(command+' && '+workload);assert.equal(installed.status,0,installed.stdout+installed.stderr);assert.equal(fs.readFileSync(path.join(root,'workload-started'),'utf8'),'started');
+ assert.equal(createHash('sha256').update(await readFile(path.join(root,cache,'release.tar.gz'))).digest('hex'),asset.sha256,'actual setup retains verified platform archive for network-free required integration tests');
+ fs.rmSync(path.join(root,'workload-started'));
+ fs.appendFileSync(path.join(root,cache,'actionlint'),'corruption');
+ const corrupt=run(workload);assert.notEqual(corrupt.status,0,corrupt.stdout+corrupt.stderr);assert.match(corrupt.stderr,/checksum|identity/);assert.equal(fs.existsSync(path.join(root,'workload-started')),false);
 });

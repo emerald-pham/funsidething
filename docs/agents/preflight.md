@@ -8,10 +8,11 @@ npm run agent:setup-workflow-validator
 npm run agent:validate-workflows
 ```
 
-Setup verifies the upstream release archive SHA-256 and stores the executable
-and extracted executable SHA-256 values and stores it under the ignored,
-checkout-local `node_modules/.cache` directory. Validation never downloads or
-installs tools. Its optional external ShellCheck and Pyflakes integrations are
+Setup verifies the upstream release archive and extracted executable SHA-256
+values. It stores the executable, identity manifest and verified `release.tar.gz`
+under the ignored, checkout-local `node_modules/.cache` directory. The retained
+archive supports network-free command integration tests after explicit setup.
+Validation never downloads or installs tools. Its optional external ShellCheck and Pyflakes integrations are
 explicitly disabled so their presence on `PATH` cannot change the result. If
 the pinned executable is absent or invalid, validation fails with the exact
 setup command. To preserve a JSON validation receipt, pass `--evidence-file
@@ -30,7 +31,11 @@ The command runs the existing default-sky wording test and Quick start FAQ brevi
 
 The managed release pre-push hook uses that same pinned validator on the YAML workflow blobs from every distinct non-deletion outgoing commit before the exact-SHA receipt gate. It reports the outgoing commit and failing workflow path, so an unrelated valid checkout cannot stand in for invalid bytes being pushed. The existing prior hook still receives the original update payload and its nonzero status still blocks the push. A missing or corrupt local validator fails with the documented setup command.
 
-The Data safety workflow also installs and runs the pinned validator in its early `validation-context` job, before cohort setup. The validation step labels the checked-out GitHub SHA, prints the workflow-set hash, and writes a JSON report that an `always()` artifact step retains even when linting fails. This source-bound static check stops later qualification steps on failure; it does not claim hosted or release acceptance until that workflow actually runs.
+The Data safety workflow also installs and runs the pinned validator in its early `validation-context` job, before cohort setup. The validation step labels the checked-out GitHub SHA, prints the workflow-set hash, and writes a JSON report that an `always()` artifact step retains even when linting fails. This source-bound static check stops later qualification steps on failure; it does not claim hosted or release acceptance until that workflow actually runs. The fresh uncovered `native-process`
+regression runner separately installs its own pin after `npm ci` and before
+native Chromium or test workloads. Covered, reused and other-group runners do
+not perform that extra setup. Required integration tests fail with the setup
+command when the pin is absent; they do not introduce skip exceptions.
 
 With no `--base`, the command uses the first available merge base from `origin/main`, `main`, or `master`. Pass `--base <ref>` to choose the comparison explicitly.
 

@@ -2352,3 +2352,16 @@ Public aggregate controls cover four fresh groups with inherited emulator eviden
 - `RISK repository process: workflow browser paths resolve only in supported runner contexts`
 
 The actual workflow installer and enforcing persistence consumer must resolve the same isolated runner-temp browser directory at a supported environment scope. Controlled external Chromium installation feeds the real group preflight and complete outcomes; missing, literal unexpanded or mismatched consumer paths fail closed. This process contract starts no real browser and supplies no hosted qualification.
+
+## Pinned validator readiness on fresh CI runners
+
+- `RISK repository process: fresh native-process CI sets up the pinned validator before workload`
+
+The checked-in fresh native-process setup command runs through the real public
+CLI with a controlled external provider serving the official checksum-pinned
+archive. Missing or corrupt setup and provider failure stop before the workload
+sentinel; successful setup retains verified platform archive bytes for offline
+process integrations. Covered, reused and other-group runners retain the existing
+zero-setup condition. The required validator and outgoing pre-push integration
+commands fail actionably instead of adding environment-dependent skips. These
+isolated command checks launch no native browser and provide no hosted proof.

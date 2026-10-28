@@ -75,10 +75,6 @@ await t.test('public validator entrypoint follows filesystem aliases and imports
 
 await t.test('public workflow command fails closed for missing and corrupt setup, then accepts the restored pin', async (context) => {
   const sourceProbe = await validateWorkflows({ repositoryRoot, sourceDir: join(repositoryRoot, '.github', 'workflows') });
-  if (sourceProbe.error?.includes('is not set up in this repository')) {
-    context.skip('Run npm run agent:setup-workflow-validator before this pinned-tool integration test.');
-    return;
-  }
   assert.equal(sourceProbe.ok, true, sourceProbe.error ?? sourceProbe.diagnostics);
 
   const fixtureRoot = await mkdtemp(join(tmpdir(), 'workflow-validator-setup-test-'));
@@ -133,10 +129,6 @@ await t.test('public workflow command fails closed for missing and corrupt setup
 
 await t.test('an edited manifest cannot authorize an arbitrary same-version executable', async (context) => {
   const sourceProbe = await validateWorkflows({ repositoryRoot, sourceDir: join(repositoryRoot, '.github', 'workflows') });
-  if (sourceProbe.error?.includes('is not set up in this repository')) {
-    context.skip('Run npm run agent:setup-workflow-validator before this pinned-tool integration test.');
-    return;
-  }
   assert.equal(sourceProbe.ok, true, sourceProbe.error ?? sourceProbe.diagnostics);
 
   const fixtureRoot = await mkdtemp(join(tmpdir(), 'workflow-validator-forged-pin-test-'));
@@ -177,10 +169,6 @@ await t.test('public workflow command runs pinned actionlint on invalid job and 
     repositoryRoot,
     sourceDir: join(repositoryRoot, '.github', 'workflows'),
   });
-  if (setupProbe.error?.includes('is not set up in this repository')) {
-    context.skip('Run npm run agent:setup-workflow-validator before this pinned-tool integration test.');
-    return;
-  }
   assert.equal(setupProbe.ok, true, setupProbe.error ?? setupProbe.diagnostics);
 
   const fixtureRoot = await mkdtemp(join(tmpdir(), 'workflow-validator-test-'));
@@ -233,6 +221,8 @@ await t.test('public workflow command runs pinned actionlint on invalid job and 
 });
 
 await t.test('CI executes the checkout-bound validator command and retains its result before qualification', async () => {
+  const setup = await validateWorkflows({ repositoryRoot });
+  assert.equal(setup.ok, true, setup.error ?? setup.diagnostics);
   const workflowPath = join(repositoryRoot, '.github', 'workflows', 'data-safety.yml');
   const workflowBytes = await readFile(workflowPath);
   const workflow = workflowBytes.toString('utf8');
@@ -321,4 +311,59 @@ await t.test('CI executes the checkout-bound validator command and retains its r
     await rm(fixtureRoot, { recursive: true, force: true });
   }
 });
+});
+
+test('required validator integrations fail actionably without setup and never skip', async (context) => {
+  const fixtureRoot = await mkdtemp(join(tmpdir(), 'workflow-validator-required-integrations-'));
+  context.after(() => rm(fixtureRoot, { recursive: true, force: true }));
+  const scripts = join(fixtureRoot, 'scripts', 'agent-tools');
+  const workflows = join(fixtureRoot, '.github', 'workflows');
+  await Promise.all([mkdir(scripts, { recursive: true }), mkdir(workflows, { recursive: true })]);
+  await Promise.all([
+    copyFile(validatorScript, join(scripts, 'workflow-validator.mjs')),
+    copyFile(resolve(repositoryRoot, 'scripts/agent-tools/workflow-validator.test.mjs'), join(scripts, 'workflow-validator.test.mjs')),
+    copyFile(join(repositoryRoot, '.github/workflows/data-safety.yml'), join(workflows, 'data-safety.yml')),
+  ]);
+  const required = [
+    'public workflow command fails closed for missing and corrupt setup, then accepts the restored pin',
+    'an edited manifest cannot authorize an arbitrary same-version executable',
+    'public workflow command runs pinned actionlint on invalid job and valid step runner contexts',
+  ];
+  const environment = { ...process.env };
+  delete environment.NODE_TEST_CONTEXT;
+  const invoke = () => spawnSync(process.execPath, [
+    '--test', '--test-reporter=tap', '--test-name-pattern=^workflow validator command contracts are pinned and source-bound$',
+    'scripts/agent-tools/workflow-validator.test.mjs',
+  ], { cwd: fixtureRoot, env: environment, encoding: 'utf8', maxBuffer: 2 * 1024 * 1024 });
+  const missing = invoke();
+  assert.equal(missing.error, undefined, missing.error?.message);
+  assert.notEqual(missing.status, 0, `Missing setup must fail required integration checks.\n${missing.stdout}\n${missing.stderr}`);
+  assert.match(missing.stdout, /# skipped 0\b/);
+  for (const name of required) assert.ok(missing.stdout.split('\n').some(line => /^\s*not ok \d+ - /.test(line) && line.endsWith(name)), name);
+  assert.match(missing.stdout + missing.stderr, /npm run agent:setup-workflow-validator/);
+
+  const original = cachePaths(repositoryRoot), installed = cachePaths(fixtureRoot);
+  await mkdir(installed.directory, { recursive: true });
+  await Promise.all([copyFile(original.executable, installed.executable), copyFile(original.manifest, installed.manifest)]);
+  await chmod(installed.executable, 0o755);
+  const present = invoke();
+  assert.equal(present.error, undefined, present.error?.message);
+  assert.equal(present.status, 0, `${present.stdout}\n${present.stderr}`);
+  assert.match(present.stdout, /# skipped 0\b/);
+  for (const name of required) assert.ok(present.stdout.split('\n').some(line => /^\s*ok \d+ - /.test(line) && line.endsWith(name)), name);
+
+  await rm(join(fixtureRoot, 'node_modules'), { recursive: true, force: true });
+  for (const file of ['tests.js', 'index.html', 'vendor/lz-string-1.5.0.min.js',
+    'scripts/install-release-hook.mjs', 'scripts/release-evidence.mjs', 'scripts/agent-tools/checkpoint-progress.mjs']) {
+    await mkdir(dirname(join(fixtureRoot, file)), { recursive: true });
+    await copyFile(join(repositoryRoot, file), join(fixtureRoot, file));
+  }
+  const outgoing = spawnSync(process.execPath, ['--test', '--test-reporter=tap',
+    '--test-name-pattern=^RISK repository process: managed pre-push validates the exact outgoing workflow commit$', 'tests.js'],
+  { cwd: fixtureRoot, env: environment, encoding: 'utf8', maxBuffer: 2 * 1024 * 1024 });
+  assert.equal(outgoing.error, undefined, outgoing.error?.message);
+  assert.notEqual(outgoing.status, 0, `Missing setup cannot skip required outgoing workflow integration.\n${outgoing.stdout}\n${outgoing.stderr}`);
+  assert.match(outgoing.stdout, /not ok \d+ - RISK repository process: managed pre-push validates the exact outgoing workflow commit/);
+  assert.match(outgoing.stdout, /# skipped 0\b/);
+  assert.match(outgoing.stdout + outgoing.stderr, /npm run agent:setup-workflow-validator/);
 });

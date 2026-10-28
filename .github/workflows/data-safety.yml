@@ -310,6 +310,9 @@ jobs:
           java-version: '21'
       - run: npm ci
         if: steps.selected.outputs.decision == 'full' && !contains(fromJSON(steps.selected.outputs.reused), matrix.group)
+      - name: Install pinned workflow validator for native-process
+        if: steps.selected.outputs.decision == 'full' && matrix.group == 'native-process' && !contains(fromJSON(steps.selected.outputs.reused), matrix.group)
+        run: npm run agent:setup-workflow-validator
       - name: Install matching native Chromium
         env:
           PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/playwright-browsers

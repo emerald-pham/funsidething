@@ -161,6 +161,8 @@ export async function setupPinnedActionlint(repositoryRoot = process.cwd(), { fe
     const stagedExecutable = join(staging, executableName);
     await writeFile(stagedExecutable, executableBytes, { mode: 0o755, flag: 'wx' });
     await chmod(stagedExecutable, 0o755);
+    // Preserve the verified provider bytes for network-free command integration tests.
+    await writeFile(join(staging, 'release.tar.gz'), archiveBytes, { flag: 'wx' });
     const version = spawnSync(stagedExecutable, ['-version'], { encoding: 'utf8', maxBuffer: 1024 * 1024 });
     if (version.error || version.signal || version.status !== 0 || !new RegExp(`\\b${ACTIONLINT_VERSION.replaceAll('.', '\\.')}(?:\\b|$)`).test(`${version.stdout ?? ''}\n${version.stderr ?? ''}`)) {
       throw new Error(`Downloaded executable did not identify as actionlint v${ACTIONLINT_VERSION}.`);
