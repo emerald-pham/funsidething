@@ -499,3 +499,15 @@ error and keyboard assertion. Application/assets/copy remain byte-identical to
 gate and corrected external supplement need fresh exact execution. Exact8f9
 compatibility478c2c78 passed15/15 and rules28586a53 passed24/24, zero skips;
 their unchanged app/rules/runtime inputs remain explicit rather than relabeled.
+
+The first controlled-clock runner d9285a8 stopped before status assertions:
+bf30e253's native Motion dialog intercepted Quick start because a real-time
+fixture hint appeared future-dated under the fixed clock. The fixture now stamps
+that hint in the same controlled time domain on every navigation, and handles a
+visible first-run Motion choice through its native Reduced control before Quick
+start. Product assets and every paint/geometry/keyboard/error assertion remain
+unchanged. Actual Chromium/WebKit, both themes and390/1100 status variants pass
+in93e53fda (one complete matrix root, zero skipped). Its dirty-runner test bytes
+are retained and bound to the subsequent test-only commit rather than described
+as a clean qualification run. Clean full/npm-test and both installed-client
+outcomes remain required on that final committed source.

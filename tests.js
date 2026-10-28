@@ -15822,6 +15822,7 @@ async function invisibleSavedViewBrowser(theme='light',delayAppearanceAsset=fals
  const engineName=startupOptions.browserEngine==='webkit'?'webkit':'chromium',engine=engineName==='webkit'?webkit:chromium,
   evidencePrefix=startupOptions.brokenDeviceBoard?`broken-board-${engineName}-${theme}-${viewport.width}-${startupOptions.retainAppearance===false?'without-appearance':'with-appearance'}`:`invisible-${theme}`;
  const browser=await engine.launch(engineName==='webkit'?{headless:true}:{headless:true,channel:process.env.LANDSCAPE_BROWSER_CHANNEL||(openingBoardSelfHosted?undefined:'chrome')});
+ const fixtureTime=startupOptions.fixedTime?Date.parse(startupOptions.fixedTime):startupOptions.availabilityFixture?Date.parse('2026-10-28T12:00:00Z'):null;
  let releaseFirebaseImports,resolveFirebaseImportsStarted,firebaseImportCount=0;
  const firebaseImportsStarted=new Promise(resolve=>{resolveFirebaseImportsStarted=resolve;});
  const firebaseImportsReleased=new Promise(resolve=>{releaseFirebaseImports=resolve;});
@@ -15850,26 +15851,27 @@ async function invisibleSavedViewBrowser(theme='light',delayAppearanceAsset=fals
   Object.defineProperty(window,'CloudSync',{configurable:true,enumerable:true,get:()=>cloud,set:value=>{if(value?.configured!==false)cloud=configure(value);}});
  });
  if(delayAppearanceAsset)await context.route('**/saved-appearance.js',async route=>{await new Promise(resolve=>setTimeout(resolve,600));await route.continue();});
- await context.addInitScript(theme=>{
+ await context.addInitScript(({theme,fixtureTime})=>{
   const configured=localStorage.getItem('__quietStartupConfiguredCloud')==='true';
   Object.defineProperty(window,'FIREBASE_CONFIG',{value:configured?{apiKey:'quiet-startup-test-only',authDomain:'quiet-startup.invalid',projectId:'quiet-startup-test'}:null,writable:false});
   window.__cloudsyncEvents=0;window.addEventListener('cloudsync',()=>window.__cloudsyncEvents++);
   localStorage.setItem('fvp:chain-scanner:theme',theme);
-  localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
+  localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:fixtureTime??Date.now()}));
   window.__actualLocalRead={started:false,settled:false};
   window.__firstAppearanceFrames=[];let frames=0;function observe(){if(localStorage.getItem('__delayLocalRead')==='true'&&document.querySelector('.wrap')){const preview=document.querySelector('[data-saved-preview]');const root=[...document.querySelectorAll('.wrap')].find(e=>getComputedStyle(e).visibility==='visible');window.__firstAppearanceFrames.push({ready:document.documentElement.dataset.appReady==='true',populated:!!preview&&getComputedStyle(preview).visibility==='visible'&&!!preview.querySelector('.trow'),readStarted:window.__actualLocalRead.started,boardVisible:!!root,rows:root?.querySelectorAll('.trow').length||0,connectedBoards:document.querySelectorAll('.wrap:has(.trow)').length});}if(++frames<600)requestAnimationFrame(observe);}requestAnimationFrame(observe);
   const open=indexedDB.open.bind(indexedDB),success=Object.getOwnPropertyDescriptor(IDBRequest.prototype,'onsuccess');
   indexedDB.open=(...args)=>{const request=open(...args);if(localStorage.getItem('__delayLocalRead')!=='true')return request;
    window.__actualLocalRead.started=true;window.__actualLocalRead.attempts=(window.__actualLocalRead.attempts||0)+1;const failures=Number(localStorage.getItem('__openingReadFailures'))||0;if(window.__actualLocalRead.attempts<=failures){request.onsuccess=()=>request.result.close();const failed={};setTimeout(()=>{window.__actualLocalRead.failedAttempts=(window.__actualLocalRead.failedAttempts||0)+1;failed.error=Object.assign(Error('An internal error was encountered in the Indexed Database server'),{name:'UnknownError'});failed.onerror?.();},200);return failed;}let listener=null;const delay=Number(localStorage.getItem('__delayLocalReadMs'))||1800;
    Object.defineProperty(request,'onsuccess',{configurable:true,get:()=>listener,set:fn=>{listener=fn;success.set.call(request,event=>setTimeout(()=>{window.__actualLocalRead.settled=true;fn?.call(request,event);},delay));}});return request;};
- },theme);
+ },{theme,fixtureTime});
  const page=await context.newPage(),errors=[],pageErrorDetails=[];page.on('pageerror',error=>{errors.push(error.message);pageErrorDetails.push({message:error.message,stack:error.stack,url:page.url()});});
- if(startupOptions.availabilityFixture||startupOptions.fixedTime)await page.clock.setFixedTime(new Date(startupOptions.fixedTime||'2026-10-28T12:00:00Z'));
+ if(fixtureTime!==null)await page.clock.setFixedTime(new Date(fixtureTime));
  await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded',timeout:10000});
  await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true',null,{timeout:10000});
  // Finish the fresh-profile fixture's unrelated local asset reads before
  // seeding and navigating. The actual reopening read remains held below.
  await page.waitForLoadState('networkidle');
+ if(await page.locator('#motionDialog').isVisible())await page.locator('[data-landscape-motion="reduced"]').click();
  await page.waitForFunction(()=>!!document.querySelector('#modalRoot [data-act="ok-quickstart"]'),null,{timeout:10000});
  await page.locator('#modalRoot [data-act="ok-quickstart"]').click();
  assert.equal(await page.evaluate(()=>state.tasks.length),0,'a genuinely fresh profile contains no fabricated saved tasks');
