@@ -21573,5 +21573,65 @@
       "command": "Actual Node22 public record-run/Node test commands retained in task artifacts retro-504-20261027: workflow-chain/505-committed-red; recorder-535/red/combined-corrected; recorder-537/red-real-node22; qualification-521/evidence; ci-validator-readiness/chronology.json; fixture-red and fixture-green records. Prerequisite RED commands remain in all unchanged inherited rationale records.",
       "failure": "Separate contemporaneous failures precede their corresponding fixes: raw event policy mismatch, innocuous TAP identity redaction, generic credential newline consumption, missing selected parent gate, realpath CLI alias bypass, exact outgoing invalid workflow admission, fresh CI validator omission, absent required validator skips and missing verified archive retention. Later fixed-mode owned-port RED precedes its port-binding fix. These are distinct REDs rather than one combined failure. Two historical gaps are explicitly retained: CAS conditional-release implementation preceded its RED (user authorized one exception conditional on all remaining gates); initial fixed-mode implementation preceded a failing supported-mode test (separate unresolved policy gate). The original Node/PATH test exercised ordinary recorder only and is not fixed-mode RED. Later restored-baseline sensitivity cannot establish original chronology."
     }
+  },
+  {
+    "testChangesSha256": "536e6a4acede92d9e461e627efc4ee0db3ff9ae605dd1d3dddd9b9238a63e069",
+    "reason": "Exact #543 source-review repair comparison against e00013520c338bd8761aee2f2b472cf6d9abd0fe: retain prior protected regressions and add real public command controls for complete local authority, required fixture proof and approved diagnostic execution closure.",
+    "previousBehavior": "Malformed/unconfirmed/takeover leases could launch local browser preflight; zero-exit fixed fixtures could qualify without selected root/nested TAP or listener/accounting proof; current diagnostic command imports lacked an admissible complete execution bundle.",
+    "intendedBehavior": "Require current confirmed non-takeover finite lease authority before launch, exact selected root and eleven nested passing outcomes plus original observed listener/accounting, and exactly five byte/mode-bound current governance dependencies while frozen application/profile/catalog and nonqualifying finite diagnostic policy remain protected.",
+    "replacementTests": [
+      "RISK repository process: local browser admission requires complete current owner authority",
+      "RISK repository process: fixed local fixture refuses absent required execution and observation proof",
+      "RISK repository process: diagnostic command closure remains exact and nonqualifying"
+    ],
+    "preservedCoverage": [
+      "All 857 pre-repair rationale records remain an unchanged raw prefix, including all 853 prerequisite and 792 main objects. Existing test assertions, 2746 assignment rows, two process controls, frozen inventory and 61 accepted skips remain intact; six new native-process registrations extend coverage.",
+      "Production application, FAQ/changelog, version, shell assets/PWA, rules and dependency pins remain unchanged. Ordinary recorder statuses, sanitization, exact source identity, actual child outcome and owned cleanup stay independent. No actual browser engine, native memory, hosted, full-suite or release result follows from these fixtures.",
+      "Inherited source-bound RED/GREEN remains attributed to its original commits. The CAS exception is historical and conditional; initial fixed-mode preimplementation chronology remains a separate parent-owned policy gap. Neither later comparison nor setup/import failure supplies missing original RED."
+    ],
+    "redEvidence": {
+      "command": "Actual Node22 public process commands and source/diff/timestamps are retained under retro-504-20261027/review-repair-543: code2-behavior-red (test group workflow consumer), code3-red and code3-risk-red (public allocated preflight), code4-red and code4-risk-red (fixed-mode recorder), code1-closure-red and code1-closure-risk-red (public diagnostic-plan). Original final-542/focused import failures remain setup failures; two unmatched code2 name-filter attempts ran no selected behavior and receive no RED credit.",
+      "failure": "Each behavioral RED was observed before its corresponding functional edit: selected non-Homebrew forwarding executable did not launch run-group; invalid leases returned status0 before launch refusals; all13 successful-child recorder controls returned status0 despite missing/renamed/skipped root/nested and absent/malformed/redacted/wrong listener/accounting proof; diagnostic-plan rejected the explicitly authorized exact five-file execution closure as frozen inventory drift. Subsequent separate GREEN records preserve actual workload/cleanup and frozen application refusal controls. Historical initial-mode and CAS chronology corrections remain unchanged."
+    }
+  },
+  {
+    "testChangesSha256": "b776d3d781008801a6d96ced570433596d941fbd826269f528dde635b783f113",
+    "reason": "Exact #543 source-review repair comparison against 4fe423bfec43bddc4262452e4b089a2bef8c9216: retain prior protected regressions and add real public command controls for complete local authority, required fixture proof and approved diagnostic execution closure.",
+    "previousBehavior": "Malformed/unconfirmed/takeover leases could launch local browser preflight; zero-exit fixed fixtures could qualify without selected root/nested TAP or listener/accounting proof; current diagnostic command imports lacked an admissible complete execution bundle.",
+    "intendedBehavior": "Require current confirmed non-takeover finite lease authority before launch, exact selected root and eleven nested passing outcomes plus original observed listener/accounting, and exactly five byte/mode-bound current governance dependencies while frozen application/profile/catalog and nonqualifying finite diagnostic policy remain protected.",
+    "replacementTests": [
+      "RISK repository process: local browser admission requires complete current owner authority",
+      "RISK repository process: fixed local fixture refuses absent required execution and observation proof",
+      "RISK repository process: diagnostic command closure remains exact and nonqualifying"
+    ],
+    "preservedCoverage": [
+      "All 857 pre-repair rationale records remain an unchanged raw prefix, including all 853 prerequisite and 792 main objects. Existing test assertions, 2746 assignment rows, two process controls, frozen inventory and 61 accepted skips remain intact; six new native-process registrations extend coverage.",
+      "Production application, FAQ/changelog, version, shell assets/PWA, rules and dependency pins remain unchanged. Ordinary recorder statuses, sanitization, exact source identity, actual child outcome and owned cleanup stay independent. No actual browser engine, native memory, hosted, full-suite or release result follows from these fixtures.",
+      "Inherited source-bound RED/GREEN remains attributed to its original commits. The CAS exception is historical and conditional; initial fixed-mode preimplementation chronology remains a separate parent-owned policy gap. Neither later comparison nor setup/import failure supplies missing original RED."
+    ],
+    "redEvidence": {
+      "command": "Actual Node22 public process commands and source/diff/timestamps are retained under retro-504-20261027/review-repair-543: code2-behavior-red (test group workflow consumer), code3-red and code3-risk-red (public allocated preflight), code4-red and code4-risk-red (fixed-mode recorder), code1-closure-red and code1-closure-risk-red (public diagnostic-plan). Original final-542/focused import failures remain setup failures; two unmatched code2 name-filter attempts ran no selected behavior and receive no RED credit.",
+      "failure": "Each behavioral RED was observed before its corresponding functional edit: selected non-Homebrew forwarding executable did not launch run-group; invalid leases returned status0 before launch refusals; all13 successful-child recorder controls returned status0 despite missing/renamed/skipped root/nested and absent/malformed/redacted/wrong listener/accounting proof; diagnostic-plan rejected the explicitly authorized exact five-file execution closure as frozen inventory drift. Subsequent separate GREEN records preserve actual workload/cleanup and frozen application refusal controls. Historical initial-mode and CAS chronology corrections remain unchanged."
+    }
+  },
+  {
+    "testChangesSha256": "d2e02d023dde3b5e6e821799dbe5bf4093ac22f2fece8a2c2a8a09ec7dfead7c",
+    "reason": "Exact #543 source-review repair comparison against e1ed5c269a0c64b0023483d3fe7dd7c6d2bfb3ed: retain prior protected regressions and add real public command controls for complete local authority, required fixture proof and approved diagnostic execution closure.",
+    "previousBehavior": "Malformed/unconfirmed/takeover leases could launch local browser preflight; zero-exit fixed fixtures could qualify without selected root/nested TAP or listener/accounting proof; current diagnostic command imports lacked an admissible complete execution bundle.",
+    "intendedBehavior": "Require current confirmed non-takeover finite lease authority before launch, exact selected root and eleven nested passing outcomes plus original observed listener/accounting, and exactly five byte/mode-bound current governance dependencies while frozen application/profile/catalog and nonqualifying finite diagnostic policy remain protected.",
+    "replacementTests": [
+      "RISK repository process: local browser admission requires complete current owner authority",
+      "RISK repository process: fixed local fixture refuses absent required execution and observation proof",
+      "RISK repository process: diagnostic command closure remains exact and nonqualifying"
+    ],
+    "preservedCoverage": [
+      "All 857 pre-repair rationale records remain an unchanged raw prefix, including all 853 prerequisite and 792 main objects. Existing test assertions, 2746 assignment rows, two process controls, frozen inventory and 61 accepted skips remain intact; six new native-process registrations extend coverage.",
+      "Production application, FAQ/changelog, version, shell assets/PWA, rules and dependency pins remain unchanged. Ordinary recorder statuses, sanitization, exact source identity, actual child outcome and owned cleanup stay independent. No actual browser engine, native memory, hosted, full-suite or release result follows from these fixtures.",
+      "Inherited source-bound RED/GREEN remains attributed to its original commits. The CAS exception is historical and conditional; initial fixed-mode preimplementation chronology remains a separate parent-owned policy gap. Neither later comparison nor setup/import failure supplies missing original RED."
+    ],
+    "redEvidence": {
+      "command": "Actual Node22 public process commands and source/diff/timestamps are retained under retro-504-20261027/review-repair-543: code2-behavior-red (test group workflow consumer), code3-red and code3-risk-red (public allocated preflight), code4-red and code4-risk-red (fixed-mode recorder), code1-closure-red and code1-closure-risk-red (public diagnostic-plan). Original final-542/focused import failures remain setup failures; two unmatched code2 name-filter attempts ran no selected behavior and receive no RED credit.",
+      "failure": "Each behavioral RED was observed before its corresponding functional edit: selected non-Homebrew forwarding executable did not launch run-group; invalid leases returned status0 before launch refusals; all13 successful-child recorder controls returned status0 despite missing/renamed/skipped root/nested and absent/malformed/redacted/wrong listener/accounting proof; diagnostic-plan rejected the explicitly authorized exact five-file execution closure as frozen inventory drift. Subsequent separate GREEN records preserve actual workload/cleanup and frozen application refusal controls. Historical initial-mode and CAS chronology corrections remain unchanged."
+    }
   }
 ]
