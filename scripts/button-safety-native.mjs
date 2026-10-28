@@ -30,7 +30,17 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
   assert.ok(ledgerPath&&path.isAbsolute(ledgerPath),'Local named-engine launch requires explicit canonical coordination ledger');
   const ledger=JSON.parse(fs.readFileSync(ledgerPath,'utf8'));
   const owners=(ledger.entries||[]).filter(entry=>['active','parked'].includes(entry.status));
-  const own=owners.find(entry=>entry.status==='active'&&fs.realpathSync(entry.worktree)===fs.realpathSync(repo));
+  const repoPath=fs.realpathSync(repo);
+  const own=owners.find(entry=>{
+   if(entry.status!=='active')return false;
+   try{return fs.realpathSync(entry.worktree)===repoPath;}
+   catch(error){
+    // Missing foreign paths cannot identify this owner, but remain in owners
+    // so their active/parked resource claims still refuse conflicting launches.
+    if(error.code==='ENOENT'||error.code==='ENOTDIR')return false;
+    throw error;
+   }
+  });
   assert.ok(own,'Active worktree allocation required before native launch');
   assert.ok(own.lease?.state==='healthy'&&Date.parse(own.lease.expiresAt)>Date.now()&&!own.lease.ownerConfirmationRequired,'Current healthy worktree lease required before native launch');
   for(const resource of ['browser-runtime:playwright-'+engine,'loopback:127.0.0.1:'+port]){

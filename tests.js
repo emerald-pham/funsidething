@@ -46517,6 +46517,42 @@ test('RISK repository process: native button gate refuses unallocated local laun
  }
 });
 
+test('RISK repository process: native allocation admits its healthy owner past missing foreign paths and protects their claims',async t=>{
+ const directory=fs.mkdtempSync('/tmp/chain-button-missing-owner-');t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const ledger=path.join(directory,'ledger.json'),missing=path.join(directory,'missing-foreign'),alias=path.join(directory,'own-alias'),port=48971;
+ fs.symlinkSync(__dirname,alias,'dir');
+ const keys=['CI','CODEX_COORDINATION_FILE','DOW_EMULATOR_COORDINATION_FILE'],before=Object.fromEntries(keys.map(key=>[key,process.env[key]]));
+ delete process.env.CI;process.env.CODEX_COORDINATION_FILE=ledger;process.env.DOW_EMULATOR_COORDINATION_FILE=ledger;
+ t.after(()=>{for(const key of keys)if(before[key]===undefined)delete process.env[key];else process.env[key]=before[key];});
+ const {runButtonSafety}=await import('./scripts/button-safety-native.mjs');
+ const events=[],stopped=Error('Synthetic external output boundary reached'),mkdir=fs.mkdirSync;let expectedOutput;
+ // Stop at the external filesystem boundary immediately after admission. This
+ // tests the actual guard without bypassing the separate source inventory gate.
+ t.mock.method(fs,'mkdirSync',function(target,...args){if(target===expectedOutput){events.push('output');throw stopped;}return mkdir.call(this,target,...args);});
+ const healthy={id:'own',status:'active',worktree:__dirname,lease:{state:'healthy',expiresAt:new Date(Date.now()+60000).toISOString(),ownerConfirmationRequired:false},resources:['browser-runtime:playwright-webkit','loopback:127.0.0.1:'+port]};
+ const foreign={id:'foreign-missing',status:'active',worktree:missing,resources:['unrelated:resource'],claims:['foreign:preserved'],unknown:{preserve:'literal metadata'}};
+ const cases=[
+  {name:'healthy current owner control',entries:[healthy],admitted:true},
+  {name:'missing unrelated owner precedes healthy current owner',entries:[foreign,healthy],admitted:true},
+  {name:'canonical current owner alias remains admitted',entries:[{...healthy,worktree:alias}],admitted:true},
+  ...['active','parked'].flatMap(status=>healthy.resources.map(resource=>({name:status+' missing foreign claim '+resource,entries:[{...foreign,status,resources:[resource]},healthy],refusal:/Conflicting local native allocation/}))),
+  {name:'missing current owner never grants admission',entries:[{...healthy,worktree:missing}],refusal:/Active worktree allocation required/},
+ ];
+ for(const [index,item]of cases.entries())await t.test(item.name,async()=>{
+  events.length=0;const output=path.join(directory,'native-'+index),bytes=JSON.stringify({version:1,entries:item.entries,reservations:[],configurations:[],unknown:'retain exact bytes'},null,2)+'\n';fs.writeFileSync(ledger,bytes);expectedOutput=output;
+  let failure;try{await runButtonSafety({repo:__dirname,engine:'webkit',outputDir:output,port,probe:true});}catch(error){failure=error;}
+  assert.equal(fs.readFileSync(ledger,'utf8'),bytes,'Admission/refusal cannot rewrite any foreign claim or fixture ledger byte');
+  if(item.admitted){
+   assert.equal(failure,stopped,'A healthy owned run must reach its external output boundary despite an unrelated missing foreign path');
+   assert.deepEqual(events,['output'],'The actual native consumer completed admission before requesting its output directory');
+   assert.equal(fs.existsSync(output),false,'The controlled external stop precedes report, listener and browser creation');
+  }else{
+   assert.match(failure?.message||'',item.refusal,'Missing owners must retain their conflicting resources and cannot become current authority');
+   assert.deepEqual(events,[],'Refusal precedes socket binding and browser launch');assert.equal(fs.existsSync(output),false,'Refusal precedes report or workload creation');
+  }
+ });
+});
+
 test('RISK repository process: new and duplicate source buttons require native coverage inventory',async t=>{
  const directory=fs.mkdtempSync('/tmp/chain-button-source-');t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
  const tag='<button data-act="add">',manifest=path.join(directory,'inventory.json'),source=path.join(directory,'index.html');
@@ -46526,6 +46562,19 @@ test('RISK repository process: new and duplicate source buttons require native c
  for(const [name,html]of [['new action',tag+'Add</button><button data-act="new-untested">New</button>'],['duplicate route',tag+'Add</button>'+tag+'Add again</button>'],['nonbutton action consumer',tag+'Add</button><span role="button" data-act="new-untested">New</span>']])await t.test(name,()=>{
   const result=invoke(html);assert.equal(result.error,undefined);assert.notEqual(result.status,0,'native coverage inventory must fail closed for '+name);assert.match(result.stderr,/Source button templates differ from reviewed native inventory/);
  });
+});
+
+test('RISK repository process: merged tracked app sources match the reviewed button templates',t=>{
+ const directory=fs.mkdtempSync('/tmp/chain-button-merged-source-');t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const listed=spawnSync('git',['ls-files'],{cwd:__dirname,encoding:'utf8'});assert.equal(listed.error,undefined);assert.equal(listed.status,0,listed.stderr);
+ const files=listed.stdout.split(/\r?\n/).filter(file=>file&&file!=='tests.js'&&!file.startsWith('scripts/')&&/\.(?:js|html)$/.test(file));
+ assert.ok(files.includes('index.html'),'the exact tracked native source pool includes the application entry point');
+ const source=files.map(file=>fs.readFileSync(path.join(__dirname,file),'utf8')).join('\n'),sourcePath=path.join(directory,'merged-source.html'),inventoryPath=path.join(__dirname,'scripts/button-safety-inventory.json');
+ fs.writeFileSync(sourcePath,source);
+ const identity=spawnSync('git',['rev-parse','HEAD','HEAD^{tree}'],{cwd:__dirname,encoding:'utf8'});assert.equal(identity.error,undefined);assert.equal(identity.status,0,identity.stderr);
+ const inventoryBytes=fs.readFileSync(inventoryPath),result=spawnSync(process.execPath,['scripts/button-safety.mjs','--check-inventory','--source',sourcePath,'--inventory',inventoryPath],{cwd:__dirname,encoding:'utf8'});
+ assert.equal(result.error,undefined);assert.equal(result.status,0,result.stderr+'\n'+result.stdout);assert.match(result.stdout,/Source button inventory verified\./);
+ t.diagnostic(JSON.stringify({candidate:identity.stdout.trim().split(/\r?\n/)[0],tree:identity.stdout.trim().split(/\r?\n/)[1],sourceFiles:files,sourcePoolSha256:createHash('sha256').update(source).digest('hex'),inventorySha256:createHash('sha256').update(inventoryBytes).digest('hex')}));
 });
 
 test('RISK repository process: native button gate awaits an asynchronous false outcome',t=>{
