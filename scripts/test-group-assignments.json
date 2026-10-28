@@ -12764,6 +12764,61 @@
       "root": "RISK DATABASE REPAIR EXPORT: reload help routes users to the combined export after standalone log exporters are removed",
       "group": "core",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK AUTH HYDRATION: a broken device board stays quiet until protected local recovery is visible",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK opening board presentation: shared markup retains released cards contexts task rows and history",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK saved view broken-board guidance: opening status does not imply cloud confirmation or erase recovery warnings",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK saved view broken-board startup: configured Firebase leaves the prior warning neutral until its first event",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK saved view broken-board startup: prior appearance stays inert until the recovered board opens",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK saved view broken-board status: configured cloud changes remain visible in the saved appearance and after recovery",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK saved view broken-board visibility: the complete saved board is readable while durable startup waits",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK saved view full-board filters: opening preserves saved membership controls and cheap task facts",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK saved view full-board safety: supported copies and identity masks never grant authority",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK saved view opening source preservation: invalid optional appearance keeps its bytes while one complete task opens",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK saved view accepted handover: normal actions and exact local work survive repeated offline reopening",
+      "group": "persistence-recovery",
+      "file": "tests.js"
     }
   ],
   "processControls": [
