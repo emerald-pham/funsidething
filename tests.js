@@ -47211,3 +47211,24 @@ test('RISK repository process: native scene-time bursts cannot activate controls
  const opened=result.report.rapidOutcomes.find(row=>row.action==='act:scene-time-settings').bursts[0];assert.equal(opened.attempts,10);assert.equal(opened.trustedPresses,10);assert.equal(opened.unrelatedClicks,0);assert.equal(opened.acceptedClicks,1);assert.ok(opened.windowMs<=2000);assert.ok(opened.attemptDetails.slice(1).every(row=>row.nativeDownAction==='scene-preset:first-light'&&row.neutralRelease&&row.acceptedClicks===0&&row.neutralDocumentId===result.report.releaseSurfaces[0].documentId));
  for(const value of Object.values(result.report.cleanup))assert.equal(value,true);t.diagnostic('Actual scene dialog burst evidence: '+directory);
 });
+
+test('RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app',async()=>{
+ const {verifyButtonSafetyReport}=await import('./scripts/button-safety-contract.mjs');
+ const inventory={requiredActions:['act:toggle-add']};
+ const timeline={schemaVersion:1,status:'complete',clock:{basis:'page-performance',timeOrigin:1700000000000},observations:{
+  navigationStart:{status:'observed',atMs:0,basis:'synthetic navigation timing control'},
+  firstBackgroundPaint:{status:'observed',atMs:40,basis:'synthetic external pixel observation control'},
+  completeBoardPaint:{status:'observed',atMs:400,basis:'synthetic external pixel observation control'},
+  firstTrustedInputReceipt:{status:'observed',atMs:450,basis:'synthetic trusted receipt control'},
+  firstVisibleResponse:{status:'observed',atMs:800,basis:'synthetic external pixel observation control'},
+  overlappingWorkIntervals:{status:'observed',basis:'synthetic external work control',intervals:[{name:'controlled work',caller:'synthetic opening',kind:'sync',startMs:50,endMs:350}]}
+ }};
+ const report={schemaVersion:1,kind:'button-safety',engine:'webkit',status:'passed',candidateCommit:'a'.repeat(40),candidateTree:'b'.repeat(40),requiredActions:inventory.requiredActions,observedActions:inventory.requiredActions,outcomes:[{action:'act:toggle-add',status:'passed',events:['click'],assertions:1,responsive:true}],errors:[],cleanup:{contextClosed:true,browserClosed:true,serverClosed:true},startupTimeline:timeline};
+ const complete=verifyButtonSafetyReport(structuredClone(report),{inventory});
+ assert.equal(complete.startupTimeline.status,'complete','Observed complete positive control has no200ms pass/fail limit');
+ const omitted=structuredClone(report);delete omitted.startupTimeline.observations.completeBoardPaint;
+ const incomplete=verifyButtonSafetyReport(omitted,{inventory});
+ assert.equal(incomplete.startupTimeline.status,'incomplete','Missing actual complete-board paint cannot retain a complete timeline claim');
+ assert.equal(incomplete.status,'passed','An incomplete diagnostic timeline does not turn app behavior into a failure');
+ assert.ok(incomplete.startupTimeline.missing.includes('completeBoardPaint'));
+});

@@ -13451,6 +13451,11 @@
       "root": "RISK saved view accepted handover: normal actions and exact local work survive repeated offline reopening",
       "group": "persistence-recovery",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [
