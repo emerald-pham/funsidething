@@ -21693,5 +21693,43 @@
       "command": "Actual Node22 public process commands and source/diff/timestamps are retained under retro-504-20261027/review-repair-543: code2-behavior-red (test group workflow consumer), code3-red and code3-risk-red (public allocated preflight), code4-red and code4-risk-red (fixed-mode recorder), code1-closure-red and code1-closure-risk-red (public diagnostic-plan). Parent exact1f5 setup reproduction review-repair-543-parent-copy-audit/2026-10-28T01-04-11-743Z-693d1fe8-8a0b-4353-9f8c-fe51bcec2894.json found one additional tests.js large-diff release fixture missing workflow-validator; this bounded fixture setup repair preserves every classification assertion and is not behavioral RED. Focused tail/pre-push GREEN is retained in code1-testsjs-closure-green. Original final-542/focused import failures remain setup failures; two unmatched code2 name-filter attempts ran no selected behavior and receive no RED credit.",
       "failure": "Each behavioral RED was observed before its corresponding functional edit: selected non-Homebrew forwarding executable did not launch run-group; invalid leases returned status0 before launch refusals; all13 successful-child recorder controls returned status0 despite missing/renamed/skipped root/nested and absent/malformed/redacted/wrong listener/accounting proof; diagnostic-plan rejected the explicitly authorized exact five-file execution closure as frozen inventory drift. Subsequent separate GREEN records preserve actual workload/cleanup and frozen application refusal controls. Historical initial-mode and CAS chronology corrections remain unchanged."
     }
+  },
+  {
+    "testChangesSha256": "4d4d1bd95eff082851de6108987b028f0c474bd6aa2f1575eacffb211d7b5b03",
+    "reason": "Complete the existing outgoing-preflight isolated fixture setup for the real pinned workflow precheck, exact comparison 4fe423bfec43bddc4262452e4b089a2bef8c9216. This is test infrastructure dependency completion only, with no product or enforcement behavior change.",
+    "previousBehavior": "The fixture copied only test-first-gate.mjs, so actual preflight failed with MODULE_NOT_FOUND for scripts/agent-tools/workflow-validator.mjs before reaching the already-required outgoing upstream rationale assertions.",
+    "intendedBehavior": "Seed the current real workflow-validator module, existing workflow YAML, verified pinned actionlint executable and manifest in an ignored cache; then pass the selected-base comparison and reject the deliberately missing outgoing-upstream rationale through the unchanged real command.",
+    "replacementTests": [
+      "RISK repository process: preflight catches outgoing upstream rationale gaps after the selected base passes"
+    ],
+    "preservedCoverage": [
+      "All existing semantic assertions in this root are unchanged: real selected-base success, deliberately missing outgoing rationale rejection, each focused copy check exactly once, exactly one selected-base gate pass, and unchanged refs, HEAD, tracked status and local configuration.",
+      "All 863 prior rationale objects and their raw bytes remain an unchanged prefix. All existing test titles, assigned roots, process controls, accepted skip IDs, command protocols, timeouts, source/privacy/ownership and release checks remain intact.",
+      "Application code, saved boards, workflows, dependency pins, source consumers, qualification behavior and release policy remain unchanged. Focused fixture validation is not full regression, real browser/native acceptance, compatibility, CI, hosted, deployment or live proof.",
+      "Historical RED/GREEN and the two specifically approved old chronology exceptions retain their original attribution. This fixture setup failure is not behavioral RED and requires no claim of restored chronology or future policy exception."
+    ],
+    "redEvidence": {
+      "command": "Node22 scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/retro-504-final-preflight-fixture/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/retro-504-20261027/full-repair-544/owner/baseline --purpose later-baseline-sensitivity --summary -- node --test '--test-name-pattern=^RISK repository process: preflight catches outgoing upstream rationale gaps after the selected base passes$' tests.js",
+      "failure": "Observed before fixture edit on clean e70d4e4cf981f09ab9684ab819471526a934a3a2 in owner/baseline/2026-10-28T02-35-02-455Z-bc0a977e-3892-419d-8b30-d3c08c15cbd2.json: actual preflight first returned MODULE_NOT_FOUND for the temporary fixture scripts/agent-tools/workflow-validator.mjs, so the upstream assertion failed. Classification is infrastructure/setup failure, not functional behavioral RED. The same failure remains preserved in the parent exact-source full and focused records. Subsequent owner/focused-green validates dependency completion with the original semantic expectations."
+    }
+  },
+  {
+    "testChangesSha256": "7b00e3d37868748e926f10b713719447452a332e5286652cfb6daeab887d46af",
+    "reason": "Complete the existing outgoing-preflight isolated fixture setup for the real pinned workflow precheck, exact comparison e70d4e4cf981f09ab9684ab819471526a934a3a2. This is test infrastructure dependency completion only, with no product or enforcement behavior change.",
+    "previousBehavior": "The fixture copied only test-first-gate.mjs, so actual preflight failed with MODULE_NOT_FOUND for scripts/agent-tools/workflow-validator.mjs before reaching the already-required outgoing upstream rationale assertions.",
+    "intendedBehavior": "Seed the current real workflow-validator module, existing workflow YAML, verified pinned actionlint executable and manifest in an ignored cache; then pass the selected-base comparison and reject the deliberately missing outgoing-upstream rationale through the unchanged real command.",
+    "replacementTests": [
+      "RISK repository process: preflight catches outgoing upstream rationale gaps after the selected base passes"
+    ],
+    "preservedCoverage": [
+      "All existing semantic assertions in this root are unchanged: real selected-base success, deliberately missing outgoing rationale rejection, each focused copy check exactly once, exactly one selected-base gate pass, and unchanged refs, HEAD, tracked status and local configuration.",
+      "All 863 prior rationale objects and their raw bytes remain an unchanged prefix. All existing test titles, assigned roots, process controls, accepted skip IDs, command protocols, timeouts, source/privacy/ownership and release checks remain intact.",
+      "Application code, saved boards, workflows, dependency pins, source consumers, qualification behavior and release policy remain unchanged. Focused fixture validation is not full regression, real browser/native acceptance, compatibility, CI, hosted, deployment or live proof.",
+      "Historical RED/GREEN and the two specifically approved old chronology exceptions retain their original attribution. This fixture setup failure is not behavioral RED and requires no claim of restored chronology or future policy exception."
+    ],
+    "redEvidence": {
+      "command": "Node22 scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/retro-504-final-preflight-fixture/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/retro-504-20261027/full-repair-544/owner/baseline --purpose later-baseline-sensitivity --summary -- node --test '--test-name-pattern=^RISK repository process: preflight catches outgoing upstream rationale gaps after the selected base passes$' tests.js",
+      "failure": "Observed before fixture edit on clean e70d4e4cf981f09ab9684ab819471526a934a3a2 in owner/baseline/2026-10-28T02-35-02-455Z-bc0a977e-3892-419d-8b30-d3c08c15cbd2.json: actual preflight first returned MODULE_NOT_FOUND for the temporary fixture scripts/agent-tools/workflow-validator.mjs, so the upstream assertion failed. Classification is infrastructure/setup failure, not functional behavioral RED. The same failure remains preserved in the parent exact-source full and focused records. Subsequent owner/focused-green validates dependency completion with the original semantic expectations."
+    }
   }
 ]

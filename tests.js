@@ -41634,14 +41634,23 @@ test('RISK independent decision guidance: the actual bulk result keeps confirmat
  assert.match(result,/not a server save confirmation/);assert.match(result,/Undo reverses your last action and keeps unrelated progress/);
  assert.doesNotMatch(result,/earlier whole board|Undo restores.*board/);
 });
-test('RISK repository process: preflight catches outgoing upstream rationale gaps after the selected base passes',async t=>{
+test('RISK repository process: preflight catches outgoing upstream rationale gaps after the selected base passes',async t => {
  const os=await import('node:os'),fixture=fs.mkdtempSync(path.join(os.tmpdir(),'chain-preflight-outgoing-'));
  t.after(()=>fs.rmSync(fixture,{recursive:true,force:true}));
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
  const git=(...args)=>{const r=spawnSync('git',args,{cwd:fixture,encoding:'utf8',env});assert.equal(r.status,0,r.stderr||r.stdout);return r.stdout.trim();};
  const run=(...args)=>spawnSync(process.execPath,args,{cwd:fixture,encoding:'utf8',env});
- fs.mkdirSync(path.join(fixture,'scripts'));
- fs.copyFileSync(path.join(__dirname,'scripts/test-first-gate.mjs'),path.join(fixture,'scripts/test-first-gate.mjs'));
+ const {ACTIONLINT_VERSION}=await import('./scripts/agent-tools/workflow-validator.mjs');
+ for(const file of ['scripts/test-first-gate.mjs','scripts/agent-tools/workflow-validator.mjs','.github/workflows/data-safety.yml']){
+  const target=path.join(fixture,file);fs.mkdirSync(path.dirname(target),{recursive:true});
+  fs.copyFileSync(path.join(__dirname,file),target);
+ }
+ fs.writeFileSync(path.join(fixture,'.gitignore'),'node_modules/\n');
+ const cacheRelative=path.join('node_modules','.cache','funsidething','actionlint',`v${ACTIONLINT_VERSION}`,`${process.platform}-${process.arch}`);
+ const sourceCache=path.join(__dirname,cacheRelative),fixtureCache=path.join(fixture,cacheRelative);
+ fs.mkdirSync(fixtureCache,{recursive:true});
+ for(const file of ['actionlint','manifest.json'])fs.copyFileSync(path.join(sourceCache,file),path.join(fixtureCache,file));
+ fs.chmodSync(path.join(fixtureCache,'actionlint'),0o755);
  fs.writeFileSync(path.join(fixture,'TEST_CHANGE_RATIONALES.json'),'[]\n');
  const selected="import {test} from 'node:test';\ntest('Landscape location: visible default-sky copy does not name Orlando',()=>{});\ntest('RISK Quick start content: essential steps stay brief and detailed help remains user-facing in existing sections',()=>{});\n";
  fs.writeFileSync(path.join(fixture,'tests.js'),selected);
