@@ -46039,3 +46039,4 @@ test('RISK repository process: recorder retains exact public identities through 
  assert.match(result.stdout,/^# pass 4$/m);
  for(const label of ['fail','cancelled','skipped','todo'])assert.match(result.stdout,new RegExp('^# '+label+' 0$','m'));
 });
+// Disposable hosted early-failure control: .waitForFunction(async
