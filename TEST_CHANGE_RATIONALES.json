@@ -26243,5 +26243,62 @@
       "command": "Historical observed RED/GREEN commands remain verbatim in retained rationale entries from b176026, 9b5bc1c and 99b5dd0. Reconciliation focused runs use scripts/agent-tools/record-run.mjs with purpose green under external implement-293-20261028/reconciliation/runs; this merge claims no new preimplementation RED.",
       "failure": "No new functional story is introduced by this merge, and no retrospective run is represented as original RED. Parked repair nextAction retains original RED b8760d77/bb8725a7 and source-exact GREEN cd361380. Initial broad focused selection refused missing native allocations; the first process cohort exposed parent/child Node runtime mismatch. Both actual failures are retained unchanged outside the repository."
     }
+  },
+  {
+    "baseCommit": "25942c39148b13da7f7cd118b6b3c87f0e15035c",
+    "testChangesSha256": "6e7f1970338e2ba9ff604119e732ba5bad9a465faafc9ac6ad93e9e4005a5bd9",
+    "reason": "Keep the optional capped mobile workload out of ordinary required-cohort reuse while retaining the exact explicit-selection route as a separate diagnostic.",
+    "previousBehavior": "The actual planner treated mobile-WebKit-1GB-and-512MB-stress as mandatory topology, so an ordinary unrelated-change producer with every required group and aggregate complete but no optional mobile job was downgraded to a fresh full run.",
+    "intendedBehavior": "The mandatory four-group cohort can be reused without the optional mobile diagnostic. Only explicit dispatch selection launches the optional story; it never becomes required proof and cannot replace mandatory current checks.",
+    "replacementTests": [
+      "RISK repository process: optional mobile diagnostics do not block ordinary reuse"
+    ],
+    "preservedCoverage": [
+      "The same actual router still rejects failed, skipped, canceled, stale, duplicate and source-mismatched mandatory producer jobs; this change only removes mobile diagnostics from required cohort topology.",
+      "Ordinary Chromium/WebKit action and state coverage, source/preservation checks, rules, compatibility, installed-client tests, and the diagnostic cap/report integrity remain required or strictly validated as appropriate."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <worktree> --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/phase-G01/ordinary-plan --purpose preimplementation-red --summary -- node --test --test-name-pattern=\"^RISK repository process: optional mobile diagnostics do not block ordinary reuse$\" tests.js",
+      "failure": "Recorder 2026-10-28T18-57-14-085Z-1f79f105 observed the actual grouped router return `decision=full` when the normal unrelated-change producer had all required groups and aggregate complete but no mobile job; the focused expectation was `reuse`. The failure is `Producer required topology is incomplete or ambiguous`, at ci-routing.test.mjs:647. The separate earlier workflow_dispatch rejection is saved as unsupported-opt-in admission evidence and is not claimed as G01 RED."
+    }
+  },
+  {
+    "baseCommit": "25942c39148b13da7f7cd118b6b3c87f0e15035c",
+    "testChangesSha256": "872c89dfd375a7daf66f8effb0fe2326ecd9930211a8e6fb32cd9d46dbbf880c",
+    "reason": "Separate the ordinary mobile-free reuse contract from the explicit optional dispatch selector while keeping the selected hosted consumer's admission fail-closed.",
+    "previousBehavior": "Ordinary reuse required the capped mobile producer, and the actual planner rejected workflow_dispatch before a user could select the diagnostic route; no explicit default-off workflow selector or hosted dispatch policy existed.",
+    "intendedBehavior": "Routine plans do not launch mobile diagnostics. A branch-only workflow_dispatch boolean defaults false; only its explicit true selection records a non-required diagnostic and can reach the existing hosted capped-memory boundary.",
+    "replacementTests": [
+      "RISK repository process: optional mobile diagnostics do not block ordinary reuse",
+      "RISK repository process: explicit mobile diagnostics require dispatch selection and hosted admission"
+    ],
+    "preservedCoverage": [
+      "The mandatory ordinary producer and four-group evidence remain bound to the exact source, checkout, workflow, event and comparison base; optional diagnostics cannot supply required proof.",
+      "Selected diagnostics retain their existing exact cap, raw event/ref identity, failure classification, cleanup ownership and report provenance."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <worktree> --evidence-dir <external phase-G02 directory> --purpose preimplementation-red --summary -- node --test --test-name-pattern=^RISK repository process: explicit mobile diagnostics require dispatch selection and hosted admission$ tests.js",
+      "failure": "The newly added workflow/route contract fails because the current workflow has no optional_mobile_diagnostics boolean defaulting to false. Earlier separate evidence records the planner rejecting the selected dispatch with Unknown workflow event policy; that is dispatch admission evidence, not the G01 ordinary-route RED."
+    }
+  },
+  {
+    "baseCommit": "25942c39148b13da7f7cd118b6b3c87f0e15035c",
+    "testChangesSha256": "252bf43da4f426c5f5a73f500debdf6e0f9453be9240d9d17b19c053590639a2",
+    "reason": "Keep each optional mobile diagnostic outcome separate from mandatory aggregate authority, including when no optional report is available.",
+    "previousBehavior": "The aggregate treated the optional producer job and its 1 GB and 512 MB reports as required inputs, so a skipped, failed, absent or invalid diagnostic failed the mandatory cohort.",
+    "intendedBehavior": "The aggregate reports optional selection and the exact outcome as pass, app-failed, invalid, unavailable or not-run, while leaving mandatory success and failure decisions to the required cohort.",
+    "replacementTests": [
+      "RISK repository process: optional mobile outcomes remain distinct from the required aggregate verdict"
+    ],
+    "preservedCoverage": [
+      "A missing optional report, non-success optional producer, invalid source identity and attributable application failure remain distinct recorded outcomes and never become mandatory proof.",
+      "The four required group results, source and fixture identity, native Chromium and WebKit action reports, cleanup, rules, compatibility and installed-client checks remain strict mandatory aggregate inputs.",
+      "The selected diagnostic keeps the legacy source, cap, browser-action and cleanup integrity validators strict; malformed or stale selected reports remain visible as invalid.",
+      "A valid kernel OOM remains a distinct failed diagnostic outcome; it is not relabeled as app-failed, and its full capped execution report remains strict."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <worktree> --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/phase-G05/optional-outcomes-red --purpose preimplementation-red --summary -- node --test --test-name-pattern='^RISK repository process: optional mobile outcomes remain distinct from the required aggregate verdict$' tests.js",
+      "failure": "Recorder 2026-10-28T19-53-03-445Z classified the run infrastructure-failure because missing optional reports emitted ENOENT. The nested policy assertion independently failed: for not-run, the aggregate command exited 1 with Required mobile memory job did not succeed, and the expected aggregate mobileMemory outcome was absent; invalid, pass and app-failed outcomes were also absent. Preserve both classifications separately."
+    }
   }
 ]

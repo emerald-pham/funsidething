@@ -564,18 +564,52 @@ function aggregateCopy(t,fixture,mutate=()=>{},args=[],env={}) {
   mutate(collected,needs);
   return invoke(fixture,{args:['--aggregate','--results-dir',collected,'--needs-json',needs,...args],env});
 }
-test('test group aggregate refuses a declared mobile memory story without a capped runtime report',async t=>{
- const fixture=aggregateFixture(t,{mobileStory:true});
- const missing=aggregateCopy(t,fixture);assert.notEqual(missing.status,0,'Four passing desktop groups cannot waive the independently required1GB and reported512MB stories');assert.match(missing.stderr,/mobile.*(?:memory|report|job)|capped/i);
- const directory=fs.mkdtempSync(path.join(os.tmpdir(),'chain-mobile-aggregate-'));t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
- const bundle=createMobileBundle(directory,{candidateCommit:fixture.sourceSha,candidateTree:git(fixture.root,'rev-parse','HEAD^{tree}'),sourceSha:fixture.sourceSha});
- const passJob=(_,needs)=>{const value=JSON.parse(fs.readFileSync(needs,'utf8'));value['mobile-memory']={result:'success'};writeJson(needs,value);};
- const stressDirectory=directory+'-stress';t.after(()=>fs.rmSync(stressDirectory,{recursive:true,force:true}));createMobileBundle(stressDirectory,{candidateCommit:fixture.sourceSha,candidateTree:git(fixture.root,'rev-parse','HEAD^{tree}'),sourceSha:fixture.sourceSha},'stress-512mb');
- const args=['--mobile-report',path.join(directory,'report.json'),'--mobile-stress-report',path.join(stressDirectory,'report.json')];const good=aggregateCopy(t,fixture,passJob,args);assert.equal(good.status,0,good.stdout+good.stderr);assert.equal(JSON.parse(fs.readFileSync(path.join(good.outputDir,'aggregate.json'))).mobileMemory.cases,2);
- for(const change of ['failed-job','wrong-source','no-oom','unbounded','duplicate-tasks','missing-normal','legacy-scope','external-driver-network','remote-disconnect-only','control-outside-browser'])await t.test(change,()=>{
-  const variantDir=fs.mkdtempSync(path.join(os.tmpdir(),'chain-mobile-aggregate-mutant-'));t.after(()=>fs.rmSync(variantDir,{recursive:true,force:true}));const altered=createMobileBundle(variantDir,{candidateCommit:fixture.sourceSha,candidateTree:git(fixture.root,'rev-parse','HEAD^{tree}'),sourceSha:fixture.sourceSha});
-  if(change==='wrong-source')altered.report.candidateTree='0'.repeat(40);if(change==='no-oom')altered.report.negativeControl.after.events.oom_kill=0;if(change==='unbounded')altered.report.cases[0].after.memoryMaxBytes=1024000000;if(change==='duplicate-tasks')altered.native.normal.presses[1].offeredTaskId=altered.native.normal.presses[0].offeredTaskId;if(change==='missing-normal')altered.report.cases.shift();if(change==='legacy-scope')altered.report.schemaVersion=1;if(change==='external-driver-network')altered.report.cases[0].driver.networkMode='bridge';if(change==='remote-disconnect-only')altered.report.cases[0].server.cleanup.engineExited=false;if(change==='control-outside-browser')altered.report.negativeControl.server.control.membership='0::/outside';refreshMobileBundle(altered);
-  const result=aggregateCopy(t,fixture,(collected,needs)=>{passJob(collected,needs);if(change==='failed-job'){const value=JSON.parse(fs.readFileSync(needs,'utf8'));value['mobile-memory'].result='failure';writeJson(needs,value);}},['--mobile-report',path.join(variantDir,'report.json'),'--mobile-stress-report',path.join(stressDirectory,'report.json')]);assert.notEqual(result.status,0,'No malformed mobile proof may qualify the actual aggregate: '+change);assert.match(result.stderr,/mobile|Mobile/);
+test('test group aggregate preserves optional outcomes separately from the required verdict',async t=>{
+ const fixture=aggregateFixture(t,{mobileStory:true}),tree=git(fixture.root,'rev-parse','HEAD^{tree}'),source={candidateCommit:fixture.sourceSha,candidateTree:tree,sourceSha:fixture.sourceSha};
+ const directory=fs.mkdtempSync(path.join(os.tmpdir(),'chain-optional-mobile-aggregate-'));t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const required=createMobileBundle(path.join(directory,'required'),source),stress=createMobileBundle(path.join(directory,'stress'),source,'stress-512mb');
+ const invalid=createMobileBundle(path.join(directory,'invalid'),source);invalid.report.candidateTree='0'.repeat(40);refreshMobileBundle(invalid);
+ const failedStress=createMobileBundle(path.join(directory,'failed-stress'),source,'stress-512mb');failedStress.report.status='failed';failedStress.report.cases[0].appOutcome='app-runtime-failure';failedStress.native.normal.status='failed';failedStress.native.normal.errors=['page-crash'];failedStress.native.normal.failure='Page crashed';refreshMobileBundle(failedStress);
+ const kernelFailedStress=createMobileBundle(path.join(directory,'kernel-failed-stress'),source,'stress-512mb');kernelFailedStress.report.status='failed';kernelFailedStress.report.cases[0].appOutcome='kernel-oom';kernelFailedStress.report.cases[0].after.events={max:1,oom:1,oom_kill:1};kernelFailedStress.report.cases[0].containerOOMKilled=true;kernelFailedStress.report.cases[0].server.status='failed';kernelFailedStress.report.cases[0].server.errors=['Browser budget OOM: oom','Browser budget OOM: oom_kill'];kernelFailedStress.report.cases[0].server.engineExit={exitCode:137,signal:null};kernelFailedStress.native.normal.status='failed';kernelFailedStress.native.normal.errors=['page-crash'];kernelFailedStress.native.normal.failure='page.goto: Page crashed';refreshMobileBundle(kernelFailedStress);
+ const reportArgs=(one,two)=>['--mobile-report',path.join(one,'report.json'),'--mobile-stress-report',path.join(two,'report.json')];
+ const missingArgs=reportArgs(path.join(directory,'missing-required'),path.join(directory,'missing-stress'));
+ const scenarios=[
+  {name:'not-run',selected:false,jobResult:'skipped',args:missingArgs,status:'not-run'},
+  {name:'unavailable',selected:true,jobResult:'failure',args:missingArgs,status:'unavailable'},
+  {name:'invalid',selected:true,jobResult:'success',args:reportArgs(invalid.directory,stress.directory),status:'invalid'},
+  {name:'pass',selected:true,jobResult:'success',args:reportArgs(required.directory,stress.directory),status:'pass'},
+  {name:'app-failed',selected:true,jobResult:'success',args:reportArgs(required.directory,failedStress.directory),status:'app-failed'},
+  {name:'failed',selected:true,jobResult:'success',args:reportArgs(required.directory,kernelFailedStress.directory),status:'failed'},
+ ];
+ for(const scenario of scenarios)await t.test(scenario.name,sub=>{
+  const result=aggregateCopy(sub,fixture,(_,needsFile)=>{const needs=JSON.parse(fs.readFileSync(needsFile,'utf8'));needs['validation-context'].outputs={policy:scenario.selected?'optional-mobile-dispatch-v1':'outgoing-branch-push-v1','mobile-diagnostics':String(scenario.selected)};needs['mobile-memory']={result:scenario.jobResult};writeJson(needsFile,needs);},scenario.args);
+  assert.equal(result.status,0,'Optional '+scenario.name+' diagnostics must not fail the required aggregate: '+result.stdout+result.stderr);
+  const aggregate=JSON.parse(fs.readFileSync(path.join(result.outputDir,'aggregate.json'),'utf8'));
+  assert.equal(aggregate.status,'passed');assert.equal(aggregate.mobileMemory.status,scenario.status);assert.equal(aggregate.mobileMemory.selected,scenario.selected);assert.equal(aggregate.mobileMemory.jobResult,scenario.jobResult);assert.equal(aggregate.mobileMemory.required,false);
+  if(scenario.status==='app-failed'){assert.equal(aggregate.mobileMemory.stress.status,'failed');assert.ok(aggregate.mobileMemory.stress.cases.some(row=>row.outcome==='app-runtime-failure'));}
+  if(scenario.status==='failed'){assert.equal(aggregate.mobileMemory.stress.status,'failed');assert.ok(aggregate.mobileMemory.stress.cases.some(row=>row.outcome==='kernel-oom'));}
+ });
+ const integrityRoot=fs.mkdtempSync(path.join(os.tmpdir(),'chain-selected-mobile-integrity-'));t.after(()=>fs.rmSync(integrityRoot,{recursive:true,force:true}));
+ const stressIntegrity=createMobileBundle(path.join(integrityRoot,'stress'),source,'stress-512mb');
+ const variants=['failed-job','wrong-source','no-oom','unbounded','duplicate-tasks','missing-normal','legacy-scope','external-driver-network','remote-disconnect-only','control-outside-browser'];
+ for(const variant of variants)await t.test('selected report '+variant,sub=>{
+  const directory=path.join(integrityRoot,variant),required=createMobileBundle(directory,source);
+  if(variant==='wrong-source')required.report.candidateTree='0'.repeat(40);
+  if(variant==='no-oom')required.report.negativeControl.after.events.oom_kill=0;
+  if(variant==='unbounded')required.report.cases[0].after.memoryMaxBytes=1024000000;
+  if(variant==='duplicate-tasks')required.native.normal.presses[1].offeredTaskId=required.native.normal.presses[0].offeredTaskId;
+  if(variant==='missing-normal')required.report.cases.shift();
+  if(variant==='legacy-scope')required.report.schemaVersion=1;
+  if(variant==='external-driver-network')required.report.cases[0].driver.networkMode='bridge';
+  if(variant==='remote-disconnect-only')required.report.cases[0].server.cleanup.engineExited=false;
+  if(variant==='control-outside-browser')required.report.negativeControl.server.control.membership='0::/outside';
+  refreshMobileBundle(required);
+  const result=aggregateCopy(sub,fixture,(_,needsFile)=>{const needs=JSON.parse(fs.readFileSync(needsFile,'utf8'));needs['validation-context'].outputs={policy:'optional-mobile-dispatch-v1','mobile-diagnostics':'true'};needs['mobile-memory']={result:variant==='failed-job'?'failure':'success'};writeJson(needsFile,needs);},['--mobile-report',path.join(required.directory,'report.json'),'--mobile-stress-report',path.join(stressIntegrity.directory,'report.json')]);
+  assert.equal(result.status,0,'Invalid or failed selected diagnostic data cannot fail the mandatory aggregate: '+variant+' '+result.stderr);
+  const aggregate=JSON.parse(fs.readFileSync(path.join(result.outputDir,'aggregate.json'),'utf8'));
+  assert.equal(aggregate.status,'passed');assert.equal(aggregate.mobileMemory.status,variant==='failed-job'?'unavailable':'invalid');
+  assert.ok(aggregate.mobileMemory.observedReports.required.reportSha256,'The actual optional report bytes remain identified.');
+  if(variant!=='failed-job')assert.ok(aggregate.mobileMemory.errors.length>0,'The selected report integrity failure must remain visible: '+variant);
  });
 });
 test('test group aggregate verifies the complete actual cohort and native artifacts', t => {
@@ -610,13 +644,42 @@ test('test group aggregate rejects corrupt outcomes identities jobs and native e
   for(const [name,mutate]of scenarios)await parent.test(name,t=>{const result=aggregateCopy(t,fixture,mutate);assert.notEqual(result.status,0,'aggregate must reject '+name);});
 });
 
-test('test group workflow scanner command rejects missing parallel group evidence', t => {
+test('test group workflow scanner command rejects missing parallel group evidence', async t => {
+  const workflow=fs.readFileSync(path.join(repository,'.github/workflows/data-safety.yml'),'utf8'),lines=workflow.split('\n');
+  const jobLines=name=>{const start=lines.findIndex(line=>line===`  ${name}:`),end=lines.findIndex((line,index)=>index>start&&/^  [A-Za-z0-9_-]+:\s*$/.test(line));assert.notEqual(start,-1,'workflow job exists: '+name);return lines.slice(start,end<0?undefined:end);};
+  const jobHeader=job=>{const steps=job.indexOf('    steps:');return job.slice(0,steps<0?job.length:steps).join('\n');};
+  const jobSteps=job=>{const result=[];let step=null;for(const line of job){if(line.startsWith('      - ')){if(step)result.push(step.join('\n'));step=[line];}else if(step)step.push(line);}if(step)result.push(step.join('\n'));return result;};
+  const scanner=jobLines('scanner-tests'),mobile=jobLines('mobile-memory'),scannerHeader=jobHeader(scanner),mobileHeader=jobHeader(mobile),steps=jobSteps(scanner);
+  const optionalDownload=steps.find(step=>step.includes('uses: actions/download-artifact@v4')&&step.includes('name: mobile-memory-${{ github.run_id }}-${{ github.run_attempt }}'));
+  await t.test('mobile download follows the default-off explicit branch selector',()=>{
+    assert.match(workflow,/^  workflow_dispatch:\n    inputs:\n      optional_mobile_diagnostics:\n        description: Run the capped mobile WebKit diagnostic story for this branch\.\n        required: false\n        default: false\n        type: boolean$/m,'The diagnostic selector must stay default-off.');
+    assert.match(mobileHeader,/^    if: \$\{\{ github\.event_name == 'workflow_dispatch' && needs\.validation-context\.outputs\.mobile-diagnostics == 'true' \}\}$/m,'Only explicit branch dispatch may run the optional producer.');
+    assert.ok(optionalDownload,'scanner-tests must retain the exact run/attempt-bound optional artifact input.');
+    assert.match(optionalDownload,/^        if: always\(\) && needs\.validation-context\.outputs\.mobile-diagnostics == 'true'$/m,'The optional download must be skipped when unselected but remain inspectable after selected producer failure.');
+    assert.match(optionalDownload,/^          name: mobile-memory-\$\{\{ github\.run_id \}\}-\$\{\{ github\.run_attempt \}\}$/m);
+    assert.match(optionalDownload,/^          path: \$\{\{ runner\.temp \}\}\/mobile-memory$/m);
+  });
+  await t.test('only optional mobile download failure is contained; mandatory failures still block',()=>{
+    assert.ok(optionalDownload,'The exact optional download step must be present.');
+    assert.match(optionalDownload,/^        continue-on-error: true$/m,'Only this optional download failure may be nonfatal to scanner-tests.');
+    assert.match(scannerHeader,/^    if: always\(\)$/m,'The aggregate consumer must still collect predecessor results.');
+    assert.doesNotMatch(scannerHeader,/continue-on-error\s*:/,'Do not make the entire scanner job nonfatal.');
+    assert.doesNotMatch(mobileHeader,/continue-on-error\s*:/,'Do not make the optional producer job nonfatal.');
+    const tolerated=steps.filter(step=>/^        continue-on-error:\s*true\s*$/m.test(step));
+    assert.deepEqual(tolerated,[optionalDownload],'Failure containment must be scoped to the optional download step only.');
+    const requiredDownloads=steps.filter(step=>step.includes('uses: actions/download-artifact@v4')&&step!==optionalDownload);
+    assert.ok(requiredDownloads.some(step=>step.includes('regression-${{ github.run_id }}-${{ github.run_attempt }}-core')),'A mandatory group artifact control remains present.');
+    assert.ok(requiredDownloads.some(step=>step.includes('ci-routing-${{ github.run_id }}-${{ github.run_attempt }}')),'The required routing proof remains present.');
+    for(const step of requiredDownloads)assert.doesNotMatch(step,/continue-on-error\s*:/,'Required artifact download must remain fatal.');
+    const aggregate=steps.find(step=>step.includes('name: Verify complete required cohort'));
+    assert.ok(aggregate,'The existing required aggregate consumer must remain present.');
+    assert.doesNotMatch(aggregate,/continue-on-error\s*:/,'The mandatory aggregate result must remain fatal.');
+  });
   const fixture=createFixture(t),temporary=fs.mkdtempSync(path.join(os.tmpdir(),'chain-workflow-aggregate-'));
   t.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));fs.mkdirSync(path.join(temporary,'groups'));
   for(const group of groups){const result=invoke(fixture,{group});assert.equal(result.status,0,result.stdout+result.stderr);fs.cpSync(result.outputDir,path.join(temporary,'groups',group),{recursive:true});}
   fs.rmSync(path.join(temporary,'groups/scenery/result.json'));
   writeJson(path.join(temporary,'needs.json'),Object.fromEntries(['validation-context','event-gates','cohort-routing','regression'].map(id=>[id,{result:'success'}])));
-  const workflow=fs.readFileSync(path.join(repository,'.github/workflows/data-safety.yml'),'utf8');
   const step=workflow.match(/      - name: Verify complete required cohort\n[\s\S]*?        run: \|\n((?:          [^\n]*\n|\n)*)/);
   const command=step?step[1].split('\n').map(line=>line.startsWith('          ')?line.slice(10):line).join('\n'):'npm test';
   const env={...process.env,RUNNER_TEMP:temporary,GITHUB_REPOSITORY:'example/fixture',GITHUB_RUN_ID:'fixture-run-1',GITHUB_RUN_ATTEMPT:'1',CHAIN_TEST_SOURCE_SHA:fixture.sourceSha,CHAIN_TEST_COMPARISON_BASE:fixture.comparisonBase,CHAIN_TEST_EVENT_POLICY:'local'};delete env.NODE_TEST_CONTEXT;
@@ -892,11 +955,11 @@ test('test group aggregate requires independently bound required and reported st
  const fixture=aggregateFixture(t,{mobileStory:true}),source={candidateCommit:fixture.sourceSha,candidateTree:git(fixture.root,'rev-parse','HEAD^{tree}'),sourceSha:fixture.sourceSha};
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'chain-budget-pair-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
  const required=createMobileBundle(path.join(dir,'required'),source),stress=createMobileBundle(path.join(dir,'stress'),source,'stress-512mb');
- const passJob=(_,needs)=>{const j=JSON.parse(fs.readFileSync(needs));j['mobile-memory']={result:'success'};writeJson(needs,j);};
+ const passJob=(_,needs)=>{const j=JSON.parse(fs.readFileSync(needs));j['validation-context'].outputs={policy:'optional-mobile-dispatch-v1','mobile-diagnostics':'true'};j['mobile-memory']={result:'success'};writeJson(needs,j);};
  const args=['--mobile-report',path.join(required.directory,'report.json')];
- const missing=aggregateCopy(t,fixture,passJob,args);assert.notEqual(missing.status,0,'A required pass alone cannot hide missing stress execution');assert.match(missing.stderr,/stress/i);
- const pair=[...args,'--mobile-stress-report',path.join(stress.directory,'report.json')];const good=aggregateCopy(t,fixture,passJob,pair);assert.equal(good.status,0,good.stdout+good.stderr);
- stress.report.status='failed';stress.report.cases[0].appOutcome='app-runtime-failure';stress.native.normal.status='failed';stress.native.normal.errors=['page-crash'];stress.native.normal.failure='Page crashed';refreshMobileBundle(stress);const failedApp=aggregateCopy(t,fixture,passJob,pair);assert.equal(failedApp.status,0,'An honestly failed stress app remains nonblocking: '+failedApp.stderr);
- stress.report.candidateTree='0'.repeat(40);refreshMobileBundle(stress);assert.notEqual(aggregateCopy(t,fixture,passJob,pair).status,0,'Stress must bind the same exact source');
- const substitute=aggregateCopy(t,fixture,passJob,['--mobile-report',path.join(stress.directory,'report.json'),'--mobile-stress-report',path.join(required.directory,'report.json')]);assert.notEqual(substitute.status,0,'Neither profile can substitute for the other');
+ const missing=aggregateCopy(t,fixture,passJob,args);assert.equal(missing.status,0,'A missing optional stress input cannot fail the mandatory aggregate: '+missing.stderr);let missingAggregate=JSON.parse(fs.readFileSync(path.join(missing.outputDir,'aggregate.json'),'utf8'));assert.equal(missingAggregate.status,'passed');assert.equal(missingAggregate.mobileMemory.status,'unavailable');assert.deepEqual(missingAggregate.mobileMemory.missingReports,['stress']);
+ const pair=[...args,'--mobile-stress-report',path.join(stress.directory,'report.json')];const good=aggregateCopy(t,fixture,passJob,pair);assert.equal(good.status,0,good.stdout+good.stderr);let goodAggregate=JSON.parse(fs.readFileSync(path.join(good.outputDir,'aggregate.json'),'utf8'));assert.equal(goodAggregate.status,'passed');assert.equal(goodAggregate.mobileMemory.status,'pass');
+ stress.report.status='failed';stress.report.cases[0].appOutcome='app-runtime-failure';stress.native.normal.status='failed';stress.native.normal.errors=['page-crash'];stress.native.normal.failure='Page crashed';refreshMobileBundle(stress);const failedApp=aggregateCopy(t,fixture,passJob,pair);assert.equal(failedApp.status,0,'An honestly failed stress app remains nonblocking: '+failedApp.stderr);const failedAggregate=JSON.parse(fs.readFileSync(path.join(failedApp.outputDir,'aggregate.json'),'utf8'));assert.equal(failedAggregate.status,'passed');assert.equal(failedAggregate.mobileMemory.status,'app-failed');assert.equal(failedAggregate.mobileMemory.stress.status,'failed');assert.ok(failedAggregate.mobileMemory.stress.cases.some(row=>row.outcome==='app-runtime-failure'),'The optional application failure must remain visible in the aggregate evidence.');
+ stress.report.candidateTree='0'.repeat(40);refreshMobileBundle(stress);const wrongSource=aggregateCopy(t,fixture,passJob,pair);assert.equal(wrongSource.status,0,'An invalid optional source cannot fail the mandatory aggregate: '+wrongSource.stderr);const wrongSourceAggregate=JSON.parse(fs.readFileSync(path.join(wrongSource.outputDir,'aggregate.json'),'utf8'));assert.equal(wrongSourceAggregate.status,'passed');assert.equal(wrongSourceAggregate.mobileMemory.status,'invalid');assert.equal(wrongSourceAggregate.mobileMemory.observedReports.stress.candidateTree,'0'.repeat(40));assert.ok(wrongSourceAggregate.mobileMemory.errors.some(error=>/candidateTree/.test(error)),'The exact source-identity defect must remain recorded.');
+ const substitute=aggregateCopy(t,fixture,passJob,['--mobile-report',path.join(stress.directory,'report.json'),'--mobile-stress-report',path.join(required.directory,'report.json')]);assert.equal(substitute.status,0,'An invalid profile substitution cannot fail the mandatory aggregate: '+substitute.stderr);const substituteAggregate=JSON.parse(fs.readFileSync(path.join(substitute.outputDir,'aggregate.json'),'utf8'));assert.equal(substituteAggregate.status,'passed');assert.equal(substituteAggregate.mobileMemory.status,'invalid');assert.ok(substituteAggregate.mobileMemory.errors.length>0,'A profile substitution must remain invalid rather than pass.');
 });

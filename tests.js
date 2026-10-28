@@ -46052,10 +46052,10 @@ test('RISK repository process: capped mobile reports bind kernel memory distinct
  const env={...process.env};delete env.NODE_TEST_CONTEXT;const result=spawnSync(process.execPath,['--test','scripts/agent-tools/mobile-memory.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});assert.equal(result.error,undefined);assert.equal(result.status,0,'Kernel-bound report/parser/refusal controls must pass: '+result.stdout+'\n'+result.stderr);
 });
 
-test('RISK repository process: required mobile memory evidence cannot be replaced by passing desktop groups',()=>{
+test('RISK repository process: optional mobile outcomes remain distinct from the required aggregate verdict',()=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
- const result=spawnSync(process.execPath,['--test','--test-name-pattern=^test group aggregate refuses a declared mobile memory story without a capped runtime report$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
- assert.equal(result.error,undefined);assert.equal(result.status,0,'The actual four-group aggregate must reject absent required1GB and reported512MB proof: '+result.stdout+'\n'+result.stderr);
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group aggregate preserves optional outcomes separately from the required verdict$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
+ assert.equal(result.error,undefined);assert.equal(result.status,0,'The actual four-group aggregate must preserve optional status without blocking mandatory results: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# tests 17$/m);assert.match(result.stdout,/^# skipped 0$/m);
 });
 
 test('RISK repository process: required parallel scanner aggregation rejects absent group evidence',()=>{
@@ -46681,8 +46681,23 @@ test('RISK repository process: routed hosted policies reach native consumers wit
  const env={...process.env};delete env.NODE_TEST_CONTEXT;const result=spawnSync(process.execPath,['--test','scripts/agent-tools/button-ci-policy.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:4*1024*1024});assert.equal(result.error,undefined);assert.equal(result.status,0,'Actual native/capped admission must retain raw events and routed policies: '+result.stdout+'\n'+result.stderr);
 });
 
-test('RISK repository process: current producer reuse requires successful capped mobile evidence',t=>{
- const env={...process.env};delete env.NODE_TEST_CONTEXT;const result=spawnSync(process.execPath,['--test','--test-name-pattern=^current grouped routing requires the completed capped mobile producer before reuse$','scripts/agent-tools/ci-routing.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:4*1024*1024});assert.equal(result.error,undefined);assert.equal(result.status,0,'The actual routing consumer must require the exact current mobile producer: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# tests 16$/m,'All required current producer acceptance and ambiguity controls must execute');assert.match(result.stdout,/^# skipped 0$/m);t.diagnostic('Executed current producer positive and ambiguous-row rejection controls through the actual routing command.');
+test('RISK repository process: optional mobile diagnostics do not block ordinary reuse',t=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;const result=spawnSync(process.execPath,['--test','--test-name-pattern=^current grouped routing ignores optional mobile diagnostic rows for reuse$','scripts/agent-tools/ci-routing.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:4*1024*1024});assert.equal(result.error,undefined);assert.equal(result.status,0,'The actual ordinary routing planner must reuse the completed mandatory cohort regardless of optional mobile status: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# tests 16$/m);assert.match(result.stdout,/^# skipped 0$/m);t.diagnostic('Executed the ordinary unrelated-change producer route while optional mobile rows were absent, failed, invalid, skipped or pending.');
+});
+
+test('RISK repository process: explicit mobile diagnostics require dispatch selection and hosted admission',t=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const planner=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^workflow dispatch explicitly selects optional mobile diagnostics$','scripts/agent-tools/ci-routing.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:4*1024*1024});
+ const hosted=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^hosted memory policy admits only explicitly selected mobile workflow dispatch on a branch$','scripts/agent-tools/button-ci-policy.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:4*1024*1024});
+ const report=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^hosted mobile reports require explicit raw policy for optional dispatch$','scripts/agent-tools/button-ci-policy.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:4*1024*1024});
+ assert.equal(planner.error,undefined);assert.equal(hosted.error,undefined);assert.equal(report.error,undefined);
+ assert.equal(planner.status,0,'The actual planner and workflow must expose only the explicit default-off optional dispatch route: '+planner.stdout+'\n'+planner.stderr);
+ assert.equal(hosted.status,0,'The hosted optional consumer must admit only the selected branch dispatch before runtime work: '+hosted.stdout+'\n'+hosted.stderr);
+ assert.equal(report.status,0,'The selected dispatch report must retain raw event/ref identity: '+report.stdout+'\n'+report.stderr);
+ assert.match(planner.stdout,/^# tests 1$/m);assert.match(planner.stdout,/^# skipped 0$/m);
+ assert.match(hosted.stdout,/^# tests 1$/m);assert.match(hosted.stdout,/^# skipped 0$/m);
+ assert.match(report.stdout,/^# tests 1$/m);assert.match(report.stdout,/^# skipped 0$/m);
+ t.diagnostic('Verified default-off workflow selection and exact hosted optional dispatch admission through the existing routing and memory policy consumers.');
 });
 
 test('RISK repository process: mobile budget planner caps browsers before launch and isolates the external driver',async()=>{

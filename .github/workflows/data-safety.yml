@@ -4,6 +4,13 @@ on:
   push:
   pull_request:
     types: [opened, synchronize, reopened, edited]
+  workflow_dispatch:
+    inputs:
+      optional_mobile_diagnostics:
+        description: Run the capped mobile WebKit diagnostic story for this branch.
+        required: false
+        default: false
+        type: boolean
 
 env:
   CHAIN_CI_TOPOLOGY: four-groups-v1
@@ -16,6 +23,7 @@ jobs:
       base: ${{ steps.diff-base.outputs.sha }}
       context: ${{ steps.plan.outputs.context }}
       policy: ${{ steps.plan.outputs.policy }}
+      mobile-diagnostics: ${{ steps.plan.outputs.mobile-diagnostics }}
       tree: ${{ steps.plan.outputs.tree }}
       workflow-blob: ${{ steps.plan.outputs.workflow-blob }}
       input-keys: ${{ steps.plan.outputs.input-keys }}
@@ -224,6 +232,7 @@ jobs:
 
   mobile-memory:
     name: mobile-WebKit-1GB-and-512MB-stress
+    if: ${{ github.event_name == 'workflow_dispatch' && needs.validation-context.outputs.mobile-diagnostics == 'true' }}
     needs: validation-context
     runs-on: ubuntu-latest
     env:
@@ -297,7 +306,8 @@ jobs:
           name: regression-${{ github.run_id }}-${{ github.run_attempt }}-native-process
           path: ${{ runner.temp }}/groups/native-process
       - uses: actions/download-artifact@v4
-        if: always()
+        if: always() && needs.validation-context.outputs.mobile-diagnostics == 'true'
+        continue-on-error: true
         with:
           name: mobile-memory-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/mobile-memory

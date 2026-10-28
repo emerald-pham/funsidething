@@ -685,6 +685,65 @@ function coverageReference(proof, identity, execution=true) {
   return {contextSha256:proof.contextSha256,cohortContext:context,coveredBy:producer};
 }
 
+async function optionalMobileOutcome({needs,options,descriptor,mobileInventory,mobilePolicy,mobilePolicyError}) {
+  const outputs=needs['validation-context']?.outputs||{},policy=outputs.policy,selectedValue=outputs['mobile-diagnostics'];
+  const selectedKnown=['true','false'].includes(selectedValue),selected=selectedKnown?selectedValue==='true':null;
+  const jobResult=needs['mobile-memory']?.result??null,requiredPath=options.mobileReport,stressPath=options.mobileStressReport;
+  const paths={required:requiredPath,stress:stressPath},present=Object.fromEntries(Object.entries(paths).map(([name,file])=>[name,Boolean(file&&fs.existsSync(file))]));
+  const storyInRun=fs.existsSync(mobileInventory)||descriptor.groups.some(group=>group.roots.includes('RISK repository process: mobile WebKit accepts ten distinct offered tasks using real touch'));
+  if(!storyInRun&&selected!==true)return null;
+  const outcome={selected,required:false,selectedBy:selected===true?'workflow_dispatch':null,policy:policy??null,jobResult,status:'invalid'};
+  const policies=new Set(['canonical-pr-merge-v1','outgoing-branch-push-v1','exact-main-push-v1','workflow-dispatch-unselected-v1','optional-mobile-dispatch-v1']);
+  if(!selectedKnown||!policies.has(policy)||(selected===(policy!=='optional-mobile-dispatch-v1'))){
+    outcome.errors=['Optional mobile selection output and routed workflow policy are missing, unknown or inconsistent.'];
+    return outcome;
+  }
+  const reportsPresent=present.required||present.stress;
+  if(!selected){
+    outcome.status=jobResult==='skipped'&&!reportsPresent?'not-run':'invalid';
+    if(outcome.status==='invalid')outcome.errors=['An unselected optional mobile diagnostic has an unexpected job result or report.'];
+    return outcome;
+  }
+  if(mobilePolicyError){outcome.errors=[mobilePolicyError];return outcome;}
+  if(!fs.existsSync(mobileInventory)||!storyInRun){outcome.errors=['Selected optional mobile diagnostic has no authoritative capped-story inventory.'];return outcome;}
+  try{
+    const {MOBILE_STORY}=await import('./button-safety-mobile-contract.mjs');
+    if(!mobilePolicy||Object.keys(MOBILE_STORY).some(key=>JSON.stringify(mobilePolicy[key])!==JSON.stringify(MOBILE_STORY[key])))throw Error('Mobile memory policy cannot waive required1GB/reported512MB/motion/Yes workload.');
+  }catch(error){outcome.errors=['Mobile memory policy unavailable or invalid: '+error.message];return outcome;}
+  const missingReports=Object.keys(paths).filter(name=>!present[name]);
+  if(missingReports.length){outcome.status='unavailable';outcome.missingReports=missingReports;return outcome;}
+  const observedReports={},errors=[],reports={};
+  for(const [name,file]of Object.entries(paths)){
+    try{
+      const bytes=fs.readFileSync(file),report=JSON.parse(bytes.toString('utf8'));
+      reports[name]=report;
+      observedReports[name]={reportSha256:sha256(bytes),candidateCommit:report.candidateCommit??null,candidateTree:report.candidateTree??null,sourceSha:report.sourceSha??null,repository:report.repository??null,runId:report.runId??null,runAttempt:report.runAttempt??null,eventPolicy:report.eventPolicy??null,budgetProfile:report.budgetProfile??null,status:report.status??null,cases:Array.isArray(report.cases)?report.cases.length:null,artifactCount:Array.isArray(report.artifacts)?report.artifacts.length:null};
+    }catch(error){errors.push(`${name} mobile report: ${error.message}`);}
+  }
+  if(reports.required&&reports.stress){
+    const {verifyMobileMemoryReport,verifyMobileStressReport}=await import('./button-safety-mobile-contract.mjs');
+    for(const [name,report,verify]of [['required',reports.required,verifyMobileMemoryReport],['stress',reports.stress,verifyMobileStressReport]])try{
+      verify(report,{artifactRoot:path.dirname(path.resolve(paths[name])),candidateCommit:descriptor.resultIdentity.checkoutSha,candidateTree:descriptor.resultIdentity.checkoutTree,sourceSha:options.sourceSha,repository:options.repository,runId:options.runId,runAttempt:options.runAttempt,eventPolicy:options.eventPolicy});
+    }catch(error){errors.push(`${name} mobile report: ${error.message}`);}
+  }
+  outcome.observedReports=observedReports;
+  if(errors.length){outcome.status='invalid';outcome.errors=errors;return outcome;}
+  const required=reports.required,stress=reports.stress;
+  outcome.reportSha256=observedReports.required.reportSha256;
+  outcome.candidateCommit=required.candidateCommit;
+  outcome.candidateTree=required.candidateTree;
+  outcome.image=required.image;
+  outcome.cases=required.cases.length;
+  outcome.artifactCount=required.artifacts.length;
+  outcome.stress={reportSha256:observedReports.stress.reportSha256,status:stress.status,cases:stress.cases.map(row=>({motion:row.motion,outcome:row.appOutcome})),artifactCount:stress.artifacts.length};
+  const outcomes=outcome.stress.cases.map(row=>row.outcome),applicationFailure=outcomes.some(value=>typeof value==='string'&&value.startsWith('app-'));
+  if(applicationFailure)outcome.status='app-failed';
+  else if(stress.status==='failed')outcome.status='failed';
+  else if(jobResult==='success')outcome.status='pass';
+  else{outcome.status='unavailable';outcome.reason='The selected diagnostic producer did not complete successfully.';}
+  return outcome;
+}
+
 async function aggregateResults({options, outputDir, descriptor, inventory, assignmentIndex, assignments, files, source}) {
   if (!options.resultsDir || !options.needsJson) fail('Aggregate requires --results-dir and --needs-json.');
   const needs = readJson(options.needsJson, 'actual workflow predecessor results');
@@ -692,22 +751,9 @@ async function aggregateResults({options, outputDir, descriptor, inventory, assi
 
   let mobileMemory=null;
   const mobileInventory=path.join(ROOT,'scripts/button-safety-inventory.json');
-  const mobilePolicy=fs.existsSync(mobileInventory)?readJson(mobileInventory,'mobile story policy').requiredMobileStory:null;
-  if(fs.existsSync(mobileInventory)||descriptor.groups.some(group=>group.roots.includes('RISK repository process: mobile WebKit accepts ten distinct offered tasks using real touch'))){
-    try{const {MOBILE_STORY}=await import('./button-safety-mobile-contract.mjs');if(!mobilePolicy||Object.keys(MOBILE_STORY).some(key=>JSON.stringify(mobilePolicy[key])!==JSON.stringify(MOBILE_STORY[key])))issues.push('Mobile memory policy cannot waive required1GB/reported512MB/motion/Yes workload.');}catch(error){issues.push('Mobile memory policy unavailable: '+error.message);}
-    if(needs['mobile-memory']?.result!=='success')issues.push('Required mobile memory job did not succeed.');
-    if(!options.mobileReport)issues.push('Required capped mobile memory report is missing.');
-    else try{
-      const {verifyMobileMemoryReport}=await import('./button-safety-mobile-contract.mjs');
-      const mobileReport=readJson(options.mobileReport,'capped mobile memory report');
-      verifyMobileMemoryReport(mobileReport,{artifactRoot:path.dirname(path.resolve(options.mobileReport)),candidateCommit:descriptor.resultIdentity.checkoutSha,candidateTree:descriptor.resultIdentity.checkoutTree,sourceSha:options.sourceSha,repository:options.repository,runId:options.runId,runAttempt:options.runAttempt,eventPolicy:options.eventPolicy});
-      mobileMemory={reportSha256:sha256(fs.readFileSync(options.mobileReport)),candidateCommit:mobileReport.candidateCommit,candidateTree:mobileReport.candidateTree,image:mobileReport.image,cases:mobileReport.cases.length,artifactCount:mobileReport.artifacts.length};
-      if(!options.mobileStressReport)throw Error('Required reported stress execution bundle is missing.');
-      const {verifyMobileStressReport}=await import('./button-safety-mobile-contract.mjs'),stress=readJson(options.mobileStressReport,'reported512MB stress report');
-      verifyMobileStressReport(stress,{artifactRoot:path.dirname(path.resolve(options.mobileStressReport)),candidateCommit:descriptor.resultIdentity.checkoutSha,candidateTree:descriptor.resultIdentity.checkoutTree,sourceSha:options.sourceSha,repository:options.repository,runId:options.runId,runAttempt:options.runAttempt,eventPolicy:options.eventPolicy});
-      mobileMemory.stress={reportSha256:sha256(fs.readFileSync(options.mobileStressReport)),status:stress.status,cases:stress.cases.map(row=>({motion:row.motion,outcome:row.appOutcome})),artifactCount:stress.artifacts.length};
-    }catch(error){issues.push('Mobile memory report: '+error.message);}
-  }
+  let mobilePolicy=null,mobilePolicyError=null;
+  if(fs.existsSync(mobileInventory))try{mobilePolicy=readJson(mobileInventory,'mobile story policy').requiredMobileStory;}catch(error){mobilePolicyError='Mobile memory policy unavailable: '+error.message;}
+  mobileMemory=await optionalMobileOutcome({needs,options,descriptor,mobileInventory,mobilePolicy,mobilePolicyError});
   const covered=needs['cohort-routing']?.outputs?.decision==='reuse';
   const reused=JSON.parse(needs['cohort-routing']?.outputs?.reused||'[]');
   if(!Array.isArray(reused)||new Set(reused).size!==reused.length||reused.some(id=>!GROUP_IDS.includes(id)&&!['rules','compatibility'].includes(id)))fail('Invalid reused-gate inventory.');

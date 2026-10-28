@@ -69,14 +69,15 @@ decision="$(node -p "require('$ROUTING_OUTPUT/ci-routing/routing.json').decision
 if [[ "$decision" == "full" ]]; then npm test; elif [[ "$decision" != "reuse" ]]; then exit 1; fi`;
 }
 
-function invoke(f, { event = 'push', ref = 'refs/heads/topic', source = f.head, checkout = f.head, base = f.base, action = 'synchronize', changes = undefined, planOnly = false, environment = {} } = {}) {
+function invoke(f, { event = 'push', ref = 'refs/heads/topic', source = f.head, checkout = f.head, base = f.base, action = 'synchronize', changes = undefined, workflowInputs = undefined, planOnly = false, environment = {} } = {}) {
   git(f.source, 'checkout', '--detach', checkout);
   const output = path.join(f.root, `attempt-${++f.attempt}`);
   mkdirSync(output);
   const eventPath = path.join(output, 'event.json');
   writeFileSync(eventPath, JSON.stringify(event === 'pull_request' ? {
     action, changes, number: 17, pull_request: { number: 17, head: { sha: source, ref: 'topic', repo: { full_name: 'fixture/repo' } }, base: { sha: base, ref: 'main' } },
-  } : { after: source, before: base, repository: { full_name: 'fixture/repo' } }));
+  } : event === 'workflow_dispatch' ? { ref, inputs: workflowInputs, repository: { full_name: 'fixture/repo' } }
+    : { after: source, before: base, repository: { full_name: 'fixture/repo' } }));
   const result = spawnSync('bash', ['-euo', 'pipefail', '-c', planOnly ? 'node "$ROUTING_COMMAND" --comparison-base "$ROUTING_BASE" --evidence-dir "$ROUTING_OUTPUT/ci-routing" --plan-only 1' : cohortShell()], {
     cwd: f.source, encoding: 'utf8', timeout: 15000,
     env: { ...process.env, PATH: f.bin + path.delimiter + process.env.PATH,
@@ -406,6 +407,27 @@ const fallbackCases = [
   ['missing producer inventory count', x => { x.omitRunTotal = true; }],
 ];
 
+test('workflow dispatch explicitly selects optional mobile diagnostics', t => {
+  const f = fixture(t, 'mobile');
+  const workflow = readFileSync(path.join(f.source, '.github/workflows/data-safety.yml'), 'utf8');
+  assert.match(workflow, /^  workflow_dispatch:\n    inputs:\n      optional_mobile_diagnostics:\n        description: [^\n]+\n        required: false\n        default: false\n        type: boolean$/m, 'The diagnostic selector must be an explicit default-off workflow input');
+  const mobileJob = workflow.split(/^  mobile-memory:\s*$/m)[1]?.split(/^  [a-z][a-z0-9-]*:\s*$/m)[0] || '';
+  assert.match(mobileJob, /^\s+if: \$\{\{ github\.event_name == 'workflow_dispatch' && needs\.validation-context\.outputs\.mobile-diagnostics == 'true' \}\}$/m, 'Only the planner-approved dispatch selection may launch the diagnostic producer');
+  const ordinary = invoke(f, { event: 'push', ref: 'refs/heads/topic', planOnly: true });
+  assert.equal(ordinary.error, undefined);
+  assert.equal(ordinary.status, 0, ordinary.stderr || ordinary.stdout);
+  assert.deepEqual(ordinary.record?.optionalDiagnostics?.mobileMemory, { selected: false, required: false, selectedBy: null });
+  assert.match(ordinary.stdout, /mobile-diagnostics=false/);
+  const selected = invoke(f, { event: 'workflow_dispatch', ref: 'refs/heads/topic', workflowInputs: { optional_mobile_diagnostics: 'true' }, planOnly: true });
+  assert.equal(selected.error, undefined);
+  assert.equal(selected.status, 0, selected.stderr || selected.stdout);
+  assert.equal(selected.record?.optionalDiagnostics?.mobileMemory?.selected, true);
+  assert.equal(selected.record?.optionalDiagnostics?.mobileMemory?.required, false);
+  assert.equal(selected.record?.optionalDiagnostics?.mobileMemory?.selectedBy, 'workflow_dispatch');
+  assert.equal(selected.record?.validationContext?.eventPolicy, 'optional-mobile-dispatch-v1');
+  assert.match(selected.stdout, /mobile-diagnostics=true/);
+});
+
 test('workflow routing rejects uncertain producer contexts', async parent => {
 for (const [name, change] of fallbackCases) {
   await parent.test(`workflow runs the actual branch cohort for ${name}`, t => {
@@ -611,22 +633,22 @@ test('metadata edits continue past verified covered runs to the original full pr
 });
 
 
-test('current grouped routing requires the completed capped mobile producer before reuse',async parent=>{
+test('current grouped routing ignores optional mobile diagnostic rows for reuse',async parent=>{
  const scenarios=[
   ['complete current producer',()=>{},'reuse'],
-  ['missing mobile',x=>{x.jobs=x.jobs.filter(job=>job.name!=='mobile-WebKit-1GB-and-512MB-stress');},'full'],
-  ['failed mobile',x=>{x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress').conclusion='failure';},'full'],
-  ['skipped mobile',x=>{x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress').conclusion='skipped';},'full'],
-  ['canceled mobile',x=>{x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress').conclusion='cancelled';},'full'],
-  ['running mobile',x=>{x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress').status='in_progress';},'full'],
-  ['wrong mobile attempt',x=>{x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress').run_attempt=1;},'full'],
-  ['wrong mobile source',x=>{x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress').head_sha='0'.repeat(40);},'full'],
-  ['duplicate mobile',x=>{x.jobs.push({...x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress')});},'full'],
-  ['valid mobile plus failed duplicate',x=>{x.jobs.push({...x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress'),conclusion:'failure'});},'full'],
-  ['valid mobile plus running duplicate',x=>{x.jobs.push({...x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress'),status:'in_progress'});},'full'],
-  ['valid mobile plus wrong-run duplicate',x=>{x.jobs.push({...x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress'),run_id:72});},'full'],
-  ['valid mobile plus wrong-attempt duplicate',x=>{x.jobs.push({...x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress'),run_attempt:1});},'full'],
-  ['valid mobile plus wrong-source duplicate',x=>{x.jobs.push({...x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress'),head_sha:'0'.repeat(40)});},'full'],
+  ['missing mobile',x=>{x.jobs=x.jobs.filter(job=>job.name!=='mobile-WebKit-1GB-and-512MB-stress');},'reuse'],
+  ['failed mobile',x=>{x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress').conclusion='failure';},'reuse'],
+  ['skipped mobile',x=>{x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress').conclusion='skipped';},'reuse'],
+  ['canceled mobile',x=>{x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress').conclusion='cancelled';},'reuse'],
+  ['running mobile',x=>{x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress').status='in_progress';},'reuse'],
+  ['wrong mobile attempt',x=>{x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress').run_attempt=1;},'reuse'],
+  ['wrong mobile source',x=>{x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress').head_sha='0'.repeat(40);},'reuse'],
+  ['duplicate mobile',x=>{x.jobs.push({...x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress')});},'reuse'],
+  ['valid mobile plus failed duplicate',x=>{x.jobs.push({...x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress'),conclusion:'failure'});},'reuse'],
+  ['valid mobile plus running duplicate',x=>{x.jobs.push({...x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress'),status:'in_progress'});},'reuse'],
+  ['valid mobile plus wrong-run duplicate',x=>{x.jobs.push({...x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress'),run_id:72});},'reuse'],
+  ['valid mobile plus wrong-attempt duplicate',x=>{x.jobs.push({...x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress'),run_attempt:1});},'reuse'],
+  ['valid mobile plus wrong-source duplicate',x=>{x.jobs.push({...x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress'),head_sha:'0'.repeat(40)});},'reuse'],
   ['valid core plus failed duplicate',x=>{x.jobs.push({...x.jobs.find(job=>job.name==='regression-core'),conclusion:'failure'});},'full'],
  ];
  for(const [name,mutate,decision]of scenarios)await parent.test(name,t=>{
