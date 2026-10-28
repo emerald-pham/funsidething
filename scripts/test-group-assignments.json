@@ -3733,6 +3733,11 @@
       "file": "scripts/agent-tools/coordination.test.mjs"
     },
     {
+      "root": "release-claim compares the healthy lease and exact resource under lock",
+      "group": "native-process",
+      "file": "scripts/agent-tools/coordination.test.mjs"
+    },
+    {
       "root": "renderHistory: a 'worked' entry shows its title and a 'worked on it' label, with no restore button",
       "group": "core",
       "file": "tests.js"
@@ -13752,6 +13757,41 @@
       "root": "qualification readiness gates the recorder child on selected parent contracts and explicit no-change",
       "group": "native-process",
       "file": "scripts/agent-tools/qualification-contracts.test.mjs"
+    },
+    {
+      "root": "local fixture runs its fixed child, records nested outcomes, and releases only its own allocation",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "local fixture rejects invalid ownership and evidence before starting the fixed workload",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "local fixture rejects help misuse and arbitrary commands without workload or ledger writes",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "record-run CLI executes through a path alias and importing its readiness helper stays inert",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "local fixture reports child failure separately from successful owned cleanup",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "local fixture interruption finalizes child and allocation cleanup independently",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
+    },
+    {
+      "root": "local fixture preserves a passing workload and allocation when lease identity changes during cleanup",
+      "group": "native-process",
+      "file": "scripts/agent-tools/record-run.test.mjs"
     }
   ],
   "processControls": [
