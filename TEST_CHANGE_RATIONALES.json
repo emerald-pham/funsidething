@@ -26894,5 +26894,26 @@
       "TC01MechanicalComparisonSha256": "8511808aedd4a78f7094bee207d7c30345ddad617e1ea405c6e0a94b11f7523c",
       "finalBothEngineProof": "not-run; owned by1174"
     }
+  },
+  {
+    "baseCommit": "2ea5ab8b7dcbc010f7c6ca07d0146926b4308fb2",
+    "comparisonMergeBase": "2ea5ab8b7dcbc010f7c6ca07d0146926b4308fb2",
+    "testChangesSha256": "a88b6e6835d1130249291e064535217ab479b9e39607b67d2ad3d5aa0991bf53",
+    "cycle": "1299-guidance-370-371",
+    "reason": "Add direct mounted UI assertions for the admitted transfer guidance so the FAQ and current Settings changelog describe the actual Export and Import controls and their bounded recovery outcomes.",
+    "previousBehavior": "The mounted Export FAQ said Copy sends the archive to the clipboard and Download saves the same bytes, without distinguishing clipboard success from a download-start status or explaining source-only capture during held opening.",
+    "intendedBehavior": "The mounted Settings, prepared Export dialog, FAQ and current Changelog state that Copy and Download share prepared bytes, report their distinct outcomes, preserve readable raw sources in a partial source-only archive while opening is held without an accepted board, keep complete paste text for bounded Preview, and apply only a supported selected board after confirmation.",
+    "replacementTests": [
+      "RISK transfer guidance: mounted FAQ and changelog explain one prepared archive and guarded recovery limits"
+    ],
+    "preservedCoverage": [
+      "The existing unreadable-device FAQ and Changelog assertions, including the October 28 recovery note, remain unchanged.",
+      "Existing transfer consumer tests and the pasted-board recovery test retain their original assertions for one Export and Import, complete Preview text, protected sources and explicit Restore.",
+      "The original October 25 transfer changelog item remains exact; the new clarification sits in an adjacent item under the same date, with the protected October 28 recovery note unchanged."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/faq-370-371/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/guidance/test-runs --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=dot --test-name-pattern='^RISK transfer guidance: mounted FAQ and changelog explain one prepared archive and guarded recovery limits$' tests.js; recorder metadata: /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/guidance/test-runs/2026-10-29T12-38-06-407Z-7b1cbfa6-c536-4c03-8e8b-2d5d3506ab1e.json",
+      "failure": "Baseline RED at tests.js:1113 showed the mounted FAQ still said “Copy sends the prepared archive straight to the clipboard; Download saves the same bytes,” without distinguishing clipboard-write success from a Download started status. An unchanged existing consumer test later caught replacement of its protected phrase, so final wording retains that phrase conditionally (if the browser completes the download) and adds the actual start-only status; all seven affected existing/new copy tests now pass."
+    }
   }
 ]

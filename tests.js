@@ -1094,6 +1094,46 @@ test('RISK unreadable device recovery: Quick start and current Changelog explain
  assert.match(latest,/genuine errors and recovery warnings remain visible/);
 });
 
+test('RISK transfer guidance: mounted FAQ and changelog explain one prepared archive and guarded recovery limits',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());app.ctx.openSettings();
+ const settings=app.shim.document.getElementById('modalRoot').innerHTML;
+ assert.equal((settings.match(/data-act="export-backup"/g)||[]).length,1,'mounted Settings exposes one Export action');
+ assert.equal((settings.match(/data-act="import-backup"/g)||[]).length,1,'mounted Settings exposes one Import action');
+ await app.ctx.onAction('export-backup',{});
+ const transfer=app.shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(transfer,/id="exportTransferDialog"/,'the Settings Export opens its prepared transfer dialog');
+ assert.equal((transfer.match(/data-act="copy-export"/g)||[]).length,1,'the prepared archive has one Copy choice');
+ assert.equal((transfer.match(/data-act="download-export"/g)||[]).length,1,'the prepared archive has one Download choice');
+ app.ctx.openHelp();const help=app.shim.document.getElementById('modalRoot').innerHTML;
+ const answers=new Map([...help.matchAll(/<dt>(.*?)<\/dt><dd>(.*?)<\/dd>/g)].map(row=>[row[1],row[2]]));
+ const answer=question=>{assert.ok(answers.has(question),'mounted FAQ includes '+question);return answers.get(question);};
+ const exported=answer('What does Export include?');
+ assert.ok(exported.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the Export FAQ stays within its word limit');
+ assert.match(exported,/one read-only recovery archive.*accepted current board/i);
+ assert.match(exported,/Copy sends the prepared archive straight to the clipboard; Download saves the same bytes if the browser completes its file download\. Copy reports success after the clipboard write completes; Download reports only that saving those same prepared bytes started/i);
+ assert.match(exported,/clearly marked partial archive/);
+ assert.match(exported,/pending work is never replayed.*original sources stay protected/);
+ const paste=answer('How do I paste a saved board?');
+ assert.ok(paste.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the pasted-recovery FAQ stays within its word limit');
+ assert.match(paste,/Large pasted archives stay captured without filling the text box; Preview uses their complete text/);
+ assert.match(paste,/Nothing applies until you confirm Restore/);
+ const unreadable=answer('What if my saved device source cannot be read?');
+ assert.ok(unreadable.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the held-recovery FAQ stays within its word limit');
+ assert.match(unreadable,/Export can preserve readable raw sources in a partial archive; it cannot restore a board\./);
+ assert.match(unreadable,/Held opening with no accepted board yields a source-only archive/);
+ app.shim.document.getElementById('appChangelogCurrent').innerHTML=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];
+ app.shim.document.getElementById('appChangelog').innerHTML=html.match(/<template id="appChangelog">([\s\S]*?)<\/template>/)[1];
+ app.ctx.openHelp();
+ const mountedHelp=app.shim.document.getElementById('modalRoot').innerHTML;
+ const changelog=mountedHelp.split('<div class="kv" data-changelog-notes>')[1]?.split('</details>')[0];
+ assert.ok(changelog,'the mounted Changelog is available beside the FAQ');
+ assert.match(changelog,/Settings now has one Import and one Export, with separate Copy and Download choices\./);
+ assert.match(changelog,/Copy reports success after the clipboard write completes; Download reports only that saving the same prepared bytes started\./);
+ assert.match(changelog,/During held opening, Export can preserve readable raw sources in a partial source-only archive when no accepted current board is available; it cannot restore a board\./);
+ assert.match(changelog,/Large pastes stay captured in full for Preview while the text box stays bounded\./);
+ assert.match(changelog,/Restore applies only a supported selected board after confirmation; sources remain protected\./);
+});
+
 test('RISK unreadable device recovery: partial raw rows remain exact while the restored board accepts later local edits',async t=>{
  const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='partial-raw-rows-'+Math.random();
  const inspector=loadStorageV2({indexedDB}).createDeviceStore({indexedDB,crypto:webcrypto,dbName:deviceDbName});await inspector.open();t.after(()=>inspector.close());
