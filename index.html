@@ -2306,12 +2306,15 @@ async function exportRecoveryArchive({rawSourcesOnly=exportTransferSourceOnly(),
 function downloadPreparedExport(){
   if(!exportTransferPayload||exportTransferBusy)return false;
   setExportTransferBusy(true,"Starting download…");
+  let url=null,link=null;
   try{
-    const url=URL.createObjectURL(new Blob([exportTransferPayload],{type:"application/json"})),link=document.createElement("a");
+    url=URL.createObjectURL(new Blob([exportTransferPayload],{type:"application/json"}));link=document.createElement("a");
     link.href=url;link.download="chain-scanner-recovery-archive.json";document.getElementById("exportTransferDialog").appendChild(link);link.click();link.remove();
     setTimeout(()=>URL.revokeObjectURL(url),30000);
     setExportTransferBusy(false,"Download started. The archive contains the exact prepared export.");return true;
   }catch{
+    if(link){try{link.remove();}catch{}}
+    if(url!==null){try{URL.revokeObjectURL(url);}catch{}}
     setExportTransferBusy(false,"Download could not start. Copy remains available for this prepared archive.");return false;
   }
 }

@@ -7818,6 +7818,11 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK MANUAL JSON EXPORT: refused Download releases its temporary anchor and object URL",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK MANUAL JSON EXPORT: the actual Settings actions download current board and recovery archive",
       "group": "core",
       "file": "tests.js"
@@ -13444,6 +13449,11 @@
     },
     {
       "root": "RISK saved view held Download: trusted terminal Download preserves the same Copy archive and original sources",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources",
       "group": "persistence-recovery",
       "file": "tests.js"
     },
