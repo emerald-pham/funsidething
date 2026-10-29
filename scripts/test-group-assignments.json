@@ -7813,6 +7813,11 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK MANUAL JSON EXPORT: a refused download leaves the same prepared archive available to Copy",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK MANUAL JSON EXPORT: the actual Settings actions download current board and recovery archive",
       "group": "core",
       "file": "tests.js"
@@ -13424,6 +13429,21 @@
     },
     {
       "root": "RISK saved view opening source preservation: invalid optional appearance keeps its bytes while one complete task opens",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK saved view held Export: terminal Settings preserves an exact partial source-only archive",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK saved view held Copy: trusted terminal Copy preserves prepared bytes and original sources",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK saved view held Download: trusted terminal Download preserves the same Copy archive and original sources",
       "group": "persistence-recovery",
       "file": "tests.js"
     },

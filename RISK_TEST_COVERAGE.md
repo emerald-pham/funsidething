@@ -216,6 +216,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK DATABASE REPAIR EXPORT: Help describes direct Copy and partial archive status
 - RISK DATABASE REPAIR EXPORT: reload help routes users to the combined export after standalone log exporters are removed
 - RISK MANUAL JSON EXPORT: the actual Settings actions download current board and recovery archive
+- RISK MANUAL JSON EXPORT: a refused download leaves the same prepared archive available to Copy
 - RISK MANUAL JSON EXPORT: unavailable and unsupported sources are explicit partial exports
 - RISK BACKUP FILE RESTORE: the actual Settings file selection protects exact sources before explicit local adoption
 - RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exact sources before explicit local adoption
@@ -1291,6 +1292,9 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK saved view full-board safety: supported copies and identity masks never grant authority
 - RISK saved view full-board filters: opening preserves saved membership controls and cheap task facts
 - RISK saved view opening source preservation: invalid optional appearance keeps its bytes while one complete task opens
+- RISK saved view held Export: terminal Settings preserves an exact partial source-only archive
+- RISK saved view held Copy: trusted terminal Copy preserves prepared bytes and original sources
+- RISK saved view held Download: trusted terminal Download preserves the same Copy archive and original sources
 - RISK saved view accepted handover: normal actions and exact local work survive repeated offline reopening
 - RISK bulk toolbar guidance: extended FAQ describes frozen controls and rank-slot selection
 - RISK repository process boundary: actual visual tests compare every changed control with neighboring controls and scrolled states

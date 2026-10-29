@@ -15977,9 +15977,10 @@ async function invisibleSavedViewBrowser(theme='light',delayAppearanceAsset=fals
  if(startupOptions.savedFilter==='combined'){
   await page.locator('[data-act="list-eligibility"][data-id="eligible"]').click();const id=await page.evaluate(()=>state.contexts[0].id);await page.locator('[data-act="list-tag"][data-id="c:'+id+'"]').click();assert.equal(await page.locator('[data-act="list-tag"].on').textContent(),await page.evaluate(()=>state.contexts[0].name));await page.locator('[data-act="list-tag"][data-id="s:evergreen"]').click();await page.locator('#listSearch').fill('Saved appearance');
  }
- const startup=await page.evaluate(async({brokenDeviceBoard,retainAppearance,topOfPage,seedPriorRecoveryAppearance,theme})=>{
+ const startup=await page.evaluate(async({brokenDeviceBoard,retainAppearance,topOfPage,seedPriorRecoveryAppearance,theme,heldExportSources})=>{
   window.scrollTo(0,topOfPage?0:220);window.dispatchEvent(new Event('pagehide'));
   let brokenPayload=null;
+  let heldExportSourcesSeeded=null;
   if(brokenDeviceBoard){
    brokenPayload='{broken durable device board';
    const sourceBoard=JSON.parse(JSON.stringify(state));
@@ -15992,14 +15993,25 @@ async function invisibleSavedViewBrowser(theme='light',delayAppearanceAsset=fals
    localStorage.setItem('fvp:chain-scanner:v1',source);
    localStorage.setItem('fvp:chain-scanner:protected:v1',source);
    const deadline=promise=>Promise.race([promise,new Promise((_,reject)=>setTimeout(()=>reject(Error('Fixture device-store operation exceeded five seconds')),5000))]);
-   const head=await deadline(window.ScannerDeviceStore.readHead());
+   const store=window.ScannerDeviceStore,head=await deadline(store.readHead());
+   if(heldExportSources){
+    const {backupPayload,backup,pendingOwner,pending,opaqueKey,opaqueValue}=heldExportSources;
+    const backupResult=await store.putBackup({expectedHash:head.hash,backup});if(!backupResult?.ok)throw Error('Could not add the exact isolated manual source fixture');
+    const pendingResult=await store.setPendingUpload(pendingOwner,pending);
+    if(!pendingResult?.ok)throw Error('Could not verify the isolated pending source fixture');
+    const dbName=window.CHAIN_STORAGE_DB_NAME||'chain-scanner-v2',db=await new Promise((resolve,reject)=>{const request=indexedDB.open(dbName);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error||new Error('Could not open isolated app device database'));});
+    await new Promise((resolve,reject)=>{const tx=db.transaction(['meta','opaque'],'readwrite');tx.objectStore('meta').put({...pending,account:pendingOwner},'pending:'+pendingOwner);tx.objectStore('opaque').put(opaqueValue,opaqueKey);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||new Error('Opaque fixture transaction failed'));tx.onabort=()=>reject(tx.error||new Error('Opaque fixture transaction aborted'));});db.close();
+    const pendingStored=await store.getPendingUpload(pendingOwner);
+    if(JSON.stringify(pendingStored)!==JSON.stringify({...pending,account:pendingOwner}))throw Error('Could not verify the isolated pending source fixture');
+    heldExportSourcesSeeded={backupPayload,backupId:backup.id,pendingOwner,pendingStored,opaqueKey,opaqueValue};
+   }
    const committed=await deadline(window.ScannerDeviceStore.commitHead({expectedHash:head.hash,payload:brokenPayload,account:null}));
    if(!committed.ok)throw Error('Could not seed the malformed durable board');
   }
   if(!retainAppearance){localStorage.removeItem('fvp:chain-scanner:appearance:v1');localStorage.removeItem('fvp:chain-scanner:saved-view:v1');}
   if(!seedPriorRecoveryAppearance)localStorage.setItem('__delayLocalRead','true');
-  return{brokenPayload,sourceCheck:window.__brokenBoardSourceCheck||null};
- },{brokenDeviceBoard:startupOptions.brokenDeviceBoard===true,retainAppearance:startupOptions.retainAppearance!==false,topOfPage:startupOptions.topOfPage===true,seedPriorRecoveryAppearance:startupOptions.seedPriorRecoveryAppearance===true,theme});
+  return{brokenPayload,sourceCheck:window.__brokenBoardSourceCheck||null,...(heldExportSourcesSeeded?{heldExportSources:heldExportSourcesSeeded}:{})};
+ },{brokenDeviceBoard:startupOptions.brokenDeviceBoard===true,retainAppearance:startupOptions.retainAppearance!==false,topOfPage:startupOptions.topOfPage===true,seedPriorRecoveryAppearance:startupOptions.seedPriorRecoveryAppearance===true,theme,heldExportSources:startupOptions.heldExportSources||null});
  if(startupOptions.sourceFault)await page.evaluate(fault=>{
   const shared='fvp:chain-scanner:v1',protectedKey='fvp:chain-scanner:protected:v1',board=JSON.parse(localStorage.getItem(shared));
   if(fault==='malformed-primary')localStorage.setItem(shared,'{unreadable primary source');
@@ -16174,6 +16186,461 @@ test('RISK saved view opening source preservation: invalid optional appearance k
   }
   await view.page.waitForFunction(()=>document.documentElement.dataset.appReady==='true');
   assert.equal(await view.page.locator('#listBody .trow').count(),1);const frames=await view.page.evaluate(()=>window.__firstAppearanceFrames);assert.ok(frames.filter(f=>f.readStarted).every(f=>f.boardVisible&&f.rows===1&&f.connectedBoards===1),'one complete board remains connected from first read through accepted handover');assert.deepEqual(view.errors,[]);
+ }finally{view.releaseHeldFirebaseImports();await view.browser.close();}
+ });
+});
+
+test('RISK saved view held Export: terminal Settings preserves an exact partial source-only archive',async t=>{
+ await openingBoardFixture(t);
+ for(const browserEngine of ['chromium','webkit'])await t.test(browserEngine,async t=>{
+ const backupPayload='{"futureHeldExportSource":{"retain":"unknown 🌿\\u0000 bytes"}}',backup={id:'held-export-source-backup',day:'2026-10-28',at:1,kind:'manual',payload:backupPayload};
+ const pendingOwner='held-export-source-owner@example.test',pending={generationId:'held-export-pending-generation',payloadHash:'a'.repeat(64),baseRev:7,updatedAt:1793232000000,futurePendingField:{retain:'unknown pending metadata'}};
+ const opaqueKey='held-export-opaque-source',opaqueValue={key:opaqueKey,raw:'opaque exact bytes\u0000🌿',futureOpaqueField:{retain:['unknown',19]}};
+ const heldExportSources={backupPayload,backup,pendingOwner,pending,opaqueKey,opaqueValue};
+ const view=await invisibleSavedViewBrowser('light',false,false,{width:390,height:844},false,{browserEngine,brokenDeviceBoard:true,retainAppearance:true,oneTask:true,readFailures:2,syntheticCloud:true,holdConfiguredFirebaseImports:true,topOfPage:true,heldExportSources});
+ try{
+  await view.waitForFirebaseImports();view.releaseHeldFirebaseImports();
+  await view.page.waitForFunction(()=>window.SavedAppearance?.recoveryHeld===true,null,{timeout:6000});
+  const seeded=view.startup.heldExportSources;
+  await view.page.locator('[data-saved-preview] [data-act="settings"]').click();
+  await view.page.getByText('Data and backups',{exact:true}).click();
+  const sourceKeys=['fvp:chain-scanner:v1','fvp:chain-scanner:protected:v1','fvp:chain-scanner:daily-backups:v1','fvp:chain-scanner:device-store-v2'];
+  await view.page.evaluate(keys=>{
+   window.__heldExportSourceWrites=[];window.__heldExportDeviceWrites=[];window.__heldExportCloudPushes=0;
+   const localKeys=[...keys,...Array.from({length:localStorage.length},(_,index)=>localStorage.key(index)).filter(key=>typeof key==='string'&&key.startsWith('fvp:chain-scanner:pending-scene-choice:v1:'))],watched=new Set(localKeys),set=Storage.prototype.setItem,remove=Storage.prototype.removeItem,clear=Storage.prototype.clear;
+   Storage.prototype.setItem=function(key,value){if(watched.has(key))window.__heldExportSourceWrites.push(['set',key]);return set.call(this,key,value);};
+   Storage.prototype.removeItem=function(key){if(watched.has(key))window.__heldExportSourceWrites.push(['remove',key]);return remove.call(this,key);};
+   Storage.prototype.clear=function(){if(this===localStorage)window.__heldExportSourceWrites.push(['clear']);return clear.call(this);};
+   const database=window.CHAIN_STORAGE_DB_NAME||'chain-scanner-v2',transaction=IDBDatabase.prototype.transaction;
+   IDBDatabase.prototype.transaction=function(names,mode,...options){if(this.name===database&&['readwrite','versionchange'].includes(mode))window.__heldExportDeviceWrites.push(mode);return transaction.call(this,names,mode,...options);};
+   const cloud=window.CloudSync;if(cloud&&typeof cloud.push==='function'){const push=cloud.push.bind(cloud);cloud.push=(...args)=>{window.__heldExportCloudPushes++;return push(...args);};}
+  },sourceKeys);
+  const capture=()=>view.page.evaluate(async keys=>{
+   const localKeys=[...keys,...Array.from({length:localStorage.length},(_,index)=>localStorage.key(index)).filter(key=>typeof key==='string'&&key.startsWith('fvp:chain-scanner:pending-scene-choice:v1:'))];
+   const localSources=localKeys.map(key=>{const raw=localStorage.getItem(key);return raw===null?{key,status:'absent'}:{key,status:'present',raw};});
+   const appStoreNullBefore=window.ScannerDeviceStore===null&&deviceStore===null,database=window.CHAIN_STORAGE_DB_NAME||'chain-scanner-v2',names=['meta','snapshots','backups','opaque'];
+   let observer=null,tx=null,timer;
+   // This test-owned connection observes originals without restoring the app's
+   // deliberately revoked storage port or granting board/recovery authority.
+   let rawSnapshot;
+   try{
+    rawSnapshot=await new Promise((resolve,reject)=>{
+     let settled=false;
+     const finish=(error,value)=>{if(settled)return;settled=true;clearTimeout(timer);if(error){try{tx?.abort();}catch{}reject(error);}else resolve(value);};
+     timer=setTimeout(()=>finish(Error('Held Export source observation exceeded ten seconds')),10000);
+     const request=indexedDB.open(database);
+     request.onupgradeneeded=()=>{try{request.transaction.abort();}catch{}finish(Error('Held Export observation requires the existing seeded database'));};
+     request.onerror=()=>finish(request.error||Error('Held Export source database could not be opened'));
+     request.onblocked=()=>finish(Error('Held Export source database opening was blocked'));
+     request.onsuccess=()=>{
+      if(settled){request.result.close();return;}
+      observer=request.result;
+      try{
+       for(const name of names)if(!observer.objectStoreNames.contains(name))throw Error('Held Export source store is missing: '+name);
+       tx=observer.transaction(names,'readonly');const stores={};
+       tx.oncomplete=()=>{if(names.some(name=>!Array.isArray(stores[name]?.keys)||!Array.isArray(stores[name]?.values)))finish(Error('Held Export source observation is incomplete'));else finish(null,{stores});};
+       tx.onerror=()=>finish(tx.error||Error('Held Export source transaction failed'));
+       tx.onabort=()=>finish(tx.error||Error('Held Export source transaction aborted'));
+       for(const name of names){
+        const store=tx.objectStore(name);stores[name]={};
+        for(const [field,read] of [['keys',()=>store.getAllKeys()],['values',()=>store.getAll()]]){
+         const row=read();row.onsuccess=()=>{stores[name][field]=row.result;};row.onerror=()=>finish(row.error||Error('Held Export source request failed: '+name+'/'+field));
+        }
+       }
+      }catch(error){finish(error);}
+     };
+    });
+   }finally{clearTimeout(timer);observer?.close();}
+   const cloud=window.CloudSync;
+   return{localSources,indexedDB:rawSnapshot,database,appStoreNullBefore,appStoreNullAfter:window.ScannerDeviceStore===null&&deviceStore===null,
+    authority:{deviceStorageAuthority,deviceStorageRequired,deviceHeadHash,unacceptedSource:JSON.stringify(unacceptedDeviceSource)},accepted:liveBoardAccepted===true,taskCount:state?.tasks?.length??null,state:JSON.stringify(state),
+    recoveryHeld:window.SavedAppearance?.recoveryHeld===true,scanTimer:scanWakeTimer,saveTimer,
+    cloud:{user:cloud?.user??null,ready:cloud?.ready??null,pushes:window.__heldExportCloudPushes??0},
+    sourceWrites:[...(window.__heldExportSourceWrites||[])],deviceWrites:[...(window.__heldExportDeviceWrites||[])]};
+  },sourceKeys);
+  const before=await capture();
+  assert.equal(before.recoveryHeld,true,'the actual public Settings action starts from terminal openingRecoveryHeld');
+  assert.equal(before.accepted,false,'the one-task saved presentation remains unaccepted');
+  assert.equal(before.taskCount,0,'the held placeholder has no adopted tasks');
+  assert.equal(before.scanTimer,null,'the scanner remains idle before source-only Export');assert.equal(before.saveTimer,null,'no hidden board save is queued');
+  assert.equal(before.appStoreNullBefore,true);assert.equal(before.appStoreNullAfter,true,'independent raw observation never exposes an application storage port');
+  assert.equal(before.authority.deviceStorageAuthority,false);assert.equal(before.authority.deviceStorageRequired,true);
+  assert.deepEqual(Object.keys(before.indexedDB.stores),['meta','snapshots','backups','opaque']);
+  const sourceRow=(store,key)=>{const rows=before.indexedDB.stores[store],at=rows.keys.indexOf(key);assert.notEqual(at,-1,store+' retains '+key);assert.equal(rows.keys.length,rows.values.length);return rows.values[at];};
+  const rawHead=sourceRow('meta','head'),brokenHash=createHash('sha256').update(view.startup.brokenPayload).digest('hex');
+  assert.equal(rawHead.schemaVersion,2);assert.equal(rawHead.hash,brokenHash);assert.equal(rawHead.account,null);
+  assert.equal(sourceRow('snapshots',brokenHash).payload,view.startup.brokenPayload,'the exact malformed durable source remains retained');
+  const rawPending=sourceRow('meta','pending:'+seeded.pendingOwner);
+  assert.deepEqual(rawPending,{...pending,account:pendingOwner},'pending account/revision and unknown metadata remain exact without acknowledgement');assert.deepEqual(rawPending,seeded.pendingStored);
+  const rawBackup=sourceRow('backups',seeded.backupId),backupHash=createHash('sha256').update(backupPayload).digest('hex');
+  assert.deepEqual(rawBackup,{id:backup.id,day:backup.day,at:backup.at,kind:backup.kind,payloadHash:backupHash});
+  assert.equal(sourceRow('snapshots',backupHash).payload,seeded.backupPayload,'the backup snapshot retains its exact unknown JSON source bytes');
+  assert.deepEqual(sourceRow('opaque',seeded.opaqueKey),seeded.opaqueValue,'the opaque raw bytes and unknown fields remain exact');
+  const exportControl=view.page.locator('#modalRoot [data-act="export-backup"]');
+  assert.equal(await exportControl.count(),1,'the existing Settings section exposes exactly one Export');
+  assert.equal(await exportControl.isEnabled(),true,'the actual held Export entry is enabled before a trusted click');
+  await exportControl.click();
+  let preparationWaitError=null;
+  try{await view.page.waitForFunction(()=>!!document.getElementById('exportTransferDialog')||exportCaptureBusy===false,null,{timeout:6000});}catch(error){preparationWaitError=error;}
+  const preparation=await view.page.evaluate(()=>({dialogCount:document.querySelectorAll('#exportTransferDialog').length,busy:exportCaptureBusy,hasPrepared:typeof exportTransferPayload==='string',serial:exportCaptureSerial,status:document.getElementById('exportBackupStatus')?.textContent??null,held:openingRecoveryHeld,accepted:liveBoardAccepted,appStoreNull:window.ScannerDeviceStore===null&&deviceStore===null}));
+  t.diagnostic('Held Export preparation observation: '+JSON.stringify(preparation));
+  if(preparationWaitError)throw preparationWaitError;
+  assert.equal(await view.page.locator('#exportTransferDialog').count(),1,'the real Export action opens its existing prepared-transfer dialog');
+  assert.equal(await view.page.getByText(/Partial recovery archive\. Some sources were unavailable or changed during capture\./).isVisible(),true,'an unaccepted current board is presented as a visibly partial archive');
+  assert.equal(await view.page.locator('#exportTransferDialog textarea').count(),0,'raw archive data is not rendered into a page text editor');
+  const raw=await view.page.evaluate(()=>exportTransferPayload);assert.equal(typeof raw,'string','the real entry prepared its transfer bytes without invoking Copy or Download');
+  const archive=JSON.parse(raw);
+  assert.equal(archive.format,'chain-scanner.recovery-archive');assert.equal(archive.manifest.status,'partial');
+  assert.equal(archive.currentBoard,null,'a held placeholder is never exported as the current board');
+  assert.deepEqual(archive.manifest.sources.currentBoard,{status:'unavailable',reason:'unaccepted-device-source'});
+  assert.ok(archive.manifest.failures.some(row=>row.source==='currentBoard'&&row.code==='unavailable'));
+  assert.deepEqual(archive.appSources.localStorage,before.localSources,'all four app-owned local source observations are byte-exact');
+  assert.deepEqual(archive.manifest.sources.localStorage,Object.fromEntries(before.localSources.map(row=>[row.key,{status:row.status==='present'?'included':row.status,...(row.reason?{reason:row.reason}:{})}])), 'the manifest truthfully labels each exact local source observation');
+  assert.deepEqual(archive.appSources.indexedDB,{database:before.database,stores:null},'the unavailable application store is never invented as readable archive data');
+  assert.deepEqual(archive.manifest.sources.indexedDB,{database:before.database,schemaVersion:2,status:'unavailable',reason:'unavailable'});
+  assert.ok(archive.manifest.failures.some(row=>row.source==='indexedDB'&&row.code==='unavailable'),'the partial manifest explicitly identifies the revoked storage port');
+  assert.equal(before.cloud.user,null,'the pending fixture is not the active cloud identity');
+  await view.page.locator('#exportTransferDialog [data-act="close-modal"]').click();
+  await view.page.waitForFunction(()=>!document.getElementById('exportTransferDialog'));
+  const after=await capture();
+  assert.deepEqual(after.localSources,before.localSources,'closing Export leaves all original local bytes unchanged');
+  assert.deepEqual(after.indexedDB,before.indexedDB,'closing Export leaves every saved, pending, opaque and unknown device source unchanged');
+  assert.equal(after.appStoreNullBefore,true);assert.equal(after.appStoreNullAfter,true);assert.deepEqual(after.authority,before.authority,'Export and independent source observation grant no device/recovery authority');
+  assert.equal(after.accepted,false);assert.equal(after.taskCount,0);assert.equal(after.state,before.state,'the empty held placeholder remains unadopted');
+  assert.equal(after.recoveryHeld,true,'closing Export keeps the terminal recovery hold active');assert.equal(after.scanTimer,null);assert.equal(after.saveTimer,null);
+  assert.deepEqual(after.cloud,before.cloud,'Export does not upload, replay pending work, or change account/revision acknowledgement authority');
+  assert.deepEqual(after.sourceWrites,[],'the public Export flow makes no app-owned localStorage set/remove/clear');assert.deepEqual(after.deviceWrites,[],'no native write transaction is attempted against the original device database');
+  assert.deepEqual(view.errors,[]);
+ }finally{view.releaseHeldFirebaseImports();await view.browser.close();}
+ });
+});
+
+test('RISK saved view held Copy: trusted terminal Copy preserves prepared bytes and original sources',async t=>{
+ await openingBoardFixture(t);
+ for(const browserEngine of ['chromium','webkit'])await t.test(browserEngine,async t=>{
+ const backupPayload='{"futureHeldExportSource":{"retain":"unknown 🌿\\u0000 bytes"}}',backup={id:'held-export-source-backup',day:'2026-10-28',at:1,kind:'manual',payload:backupPayload};
+ const pendingOwner='held-export-source-owner@example.test',pending={generationId:'held-export-pending-generation',payloadHash:'a'.repeat(64),baseRev:7,updatedAt:1793232000000,futurePendingField:{retain:'unknown pending metadata'}};
+ const opaqueKey='held-export-opaque-source',opaqueValue={key:opaqueKey,raw:'opaque exact bytes\u0000🌿',futureOpaqueField:{retain:['unknown',19]}};
+ const heldExportSources={backupPayload,backup,pendingOwner,pending,opaqueKey,opaqueValue};
+ const view=await invisibleSavedViewBrowser('light',false,false,{width:390,height:844},false,{browserEngine,brokenDeviceBoard:true,retainAppearance:true,oneTask:true,readFailures:2,syntheticCloud:true,holdConfiguredFirebaseImports:true,topOfPage:true,heldExportSources});
+ try{
+  await view.waitForFirebaseImports();view.releaseHeldFirebaseImports();
+  await view.page.waitForFunction(()=>window.SavedAppearance?.recoveryHeld===true,null,{timeout:6000});
+  const seeded=view.startup.heldExportSources;
+  await view.page.locator('[data-saved-preview] [data-act="settings"]').click();
+  await view.page.getByText('Data and backups',{exact:true}).click();
+  const sourceKeys=['fvp:chain-scanner:v1','fvp:chain-scanner:protected:v1','fvp:chain-scanner:daily-backups:v1','fvp:chain-scanner:device-store-v2'];
+  await view.page.evaluate(keys=>{
+   window.__heldExportSourceWrites=[];window.__heldExportDeviceWrites=[];window.__heldExportCloudPushes=0;
+   const localKeys=[...keys,...Array.from({length:localStorage.length},(_,index)=>localStorage.key(index)).filter(key=>typeof key==='string'&&key.startsWith('fvp:chain-scanner:pending-scene-choice:v1:'))],watched=new Set(localKeys),set=Storage.prototype.setItem,remove=Storage.prototype.removeItem,clear=Storage.prototype.clear;
+   Storage.prototype.setItem=function(key,value){if(watched.has(key))window.__heldExportSourceWrites.push(['set',key]);return set.call(this,key,value);};
+   Storage.prototype.removeItem=function(key){if(watched.has(key))window.__heldExportSourceWrites.push(['remove',key]);return remove.call(this,key);};
+   Storage.prototype.clear=function(){if(this===localStorage)window.__heldExportSourceWrites.push(['clear']);return clear.call(this);};
+   const database=window.CHAIN_STORAGE_DB_NAME||'chain-scanner-v2',transaction=IDBDatabase.prototype.transaction;
+   IDBDatabase.prototype.transaction=function(names,mode,...options){if(this.name===database&&['readwrite','versionchange'].includes(mode))window.__heldExportDeviceWrites.push(mode);return transaction.call(this,names,mode,...options);};
+   const cloud=window.CloudSync;if(cloud&&typeof cloud.push==='function'){const push=cloud.push.bind(cloud);cloud.push=(...args)=>{window.__heldExportCloudPushes++;return push(...args);};}
+  },sourceKeys);
+  const capture=()=>view.page.evaluate(async keys=>{
+   const localKeys=[...keys,...Array.from({length:localStorage.length},(_,index)=>localStorage.key(index)).filter(key=>typeof key==='string'&&key.startsWith('fvp:chain-scanner:pending-scene-choice:v1:'))];
+   const localSources=localKeys.map(key=>{const raw=localStorage.getItem(key);return raw===null?{key,status:'absent'}:{key,status:'present',raw};});
+   const appStoreNullBefore=window.ScannerDeviceStore===null&&deviceStore===null,database=window.CHAIN_STORAGE_DB_NAME||'chain-scanner-v2',names=['meta','snapshots','backups','opaque'];
+   let observer=null,tx=null,timer;
+   // This test-owned connection observes originals without restoring the app's
+   // deliberately revoked storage port or granting board/recovery authority.
+   let rawSnapshot;
+   try{
+    rawSnapshot=await new Promise((resolve,reject)=>{
+     let settled=false;
+     const finish=(error,value)=>{if(settled)return;settled=true;clearTimeout(timer);if(error){try{tx?.abort();}catch{}reject(error);}else resolve(value);};
+     timer=setTimeout(()=>finish(Error('Held Export source observation exceeded ten seconds')),10000);
+     const request=indexedDB.open(database);
+     request.onupgradeneeded=()=>{try{request.transaction.abort();}catch{}finish(Error('Held Export observation requires the existing seeded database'));};
+     request.onerror=()=>finish(request.error||Error('Held Export source database could not be opened'));
+     request.onblocked=()=>finish(Error('Held Export source database opening was blocked'));
+     request.onsuccess=()=>{
+      if(settled){request.result.close();return;}
+      observer=request.result;
+      try{
+       for(const name of names)if(!observer.objectStoreNames.contains(name))throw Error('Held Export source store is missing: '+name);
+       tx=observer.transaction(names,'readonly');const stores={};
+       tx.oncomplete=()=>{if(names.some(name=>!Array.isArray(stores[name]?.keys)||!Array.isArray(stores[name]?.values)))finish(Error('Held Export source observation is incomplete'));else finish(null,{stores});};
+       tx.onerror=()=>finish(tx.error||Error('Held Export source transaction failed'));
+       tx.onabort=()=>finish(tx.error||Error('Held Export source transaction aborted'));
+       for(const name of names){
+        const store=tx.objectStore(name);stores[name]={};
+        for(const [field,read] of [['keys',()=>store.getAllKeys()],['values',()=>store.getAll()]]){
+         const row=read();row.onsuccess=()=>{stores[name][field]=row.result;};row.onerror=()=>finish(row.error||Error('Held Export source request failed: '+name+'/'+field));
+        }
+       }
+      }catch(error){finish(error);}
+     };
+    });
+   }finally{clearTimeout(timer);observer?.close();}
+   const cloud=window.CloudSync;
+   return{localSources,indexedDB:rawSnapshot,database,appStoreNullBefore,appStoreNullAfter:window.ScannerDeviceStore===null&&deviceStore===null,
+    authority:{deviceStorageAuthority,deviceStorageRequired,deviceHeadHash,unacceptedSource:JSON.stringify(unacceptedDeviceSource)},accepted:liveBoardAccepted===true,taskCount:state?.tasks?.length??null,state:JSON.stringify(state),
+    recoveryHeld:window.SavedAppearance?.recoveryHeld===true,scanTimer:scanWakeTimer,saveTimer,
+    cloud:{user:cloud?.user??null,ready:cloud?.ready??null,pushes:window.__heldExportCloudPushes??0},
+    sourceWrites:[...(window.__heldExportSourceWrites||[])],deviceWrites:[...(window.__heldExportDeviceWrites||[])]};
+  },sourceKeys);
+  const before=await capture();
+  assert.equal(before.recoveryHeld,true,'the actual public Settings action starts from terminal openingRecoveryHeld');
+  assert.equal(before.accepted,false,'the one-task saved presentation remains unaccepted');
+  assert.equal(before.taskCount,0,'the held placeholder has no adopted tasks');
+  assert.equal(before.scanTimer,null,'the scanner remains idle before source-only Export');assert.equal(before.saveTimer,null,'no hidden board save is queued');
+  assert.equal(before.appStoreNullBefore,true);assert.equal(before.appStoreNullAfter,true,'independent raw observation never exposes an application storage port');
+  assert.equal(before.authority.deviceStorageAuthority,false);assert.equal(before.authority.deviceStorageRequired,true);
+  assert.deepEqual(Object.keys(before.indexedDB.stores),['meta','snapshots','backups','opaque']);
+  const sourceRow=(store,key)=>{const rows=before.indexedDB.stores[store],at=rows.keys.indexOf(key);assert.notEqual(at,-1,store+' retains '+key);assert.equal(rows.keys.length,rows.values.length);return rows.values[at];};
+  const rawHead=sourceRow('meta','head'),brokenHash=createHash('sha256').update(view.startup.brokenPayload).digest('hex');
+  assert.equal(rawHead.schemaVersion,2);assert.equal(rawHead.hash,brokenHash);assert.equal(rawHead.account,null);
+  assert.equal(sourceRow('snapshots',brokenHash).payload,view.startup.brokenPayload,'the exact malformed durable source remains retained');
+  const rawPending=sourceRow('meta','pending:'+seeded.pendingOwner);
+  assert.deepEqual(rawPending,{...pending,account:pendingOwner},'pending account/revision and unknown metadata remain exact without acknowledgement');assert.deepEqual(rawPending,seeded.pendingStored);
+  const rawBackup=sourceRow('backups',seeded.backupId),backupHash=createHash('sha256').update(backupPayload).digest('hex');
+  assert.deepEqual(rawBackup,{id:backup.id,day:backup.day,at:backup.at,kind:backup.kind,payloadHash:backupHash});
+  assert.equal(sourceRow('snapshots',backupHash).payload,seeded.backupPayload,'the backup snapshot retains its exact unknown JSON source bytes');
+  assert.deepEqual(sourceRow('opaque',seeded.opaqueKey),seeded.opaqueValue,'the opaque raw bytes and unknown fields remain exact');
+  const exportControl=view.page.locator('#modalRoot [data-act="export-backup"]');
+  assert.equal(await exportControl.count(),1,'the existing Settings section exposes exactly one Export');
+  assert.equal(await exportControl.isEnabled(),true,'the actual held Export entry is enabled before a trusted click');
+  await exportControl.click();
+  let preparationWaitError=null;
+  try{await view.page.waitForFunction(()=>!!document.getElementById('exportTransferDialog')||exportCaptureBusy===false,null,{timeout:6000});}catch(error){preparationWaitError=error;}
+  const preparation=await view.page.evaluate(()=>({dialogCount:document.querySelectorAll('#exportTransferDialog').length,busy:exportCaptureBusy,hasPrepared:typeof exportTransferPayload==='string',serial:exportCaptureSerial,status:document.getElementById('exportBackupStatus')?.textContent??null,held:openingRecoveryHeld,accepted:liveBoardAccepted,appStoreNull:window.ScannerDeviceStore===null&&deviceStore===null}));
+  t.diagnostic('Held Export preparation observation: '+JSON.stringify(preparation));
+  if(preparationWaitError)throw preparationWaitError;
+  assert.equal(await view.page.locator('#exportTransferDialog').count(),1,'the real Export action opens its existing prepared-transfer dialog');
+  assert.equal(await view.page.getByText(/Partial recovery archive\. Some sources were unavailable or changed during capture\./).isVisible(),true,'an unaccepted current board is presented as a visibly partial archive');
+  assert.equal(await view.page.locator('#exportTransferDialog textarea').count(),0,'raw archive data is not rendered into a page text editor');
+  const raw=await view.page.evaluate(()=>exportTransferPayload);assert.equal(typeof raw,'string','the real entry prepared its transfer bytes without invoking Copy or Download');
+  const archive=JSON.parse(raw);
+  assert.equal(archive.format,'chain-scanner.recovery-archive');assert.equal(archive.manifest.status,'partial');
+  assert.equal(archive.currentBoard,null,'a held placeholder is never exported as the current board');
+  assert.deepEqual(archive.manifest.sources.currentBoard,{status:'unavailable',reason:'unaccepted-device-source'});
+  assert.ok(archive.manifest.failures.some(row=>row.source==='currentBoard'&&row.code==='unavailable'));
+  assert.deepEqual(archive.appSources.localStorage,before.localSources,'all four app-owned local source observations are byte-exact');
+  assert.deepEqual(archive.manifest.sources.localStorage,Object.fromEntries(before.localSources.map(row=>[row.key,{status:row.status==='present'?'included':row.status,...(row.reason?{reason:row.reason}:{})}])), 'the manifest truthfully labels each exact local source observation');
+  assert.deepEqual(archive.appSources.indexedDB,{database:before.database,stores:null},'the unavailable application store is never invented as readable archive data');
+  assert.deepEqual(archive.manifest.sources.indexedDB,{database:before.database,schemaVersion:2,status:'unavailable',reason:'unavailable'});
+  assert.ok(archive.manifest.failures.some(row=>row.source==='indexedDB'&&row.code==='unavailable'),'the partial manifest explicitly identifies the revoked storage port');
+  assert.equal(before.cloud.user,null,'the pending fixture is not the active cloud identity');
+  t.diagnostic('Actual trusted Copy control; external clipboard.writeText promise stub only. No OS clipboard permission/content or system-paste claim.');
+  let automaticDownloads=0;view.page.on('download',()=>{automaticDownloads++;});
+  await view.page.evaluate(()=>{window.__heldCopyRequests=[];Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText(raw){return new Promise((resolve,reject)=>window.__heldCopyRequests.push({raw,resolve,reject}));}}});});
+  const copyControl=view.page.locator('#exportTransferDialog [data-act="copy-export"]');
+  assert.equal(await copyControl.count(),1,'the prepared dialog exposes exactly one real Copy');
+  assert.equal(await copyControl.isEnabled(),true,'the actual held Copy action is enabled before a trusted click');
+  await copyControl.click();
+  assert.equal(await view.page.evaluate(()=>window.__heldCopyRequests.length),1);
+  assert.equal(await view.page.evaluate(()=>window.__heldCopyRequests[0].raw),raw,'the real Copy consumer sends the exact prepared bytes to the external clipboard boundary');
+  assert.equal(await copyControl.isDisabled(),true);assert.equal(await view.page.locator('#downloadExportButton').isDisabled(),true,'a pending clipboard write keeps both transfer controls busy');
+  assert.equal(await view.page.evaluate(()=>exportTransferPayload),raw,'pending Copy retains the original prepared archive');
+  await view.page.evaluate(()=>window.__heldCopyRequests[0].resolve());
+  await view.page.waitForFunction(()=>exportTransferBusy===false);
+  assert.match(await view.page.locator('#exportTransferStatus').innerText(),/Copied the same recovery archive/);
+  assert.equal(await copyControl.isEnabled(),true);
+  await copyControl.click();
+  assert.equal(await view.page.evaluate(()=>window.__heldCopyRequests.length),2);
+  assert.equal(await view.page.evaluate(()=>window.__heldCopyRequests[1].raw),raw,'a second deliberate Copy reuses the same prepared instance');
+  await view.page.evaluate(()=>window.__heldCopyRequests[1].reject(Error('isolated external clipboard refusal')));
+  await view.page.waitForFunction(()=>exportTransferBusy===false);
+  assert.match(await view.page.locator('#exportTransferStatus').innerText(),/Clipboard access failed\. Download remains available/);
+  assert.equal(await view.page.locator('#downloadExportButton').isEnabled(),true,'clipboard refusal retains the existing Download alternative');
+  assert.equal(await view.page.evaluate(()=>exportTransferPayload),raw);assert.equal(automaticDownloads,0,'clipboard refusal never starts an unsolicited download');
+  await copyControl.click();
+  assert.equal(await view.page.evaluate(()=>window.__heldCopyRequests.length),3);
+  assert.equal(await view.page.evaluate(()=>window.__heldCopyRequests[2].raw),raw);
+  await view.page.locator('#exportTransferDialog [data-act="close-modal"]').click();
+  await view.page.waitForFunction(()=>!document.getElementById('exportTransferDialog'));
+  await view.page.locator('[data-saved-preview] [data-act="settings"]').click();
+  await view.page.getByText('Data and backups',{exact:true}).click();
+  await exportControl.click();
+  await view.page.waitForFunction(()=>!!document.getElementById('exportTransferDialog'));
+  const nextPrepared=await view.page.evaluate(()=>({raw:exportTransferPayload,serial:exportCaptureSerial}));
+  assert.equal(JSON.parse(nextPrepared.raw).currentBoard,null);
+  await copyControl.click();
+  assert.equal(await view.page.evaluate(()=>window.__heldCopyRequests.length),4);
+  assert.equal(await view.page.evaluate(()=>window.__heldCopyRequests[3].raw),nextPrepared.raw);
+  const nextWaiting=await view.page.locator('#exportTransferStatus').innerText();
+  await view.page.evaluate(async()=>{window.__heldCopyRequests[2].resolve();await Promise.resolve();await Promise.resolve();});
+  assert.equal(await view.page.evaluate(()=>exportTransferBusy),true,'obsolete Copy completion cannot release a newer transfer');
+  assert.equal(await copyControl.isDisabled(),true);assert.equal(await view.page.locator('#downloadExportButton').isDisabled(),true);
+  assert.equal(await view.page.locator('#exportTransferStatus').innerText(),nextWaiting);
+  assert.deepEqual(await view.page.evaluate(()=>({raw:exportTransferPayload,serial:exportCaptureSerial})),nextPrepared,'obsolete completion cannot replace the newer prepared instance');
+  await view.page.evaluate(()=>window.__heldCopyRequests[3].resolve());
+  await view.page.waitForFunction(()=>exportTransferBusy===false);
+  assert.equal(automaticDownloads,0);
+  await view.page.locator('#exportTransferDialog [data-act="close-modal"]').click();
+  await view.page.waitForFunction(()=>!document.getElementById('exportTransferDialog'));
+  const after=await capture();
+  assert.deepEqual(after.localSources,before.localSources,'closing Export leaves all original local bytes unchanged');
+  assert.deepEqual(after.indexedDB,before.indexedDB,'closing Export leaves every saved, pending, opaque and unknown device source unchanged');
+  assert.equal(after.appStoreNullBefore,true);assert.equal(after.appStoreNullAfter,true);assert.deepEqual(after.authority,before.authority,'Export and independent source observation grant no device/recovery authority');
+  assert.equal(after.accepted,false);assert.equal(after.taskCount,0);assert.equal(after.state,before.state,'the empty held placeholder remains unadopted');
+  assert.equal(after.recoveryHeld,true,'closing Export keeps the terminal recovery hold active');assert.equal(after.scanTimer,null);assert.equal(after.saveTimer,null);
+  assert.deepEqual(after.cloud,before.cloud,'Export does not upload, replay pending work, or change account/revision acknowledgement authority');
+  assert.deepEqual(after.sourceWrites,[],'the public Export flow makes no app-owned localStorage set/remove/clear');assert.deepEqual(after.deviceWrites,[],'no native write transaction is attempted against the original device database');
+  assert.deepEqual(view.errors,[]);
+ }finally{view.releaseHeldFirebaseImports();await view.browser.close();}
+ });
+});
+
+test('RISK saved view held Download: trusted terminal Download preserves the same Copy archive and original sources',async t=>{
+ await openingBoardFixture(t);
+ for(const browserEngine of ['chromium','webkit'])await t.test(browserEngine,async t=>{
+ const backupPayload='{"futureHeldExportSource":{"retain":"unknown 🌿\\u0000 bytes"}}',backup={id:'held-export-source-backup',day:'2026-10-28',at:1,kind:'manual',payload:backupPayload};
+ const pendingOwner='held-export-source-owner@example.test',pending={generationId:'held-export-pending-generation',payloadHash:'a'.repeat(64),baseRev:7,updatedAt:1793232000000,futurePendingField:{retain:'unknown pending metadata'}};
+ const opaqueKey='held-export-opaque-source',opaqueValue={key:opaqueKey,raw:'opaque exact bytes\u0000🌿',futureOpaqueField:{retain:['unknown',19]}};
+ const heldExportSources={backupPayload,backup,pendingOwner,pending,opaqueKey,opaqueValue};
+ const view=await invisibleSavedViewBrowser('light',false,false,{width:390,height:844},false,{browserEngine,brokenDeviceBoard:true,retainAppearance:true,oneTask:true,readFailures:2,syntheticCloud:true,holdConfiguredFirebaseImports:true,topOfPage:true,heldExportSources});
+ try{
+  await view.waitForFirebaseImports();view.releaseHeldFirebaseImports();
+  await view.page.waitForFunction(()=>window.SavedAppearance?.recoveryHeld===true,null,{timeout:6000});
+  const seeded=view.startup.heldExportSources;
+  await view.page.locator('[data-saved-preview] [data-act="settings"]').click();
+  await view.page.getByText('Data and backups',{exact:true}).click();
+  const sourceKeys=['fvp:chain-scanner:v1','fvp:chain-scanner:protected:v1','fvp:chain-scanner:daily-backups:v1','fvp:chain-scanner:device-store-v2'];
+  await view.page.evaluate(keys=>{
+   window.__heldExportSourceWrites=[];window.__heldExportDeviceWrites=[];window.__heldExportCloudPushes=0;
+   const localKeys=[...keys,...Array.from({length:localStorage.length},(_,index)=>localStorage.key(index)).filter(key=>typeof key==='string'&&key.startsWith('fvp:chain-scanner:pending-scene-choice:v1:'))],watched=new Set(localKeys),set=Storage.prototype.setItem,remove=Storage.prototype.removeItem,clear=Storage.prototype.clear;
+   Storage.prototype.setItem=function(key,value){if(watched.has(key))window.__heldExportSourceWrites.push(['set',key]);return set.call(this,key,value);};
+   Storage.prototype.removeItem=function(key){if(watched.has(key))window.__heldExportSourceWrites.push(['remove',key]);return remove.call(this,key);};
+   Storage.prototype.clear=function(){if(this===localStorage)window.__heldExportSourceWrites.push(['clear']);return clear.call(this);};
+   const database=window.CHAIN_STORAGE_DB_NAME||'chain-scanner-v2',transaction=IDBDatabase.prototype.transaction;
+   IDBDatabase.prototype.transaction=function(names,mode,...options){if(this.name===database&&['readwrite','versionchange'].includes(mode))window.__heldExportDeviceWrites.push(mode);return transaction.call(this,names,mode,...options);};
+   const cloud=window.CloudSync;if(cloud&&typeof cloud.push==='function'){const push=cloud.push.bind(cloud);cloud.push=(...args)=>{window.__heldExportCloudPushes++;return push(...args);};}
+  },sourceKeys);
+  const capture=()=>view.page.evaluate(async keys=>{
+   const localKeys=[...keys,...Array.from({length:localStorage.length},(_,index)=>localStorage.key(index)).filter(key=>typeof key==='string'&&key.startsWith('fvp:chain-scanner:pending-scene-choice:v1:'))];
+   const localSources=localKeys.map(key=>{const raw=localStorage.getItem(key);return raw===null?{key,status:'absent'}:{key,status:'present',raw};});
+   const appStoreNullBefore=window.ScannerDeviceStore===null&&deviceStore===null,database=window.CHAIN_STORAGE_DB_NAME||'chain-scanner-v2',names=['meta','snapshots','backups','opaque'];
+   let observer=null,tx=null,timer;
+   // This test-owned connection observes originals without restoring the app's
+   // deliberately revoked storage port or granting board/recovery authority.
+   let rawSnapshot;
+   try{
+    rawSnapshot=await new Promise((resolve,reject)=>{
+     let settled=false;
+     const finish=(error,value)=>{if(settled)return;settled=true;clearTimeout(timer);if(error){try{tx?.abort();}catch{}reject(error);}else resolve(value);};
+     timer=setTimeout(()=>finish(Error('Held Export source observation exceeded ten seconds')),10000);
+     const request=indexedDB.open(database);
+     request.onupgradeneeded=()=>{try{request.transaction.abort();}catch{}finish(Error('Held Export observation requires the existing seeded database'));};
+     request.onerror=()=>finish(request.error||Error('Held Export source database could not be opened'));
+     request.onblocked=()=>finish(Error('Held Export source database opening was blocked'));
+     request.onsuccess=()=>{
+      if(settled){request.result.close();return;}
+      observer=request.result;
+      try{
+       for(const name of names)if(!observer.objectStoreNames.contains(name))throw Error('Held Export source store is missing: '+name);
+       tx=observer.transaction(names,'readonly');const stores={};
+       tx.oncomplete=()=>{if(names.some(name=>!Array.isArray(stores[name]?.keys)||!Array.isArray(stores[name]?.values)))finish(Error('Held Export source observation is incomplete'));else finish(null,{stores});};
+       tx.onerror=()=>finish(tx.error||Error('Held Export source transaction failed'));
+       tx.onabort=()=>finish(tx.error||Error('Held Export source transaction aborted'));
+       for(const name of names){
+        const store=tx.objectStore(name);stores[name]={};
+        for(const [field,read] of [['keys',()=>store.getAllKeys()],['values',()=>store.getAll()]]){
+         const row=read();row.onsuccess=()=>{stores[name][field]=row.result;};row.onerror=()=>finish(row.error||Error('Held Export source request failed: '+name+'/'+field));
+        }
+       }
+      }catch(error){finish(error);}
+     };
+    });
+   }finally{clearTimeout(timer);observer?.close();}
+   const cloud=window.CloudSync;
+   return{localSources,indexedDB:rawSnapshot,database,appStoreNullBefore,appStoreNullAfter:window.ScannerDeviceStore===null&&deviceStore===null,
+    authority:{deviceStorageAuthority,deviceStorageRequired,deviceHeadHash,unacceptedSource:JSON.stringify(unacceptedDeviceSource)},accepted:liveBoardAccepted===true,taskCount:state?.tasks?.length??null,state:JSON.stringify(state),
+    recoveryHeld:window.SavedAppearance?.recoveryHeld===true,scanTimer:scanWakeTimer,saveTimer,
+    cloud:{user:cloud?.user??null,ready:cloud?.ready??null,pushes:window.__heldExportCloudPushes??0},
+    sourceWrites:[...(window.__heldExportSourceWrites||[])],deviceWrites:[...(window.__heldExportDeviceWrites||[])]};
+  },sourceKeys);
+  const before=await capture();
+  assert.equal(before.recoveryHeld,true,'the actual public Settings action starts from terminal openingRecoveryHeld');
+  assert.equal(before.accepted,false,'the one-task saved presentation remains unaccepted');
+  assert.equal(before.taskCount,0,'the held placeholder has no adopted tasks');
+  assert.equal(before.scanTimer,null,'the scanner remains idle before source-only Export');assert.equal(before.saveTimer,null,'no hidden board save is queued');
+  assert.equal(before.appStoreNullBefore,true);assert.equal(before.appStoreNullAfter,true,'independent raw observation never exposes an application storage port');
+  assert.equal(before.authority.deviceStorageAuthority,false);assert.equal(before.authority.deviceStorageRequired,true);
+  assert.deepEqual(Object.keys(before.indexedDB.stores),['meta','snapshots','backups','opaque']);
+  const sourceRow=(store,key)=>{const rows=before.indexedDB.stores[store],at=rows.keys.indexOf(key);assert.notEqual(at,-1,store+' retains '+key);assert.equal(rows.keys.length,rows.values.length);return rows.values[at];};
+  const rawHead=sourceRow('meta','head'),brokenHash=createHash('sha256').update(view.startup.brokenPayload).digest('hex');
+  assert.equal(rawHead.schemaVersion,2);assert.equal(rawHead.hash,brokenHash);assert.equal(rawHead.account,null);
+  assert.equal(sourceRow('snapshots',brokenHash).payload,view.startup.brokenPayload,'the exact malformed durable source remains retained');
+  const rawPending=sourceRow('meta','pending:'+seeded.pendingOwner);
+  assert.deepEqual(rawPending,{...pending,account:pendingOwner},'pending account/revision and unknown metadata remain exact without acknowledgement');assert.deepEqual(rawPending,seeded.pendingStored);
+  const rawBackup=sourceRow('backups',seeded.backupId),backupHash=createHash('sha256').update(backupPayload).digest('hex');
+  assert.deepEqual(rawBackup,{id:backup.id,day:backup.day,at:backup.at,kind:backup.kind,payloadHash:backupHash});
+  assert.equal(sourceRow('snapshots',backupHash).payload,seeded.backupPayload,'the backup snapshot retains its exact unknown JSON source bytes');
+  assert.deepEqual(sourceRow('opaque',seeded.opaqueKey),seeded.opaqueValue,'the opaque raw bytes and unknown fields remain exact');
+  const exportControl=view.page.locator('#modalRoot [data-act="export-backup"]');
+  assert.equal(await exportControl.count(),1,'the existing Settings section exposes exactly one Export');
+  assert.equal(await exportControl.isEnabled(),true,'the actual held Export entry is enabled before a trusted click');
+  await exportControl.click();
+  let preparationWaitError=null;
+  try{await view.page.waitForFunction(()=>!!document.getElementById('exportTransferDialog')||exportCaptureBusy===false,null,{timeout:6000});}catch(error){preparationWaitError=error;}
+  const preparation=await view.page.evaluate(()=>({dialogCount:document.querySelectorAll('#exportTransferDialog').length,busy:exportCaptureBusy,hasPrepared:typeof exportTransferPayload==='string',serial:exportCaptureSerial,status:document.getElementById('exportBackupStatus')?.textContent??null,held:openingRecoveryHeld,accepted:liveBoardAccepted,appStoreNull:window.ScannerDeviceStore===null&&deviceStore===null}));
+  t.diagnostic('Held Export preparation observation: '+JSON.stringify(preparation));
+  if(preparationWaitError)throw preparationWaitError;
+  assert.equal(await view.page.locator('#exportTransferDialog').count(),1,'the real Export action opens its existing prepared-transfer dialog');
+  assert.equal(await view.page.getByText(/Partial recovery archive\. Some sources were unavailable or changed during capture\./).isVisible(),true,'an unaccepted current board is presented as a visibly partial archive');
+  assert.equal(await view.page.locator('#exportTransferDialog textarea').count(),0,'raw archive data is not rendered into a page text editor');
+  const raw=await view.page.evaluate(()=>exportTransferPayload);assert.equal(typeof raw,'string','the real entry prepared its transfer bytes without invoking Copy or Download');
+  const archive=JSON.parse(raw);
+  assert.equal(archive.format,'chain-scanner.recovery-archive');assert.equal(archive.manifest.status,'partial');
+  assert.equal(archive.currentBoard,null,'a held placeholder is never exported as the current board');
+  assert.deepEqual(archive.manifest.sources.currentBoard,{status:'unavailable',reason:'unaccepted-device-source'});
+  assert.ok(archive.manifest.failures.some(row=>row.source==='currentBoard'&&row.code==='unavailable'));
+  assert.deepEqual(archive.appSources.localStorage,before.localSources,'all four app-owned local source observations are byte-exact');
+  assert.deepEqual(archive.manifest.sources.localStorage,Object.fromEntries(before.localSources.map(row=>[row.key,{status:row.status==='present'?'included':row.status,...(row.reason?{reason:row.reason}:{})}])), 'the manifest truthfully labels each exact local source observation');
+  assert.deepEqual(archive.appSources.indexedDB,{database:before.database,stores:null},'the unavailable application store is never invented as readable archive data');
+  assert.deepEqual(archive.manifest.sources.indexedDB,{database:before.database,schemaVersion:2,status:'unavailable',reason:'unavailable'});
+  assert.ok(archive.manifest.failures.some(row=>row.source==='indexedDB'&&row.code==='unavailable'),'the partial manifest explicitly identifies the revoked storage port');
+  assert.equal(before.cloud.user,null,'the pending fixture is not the active cloud identity');
+  const downloadControl=view.page.locator('#exportTransferDialog [data-act="download-export"]');
+  assert.equal(await downloadControl.count(),1,'the fresh prepared dialog exposes exactly one real Download');
+  assert.equal(await downloadControl.isEnabled(),true,'the actual held Download is enabled on a fresh prepared instance before any Copy');
+  const serial=await view.page.evaluate(()=>exportCaptureSerial);
+  let downloads=0;view.page.on('download',()=>{downloads++;});
+  t.diagnostic('Actual trusted Copy and Download controls; isolated clipboard promise boundary, actual browser download/file readback. No OS clipboard or paste claim.');
+  await view.page.evaluate(()=>{window.__heldDownloadCopyRequests=[];Object.defineProperty(navigator,'clipboard',{configurable:true,value:{async writeText(raw){window.__heldDownloadCopyRequests.push(raw);}}});});
+  const copyControl=view.page.locator('#exportTransferDialog [data-act="copy-export"]');
+  assert.equal(await copyControl.count(),1);assert.equal(await copyControl.isEnabled(),true);
+  await copyControl.click();
+  await view.page.waitForFunction(()=>exportTransferBusy===false&&window.__heldDownloadCopyRequests.length===1);
+  assert.equal(await view.page.evaluate(()=>window.__heldDownloadCopyRequests[0]),raw,'deliberate Copy receives the exact prepared archive later used by Download');
+  assert.equal(downloads,0,'Copy does not start a download');
+  assert.equal(await downloadControl.isEnabled(),true);
+  assert.deepEqual(await view.page.evaluate(()=>({raw:exportTransferPayload,serial:exportCaptureSerial})),{raw,serial},'Copy leaves the same prepared instance available to Download');
+  const [download]=await Promise.all([view.page.waitForEvent('download',{timeout:10000}),downloadControl.click()]);
+  assert.equal(download.suggestedFilename(),'chain-scanner-recovery-archive.json');
+  const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base&&path.isAbsolute(base),'retain the actual downloaded file in allocated external native output');
+  fs.mkdirSync(base,{recursive:true});const directory=fs.mkdtempSync(path.join(base,'held-download-')),file=path.join(directory,download.suggestedFilename());
+  await download.saveAs(file);assert.equal(await download.failure(),null);
+  const bytes=fs.readFileSync(file),downloadedRaw=bytes.toString('utf8');
+  assert.equal(downloadedRaw,raw,'actual browser-downloaded file is byte-identical to the prepared archive');
+  assert.equal(downloadedRaw,await view.page.evaluate(()=>window.__heldDownloadCopyRequests[0]),'actual file equals the exact bytes offered to Copy');
+  const decoded=JSON.parse(downloadedRaw);
+  assert.equal(decoded.format,'chain-scanner.recovery-archive');assert.equal(decoded.currentBoard,null);
+  assert.equal(decoded.manifest.status,'partial');assert.deepEqual(decoded.manifest,archive.manifest);
+  assert.deepEqual(decoded.appSources.localStorage,before.localSources,'the decoded file contains the exact readable local sources');
+  assert.deepEqual(decoded.appSources.indexedDB,{database:before.database,stores:null},'the file never fabricates unavailable indexed database rows');
+  assert.deepEqual(decoded.manifest.sources.indexedDB,{database:before.database,schemaVersion:2,status:'unavailable',reason:'unavailable'});
+  assert.equal(downloads,1,'only the deliberate Download starts one actual file');
+  assert.match(await view.page.locator('#exportTransferStatus').innerText(),/Download started\. The archive contains the exact prepared export\./);
+  assert.equal(await copyControl.isEnabled(),true);assert.equal(await downloadControl.isEnabled(),true);
+  assert.deepEqual(await view.page.evaluate(()=>({raw:exportTransferPayload,serial:exportCaptureSerial})),{raw,serial});
+  t.diagnostic('Actual held Download artifact: '+JSON.stringify({file,suggestedFilename:download.suggestedFilename(),bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),preparedSerial:serial,downloads}));
+  await view.page.locator('#exportTransferDialog [data-act="close-modal"]').click();
+  await view.page.waitForFunction(()=>!document.getElementById('exportTransferDialog'));
+  const after=await capture();
+  assert.deepEqual(after.localSources,before.localSources,'closing Export leaves all original local bytes unchanged');
+  assert.deepEqual(after.indexedDB,before.indexedDB,'closing Export leaves every saved, pending, opaque and unknown device source unchanged');
+  assert.equal(after.appStoreNullBefore,true);assert.equal(after.appStoreNullAfter,true);assert.deepEqual(after.authority,before.authority,'Export and independent source observation grant no device/recovery authority');
+  assert.equal(after.accepted,false);assert.equal(after.taskCount,0);assert.equal(after.state,before.state,'the empty held placeholder remains unadopted');
+  assert.equal(after.recoveryHeld,true,'closing Export keeps the terminal recovery hold active');assert.equal(after.scanTimer,null);assert.equal(after.saveTimer,null);
+  assert.deepEqual(after.cloud,before.cloud,'Export does not upload, replay pending work, or change account/revision acknowledgement authority');
+  assert.deepEqual(after.sourceWrites,[],'the public Export flow makes no app-owned localStorage set/remove/clear');assert.deepEqual(after.deviceWrites,[],'no native write transaction is attempted against the original device database');
+  assert.deepEqual(view.errors,[]);
  }finally{view.releaseHeldFirebaseImports();await view.browser.close();}
  });
 });
@@ -20864,6 +21331,111 @@ test('RISK MANUAL JSON EXPORT: the actual Settings actions download current boar
   assert.deepEqual(deviceWrites,[],'export performs no device-store write');
   assert.deepEqual(browserWrites,[],'export performs no browser-storage write');
   assert.equal(inspect({head:await store.readHead(),backups:await store.listBackups(),opaque:await store.listOpaqueArchives(),pending:await store.getPendingUpload(account)},{depth:null,sorted:true,maxArrayLength:null,maxStringLength:null}),storedBefore,'export leaves every seeded device-store source unchanged');
+});
+
+test('RISK MANUAL JSON EXPORT: a refused download leaves the same prepared archive available to Copy',async t=>{
+  const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),dbName='manual-export-download-refusal-'+Date.now()+'-'+Math.random();
+  const storage=sharedScannerStorage(),cloudPushes=[],cloud={configured:true,user:null,ready:false,status:'syncing',signIn(){},signOut(){},async pull(){return{error:true};},async push(...args){cloudPushes.push(args);return{error:true};}};
+  const app=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName:dbName,cloudSyncFactory:()=>cloud}),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+  assert.ok(store,'the existing app fixture opened its own device store');t.after(()=>app.dispose());
+  const task=ctx.addTask('Prepared export survives an external Download refusal',false);await ctx.persist();
+  task.futureDownloadRefusalTask={retain:'unknown task bytes 🌿',sequence:[1,19]};ctx.state.futureDownloadRefusalBoard={retain:'unknown board field'};ctx.state.syncDirty=true;
+  const account='download-refusal-pending@example.test',pending={generationId:'download-refusal-pending-generation',payloadHash:'c'.repeat(64),baseRev:11,updatedAt:1};
+  assert.equal((await store.setPendingUpload(account,pending)).ok,true);
+  assert.deepEqual(await store.getPendingUpload(account),{...pending,account},'the independent pending source exists before Export');
+  const backupPayload='{"futureDownloadRefusalBackup":{"retain":"exact raw source 🌿\\u0000 bytes"}}',head=await store.readHead();
+  const backup={id:'download-refusal-original-backup',day:'2026-10-29',at:1,kind:'manual',payload:backupPayload};
+  assert.equal((await store.putBackup({expectedHash:head.hash,backup})).ok,true);
+  const opaqueKey='download-refusal-opaque-source',opaque={raw:'opaque source\u0000🌿',futureOpaque:{retain:19},bytes:new Uint8Array([0,17,255])};
+  const db=await new Promise((resolve,reject)=>{const request=indexedDB.open(dbName);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
+  try{await new Promise((resolve,reject)=>{const tx=db.transaction(['opaque'],'readwrite');tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||Error('Download-refusal source fixture aborted'));tx.objectStore('opaque').put(opaque,opaqueKey);});}finally{db.close();}
+  shim.localStorage.setItem('fvp:chain-scanner:device-store-v2','1');
+  const localBackupRaw=JSON.stringify([{...backup,futureLocalDownloadRefusal:{retain:true}}]);shim.localStorage.setItem('fvp:chain-scanner:daily-backups:v1',localBackupRaw);
+  const keys=['fvp:chain-scanner:v1','fvp:chain-scanner:protected:v1','fvp:chain-scanner:daily-backups:v1','fvp:chain-scanner:device-store-v2'];
+  const localSources=()=>keys.map(key=>{const raw=shim.localStorage.getItem(key);return raw===null?{key,status:'absent'}:{key,status:'present',raw};});
+  const rawBefore=await store.readRawExportSnapshot(),durableBefore=await store.readHead(),memoryBefore=JSON.stringify(ctx.state),localBefore=localSources();
+  const sourceRow=(name,key)=>{const rows=rawBefore.stores[name],at=rows.keys.indexOf(key);assert.notEqual(at,-1,name+' retains '+key);return rows.values[at];};
+  assert.deepEqual(sourceRow('meta','pending:'+account),{...pending,account});
+  assert.deepEqual(sourceRow('opaque',opaqueKey),opaque);
+  assert.equal(sourceRow('snapshots',createHash('sha256').update(backupPayload).digest('hex')).payload,backupPayload);
+  assert.equal(JSON.parse(durableBefore.payload).tasks.find(row=>row.id===task.id).futureDownloadRefusalTask,undefined,'the unknown current edit is deliberately unsaved');
+  const authority=()=>JSON.parse(readConst(ctx,'JSON.stringify({accepted:liveBoardAccepted,device:deviceStorageAuthority,required:deviceStorageRequired,head:deviceHeadHash,unaccepted:unacceptedDeviceSource,account:state.syncAccount??null,rev:state.syncRev??null,cloudUser:window.CloudSync?.user??null,cloudReady:window.CloudSync?.ready??null})'));
+  const authorityBefore=authority(),scanBefore=readConst(ctx,'scanWakeTimer'),saveBefore=readConst(ctx,'saveTimer');
+  assert.equal(authorityBefore.accepted,true);assert.equal(authorityBefore.device,true);assert.equal(authorityBefore.head,durableBefore.hash);assert.equal(authorityBefore.cloudUser,null);
+  const diagnosticsKey='fvp:chain-scanner:restart-diagnostics:v1',diagnosticsRaw=shim.localStorage.getItem(diagnosticsKey);
+  assert.equal(typeof diagnosticsRaw,'string');const diagnostics=JSON.parse(diagnosticsRaw),diagnosticDocument=diagnostics.documents?.[0];
+  assert.deepEqual(diagnostics,{version:1,documents:[{document:diagnosticDocument?.document,navigationType:'unavailable',events:diagnosticDocument?.events}]});
+  assert.match(diagnosticDocument.document,/^[a-f0-9]{16}$/);
+  assert.deepEqual(diagnosticDocument.events.map(({at,...metadata})=>metadata),[
+    {stage:'boot'},{stage:'save',status:'started',role:'current',code:'unknown'},
+    {stage:'persist',status:'started',role:'current',code:'unknown'},{stage:'persist',status:'durable',role:'current',code:'unknown'}
+  ],'the existing fixture contributes only fixed startup/save metadata before observation');
+  const diagnosticObservedAt=realNow(ctx);
+  for(const event of diagnosticDocument.events)assert.ok(Number.isSafeInteger(event.at)&&event.at>0&&event.at<=diagnosticObservedAt&&diagnosticObservedAt-event.at<=60*60*1000);
+  assert.ok(Buffer.byteLength(diagnosticsRaw,'utf8')<=8192);
+  const deviceWrites=[],browserWrites=[];
+  for(const name of ['migrateLegacy','commitHead','putBackup','updateBackupKind','deleteBackup','setPendingUpload','clearPendingUpload','setLegacyFingerprint','setRecoveryCloudHold','clearRecoveryCloudHold'])if(typeof store[name]==='function'){
+    const original=store[name];store[name]=(...args)=>{deviceWrites.push(name);return original(...args);};
+  }
+  for(const name of ['setItem','removeItem','clear'])if(typeof shim.localStorage[name]==='function'){
+    const original=shim.localStorage[name].bind(shim.localStorage);shim.localStorage[name]=(...args)=>{browserWrites.push([name,...args]);return original(...args);};
+  }
+  const controls=Object.fromEntries(['copyExportButton','downloadExportButton','exportTransferStatus'].map(id=>[id,makeFakeElement()])),getId=shim.document.getElementById.bind(shim.document);
+  shim.document.getElementById=id=>controls[id]||getId(id);
+  const copies=[],blobs=[],attempts=[],link=makeFakeElement(),refusal=Object.assign(Error('Controlled external Download launch refusal'),{code:'CONTROLLED_DOWNLOAD_REFUSAL'});
+  link.remove=()=>{};link.click=()=>{attempts.push({error:refusal,name:link.download,href:link.href,blob:blobs.at(-1)});throw refusal;};
+  shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();
+  ctx.Blob=class{constructor(parts,options){this.text=parts.join('');this.type=options.type;}};
+  ctx.URL={createObjectURL(blob){blobs.push(blob);return 'blob:controlled-download-refusal-'+blobs.length;},revokeObjectURL(){}};
+  ctx.navigator={clipboard:{writeText(raw){copies.push(raw);return Promise.resolve();}}};
+  ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
+  assert.equal((settings.match(/data-act="export-backup"/g)||[]).length,1);
+  assert.equal(await ctx.onAction('export-backup',{isConnected:true}),true);
+  const dialog=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(dialog,/id="exportTransferDialog"/);assert.equal((dialog.match(/data-act="copy-export"/g)||[]).length,1);assert.equal((dialog.match(/data-act="download-export"/g)||[]).length,1);
+  assert.doesNotMatch(dialog,/<textarea\b|currentBoardData|databaseRepairData|rawBackupData/);
+  const raw=readConst(ctx,'exportTransferPayload'),serial=readConst(ctx,'exportCaptureSerial'),archive=JSON.parse(raw);
+  assert.equal(typeof raw,'string');assert.ok(serial>0);assert.equal(archive.format,'chain-scanner.recovery-archive');assert.equal(archive.manifest.status,'complete');
+  assert.deepEqual(archive.currentBoard.tasks.find(row=>row.id===task.id).futureDownloadRefusalTask,{retain:'unknown task bytes 🌿',sequence:[1,19]});
+  assert.deepEqual(archive.currentBoard.futureDownloadRefusalBoard,{retain:'unknown board field'});
+  assert.deepEqual(archive.appSources.localStorage,localBefore);assert.equal(archive.appSources.localStorage.find(row=>row.key==='fvp:chain-scanner:daily-backups:v1').raw,localBackupRaw);
+  const archivedRow=(name,key)=>archive.appSources.indexedDB.stores[name].find(row=>decodeManualArchiveTypedValue(row.key)===key);
+  assert.deepEqual(decodeManualArchiveTypedValue(archivedRow('meta','pending:'+account).value),{...pending,account});
+  assert.equal(decodeManualArchiveTypedValue(archivedRow('snapshots',createHash('sha256').update(backupPayload).digest('hex')).value).payload,backupPayload);
+  assert.deepEqual(decodeManualArchiveTypedValue(archivedRow('opaque',opaqueKey).value),opaque);
+  assert.deepEqual(copies,[]);assert.deepEqual(attempts,[],'preparing the archive starts no external transfer');
+  assert.equal(await ctx.onAction('download-export',{}),false,'the real Download consumer reports its controlled external launch refusal');
+  assert.equal(attempts.length,1);assert.equal(attempts[0].error,refusal,'the intended temporary-anchor click boundary actually refused');
+  assert.equal(attempts[0].name,'chain-scanner-recovery-archive.json');assert.equal(attempts[0].blob.type,'application/json');assert.equal(attempts[0].blob.text,raw);assert.equal(blobs.length,1);
+  assert.equal(controls.exportTransferStatus.textContent,'Download could not start. Copy remains available for this prepared archive.');
+  assert.equal(controls.copyExportButton.disabled,false);assert.equal(controls.downloadExportButton.disabled,false);assert.equal(readConst(ctx,'exportTransferBusy'),false);
+  assert.equal(readConst(ctx,'exportTransferPayload'),raw);assert.equal(readConst(ctx,'exportCaptureSerial'),serial);assert.deepEqual(copies,[],'a refused Download never copies automatically');
+  assert.equal(await ctx.onAction('copy-export',{}),true,'the next deliberate Copy remains usable after Download refuses');
+  assert.deepEqual(copies,[raw],'Copy receives the exact full archive prepared before Download failed');
+  assert.equal(attempts.length,1,'Copy never retries or replaces the refused Download');assert.equal(blobs.length,1);
+  assert.match(controls.exportTransferStatus.textContent,/Copied the same recovery archive available from Download/);
+  assert.equal(controls.copyExportButton.disabled,false);assert.equal(controls.downloadExportButton.disabled,false);
+  assert.equal(readConst(ctx,'exportTransferPayload'),raw);assert.equal(readConst(ctx,'exportCaptureSerial'),serial);
+  assert.deepEqual(browserWrites,[],'Settings, Export preparation, refused Download and subsequent Copy perform no browser-storage writes');
+  assert.equal(shim.localStorage.getItem(diagnosticsKey),diagnosticsRaw,'transfer consumers also preserve the original diagnostic bytes');
+  const closeStartedAt=realNow(ctx);await ctx.onAction('close-modal',{});const closeFinishedAt=realNow(ctx);
+  assert.equal(JSON.stringify(ctx.state),memoryBefore,'Download refusal, subsequent Copy and Close never save or replace the accepted unsaved board');
+  assert.deepEqual(await store.readHead(),durableBefore,'the durable current board remains exact');
+  assert.deepEqual(await store.readRawExportSnapshot(),rawBefore,'every original raw meta/snapshot/backup/opaque/pending source remains exact');
+  assert.deepEqual(localSources(),localBefore);assert.deepEqual(authority(),authorityBefore,'no transfer grants or changes device/cloud/account/revision authority');
+  assert.equal(readConst(ctx,'scanWakeTimer'),scanBefore);assert.equal(readConst(ctx,'saveTimer'),saveBefore);
+  assert.deepEqual(deviceWrites,[]);
+  assert.equal(browserWrites.length,1,'only the explicit Close action may record its one bounded diagnostic write');
+  const [operation,key,closedRaw]=browserWrites[0];assert.equal(operation,'setItem');assert.equal(key,diagnosticsKey);
+  const closeEvent=JSON.parse(closedRaw).documents?.[0]?.lastAction;
+  assert.ok(Number.isSafeInteger(closeEvent?.at)&&closeEvent.at>=closeStartedAt&&closeEvent.at<=closeFinishedAt);
+  const expectedCloseEvent={at:closeEvent.at,stage:'action',detail:'close-modal'};
+  const expectedCloseRaw=JSON.stringify({version:1,documents:[{document:diagnosticDocument.document,navigationType:'unavailable',events:[...diagnosticDocument.events,expectedCloseEvent],lastAction:expectedCloseEvent}]});
+  assert.deepEqual(browserWrites,[['setItem',diagnosticsKey,expectedCloseRaw]],'the complete unreset write history permits no other operation, key, value or diagnostic field');
+  assert.ok(diagnosticDocument.events.length+1<=8);assert.ok(Buffer.byteLength(closedRaw,'utf8')<=8192);
+  for(const event of diagnosticDocument.events)assert.ok(closeFinishedAt-event.at<=60*60*1000);
+  assert.equal(shim.localStorage.getItem(diagnosticsKey),expectedCloseRaw);
+  assert.deepEqual(cloudPushes,[],'pending archive sources are never replayed or uploaded');
 });
 
 test('RISK MANUAL JSON EXPORT: unavailable and unsupported sources are explicit partial exports',async t=>{
