@@ -217,6 +217,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK DATABASE REPAIR EXPORT: reload help routes users to the combined export after standalone log exporters are removed
 - RISK MANUAL JSON EXPORT: the actual Settings actions download current board and recovery archive
 - RISK MANUAL JSON EXPORT: a refused download leaves the same prepared archive available to Copy
+- RISK MANUAL JSON EXPORT: refused Download releases its temporary anchor and object URL
 - RISK MANUAL JSON EXPORT: unavailable and unsupported sources are explicit partial exports
 - RISK BACKUP FILE RESTORE: the actual Settings file selection protects exact sources before explicit local adoption
 - RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exact sources before explicit local adoption

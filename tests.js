@@ -21333,6 +21333,71 @@ test('RISK MANUAL JSON EXPORT: the actual Settings actions download current boar
   assert.equal(inspect({head:await store.readHead(),backups:await store.listBackups(),opaque:await store.listOpaqueArchives(),pending:await store.getPendingUpload(account)},{depth:null,sorted:true,maxArrayLength:null,maxStringLength:null}),storedBefore,'export leaves every seeded device-store source unchanged');
 });
 
+test('RISK MANUAL JSON EXPORT: refused Download releases its temporary anchor and object URL',async t=>{
+  const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),dbName='manual-export-resource-refusal-'+Date.now()+'-'+Math.random();
+  const storage=sharedScannerStorage(),cloudPushes=[],cloud={configured:true,user:null,ready:false,status:'syncing',signIn(){},signOut(){},async pull(){return{error:true};},async push(...args){cloudPushes.push(args);return{error:true};}};
+  const app=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName:dbName,cloudSyncFactory:()=>cloud}),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+  assert.ok(store,'the existing app fixture opened its own device store');t.after(()=>app.dispose());
+  const task=ctx.addTask('Prepared export survives resource cleanup after Download refusal',false);await ctx.persist();
+  task.futureResourceRefusalTask={retain:'unknown task bytes 🌿',sequence:[1,19]};ctx.state.futureResourceRefusalBoard={retain:'unknown board field'};ctx.state.syncDirty=true;
+  const account='resource-refusal-pending@example.test',pending={generationId:'resource-refusal-pending-generation',payloadHash:'d'.repeat(64),baseRev:12,updatedAt:2};
+  assert.equal((await store.setPendingUpload(account,pending)).ok,true);
+  const keys=['fvp:chain-scanner:v1','fvp:chain-scanner:protected:v1','fvp:chain-scanner:daily-backups:v1','fvp:chain-scanner:device-store-v2'];
+  const localSources=()=>keys.map(key=>{const raw=shim.localStorage.getItem(key);return raw===null?{key,status:'absent'}:{key,status:'present',raw};});
+  const rawBefore=await store.readRawExportSnapshot(),durableBefore=await store.readHead(),memoryBefore=JSON.stringify(ctx.state),localBefore=localSources();
+  const authority=()=>readConst(ctx,'JSON.stringify({accepted:liveBoardAccepted,device:deviceStorageAuthority,required:deviceStorageRequired,head:deviceHeadHash,unaccepted:unacceptedDeviceSource,account:state.syncAccount??null,rev:state.syncRev??null,cloudUser:window.CloudSync?.user??null,cloudReady:window.CloudSync?.ready??null})');
+  const authorityBefore=authority(),scanBefore=readConst(ctx,'scanWakeTimer'),saveBefore=readConst(ctx,'saveTimer');
+  const deviceWrites=[],browserWrites=[];
+  for(const name of ['migrateLegacy','commitHead','putBackup','updateBackupKind','deleteBackup','setPendingUpload','clearPendingUpload','setLegacyFingerprint','setRecoveryCloudHold','clearRecoveryCloudHold'])if(typeof store[name]==='function'){
+    const original=store[name];store[name]=(...args)=>{deviceWrites.push(name);return original(...args);};
+  }
+  for(const name of ['setItem','removeItem','clear'])if(typeof shim.localStorage[name]==='function'){
+    const original=shim.localStorage[name].bind(shim.localStorage);shim.localStorage[name]=(...args)=>{browserWrites.push([name,...args]);return original(...args);};
+  }
+  const controls=Object.fromEntries(['copyExportButton','downloadExportButton','exportTransferStatus'].map(id=>[id,makeFakeElement()])),getId=shim.document.getElementById.bind(shim.document);
+  shim.document.getElementById=id=>controls[id]||getId(id);
+  const downloadUrl='blob:manual-download-resource-refusal',copies=[],blobs=[],attempts=[],removedAnchors=[],revokedUrls=[],link=makeFakeElement(),refusal=Object.assign(Error('Controlled external Download launch refusal'),{code:'CONTROLLED_DOWNLOAD_REFUSAL'});
+  link.remove=()=>{removedAnchors.push(link);};
+  link.click=()=>{attempts.push({error:refusal,name:link.download,href:link.href,blob:blobs.at(-1)});throw refusal;};
+  shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();
+  ctx.Blob=class{constructor(parts,options){this.text=parts.join('');this.type=options.type;}};
+  ctx.URL={createObjectURL(blob){blobs.push(blob);return downloadUrl;},revokeObjectURL(url){revokedUrls.push(url);}};
+  ctx.navigator={clipboard:{writeText(raw){copies.push(raw);return Promise.resolve();}}};
+  ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
+  assert.equal((settings.match(/data-act="export-backup"/g)||[]).length,1);
+  assert.equal(await ctx.onAction('export-backup',{isConnected:true}),true);
+  const dialog=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(dialog,/id="exportTransferDialog"/);assert.equal((dialog.match(/data-act="copy-export"/g)||[]).length,1);assert.equal((dialog.match(/data-act="download-export"/g)||[]).length,1);
+  assert.doesNotMatch(dialog,/<textarea\b|currentBoardData|databaseRepairData|rawBackupData/);
+  const raw=readConst(ctx,'exportTransferPayload'),serial=readConst(ctx,'exportCaptureSerial'),archive=JSON.parse(raw);
+  assert.equal(typeof raw,'string');assert.ok(serial>0);assert.equal(archive.format,'chain-scanner.recovery-archive');assert.equal(archive.manifest.status,'complete');
+  assert.deepEqual(archive.currentBoard.tasks.find(row=>row.id===task.id).futureResourceRefusalTask,{retain:'unknown task bytes 🌿',sequence:[1,19]});
+  assert.deepEqual(archive.currentBoard.futureResourceRefusalBoard,{retain:'unknown board field'});
+  assert.deepEqual(archive.appSources.localStorage,localBefore);
+  assert.deepEqual(copies,[]);assert.deepEqual(attempts,[],'preparing the archive starts no external transfer');
+  assert.equal(await ctx.onAction('download-export',{}),false,'the actual Download consumer reports the controlled external launch refusal');
+  assert.equal(attempts.length,1);assert.equal(attempts[0].error,refusal,'the intended temporary-anchor click boundary actually refused');
+  assert.equal(attempts[0].name,'chain-scanner-recovery-archive.json');assert.equal(attempts[0].href,downloadUrl);
+  assert.equal(attempts[0].blob.type,'application/json');assert.equal(attempts[0].blob.text,raw);assert.equal(blobs.length,1);
+  assert.equal(removedAnchors.length,1,'the failed Download removes the temporary anchor');assert.equal(removedAnchors[0],link);
+  assert.deepEqual(revokedUrls,[downloadUrl],'the failed Download releases the exact object URL it acquired');
+  assert.equal(controls.exportTransferStatus.textContent,'Download could not start. Copy remains available for this prepared archive.');
+  assert.equal(controls.copyExportButton.disabled,false);assert.equal(controls.downloadExportButton.disabled,false);assert.equal(readConst(ctx,'exportTransferBusy'),false);
+  assert.equal(readConst(ctx,'exportTransferPayload'),raw);assert.equal(readConst(ctx,'exportCaptureSerial'),serial);assert.deepEqual(copies,[],'a refused Download never copies automatically');
+  assert.equal(await ctx.onAction('copy-export',{}),true,'the next deliberate Copy remains usable after Download refuses');
+  assert.deepEqual(copies,[raw],'Copy receives the exact prepared archive after failed Download cleanup');
+  assert.equal(attempts.length,1,'Copy does not retry or replace the refused Download');assert.equal(blobs.length,1);
+  assert.match(controls.exportTransferStatus.textContent,/Copied the same recovery archive available from Download/);
+  assert.equal(controls.copyExportButton.disabled,false);assert.equal(controls.downloadExportButton.disabled,false);
+  assert.equal(readConst(ctx,'exportTransferPayload'),raw);assert.equal(readConst(ctx,'exportCaptureSerial'),serial);
+  assert.equal(JSON.stringify(ctx.state),memoryBefore,'Download refusal, cleanup and Copy never save or replace the accepted unsaved board');
+  assert.deepEqual(await store.readHead(),durableBefore,'the durable current board remains exact');
+  assert.deepEqual(await store.readRawExportSnapshot(),rawBefore,'every saved and pending device-store source remains exact');
+  assert.deepEqual(localSources(),localBefore);assert.deepEqual(authority(),authorityBefore,'transfer failure and Copy do not change device/cloud/account/revision authority');
+  assert.equal(readConst(ctx,'scanWakeTimer'),scanBefore);assert.equal(readConst(ctx,'saveTimer'),saveBefore);
+  assert.deepEqual(deviceWrites,[]);assert.deepEqual(browserWrites,[]);assert.deepEqual(cloudPushes,[]);
+});
+
 test('RISK MANUAL JSON EXPORT: a refused download leaves the same prepared archive available to Copy',async t=>{
   const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),dbName='manual-export-download-refusal-'+Date.now()+'-'+Math.random();
   const storage=sharedScannerStorage(),cloudPushes=[],cloud={configured:true,user:null,ready:false,status:'syncing',signIn(){},signOut(){},async pull(){return{error:true};},async push(...args){cloudPushes.push(args);return{error:true};}};

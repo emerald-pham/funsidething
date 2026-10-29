@@ -7818,6 +7818,11 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK MANUAL JSON EXPORT: refused Download releases its temporary anchor and object URL",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK MANUAL JSON EXPORT: the actual Settings actions download current board and recovery archive",
       "group": "core",
       "file": "tests.js"

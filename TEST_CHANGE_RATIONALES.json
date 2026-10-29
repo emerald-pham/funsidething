@@ -26894,5 +26894,30 @@
       "TC01MechanicalComparisonSha256": "8511808aedd4a78f7094bee207d7c30345ddad617e1ea405c6e0a94b11f7523c",
       "finalBothEngineProof": "not-run; owned by1174"
     }
+  },
+  {
+    "baseCommit": "2ea5ab8b7dcbc010f7c6ca07d0146926b4308fb2",
+    "testChangesSha256": "c7ab4f872df44faf6b7a5cda6facd27d725197a0fe7f43f9b417f0963cbd792a",
+    "reason": "The unchanged-E Settings Export/Download consumer reached an actual refused temporary-anchor click but left the acquired anchor attached and Blob URL unreleased. This focused regression requires both owned resources to be released on failure while retaining the previously proven Copy fallback and source protections.",
+    "previousBehavior": "When the temporary anchor click throws, the existing catch restores the truthful failure status and leaves the prepared archive available for deliberate Copy, but skips the remove and revoke statements that only run after a successful click.",
+    "intendedBehavior": "A failed launch attempts to remove its temporary anchor and revoke its exact acquired Blob URL while preserving the exact prepared archive, Copy availability, source state, authority and failure status. Successful Download keeps its current status and deferred 30-second URL revocation.",
+    "replacementTests": [
+      "RISK MANUAL JSON EXPORT: refused Download releases its temporary anchor and object URL"
+    ],
+    "preservedCoverage": [
+      "The original complete refused-Download-to-Copy consumer remains unchanged and continues to protect exact archive bytes, unknown and typed current fields, saved and pending sources, truthful status, authority, and absence of automatic transfer.",
+      "The new existing-consumer RISK adds exact temporary-anchor and acquired-URL cleanup assertions after a controlled external click refusal; it also preserves deliberate Copy and saved/current/source/authority lifetimes.",
+      "Successful Download, partial and unavailable-source behavior, stale Copy completion ownership, and all unrelated native, protected-state, and browser-boundary cases remain existing feature contracts."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^RISK MANUAL JSON EXPORT: refused Download releases its temporary anchor and object URL$ tests.js",
+      "failure": "Recorder 2026-10-29T12-54-28-271Z-f4f32f40-0ac4-4934-8aa4-6b40842950a0 observed the real Settings Export and Download consumer, confirmed the controlled anchor-click refusal, then failed at tests.js:21382: the failed Download removes the temporary anchor; expected 1 removal, observed 0. The same test separately requires revocation of the exact acquired URL; that assertion follows the failing anchor assertion in the baseline run.",
+      "recorderId": "2026-10-29T12-54-28-271Z-f4f32f40-0ac4-4934-8aa4-6b40842950a0",
+      "nodeVersion": "v24.19.0",
+      "sourceCommit": "2ea5ab8b7dcbc010f7c6ca07d0146926b4308fb2",
+      "sourceTree": "25942860ac2c2d67e95b22b7886c11a7b0522136",
+      "sourceTestDiffSha256": "4487f6cd20324e753f95729c28a07d482976b0de21ce7c2d6fc03bcaf137bb07",
+      "outputSha256": "42d5c3fbec31c650cc88a7e53bfc2e2ceeb9b28d3ddf4f38b642c68f1e67be2c"
+    }
   }
 ]
