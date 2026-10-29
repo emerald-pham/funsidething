@@ -27634,5 +27634,387 @@
       "commonBase": "2ea5ab8b7dcbc010f7c6ca07d0146926b4308fb2",
       "metadataOnly": true
     }
+  },
+  {
+    "baseCommit": "694c5bb61dfcb006b771493e238014eb74c3bada",
+    "testChangesSha256": "600e9237fd9d13b064faff1e92e97f690f73ac38e5fabe46fb10e60028e96122",
+    "reason": "Strengthen the existing manual Export consumer evidence for accepted-board and original-source preservation on its unsupported, cyclic, and repeated-reference IndexedDB paths. This adds coverage of existing behavior only; no runtime defect or implementation fix is claimed.",
+    "previousBehavior": "The existing consumer proved that unsupported IndexedDB values make the manual Export partial, leave IndexedDB stores unavailable, and do not leak fixture keys, but it did not independently compare the accepted board, readable local source bytes, physical device snapshot/head, or supplied unsupported input before and after Export.",
+    "intendedBehavior": "For each existing unsupported-value variant, the same real Export\u2192Copy consumer retains the independently captured accepted board and exact readable local data while leaving in-memory state, durable head, physical raw snapshot, and supplied input graph unchanged. One isolated loadApp appSource mutant dropping archive currentBoard is caught by the exact accepted-board equality assertion.",
+    "replacementTests": [
+      "RISK MANUAL JSON EXPORT: unavailable and unsupported sources are explicit partial exports"
+    ],
+    "preservedCoverage": [
+      "The source-only corrupt-localStorage path, its partial archive/currentBoard:null/raw-byte checks, and its refusal to decode an incomplete archive remain unchanged.",
+      "All three existing unsupported, cycle, and repeated-reference variants retain their original raw-reader injection, partial/unavailable assertions, IndexedDB failure checks, and no-injected-value-leak assertion.",
+      "The negative control uses one in-memory appSource replacement only in a separate loadApp fixture; healthy variants and the tracked application/runtime source remain unmutated.",
+      "The fixed 3-root/6-case selection remains unchanged; no new root, nested test, group, fixture helper, input seam, or product behavior is added."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/partial-export-preservation-coverage/focused-validation/run-1437 --purpose green -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern='^(?:RISK DATABASE REPAIR EXPORT: unreadable sources are labeled partial and never shown as an empty database|RISK DATABASE REPAIR EXPORT: asynchronous snapshot rejection stays partial and unavailable|RISK MANUAL JSON EXPORT: unavailable and unsupported sources are explicit partial exports)$' tests.js",
+      "failure": "The one focused command was declared green but actually ended assertion-failure (5/6 TAP cases, 2/3 selected roots passed). The first unsupported-value variant failed at the new readable-local-source export assertion: `fvp:chain-scanner:restart-diagnostics:v1` had a captured readable localStorage string but no matching archive appSources.localStorage row. This means the added every-readable-local-key retention expectation is not earned for this key; the cycle/repeated-reference variants and isolated mutant sensitivity were not reached. This is a focused coverage/acceptance failure, not a preimplementation app RED or evidence of a product defect. No repair or rerun was made.",
+      "recorderId": "2026-10-29T14-42-00-837Z-0f98c846-4c1f-4918-a882-cc44d7f2676b",
+      "recorderRecordSha256": "d6cb3dd97de18af63b2e01f279c002ae0d0250a6fda512a124cb60c63dd45314",
+      "actualOutcome": "assertion-failure",
+      "tapCounts": {
+        "tests": 6,
+        "pass": 5,
+        "fail": 1,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      "nodeVersion": "v24.19.0",
+      "sourceCommit": "694c5bb61dfcb006b771493e238014eb74c3bada",
+      "sourceTree": "f48a945667cdcc79b66031a488f302cfc948672b",
+      "sourceTestsSha256": "c0321835be568c6d4f06a3fc2e91f5bf2efffc7157556e13582000c59da3bdd7",
+      "sourceAppSha256": "e255ff296c10ba99292a9ed4164e9b4564f6b967d5818ea11204b9cea0d4c18b",
+      "sourceTestDiffSha256": "a4eb2c82fbc23691fe3c780454dcabd968c911a536a960d8a3278f6ba3d98607",
+      "outputSha256": "3aebaea20038b47723ec8e086a384bad641b3d30468f967714da9be6a267142f",
+      "failingAssertion": "tests.js:21562:14",
+      "failingReadableLocalSourceKey": "fvp:chain-scanner:restart-diagnostics:v1"
+    }
+  },
+  {
+    "baseCommit": "694c5bb61dfcb006b771493e238014eb74c3bada",
+    "testChangesSha256": "1989d74ef42ac673fe76569c12bef45e0c60c81ef5aafb439f18e8ec1116bd61",
+    "reason": "Correct only the new unsupported-Export test oracle and its source-settle precondition, as admitted by closed issue1443. The original1437 failure expected all readable localStorage keys as raw archive rows even though the declared public archive contract includes four fixed source keys plus pending-scene keys; no application defect or runtime fix is claimed.",
+    "previousBehavior": "The added oracle conflated all localStorage preservation with the selected raw archive inventory and could snapshot head/physical sources while Add still had a real350ms save queued after explicit persist. Its first unsupported variant failed on the deliberately non-raw restart-diagnostics key, leaving tail/cycle/shared/sensitivity acceptance unearned.",
+    "intendedBehavior": "Keep complete ALL-key/raw-localStorage equality. Independently expect raw archive rows only for the four declared source constants and existing pending-scene prefix keys captured before Export. Reuse existing loadBackupFileFixtureApp and prepareBackupFileFixtureSource at the healthy and isolated-mutant call sites so actual queued saves finish before exact board/head/physical/input comparisons. Preserve the exact currentBoard-null accepted-board sensitivity discriminator.",
+    "replacementTests": [
+      "RISK MANUAL JSON EXPORT: unavailable and unsupported sources are explicit partial exports"
+    ],
+    "preservedCoverage": [
+      "The original source-only corrupt-localStorage input, partial/currentBoard:null/raw bytes and incomplete-archive parser refusal remain exact.",
+      "All original unsupported RegExp, cyclic and repeated-reference healthy inputs and every original partial/unavailable/IndexedDB-failure/no-leak assertion remain.",
+      "Complete memory, ALL local keys/raw strings including raw diagnostics, durable head, physical snapshot, supplied injection snapshot and original value/alias/cycle/RegExp shape checks remain. Only the newly incorrect raw-archive inventory expectation changes.",
+      "The existing separate loadApp appSource mutant still changes only the one-count currentBoard:board fragment to currentBoard:null and must catch the specific ERR_ASSERTION/deepStrictEqual/null/independent-expected/message failure through actual Export and Copy.",
+      "All982 prior rationale objects including the actual1437 failure stay an exact prefix. No application/helper/harness/root/group/map/input change or preimplementation application RED is claimed."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/342-sol-contract/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/partial-export-source-contract-repair/sol-owner/1445-runs --purpose green --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern='^(?:RISK DATABASE REPAIR EXPORT: unreadable sources are labeled partial and never shown as an empty database|RISK DATABASE REPAIR EXPORT: asynchronous snapshot rejection stays partial and unavailable|RISK MANUAL JSON EXPORT: unavailable and unsupported sources are explicit partial exports)$' tests.js",
+      "failure": "Observed later established-behavior negative-control sensitivity in the one corrected focused run: the actual Export\u2192Copy consumer with the sole in-memory currentBoard:board, to currentBoard:null, mutation threw and caught ERR_ASSERTION with operator deepStrictEqual, actual null, the independently captured expected accepted board, and the exact preservation message. All3 healthy roots/6 TAPcases including all3 unsupported/cycle/repeated-reference variants passed, zero fail/skip/cancel and child/wrapper0. This is not a preimplementation app RED or app defect. The original1437 wrong-inventory failure remains unchanged in originalFailedEvidence and the prior rationale object.",
+      "recorderId": "2026-10-29T15-04-09-775Z-00ab87d9-26ef-42de-a063-b2da9f6637c5",
+      "recorderRecordSha256": "8c668d8d2a1d2b18f203b2278c151ad9df69feca715938d0105a49cb3df3635a",
+      "actualOutcome": "passed-with-caught-established-behavior-negative-control",
+      "tapCounts": {
+        "tests": 6,
+        "pass": 6,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "nodeVersion": "v24.19.0",
+      "sourceCommit": "694c5bb61dfcb006b771493e238014eb74c3bada",
+      "sourceTree": "f48a945667cdcc79b66031a488f302cfc948672b",
+      "sourceTestsSha256": "0bc979c452ecaf68a9c2aca641aa8cfae4d1cca8045cd3cf41039c3c580df047",
+      "sourceAppSha256": "e255ff296c10ba99292a9ed4164e9b4564f6b967d5818ea11204b9cea0d4c18b",
+      "sourceRationaleSha256": "cdde4f8fcea8428e2c067d467ef64f793cce0e165c4eeb1f0359bfe5cfdcaab2",
+      "sourceTestDiffSha256": "8a2493256d5b2559ce1a6add3268e9472edbda0dfeaadb3eac2debc9d0d21b1a",
+      "outputSha256": "23809fe7c97065fc5dc4e0e2259bbfa4309a11c926fbdfabca2ec768148103d7",
+      "observedAssertion": {
+        "code": "ERR_ASSERTION",
+        "operator": "deepStrictEqual",
+        "actual": null,
+        "message": "unsupported structured-clone values preserve the independently captured accepted board exactly\\n+ actual - expected\\n\\n+ null\\n- {\\n-   addOpen: true,\\n-   candidateId: null,\\n-   cantAt: {},\\n-   chain: [],\\n-   chance: null,\\n-   clearedAfterRestoreOps: {},\\n-   clearedHistoryIds: {},\\n-   considered: {},\\n-   contexts: [\\n-     {\\n-       active: true,\\n-       id: 'c_errand',\\n-       name: 'Errands'\\n-     },\\n-     {\\n-       active: true,\\n-       id: 'c_home',\\n-       name: 'Home Only'\\n-     }\\n-   ],\\n-   ctxOpen: true,\\n-   decisionsMs: [],\\n-   deletedAfterRestoreOps: {},\\n-   deletedTaskIds: {},\\n-   deletionLog: [],\\n-   histOpen: false,\\n-   interventionActive: false,\\n-   interventionP: 0,\\n-   listOpen: false,\\n-   mode: 'scan',\\n-   passId: null,\\n-   passStartedAt: 0,\\n-   presentedAt: 0,\\n-   restoredHistoryIds: {},\\n-   restoredHistoryOps: {},\\n-   restoredTaskIds: {},\\n-   restoredTaskOps: {},\\n-   scanMode: 'descending',\\n-   settings: {\\n-     cantMin: 30,\\n-     dateFormat: 'system',\\n-     evergreenHours: 18,\\n-     evergreenResetAtDay: true,\\n-     excludeNoContext: false,\\n-     floatingHeader: false,\\n-     horizonMin: 60,\\n-     hourlyQuotes: {},\\n-     lastTaskWoop: false,\\n-     listMetric: 'rank',\\n-     patternedIndicators: false,\\n-     postponeHours: 1,\\n-     samples: 250,\\n-     scanMode: 'halving',\\n-     scene: {\\n-       location: null,\\n-       season: null,\\n-       time: null\\n-     },\\n-     showPostpone: false,\\n-     skipOldestFirstDot: false,\\n-     squaredDefaultVersion: 1,\\n-     theme: 'system',\\n-     thresholdPct: 25,\\n-     workedHours: 16\\n-   },\\n-   snooze: 0,\\n-   tasks: [\\n-     {\\n-       completedAt: null,\\n-       createdAt: 1793286251048,\\n-       ctx: [],\\n-       done: false,\\n-       due: null,\\n-       evergreen: false,\\n-       evergreenHours: 18,\\n-       evergreenResetAtDay: true,\\n-       id: 't115d91e8-a1ba-49cb-92c4-a6a32d426548',\\n-       lastDoneAt: null,\\n-       mu: 25,\\n-       prerequisiteId: null,\\n-       prerequisiteIds: [],\\n-       prerequisiteMirror: null,\\n-       prerequisiteOps: {},\\n-       prerequisiteRevision: 0,\\n-       sigma: 8.333333333333334,\\n-       startsAt: null,\\n-       title: 'Accepted board for isolated unsupported-source negative control',\\n-       url: null\\n-     }\\n-   ],\\n-   updatedAt: 1793286251048,\\n-   v: 2,\\n-   workLog: [],\\n-   workedAt: {}\\n- }\\n"
+      }
+    },
+    "originalFailedEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/partial-export-preservation-coverage/focused-validation/run-1437 --purpose green -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern='^(?:RISK DATABASE REPAIR EXPORT: unreadable sources are labeled partial and never shown as an empty database|RISK DATABASE REPAIR EXPORT: asynchronous snapshot rejection stays partial and unavailable|RISK MANUAL JSON EXPORT: unavailable and unsupported sources are explicit partial exports)$' tests.js",
+      "failure": "The one focused command was declared green but actually ended assertion-failure (5/6 TAP cases, 2/3 selected roots passed). The first unsupported-value variant failed at the new readable-local-source export assertion: `fvp:chain-scanner:restart-diagnostics:v1` had a captured readable localStorage string but no matching archive appSources.localStorage row. This means the added every-readable-local-key retention expectation is not earned for this key; the cycle/repeated-reference variants and isolated mutant sensitivity were not reached. This is a focused coverage/acceptance failure, not a preimplementation app RED or evidence of a product defect. No repair or rerun was made.",
+      "recorderId": "2026-10-29T14-42-00-837Z-0f98c846-4c1f-4918-a882-cc44d7f2676b",
+      "recorderRecordSha256": "d6cb3dd97de18af63b2e01f279c002ae0d0250a6fda512a124cb60c63dd45314",
+      "actualOutcome": "assertion-failure",
+      "tapCounts": {
+        "tests": 6,
+        "pass": 5,
+        "fail": 1,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      "nodeVersion": "v24.19.0",
+      "sourceCommit": "694c5bb61dfcb006b771493e238014eb74c3bada",
+      "sourceTree": "f48a945667cdcc79b66031a488f302cfc948672b",
+      "sourceTestsSha256": "c0321835be568c6d4f06a3fc2e91f5bf2efffc7157556e13582000c59da3bdd7",
+      "sourceAppSha256": "e255ff296c10ba99292a9ed4164e9b4564f6b967d5818ea11204b9cea0d4c18b",
+      "sourceTestDiffSha256": "a4eb2c82fbc23691fe3c780454dcabd968c911a536a960d8a3278f6ba3d98607",
+      "outputSha256": "3aebaea20038b47723ec8e086a384bad641b3d30468f967714da9be6a267142f",
+      "failingAssertion": "tests.js:21562:14",
+      "failingReadableLocalSourceKey": "fvp:chain-scanner:restart-diagnostics:v1"
+    },
+    "verificationEvidence": {
+      "status": "observed-passed-once",
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/342-sol-contract/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/partial-export-source-contract-repair/sol-owner/1445-runs --purpose green --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern='^(?:RISK DATABASE REPAIR EXPORT: unreadable sources are labeled partial and never shown as an empty database|RISK DATABASE REPAIR EXPORT: asynchronous snapshot rejection stays partial and unavailable|RISK MANUAL JSON EXPORT: unavailable and unsupported sources are explicit partial exports)$' tests.js",
+      "plannedSensitivity": "Actual Export\u2192Copy in the separate existing appSource currentBoard:null VM must throw and catch the specific new accepted-board equality AssertionError; no corrected healthy acceptance or sensitivity is claimed before1445.",
+      "recorderId": "2026-10-29T15-04-09-775Z-00ab87d9-26ef-42de-a063-b2da9f6637c5",
+      "recordPath": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/partial-export-source-contract-repair/sol-owner/1445-runs/2026-10-29T15-04-09-775Z-00ab87d9-26ef-42de-a063-b2da9f6637c5.json",
+      "recordSha256": "8c668d8d2a1d2b18f203b2278c151ad9df69feca715938d0105a49cb3df3635a",
+      "rootNames": [
+        "RISK DATABASE REPAIR EXPORT: unreadable sources are labeled partial and never shown as an empty database",
+        "RISK DATABASE REPAIR EXPORT: asynchronous snapshot rejection stays partial and unavailable",
+        "RISK MANUAL JSON EXPORT: unavailable and unsupported sources are explicit partial exports"
+      ],
+      "tapCounts": {
+        "tests": 6,
+        "pass": 6,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "healthyVariantsComplete": [
+        "unsupported structured-clone values",
+        "cycles",
+        "repeated references"
+      ],
+      "caughtNegativeControlObserved": true,
+      "executedTestsSha256": "0bc979c452ecaf68a9c2aca641aa8cfae4d1cca8045cd3cf41039c3c580df047",
+      "executedAppSha256": "e255ff296c10ba99292a9ed4164e9b4564f6b967d5818ea11204b9cea0d4c18b",
+      "executedRationaleSha256": "cdde4f8fcea8428e2c067d467ef64f793cce0e165c4eeb1f0359bfe5cfdcaab2",
+      "sourceTestDiffSha256": "8a2493256d5b2559ce1a6add3268e9472edbda0dfeaadb3eac2debc9d0d21b1a",
+      "outputSha256": "23809fe7c97065fc5dc4e0e2259bbfa4309a11c926fbdfabca2ec768148103d7",
+      "environmentSha256": "4116999a50cb3de4898836aa5686260815f38bb3835d04a039885f8a964c43d1",
+      "childExitCode": 0,
+      "wrapperExitCode": 0,
+      "signal": null,
+      "chronology": "Established-behavior later isolated source-mutant sensitivity; no preimplementation application RED or product defect claimed. Original1437 failure remains source-specific and immutable."
+    },
+    "assessmentEvidence": {
+      "issue": 1443,
+      "comment": "https://github.com/emerald-pham/funsidething/issues/1443#issuecomment-6500113677",
+      "decisionSha256": "faf049bb0e08310c42c1b9e47bbad5c27ccb92f598c04a6e4da2c93d4d5fe75a"
+    },
+    "definitionState": "Defined only: exact actual694-to-working protected fingerprint recorded after admitted edit; syntax/JSON/diff and source inverse checks only. Corrected healthy run and caught sensitivity are still unobserved until1445."
+  },
+  {
+    "baseCommit": "1e48c6f5c592a62624c318d891c035470c09fda3",
+    "testChangesSha256": "c898298367641a16430e56dab918a0238a6da08e461121522392be67abc497ea",
+    "reason": "Close the existing canceled-capture consumer coverage gap for late raw capture success/failure against newer busy owners, prepared archive Copy and unsaved Paste/Settings drafts. Existing serial guards are not a demonstrated defect; application/runtime source is unchanged.",
+    "previousBehavior": "The existing root proved one cancelled continuation retained a pasted draft and repeated capture was refused, but did not control both old settlement outcomes while each newer busy/payload/draft owner remained active.",
+    "intendedBehavior": "Eight named internal healthy cases preserve the independent newer view/payload/status/captureBusy/transferBusy/control/draft facts and exact accepted memory/local/raw device sources after late old resolve or reject. Only the current read/Copy settles afterward. The same busy-owner assertion must catch the sole final serial-guard source mutant in one separate existing appSource VM.",
+    "replacementTests": [
+      "RISK DATABASE REPAIR EXPORT: canceled capture keeps the pasted draft and concurrent capture is bounded"
+    ],
+    "preservedCoverage": [
+      "The complete original canceled continuation, pasted draft, concurrent repeat refusal, current capture and whole memory assertions remain unchanged inside the same root/title.",
+      "All983 earlier rationale objects and original1430/1437/1445 source, failure, redaction and corrected-proof chronology stay an exact prefix.",
+      "Healthy cases use original app source, real public controls, existing loader/readConst/raw and clipboard promise seams, actual save-producer settlement and explicit latch cleanup; no helper/root/group/map/harness/app/runtime changes.",
+      "Whole accepted board/memory, ALL local key/raw observations, durable head/physical snapshot and authority/save/persist facts remain exact; actual Close restart metadata is retained separately from zero export writes."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/342-sol-contract/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/late-capture-preservation/sol-owner/1441-runs --purpose green --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern='^RISK DATABASE REPAIR EXPORT: canceled capture keeps the pasted draft and concurrent capture is bounded$' tests.js",
+      "failure": "Observed established-behavior sensitivity in the same one passing focused run 2026-10-29T15-54-21-568Z-e3eaa056-cca5-4da1-a69a-1e1dd98d5436: the separate existing appSource VM changed only the unique final serial-guard busy clear to unconditional clearing. The SAME added capture-busy equality caught actual ERR_ASSERTION/strictEqual/expectedtrue/actualfalse with message negative control: old resolve / capture-busy preserves the newer capture busy owner\\n\\nfalse !== true\\n. All original checks and eight named healthy internal cases passed with child/wrapper0. This is not preimplementation application RED or a demonstrated app defect; no app/runtime fix or behavioral rerun occurred."
+    },
+    "verificationEvidence": {
+      "status": "passed",
+      "executed": true,
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/342-sol-contract/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/late-capture-preservation/sol-owner/1441-runs --purpose green --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern='^RISK DATABASE REPAIR EXPORT: canceled capture keeps the pasted draft and concurrent capture is bounded$' tests.js",
+      "recorderId": "2026-10-29T15-54-21-568Z-e3eaa056-cca5-4da1-a69a-1e1dd98d5436",
+      "recordPath": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/late-capture-preservation/sol-owner/1441-runs/2026-10-29T15-54-21-568Z-e3eaa056-cca5-4da1-a69a-1e1dd98d5436.json",
+      "recordSha256": "cee7abcae3e88501c589183f84b0eef29722dd51571ad47748fdf6dde1d8a751",
+      "sourceTestDiffSha256": "61ca5500b2b0f55b3852b8b18468e7b4d49967eb6bc3464b142111ec15856f85",
+      "outputSha256": "6233d0ffe48b9c0ad4eaaf824f549abbc7a58c4f6e9ff5e03ee3f3a74f2a5315",
+      "stdoutSha256": "68417866c0700964ef2294700ee6ae61cdbd448f2533fdc0820f15d30f8de830",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "childExitCode": 0,
+      "wrapperExitCode": 0,
+      "tapTests": 1,
+      "tapPass": 1,
+      "tapFail": 0,
+      "tapCancelled": 0,
+      "tapSkipped": 0,
+      "selectedRoots": 1,
+      "healthyInternalCases": [
+        "old resolve / capture-busy",
+        "old reject / capture-busy",
+        "old resolve / copy-busy",
+        "old reject / copy-busy",
+        "old resolve / paste-draft",
+        "old reject / paste-draft",
+        "old resolve / settings-draft",
+        "old reject / settings-draft"
+      ],
+      "caughtNegativeControl": {
+        "code": "ERR_ASSERTION",
+        "operator": "strictEqual",
+        "expected": true,
+        "actual": false,
+        "message": "negative control: old resolve / capture-busy preserves the newer capture busy owner\\n\\nfalse !== true\\n"
+      },
+      "executedTestsSha256": "64b556fde2551e986072ff4f02cce93f0b0a988492fbdf9c26cd7ae08eb86e9d",
+      "executedRuntimeIndexSha256": "e255ff296c10ba99292a9ed4164e9b4564f6b967d5818ea11204b9cea0d4c18b",
+      "executedRawRationaleSha256": "1f211d4ea78cc37a2fd237e4ff1d4410fca693bf784f67f05993f72d9fef07fb",
+      "rawPreRunRationalePath": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/late-capture-preservation/sol-owner/1441-RAW-PRE-RUN-TEST_CHANGE_RATIONALES.json",
+      "inputManifestSha256": "822710ce77158dd318a946a6ebcb514dd676ca61b4c660351411276c88d89559",
+      "recorderRationaleSanitizedContentSha256": "68c222f52823b152dbc7b1acb58ad77dbfdd3ba12f5f57a428a66e976a7a59ea",
+      "recorderRedaction": {
+        "applied": true,
+        "count": 73,
+        "locations": {
+          "workingTree.content": 73
+        }
+      },
+      "limit": "Source/VM focused evidence only; no app RED, native/browser/emulator/production-data/CI/deployment/release claim."
+    }
+  },
+  {
+    "baseCommit": "c129263cf1b5cbc96ed2c97e322e464d8ef0d2e9",
+    "comparisonMergeBase": "c129263cf1b5cbc96ed2c97e322e464d8ef0d2e9",
+    "testChangesSha256": "d1c03140ef8ec6c77c0ea5ac60864ec769fbef00846e468c65e67de3e50d80b4",
+    "cycle": "source-join-1479",
+    "reason": "Associate the exact admitted source union with its new comparison fingerprint while preserving all complete parent rationale objects. Metadata-only source integration creates no new test, behavior or RED chronology.",
+    "previousBehavior": "The original complete source and tests had accepted source-specific evidence; this exact combined-source comparison had a new fingerprint without its own association.",
+    "intendedBehavior": "Keep the exact automatic three-way functional and test source, retain every complete accepted parent history, and bind subsequent committed verification to the actual combined diff.",
+    "replacementTests": [
+      "RISK DATABASE REPAIR EXPORT: canceled capture keeps the pasted draft and concurrent capture is bounded",
+      "RISK MANUAL JSON EXPORT: unavailable and unsupported sources are explicit partial exports"
+    ],
+    "preservedCoverage": [
+      "Every complete prior integration record remains exact prefix; every complete incoming source object remains present without deduplicating different objects by fingerprint.",
+      "Every admitted functional/test assertion and original source/authority/durable/pending/unknown-data protection remains the unchanged clean Git three-way result.",
+      "Original RED/GREEN and native results retain their actual source identities and limits; this source association creates no fresh native, fullsuite, CI, release or physical-device proof."
+    ],
+    "redEvidence": {
+      "command": "Historical source-bound evidence only; no new RED execution in this metadata integration. /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/342-sol-contract/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/late-capture-preservation/sol-owner/1441-runs --purpose green --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern='^RISK DATABASE REPAIR EXPORT: canceled capture keeps the pasted draft and concurrent capture is bounded$' tests.js",
+      "failure": "Original actual failures remain retained and are not relabeled as a new RED or passing result. Observed established-behavior sensitivity in the same one passing focused run 2026-10-29T15-54-21-568Z-e3eaa056-cca5-4da1-a69a-1e1dd98d5436: the separate existing appSource VM changed only the unique final serial-guard busy clear to unconditional clearing. The SAME added capture-busy equality caught actual ERR_ASSERTION/strictEqual/expectedtrue/actualfalse with message negative control: old resolve / capture-busy preserves the newer capture busy owner\\n\\nfalse !== true\\n. All original checks and eight named healthy internal cases passed with child/wrapper0. This is not preimplementation application RED or a demonstrated app defect; no app/runtime fix or behavioral rerun occurred."
+    },
+    "sourceJoin": {
+      "parent": "c129263cf1b5cbc96ed2c97e322e464d8ef0d2e9",
+      "source": "066697ec1cc806df8ada613f7dc3c33518f4e19c",
+      "commonBase": "694c5bb61dfcb006b771493e238014eb74c3bada",
+      "metadataOnly": true
+    }
+  },
+  {
+    "baseCommit": "066697ec1cc806df8ada613f7dc3c33518f4e19c",
+    "comparisonMergeBase": "066697ec1cc806df8ada613f7dc3c33518f4e19c",
+    "testChangesSha256": "5a4914a3e7fece7b3fb7af6db7ad8e9193c64ffb24a6e14c2db38f21effadaab",
+    "cycle": "source-join-1479",
+    "reason": "Associate the exact admitted source union with its new comparison fingerprint while preserving all complete parent rationale objects. Metadata-only source integration creates no new test, behavior or RED chronology.",
+    "previousBehavior": "The original complete source and tests had accepted source-specific evidence; this exact combined-source comparison had a new fingerprint without its own association.",
+    "intendedBehavior": "Keep the exact automatic three-way functional and test source, retain every complete accepted parent history, and bind subsequent committed verification to the actual combined diff.",
+    "replacementTests": [
+      "RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources",
+      "RISK repository process: supplemental startup capture rejects malformed artifacts and unsupported paint completeness",
+      "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
+      "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
+    ],
+    "preservedCoverage": [
+      "Every complete prior integration record remains exact prefix; every complete incoming source object remains present without deduplicating different objects by fingerprint.",
+      "Every admitted functional/test assertion and original source/authority/durable/pending/unknown-data protection remains the unchanged clean Git three-way result.",
+      "Original RED/GREEN and native results retain their actual source identities and limits; this source association creates no fresh native, fullsuite, CI, release or physical-device proof."
+    ],
+    "redEvidence": {
+      "command": "Historical source-bound evidence only; no new RED execution in this metadata integration. /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/342-sol-contract/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/late-capture-preservation/sol-owner/1441-runs --purpose green --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern='^RISK DATABASE REPAIR EXPORT: canceled capture keeps the pasted draft and concurrent capture is bounded$' tests.js",
+      "failure": "Original actual failures remain retained and are not relabeled as a new RED or passing result. Observed established-behavior sensitivity in the same one passing focused run 2026-10-29T15-54-21-568Z-e3eaa056-cca5-4da1-a69a-1e1dd98d5436: the separate existing appSource VM changed only the unique final serial-guard busy clear to unconditional clearing. The SAME added capture-busy equality caught actual ERR_ASSERTION/strictEqual/expectedtrue/actualfalse with message negative control: old resolve / capture-busy preserves the newer capture busy owner\\n\\nfalse !== true\\n. All original checks and eight named healthy internal cases passed with child/wrapper0. This is not preimplementation application RED or a demonstrated app defect; no app/runtime fix or behavioral rerun occurred."
+    },
+    "sourceJoin": {
+      "parent": "c129263cf1b5cbc96ed2c97e322e464d8ef0d2e9",
+      "source": "066697ec1cc806df8ada613f7dc3c33518f4e19c",
+      "commonBase": "694c5bb61dfcb006b771493e238014eb74c3bada",
+      "metadataOnly": true
+    }
+  },
+  {
+    "baseCommit": "f22f28be699f10a766ce9a90d01469b65457bfed",
+    "comparisonMergeBase": "f22f28be699f10a766ce9a90d01469b65457bfed",
+    "testChangesSha256": "6f6539d812b1ca5628867b350a34a5a5781fb81ac0d479984f89d7919a0b6b7b",
+    "cycle": "source-join-1479",
+    "reason": "Associate the exact admitted source union with its new comparison fingerprint while preserving all complete parent rationale objects. Metadata-only source integration creates no new test, behavior or RED chronology.",
+    "previousBehavior": "The original complete source and tests had accepted source-specific evidence; this exact combined-source comparison had a new fingerprint without its own association.",
+    "intendedBehavior": "Keep the exact automatic three-way functional and test source, retain every complete accepted parent history, and bind subsequent committed verification to the actual combined diff.",
+    "replacementTests": [
+      "RISK saved view held Export: terminal Settings preserves an exact partial source-only archive",
+      "RISK saved view held Copy: trusted terminal Copy preserves prepared bytes and original sources",
+      "RISK saved view held Download: trusted terminal Download preserves the same Copy archive and original sources",
+      "RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources",
+      "RISK DATABASE REPAIR EXPORT: canceled capture keeps the pasted draft and concurrent capture is bounded",
+      "RISK MANUAL JSON EXPORT: refused Download releases its temporary anchor and object URL",
+      "RISK MANUAL JSON EXPORT: a refused download leaves the same prepared archive available to Copy",
+      "RISK MANUAL JSON EXPORT: unavailable and unsupported sources are explicit partial exports"
+    ],
+    "preservedCoverage": [
+      "Every complete prior integration record remains exact prefix; every complete incoming source object remains present without deduplicating different objects by fingerprint.",
+      "Every admitted functional/test assertion and original source/authority/durable/pending/unknown-data protection remains the unchanged clean Git three-way result.",
+      "Original RED/GREEN and native results retain their actual source identities and limits; this source association creates no fresh native, fullsuite, CI, release or physical-device proof."
+    ],
+    "redEvidence": {
+      "command": "Historical source-bound evidence only; no new RED execution in this metadata integration. /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/342-sol-contract/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/late-capture-preservation/sol-owner/1441-runs --purpose green --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern='^RISK DATABASE REPAIR EXPORT: canceled capture keeps the pasted draft and concurrent capture is bounded$' tests.js",
+      "failure": "Original actual failures remain retained and are not relabeled as a new RED or passing result. Observed established-behavior sensitivity in the same one passing focused run 2026-10-29T15-54-21-568Z-e3eaa056-cca5-4da1-a69a-1e1dd98d5436: the separate existing appSource VM changed only the unique final serial-guard busy clear to unconditional clearing. The SAME added capture-busy equality caught actual ERR_ASSERTION/strictEqual/expectedtrue/actualfalse with message negative control: old resolve / capture-busy preserves the newer capture busy owner\\n\\nfalse !== true\\n. All original checks and eight named healthy internal cases passed with child/wrapper0. This is not preimplementation application RED or a demonstrated app defect; no app/runtime fix or behavioral rerun occurred."
+    },
+    "sourceJoin": {
+      "parent": "c129263cf1b5cbc96ed2c97e322e464d8ef0d2e9",
+      "source": "066697ec1cc806df8ada613f7dc3c33518f4e19c",
+      "commonBase": "694c5bb61dfcb006b771493e238014eb74c3bada",
+      "metadataOnly": true
+    }
+  },
+  {
+    "baseCommit": "c920ccffc11af487ec84277c33fe2e370541e384",
+    "comparisonMergeBase": "c920ccffc11af487ec84277c33fe2e370541e384",
+    "testChangesSha256": "e79d89f09b5a85c86eb750e1011b980a8c3ca3852411f473be7d4c2ea8addf1e",
+    "cycle": "source-join-1479",
+    "reason": "Associate the exact admitted source union with its new comparison fingerprint while preserving all complete parent rationale objects. Metadata-only source integration creates no new test, behavior or RED chronology.",
+    "previousBehavior": "The original complete source and tests had accepted source-specific evidence; this exact combined-source comparison had a new fingerprint without its own association.",
+    "intendedBehavior": "Keep the exact automatic three-way functional and test source, retain every complete accepted parent history, and bind subsequent committed verification to the actual combined diff.",
+    "replacementTests": [
+      "RISK saved view opening source preservation: invalid optional appearance keeps its bytes while one complete task opens",
+      "RISK saved view held Export: terminal Settings preserves an exact partial source-only archive",
+      "RISK saved view held Copy: trusted terminal Copy preserves prepared bytes and original sources",
+      "RISK saved view held Download: trusted terminal Download preserves the same Copy archive and original sources",
+      "RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources",
+      "RISK DATABASE REPAIR EXPORT: canceled capture keeps the pasted draft and concurrent capture is bounded",
+      "RISK MANUAL JSON EXPORT: refused Download releases its temporary anchor and object URL",
+      "RISK MANUAL JSON EXPORT: a refused download leaves the same prepared archive available to Copy"
+    ],
+    "preservedCoverage": [
+      "Every complete prior integration record remains exact prefix; every complete incoming source object remains present without deduplicating different objects by fingerprint.",
+      "Every admitted functional/test assertion and original source/authority/durable/pending/unknown-data protection remains the unchanged clean Git three-way result.",
+      "Original RED/GREEN and native results retain their actual source identities and limits; this source association creates no fresh native, fullsuite, CI, release or physical-device proof."
+    ],
+    "redEvidence": {
+      "command": "Historical source-bound evidence only; no new RED execution in this metadata integration. /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/342-sol-contract/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/late-capture-preservation/sol-owner/1441-runs --purpose green --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern='^RISK DATABASE REPAIR EXPORT: canceled capture keeps the pasted draft and concurrent capture is bounded$' tests.js",
+      "failure": "Original actual failures remain retained and are not relabeled as a new RED or passing result. Observed established-behavior sensitivity in the same one passing focused run 2026-10-29T15-54-21-568Z-e3eaa056-cca5-4da1-a69a-1e1dd98d5436: the separate existing appSource VM changed only the unique final serial-guard busy clear to unconditional clearing. The SAME added capture-busy equality caught actual ERR_ASSERTION/strictEqual/expectedtrue/actualfalse with message negative control: old resolve / capture-busy preserves the newer capture busy owner\\n\\nfalse !== true\\n. All original checks and eight named healthy internal cases passed with child/wrapper0. This is not preimplementation application RED or a demonstrated app defect; no app/runtime fix or behavioral rerun occurred."
+    },
+    "sourceJoin": {
+      "parent": "c129263cf1b5cbc96ed2c97e322e464d8ef0d2e9",
+      "source": "066697ec1cc806df8ada613f7dc3c33518f4e19c",
+      "commonBase": "694c5bb61dfcb006b771493e238014eb74c3bada",
+      "metadataOnly": true
+    }
+  },
+  {
+    "baseCommit": "b176026825e4f9539780f745fe60e09cf348d288",
+    "comparisonMergeBase": "b176026825e4f9539780f745fe60e09cf348d288",
+    "testChangesSha256": "769f114f68a352b89024ec62e7b22b1849d656139e37297b8a035ae5e1bd6fe3",
+    "cycle": "source-join-1479",
+    "reason": "Associate the exact admitted source union with its new comparison fingerprint while preserving all complete parent rationale objects. Metadata-only source integration creates no new test, behavior or RED chronology.",
+    "previousBehavior": "The original complete source and tests had accepted source-specific evidence; this exact combined-source comparison had a new fingerprint without its own association.",
+    "intendedBehavior": "Keep the exact automatic three-way functional and test source, retain every complete accepted parent history, and bind subsequent committed verification to the actual combined diff.",
+    "replacementTests": [
+      "RISK AUTH HYDRATION: a broken device board stays quiet until protected local recovery is visible",
+      "RISK saved view broken-board guidance: opening status does not imply cloud confirmation or erase recovery warnings",
+      "RISK saved view broken-board startup: prior appearance stays inert until the recovered board opens",
+      "RISK saved view opening source preservation: invalid optional appearance keeps its bytes while one complete task opens",
+      "RISK saved view held Export: terminal Settings preserves an exact partial source-only archive",
+      "RISK saved view held Copy: trusted terminal Copy preserves prepared bytes and original sources",
+      "RISK saved view held Download: trusted terminal Download preserves the same Copy archive and original sources",
+      "RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources"
+    ],
+    "preservedCoverage": [
+      "Every complete prior integration record remains exact prefix; every complete incoming source object remains present without deduplicating different objects by fingerprint.",
+      "Every admitted functional/test assertion and original source/authority/durable/pending/unknown-data protection remains the unchanged clean Git three-way result.",
+      "Original RED/GREEN and native results retain their actual source identities and limits; this source association creates no fresh native, fullsuite, CI, release or physical-device proof."
+    ],
+    "redEvidence": {
+      "command": "Historical source-bound evidence only; no new RED execution in this metadata integration. /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/342-sol-contract/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/late-capture-preservation/sol-owner/1441-runs --purpose green --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern='^RISK DATABASE REPAIR EXPORT: canceled capture keeps the pasted draft and concurrent capture is bounded$' tests.js",
+      "failure": "Original actual failures remain retained and are not relabeled as a new RED or passing result. Observed established-behavior sensitivity in the same one passing focused run 2026-10-29T15-54-21-568Z-e3eaa056-cca5-4da1-a69a-1e1dd98d5436: the separate existing appSource VM changed only the unique final serial-guard busy clear to unconditional clearing. The SAME added capture-busy equality caught actual ERR_ASSERTION/strictEqual/expectedtrue/actualfalse with message negative control: old resolve / capture-busy preserves the newer capture busy owner\\n\\nfalse !== true\\n. All original checks and eight named healthy internal cases passed with child/wrapper0. This is not preimplementation application RED or a demonstrated app defect; no app/runtime fix or behavioral rerun occurred."
+    },
+    "sourceJoin": {
+      "parent": "c129263cf1b5cbc96ed2c97e322e464d8ef0d2e9",
+      "source": "066697ec1cc806df8ada613f7dc3c33518f4e19c",
+      "commonBase": "694c5bb61dfcb006b771493e238014eb74c3bada",
+      "metadataOnly": true
+    }
   }
 ]
