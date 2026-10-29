@@ -21503,7 +21503,7 @@ test('RISK MANUAL JSON EXPORT: a refused download leaves the same prepared archi
   assert.deepEqual(cloudPushes,[],'pending archive sources are never replayed or uploaded');
 });
 
-test('RISK MANUAL JSON EXPORT: unavailable and unsupported sources are explicit partial exports',async t=>{
+test("RISK MANUAL JSON EXPORT: unavailable and unsupported sources are explicit partial exports",async t=>{
   const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),dbName='chain-scanner-manual-export-failure-'+Date.now()+'-'+Math.random();
   const storage=sharedScannerStorage();storage.setItem(SYNC_STORE_KEY,'{"tasks":[{"id":"broken","title":"corrupt"}');
   const app=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName:dbName}),{ctx,shim}=app;
@@ -21526,16 +21526,74 @@ test('RISK MANUAL JSON EXPORT: unavailable and unsupported sources are explicit 
     ['cycle-export-fixture-190',(()=>{const cycle={};cycle.self=cycle;return cycle;})(),'cycles'],
     ['repeated-export-fixture-190',(()=>{const shared={future:true};return {first:shared,second:shared};})(),'repeated references'],
   ]){
-    const valid=await loadApp({sharedStorage:sharedScannerStorage(),indexedDBProvider:new IDBFactory(),deviceDbName:dbName+'-unsupported-'+Math.random()});
-    t.after(()=>valid.dispose());valid.ctx.addTask('Accepted board for unsupported source fixture',false);await valid.ctx.persist();
+    const suppliedValueBefore=structuredClone(value);
+    const suppliedShapeBefore={
+      keys:value&&typeof value==='object'?Object.keys(value).sort():[],
+      cycle:value?.self===value,
+      repeatedReference:value?.first===value?.second,
+      regexp:value instanceof RegExp?{source:value.source,flags:value.flags}:null,
+    };
+    const valid=await loadBackupFileFixtureApp({sharedStorage:sharedScannerStorage(),indexedDBProvider:new IDBFactory(),deviceDbName:dbName+'-unsupported-'+Math.random()});
+    t.after(()=>valid.dispose());valid.ctx.addTask('Accepted board for unsupported source fixture',false);await prepareBackupFileFixtureSource(valid);
     const validStore=valid.ctx.window.ScannerDeviceStore;assert.ok(validStore);const rawSnapshot=validStore.readRawExportSnapshot.bind(validStore);
-    validStore.readRawExportSnapshot=async()=>{const snapshot=await rawSnapshot();snapshot.stores.opaque.keys.push(key);snapshot.stores.opaque.values.push(value);return snapshot;};
+    const acceptedBoardBefore=JSON.parse(valid.ctx.currentBoardExportPayload()),memoryBefore=JSON.stringify(valid.ctx.state);
+    const headBefore=await validStore.readHead(),physicalBefore=await rawSnapshot();
+    const localKeys=[...new Set([STORE_KEY,LOCAL_HEAD_KEY,LOCAL_BACKUPS_KEY,DEVICE_AUTHORITY_KEY,...Array.from({length:valid.shim.localStorage.length},(_,index)=>valid.shim.localStorage.key(index)).filter(key=>typeof key==='string')])].sort();
+    const localBefore=localKeys.map(key=>({key,raw:valid.shim.localStorage.getItem(key)}));
+    const archiveLocalKeys=[STORE_KEY,LOCAL_HEAD_KEY,LOCAL_BACKUPS_KEY,DEVICE_AUTHORITY_KEY,...localKeys.filter(key=>key.startsWith('fvp:chain-scanner:pending-scene-choice:v1:'))];
+    const readableLocalBefore=archiveLocalKeys.map(key=>({key,raw:valid.shim.localStorage.getItem(key)})).filter(row=>typeof row.raw==='string');
+    assert.ok(readableLocalBefore.length>0,`${description} has independently captured readable local sources`);
+    const injectedSnapshotExpected=await rawSnapshot();injectedSnapshotExpected.stores.opaque.keys.push(key);injectedSnapshotExpected.stores.opaque.values.push(value);
+    let injectedSnapshot=null;
+    t.after(()=>{validStore.readRawExportSnapshot=rawSnapshot;});
+    validStore.readRawExportSnapshot=async()=>{const snapshot=await rawSnapshot();snapshot.stores.opaque.keys.push(key);snapshot.stores.opaque.values.push(value);injectedSnapshot=snapshot;return snapshot;};
     valid.ctx.openSettings();assert.equal(await valid.ctx.onAction('export-backup',{isConnected:true}),true,`${description} captures from an accepted board`);
     assert.match(valid.shim.document.getElementById('modalRoot').innerHTML,/Partial recovery archive/,`${description} are not presented as complete`);
     const copied=await copyPreparedExport(valid.ctx),report=JSON.parse(copied);
     assert.equal(report.manifest.status,'partial');assert.equal(report.appSources.indexedDB.stores,null);
     assert.ok(report.manifest.failures.some(row=>row.source==='indexedDB'));
     const leakedFixture=copied.search(/unsupported-export-fixture|cycle-export-fixture|repeated-export-fixture/);assert.ok(leakedFixture<0,`unsupported source details leaked near ${copied.slice(Math.max(0,leakedFixture-120),leakedFixture+180)}`);
+    assert.deepEqual(report.currentBoard,acceptedBoardBefore,`${description} preserves the independently captured accepted board exactly`);
+    assert.equal(JSON.stringify(valid.ctx.state),memoryBefore,`${description} preserves complete in-memory state`);
+    const localKeysAfter=[...new Set([STORE_KEY,LOCAL_HEAD_KEY,LOCAL_BACKUPS_KEY,DEVICE_AUTHORITY_KEY,...Array.from({length:valid.shim.localStorage.length},(_,index)=>valid.shim.localStorage.key(index)).filter(key=>typeof key==='string')])].sort();
+    assert.deepEqual(localKeysAfter,localKeys,`${description} preserves the exact local source key set`);
+    const localAfter=localKeysAfter.map(key=>({key,raw:valid.shim.localStorage.getItem(key)}));
+    assert.deepEqual(localAfter,localBefore,`${description} preserves every fixed readable local source string exactly`);
+    for(const row of readableLocalBefore){
+      const archivedRow=report.appSources.localStorage.find(source=>source.key===row.key);
+      assert.ok(archivedRow,`${description} retains readable local source ${row.key}`);
+      assert.equal(archivedRow.raw,row.raw,`${description} exports exact readable local source ${row.key}`);
+    }
+    assert.deepEqual(await validStore.readHead(),headBefore,`${description} preserves durable head exactly`);
+    assert.deepEqual(await rawSnapshot(),physicalBefore,`${description} preserves the original physical raw snapshot exactly`);
+    assert.ok(injectedSnapshot,`${description} traverses the existing raw-reader injection seam`);
+    assert.deepEqual(injectedSnapshot,injectedSnapshotExpected,`${description} leaves the supplied raw-reader input shape exactly intact`);
+    assert.deepEqual(value,suppliedValueBefore,`${description} leaves the original unsupported supplied value exactly intact`);
+    assert.deepEqual({keys:value&&typeof value==='object'?Object.keys(value).sort():[],cycle:value?.self===value,repeatedReference:value?.first===value?.second,regexp:value instanceof RegExp?{source:value.source,flags:value.flags}:null},suppliedShapeBefore,`${description} leaves cycle/shared-reference input shape exactly intact`);
+
+    if(description==='unsupported structured-clone values'){
+      const mutantFragment='currentBoard:board,';
+      assert.equal(appSrc.split(mutantFragment).length-1,1,'the negative-control source mutation has one exact archive-board target');
+      const mutantSource=appSrc.replace(mutantFragment,'currentBoard:null,');
+      const mutant=await loadBackupFileFixtureApp({appSource:mutantSource,sharedStorage:sharedScannerStorage(),indexedDBProvider:new IDBFactory(),deviceDbName:dbName+'-unsupported-mutant-'+Math.random()});
+      t.after(()=>mutant.dispose());mutant.ctx.addTask('Accepted board for isolated unsupported-source negative control',false);await prepareBackupFileFixtureSource(mutant);
+      const mutantStore=mutant.ctx.window.ScannerDeviceStore;assert.ok(mutantStore);const mutantRawSnapshot=mutantStore.readRawExportSnapshot.bind(mutantStore);let mutantInput=null;
+      t.after(()=>{mutantStore.readRawExportSnapshot=mutantRawSnapshot;});
+      mutantStore.readRawExportSnapshot=async()=>{const snapshot=await mutantRawSnapshot();snapshot.stores.opaque.keys.push(key);snapshot.stores.opaque.values.push(value);mutantInput=snapshot;return snapshot;};
+      const mutantAcceptedBoard=JSON.parse(mutant.ctx.currentBoardExportPayload());
+      mutant.ctx.openSettings();assert.equal(await mutant.ctx.onAction('export-backup',{isConnected:true}),true,'the isolated mutated app still reaches real Export');
+      const mutantCopied=await copyPreparedExport(mutant.ctx),mutantReport=JSON.parse(mutantCopied);
+      assert.equal(mutantReport.manifest.status,'partial','the single mutation leaves the unsupported-source result partial');
+      const preservationMessage='unsupported structured-clone values preserve the independently captured accepted board exactly';
+      let caught=null;try{assert.deepEqual(mutantReport.currentBoard,mutantAcceptedBoard,preservationMessage);}catch(error){caught=error;}
+      assert.ok(caught?.code==='ERR_ASSERTION','the accepted-board preservation assertion catches the deliberate isolated source mutation');
+      assert.equal(caught.operator,'deepStrictEqual','the caught failure is the exact new strict board equality assertion');
+      assert.strictEqual(caught.actual,null,'the single mutant drops only the exported currentBoard');
+      assert.deepEqual(caught.expected,mutantAcceptedBoard,'the assertion expectation was captured from the accepted board before Export');
+      assert.ok(caught.message.startsWith(preservationMessage),'the observed assertion failure has the specific preservation message');
+      assert.ok(mutantInput&&mutantInput.stores.opaque.keys.at(-1)===key&&mutantInput.stores.opaque.values.at(-1)===value,'the negative control traverses the same existing unsupported-source reader injection');
+      console.log('CAUGHT_NEGATIVE_CONTROL '+JSON.stringify({code:caught.code,operator:caught.operator,actual:caught.actual,message:caught.message}));
+    }
   }
 
 });
