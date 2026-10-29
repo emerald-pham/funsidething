@@ -59,7 +59,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK cloud source recovery pending capture: a cached device store without conditional staging keeps the choice held
 - RISK DEVICE STORAGE V2: conditional pending writes refuse JSON-lossy unknown evidence
 - RISK cloud source recovery pending capture: native recovery cannot discard a named array extension
-- RISK unreadable device recovery: Quick start and current Changelog explain preserved sources and local pending recovery
+- RISK unreadable device recovery: Quick start and dated Changelog explain preserved sources and local pending recovery
 - RISK cloud source recovery: readable device work stays visible read-only during pending and timed-out cloud checks
 - RISK cloud source recovery: complete-source details stay responsive bounded and exact
 - RISK cloud source recovery: read-only inspection does not expose unreadable placeholders or foreign identity work
@@ -2054,6 +2054,7 @@ The held-demotion native boundary requires one Current and one Previous heading 
 ## Populated-board responsiveness and damaged-source work
 
 - RISK sync responsiveness guidance: mounted Help explains large boards and bounded damaged-source recovery
+- RISK corrupt cloud work budget fixture: incompatible complete prior ratings keep the actual source held: real cloudPull retains corrupt-generation and exact current/cloud bytes when the complete prior source has incompatible legacy ratings (saved a.mu 26 versus accepted 25); helper default and production recovery remain unchanged.
 - RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations
 - RISK populated task responsiveness: three rapid Yes actions retain history and reopen within the interaction budget
 - RISK populated completion responsiveness: rapid Done and Undo preserve earlier completions without full-pool stalls

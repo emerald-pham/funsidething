@@ -1074,7 +1074,7 @@ test('RISK unreadable device recovery: raw transaction CAS refuses peer source c
  });
 });
 
-test('RISK unreadable device recovery: Quick start and current Changelog explain preserved sources and local pending recovery',async()=>{
+test('RISK unreadable device recovery: Quick start and dated Changelog explain preserved sources and local pending recovery',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();
  const help=shim.document.getElementById('modalRoot').innerHTML,answer=help.match(/<dt>What if my saved device source cannot be read\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
  assert.ok(answer,'the extended FAQ covers unreadable missing unsupported and partial device sources');
@@ -1088,7 +1088,7 @@ test('RISK unreadable device recovery: Quick start and current Changelog explain
  assert.match(html,/one guarded Restore action for a file or pasted JSON/,'the current changelog describes the consolidated restore route');
  assert.match(html,/unreadable device data offers a source-only archive/,'the current changelog preserves the raw-source recovery limit');
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1]||'';
- const latest=current.match(/<li>(.*?)<\/li>/)?.[1]||'';
+ const latest=current.match(/<h3>October 28, 2026<\/h3><ul><li>(.*?)<\/li>/)?.[1]||'';
  assert.match(latest,/saved board needs recovery.*preserved local copies/);
  assert.match(latest,/syncing label.*board is still opening.*not that cloud saving is confirmed/);
  assert.match(latest,/genuine errors and recovery warnings remain visible/);
@@ -1422,7 +1422,7 @@ test('RISK recovery fixture ownership: acknowledged damage inputs finish both na
  assert.equal((await backend.CS.pull()).code,'corrupt-generation','the real first automatic read still has a damaged generation to recover');
 });
 
-async function damagedAcknowledgedApp187(t,{timeoutMs=5000,sourcePadding=0,timerProvider=null,recoveryTimeoutMs=timeoutMs,artifacts=null,nativeDeviceConnection=false}={}){
+async function damagedAcknowledgedApp187(t,{timeoutMs=5000,sourcePadding=0,timerProvider=null,recoveryTimeoutMs=timeoutMs,artifacts=null,nativeDeviceConnection=false,incompatiblePreviousRatings=false}={}){
  const fixture=heldDecisionFixture188();
  if(sourcePadding)fixture.remote.futureIOSReportFixture={opaque:'q'.repeat(sourcePadding)};
  fixture.local=structuredClone(fixture.remote);
@@ -1463,6 +1463,16 @@ async function damagedAcknowledgedApp187(t,{timeoutMs=5000,sourcePadding=0,timer
  assert.equal(createHash('sha256').update(acknowledged,'utf8').digest('hex'),originalHeader.hash,'the retained source is independently proved byte exact');
  const acknowledgedTasks=JSON.parse(acknowledged).tasks;
  const previousPath='users/owner/generations/'+originalRoot.previousGeneration;
+ if(incompatiblePreviousRatings){
+  const header=backend.docs.get(previousPath),chunks=[...backend.docs].filter(([key])=>key.startsWith(previousPath+'/chunks/')).map(([,row])=>row).sort((a,b)=>a.index-b.index);
+  const previous=JSON.parse(await ctx.window.ChainStorageV2.decodeSnapshot(header,chunks));
+  assert.equal(previous.decisionBaseline,undefined,'this held-source fixture uses independently saved legacy numbers');
+  const task=previous.tasks.find(row=>row.id==='a');assert.equal(task.mu,25);task.mu=26;
+  const encoded=await ctx.window.ChainStorageV2.encodeSnapshot(JSON.stringify(previous));
+  backend.docs.set(previousPath,{...header,hash:encoded.hash,byteLength:encoded.byteLength,chunkCount:encoded.chunkCount,encoding:encoded.encoding});
+  for(const key of [...backend.docs.keys()])if(key.startsWith(previousPath+'/chunks/'))backend.docs.delete(key);
+  for(const chunk of encoded.chunks)backend.docs.set(previousPath+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
+ }
  const previousSource=[...backend.docs].filter(([key])=>key===previousPath||key.startsWith(previousPath+'/')).map(([key,value])=>[key,JSON.stringify(value)]);
  assert.ok(previousSource.length>1,'the damaged root also names a complete previous source');
  for(const key of [...backend.docs.keys()])if(key.startsWith('users/owner/generations/'+originalRoot.activeGeneration+'/chunks/'))backend.docs.delete(key);
@@ -4105,11 +4115,30 @@ test('RISK sync responsiveness guidance: mounted Help explains large boards and 
  assert.match(help,/Large saved boards respond faster/);assert.match(help,/Corrupted cloud sources stop repeated downloads/);
 });
 
+test('RISK corrupt cloud work budget fixture: incompatible complete prior ratings keep the actual source held',{timeout:20000},async t=>{
+ const app=await damagedAcknowledgedApp187(t,{sourcePadding:2000000,incompatiblePreviousRatings:true}),{ctx,backend,originalRoot}=app;
+ const activePath='users/owner/generations/'+originalRoot.activeGeneration;
+ backend.docs.set(activePath,{...backend.docs.get(activePath),hash:'f'.repeat(64)});
+ const cloud=JSON.stringify([...backend.docs]),writes=backend.writes.length;
+ await ctx.cloudPull();
+ assert.equal(backend.CS.errorCode,'corrupt-generation','the actual consumer must retain a hold when the complete prior source has incompatible saved ratings');
+ assert.equal(backend.CS.knownDamagedSource,true);
+ assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev);
+ assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal(backend.writes.length,writes);
+ const previousPath='users/owner/generations/'+originalRoot.previousGeneration,header=backend.docs.get(previousPath);
+ const chunks=[...backend.docs].filter(([key])=>key.startsWith(previousPath+'/chunks/')).map(([,row])=>row).sort((a,b)=>a.index-b.index);
+ const previous=JSON.parse(await ctx.window.ChainStorageV2.decodeSnapshot(header,chunks));
+ assert.equal(previous.decisionBaseline,undefined,'the prior saved numbers are legacy facts, not a new recorded comparison');
+ assert.equal(previous.tasks.find(row=>row.id==='a').mu,26);
+ assert.equal(ctx.state.tasks.find(row=>row.id==='a').mu,25);
+ assert.equal((await ctx.window.ScannerDeviceStore.readHead()).payload,JSON.stringify(ctx.state));
+});
+
 test('RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations',{timeout:20000+9*5000},async t=>{
  // Finite envelope: startup/auth, two native saves and two ACKs, initial
  // recovery, Retry and healthy-revision observation retain their 5s bounds.
  // The four actual ordinary actions share one separate absolute 20s bound.
- const app=await damagedAcknowledgedApp187(t,{sourcePadding:2000000}),{ctx,shim,backend,originalRoot}=app;
+ const app=await damagedAcknowledgedApp187(t,{sourcePadding:2000000,incompatiblePreviousRatings:true}),{ctx,shim,backend,originalRoot}=app;
  const headerPath='users/owner/generations/'+originalRoot.activeGeneration;
  const different=JSON.parse(ctx.state.decisionBase.payload);different.futureDifferent={keep:'a different accepted cloud source'};
  const encoded=await ctx.window.ChainStorageV2.encodeSnapshot(JSON.stringify(different));
@@ -4148,8 +4177,8 @@ test('RISK corrupt cloud work budget: ordinary actions stay durable without rere
  assert.equal(backend.CS.knownDamagedSource,false);assert.equal(JSON.stringify(backend.docs.get(headerPath)),JSON.stringify(JSON.parse(originalCloud).find(([key])=>key===headerPath)[1]));
 });
 
-async function coldDamagedSourceWithoutAck214(t,{newerLocalWork=false}={}){
- const seed=await damagedAcknowledgedApp187(t,{sourcePadding:2000000});
+async function coldDamagedSourceWithoutAck214(t,{newerLocalWork=false,incompatiblePreviousRatings=false}={}){
+ const seed=await damagedAcknowledgedApp187(t,{sourcePadding:2000000,incompatiblePreviousRatings});
  if(newerLocalWork){seed.shim.document.getElementById('addInput').value='Newer local task without an ACK export';await seed.ctx.onAction('add',{});assert.equal(await seed.ctx.persist(),true);}
  const raw=seed.ctx.cloudPayload(),originalRoot={...seed.originalRoot},originalHeader={...seed.originalHeader},provider=[...seed.backend.docs];
  assert.equal(Object.hasOwn(JSON.parse(raw),'decisionBase'),false,'the supported export does not carry the private ACK payload');
@@ -4169,7 +4198,7 @@ async function coldDamagedSourceWithoutAck214(t,{newerLocalWork=false}={}){
 }
 
 test('RISK corrupt cloud work budget: cold-opened sources without an ACK keep newer edits without repeated downloads',{timeout:20000},async t=>{
- const app=await coldDamagedSourceWithoutAck214(t,{newerLocalWork:true}),{ctx,shim,backend,counts,originalRoot}=app;
+ const app=await coldDamagedSourceWithoutAck214(t,{newerLocalWork:true,incompatiblePreviousRatings:true}),{ctx,shim,backend,counts,originalRoot}=app;
  assert.equal(backend.CS.errorCode,'corrupt-generation');assert.equal(backend.CS.knownDamagedSource,true);
  const initialReads=counts.reads,originalCloud=JSON.stringify([...backend.docs]),writes=backend.writes.length,byAction=[];
  assert.ok(initialReads>0);ctx.window.CLOUD_PUSH_DELAY_MS=0;
@@ -9477,6 +9506,7 @@ test('RISK corrupt work budget fixture: one shared action deadline rejects an ac
  // Child envelope includes the existing setup/control bounds; it must report
  // the single 20s action bound, never pass or require process termination.
  const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^'+name+'$','stalled-consumer.mjs'],{cwd:root,env,encoding:'utf8',timeout:70000,maxBuffer:1024*1024}),output=child.stdout+child.stderr;
+ t.diagnostic('HELD_COMMIT_CHILD_RESULT '+JSON.stringify({stdout:child.stdout,stderr:child.stderr,status:child.status,signal:child.signal}));
  assert.equal(child.error,undefined,output);assert.equal(child.signal,null,output);assert.equal(child.status,1,output);
  assert.match(output,/ACTUAL_ORDINARY_ACTION_COMMIT_ENTERED/);
  assert.match(output,/four ordinary actions exceed their shared 20000ms durability\/read budget/);

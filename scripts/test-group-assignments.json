@@ -10918,7 +10918,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK unreadable device recovery: Quick start and current Changelog explain preserved sources and local pending recovery",
+      "root": "RISK unreadable device recovery: Quick start and dated Changelog explain preserved sources and local pending recovery",
       "group": "core",
       "file": "tests.js"
     },
@@ -13486,6 +13486,11 @@
       "root": "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK corrupt cloud work budget fixture: incompatible complete prior ratings keep the actual source held",
+      "group": "persistence-recovery",
+      "file": "tests.js"
     }
   ],
   "processControls": [
@@ -13608,6 +13613,14 @@
       "group": "core",
       "file": "tests.js",
       "reason": "Preserve the complete native scene-time preset/save/reload/live consumer while adding the observed renderer-loading readiness transition before its trusted click."
+    },
+    {
+      "baselineRoot": "RISK unreadable device recovery: Quick start and current Changelog explain preserved sources and local pending recovery",
+      "currentRoot": "RISK unreadable device recovery: Quick start and dated Changelog explain preserved sources and local pending recovery",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "Ticket #1393 binds the unchanged recovery-copy expectations to their retained October28 dated entry while allowing a newer WOOP note above it. Every original content assertion remains protected and the historical baseline duration/group are retained."
     }
   ]
 }

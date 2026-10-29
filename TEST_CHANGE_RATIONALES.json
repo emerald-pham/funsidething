@@ -28172,5 +28172,246 @@
       "commonBase": "2ea5ab8b7dcbc010f7c6ca07d0146926b4308fb2",
       "metadataOnly": true
     }
+  },
+  {
+    "baseCommit": "b9212f86b310c5b07853b3413148a19e2ddb891d",
+    "testChangesSha256": "dfbfda4ab4311bb0bdefd4202696ff3a0dca775204f7acc50296bae75ad8d485",
+    "reason": "Reconcile the admitted fixture-only held-source repairs and retained dated guidance, and preserve actual held-commit child streams through the existing diagnostic boundary. No product recovery, ranking or runtime source changes are introduced by this packet.",
+    "previousBehavior": "Released recovery could repair the old work-budget fixture before its required held-source assertions; the copy test assumed its October28 recovery note stayed first, and the held-commit sensitivity asserted but did not emit its captured inner output.",
+    "intendedBehavior": "Only explicit default-off fixture opt-ins supply complete incompatible legacy prior ratings; ordinary and cold held-work assertions remain unchanged. Recovery prose is checked at its dated entry and the existing held-commit root emits lossless captured child JSON before unchanged assertions.",
+    "replacementTests": [
+      "RISK corrupt cloud work budget fixture: incompatible complete prior ratings keep the actual source held",
+      "RISK unreadable device recovery: Quick start and dated Changelog explain preserved sources and local pending recovery"
+    ],
+    "preservedCoverage": [
+      "All original ordinary/cold Add, Start, No, Done, exact durable head, retained newer task, source/no-write/read counts, Retry, new-revision release and original20s/5s bounds remain unchanged. Exact-current no-ACK repair and ambiguous legacy-rating positive/safety controls retain their default helper behavior.",
+      "All original FAQ, Restore, raw-source, cloud-saving and visibility content assertions remain identical. Only the retained October28 selector and title change; later missing-note sensitivity19e94a9a fails the original recovery regex and is not preimplementation RED.",
+      "Every original shutdown, held-device-commit and first-Add-prefix assertion and deadline remains unchanged. Only one existing-root diagnostic was added; child status1/no signal,1failure0cancel and earned20002ms are retained losslessly.",
+      "Original WOOP extraction REDfc2e8786 preceded its existing app hunk; GREENeeaa5f38 and affected30/30 remain source-specific. This metadata addendum preserves the original rationale objects and does not qualify the failed fullce10328a or later integrated/deployed/device behavior."
+    ],
+    "redEvidence": {
+      "command": "Original fixture consumer: /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap '--test-name-pattern=^RISK corrupt cloud work budget fixture: incompatible complete prior ratings keep the actual source held$' tests.js\nOriginal failed qualification: npm test\nExact #1409 observability readback argv/code is retained in WOOP/retained-child-output/implementation/CHECK-COMMAND.json and recorder512e0fd3; this is the existing diagnostic report seam.",
+      "failure": "FR01 actual consumer REDa0ff985d observed null versus corrupt-generation before the default-off fixture edit; GREEN2ace7ce4 passes2/2. Cold original paired RED8ea551ea/e0f21326 preceded caller opt-in; retained GREENd7b3a7ed passes3/3 on exact dirtydcf4 bytes. Copy REDce10328a expected retained recovery text but received the newly prepended WOOP note; dated-selector GREEN9a8977ce passes1/1. #1409 unchanged baseline2539f714 passes1/1, then actual missing-output assertion512e0fd3 fails0results versus1 before the single diagnostic line; same-root GREEN22a0a33f passes1/1. These are fixture/copy/observability outcomes, not a new app defect."
+    },
+    "sensitivityEvidence": {
+      "shutdown": "cdf9e8ba1/1 with source-bound strict child refusal/deadline/cleanup assertions; no separately retained inner stream claim",
+      "firstAdd": "b57fa9ac1/1; actual prefix21010ms rejected under original20s deadline; full inner stdout asserted internally",
+      "missingNote": "19e94a9a1test1intendedfailure0skip/cancel on external162-file copy; only exact retained note removed; explicit later sensitivity",
+      "heldCommit": "22a0a33f1/1 and retained-only readbackae2fd6db prove child20002ms/status1/no signal/1fail0cancel. cf5633a6 TAP-decoder authoring failure is preserved; one exact-installed-code inverse repair passed literal backslash/hash control without source/root rerun."
+    },
+    "metadataEvidence": "Pre-change map2b12686b fails missing renamed RISK. Descriptor3689c1e3 missing --group is preparation-only, not RED; correction-linked zero-body3b7f98d5 reaches actual missing assignment. Structural GREEN follows metadata edits.",
+    "scope": "#1299 resumed reuse; historical #1300 standalone release authority remains revoked. #1398 owns metadata and #1399 one packaging commit; no full qualification, push, PR, CI or release."
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "55b247955e7035c66951aba2c6591f6de1b9685249ab9298e93ca481b350d014",
+    "reason": "Bind the complete Stable-to-packet test diff to its exact final fingerprint while preserving the original WOOP extraction chronology and every existing rationale object. Reconcile the admitted fixture-only held-source repairs and retained dated guidance, and preserve actual held-commit child streams through the existing diagnostic boundary. No product recovery, ranking or runtime source changes are introduced by this packet.",
+    "previousBehavior": "Released recovery could repair the old work-budget fixture before its required held-source assertions; the copy test assumed its October28 recovery note stayed first, and the held-commit sensitivity asserted but did not emit its captured inner output.",
+    "intendedBehavior": "Only explicit default-off fixture opt-ins supply complete incompatible legacy prior ratings; ordinary and cold held-work assertions remain unchanged. Recovery prose is checked at its dated entry and the existing held-commit root emits lossless captured child JSON before unchanged assertions.",
+    "replacementTests": [
+      "RISK corrupt cloud work budget fixture: incompatible complete prior ratings keep the actual source held",
+      "RISK unreadable device recovery: Quick start and dated Changelog explain preserved sources and local pending recovery",
+      "RISK overdue WOOP: a newly started scan keeps Next usable and the saved plan through reopening"
+    ],
+    "preservedCoverage": [
+      "All original ordinary/cold Add, Start, No, Done, exact durable head, retained newer task, source/no-write/read counts, Retry, new-revision release and original20s/5s bounds remain unchanged. Exact-current no-ACK repair and ambiguous legacy-rating positive/safety controls retain their default helper behavior.",
+      "All original FAQ, Restore, raw-source, cloud-saving and visibility content assertions remain identical. Only the retained October28 selector and title change; later missing-note sensitivity19e94a9a fails the original recovery regex and is not preimplementation RED.",
+      "Every original shutdown, held-device-commit and first-Add-prefix assertion and deadline remains unchanged. Only one existing-root diagnostic was added; child status1/no signal,1failure0cancel and earned20002ms are retained losslessly.",
+      "Original WOOP extraction REDfc2e8786 preceded its existing app hunk; GREENeeaa5f38 and affected30/30 remain source-specific. This metadata addendum preserves the original rationale objects and does not qualify the failed fullce10328a or later integrated/deployed/device behavior."
+    ],
+    "redEvidence": {
+      "command": "Original fixture consumer: /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap '--test-name-pattern=^RISK corrupt cloud work budget fixture: incompatible complete prior ratings keep the actual source held$' tests.js\nOriginal failed qualification: npm test\nExact #1409 observability readback argv/code is retained in WOOP/retained-child-output/implementation/CHECK-COMMAND.json and recorder512e0fd3; this is the existing diagnostic report seam.",
+      "failure": "FR01 actual consumer REDa0ff985d observed null versus corrupt-generation before the default-off fixture edit; GREEN2ace7ce4 passes2/2. Cold original paired RED8ea551ea/e0f21326 preceded caller opt-in; retained GREENd7b3a7ed passes3/3 on exact dirtydcf4 bytes. Copy REDce10328a expected retained recovery text but received the newly prepended WOOP note; dated-selector GREEN9a8977ce passes1/1. #1409 unchanged baseline2539f714 passes1/1, then actual missing-output assertion512e0fd3 fails0results versus1 before the single diagnostic line; same-root GREEN22a0a33f passes1/1. These are fixture/copy/observability outcomes, not a new app defect."
+    },
+    "sensitivityEvidence": {
+      "shutdown": "cdf9e8ba1/1 with source-bound strict child refusal/deadline/cleanup assertions; no separately retained inner stream claim",
+      "firstAdd": "b57fa9ac1/1; actual prefix21010ms rejected under original20s deadline; full inner stdout asserted internally",
+      "missingNote": "19e94a9a1test1intendedfailure0skip/cancel on external162-file copy; only exact retained note removed; explicit later sensitivity",
+      "heldCommit": "22a0a33f1/1 and retained-only readbackae2fd6db prove child20002ms/status1/no signal/1fail0cancel. cf5633a6 TAP-decoder authoring failure is preserved; one exact-installed-code inverse repair passed literal backslash/hash control without source/root rerun."
+    },
+    "metadataEvidence": "Pre-change map2b12686b fails missing renamed RISK. Descriptor3689c1e3 missing --group is preparation-only, not RED; correction-linked zero-body3b7f98d5 reaches actual missing assignment. Structural GREEN follows metadata edits.",
+    "scope": "#1299 resumed reuse; historical #1300 standalone release authority remains revoked. #1398 owns metadata and #1399 one packaging commit; no full qualification, push, PR, CI or release."
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "6fabd2daa23e1dc2a1c131e6e418d20261d30cfa4452c9f69779d20427e0183f",
+    "reason": "Extract the completed narrow overdue-WOOP fix onto current Stable with a permanent consumer regression reaching a newly started scan rather than a fixture already paused in work mode.",
+    "previousBehavior": "After Start scanning, Run WOOP chose the overdue candidate but its saved-choice projection restored scan mode. The first Next closed the walkthrough as stale rather than opening Step 2.",
+    "intendedBehavior": "Record the explicit WOOP dot and its paused scanner mode in the same saved action. All three steps complete, the plan survives reopening, and Undo restores the prior scan mode and benchmark.",
+    "replacementTests": [
+      "RISK overdue WOOP: a newly started scan keeps Next usable and the saved plan through reopening"
+    ],
+    "preservedCoverage": [
+      "All existing overdue and final-task WOOP controls, stale account/board/peer-plan guards, cancellation and explicit delete contracts remain unchanged.",
+      "Existing current-choice projection, mixed rollout, scanner-mode, saved-plan persistence and Undo assertions remain intact; no blanket cloud or physical-device claim is added."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo <isolated-checkpoint> --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/checkpoint-woop-release/tdd/red --purpose preimplementation-red --summary -- node --test --test-name-pattern='^RISK overdue WOOP: a newly started scan keeps Next usable and the saved plan through reopening$' tests.js",
+      "failure": "Actual current-Stable replay before app extraction at 2026-10-29T10:02:03Z: recorder fc2e8786-c430-42eb-92c3-31d36f037181, child/wrapper exit1, 1 failed, zero skipped. Expected Step 2 of 3; actual modal empty. App index and all runtime assets were exact base8cd, tests.js alone changed. This is current-base extraction chronology, not a claim to reconstruct original b9d history. Focused GREEN eeaa5f38 at10:02:32Z passes30 cases, zero skips, after the exact original hunk."
+    }
+  },
+  {
+    "baseCommit": "9d6522132dadb397264ccd24393e13f4e74d6c5a",
+    "comparisonMergeBase": "9d6522132dadb397264ccd24393e13f4e74d6c5a",
+    "testChangesSha256": "a7f40d92835aa3fcebf2fb0072f405983d619fa4275781734c07b6a1d4294637",
+    "cycle": "source-join-1483",
+    "reason": "Associate the exact admitted source union with its new comparison fingerprint while preserving all complete parent rationale objects. Metadata-only source integration creates no new test, behavior or RED chronology.",
+    "previousBehavior": "The original complete source and tests had accepted source-specific evidence; this exact combined-source comparison had a new fingerprint without its own association.",
+    "intendedBehavior": "Keep the exact automatic three-way functional and test source, retain every complete accepted parent history, and bind subsequent committed verification to the actual combined diff.",
+    "replacementTests": [
+      "RISK unreadable device recovery: Quick start and dated Changelog explain preserved sources and local pending recovery",
+      "RISK corrupt cloud work budget fixture: incompatible complete prior ratings keep the actual source held"
+    ],
+    "preservedCoverage": [
+      "Every complete prior integration record remains exact prefix; every complete incoming source object remains present without deduplicating different objects by fingerprint.",
+      "Every admitted functional/test assertion and original source/authority/durable/pending/unknown-data protection remains the unchanged clean Git three-way result.",
+      "Original RED/GREEN and native results retain their actual source identities and limits; this source association creates no fresh native, fullsuite, CI, release or physical-device proof."
+    ],
+    "redEvidence": {
+      "command": "Historical source-bound evidence only; no new RED execution in this metadata integration. CHAIN_NATIVE_PORT=48372 CHAIN_NATIVE_SMOKE_PORT=48373 node scripts/agent-tools/record-run.mjs --repo . --evidence-dir <external>/... --purpose preimplementation-red -- node --test --test-name-pattern='RISK saved view opening source preservation|RISK saved view accepted handover|RISK saved view broken-board guidance' tests.js",
+      "failure": "Original actual failures remain retained and are not relabeled as a new RED or passing result. Contemporaneous ffcce662 observed malformed appearance bytes deleted (GREEN d45f5b96). Repeated-device-open failure discovery00233d61 and explicit RED7a423d69 observed0 retained rows (GREEN4ee4678c). Optional cache invalidation diagnostic74f1ca0e and explicit RED97e4dc3f reached66 then0 rows while safe raw sources remained equal; actual accepted edit/offline/reopen passes3313e9d3. Terminal hint REDfe299698 observed0 projection/settings/sync; masked-control RED6e3d8c0c observed enabled-looking Undo/Theme; GREEN2be3b030 passes8/8. Focus-return is an unchanged passing positive, not a clock repair. Masked Settings copy RED797c0aa7 rejects claiming hidden retained content remains visible. Terminal FAQ RED9c002620 preceded copy. Whole-board permanent enlargement fixture RED923cbbdb/GREEN4e57aaa5 strengthens current execution; prior82-artifact supplement is retained. Date+cached-old-error acceptance passesdeddd8854/4. Initial missing-port d47eef50, strict-selector3313e9d3 terminal cases and earlier fixture-only failures are retained as setup/fixture failures, not product RED. All records live in task-artifacts/issue-358-resume-20261028; final exact qualification remains separately required. Independent review RED295d362e meaningfully reaches cached-only initial/later same-email UID, cached source change and same-owner terminal loss; earlier17187d76 UID fixtures were overwritten at old pagehide and do not prove UID coverage. Backplate RED9dc290d2 observes transparent paint in actual rendered notices. Batched first GREEN8b47ae99 passes all17 safety cases and terminal owner/paint assertions, but its new signed-in fixture overclaimed automatic guest-head recovery after a UID change. Existing seven retry cases stay unchanged; the added signed-in case stops with explicit no-adoption assertions after the UID mask. Frozen0d render7ed80043 is47/48 after an initial LandscapeVisits page error; supplementary1c4c99fe completes four Chromium cases then fails an unguarded new-document WebKit wait. The external corrected producer does not change application code. Diagnostic a58e0733 reproduces initial-scene navigation overlap under a delayed external first SPAWN_RATES fetch with a different WebKit fetch page error; exact LandscapeVisits cause is unconfirmed. The preparatory fixture now awaits owned local network idleness before seeding/reloading, retains all page errors, and never waits away the actual held read under test. Exact8f9 rendered5e46ac10 passes51/52 but strict scene-tinted panel paint differs by about0.00024sRGB after a live minute tick. This test-only successor freezes the existing external status clock before first navigation; all strict equality/theme/geometry/error/keyboard assertions remain and product assets are byte-identical. It is a fixture-input repair, not an app paint fix or assertion relaxation. Controlled-clock d928 runnerbf30e253 stopped at native Motion/Quick start setup: a wall-time motion hint became future-dated. The fixture now stamps that existing hint in its explicit fixed clock domain on every navigation and chooses Reduced through the native first-run control if shown. No app assets or assertions change. Actual93e53fda passes the complete8-variant Chromium/WebKit/theme/width status root with zero skips; its dirty-runner test bytes are bound to the final test-only commit and are not clean full qualification. Exact fullf33a7eed is a failed qualification discovery, not a preimplementation product RED. Clean focused2d614241 repeats the inherited large-original positive failure while channel fixture passes in isolation. External instrumented diagnosticeb826e9c retains the actual router and assertions and proves premature fake-curl truncation;99c7ec9c proves bsdtar complete extraction versus writer paddingEPIPE. Existing full async-predicate guard identifies lines16119/16128. Bounded test-only repair GREENf7fe1eea passes8/8; no passing product assertion, gate, retry/deadline or accepted skip is removed."
+    },
+    "sourceJoin": {
+      "parent": "9d6522132dadb397264ccd24393e13f4e74d6c5a",
+      "source": "630403a4bfe1a07c7a5a34f000943b26726ded0e",
+      "commonBase": "b9212f86b310c5b07853b3413148a19e2ddb891d",
+      "metadataOnly": true
+    }
+  },
+  {
+    "baseCommit": "630403a4bfe1a07c7a5a34f000943b26726ded0e",
+    "comparisonMergeBase": "99b5dd01df0bc6fee9fa2f9cac30d5ce0c701ee5",
+    "testChangesSha256": "95bb7330e5ab943ee45c39b6e6111702d473c680ce5924c16fb921aae87b3062",
+    "cycle": "source-join-1483",
+    "reason": "Associate the exact admitted source union with its new comparison fingerprint while preserving all complete parent rationale objects. Metadata-only source integration creates no new test, behavior or RED chronology.",
+    "previousBehavior": "The original complete source and tests had accepted source-specific evidence; this exact combined-source comparison had a new fingerprint without its own association.",
+    "intendedBehavior": "Keep the exact automatic three-way functional and test source, retain every complete accepted parent history, and bind subsequent committed verification to the actual combined diff.",
+    "replacementTests": [
+      "RISK unreadable device recovery: Quick start and dated Changelog explain preserved sources and local pending recovery",
+      "RISK transfer guidance: mounted FAQ and changelog explain one prepared archive and guarded recovery limits",
+      "RISK corrupt cloud work budget fixture: incompatible complete prior ratings keep the actual source held",
+      "RISK Settings transfer consolidation: one Import, one Export and direct Copy",
+      "RISK Settings transfer sections: cleanup controls stay outside the focused backup section",
+      "RISK backup export safety: unreadable originals stay byte-exact without a raw-data view",
+      "RISK saved view continuity: repeated selected eligibility retains mounted rows and still refreshes changed views",
+      "RISK saved view opening source preservation: invalid optional appearance keeps its bytes while one complete task opens"
+    ],
+    "preservedCoverage": [
+      "Every complete prior integration record remains exact prefix; every complete incoming source object remains present without deduplicating different objects by fingerprint.",
+      "Every admitted functional/test assertion and original source/authority/durable/pending/unknown-data protection remains the unchanged clean Git three-way result.",
+      "Original RED/GREEN and native results retain their actual source identities and limits; this source association creates no fresh native, fullsuite, CI, release or physical-device proof."
+    ],
+    "redEvidence": {
+      "command": "Historical source-bound evidence only; no new RED execution in this metadata integration. CHAIN_NATIVE_PORT=48372 CHAIN_NATIVE_SMOKE_PORT=48373 node scripts/agent-tools/record-run.mjs --repo . --evidence-dir <external>/... --purpose preimplementation-red -- node --test --test-name-pattern='RISK saved view opening source preservation|RISK saved view accepted handover|RISK saved view broken-board guidance' tests.js",
+      "failure": "Original actual failures remain retained and are not relabeled as a new RED or passing result. Contemporaneous ffcce662 observed malformed appearance bytes deleted (GREEN d45f5b96). Repeated-device-open failure discovery00233d61 and explicit RED7a423d69 observed0 retained rows (GREEN4ee4678c). Optional cache invalidation diagnostic74f1ca0e and explicit RED97e4dc3f reached66 then0 rows while safe raw sources remained equal; actual accepted edit/offline/reopen passes3313e9d3. Terminal hint REDfe299698 observed0 projection/settings/sync; masked-control RED6e3d8c0c observed enabled-looking Undo/Theme; GREEN2be3b030 passes8/8. Focus-return is an unchanged passing positive, not a clock repair. Masked Settings copy RED797c0aa7 rejects claiming hidden retained content remains visible. Terminal FAQ RED9c002620 preceded copy. Whole-board permanent enlargement fixture RED923cbbdb/GREEN4e57aaa5 strengthens current execution; prior82-artifact supplement is retained. Date+cached-old-error acceptance passesdeddd8854/4. Initial missing-port d47eef50, strict-selector3313e9d3 terminal cases and earlier fixture-only failures are retained as setup/fixture failures, not product RED. All records live in task-artifacts/issue-358-resume-20261028; final exact qualification remains separately required. Independent review RED295d362e meaningfully reaches cached-only initial/later same-email UID, cached source change and same-owner terminal loss; earlier17187d76 UID fixtures were overwritten at old pagehide and do not prove UID coverage. Backplate RED9dc290d2 observes transparent paint in actual rendered notices. Batched first GREEN8b47ae99 passes all17 safety cases and terminal owner/paint assertions, but its new signed-in fixture overclaimed automatic guest-head recovery after a UID change. Existing seven retry cases stay unchanged; the added signed-in case stops with explicit no-adoption assertions after the UID mask. Frozen0d render7ed80043 is47/48 after an initial LandscapeVisits page error; supplementary1c4c99fe completes four Chromium cases then fails an unguarded new-document WebKit wait. The external corrected producer does not change application code. Diagnostic a58e0733 reproduces initial-scene navigation overlap under a delayed external first SPAWN_RATES fetch with a different WebKit fetch page error; exact LandscapeVisits cause is unconfirmed. The preparatory fixture now awaits owned local network idleness before seeding/reloading, retains all page errors, and never waits away the actual held read under test. Exact8f9 rendered5e46ac10 passes51/52 but strict scene-tinted panel paint differs by about0.00024sRGB after a live minute tick. This test-only successor freezes the existing external status clock before first navigation; all strict equality/theme/geometry/error/keyboard assertions remain and product assets are byte-identical. It is a fixture-input repair, not an app paint fix or assertion relaxation. Controlled-clock d928 runnerbf30e253 stopped at native Motion/Quick start setup: a wall-time motion hint became future-dated. The fixture now stamps that existing hint in its explicit fixed clock domain on every navigation and chooses Reduced through the native first-run control if shown. No app assets or assertions change. Actual93e53fda passes the complete8-variant Chromium/WebKit/theme/width status root with zero skips; its dirty-runner test bytes are bound to the final test-only commit and are not clean full qualification. Exact fullf33a7eed is a failed qualification discovery, not a preimplementation product RED. Clean focused2d614241 repeats the inherited large-original positive failure while channel fixture passes in isolation. External instrumented diagnosticeb826e9c retains the actual router and assertions and proves premature fake-curl truncation;99c7ec9c proves bsdtar complete extraction versus writer paddingEPIPE. Existing full async-predicate guard identifies lines16119/16128. Bounded test-only repair GREENf7fe1eea passes8/8; no passing product assertion, gate, retry/deadline or accepted skip is removed."
+    },
+    "sourceJoin": {
+      "parent": "9d6522132dadb397264ccd24393e13f4e74d6c5a",
+      "source": "630403a4bfe1a07c7a5a34f000943b26726ded0e",
+      "commonBase": "b9212f86b310c5b07853b3413148a19e2ddb891d",
+      "metadataOnly": true
+    }
+  },
+  {
+    "baseCommit": "f22f28be699f10a766ce9a90d01469b65457bfed",
+    "comparisonMergeBase": "f22f28be699f10a766ce9a90d01469b65457bfed",
+    "testChangesSha256": "8141b690d52fc509f68d7790ca5dae6784f6967087abff73f8fe40e1cd66ad49",
+    "cycle": "source-join-1483",
+    "reason": "Associate the exact admitted source union with its new comparison fingerprint while preserving all complete parent rationale objects. Metadata-only source integration creates no new test, behavior or RED chronology.",
+    "previousBehavior": "The original complete source and tests had accepted source-specific evidence; this exact combined-source comparison had a new fingerprint without its own association.",
+    "intendedBehavior": "Keep the exact automatic three-way functional and test source, retain every complete accepted parent history, and bind subsequent committed verification to the actual combined diff.",
+    "replacementTests": [
+      "RISK unreadable device recovery: Quick start and dated Changelog explain preserved sources and local pending recovery",
+      "RISK transfer guidance: mounted FAQ and changelog explain one prepared archive and guarded recovery limits",
+      "RISK corrupt cloud work budget fixture: incompatible complete prior ratings keep the actual source held",
+      "RISK saved view held Export: terminal Settings preserves an exact partial source-only archive",
+      "RISK saved view held Copy: trusted terminal Copy preserves prepared bytes and original sources",
+      "RISK saved view held Download: trusted terminal Download preserves the same Copy archive and original sources",
+      "RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources",
+      "RISK DATABASE REPAIR EXPORT: canceled capture keeps the pasted draft and concurrent capture is bounded"
+    ],
+    "preservedCoverage": [
+      "Every complete prior integration record remains exact prefix; every complete incoming source object remains present without deduplicating different objects by fingerprint.",
+      "Every admitted functional/test assertion and original source/authority/durable/pending/unknown-data protection remains the unchanged clean Git three-way result.",
+      "Original RED/GREEN and native results retain their actual source identities and limits; this source association creates no fresh native, fullsuite, CI, release or physical-device proof."
+    ],
+    "redEvidence": {
+      "command": "Historical source-bound evidence only; no new RED execution in this metadata integration. CHAIN_NATIVE_PORT=48372 CHAIN_NATIVE_SMOKE_PORT=48373 node scripts/agent-tools/record-run.mjs --repo . --evidence-dir <external>/... --purpose preimplementation-red -- node --test --test-name-pattern='RISK saved view opening source preservation|RISK saved view accepted handover|RISK saved view broken-board guidance' tests.js",
+      "failure": "Original actual failures remain retained and are not relabeled as a new RED or passing result. Contemporaneous ffcce662 observed malformed appearance bytes deleted (GREEN d45f5b96). Repeated-device-open failure discovery00233d61 and explicit RED7a423d69 observed0 retained rows (GREEN4ee4678c). Optional cache invalidation diagnostic74f1ca0e and explicit RED97e4dc3f reached66 then0 rows while safe raw sources remained equal; actual accepted edit/offline/reopen passes3313e9d3. Terminal hint REDfe299698 observed0 projection/settings/sync; masked-control RED6e3d8c0c observed enabled-looking Undo/Theme; GREEN2be3b030 passes8/8. Focus-return is an unchanged passing positive, not a clock repair. Masked Settings copy RED797c0aa7 rejects claiming hidden retained content remains visible. Terminal FAQ RED9c002620 preceded copy. Whole-board permanent enlargement fixture RED923cbbdb/GREEN4e57aaa5 strengthens current execution; prior82-artifact supplement is retained. Date+cached-old-error acceptance passesdeddd8854/4. Initial missing-port d47eef50, strict-selector3313e9d3 terminal cases and earlier fixture-only failures are retained as setup/fixture failures, not product RED. All records live in task-artifacts/issue-358-resume-20261028; final exact qualification remains separately required. Independent review RED295d362e meaningfully reaches cached-only initial/later same-email UID, cached source change and same-owner terminal loss; earlier17187d76 UID fixtures were overwritten at old pagehide and do not prove UID coverage. Backplate RED9dc290d2 observes transparent paint in actual rendered notices. Batched first GREEN8b47ae99 passes all17 safety cases and terminal owner/paint assertions, but its new signed-in fixture overclaimed automatic guest-head recovery after a UID change. Existing seven retry cases stay unchanged; the added signed-in case stops with explicit no-adoption assertions after the UID mask. Frozen0d render7ed80043 is47/48 after an initial LandscapeVisits page error; supplementary1c4c99fe completes four Chromium cases then fails an unguarded new-document WebKit wait. The external corrected producer does not change application code. Diagnostic a58e0733 reproduces initial-scene navigation overlap under a delayed external first SPAWN_RATES fetch with a different WebKit fetch page error; exact LandscapeVisits cause is unconfirmed. The preparatory fixture now awaits owned local network idleness before seeding/reloading, retains all page errors, and never waits away the actual held read under test. Exact8f9 rendered5e46ac10 passes51/52 but strict scene-tinted panel paint differs by about0.00024sRGB after a live minute tick. This test-only successor freezes the existing external status clock before first navigation; all strict equality/theme/geometry/error/keyboard assertions remain and product assets are byte-identical. It is a fixture-input repair, not an app paint fix or assertion relaxation. Controlled-clock d928 runnerbf30e253 stopped at native Motion/Quick start setup: a wall-time motion hint became future-dated. The fixture now stamps that existing hint in its explicit fixed clock domain on every navigation and chooses Reduced through the native first-run control if shown. No app assets or assertions change. Actual93e53fda passes the complete8-variant Chromium/WebKit/theme/width status root with zero skips; its dirty-runner test bytes are bound to the final test-only commit and are not clean full qualification. Exact fullf33a7eed is a failed qualification discovery, not a preimplementation product RED. Clean focused2d614241 repeats the inherited large-original positive failure while channel fixture passes in isolation. External instrumented diagnosticeb826e9c retains the actual router and assertions and proves premature fake-curl truncation;99c7ec9c proves bsdtar complete extraction versus writer paddingEPIPE. Existing full async-predicate guard identifies lines16119/16128. Bounded test-only repair GREENf7fe1eea passes8/8; no passing product assertion, gate, retry/deadline or accepted skip is removed."
+    },
+    "sourceJoin": {
+      "parent": "9d6522132dadb397264ccd24393e13f4e74d6c5a",
+      "source": "630403a4bfe1a07c7a5a34f000943b26726ded0e",
+      "commonBase": "b9212f86b310c5b07853b3413148a19e2ddb891d",
+      "metadataOnly": true
+    }
+  },
+  {
+    "baseCommit": "c920ccffc11af487ec84277c33fe2e370541e384",
+    "comparisonMergeBase": "c920ccffc11af487ec84277c33fe2e370541e384",
+    "testChangesSha256": "4d09f05b959bd0b07b37f63491a9ce32357a86bb161c5d6f55f7580a5c43300e",
+    "cycle": "source-join-1483",
+    "reason": "Associate the exact admitted source union with its new comparison fingerprint while preserving all complete parent rationale objects. Metadata-only source integration creates no new test, behavior or RED chronology.",
+    "previousBehavior": "The original complete source and tests had accepted source-specific evidence; this exact combined-source comparison had a new fingerprint without its own association.",
+    "intendedBehavior": "Keep the exact automatic three-way functional and test source, retain every complete accepted parent history, and bind subsequent committed verification to the actual combined diff.",
+    "replacementTests": [
+      "RISK unreadable device recovery: Quick start and dated Changelog explain preserved sources and local pending recovery",
+      "RISK transfer guidance: mounted FAQ and changelog explain one prepared archive and guarded recovery limits",
+      "RISK corrupt cloud work budget fixture: incompatible complete prior ratings keep the actual source held",
+      "RISK saved view opening source preservation: invalid optional appearance keeps its bytes while one complete task opens",
+      "RISK saved view held Export: terminal Settings preserves an exact partial source-only archive",
+      "RISK saved view held Copy: trusted terminal Copy preserves prepared bytes and original sources",
+      "RISK saved view held Download: trusted terminal Download preserves the same Copy archive and original sources",
+      "RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources"
+    ],
+    "preservedCoverage": [
+      "Every complete prior integration record remains exact prefix; every complete incoming source object remains present without deduplicating different objects by fingerprint.",
+      "Every admitted functional/test assertion and original source/authority/durable/pending/unknown-data protection remains the unchanged clean Git three-way result.",
+      "Original RED/GREEN and native results retain their actual source identities and limits; this source association creates no fresh native, fullsuite, CI, release or physical-device proof."
+    ],
+    "redEvidence": {
+      "command": "Historical source-bound evidence only; no new RED execution in this metadata integration. CHAIN_NATIVE_PORT=48372 CHAIN_NATIVE_SMOKE_PORT=48373 node scripts/agent-tools/record-run.mjs --repo . --evidence-dir <external>/... --purpose preimplementation-red -- node --test --test-name-pattern='RISK saved view opening source preservation|RISK saved view accepted handover|RISK saved view broken-board guidance' tests.js",
+      "failure": "Original actual failures remain retained and are not relabeled as a new RED or passing result. Contemporaneous ffcce662 observed malformed appearance bytes deleted (GREEN d45f5b96). Repeated-device-open failure discovery00233d61 and explicit RED7a423d69 observed0 retained rows (GREEN4ee4678c). Optional cache invalidation diagnostic74f1ca0e and explicit RED97e4dc3f reached66 then0 rows while safe raw sources remained equal; actual accepted edit/offline/reopen passes3313e9d3. Terminal hint REDfe299698 observed0 projection/settings/sync; masked-control RED6e3d8c0c observed enabled-looking Undo/Theme; GREEN2be3b030 passes8/8. Focus-return is an unchanged passing positive, not a clock repair. Masked Settings copy RED797c0aa7 rejects claiming hidden retained content remains visible. Terminal FAQ RED9c002620 preceded copy. Whole-board permanent enlargement fixture RED923cbbdb/GREEN4e57aaa5 strengthens current execution; prior82-artifact supplement is retained. Date+cached-old-error acceptance passesdeddd8854/4. Initial missing-port d47eef50, strict-selector3313e9d3 terminal cases and earlier fixture-only failures are retained as setup/fixture failures, not product RED. All records live in task-artifacts/issue-358-resume-20261028; final exact qualification remains separately required. Independent review RED295d362e meaningfully reaches cached-only initial/later same-email UID, cached source change and same-owner terminal loss; earlier17187d76 UID fixtures were overwritten at old pagehide and do not prove UID coverage. Backplate RED9dc290d2 observes transparent paint in actual rendered notices. Batched first GREEN8b47ae99 passes all17 safety cases and terminal owner/paint assertions, but its new signed-in fixture overclaimed automatic guest-head recovery after a UID change. Existing seven retry cases stay unchanged; the added signed-in case stops with explicit no-adoption assertions after the UID mask. Frozen0d render7ed80043 is47/48 after an initial LandscapeVisits page error; supplementary1c4c99fe completes four Chromium cases then fails an unguarded new-document WebKit wait. The external corrected producer does not change application code. Diagnostic a58e0733 reproduces initial-scene navigation overlap under a delayed external first SPAWN_RATES fetch with a different WebKit fetch page error; exact LandscapeVisits cause is unconfirmed. The preparatory fixture now awaits owned local network idleness before seeding/reloading, retains all page errors, and never waits away the actual held read under test. Exact8f9 rendered5e46ac10 passes51/52 but strict scene-tinted panel paint differs by about0.00024sRGB after a live minute tick. This test-only successor freezes the existing external status clock before first navigation; all strict equality/theme/geometry/error/keyboard assertions remain and product assets are byte-identical. It is a fixture-input repair, not an app paint fix or assertion relaxation. Controlled-clock d928 runnerbf30e253 stopped at native Motion/Quick start setup: a wall-time motion hint became future-dated. The fixture now stamps that existing hint in its explicit fixed clock domain on every navigation and chooses Reduced through the native first-run control if shown. No app assets or assertions change. Actual93e53fda passes the complete8-variant Chromium/WebKit/theme/width status root with zero skips; its dirty-runner test bytes are bound to the final test-only commit and are not clean full qualification. Exact fullf33a7eed is a failed qualification discovery, not a preimplementation product RED. Clean focused2d614241 repeats the inherited large-original positive failure while channel fixture passes in isolation. External instrumented diagnosticeb826e9c retains the actual router and assertions and proves premature fake-curl truncation;99c7ec9c proves bsdtar complete extraction versus writer paddingEPIPE. Existing full async-predicate guard identifies lines16119/16128. Bounded test-only repair GREENf7fe1eea passes8/8; no passing product assertion, gate, retry/deadline or accepted skip is removed."
+    },
+    "sourceJoin": {
+      "parent": "9d6522132dadb397264ccd24393e13f4e74d6c5a",
+      "source": "630403a4bfe1a07c7a5a34f000943b26726ded0e",
+      "commonBase": "b9212f86b310c5b07853b3413148a19e2ddb891d",
+      "metadataOnly": true
+    }
+  },
+  {
+    "baseCommit": "b176026825e4f9539780f745fe60e09cf348d288",
+    "comparisonMergeBase": "b176026825e4f9539780f745fe60e09cf348d288",
+    "testChangesSha256": "1ddad83bcb616111aa5fcc2ccf49b7748b9816d395f6f09d89ad8367cc8bf5fe",
+    "cycle": "source-join-1483",
+    "reason": "Associate the exact admitted source union with its new comparison fingerprint while preserving all complete parent rationale objects. Metadata-only source integration creates no new test, behavior or RED chronology.",
+    "previousBehavior": "The original complete source and tests had accepted source-specific evidence; this exact combined-source comparison had a new fingerprint without its own association.",
+    "intendedBehavior": "Keep the exact automatic three-way functional and test source, retain every complete accepted parent history, and bind subsequent committed verification to the actual combined diff.",
+    "replacementTests": [
+      "RISK unreadable device recovery: Quick start and dated Changelog explain preserved sources and local pending recovery",
+      "RISK transfer guidance: mounted FAQ and changelog explain one prepared archive and guarded recovery limits",
+      "RISK corrupt cloud work budget fixture: incompatible complete prior ratings keep the actual source held",
+      "RISK AUTH HYDRATION: a broken device board stays quiet until protected local recovery is visible",
+      "RISK saved view broken-board guidance: opening status does not imply cloud confirmation or erase recovery warnings",
+      "RISK saved view broken-board startup: prior appearance stays inert until the recovered board opens",
+      "RISK saved view opening source preservation: invalid optional appearance keeps its bytes while one complete task opens",
+      "RISK saved view held Export: terminal Settings preserves an exact partial source-only archive"
+    ],
+    "preservedCoverage": [
+      "Every complete prior integration record remains exact prefix; every complete incoming source object remains present without deduplicating different objects by fingerprint.",
+      "Every admitted functional/test assertion and original source/authority/durable/pending/unknown-data protection remains the unchanged clean Git three-way result.",
+      "Original RED/GREEN and native results retain their actual source identities and limits; this source association creates no fresh native, fullsuite, CI, release or physical-device proof."
+    ],
+    "redEvidence": {
+      "command": "Historical source-bound evidence only; no new RED execution in this metadata integration. CHAIN_NATIVE_PORT=48372 CHAIN_NATIVE_SMOKE_PORT=48373 node scripts/agent-tools/record-run.mjs --repo . --evidence-dir <external>/... --purpose preimplementation-red -- node --test --test-name-pattern='RISK saved view opening source preservation|RISK saved view accepted handover|RISK saved view broken-board guidance' tests.js",
+      "failure": "Original actual failures remain retained and are not relabeled as a new RED or passing result. Contemporaneous ffcce662 observed malformed appearance bytes deleted (GREEN d45f5b96). Repeated-device-open failure discovery00233d61 and explicit RED7a423d69 observed0 retained rows (GREEN4ee4678c). Optional cache invalidation diagnostic74f1ca0e and explicit RED97e4dc3f reached66 then0 rows while safe raw sources remained equal; actual accepted edit/offline/reopen passes3313e9d3. Terminal hint REDfe299698 observed0 projection/settings/sync; masked-control RED6e3d8c0c observed enabled-looking Undo/Theme; GREEN2be3b030 passes8/8. Focus-return is an unchanged passing positive, not a clock repair. Masked Settings copy RED797c0aa7 rejects claiming hidden retained content remains visible. Terminal FAQ RED9c002620 preceded copy. Whole-board permanent enlargement fixture RED923cbbdb/GREEN4e57aaa5 strengthens current execution; prior82-artifact supplement is retained. Date+cached-old-error acceptance passesdeddd8854/4. Initial missing-port d47eef50, strict-selector3313e9d3 terminal cases and earlier fixture-only failures are retained as setup/fixture failures, not product RED. All records live in task-artifacts/issue-358-resume-20261028; final exact qualification remains separately required. Independent review RED295d362e meaningfully reaches cached-only initial/later same-email UID, cached source change and same-owner terminal loss; earlier17187d76 UID fixtures were overwritten at old pagehide and do not prove UID coverage. Backplate RED9dc290d2 observes transparent paint in actual rendered notices. Batched first GREEN8b47ae99 passes all17 safety cases and terminal owner/paint assertions, but its new signed-in fixture overclaimed automatic guest-head recovery after a UID change. Existing seven retry cases stay unchanged; the added signed-in case stops with explicit no-adoption assertions after the UID mask. Frozen0d render7ed80043 is47/48 after an initial LandscapeVisits page error; supplementary1c4c99fe completes four Chromium cases then fails an unguarded new-document WebKit wait. The external corrected producer does not change application code. Diagnostic a58e0733 reproduces initial-scene navigation overlap under a delayed external first SPAWN_RATES fetch with a different WebKit fetch page error; exact LandscapeVisits cause is unconfirmed. The preparatory fixture now awaits owned local network idleness before seeding/reloading, retains all page errors, and never waits away the actual held read under test. Exact8f9 rendered5e46ac10 passes51/52 but strict scene-tinted panel paint differs by about0.00024sRGB after a live minute tick. This test-only successor freezes the existing external status clock before first navigation; all strict equality/theme/geometry/error/keyboard assertions remain and product assets are byte-identical. It is a fixture-input repair, not an app paint fix or assertion relaxation. Controlled-clock d928 runnerbf30e253 stopped at native Motion/Quick start setup: a wall-time motion hint became future-dated. The fixture now stamps that existing hint in its explicit fixed clock domain on every navigation and chooses Reduced through the native first-run control if shown. No app assets or assertions change. Actual93e53fda passes the complete8-variant Chromium/WebKit/theme/width status root with zero skips; its dirty-runner test bytes are bound to the final test-only commit and are not clean full qualification. Exact fullf33a7eed is a failed qualification discovery, not a preimplementation product RED. Clean focused2d614241 repeats the inherited large-original positive failure while channel fixture passes in isolation. External instrumented diagnosticeb826e9c retains the actual router and assertions and proves premature fake-curl truncation;99c7ec9c proves bsdtar complete extraction versus writer paddingEPIPE. Existing full async-predicate guard identifies lines16119/16128. Bounded test-only repair GREENf7fe1eea passes8/8; no passing product assertion, gate, retry/deadline or accepted skip is removed."
+    },
+    "sourceJoin": {
+      "parent": "9d6522132dadb397264ccd24393e13f4e74d6c5a",
+      "source": "630403a4bfe1a07c7a5a34f000943b26726ded0e",
+      "commonBase": "b9212f86b310c5b07853b3413148a19e2ddb891d",
+      "metadataOnly": true
+    }
   }
 ]
