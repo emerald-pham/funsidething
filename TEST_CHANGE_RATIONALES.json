@@ -26894,5 +26894,415 @@
       "TC01MechanicalComparisonSha256": "8511808aedd4a78f7094bee207d7c30345ddad617e1ea405c6e0a94b11f7523c",
       "finalBothEngineProof": "not-run; owned by1174"
     }
+  },
+  {
+    "baseCommit": "c920ccffc11af487ec84277c33fe2e370541e384",
+    "testChangesSha256": "ca2bdda26a767dfb7052964e8cea027373d9d01f80135598ae1e9a2a2558c4e0",
+    "reason": "Report-only supplemental capture admission under1101-1104 needs bounded artifact/clock/cleanup and false-completeness sensitivity at the existing verifier.",
+    "previousBehavior": "Unchanged report consumer silently accepted malformed capture counts,bytes,paths,hashes,clock conversion,cleanup,bounds and a complete claim based on ambiguous public timestamps.",
+    "intendedBehavior": "Validate fixed finite supplemental data and keep D02 incomplete for unsupported capture clocks/work without changing actual application verdicts or original no-capture positives.",
+    "replacementTests": [
+      "RISK repository process: supplemental startup capture rejects malformed artifacts and unsupported paint completeness"
+    ],
+    "preservedCoverage": [
+      "Original D03 complete and incomplete synthetic controls remain unchanged, including its accepted800ms positive and diagnostic/app-verdict separation.",
+      "All existing native button/rapid/saved-source/guard/inventory assertions remain intact; no producer or app bytes change in this report cycle."
+    ],
+    "redEvidence": {
+      "command": "Actual recorder1102-red d9fb096f: node --test --test-name-pattern=^RISK.repository.process:.supplemental.startup.capture tests.js",
+      "failure": "Nine Missing expected exception admissions and unsupported complete instead of incomplete observed at unchanged c920; exact unchanged test GREEN2a2531e2 with17/17 affected controls."
+    }
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "97e216a255a3fc51b02cfe301a3e2c75c17eb071215f75becd4c465a4bb61589",
+    "reason": "Report-only supplemental capture admission under1101-1104 needs bounded artifact/clock/cleanup and false-completeness sensitivity at the existing verifier.",
+    "previousBehavior": "Unchanged report consumer silently accepted malformed capture counts,bytes,paths,hashes,clock conversion,cleanup,bounds and a complete claim based on ambiguous public timestamps.",
+    "intendedBehavior": "Validate fixed finite supplemental data and keep D02 incomplete for unsupported capture clocks/work without changing actual application verdicts or original no-capture positives.",
+    "replacementTests": [
+      "RISK repository process: supplemental startup capture rejects malformed artifacts and unsupported paint completeness"
+    ],
+    "preservedCoverage": [
+      "Original D03 complete and incomplete synthetic controls remain unchanged, including its accepted800ms positive and diagnostic/app-verdict separation.",
+      "All existing native button/rapid/saved-source/guard/inventory assertions remain intact; no producer or app bytes change in this report cycle."
+    ],
+    "redEvidence": {
+      "command": "Actual recorder1102-red d9fb096f: node --test --test-name-pattern=^RISK.repository.process:.supplemental.startup.capture tests.js",
+      "failure": "Nine Missing expected exception admissions and unsupported complete instead of incomplete observed at unchanged c920; exact unchanged test GREEN2a2531e2 with17/17 affected controls."
+    }
+  },
+  {
+    "baseCommit": "c920ccffc11af487ec84277c33fe2e370541e384",
+    "testChangesSha256": "77b5dabd3ea4c836fa969a0e3296b280f75e896812330208ac0050c0e1e77271",
+    "reason": "CN01 test-only source defines actual selected startup JPEG artifacts and strict API/CLI selection admission before the single genuine CN02 producer RED.",
+    "previousBehavior": "Existing public native startup succeeds without producing supplemental JPEG evidence; the report-only validator has been tested and fixed independently.",
+    "intendedBehavior": "One real selected startup case must retain actual JPEG files,finite counts/bytes,distinct clocks,stop/cleanup,trusted input and exact saved fixture; selection outside startup or unknown mode refuses before launch.",
+    "replacementTests": [
+      "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
+      "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
+    ],
+    "preservedCoverage": [
+      "Existing report RED/GREEN d9fb096f/2a2531e2,original D03 full/incomplete controls,all native guard/inventory/ordinary action/source assertions remain unchanged.",
+      "This commit changes only tests and their metadata; no producer implementation or native execution has occurred yet."
+    ],
+    "redEvidence": {
+      "command": "CN02 will run exact committed selected startup producer RISK once under an immutable allocated manifest. This test-definition commit deliberately precedes that execution.",
+      "failure": "Native producer RED is not yet observed at CN01 and is not claimed. Existing independent report RED d9fb096f is retained only as report evidence, not native producer evidence."
+    }
+  },
+  {
+    "baseCommit": "900a9a7796492567ade6f29ebe573dc7e1ba4ebb",
+    "testChangesSha256": "924cef5b7999e42aaa4aa45c5e32819ac862a7d436c74f21f0efcede4087a20f",
+    "reason": "CN01 test-only source defines actual selected startup JPEG artifacts and strict API/CLI selection admission before the single genuine CN02 producer RED.",
+    "previousBehavior": "Existing public native startup succeeds without producing supplemental JPEG evidence; the report-only validator has been tested and fixed independently.",
+    "intendedBehavior": "One real selected startup case must retain actual JPEG files,finite counts/bytes,distinct clocks,stop/cleanup,trusted input and exact saved fixture; selection outside startup or unknown mode refuses before launch.",
+    "replacementTests": [
+      "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
+      "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
+    ],
+    "preservedCoverage": [
+      "Existing report RED/GREEN d9fb096f/2a2531e2,original D03 full/incomplete controls,all native guard/inventory/ordinary action/source assertions remain unchanged.",
+      "This commit changes only tests and their metadata; no producer implementation or native execution has occurred yet."
+    ],
+    "redEvidence": {
+      "command": "CN02 will run exact committed selected startup producer RISK once under an immutable allocated manifest. This test-definition commit deliberately precedes that execution.",
+      "failure": "Native producer RED is not yet observed at CN01 and is not claimed. Existing independent report RED d9fb096f is retained only as report evidence, not native producer evidence."
+    }
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "ef7f0898ec94f03ff7e001b9e1fbc63eae8e90331f55c638738126a767b0e4fb",
+    "reason": "CN01 test-only source defines actual selected startup JPEG artifacts and strict API/CLI selection admission before the single genuine CN02 producer RED.",
+    "previousBehavior": "Existing public native startup succeeds without producing supplemental JPEG evidence; the report-only validator has been tested and fixed independently.",
+    "intendedBehavior": "One real selected startup case must retain actual JPEG files,finite counts/bytes,distinct clocks,stop/cleanup,trusted input and exact saved fixture; selection outside startup or unknown mode refuses before launch.",
+    "replacementTests": [
+      "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
+      "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
+    ],
+    "preservedCoverage": [
+      "Existing report RED/GREEN d9fb096f/2a2531e2,original D03 full/incomplete controls,all native guard/inventory/ordinary action/source assertions remain unchanged.",
+      "This commit changes only tests and their metadata; no producer implementation or native execution has occurred yet."
+    ],
+    "redEvidence": {
+      "command": "CN02 will run exact committed selected startup producer RISK once under an immutable allocated manifest. This test-definition commit deliberately precedes that execution.",
+      "failure": "Native producer RED is not yet observed at CN01 and is not claimed. Existing independent report RED d9fb096f is retained only as report evidence, not native producer evidence."
+    }
+  },
+  {
+    "baseCommit": "c920ccffc11af487ec84277c33fe2e370541e384",
+    "testChangesSha256": "989a08a8449a6b41dbc01906f7c5bd31c4c056c9b4ea5925017b7bea9207929c",
+    "reason": "CN01 test-only source defines actual selected startup JPEG artifacts and strict API/CLI selection admission before the single genuine CN02 producer RED. Static test-definition self-review uses the existing imported spawnSync for exact source identity before any native execution.",
+    "previousBehavior": "Existing public native startup succeeds without producing supplemental JPEG evidence; the report-only validator has been tested and fixed independently.",
+    "intendedBehavior": "One real selected startup case must retain actual JPEG files,finite counts/bytes,distinct clocks,stop/cleanup,trusted input and exact saved fixture; selection outside startup or unknown mode refuses before launch.",
+    "replacementTests": [
+      "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
+      "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
+    ],
+    "preservedCoverage": [
+      "Existing report RED/GREEN d9fb096f/2a2531e2,original D03 full/incomplete controls,all native guard/inventory/ordinary action/source assertions remain unchanged.",
+      "This commit changes only tests and their metadata; no producer implementation or native execution has occurred yet."
+    ],
+    "redEvidence": {
+      "command": "CN02 will run exact committed selected startup producer RISK once under an immutable allocated manifest. This test-definition commit deliberately precedes that execution.",
+      "failure": "Native producer RED is not yet observed at CN01 and is not claimed. Existing independent report RED d9fb096f is retained only as report evidence, not native producer evidence."
+    }
+  },
+  {
+    "baseCommit": "900a9a7796492567ade6f29ebe573dc7e1ba4ebb",
+    "testChangesSha256": "b9018c1a84be99dbc275a9774c5ec6b3eccfd62bfe48da839f35e35289c4d716",
+    "reason": "CN01 test-only source defines actual selected startup JPEG artifacts and strict API/CLI selection admission before the single genuine CN02 producer RED. Static test-definition self-review uses the existing imported spawnSync for exact source identity before any native execution.",
+    "previousBehavior": "Existing public native startup succeeds without producing supplemental JPEG evidence; the report-only validator has been tested and fixed independently.",
+    "intendedBehavior": "One real selected startup case must retain actual JPEG files,finite counts/bytes,distinct clocks,stop/cleanup,trusted input and exact saved fixture; selection outside startup or unknown mode refuses before launch.",
+    "replacementTests": [
+      "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
+      "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
+    ],
+    "preservedCoverage": [
+      "Existing report RED/GREEN d9fb096f/2a2531e2,original D03 full/incomplete controls,all native guard/inventory/ordinary action/source assertions remain unchanged.",
+      "This commit changes only tests and their metadata; no producer implementation or native execution has occurred yet."
+    ],
+    "redEvidence": {
+      "command": "CN02 will run exact committed selected startup producer RISK once under an immutable allocated manifest. This test-definition commit deliberately precedes that execution.",
+      "failure": "Native producer RED is not yet observed at CN01 and is not claimed. Existing independent report RED d9fb096f is retained only as report evidence, not native producer evidence."
+    }
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "d71cf9a2a91f50550be6acc2a88bf5cd4110d1a8fd003fa0f3edd529bd5cf6b3",
+    "reason": "CN01 test-only source defines actual selected startup JPEG artifacts and strict API/CLI selection admission before the single genuine CN02 producer RED. Static test-definition self-review uses the existing imported spawnSync for exact source identity before any native execution.",
+    "previousBehavior": "Existing public native startup succeeds without producing supplemental JPEG evidence; the report-only validator has been tested and fixed independently.",
+    "intendedBehavior": "One real selected startup case must retain actual JPEG files,finite counts/bytes,distinct clocks,stop/cleanup,trusted input and exact saved fixture; selection outside startup or unknown mode refuses before launch.",
+    "replacementTests": [
+      "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
+      "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
+    ],
+    "preservedCoverage": [
+      "Existing report RED/GREEN d9fb096f/2a2531e2,original D03 full/incomplete controls,all native guard/inventory/ordinary action/source assertions remain unchanged.",
+      "This commit changes only tests and their metadata; no producer implementation or native execution has occurred yet."
+    ],
+    "redEvidence": {
+      "command": "CN02 will run exact committed selected startup producer RISK once under an immutable allocated manifest. This test-definition commit deliberately precedes that execution.",
+      "failure": "Native producer RED is not yet observed at CN01 and is not claimed. Existing independent report RED d9fb096f is retained only as report evidence, not native producer evidence."
+    }
+  },
+  {
+    "baseCommit": "c920ccffc11af487ec84277c33fe2e370541e384",
+    "testChangesSha256": "989a08a8449a6b41dbc01906f7c5bd31c4c056c9b4ea5925017b7bea9207929c",
+    "reason": "Actual committed native producer expectation now has original a34d3e00 RED before CN03 collector implementation. Exact test is unchanged from a9e0892.",
+    "previousBehavior": "Existing public native startup succeeds without producing supplemental JPEG evidence; the report-only validator has been tested and fixed independently.",
+    "intendedBehavior": "One real selected startup case must retain actual JPEG files,finite counts/bytes,distinct clocks,stop/cleanup,trusted input and exact saved fixture; selection outside startup or unknown mode refuses before launch.",
+    "replacementTests": [
+      "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
+      "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
+    ],
+    "preservedCoverage": [
+      "Existing report RED/GREEN d9fb096f/2a2531e2,original D03 full/incomplete controls,all native guard/inventory/ordinary action/source assertions remain unchanged.",
+      "This commit changes only tests and their metadata; no producer implementation or native execution has occurred yet."
+    ],
+    "redEvidence": {
+      "command": "CN02 actual recorder1106-red a34d3e00: node --test --test-name-pattern=\"^RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command$\" tests.js; source a9e08924a89a44196a7e8b2b4c536f862705a63c",
+      "failure": "Actual ordinary frozen85ce64-task Normal uncapped desktopWebKit opening/action and cleanup passed; subsequent consumer assertion Selected startup operation must retain real bounded JPEG capture evidence failed because report.startupCapture was absent. Exactly one native RED; this is producer enforcement, not app defect. Report RED d9fb096f remains separate. Nonnative affected controls147dbe50 pass before committed producer GREEN."
+    }
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "d71cf9a2a91f50550be6acc2a88bf5cd4110d1a8fd003fa0f3edd529bd5cf6b3",
+    "reason": "Actual committed native producer expectation now has original a34d3e00 RED before CN03 collector implementation. Exact test is unchanged from a9e0892.",
+    "previousBehavior": "Existing public native startup succeeds without producing supplemental JPEG evidence; the report-only validator has been tested and fixed independently.",
+    "intendedBehavior": "One real selected startup case must retain actual JPEG files,finite counts/bytes,distinct clocks,stop/cleanup,trusted input and exact saved fixture; selection outside startup or unknown mode refuses before launch.",
+    "replacementTests": [
+      "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
+      "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
+    ],
+    "preservedCoverage": [
+      "Existing report RED/GREEN d9fb096f/2a2531e2,original D03 full/incomplete controls,all native guard/inventory/ordinary action/source assertions remain unchanged.",
+      "This commit changes only tests and their metadata; no producer implementation or native execution has occurred yet."
+    ],
+    "redEvidence": {
+      "command": "CN02 actual recorder1106-red a34d3e00: node --test --test-name-pattern=\"^RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command$\" tests.js; source a9e08924a89a44196a7e8b2b4c536f862705a63c",
+      "failure": "Actual ordinary frozen85ce64-task Normal uncapped desktopWebKit opening/action and cleanup passed; subsequent consumer assertion Selected startup operation must retain real bounded JPEG capture evidence failed because report.startupCapture was absent. Exactly one native RED; this is producer enforcement, not app defect. Report RED d9fb096f remains separate. Nonnative affected controls147dbe50 pass before committed producer GREEN."
+    }
+  },
+  {
+    "baseCommit": "f22f28be699f10a766ce9a90d01469b65457bfed",
+    "testChangesSha256": "42140fbba979003b396cc61d1c5739f8678ebecf27b4f0b38bf5c2eb7bcc09cb",
+    "reason": "CS02 #1156 associates the actual protected-test fingerprint after source-only merge ce92958c61d0869de28cd7266b98252a16978b71 of original startup b1a224a77589702418712fb15b991b302b62257c and admitted Import integration f22f28be699f10a766ce9a90d01469b65457bfed. This is retrospective combined-source metadata; it introduces no behavioral change, test or preimplementation run. All979 prior objects, including967 common originals,10 startup additions and2 Import associations, remain unchanged. The three exact required bases are f22,c920 and configured published b176; no upstream or base is waived.",
+    "previousBehavior": "The correctly merged test bytes and original behavioral chronology already existed, but this exact combined-source diff had no matching rationale fingerprint for base f22f28be699f10a766ce9a90d01469b65457bfed. Original RED/GREEN evidence remains at its original source and is not relabeled by this metadata association.",
+    "intendedBehavior": "Bind the existing complete merged test diff to its actual comparison base, preserve every original test assertion and historical rationale object, and permit subsequent direct gate verification without inventing new RED evidence or attributing original capture pixels to the merged source.",
+    "replacementTests": [
+      "RISK repository process: supplemental startup capture rejects malformed artifacts and unsupported paint completeness",
+      "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
+      "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
+    ],
+    "preservedCoverage": [
+      "All967 original rationale objects,10 startup associations and2 held Import associations remain semantically unchanged and retained; original guard/inventory and configured published-base coverage are preserved.",
+      "The existing report complete/incomplete controls and selected startup-only collector retain12s/120acceptedJPEG/8MiBtotal/256KiBeach bounds, exact original fixture, trusted input and owned stop/cleanup; callbacks and DOM/rAF do not establish calibrated paint/work.",
+      "The held Import consumer keeps its original eight configurations, original source-preservation/placeholder assertions and original actual RED87a7231c; later admitted complete-tree H9/9 remains separate browser evidence.",
+      "Original1129 actual capture/pixels/clocks remain bound to b1a with frozen85ce application and b70ef16664-task fixture. No new capture, calibrated duration, startup cause, mobile/physical-iPhone, full-suite, CI or release proof is created."
+    ],
+    "redEvidence": {
+      "command": "Historical source-bound producer RED only; no new RED in CS02. CN02 actual recorder1106-red a34d3e00: node --test --test-name-pattern=\"^RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command$\" tests.js; source a9e08924a89a44196a7e8b2b4c536f862705a63c",
+      "failure": "Historical observed producer enforcement failure only: Actual ordinary frozen85ce64-task Normal uncapped desktopWebKit opening/action and cleanup passed; subsequent consumer assertion Selected startup operation must retain real bounded JPEG capture evidence failed because report.startupCapture was absent. Exactly one native RED; this is producer enforcement, not app defect. Report RED d9fb096f remains separate. Nonnative affected controls147dbe50 pass before committed producer GREEN. CS02 computes a later combined-source fingerprint; it does not manufacture behavioral RED or rewrite the original source IDs."
+    }
+  },
+  {
+    "baseCommit": "c920ccffc11af487ec84277c33fe2e370541e384",
+    "testChangesSha256": "786ce3d2e1d44135da47165bcec89aff6fe42a6fe3e15cbb55102d7f33696b95",
+    "reason": "CS02 #1156 associates the actual protected-test fingerprint after source-only merge ce92958c61d0869de28cd7266b98252a16978b71 of original startup b1a224a77589702418712fb15b991b302b62257c and admitted Import integration f22f28be699f10a766ce9a90d01469b65457bfed. This is retrospective combined-source metadata; it introduces no behavioral change, test or preimplementation run. All979 prior objects, including967 common originals,10 startup additions and2 Import associations, remain unchanged. The three exact required bases are f22,c920 and configured published b176; no upstream or base is waived.",
+    "previousBehavior": "The correctly merged test bytes and original behavioral chronology already existed, but this exact combined-source diff had no matching rationale fingerprint for base c920ccffc11af487ec84277c33fe2e370541e384. Original RED/GREEN evidence remains at its original source and is not relabeled by this metadata association.",
+    "intendedBehavior": "Bind the existing complete merged test diff to its actual comparison base, preserve every original test assertion and historical rationale object, and permit subsequent direct gate verification without inventing new RED evidence or attributing original capture pixels to the merged source.",
+    "replacementTests": [
+      "RISK saved view opening source preservation: invalid optional appearance keeps its bytes while one complete task opens",
+      "RISK repository process: supplemental startup capture rejects malformed artifacts and unsupported paint completeness",
+      "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
+      "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
+    ],
+    "preservedCoverage": [
+      "All967 original rationale objects,10 startup associations and2 held Import associations remain semantically unchanged and retained; original guard/inventory and configured published-base coverage are preserved.",
+      "The existing report complete/incomplete controls and selected startup-only collector retain12s/120acceptedJPEG/8MiBtotal/256KiBeach bounds, exact original fixture, trusted input and owned stop/cleanup; callbacks and DOM/rAF do not establish calibrated paint/work.",
+      "The held Import consumer keeps its original eight configurations, original source-preservation/placeholder assertions and original actual RED87a7231c; later admitted complete-tree H9/9 remains separate browser evidence.",
+      "Original1129 actual capture/pixels/clocks remain bound to b1a with frozen85ce application and b70ef16664-task fixture. No new capture, calibrated duration, startup cause, mobile/physical-iPhone, full-suite, CI or release proof is created."
+    ],
+    "redEvidence": {
+      "command": "Historical source-bound producer RED only; no new RED in CS02. CN02 actual recorder1106-red a34d3e00: node --test --test-name-pattern=\"^RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command$\" tests.js; source a9e08924a89a44196a7e8b2b4c536f862705a63c Historical held Import RED: Recorder 2026-10-28T21-36-34-747Z-87a7231c-7331-4cb2-a5c0-08f4725305ef (preimplementation-red) on af00e0b07f60b3fd942d5d348234ff02e85e1a56 / tree 695170d86f4fb32acebcd2bde496e4d886078fe4: node --test --test-name-pattern='RISK saved view opening source preservation: invalid optional appearance keeps its bytes while one complete task opens' tests.js. It used openingBoardFixture/invisibleSavedViewBrowser, isolated fake data, pinned Playwright 1.62.1 ESM, Chromium and loopback:127.0.0.1:52239. Full recorder argv/output are retained in evidence/held-import/rendered-1079/recorder/2026-10-28T21-36-34-747Z-87a7231c-7331-4cb2-a5c0-08f4725305ef.json.",
+      "failure": "Historical observed producer enforcement failure only: Actual ordinary frozen85ce64-task Normal uncapped desktopWebKit opening/action and cleanup passed; subsequent consumer assertion Selected startup operation must retain real bounded JPEG capture evidence failed because report.startupCapture was absent. Exactly one native RED; this is producer enforcement, not app defect. Report RED d9fb096f remains separate. Nonnative affected controls147dbe50 pass before committed producer GREEN. Historical separately observed held Import consumer failure: Observed ERR_ASSERTION at tests.js:16161:325: held Settings keeps the actual Import action enabled (actual false, expected true). In each of five read-failures-2 terminal-hold variants the real import-backup locator existed exactly once but isEnabled() was false; the other three configuration children passed. TAP reported 9 results, 3 pass, and 6 fail counting the aggregate parent plus five children. This was the intended disabled-entry mismatch, not a stale-selector timeout, missing element, ESM/setup failure, or runtime-startup failure. CS02 computes a later combined-source fingerprint; it does not manufacture behavioral RED or rewrite the original source IDs."
+    }
+  },
+  {
+    "baseCommit": "b176026825e4f9539780f745fe60e09cf348d288",
+    "testChangesSha256": "164a38402fa9488fc4aa4c2726a934a1da0f3cd60c3a31ead7baed66c4553047",
+    "reason": "CS02 #1156 associates the actual protected-test fingerprint after source-only merge ce92958c61d0869de28cd7266b98252a16978b71 of original startup b1a224a77589702418712fb15b991b302b62257c and admitted Import integration f22f28be699f10a766ce9a90d01469b65457bfed. This is retrospective combined-source metadata; it introduces no behavioral change, test or preimplementation run. All979 prior objects, including967 common originals,10 startup additions and2 Import associations, remain unchanged. The three exact required bases are f22,c920 and configured published b176; no upstream or base is waived.",
+    "previousBehavior": "The correctly merged test bytes and original behavioral chronology already existed, but this exact combined-source diff had no matching rationale fingerprint for base b176026825e4f9539780f745fe60e09cf348d288. Original RED/GREEN evidence remains at its original source and is not relabeled by this metadata association.",
+    "intendedBehavior": "Bind the existing complete merged test diff to its actual comparison base, preserve every original test assertion and historical rationale object, and permit subsequent direct gate verification without inventing new RED evidence or attributing original capture pixels to the merged source.",
+    "replacementTests": [
+      "RISK AUTH HYDRATION: a broken device board stays quiet until protected local recovery is visible",
+      "RISK saved view broken-board guidance: opening status does not imply cloud confirmation or erase recovery warnings",
+      "RISK saved view broken-board startup: prior appearance stays inert until the recovered board opens",
+      "RISK saved view opening source preservation: invalid optional appearance keeps its bytes while one complete task opens",
+      "RISK saved view accepted handover: normal actions and exact local work survive repeated offline reopening",
+      "RISK opening board presentation: shared markup retains released cards contexts task rows and history",
+      "RISK saved view broken-board visibility: the complete saved board is readable while durable startup waits",
+      "RISK saved view full-board filters: opening preserves saved membership controls and cheap task facts",
+      "RISK saved view full-board safety: supported copies and identity masks never grant authority",
+      "RISK saved view broken-board startup: configured Firebase leaves the prior warning neutral until its first event",
+      "RISK saved view broken-board status: configured cloud changes remain visible in the saved appearance and after recovery",
+      "RISK repository process: unchanged CI inputs reuse an original successful gate across events",
+      "RISK repository process: large original CI artifacts retain verified coverage without buffering native reports",
+      "RISK repository process: released host locks cannot cause spurious CI migration failures",
+      "RISK repository process: CI admission enforces reuse before repeating a passed test child",
+      "RISK repository process: CI observer keeps honest reuse and fresh emulator fallback outcomes",
+      "RISK repository process: native allocation admits its healthy owner past missing foreign paths and protects their claims",
+      "RISK repository process: merged tracked app sources match the reviewed button templates",
+      "RISK repository process: scenery consumers use allocated fallback ports and preserve early native failures",
+      "RISK repository process: native scene-time bursts cannot activate controls behind a refused top-layer release",
+      "RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app",
+      "RISK repository process: supplemental startup capture rejects malformed artifacts and unsupported paint completeness",
+      "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
+      "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
+    ],
+    "preservedCoverage": [
+      "All967 original rationale objects,10 startup associations and2 held Import associations remain semantically unchanged and retained; original guard/inventory and configured published-base coverage are preserved.",
+      "The existing report complete/incomplete controls and selected startup-only collector retain12s/120acceptedJPEG/8MiBtotal/256KiBeach bounds, exact original fixture, trusted input and owned stop/cleanup; callbacks and DOM/rAF do not establish calibrated paint/work.",
+      "The held Import consumer keeps its original eight configurations, original source-preservation/placeholder assertions and original actual RED87a7231c; later admitted complete-tree H9/9 remains separate browser evidence.",
+      "Original1129 actual capture/pixels/clocks remain bound to b1a with frozen85ce application and b70ef16664-task fixture. No new capture, calibrated duration, startup cause, mobile/physical-iPhone, full-suite, CI or release proof is created."
+    ],
+    "redEvidence": {
+      "command": "Historical source-bound producer RED only; no new RED in CS02. CN02 actual recorder1106-red a34d3e00: node --test --test-name-pattern=\"^RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command$\" tests.js; source a9e08924a89a44196a7e8b2b4c536f862705a63c Historical held Import RED: Recorder 2026-10-28T21-36-34-747Z-87a7231c-7331-4cb2-a5c0-08f4725305ef (preimplementation-red) on af00e0b07f60b3fd942d5d348234ff02e85e1a56 / tree 695170d86f4fb32acebcd2bde496e4d886078fe4: node --test --test-name-pattern='RISK saved view opening source preservation: invalid optional appearance keeps its bytes while one complete task opens' tests.js. It used openingBoardFixture/invisibleSavedViewBrowser, isolated fake data, pinned Playwright 1.62.1 ESM, Chromium and loopback:127.0.0.1:52239. Full recorder argv/output are retained in evidence/held-import/rendered-1079/recorder/2026-10-28T21-36-34-747Z-87a7231c-7331-4cb2-a5c0-08f4725305ef.json.",
+      "failure": "Historical observed producer enforcement failure only: Actual ordinary frozen85ce64-task Normal uncapped desktopWebKit opening/action and cleanup passed; subsequent consumer assertion Selected startup operation must retain real bounded JPEG capture evidence failed because report.startupCapture was absent. Exactly one native RED; this is producer enforcement, not app defect. Report RED d9fb096f remains separate. Nonnative affected controls147dbe50 pass before committed producer GREEN. Historical separately observed held Import consumer failure: Observed ERR_ASSERTION at tests.js:16161:325: held Settings keeps the actual Import action enabled (actual false, expected true). In each of five read-failures-2 terminal-hold variants the real import-backup locator existed exactly once but isEnabled() was false; the other three configuration children passed. TAP reported 9 results, 3 pass, and 6 fail counting the aggregate parent plus five children. This was the intended disabled-entry mismatch, not a stale-selector timeout, missing element, ESM/setup failure, or runtime-startup failure. CS02 computes a later combined-source fingerprint; it does not manufacture behavioral RED or rewrite the original source IDs."
+    }
+  },
+  {
+    "baseCommit": "f22f28be699f10a766ce9a90d01469b65457bfed",
+    "comparisonMergeBase": "f22f28be699f10a766ce9a90d01469b65457bfed",
+    "testChangesSha256": "eaa0bb963335df3ead8224a2593618891396ec1ca986fa4775288afcb2486265",
+    "cycle": "E-CP-source-union-1474",
+    "reason": "Retrospectively associate the exact accepted E plus CP source merge with this comparison; preserve all complete parent rationale objects and assertions. This metadata-only resolution does not create a new behavior, test or RED chronology.",
+    "previousBehavior": "Both admitted source packets passed their separate gates, but their combined test diff has a new fingerprint and a sole append-only rationale conflict.",
+    "intendedBehavior": "Retain exact Git three-way test/map/assignment source, exact E application and exact CP collector files while retaining both complete source histories and original failure identities.",
+    "replacementTests": [
+      "RISK saved view held Export: terminal Settings preserves an exact partial source-only archive",
+      "RISK saved view held Copy: trusted terminal Copy preserves prepared bytes and original sources",
+      "RISK saved view held Download: trusted terminal Download preserves the same Copy archive and original sources",
+      "RISK MANUAL JSON EXPORT: a refused download leaves the same prepared archive available to Copy",
+      "RISK repository process: supplemental startup capture rejects malformed artifacts and unsupported paint completeness",
+      "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
+      "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
+    ],
+    "preservedCoverage": [
+      "All980 E rationale objects remain exact prefix and every982 CP complete object remains present, with differing objects never collapsed by a shared fingerprint.",
+      "Every original Export/Copy/Download source/authority/protected-data assertion and all collector/report malformed-artifact and incomplete-clock limits remain unchanged in the automatic Git merge.",
+      "Original native proof belongs to its original source; this metadata union earns no fresh browser, native, calibrated startup, fullsuite, CI or release credit."
+    ],
+    "redEvidence": {
+      "command": "Original source-bound E and CP product/process RED evidence only; no new invocation or RED in1474. E original record: Retained actual product-cycle records Export RED62d116ec/GREEN0c13d433, Copy REDf2b8736a/GREEN5301267e and fresh Download RED4c4c6527; original attempted GREEN1297520c remains declared green/nonzero-exit. Later process-oracle baseline: Node24.19.0 --test --test-reporter=tap --test-name-pattern=^RISK MANUAL JSON EXPORT: a refused download leaves the same prepared archive available to Copy$ tests.js, recorder2026-10-29T03-57-10-746Z-30282cd1-4a92-4f02-bf2c-9ed797641fa3, testsSHAa1785a5d1e76fe96c46db3abed97615b8beb6887d17e421b9897369f6e64a681, recordSHAe8f56792b70a3a400a7f91de2288669e48c4cb92edb5569bac9f1c1503c96677. These original commands/streams remain external under implement-293-20261028 and their original native tickets. CP original record: Historical source-bound producer RED only; no new RED in CS02. CN02 actual recorder1106-red a34d3e00: node --test --test-name-pattern=\"^RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command$\" tests.js; source a9e08924a89a44196a7e8b2b4c536f862705a63c Historical held Import RED: Recorder 2026-10-28T21-36-34-747Z-87a7231c-7331-4cb2-a5c0-08f4725305ef (preimplementation-red) on af00e0b07f60b3fd942d5d348234ff02e85e1a56 / tree 695170d86f4fb32acebcd2bde496e4d886078fe4: node --test --test-name-pattern='RISK saved view opening source preservation: invalid optional appearance keeps its bytes while one complete task opens' tests.js. It used openingBoardFixture/invisibleSavedViewBrowser, isolated fake data, pinned Playwright 1.62.1 ESM, Chromium and loopback:127.0.0.1:52239. Full recorder argv/output are retained in evidence/held-import/rendered-1079/recorder/2026-10-28T21-36-34-747Z-87a7231c-7331-4cb2-a5c0-08f4725305ef.json.",
+      "failure": "Original source-bound outcomes retained verbatim in the unchanged parent objects. E original failure: Actual30282cd1 outcome assertion-failure/1test0pass1fail at tests21408:44: expected browserWrites[] but observed one545byte restart-diagnostics setItem ending with close-modal. Earlier refusal/Copy/source/authority/device checks passed; finalcloud was unreached. Static1244 and accepted1248 corrected only this oracle; actualb35acfe7 then passed1/1 including finalcloud at testsdf2a7674. This schema redEvidence field preserves an observed process-oracle failure, not an original preimplementation productRED. TC01 engine wrappers are definition-only, with no invented failing or WebKit run. CP original failure: Historical observed producer enforcement failure only: Actual ordinary frozen85ce64-task Normal uncapped desktopWebKit opening/action and cleanup passed; subsequent consumer assertion Selected startup operation must retain real bounded JPEG capture evidence failed because report.startupCapture was absent. Exactly one native RED; this is producer enforcement, not app defect. Report RED d9fb096f remains separate. Nonnative affected controls147dbe50 pass before committed producer GREEN. Historical separately observed held Import consumer failure: Observed ERR_ASSERTION at tests.js:16161:325: held Settings keeps the actual Import action enabled (actual false, expected true). In each of five read-failures-2 terminal-hold variants the real import-backup locator existed exactly once but isEnabled() was false; the other three configuration children passed. TAP reported 9 results, 3 pass, and 6 fail counting the aggregate parent plus five children. This was the intended disabled-entry mismatch, not a stale-selector timeout, missing element, ESM/setup failure, or runtime-startup failure. CS02 computes a later combined-source fingerprint; it does not manufacture behavioral RED or rewrite the original source IDs."
+    },
+    "sourceJoin": {
+      "parent": "3a4abea89a404e8a46c4d98f66bfe39579c9ca64",
+      "admittedSource": "f20796183aa3c85f8854ee7adcabb62a1aff7c48",
+      "commonBase": "f22f28be699f10a766ce9a90d01469b65457bfed",
+      "metadataOnly": true,
+      "newRed": false
+    }
+  },
+  {
+    "baseCommit": "c920ccffc11af487ec84277c33fe2e370541e384",
+    "comparisonMergeBase": "c920ccffc11af487ec84277c33fe2e370541e384",
+    "testChangesSha256": "a6e7de4086c525ab1ca589846193b06db4cd0868fbfa930cee6b4459116624a8",
+    "cycle": "E-CP-source-union-1474",
+    "reason": "Retrospectively associate the exact accepted E plus CP source merge with this comparison; preserve all complete parent rationale objects and assertions. This metadata-only resolution does not create a new behavior, test or RED chronology.",
+    "previousBehavior": "Both admitted source packets passed their separate gates, but their combined test diff has a new fingerprint and a sole append-only rationale conflict.",
+    "intendedBehavior": "Retain exact Git three-way test/map/assignment source, exact E application and exact CP collector files while retaining both complete source histories and original failure identities.",
+    "replacementTests": [
+      "RISK saved view opening source preservation: invalid optional appearance keeps its bytes while one complete task opens",
+      "RISK saved view held Export: terminal Settings preserves an exact partial source-only archive",
+      "RISK saved view held Copy: trusted terminal Copy preserves prepared bytes and original sources",
+      "RISK saved view held Download: trusted terminal Download preserves the same Copy archive and original sources",
+      "RISK MANUAL JSON EXPORT: a refused download leaves the same prepared archive available to Copy",
+      "RISK repository process: supplemental startup capture rejects malformed artifacts and unsupported paint completeness",
+      "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
+      "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
+    ],
+    "preservedCoverage": [
+      "All980 E rationale objects remain exact prefix and every982 CP complete object remains present, with differing objects never collapsed by a shared fingerprint.",
+      "Every original Export/Copy/Download source/authority/protected-data assertion and all collector/report malformed-artifact and incomplete-clock limits remain unchanged in the automatic Git merge.",
+      "Original native proof belongs to its original source; this metadata union earns no fresh browser, native, calibrated startup, fullsuite, CI or release credit."
+    ],
+    "redEvidence": {
+      "command": "Original source-bound E and CP product/process RED evidence only; no new invocation or RED in1474. E original record: Retained actual product-cycle records Export RED62d116ec/GREEN0c13d433, Copy REDf2b8736a/GREEN5301267e and fresh Download RED4c4c6527; original attempted GREEN1297520c remains declared green/nonzero-exit. Later process-oracle baseline: Node24.19.0 --test --test-reporter=tap --test-name-pattern=^RISK MANUAL JSON EXPORT: a refused download leaves the same prepared archive available to Copy$ tests.js, recorder2026-10-29T03-57-10-746Z-30282cd1-4a92-4f02-bf2c-9ed797641fa3, testsSHAa1785a5d1e76fe96c46db3abed97615b8beb6887d17e421b9897369f6e64a681, recordSHAe8f56792b70a3a400a7f91de2288669e48c4cb92edb5569bac9f1c1503c96677. These original commands/streams remain external under implement-293-20261028 and their original native tickets. CP original record: Historical source-bound producer RED only; no new RED in CS02. CN02 actual recorder1106-red a34d3e00: node --test --test-name-pattern=\"^RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command$\" tests.js; source a9e08924a89a44196a7e8b2b4c536f862705a63c Historical held Import RED: Recorder 2026-10-28T21-36-34-747Z-87a7231c-7331-4cb2-a5c0-08f4725305ef (preimplementation-red) on af00e0b07f60b3fd942d5d348234ff02e85e1a56 / tree 695170d86f4fb32acebcd2bde496e4d886078fe4: node --test --test-name-pattern='RISK saved view opening source preservation: invalid optional appearance keeps its bytes while one complete task opens' tests.js. It used openingBoardFixture/invisibleSavedViewBrowser, isolated fake data, pinned Playwright 1.62.1 ESM, Chromium and loopback:127.0.0.1:52239. Full recorder argv/output are retained in evidence/held-import/rendered-1079/recorder/2026-10-28T21-36-34-747Z-87a7231c-7331-4cb2-a5c0-08f4725305ef.json.",
+      "failure": "Original source-bound outcomes retained verbatim in the unchanged parent objects. E original failure: Actual30282cd1 outcome assertion-failure/1test0pass1fail at tests21408:44: expected browserWrites[] but observed one545byte restart-diagnostics setItem ending with close-modal. Earlier refusal/Copy/source/authority/device checks passed; finalcloud was unreached. Static1244 and accepted1248 corrected only this oracle; actualb35acfe7 then passed1/1 including finalcloud at testsdf2a7674. This schema redEvidence field preserves an observed process-oracle failure, not an original preimplementation productRED. TC01 engine wrappers are definition-only, with no invented failing or WebKit run. CP original failure: Historical observed producer enforcement failure only: Actual ordinary frozen85ce64-task Normal uncapped desktopWebKit opening/action and cleanup passed; subsequent consumer assertion Selected startup operation must retain real bounded JPEG capture evidence failed because report.startupCapture was absent. Exactly one native RED; this is producer enforcement, not app defect. Report RED d9fb096f remains separate. Nonnative affected controls147dbe50 pass before committed producer GREEN. Historical separately observed held Import consumer failure: Observed ERR_ASSERTION at tests.js:16161:325: held Settings keeps the actual Import action enabled (actual false, expected true). In each of five read-failures-2 terminal-hold variants the real import-backup locator existed exactly once but isEnabled() was false; the other three configuration children passed. TAP reported 9 results, 3 pass, and 6 fail counting the aggregate parent plus five children. This was the intended disabled-entry mismatch, not a stale-selector timeout, missing element, ESM/setup failure, or runtime-startup failure. CS02 computes a later combined-source fingerprint; it does not manufacture behavioral RED or rewrite the original source IDs."
+    },
+    "sourceJoin": {
+      "parent": "3a4abea89a404e8a46c4d98f66bfe39579c9ca64",
+      "admittedSource": "f20796183aa3c85f8854ee7adcabb62a1aff7c48",
+      "commonBase": "f22f28be699f10a766ce9a90d01469b65457bfed",
+      "metadataOnly": true,
+      "newRed": false
+    }
+  },
+  {
+    "baseCommit": "b176026825e4f9539780f745fe60e09cf348d288",
+    "comparisonMergeBase": "b176026825e4f9539780f745fe60e09cf348d288",
+    "testChangesSha256": "5eeaec108bb68057b4437569d1b41bbe31ba0e6ffedbc891e662017eff2d5ff7",
+    "cycle": "E-CP-source-union-1474",
+    "reason": "Retrospectively associate the exact accepted E plus CP source merge with this comparison; preserve all complete parent rationale objects and assertions. This metadata-only resolution does not create a new behavior, test or RED chronology.",
+    "previousBehavior": "Both admitted source packets passed their separate gates, but their combined test diff has a new fingerprint and a sole append-only rationale conflict.",
+    "intendedBehavior": "Retain exact Git three-way test/map/assignment source, exact E application and exact CP collector files while retaining both complete source histories and original failure identities.",
+    "replacementTests": [
+      "RISK AUTH HYDRATION: a broken device board stays quiet until protected local recovery is visible",
+      "RISK saved view broken-board guidance: opening status does not imply cloud confirmation or erase recovery warnings",
+      "RISK saved view broken-board startup: prior appearance stays inert until the recovered board opens",
+      "RISK saved view opening source preservation: invalid optional appearance keeps its bytes while one complete task opens",
+      "RISK saved view held Export: terminal Settings preserves an exact partial source-only archive",
+      "RISK saved view held Copy: trusted terminal Copy preserves prepared bytes and original sources",
+      "RISK saved view held Download: trusted terminal Download preserves the same Copy archive and original sources",
+      "RISK saved view accepted handover: normal actions and exact local work survive repeated offline reopening"
+    ],
+    "preservedCoverage": [
+      "All980 E rationale objects remain exact prefix and every982 CP complete object remains present, with differing objects never collapsed by a shared fingerprint.",
+      "Every original Export/Copy/Download source/authority/protected-data assertion and all collector/report malformed-artifact and incomplete-clock limits remain unchanged in the automatic Git merge.",
+      "Original native proof belongs to its original source; this metadata union earns no fresh browser, native, calibrated startup, fullsuite, CI or release credit."
+    ],
+    "redEvidence": {
+      "command": "Original source-bound E and CP product/process RED evidence only; no new invocation or RED in1474. E original record: Retained actual product-cycle records Export RED62d116ec/GREEN0c13d433, Copy REDf2b8736a/GREEN5301267e and fresh Download RED4c4c6527; original attempted GREEN1297520c remains declared green/nonzero-exit. Later process-oracle baseline: Node24.19.0 --test --test-reporter=tap --test-name-pattern=^RISK MANUAL JSON EXPORT: a refused download leaves the same prepared archive available to Copy$ tests.js, recorder2026-10-29T03-57-10-746Z-30282cd1-4a92-4f02-bf2c-9ed797641fa3, testsSHAa1785a5d1e76fe96c46db3abed97615b8beb6887d17e421b9897369f6e64a681, recordSHAe8f56792b70a3a400a7f91de2288669e48c4cb92edb5569bac9f1c1503c96677. These original commands/streams remain external under implement-293-20261028 and their original native tickets. CP original record: Historical source-bound producer RED only; no new RED in CS02. CN02 actual recorder1106-red a34d3e00: node --test --test-name-pattern=\"^RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command$\" tests.js; source a9e08924a89a44196a7e8b2b4c536f862705a63c Historical held Import RED: Recorder 2026-10-28T21-36-34-747Z-87a7231c-7331-4cb2-a5c0-08f4725305ef (preimplementation-red) on af00e0b07f60b3fd942d5d348234ff02e85e1a56 / tree 695170d86f4fb32acebcd2bde496e4d886078fe4: node --test --test-name-pattern='RISK saved view opening source preservation: invalid optional appearance keeps its bytes while one complete task opens' tests.js. It used openingBoardFixture/invisibleSavedViewBrowser, isolated fake data, pinned Playwright 1.62.1 ESM, Chromium and loopback:127.0.0.1:52239. Full recorder argv/output are retained in evidence/held-import/rendered-1079/recorder/2026-10-28T21-36-34-747Z-87a7231c-7331-4cb2-a5c0-08f4725305ef.json.",
+      "failure": "Original source-bound outcomes retained verbatim in the unchanged parent objects. E original failure: Actual30282cd1 outcome assertion-failure/1test0pass1fail at tests21408:44: expected browserWrites[] but observed one545byte restart-diagnostics setItem ending with close-modal. Earlier refusal/Copy/source/authority/device checks passed; finalcloud was unreached. Static1244 and accepted1248 corrected only this oracle; actualb35acfe7 then passed1/1 including finalcloud at testsdf2a7674. This schema redEvidence field preserves an observed process-oracle failure, not an original preimplementation productRED. TC01 engine wrappers are definition-only, with no invented failing or WebKit run. CP original failure: Historical observed producer enforcement failure only: Actual ordinary frozen85ce64-task Normal uncapped desktopWebKit opening/action and cleanup passed; subsequent consumer assertion Selected startup operation must retain real bounded JPEG capture evidence failed because report.startupCapture was absent. Exactly one native RED; this is producer enforcement, not app defect. Report RED d9fb096f remains separate. Nonnative affected controls147dbe50 pass before committed producer GREEN. Historical separately observed held Import consumer failure: Observed ERR_ASSERTION at tests.js:16161:325: held Settings keeps the actual Import action enabled (actual false, expected true). In each of five read-failures-2 terminal-hold variants the real import-backup locator existed exactly once but isEnabled() was false; the other three configuration children passed. TAP reported 9 results, 3 pass, and 6 fail counting the aggregate parent plus five children. This was the intended disabled-entry mismatch, not a stale-selector timeout, missing element, ESM/setup failure, or runtime-startup failure. CS02 computes a later combined-source fingerprint; it does not manufacture behavioral RED or rewrite the original source IDs."
+    },
+    "sourceJoin": {
+      "parent": "3a4abea89a404e8a46c4d98f66bfe39579c9ca64",
+      "admittedSource": "f20796183aa3c85f8854ee7adcabb62a1aff7c48",
+      "commonBase": "f22f28be699f10a766ce9a90d01469b65457bfed",
+      "metadataOnly": true,
+      "newRed": false
+    }
+  },
+  {
+    "baseCommit": "3a4abea89a404e8a46c4d98f66bfe39579c9ca64",
+    "comparisonMergeBase": "3a4abea89a404e8a46c4d98f66bfe39579c9ca64",
+    "testChangesSha256": "cbc4afadb398c9ad3efa49ac679e4211a6c32b0bc409cfe720ca650071064b01",
+    "cycle": "E-CP-source-union-1474",
+    "reason": "Retrospectively associate the exact accepted E plus CP source merge with this comparison; preserve all complete parent rationale objects and assertions. This metadata-only resolution does not create a new behavior, test or RED chronology.",
+    "previousBehavior": "Both admitted source packets passed their separate gates, but their combined test diff has a new fingerprint and a sole append-only rationale conflict.",
+    "intendedBehavior": "Retain exact Git three-way test/map/assignment source, exact E application and exact CP collector files while retaining both complete source histories and original failure identities.",
+    "replacementTests": [
+      "RISK repository process: supplemental startup capture rejects malformed artifacts and unsupported paint completeness",
+      "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
+      "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
+    ],
+    "preservedCoverage": [
+      "All980 E rationale objects remain exact prefix and every982 CP complete object remains present, with differing objects never collapsed by a shared fingerprint.",
+      "Every original Export/Copy/Download source/authority/protected-data assertion and all collector/report malformed-artifact and incomplete-clock limits remain unchanged in the automatic Git merge.",
+      "Original native proof belongs to its original source; this metadata union earns no fresh browser, native, calibrated startup, fullsuite, CI or release credit."
+    ],
+    "redEvidence": {
+      "command": "Original source-bound E and CP product/process RED evidence only; no new invocation or RED in1474. E original record: Retained actual product-cycle records Export RED62d116ec/GREEN0c13d433, Copy REDf2b8736a/GREEN5301267e and fresh Download RED4c4c6527; original attempted GREEN1297520c remains declared green/nonzero-exit. Later process-oracle baseline: Node24.19.0 --test --test-reporter=tap --test-name-pattern=^RISK MANUAL JSON EXPORT: a refused download leaves the same prepared archive available to Copy$ tests.js, recorder2026-10-29T03-57-10-746Z-30282cd1-4a92-4f02-bf2c-9ed797641fa3, testsSHAa1785a5d1e76fe96c46db3abed97615b8beb6887d17e421b9897369f6e64a681, recordSHAe8f56792b70a3a400a7f91de2288669e48c4cb92edb5569bac9f1c1503c96677. These original commands/streams remain external under implement-293-20261028 and their original native tickets. CP original record: Historical source-bound producer RED only; no new RED in CS02. CN02 actual recorder1106-red a34d3e00: node --test --test-name-pattern=\"^RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command$\" tests.js; source a9e08924a89a44196a7e8b2b4c536f862705a63c Historical held Import RED: Recorder 2026-10-28T21-36-34-747Z-87a7231c-7331-4cb2-a5c0-08f4725305ef (preimplementation-red) on af00e0b07f60b3fd942d5d348234ff02e85e1a56 / tree 695170d86f4fb32acebcd2bde496e4d886078fe4: node --test --test-name-pattern='RISK saved view opening source preservation: invalid optional appearance keeps its bytes while one complete task opens' tests.js. It used openingBoardFixture/invisibleSavedViewBrowser, isolated fake data, pinned Playwright 1.62.1 ESM, Chromium and loopback:127.0.0.1:52239. Full recorder argv/output are retained in evidence/held-import/rendered-1079/recorder/2026-10-28T21-36-34-747Z-87a7231c-7331-4cb2-a5c0-08f4725305ef.json.",
+      "failure": "Original source-bound outcomes retained verbatim in the unchanged parent objects. E original failure: Actual30282cd1 outcome assertion-failure/1test0pass1fail at tests21408:44: expected browserWrites[] but observed one545byte restart-diagnostics setItem ending with close-modal. Earlier refusal/Copy/source/authority/device checks passed; finalcloud was unreached. Static1244 and accepted1248 corrected only this oracle; actualb35acfe7 then passed1/1 including finalcloud at testsdf2a7674. This schema redEvidence field preserves an observed process-oracle failure, not an original preimplementation productRED. TC01 engine wrappers are definition-only, with no invented failing or WebKit run. CP original failure: Historical observed producer enforcement failure only: Actual ordinary frozen85ce64-task Normal uncapped desktopWebKit opening/action and cleanup passed; subsequent consumer assertion Selected startup operation must retain real bounded JPEG capture evidence failed because report.startupCapture was absent. Exactly one native RED; this is producer enforcement, not app defect. Report RED d9fb096f remains separate. Nonnative affected controls147dbe50 pass before committed producer GREEN. Historical separately observed held Import consumer failure: Observed ERR_ASSERTION at tests.js:16161:325: held Settings keeps the actual Import action enabled (actual false, expected true). In each of five read-failures-2 terminal-hold variants the real import-backup locator existed exactly once but isEnabled() was false; the other three configuration children passed. TAP reported 9 results, 3 pass, and 6 fail counting the aggregate parent plus five children. This was the intended disabled-entry mismatch, not a stale-selector timeout, missing element, ESM/setup failure, or runtime-startup failure. CS02 computes a later combined-source fingerprint; it does not manufacture behavioral RED or rewrite the original source IDs."
+    },
+    "sourceJoin": {
+      "parent": "3a4abea89a404e8a46c4d98f66bfe39579c9ca64",
+      "admittedSource": "f20796183aa3c85f8854ee7adcabb62a1aff7c48",
+      "commonBase": "f22f28be699f10a766ce9a90d01469b65457bfed",
+      "metadataOnly": true,
+      "newRed": false
+    }
   }
 ]

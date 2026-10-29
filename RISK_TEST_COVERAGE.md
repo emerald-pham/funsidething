@@ -2404,3 +2404,9 @@ The pinned Linux x64 reader preserves the raw AT_PAGESZ witness and binds it to 
   - The real scene dialog preset occupies the refused opener coordinate: nine actual trusted first-light downs must receive isolated neutral ups, zero wrong clicks, one accepted opener, ten attempts within2s, and complete cleanup. Existing two-engine neutral release preservation remains required.
 
 - RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app
+
+- RISK repository process: supplemental startup capture rejects malformed artifacts and unsupported paint completeness
+
+- RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command
+
+- RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch

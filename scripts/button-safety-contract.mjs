@@ -10,7 +10,26 @@ export function verifyButtonInventorySource(source,inventory){
 }
 export const digest=value=>createHash('sha256').update(value).digest('hex');
 // Diagnostic timing is independent of the application's functional verdict.
-export function classifyButtonStartupTimeline(timeline){
+export function verifyButtonStartupCapture(capture){
+ const check=(condition,message)=>assert.ok(condition,'Startup capture '+message),finite=value=>Number.isFinite(value)&&value>=0;
+ check(capture?.schemaVersion===1&&capture.selected===true&&capture.provider==='playwright-public-screencast','known selected public provider required');
+ check(JSON.stringify(capture.bounds)===JSON.stringify({maxDurationMs:12000,maxFrames:120,maxTotalBytes:8388608,maxFrameBytes:262144}),'fixed finite bounds required');
+ check(['captured','unavailable','error'].includes(capture.status),'explicit outcome required');check(capture.startedBeforeNavigation===true,'must start before app navigation');
+ check(finite(capture.startedHostMonotonicMs)&&finite(capture.stoppedHostMonotonicMs)&&capture.stoppedHostMonotonicMs>=capture.startedHostMonotonicMs&&capture.stoppedHostMonotonicMs-capture.startedHostMonotonicMs<=12000,'duration exceeds bound or mixes clocks');
+ check(capture.clock?.reportedTimestampBasis==='engine-or-Date.now-fallback-ambiguous'&&capture.clock.hostEpochBasis==='Date.now'&&capture.clock.hostMonotonicBasis==='performance.now'&&capture.clock.pageClockConversion==='unavailable','reported/host/page clocks must remain distinct and ambiguous');
+ const frames=capture.frames,counts=capture.counts;check(Array.isArray(frames)&&frames.length<=120,'accepted frame limit');check(counts&&['received','accepted','dropped','oversized','writeRefused'].every(key=>Number.isSafeInteger(counts[key])&&counts[key]>=0),'bounded explicit counters');check(counts.accepted===frames.length&&counts.received===counts.accepted+counts.dropped+counts.oversized+counts.writeRefused,'frame counts must reconcile');
+ const paths=new Set();let total=0;
+ for(const [index,frame]of frames.entries()){
+  check(frame.index===index+1&&/^startup-frames\/frame-[0-9]{4}\.jpg$/.test(frame.path)&&!paths.has(frame.path),'relative unique JPEG path/index required');paths.add(frame.path);
+  check(Number.isSafeInteger(frame.bytes)&&frame.bytes>0&&frame.bytes<=262144,'per-frame byte limit');total+=frame.bytes;check(/^[a-f0-9]{64}$/.test(frame.sha256||''),'SHA256 required');
+  check([frame.reportedTimestampMs,frame.hostReceiptEpochMs,frame.hostReceiptMonotonicMs].every(finite)&&frame.hostReceiptMonotonicMs>=capture.startedHostMonotonicMs&&frame.hostReceiptMonotonicMs<=capture.stoppedHostMonotonicMs,'separate finite frame clocks required');
+  check(frame.viewportWidth===1100&&frame.viewportHeight===850,'original capture viewport required');
+  check(frame.pageClockSample?.status==='unavailable'||frame.pageClockSample?.status==='observed'&&finite(frame.pageClockSample.timeOrigin)&&finite(frame.pageClockSample.nowMs)&&frame.pageClockSample.basis==='post-callback-receipt-upper-bound','page sample cannot claim compositor timing');
+ }
+ check(total===capture.totalBytes&&total<=8388608,'total byte/count mismatch');check(typeof capture.stopReason==='string'&&capture.stopReason.length>0,'explicit stop reason required');check(capture.cleanup?.stopAttempted===true&&capture.cleanup.stopped===true&&capture.cleanup.timerCleared===true,'owned stop and timer cleanup required');
+ check(Array.isArray(capture.errors),'explicit capture errors required');if(capture.status==='captured')check(frames.length>0&&capture.errors.length===0,'captured requires real accepted frames without error');return capture;
+}
+export function classifyButtonStartupTimeline(timeline,capture=null){
  const names=['navigationStart','firstBackgroundPaint','completeBoardPaint','firstTrustedInputReceipt','firstVisibleResponse','overlappingWorkIntervals'];
  const observations=timeline?.observations||{},missing=[];
  const clockValid=timeline?.schemaVersion===1&&timeline.clock?.basis==='page-performance'&&Number.isFinite(timeline.clock.timeOrigin);
@@ -21,6 +40,7 @@ export function classifyButtonStartupTimeline(timeline){
   if(!valid)missing.push(name);
  }
  if(!missing.length){const times=names.slice(0,5).map(name=>observations[name].atMs);if(times[0]!==0||times.some((value,index)=>index>0&&value<times[index-1]))missing.push('ordered-page-clock');}
+ if(capture){verifyButtonStartupCapture(capture);missing.push('supplemental-clock-and-work-provenance');}
  return{...timeline,status:missing.length?'incomplete':'complete',missing};
 }
 export function verifyButtonSafetyReport(report,{inventory,inventorySha256,candidateCommit,candidateTree,engine}={}){
@@ -100,5 +120,5 @@ export function verifyButtonSafetyReport(report,{inventory,inventorySha256,candi
  for(const action of report.observedActions)assert.ok(actions.includes(action),'New untested button action: '+action);
  assert.deepEqual(report.errors,[],'Native lifecycle or error detector failed');
  for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(report.cleanup?.[key],true,'Button runtime cleanup required: '+key);
- return report.startupTimeline?{...report,startupTimeline:classifyButtonStartupTimeline(report.startupTimeline)}:report;
+ return report.startupTimeline?{...report,startupTimeline:classifyButtonStartupTimeline(report.startupTimeline,report.startupCapture)}:report;
 }

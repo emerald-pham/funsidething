@@ -11,8 +11,9 @@ import {hostedButtonPolicy} from './button-safety-ci-policy.mjs';
 import {classifyButtonStartupTimeline} from './button-safety-contract.mjs';
 const digest=value=>createHash('sha256').update(value).digest('hex');
 const MIME={'.js':'text/javascript','.html':'text/html','.css':'text/css','.svg':'image/svg+xml','.png':'image/png','.webmanifest':'application/manifest+json','.md':'text/markdown; charset=utf-8'};
-export async function runButtonSafety({repo,engine,outputDir,port=0,control=null,probe=false,scenarioFilter=null,mobileYesMotion=null,browserServerEndpoint=null,closeBrowserServer=null,startupOpening=null}){
+export async function runButtonSafety({repo,engine,outputDir,port=0,control=null,probe=false,scenarioFilter=null,mobileYesMotion=null,browserServerEndpoint=null,closeBrowserServer=null,startupOpening=null,startupCapture=null}){
  assert.ok(['chromium','webkit'].includes(engine),'Explicit supported engine');
+ if(startupCapture!==null)assert.ok(startupCapture==='jpeg'&&startupOpening&&!mobileYesMotion&&!probe&&!scenarioFilter&&!control&&!browserServerEndpoint,'Startup capture selection requires known jpeg mode on the ordinary startup operation only');
  if(startupOpening){
   assert.equal(engine,'webkit','Ordinary startup diagnostic names WebKit');assert.equal(control,null);assert.equal(probe,false);assert.equal(scenarioFilter,null);assert.equal(mobileYesMotion,null);assert.equal(browserServerEndpoint,null);
   assert.match(startupOpening.sourceCommit||'',/^[a-f0-9]{40}$/,'Immutable startup application source required');
@@ -65,9 +66,39 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
  if(!startupOpening)for(const [file,hash]of Object.entries(runtimeAssets))assert.equal(report.assets[file],hash,'Reviewed runtime asset missing or changed: '+file);
  const {verifyButtonInventorySource}=await import('./button-safety-contract.mjs');if(!startupOpening)verifyButtonInventorySource([...sources].filter(([file])=>/\.(?:js|html)$/.test(file)).map(([,bytes])=>bytes.toString()).join('\n'),JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')));
  for(const [file,bytes]of sources)assert.equal(digest(bytes),digest(git('show',appCommit+':'+file)),'Button run requires exact committed app bytes: '+file);
- let server,browser,context,page,armed=false,closing=false;
+ let server,browser,context,page,armed=false,closing=false,stopStartupCapture=null,interrupted=null;
  const check=()=>{assert.equal(report.errors.length,0,'Native button safety detected '+report.errors.join(', '));};
  const bounded=async(work,label,timeoutMs=2500)=>{let timer;try{return await Promise.race([work,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Native button safety detected stalled responsiveness: '+label)),timeoutMs);})]);}finally{clearTimeout(timer);}};
+ const beginStartupCapture=async()=>{
+  const bounds={maxDurationMs:12000,maxFrames:120,maxTotalBytes:8388608,maxFrameBytes:262144};
+  const capture=report.startupCapture={schemaVersion:1,selected:true,provider:'playwright-public-screencast',status:'running',bounds,startedBeforeNavigation:false,startedHostMonotonicMs:performance.now(),stoppedHostMonotonicMs:null,stopReason:null,clock:{reportedTimestampBasis:'engine-or-Date.now-fallback-ambiguous',hostEpochBasis:'Date.now',hostMonotonicBasis:'performance.now',pageClockConversion:'unavailable'},counts:{received:0,accepted:0,dropped:0,oversized:0,writeRefused:0},totalBytes:0,frames:[],errors:[],cleanup:{stopAttempted:false,stopped:false,timerCleared:false},overhead:'Selected external JPEG delivery and synchronous bounded file writes; no page-clock/compositor conversion'};
+  let halted=false,stopPromise,timer;
+  stopStartupCapture=reason=>{
+   if(stopPromise)return stopPromise;halted=true;clearTimeout(timer);capture.cleanup.timerCleared=true;capture.stopReason=reason;capture.stoppedHostMonotonicMs=performance.now();capture.cleanup.stopAttempted=true;
+   stopPromise=(async()=>{try{await page.screencast.stop();capture.cleanup.stopped=true;}catch(error){capture.errors.push('stop: '+String(error).slice(0,240));}finally{capture.status=capture.errors.length?'error':capture.frames.length?'captured':'unavailable';save();}})();return stopPromise;
+  };
+  if(!page.screencast||typeof page.screencast.start!=='function'||typeof page.screencast.stop!=='function'){capture.errors.push('unsupported: pinned public page.screencast unavailable');await stopStartupCapture('unsupported');return;}
+  const framesDir=path.join(outputDir,'startup-frames');
+  try{
+   fs.mkdirSync(framesDir);
+   timer=setTimeout(()=>{void stopStartupCapture('duration-limit');},bounds.maxDurationMs);
+   await page.screencast.start({size:{width:1100,height:850},quality:65,onFrame:frame=>{
+    const hostReceiptEpochMs=Date.now(),hostReceiptMonotonicMs=performance.now();capture.counts.received++;
+    if(halted){capture.counts.dropped++;return;}
+    if(hostReceiptMonotonicMs-capture.startedHostMonotonicMs>bounds.maxDurationMs){capture.counts.dropped++;void stopStartupCapture('duration-limit');return;}
+    const data=frame.data;if(!Buffer.isBuffer(data)||data.length===0||data.subarray(0,2).toString('hex')!=='ffd8'||data.subarray(-2).toString('hex')!=='ffd9'){capture.counts.dropped++;capture.errors.push('invalid JPEG callback');void stopStartupCapture('capture-error');return;}
+    if(data.length>bounds.maxFrameBytes){capture.counts.oversized++;return;}
+    if(capture.frames.length>=bounds.maxFrames||capture.totalBytes+data.length>bounds.maxTotalBytes){capture.counts.dropped++;void stopStartupCapture(capture.frames.length>=bounds.maxFrames?'frame-limit':'byte-limit');return;}
+    const index=capture.frames.length+1,relative='startup-frames/frame-'+String(index).padStart(4,'0')+'.jpg';
+    try{fs.writeFileSync(path.join(outputDir,relative),data,{flag:'wx'});}catch(error){capture.counts.writeRefused++;capture.errors.push('write-refused: '+String(error).slice(0,240));void stopStartupCapture('write-refused');return;}
+    capture.frames.push({index,path:relative,bytes:data.length,sha256:digest(data),reportedTimestampMs:frame.timestamp,hostReceiptEpochMs,hostReceiptMonotonicMs,viewportWidth:frame.viewportWidth,viewportHeight:frame.viewportHeight,pageClockSample:{status:'unavailable',reason:'No independent same-document compositor clock sample; callback receipt is not page paint'}});capture.counts.accepted++;capture.totalBytes+=data.length;
+    if(capture.frames.length===bounds.maxFrames)void stopStartupCapture('frame-limit');
+   }});if(halted)await page.screencast.stop();capture.startedBeforeNavigation=true;save();
+  }catch(error){capture.errors.push('capture: '+String(error).slice(0,240));await stopStartupCapture('capture-error');}
+ };
+ const captureSignals=startupCapture?Object.fromEntries(['SIGINT','SIGTERM'].map(signal=>[signal,()=>{interrupted??=signal;void(async()=>{await stopStartupCapture?.('interrupted');if(browser)await browser.close();})().catch(error=>{report.errors.push('capture interruption cleanup: '+String(error));});}])):{};
+ for(const [signal,handler]of Object.entries(captureSignals))process.on(signal,handler);
+
  try{
   server=http.createServer((req,res)=>{
    const pathname=new URL(req.url,'http://127.0.0.1').pathname;
@@ -77,6 +108,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
    res.writeHead(bytes?200:404,{'Content-Type':observer?'text/html':module?'text/javascript':MIME[path.extname(name)]||'text/plain','Cache-Control':'no-store'});res.end(bytes||'Not found');
   });await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',resolve);});
   const origin='http://127.0.0.1:'+server.address().port;
+  if(interrupted)throw Error('Startup capture interrupted before launch: '+interrupted);
   const playwright=await import('playwright');browser=browserServerEndpoint?await playwright[engine].connect(browserServerEndpoint,{timeout:15000}):await playwright[engine].launch({headless:true});browser.on('disconnected',()=>{if(!closing)report.errors.push('browser-disconnected');});report.runtime={engine,version:browser.version(),playwright:'1.62.1',platform:process.platform,nodeVersion:process.version,browserConnection:browserServerEndpoint?'remote-owned':'local-owned',...(browserServerEndpoint?{browserEndpointSha256:digest(browserServerEndpoint)}:{})};
   const {runButtonScenarios}=await import('./button-safety-scenarios.mjs');
   const observed=new Set(),outcomes=new Map(),rapidOutcomes=new Map();
@@ -186,6 +218,8 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
     const scan=()=>{if(document.documentElement){const els=[...document.querySelectorAll('button,summary,[data-act],[role="button"],[data-scene-view],[data-landscape-motion],[data-scene-time],[data-scene-preset],[data-location-action]')];void window.__buttonObserved(els.map(key).filter(value=>value!==null));for(const el of els)if(key(el)?.startsWith('button-id:'))void window.__buttonUnidentified(el.outerHTML.slice(0,1000));}};
     addEventListener('DOMContentLoaded',()=>{scan();new MutationObserver(scan).observe(document.documentElement,{childList:true,subtree:true});});
    },{keySource:actionFor.toString()});
+   if(startupCapture)await bounded(beginStartupCapture(),'startup public screencast start');
+   if(interrupted)throw Error('Startup capture interrupted: '+interrupted);
    await page.goto(origin+prefix);await page.waitForFunction(()=>typeof state!=='undefined'&&state&&window.ScannerDeviceStore);await page.waitForFunction(()=>window.CloudSync?.ready);if(mobileYesMotion)await page.waitForFunction(motion=>document.documentElement.dataset.landscapeMotion===motion,mobileYesMotion,{timeout:12000});localArmed=true;
    const setup=await bounded((async()=>{for(let attempt=0;attempt<200;attempt++){
     const result=await page.evaluate(async()=>{const head=await ScannerDeviceStore.readHead();return{currentTasks:state.tasks.length,activeTasks:state.tasks.filter(task=>!task.done).length,durableTasks:head?.payload?JSON.parse(head.payload).tasks.length:0,durableHash:head?.hash};});
@@ -375,6 +409,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
    await ui.act('toggle-add',new Function('return document.getElementById("addToggle").getAttribute("aria-expanded")!=='+JSON.stringify(before)));
    report.startupTimeline=classifyButtonStartupTimeline(await page.evaluate(()=>{window.__buttonStartupTimeline.proxies.actionDomOutcomeObservedAtMs=performance.now();return window.__buttonStartupTimeline;}));
    report.openingResult={functional:'passed',tasks:await page.evaluate(()=>state.tasks.length),timing:report.startupTimeline.status};
+   if(startupCapture)report.openingResult.savedHeadHash=await bounded(page.evaluate(async()=>{const head=await ScannerDeviceStore.readHead();return ChainStorageV2.hashPayload(head.payload);}),'startup exact post-action durable board');
   });
   else if(mobileYesMotion){const {runRapidCoreScenarios}=await import('./button-safety-rapid-core.mjs');await runRapidCoreScenarios({scenario});}
   else if(probe)await scenario('detector sensitivity',{},async ui=>{await ui.act('settings',control==='async-predicate-false'?async()=>false:()=>!!document.getElementById('stHorizon'));});
@@ -389,6 +424,8 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
   closing=true;
   let cleanupError;
   const close=async work=>{try{await work();}catch(error){cleanupError??=error;report.status='failed';report.errors.push('cleanup: '+String(error));}};
+  if(stopStartupCapture)await close(async()=>{await stopStartupCapture(interrupted?'interrupted':'case-finished');});
+  for(const [signal,handler]of Object.entries(captureSignals))process.off(signal,handler);
   if(context)await close(async()=>{await context.close();report.cleanup.contextClosed=true;});
   if(browser)await close(async()=>{
    await browser.close();
