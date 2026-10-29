@@ -8,10 +8,14 @@ import {browserInit,appModule,authModule,firestoreModule,fixture as installedFix
 import {buttonFixture,populateButtonWorkload,TASK_COUNT} from './button-safety-fixture.mjs';
 import {MOBILE_PROFILE,MOBILE_SCENARIO} from './button-safety-mobile-contract.mjs';
 import {hostedButtonPolicy} from './button-safety-ci-policy.mjs';
-import {classifyButtonStartupTimeline} from './button-safety-contract.mjs';
+import {classifyButtonStartupTimeline,verifyButtonSafetyReport} from './button-safety-contract.mjs';
 const digest=value=>createHash('sha256').update(value).digest('hex');
+const fixtureSourceForAuthMode=Object.freeze({'signed-out':'signed-out-installed','reconcile-held':'reconcile-held-installed'});
 const MIME={'.js':'text/javascript','.html':'text/html','.css':'text/css','.svg':'image/svg+xml','.png':'image/png','.webmanifest':'application/manifest+json','.md':'text/markdown; charset=utf-8'};
-export async function runButtonSafety({repo,engine,outputDir,port=0,control=null,probe=false,scenarioFilter=null,mobileYesMotion=null,browserServerEndpoint=null,closeBrowserServer=null,startupOpening=null}){
+export async function runButtonSafety({repo,engine,outputDir,port=0,profile,control=null,probe=false,scenarioFilter=null,mobileYesMotion=null,browserServerEndpoint=null,closeBrowserServer=null,startupOpening=null}){
+ const selectedProfile=mobileYesMotion?'workload-diagnostic':profile??'ordinary';
+ assert.ok(['ordinary','workload-diagnostic'].includes(selectedProfile),'Unknown button safety profile');
+ if(mobileYesMotion&&profile!==undefined)assert.equal(profile,'workload-diagnostic','Mobile button safety requires the original workload-diagnostic profile');
  assert.ok(['chromium','webkit'].includes(engine),'Explicit supported engine');
  if(startupOpening){
   assert.equal(engine,'webkit','Ordinary startup diagnostic names WebKit');assert.equal(control,null);assert.equal(probe,false);assert.equal(scenarioFilter,null);assert.equal(mobileYesMotion,null);assert.equal(browserServerEndpoint,null);
@@ -50,9 +54,16 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
   assert.ok(Number.isSafeInteger(port)&&port>0,'Explicit allocated local native port required');
  }
 
+ const inventoryBytes=fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'));
+ const inventory=JSON.parse(inventoryBytes);
+ const profileDefinition=inventory.profiles?.[selectedProfile];
+ assert.ok(profileDefinition&&Array.isArray(profileDefinition.requiredScenarios),'Independent selected button profile required');
+ const fixtureTaskCount=profileDefinition.fixture?.savedTasks??profileDefinition.requiredWorkload?.savedTasks??TASK_COUNT;
+ const selectedScenarios=new Set(profileDefinition.requiredScenarios);
  fs.mkdirSync(outputDir,{recursive:true});
  const git=(...args)=>execFileSync('git',args,{cwd:repo,maxBuffer:32*1024*1024}),candidateCommit=git('rev-parse','HEAD').toString().trim(),candidateTree=git('rev-parse','HEAD^{tree}').toString().trim();
- const report={schemaVersion:1,kind:mobileYesMotion?'button-mobile-functional':probe?'button-sensitivity':scenarioFilter?'button-diagnostic':'button-safety',engine,candidateCommit,candidateTree,hostedPolicy,status:'running',startedAt:new Date().toISOString(),requiredActions:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredActions,requiredScenarios:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredScenarios,requiredWorkload:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredWorkload,requiredRapidActions:JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')).requiredRapidActions,inventorySha256:digest(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'))),observedActions:[],outcomes:[],errors:[],cleanup:{},limits:['Synthetic isolated browser storage and Firebase/clipboard/geolocation boundaries.',mobileYesMotion?'Emulated mobile WebKit; uncapped functional evidence unless independently bound to a verified Linux cgroup report; no physical iPhone or private-board recovery claim.':'Native desktop engine; no physical iPhone or private-board recovery claim.']};
+ const diagnosticProfile=selectedProfile==='workload-diagnostic';
+ const report={schemaVersion:1,kind:mobileYesMotion?'button-mobile-functional':probe?'button-sensitivity':scenarioFilter?'button-diagnostic':'button-safety',engine,candidateCommit,candidateTree,hostedPolicy,status:'running',startedAt:new Date().toISOString(),profile:selectedProfile,requiredActions:inventory.requiredActions,requiredScenarios:profileDefinition.requiredScenarios,...(diagnosticProfile?{requiredWorkload:profileDefinition.requiredWorkload,requiredRapidActions:profileDefinition.requiredRapidActions}:{}),inventorySha256:digest(inventoryBytes),observedActions:[],outcomes:[],errors:[],cleanup:{},limits:['Synthetic isolated browser storage and Firebase/clipboard/geolocation boundaries.',mobileYesMotion?'Emulated mobile WebKit; uncapped functional evidence unless independently bound to a verified Linux cgroup report; no physical iPhone or private-board recovery claim.':'Native desktop engine; no physical iPhone or private-board recovery claim.']};
  const reportPath=path.join(outputDir,'button-safety-'+engine+'-'+randomUUID()+'.json'),save=()=>fs.writeFileSync(reportPath,JSON.stringify(report,null,2)+'\n');save();
  if(startupOpening){report.kind='startup-diagnostic';report.scope='ordinary-startup-diagnostic';report.limits.push('Ordinary uncapped64-task opening only; no button, mobile memory, release or physical-iOS qualification.');}
  const appCommit=startupOpening?.sourceCommit||candidateCommit;
@@ -91,14 +102,30 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
   };
   const scenario=async(name,options,execute)=>{
    if(scenarioFilter&&name!==scenarioFilter)return;
+   if(!scenarioFilter&&!probe&&!selectedScenarios.has(name))return;
+   const scenarioFixture=selectedProfile==='ordinary'&&!probe&&!startupOpening?profileDefinition.scenarioFixtures?.[name]:null;
+   if(selectedProfile==='ordinary'&&!probe&&!startupOpening){
+    assert.ok(scenarioFixture&&typeof scenarioFixture==='object','Trusted ordinary scenario fixture required: '+name);
+    assert.equal(scenarioFixture.savedTasks,fixtureTaskCount,'Ordinary scenario uses its independently declared base size: '+name);
+    assert.equal(scenarioFixture.source,fixtureSourceForAuthMode[scenarioFixture.authMode],'Ordinary source label must match its installed fixture mode: '+name);
+    assert.equal(scenarioFixture.fixtureRole,profileDefinition.scenarioRoles?.[name]||'active','Ordinary fixture role must match its independent inventory: '+name);
+    if(options.authMode!==undefined)assert.equal(options.authMode,scenarioFixture.authMode,'Scenario helper cannot select an unreviewed ordinary auth mode: '+name);
+    if(options.fixtureRole!==undefined)assert.equal(options.fixtureRole,scenarioFixture.fixtureRole,'Scenario helper cannot select an unreviewed ordinary fixture role: '+name);
+   }
+   const fixtureRole=scenarioFixture?.fixtureRole||options.fixtureRole||profileDefinition.scenarioRoles?.[name]||'active';
+   const fixtureMode=scenarioFixture?.authMode||options.authMode||profileDefinition.fixture?.authMode||'signed-out';
    if(context){closing=true;await context.close();closing=false;}
    const device=mobileYesMotion?playwright.devices['iPhone 13']:null;
    context=await browser.newContext({...(device?{userAgent:device.userAgent,screen:MOBILE_PROFILE.screen,deviceScaleFactor:3,isMobile:true,hasTouch:true}:{}),serviceWorkers:'block',viewport:mobileYesMotion?MOBILE_PROFILE.viewport:options.viewport||{width:1100,height:850},reducedMotion:startupOpening||mobileYesMotion==='normal'?'no-preference':'reduce'});
    if(mobileYesMotion)options={...options,retainedCopies:2};
-   const board=startupOpening?JSON.parse(startupOpening.raw):buttonFixture(options.authMode||'signed-out');
+   const board=startupOpening?JSON.parse(startupOpening.raw):buttonFixture(fixtureMode,{profile:selectedProfile});
+   if(scenarioFixture){
+    assert.equal(board.syncAccount,scenarioFixture.syncAccount,'Ordinary fixture uses its independently declared seed account: '+name);
+    assert.equal(board.syncRev,scenarioFixture.seedSyncRev,'Ordinary fixture uses its independently declared seed revision: '+name);
+   }
    if(options.board)Object.assign(board,options.board);
    if(options.decorate)options.decorate(board);
-   if(!startupOpening)populateButtonWorkload(board,{role:options.fixtureRole||'active'});
+   if(!startupOpening)populateButtonWorkload(board,{role:fixtureRole,taskCount:fixtureTaskCount});
    await context.exposeBinding('__installedRPC',(_,kind,args)=>{
     if((kind==='get'||kind==='list')&&options.cloudReadFail)return{fixtureFailure:'unavailable'};
     if(kind==='get')return structuredClone(options.remote?.get(args[0])??null);
@@ -109,7 +136,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
    const dbName='button-'+randomUUID();
    // The neutral pointer-release iframe must never reseed shared browser
    // preferences or app storage while a button burst is in progress.
-   await context.addInitScript({content:'if(window.top===window){('+browserInit.toString()+')('+JSON.stringify({dbName,authMode:options.authMode||'signed-out',sdkBase:origin+sdk})+');'+((startupOpening||mobileYesMotion)?'localStorage.setItem("fvp:chain-scanner:landscape-motion",JSON.stringify({choice:'+JSON.stringify(startupOpening?'normal':mobileYesMotion)+',savedAt:Date.now()}));':'')+'}'});
+   await context.addInitScript({content:'if(window.top===window){('+browserInit.toString()+')('+JSON.stringify({dbName,authMode:fixtureMode,sdkBase:origin+sdk})+');'+((startupOpening||mobileYesMotion)?'localStorage.setItem("fvp:chain-scanner:landscape-motion",JSON.stringify({choice:'+JSON.stringify(startupOpening?'normal':mobileYesMotion)+',savedAt:Date.now()}));':'')+'}'});
    // Retained sources are seeded once in the observer below, not serialized
    // into every later page/frame bootstrap. Ordinary fixtures keep their seed.
    if(!options.retainedCopies)await context.addInitScript(({board})=>{
@@ -130,19 +157,30 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
    });
    if(options.retainedCopies){
     const observer=await context.newPage();await observer.goto(origin+prefix+'__button-observer');await observer.addScriptTag({content:sources.get('device-store-v2.js').toString()});
-    report.retainedSources??=[];report.retainedSources.push(await observer.evaluate(async({dbName,board,count,mobile})=>{
+    report.retainedSources??=[];report.retainedSources.push(await observer.evaluate(async({dbName,board,count,mobile,ordinaryUndo})=>{
+     const seedStartedAtMs=Date.now();
      const raw=JSON.stringify(board),legacyKey='fvp:chain-scanner:v1',legacyBefore=localStorage.getItem(legacyKey);let legacySeeded=false;
      if(!localStorage.getItem('fvp:chain-scanner:device-store-v2')&&legacyBefore===null){localStorage.setItem(legacyKey,raw);legacySeeded=true;}
      const store=ChainStorageV2.createDeviceStore({dbName});await store.open();
      const backups=Array.from({length:count},(_,i)=>({id:'gate-retained-'+i,kind:'manual',at:Date.now()-i,day:'2026-10-25',payload:JSON.stringify({...board,futureSourceRole:i})}));
+     if(ordinaryUndo){
+      if(count!==3)throw Error('The admitted ordinary Undo source fixture requires its exact three originals');
+      const kinds=['manual','latest','future-recovery'],roles=['manual','pinned-automatic','unknown-kind'];
+      backups.forEach((row,index)=>{row.kind=kinds[index];row.futureRetained={role:roles[index],raw:roles[index]+' original\u0000bytes',opaque:['retain',[13,17,19][index]],flag:true,empty:null};});
+     }
+     // Capture generated fixture inputs before migration/readback.
+     const inputRows=ordinaryUndo?structuredClone(backups):null;
      const result=await store.migrateLegacy({headPayload:raw,account:null,sourceFingerprint:await ChainStorageV2.hashPayload(JSON.stringify([{key:'fvp:chain-scanner:v1',raw}])),backups,opaqueArchives:[{key:'gate-opaque-exact',raw:'opaque exact bytes\u0000retain',futureBytes:new Uint8Array([0,17,255]),futureMinusZero:-0}]});
      if(!result.verified)throw Error('Native retained source fixture failed');const head=await store.readHead();await store.setPendingUpload('gate-owner',{generationId:'gate-pending',payloadHash:head.hash,baseRev:0,updatedAt:7});
      const legacyAfter=localStorage.getItem(legacyKey),retainedSources=[];
      for(const row of (await store.listBackups()).filter(row=>row.id.startsWith('gate-retained-')).sort((a,b)=>a.id.localeCompare(b.id))){const saved=JSON.parse(row.payload);retainedSources.push({id:row.id,payloadHash:await ChainStorageV2.hashPayload(row.payload),...(mobile?{durableTasks:saved.tasks.length,unknownBytes:new TextEncoder().encode(saved.futurePopulated.opaque).byteLength}:{})});}
      let workload;if(mobile){const saved=JSON.parse(head.payload),opaque=(await store.listOpaqueArchives()).find(row=>row.key==='gate-opaque-exact' );workload={durableTasks:saved.tasks.length,activeTasks:saved.tasks.filter(row=>!row.done).length,distinctTaskIds:new Set(saved.tasks.map(row=>row.id)).size,unknownBytes:new TextEncoder().encode(saved.futurePopulated.opaque).byteLength,taskIdentityHash:await ChainStorageV2.hashPayload(JSON.stringify(saved.tasks.map(row=>({id:row.id,title:row.title,createdAt:row.createdAt})))),unknownSourceHash:await ChainStorageV2.hashPayload(JSON.stringify({board:saved.futureBoard,populated:saved.futurePopulated,tasks:saved.tasks.map(row=>({id:row.id,future:row.futureTask}))})),opaque:opaque?{key:opaque.key,rawHash:await ChainStorageV2.hashPayload(opaque.raw),futureBytes:Array.from(opaque.futureBytes),futureMinusZero:Object.is(opaque.futureMinusZero,-0)}:null,pending:await store.getPendingUpload('gate-owner')};}
      const bootstrap={delivery:'observer-evaluate-once',legacySeeded,legacyBeforeHash:legacyBefore===null?null:await ChainStorageV2.hashPayload(legacyBefore),legacyPayloadHash:legacyAfter===null?null:await ChainStorageV2.hashPayload(legacyAfter),headPayloadHash:await ChainStorageV2.hashPayload(head.payload),headPayloadBytes:new TextEncoder().encode(head.payload).byteLength,...(mobile?{workload}:{}),retainedSources};
-     await store.close();return{count,eachPayloadBytes:backups[0].payload.length,ids:backups.map(row=>row.id),bootstrap};
-    },{dbName,board,count:options.retainedCopies,mobile:!!mobileYesMotion}));
+     let ordinaryUndoFixtureSeed;
+     if(ordinaryUndo)ordinaryUndoFixtureSeed={seedStartedAtMs,seedFinishedAtMs:Date.now(),headPayload:raw,headHash:head.hash,
+      rows:inputRows,readbackRows:await store.listBackups(),pending:await store.getPendingUpload('gate-owner')};
+     await store.close();return{count,eachPayloadBytes:backups[0].payload.length,ids:backups.map(row=>row.id),bootstrap,...(ordinaryUndo?{ordinaryUndoFixtureSeed}: {})};
+    },{dbName,board,count:options.retainedCopies,mobile:!!mobileYesMotion,ordinaryUndo:name==='ordinary Undo consumes two saved edit frames'}));
     const proof=report.retainedSources.at(-1).bootstrap,expected=digest(JSON.stringify(board));
     assert.equal(proof.legacyPayloadHash,proof.legacySeeded?expected:proof.legacyBeforeHash,'Observer retains exact guarded legacy bytes');
     assert.equal(proof.headPayloadHash,expected,'Observer reads back exact fixture head');assert.equal(proof.headPayloadBytes,Buffer.byteLength(JSON.stringify(board)));
@@ -188,10 +226,17 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
    },{keySource:actionFor.toString()});
    await page.goto(origin+prefix);await page.waitForFunction(()=>typeof state!=='undefined'&&state&&window.ScannerDeviceStore);await page.waitForFunction(()=>window.CloudSync?.ready);if(mobileYesMotion)await page.waitForFunction(motion=>document.documentElement.dataset.landscapeMotion===motion,mobileYesMotion,{timeout:12000});localArmed=true;
    const setup=await bounded((async()=>{for(let attempt=0;attempt<200;attempt++){
-    const result=await page.evaluate(async()=>{const head=await ScannerDeviceStore.readHead();return{currentTasks:state.tasks.length,activeTasks:state.tasks.filter(task=>!task.done).length,durableTasks:head?.payload?JSON.parse(head.payload).tasks.length:0,durableHash:head?.hash};});
-    if(result.currentTasks===(startupOpening?64:TASK_COUNT)&&result.durableTasks===(startupOpening?64:TASK_COUNT))return{...result,fixtureRole:options.fixtureRole||'active'};
+    const result=await page.evaluate(async(captureFixtureMode)=>{const head=await ScannerDeviceStore.readHead();return{currentTasks:state.tasks.length,activeTasks:state.tasks.filter(task=>!task.done).length,durableTasks:head?.payload?JSON.parse(head.payload).tasks.length:0,durableHash:head?.hash,...(captureFixtureMode?{authMode:window.__installedFixture?.authMode}:{})};},Boolean(scenarioFixture));
+    if(result.currentTasks===(startupOpening?64:fixtureTaskCount)&&result.durableTasks===(startupOpening?64:fixtureTaskCount)){
+     const row={...result,fixtureRole};
+     if(scenarioFixture){
+      assert.equal(row.authMode,fixtureMode,'Ordinary page retained the installed auth fixture: '+name);
+      row.source=fixtureSourceForAuthMode[row.authMode];
+     }
+     return row;
+    }
     await new Promise(resolve=>setTimeout(resolve,25));
-   }throw Error('Independent saved-board setup did not reach durable storage');})(),startupOpening?'ordinary saved-board durable setup':'400-task durable setup',12000);
+   }throw Error('Independent saved-board setup did not reach durable storage');})(),startupOpening?'ordinary saved-board durable setup':fixtureTaskCount+'-task durable setup',12000);
    const prepareReleaseSurface=async()=>{
     const receipt=await bounded(page.evaluate(async identity=>{
      const sink=document.createElement('iframe');sink.id='__buttonReleaseSink';sink.title='Native test release surface';sink.hidden=true;
@@ -354,7 +399,119 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
     const normal=outcomes.get(action)||{action,status:'passed',events:['click'],assertions:0,responsive:true,steps:[]};normal.assertions++;normal.steps.push({scenario:name,description:'Rapid '+semantics,elapsedMs:finished-began,maxFrameGapMs:heartbeat.maxGapMs});outcomes.set(action,normal);report.outcomes=[...outcomes.values()];
     delete report.inFlightBurst;return row.bursts.at(-1);
    };
-   const ui={page,mobileYesMotion,recordMobileStory:value=>{report.mobileStory=value;},click:step,waitFor,burst,pasteBoundary,backdrop:()=>step('.mback',()=>!document.querySelector('#modalRoot .modal'),'Dismiss dialog backdrop',{position:{x:5,y:5}}),expectReload:async action=>{const before=await page.evaluate(()=>window.__installedFixture.documentId);allowedNavigation={url:page.url(),remaining:1,action};const expected=new Function('return window.__installedFixture?.documentId!=='+JSON.stringify(before)+'&&document.documentElement.dataset.appReady==="true"');await step('[data-act="'+action+'"]',expected,action+' bounded reload');assert.equal(allowedNavigation.remaining,0,'exactly one expected same-route reload');allowedNavigation=null;},act:async(action,expect,selector)=>{if(!selector){selector='[data-act="'+action+'"]';if(await page.locator('#modalRoot '+selector).count())selector='#modalRoot '+selector;}return step(selector,expect,action);},fill:(selector,value)=>nativeInput('fill',selector,value),select:(selector,value)=>nativeInput('select',selector,value),expose};
+   const writeOrdinaryUndoSource=(phase,snapshot)=>{
+    assert.equal(name,'ordinary Undo consumes two saved edit frames','Full Undo phases belong only to the admitted ordinary case');
+    assert.equal(selectedProfile,'ordinary');
+    const file='ordinary-undo-'+phase+'.json',artifact={schemaVersion:1,phase,scenario:name,
+      sourceIdentity:{candidateCommit,candidateTree,inventorySha256:digest(inventoryBytes)},...snapshot};
+    const bytes=JSON.stringify(artifact,null,2)+'\n';fs.writeFileSync(path.join(outputDir,file),bytes,{flag:'wx'});
+    return{phase,file,sha256:digest(bytes),bytes:Buffer.byteLength(bytes),currentHash:snapshot.currentHash,durableHash:snapshot.durableHash,
+      currentBytes:Buffer.byteLength(snapshot.current),durableBytes:Buffer.byteLength(snapshot.durable)};
+   };
+   const recordOrdinaryUndoPhase=(phase,snapshot)=>{
+    const order=['B0','B1','B2','U1','U2'];report.ordinaryUndoPhases??=[];
+    assert.equal(phase,order[report.ordinaryUndoPhases.length],'Retain each complete ordinary Undo phase once and in order');
+    assert.equal(typeof snapshot.current,'string');assert.equal(typeof snapshot.durable,'string');
+    assert.equal(snapshot.currentHash,digest(snapshot.current));assert.equal(snapshot.durableHash,digest(snapshot.durable));
+    report.ordinaryUndoPhases.push(writeOrdinaryUndoSource(phase,snapshot));save();
+   };
+   const recordOrdinaryUndoSeedSource=snapshot=>{
+    assert.equal(report.ordinaryUndoSeedSource,undefined,'Retain the original seeded Undo sources exactly once');
+    report.ordinaryUndoSeedSource=writeOrdinaryUndoSource('seed-source',snapshot);save();
+   };
+   const recordOrdinaryUndoFinalSource=snapshot=>{
+    assert.equal(report.ordinaryUndoFinalSource,undefined,'Retain the final Undo sources exactly once');
+    // Write before semantic/hash assertions so mismatches retain their actual values.
+    report.ordinaryUndoFinalSource=writeOrdinaryUndoSource('final-source',snapshot);save();
+   };
+   const repeat=async(actionFamily,attemptCount,expect,selector,description)=>{
+    const definition=profileDefinition.requiredRepeatCases?.find(row=>row.name===name);
+    assert.ok(definition,'Independent ordinary repeat definition required: '+name);
+    assert.ok(definition.actionFamilies.includes(actionFamily),'Ordinary repeat action belongs to its selected case: '+name);
+    assert.ok(Number.isSafeInteger(attemptCount)&&attemptCount>=definition.minimumAttempts,'Required ordinary native repeat attempts: '+name);
+    const attempts=[];report.inFlightRepeat={scenario:name,actionFamily,attempts};
+    for(let index=0;index<attemptCount;index++){
+     const before={presses:report.presses?.length||0,clicks:report.clicks?.length||0};
+     await step(selector,expect,description+' '+(index+1));
+     const presses=(report.presses||[]).slice(before.presses),clicks=(report.clicks||[]).slice(before.clicks);
+     assert.equal(presses.length,1,'One trusted native press receipt per ordinary repeat attempt: '+name);
+     const press=presses[0];assert.equal(press.scenario,name);assert.equal(press.action,actionFamily);assert.equal(press.trusted,true);
+     assert.ok(Number.isFinite(press.at)&&press.at>=0,'Actual native press timestamp required: '+name);
+     assert.deepEqual(clicks.filter(row=>row.action!==null&&row.action!==actionFamily),[],'No unrelated native action during ordinary repeat: '+name);
+     assert.equal(clicks.length,1,'One trusted matching click per ordinary repeat attempt: '+name);
+     const click=clicks[0];assert.equal(click.scenario,name);assert.equal(click.action,actionFamily);assert.equal(click.trusted,true);
+     assert.ok(Number.isFinite(click.at)&&click.at>=press.at,'Native click follows its trusted press: '+name);
+     attempts.push({receiptId:name+':'+randomUUID(),actionFamily,trusted:true,result:'accepted',receiptAtMs:press.at});
+     if(name==='ordinary Undo consumes two saved edit frames'){
+      const snapshot=await page.evaluate(index=>window.__ordinaryUndoSavedPhases?.[index],index);
+      assert.ok(snapshot,'The completed native Undo input must retain its complete board phase');
+      snapshot.currentHash=digest(snapshot.current);recordOrdinaryUndoPhase('U'+(index+1),snapshot);
+     }
+     save();
+    }
+    return attempts;
+   };
+   const recordRepeatOutcome=(caseName,attempts,evidence)=>{
+    const definition=profileDefinition.requiredRepeatCases?.find(row=>row.name===caseName);
+    assert.ok(definition,'Independent ordinary repeat definition required: '+caseName);assert.equal(caseName,name,'Repeat evidence is bound to the current scenario');
+    assert.ok(Array.isArray(attempts)&&attempts.length>=definition.minimumAttempts,'Complete native repeat attempts required: '+caseName);
+    assert.ok(typeof evidence==='string'&&evidence.trim().length>0,'Independent ordinary semantic evidence required: '+caseName);
+    assert.ok(attempts.every(row=>definition.actionFamilies.includes(row.actionFamily)&&row.trusted===true&&
+      ['accepted','refused','disappeared'].includes(row.result)&&Number.isFinite(row.receiptAtMs)&&row.receiptAtMs>=0),
+      'Every ordinary repeat is bound to trusted source-owned native input: '+caseName);
+    const receiptIds=attempts.map(row=>row.receiptId);assert.ok(receiptIds.every(id=>typeof id==='string'&&id.length>0));
+    assert.equal(new Set(receiptIds).size,receiptIds.length,'Ordinary repeat receipt identifiers are unique: '+caseName);
+    const accounting={attempted:attempts.length,accepted:0,refused:0,disappeared:0};
+    for(const attempt of attempts)accounting[attempt.result]++;
+    const outcome={name:caseName,status:'running',attempts,accounting,
+      assertions:[{id:definition.assertionId,status:'passed',expected:definition.expected,evidence}],
+      sourceIdentity:{candidateCommit,candidateTree,inventorySha256:digest(inventoryBytes),durableHash:setup.durableHash}};
+    report.repeatOutcomes??=[];
+    assert.equal(report.repeatOutcomes.some(row=>row.name===caseName),false,'One ordinary repeat outcome per selected case: '+caseName);
+    report.repeatOutcomes.push(outcome);delete report.inFlightRepeat;save();
+   };
+   const recordOrdinaryWoopPhase=(phase,snapshot)=>{
+    if(name==='ordinary repeated saved decision choice'){
+     assert.equal(selectedProfile,'ordinary');const order=['seed','settings','baseline-saved','settings-review','read-refused','reviewed','selected','repeated','write-refused','reviewed-retry','selected-retry','applied','final-source'];report.ordinarySavedDecisionPhases??=[];assert.equal(phase,order[report.ordinarySavedDecisionPhases.length],'Retain every complete saved-decision source phase once in order');
+     const file='ordinary-saved-decision-'+phase+'.json',artifact={schemaVersion:1,phase,scenario:name,sourceIdentity:{candidateCommit,candidateTree,inventorySha256:digest(inventoryBytes)},...snapshot};
+     const bytes=JSON.stringify(artifact,null,2)+'\n';fs.writeFileSync(path.join(outputDir,file),bytes,{flag:'wx'});report.ordinarySavedDecisionPhases.push({phase,file,sha256:digest(bytes),bytes:Buffer.byteLength(bytes),currentHash:snapshot.currentHash,durableHash:snapshot.durableHash,currentBytes:Buffer.byteLength(snapshot.current),durableBytes:Buffer.byteLength(snapshot.durable)});save();return;
+    }
+    if(name==='ordinary repeated cloud source choice'){
+     assert.equal(selectedProfile,'ordinary');const order=['seed','menu','read-refused','reviewed','selected','repeated','keyboard','alternate','write-refused','final-source'];report.ordinaryCloudSourcePhases??=[];assert.equal(phase,order[report.ordinaryCloudSourcePhases.length],'Retain every complete cloud-choice source phase once in order');
+     const file='ordinary-cloud-source-'+phase+'.json',artifact={schemaVersion:1,phase,scenario:name,sourceIdentity:{candidateCommit,candidateTree,inventorySha256:digest(inventoryBytes)},...snapshot};
+     // Same external source writer: retain the full lossless actual read before assertions.
+     const bytes=JSON.stringify(artifact,null,2)+'\n';fs.writeFileSync(path.join(outputDir,file),bytes,{flag:'wx'});report.ordinaryCloudSourcePhases.push({phase,file,sha256:digest(bytes),bytes:Buffer.byteLength(bytes),currentHash:snapshot.currentHash,durableHash:snapshot.durableHash,currentBytes:Buffer.byteLength(snapshot.current),durableBytes:Buffer.byteLength(snapshot.durable)});save();return;
+    }
+    if(name==='ordinary final WOOP repeated Next retains answers'){
+     assert.equal(selectedProfile,'ordinary');const order=['seed','opened','outcome-filled','outcome-repeated','obstacle-filled','obstacle-repeated','plan-filled','saved','reopened','deleted','deleted-reopened','final-source'];report.ordinaryFinalWoopPhases??=[];
+     assert.equal(phase,order[report.ordinaryFinalWoopPhases.length],'Retain every complete final WOOP source phase once and in order');
+     const file='ordinary-final-woop-'+phase+'.json',artifact={schemaVersion:1,phase,scenario:name,sourceIdentity:{candidateCommit,candidateTree,inventorySha256:digest(inventoryBytes)},...snapshot};
+     // The full lossless actual read is durable before any semantic/hash assertion.
+     const bytes=JSON.stringify(artifact,null,2)+'\n';fs.writeFileSync(path.join(outputDir,file),bytes,{flag:'wx'});report.ordinaryFinalWoopPhases.push({phase,file,sha256:digest(bytes),bytes:Buffer.byteLength(bytes),currentHash:snapshot.currentHash,durableHash:snapshot.durableHash,currentBytes:Buffer.byteLength(snapshot.current),durableBytes:Buffer.byteLength(snapshot.durable)});save();return;
+    }
+    assert.equal(name,'ordinary overdue WOOP repeated Next retains answers','WOOP source artifacts belong only to the admitted case');assert.equal(selectedProfile,'ordinary');
+    const order=['seed','scan','opened','outcome-filled','repeated','obstacle-filled','answered','plan-filled','saved','reopened'];report.ordinaryWoopPhases??=[];
+    assert.equal(phase,order[report.ordinaryWoopPhases.length],'Retain every complete WOOP source phase once and in order');
+    const file='ordinary-woop-'+phase+'.json',artifact={schemaVersion:1,phase,scenario:name,sourceIdentity:{candidateCommit,candidateTree,inventorySha256:digest(inventoryBytes)},...snapshot};
+    // Preserve the complete actual read before any semantic/hash assertion.
+    const bytes=JSON.stringify(artifact,null,2)+'\n';fs.writeFileSync(path.join(outputDir,file),bytes,{flag:'wx'});
+    report.ordinaryWoopPhases.push({phase,file,sha256:digest(bytes),bytes:Buffer.byteLength(bytes),currentHash:snapshot.currentHash,durableHash:snapshot.durableHash,
+      currentBytes:Buffer.byteLength(snapshot.current),durableBytes:Buffer.byteLength(snapshot.durable)});save();
+   };
+   const reopenOrdinaryWoop=async()=>{
+    if(name==='ordinary final WOOP repeated Next retains answers'){
+     assert.equal(selectedProfile,'ordinary');const before=await page.evaluate(()=>window.__installedFixture.documentId);assert.equal(allowedNavigation,null);allowedNavigation={url:page.url(),remaining:1,action:'ordinary-final-woop-browser-reopen'};
+     await page.reload({waitUntil:'domcontentloaded'});await waitFor(new Function('return window.__installedFixture?.documentId!=='+JSON.stringify(before)+'&&document.documentElement.dataset.appReady==="true"&&window.CloudSync?.ready'),12000,'Actual browser reopen of saved/deleted final WOOP');
+     assert.equal(allowedNavigation.remaining,0,'Exactly one same-route browser reopen');allowedNavigation=null;check();return;
+    }
+    assert.equal(name,'ordinary overdue WOOP repeated Next retains answers');assert.equal(selectedProfile,'ordinary');
+    const before=await page.evaluate(()=>window.__installedFixture.documentId);assert.equal(allowedNavigation,null);
+    allowedNavigation={url:page.url(),remaining:1,action:'ordinary-woop-browser-reopen'};
+    await page.reload({waitUntil:'domcontentloaded'});
+    await waitFor(new Function('return window.__installedFixture?.documentId!=='+JSON.stringify(before)+'&&document.documentElement.dataset.appReady==="true"&&window.CloudSync?.ready'),12000,'Actual browser reopen of saved ordinary WOOP');
+    assert.equal(allowedNavigation.remaining,0,'Exactly one same-route browser reopen');allowedNavigation=null;check();
+   };
+   const ui={page,recordOrdinaryCloudSourcePhase:recordOrdinaryWoopPhase,recordOrdinaryWoopPhase,reopenOrdinaryWoop,mobileYesMotion,recordMobileStory:value=>{report.mobileStory=value;},click:step,waitFor,burst,repeat,recordRepeatOutcome,recordOrdinaryUndoPhase,recordOrdinaryUndoSeedSource,recordOrdinaryUndoFinalSource,ordinaryUndoFixtureSeed:name==='ordinary Undo consumes two saved edit frames'?report.retainedSources?.at(-1)?.ordinaryUndoFixtureSeed:undefined,pasteBoundary,backdrop:()=>step('.mback',()=>!document.querySelector('#modalRoot .modal'),'Dismiss dialog backdrop',{position:{x:5,y:5}}),expectReload:async action=>{const before=await page.evaluate(()=>window.__installedFixture.documentId);allowedNavigation={url:page.url(),remaining:1,action};const expected=new Function('return window.__installedFixture?.documentId!=='+JSON.stringify(before)+'&&document.documentElement.dataset.appReady==="true"');await step('[data-act="'+action+'"]',expected,action+' bounded reload');assert.equal(allowedNavigation.remaining,0,'exactly one expected same-route reload');allowedNavigation=null;},act:async(action,expect,selector)=>{if(!selector){selector='[data-act="'+action+'"]';if(await page.locator('#modalRoot '+selector).count())selector='#modalRoot '+selector;}return step(selector,expect,action);},fill:(selector,value)=>nativeInput('fill',selector,value),select:(selector,value)=>nativeInput('select',selector,value),expose};
    report.scenarios??=[];const record={name,status:'running',setup};report.scenarios.push(record);save();
    if(control==='new-action')await page.evaluate(()=>{const button=document.createElement('button');button.dataset.act='gate-new-untested';button.textContent='New untested button';document.body.append(button);});
    if(control){
@@ -369,6 +526,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
     },true);},control);
    }
    await execute(ui);check();record.status='passed';
+   for(const outcome of report.repeatOutcomes||[])if(outcome.name===name&&outcome.status==='running')outcome.status='passed';
   };
   if(startupOpening)await scenario('ordinary saved-board opening',{},async ui=>{
    const before=await page.locator('#addToggle').getAttribute('aria-expanded');
@@ -379,7 +537,11 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
   else if(mobileYesMotion){const {runRapidCoreScenarios}=await import('./button-safety-rapid-core.mjs');await runRapidCoreScenarios({scenario});}
   else if(probe)await scenario('detector sensitivity',{},async ui=>{await ui.act('settings',control==='async-predicate-false'?async()=>false:()=>!!document.getElementById('stHorizon'));});
   else if(scenarioFilter?.startsWith('rapid ')){const {runRapidScenarios}=await import('./button-safety-rapid.mjs');await runRapidScenarios({scenario});}
-  else {await runButtonScenarios({scenario});const {runRapidScenarios}=await import('./button-safety-rapid.mjs');await runRapidScenarios({scenario});}
+  else {
+   await runButtonScenarios({scenario});
+   if(diagnosticProfile){const {runRapidScenarios}=await import('./button-safety-rapid.mjs');await runRapidScenarios({scenario});}
+   else{const {runRapidCoreScenarios}=await import('./button-safety-rapid-core.mjs');await runRapidCoreScenarios({scenario});}
+  }
   if(scenarioFilter)assert.equal(report.scenarios?.length,1,'Exactly one requested diagnostic scenario must execute');
   if(!startupOpening)for(const action of observed)assert.ok(report.requiredActions.includes(action),'New untested button action: '+action);
   report.observedActions=[...observed].sort();report.outcomes=[...outcomes.values()];report.rapidOutcomes=[...rapidOutcomes.values()];if(scenarioFilter&&!startupOpening)report.scope='focused-diagnostic';
@@ -397,6 +559,10 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,control=null
   });
   if(server)await close(async()=>{await new Promise(resolve=>server.close(resolve));report.cleanup.serverClosed=true;});
   report.finishedAt=new Date().toISOString();save();if(cleanupError)throw cleanupError;
+ }
+ if(!startupOpening&&!probe&&!scenarioFilter&&!mobileYesMotion){
+  try{verifyButtonSafetyReport(report,{inventory,inventorySha256:digest(inventoryBytes),candidateCommit,candidateTree,engine,expectedProfile:selectedProfile});}
+  catch(error){report.status='failed';report.failure=error.stack;save();throw error;}
  }
  return{report,reportPath};
 }

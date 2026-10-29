@@ -12773,6 +12773,16 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK repository process: button safety report admission binds ordinary and workload diagnostic profiles",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: button safety CLI and runner select ordinary and diagnostic profiles",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK repository process: native button gate detects errors raised by a real click",
       "group": "native-process",
       "file": "tests.js"
@@ -13455,6 +13465,51 @@
     {
       "root": "RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app",
       "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary native Playwright resolution is pinned and cleanup owned",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary repeated selected eligibility preserves rows receipts and sources",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary Undo restores two saved edit frames and preserves prior history and sources",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary overdue WOOP repeated Next preserves answers plans and sources",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary final WOOP repeated Next preserves sole-task answers plans deletion and sources",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary repeated cloud source choice preserves mounted facts receipts and complete sources",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary repeated saved decision choice retains selection authority and complete sources",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK saved decision review guidance: mounted FAQ retains place and explicit save authority",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK saved decision review guidance: mounted changelog records selected review continuity",
+      "group": "core",
       "file": "tests.js"
     }
   ],

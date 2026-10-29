@@ -2270,10 +2270,15 @@ The real Sync → Review action and Copy debug log consumer distinguish failed p
 
 ## Native button safety process
 
-The command/report consumer rejects missing, duplicate, skipped, cancelled, unresponsive or unasserted button outcomes; named Chromium and WebKit must execute. Source button template counts and native observed actions fail closed on new uncovered controls. The independent scenario inventory requires populated, oversized, retained-draft, route and external-failure variants; async predicates must resolve to true, rather than merely return a Promise. Local allocation, exact source/tree and aggregate artifact identities remain required. Desktop synthetic fixtures do not establish physical-device or private-board recovery.
+The command/report consumer rejects missing, duplicate, skipped, cancelled, unresponsive or unasserted button outcomes; named Chromium and WebKit must execute. Source button template counts and native observed actions fail closed on new uncovered controls. The independent scenario inventory requires populated, oversized, retained-draft, route and external-failure variants; async predicates must resolve to true, rather than merely return a Promise. Local allocation, exact source/tree and aggregate artifact identities remain required. Desktop synthetic fixtures do not establish physical-device or private-board recovery. The ordinary report-admission RISK cohort independently binds all sixty scenario IDs to fifty-four signed-out and six existing reconcile-held source/auth fixtures; reports cannot choose their own expected profile or fixture. The separately selected workload diagnostic keeps its original strict numeric controls; legacy rapid single-scenario tests opt into it explicitly, while ordinary oversized-transfer evidence uses the trusted64-task fixture.
 
 - RISK repository process: button safety rejects incomplete native action evidence
 - RISK repository process: button safety rejects false passes and newly untested actions
+- RISK repository process: button safety report admission binds ordinary and workload diagnostic profiles
+- RISK repository process: button safety CLI and runner select ordinary and diagnostic profiles
+- RISK repository process: ordinary native Playwright resolution is pinned and cleanup owned
+- RISK repository process: ordinary repeated selected eligibility preserves rows receipts and sources
+- RISK repository process: ordinary Undo restores two saved edit frames and preserves prior history and sources
 - RISK repository process: native button gate detects errors raised by a real click
 - RISK repository process: required native button actions execute in Chromium and WebKit
 - RISK repository process: rapid native attempts preserve Add and asynchronous dialog outcomes
@@ -2400,3 +2405,20 @@ The pinned Linux x64 reader preserves the raw AT_PAGESZ witness and binds it to 
   - The real scene dialog preset occupies the refused opener coordinate: nine actual trusted first-light downs must receive isolated neutral ups, zero wrong clicks, one accepted opener, ten attempts within2s, and complete cleanup. Existing two-engine neutral release preservation remains required.
 
 - RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app
+- RISK repository process: ordinary overdue WOOP repeated Next preserves answers plans and sources
+
+- RISK repository process: ordinary final WOOP repeated Next preserves sole-task answers plans deletion and sources
+  - Sole-active ordinary64 final WOOP, four trusted repeated Next receipts, actual answer/Save/Delete controls, complete lossless source and real-time/lifecycle preservation through two browser reopens. Runner-enforcement RED pending under1050; no app-regression claim.
+
+- RISK repository process: ordinary repeated cloud source choice preserves mounted facts receipts and complete sources
+  - Ordinary held64 source choices retain mounted full facts/focus/scroll through two trusted repeats and Enter; alternate selection/read refusal/explicit refused publication preserve complete current/durable/remote/typed/pending/protected sources and declared added-copy lifecycle. Definition-only RED pending1054.
+  - CF02 #1284 independently requires full trusted focus-event/node/receipt boundaries in all10 lossless phases, application received-focus continuity and actual Enter; read-only observation RED pending1285. Existing whole source/lifecycle/exit/cleanup assertions retained.
+
+- RISK repository process: ordinary repeated saved decision choice retains selection authority and complete sources
+  - Ordinary held64 Light selections retain the mounted review and exact complete current/durable/cloud/manual/protected/typed/pending sources. Explicit refused Apply retains prepared consent; explicit retry confirms only its new decision. Definition-only1057; actual runner RED1058 still unrun.
+
+- RISK saved decision review guidance: mounted FAQ retains place and explicit save authority
+  - Existing public mounted Help/Settings copy seam: saved-decision repeat/place and explicit save authority, with prior app/data assertions retained.
+
+- RISK saved decision review guidance: mounted changelog records selected review continuity
+  - Existing public mounted Help/Settings copy seam: saved-decision repeat/place and explicit save authority, with prior app/data assertions retained.

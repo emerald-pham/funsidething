@@ -26556,5 +26556,725 @@
       "command": "No tests or runtime were executed for PS01, per #1026. Original RED/GREEN commands and outcomes remain in the unchanged component rationale records and source-sync evidence.",
       "failure": "This source-only synchronization has no new functional failure or pass. The derived fingerprint records the exact combined test diff and does not reinterpret prior RED/GREEN chronology."
     }
+  },
+  {
+    "baseCommit": "99b5dd01df0bc6fee9fa2f9cac30d5ce0c701ee5",
+    "testChangesSha256": "b8be1a3a734bd0690e499710cc7917e44cde15bea55493b76227e9a8088244b4",
+    "reason": "PC03 #1029 adds the trusted ordinary/workload-diagnostic report contract and makes the profile RISK cohort read the actual reviewed inventory. This new exact-diff record preserves the inherited merge rationale objects and binds the current tests.js change to the observed preimplementation failure.",
+    "previousBehavior": "The public report verifier used one global 90-scenario, 400-task, 114-rapid-action, ten-attempt, 2000ms contract and did not select a profile independently, so ordinary reports were measured against optional diagnostic work and a report could label itself diagnostic.",
+    "intendedBehavior": "The checked-in inventory declares common actions with distinct ordinary and workload-diagnostic profiles; the verifier defaults to independently selected ordinary, checks its 60 semantic scenarios, signed-out 64-task fixture, repeat receipts/accounting/source and cleanup, while the explicit diagnostic retains every original numeric and rapid-action assertion.",
+    "replacementTests": [
+      "RISK repository process: button safety report admission binds ordinary and workload diagnostic profiles"
+    ],
+    "preservedCoverage": [
+      "All 114 required actions still require exactly one successful real consumer outcome, responsiveness, no new action, exact candidate/inventory source, runtime asset bytes, error-free lifecycle and owned cleanup.",
+      "The workload-diagnostic profile preserves the unchanged original 90 scenarios, 400 saved tasks, 114 rapid families, ten trusted attempts and 2000ms ceiling; its focused report and 399-task/2001ms negative controls passed in the recorded run.",
+      "Existing missing/duplicate action and scenario controls, source template inventory, guard/G/GW assertions and all prior rationale objects remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/293-optional-policy/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/profile-graph/current-runs --purpose preimplementation-red --summary -- node --test --test-name-pattern=^RISK repository process: button safety report admission binds ordinary and workload diagnostic profiles$ tests.js",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/profile-graph/current-runs/2026-10-28T21-46-09-714Z-d8b996d6-cbd6-4bb0-bfaa-3751283a9f44.json",
+      "sourceCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+      "failure": "Recognized assertion-failure, exit 1, 6 assertions: 1 passed and 5 failed. The direct verifier accepted an omitted ordinary profile label, compared 60 ordinary cases to the old global 90, ignored missing repeat receipts, and failed to reject a 65-task ordinary fixture. The explicitly selected original diagnostic report and its 399-task and 2001ms refusals passed."
+    }
+  },
+  {
+    "baseCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+    "testChangesSha256": "9c4fb74ed05f3f6673b09668315ccaef2844edd5701161291f642b42c1be1909",
+    "reason": "PR01 #1031 defines runner and CLI profile-routing regressions. This combined fingerprint binds the exact tests.js diff from the current source checkpoint, including the prior PC03 report-admission test and this new RISK cohort; the earlier PC03 RED record remains unchanged. This PR01 record is pending the separate public-consumer RED owned by #1032.",
+    "previousBehavior": "The native runner always admitted the global 90-scenario, 400-task and rapid-action workload, while CLI selection could not explicitly request workload-diagnostic or reject an unknown profile before side effects.",
+    "intendedBehavior": "Omitted CLI and runButtonSafety selection uses ordinary 114-action and 60-scenario evidence with the installed signed-out 64-task fixture; explicit workload-diagnostic preserves the old 90/400/114/10/2000 contract, and unknown selection stops before output, bind or launch.",
+    "replacementTests": [
+      "RISK repository process: button safety CLI and runner select ordinary and diagnostic profiles"
+    ],
+    "preservedCoverage": [
+      "Shared 114-action, 50 ordinary semantic, 10 semantic repeat, exact source, accepted-decision, cleanup and 64-task installed-fixture contracts remain required.",
+      "The explicitly selected diagnostic keeps all original 90 scenarios, 400 saved tasks, 114 rapid actions, ten attempts and 2000ms assertions; mobile and capped paths remain strict, with no 200ms verdict.",
+      "Earlier report-admission RED/GREEN chronology, unknown and invalid distinctions, cleanup and all source/preservation controls remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "PENDING #1032: node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/293-optional-policy/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/profile-graph/current-runs --purpose preimplementation-red --summary -- node --test --test-name-pattern=^RISK repository process: button safety CLI and runner select ordinary and diagnostic profiles$ tests.js. Intentionally not executed in PR01.",
+      "failure": "PENDING #1032. PR01 executed no tests and observed no RED; this is an intentionally incomplete development record, not accepted failure evidence. The earlier PC03 report-admission RED remains separately recorded."
+    }
+  },
+  {
+    "baseCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+    "testChangesSha256": "2af257e1c1eccda914b4c65c7d6aa3bf08a3be74a7506243a4ffae0fba44c211",
+    "reason": "GS02 #1136 makes only a test-owned Playwright module-resolution and preload correction so the existing public-consumer profile cohort can reach its assertions. The PR01 pending record with fingerprint 9c4fb74ed05f3f6673b09668315ccaef2844edd5701161291f642b42c1be1909 remains unchanged immediately before this row as history; the original #1032 infrastructure failure and partial fixture signal remain separately preserved.",
+    "previousBehavior": "The original #1032 cohort could not reach its complete public assertions because a temporary preload and a worktree without node_modules could not resolve the existing pinned Playwright dependency; the partial 400-versus-64 assertion was not a complete behavioral RED.",
+    "intendedBehavior": "The unchanged runner literal import and test preload use the project lock-pinned Playwright package through portable Git-common-root resolution and temporary cleanup-scoped worktree module visibility, while the existing chromium.launch stop prevents a browser launch. The behavioral cohort remains pending one recorded #1032 attempt.",
+    "replacementTests": [
+      "RISK repository process: button safety CLI and runner select ordinary and diagnostic profiles"
+    ],
+    "preservedCoverage": [
+      "Shared 114-action, 50 ordinary semantic, 10 semantic repeat, exact source, accepted-decision, cleanup and 64-task installed-fixture contracts remain required.",
+      "The explicitly selected diagnostic keeps all original 90 scenarios, 400 saved tasks, 114 rapid actions, ten attempts and 2000ms assertions; mobile and capped paths remain strict, with no 200ms verdict.",
+      "Earlier report-admission RED/GREEN chronology, unknown and invalid distinctions, cleanup and all source/preservation controls remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "GS03 one recorded public-consumer RED: node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/293-optional-policy/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/profile-graph/current-runs --purpose preimplementation-red --summary -- node --test --test-name-pattern='^RISK repository process: button safety CLI and runner select ordinary and diagnostic profiles$' tests.js",
+      "failure": "Recorder 2026-10-28T22-39-01-333Z-533034fd-eb46-4bef-a32f-017002441761 classified assertion-failure (child/wrapper exit 1; complete identity; source/test diff ab350233ff810052bb98ea4bf1dbd770bc053cb3046929387c94b001e4c9a923). The complete cohort reached all five intended nested checks: omitted CLI report.profile was undefined instead of ordinary; explicit workload-diagnostic report.profile was undefined; unknown CLI profile reached the controlled intercepted chromium.launch instead of preflight rejection; unknown runButtonSafety profile reached the controlled launch instead of rejecting before output/bind/launch; explicit ordinary buttonFixture had 400 tasks instead of the installed 64. Both partial CLI reports matched candidate and inventory identity and recorded cleanup.serverClosed=true. No real browser/app server was launched. The earlier ERR_MODULE_NOT_FOUND infrastructure attempt and partial fixture signal remain separately preserved; this is the first complete behavioral RED. See gate-policy/runner-module-followup/worker-evidence/GS03.json and the exact recorder files under gate-policy/profile-graph/current-runs/."
+    },
+    "fingerprintHistory": [
+      {
+        "testChangesSha256": "9c4fb74ed05f3f6673b09668315ccaef2844edd5701161291f642b42c1be1909",
+        "status": "Original PR01 pending development record; preserved unchanged immediately before this setup-corrected record.",
+        "evidence": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/profile-graph/worker-evidence/PR01.json"
+      }
+    ]
+  },
+  {
+    "baseCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+    "testChangesSha256": "3dbe5228d08808284862908405d26c3dc00dc9b5b1f621ebf0f12d4d7b10c680",
+    "reason": "AO01 #1148 defined the exact 60-key source/auth fixture cohort, then AO02 #1149 recorded its single direct report-consumer RED. This source-bound rationale preserves the prior GS02 record and all inherited rationale objects; no test-source edits occurred after the recorded RED.",
+    "previousBehavior": "The ordinary synthetic factory labeled every scenario signed-out, while the accepted report contract has six existing reconcile-held cloud cases; the consumer did not bind each ordinary row to an independently reviewed per-scenario fixture map.",
+    "intendedBehavior": "An independent exact 60-key map records each source/auth mode, seed identity and existing role; the direct consumer cohort presents 54 signed-out and six reconcile-held rows and rejects wrong variants, malformed map keys, report-selected fixture waivers and current/durable hash mismatches. No implementation or observed RED is claimed in AO01.",
+    "replacementTests": [
+      "RISK repository process: button safety report admission binds ordinary and workload diagnostic profiles"
+    ],
+    "preservedCoverage": [
+      "All 114 shared action outcomes, exact candidate and inventory identities, 64-task base, durable hashes, scenario roles, repeat receipt accounting and cleanup assertions remain present.",
+      "The explicitly selected workload diagnostic retains its original 90 scenarios, 400 saved tasks, ten attempts and 2000ms controls with strict failure behavior.",
+      "Every prior rationale object and the original PC03, PR01 and GS03 RED/GREEN chronology remain unchanged; AO01 executed no tests."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/293-optional-policy/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/auth-fixture-contract/worker-evidence --purpose preimplementation-red --summary -- node --test --test-name-pattern='^RISK repository process: button safety report admission binds ordinary and workload diagnostic profiles$' tests.js",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/auth-fixture-contract/worker-evidence/2026-10-28T23-15-01-293Z-241dee10-1f1e-4a02-8320-e6d8dca59ac1.json",
+      "sourceCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+      "sourceTestDiffSha256": "7b1bd1e896469b7746b0851ab3df67414ad2143c83568bd71e664c9917b99f22",
+      "failure": "Recorder 2026-10-28T23-15-01-293Z-241dee10-1f1e-4a02-8320-e6d8dca59ac1 classified assertion-failure (child/wrapper exit 1; complete source/test identity; 8 tests, 2 passed, 6 failed). The valid 54 signed-out / 6 reconcile-held report was rejected at scripts/button-safety-contract.mjs:136 because the verifier compared every ordinary row with the global signed-out-installed base. It also falsely admitted a wrong cloud source, a missing scenario fixture-map key, and a report-selected fixture waiver. The omitted-profile and strict explicit-diagnostic controls passed. The preserved repeat-receipt case was masked because the same early source rejection did not match its /repeat/ assertion; later extra/unknown map mutations were not reached. Treat that as a cascade/limit, not separate behavior evidence. No browser or native fixture ran."
+    }
+  },
+  {
+    "baseCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+    "testChangesSha256": "effaebeff4368ac718311f59aedae528e068aba06a957a7df63cb533bf3e1b79",
+    "reason": "PR03 #1033 binds the current tests.js diff after implementing trusted ordinary runner setup. Existing single-scenario tests that intentionally retain the original rapid diagnostic now select workload-diagnostic explicitly; this combined record preserves the earlier PR01, GS03 and AO test records unchanged.",
+    "previousBehavior": "The public runner previously used the original 400-task and rapid workload by default, so focused rapid scenario tests omitted a profile and inherited those diagnostic inputs implicitly.",
+    "intendedBehavior": "Omitted profile selects ordinary behavior and the exact per-scenario 64-task source/auth fixture map; existing rapid single-scenario diagnostic tests explicitly select workload-diagnostic and retain their original 400-task, ten-attempt and 2000ms assertions.",
+    "replacementTests": [
+      "RISK repository process: button safety CLI and runner select ordinary and diagnostic profiles"
+    ],
+    "preservedCoverage": [
+      "All fifty existing ordinary semantic cases retain their independently reviewed fixture source, auth mode, role and 64-task current/durable readback; the ten repeat cases remain separately owned by their OR leaves.",
+      "The original ninety diagnostic scenarios and their strict 400-task, 114-family, ten-attempt and 2000ms controls remain selected explicitly where a focused rapid diagnostic is intended.",
+      "The earlier exact PR03 RED, AO report-consumer RED/GREEN, source identity, cleanup and preserved G/GW evidence remain unchanged; no post-bootstrap seed revision or syncDirty condition was added."
+    ],
+    "redEvidence": {
+      "command": "Existing #1032/GS03 recorded RED command: node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/293-optional-policy/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/profile-graph/current-runs --purpose preimplementation-red --summary -- node --test --test-name-pattern='^RISK repository process: button safety CLI and runner select ordinary and diagnostic profiles$' tests.js",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/profile-graph/current-runs/2026-10-28T22-39-01-333Z-533034fd-eb46-4bef-a32f-017002441761.json",
+      "failure": "The complete original cohort reached five intended checks and recorded assertion failures for omitted ordinary selection, explicit diagnostic selection, unknown CLI preflight, unknown runner preflight and the ordinary 64-task installed fixture. This row adds no rerun or new RED claim; it records the source-test migration needed to make legacy diagnostic calls explicit."
+    }
+  },
+  {
+    "baseCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+    "testChangesSha256": "7925649da8e4c4e2d4c0a3643f6d1a797cf294c5ba021baf62727bf103aea7d1",
+    "reason": "NR02 changes only the existing optional-mobile reuse wrapper child reporter so the already-protected exact TAP summary assertions match Node 23.10 output. The current full-file fingerprint also retains the two earlier PR03 RISK declarations in this same protected diff; the directly edited wrapper and all its assertions remain intact, and all 977 earlier rationale objects are byte-for-byte preserved.",
+    "previousBehavior": "The unchanged nested routing child completed all 16 selected outcomes successfully but Node 23.10 emitted its default spec summary; the existing wrapper required TAP summary lines and rejected the otherwise successful report.",
+    "intendedBehavior": "The same child selector, source, sixteen routing checks, exit-status check and exact count/skip assertions are retained while --test-reporter=tap explicitly supplies the format those assertions already require.",
+    "replacementTests": [
+      "RISK repository process: button safety report admission binds ordinary and workload diagnostic profiles",
+      "RISK repository process: button safety CLI and runner select ordinary and diagnostic profiles"
+    ],
+    "preservedCoverage": [
+      "The nested routing child still runs the exact named consumer and must exit zero with all sixteen outcomes present and zero skipped; no count, selector or policy assertion is relaxed.",
+      "Absent, failed, invalid, skipped, canceled, running, wrong-attempt, wrong-source and duplicate optional mobile outcomes remain separately classified by the unchanged child cases.",
+      "All current ordinary planner, trusted source, cleanup, strict diagnostic and previous G/GW protected assertions remain unchanged; the original 39-of-40 failure is retained as reporter-format evidence, not an app or planner RED."
+    ],
+    "redEvidence": {
+      "command": "node --test '--test-name-pattern=^RISK repository process: button safety report admission binds ordinary and workload diagnostic profiles$|^RISK repository process: button safety CLI and runner select ordinary and diagnostic profiles$|^RISK repository process: native button gate refuses unallocated local launch before browser startup$|^RISK repository process: native allocation admits its healthy owner past missing foreign paths and protects their claims$|^RISK repository process: native button gate cannot omit a required stress scenario$|^RISK repository process: native button safety requires 400-task and rapid-press evidence$|^RISK repository process: optional mobile diagnostics do not block ordinary reuse$|^RISK repository process: explicit mobile diagnostics require dispatch selection and hosted admission$|^RISK repository process: routed hosted policies reach native consumers without waiving invalid launches$' tests.js",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/profile-graph/current-runs/2026-10-28T23-42-52-142Z-f76641f4-e98e-4850-a9c5-12288a766978.json",
+      "failure": "Recorded run f76641f4-e98e-4850-a9c5-12288a766978 (output SHA-256 40e7d4853b51be86df60d859941cbfbc4d7f8d4e0675a45aa5ad850be7e26a9a) passed 39 of 40 outer assertions. The nested routing consumer exited 0 with 16 passed, 0 failed and 0 skipped, but emitted Node spec summary markers while the wrapper asserted exact TAP lines ^# tests 16$ and ^# skipped 0$. This was the sole reporter-format mismatch; it is not claimed as a product, planner or workflow behavior failure."
+    }
+  },
+  {
+    "baseCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+    "testChangesSha256": "f6f5a61c2de86a0c0a32cb28e19b1749c8d7d001a95af8961dd930f4e9fe1887",
+    "reason": "OR0101 #1035 defines the ordinary repeated selected-eligibility public-consumer case and its focused RISK regression before implementation. The record preserves the prior profile, auth-map, reporter and G/GW rationale history; #1035 executes no tests, so its redEvidence remains intentionally pending #1036.",
+    "previousBehavior": "The ordinary inventory names repeated selected eligibility, but the default native public consumer has no ordinary execution of that scenario or its two-click repeat receipt; the existing ten-attempt selected-filter case remains in the strict optional workload diagnostic.",
+    "intendedBehavior": "A focused ordinary WebKit consumer uses the trusted signed-out64 fixture, selects Eligible, delivers two real repeat clicks and native Enter, preserves actual rows, selected control, focus and scroll, then proves a genuinely changed filter refreshes the view without changing exact current, durable or protected sources. The original400-task ten-attempt diagnostic remains unchanged.",
+    "replacementTests": [
+      "RISK repository process: ordinary repeated selected eligibility preserves rows receipts and sources"
+    ],
+    "preservedCoverage": [
+      "The existing rapid diagnostic still owns the original400-task setup, ten-attempt input accounting, two-second bound and strict failures; this definition adds no optional workload to ordinary proof.",
+      "The new consumer asserts the reviewed ordinary64-task signed-out source identity, current and durable board bytes, retained backup/opaque/pending source set, trusted repeat receipts, and no unrelated action.",
+      "Earlier PC03, PR01, GS, AO and G/GW test rationale objects remain byte-for-byte unchanged; the pending record makes no observed RED, GREEN, or product-failure claim."
+    ],
+    "redEvidence": {
+      "command": "PENDING #1036: node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir \"/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/profile-graph/current-runs\" --purpose preimplementation-red --summary -- node --test --test-name-pattern='^RISK repository process: ordinary repeated selected eligibility preserves rows receipts and sources$' tests.js. #1035 has not executed this test.",
+      "failure": "PENDING #1036. #1035 added the public-consumer regression definition only; it observed no RED and does not claim application behavior is broken."
+    }
+  },
+  {
+    "baseCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+    "testChangesSha256": "66c3d79297f8ed3ae9a132f399f31dcca8fd9d9d16eef2baa4e9498c1d01ef9e",
+    "reason": "OP01 #1204 adds a narrowly test-owned Playwright resolution helper for the ordinary native consumer and an isolated nonbrowser setup control. This fingerprints only the current tests.js delta; no application, runner, workflow, package or lockfile behavior changed.",
+    "previousBehavior": "The ordinary consumer's worktree has no node_modules/playwright link, while the existing pinned Playwright package is resolvable from the Git common root; its public consumer cannot import the package from the worktree until test-owned setup supplies the link.",
+    "intendedBehavior": "Resolve the existing Playwright 1.62.1 package from the worktree or common root, create node_modules/playwright only when absent, preserve any pre-existing path, and remove only the exact link and empty directory created by this test. The setup control imports the package without launching a browser; the ordinary consumer's existing assertions remain unchanged.",
+    "replacementTests": [
+      "RISK repository process: ordinary native Playwright resolution is pinned and cleanup owned",
+      "RISK repository process: ordinary repeated selected eligibility preserves rows receipts and sources"
+    ],
+    "preservedCoverage": [
+      "The original OR0101 behavioral assertions, exact source and cleanup controls, and strict 400-task diagnostic assertions are unchanged.",
+      "The setup control only verifies resolution to the existing pinned package and restores the observed worktree module-path state; it does not launch Chromium, WebKit, a browser, or the application runner.",
+      "The prior OR0101 pending rationale with fingerprint f6f5a61c2de86a0c0a32cb28e19b1749c8d7d001a95af8961dd930f4e9fe1887 remains preserved as history; #1204 executes no tests, and the ordinary behavioral RED remains pending #1036."
+    ],
+    "redEvidence": {
+      "command": "PENDING #1206 setup control, then #1036 ordinary-consumer RED: node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir \"/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/ordinary-native-module-setup/current-runs\" --purpose focused-control --summary -- node --test --test-name-pattern='^RISK repository process: ordinary native Playwright resolution is pinned and cleanup owned$' tests.js; separately record the unchanged OR0101 public-consumer test under #1036.",
+      "failure": "PENDING #1206 and #1036. OP01 did not execute either test and observed no RED or GREEN; the setup control's expected package-resolution and cleanup result is not yet verified, and no product failure is claimed."
+    }
+  },
+  {
+    "baseCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+    "testChangesSha256": "b4f98f4b954d064f702000b197743602f6da412558d1fceb5dc83691151f0ecf",
+    "reason": "OP02 #1206 extends the test-owned Playwright resolution control with an isolated pre-existing pinned-link preservation branch. This exact current tests.js fingerprint also includes the existing profile/report and ordinary consumer RISK definitions, whose earlier rationale objects and evidence remain unchanged; this record preserves their chronology rather than rewriting it.",
+    "previousBehavior": "The setup control checked creation and cleanup from the absent module-path state but had not demonstrated that a pre-existing pinned package link remains untouched. The separately owned profile/report and ordinary-consumer behaviors retain their own source-bound evidence and acceptance records.",
+    "intendedBehavior": "The setup control resolves the existing Playwright 1.62.1 package, verifies owned cleanup from an absent path and preservation of an exact pre-existing pinned link, and restores its controlled path state without launching a browser. Existing profile, report, diagnostic, and ordinary consumer assertions remain unchanged.",
+    "replacementTests": [
+      "RISK repository process: button safety report admission binds ordinary and workload diagnostic profiles",
+      "RISK repository process: button safety CLI and runner select ordinary and diagnostic profiles",
+      "RISK repository process: ordinary native Playwright resolution is pinned and cleanup owned",
+      "RISK repository process: ordinary repeated selected eligibility preserves rows receipts and sources"
+    ],
+    "preservedCoverage": [
+      "The report-profile RED/GREEN history and strict workload-diagnostic controls remain bound to their existing rationale and recorder objects; this entry does not relabel or rerun them.",
+      "The prior runner/profile RED history and setup-infrastructure classifications remain distinct. The current ordinary selected-eligibility RED is an inventory-admitted runner-enforcement failure only; it observes no app state or product behavior.",
+      "The focused setup control checks only the exact pinned module resolution and preservation/cleanup of test-owned paths. It does not launch Chromium, WebKit, another browser, or the application runner."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/293-optional-policy/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/profile-graph/current-runs --purpose preimplementation-red --summary -- node --test --test-reporter=tap --test-name-pattern='^RISK repository process: ordinary repeated selected eligibility preserves rows receipts and sources$' tests.js",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/profile-graph/current-runs/2026-10-29T01-03-10-036Z-014b3714-3c5c-406b-b68a-d2cae2492e15.json",
+      "sourceCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+      "sourceTree": "2944bffc61e244b132bb48a8afaa392f14a24c14",
+      "sourceTestDiffSha256": "65a29a7ec50cb6ee31bb4d8cb4d934079a268f5da93433674cf85f60220f25f6",
+      "protectedTestFingerprint": "b4f98f4b954d064f702000b197743602f6da412558d1fceb5dc83691151f0ecf",
+      "failure": "The trusted ordinary inventory contains the requested case and the public runner completed setup, but the producer emitted report.scenarios as undefined with no scenario record, app action or outcome. scripts/button-safety-native.mjs:417 failed its exact-one-requested-scenario enforcement assertion (undefined !== 1). Parent accepted this as the genuine inventory-admitted ordinary-scenario enforcement RED for #1036, not an observed app behavior failure. The later failureObservationError TypeError follows from the absent scenario page and is secondary; this run establishes no rows, focus, scroll, repeat receipt or product-semantics result. The OP02 pinned-module cleanup/preservation control separately passed as recorded in setupControlEvidence; the earlier first pass used fingerprint 66c3d79297f8ed3ae9a132f399f31dcca8fd9d9d16eef2baa4e9498c1d01ef9e and remains uncredited for the amended source."
+    },
+    "setupControlEvidence": {
+      "record": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/ordinary-native-module-setup/current-runs/2026-10-29T00-58-50-455Z-7250ca91-0418-486e-84fd-0d81d4e6c275.json",
+      "summary": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/ordinary-native-module-setup/current-runs/OP02-RESULT.json",
+      "sourceCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+      "sourceTestDiffSha256": "e1369f2451956ef0daa67610f99a23339762b615001438e9ae0d2e3d3e940b2b",
+      "protectedTestFingerprint": "b4f98f4b954d064f702000b197743602f6da412558d1fceb5dc83691151f0ecf",
+      "outcome": "passed",
+      "tests": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "browserLaunched": false,
+      "postRunPaths": "Both node_modules and node_modules/playwright were absent after the controlled cleanup assertions."
+    }
+  },
+  {
+    "baseCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+    "testChangesSha256": "89334d6644dc2efdd63b6ba94f0927483708daa845ced31be7832ad2ced57d9a",
+    "reason": "EC02 #1221 corrects one source-proven OR0101 consumer expectation after immutable OR0104 failure: four was the prefix before the final changed Ineligible click, while the unchanged required scenario includes that fifth input. The current exact test-diff record preserves every earlier profile, setup, reporter, diagnostic, and ordinary-case rationale object and records the prior failure as a consumer assertion mismatch, not a product failure.",
+    "previousBehavior": "The ordinary consumer expected four trusted list-eligibility clicks even though its required input sequence also clicks the changed Ineligible filter after initial Eligible selection, two repeated Eligible clicks, and focused Enter.",
+    "intendedBehavior": "Require exactly five trusted list-eligibility click events for the complete intended sequence, including the final changed Ineligible filter; retain the independently verified two accepted repeat receipts, Enter and changed-view semantics, all source-preservation and cleanup checks, and the strict workload-diagnostic contract.",
+    "replacementTests": [
+      "RISK repository process: ordinary repeated selected eligibility preserves rows receipts and sources"
+    ],
+    "preservedCoverage": [
+      "The report and unchanged helper use explicit Eligible and Ineligible locators, two independently receipted repeated mouse clicks, focused Enter, and semantic readback for rows, selection, focus, scroll and changed-filter refresh.",
+      "Current/durable/protected source comparisons, trusted action accounting, no unrelated action checks, report source identity, error status and owned lifecycle cleanup remain unchanged.",
+      "The original 400-task, ten-attempt, 2000ms and workload-diagnostic strict controls remain untouched; prior RED and original passing diagnostic controls keep their own immutable evidence."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/293-optional-policy/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/profile-graph/current-runs --purpose green --summary -- node --test --test-reporter=tap --test-name-pattern='^RISK repository process: ordinary repeated selected eligibility preserves rows receipts and sources$' tests.js",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/profile-graph/current-runs/2026-10-29T01-16-56-593Z-bc3f1689-53a0-4c69-8e47-2660b5e91b50.json",
+      "output": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/profile-graph/current-runs/OR0104-FAILURE.json",
+      "failure": "The unchanged consumer stopped at tests.js:47066 because it expected 4 trusted scenario clicks and observed 5. Static source/report accounting proves the fifth is the later intended Ineligible filter click. The focused native report had passed, but the outer test did not reach its final child exit-status assertion; therefore #1040 remains failed and no consumer GREEN or app behavior RED is claimed."
+    }
+  },
+  {
+    "baseCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+    "testChangesSha256": "854cac7e60fabf179e642de98d66d52ecbe8d912b768450b5ae28e77d45b8d47",
+    "reason": "OR0201 #1041 defines the ordinary two-frame Undo consumer before execution. The focused case creates one earlier saved edit, then two separate target-task title saves, and requires exactly two native Undo inputs to restore the exact intervening board while keeping the earlier history available. This current full tests.js diff fingerprint includes all preceding test cohorts and preserves their rationale records unchanged.",
+    "previousBehavior": "The ordinary profile names the two-save Undo scenario, but no ordinary selected native consumer executes it; the existing rapid Undo case remains a strict optional 400-task ten-press diagnostic.",
+    "intendedBehavior": "A signed-out64 ordinary WebKit consumer independently saves an earlier edit and two later title frames, receipts two trusted Undo presses with per-frame current and durable readback, restores the exact pre-target current and durable board, preserves the earlier Undo frame, and retains protected source bytes and cleanup.",
+    "replacementTests": [
+      "RISK repository process: ordinary Undo restores two saved edit frames and preserves prior history and sources"
+    ],
+    "preservedCoverage": [
+      "The previous ordinary eligibility RED/GREEN, reporter and profile evidence remains separately fingerprinted and unchanged; this definition does not claim an observed RED or GREEN.",
+      "The strict original 400-task, ten-press, 2000ms diagnostic Undo case and all existing task Undo, source preservation and cleanup contracts remain intact.",
+      "OR0201 only defines the already agreed native scenario and public consumer; it does not edit application behavior or execute tests."
+    ],
+    "redEvidence": {
+      "command": "PENDING #1042: node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir \"/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/profile-graph/current-runs\" --purpose preimplementation-red --summary -- node --test --test-reporter=tap --test-name-pattern='^RISK repository process: ordinary Undo restores two saved edit frames and preserves prior history and sources$' tests.js",
+      "failure": "PENDING #1042. OR0201 has not executed the new consumer; no RED, GREEN, or application behavior failure has been observed."
+    }
+  },
+  {
+    "baseCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+    "testChangesSha256": "cf631888783acec51fab42acc32d88a323c9e21e29c14ba9ef8feefbc4f959d0",
+    "reason": "GS02 #1227 preserves the exact spawned ordinary Undo child result before any report assertion after the consumed #1042 no-report setup failure. This is a test-owned observability correction before any accepted product RED; every earlier rationale object and genuine RED/GREEN artifact remains unchanged.",
+    "previousBehavior": "The existing Undo consumer asserted one focused native report before persisting child stdout, stderr, status, signal or error. The single consumed OR0202 attempt stopped at that assertion with zero reports, so its actual emitted child cause was lost and no application Undo RED was established.",
+    "intendedBehavior": "Immediately after the same existing spawn, retain stdout, stderr and status/signal/error fields in the owned output directory before any spawn or report assertion. Include child status, signal, output path and captured streams in the no-report failure; preserve every original Undo, report, source, receipt and cleanup assertion.",
+    "replacementTests": [
+      "RISK repository process: ordinary Undo restores two saved edit frames and preserves prior history and sources"
+    ],
+    "preservedCoverage": [
+      "The exact ordinary64 signed-out-installed fixture, two trusted Undo inputs, independently saved frames, exact current/durable baseline, prior history, protected sources, unrelated-action controls, native cleanup and final child-status assertion remain unchanged.",
+      "The already passing ordinary selected-eligibility consumer, common-root owned Playwright helper, strict healthy-lease/resource gate, CLI/native/scenario/fixture files and original strict400-task ten-press2000ms diagnostic remain unchanged.",
+      "The current full tests.js diff fingerprint includes preceding test cohorts with their immutable rationale and recorder history. GS02 only performs Node24.19 syntax and git diff checks; behavioral RED/GREEN remains pending the separately authorized single #1228 attempt."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/293-optional-policy/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/profile-graph/current-runs --purpose preimplementation-red --summary -- node --test --test-reporter=tap --test-name-pattern=^RISK\\ repository\\ process:\\ ordinary\\ Undo\\ restores\\ two\\ saved\\ edit\\ frames\\ and\\ preserves\\ prior\\ history\\ and\\ sources$ tests.js",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/profile-graph/current-runs/2026-10-29T01-40-27-564Z-093ad0d2-df24-46e4-b27e-c7f53682dc35.json",
+      "failure": "Consumed OR0202/#1042 attempt093ad0d2 failed tests.js:47092, One exact focused ordinary WebKit report, expected1 actual0. Its child stdout/stderr/status were not retained before the assertion. GS01 found a saved lease expiry303.412seconds before launch, but the exact emitted runtime cause remains unknown. This is a no-report/setup and missing-observability result only, not valid product RED. A fresh behavioral attempt remains pending #1228."
+    }
+  },
+  {
+    "baseCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+    "testChangesSha256": "a4752869bf35aefcc722f80c26823cb6f10769d4e335af2d5968bab7b0c1211e",
+    "reason": "UA02 #1232 implements the expressly admitted UA01/#1231 process-oracle correction after UD01/#1229 source diagnosis. Literal historical whole-board equality conflicts with immutable rating/title/cancellation facts and fresh save bookkeeping; no application change or app-product RED is claimed. Complete source-bound phase artifacts now protect every full task and unknown field.",
+    "previousBehavior": "The exact ordinary Undo consumer restored two titles but failed its raw pre-target whole-board equality against legitimate retained observations and newer immutable choice/cancellation/save evidence. Its large-string assertion truncated both complete boards, leaving durable/source/history assertions unexecuted. Original a6c2ea1c remains unchanged native-consumer/oracle false-negative evidence.",
+    "intendedBehavior": "Retain complete B0/B1/B2/U1/U2 current/durable strings and hashes externally before full-board checks. Restore all64 whole task objects from the literal baseline and titles while independently preserving the first saved observation/head and validated exact title/cancellation fact sequences, fresh actual save metadata and every other unknown board/task key. Keep two trusted Undo inputs and all protected-source/prior-history/cleanup assertions.",
+    "replacementTests": [
+      "RISK repository process: ordinary Undo restores two saved edit frames and preserves prior history and sources"
+    ],
+    "preservedCoverage": [
+      "Every preceding rationale and actual OR01 GREEN, original no-report attempt093ad0d2, and actual a6c2ea1c oracle mismatch remain byte-for-byte preserved with their original chronology. No app-product RED, app regression or app repair is inferred.",
+      "The unchanged original400-task/ten-press/2000ms optional diagnostic, required Undo scene paint and winter23:15 controls, common-root package ownership, strict local lease/allocation and all existing pure report/selection/accounting cohorts remain intact.",
+      "The corrected case uses the existing public input/readback/native repeat seams and a narrowly guarded case-specific artifact writer, with no field exclusion, priming Save, Date freeze, extra Undo input, app normalization or generic harness. Only authorized Node24.19 syntax/diff checks occur in UA02; native1233 and pure1234 execution are separate leaves."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=tap --test-name-pattern='^RISK repository process: ordinary Undo restores two saved edit frames and preserves prior history and sources$' tests.js through the provenance recorder under GS03/#1228",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/ordinary-undo-stopped-boundary/GS03/current-runs/2026-10-29T02-41-11-574Z-a6c2ea1c-0a5a-4c60-bb49-e1800d57292a.json",
+      "failure": "Native core195 failed exact-current-pre-edit-board equality after two trusted accepted Undo inputs and restored titles. Original output remains immutable. Closed1231 accepted UD01 source proof: this is an oracle false-negative because rating observations/head, title facts/cancellations and fresh save metadata must remain; it is not app-product RED. Complete board/source pass is pending the separately authorized ONE corrected native1233 attempt."
+    }
+  },
+  {
+    "baseCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+    "testChangesSha256": "c1dd0695667612ab84d046d3747063c6e440510d550191a69741891b98e93a15",
+    "reason": "UB04 #1246 implements only the six explicitly admitted existing-seam regions under closed UB03/#1245 and static UB02/#1243. The ordinary Undo fixture now contains real manual, pinned automatic, unknown-kind, typed opaque and pending originals, while the invalid immutable rolling-latest expectation becomes a complete independently expected lifecycle. No application change or app-product RED is claimed.",
+    "previousBehavior": "Sole native73703644 passed the complete64-task/current/durable/fact/history/save/hash and prior-Undo assertions, then failed the all-B0-row immutable backup boolean at rapid-core306. That baseline included an unpinned rolling latest, which established retention legitimately replaces. Manual/pinned/unknown/opaque/pending protection was vacuous, U1/U2 source rows were absent and the complete final source read was not retained before the failing boolean.",
+    "intendedBehavior": "The same named ordinary64 signed-out consumer seeds exactly M/manual, P/pinned-latest and X/future-recovery with literal payload hashes and complete metadata through the existing observer. Full seed/B0/B1/B2/U1/U2/final sources preserve every original key and byte, independently validate all daily/rolling rows and current/durable expected payloads, and retain actual Uint8Array backing bytes/NUL/negative-zero using the existing lossless observation encoder. The final source artifact precedes parsing/behavior assertions. Original full-board/history/two-trusted-Undo/prior-history/receipt/cleanup assertions remain required; finite in-memory negative controls are added inside that same outer consumer.",
+    "replacementTests": [
+      "RISK repository process: ordinary Undo restores two saved edit frames and preserves prior history and sources"
+    ],
+    "preservedCoverage": [
+      "All preceding rationale objects and source/evidence chronology are unchanged, including original73703644, a6c2ea1c and setup failures and OR01 GREEN4dd19b5d. The old rolling-row expectation is explicitly migrated only under parent1245 admission; this is not an application failure/fix or retrospective product RED.",
+      "All existing64 complete task objects/unknown fields, current/durable hashes, original rating observation/head, immutable prior/title/cancellation facts, fresh actual save metadata, earlier Undo availability, exactly two trusted inputs and receipt accounting, child streams/provenance and owned cleanup remain protected. No priming Save, extra Undo, frozen clock, app retention/normalization-derived expectations or field/kind exclusions.",
+      "Only the named Undo source/fixture/writer/outer-consumer regions change; every other fixture, app asset, auth/source map, root/inventory registration, original strict400-task/ten-press/2000ms optional diagnostic, workflow and all nine pure-control root bodies remain unchanged. UB04 permits Node24.19 syntax/static diff checks only; behavioral native1247 and pure1234 results remain pending separate source-specific admission."
+    ],
+    "redEvidence": {
+      "command": "Node24.19 --test --test-reporter=tap --test-name-pattern='^RISK repository process: ordinary Undo restores two saved edit frames and preserves prior history and sources$' tests.js through the existing provenance recorder under UA03/#1233",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/ordinary-undo-oracle-correction/UA03/current-runs/2026-10-29T03-32-18-618Z-73703644-a776-4424-83ed-7e8bf0d67e61.json",
+      "failure": "Actual73703644 failed originalBackupsPreserved false at rapid-core306 after the full five current/durable board/fact/history/save/hash and prior-Undo checks passed. Its final backup values were not retained. Closed1240 proved the unpinned rolling-latest immutable-oracle conflict and vacuous original fixture; closed1245 explicitly admitted this complete fixture/lifecycle/lossless-evidence process correction. No new behavioral run occurred under1246, no missing final value is invented, and no app defect/productRED or typed-coverage pass is inferred. The ONE new native1247 remains unrun."
+    }
+  },
+  {
+    "baseCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+    "testChangesSha256": "b1b3944bcc8e8de9fcf51ce91ee86187f701a7384ec8cd5c9649d19493c1a55e",
+    "reason": "OR03 #1045 defines the independently required ordinary overdue-WOOP selected-case public consumer at the explicitly authorized existing CLI/native UI/attempt/source seam. This leaf is test-only and does not implement or run the missing case.",
+    "previousBehavior": "Independent ordinary inventory already requires ordinary overdue WOOP repeated Next retains answers, but the ordinary core does not dispatch that case. No app regression is claimed; the selected public consumer must discriminate missing runner enforcement.",
+    "intendedBehavior": "The same anchored native consumer must execute the existing64 signed-out scanner fixture, open overdue WOOP, deliver two trusted Next inputs with one answer without skipping a required step, retain the later obstacle/plan answers, preserve the exact full saved board and sources, and reopen the complete plan through a real browser reload. Seven full typed source artifacts and independent complete row/plan/current/durable expectations remain required.",
+    "replacementTests": [
+      "RISK repository process: ordinary overdue WOOP repeated Next preserves answers plans and sources"
+    ],
+    "preservedCoverage": [
+      "All prior986 rationale objects, all earlier tests.js bytes, ten-file dirty checkpoint custody, original G/GW/#1017/guard/inventory and OR01/OR02 RED and GREEN evidence remain unchanged.",
+      "The original rapid overdue and final-task400-task/ten-input diagnostic bodies, all nine pure-control roots, all prior ordinary and Undo assertions, app/assets/auth/workflows and all other source fixtures remain intact.",
+      "Full current/durable64-task/unknown-field/history comparisons, literal manual/protected sources, typed Uint8Array/NUL/negative-zero opaque and pending sources, exact complete daily/rolling sets, trusted receipt accounting and owned cleanup are required. No timing/memory/cap requirement is introduced into ordinary."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^RISK repository process: ordinary overdue WOOP repeated Next preserves answers plans and sources$ tests.js via record-run purposepreimplementation-red under1046",
+      "failure": "UNRUN at definition1045: no observed RED is claimed. The intended missing public selected-case dispatch must produce an assertion-level runner-enforcement mismatch under1046 before any functional implementation. Infrastructure or an unexpected GREEN must stop."
+    }
+  },
+  {
+    "baseCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+    "testChangesSha256": "b1b3944bcc8e8de9fcf51ce91ee86187f701a7384ec8cd5c9649d19493c1a55e",
+    "reason": "OR03 #1047 implements only the admitted ordinary overdue-WOOP core/native consumer after the genuine1046 missing-dispatch runner-enforcement RED. The unchanged public consumer test now requires actual UI/receipt/full-source behavior, not an app-product fix.",
+    "previousBehavior": "Actual1046 public runner and unchanged new Node consumer both asserted that the required overdue-WOOP selected case did not execute. Supported Node24/PW1.62.1/WebKit launched, no selected context/scenario existed, and browser/server cleanup completed. This is missing runner coverage, not an application regression.",
+    "intendedBehavior": "The same anchored native consumer must execute the existing64 signed-out scanner fixture, open overdue WOOP, deliver two trusted Next inputs with one answer without skipping a required step, retain the later obstacle/plan answers, preserve the exact full saved board and sources, and reopen the complete plan through a real browser reload. Seven full typed source artifacts and independent complete row/plan/current/durable expectations remain required.",
+    "replacementTests": [
+      "RISK repository process: ordinary overdue WOOP repeated Next preserves answers plans and sources"
+    ],
+    "preservedCoverage": [
+      "All prior986 rationale objects, all earlier tests.js bytes, ten-file dirty checkpoint custody, original G/GW/#1017/guard/inventory and OR01/OR02 RED and GREEN evidence remain unchanged.",
+      "The original rapid overdue and final-task400-task/ten-input diagnostic bodies, all nine pure-control roots, all prior ordinary and Undo assertions, app/assets/auth/workflows and all other source fixtures remain intact.",
+      "Full current/durable64-task/unknown-field/history comparisons, literal manual/protected sources, typed Uint8Array/NUL/negative-zero opaque and pending sources, exact complete daily/rolling sets, trusted receipt accounting and owned cleanup are required. No timing/memory/cap requirement is introduced into ordinary.",
+      "The exact1045 RED consumer and all987 preceding rationale objects/raw prefix remain unchanged. This appended actual-RED stage follows the historical1045 UNRUN definition record; chronology is retained, not rewritten. Only the new scenario and narrow phase/reopen native insertions change functional test-process source."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/293-optional-policy/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/next-ordinary-woop/1046/current-runs --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^RISK repository process: ordinary overdue WOOP repeated Next preserves answers plans and sources$ tests.js",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/next-ordinary-woop/1046/current-runs/2026-10-29T05-13-07-358Z-aa875320-256a-4cdf-baf2-4da91cb9d176.json",
+      "recordSha256": "d677ca326b72cd3ef704f30c675a2bc19907b592dc057659da52e3cf93b87846",
+      "failure": "Actual aa875320 assertion-failure, child/wrapper1: The public ordinary runner must execute the required overdue-WOOP selected case (undefined !==1), corroborated by native Exactly one requested diagnostic scenario must execute. Complete raw output/report/source retained; no missing module, launch or lease setup error. No app behavior defect inferred.",
+      "result": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/next-ordinary-woop/1046-RESULT.json"
+    }
+  },
+  {
+    "baseCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+    "testChangesSha256": "e268541ed14ae35fb68e604ceb4f5fc9eafd8f1419dfb2ae52937ff636746b79",
+    "reason": "OW03 #1256 implements only closed OW02/#1255 admission of the exact f85d6f43 static observation contract. The failed unsupported paused-scanner answer inclusion is explicitly migrated to the existing real visible WOOP answer controls, with three additional complete no-save source phases. No application change or app-product RED is claimed.",
+    "previousBehavior": "Attempted-GREEN59036ae7 retained matching complete saved/reopened boards and plan, then failed the unsupported reopened #scan answer inclusion. The source correctly renders the paused scanner for this two-dot work state; no existing read-only saved-plan display is present. Later source lifecycle, finalized semantic, downstream outer and pure checks were unreached. The original genuine missing-runner REDaa875320 and the attempted-GREEN failure remain immutable.",
+    "intendedBehavior": "The unchanged named existing native consumer observes the three exact literal answers at their actual visible, available #modalRoot #woopAnswer controls with independently required prompt and step. Ten complete typed source artifacts retain all original seven phases/raw DOM plus outcome-filled, obstacle-filled and plan-filled before assertions. Every no-save phase preserves the exact complete opened current/durable board and prior source row/order; saved/reopened full board, target-only plan/operation/head, honest paused DOM and new document remain required.",
+    "replacementTests": [
+      "RISK repository process: ordinary overdue WOOP repeated Next preserves answers plans and sources"
+    ],
+    "preservedCoverage": [
+      "All988 preceding rationale objects/raw prefix and all old failures and actual OR01/OR02 evidence remain unchanged. Only the explicitly failed paused-inline inclusion is replaced under1255 admission; no historical failure is relabeled as app-product RED or as passing.",
+      "All original64 complete tasks/unknown fields, immutable facts/history, source literals including the three manual originals and pinned ID, full typed Uint8Array/NUL/negative-zero opaque and pending source, independent complete daily/rolling lifecycle, actual IDs/save times, exact saved/reopened board and plan equality remain required. No field/kind exclusion, new fixture, viewer, app seam, clock freeze or priming action.",
+      "All earlier tests, ordinary/Undo and optional diagnostic source, nine pure-control bodies, app/assets/auth, fixtures, inventory, assignments, RISK registration and workflows stay exact. The same six intended native presses/clicks, three native fills and two repeated trusted Next receipts remain. This leaf performs only Node24 syntax/JSON/static protection/diff checks; the separately assigned ONE1257 native and conditional1258 pure outcomes are not yet run."
+    ],
+    "redEvidence": {
+      "command": "The unchanged named OR03 outer consumer through record-run: actual1046 purposepreimplementation-red; actual1048 purposegreen (failed). Separate corrected1257 purposegreen remains pending.",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/next-ordinary-woop/1048/current-runs/2026-10-29T05-21-04-718Z-59036ae7-9cd9-4303-9c55-6eb247dd0d9f.json",
+      "recordSha256": "92b871015d799940db60dbb59d1071af63ff49c257a6d60f298a17ed4f729ed6",
+      "failure": "Actual59036ae7 failed Reopened plan renders the complete retained answer at rapid-core247; no app/data-loss defect is inferred. Actualaa875320 was the genuine runner-enforcement RED, not this oracle failure. Closed1253/1255 explicitly admitted the observation correction with honest absent-display limit and every downstream source/receipt requirement preserved. No behavioral run occurs under1256."
+    }
+  },
+  {
+    "baseCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+    "testChangesSha256": "8e10b894bac0d4391e10619734f9d9b34700ddfc3d5790dfebea19f2de11b9d7",
+    "reason": "OA02 #1260 applies only the closed1259 canonical-parent complete outer-tail audit contract0360c9fb: add the independently required file literal scripts/button-safety-rapid-core.mjs to the existing complete inventory definition equality. No assertion projection, producer, app, core or native change.",
+    "previousBehavior": "Actual1257 recorder4501a1d6 failed at outer tests.js48157 because the expected inventory definition omitted the normative file key. Its inner native passed all10 source/core/lifecycle phases, but later outer receipt/input/semantic/final-result checks were unreached. Closed1259 statically audited every remaining tail assertion and found no other actionable mismatch; static consistency is not a replay or GREEN.",
+    "intendedBehavior": "The unchanged named outer consumer independently compares all six complete normative definition keys, then actually reaches all retained source/receipt/input/semantic/navigation/child-exit checks in a separately authorized fresh ONE1261 invocation. Complete current/durable64-task unknown/history/plan/op/head, all10 typed/protected/pending/lifecycle/raw-view phases, exact visible answer controls and all original input/cleanup expectations remain required.",
+    "replacementTests": [
+      "RISK repository process: ordinary overdue WOOP repeated Next preserves answers plans and sources"
+    ],
+    "preservedCoverage": [
+      "All989 preceding rationale objects/raw prefix and every old failure retain their original exact bytes and chronology, including attempted-GREEN4501a1d6 and59036ae7, genuine runnerREDaa875320, actualOR01/OR02 and prior Undo/setup records. No failed attempt is relabeled passing or app-product RED.",
+      "Removing only the inserted file field restores the exact prior tests.js5f94c02e; every existing assertion, complete comparison and assertion order stays. The core/native/app/assets/auth/inventory/fixtures/assignments/RISK/workflows and all nine pure-control bodies remain unchanged. No projected key/kind/field, clock freeze, extra action, priming, new harness or workload/timing threshold.",
+      "OA02 permits only Node24 tests.js syntax parse, rationale JSON parse, static byte/inverse/fingerprint protection and diff checks. Fresh complete1261 native and conditional existing1258 pure remain unrun at this implementation stage; only both actual complete passes may close1048."
+    ],
+    "redEvidence": {
+      "command": "Actual4501a1d6 was the purposegreen named OR03 outer consumer under1257; genuine runnerREDaa875320 remains historical. Future1261 purposegreen is separately populated, not executed by1260.",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/ordinary-woop-reopen-correction/1257/current-runs/2026-10-29T05-55-37-389Z-4501a1d6-9b1b-44d4-b125-bb18fec5fef7.json",
+      "recordSha256": "4f3e44bbe0b20162e6badf5bdab26c1f0608ed73eced5544bf0f9332f60973cf",
+      "failure": "Actual4501 outer1test/0pass/1fail stopped at inventory definition deepStrictEqual, actual file key present and expected missing. Closed1259 normative accepted1020/source audit admitted exactly this independent literal; no new behavioral result or app defect is claimed. Native inner PASS alone did not establish complete outer acceptance."
+    }
+  },
+  {
+    "baseCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+    "testChangesSha256": "eacd64c3b7307852c29ed4603f797fd8ad18eae67c2920582275e9791aaaa7d4",
+    "reason": "UP01 #1210 migrates the existing required task-Undo/scene-paint consumer to the admitted ordinary64/two-edit Undo case, with closed1264 renderer-only clock fixture. Global task/save/source clocks remain native while original deterministic renderer clock and complete clear-count/scene/task contracts remain. This is an authorized test-definition migration, not an app-product fix or invented RED.",
+    "previousBehavior": "The required paint root filtered a diagnostic-only ten-frame Undo name while the default runner profile is ordinary, and its global fixedDate conflicted statically with the ordinaryUndo strictly increasing actual Save/Undo timestamp oracle. No new behavioral execution or observed app defect is claimed. Closed1193 and1264 admit the definition/clock corrections.",
+    "intendedBehavior": "Use the actual ordinary two-independent-save Undo scenario and exactly two trusted Undo observations, then the existing real23:15/winter scene choice and subsequent task Undo. Keep complete unchanged-scene clear-count equality, actual changed-scene paint, original whole-task restoration, current/durable selected scene and exact local scene values. Route exactly one HTTP200 exact candidate landscape.js at the existing script-response fixture boundary, verify its one closure anchor and retain original/instrumented hashes; fixedDate is closure-local only. The unchanged core retains its complete64-task/source/typed/protected/pending/lifecycle/actual-time oracle.",
+    "replacementTests": [
+      "RISK repository process: ordinary task Undo keeps unchanged scenery while separate scene choices repaint and save"
+    ],
+    "preservedCoverage": [
+      "All990 preceding rationale objects/raw prefix and every older source/evidence chronology remain unchanged. The original whole canvas and task equality assertions are retained; only the admitted ten-to-two interaction expectation migrates. Native timers/canvas clear implementation remain intact; no count projection, timer suppression, priming action, source clock mock or new app API/harness.",
+      "All bytes outside this existing paint root, every app/core/native/inventory/fixture/assignment/RISK/workflow file, ordinary/Undo/WOOP controls and original strict diagnostic cases remain exact. Existing ephemeral pinned Playwright resolution is reused. Actual observations are retained before their assertions inside the existing artifact so failures preserve reached values.",
+      "Only Node24 syntax/JSON/static inverse/diff checks occur under1210. ONE separately bound Chromium1211 consumer owns runtime acceptance; a failure stops without repair/retry or downstreamOR04 action. Static1264 is neither RED nor GREEN."
+    ],
+    "redEvidence": {
+      "command": "UNRUN at1210 definition; only separately populated1211 may execute the migrated root through Node24 explicitTAP/provenance recorder with normal Chromium allocation.",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/undo-paint-clock-decision/RESULT.json",
+      "failure": "No observed RED is claimed.1193 identified the ordinary/diagnostic selector mismatch statically and1264 identified the global-clock/fresh-save oracle contradiction statically. Parent admitted only the existing consumer migration and renderer-response fixture; actual1211 may fail and must stop. All prior4501/590 failures andaa875 runnerRED remain unchanged."
+    }
   }
+,
+  {
+    "baseCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+    "testChangesSha256": "69b42b512db8e5c6acda9ad6d812669aa30f1f6755ba3b8e977ab8d653826a22",
+    "reason": "UR02 #1266 applies only closed1265 exact existing-boundary routing correction after actualc380 mandatory fixture-route failure. Install the unchanged renderer-only clock response on the existing higher-priority page route, bound to explicit allocated native origin/exact page-relative script URL, zero redirects200sameURL. Native network guard and every prior assertion remain intact.",
+    "previousBehavior": "Actual1211 purposegreen c3802885 passed its real ordinaryUndo/scene reached prefix, then failed the required rendererClockRoutes length undefined!==1. Closed1265 proved the later native context-wide continue handler bypassed the earlier context fixture under installedPlaywright1.62.1 route precedence. This is a test fixture routing defect, not an app-product RED or accepted overallGREEN.",
+    "intendedBehavior": "The ONE separately bound1267 complete unchanged Chromium outer must evidence one exact candidate renderer original/instrumented hash and private clock, then actually pass every preserved full source/timestamp/typed/protected/unknown/pending/lifecycle, whole canvas count, real23:15winter/complete task/current-durable-local scene and remaining profile/fixture/source/cleanup assertion. Only the existing clock handler registration/fetch guards change; foreign requests retain native abort behavior.",
+    "replacementTests": [
+      "RISK repository process: ordinary task Undo keeps unchanged scenery while separate scene choices repaint and save"
+    ],
+    "preservedCoverage": [
+      "All991 prior rationale objects and exact5555835-byte raw prefix18ffca2f65ef55be0e4a7e62ef4327dd2492179f87209a2e7afe40f846f99950 are preserved. Originalc380 remains failed with its exact reached/unreached ledger,1264/1265 remain static diagnoses, and all earlierOR03/OR02/OR01 failures and passes are unchanged.",
+      "Every existing paint-root assertion and its order, closure-local fixedDate/global-real clock separation, native timers, two actual Undo/scene user actions, complete canvas/task/scene/source/lifecycle expectations remain unchanged. No projection, priming, fake save times, callback suppression, new app API/harness or timing threshold. Native guard, app/core/renderer/inventory/fixture/assignment/RISK/workflow and all outside-root tests remain exact.",
+      "UR02 executes Node24 syntax/JSON/static inverse/diff protection only. Fresh1267 actual entire outer/native acceptance remainsunrun at this implementation stage; static c380-tail consistency and innernativePASS cannot close original1211. Any new failure stops without automatic repair/retry/OR04 action."
+    ],
+    "redEvidence": {
+      "command": "Actual1211 Node24 explicitTAP anchored required paint consumer through record-run purposegreen; corrected1267 is separately populated and unrun under1266.",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/next-up-final-woop/1211/current-runs/2026-10-29T07-01-37-051Z-c3802885-20b3-4023-a741-64b0622020c2.json",
+      "recordSha256": "b5c6c0dc669dc13c2205571ca49aabe4feeab355f003e5894b75e0f965f1e6a5",
+      "failure": "Actualc380 outer1/0/1 failed required route count at tests.js47823:156; no rendererClockRoutes key/hash evidence existed. Its innerordinaryUndo source/time and scene prefix passed, but final outer tail was unreached. Closed1265 admitted exact page-route correction; no app defect or productRED inferred."
+    }
+  }
+,
+{
+  "baseCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+  "testChangesSha256": "b341081dd9e737389da3d04fc8a1b04d4d9f66601a4bd4d3bd7406915072972c",
+  "reason": "OR04 #1049 defines only the independent required final-WOOP public outer and its exact native-process/RISK metadata before implementation. It is an ordinary semantic runner-enforcement case, not an observed app regression.",
+  "previousBehavior": "The admitted inventory already requires ordinary final WOOP repeated Next retains answers, but runRapidCoreScenarios has no corresponding ordinary selected case. No new behavioral command has run under1049. Prior1267 full paint PASS and all prior failed/passing records remain unchanged.",
+  "intendedBehavior": "The existing selected CLI/native consumer must use64 saved tasks with sole active synthetic-kept, two valid history facts, two trusted Next attempts at each of the two actual Next steps, literal visible answers, actual Save/Delete, exact full board/plan/operation/history and nonvacuous typed opaque/pending/protected original/lifecycle source preservation through two genuine reopens. Independent inventory equality includes normative file. Twelve complete lossless pre-assertion phase/final artifacts and complete receipt/source/cleanup outer tail are required.",
+  "replacementTests": [
+    "RISK repository process: ordinary final WOOP repeated Next preserves sole-task answers plans deletion and sources"
+  ],
+  "preservedCoverage": [
+    "Append-only new root: every prior tests.js byte/assertion and all nine pure roots remain exact. Original rapid final-task diagnostic and every prior ordinary/diagnostic fixture/assertion remain unchanged.",
+    "All992 prior rationale objects and exact5559440-byte prefix5335c12f5d0065461bdc5463149c70adc2c017f9dcc7336054dbacb7d8723706 retained; only native-process registration/RISK map added. No app/core/native/fixture/inventory/workflow change under1049.",
+    "Definition-only syntax/JSON/diff/custody;1050 owns one actual missing-case RED,1051 minimal implementation,1262 one full native and1263 conditional unchanged40pure. No global clock/timing substitution, priming, new harness or app mutation. Stop unexpected failure; no repair/retry."
+  ],
+  "redEvidence": {
+    "command": "UNRUN under1049. Separately source-bound1050 will run the exact new outer once through supported Node24 explicitTAP/provenance recorder with normal WebKit53617 allocation.",
+    "failure": "No RED observed yet. Expected missing required selected-case runner enforcement must actually fail; setup or unexpectedGREEN stops."
+  }
+}
+,
+{
+  "baseCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+  "testChangesSha256": "b341081dd9e737389da3d04fc8a1b04d4d9f66601a4bd4d3bd7406915072972c",
+  "reason": "OR04 #1051 implements only the missing required ordinary final-WOOP selectedcase after actual1050 runner-enforcement RED190d3ad7. The exact full outer165assertions is unchanged for1262 acceptance.",
+  "previousBehavior": "Actual1050 supported Node24/WebKit outer failed tests.js48341 required selected-case count undefined!==1; native dispatch522 likewise had no case. Metadata0c7c8a08b3852905f37cdf7fa7746c6251c05abab757848fe45d88bd50e67243/report17d7f486adc120283d0a1119b734dd6696c3a503ec24f7c7b8f358a3160daa85 preserved. No application scenario executed, no app defect is inferred.",
+  "intendedBehavior": "Existing core/native UI boundary executes64task sole-active final WOOP, four real repeated Next receipts with literal later answers, real Save/Delete, exact full board/ordered WOOP facts and old history, all3 manual originals/protectedID/unknownfields/typed opaque/pending plus independently validated daily/rolling lifecycle through2 accounted browser reopens. Existing narrow source writer retains12 complete lossless phase/final reads before semantic/hash assertions.",
+  "replacementTests": [
+    "RISK repository process: ordinary final WOOP repeated Next preserves sole-task answers plans deletion and sources"
+  ],
+  "preservedCoverage": [
+    "tests.js is byte-identical fc82bef96d96fb5c6b7f4d0dabb621a0cdfc345415f7f5cede954610e4edb64e; all previous and newouter assertions and nine pure roots remain exact. No original diagnostic/ordinary path, fixture, inventory, auth, RISK/assignment or app change.",
+    "Removing only the inserted finalcase and finalcase-only phase/reopen branches exactly recovers prior core183448eb and native3dba673d. No new harness/globalclock/priming/timing threshold or direct app-state substitute for intended action.",
+    "All993 prior rationale objects and complete raw prefix retained.1051 runs static syntax/JSON/diff protection only;1262 is one unchanged complete native acceptance,1263 is conditional unchanged40pure. Any unexpected failure stops without repair/retry."
+  ],
+  "redEvidence": {
+    "command": "One1050 unchanged full outer through record-run purposepreimplementation-red, supportedNode24 explicitTAP, allocatedWebKit53617.",
+    "record": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/next-up-final-woop/1050/current-runs/2026-10-29T07-36-30-352Z-190d3ad7-9e3d-4f4e-880c-646d27479690.json",
+    "recordSha256": "0c7c8a08b3852905f37cdf7fa7746c6251c05abab757848fe45d88bd50e67243",
+    "failure": "Required selected-case count undefined!==1; genuine runner-enforcement only.1/0/1,wrapper/child1,no signal.",
+    "resultSha256": "9b36cb6d427ebe31270444578e421af12978e98868282fd59fdda0f3dd2fe177"
+  }
+}
+,
+{
+  "baseCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+  "testChangesSha256": "6f6e5cefd568105614f7058f331517c446192f7b9243d8ec3a29508b4fbeddd9",
+  "reason": "OR05 #1053 definition-only independent selected cloud-source public consumer and exact RISK/native-process registration; no behavior run/functional implementation.",
+  "previousBehavior": "Accepted inventory requires ordinary repeated cloud source choice, but existing cloud runner lacks that named ordinary selectedcase. Actual OR04 nativee69648cf/pure9050b683 and static1274 full-contract reconciliation remain accepted unchanged. No app defect or observedRED is claimed under1053.",
+  "intendedBehavior": "Held-account64-task fixture; same eligibleprevious source two actual trusted repeats and Enter retain full mountedfacts/focus/positive scroll, alternate device choice changesselection, read refusal offers nochoice, explicit refused cloud publication preserves complete local/durable/remote sources while every added protection copy is independently expected. Ten complete lossless pre-assertion phase/final artifacts include real timestamps, all original manual/protected/typed opaque/pending and complete new-row lifecycle. Independent normative record includes file.",
+  "replacementTests": [
+    "RISK repository process: ordinary repeated cloud source choice preserves mounted facts receipts and complete sources"
+  ],
+  "preservedCoverage": [
+    "Every prior tests.js byte/assertion and all nine pure roots retained as exact prefix, including fullOR04 source/receipt/plan/delete oracles. Original cloud/rapid/workload diagnostics untouched.",
+    "All994 previous rationale objects and exact5564900-byte raw prefixd03218b657e7cbf60c87e0e5d1e0ad16fbcb9563b05544bf7984d52ec36b2034 retained. Only new consumer/RISK/native-process row/rationale; app/cloud/native/core/fixture/inventory/workflow unchanged.",
+    "Definition syntax/JSON/diff/custody only.1054 owns one actual missing-case runner-enforcementRED;1055 minimal existing-seam implementation,1268 one complete native and1269 conditional exact40pure. No newapp/harness/globalclock/priming or hidden adoption. Firstunexpectedfailure stops no automaticrepair/retry."
+  ],
+  "redEvidence": {
+    "command": "UNRUN under1053. Separately source-bound1054 will run ONE unchanged full newouter through supported Node24 explicitTAP recorder purposepreimplementation-red with normal WebKit53617 lease.",
+    "failure": "No observedRED yet. Missing required selected-case dispatch is expected runner-enforcement only; setup/format/runtime failures and unexpectedGREEN stop."
+  }
+}
+,
+{
+  "baseCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+  "testChangesSha256": "6f6e5cefd568105614f7058f331517c446192f7b9243d8ec3a29508b4fbeddd9",
+  "reason": "OR05 #1055 minimally adds only required ordinary repeated cloud-source selectedcase after actual1054 missing-registration runner-enforcement REDf27c8133. Entire171assertion outer stays unchanged.",
+  "previousBehavior": "Actual1054 tests.js48422 required selectedcase count undefined!==1 and native534 missing selectedscenario. Metadatae01de1384582c47a77741688b7c4ffefcb22d9f9e5d0eb299330c45fd832e305/reportd5109cd6370d58142c92f0d1fbc8471c5649e9883c83f905e1871b6cb7091868 retained; no app context/scenario executed, no appdefect inferred.",
+  "intendedBehavior": "Existing held64 source UI consumes initial eligibleprevious choice then2 repeated trustedchoices/Enter with full mountedfacts/focus/scroll, actualalternateDevice and read/refusedApply paths. Existing narrow external source writer gains only cloudcase family branch/alias for10 full pre-assertion lossless phase/final files, all current/durable/remote/typed/protected/manual/pending and explicitly expected protection-copy lifecycle/source/receipt/cleanup. No new app seam or harness.",
+  "replacementTests": [
+    "RISK repository process: ordinary repeated cloud source choice preserves mounted facts receipts and complete sources"
+  ],
+  "preservedCoverage": [
+    "tests.js remains byte-identical387da264d531c25195a35f85e85509ccd5167cd42eef3c2b690d6bf0d828b2ad. Every previous/new171 assertion and nine pure roots, original400cloud diagnostics including successful retry, original core/native paths/fixture/auth/inventory/app/workflow/RISK/assignments remain intact.",
+    "Removing only inserted cloudcase+Nodecrypto import and nativefamily branch/alias restores cloud92319964 and native64ec2465 exactly. Scopedcloud claim added to same owner only after foreign-ledger check; no runtime resources duringimplementation.",
+    "All995 prior rationale objects/rawprefix retained. Static syntax/JSON/diff/custody only here;1268 one unchanged complete native acceptance thenconditional1269 exact40pure. No automaticrepair/retry/globalclock/priming/optional threshold or source mutation for UI action."
+  ],
+  "redEvidence": {
+    "command": "ONE unchanged1054 public outer via supported Node24 explicitTAP recorder purposepreimplementation-red with normal allocated WebKit53617.",
+    "record": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/next-ordinary-decisions/1054/current-runs/2026-10-29T08-13-05-961Z-f27c8133-2612-4fa3-adbd-71d5ab9dfe53.json",
+    "recordSha256": "e01de1384582c47a77741688b7c4ffefcb22d9f9e5d0eb299330c45fd832e305",
+    "failure": "Missing required selected-case countundefined!==1; runner enforcement only,1/0/1 wrapper/child1, no signal.",
+    "resultSha256": "e447cc5948b1f76992852e3db49ac6f9797945f5d355e5321e9a0d69b9f4c16d"
+  }
+}
+,
+{
+  "baseCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+  "testChangesSha256": "cfe30c12f916b49bb33af44c4c7798a89db64c900a8c991ed47dbad7ebc5310c",
+  "reason": "CE02 #1282 applies exactly the two CE01 #1281-admitted epoch>0 to epoch>=0 oracle corrections in the new OR05 native and independent outer verifiers. Public recoveryAuthEpoch starts at0 for the already-authenticated owner and increments only on changedUID; no product defect or new authority is inferred.",
+  "previousBehavior": "Actual1268 df0d1575 remained failed1/0/1: native cloud.mjs122 rejected safe-integer epoch0 after exact same-seed/account/UID checks, then tests.js48422 observed running rather than passed. All10 complete pre-assertion phase files and all reached/unreached limits remain retained. Previous source patch9485e11f/tests387da264 and accepted CE01 source proof are unchanged historical inputs.",
+  "intendedBehavior": "Allow only nonnegative safe-integer actual epoch while retaining exact seed epoch, fixture@example.invalid account and owner UID identity in both independent verifiers. All other source/type/unknown/protected/pending/remote/lifecycle, UI/input/focus/attempt/receipt/status/exit/cleanup assertions stay byte-identical. No application, fixture, capture, input, account transition, clock or semantic expectation change.",
+  "replacementTests": [
+    "RISK repository process: ordinary repeated cloud source choice preserves mounted facts receipts and complete sources"
+  ],
+  "preservedCoverage": [
+    "Exactly one >0 to >=0 replacement per admitted new verifier; inverse restores tests387da264 and cloud d74043c6 exactly. Existing safe-integer, exact epoch/account/UID and all surrounding complete source/semantic assertions are retained.",
+    "Every996 prior rationale object and raw prefix5570430bytes SHA15f55fed20ef413aca40523829f66ce9e4496c9177673a1aea1ee0f424876fe3 is preserved. All other dirty files, application, original diagnostics, nine pure roots, native/core/inventory/fixtures/assignments/RISK/workflows and passed/failed historical evidence remain exact.",
+    "This correction uses only Node24 --check tests.js, --check scripts/button-safety-cloud.mjs and git diff --check plus byte-only custody hashing. No test/native/browser/pure/gate run, no1268 retry, no overall GREEN. Parent-owned CF01 #1283 focus disposition remains required;1269/1056/OR06+ stay held."
+  ],
+  "redEvidence": {
+    "command": "[\"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\", \"--test\", \"--test-reporter=tap\", \"--test-name-pattern=^RISK repository process: ordinary repeated cloud source choice preserves mounted facts receipts and complete sources$\", \"tests.js\"]",
+    "record": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/next-ordinary-decisions/1268/current-runs/2026-10-29T08-19-42-356Z-df0d1575-68d8-44a9-9a0c-5f690ed13fbf.json",
+    "recordSha256": "40e04bd7fe2c4df43f33eed9a6e9e48803e5029719d9fcb59faff1729d142e48",
+    "nativeReportSha256": "98622f61f41f1a024ab83f1929c842cf692ace459363e813ba5db707d3da27a6",
+    "failure": "Actual failed1268 native assert.ok(Number.isSafeInteger(phase.backend.epoch)&&phase.backend.epoch>0) at cloud.mjs122 for rawepoch0; outer running!==passed at tests.js48422. One test/0 pass/1 fail, child/wrapper1, no signal; later assertions unreached. This original failed run is retained and was not repeated for1282.",
+    "resultSha256": "88d98fb4e23c490536c7099f14748b53a997a7cad8f2ba65fda35fec80a4ba8c"
+  },
+  "admittedDiagnosis": {
+    "issue": 1281,
+    "comment": 6491862211,
+    "contractSha256": "38f5e6f19bba9bf3a6f0dfbaf5de7e8a385097fe33632e72c0e5f0f0d73ccc0d",
+    "twoGuardPatchSha256": "63aebf409ab6686d98f32b26cae4ff8c735ef4f0faef69bb793468c66be48943"
+  }
+}
+,
+{
+  "baseCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+  "testChangesSha256": "e2586ff6d6ef428dac06675bf2b707d0737da559a26c2d4b05af8f98aed51ac1",
+  "reason": "CF02 #1284 adds independent focus-boundary regression assertions to the existing full OR05 outer consumer after parent CF01 #1283 found the retained pointer snapshots could not locate focus loss relative to the app handler. Definition only; no native/capture/input/app change.",
+  "previousBehavior": "Failed1268 df0d1575 retained selectedfocusedtrue/repeatedfocusedfalse and keyboardfocusedtrue after explicit focus preparation, but stopped at unsupported positive epoch. Closed1282 corrected only those two new epoch guards. Snapshot identity/source facts do not establish the pointer focus transition or application click-boundary focus continuity.",
+  "intendedBehavior": "Require a finite full lossless view.focusEvidence schema in all10 phases, trusted chronological pointerdown/mousedown/blur-or-focusout/click capture and after-app document bubble, actual Enter keydown/click, live-node descriptors/reference equality, first-repeat selected focus, explicit outside-dispatch keyboard preparation and exact original8press/9click/two-repeat accounting. An app-caused focus change fails; browser prior transitions remain raw.",
+  "replacementTests": [
+    "RISK repository process: ordinary repeated cloud source choice preserves mounted facts receipts and complete sources"
+  ],
+  "preservedCoverage": [
+    "Removing only the inserted focus verifier and its one call restores tests641d1871 exactly; every old171assertion/source/lifecycle/UI/receipt/whole-tail statement stays byte-identical and ordered. Native/cloud/app/fixture/auth/inventory/assignments/workflow and all nine pure roots are unchanged.",
+    "Every997 previous rationale object and raw prefix is retained byte-for-byte; one RISK detail and exact rationale are appended. No top-level source projection, source mutation, global clock, priming, extra action or focus/blur inside dispatch is introduced.",
+    "Static Node24 --check tests.js and git diff --check only in1284. Actual1285 unchanged whole outer/native preimplementation RED must establish absent focus evidence, not app defect; all historical passed/failed/runnerRED results stay immutable."
+  ],
+  "redEvidence": {
+    "command": "Planned1285 ONE unchanged anchored OR05 whole outer/native through supported Node24 explicit TAP record-run purpose preimplementation-red after this definition closes. No behavioral command has run under1284.",
+    "failure": "Expected missing full cloud-choice focus evidence in unchanged native snapshot. This is a definition-only expectation; actual1285 RED and exact result will be retained separately before any implementation. Original failed1268 df0 evidence remains failed and is not represented as this new RED."
+  },
+  "acceptedFocusContractSha256": "11ff77a66fc5825f2e6b11cf8ada679f3f41e41181fb6ec1d2934c5083f9a9ed",
+  "finiteOracleSha256": "e132112adf5e619a53c1ff4e52b46031e9783efe928f1f52186e96b2075f4a3f"
+}
+,
+{
+  "baseCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+  "testChangesSha256": "e2586ff6d6ef428dac06675bf2b707d0737da559a26c2d4b05af8f98aed51ac1",
+  "reason": "CF04 #1286 implements only the five reviewed ordinary cloud-choice insertions after actual CF03 missing-focus observability REDe08b15f2. FE01 #1290 resolves the external short-anchor collision using one ordinary-specific full anchor; original builder/binding errors remain retained.",
+  "previousBehavior": "Actual1285 whole outer failed1/0/1 only at Complete cloud-choice focus evidence required in every lossless phase, after all old assertion/tail statements. Native child passed0 with10 complete files and8press/9click/two repeats. Existing snapshots could not locate pointer focus change relative to app click dispatch. This was missing observation, not an established app defect.",
+  "intendedBehavior": "Append finite focus facts within full lossless view in all10 phases. Read-only listeners retain live-node descriptors, trusted pointer/mouse/focus/click/keydown order, exact before/after app-document-bubble focus reference equality, raw pre-click browser transition and explicit existing keyboard preparation outside dispatch. Independent native oracle matches the unchanged outer schema. Same-choice application must preserve received focus and actual Enter starts/ends on the same retained button.",
+  "replacementTests": [
+    "RISK repository process: ordinary repeated cloud source choice preserves mounted facts receipts and complete sources"
+  ],
+  "preservedCoverage": [
+    "The reviewed five-region inverse restores whole cloud84c4521f exactly, including every original diagnostic and UI action/input/capture field/source codec/writer seam. tests04b500b4 and all old171+newfocus assertions stay byte-identical. No app/auth/fixture/inventory/nativewriter/core/assignment/RISK/workflow or other root changes.",
+    "All998 prior rationale objects/rawprefix are preserved; only truthful rationale999 is appended. No default cancellation, propagation change, synthetic dispatch, focus/blur during event processing, priming, clock mock, new harness, source projection, optional threshold or account/epoch forcing.",
+    "Only Node24 --check scripts/button-safety-cloud.mjs, --check tests.js and git diff --check are authorized under1286. Static validity is not acceptance. ONE unchanged whole outer/native under1287 must actually pass every old/new source/focus/receipt/tail assertion before1269 unchanged pure and1056 closure. Original df0 failure/e08RED/all old history remain immutable."
+  ],
+  "redEvidence": {
+    "command": "[\"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\", \"--test\", \"--test-reporter=tap\", \"--test-name-pattern=^RISK repository process: ordinary repeated cloud source choice preserves mounted facts receipts and complete sources$\", \"tests.js\"]",
+    "record": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/cloud-choice-focus-proof/1285/current-runs/2026-10-29T08-51-53-839Z-e08b15f2-9636-43f8-b3db-8e4fe14cfad0.json",
+    "recordSha256": "82fd42665e4e524e3ab0567b22de393f37c3ae676d1203debde56ec91c1b1dd1",
+    "nativeReportSha256": "a7be0a6005090c5af9d76da4edecc77c0df467cdc9393031c78dde9d67388c0e",
+    "failure": "Whole outer1/0/1 child/wrapper1/no signal rejected missing view.focusEvidence at tests48429:48/48468:2; nativechildpassed0. Complete newfocus handler/chronology assertions remain unreached until implementation.",
+    "resultSha256": "bcc9f75b3a7d511d74d48d02c5a7b8bb5e63029055f2f4ee7aa99d75f4ba448b"
+  },
+  "reviewedPreparation": {
+    "issue": 1290,
+    "comment": 6492507273,
+    "contractSha256": "355c4f018279af6555fcd00e70246b13b4f4e8741e5be0720a62f07ffaf9eb1d",
+    "proposalSha256": "87bd1183fb7d71d6fa7794915fcc6a094aea9a19f40b4ec800538df205e7968b",
+    "patchSha256": "f5adaddb5043bb2851031815d9a7071053b4daf3c67778b5925b69ab105e4f47"
+  }
+}
+,
+{
+  "baseCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+  "testChangesSha256": "e433002b5a6dc3b55bdd9075390d67c9862e51be4780cba5924948b36c1c04bc",
+  "reason": "OR06 #1057 definition-only: append the independent existing public selected saved-decision consumer with exact native-process/RISK registration; no functional change or observed RED yet.",
+  "previousBehavior": "Accepted #1020/#1299 ordinary saved-decision repeat is required but no named ordinary adapter exists. All accepted OR01-OR05 source and assertions remain exact. Source inspection suggests repeated Light replaces its modal; that is not observed app RED.",
+  "intendedBehavior": "Two trusted same-Light inputs preserve selection, mounted facts/focus/scroll and complete current/durable/source boundaries. Failed explicit Apply creates only independently expected preservation/prepared rows and cannot adopt or acknowledge. A separately explicit retry confirms its new choice, preserves old refused consent as superseded, and retains exact manual/daily/typed/unknown/pending/remote sources and complete trusted receipts.",
+  "replacementTests": [
+    "RISK repository process: ordinary repeated saved decision choice retains selection authority and complete sources"
+  ],
+  "preservedCoverage": [
+    "Every previous tests.js byte and passing assertion retained as exact prefix; original cloud/workload/rapid controls and all previous ordinary cases remain unchanged.",
+    "Exact60 scenarios/114 actions, fixed64 fixture and54 signed-out/6 held map, strict opt-in diagnostics and existing source/cleanup thresholds remain unchanged.",
+    "Definition-only syntax/JSON/diff/custody. #1058 owns one actual missing-adapter runner-enforcement RED, not an app defect. #1059 owns minimal existing runner adapter and no app changes. #1270/#1271 own separate native and pure acceptance; unexpected failure stops for populated action."
+  ],
+  "redEvidence": {
+    "command": "UNRUN under1057. #1058 will bind ONE whole new tests.js consumer through supported Node24 explicit TAP and provenance with owned WebKit/53617.",
+    "failure": "No observed RED claimed. Missing selected-case registration is runner enforcement only; infrastructure/setup failure and unexpected GREEN stop without fabricated chronology."
+  }
+}
+,
+{
+  "baseCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+  "testChangesSha256": "e433002b5a6dc3b55bdd9075390d67c9862e51be4780cba5924948b36c1c04bc",
+  "reason": "OR06 #1059 minimal named ordinary saved-decision runner adapter after actual missing-case enforcement RED; original diagnostic callers retain their default400 source.",
+  "previousBehavior": "1058 recorder78851e0d reached the intended outer assertion: required selected saved-decision case was absent (undefined !==1). This is runner-enforcement RED, not observed app RED.",
+  "intendedBehavior": "One actual ordinary64 saved-decision consumer uses the existing Settings/save/review/Apply route, two trusted repeats and exact independent full source/receipt/oracle contract. Read-only phase writes precede assertions. The existing native writer gains only a saved-decision branch. Original diagnostic source and every prior passing assertion remain unchanged.",
+  "replacementTests": [
+    "RISK repository process: ordinary repeated saved decision choice retains selection authority and complete sources"
+  ],
+  "preservedCoverage": [
+    "tests.js remains byte-identical to actual1058 RED, including all original OR01-OR05 and diagnostic/control assertions.",
+    "Exact inverse proves original cloud module (including all diagnostic cases/default semantics) and native module are recovered. No app/runtime assets, workflow, inventory, contract, fixture, or other source changed.",
+    "Current #1299 mounted Light review/focus/scroll requirement remains strict; actual app failure is not repaired under1059. #1270 owns ONE full unchanged outer/native; first unexpected failure stops for a populated parent scope. No new harness, global clock, authority mutation, priming action, workload run, source sync or release."
+  ],
+  "redEvidence": {
+    "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/293-optional-policy/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/G/1058/current-runs --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^RISK repository process: ordinary repeated saved decision choice retains selection authority and complete sources$ tests.js",
+    "failure": "Observed78851e0d Node24.19.0 wholeouter1test/0pass/1fail/0skip/0cancel child/wrapper1; required selected-case absent undefined !==1. Inner runner reports exactly one requested scenario must execute; source unchanged and cleanup completed. Actual raw artifacts: /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/G/1058/current-runs"
+  }
+}
+,
+{
+  "baseCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+  "testChangesSha256": "14d2cc3aa6ac7fb33ed0c194304cafd1a829b40a9615631135fbc8bf2e78c1a7",
+  "reason": "#1417 existing mounted public guidance regression authored before its corresponding copy edit. No prior assertion changes.",
+  "previousBehavior": "The saved-decision guard has actual native RED4cc85c53 before its repair. Its corresponding new copy consumer has not executed yet; current public wording does not describe the new selected-Light place behavior and explicit save boundary.",
+  "intendedBehavior": "The existing Help/Settings consumer mounts concise factual guidance for retained review/focus/scroll and explicit Save choice and sync, preserving all unrelated content and history.",
+  "replacementTests": [
+    "RISK saved decision review guidance: mounted FAQ retains place and explicit save authority"
+  ],
+  "preservedCoverage": [
+    "Every inherited tests.js byte remains an exact prefix, including the original OR06 201-assertion public whole outer/native consumer.",
+    "All prior RISK/group/rationale objects and source files retained; only this direct public copy test and exact metadata added. No new seam/harness or weak predicate."
+  ],
+  "redEvidence": {
+    "command": "UNRUN before this definition. Existing recorder will run one exact anchored RISK saved decision review guidance: mounted FAQ retains place and explicit save authority on supported Node24 explicitTAP before the copy edit.",
+    "failure": "No observed copy RED claimed yet. A real missing-wording assertion must fail; infrastructure/unexpected GREEN stops."
+  }
+}
+,
+{
+  "baseCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+  "testChangesSha256": "14d2cc3aa6ac7fb33ed0c194304cafd1a829b40a9615631135fbc8bf2e78c1a7",
+  "reason": "#1417 matching saved-decision FAQ clarification after actual mounted-copy REDbcc4d046; no assertion changes.",
+  "previousBehavior": "The mounted saved-appearance answer lacked repeated-place preservation and implied offered selection made the fresh decision. Actualbcc4d046 failed the independently required repeat-place wording before FAQ edit, one test/one assertion failure.",
+  "intendedBehavior": "Repeat keeps the current review/focus/scroll; only explicit Save choice and sync saves, failed confirmation remains pending, all earlier decisions/task edits/comparisons/ratings/History remain protected. Existing answer prefix and all unrelated content stay exact, within130 words.",
+  "replacementTests": [
+    "RISK saved decision review guidance: mounted FAQ retains place and explicit save authority"
+  ],
+  "preservedCoverage": [
+    "The full original OR06 201-assertion consumer and every prior test remain byte-identical; copy test unchanged from actualRED.",
+    "All previous rationale objects/raw prefix remain exact. No source/authority rule, fixture, harness or unrelated public guidance changed."
+  ],
+  "redEvidence": {
+    "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/293-optional-policy/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/G/light-repeat-repair/1417-RED --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^RISK saved decision review guidance: mounted FAQ retains place and explicit save authority$ tests.js",
+    "failure": "Observedbcc4d046: mounted answer present, required repeated-place phrase absent; ERR_ASSERTION named A repeated selection preserves the current review and place; one fail, zero skip/cancel, child/wrapper1. Raw /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/G/light-repeat-repair/1417-RED"
+  }
+}
+,
+{
+  "baseCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+  "testChangesSha256": "decb946d4a2e2e45362ee2a7c8df8e99d3d26a81bc7473fa3b3e49addf8685cb",
+  "reason": "#1418 existing mounted public guidance regression authored before its corresponding copy edit. No prior assertion changes.",
+  "previousBehavior": "The saved-decision guard has actual native RED4cc85c53 before its repair. Its corresponding new copy consumer has not executed yet; current public wording does not describe the new selected-Light place behavior and explicit save boundary.",
+  "intendedBehavior": "The existing Help/Settings consumer mounts concise factual guidance for retained review/focus/scroll and explicit Save choice and sync, preserving all unrelated content and history.",
+  "replacementTests": [
+    "RISK saved decision review guidance: mounted changelog records selected review continuity"
+  ],
+  "preservedCoverage": [
+    "Every inherited tests.js byte remains an exact prefix, including the original OR06 201-assertion public whole outer/native consumer.",
+    "All prior RISK/group/rationale objects and source files retained; only this direct public copy test and exact metadata added. No new seam/harness or weak predicate."
+  ],
+  "redEvidence": {
+    "command": "UNRUN before this definition. Existing recorder will run one exact anchored RISK saved decision review guidance: mounted changelog records selected review continuity on supported Node24 explicitTAP before the copy edit.",
+    "failure": "No observed copy RED claimed yet. A real missing-wording assertion must fail; infrastructure/unexpected GREEN stops."
+  }
+}
+,
+{
+  "baseCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+  "testChangesSha256": "decb946d4a2e2e45362ee2a7c8df8e99d3d26a81bc7473fa3b3e49addf8685cb",
+  "reason": "#1418 corresponding concise changelog note after actual mounted public copy RED6254ea98; all prior assertions retained.",
+  "previousBehavior": "The existing public FAQs/Changelog consumer mounted old release notes but lacked the selected saved-decision review continuity fix; actual6254ea98 failed that direct missing-note assertion before the edit.",
+  "intendedBehavior": "One concise note says repeating the selected value in Review saved decisions keeps review/focus/scroll. It adds no save, cloud acknowledgement, performance or device promise. All dated/unrelated notes, including October28 recovery, remain exact; no new release date/version.",
+  "replacementTests": [
+    "RISK saved decision review guidance: mounted changelog records selected review continuity"
+  ],
+  "preservedCoverage": [
+    "Original OR06 201 assertions and every earlier test remain unchanged; copy test byte-identical throughRED/GREEN.",
+    "All previous rationale objects/raw prefix and unrelated app bytes remain exact. Existing changelog is reached through FAQs/Changelog; no Settings duplicate or new consumer/harness."
+  ],
+  "redEvidence": {
+    "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/293-optional-policy/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/G/light-repeat-repair/1418-RED --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^RISK saved decision review guidance: mounted changelog records selected review continuity$ tests.js",
+    "failure": "Observed6254ea98 one test/one ERR_ASSERTION, zero skip/cancel, child/wrapper1: The existing public Changelog mounts the selected saved-decision fix. Missing-note assertion before text edit; raw /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/G/light-repeat-repair/1418-RED"
+  }
+}
 ]
