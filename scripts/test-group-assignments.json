@@ -10923,6 +10923,11 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK transfer guidance: mounted FAQ and changelog explain one prepared archive and guarded recovery limits",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK unreadable device recovery: raw source export excludes the placeholder and preserves exact device evidence",
       "group": "core",
       "file": "tests.js"

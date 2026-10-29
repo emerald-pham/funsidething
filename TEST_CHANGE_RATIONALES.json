@@ -28016,5 +28016,161 @@
       "commonBase": "694c5bb61dfcb006b771493e238014eb74c3bada",
       "metadataOnly": true
     }
+  },
+  {
+    "baseCommit": "2ea5ab8b7dcbc010f7c6ca07d0146926b4308fb2",
+    "comparisonMergeBase": "2ea5ab8b7dcbc010f7c6ca07d0146926b4308fb2",
+    "testChangesSha256": "a88b6e6835d1130249291e064535217ab479b9e39607b67d2ad3d5aa0991bf53",
+    "cycle": "1299-guidance-370-371",
+    "reason": "Add direct mounted UI assertions for the admitted transfer guidance so the FAQ and current Settings changelog describe the actual Export and Import controls and their bounded recovery outcomes.",
+    "previousBehavior": "The mounted Export FAQ said Copy sends the archive to the clipboard and Download saves the same bytes, without distinguishing clipboard success from a download-start status or explaining source-only capture during held opening.",
+    "intendedBehavior": "The mounted Settings, prepared Export dialog, FAQ and current Changelog state that Copy and Download share prepared bytes, report their distinct outcomes, preserve readable raw sources in a partial source-only archive while opening is held without an accepted board, keep complete paste text for bounded Preview, and apply only a supported selected board after confirmation.",
+    "replacementTests": [
+      "RISK transfer guidance: mounted FAQ and changelog explain one prepared archive and guarded recovery limits"
+    ],
+    "preservedCoverage": [
+      "The existing unreadable-device FAQ and Changelog assertions, including the October 28 recovery note, remain unchanged.",
+      "Existing transfer consumer tests and the pasted-board recovery test retain their original assertions for one Export and Import, complete Preview text, protected sources and explicit Restore.",
+      "The original October 25 transfer changelog item remains exact; the new clarification sits in an adjacent item under the same date, with the protected October 28 recovery note unchanged."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/faq-370-371/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/guidance/test-runs --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=dot --test-name-pattern='^RISK transfer guidance: mounted FAQ and changelog explain one prepared archive and guarded recovery limits$' tests.js; recorder metadata: /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/guidance/test-runs/2026-10-29T12-38-06-407Z-7b1cbfa6-c536-4c03-8e8b-2d5d3506ab1e.json",
+      "failure": "Baseline RED at tests.js:1113 showed the mounted FAQ still said \u201cCopy sends the prepared archive straight to the clipboard; Download saves the same bytes,\u201d without distinguishing clipboard-write success from a Download started status. An unchanged existing consumer test later caught replacement of its protected phrase, so final wording retains that phrase conditionally (if the browser completes the download) and adds the actual start-only status; all seven affected existing/new copy tests now pass."
+    }
+  },
+  {
+    "baseCommit": "dbc23159bc24af18859ab987acb6d64a27ada117",
+    "comparisonMergeBase": "dbc23159bc24af18859ab987acb6d64a27ada117",
+    "testChangesSha256": "3cbfba2a02444aa927bd9a18b442c36c4190dc8fa74b140c29954519af93f194",
+    "cycle": "source-join-1480",
+    "reason": "Associate the exact admitted source union with its new comparison fingerprint while preserving all complete parent rationale objects. Metadata-only source integration creates no new test, behavior or RED chronology.",
+    "previousBehavior": "The original complete source and tests had accepted source-specific evidence; this exact combined-source comparison had a new fingerprint without its own association.",
+    "intendedBehavior": "Keep the exact automatic three-way functional and test source, retain every complete accepted parent history, and bind subsequent committed verification to the actual combined diff.",
+    "replacementTests": [
+      "RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources",
+      "RISK DATABASE REPAIR EXPORT: canceled capture keeps the pasted draft and concurrent capture is bounded",
+      "RISK MANUAL JSON EXPORT: refused Download releases its temporary anchor and object URL",
+      "RISK MANUAL JSON EXPORT: unavailable and unsupported sources are explicit partial exports",
+      "RISK repository process: supplemental startup capture rejects malformed artifacts and unsupported paint completeness",
+      "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
+      "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
+    ],
+    "preservedCoverage": [
+      "Every complete prior integration record remains exact prefix; every complete incoming source object remains present without deduplicating different objects by fingerprint.",
+      "Every admitted functional/test assertion and original source/authority/durable/pending/unknown-data protection remains the unchanged clean Git three-way result.",
+      "Original RED/GREEN and native results retain their actual source identities and limits; this source association creates no fresh native, fullsuite, CI, release or physical-device proof."
+    ],
+    "redEvidence": {
+      "command": "Historical source-bound evidence only; no new RED execution in this metadata integration. /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/faq-370-371/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/guidance/test-runs --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=dot --test-name-pattern='^RISK transfer guidance: mounted FAQ and changelog explain one prepared archive and guarded recovery limits$' tests.js; recorder metadata: /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/guidance/test-runs/2026-10-29T12-38-06-407Z-7b1cbfa6-c536-4c03-8e8b-2d5d3506ab1e.json",
+      "failure": "Original actual failures remain retained and are not relabeled as a new RED or passing result. Baseline RED at tests.js:1113 showed the mounted FAQ still said \u201cCopy sends the prepared archive straight to the clipboard; Download saves the same bytes,\u201d without distinguishing clipboard-write success from a Download started status. An unchanged existing consumer test later caught replacement of its protected phrase, so final wording retains that phrase conditionally (if the browser completes the download) and adds the actual start-only status; all seven affected existing/new copy tests now pass."
+    },
+    "sourceJoin": {
+      "parent": "60982256418f3ff4d2b13b73a2236f2125eacb73",
+      "source": "dbc23159bc24af18859ab987acb6d64a27ada117",
+      "commonBase": "2ea5ab8b7dcbc010f7c6ca07d0146926b4308fb2",
+      "metadataOnly": true
+    }
+  },
+  {
+    "baseCommit": "f22f28be699f10a766ce9a90d01469b65457bfed",
+    "comparisonMergeBase": "f22f28be699f10a766ce9a90d01469b65457bfed",
+    "testChangesSha256": "b582331d2031309d6afaa9111bc341227f66a4fa7592150b3b598d78e7907bdf",
+    "cycle": "source-join-1480",
+    "reason": "Associate the exact admitted source union with its new comparison fingerprint while preserving all complete parent rationale objects. Metadata-only source integration creates no new test, behavior or RED chronology.",
+    "previousBehavior": "The original complete source and tests had accepted source-specific evidence; this exact combined-source comparison had a new fingerprint without its own association.",
+    "intendedBehavior": "Keep the exact automatic three-way functional and test source, retain every complete accepted parent history, and bind subsequent committed verification to the actual combined diff.",
+    "replacementTests": [
+      "RISK transfer guidance: mounted FAQ and changelog explain one prepared archive and guarded recovery limits",
+      "RISK saved view held Export: terminal Settings preserves an exact partial source-only archive",
+      "RISK saved view held Copy: trusted terminal Copy preserves prepared bytes and original sources",
+      "RISK saved view held Download: trusted terminal Download preserves the same Copy archive and original sources",
+      "RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources",
+      "RISK DATABASE REPAIR EXPORT: canceled capture keeps the pasted draft and concurrent capture is bounded",
+      "RISK MANUAL JSON EXPORT: refused Download releases its temporary anchor and object URL",
+      "RISK MANUAL JSON EXPORT: a refused download leaves the same prepared archive available to Copy"
+    ],
+    "preservedCoverage": [
+      "Every complete prior integration record remains exact prefix; every complete incoming source object remains present without deduplicating different objects by fingerprint.",
+      "Every admitted functional/test assertion and original source/authority/durable/pending/unknown-data protection remains the unchanged clean Git three-way result.",
+      "Original RED/GREEN and native results retain their actual source identities and limits; this source association creates no fresh native, fullsuite, CI, release or physical-device proof."
+    ],
+    "redEvidence": {
+      "command": "Historical source-bound evidence only; no new RED execution in this metadata integration. /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/faq-370-371/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/guidance/test-runs --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=dot --test-name-pattern='^RISK transfer guidance: mounted FAQ and changelog explain one prepared archive and guarded recovery limits$' tests.js; recorder metadata: /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/guidance/test-runs/2026-10-29T12-38-06-407Z-7b1cbfa6-c536-4c03-8e8b-2d5d3506ab1e.json",
+      "failure": "Original actual failures remain retained and are not relabeled as a new RED or passing result. Baseline RED at tests.js:1113 showed the mounted FAQ still said \u201cCopy sends the prepared archive straight to the clipboard; Download saves the same bytes,\u201d without distinguishing clipboard-write success from a Download started status. An unchanged existing consumer test later caught replacement of its protected phrase, so final wording retains that phrase conditionally (if the browser completes the download) and adds the actual start-only status; all seven affected existing/new copy tests now pass."
+    },
+    "sourceJoin": {
+      "parent": "60982256418f3ff4d2b13b73a2236f2125eacb73",
+      "source": "dbc23159bc24af18859ab987acb6d64a27ada117",
+      "commonBase": "2ea5ab8b7dcbc010f7c6ca07d0146926b4308fb2",
+      "metadataOnly": true
+    }
+  },
+  {
+    "baseCommit": "c920ccffc11af487ec84277c33fe2e370541e384",
+    "comparisonMergeBase": "c920ccffc11af487ec84277c33fe2e370541e384",
+    "testChangesSha256": "c3eb48ff9a0efeeec91ec25502768dbc7baf1a2ee2e9d22c3532a0e2059fef17",
+    "cycle": "source-join-1480",
+    "reason": "Associate the exact admitted source union with its new comparison fingerprint while preserving all complete parent rationale objects. Metadata-only source integration creates no new test, behavior or RED chronology.",
+    "previousBehavior": "The original complete source and tests had accepted source-specific evidence; this exact combined-source comparison had a new fingerprint without its own association.",
+    "intendedBehavior": "Keep the exact automatic three-way functional and test source, retain every complete accepted parent history, and bind subsequent committed verification to the actual combined diff.",
+    "replacementTests": [
+      "RISK transfer guidance: mounted FAQ and changelog explain one prepared archive and guarded recovery limits",
+      "RISK saved view opening source preservation: invalid optional appearance keeps its bytes while one complete task opens",
+      "RISK saved view held Export: terminal Settings preserves an exact partial source-only archive",
+      "RISK saved view held Copy: trusted terminal Copy preserves prepared bytes and original sources",
+      "RISK saved view held Download: trusted terminal Download preserves the same Copy archive and original sources",
+      "RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources",
+      "RISK DATABASE REPAIR EXPORT: canceled capture keeps the pasted draft and concurrent capture is bounded",
+      "RISK MANUAL JSON EXPORT: refused Download releases its temporary anchor and object URL"
+    ],
+    "preservedCoverage": [
+      "Every complete prior integration record remains exact prefix; every complete incoming source object remains present without deduplicating different objects by fingerprint.",
+      "Every admitted functional/test assertion and original source/authority/durable/pending/unknown-data protection remains the unchanged clean Git three-way result.",
+      "Original RED/GREEN and native results retain their actual source identities and limits; this source association creates no fresh native, fullsuite, CI, release or physical-device proof."
+    ],
+    "redEvidence": {
+      "command": "Historical source-bound evidence only; no new RED execution in this metadata integration. /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/faq-370-371/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/guidance/test-runs --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=dot --test-name-pattern='^RISK transfer guidance: mounted FAQ and changelog explain one prepared archive and guarded recovery limits$' tests.js; recorder metadata: /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/guidance/test-runs/2026-10-29T12-38-06-407Z-7b1cbfa6-c536-4c03-8e8b-2d5d3506ab1e.json",
+      "failure": "Original actual failures remain retained and are not relabeled as a new RED or passing result. Baseline RED at tests.js:1113 showed the mounted FAQ still said \u201cCopy sends the prepared archive straight to the clipboard; Download saves the same bytes,\u201d without distinguishing clipboard-write success from a Download started status. An unchanged existing consumer test later caught replacement of its protected phrase, so final wording retains that phrase conditionally (if the browser completes the download) and adds the actual start-only status; all seven affected existing/new copy tests now pass."
+    },
+    "sourceJoin": {
+      "parent": "60982256418f3ff4d2b13b73a2236f2125eacb73",
+      "source": "dbc23159bc24af18859ab987acb6d64a27ada117",
+      "commonBase": "2ea5ab8b7dcbc010f7c6ca07d0146926b4308fb2",
+      "metadataOnly": true
+    }
+  },
+  {
+    "baseCommit": "b176026825e4f9539780f745fe60e09cf348d288",
+    "comparisonMergeBase": "b176026825e4f9539780f745fe60e09cf348d288",
+    "testChangesSha256": "9baadcfc65e152747404ae8b2f0785a1d97da13075d4c993d84f4afc199f724f",
+    "cycle": "source-join-1480",
+    "reason": "Associate the exact admitted source union with its new comparison fingerprint while preserving all complete parent rationale objects. Metadata-only source integration creates no new test, behavior or RED chronology.",
+    "previousBehavior": "The original complete source and tests had accepted source-specific evidence; this exact combined-source comparison had a new fingerprint without its own association.",
+    "intendedBehavior": "Keep the exact automatic three-way functional and test source, retain every complete accepted parent history, and bind subsequent committed verification to the actual combined diff.",
+    "replacementTests": [
+      "RISK transfer guidance: mounted FAQ and changelog explain one prepared archive and guarded recovery limits",
+      "RISK AUTH HYDRATION: a broken device board stays quiet until protected local recovery is visible",
+      "RISK saved view broken-board guidance: opening status does not imply cloud confirmation or erase recovery warnings",
+      "RISK saved view broken-board startup: prior appearance stays inert until the recovered board opens",
+      "RISK saved view opening source preservation: invalid optional appearance keeps its bytes while one complete task opens",
+      "RISK saved view held Export: terminal Settings preserves an exact partial source-only archive",
+      "RISK saved view held Copy: trusted terminal Copy preserves prepared bytes and original sources",
+      "RISK saved view held Download: trusted terminal Download preserves the same Copy archive and original sources"
+    ],
+    "preservedCoverage": [
+      "Every complete prior integration record remains exact prefix; every complete incoming source object remains present without deduplicating different objects by fingerprint.",
+      "Every admitted functional/test assertion and original source/authority/durable/pending/unknown-data protection remains the unchanged clean Git three-way result.",
+      "Original RED/GREEN and native results retain their actual source identities and limits; this source association creates no fresh native, fullsuite, CI, release or physical-device proof."
+    ],
+    "redEvidence": {
+      "command": "Historical source-bound evidence only; no new RED execution in this metadata integration. /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/faq-370-371/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/guidance/test-runs --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=dot --test-name-pattern='^RISK transfer guidance: mounted FAQ and changelog explain one prepared archive and guarded recovery limits$' tests.js; recorder metadata: /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/guidance/test-runs/2026-10-29T12-38-06-407Z-7b1cbfa6-c536-4c03-8e8b-2d5d3506ab1e.json",
+      "failure": "Original actual failures remain retained and are not relabeled as a new RED or passing result. Baseline RED at tests.js:1113 showed the mounted FAQ still said \u201cCopy sends the prepared archive straight to the clipboard; Download saves the same bytes,\u201d without distinguishing clipboard-write success from a Download started status. An unchanged existing consumer test later caught replacement of its protected phrase, so final wording retains that phrase conditionally (if the browser completes the download) and adds the actual start-only status; all seven affected existing/new copy tests now pass."
+    },
+    "sourceJoin": {
+      "parent": "60982256418f3ff4d2b13b73a2236f2125eacb73",
+      "source": "dbc23159bc24af18859ab987acb6d64a27ada117",
+      "commonBase": "2ea5ab8b7dcbc010f7c6ca07d0146926b4308fb2",
+      "metadataOnly": true
+    }
   }
 ]
