@@ -26919,5 +26919,151 @@
       "sourceTestDiffSha256": "4487f6cd20324e753f95729c28a07d482976b0de21ce7c2d6fc03bcaf137bb07",
       "outputSha256": "42d5c3fbec31c650cc88a7e53bfc2e2ceeb9b28d3ddf4f38b642c68f1e67be2c"
     }
+  },
+  {
+    "baseCommit": "694c5bb61dfcb006b771493e238014eb74c3bada",
+    "comparisonMergeBase": "2ea5ab8b7dcbc010f7c6ca07d0146926b4308fb2",
+    "testChangesSha256": "b1dcd0014011d6fe0a545013a0ebd42e93f8bdc29ffe23582d8622b1b240569a",
+    "cycle": "complete-native-download-definition-1433",
+    "reason": "Define the missing complete accepted-unsaved native Download file observation for #1433 using the existing healthy signed-out Settings/Export consumer. The prior actual Chromium/WebKit files covered only a held partial archive, so this fills a proof gap without claiming a new product failure.",
+    "previousBehavior": "The existing VM consumer proves complete prepared Blob/Copy bytes, and the existing held native Download consumer proves real files only for a partial source-only archive with no accepted current board. No actual native file has yet been compared with Copy for a complete accepted-unsaved archive.",
+    "intendedBehavior": "Exercise one trusted public Edit/Save action while its normal local save remains pending, then use Settings/Export/Copy/Download in Chromium and WebKit. Require the actual complete file bytes to equal the same prepared Copy archive, independently distinguish the accepted edit from its exact durable head, retain every complete readable source, and report clipboard and initiation boundaries honestly.",
+    "replacementTests": [
+      "RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources"
+    ],
+    "modifiedExistingTestRoots": [],
+    "preservedCoverage": [
+      "This definition adds one named RISK root with Chromium and WebKit children, using the existing healthy signed-out browser fixture and the established real Settings/Export/Download consumer. It adds no app/runtime/helper source, no test seam or harness, and no ordinary scenario.",
+      "The trusted UI edit must be accepted while saveTimer remains pending; the independently read pre-edit durable head stays distinct. The complete file is compared byte-for-byte with both prepared JSON and the external clipboard write stub, and decoded current/unknown/saved/pending/opaque sources are checked against independently captured expectations.",
+      "The test checks unchanged local and durable sources across preparation, accepted-board/device authority, truthful Download-start status, actual native file completion, temporary anchor removal and transfer invalidation. It makes no OS clipboard, Paste, installed-client, physical-device, release or deployment claim.",
+      "All previous Export refusal, resource cleanup, partial held Download, Copy, source-protection and authority assertions remain unchanged. This definition leaf records no test execution; the exact supported Node24 two-engine run belongs to #1434."
+    ],
+    "redEvidence": {
+      "command": "Not run by design: #1433 is definition-only and explicitly does not authorize test execution; #1434 owns the exact supported Node24 Chromium/WebKit verification.",
+      "failure": "No new test failure or functional RED is claimed. The prior complete VM archive and partial-only native Download evidence are preserved as history; this is a proof-coverage gap, not a newly demonstrated product defect."
+    }
+  },
+  {
+    "baseCommit": "694c5bb61dfcb006b771493e238014eb74c3bada",
+    "testChangesSha256": "2215dd05c089c9a5999164cfe1eb0dffbcde85d0908ec4b20ac6140c9fe38b71",
+    "cycle": "complete-native-download-source-contract-1447",
+    "reason": "Correct all six new fixture/oracle defects admitted by the complete source-only #1446 assessment, retaining the original #1433 definition and both #1434 setup failures unchanged. This is existing-route test coverage and source-contract correction, with no application behavior change.",
+    "previousBehavior": "The new native root checked authority before delayed reopening, expected unknown pending metadata from a canonicalizing setter, referenced a Node-only owner inside the browser, derived local/current expectations through production helpers, only partly compared currentBoard, and confused raw head metadata with readHead payload.",
+    "intendedBehavior": "Wait for actual accepted signed-out head authority, seed unknown raw pending metadata in the existing physical fixture transaction, independently capture every expected current/local/raw source before Export, and verify exact metadata-to-snapshot head binding while preserving the natural unsaved Edit/Save producer and real native file controls.",
+    "replacementTests": [
+      "RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources"
+    ],
+    "modifiedExistingTestRoots": [],
+    "preservedCoverage": [
+      "All pre-existing 694 tests/assertions, original #1433 rationale objects, app/fixture/helper bytes, ordinary sixty-scenario membership and opt-in diagnostic root membership remain unchanged; only the one newly added root is corrected.",
+      "The complete current board is independently captured from accepted state input with the seven explicit device-only omissions. Literal local keys and scene prefix, full raw snapshot, full pending unknown metadata, backup bytes/hash, opaque unknown fields and exact durable snapshot remain strict expected inputs.",
+      "The public Edit/Save natural debounce is untouched; pending state and exact archived durable input must actually distinguish accepted unsaved work. Copy remains an external promise stub, Download is the real native event/file readback, and app initiation status remains distinct from completion.",
+      "Existing refusal cleanup RED/GREEN and later VM archive-field sensitivity are retained separately from the new healthy native file proof. Any new failure stops at SolMax without repair/retry; no OS clipboard, Paste, device, full qualification or release claim is made."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^RISK MANUAL JSON EXPORT: refused Download releases its temporary anchor and object URL$ tests.js",
+      "failure": "Retained actual #1413 preimplementation RED f4f32f40 on exact E: the actual Settings/Download refused anchor path failed expected 1 removal, actual 0; minimal source 694 passed #1415 9/9. New #1434 d245b4e3 failed both engines only at the initial aggregate healthy-fixture guard before Export; that is setup failure, never app RED. Corrected #1437 VM archive-field sensitivity must actually close on source-compatible 694 before #1448; no new native handler interception or fabricated RED is claimed.",
+      "recorderId": "2026-10-29T12-54-28-271Z-f4f32f40-0ac4-4934-8aa4-6b40842950a0",
+      "sourceCommit": "2ea5ab8b7dcbc010f7c6ca07d0146926b4308fb2"
+    },
+    "setupChronology": {
+      "issue": 1434,
+      "recorderId": "2026-10-29T14-19-32-008Z-d245b4e3-d3e8-43fa-9ff7-a2541653d736",
+      "meaning": "Initial aggregate fixture precondition only; no per-predicate values, application RED or native Download result."
+    },
+    "observedEvidence": {
+      "native": {
+        "issue": 1448,
+        "recordId": "2026-10-29T15-18-21-291Z-498a0b30-4f1b-4b4f-b791-38ec992e66dc",
+        "recordSha256": "88350d961bfb5dedd0f10b891ada4a797be52f8ffd34e0b5816924d121f19865",
+        "outputSha256": "2d959a394ea180350bb1af68c3054e6ded61c6de27c2d419bc6fe547381bab0b",
+        "sourceTestDiffSha256": "14c42ce5d1c7bd5f37c5452d9ce3f7746ac6d84f9d9dba04bfa0e25ab68bff40",
+        "childExitCode": 0,
+        "wrapperExitCode": 0,
+        "counts": {
+          "tests": 3,
+          "pass": 3,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        "executedTestsSha256": "77532da6311548c53de7e19790de063c88d424c3c694b80af47a51b807b705a2",
+        "executedRationaleSha256": "4bf4dc0a30c9e90199c2687251bf436505d88c21c4530152cb16a36416565d23",
+        "executedWholeDiffSha256": "6b554af117fa984d2a66cb08dd25caa3f389c3c2e996d93ad5ca2d09a31093c2",
+        "appSha256": "e255ff296c10ba99292a9ed4164e9b4564f6b967d5818ea11204b9cea0d4c18b",
+        "files": [
+          {
+            "browserEngine": "chromium",
+            "file": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/complete-download-source-contract-repair/sol-owner/1448-native/complete-download-chromium-t2Ael6/chain-scanner-recovery-archive.json",
+            "suggestedFilename": "chain-scanner-recovery-archive.json",
+            "failure": null,
+            "bytes": 203012,
+            "sha256": "76ed552712bcbf95de2071a8722972f39df4a463fc7b2281de91b24bcbd833b2",
+            "preparedSerial": 2,
+            "downloads": 1,
+            "acceptedUnsavedTitle": "Native accepted unsaved Download edit chromium 🌿",
+            "durableTitle": "Saved appearance task 28",
+            "durableHash": "ac6b232f9042938c7c012cfef6238bd256d1d56a35ebf66bb9cea38476d48ede",
+            "currentBoardSha256": "8eccac910f13b817fb7f232f160b238e27c57c0f8ac83333c4202c2844ca9818",
+            "format": "chain-scanner.recovery-archive",
+            "formatVersion": 1,
+            "currentBoardTaskCount": 66,
+            "manifestStatus": "complete",
+            "schemaVersion": 2,
+            "savedFileReadback": "UTF8 JSON parsed; byte length and SHA independently read back"
+          },
+          {
+            "browserEngine": "webkit",
+            "file": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/complete-download-source-contract-repair/sol-owner/1448-native/complete-download-webkit-dBpOag/chain-scanner-recovery-archive.json",
+            "suggestedFilename": "chain-scanner-recovery-archive.json",
+            "failure": null,
+            "bytes": 203005,
+            "sha256": "7d966c3d3bdcb43ffeefc219fc4f0bde74de2541db8ef73e549f3df0b2c8e8c9",
+            "preparedSerial": 2,
+            "downloads": 1,
+            "acceptedUnsavedTitle": "Native accepted unsaved Download edit webkit 🌿",
+            "durableTitle": "Saved appearance task 03",
+            "durableHash": "583a2e50f4f5aadc287002e39c3412c500e21ba335465688e242d625358ab69b",
+            "currentBoardSha256": "68c473c62b54f990cd8c3b1c4177f37f2fadf1121dd0ad39e28b824d76b14397",
+            "format": "chain-scanner.recovery-archive",
+            "formatVersion": 1,
+            "currentBoardTaskCount": 66,
+            "manifestStatus": "complete",
+            "schemaVersion": 2,
+            "savedFileReadback": "UTF8 JSON parsed; byte length and SHA independently read back"
+          }
+        ],
+        "wholeAcceptedInputAndExactDurableDistinction": "Both healthy native children passed all exact input/source/authority/no-extra-download assertions with the untouched natural save producer."
+      },
+      "vmSensitivity": {
+        "closedIssue": 1437,
+        "closedResultIssue": 1445,
+        "recordId": "2026-10-29T15-04-09-775Z-00ab87d9-26ef-42de-a063-b2da9f6637c5",
+        "recordSha256": "8c668d8d2a1d2b18f203b2278c151ad9df69feca715938d0105a49cb3df3635a",
+        "outputSha256": "23809fe7c97065fc5dc4e0e2259bbfa4309a11c926fbdfabca2ec768148103d7",
+        "exactCompatibleAppSha256": "e255ff296c10ba99292a9ed4164e9b4564f6b967d5818ea11204b9cea0d4c18b",
+        "caught": {
+          "code": "ERR_ASSERTION",
+          "operator": "deepStrictEqual",
+          "actual": null
+        },
+        "limit": "Later established-behavior VM appSource archive-field sensitivity; no native handler mutation or preimplementation app RED claim."
+      },
+      "cleanup": {
+        "browserContexts": "Both existing finally browser.close paths completed with passing children",
+        "server": "Existing t.after server close completed; no port53618 listener after run",
+        "ownResourcesReleased": true,
+        "resources": []
+      },
+      "limits": [
+        "clipboard external write promise stub only",
+        "VM archive-field sensitivity is separate from native healthy file readback",
+        "no native handler mutation",
+        "success URL30second revocation timer not dynamically waited out",
+        "no OS clipboard/Paste/device/ordinary/full/CI/release proof"
+      ],
+      "metadataChronology": "Only this new record observedEvidence completed after the actual run. Executed raw rationale is retained separately; no behavior/native rerun."
+    }
   }
 ]

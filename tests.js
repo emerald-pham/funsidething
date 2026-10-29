@@ -16645,6 +16645,150 @@ test('RISK saved view held Download: trusted terminal Download preserves the sam
  });
 });
 
+test('RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources',async t=>{
+ await openingBoardFixture(t);
+ for(const browserEngine of ['chromium','webkit'])await t.test(browserEngine,async t=>{
+  const backupPayload='{"futureNativeDownloadBackup":{"retain":"unknown 🌿\\u0000 bytes"}}',backup={id:'native-download-proof-backup',day:'2026-10-29',at:1793275200000,kind:'manual',payload:backupPayload};
+  const pendingOwner='native-download-proof-owner@example.test',pending={generationId:'native-download-proof-pending',payloadHash:'b'.repeat(64),baseRev:9,updatedAt:1793275200000,futurePendingField:{retain:'unknown pending metadata'}};
+  const opaqueKey='native-download-proof-opaque',opaqueValue={key:opaqueKey,raw:'opaque exact bytes\u0000🌿',futureOpaqueField:{retain:['unknown',23]}};
+  const view=await invisibleSavedViewBrowser('light',false,false,{width:390,height:844},false,{browserEngine,fixedTime:'2026-10-29T12:00:00Z',topOfPage:true});
+  try{
+   await view.page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&window.__actualLocalRead?.settled&&liveBoardAccepted&&window.ScannerDeviceStore&&deviceStorageAuthority&&!openingRecoveryHeld,null,{timeout:30000});
+   const seeded=await view.page.evaluate(async fixture=>{
+    const store=window.ScannerDeviceStore;
+    if(!liveBoardAccepted||!store||!deviceStorageAuthority)throw Error('The healthy signed-out fixture must begin from an accepted board with readable device authority');
+    const openingHead=await store.readHead(),openingHash=deviceHeadHash;
+    if(deviceStore!==store||!openingHead?.payload||openingHead.hash!==openingHash||openingHead.account!==null)throw Error('The reopened public head must be the exact signed-out source accepted by application authority');
+    state.futureNativeDownloadBoardField={retain:'unknown accepted board metadata 🌿',sequence:[1,'😀']};
+    for(const task of state.tasks)task.futureNativeDownloadTaskField={retain:'unknown accepted task metadata',taskId:task.id};
+    state.syncDirty=true;
+    if(!await persist())throw Error('The isolated accepted-board fixture could not become a durable baseline');
+    const durable=await store.readHead();if(!durable?.hash||!durable.payload)throw Error('The accepted durable baseline is unavailable');
+    const backupResult=await store.putBackup({expectedHash:durable.hash,backup:fixture.backup});
+    if(!backupResult?.ok)throw Error('The isolated complete-archive backup source could not be retained');
+    const pendingResult=await store.setPendingUpload(fixture.pendingOwner,fixture.pending);
+    if(!pendingResult?.ok)throw Error('The isolated complete-archive pending source could not be retained');
+    const database=window.CHAIN_STORAGE_DB_NAME||'chain-scanner-v2',db=await new Promise((resolve,reject)=>{const request=indexedDB.open(database);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error||Error('The isolated native device database could not be observed'));});
+    await new Promise((resolve,reject)=>{const tx=db.transaction(['meta','opaque'],'readwrite');tx.objectStore('meta').put({...fixture.pending,account:fixture.pendingOwner},'pending:'+fixture.pendingOwner);tx.objectStore('opaque').put(fixture.opaqueValue,fixture.opaqueKey);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||Error('The isolated pending and opaque sources could not be retained'));tx.onabort=()=>reject(tx.error||Error('The isolated pending and opaque source transaction aborted'));});db.close();
+    const pendingStored=await store.getPendingUpload(fixture.pendingOwner);
+    if(JSON.stringify(pendingStored)!==JSON.stringify({...fixture.pending,account:fixture.pendingOwner}))throw Error('The pending fixture did not read back with its exact owner and unknown metadata');
+    const baselineHead=await store.readHead(),baselineCurrent=JSON.parse(JSON.stringify(state)),rawSources=await store.readRawExportSnapshot();
+    for(const key of ['syncRev','syncAccount','syncIdentity','lastCloudServerAt','syncDirty','protectedBackupIds','decisionBase'])delete baselineCurrent[key];
+    const sceneKeys=[];for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(typeof key==='string'&&key.startsWith('fvp:chain-scanner:pending-scene-choice:v1:'))sceneKeys.push(key);}
+    const localSources=['fvp:chain-scanner:v1','fvp:chain-scanner:protected:v1','fvp:chain-scanner:daily-backups:v1','fvp:chain-scanner:device-store-v2',...new Set(sceneKeys.sort())].map(key=>{const raw=localStorage.getItem(key);return raw===null?{key,status:'absent'}:{key,status:'present',raw};});
+    return{database,openingHead,openingHash,baselineHead,baselineCurrent,rawSources,localSources,targetId:state.tasks[0].id,oldTitle:state.tasks[0].title,
+     authority:{accepted:liveBoardAccepted,deviceStorageAuthority,deviceStorageRequired,deviceHeadHash,unaccepted:JSON.stringify(unacceptedDeviceSource),hold:JSON.stringify(deviceRecoveryCloudHold),account:state.syncAccount??null,revision:state.syncRev??null,cloudUser:window.CloudSync?.user??null,cloudReady:window.CloudSync?.ready??null},
+     seeded:{backup:fixture.backup,backupPayload:fixture.backup.payload,pendingOwner:fixture.pendingOwner,pendingStored,opaqueKey:fixture.opaqueKey,opaqueValue:fixture.opaqueValue}};
+   },{backup,pendingOwner,pending,opaqueKey,opaqueValue});
+   assert.equal(seeded.openingHead.hash,seeded.openingHash);assert.equal(createHash('sha256').update(seeded.openingHead.payload).digest('hex'),seeded.openingHash,'the reopened public source bytes match the exact accepted authority');
+   assert.equal(seeded.authority.accepted,true,'the healthy signed-out app has accepted its current board');
+   assert.equal(seeded.authority.deviceStorageAuthority,true,'the baseline has real readable device authority');
+   assert.equal(seeded.authority.account,null);assert.equal(seeded.authority.cloudUser,null,'this fixture remains signed out');
+   assert.equal(seeded.baselineHead.hash,seeded.authority.deviceHeadHash,'the baseline device head is the exact source bound by application authority');
+   assert.equal(createHash('sha256').update(seeded.baselineHead.payload).digest('hex'),seeded.baselineHead.hash);
+   assert.deepEqual(seeded.seeded.pendingStored,{...pending,account:pendingOwner},'the independently declared full pending fixture retains its unknown raw metadata');
+   assert.equal(JSON.parse(seeded.baselineHead.payload).tasks.find(task=>task.id===seeded.targetId).title,seeded.oldTitle);
+   assert.equal(seeded.baselineCurrent.tasks.find(task=>task.id===seeded.targetId).title,seeded.oldTitle);
+   assert.deepEqual(seeded.baselineCurrent.futureNativeDownloadBoardField,{retain:'unknown accepted board metadata 🌿',sequence:[1,'😀']});
+   const editControl=view.page.locator('#listBody [data-act="edit"]').first();
+   assert.equal(await editControl.count()>0,true,'the accepted healthy board exposes a real task editor');
+   const targetId=await editControl.getAttribute('data-id'),target=seeded.baselineCurrent.tasks.find(task=>task.id===targetId);
+   assert.ok(target,'the real editor is bound to one independently known durable task');
+   const acceptedTitle='Native accepted unsaved Download edit '+browserEngine+' 🌿';
+   await editControl.click();assert.equal(await view.page.locator('#etTitle').inputValue(),target.title);
+   await view.page.locator('#etTitle').fill(acceptedTitle);
+   await view.page.locator('#modalRoot [data-act="save-edit"]').click();
+   const acceptedUnsaved=await view.page.evaluate(id=>{const board=JSON.parse(JSON.stringify(state));for(const key of ['syncRev','syncAccount','syncIdentity','lastCloudServerAt','syncDirty','protectedBackupIds','decisionBase'])delete board[key];return{board,accepted:liveBoardAccepted,title:state.tasks.find(task=>task.id===id)?.title,
+    savePending:saveTimer!==null,dirty:state.syncDirty,deviceHeadHash,authority:deviceStorageAuthority,required:deviceStorageRequired,
+    user:window.CloudSync?.user??null,task:state.tasks.find(task=>task.id===id)};},targetId);
+   assert.equal(acceptedUnsaved.accepted,true);assert.equal(acceptedUnsaved.title,acceptedTitle,'a trusted public Edit and Save action accepts the new task title');
+   assert.equal(acceptedUnsaved.savePending,true,'the deliberate edit is still unsaved when the native Export begins');
+   assert.equal(acceptedUnsaved.dirty,true);assert.equal(acceptedUnsaved.deviceHeadHash,seeded.authority.deviceHeadHash,'the accepted edit is distinct from the exact durable head');
+   assert.equal(acceptedUnsaved.authority,true);assert.equal(acceptedUnsaved.required,seeded.authority.deviceStorageRequired);assert.equal(acceptedUnsaved.user,null);
+   let downloads=0;view.page.on('download',()=>{downloads++;});
+   await view.page.locator('#appHeader [data-act="settings"]').first().click();
+   await view.page.getByText('Data and backups',{exact:true}).click();
+   const exportControl=view.page.locator('#modalRoot [data-act="export-backup"]');
+   assert.equal(await exportControl.count(),1);assert.equal(await exportControl.isEnabled(),true);
+   const beforeExport=await view.page.evaluate(()=>{const board=JSON.parse(JSON.stringify(state));for(const key of ['syncRev','syncAccount','syncIdentity','lastCloudServerAt','syncDirty','protectedBackupIds','decisionBase'])delete board[key];return{board,savePending:saveTimer!==null,deviceHeadHash};});
+   assert.deepEqual(beforeExport.board,acceptedUnsaved.board,'the whole independently captured accepted input stays exact before Export');assert.equal(beforeExport.savePending,true,'the normal save producer is still pending at Export');assert.equal(beforeExport.deviceHeadHash,seeded.baselineHead.hash);
+   await exportControl.click();await view.page.waitForSelector('#exportTransferDialog',{timeout:10000});
+   assert.equal(await view.page.getByText(/Complete recovery archive captured\. Saved sources were not changed\./).isVisible(),true,'all accepted and readable sources form a complete archive');
+   assert.equal(await view.page.locator('#exportTransferDialog textarea').count(),0,'the complete raw archive stays out of a rendered text field');
+   const raw=await view.page.evaluate(()=>exportTransferPayload);assert.equal(typeof raw,'string');
+   const archive=JSON.parse(raw),archivedTask=archive.currentBoard.tasks.find(task=>task.id===targetId);
+   assert.equal(archive.format,'chain-scanner.recovery-archive');assert.equal(archive.manifest.status,'complete');assert.deepEqual(archive.manifest.failures,[]);
+   assert.equal(archive.formatVersion,1);assert.equal(archive.manifest.consistency,'single-readonly-idb-transaction-and-unchanged-live-sources');
+   assert.deepEqual(archive.currentBoard,acceptedUnsaved.board,'the complete current board equals its whole independently captured accepted input');
+   assert.deepEqual(archive.manifest.sources.currentBoard,{status:'included',format:'existing-board-json'});
+   assert.equal(archive.currentBoard.tasks.length,seeded.baselineCurrent.tasks.length);
+   assert.equal(archivedTask.title,acceptedTitle,'the archive contains the trusted accepted edit');
+   assert.deepEqual(archivedTask.futureNativeDownloadTaskField,{retain:'unknown accepted task metadata',taskId:targetId});
+   assert.deepEqual(archive.currentBoard.futureNativeDownloadBoardField,seeded.baselineCurrent.futureNativeDownloadBoardField);
+   assert.deepEqual(archive.appSources.localStorage,seeded.localSources,'all exact readable local source bytes are included');
+   assert.deepEqual(archive.manifest.sources.localStorage,Object.fromEntries(seeded.localSources.map(row=>[row.key,{status:row.status==='present'?'included':row.status,...(row.reason?{reason:row.reason}:{})}])));
+   assert.equal(archive.appSources.indexedDB.database,seeded.database);
+   assert.equal(archive.manifest.sources.indexedDB.database,seeded.database);assert.equal(archive.manifest.sources.indexedDB.schemaVersion,2);
+   assert.deepEqual(archive.manifest.sources.indexedDB.stores,Object.fromEntries(['meta','snapshots','backups','opaque'].map(name=>[name,{status:'included',rowCount:seeded.rawSources.stores[name].keys.length}])));
+   const decodedSnapshot={stores:Object.fromEntries(['meta','snapshots','backups','opaque'].map(name=>{
+    const rows=archive.appSources.indexedDB.stores[name];
+    return[name,{keys:rows.map(row=>decodeManualArchiveTypedValue(row.key)),values:rows.map(row=>decodeManualArchiveTypedValue(row.value))}];
+   }))};
+   assert.deepEqual(decodedSnapshot,seeded.rawSources,'the complete archive independently preserves every exact durable meta, snapshot, backup, pending and opaque row');
+   const durableHead=decodedSnapshot.stores.meta.values[decodedSnapshot.stores.meta.keys.indexOf('head')];
+   const {payload:durablePayload,...durableMetadata}=seeded.baselineHead;
+   assert.deepEqual(durableHead,durableMetadata,'the archive retains the exact accepted-board durable head metadata captured before the user edit');
+   const durableSnapshot=decodedSnapshot.stores.snapshots.values[decodedSnapshot.stores.snapshots.keys.indexOf(durableHead.hash)];
+   assert.deepEqual(durableSnapshot,{hash:seeded.baselineHead.hash,payload:durablePayload},'the durable head references its exact independently captured snapshot bytes');
+   assert.equal(createHash('sha256').update(durableSnapshot.payload).digest('hex'),durableHead.hash);
+   const durableBoard=JSON.parse(durableSnapshot.payload),durableTask=durableBoard.tasks.find(task=>task.id===targetId);
+   assert.equal(durableTask.title,target.title,'the full file distinguishes the accepted unsaved title from the unchanged durable board');
+   assert.notEqual(archivedTask.title,durableTask.title);
+   assert.deepEqual(decodedSnapshot.stores.meta.values[decodedSnapshot.stores.meta.keys.indexOf('pending:'+pendingOwner)],seeded.seeded.pendingStored);
+   assert.deepEqual(decodedSnapshot.stores.meta.values[decodedSnapshot.stores.meta.keys.indexOf('pending:'+pendingOwner)],{...pending,account:pendingOwner});
+   const backupHash=createHash('sha256').update(backupPayload).digest('hex');
+   const backupRow=decodedSnapshot.stores.backups.values.find(row=>row.id===backup.id);
+   assert.deepEqual(backupRow,{id:backup.id,day:backup.day,at:backup.at,kind:backup.kind,payloadHash:backupHash});
+   assert.equal(decodedSnapshot.stores.snapshots.values.find(row=>row.hash===backupHash)?.payload,backupPayload);
+   assert.deepEqual(decodedSnapshot.stores.opaque.values[decodedSnapshot.stores.opaque.keys.indexOf(opaqueKey)],opaqueValue);
+   const afterPreparation=await view.page.evaluate(async()=>{const sceneKeys=[];for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(typeof key==='string'&&key.startsWith('fvp:chain-scanner:pending-scene-choice:v1:'))sceneKeys.push(key);}
+    const localSources=['fvp:chain-scanner:v1','fvp:chain-scanner:protected:v1','fvp:chain-scanner:daily-backups:v1','fvp:chain-scanner:device-store-v2',...new Set(sceneKeys.sort())].map(key=>{const raw=localStorage.getItem(key);return raw===null?{key,status:'absent'}:{key,status:'present',raw};});
+    return{localSources,rawSources:await ScannerDeviceStore.readRawExportSnapshot(),
+     authority:{accepted:liveBoardAccepted,deviceStorageAuthority,deviceStorageRequired,unaccepted:JSON.stringify(unacceptedDeviceSource),hold:JSON.stringify(deviceRecoveryCloudHold),account:state.syncAccount??null,revision:state.syncRev??null,user:window.CloudSync?.user??null}};});
+   assert.deepEqual(afterPreparation.localSources,seeded.localSources,'preparing Export performs no app-owned local source write');
+   assert.deepEqual(afterPreparation.rawSources,seeded.rawSources,'preparing Export leaves all original saved, backup, pending and opaque source rows exact');
+   assert.deepEqual(afterPreparation.authority,{accepted:true,deviceStorageAuthority:true,deviceStorageRequired:seeded.authority.deviceStorageRequired,unaccepted:seeded.authority.unaccepted,hold:seeded.authority.hold,account:null,revision:seeded.authority.revision,user:null},'Export grants no device/recovery or cloud authority');
+   const serial=await view.page.evaluate(()=>exportCaptureSerial);
+   await view.page.evaluate(()=>{window.__nativeCompleteDownloadCopyRequests=[];Object.defineProperty(navigator,'clipboard',{configurable:true,value:{async writeText(value){window.__nativeCompleteDownloadCopyRequests.push(value);}}});});
+   const copyControl=view.page.locator('#exportTransferDialog [data-act="copy-export"]'),downloadControl=view.page.locator('#exportTransferDialog [data-act="download-export"]');
+   assert.equal(await copyControl.count(),1);assert.equal(await copyControl.isEnabled(),true);assert.equal(await downloadControl.count(),1);assert.equal(await downloadControl.isEnabled(),true);
+   t.diagnostic('Signed-out native Settings/Export consumer, actual trusted controls and browser download event; clipboard write is a test-only external promise stub, with no OS clipboard or Paste claim.');
+   await copyControl.click();await view.page.waitForFunction(()=>exportTransferBusy===false&&window.__nativeCompleteDownloadCopyRequests.length===1,{},{timeout:10000});
+   assert.equal(await view.page.evaluate(()=>window.__nativeCompleteDownloadCopyRequests[0]),raw,'Copy receives the exact prepared complete archive');assert.equal(downloads,0);
+   assert.deepEqual(await view.page.evaluate(()=>({raw:exportTransferPayload,serial:exportCaptureSerial})),{raw,serial},'Copy retains the same prepared instance for Download');
+   const [download]=await Promise.all([view.page.waitForEvent('download',{timeout:15000}),downloadControl.click()]);
+   assert.equal(download.suggestedFilename(),'chain-scanner-recovery-archive.json');
+   const output=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(output&&path.isAbsolute(output),'retain the actual native downloaded file under allocated output');
+   fs.mkdirSync(output,{recursive:true});const directory=fs.mkdtempSync(path.join(output,'complete-download-'+browserEngine+'-')),file=path.join(directory,download.suggestedFilename());
+   await download.saveAs(file);assert.equal(await download.failure(),null,'the actual native download completed without failure');
+   const bytes=fs.readFileSync(file),downloadedRaw=bytes.toString('utf8');
+   assert.deepEqual(bytes,Buffer.from(raw,'utf8'),'native file bytes exactly match the prepared UTF-8 archive');
+   assert.equal(downloadedRaw,raw,'native file bytes equal the exact prepared archive');
+   assert.equal(downloadedRaw,await view.page.evaluate(()=>window.__nativeCompleteDownloadCopyRequests[0]),'native file bytes equal the archive offered to Copy');
+   assert.equal(downloads,1,'only the deliberate Download starts an actual file');
+   assert.match(await view.page.locator('#exportTransferStatus').innerText(),/Download started\. The archive contains the exact prepared export\./,'the app status reports initiation while the native event/file readback separately proves completion');
+   assert.equal(await view.page.locator('#exportTransferDialog a[download="chain-scanner-recovery-archive.json"]').count(),0,'the temporary anchor is removed after successful initiation');
+   t.diagnostic('Actual complete native Download artifact: '+JSON.stringify({browserEngine,file,suggestedFilename:download.suggestedFilename(),failure:await download.failure(),bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),preparedSerial:serial,downloads,acceptedUnsavedTitle:acceptedUnsaved.title,durableTitle:durableTask.title,durableHash:durableHead.hash,currentBoardSha256:createHash('sha256').update(JSON.stringify(acceptedUnsaved.board)).digest('hex')}));
+   await view.page.locator('#exportTransferDialog [data-act="close-modal"]').click();
+   await view.page.waitForFunction(()=>!document.getElementById('exportTransferDialog'));
+   assert.deepEqual(await view.page.evaluate(()=>({accepted:liveBoardAccepted,authority:deviceStorageAuthority,required:deviceStorageRequired,unaccepted:JSON.stringify(unacceptedDeviceSource),hold:JSON.stringify(deviceRecoveryCloudHold),account:state.syncAccount??null,user:window.CloudSync?.user??null,transfer:exportTransferPayload,serial:exportCaptureSerial})),
+    {accepted:true,authority:true,required:seeded.authority.deviceStorageRequired,unaccepted:seeded.authority.unaccepted,hold:seeded.authority.hold,account:null,user:null,transfer:null,serial:serial+1},'closing Export invalidates only the prepared transfer and preserves accepted source authority');
+   assert.equal(downloads,1,'Copy and closing Export start no extra native download');
+   assert.deepEqual(view.errors,[]);
+  }finally{await view.browser.close();}
+ });
+});
+
 test('RISK saved view accepted handover: normal actions and exact local work survive repeated offline reopening',async t=>{
  await openingBoardFixture(t);
  const {waitForTruthyProbe}=await import('./scripts/agent-tools/async-probe.mjs');

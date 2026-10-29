@@ -13453,6 +13453,11 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK saved view accepted handover: normal actions and exact local work survive repeated offline reopening",
       "group": "persistence-recovery",
       "file": "tests.js"

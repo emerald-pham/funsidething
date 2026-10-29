@@ -1296,6 +1296,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK saved view held Export: terminal Settings preserves an exact partial source-only archive
 - RISK saved view held Copy: trusted terminal Copy preserves prepared bytes and original sources
 - RISK saved view held Download: trusted terminal Download preserves the same Copy archive and original sources
+- RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources
 - RISK saved view accepted handover: normal actions and exact local work survive repeated offline reopening
 - RISK bulk toolbar guidance: extended FAQ describes frozen controls and rank-slot selection
 - RISK repository process boundary: actual visual tests compare every changed control with neighboring controls and scrolled states
