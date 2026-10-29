@@ -27068,5 +27068,76 @@
       "decisionSha256": "faf049bb0e08310c42c1b9e47bbad5c27ccb92f598c04a6e4da2c93d4d5fe75a"
     },
     "definitionState": "Defined only: exact actual694-to-working protected fingerprint recorded after admitted edit; syntax/JSON/diff and source inverse checks only. Corrected healthy run and caught sensitivity are still unobserved until1445."
+  },
+  {
+    "baseCommit": "1e48c6f5c592a62624c318d891c035470c09fda3",
+    "testChangesSha256": "c898298367641a16430e56dab918a0238a6da08e461121522392be67abc497ea",
+    "reason": "Close the existing canceled-capture consumer coverage gap for late raw capture success/failure against newer busy owners, prepared archive Copy and unsaved Paste/Settings drafts. Existing serial guards are not a demonstrated defect; application/runtime source is unchanged.",
+    "previousBehavior": "The existing root proved one cancelled continuation retained a pasted draft and repeated capture was refused, but did not control both old settlement outcomes while each newer busy/payload/draft owner remained active.",
+    "intendedBehavior": "Eight named internal healthy cases preserve the independent newer view/payload/status/captureBusy/transferBusy/control/draft facts and exact accepted memory/local/raw device sources after late old resolve or reject. Only the current read/Copy settles afterward. The same busy-owner assertion must catch the sole final serial-guard source mutant in one separate existing appSource VM.",
+    "replacementTests": [
+      "RISK DATABASE REPAIR EXPORT: canceled capture keeps the pasted draft and concurrent capture is bounded"
+    ],
+    "preservedCoverage": [
+      "The complete original canceled continuation, pasted draft, concurrent repeat refusal, current capture and whole memory assertions remain unchanged inside the same root/title.",
+      "All983 earlier rationale objects and original1430/1437/1445 source, failure, redaction and corrected-proof chronology stay an exact prefix.",
+      "Healthy cases use original app source, real public controls, existing loader/readConst/raw and clipboard promise seams, actual save-producer settlement and explicit latch cleanup; no helper/root/group/map/harness/app/runtime changes.",
+      "Whole accepted board/memory, ALL local key/raw observations, durable head/physical snapshot and authority/save/persist facts remain exact; actual Close restart metadata is retained separately from zero export writes."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/342-sol-contract/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/late-capture-preservation/sol-owner/1441-runs --purpose green --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern='^RISK DATABASE REPAIR EXPORT: canceled capture keeps the pasted draft and concurrent capture is bounded$' tests.js",
+      "failure": "Observed established-behavior sensitivity in the same one passing focused run 2026-10-29T15-54-21-568Z-e3eaa056-cca5-4da1-a69a-1e1dd98d5436: the separate existing appSource VM changed only the unique final serial-guard busy clear to unconditional clearing. The SAME added capture-busy equality caught actual ERR_ASSERTION/strictEqual/expectedtrue/actualfalse with message negative control: old resolve / capture-busy preserves the newer capture busy owner\\n\\nfalse !== true\\n. All original checks and eight named healthy internal cases passed with child/wrapper0. This is not preimplementation application RED or a demonstrated app defect; no app/runtime fix or behavioral rerun occurred."
+    },
+    "verificationEvidence": {
+      "status": "passed",
+      "executed": true,
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/342-sol-contract/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/late-capture-preservation/sol-owner/1441-runs --purpose green --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern='^RISK DATABASE REPAIR EXPORT: canceled capture keeps the pasted draft and concurrent capture is bounded$' tests.js",
+      "recorderId": "2026-10-29T15-54-21-568Z-e3eaa056-cca5-4da1-a69a-1e1dd98d5436",
+      "recordPath": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/late-capture-preservation/sol-owner/1441-runs/2026-10-29T15-54-21-568Z-e3eaa056-cca5-4da1-a69a-1e1dd98d5436.json",
+      "recordSha256": "cee7abcae3e88501c589183f84b0eef29722dd51571ad47748fdf6dde1d8a751",
+      "sourceTestDiffSha256": "61ca5500b2b0f55b3852b8b18468e7b4d49967eb6bc3464b142111ec15856f85",
+      "outputSha256": "6233d0ffe48b9c0ad4eaaf824f549abbc7a58c4f6e9ff5e03ee3f3a74f2a5315",
+      "stdoutSha256": "68417866c0700964ef2294700ee6ae61cdbd448f2533fdc0820f15d30f8de830",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "childExitCode": 0,
+      "wrapperExitCode": 0,
+      "tapTests": 1,
+      "tapPass": 1,
+      "tapFail": 0,
+      "tapCancelled": 0,
+      "tapSkipped": 0,
+      "selectedRoots": 1,
+      "healthyInternalCases": [
+        "old resolve / capture-busy",
+        "old reject / capture-busy",
+        "old resolve / copy-busy",
+        "old reject / copy-busy",
+        "old resolve / paste-draft",
+        "old reject / paste-draft",
+        "old resolve / settings-draft",
+        "old reject / settings-draft"
+      ],
+      "caughtNegativeControl": {
+        "code": "ERR_ASSERTION",
+        "operator": "strictEqual",
+        "expected": true,
+        "actual": false,
+        "message": "negative control: old resolve / capture-busy preserves the newer capture busy owner\\n\\nfalse !== true\\n"
+      },
+      "executedTestsSha256": "64b556fde2551e986072ff4f02cce93f0b0a988492fbdf9c26cd7ae08eb86e9d",
+      "executedRuntimeIndexSha256": "e255ff296c10ba99292a9ed4164e9b4564f6b967d5818ea11204b9cea0d4c18b",
+      "executedRawRationaleSha256": "1f211d4ea78cc37a2fd237e4ff1d4410fca693bf784f67f05993f72d9fef07fb",
+      "rawPreRunRationalePath": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/late-capture-preservation/sol-owner/1441-RAW-PRE-RUN-TEST_CHANGE_RATIONALES.json",
+      "inputManifestSha256": "822710ce77158dd318a946a6ebcb514dd676ca61b4c660351411276c88d89559",
+      "recorderRationaleSanitizedContentSha256": "68c222f52823b152dbc7b1acb58ad77dbfdd3ba12f5f57a428a66e976a7a59ea",
+      "recorderRedaction": {
+        "applied": true,
+        "count": 73,
+        "locations": {
+          "workingTree.content": 73
+        }
+      },
+      "limit": "Source/VM focused evidence only; no app RED, native/browser/emulator/production-data/CI/deployment/release claim."
+    }
   }
 ]

@@ -21083,7 +21083,7 @@ test('RISK DATABASE REPAIR EXPORT: available worker and cache identities are cap
   assert.deepEqual(writes,[],'repair observations do not append diagnostic events to storage');
 });
 
-test('RISK DATABASE REPAIR EXPORT: canceled capture keeps the pasted draft and concurrent capture is bounded',async t=>{
+test("RISK DATABASE REPAIR EXPORT: canceled capture keeps the pasted draft and concurrent capture is bounded",async t=>{
   const {IDBFactory}=await import('fake-indexeddb');
   const app=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'repair-capture-cancel-'+Date.now()}),{ctx,shim}=app;t.after(()=>app.dispose());
   ctx.addTask('Retained during repair capture',false);await prepareBackupFileFixtureSource(app);const before=JSON.stringify(ctx.state);
@@ -21100,6 +21100,150 @@ test('RISK DATABASE REPAIR EXPORT: canceled capture keeps the pasted draft and c
   const second=await ctx.onAction('export-backup',firstSource);assert.equal(second,false,'rapid repeat cannot start a second full source capture');
   release();assert.equal(await first,true);assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="exportTransferDialog"/);
   assert.equal(JSON.stringify(ctx.state),before);
+
+  for(const [outcome,replacement,mutant] of [
+    ['resolve','capture-busy',false],['reject','capture-busy',false],
+    ['resolve','copy-busy',false],['reject','copy-busy',false],
+    ['resolve','paste-draft',false],['reject','paste-draft',false],
+    ['resolve','settings-draft',false],['reject','settings-draft',false],
+    ['resolve','capture-busy',true],
+  ]){
+    const label=(mutant?'negative control: ':'')+'old '+outcome+' / '+replacement;
+    const finalGuard='if(serial===exportCaptureSerial)exportCaptureBusy=false;';
+    if(mutant)assert.equal(appSrc.split(finalGuard).length-1,1,'the busy-owner mutant has one exact final serial guard');
+    const late=await loadBackupFileFixtureApp({...(mutant?{appSource:appSrc.replace(finalGuard,'exportCaptureBusy=false;')}:{}),
+      sharedStorage:sharedScannerStorage(),indexedDBProvider:new IDBFactory(),deviceDbName:'late-capture-'+label+'-'+Date.now()+'-'+Math.random()});
+    t.after(()=>late.dispose());const {ctx:lateCtx,shim:lateShim}=late;
+    lateCtx.addTask('Accepted source for '+label,false);await prepareBackupFileFixtureSource(late);
+    const lateStore=lateCtx.window.ScannerDeviceStore,physicalRead=lateStore.readRawExportSnapshot.bind(lateStore);
+    const memoryBefore=JSON.stringify(lateCtx.state),boardBefore=JSON.parse(lateCtx.currentBoardExportPayload());
+    const headBefore=await lateStore.readHead(),physicalBefore=await physicalRead();
+    const authorityBefore=JSON.stringify(readConst(lateCtx,'({liveBoardAccepted,deviceStorageAuthority,deviceHeadHash,deviceRecoveryCloudHold,saveRequestGeneration,supportDiagnosticsPersistCalls})'));
+    const local=lateShim.localStorage,set=local.setItem.bind(local),remove=local.removeItem.bind(local),writes=[];
+    let oldRelease,oldReject,oldEntered,currentRelease,currentEntered,copyRelease,copyEntered,deadlineTimer;
+    const oldGate=new Promise((resolve,reject)=>{oldRelease=resolve;oldReject=reject;}),oldStarted=new Promise(resolve=>{oldEntered=resolve;});
+    const currentGate=new Promise(resolve=>{currentRelease=resolve;}),currentStarted=new Promise(resolve=>{currentEntered=resolve;});
+    const copyGate=new Promise(resolve=>{copyRelease=resolve;}),copyStarted=new Promise(resolve=>{copyEntered=resolve;});
+    const deadline=new Promise((_,reject)=>{deadlineTimer=setTimeout(()=>reject(Error(label+' explicit latch did not settle')),8000);});
+    oldGate.catch(()=>{});deadline.catch(()=>{});
+    let oldAction=null,currentAction=null,copyAction=null,reads=0,oldSnapshot=null,currentSnapshot=null,copyInput=null,caughtDiagnostic=null;
+    const oldSource=makeFakeElement(),currentSource=makeFakeElement();oldSource.isConnected=true;currentSource.isConnected=true;
+    try{
+      local.setItem=(...args)=>{writes.push(['set',args[0]]);return set(...args);};
+      local.removeItem=key=>{writes.push(['remove',key]);return remove(key);};
+      lateStore.readRawExportSnapshot=async()=>{
+        const snapshot=await physicalRead();reads++;
+        if(reads===1){oldSnapshot=snapshot;oldEntered();await oldGate;}
+        else{
+          currentSnapshot=snapshot;
+          if(replacement==='capture-busy'){currentEntered();await currentGate;}
+        }
+        return snapshot;
+      };
+      lateCtx.openSettings();oldAction=lateCtx.onAction('export-backup',oldSource);
+      await Promise.race([oldStarted,deadline]);
+      const oldSerial=readConst(lateCtx,'exportCaptureSerial');
+      assert.equal(readConst(lateCtx,'exportCaptureBusy'),true,label+' starts with a real held old capture');
+      await lateCtx.onAction('close-modal',{});oldSource.isConnected=false;lateCtx.openSettings();
+      if(replacement==='capture-busy'){
+        currentAction=lateCtx.onAction('export-backup',currentSource);
+        await Promise.race([currentStarted,deadline]);
+      }else if(replacement==='copy-busy'){
+        currentAction=lateCtx.onAction('export-backup',currentSource);
+        assert.equal(await Promise.race([currentAction,deadline]),true,label+' prepares the current real archive');
+        lateCtx.navigator={clipboard:{writeText(raw){copyInput=raw;copyEntered();return copyGate;}}};
+        copyAction=lateCtx.onAction('copy-export',{});
+        await Promise.race([copyStarted,deadline]);
+      }else if(replacement==='paste-draft'){
+        lateShim.document.getElementById('backupRestoreSource').value='paste';await lateCtx.onAction('import-backup',{});
+        const draft=lateShim.document.getElementById('jsonBox');draft.id='jsonBox';draft.value='newer unfinished Paste JSON for '+label;
+        lateShim.document.dispatchEvent({type:'input',target:draft});
+      }else{
+        const horizon=lateShim.document.getElementById('stHorizon'),samples=lateShim.document.getElementById('stSamples');
+        horizon.id='stHorizon';horizon.value='135';samples.id='stSamples';samples.value='650';
+        lateShim.document.dispatchEvent({type:'input',target:horizon});lateShim.document.dispatchEvent({type:'input',target:samples});
+      }
+      assert.equal(JSON.stringify(lateCtx.state),memoryBefore,label+' replacement controls keep the accepted memory unchanged');
+      assert.deepEqual(await lateStore.readHead(),headBefore,label+' replacement controls keep the durable head');
+      assert.deepEqual(await physicalRead(),physicalBefore,label+' replacement controls keep every physical source');
+      const localKeys=Array.from({length:local.length},(_,index)=>local.key(index)).sort(),localBefore=localKeys.map(key=>({key,raw:local.getItem(key)}));
+      const archiveRows=[STORE_KEY,LOCAL_HEAD_KEY,LOCAL_BACKUPS_KEY,DEVICE_AUTHORITY_KEY,...localKeys.filter(key=>key.startsWith('fvp:chain-scanner:pending-scene-choice:v1:'))].map(key=>({key,raw:local.getItem(key)}));
+      const captureBusyBefore=readConst(lateCtx,'exportCaptureBusy'),visibleBefore={
+        serial:readConst(lateCtx,'exportCaptureSerial'),raw:readConst(lateCtx,'exportTransferPayload'),transferBusy:readConst(lateCtx,'exportTransferBusy'),
+        markup:lateShim.document.getElementById('modalRoot').innerHTML,exportStatus:lateShim.document.getElementById('exportBackupStatus').textContent,
+        transferStatus:lateShim.document.getElementById('exportTransferStatus').textContent,toast:lateShim.document.getElementById('toast').textContent,
+        controls:{source:!!currentSource.disabled,copy:!!lateShim.document.getElementById('copyExportButton').disabled,download:!!lateShim.document.getElementById('downloadExportButton').disabled},
+        paste:lateShim.document.getElementById('jsonBox').value,pasteSession:JSON.stringify(readConst(lateCtx,'pasteEditorSession')),
+        settings:[lateShim.document.getElementById('stHorizon').value,lateShim.document.getElementById('stSamples').value],
+      },writesBeforeLate=writes.length;
+      assert.ok(visibleBefore.serial>oldSerial,label+' is bound to a newer serial');
+      assert.equal(captureBusyBefore,replacement==='capture-busy',label+' establishes the intended current capture owner');
+      assert.equal(visibleBefore.transferBusy,replacement==='copy-busy',label+' establishes the intended current Copy owner');
+      if(replacement==='copy-busy'){assert.equal(typeof visibleBefore.raw,'string');assert.equal(copyInput,visibleBefore.raw,label+' actual Copy receives the current prepared bytes');}
+      else assert.strictEqual(visibleBefore.raw,null,label+' has no obsolete prepared payload');
+      if(replacement==='paste-draft'){assert.match(visibleBefore.markup,/id="jsonBox"/);assert.equal(visibleBefore.paste,'newer unfinished Paste JSON for '+label);}
+      if(replacement==='settings-draft'){assert.match(visibleBefore.markup,/id="stHorizon"/);assert.deepEqual(visibleBefore.settings,['135','650']);}
+      const privateFailure='PRIVATE_LATE_CAPTURE_REJECTION '+label;
+      if(outcome==='resolve')oldRelease();else oldReject(Error(privateFailure));
+      assert.equal(await Promise.race([oldAction,deadline]),false,label+' obsolete capture returns false');
+      const busyMessage=label+' preserves the newer capture busy owner';
+      let caught=null;
+      try{assert.equal(readConst(lateCtx,'exportCaptureBusy'),captureBusyBefore,busyMessage);}catch(error){if(!mutant)throw error;caught=error;}
+      if(mutant){
+        assert.equal(caught?.code,'ERR_ASSERTION','the final-guard mutation is caught by the same busy-owner equality');
+        assert.equal(caught.operator,'strictEqual');assert.strictEqual(caught.expected,true);assert.strictEqual(caught.actual,false);
+        assert.ok(caught.message.startsWith(busyMessage),'the caught failure names the exact newer capture owner');
+        caughtDiagnostic={code:caught.code,operator:caught.operator,expected:caught.expected,actual:caught.actual,message:caught.message};
+      }
+      assert.deepEqual({
+        serial:readConst(lateCtx,'exportCaptureSerial'),raw:readConst(lateCtx,'exportTransferPayload'),transferBusy:readConst(lateCtx,'exportTransferBusy'),
+        markup:lateShim.document.getElementById('modalRoot').innerHTML,exportStatus:lateShim.document.getElementById('exportBackupStatus').textContent,
+        transferStatus:lateShim.document.getElementById('exportTransferStatus').textContent,toast:lateShim.document.getElementById('toast').textContent,
+        controls:{source:!!currentSource.disabled,copy:!!lateShim.document.getElementById('copyExportButton').disabled,download:!!lateShim.document.getElementById('downloadExportButton').disabled},
+        paste:lateShim.document.getElementById('jsonBox').value,pasteSession:JSON.stringify(readConst(lateCtx,'pasteEditorSession')),
+        settings:[lateShim.document.getElementById('stHorizon').value,lateShim.document.getElementById('stSamples').value],
+      },visibleBefore,label+' preserves the exact newer view, payload, status, transfer owner, controls and drafts');
+      assert.doesNotMatch(JSON.stringify(visibleBefore),/PRIVATE_LATE_CAPTURE_REJECTION/);
+      assert.deepEqual(writes.slice(writesBeforeLate),[],label+' obsolete settlement performs no local storage write');
+      if(replacement==='capture-busy'){
+        currentRelease();assert.equal(await Promise.race([currentAction,deadline]),true,label+' only the current held capture finishes');
+        assert.equal(readConst(lateCtx,'exportCaptureBusy'),false,label+' current capture releases its own busy flag');
+        copyInput=await copyPreparedExport(lateCtx);
+      }else if(replacement==='copy-busy'){
+        copyRelease();assert.equal(await Promise.race([copyAction,deadline]),true,label+' only the current Copy finishes');
+        assert.equal(readConst(lateCtx,'exportTransferBusy'),false);assert.match(lateShim.document.getElementById('exportTransferStatus').textContent,/Copied the same recovery archive/);
+        assert.equal(readConst(lateCtx,'exportTransferPayload'),visibleBefore.raw,label+' Copy retains the same prepared payload');
+      }
+      if(copyInput!==null){
+        assert.equal(copyInput,readConst(lateCtx,'exportTransferPayload'),label+' actual Copy bytes equal the current prepared source');
+        const archive=JSON.parse(copyInput);assert.equal(archive.format,'chain-scanner.recovery-archive');assert.equal(archive.manifest.status,'complete');
+        assert.deepEqual(archive.currentBoard,boardBefore,label+' current archive retains the independently captured whole accepted board');
+        for(const row of archiveRows){
+          const archived=archive.appSources.localStorage.find(item=>item.key===row.key);assert.ok(archived,label+' retains declared local source '+row.key);
+          assert.equal(archived.status,row.raw===null?'absent':'present');assert.equal(archived.raw,row.raw===null?undefined:row.raw);
+        }
+        assert.deepEqual(Object.keys(archive.appSources.indexedDB.stores).sort(),['backups','meta','opaque','snapshots']);
+        const encodedSources=JSON.stringify(archive.appSources.indexedDB.stores);
+        assert.ok(encodedSources.includes(headBefore.hash)&&encodedSources.includes(JSON.stringify(headBefore.payload)),label+' current archive includes the independently captured durable head and exact payload');
+        assert.doesNotMatch(copyInput,/PRIVATE_LATE_CAPTURE_REJECTION/);
+      }
+      assert.deepEqual(oldSnapshot,physicalBefore,label+' old read observed the original exact physical sources');
+      if(currentSnapshot)assert.deepEqual(currentSnapshot,physicalBefore,label+' current read observed the same exact physical sources');
+      assert.equal(JSON.stringify(lateCtx.state),memoryBefore);assert.deepEqual(JSON.parse(lateCtx.currentBoardExportPayload()),boardBefore);
+      assert.equal(JSON.stringify(readConst(lateCtx,'({liveBoardAccepted,deviceStorageAuthority,deviceHeadHash,deviceRecoveryCloudHold,saveRequestGeneration,supportDiagnosticsPersistCalls})')),authorityBefore,label+' export never adopts, replays, saves or changes authority');
+      assert.deepEqual(await lateStore.readHead(),headBefore);assert.deepEqual(await physicalRead(),physicalBefore);
+      const keysAfter=Array.from({length:local.length},(_,index)=>local.key(index)).sort();assert.deepEqual(keysAfter,localKeys);
+      assert.deepEqual(keysAfter.map(key=>({key,raw:local.getItem(key)})),localBefore,label+' preserves ALL local raw keys and strings after replacement');
+      assert.deepEqual(writes.slice(writesBeforeLate),[],label+' current read and Copy perform no local storage writes');
+      assert.deepEqual(writes,[['set','fvp:chain-scanner:restart-diagnostics:v1']],label+' only the explicit Close action records restart metadata');
+    }finally{
+      oldRelease();currentRelease();copyRelease();
+      try{await Promise.race([Promise.allSettled([oldAction,currentAction,copyAction].filter(Boolean)),deadline]);}
+      finally{clearTimeout(deadlineTimer);lateStore.readRawExportSnapshot=physicalRead;local.setItem=set;local.removeItem=remove;await late.dispose();}
+    }
+    if(mutant)console.log('CAUGHT_LATE_CAPTURE_NEGATIVE_CONTROL '+JSON.stringify(caughtDiagnostic));
+    else console.log('LATE_CAPTURE_CASE_PASSED '+JSON.stringify({outcome,replacement,name:label}));
+  }
 });
 
 test('RISK DATABASE REPAIR EXPORT: a damaged saved source is retained without inventing a current board',async t=>{
