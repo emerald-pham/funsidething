@@ -26502,5 +26502,397 @@
     "command": "Recorder 2026-10-28T21-36-34-747Z-87a7231c-7331-4cb2-a5c0-08f4725305ef (preimplementation-red) on af00e0b07f60b3fd942d5d348234ff02e85e1a56 / tree 695170d86f4fb32acebcd2bde496e4d886078fe4: node --test --test-name-pattern='RISK saved view opening source preservation: invalid optional appearance keeps its bytes while one complete task opens' tests.js. It used openingBoardFixture/invisibleSavedViewBrowser, isolated fake data, pinned Playwright 1.62.1 ESM, Chromium and loopback:127.0.0.1:52239. Full recorder argv/output are retained in evidence/held-import/rendered-1079/recorder/2026-10-28T21-36-34-747Z-87a7231c-7331-4cb2-a5c0-08f4725305ef.json. Inherited guard/inventory evidence remains under the unchanged original25a383b1 rationale: Original guard recorder43a07435-dade-40d4-a518-6261724090c2 at unchanged4ef3862, GREEN823f254f; inventory original evidence retained in inventory-merge/integrated-evidence.json and unchanged inherited inventory rationale. NS01 derives only combined protected-test fingerprint after merge984d514.",
     "failure": "Observed ERR_ASSERTION at tests.js:16161:325: held Settings keeps the actual Import action enabled (actual false, expected true). In each of five read-failures-2 terminal-hold variants the real import-backup locator existed exactly once but isEnabled() was false; the other three configuration children passed. TAP reported 9 results, 3 pass, and 6 fail counting the aggregate parent plus five children. This was the intended disabled-entry mismatch, not a stale-selector timeout, missing element, ESM/setup failure, or runtime-startup failure. Original1083 recorder459b2b48 subsequently passed9/9 on7149daff/treefa8f39b. HM01/HM02 are later static integration metadata work, not a new preimplementation RED. Actual154ebabe at82313738 failed only this missing published-base exact-fingerprint association after copy and selected-base checks passed; that metadata failure is retained separately and is not behavioralRED."
   }
-}
+},
+  {
+    "baseCommit": "f22f28be699f10a766ce9a90d01469b65457bfed",
+    "testChangesSha256": "7c43e830502d41e8027a8325b34a5f7a9a9a310ba234105decade5015c0ccce1",
+    "reason": "Add the real terminal opening-hold Settings Export consumer under #1159 and correct its never-passing fixture through #1185/#1187/#1191/#1217 and the explicit #1216 availability decision. The actual real Export enabled assertion then discriminated the missing allowlist entry before #1161 implementation. Preserve every inherited passing contract and all original setup-failure chronology.",
+    "previousBehavior": "The real export-backup action was absent from the opening recovery allowlist, so its single rendered Settings control was disabled and dispatch was refused. Three earlier new-fixture attempts failed before Export and remain setup failures. The corrected actual #1218 attempt reached exactly one Export and observed isEnabled false before the application change.",
+    "intendedBehavior": "A deliberate click on the real held Settings Export prepares a source-only partial archive with exact readable local sources, null/unavailable currentBoard and truthful unavailable-IDB/null-stores. Independently read every original raw database key/value before and after Close without restoring an application store or granting authority; retain exact pending/backup/opaque/unknown bytes, zero adoption/write/upload/replay, and idle timers.",
+    "replacementTests": [
+      "RISK saved view held Export: terminal Settings preserves an exact partial source-only archive"
+    ],
+    "preservedCoverage": [
+      "All original held Import/Close appearance-fault, read-failure, theme, viewport, account, UID, source-mask, focus, keyboard and Reload configurations remain unchanged, including their no-adoption and original-source assertions.",
+      "The fixture adds only opt-in isolated raw source seeding before the intentional malformed head; callers without that option retain their original input/default return shape. The terminal case keeps two failed application opens and a null app storage port.",
+      "Existing readable-store manual JSON export, damaged-source, partial/unavailable source, raw snapshot, pending metadata and transfer lifecycle consumers retain their passing assertions. Only the new never-passing archived-IDB expectation is corrected by explicit #1216 admission while stronger independent complete raw-source preservation remains.",
+      "Copy and Download remain separately restricted and unproved in this cycle; their actual held consumers and minimal allowlist additions have distinct subsequent TDD leaves. Existing refusal, stale completion, byte identity and cloud authority contracts are unchanged."
+    ],
+    "redEvidence": {
+      "command": "#1218 actual recorder 2026-10-29T01-05-37-594Z-62d116ec-71b5-46f0-ac8e-a4c7b08750ad, purpose preimplementation-red, Node24.19.0 --test --test-name-pattern=^RISK saved view held Export: terminal Settings preserves an exact partial source-only archive$ tests.js. Full actual recorder argv/output under held-export-sol-transfer/evidence/SX07/recorder; app HEAD f22f28be699f10a766ce9a90d01469b65457bfed/tree404f4f86556ceb9e6a64544c201ad1ab1d652868, tests SHA42ab2c8b009a4a640cb472f3cadf159c311f9429f4e2f625812b00af94a35ceb, owned Chromium/52239, all28 runtime assets equal committed bytes.",
+      "failure": "Observed ERR_ASSERTION at tests.js16280:10: the actual held Export entry is enabled before a trusted click, actual false expected true. Exactly one actual Export existed; all preceding terminal-hold, independent native raw-source, null-port, pending/backup/opaque/malformed-source, zero-task/acceptance/authority and timer assertions passed. One case/pass0/fail1; child1/wrapper1/assertion-failure. No Export click, archive/Close/Copy/Download result was reached. Earlier eaf7709a/08adc787/b623360d remain setup failures and are not product RED."
+    }
+  },
+  {
+    "baseCommit": "69fd9a8db69c52696046d5d00d5c4d17e6d433e7",
+    "testChangesSha256": "01744e635b6c5303c6ed5e43e184d92d984b4f91f757d72fc45fe69a00a9560b",
+    "reason": "Record the genuine terminal held Copy cycle under #1163/#1223-#1225/#1165. Preserve the prior actual Export RED and GREEN and every passing source/authority assertion. #1224 adds only read-only preparation completion observation to the two existing transfer consumers; it changes no app or fixture contract.",
+    "previousBehavior": "At committed Export-only candidate 69fd9a8 the real Export prepares the existing partial source-only archive, but the actual Copy button exists once and is disabled by the terminal-hold allowlist. Actual f2b8736a reached that mismatch after complete valid fixture/archive checks. Original 7cc6c649 failed earlier and remains an invalid pre-Copy attempt.",
+    "intendedBehavior": "Add only copy-export to the existing opening recovery allowlist, then run the exact unchanged Copy test once. Deliberate Copy uses identical prepared bytes, handles pending/success/refusal/stale completion and Close without source writes, board adoption, timers, cloud upload or acknowledgement changes. The clipboard promise boundary is isolated and does not prove OS paste.",
+    "replacementTests": [
+      "RISK saved view held Copy: trusted terminal Copy preserves prepared bytes and original sources"
+    ],
+    "preservedCoverage": [
+      "All inherited held Import configurations and public consumer assertions remain intact. The actual Export RED62d116ec and unchanged GREEN0c13d433 stay immutable; the modified Export observation is not yet a new Export GREEN.",
+      "The read-only preparation observation waits for an existing dialog or settled capture, retains exact readiness diagnostics, and leaves every original count/enabled/archive/source assertion unchanged. No cause is inferred for the earlier missing-dialog attempt.",
+      "Independent raw local and native database before/after source protection, null application store, unavailable-IDB manifest, pending/opaque/backup/unknown sources, account/revision and no-adoption authority remain strict. All original clipboard/refusal/stale/busy and Download restriction logic is unchanged.",
+      "Copy and Download use separate TDD cycles. No Download pass, post-Close Copy protection or final candidate/release qualification is claimed from a RED. The full held Import matrix and combined transfer cohort remain required later under #1174."
+    ],
+    "redEvidence": {
+      "command": "Actual #1225/#1164 recorder 2026-10-29T02-40-17-520Z-f2b8736a-9e12-455e-9a10-9a6068f2235e, purpose preimplementation-red, Node24.19.0 --test --test-reporter=tap --test-name-pattern=^RISK saved view held Copy: trusted terminal Copy preserves prepared bytes and original sources$ tests.js. App69fd9a8db69c52696046d5d00d5c4d17e6d433e7/tree426ef08ac0abd52e55b180b6320bd11fc979b75d; exact tests SHA d2734679d473e6263fac5b0bd61aa984fff0e877cccad92a121755120c3aaf40. All36 runtime assets equal committed app; owned Chromium/52239, future lease and isolated source fixture. Durable recorder and RESULT.json: held-copy-stopped-boundary/evidence/CO02. Historical Export RED62d116ec on f22 and GREEN0c13d433 on69fd remain separate actual attempts with test SHA42ab2c8b.",
+      "failure": "Observed ERR_ASSERTION at tests.js16430: the actual held Copy action is enabled before a trusted click, false !== true. Exactly one Copy exists. Before it: real Export count1/enabledtrue, trusted click, settled dialog1/busyfalse/hasPreparedtrue/serial1/heldtrue/acceptedfalse/appStoreNulltrue; all preceding raw-source, authority/timer, currentBoard=null/partial manifest/exactlocal/unavailableIDB checks passed. One actual case,0pass/1fail, child1/wrapper1/assertion-failure. No Copy click, post-Close source comparison or Download result was reached. Original7cc6c649 is retained and not reclassified. The #1224 read-only observation has no fabricated standalone RED."
+    }
+  },
+  {
+    "baseCommit": "f22f28be699f10a766ce9a90d01469b65457bfed",
+    "testChangesSha256": "c7ce3d691e15ab6c85829eb584813cb16bf04012febf0cc3b2deff16b19453de",
+    "reason": "Record the genuine terminal held Copy cycle under #1163/#1223-#1225/#1165. Preserve the prior actual Export RED and GREEN and every passing source/authority assertion. #1224 adds only read-only preparation completion observation to the two existing transfer consumers; it changes no app or fixture contract.",
+    "previousBehavior": "At committed Export-only candidate 69fd9a8 the real Export prepares the existing partial source-only archive, but the actual Copy button exists once and is disabled by the terminal-hold allowlist. Actual f2b8736a reached that mismatch after complete valid fixture/archive checks. Original 7cc6c649 failed earlier and remains an invalid pre-Copy attempt.",
+    "intendedBehavior": "Add only copy-export to the existing opening recovery allowlist, then run the exact unchanged Copy test once. Deliberate Copy uses identical prepared bytes, handles pending/success/refusal/stale completion and Close without source writes, board adoption, timers, cloud upload or acknowledgement changes. The clipboard promise boundary is isolated and does not prove OS paste.",
+    "replacementTests": [
+      "RISK saved view held Export: terminal Settings preserves an exact partial source-only archive",
+      "RISK saved view held Copy: trusted terminal Copy preserves prepared bytes and original sources"
+    ],
+    "preservedCoverage": [
+      "All inherited held Import configurations and public consumer assertions remain intact. The actual Export RED62d116ec and unchanged GREEN0c13d433 stay immutable; the modified Export observation is not yet a new Export GREEN.",
+      "The read-only preparation observation waits for an existing dialog or settled capture, retains exact readiness diagnostics, and leaves every original count/enabled/archive/source assertion unchanged. No cause is inferred for the earlier missing-dialog attempt.",
+      "Independent raw local and native database before/after source protection, null application store, unavailable-IDB manifest, pending/opaque/backup/unknown sources, account/revision and no-adoption authority remain strict. All original clipboard/refusal/stale/busy and Download restriction logic is unchanged.",
+      "Copy and Download use separate TDD cycles. No Download pass, post-Close Copy protection or final candidate/release qualification is claimed from a RED. The full held Import matrix and combined transfer cohort remain required later under #1174."
+    ],
+    "redEvidence": {
+      "command": "Actual #1225/#1164 recorder 2026-10-29T02-40-17-520Z-f2b8736a-9e12-455e-9a10-9a6068f2235e, purpose preimplementation-red, Node24.19.0 --test --test-reporter=tap --test-name-pattern=^RISK saved view held Copy: trusted terminal Copy preserves prepared bytes and original sources$ tests.js. App69fd9a8db69c52696046d5d00d5c4d17e6d433e7/tree426ef08ac0abd52e55b180b6320bd11fc979b75d; exact tests SHA d2734679d473e6263fac5b0bd61aa984fff0e877cccad92a121755120c3aaf40. All36 runtime assets equal committed app; owned Chromium/52239, future lease and isolated source fixture. Durable recorder and RESULT.json: held-copy-stopped-boundary/evidence/CO02. Historical Export RED62d116ec on f22 and GREEN0c13d433 on69fd remain separate actual attempts with test SHA42ab2c8b.",
+      "failure": "Observed ERR_ASSERTION at tests.js16430: the actual held Copy action is enabled before a trusted click, false !== true. Exactly one Copy exists. Before it: real Export count1/enabledtrue, trusted click, settled dialog1/busyfalse/hasPreparedtrue/serial1/heldtrue/acceptedfalse/appStoreNulltrue; all preceding raw-source, authority/timer, currentBoard=null/partial manifest/exactlocal/unavailableIDB checks passed. One actual case,0pass/1fail, child1/wrapper1/assertion-failure. No Copy click, post-Close source comparison or Download result was reached. Original7cc6c649 is retained and not reclassified. The #1224 read-only observation has no fabricated standalone RED."
+    }
+  },
+  {
+    "baseCommit": "e30a930f6b479958b629114c29db09403bcdcf41",
+    "testChangesSha256": "83a6c91e312cc588e109b053e1b3441f6345f0ef5696e30871e0490ccb110c75",
+    "reason": "Add the separately ticketed real held Download consumer under #1167/#1168/#1169 and the accepted #1219 ordering. Observe the fresh actual disabled Download before Copy can re-enable its appearance; preserve all existing passing tests byte-for-byte and all original Export/Copy TDD evidence.",
+    "previousBehavior": "Committed Copy candidate e30a930 prepares the real partial source-only archive and supports Copy, but download-export is still absent from the opening recovery allowlist. Actual 4c4c6527 found exactly one fresh Download with isEnabled false before any Copy or file operation. The three definition-script guard stops were not runtime tests and provide no product RED.",
+    "intendedBehavior": "Add only download-export to OPENING_RECOVERY_ACTIONS. The exact unchanged public consumer must first see the fresh button enabled, then deliberately Copy and Download one prepared instance. Retain and read the actual browser-downloaded file, compare exact bytes/filename with prepared and Copy payloads, decode the truthful partial source inventory, and preserve original local/native database sources and all authority boundaries after Close.",
+    "replacementTests": [
+      "RISK saved view held Download: trusted terminal Download preserves the same Copy archive and original sources"
+    ],
+    "preservedCoverage": [
+      "Every previous tests.js byte is unchanged by this definition; original actual Export RED62d116ec/GREEN0c13d433 and Copy REDf2b8736a/GREEN5301267e remain immutable with their respective source/test identities.",
+      "The new Download case uses the same passing real held fixture, raw observer and after-Close preservation as Copy. It requires Download enabled on a fresh prepared instance before any Copy, then real trusted controls and an actual downloaded-file event/readback. No fake file, forced enable, new harness or app storage port is introduced.",
+      "Exact readable local sources, independent whole raw meta/snapshots/backups/opaque observations, unknown bytes, pending account/revision metadata, unavailable-IDB/null-stores partial manifest, currentBoard-null, zero acceptance/tasks/writes/upload/replay and idle scanner/save timers remain strict.",
+      "Existing Copy pending/refusal/stale completion/serial/Close, actual Import matrix and every read-only transfer/source-recovery guard remain unchanged. The final combined cohort and full held Import matrix remain separately required under1174; no final candidate/CI/Stable claim is made."
+    ],
+    "redEvidence": {
+      "command": "Actual1168 recorder2026-10-29T02-55-51-332Z-4c4c6527-379e-48c8-9ed7-28cad348d3a4 purposepreimplementation-red, Node24.19.0 --test --test-reporter=tap --test-name-pattern=^RISK saved view held Download: trusted terminal Download preserves the same Copy archive and original sources$ tests.js, app e30a930f6b479958b629114c29db09403bcdcf41/treeb9d39962fe955d97212aaee2c2d35116d54b8318, tests SHA84e51a1656c4f6dbff7fe60ca0aa54cfaea4dbe20c53e346cc41d520040b1082. Owned Chromium/52239 and future lease; all36 runtime assets equal immutable app. Full recorder and RESULT.json retained at held-copy-stopped-boundary/evidence/HE11. Earlier genuine Export and Copy cycles are retained in their original entries, not relabeled as new Download evidence.",
+      "failure": "ERR_ASSERTION tests.js16596: the actual held Download is enabled on a fresh prepared instance before any Copy, actualfalse expectedtrue. Actual Downloadcount1; trusted Export/prepared dialog1/busyfalse/hasPreparedtrue/serial1/heldtrue/acceptedfalse/appStoreNulltrue, all preceding raw-source/account/authority/timer/partial/currentBoard-null/exactlocal/unavailableIDB assertions passed. One actual case,0pass/1fail, child1/wrapper1/assertion-failure. No Copy invocation or actual file was reached. This is the intended fresh disabled-control RED, not a selector/setup failure or post-Copy enabled appearance."
+    }
+  },
+  {
+    "baseCommit": "f22f28be699f10a766ce9a90d01469b65457bfed",
+    "testChangesSha256": "05c9afc246ec5508b6b5d6c2ca566039134f24582368c9831f9785cea14bb381",
+    "reason": "Add the separately ticketed real held Download consumer under #1167/#1168/#1169 and the accepted #1219 ordering. Observe the fresh actual disabled Download before Copy can re-enable its appearance; preserve all existing passing tests byte-for-byte and all original Export/Copy TDD evidence.",
+    "previousBehavior": "Committed Copy candidate e30a930 prepares the real partial source-only archive and supports Copy, but download-export is still absent from the opening recovery allowlist. Actual 4c4c6527 found exactly one fresh Download with isEnabled false before any Copy or file operation. The three definition-script guard stops were not runtime tests and provide no product RED.",
+    "intendedBehavior": "Add only download-export to OPENING_RECOVERY_ACTIONS. The exact unchanged public consumer must first see the fresh button enabled, then deliberately Copy and Download one prepared instance. Retain and read the actual browser-downloaded file, compare exact bytes/filename with prepared and Copy payloads, decode the truthful partial source inventory, and preserve original local/native database sources and all authority boundaries after Close.",
+    "replacementTests": [
+      "RISK saved view held Export: terminal Settings preserves an exact partial source-only archive",
+      "RISK saved view held Copy: trusted terminal Copy preserves prepared bytes and original sources",
+      "RISK saved view held Download: trusted terminal Download preserves the same Copy archive and original sources"
+    ],
+    "preservedCoverage": [
+      "Every previous tests.js byte is unchanged by this definition; original actual Export RED62d116ec/GREEN0c13d433 and Copy REDf2b8736a/GREEN5301267e remain immutable with their respective source/test identities.",
+      "The new Download case uses the same passing real held fixture, raw observer and after-Close preservation as Copy. It requires Download enabled on a fresh prepared instance before any Copy, then real trusted controls and an actual downloaded-file event/readback. No fake file, forced enable, new harness or app storage port is introduced.",
+      "Exact readable local sources, independent whole raw meta/snapshots/backups/opaque observations, unknown bytes, pending account/revision metadata, unavailable-IDB/null-stores partial manifest, currentBoard-null, zero acceptance/tasks/writes/upload/replay and idle scanner/save timers remain strict.",
+      "Existing Copy pending/refusal/stale completion/serial/Close, actual Import matrix and every read-only transfer/source-recovery guard remain unchanged. The final combined cohort and full held Import matrix remain separately required under1174; no final candidate/CI/Stable claim is made."
+    ],
+    "redEvidence": {
+      "command": "Actual1168 recorder2026-10-29T02-55-51-332Z-4c4c6527-379e-48c8-9ed7-28cad348d3a4 purposepreimplementation-red, Node24.19.0 --test --test-reporter=tap --test-name-pattern=^RISK saved view held Download: trusted terminal Download preserves the same Copy archive and original sources$ tests.js, app e30a930f6b479958b629114c29db09403bcdcf41/treeb9d39962fe955d97212aaee2c2d35116d54b8318, tests SHA84e51a1656c4f6dbff7fe60ca0aa54cfaea4dbe20c53e346cc41d520040b1082. Owned Chromium/52239 and future lease; all36 runtime assets equal immutable app. Full recorder and RESULT.json retained at held-copy-stopped-boundary/evidence/HE11. Earlier genuine Export and Copy cycles are retained in their original entries, not relabeled as new Download evidence.",
+      "failure": "ERR_ASSERTION tests.js16596: the actual held Download is enabled on a fresh prepared instance before any Copy, actualfalse expectedtrue. Actual Downloadcount1; trusted Export/prepared dialog1/busyfalse/hasPreparedtrue/serial1/heldtrue/acceptedfalse/appStoreNulltrue, all preceding raw-source/account/authority/timer/partial/currentBoard-null/exactlocal/unavailableIDB assertions passed. One actual case,0pass/1fail, child1/wrapper1/assertion-failure. No Copy invocation or actual file was reached. This is the intended fresh disabled-control RED, not a selector/setup failure or post-Copy enabled appearance."
+    }
+  },
+  {
+    "baseCommit": "e30a930f6b479958b629114c29db09403bcdcf41",
+    "testChangesSha256": "83a6c91e312cc588e109b053e1b3441f6345f0ef5696e30871e0490ccb110c75",
+    "cycle": "held-download-anchor-repair-DE03-1236",
+    "reason": "Supplement the retained initial Download allowlist cycle with the separately admitted anchor-parent correction under #1236 after the actual #1170 attempted GREEN reached the real file-event boundary and timed out. Preserve every original rationale object and its chronology; identical protected test fingerprints describe different actual vertical-cycle evidence and are not proof of chronology.",
+    "previousBehavior": "At clean 1d1a6ff the fresh real Download was enabled before Copy and real Copy preserved exact prepared bytes, but the actual public Download produced no browser file event within 10000ms. Static #1230 traced the nested body-level anchor click through the held SavedAppearance capture guard, which cancels targets outside the existing recovery modal. The original record remains declared purpose green and outcome nonzero-exit.",
+    "intendedBehavior": "Move only the temporary Download anchor into the existing exportTransferDialog so the same held-page guard permits its native click. Keep the real public action, Blob/object URL/filename/click/remove/revoke, transfer payload/serial/busy behavior and all storage/source/authority boundaries. Run the exact unchanged real held Download case once on the immutable corrected candidate; no file or GREEN is claimed by this metadata.",
+    "replacementTests": [
+      "RISK saved view held Download: trusted terminal Download preserves the same Copy archive and original sources"
+    ],
+    "preservedCoverage": [
+      "Every tests.js byte remains unchanged at SHA-25684e51a1656c4f6dbff7fe60ca0aa54cfaea4dbe20c53e346cc41d520040b1082, including fresh Download enabled before any Copy, trusted public controls, actual downloaded-file readback and identical prepared/Copy/file bytes.",
+      "Truthful partial currentBoard:null/unavailable application indexedDB/stores:null archive and exact readable local sources remain required. Independent complete native meta/snapshots/backups/opaque observations preserve original malformed, pending account/revision, backup, opaque and unknown bytes after Close without restoring the app port.",
+      "All original no-adoption/no-write/no-upload/no-pending-replay, account/revision acknowledgement authority, scanner/save timer, page-error, Copy pending/refusal/stale completion, Import matrix and ordinary transfer assertions remain unchanged. No fixture, harness, permission or capture-guard exemption is added.",
+      "Original Export RED62d116ec/GREEN0c13d433, Copy REDf2b8736a/GREEN5301267e, fresh disabled Download RED4c4c6527 and failed attempted GREEN1297520c retain their source/test identities, declared purposes and outcomes. The original initial-allowlist rationale records remain intact; the gate may select an earlier same-fingerprint record and does not establish actual chronology."
+    ],
+    "redEvidence": {
+      "command": "Actual #1170 attempted GREEN recorder2026-10-29T02-59-26-187Z-1297520c-3ca9-41ea-a824-accc4c8ebd4f, declared purpose green, Node24.19.0 --test --test-reporter=tap --test-name-pattern=^RISK saved view held Download: trusted terminal Download preserves the same Copy archive and original sources$ tests.js at clean1d1a6ff38ec6ef26a12d205d9e82ca7441408679/treecda0ffceee1e5aee358be0181c255afb571c0535, exact tests SHA84e51a1656c4f6dbff7fe60ca0aa54cfaea4dbe20c53e346cc41d520040b1082. Immutable streams/record are retained at held-copy-stopped-boundary/evidence/HE13/recorder; record SHAeeb229241662dc84d7fbef1fcb625a4b55f21b819e9ecd3f51864153d40cf784. It is observed failure before this new anchor repair, not a newly declared preimplementation-red attempt.",
+      "failure": "Observed page.waitForEvent Timeout10000ms at tests.js16609 waiting for actual browser download. Actual one case/0pass/1fail, child1/wrapper1, outcome nonzero-exit. Before failure the fresh Download count1/enabledtrue BEFORE Copy, actual Export/partial/null-store/raw-source/authority setup and trusted Copy/exact bytes/one request/no automatic Download/same prepared payload and serial assertions passed. No file, callback/status/page-error/policy disposition or post-Close proof was retained. Static #1230 identifies the body-level synthetic anchor cancellation; no new runtime disposition or fabricated chronology is claimed."
+    },
+    "observedFailure": {
+      "recordId": "2026-10-29T02-59-26-187Z-1297520c-3ca9-41ea-a824-accc4c8ebd4f",
+      "declaredPurpose": "green",
+      "outcome": "nonzero-exit",
+      "beforeProspectiveAnchorRepair": true
+    }
+  },
+  {
+    "baseCommit": "f22f28be699f10a766ce9a90d01469b65457bfed",
+    "testChangesSha256": "05c9afc246ec5508b6b5d6c2ca566039134f24582368c9831f9785cea14bb381",
+    "cycle": "held-download-anchor-repair-DE03-1236",
+    "reason": "Supplement the retained initial Download allowlist cycle with the separately admitted anchor-parent correction under #1236 after the actual #1170 attempted GREEN reached the real file-event boundary and timed out. Preserve every original rationale object and its chronology; identical protected test fingerprints describe different actual vertical-cycle evidence and are not proof of chronology.",
+    "previousBehavior": "At clean 1d1a6ff the fresh real Download was enabled before Copy and real Copy preserved exact prepared bytes, but the actual public Download produced no browser file event within 10000ms. Static #1230 traced the nested body-level anchor click through the held SavedAppearance capture guard, which cancels targets outside the existing recovery modal. The original record remains declared purpose green and outcome nonzero-exit.",
+    "intendedBehavior": "Move only the temporary Download anchor into the existing exportTransferDialog so the same held-page guard permits its native click. Keep the real public action, Blob/object URL/filename/click/remove/revoke, transfer payload/serial/busy behavior and all storage/source/authority boundaries. Run the exact unchanged real held Download case once on the immutable corrected candidate; no file or GREEN is claimed by this metadata.",
+    "replacementTests": [
+      "RISK saved view held Export: terminal Settings preserves an exact partial source-only archive",
+      "RISK saved view held Copy: trusted terminal Copy preserves prepared bytes and original sources",
+      "RISK saved view held Download: trusted terminal Download preserves the same Copy archive and original sources"
+    ],
+    "preservedCoverage": [
+      "Every tests.js byte remains unchanged at SHA-25684e51a1656c4f6dbff7fe60ca0aa54cfaea4dbe20c53e346cc41d520040b1082, including fresh Download enabled before any Copy, trusted public controls, actual downloaded-file readback and identical prepared/Copy/file bytes.",
+      "Truthful partial currentBoard:null/unavailable application indexedDB/stores:null archive and exact readable local sources remain required. Independent complete native meta/snapshots/backups/opaque observations preserve original malformed, pending account/revision, backup, opaque and unknown bytes after Close without restoring the app port.",
+      "All original no-adoption/no-write/no-upload/no-pending-replay, account/revision acknowledgement authority, scanner/save timer, page-error, Copy pending/refusal/stale completion, Import matrix and ordinary transfer assertions remain unchanged. No fixture, harness, permission or capture-guard exemption is added.",
+      "Original Export RED62d116ec/GREEN0c13d433, Copy REDf2b8736a/GREEN5301267e, fresh disabled Download RED4c4c6527 and failed attempted GREEN1297520c retain their source/test identities, declared purposes and outcomes. The original initial-allowlist rationale records remain intact; the gate may select an earlier same-fingerprint record and does not establish actual chronology."
+    ],
+    "redEvidence": {
+      "command": "Actual #1170 attempted GREEN recorder2026-10-29T02-59-26-187Z-1297520c-3ca9-41ea-a824-accc4c8ebd4f, declared purpose green, Node24.19.0 --test --test-reporter=tap --test-name-pattern=^RISK saved view held Download: trusted terminal Download preserves the same Copy archive and original sources$ tests.js at clean1d1a6ff38ec6ef26a12d205d9e82ca7441408679/treecda0ffceee1e5aee358be0181c255afb571c0535, exact tests SHA84e51a1656c4f6dbff7fe60ca0aa54cfaea4dbe20c53e346cc41d520040b1082. Immutable streams/record are retained at held-copy-stopped-boundary/evidence/HE13/recorder; record SHAeeb229241662dc84d7fbef1fcb625a4b55f21b819e9ecd3f51864153d40cf784. It is observed failure before this new anchor repair, not a newly declared preimplementation-red attempt.",
+      "failure": "Observed page.waitForEvent Timeout10000ms at tests.js16609 waiting for actual browser download. Actual one case/0pass/1fail, child1/wrapper1, outcome nonzero-exit. Before failure the fresh Download count1/enabledtrue BEFORE Copy, actual Export/partial/null-store/raw-source/authority setup and trusted Copy/exact bytes/one request/no automatic Download/same prepared payload and serial assertions passed. No file, callback/status/page-error/policy disposition or post-Close proof was retained. Static #1230 identifies the body-level synthetic anchor cancellation; no new runtime disposition or fabricated chronology is claimed."
+    },
+    "observedFailure": {
+      "recordId": "2026-10-29T02-59-26-187Z-1297520c-3ca9-41ea-a824-accc4c8ebd4f",
+      "declaredPurpose": "green",
+      "outcome": "nonzero-exit",
+      "beforeProspectiveAnchorRepair": true
+    }
+  },
+  {
+    "baseCommit": "f22f28be699f10a766ce9a90d01469b65457bfed",
+    "comparisonMergeBase": "f22f28be699f10a766ce9a90d01469b65457bfed",
+    "testChangesSha256": "990d48bbd0b1feee2640bb90bac598ee47672f740ddb7cc81c5c8e7af1a80f80",
+    "cycle": "held-transfer-final-comparison-HE14-1171",
+    "reason": "Associate the actual completed held-transfer test diff with this immutable comparison base while preserving every inherited rationale object and its original bytes. Seal the genuine new Download-refusal consumer and its explicitly accepted bounded Close observer correction together with the three minimal sequential Chromium/WebKit definitions. This is comparison metadata for completed source, not new application behavior or fabricated RED chronology.",
+    "previousBehavior": "The held product cycles already admitted Export/Copy/Download under the opening recovery hold, then corrected the temporary anchor parent. The new refusal control initially failed its all-browser-writes-zero oracle at explicit Close; source/output proved one permitted bounded restart-metadata write. The actual old30282cd1 run remains failed, purposegreen, with finalcloud assertion unreached. Existing terminal definitions used default Chromium only.",
+    "intendedBehavior": "Retain exact final testsfa918b8ce9dd4461f468091e6b65ab07bc6b5d47b6037f69275d2f2243b2d341: actual external Download refusal preserves the same prepared bytes/serial and later Copy, transfer work performs zero writes, explicit Close permits only its exact bounded metadata delta in the complete unreset history, and every original raw/current/durable/source/authority/timer/device/cloud assertion remains. Define original terminal bodies in sequential explicit chromium/webkit children with one root fixture. Final both-engine verification remains pending one1174 cohort on the actual packaged clean candidate.",
+    "replacementTests": [
+      "RISK saved view held Export: terminal Settings preserves an exact partial source-only archive",
+      "RISK saved view held Copy: trusted terminal Copy preserves prepared bytes and original sources",
+      "RISK saved view held Download: trusted terminal Download preserves the same Copy archive and original sources",
+      "RISK MANUAL JSON EXPORT: a refused download leaves the same prepared archive available to Copy"
+    ],
+    "modifiedExistingTestRoots": [
+      "RISK saved view held Export: terminal Settings preserves an exact partial source-only archive",
+      "RISK saved view held Copy: trusted terminal Copy preserves prepared bytes and original sources",
+      "RISK saved view held Download: trusted terminal Download preserves the same Copy archive and original sources"
+    ],
+    "preservedCoverage": [
+      "Every inherited test and rationale object remains intact. TC01 mechanical reversal recovers the exact df2a7674 predecessor, retaining53/79/78 terminal assert expressions and every original statement/mock; H original eight configurations, import/source protection and established transfer cases are unchanged.",
+      "Fresh Download remains enabled BEFORE Copy; trusted controls retain one prepared serial and exact prepared/Copy/actual-file bytes and filename. Partial currentBoard:null, unavailable application IDB and stores:null remain truthful; independent raw meta/snapshot/backup/opaque/pending/unknown values are protected without restoring app authority.",
+      "The refusal consumer retains all unknown current edits, exact saved head/backup/opaque/pending/account/revision bytes, zero device/source writes, no replay/upload/adoption and scan/save timers. It never clears its monitor, blanket ignores diagnostic writes, alters fixtures/helpers or grants cloud authority.",
+      "Existing bounded Debug metadata privacy remains exact: transfer-phase storage writes zero; Close alone adds one literal-key fixed-schema event/lastAction within its call interval and established one-hour/8192byte/eight-event limits, retaining earlier metadata and rejecting every other operation/key/value/field.",
+      "Original product RED/GREEN cycles and intermediate failures remain source-specific. No final fa918 runtime, native WebKit, OS paste, physical-device, installed/full-suite/CI/release result is inferred. Broader inherited comparison-base changes retain their original rationale and accepted boundaries; this association adds no approval or coverage waiver."
+    ],
+    "redEvidence": {
+      "command": "Retained actual product-cycle records Export RED62d116ec/GREEN0c13d433, Copy REDf2b8736a/GREEN5301267e and fresh Download RED4c4c6527; original attempted GREEN1297520c remains declared green/nonzero-exit. Later process-oracle baseline: Node24.19.0 --test --test-reporter=tap --test-name-pattern=^RISK MANUAL JSON EXPORT: a refused download leaves the same prepared archive available to Copy$ tests.js, recorder2026-10-29T03-57-10-746Z-30282cd1-4a92-4f02-bf2c-9ed797641fa3, testsSHAa1785a5d1e76fe96c46db3abed97615b8beb6887d17e421b9897369f6e64a681, recordSHAe8f56792b70a3a400a7f91de2288669e48c4cb92edb5569bac9f1c1503c96677. These original commands/streams remain external under implement-293-20261028 and their original native tickets.",
+      "failure": "Actual30282cd1 outcome assertion-failure/1test0pass1fail at tests21408:44: expected browserWrites[] but observed one545byte restart-diagnostics setItem ending with close-modal. Earlier refusal/Copy/source/authority/device checks passed; finalcloud was unreached. Static1244 and accepted1248 corrected only this oracle; actualb35acfe7 then passed1/1 including finalcloud at testsdf2a7674. This schema redEvidence field preserves an observed process-oracle failure, not an original preimplementation productRED. TC01 engine wrappers are definition-only, with no invented failing or WebKit run."
+    },
+    "historicalEvidence": {
+      "refusalFailed": {
+        "recordId": "30282cd1",
+        "declaredPurpose": "green",
+        "outcome": "assertion-failure",
+        "recordSha256": "e8f56792b70a3a400a7f91de2288669e48c4cb92edb5569bac9f1c1503c96677"
+      },
+      "refusalCorrectedPass": {
+        "recordId": "b35acfe7",
+        "declaredPurpose": "green",
+        "outcome": "passed",
+        "tests": 1,
+        "sourceTestsSha256": "df2a76746eaee676f648748aae0caa58179832c6143470bf6e57d75f5332b624",
+        "recordSha256": "3fdcae929bedc6fa01aef88e88d5c6bb24645c5c82852b07d604d1ba36f1fd5e"
+      },
+      "downloadAnchorAttemptedGreenFailure": {
+        "recordId": "1297520c",
+        "declaredPurpose": "green",
+        "outcome": "nonzero-exit"
+      },
+      "downloadActualChromiumFilePass": {
+        "recordId": "33d1f1fc",
+        "recordSha256": "bb5b209ee08c286ba629796d0736808318dafddb8ed7cdfb468a924459709e39",
+        "actualFileSha256": "4a74d98185523e1a87b4a6d54c07f1f3b1e7e7774efb00165832bf17cfb76546"
+      },
+      "TC01MechanicalComparisonSha256": "8511808aedd4a78f7094bee207d7c30345ddad617e1ea405c6e0a94b11f7523c",
+      "finalBothEngineProof": "not-run; owned by1174"
+    }
+  },
+  {
+    "baseCommit": "c920ccffc11af487ec84277c33fe2e370541e384",
+    "comparisonMergeBase": "c920ccffc11af487ec84277c33fe2e370541e384",
+    "testChangesSha256": "453bd5e04d94909dade9c19211b4af769ad527248102c6d3757624146cabd4b0",
+    "cycle": "held-transfer-final-comparison-HE14-1171",
+    "reason": "Associate the actual completed held-transfer test diff with this immutable comparison base while preserving every inherited rationale object and its original bytes. Seal the genuine new Download-refusal consumer and its explicitly accepted bounded Close observer correction together with the three minimal sequential Chromium/WebKit definitions. This is comparison metadata for completed source, not new application behavior or fabricated RED chronology.",
+    "previousBehavior": "The held product cycles already admitted Export/Copy/Download under the opening recovery hold, then corrected the temporary anchor parent. The new refusal control initially failed its all-browser-writes-zero oracle at explicit Close; source/output proved one permitted bounded restart-metadata write. The actual old30282cd1 run remains failed, purposegreen, with finalcloud assertion unreached. Existing terminal definitions used default Chromium only.",
+    "intendedBehavior": "Retain exact final testsfa918b8ce9dd4461f468091e6b65ab07bc6b5d47b6037f69275d2f2243b2d341: actual external Download refusal preserves the same prepared bytes/serial and later Copy, transfer work performs zero writes, explicit Close permits only its exact bounded metadata delta in the complete unreset history, and every original raw/current/durable/source/authority/timer/device/cloud assertion remains. Define original terminal bodies in sequential explicit chromium/webkit children with one root fixture. Final both-engine verification remains pending one1174 cohort on the actual packaged clean candidate.",
+    "replacementTests": [
+      "RISK saved view held Export: terminal Settings preserves an exact partial source-only archive",
+      "RISK saved view held Copy: trusted terminal Copy preserves prepared bytes and original sources",
+      "RISK saved view held Download: trusted terminal Download preserves the same Copy archive and original sources",
+      "RISK MANUAL JSON EXPORT: a refused download leaves the same prepared archive available to Copy"
+    ],
+    "modifiedExistingTestRoots": [
+      "RISK saved view held Export: terminal Settings preserves an exact partial source-only archive",
+      "RISK saved view held Copy: trusted terminal Copy preserves prepared bytes and original sources",
+      "RISK saved view held Download: trusted terminal Download preserves the same Copy archive and original sources"
+    ],
+    "preservedCoverage": [
+      "Every inherited test and rationale object remains intact. TC01 mechanical reversal recovers the exact df2a7674 predecessor, retaining53/79/78 terminal assert expressions and every original statement/mock; H original eight configurations, import/source protection and established transfer cases are unchanged.",
+      "Fresh Download remains enabled BEFORE Copy; trusted controls retain one prepared serial and exact prepared/Copy/actual-file bytes and filename. Partial currentBoard:null, unavailable application IDB and stores:null remain truthful; independent raw meta/snapshot/backup/opaque/pending/unknown values are protected without restoring app authority.",
+      "The refusal consumer retains all unknown current edits, exact saved head/backup/opaque/pending/account/revision bytes, zero device/source writes, no replay/upload/adoption and scan/save timers. It never clears its monitor, blanket ignores diagnostic writes, alters fixtures/helpers or grants cloud authority.",
+      "Existing bounded Debug metadata privacy remains exact: transfer-phase storage writes zero; Close alone adds one literal-key fixed-schema event/lastAction within its call interval and established one-hour/8192byte/eight-event limits, retaining earlier metadata and rejecting every other operation/key/value/field.",
+      "Original product RED/GREEN cycles and intermediate failures remain source-specific. No final fa918 runtime, native WebKit, OS paste, physical-device, installed/full-suite/CI/release result is inferred. Broader inherited comparison-base changes retain their original rationale and accepted boundaries; this association adds no approval or coverage waiver."
+    ],
+    "redEvidence": {
+      "command": "Retained actual product-cycle records Export RED62d116ec/GREEN0c13d433, Copy REDf2b8736a/GREEN5301267e and fresh Download RED4c4c6527; original attempted GREEN1297520c remains declared green/nonzero-exit. Later process-oracle baseline: Node24.19.0 --test --test-reporter=tap --test-name-pattern=^RISK MANUAL JSON EXPORT: a refused download leaves the same prepared archive available to Copy$ tests.js, recorder2026-10-29T03-57-10-746Z-30282cd1-4a92-4f02-bf2c-9ed797641fa3, testsSHAa1785a5d1e76fe96c46db3abed97615b8beb6887d17e421b9897369f6e64a681, recordSHAe8f56792b70a3a400a7f91de2288669e48c4cb92edb5569bac9f1c1503c96677. These original commands/streams remain external under implement-293-20261028 and their original native tickets.",
+      "failure": "Actual30282cd1 outcome assertion-failure/1test0pass1fail at tests21408:44: expected browserWrites[] but observed one545byte restart-diagnostics setItem ending with close-modal. Earlier refusal/Copy/source/authority/device checks passed; finalcloud was unreached. Static1244 and accepted1248 corrected only this oracle; actualb35acfe7 then passed1/1 including finalcloud at testsdf2a7674. This schema redEvidence field preserves an observed process-oracle failure, not an original preimplementation productRED. TC01 engine wrappers are definition-only, with no invented failing or WebKit run."
+    },
+    "historicalEvidence": {
+      "refusalFailed": {
+        "recordId": "30282cd1",
+        "declaredPurpose": "green",
+        "outcome": "assertion-failure",
+        "recordSha256": "e8f56792b70a3a400a7f91de2288669e48c4cb92edb5569bac9f1c1503c96677"
+      },
+      "refusalCorrectedPass": {
+        "recordId": "b35acfe7",
+        "declaredPurpose": "green",
+        "outcome": "passed",
+        "tests": 1,
+        "sourceTestsSha256": "df2a76746eaee676f648748aae0caa58179832c6143470bf6e57d75f5332b624",
+        "recordSha256": "3fdcae929bedc6fa01aef88e88d5c6bb24645c5c82852b07d604d1ba36f1fd5e"
+      },
+      "downloadAnchorAttemptedGreenFailure": {
+        "recordId": "1297520c",
+        "declaredPurpose": "green",
+        "outcome": "nonzero-exit"
+      },
+      "downloadActualChromiumFilePass": {
+        "recordId": "33d1f1fc",
+        "recordSha256": "bb5b209ee08c286ba629796d0736808318dafddb8ed7cdfb468a924459709e39",
+        "actualFileSha256": "4a74d98185523e1a87b4a6d54c07f1f3b1e7e7774efb00165832bf17cfb76546"
+      },
+      "TC01MechanicalComparisonSha256": "8511808aedd4a78f7094bee207d7c30345ddad617e1ea405c6e0a94b11f7523c",
+      "finalBothEngineProof": "not-run; owned by1174"
+    }
+  },
+  {
+    "baseCommit": "b176026825e4f9539780f745fe60e09cf348d288",
+    "comparisonMergeBase": "b176026825e4f9539780f745fe60e09cf348d288",
+    "testChangesSha256": "983f56ad3007e06f5503aea6b0f85968873f367cb9607dccede35fc023508c37",
+    "cycle": "held-transfer-final-comparison-HE14-1171",
+    "reason": "Associate the actual completed held-transfer test diff with this immutable comparison base while preserving every inherited rationale object and its original bytes. Seal the genuine new Download-refusal consumer and its explicitly accepted bounded Close observer correction together with the three minimal sequential Chromium/WebKit definitions. This is comparison metadata for completed source, not new application behavior or fabricated RED chronology.",
+    "previousBehavior": "The held product cycles already admitted Export/Copy/Download under the opening recovery hold, then corrected the temporary anchor parent. The new refusal control initially failed its all-browser-writes-zero oracle at explicit Close; source/output proved one permitted bounded restart-metadata write. The actual old30282cd1 run remains failed, purposegreen, with finalcloud assertion unreached. Existing terminal definitions used default Chromium only.",
+    "intendedBehavior": "Retain exact final testsfa918b8ce9dd4461f468091e6b65ab07bc6b5d47b6037f69275d2f2243b2d341: actual external Download refusal preserves the same prepared bytes/serial and later Copy, transfer work performs zero writes, explicit Close permits only its exact bounded metadata delta in the complete unreset history, and every original raw/current/durable/source/authority/timer/device/cloud assertion remains. Define original terminal bodies in sequential explicit chromium/webkit children with one root fixture. Final both-engine verification remains pending one1174 cohort on the actual packaged clean candidate.",
+    "replacementTests": [
+      "RISK saved view held Export: terminal Settings preserves an exact partial source-only archive",
+      "RISK saved view held Copy: trusted terminal Copy preserves prepared bytes and original sources",
+      "RISK saved view held Download: trusted terminal Download preserves the same Copy archive and original sources",
+      "RISK MANUAL JSON EXPORT: a refused download leaves the same prepared archive available to Copy"
+    ],
+    "modifiedExistingTestRoots": [
+      "RISK saved view held Export: terminal Settings preserves an exact partial source-only archive",
+      "RISK saved view held Copy: trusted terminal Copy preserves prepared bytes and original sources",
+      "RISK saved view held Download: trusted terminal Download preserves the same Copy archive and original sources"
+    ],
+    "preservedCoverage": [
+      "Every inherited test and rationale object remains intact. TC01 mechanical reversal recovers the exact df2a7674 predecessor, retaining53/79/78 terminal assert expressions and every original statement/mock; H original eight configurations, import/source protection and established transfer cases are unchanged.",
+      "Fresh Download remains enabled BEFORE Copy; trusted controls retain one prepared serial and exact prepared/Copy/actual-file bytes and filename. Partial currentBoard:null, unavailable application IDB and stores:null remain truthful; independent raw meta/snapshot/backup/opaque/pending/unknown values are protected without restoring app authority.",
+      "The refusal consumer retains all unknown current edits, exact saved head/backup/opaque/pending/account/revision bytes, zero device/source writes, no replay/upload/adoption and scan/save timers. It never clears its monitor, blanket ignores diagnostic writes, alters fixtures/helpers or grants cloud authority.",
+      "Existing bounded Debug metadata privacy remains exact: transfer-phase storage writes zero; Close alone adds one literal-key fixed-schema event/lastAction within its call interval and established one-hour/8192byte/eight-event limits, retaining earlier metadata and rejecting every other operation/key/value/field.",
+      "Original product RED/GREEN cycles and intermediate failures remain source-specific. No final fa918 runtime, native WebKit, OS paste, physical-device, installed/full-suite/CI/release result is inferred. Broader inherited comparison-base changes retain their original rationale and accepted boundaries; this association adds no approval or coverage waiver."
+    ],
+    "redEvidence": {
+      "command": "Retained actual product-cycle records Export RED62d116ec/GREEN0c13d433, Copy REDf2b8736a/GREEN5301267e and fresh Download RED4c4c6527; original attempted GREEN1297520c remains declared green/nonzero-exit. Later process-oracle baseline: Node24.19.0 --test --test-reporter=tap --test-name-pattern=^RISK MANUAL JSON EXPORT: a refused download leaves the same prepared archive available to Copy$ tests.js, recorder2026-10-29T03-57-10-746Z-30282cd1-4a92-4f02-bf2c-9ed797641fa3, testsSHAa1785a5d1e76fe96c46db3abed97615b8beb6887d17e421b9897369f6e64a681, recordSHAe8f56792b70a3a400a7f91de2288669e48c4cb92edb5569bac9f1c1503c96677. These original commands/streams remain external under implement-293-20261028 and their original native tickets.",
+      "failure": "Actual30282cd1 outcome assertion-failure/1test0pass1fail at tests21408:44: expected browserWrites[] but observed one545byte restart-diagnostics setItem ending with close-modal. Earlier refusal/Copy/source/authority/device checks passed; finalcloud was unreached. Static1244 and accepted1248 corrected only this oracle; actualb35acfe7 then passed1/1 including finalcloud at testsdf2a7674. This schema redEvidence field preserves an observed process-oracle failure, not an original preimplementation productRED. TC01 engine wrappers are definition-only, with no invented failing or WebKit run."
+    },
+    "historicalEvidence": {
+      "refusalFailed": {
+        "recordId": "30282cd1",
+        "declaredPurpose": "green",
+        "outcome": "assertion-failure",
+        "recordSha256": "e8f56792b70a3a400a7f91de2288669e48c4cb92edb5569bac9f1c1503c96677"
+      },
+      "refusalCorrectedPass": {
+        "recordId": "b35acfe7",
+        "declaredPurpose": "green",
+        "outcome": "passed",
+        "tests": 1,
+        "sourceTestsSha256": "df2a76746eaee676f648748aae0caa58179832c6143470bf6e57d75f5332b624",
+        "recordSha256": "3fdcae929bedc6fa01aef88e88d5c6bb24645c5c82852b07d604d1ba36f1fd5e"
+      },
+      "downloadAnchorAttemptedGreenFailure": {
+        "recordId": "1297520c",
+        "declaredPurpose": "green",
+        "outcome": "nonzero-exit"
+      },
+      "downloadActualChromiumFilePass": {
+        "recordId": "33d1f1fc",
+        "recordSha256": "bb5b209ee08c286ba629796d0736808318dafddb8ed7cdfb468a924459709e39",
+        "actualFileSha256": "4a74d98185523e1a87b4a6d54c07f1f3b1e7e7774efb00165832bf17cfb76546"
+      },
+      "TC01MechanicalComparisonSha256": "8511808aedd4a78f7094bee207d7c30345ddad617e1ea405c6e0a94b11f7523c",
+      "finalBothEngineProof": "not-run; owned by1174"
+    }
+  },
+  {
+    "baseCommit": "2d3989d9b0309308c85eae49b32d881c0e6c0a88",
+    "comparisonMergeBase": "2d3989d9b0309308c85eae49b32d881c0e6c0a88",
+    "testChangesSha256": "5dfcbc8c411ca01b817710f183172350fc58706796ab6d750a530f9d5796de4d",
+    "cycle": "held-transfer-final-comparison-HE14-1171",
+    "reason": "Associate the actual completed held-transfer test diff with this immutable comparison base while preserving every inherited rationale object and its original bytes. Seal the genuine new Download-refusal consumer and its explicitly accepted bounded Close observer correction together with the three minimal sequential Chromium/WebKit definitions. This is comparison metadata for completed source, not new application behavior or fabricated RED chronology.",
+    "previousBehavior": "The held product cycles already admitted Export/Copy/Download under the opening recovery hold, then corrected the temporary anchor parent. The new refusal control initially failed its all-browser-writes-zero oracle at explicit Close; source/output proved one permitted bounded restart-metadata write. The actual old30282cd1 run remains failed, purposegreen, with finalcloud assertion unreached. Existing terminal definitions used default Chromium only.",
+    "intendedBehavior": "Retain exact final testsfa918b8ce9dd4461f468091e6b65ab07bc6b5d47b6037f69275d2f2243b2d341: actual external Download refusal preserves the same prepared bytes/serial and later Copy, transfer work performs zero writes, explicit Close permits only its exact bounded metadata delta in the complete unreset history, and every original raw/current/durable/source/authority/timer/device/cloud assertion remains. Define original terminal bodies in sequential explicit chromium/webkit children with one root fixture. Final both-engine verification remains pending one1174 cohort on the actual packaged clean candidate.",
+    "replacementTests": [
+      "RISK MANUAL JSON EXPORT: a refused download leaves the same prepared archive available to Copy"
+    ],
+    "modifiedExistingTestRoots": [
+      "RISK saved view held Export: terminal Settings preserves an exact partial source-only archive",
+      "RISK saved view held Copy: trusted terminal Copy preserves prepared bytes and original sources",
+      "RISK saved view held Download: trusted terminal Download preserves the same Copy archive and original sources"
+    ],
+    "preservedCoverage": [
+      "Every inherited test and rationale object remains intact. TC01 mechanical reversal recovers the exact df2a7674 predecessor, retaining53/79/78 terminal assert expressions and every original statement/mock; H original eight configurations, import/source protection and established transfer cases are unchanged.",
+      "Fresh Download remains enabled BEFORE Copy; trusted controls retain one prepared serial and exact prepared/Copy/actual-file bytes and filename. Partial currentBoard:null, unavailable application IDB and stores:null remain truthful; independent raw meta/snapshot/backup/opaque/pending/unknown values are protected without restoring app authority.",
+      "The refusal consumer retains all unknown current edits, exact saved head/backup/opaque/pending/account/revision bytes, zero device/source writes, no replay/upload/adoption and scan/save timers. It never clears its monitor, blanket ignores diagnostic writes, alters fixtures/helpers or grants cloud authority.",
+      "Existing bounded Debug metadata privacy remains exact: transfer-phase storage writes zero; Close alone adds one literal-key fixed-schema event/lastAction within its call interval and established one-hour/8192byte/eight-event limits, retaining earlier metadata and rejecting every other operation/key/value/field.",
+      "Original product RED/GREEN cycles and intermediate failures remain source-specific. No final fa918 runtime, native WebKit, OS paste, physical-device, installed/full-suite/CI/release result is inferred. Broader inherited comparison-base changes retain their original rationale and accepted boundaries; this association adds no approval or coverage waiver."
+    ],
+    "redEvidence": {
+      "command": "Retained actual product-cycle records Export RED62d116ec/GREEN0c13d433, Copy REDf2b8736a/GREEN5301267e and fresh Download RED4c4c6527; original attempted GREEN1297520c remains declared green/nonzero-exit. Later process-oracle baseline: Node24.19.0 --test --test-reporter=tap --test-name-pattern=^RISK MANUAL JSON EXPORT: a refused download leaves the same prepared archive available to Copy$ tests.js, recorder2026-10-29T03-57-10-746Z-30282cd1-4a92-4f02-bf2c-9ed797641fa3, testsSHAa1785a5d1e76fe96c46db3abed97615b8beb6887d17e421b9897369f6e64a681, recordSHAe8f56792b70a3a400a7f91de2288669e48c4cb92edb5569bac9f1c1503c96677. These original commands/streams remain external under implement-293-20261028 and their original native tickets.",
+      "failure": "Actual30282cd1 outcome assertion-failure/1test0pass1fail at tests21408:44: expected browserWrites[] but observed one545byte restart-diagnostics setItem ending with close-modal. Earlier refusal/Copy/source/authority/device checks passed; finalcloud was unreached. Static1244 and accepted1248 corrected only this oracle; actualb35acfe7 then passed1/1 including finalcloud at testsdf2a7674. This schema redEvidence field preserves an observed process-oracle failure, not an original preimplementation productRED. TC01 engine wrappers are definition-only, with no invented failing or WebKit run."
+    },
+    "historicalEvidence": {
+      "refusalFailed": {
+        "recordId": "30282cd1",
+        "declaredPurpose": "green",
+        "outcome": "assertion-failure",
+        "recordSha256": "e8f56792b70a3a400a7f91de2288669e48c4cb92edb5569bac9f1c1503c96677"
+      },
+      "refusalCorrectedPass": {
+        "recordId": "b35acfe7",
+        "declaredPurpose": "green",
+        "outcome": "passed",
+        "tests": 1,
+        "sourceTestsSha256": "df2a76746eaee676f648748aae0caa58179832c6143470bf6e57d75f5332b624",
+        "recordSha256": "3fdcae929bedc6fa01aef88e88d5c6bb24645c5c82852b07d604d1ba36f1fd5e"
+      },
+      "downloadAnchorAttemptedGreenFailure": {
+        "recordId": "1297520c",
+        "declaredPurpose": "green",
+        "outcome": "nonzero-exit"
+      },
+      "downloadActualChromiumFilePass": {
+        "recordId": "33d1f1fc",
+        "recordSha256": "bb5b209ee08c286ba629796d0736808318dafddb8ed7cdfb468a924459709e39",
+        "actualFileSha256": "4a74d98185523e1a87b4a6d54c07f1f3b1e7e7774efb00165832bf17cfb76546"
+      },
+      "TC01MechanicalComparisonSha256": "8511808aedd4a78f7094bee207d7c30345ddad617e1ea405c6e0a94b11f7523c",
+      "finalBothEngineProof": "not-run; owned by1174"
+    }
+  }
 ]

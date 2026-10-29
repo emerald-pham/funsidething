@@ -1130,7 +1130,7 @@ let openingRecoveryDisabledControls = [];
 const OPENING_RECOVERY_ACTIONS=new Set(['settings','help','close-modal','mback','sync','sync-retry','sync-reload','sync-signout',
  'view-raw-backups','select-raw-backups','download-raw-backups','view-database-repair','copy-database-repair','select-database-repair',
  'view-support-diagnostics','select-support-diagnostics','return-support-diagnostics','copy-support-diagnostics','download-support-diagnostics','refresh-support-diagnostics',
- 'download-backup','download-raw-device-sources','select-recovery-archive','import-backup','restore-backup','open-paste-recovery','close-paste-recovery','choose-backup-file','preview-pasted-recovery','cancel-file-restore','confirm-file-restore','choose-file-restore-board','choose-file-restore-ratings',
+ 'download-backup','download-raw-device-sources','select-recovery-archive','export-backup','copy-export','download-export','import-backup','restore-backup','open-paste-recovery','close-paste-recovery','choose-backup-file','preview-pasted-recovery','cancel-file-restore','confirm-file-restore','choose-file-restore-board','choose-file-restore-ratings',
  'review-cloud-source-recovery','choose-cloud-recovery-source','apply-cloud-source-recovery']);
 let localDeviceStartupAttempt = null;
 let liveBoardAccepted = false; // false means the shell is still a hydration placeholder or saved state was rejected
@@ -2308,7 +2308,7 @@ function downloadPreparedExport(){
   setExportTransferBusy(true,"Starting download…");
   try{
     const url=URL.createObjectURL(new Blob([exportTransferPayload],{type:"application/json"})),link=document.createElement("a");
-    link.href=url;link.download="chain-scanner-recovery-archive.json";document.body.appendChild(link);link.click();link.remove();
+    link.href=url;link.download="chain-scanner-recovery-archive.json";document.getElementById("exportTransferDialog").appendChild(link);link.click();link.remove();
     setTimeout(()=>URL.revokeObjectURL(url),30000);
     setExportTransferBusy(false,"Download started. The archive contains the exact prepared export.");return true;
   }catch{
