@@ -28999,9 +28999,7 @@
       "RISK BACKUP FILE RESTORE real service: failed publication cannot acknowledge an import (Firestore rules: import publication)",
       "RISK BACKUP FILE RESTORE real service: committed publication remains unacknowledged without readback (Firestore rules: import uncertain ACK)",
       "RISK BACKUP FILE RESTORE real service: a changed peer revision refuses stale consent (Firestore rules: import peer)",
-      "RISK BACKUP FILE RESTORE real service control: bypassed acknowledgement fails the complete consumer (Firestore rules: import ACK sensitivity)",
-      "RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources",
-      "RISK saved view held Export: terminal Settings preserves an exact partial source-only archive"
+      "RISK BACKUP FILE RESTORE real service control: bypassed acknowledgement fails the complete consumer (Firestore rules: import ACK sensitivity)"
     ],
     "preservedCoverage": [
       "All prior complete root objects remain the original raw prefix and all complete incoming objects remain present.",
