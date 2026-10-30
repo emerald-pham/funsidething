@@ -103,9 +103,9 @@ if(process.argv[1] && path.resolve(process.argv[1])===fileURLToPath(import.meta.
     process.stderr.write('A zero base SHA has no commit to compare. Resolve the base against the default branch before running the gate.\n');process.exitCode=2;
   }else{
     try{
-      const diff=(...args)=>execFileSync('git',['diff',...args,`${base}...HEAD`],{encoding:'utf8'});
+      const diff=(...args)=>execFileSync('git',['diff',...args,`${base}...HEAD`],{encoding:'utf8',maxBuffer:64*1024*1024});
       const changed=diff('--name-only','--diff-filter=ACMRTD').trim().split('\n').filter(Boolean);
-      const testDiff=execFileSync('git',['diff','--unified=0',`${base}...HEAD`,'--','tests.js'],{encoding:'utf8'}).split('\n');
+      const testDiff=execFileSync('git',['diff','--unified=0',`${base}...HEAD`,'--','tests.js'],{encoding:'utf8',maxBuffer:64*1024*1024}).split('\n');
       const records=fs.existsSync('TEST_CHANGE_RATIONALES.json')?JSON.parse(fs.readFileSync('TEST_CHANGE_RATIONALES.json','utf8')):[];
       const errors=[...validateTestFirst(changed,testDiff),...validateRegressionChanges(testDiff,records)];
       if(errors.length){process.stderr.write(errors.join('\n')+'\n');process.exitCode=1;}

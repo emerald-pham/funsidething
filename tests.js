@@ -51538,3 +51538,104 @@ test('RISK repository process: ordinary startup settings distinguish legacy raw8
   }finally{fs.writeFileSync(path.join(directory,'oracle-unit-custody.json'),JSON.stringify(journal,null,2)+'\n');}
  });
 });
+
+test('RISK test-first gate: public CLI validates complete large UTF8 Git diffs and preserves specific refusals',async t=>{
+ const {tmpdir}=await import('node:os'),{protectedTestFingerprint}=await import('./scripts/test-first-gate.mjs');
+ const configured=process.env.CHAIN_TEST_FIRST_CLI_EVIDENCE_DIR;
+ if(configured){assert.ok(path.isAbsolute(configured));assert.equal(fs.existsSync(configured),false,'CLI fixture evidence must start absent');}
+ const root=configured||(fs.mkdtempSync(path.join(tmpdir(),'chain-large-diff-gate-')));
+ if(configured)fs.mkdirSync(root,{recursive:true});
+ const directory=path.join(root,'repository'),journal=path.join(root,'journal');
+ fs.mkdirSync(path.join(directory,'scripts'),{recursive:true});fs.mkdirSync(journal);
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
+ const cases=['covered-large-source','missing-rationale','mismatched-fingerprint','uncovered-app','uncovered-enforcement','removal-without-exact-rationale','reviewed-replacement','invalid-ref','missing-ref','zero-ref','unavailable-commit','git-child-error'];
+ const invoked=[],completed=[];let commandCount=0,phase='setup';
+ const save=(name,value)=>fs.writeFileSync(path.join(journal,name),JSON.stringify(value,null,2)+'\n');
+ const command=(executable,args,cwd=directory)=>{
+  const id=String(++commandCount).padStart(4,'0'),argv=[executable,...args];
+  const result=spawnSync(executable,args,{cwd,env,encoding:'utf8',timeout:30000,maxBuffer:64*1024*1024});
+  const stdout=result.stdout||'',stderr=result.stderr||'';
+  fs.writeFileSync(path.join(journal,id+'.stdout'),stdout);fs.writeFileSync(path.join(journal,id+'.stderr'),stderr);
+  const record={id,argv,cwd,status:result.status,signal:result.signal,error:result.error?{name:result.error.name,message:result.error.message,code:result.error.code,stack:result.error.stack}:null,stdoutPath:id+'.stdout',stderrPath:id+'.stderr',stdoutBytes:Buffer.byteLength(stdout),stderrBytes:Buffer.byteLength(stderr),stdoutSha256:digest(stdout),stderrSha256:digest(stderr)};
+  save(id+'.json',record);return {...result,stdout,stderr,record};
+ };
+ const git=(...args)=>{const result=command('git',args);assert.equal(result.error,undefined,result.error?.stack);assert.equal(result.status,0,result.stderr);return result;};
+ const commit=message=>{git('add','.');git('-c','user.name=Large CLI fixture','-c','user.email=large-cli@example.invalid','commit','-qm',message);};
+ t.after(()=>{
+  save('terminal.json',{phase,cases,invoked,completed,unexecuted:cases.filter(name=>!invoked.includes(name)),commandCount,allSynchronousChildrenExited:true,retained:!!configured});
+  if(!configured)fs.rmSync(root,{recursive:true,force:true});
+ });
+ const gateBytes=fs.readFileSync(path.join(__dirname,'scripts/test-first-gate.mjs'));
+ fs.writeFileSync(path.join(directory,'scripts/test-first-gate.mjs'),gateBytes);
+ fs.writeFileSync(path.join(directory,'scripts/button-safety-fixture.mjs'),'export const fixtureRevision=1;\n');
+ fs.writeFileSync(path.join(directory,'index.html'),'<!doctype html><title>Original isolated app</title>\n');
+ const original="import {test} from 'node:test';\nimport assert from 'node:assert/strict';\ntest('Original arithmetic feature',()=>assert.equal(2+2,4));\n";
+ fs.writeFileSync(path.join(directory,'tests.js'),original);fs.writeFileSync(path.join(directory,'TEST_CHANGE_RATIONALES.json'),'[]\n');
+ git('init','-q','--initial-branch=fixture');commit('Original isolated feature contracts');
+ const base=git('rev-parse','HEAD').stdout.trim();
+ const rows=Array.from({length:10000},(_,index)=>{
+  const label='épreuve-'+String(index).padStart(5,'0')+'-容量-'+'complete-source-'.repeat(7);
+  return '  ['+JSON.stringify(label)+','+Buffer.byteLength(label)+'],';
+ }).join('\n');
+ const titles={covered:['RISK repository process: every large UTF8 source row stays covered','RISK repository process: late Unicode source remains executable'],app:['Large UTF8 source rows stay covered','Late Unicode source remains executable'],enforcement:['RISK unrelated large UTF8 source rows stay covered','RISK unrelated late Unicode source remains executable']};
+ const source=(names,remove=false)=>(remove?original.replace("test('Original arithmetic feature',()=>assert.equal(2+2,4));\n",''):original)+
+  'test('+JSON.stringify(names[0])+',()=>{\n const samples=[\n'+rows+'\n ];\n assert.equal(samples.length,10000);\n for(const [label,expectedBytes]of samples)assert.equal(Buffer.byteLength(label),expectedBytes);\n});\n'+
+  'test('+JSON.stringify(names[1])+",()=>assert.equal(Buffer.byteLength('終端容量é'),14));\n";
+ const late="assert.equal(Buffer.byteLength('終端容量é'),14)";
+ const rationale=(diff,names)=>({testChangesSha256:protectedTestFingerprint(diff.split('\n')),reason:'Review the entire genuine large UTF8 source comparison while preserving exact rationale enforcement.',previousBehavior:'The retained 94210 public CLI failed before a validator verdict when Git output exceeded its implicit buffer.',intendedBehavior:'A fully covered and specifically documented large source comparison passes while each precise refusal remains.',replacementTests:names,preservedCoverage:['Every original fixture boundary is preserved except the explicitly reviewed replacement scenario, whose complete diff is separately justified.'],redEvidence:{command:'node scripts/test-first-gate.mjs 6c67fb0c9988d3e578579c7bb23a8ed0731aac3f at retained 94210',failure:'Actual retained 94210 public CLI exit2: spawnSync git ENOBUFS before rationale validation.'}});
+ let coveredRecord;
+ const scenario=(name,{names=titles.covered,app=true,enforcement=true,remove=false,record='exact'}={})=>{
+  phase='prepare-'+name;git('switch','-q','-c',name,base);
+  const bytes=source(names,remove);fs.writeFileSync(path.join(directory,'tests.js'),bytes);
+  if(app)fs.writeFileSync(path.join(directory,'index.html'),'<!doctype html><title>Reviewed isolated app change</title>\n');
+  if(enforcement)fs.writeFileSync(path.join(directory,'scripts/button-safety-fixture.mjs'),'export const fixtureRevision=2;\n');
+  commit('Prepare '+name+' executable source');
+  const diff=git('diff','--unified=0',base+'...HEAD','--','tests.js');
+  const diffBytes=Buffer.byteLength(diff.stdout),lateOffset=Buffer.byteLength(diff.stdout.slice(0,diff.stdout.indexOf(late)));
+  assert.ok(diffBytes>1.25*1024*1024&&diffBytes<2*1024*1024,'real complete diff stays within its declared finite size');
+  assert.ok(diff.stdout.includes(late)&&lateOffset>1024*1024,'a real executable Unicode assertion remains beyond the old buffer');
+  const exact=rationale(diff.stdout,names);if(name==='covered-large-source')coveredRecord=exact;
+  if(record==='missing')fs.unlinkSync(path.join(directory,'TEST_CHANGE_RATIONALES.json'));
+  else fs.writeFileSync(path.join(directory,'TEST_CHANGE_RATIONALES.json'),JSON.stringify([record==='wrong'?{...exact,testChangesSha256:'0'.repeat(64)}:record==='covered'?coveredRecord:exact],null,2)+'\n');
+  commit('Bind '+name+' exact rationale state');
+  const head=git('rev-parse','HEAD').stdout.trim();
+  assert.equal(git('status','--porcelain').stdout,'','each public verdict receives a complete committed fixture');
+  const sources=['tests.js','scripts/test-first-gate.mjs','scripts/button-safety-fixture.mjs','index.html','TEST_CHANGE_RATIONALES.json'].map(relative=>{
+   const file=path.join(directory,relative);if(!fs.existsSync(file))return {path:relative,absent:true};
+   const content=fs.readFileSync(file);return {path:relative,bytes:content.length,sha256:digest(content)};
+  });
+  assert.equal(digest(fs.readFileSync(path.join(directory,'scripts/test-first-gate.mjs'))),digest(gateBytes),'actual copied public CLI stays byte exact');
+  save(name+'-source.json',{base,head,sources,diffCommand:diff.record.id,diffBytes,diffSha256:digest(diff.stdout),lateExecutableByteOffset:lateOffset,rationaleFingerprint:exact.testChangesSha256,metadataMode:record});
+ };
+ const invoke=(name,args=[base],cwd=directory)=>{
+  phase=name;invoked.push(name);
+  const result=command(process.execPath,[path.join(directory,'scripts/test-first-gate.mjs'),...args],cwd);
+  save(name+'-public-verdict.json',{...result.record,base,fixtureHead:git('rev-parse','HEAD').stdout.trim(),fixtureSourceRecord:cases.filter(value=>fs.existsSync(path.join(journal,value+'-source.json'))).at(-1)||null});
+  assert.equal(result.error,undefined,result.error?.stack);assert.equal(result.signal,null);return result;
+ };
+ const accepted=(name,result)=>{
+  assert.equal(result.status,0,'complete covered source must receive the actual public CLI success: '+result.stderr);
+  assert.equal(result.stdout,'Test-first diff gate passed.\n');assert.equal(result.stderr,'');completed.push(name);
+ };
+ const refused=(name,result,status,reason,detail)=>{
+  assert.equal(result.status,status,result.stdout+'\n'+result.stderr);assert.equal(result.stdout,'');
+  assert.match(result.stderr,reason);if(detail)assert.match(result.stderr,detail);assert.doesNotMatch(result.stderr,/ENOBUFS|SyntaxError|ERR_MODULE_NOT_FOUND/);completed.push(name);
+ };
+ scenario('covered-large-source');accepted('covered-large-source',invoke('covered-large-source'));
+ scenario('missing-rationale',{record:'missing'});refused('missing-rationale',invoke('missing-rationale'),1,/^Existing tests were changed or removed without an exact-diff rationale in TEST_CHANGE_RATIONALES\.json\.$/m);
+ scenario('mismatched-fingerprint',{record:'wrong'});refused('mismatched-fingerprint',invoke('mismatched-fingerprint'),1,/^Existing tests were changed or removed without an exact-diff rationale in TEST_CHANGE_RATIONALES\.json\.$/m);
+ scenario('uncovered-app',{names:titles.app,enforcement:false});refused('uncovered-app',invoke('uncovered-app'),1,/^A high-risk app or enforcement file changed \(index\.html\) without a new RISK test in tests\.js\.$/m);
+ scenario('uncovered-enforcement',{names:titles.enforcement,app:false});refused('uncovered-enforcement',invoke('uncovered-enforcement'),1,/^Test-first enforcement changed \(scripts\/button-safety-fixture\.mjs\) without a new RISK process test in tests\.js\.$/m);
+ scenario('removal-without-exact-rationale',{remove:true,record:'covered'});refused('removal-without-exact-rationale',invoke('removal-without-exact-rationale'),1,/^Existing tests were changed or removed without an exact-diff rationale in TEST_CHANGE_RATIONALES\.json\.$/m);
+ scenario('reviewed-replacement',{remove:true});accepted('reviewed-replacement',invoke('reviewed-replacement'));
+ refused('invalid-ref',invoke('invalid-ref',['not-a-sha']),2,/^Pass the 40-character base commit SHA\.$/m);
+ refused('missing-ref',invoke('missing-ref',[]),2,/^Pass the 40-character base commit SHA\.$/m);
+ refused('zero-ref',invoke('zero-ref',['0'.repeat(40)]),2,/^A zero base SHA has no commit to compare\. Resolve the base against the default branch before running the gate\.$/m);
+ const unavailable='f'.repeat(40),unavailableResult=invoke('unavailable-commit',[unavailable]);
+ refused('unavailable-commit',unavailableResult,2,/^Could not compare f{40} to HEAD: Command failed: git diff --name-only --diff-filter=ACMRTD /m,/bad revision|unknown revision|[Ii]nvalid symmetric difference expression/);
+ const nonRepository=path.join(root,'non-repository');fs.mkdirSync(nonRepository);
+ const childError=invoke('git-child-error',[base],nonRepository);
+ refused('git-child-error',childError,2,/^Could not compare [0-9a-f]{40} to HEAD: Command failed: git diff --name-only --diff-filter=ACMRTD /m,/[Nn]ot a git repository/);
+ assert.deepEqual(completed,cases,'all positive and specifically classified negative tails execute once');phase='complete';
+});

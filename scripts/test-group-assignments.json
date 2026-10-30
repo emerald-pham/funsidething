@@ -13755,6 +13755,11 @@
       "root": "RISK repository process: ordinary startup settings distinguish legacy raw8 from independently versioned live and durable16",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK test-first gate: public CLI validates complete large UTF8 Git diffs and preserves specific refusals",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [
