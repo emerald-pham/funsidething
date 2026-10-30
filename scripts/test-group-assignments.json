@@ -12403,7 +12403,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK repository process: nested native fixture output stays isolated at the command boundary",
+      "root": "RISK repository process: supported VM module entrypoints retain isolated native fixture output",
       "group": "native-process",
       "file": "tests.js"
     },

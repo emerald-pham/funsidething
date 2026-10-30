@@ -132,7 +132,7 @@ function readJson(file, label) {
 
 function testFiles() {
   const packageJson = readJson(path.join(ROOT, 'package.json'), 'package.json');
-  if (packageJson.scripts?.test !== 'node --test tests.js scripts/agent-tools/*.test.mjs') {
+  if (packageJson.scripts?.test !== 'node --experimental-vm-modules --test tests.js scripts/agent-tools/*.test.mjs') {
     fail('The full npm test entry point changed; update the group runner contract explicitly before grouping this suite.');
   }
   const scriptFiles = fs.readdirSync(path.join(ROOT, 'scripts/agent-tools'))
@@ -1016,7 +1016,7 @@ async function unclassifiedRootGuard(files, assignments, outputDir) {
     const patterns=testNamePatternArguments(roots).map(argument=>argument.replace('--test-name-pattern=','--test-skip-pattern='));
     const prefix=`unclassified-${index}`;
     const stdoutPath=path.join(outputDir,prefix+'.tap'),stderrPath=path.join(outputDir,prefix+'.stderr.log'),summaryPath=path.join(outputDir,prefix+'.summary.jsonl');
-    const child=spawn(process.execPath,['--test','--test-reporter=tap','--test-reporter-destination=stdout','--test-reporter='+reporterPath,'--test-reporter-destination='+summaryPath,...patterns,file],{cwd:ROOT,env,detached:true,stdio:['ignore','pipe','pipe']});
+    const child=spawn(process.execPath,['--experimental-vm-modules','--test','--test-reporter=tap','--test-reporter-destination=stdout','--test-reporter='+reporterPath,'--test-reporter-destination='+summaryPath,...patterns,file],{cwd:ROOT,env,detached:true,stdio:['ignore','pipe','pipe']});
     const stdout=fs.createWriteStream(stdoutPath,{flags:'wx'}),stderr=fs.createWriteStream(stderrPath,{flags:'wx'});
     child.stdout.pipe(stdout);child.stderr.pipe(stderr);
     let timedOut=false,overLimit=false,bytes=0;
@@ -1067,7 +1067,7 @@ async function runChild(files, roots, outputDir, options, source) {
     CHAIN_NATIVE_CANDIDATE_TREE: source.tree,
     CHAIN_RECOVERY_UI_OUTPUT: recoveryDir,
   };
-  const child = spawn(process.execPath, ['--test', '--test-reporter=tap', '--test-concurrency=1', ...patternArguments, ...files], {
+  const child = spawn(process.execPath, ['--experimental-vm-modules', '--test', '--test-reporter=tap', '--test-concurrency=1', ...patternArguments, ...files], {
     cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'],
   });
   child.stdout.pipe(tap);

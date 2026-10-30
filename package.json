@@ -2,7 +2,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tests.js scripts/agent-tools/*.test.mjs",
+    "test": "node --experimental-vm-modules --test tests.js scripts/agent-tools/*.test.mjs",
     "test:agent-tools": "node --test scripts/agent-tools/*.test.mjs",
     "agent:rendered-evidence": "node scripts/agent-tools/rendered-evidence.mjs",
     "agent:record-test-run": "node scripts/agent-tools/record-run.mjs",

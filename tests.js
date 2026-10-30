@@ -47262,7 +47262,7 @@ test('RISK repository process: grouped catalog binds real declarations rather th
  assert.match(result.stdout||'',/^# tests 1$/m);assert.match(result.stdout||'',/^# skipped 0$/m);
 });
 
-test('RISK repository process: nested native fixture output stays isolated at the command boundary',t=>{
+test('RISK repository process: supported VM module entrypoints retain isolated native fixture output',t=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
  const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group runner reconciles complete full and grouped fixture cohorts$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
  const output=[result.stdout,result.stderr].filter(Boolean).join('\n');t.diagnostic(output);
@@ -47274,6 +47274,9 @@ test('RISK repository process: nested native fixture output stays isolated at th
  assert.match(result.stdout||'',/^# skipped 0$/m,'The command-boundary contract cannot pass through a skip');
  assert.match(result.stdout||'',/^# Nested output negative control:.*ENOENT: no such file or directory, open .*candidate-identity\.json/m,
   'The unisolated inherited-output child must actually fail before the isolated child proves success');
+ const vmWitness=(result.stdout||'').match(/^# VM-module supported entrypoint witnesses: (.+)$/m);
+ assert.ok(vmWitness,'The existing whole process consumer must exercise actual VM modules through all supported entrypoints: '+output);
+ assert.deepEqual(JSON.parse(vmWitness[1]),[{entrypoint:'npm test',moduleValues:[1299]},{entrypoint:'group core and unclassified guard',moduleValues:[1299,1299]},{entrypoint:'group native-process',moduleValues:[1299]}]);
 });
 
 test('RISK independent cloud stalled storage: a pending native IDB request cannot block remote-only repair',async t=>{
