@@ -10,11 +10,14 @@ export const TIMELINE_PROVENANCE=Object.freeze({playwright:'1.62.1',webkitRevisi
 export const TIMELINE_BOUNDS=Object.freeze({maxDurationMs:12000,maxEvents:4096,maxEventBytes:1048576,maxTotalBytes:33554432,maxFrames:120,maxFrameBytes:1048576});
 const RETENTION_PROFILE='canonical-json-48mib-memory-png-v1';
 const RETENTION_PROFILE_BOUNDS=Object.freeze({...TIMELINE_BOUNDS,maxTotalBytes:50331648,maxPhysicalPayloadBytes:33554432,maxPersistentPngBytes:0,maxDecodedPngInFlightBytes:1048576});
+const RETENTION_PROFILES=Object.freeze({[RETENTION_PROFILE]:RETENTION_PROFILE_BOUNDS,'canonical-json-56mib-memory-png-v1':Object.freeze({...RETENTION_PROFILE_BOUNDS,maxTotalBytes:58720256})});
 const hash=b=>createHash('sha256').update(b).digest('hex'),finite=n=>Number.isFinite(n)&&n>=0;
 const check=(ok,message)=>assert.ok(ok,'Native Timeline '+message);
 export function verifyNativeTimelineCapture(c,{retentionProfile}={}){
- const selected=c?.schemaVersion===3,bounds=selected?RETENTION_PROFILE_BOUNDS:TIMELINE_BOUNDS;
- if(selected){check(retentionProfile===RETENTION_PROFILE,'explicit retention profile consent required');check(c.retentionProfile===RETENTION_PROFILE,'selected retention profile mismatch');}
+ const selected=c?.schemaVersion===3;
+ if(selected)check(typeof retentionProfile==='string'&&Object.hasOwn(RETENTION_PROFILES,retentionProfile),'explicit retention profile consent required');
+ const bounds=selected?RETENTION_PROFILES[retentionProfile]:TIMELINE_BOUNDS;
+ if(selected)check(c.retentionProfile===retentionProfile,'selected retention profile mismatch');
  else check(retentionProfile===undefined,'retention profile does not match capture schema');
  check([1,2,3].includes(c?.schemaVersion)&&c.selected===true&&c.provider==='webkit-native-timeline','selected provider required');
  check(c.engine==='webkit'&&c.connection==='local-owned','owned local WebKit required');
@@ -69,8 +72,8 @@ export function createNativeTimelineProvider({verifyRuntime}={}){
  check(typeof verifyRuntime==='function','mandatory runtime verifier required');
  // Construction is import-safe. Only an actual start activates the mandatory guard.
  return async function startNativeTimelineCapture({page,outputDir,sourceURL,onSave=()=>{},onStop=()=>{},retentionProfile}){
- check(retentionProfile===undefined||retentionProfile===RETENTION_PROFILE,'unknown retention profile');
- const selectedRetention=retentionProfile===RETENTION_PROFILE,bounds=selectedRetention?RETENTION_PROFILE_BOUNDS:TIMELINE_BOUNDS;
+ check(retentionProfile===undefined||typeof retentionProfile==='string'&&Object.hasOwn(RETENTION_PROFILES,retentionProfile),'unknown retention profile');
+ const selectedRetention=retentionProfile!==undefined,bounds=selectedRetention?RETENTION_PROFILES[retentionProfile]:TIMELINE_BOUNDS;
  const provenance=verifyRuntime();check(JSON.stringify(provenance)===JSON.stringify(TIMELINE_PROVENANCE),'exact verifier provenance required');
  canonicalStartupSource('',undefined,sourceURL);
  const connection=page?._connection;

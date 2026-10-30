@@ -20,7 +20,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
  assert.ok(['ordinary','workload-diagnostic'].includes(selectedProfile),'Unknown button safety profile');
  if(mobileYesMotion&&profile!==undefined)assert.equal(profile,'workload-diagnostic','Mobile button safety requires the original workload-diagnostic profile');
  const ordinaryTimeline=!!startupOpening&&startupCapture==='timeline';
- if(startupRetentionProfile!==undefined)assert.ok(startupRetentionProfile==='canonical-json-48mib-memory-png-v1'&&ordinaryTimeline&&selectedProfile==='ordinary'&&!mobileYesMotion&&!probe&&!scenarioFilter&&!control&&!browserServerEndpoint,'Explicit startup retention profile requires the known ordinary startup Timeline route');
+ if(startupRetentionProfile!==undefined)assert.ok(['canonical-json-48mib-memory-png-v1','canonical-json-56mib-memory-png-v1'].includes(startupRetentionProfile)&&ordinaryTimeline&&selectedProfile==='ordinary'&&!mobileYesMotion&&!probe&&!scenarioFilter&&!control&&!browserServerEndpoint,'Explicit startup retention profile requires the known ordinary startup Timeline route');
  assert.ok(['chromium','webkit'].includes(engine),'Explicit supported engine');
  if(startupCapture!==null)assert.ok(['jpeg','timeline'].includes(startupCapture)&&startupOpening&&!mobileYesMotion&&!probe&&!scenarioFilter&&!control&&!browserServerEndpoint,'Startup capture selection requires known mode on the ordinary startup operation only');
  if(startupCapture==='timeline')verifyNativeTimelineRuntime();
