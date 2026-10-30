@@ -1,0 +1,928 @@
+{
+  "schemaVersion": 1,
+  "selected": true,
+  "provider": "webkit-native-timeline",
+  "status": "captured",
+  "engine": "webkit",
+  "connection": "local-owned",
+  "provenance": {
+    "playwright": "1.62.1",
+    "webkitRevision": "2336",
+    "node": "v24.19.0",
+    "coreBundle": "9393fa79e1c67c74edc26b610d65a4f7ed73d345a762465cc88340a33a2454ac",
+    "protocol": "448bdfe4851c841182a686d85cf3080672adbebf5dfc54d516eb3e3cd967e5fe",
+    "wrapper": "a85baad3d8c07173ac387a59b41500c382b21ed692afe0964d29aac247ccc63b",
+    "webkit": "0eb9d97522607740724d1f019f5ecc8cc1839d24a8152243a4d2d9c59a5de361",
+    "webcore": "9403414950b629fa8732c9ac3df48cbcd05828bf09cf0ad5423a466ce8aef3f3",
+    "jsc": "7f5f6858e7c990f616850c129757548483f56041f9cc7acff2771581ecfa903d",
+    "executable": "fbb73b3ee767f999e312bdf67095b95c81421185513e196a74f6f62a2f702845"
+  },
+  "bounds": {
+    "maxDurationMs": 12000,
+    "maxEvents": 4096,
+    "maxEventBytes": 1048576,
+    "maxTotalBytes": 33554432,
+    "maxFrames": 120,
+    "maxFrameBytes": 1048576
+  },
+  "clock": {
+    "basis": "inspector-stopwatch-seconds",
+    "fallback": false,
+    "pageClockConversion": "unavailable"
+  },
+  "startedBeforeNavigation": true,
+  "startedHostMonotonicMs": 945.294959,
+  "stoppedHostMonotonicMs": 1464.076292,
+  "stopReason": "controlled-document-finished",
+  "sessions": [
+    {
+      "id": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "role": "initial-blank",
+      "armedBeforeResume": false,
+      "armedBeforeNavigation": true
+    }
+  ],
+  "documents": [
+    {
+      "id": "b159f677-41be-48b8-b9ba-e38260f6db31",
+      "timeOrigin": 1793317585676,
+      "sessionId": "page-8",
+      "contextId": 3
+    }
+  ],
+  "counts": {
+    "received": 88,
+    "accepted": 88,
+    "dropped": 0
+  },
+  "totalBytes": 125483,
+  "events": [
+    {
+      "index": 1,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 125,
+      "sha256": "ec0200579f8b3bbf8c1d0acc030db29aeb718b8a46717d4b0effa3a5c93564be",
+      "path": "startup-timeline/event-0001.json"
+    },
+    {
+      "index": 2,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 681,
+      "sha256": "2c68aba7838398259fae42799918231c66fdaf89c437fdecb45a8880d2b90835",
+      "path": "startup-timeline/event-0002.json"
+    },
+    {
+      "index": 3,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 188,
+      "sha256": "6f87923daae466e7038681d059c97763390f1e766bf0f12060e4b5b99be01cda",
+      "path": "startup-timeline/event-0003.json"
+    },
+    {
+      "index": 4,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 124,
+      "sha256": "791a286d95428625c61fcca45a51ea526805f82b469a589b4f3044fd07f09f55",
+      "path": "startup-timeline/event-0004.json"
+    },
+    {
+      "index": 5,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 90,
+      "sha256": "9976c1b3c5e074f55aef4da7c264841ee91475fdf6881dd285489eb03163e3a2",
+      "path": "startup-timeline/event-0005.json"
+    },
+    {
+      "index": 6,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 718,
+      "sha256": "9221e09e5136810b97cdb0ce0ebd71ac2c727770f9f5e8a43d95199f79c9718e",
+      "path": "startup-timeline/event-0006.json"
+    },
+    {
+      "index": 7,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 204,
+      "sha256": "f9d2a21c334734fd1a9ae46c2244649594412694b39e2572df1d6e0c54696d3e",
+      "path": "startup-timeline/event-0007.json"
+    },
+    {
+      "index": 8,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 80,
+      "sha256": "2942261bf0aaf59d2c967920db085306e3df7ceea65f67a64789a001d9173119",
+      "path": "startup-timeline/event-0008.json"
+    },
+    {
+      "index": 9,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 80,
+      "sha256": "e12e4a95b1d0e1ed6646cb9ae91d77f4a3c126344caa16a0e2109a0e803d13e2",
+      "path": "startup-timeline/event-0009.json"
+    },
+    {
+      "index": 10,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 80,
+      "sha256": "56ff0c9fabbd0fb640231a73f56557c4b75f851c5dcfad37d711e8f46323c5cb",
+      "path": "startup-timeline/event-0010.json"
+    },
+    {
+      "index": 11,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 80,
+      "sha256": "114bf03f25939da48e68d2f819e255ef0ef5dc8a9b09ca113bcf60ed3d6e4f15",
+      "path": "startup-timeline/event-0011.json"
+    },
+    {
+      "index": 12,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 78,
+      "sha256": "d65e4855d2e48a4f90837f13faa1dd7a13e068e2d2f7bb736e9a1bedf6078d49",
+      "path": "startup-timeline/event-0012.json"
+    },
+    {
+      "index": 13,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 124,
+      "sha256": "07b10d9d9658a02915b09d4818f4b28d86430475f2d5ac840689d0012a23c84f",
+      "path": "startup-timeline/event-0013.json"
+    },
+    {
+      "index": 14,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 138,
+      "sha256": "b0e30ce23ba83756c3cd4293d58662768f25c9c34b56369eb259f9ea7196b23c",
+      "path": "startup-timeline/event-0014.json"
+    },
+    {
+      "index": 15,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 84,
+      "sha256": "e900876a6e2bbfc165a0cff21a6756de5a1884d797255a79916a194d3707ee96",
+      "path": "startup-timeline/event-0015.json"
+    },
+    {
+      "index": 16,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 95,
+      "sha256": "4858ffb8319503cd09970251681194e76c6447aea36cea219adb297b6ac401e1",
+      "path": "startup-timeline/event-0016.json"
+    },
+    {
+      "index": 17,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 145,
+      "sha256": "d659fa98db9154033bc3404c4e01fa4a8c28217e493578805c4f5f506f960942",
+      "path": "startup-timeline/event-0017.json"
+    },
+    {
+      "index": 18,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 145,
+      "sha256": "bf5f0d622af68ae866adc85a2b1fb72e3abbec76e3ab5d0e8316571484919df4",
+      "path": "startup-timeline/event-0018.json"
+    },
+    {
+      "index": 19,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 116,
+      "sha256": "33e3ef7688b0c8f84205ff5172b8c9557fbfe6366ad13aab4fa1cb79b02b567e",
+      "path": "startup-timeline/event-0019.json"
+    },
+    {
+      "index": 20,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 5430,
+      "sha256": "dedb10c0732a3a9143a53772c163f4e6a5b0092e4234f0c1dcdd1162c9455fe5",
+      "path": "startup-timeline/event-0020.json"
+    },
+    {
+      "index": 21,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 116,
+      "sha256": "2c5ccb0090ce25e46670aaf464d618253db378a2b1ce6efaaa0de32f5c840222",
+      "path": "startup-timeline/event-0021.json"
+    },
+    {
+      "index": 22,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 5430,
+      "sha256": "db03d7b236710b211e8aea6384dd7d39760f2f1dfba0786fe050638a22dae24a",
+      "path": "startup-timeline/event-0022.json"
+    },
+    {
+      "index": 23,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 676,
+      "sha256": "26a37d9e154ae28db7256361a5e7932d97dd24482dafdaf0c5dbb163e7d49a9e",
+      "path": "startup-timeline/event-0023.json"
+    },
+    {
+      "index": 24,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 314,
+      "sha256": "a7300c611da7d97725778681f018ae0b7462ee86c676441109a9acb0dbaca26f",
+      "path": "startup-timeline/event-0024.json"
+    },
+    {
+      "index": 25,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 290,
+      "sha256": "082e43dc1e4692c8bab7487d9707098a8fb233de0297cd101fa0372793cb8664",
+      "path": "startup-timeline/event-0025.json"
+    },
+    {
+      "index": 26,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 116,
+      "sha256": "0ad6b309ef7a24a07fe2dea5eb0732684877b6eb676880232f553573f1e55cb3",
+      "path": "startup-timeline/event-0026.json"
+    },
+    {
+      "index": 27,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 5429,
+      "sha256": "ad6ff1605fdb349320681764ba947007cd88958a07773c3a1c9c4d32e9e1b708",
+      "path": "startup-timeline/event-0027.json"
+    },
+    {
+      "index": 28,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 291,
+      "sha256": "1cc552cac3c4f9cf6dfd9e2e7cc04424d643a7fc5d31b76775de8ab548405098",
+      "path": "startup-timeline/event-0028.json"
+    },
+    {
+      "index": 29,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 117,
+      "sha256": "f46e74e9d8f53b6bc4ef71491a58002c12221e0a06846725f5e505f2a3a6526f",
+      "path": "startup-timeline/event-0029.json"
+    },
+    {
+      "index": 30,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 5429,
+      "sha256": "7e3aa0e22a0c183d0f0948d6aa466d644faf8d1e95557b867643c118db9d08e5",
+      "path": "startup-timeline/event-0030.json"
+    },
+    {
+      "index": 31,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 484,
+      "sha256": "1dc3c6f8d8867a4ff808cc51aaa874fa9974e3e8df47c61be5c9b8810d99fae2",
+      "path": "startup-timeline/event-0031.json"
+    },
+    {
+      "index": 32,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 163,
+      "sha256": "fba7a67c0bf1e0e39c835eb5ab3d0a1f1c35e60ea46d81fdaf83e450969742da",
+      "path": "startup-timeline/event-0032.json"
+    },
+    {
+      "index": 33,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 89,
+      "sha256": "fe3ed9a36a1c132d8e901a7966d6bfe3e81657d82badd2d02d97070101d2af4b",
+      "path": "startup-timeline/event-0033.json"
+    },
+    {
+      "index": 34,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 446,
+      "sha256": "74f576eed56ae45fe54b5db12329268a27f2240fceaea7c5eb825cfa2f0c3d66",
+      "path": "startup-timeline/event-0034.json"
+    },
+    {
+      "index": 35,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 485,
+      "sha256": "b6abcd6b6a3f713df04e8e6ef86d539d4292427925976c303b65743a37482d44",
+      "path": "startup-timeline/event-0035.json"
+    },
+    {
+      "index": 36,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 165,
+      "sha256": "7182dfce1e035a804bf15b7f5257a10a32561bcea1162227f136c5af32f4060e",
+      "path": "startup-timeline/event-0036.json"
+    },
+    {
+      "index": 37,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 483,
+      "sha256": "35442d2914c2c8b582db4f25d208f5879f55375dfa8bbd8ed06257e8ed2f91a8",
+      "path": "startup-timeline/event-0037.json"
+    },
+    {
+      "index": 38,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 163,
+      "sha256": "49550ac21a50e5cc817c846b5d1f6365b7c673a7aba143cf828992dbc1a7a307",
+      "path": "startup-timeline/event-0038.json"
+    },
+    {
+      "index": 39,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 90,
+      "sha256": "acc26d3ef74fa3a94090f9b946fa27eaac38e7f52c8fde614234b0f330afa428",
+      "path": "startup-timeline/event-0039.json"
+    },
+    {
+      "index": 40,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 480,
+      "sha256": "110e4627b4544be22fba11ee543f5bb2af07ee29cfda7337cb22e173cea7d4cd",
+      "path": "startup-timeline/event-0040.json"
+    },
+    {
+      "index": 41,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 163,
+      "sha256": "054ac240999bf1e0a54d1bc4535eabb1b795e5fabdea5da8128f9d7e20ac3a5f",
+      "path": "startup-timeline/event-0041.json"
+    },
+    {
+      "index": 42,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 480,
+      "sha256": "01385666ae2a97e5aa6ccad312e1dceae94f31dd3db9b4afe269f7cdc50e1864",
+      "path": "startup-timeline/event-0042.json"
+    },
+    {
+      "index": 43,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 161,
+      "sha256": "fbf525f572ac87708c73ba8403b7ad91b62b118eb286a9bb16a37653858c87d1",
+      "path": "startup-timeline/event-0043.json"
+    },
+    {
+      "index": 44,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 474,
+      "sha256": "f085d8a9f1b1abfdf45d57436c0b5b505a1c79eccc5317d9053f80ecd0eaa2f6",
+      "path": "startup-timeline/event-0044.json"
+    },
+    {
+      "index": 45,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 158,
+      "sha256": "cfbf3003d2ab83910b3c7045f71ceea588f70a419b96d3aaad7d0a112b0d816c",
+      "path": "startup-timeline/event-0045.json"
+    },
+    {
+      "index": 46,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 631,
+      "sha256": "844594ba22af6f0504f83102797829ff41244fd1942bc64d92cbd200a3ac21ac",
+      "path": "startup-timeline/event-0046.json"
+    },
+    {
+      "index": 47,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 733,
+      "sha256": "e22bc5a1edace2a1d58d73bbc9f51b4e8f4c4d175047da62abd8269fc6648857",
+      "path": "startup-timeline/event-0047.json"
+    },
+    {
+      "index": 48,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 732,
+      "sha256": "864f6331cc7c26f5764a1924dae20ccd30706ecb6e959898cf63d94950286df0",
+      "path": "startup-timeline/event-0048.json"
+    },
+    {
+      "index": 49,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 724,
+      "sha256": "18eff34d5d7a61c90e066c60691678ae9ce964d3b17ad178c65512a945cf6dae",
+      "path": "startup-timeline/event-0049.json"
+    },
+    {
+      "index": 50,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 590,
+      "sha256": "7ee1abd76b3a8fbe14aea3f7dbbb2df8a2b9a48f2141372b8f52add337665b08",
+      "path": "startup-timeline/event-0050.json"
+    },
+    {
+      "index": 51,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 383,
+      "sha256": "29334b858123e62f997a18ee3d7d512b345a2fd8676da94840b9fccdbebd1983",
+      "path": "startup-timeline/event-0051.json"
+    },
+    {
+      "index": 52,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 360,
+      "sha256": "b9affed684e2e007903a6dbae978e349e5257ab9ef6b62c45afa8ff9da47fb32",
+      "path": "startup-timeline/event-0052.json"
+    },
+    {
+      "index": 53,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 160,
+      "sha256": "93d8217ea9f5f8814f6502feb2eea1af4750a9c63789fd003168b795af8e2a27",
+      "path": "startup-timeline/event-0053.json"
+    },
+    {
+      "index": 54,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 125,
+      "sha256": "103bd8234ea4cc04f6bb19f26a916ae9173cd3b8302c82eb18ac791e10f7c2c1",
+      "path": "startup-timeline/event-0054.json"
+    },
+    {
+      "index": 55,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 144,
+      "sha256": "8c3b7f079a95320fc066dc208e3a91b68ee9dba03904fbfe3280d41220becae0",
+      "path": "startup-timeline/event-0055.json"
+    },
+    {
+      "index": 56,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 143,
+      "sha256": "fc5aa34f5e35d3bc39fdc643c1c319caadf63c5dd2df967367a136bd8725f129",
+      "path": "startup-timeline/event-0056.json"
+    },
+    {
+      "index": 57,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 117,
+      "sha256": "62de22324d699f723c68b6e1b1c9bf3e8332ef2b26befba14d55e1275fca64ab",
+      "path": "startup-timeline/event-0057.json"
+    },
+    {
+      "index": 58,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 5517,
+      "sha256": "de99b5bc0bd8502386469c17e901155d9894a8b516b1984ac5beca28539421de",
+      "path": "startup-timeline/event-0058.json"
+    },
+    {
+      "index": 59,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 116,
+      "sha256": "9627714b8e43ce6d07151449fa3751fd2704e6278f279f4ff2b66dc1e9057eed",
+      "path": "startup-timeline/event-0059.json"
+    },
+    {
+      "index": 60,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 5517,
+      "sha256": "40e797d4efe6e925b48c5db935d6a6da11f50485760a1b48bb9430653d42dc98",
+      "path": "startup-timeline/event-0060.json"
+    },
+    {
+      "index": 61,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 557,
+      "sha256": "3ac358e2aebc74fd590113ef43d7f4b018c4f4147c1a213ff124f381b04cb91e",
+      "path": "startup-timeline/event-0061.json"
+    },
+    {
+      "index": 62,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 313,
+      "sha256": "f49fc6559ddc34bf011894d10d8ef6ce3d657442960b4fca0092157cc83aaa18",
+      "path": "startup-timeline/event-0062.json"
+    },
+    {
+      "index": 63,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 287,
+      "sha256": "98ced39e0b5e1cf28fb9caf12a9de97bb18586b6ba4d7538b09ac53243d41564",
+      "path": "startup-timeline/event-0063.json"
+    },
+    {
+      "index": 64,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 116,
+      "sha256": "e97c91c11d63d8c1e536b67f52b75de664b6660e3abaf109aa895954f7eb00a0",
+      "path": "startup-timeline/event-0064.json"
+    },
+    {
+      "index": 65,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 5518,
+      "sha256": "cf6e3127bdbb50db7305561133c6cdef37e1a556784708ca509dc6bdd7efde12",
+      "path": "startup-timeline/event-0065.json"
+    },
+    {
+      "index": 66,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 313,
+      "sha256": "643b40415e4db43a6d06f8bf65bebd25a1d00effde9f80f5c56bbde06c402538",
+      "path": "startup-timeline/event-0066.json"
+    },
+    {
+      "index": 67,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 285,
+      "sha256": "359068faca1023f9dca72a4b1fb3e01390022dbb0449e1f603fb9c9f31ebc69b",
+      "path": "startup-timeline/event-0067.json"
+    },
+    {
+      "index": 68,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 114,
+      "sha256": "47945e0df97960febd1878cf62a1d2450ca5349d4236c1e71db94941300647fa",
+      "path": "startup-timeline/event-0068.json"
+    },
+    {
+      "index": 69,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 5516,
+      "sha256": "254342efd8f026ba5f932a47d38aec4c9eec159d2e25bcf3d9eda038df458350",
+      "path": "startup-timeline/event-0069.json"
+    },
+    {
+      "index": 70,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 313,
+      "sha256": "d338ebb2a68a04c00844e2dc71a612084431ad06e5074f7ab3834a0a54fc7ed9",
+      "path": "startup-timeline/event-0070.json"
+    },
+    {
+      "index": 71,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 286,
+      "sha256": "a63a4fc3252da4765705d653e96d28f87c4f3c74a68856112efd21996bb45901",
+      "path": "startup-timeline/event-0071.json"
+    },
+    {
+      "index": 72,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 115,
+      "sha256": "ef4a79e77937c0cd28913ea3cd36188428d2a0150000abda64d77ca13ead7f37",
+      "path": "startup-timeline/event-0072.json"
+    },
+    {
+      "index": 73,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 5516,
+      "sha256": "d9de604fde9e4e26bcdaf127e3e057c5de2e8209fdc968e08fdb3bbe0e4d3f71",
+      "path": "startup-timeline/event-0073.json"
+    },
+    {
+      "index": 74,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 312,
+      "sha256": "ee5c11b4b0dcd034f4a76377584ee983151555684127d470f59c578893f2f580",
+      "path": "startup-timeline/event-0074.json"
+    },
+    {
+      "index": 75,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 286,
+      "sha256": "21430f59476fcebf68beee62390f1494691d7b4eddafe298ef4269618259bf95",
+      "path": "startup-timeline/event-0075.json"
+    },
+    {
+      "index": 76,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 115,
+      "sha256": "747eb2ec1eb5a8255d787ce84cbaaf5205d00ae2df643a50b4c44a954b0b6ea7",
+      "path": "startup-timeline/event-0076.json"
+    },
+    {
+      "index": 77,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 5515,
+      "sha256": "e2867316eb25b0d6d2133a6b23f6b720236a0092de7898f8dc96a993b10416cf",
+      "path": "startup-timeline/event-0077.json"
+    },
+    {
+      "index": 78,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 593,
+      "sha256": "95e322b5186c37e1ed807c6b011c35195aeac1a43d6360ef5f1a7586764cec6f",
+      "path": "startup-timeline/event-0078.json"
+    },
+    {
+      "index": 79,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 394,
+      "sha256": "aa88829294dc6e187638fe992a1d21fd70365ffccf4ef1758439949dbfba73b3",
+      "path": "startup-timeline/event-0079.json"
+    },
+    {
+      "index": 80,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 731,
+      "sha256": "65800cd185868aa0a90eafba33941fa49da6b972e7ce73226d449b295a86c2ed",
+      "path": "startup-timeline/event-0080.json"
+    },
+    {
+      "index": 81,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 323,
+      "sha256": "26754f4a43944178729845c5a2188653ab750fe46b86d8b18a7ba90c4ae6a8c7",
+      "path": "startup-timeline/event-0081.json"
+    },
+    {
+      "index": 82,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 122,
+      "sha256": "2ac47cfe39d1ca330d71e1413026eb29c9fc98693f9d64b5becf641ee8847483",
+      "path": "startup-timeline/event-0082.json"
+    },
+    {
+      "index": 83,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 286,
+      "sha256": "d7f6bbd9819ae8e36ab766de5bf92096b156630d3e44852c5618ddc96a04ddfc",
+      "path": "startup-timeline/event-0083.json"
+    },
+    {
+      "index": 84,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 141,
+      "sha256": "0f354263dbd05f89ae77567fc9f7175462ef524ab207c82769625d98dc9178fe",
+      "path": "startup-timeline/event-0084.json"
+    },
+    {
+      "index": 85,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 143,
+      "sha256": "d62212acacd7da666b45004eb2bab74fb0083359281d25d1f13007f20bedabd8",
+      "path": "startup-timeline/event-0085.json"
+    },
+    {
+      "index": 86,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 115,
+      "sha256": "9172104a30fe0c0da24de4862ca1842eb7f8632e852ff9dddb397e41f4eb77e1",
+      "path": "startup-timeline/event-0086.json"
+    },
+    {
+      "index": 87,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 5324,
+      "sha256": "b22c5f074d36fc383ba9045093efdbd455dfef4d02f1ae35d7a0e4e8ee3033e7",
+      "path": "startup-timeline/event-0087.json"
+    },
+    {
+      "index": 88,
+      "sessionId": "page-8",
+      "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+      "bytes": 521,
+      "sha256": "8c66701ade5318fa420ab2920a25f2cc51acc5436a502d2512aaf6fe85e6181c",
+      "path": "startup-timeline/event-0088.json"
+    }
+  ],
+  "frames": [
+    {
+      "index": 1,
+      "path": "startup-timeline/frame-0001.png",
+      "bytes": 3955,
+      "sha256": "af5f5cd161766e86e1032ce0868f23e3c371a27c3212d8940ec663df85035b0c",
+      "sessionId": "page-8",
+      "eventIndex": 20,
+      "recordPath": [],
+      "startSeconds": 0.25133649999042973,
+      "endSeconds": 0.25552183331456035
+    },
+    {
+      "index": 2,
+      "path": "startup-timeline/frame-0002.png",
+      "bytes": 3955,
+      "sha256": "af5f5cd161766e86e1032ce0868f23e3c371a27c3212d8940ec663df85035b0c",
+      "sessionId": "page-8",
+      "eventIndex": 22,
+      "recordPath": [],
+      "startSeconds": 0.25758141663391143,
+      "endSeconds": 0.25837929162662476
+    },
+    {
+      "index": 3,
+      "path": "startup-timeline/frame-0003.png",
+      "bytes": 3955,
+      "sha256": "af5f5cd161766e86e1032ce0868f23e3c371a27c3212d8940ec663df85035b0c",
+      "sessionId": "page-8",
+      "eventIndex": 27,
+      "recordPath": [],
+      "startSeconds": 0.4379529583384283,
+      "endSeconds": 0.43919266667217016
+    },
+    {
+      "index": 4,
+      "path": "startup-timeline/frame-0004.png",
+      "bytes": 3955,
+      "sha256": "af5f5cd161766e86e1032ce0868f23e3c371a27c3212d8940ec663df85035b0c",
+      "sessionId": "page-8",
+      "eventIndex": 30,
+      "recordPath": [],
+      "startSeconds": 0.44142904167529196,
+      "endSeconds": 0.4424301666440442
+    },
+    {
+      "index": 5,
+      "path": "startup-timeline/frame-0005.png",
+      "bytes": 4021,
+      "sha256": "10b0ca079ef3bb4befb2474443b9a6408b1fd8ec93eb8f3fe3277baed71409d5",
+      "sessionId": "page-8",
+      "eventIndex": 58,
+      "recordPath": [],
+      "startSeconds": 0.47441466664895415,
+      "endSeconds": 0.4752304166322574
+    },
+    {
+      "index": 6,
+      "path": "startup-timeline/frame-0006.png",
+      "bytes": 4021,
+      "sha256": "10b0ca079ef3bb4befb2474443b9a6408b1fd8ec93eb8f3fe3277baed71409d5",
+      "sessionId": "page-8",
+      "eventIndex": 60,
+      "recordPath": [],
+      "startSeconds": 0.4755040416494012,
+      "endSeconds": 0.47626829164801165
+    },
+    {
+      "index": 7,
+      "path": "startup-timeline/frame-0007.png",
+      "bytes": 4021,
+      "sha256": "10b0ca079ef3bb4befb2474443b9a6408b1fd8ec93eb8f3fe3277baed71409d5",
+      "sessionId": "page-8",
+      "eventIndex": 65,
+      "recordPath": [],
+      "startSeconds": 0.49240962497424334,
+      "endSeconds": 0.49327408330282196
+    },
+    {
+      "index": 8,
+      "path": "startup-timeline/frame-0008.png",
+      "bytes": 4021,
+      "sha256": "10b0ca079ef3bb4befb2474443b9a6408b1fd8ec93eb8f3fe3277baed71409d5",
+      "sessionId": "page-8",
+      "eventIndex": 69,
+      "recordPath": [],
+      "startSeconds": 0.5091245416551828,
+      "endSeconds": 0.5100130416685715
+    },
+    {
+      "index": 9,
+      "path": "startup-timeline/frame-0009.png",
+      "bytes": 4021,
+      "sha256": "10b0ca079ef3bb4befb2474443b9a6408b1fd8ec93eb8f3fe3277baed71409d5",
+      "sessionId": "page-8",
+      "eventIndex": 73,
+      "recordPath": [],
+      "startSeconds": 0.5257462083245628,
+      "endSeconds": 0.5266898749978282
+    },
+    {
+      "index": 10,
+      "path": "startup-timeline/frame-0010.png",
+      "bytes": 4021,
+      "sha256": "10b0ca079ef3bb4befb2474443b9a6408b1fd8ec93eb8f3fe3277baed71409d5",
+      "sessionId": "page-8",
+      "eventIndex": 77,
+      "recordPath": [],
+      "startSeconds": 0.5424522499670275,
+      "endSeconds": 0.543464791669976
+    },
+    {
+      "index": 11,
+      "path": "startup-timeline/frame-0011.png",
+      "bytes": 3878,
+      "sha256": "f5f1df7621147c9f606fd7fbd3dfa33dfe206aa1f3dede9e01f03784f780e802",
+      "sessionId": "page-8",
+      "eventIndex": 87,
+      "recordPath": [],
+      "startSeconds": 0.5598001249600202,
+      "endSeconds": 0.5609885833109729
+    }
+  ],
+  "errors": [],
+  "facts": {
+    "calibration": {
+      "status": "bounded",
+      "rate": 1,
+      "offsetMs": -213.14054162660614,
+      "uncertaintyMs": 1.001,
+      "anchors": [
+        {
+          "phase": "open",
+          "documentId": "b159f677-41be-48b8-b9ba-e38260f6db31",
+          "pageMs": 22,
+          "sessionId": "page-8",
+          "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+          "nativeSeconds": 0.23514054162660614,
+          "contextId": 3
+        },
+        {
+          "phase": "close",
+          "documentId": "b159f677-41be-48b8-b9ba-e38260f6db31",
+          "pageMs": 507,
+          "sessionId": "page-8",
+          "epoch": "a9c58bb4-e759-4a18-b073-f129eb724118",
+          "nativeSeconds": 0.7201405416126363,
+          "contextId": 3
+        }
+      ],
+      "limit": "Candidate native/page map under1468 source model; no first-presentation guarantee"
+    },
+    "work": [],
+    "presentation": "engine-content-snapshot; first-occurrence-unverified"
+  },
+  "cleanup": {
+    "listenersRemoved": true,
+    "hookRestored": true,
+    "sessionsStopped": true,
+    "timerCleared": true
+  },
+  "overhead": "Diagnostic instance session initialization hook, native Timeline/Screenshot instrumentation, page marks, raw synchronous bounded writes; no OS presentation acknowledgement"
+}

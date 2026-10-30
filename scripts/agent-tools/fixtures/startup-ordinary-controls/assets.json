@@ -1,0 +1,193 @@
+{
+  "commit": "85ce166155087d43a027151f250a100798923e2d",
+  "tree": "40b7c737c3a5e15ddc9cdc415ef0e12290d049e3",
+  "files": [
+    {
+      "path": "HUMAN_WRITTEN_HOURLY_TAGS.md",
+      "bytes": 3179,
+      "sha256": "4fa6c96f6628dbd9f1e0fd8ce14f4059d5d0270fa1450afa5a8304f9c066d7c2",
+      "urlTemplate": "{origin}{appPrefix}HUMAN_WRITTEN_HOURLY_TAGS.md"
+    },
+    {
+      "path": "SPAWN_RATES.md",
+      "bytes": 7869,
+      "sha256": "55a9ca30de892180303edd99bd2858c64af33183b0971457453cb2504672f3e0",
+      "urlTemplate": "{origin}{appPrefix}SPAWN_RATES.md"
+    },
+    {
+      "path": "app-release.js",
+      "bytes": 8817,
+      "sha256": "2b9fc4c5cbb6d6dfdbdb5f523e08541f73cfd8e2f5ca3097465729a8594f89a7",
+      "urlTemplate": "{origin}{appPrefix}app-release.js"
+    },
+    {
+      "path": "cloud-store-v2.js",
+      "bytes": 9239,
+      "sha256": "d8281f4e12ef8735ba469a779b6db2148ac509d8337ca7633b193fb3a24cd30c",
+      "urlTemplate": "{origin}{appPrefix}cloud-store-v2.js"
+    },
+    {
+      "path": "device-store-v2.js",
+      "bytes": 42864,
+      "sha256": "1ec88b44773e47b305276816ea789c623158301d5f753f7e4a87fe430dfec058",
+      "urlTemplate": "{origin}{appPrefix}device-store-v2.js"
+    },
+    {
+      "path": "icon-180-730ffcc9de36.png",
+      "bytes": 5313,
+      "sha256": "730ffcc9de36eb4b90a5739fc3abf8a0addf334fb6e64c47a7ae112823525e07",
+      "urlTemplate": "{origin}{appPrefix}icon-180-730ffcc9de36.png"
+    },
+    {
+      "path": "icon-180.png",
+      "bytes": 5313,
+      "sha256": "730ffcc9de36eb4b90a5739fc3abf8a0addf334fb6e64c47a7ae112823525e07",
+      "urlTemplate": "{origin}{appPrefix}icon-180.png"
+    },
+    {
+      "path": "icon-192.png",
+      "bytes": 5721,
+      "sha256": "961660e84232117fb753b56cc4e2cb057dc4508043aa3ffc33560ef0281db9c3",
+      "urlTemplate": "{origin}{appPrefix}icon-192.png"
+    },
+    {
+      "path": "icon-41f9327e19b3.svg",
+      "bytes": 1251,
+      "sha256": "41f9327e19b36db93e5ef3544c05213db75b4b2aab886b9910319120c0d5cf64",
+      "urlTemplate": "{origin}{appPrefix}icon-41f9327e19b3.svg"
+    },
+    {
+      "path": "icon-512.png",
+      "bytes": 19600,
+      "sha256": "1e16f61bbb1296e23a731a391bffbfb4ad232d66301cd28d6d42260b0bc882a7",
+      "urlTemplate": "{origin}{appPrefix}icon-512.png"
+    },
+    {
+      "path": "icon.svg",
+      "bytes": 1251,
+      "sha256": "41f9327e19b36db93e5ef3544c05213db75b4b2aab886b9910319120c0d5cf64",
+      "urlTemplate": "{origin}{appPrefix}icon.svg"
+    },
+    {
+      "path": "index.html",
+      "bytes": 1246737,
+      "sha256": "719f9731b7649319366bd21192d56c9f5b1fda4d9d12b7b42fc6e2620a1eea85",
+      "urlTemplate": "{origin}{appPrefix}index.html"
+    },
+    {
+      "path": "landscape-appearance.js",
+      "bytes": 1989,
+      "sha256": "c7cbf0ef6b12843badfedc2e9928347f524090175ea7f685d350a07d9d7ff6f1",
+      "urlTemplate": "{origin}{appPrefix}landscape-appearance.js"
+    },
+    {
+      "path": "landscape-config.js",
+      "bytes": 7084,
+      "sha256": "8d31732682616d5f575d9442fe97556468e250c2bebdaedca9777aa1889ea39d",
+      "urlTemplate": "{origin}{appPrefix}landscape-config.js"
+    },
+    {
+      "path": "landscape-core.js",
+      "bytes": 26724,
+      "sha256": "0cb61efe4fd842c0dbf06975ba88bd29011bf1bae55badf9d854cf7a728bb958",
+      "urlTemplate": "{origin}{appPrefix}landscape-core.js"
+    },
+    {
+      "path": "landscape-geometry.js",
+      "bytes": 60193,
+      "sha256": "767173446ca743dfa40e69e1a5eda87131c449f331d4f402ae516b19835171d9",
+      "urlTemplate": "{origin}{appPrefix}landscape-geometry.js"
+    },
+    {
+      "path": "landscape-mood.js",
+      "bytes": 38427,
+      "sha256": "4f41eda3d782ee50a093b73c02e3bd7d158c887eb294993d79682fbef205f177",
+      "urlTemplate": "{origin}{appPrefix}landscape-mood.js"
+    },
+    {
+      "path": "landscape-riders.js",
+      "bytes": 2100,
+      "sha256": "9f1bb06e640cad33445fe026d6f5f5249e57c35dfc4873eadaef71c76eb5a20b",
+      "urlTemplate": "{origin}{appPrefix}landscape-riders.js"
+    },
+    {
+      "path": "landscape-seasonal.js",
+      "bytes": 13090,
+      "sha256": "09d97f9fc3964341906a550f931a75d64e7a1fa4fed63835e1fb340b3105a208",
+      "urlTemplate": "{origin}{appPrefix}landscape-seasonal.js"
+    },
+    {
+      "path": "landscape-skywriter.js",
+      "bytes": 2945,
+      "sha256": "b187e6c81c666f241214e9a8dd41477809f1aa882ce0820fd6b8894309ae98eb",
+      "urlTemplate": "{origin}{appPrefix}landscape-skywriter.js"
+    },
+    {
+      "path": "landscape-timeline.js",
+      "bytes": 17219,
+      "sha256": "d202876102b58fdf60c6b1bae6ee20a1630fcfcf4090e0cb5653c455e74690ab",
+      "urlTemplate": "{origin}{appPrefix}landscape-timeline.js"
+    },
+    {
+      "path": "landscape-visits.js",
+      "bytes": 2942,
+      "sha256": "377fece2d59b499241520b1b20e9c69851d5f307bd946aa391a95f24002d6a5d",
+      "urlTemplate": "{origin}{appPrefix}landscape-visits.js"
+    },
+    {
+      "path": "landscape-winter.js",
+      "bytes": 22183,
+      "sha256": "341e6ad5cdf2c12b0b9e12bf5f76ae83a2610ebc507b5c15359790d56b618edd",
+      "urlTemplate": "{origin}{appPrefix}landscape-winter.js"
+    },
+    {
+      "path": "landscape.css",
+      "bytes": 13600,
+      "sha256": "1938e88be908719c5d3b38449180ebe38653fb99cbf15a82a146df086c93b7cc",
+      "urlTemplate": "{origin}{appPrefix}landscape.css"
+    },
+    {
+      "path": "landscape.js",
+      "bytes": 110189,
+      "sha256": "eec5719e3cffed9a815e22b1adf3b85ea03022dc3abab6c078e3e66be48c3f54",
+      "urlTemplate": "{origin}{appPrefix}landscape.js"
+    },
+    {
+      "path": "location.js",
+      "bytes": 12181,
+      "sha256": "cd108a1003277afa8c61026d959497ae64a8d855886f6be1ab4d77d73963a534",
+      "urlTemplate": "{origin}{appPrefix}location.js"
+    },
+    {
+      "path": "manifest.webmanifest",
+      "bytes": 553,
+      "sha256": "8f3dac70795a3b71eb9df7df38a214720710b505b11e56cb3ee859766befe817",
+      "urlTemplate": "{origin}{appPrefix}manifest.webmanifest"
+    },
+    {
+      "path": "stars.js",
+      "bytes": 42672,
+      "sha256": "e22e28fa7eb99c8a759f04d0cb30332a073f4e4c295d398d15d551a06ec55450",
+      "urlTemplate": "{origin}{appPrefix}stars.js"
+    },
+    {
+      "path": "sw.js",
+      "bytes": 4078,
+      "sha256": "936f9d18b64a81bffe28d77a0286333c994d796069e00837d435e8c980127a76",
+      "urlTemplate": "{origin}{appPrefix}sw.js"
+    },
+    {
+      "path": "vendor/astronomy.min.js",
+      "bytes": 116424,
+      "sha256": "f41139a87941ea017ab902b954c9389fa27ea72083d7fab4971756d7769d14e6",
+      "urlTemplate": "{origin}{appPrefix}vendor/astronomy.min.js"
+    },
+    {
+      "path": "vendor/lz-string-1.5.0.min.js",
+      "bytes": 4814,
+      "sha256": "95f4d1cbf099f57161b664bc048426ec3df92637801a4c79116e83315aa787e7",
+      "urlTemplate": "{origin}{appPrefix}vendor/lz-string-1.5.0.min.js"
+    }
+  ],
+  "URLParameters": "Original collector generates a fresh appPrefix/sdkPrefix and actual allocated origin. Bind actual strings before navigation, not a forecast path."
+}

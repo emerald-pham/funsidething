@@ -2475,3 +2475,23 @@ The pinned Linux x64 reader preserves the raw AT_PAGESZ witness and binds it to 
 - `RISK repository process: optional mobile outcomes remain distinct from the required aggregate verdict` — The existing aggregate preserves all optional mobile outcomes separately from the required ordinary verdict, without converting failed/unavailable diagnostics into passes.
 - `RISK repository process: optional mobile diagnostics do not block ordinary reuse` — The existing current-source reuse planner disregards optional mobile failures while still refusing missing, failed or ambiguous mandatory producers.
 - `RISK repository process: explicit mobile diagnostics require dispatch selection and hosted admission` — The existing hosted optional mobile route requires explicit branch workflow-dispatch selection and retains raw event/ref/source admission; unselected or forged policy refuses before runtime.
+
+- RISK repository process: native Timeline raw evidence stays incomplete and rejects false provenance
+
+- RISK repository process: native Timeline provider preserves raw delivery and restores owned session hooks
+
+- RISK repository process: retained native Timeline bytes preserve source-located callers and typed point stacks
+
+- RISK repository process: native Timeline SDK doubles require a portable explicit runtime boundary
+
+- RISK repository process: initial-only native Timeline evidence refuses unvalidated branches
+
+- RISK repository process: ordinary startup observations bind exact app sources and complete saved data
+
+- RISK repository process: ordinary startup snapshots preserve bounded first observed states and reject false pixels
+
+- RISK repository process: ordinary startup roles preserve unknown callers and separate trusted input from synchronous work
+
+- RISK repository process: ordinary startup source serialization preserves native marker and owned lifecycle contracts
+
+| Canonical Timeline raw storage, exact derived PNG/logical bounds and truthful failed controller custody | `RISK repository process: canonical Timeline retains exact raw deliveries and derives every PNG without eager writes`; `RISK repository process: canonical Timeline consumer rejects loss and preserves schema1 strictness`; `RISK repository process: failed Timeline controller finalizes available custody before browser close`; `RISK repository process: canonical Timeline bounds preserve logical occurrence charges and failed cleanup` |
